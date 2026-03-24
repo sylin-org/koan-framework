@@ -145,7 +145,7 @@ internal sealed class CouchbaseOptionsConfigurator : AdapterOptionsConfigurator<
                 context.Parameters["password"] = password;
 
             // Use autonomous discovery coordinator
-            var discoveryTask = _discoveryCoordinator.DiscoverServiceAsync("couchbase", context);
+            var discoveryTask = _discoveryCoordinator.DiscoverService("couchbase", context);
             var result = discoveryTask.GetAwaiter().GetResult();
 
             if (result.IsSuccessful)

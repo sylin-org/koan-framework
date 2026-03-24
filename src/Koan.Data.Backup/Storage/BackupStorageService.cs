@@ -31,7 +31,7 @@ public class BackupStorageService
     /// <summary>
     /// Creates a backup archive stream for writing
     /// </summary>
-    public Task<(Stream Stream, BackupArchiveDescriptor Descriptor)> CreateBackupArchiveAsync(
+    public Task<(Stream Stream, BackupArchiveDescriptor Descriptor)> CreateBackupArchive(
         string backupName,
         DateTimeOffset createdAt,
         CancellationToken ct = default)
@@ -115,7 +115,7 @@ public class BackupStorageService
     /// <summary>
     /// Stores the backup manifest in the archive
     /// </summary>
-    public async Task StoreManifestAsync(ZipArchive archive, BackupManifest manifest, CancellationToken ct = default)
+    public async Task StoreManifest(ZipArchive archive, BackupManifest manifest, CancellationToken ct = default)
     {
         var manifestEntry = archive.CreateEntry("manifest.json", CompressionLevel.Optimal);
         using var manifestStream = manifestEntry.Open();
@@ -130,7 +130,7 @@ public class BackupStorageService
     /// <summary>
     /// Stores verification data in the archive
     /// </summary>
-    public async Task StoreVerificationAsync(ZipArchive archive, BackupManifest manifest, CancellationToken ct = default)
+    public async Task StoreVerification(ZipArchive archive, BackupManifest manifest, CancellationToken ct = default)
     {
         // Create checksums file
         var checksums = manifest.Entities
@@ -166,7 +166,7 @@ public class BackupStorageService
     /// <summary>
     /// Uploads the completed backup archive to storage
     /// </summary>
-    public async Task<StorageObject> UploadBackupArchiveAsync(
+    public async Task<StorageObject> UploadBackupArchive(
         Stream archiveStream,
         BackupArchiveDescriptor descriptor,
         string storageProfile,
@@ -174,7 +174,7 @@ public class BackupStorageService
     {
         archiveStream.Position = 0;
 
-        var storageObject = await _storageService.PutAsync(
+        var storageObject = await _storageService.Put(
             storageProfile,
             "backups",
             descriptor.StorageKey,
@@ -191,16 +191,16 @@ public class BackupStorageService
     /// <summary>
     /// Opens a backup archive for reading
     /// </summary>
-    public async Task<ZipArchive> OpenBackupArchiveAsync(string backupPath, string storageProfile, CancellationToken ct = default)
+    public async Task<ZipArchive> OpenBackupArchive(string backupPath, string storageProfile, CancellationToken ct = default)
     {
-        var stream = await _storageService.ReadAsync(storageProfile, "backups", backupPath, ct);
+        var stream = await _storageService.Read(storageProfile, "backups", backupPath, ct);
         return new ZipArchive(stream, ZipArchiveMode.Read);
     }
 
     /// <summary>
     /// Loads a backup manifest from an archive
     /// </summary>
-    public async Task<BackupManifest> LoadManifestAsync(ZipArchive archive, CancellationToken ct = default)
+    public async Task<BackupManifest> LoadManifest(ZipArchive archive, CancellationToken ct = default)
     {
         var manifestEntry = archive.GetEntry("manifest.json");
         if (manifestEntry == null)

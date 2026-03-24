@@ -16,5 +16,5 @@ public interface IAiAdapterContributor
     /// </summary>
     /// <param name="services">Scoped service provider for resolving dependencies.</param>
     /// <param name="cancellationToken">Signals when startup is shutting down.</param>
-    ValueTask ContributeAsync(IServiceProvider services, CancellationToken cancellationToken);
+    ValueTask Contribute(IServiceProvider services, CancellationToken cancellationToken);
 }

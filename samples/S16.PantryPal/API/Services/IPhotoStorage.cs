@@ -9,10 +9,10 @@ namespace S16.PantryPal.Services;
 public interface IPhotoStorage
 {
     /// <summary>Stores a new photo stream, generating a storage key. Returns the key.</summary>
-    Task<string> StoreAsync(Stream content, string originalFileName, string? contentType, CancellationToken ct = default);
+    Task<string> Store(Stream content, string originalFileName, string? contentType, CancellationToken ct = default);
 
     /// <summary>Opens a stored photo for reading.</summary>
-    Task<Stream> OpenReadAsync(string key, CancellationToken ct = default);
+    Task<Stream> OpenRead(string key, CancellationToken ct = default);
 }
 
 public sealed class PhotoStorage : IPhotoStorage
@@ -26,16 +26,16 @@ public sealed class PhotoStorage : IPhotoStorage
         _options = options;
     }
 
-    public async Task<string> StoreAsync(Stream content, string originalFileName, string? contentType, CancellationToken ct = default)
+    public async Task<string> Store(Stream content, string originalFileName, string? contentType, CancellationToken ct = default)
     {
         var ext = Path.GetExtension(originalFileName);
         var key = $"{_options.Prefix}{Guid.CreateVersion7()}{ext}"; // GUIDv7 for ordering
-        await _storage.PutAsync(_options.Profile, _options.Container, key, content, contentType, ct);
+        await _storage.Put(_options.Profile, _options.Container, key, content, contentType, ct);
         return key;
     }
 
-    public Task<Stream> OpenReadAsync(string key, CancellationToken ct = default)
-        => _storage.ReadAsync(_options.Profile, _options.Container, key, ct);
+    public Task<Stream> OpenRead(string key, CancellationToken ct = default)
+        => _storage.Read(_options.Profile, _options.Container, key, ct);
 }
 
 public sealed class PhotoStorageOptions

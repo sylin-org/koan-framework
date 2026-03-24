@@ -20,10 +20,10 @@ internal sealed class InMemoryJobQueue : IJobQueue
         });
     }
 
-    public ValueTask EnqueueAsync(JobQueueItem item, CancellationToken cancellationToken)
+    public ValueTask Enqueue(JobQueueItem item, CancellationToken cancellationToken)
         => _channel.Writer.WriteAsync(item, cancellationToken);
 
-    public async IAsyncEnumerable<JobQueueItem> ReadAllAsync([EnumeratorCancellation] CancellationToken cancellationToken)
+    public async IAsyncEnumerable<JobQueueItem> ReadAll([EnumeratorCancellation] CancellationToken cancellationToken)
     {
         while (await _channel.Reader.WaitToReadAsync(cancellationToken))
         {

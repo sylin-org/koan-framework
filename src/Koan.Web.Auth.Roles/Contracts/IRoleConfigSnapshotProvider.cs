@@ -5,7 +5,7 @@ namespace Koan.Web.Auth.Roles.Contracts;
 public interface IRoleConfigSnapshotProvider
 {
     RoleConfigSnapshot Get();
-    Task ReloadAsync(CancellationToken ct = default);
+    Task Reload(CancellationToken ct = default);
 }
 
 public sealed class RoleConfigSnapshot

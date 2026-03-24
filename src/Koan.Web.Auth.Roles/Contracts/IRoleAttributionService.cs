@@ -4,7 +4,7 @@ namespace Koan.Web.Auth.Roles.Contracts;
 
 public interface IRoleAttributionService
 {
-    Task<RoleAttributionResult> ComputeAsync(ClaimsPrincipal user, RoleAttributionContext? context = null, CancellationToken ct = default);
+    Task<RoleAttributionResult> Compute(ClaimsPrincipal user, RoleAttributionContext? context = null, CancellationToken ct = default);
 }
 
 public sealed record RoleAttributionContext(string? TenantId = null);

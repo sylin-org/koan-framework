@@ -39,7 +39,7 @@ var app = builder.Build();
 AppHost.Current ??= app.Services;
 
 // seed some test data - plots, members, sensors
-await GardenSeederRunner.EnsureSampleDataAsync(app);
+await GardenSeederRunner.EnsureSampleData(app);
 
 // wire up startup/shutdown hooks (browser launcher, etc.)
 app.ConfigureSampleLifecycle(

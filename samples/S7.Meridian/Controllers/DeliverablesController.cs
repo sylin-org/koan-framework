@@ -42,7 +42,7 @@ public sealed class DeliverablesController : ControllerBase
             return NotFound();
         }
 
-        var markdown = await _renderer.RenderMarkdownAsync(deliverable, ct).ConfigureAwait(false);
+        var markdown = await _renderer.RenderMarkdown(deliverable, ct).ConfigureAwait(false);
         return Content(markdown, "text/markdown");
     }
 
@@ -55,7 +55,7 @@ public sealed class DeliverablesController : ControllerBase
             return NotFound();
         }
 
-        var json = await _renderer.RenderJsonAsync(deliverable, ct).ConfigureAwait(false);
+        var json = await _renderer.RenderJson(deliverable, ct).ConfigureAwait(false);
         return Content(json, "application/json");
     }
 
@@ -68,7 +68,7 @@ public sealed class DeliverablesController : ControllerBase
             return NotFound();
         }
 
-        var pdf = await _renderer.RenderPdfAsync(deliverable, ct).ConfigureAwait(false);
+        var pdf = await _renderer.RenderPdf(deliverable, ct).ConfigureAwait(false);
         if (pdf.Length == 0)
         {
             return StatusCode(StatusCodes.Status503ServiceUnavailable, "PDF renderer unavailable.");

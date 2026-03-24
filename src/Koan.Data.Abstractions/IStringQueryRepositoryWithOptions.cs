@@ -8,6 +8,6 @@ public interface IStringQueryRepositoryWithOptions<TEntity, TKey> : IStringQuery
     where TEntity : IEntity<TKey>
     where TKey : notnull
 {
-    new Task<IReadOnlyList<TEntity>> QueryAsync(string query, DataQueryOptions? options, CancellationToken ct = default);
-    Task<IReadOnlyList<TEntity>> QueryAsync(string query, object? parameters, DataQueryOptions? options, CancellationToken ct = default);
+    new Task<IReadOnlyList<TEntity>> Query(string query, DataQueryOptions? options, CancellationToken ct = default);
+    Task<IReadOnlyList<TEntity>> Query(string query, object? parameters, DataQueryOptions? options, CancellationToken ct = default);
 }

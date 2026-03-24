@@ -107,14 +107,14 @@ public sealed class MongoZenGardenInitializationSpec
                 || string.Equals(adapterId, "mongodb", StringComparison.OrdinalIgnoreCase);
         }
 
-        public ValueTask<ZenGardenOfferingResolution?> ResolveAsync(
+        public ValueTask<ZenGardenOfferingResolution?> Resolve(
             ZenGardenConnectionIntent intent,
             CancellationToken cancellationToken = default)
         {
             return ValueTask.FromResult(_resolver(intent));
         }
 
-        public ValueTask<ZenGardenCapabilityWishReceipt?> WishCapabilitiesAsync(
+        public ValueTask<ZenGardenCapabilityWishReceipt?> WishCapabilities(
             ZenGardenConnectionIntent intent,
             CancellationToken cancellationToken = default)
         {

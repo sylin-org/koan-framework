@@ -21,7 +21,7 @@ public sealed class SafetyDigestService : ISafetyDigestService
         _logger = logger;
     }
 
-    public async Task<SafetySummaryResult> SummariseAsync(SafetySummaryRequest request, CancellationToken ct)
+    public async Task<SafetySummaryResult> Summarise(SafetySummaryRequest request, CancellationToken ct)
     {
         if (request is null) throw new ArgumentNullException(nameof(request));
 
@@ -64,7 +64,7 @@ public sealed class SafetyDigestService : ISafetyDigestService
             try
             {
                 var prompt = BuildSafetyPrompt(eventList, request, lookback);
-                var response = await ai.PromptAsync(new AiChatRequest
+                var response = await ai.Prompt(new AiChatRequest
                 {
                     Model = string.IsNullOrWhiteSpace(request.Model) ? null : request.Model,
                     Messages =

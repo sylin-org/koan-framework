@@ -5,7 +5,7 @@ namespace Koan.Samples.Meridian.Services;
 
 public interface IDeliverableStorage
 {
-    Task<string> StoreAsync(Stream content, string fileName, string? contentType, CancellationToken ct = default);
+    Task<string> Store(Stream content, string fileName, string? contentType, CancellationToken ct = default);
 }
 
 public sealed class DeliverableStorage : IDeliverableStorage
@@ -19,11 +19,11 @@ public sealed class DeliverableStorage : IDeliverableStorage
         _options = options;
     }
 
-    public async Task<string> StoreAsync(Stream content, string fileName, string? contentType, CancellationToken ct = default)
+    public async Task<string> Store(Stream content, string fileName, string? contentType, CancellationToken ct = default)
     {
         var extension = Path.GetExtension(fileName);
         var key = $"{_options.Prefix}{Guid.CreateVersion7()}{extension}";
-        await _storage.PutAsync(_options.Profile, _options.Container, key, content, contentType, ct);
+        await _storage.Put(_options.Profile, _options.Container, key, content, contentType, ct);
         return key;
     }
 }

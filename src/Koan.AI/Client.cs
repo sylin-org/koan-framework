@@ -41,7 +41,7 @@ public static class Client
     /// </summary>
     public static async Task<string> Chat(string message, CancellationToken ct = default)
     {
-        var response = await Resolve().PromptAsync(BuildChatRequest(message, null), ct);
+        var response = await Resolve().Prompt(BuildChatRequest(message, null), ct);
         return response.Text;
     }
 
@@ -50,7 +50,7 @@ public static class Client
     /// </summary>
     public static async Task<string> Chat(string message, ChatOptions options, CancellationToken ct = default)
     {
-        var response = await Resolve().PromptAsync(BuildChatRequest(message, options), ct);
+        var response = await Resolve().Prompt(BuildChatRequest(message, options), ct);
         return response.Text;
     }
 
@@ -60,7 +60,7 @@ public static class Client
     public static async Task<ChatResult> ChatResult(string message, CancellationToken ct = default)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        var response = await Resolve().PromptAsync(BuildChatRequest(message, null), ct);
+        var response = await Resolve().Prompt(BuildChatRequest(message, null), ct);
         sw.Stop();
 
         return new ChatResult
@@ -82,7 +82,7 @@ public static class Client
     public static async Task<ChatResult> ChatResult(string message, ChatOptions options, CancellationToken ct = default)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        var response = await Resolve().PromptAsync(BuildChatRequest(message, options), ct);
+        var response = await Resolve().Prompt(BuildChatRequest(message, options), ct);
         sw.Stop();
 
         return new ChatResult
@@ -110,7 +110,7 @@ public static class Client
     {
         var message = prompt.Resolve(variables);
         var options = BuildOptionsFromPrompt(prompt);
-        var response = await Resolve().PromptAsync(BuildChatRequest(message, options), ct);
+        var response = await Resolve().Prompt(BuildChatRequest(message, options), ct);
         return response.Text;
     }
 
@@ -130,7 +130,7 @@ public static class Client
             options = options with { ResponseFormat = "json_object" };
         }
 
-        var response = await Resolve().PromptAsync(BuildChatRequest(message, options), ct);
+        var response = await Resolve().Prompt(BuildChatRequest(message, options), ct);
         return System.Text.Json.JsonSerializer.Deserialize<T>(response.Text)
             ?? throw new InvalidOperationException($"Failed to parse AI response as {typeof(T).Name}");
     }
@@ -142,7 +142,7 @@ public static class Client
     public static async Task<T> Chat<T>(string message, CancellationToken ct = default)
     {
         var options = new ChatOptions { ResponseFormat = "json_object" };
-        var response = await Resolve().PromptAsync(BuildChatRequest(message, options), ct);
+        var response = await Resolve().Prompt(BuildChatRequest(message, options), ct);
         return System.Text.Json.JsonSerializer.Deserialize<T>(response.Text)
             ?? throw new InvalidOperationException($"Failed to parse AI response as {typeof(T).Name}");
     }
@@ -166,7 +166,7 @@ public static class Client
         string message,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        await foreach (var chunk in Resolve().StreamAsync(BuildChatRequest(message, null), ct))
+        await foreach (var chunk in Resolve().Stream(BuildChatRequest(message, null), ct))
         {
             if (!string.IsNullOrEmpty(chunk.DeltaText))
                 yield return chunk.DeltaText;
@@ -181,7 +181,7 @@ public static class Client
         ChatOptions options,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        await foreach (var chunk in Resolve().StreamAsync(BuildChatRequest(message, options), ct))
+        await foreach (var chunk in Resolve().Stream(BuildChatRequest(message, options), ct))
         {
             if (!string.IsNullOrEmpty(chunk.DeltaText))
                 yield return chunk.DeltaText;
@@ -197,7 +197,7 @@ public static class Client
     /// </summary>
     public static async Task<float[]> Embed(string text, CancellationToken ct = default)
     {
-        var response = await Resolve().EmbedAsync(new AiEmbeddingsRequest
+        var response = await Resolve().Embed(new AiEmbeddingsRequest
         {
             Input = new() { text }
         }, ct);
@@ -209,7 +209,7 @@ public static class Client
     /// </summary>
     public static async Task<float[]> Embed(string text, EmbedOptions options, CancellationToken ct = default)
     {
-        var response = await Resolve().EmbedAsync(new AiEmbeddingsRequest
+        var response = await Resolve().Embed(new AiEmbeddingsRequest
         {
             Input = new() { text },
             Model = options.Model
@@ -225,7 +225,7 @@ public static class Client
         if (texts is null || texts.Length == 0)
             throw new ArgumentException("At least one text must be provided", nameof(texts));
 
-        var response = await Resolve().EmbedAsync(new AiEmbeddingsRequest
+        var response = await Resolve().Embed(new AiEmbeddingsRequest
         {
             Input = texts.ToList()
         }, ct);
@@ -238,7 +238,7 @@ public static class Client
     /// </summary>
     public static async Task<EmbedResult> EmbedResult(string text, CancellationToken ct = default)
     {
-        var response = await Resolve().EmbedAsync(new AiEmbeddingsRequest
+        var response = await Resolve().Embed(new AiEmbeddingsRequest
         {
             Input = new() { text }
         }, ct);
@@ -256,7 +256,7 @@ public static class Client
     /// Low-level embed access for pipeline/internal use.
     /// </summary>
     public static Task<AiEmbeddingsResponse> Embed(AiEmbeddingsRequest req, CancellationToken ct = default)
-        => Resolve().EmbedAsync(req, ct);
+        => Resolve().Embed(req, ct);
 
     // ========================================================================
     // OCR

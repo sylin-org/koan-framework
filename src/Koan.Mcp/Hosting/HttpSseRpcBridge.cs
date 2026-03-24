@@ -56,10 +56,10 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
         });
         _cts = CancellationTokenSource.CreateLinkedTokenSource(session.Cancellation.Token);
         _handler = _server.CreateHandler();
-        _processingTask = Task.Run(ProcessAsync);
+        _processingTask = Task.Run(Process);
     }
 
-    public ValueTask SubmitAsync(JsonRpcEnvelope request, CancellationToken cancellationToken)
+    public ValueTask Submit(JsonRpcEnvelope request, CancellationToken cancellationToken)
     {
         if (_cts.IsCancellationRequested)
         {
@@ -74,13 +74,13 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
         return ValueTask.CompletedTask;
     }
 
-    private async Task ProcessAsync()
+    private async Task Process()
     {
         try
         {
             await foreach (var envelope in _requests.Reader.ReadAllAsync(_cts.Token))
             {
-                await DispatchAsync(envelope, _cts.Token);
+                await Dispatch(envelope, _cts.Token);
             }
         }
         catch (OperationCanceledException)
@@ -96,7 +96,7 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
         }
     }
 
-    private async Task DispatchAsync(JsonRpcEnvelope envelope, CancellationToken cancellationToken)
+    private async Task Dispatch(JsonRpcEnvelope envelope, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(envelope.Method))
         {
@@ -109,10 +109,10 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
             switch (envelope.Method)
             {
                 case "tools/list":
-                    await HandleToolsListAsync(envelope, cancellationToken);
+                    await HandleToolsList(envelope, cancellationToken);
                     break;
                 case "tools/call":
-                    await HandleToolsCallAsync(envelope, cancellationToken);
+                    await HandleToolsCall(envelope, cancellationToken);
                     break;
                 case "ping":
                     var pong = new JObject { ["jsonrpc"] = "2.0", ["id"] = CloneId(envelope.Id), ["result"] = "pong" };
@@ -134,9 +134,9 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
         }
     }
 
-    private async Task HandleToolsListAsync(JsonRpcEnvelope envelope, CancellationToken cancellationToken)
+    private async Task HandleToolsList(JsonRpcEnvelope envelope, CancellationToken cancellationToken)
     {
-        var response = await _handler.ListToolsAsync(cancellationToken);
+        var response = await _handler.ListTools(cancellationToken);
         var filtered = response.Tools
             .Where(tool => _registry.TryGetTool(tool.Name, out var registration, out var definition) && HasAccess(registration, definition))
             .ToArray();
@@ -166,7 +166,7 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
         _session.Enqueue(ServerSentEvent.FromJsonRpc(result));
     }
 
-    private async Task HandleToolsCallAsync(JsonRpcEnvelope envelope, CancellationToken cancellationToken)
+    private async Task HandleToolsCall(JsonRpcEnvelope envelope, CancellationToken cancellationToken)
     {
         if (envelope.Params is not JObject parameters)
         {
@@ -204,7 +204,7 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
             Arguments = arguments
         };
 
-        var result = await _handler.CallToolAsync(callParams, cancellationToken);
+        var result = await _handler.CallTool(callParams, cancellationToken);
         var node = JToken.FromObject(result, JsonSerializer.Create(SerializerSettings));
         if (node is null)
         {

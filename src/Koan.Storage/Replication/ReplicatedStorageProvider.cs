@@ -70,10 +70,10 @@ public sealed class ReplicatedStorageProvider : IStorageProvider, IStatOperation
 
     // ── Write flow ────────────────────────────────────────────────
 
-    public async Task WriteAsync(string container, string key, Stream content, string? contentType, CancellationToken ct = default)
+    public async Task Write(string container, string key, Stream content, string? contentType, CancellationToken ct = default)
     {
         // Write to cache synchronously (from caller's perspective)
-        await _cache.WriteAsync(container, key, content, contentType, ct);
+        await _cache.Write(container, key, content, contentType, ct);
 
         // Determine size for manifest
         long size = 0;
@@ -84,7 +84,7 @@ public sealed class ReplicatedStorageProvider : IStorageProvider, IStatOperation
 
         if (size == 0 && _cache is IStatOperations cacheStat)
         {
-            var stat = await cacheStat.HeadAsync(container, key, ct);
+            var stat = await cacheStat.Head(container, key, ct);
             if (stat?.Length is long len) size = len;
         }
 
@@ -112,12 +112,12 @@ public sealed class ReplicatedStorageProvider : IStorageProvider, IStatOperation
 
     // ── Read flow ─────────────────────────────────────────────────
 
-    public async Task<Stream> OpenReadAsync(string container, string key, CancellationToken ct = default)
+    public async Task<Stream> OpenRead(string container, string key, CancellationToken ct = default)
     {
         // Try cache first
         try
         {
-            var stream = await _cache.OpenReadAsync(container, key, ct);
+            var stream = await _cache.OpenRead(container, key, ct);
 
             // Update last access in manifest
             var existing = _manifest.Get(key);
@@ -135,7 +135,7 @@ public sealed class ReplicatedStorageProvider : IStorageProvider, IStatOperation
         Stream durableStream;
         try
         {
-            durableStream = await _durable.OpenReadAsync(container, key, ct);
+            durableStream = await _durable.OpenRead(container, key, ct);
         }
         catch (Exception ex) when (IsNotFound(ex))
         {
@@ -143,19 +143,19 @@ public sealed class ReplicatedStorageProvider : IStorageProvider, IStatOperation
         }
 
         // Pull-through: copy from durable into cache
-        var pulled = await PullThroughAsync(container, key, durableStream, ct);
+        var pulled = await PullThrough(container, key, durableStream, ct);
 
         _logger.LogDebug("Replicated: pull-through for {Key} from durable to cache", key);
 
         return pulled;
     }
 
-    public async Task<(Stream Stream, long? Length)> OpenReadRangeAsync(string container, string key, long? from, long? to, CancellationToken ct = default)
+    public async Task<(Stream Stream, long? Length)> OpenReadRange(string container, string key, long? from, long? to, CancellationToken ct = default)
     {
         // Try cache first
         try
         {
-            var result = await _cache.OpenReadRangeAsync(container, key, from, to, ct);
+            var result = await _cache.OpenReadRange(container, key, from, to, ct);
 
             var existing = _manifest.Get(key);
             if (existing is not null)
@@ -169,17 +169,17 @@ public sealed class ReplicatedStorageProvider : IStorageProvider, IStatOperation
         }
 
         // Fall back to durable
-        return await _durable.OpenReadRangeAsync(container, key, from, to, ct);
+        return await _durable.OpenReadRange(container, key, from, to, ct);
     }
 
     // ── Delete flow ───────────────────────────────────────────────
 
-    public async Task<bool> DeleteAsync(string container, string key, CancellationToken ct = default)
+    public async Task<bool> Delete(string container, string key, CancellationToken ct = default)
     {
         // Delete from cache (ignore if missing)
         try
         {
-            await _cache.DeleteAsync(container, key, ct);
+            await _cache.Delete(container, key, ct);
         }
         catch (Exception ex) when (IsNotFound(ex))
         {
@@ -204,7 +204,7 @@ public sealed class ReplicatedStorageProvider : IStorageProvider, IStatOperation
 
     // ── Exists ────────────────────────────────────────────────────
 
-    public async Task<bool> ExistsAsync(string container, string key, CancellationToken ct = default)
+    public async Task<bool> Exists(string container, string key, CancellationToken ct = default)
     {
         // Check manifest first
         var entry = _manifest.Get(key);
@@ -214,7 +214,7 @@ public sealed class ReplicatedStorageProvider : IStorageProvider, IStatOperation
         // Fall back to cache
         try
         {
-            if (await _cache.ExistsAsync(container, key, ct))
+            if (await _cache.Exists(container, key, ct))
                 return true;
         }
         catch
@@ -223,19 +223,19 @@ public sealed class ReplicatedStorageProvider : IStorageProvider, IStatOperation
         }
 
         // Fall back to durable
-        return await _durable.ExistsAsync(container, key, ct);
+        return await _durable.Exists(container, key, ct);
     }
 
     // ── Head ──────────────────────────────────────────────────────
 
-    public async Task<ObjectStat?> HeadAsync(string container, string key, CancellationToken ct = default)
+    public async Task<ObjectStat?> Head(string container, string key, CancellationToken ct = default)
     {
         // Try cache first
         if (_cache is IStatOperations cacheStat)
         {
             try
             {
-                var stat = await cacheStat.HeadAsync(container, key, ct);
+                var stat = await cacheStat.Head(container, key, ct);
                 if (stat is not null)
                 {
                     UpdateManifestFromStat(key, stat, cached: true);
@@ -251,7 +251,7 @@ public sealed class ReplicatedStorageProvider : IStorageProvider, IStatOperation
         // Try durable
         if (_durable is IStatOperations durableStat)
         {
-            var stat = await durableStat.HeadAsync(container, key, ct);
+            var stat = await durableStat.Head(container, key, ct);
             if (stat is not null)
             {
                 UpdateManifestFromStat(key, stat, cached: false);
@@ -264,7 +264,7 @@ public sealed class ReplicatedStorageProvider : IStorageProvider, IStatOperation
 
     // ── ListObjects ───────────────────────────────────────────────
 
-    public async IAsyncEnumerable<StorageObjectInfo> ListObjectsAsync(
+    public async IAsyncEnumerable<StorageObjectInfo> ListObjects(
         string container,
         string? prefix = null,
         [EnumeratorCancellation] CancellationToken ct = default)
@@ -272,7 +272,7 @@ public sealed class ReplicatedStorageProvider : IStorageProvider, IStatOperation
         // Populate manifest from durable on first call if empty
         if (!_manifestPopulated && _durable is IListOperations durableList)
         {
-            await PopulateManifestFromDurableAsync(durableList, container, ct);
+            await PopulateManifestFromDurable(durableList, container, ct);
             _manifestPopulated = true;
         }
 
@@ -302,9 +302,9 @@ public sealed class ReplicatedStorageProvider : IStorageProvider, IStatOperation
         {
             try
             {
-                await DrainAndSyncAsync(ct);
-                await RunEvictionIfNeededAsync(ct);
-                await PersistManifestAsync(ct);
+                await DrainAndSync(ct);
+                await RunEvictionIfNeeded(ct);
+                await PersistManifest(ct);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -320,7 +320,7 @@ public sealed class ReplicatedStorageProvider : IStorageProvider, IStatOperation
         }
     }
 
-    private async Task DrainAndSyncAsync(CancellationToken ct)
+    private async Task DrainAndSync(CancellationToken ct)
     {
         var entries = _journal.Drain();
         if (entries.Count == 0)
@@ -337,11 +337,11 @@ public sealed class ReplicatedStorageProvider : IStorageProvider, IStatOperation
                 switch (entry.Op)
                 {
                     case SyncOperationType.Put:
-                        await SyncPutAsync(entry, ct);
+                        await SyncPut(entry, ct);
                         break;
 
                     case SyncOperationType.Delete:
-                        await SyncDeleteAsync(entry, ct);
+                        await SyncDelete(entry, ct);
                         break;
                 }
             }
@@ -363,13 +363,13 @@ public sealed class ReplicatedStorageProvider : IStorageProvider, IStatOperation
         SyncJournal.Truncate(_journalPath);
     }
 
-    private async Task SyncPutAsync(SyncJournalEntry entry, CancellationToken ct)
+    private async Task SyncPut(SyncJournalEntry entry, CancellationToken ct)
     {
         // Read from cache
         Stream cacheStream;
         try
         {
-            cacheStream = await _cache.OpenReadAsync(entry.Container, entry.Key, ct);
+            cacheStream = await _cache.OpenRead(entry.Container, entry.Key, ct);
         }
         catch (Exception ex) when (IsNotFound(ex))
         {
@@ -379,7 +379,7 @@ public sealed class ReplicatedStorageProvider : IStorageProvider, IStatOperation
 
         await using (cacheStream)
         {
-            await _durable.WriteAsync(entry.Container, entry.Key, cacheStream, null, ct);
+            await _durable.Write(entry.Container, entry.Key, cacheStream, null, ct);
         }
 
         // Mark synced in manifest
@@ -390,11 +390,11 @@ public sealed class ReplicatedStorageProvider : IStorageProvider, IStatOperation
         _logger.LogDebug("Replicated: pushed {Key} to durable", entry.Key);
     }
 
-    private async Task SyncDeleteAsync(SyncJournalEntry entry, CancellationToken ct)
+    private async Task SyncDelete(SyncJournalEntry entry, CancellationToken ct)
     {
         try
         {
-            await _durable.DeleteAsync(entry.Container, entry.Key, ct);
+            await _durable.Delete(entry.Container, entry.Key, ct);
         }
         catch (Exception ex) when (IsNotFound(ex))
         {
@@ -406,7 +406,7 @@ public sealed class ReplicatedStorageProvider : IStorageProvider, IStatOperation
 
     // ── Eviction ──────────────────────────────────────────────────
 
-    private async Task RunEvictionIfNeededAsync(CancellationToken ct)
+    private async Task RunEvictionIfNeeded(CancellationToken ct)
     {
         if (string.Equals(_cacheOptions.Policy, "pinned", StringComparison.OrdinalIgnoreCase))
             return;
@@ -438,7 +438,7 @@ public sealed class ReplicatedStorageProvider : IStorageProvider, IStatOperation
 
             try
             {
-                await _cache.DeleteAsync(_container, candidate.Key, ct);
+                await _cache.Delete(_container, candidate.Key, ct);
             }
             catch (Exception ex) when (IsNotFound(ex))
             {
@@ -458,8 +458,8 @@ public sealed class ReplicatedStorageProvider : IStorageProvider, IStatOperation
     {
         try
         {
-            await _manifest.LoadAsync(_manifestPath);
-            await _journal.LoadAsync(_journalPath);
+            await _manifest.Load(_manifestPath);
+            await _journal.Load(_journalPath);
         }
         catch (Exception ex)
         {
@@ -467,11 +467,11 @@ public sealed class ReplicatedStorageProvider : IStorageProvider, IStatOperation
         }
     }
 
-    private async Task PopulateManifestFromDurableAsync(IListOperations durableList, string container, CancellationToken ct)
+    private async Task PopulateManifestFromDurable(IListOperations durableList, string container, CancellationToken ct)
     {
         try
         {
-            await foreach (var obj in durableList.ListObjectsAsync(container, prefix: null, ct))
+            await foreach (var obj in durableList.ListObjects(container, prefix: null, ct))
             {
                 var existing = _manifest.Get(obj.Key);
                 if (existing is null)
@@ -494,12 +494,12 @@ public sealed class ReplicatedStorageProvider : IStorageProvider, IStatOperation
         }
     }
 
-    private async Task PersistManifestAsync(CancellationToken ct)
+    private async Task PersistManifest(CancellationToken ct)
     {
         try
         {
             ct.ThrowIfCancellationRequested();
-            await _manifest.SaveAsync(_manifestPath, ct);
+            await _manifest.Save(_manifestPath, ct);
         }
         catch (OperationCanceledException)
         {
@@ -513,7 +513,7 @@ public sealed class ReplicatedStorageProvider : IStorageProvider, IStatOperation
 
     // ── Pull-through helper ───────────────────────────────────────
 
-    private async Task<Stream> PullThroughAsync(string container, string key, Stream durableStream, CancellationToken ct)
+    private async Task<Stream> PullThrough(string container, string key, Stream durableStream, CancellationToken ct)
     {
         // Buffer into memory, write to cache, return seekable stream
         var ms = new MemoryStream();
@@ -524,7 +524,7 @@ public sealed class ReplicatedStorageProvider : IStorageProvider, IStatOperation
         ms.Position = 0;
 
         // Write to cache
-        await _cache.WriteAsync(container, key, ms, null, ct);
+        await _cache.Write(container, key, ms, null, ct);
 
         // Update manifest
         _manifest.Set(new ManifestEntry
@@ -539,7 +539,7 @@ public sealed class ReplicatedStorageProvider : IStorageProvider, IStatOperation
         // Return a fresh stream from cache
         try
         {
-            return await _cache.OpenReadAsync(container, key, ct);
+            return await _cache.OpenRead(container, key, ct);
         }
         catch
         {
@@ -613,7 +613,7 @@ public sealed class ReplicatedStorageProvider : IStorageProvider, IStatOperation
         }
 
         // Final persist
-        try { _manifest.SaveAsync(_manifestPath).GetAwaiter().GetResult(); }
+        try { _manifest.Save(_manifestPath).GetAwaiter().GetResult(); }
         catch { /* best effort on shutdown */ }
 
         _cts.Dispose();

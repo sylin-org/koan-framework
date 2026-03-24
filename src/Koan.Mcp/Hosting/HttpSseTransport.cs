@@ -44,7 +44,7 @@ public sealed class HttpSseTransport
         _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
     }
 
-    public async Task AcceptStreamAsync(HttpContext context)
+    public async Task AcceptStream(HttpContext context)
     {
         if (context is null) throw new ArgumentNullException(nameof(context));
 
@@ -123,7 +123,7 @@ public sealed class HttpSseTransport
         }
     }
 
-    public async Task<IResult> SubmitRequestAsync(HttpContext context)
+    public async Task<IResult> SubmitRequest(HttpContext context)
     {
         if (context is null) throw new ArgumentNullException(nameof(context));
 
@@ -178,7 +178,7 @@ public sealed class HttpSseTransport
         }
 
         session.Enqueue(ServerSentEvent.Acknowledged(envelope.Id));
-        await bridge.SubmitAsync(envelope, context.RequestAborted);
+        await bridge.Submit(envelope, context.RequestAborted);
         return Results.Accepted();
     }
 

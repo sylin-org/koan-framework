@@ -47,7 +47,7 @@ public abstract class EntityModerationController<TEntity, TKey, TFlow> : Control
     [HttpPost("{id}/moderation/draft")]
     public virtual async Task<IActionResult> CreateDraft([FromRoute] TKey id, [FromBody] DraftCreate body, CancellationToken ct)
     {
-        TEntity? baseModel = await Data<TEntity, TKey>.GetAsync(id!, ct);
+        TEntity? baseModel = await Data<TEntity, TKey>.Get(id!, ct);
         if (body?.Snapshot != null)
         {
             baseModel ??= Activator.CreateInstance<TEntity>();
@@ -58,7 +58,7 @@ public abstract class EntityModerationController<TEntity, TKey, TFlow> : Control
         baseModel ??= Activator.CreateInstance<TEntity>();
         typeof(TEntity).GetProperty("Id")?.SetValue(baseModel, id);
         using var _ = Data<TEntity, TKey>.WithPartition(DraftSet);
-        await Data<TEntity, TKey>.UpsertAsync(baseModel, ct);
+        await Data<TEntity, TKey>.Upsert(baseModel, ct);
         return NoContent();
     }
 
@@ -82,7 +82,7 @@ public abstract class EntityModerationController<TEntity, TKey, TFlow> : Control
     public virtual async Task<IActionResult> UpdateDraft([FromRoute] TKey id, [FromBody] DraftUpdate body, CancellationToken ct)
     {
         using var _ = Data<TEntity, TKey>.WithPartition(DraftSet);
-        var draft = await Data<TEntity, TKey>.GetAsync(id!, ct);
+        var draft = await Data<TEntity, TKey>.Get(id!, ct);
         if (draft is null) return NotFound();
         if (body?.Snapshot != null)
         {
@@ -94,7 +94,7 @@ public abstract class EntityModerationController<TEntity, TKey, TFlow> : Control
                 draft = updated;
             }
         }
-        await Data<TEntity, TKey>.UpsertAsync(draft!, ct);
+        await Data<TEntity, TKey>.Upsert(draft!, ct);
         return NoContent();
     }
 
@@ -115,7 +115,7 @@ public abstract class EntityModerationController<TEntity, TKey, TFlow> : Control
     public virtual async Task<ActionResult<TEntity>> GetDraft([FromRoute] TKey id, CancellationToken ct)
     {
         using var _ = Data<TEntity, TKey>.WithPartition(DraftSet);
-        var draft = await Data<TEntity, TKey>.GetAsync(id!, ct);
+        var draft = await Data<TEntity, TKey>.Get(id!, ct);
         if (draft is null) return NotFound();
         return Ok(draft);
     }
@@ -138,9 +138,9 @@ public abstract class EntityModerationController<TEntity, TKey, TFlow> : Control
     public virtual async Task<IActionResult> Submit([FromRoute] TKey id, [FromBody] DraftSubmit? body, CancellationToken ct)
     {
         var flow = ActivatorUtilities.CreateInstance<TFlow>(HttpContext.RequestServices);
-        var current = await Data<TEntity, TKey>.GetAsync(id!, ct);
+        var current = await Data<TEntity, TKey>.Get(id!, ct);
         using var _s = Data<TEntity, TKey>.WithPartition(SubmittedSet);
-        var submitted = await Data<TEntity, TKey>.GetAsync(id!, ct);
+        var submitted = await Data<TEntity, TKey>.Get(id!, ct);
         var ctx = new TransitionContext<TEntity> { Id = id!, Current = current, SubmittedSnapshot = submitted, User = User, Services = HttpContext.RequestServices, Options = body };
         var v = await flow.ValidateSubmit(ctx, ct);
         if (!v.Ok) return Problem(detail: v.Message, statusCode: v.Status, title: v.Code);
@@ -169,9 +169,9 @@ public abstract class EntityModerationController<TEntity, TKey, TFlow> : Control
     public virtual async Task<IActionResult> Withdraw([FromRoute] TKey id, [FromBody] DraftWithdraw? body, CancellationToken ct)
     {
         var flow = ActivatorUtilities.CreateInstance<TFlow>(HttpContext.RequestServices);
-        var current = await Data<TEntity, TKey>.GetAsync(id!, ct);
+        var current = await Data<TEntity, TKey>.Get(id!, ct);
         using var _s = Data<TEntity, TKey>.WithPartition(SubmittedSet);
-        var submitted = await Data<TEntity, TKey>.GetAsync(id!, ct);
+        var submitted = await Data<TEntity, TKey>.Get(id!, ct);
         var ctx = new TransitionContext<TEntity> { Id = id!, Current = current, SubmittedSnapshot = submitted, User = User, Services = HttpContext.RequestServices, Options = body };
         var v = await flow.ValidateWithdraw(ctx, ct);
         if (!v.Ok) return Problem(detail: v.Message, statusCode: v.Status, title: v.Code);
@@ -202,7 +202,7 @@ public abstract class EntityModerationController<TEntity, TKey, TFlow> : Control
         var items = await Data<TEntity, TKey>.Page(page <= 0 ? 1 : page, size <= 0 ? KoanWebConstants.Defaults.DefaultPageSize : Math.Min(size, KoanWebConstants.Defaults.MaxPageSize), ct);
         try
         {
-            var total = await Data<TEntity, TKey>.CountAsync(ct);
+            var total = await Data<TEntity, TKey>.Count(ct);
             var totalPages = size > 0 ? (int)Math.Ceiling((double)total / size) : 0;
             Response.Headers["X-Total-Count"] = total.ToString();
             Response.Headers["X-Page"] = (page <= 0 ? 1 : page).ToString();
@@ -232,9 +232,9 @@ public abstract class EntityModerationController<TEntity, TKey, TFlow> : Control
     public virtual async Task<IActionResult> Approve([FromRoute] TKey id, [FromBody] ApproveOptions? options, CancellationToken ct)
     {
         var flow = ActivatorUtilities.CreateInstance<TFlow>(HttpContext.RequestServices);
-        var current = await Data<TEntity, TKey>.GetAsync(id!, ct);
+        var current = await Data<TEntity, TKey>.Get(id!, ct);
         using var _from = Data<TEntity, TKey>.WithPartition(SubmittedSet);
-        var draft = await Data<TEntity, TKey>.GetAsync(id!, ct);
+        var draft = await Data<TEntity, TKey>.Get(id!, ct);
         var ctx = new TransitionContext<TEntity> { Id = id!, Current = current, SubmittedSnapshot = draft, User = User, Services = HttpContext.RequestServices, Options = options };
         var v = await flow.ValidateApprove(ctx, ct);
         if (!v.Ok) return Problem(detail: v.Message, statusCode: v.Status, title: v.Code);
@@ -250,11 +250,11 @@ public abstract class EntityModerationController<TEntity, TKey, TFlow> : Control
         if (!string.IsNullOrWhiteSpace(toSet))
         {
             using var _t = Data<TEntity, TKey>.WithPartition(toSet!);
-            await Data<TEntity, TKey>.UpsertAsync(ctx.SubmittedSnapshot!, ct);
+            await Data<TEntity, TKey>.Upsert(ctx.SubmittedSnapshot!, ct);
         }
         else
         {
-            await Data<TEntity, TKey>.UpsertAsync(ctx.SubmittedSnapshot!, ct);
+            await Data<TEntity, TKey>.Upsert(ctx.SubmittedSnapshot!, ct);
         }
         _ = await Data<TEntity, TKey>.MovePartition(SubmittedSet, ApprovedSet, e => Equals(e.Id, id), null, 500, ct);
         await flow.AfterApproved(ctx, ct);
@@ -322,9 +322,9 @@ public abstract class EntityModerationController<TEntity, TKey, TFlow> : Control
     {
         if (body is null || string.IsNullOrWhiteSpace(body.Reason)) return BadRequest(new { error = "reason is required" });
         var flow = ActivatorUtilities.CreateInstance<TFlow>(HttpContext.RequestServices);
-        var current = await Data<TEntity, TKey>.GetAsync(id!, ct);
+        var current = await Data<TEntity, TKey>.Get(id!, ct);
         using var _s = Data<TEntity, TKey>.WithPartition(SubmittedSet);
-        var submitted = await Data<TEntity, TKey>.GetAsync(id!, ct);
+        var submitted = await Data<TEntity, TKey>.Get(id!, ct);
         var ctx = new TransitionContext<TEntity> { Id = id!, Current = current, SubmittedSnapshot = submitted, User = User, Services = HttpContext.RequestServices, Options = body };
         var v = await flow.ValidateReject(ctx, ct);
         if (!v.Ok) return Problem(detail: v.Message, statusCode: v.Status, title: v.Code);
@@ -355,9 +355,9 @@ public abstract class EntityModerationController<TEntity, TKey, TFlow> : Control
     {
         if (body is null || string.IsNullOrWhiteSpace(body.Reason)) return BadRequest(new { error = "reason is required" });
         var flow = ActivatorUtilities.CreateInstance<TFlow>(HttpContext.RequestServices);
-        var current = await Data<TEntity, TKey>.GetAsync(id!, ct);
+        var current = await Data<TEntity, TKey>.Get(id!, ct);
         using var _s = Data<TEntity, TKey>.WithPartition(SubmittedSet);
-        var submitted = await Data<TEntity, TKey>.GetAsync(id!, ct);
+        var submitted = await Data<TEntity, TKey>.Get(id!, ct);
         var ctx = new TransitionContext<TEntity> { Id = id!, Current = current, SubmittedSnapshot = submitted, User = User, Services = HttpContext.RequestServices, Options = body };
         var v = await flow.ValidateReturn(ctx, ct);
         if (!v.Ok) return Problem(detail: v.Message, statusCode: v.Status, title: v.Code);

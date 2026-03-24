@@ -68,7 +68,7 @@ def foo():
         var filePath = await CreateTestFile("unclosed.md", content);
 
         // Act
-        var result = await _service.ExtractAsync(filePath);
+        var result = await _service.Extract(filePath);
 
         // Assert
         result.Sections.Should().HaveCount(2); // Heading + Code block
@@ -98,7 +98,7 @@ def foo():
         var filePath = await CreateTestFile("windows.md", content);
 
         // Act
-        var result = await _service.ExtractAsync(filePath);
+        var result = await _service.Extract(filePath);
 
         // Assert
         result.Sections.Should().HaveCount(3);
@@ -115,7 +115,7 @@ def foo():
         var filePath = await CreateTestFile("mixed.md", content);
 
         // Act
-        var result = await _service.ExtractAsync(filePath);
+        var result = await _service.Extract(filePath);
 
         // Assert
         result.Sections.Should().NotBeEmpty();
@@ -136,7 +136,7 @@ def foo():
         var filePath = await CreateTestFile("hierarchy.md", content);
 
         // Act
-        var result = await _service.ExtractAsync(filePath);
+        var result = await _service.Extract(filePath);
 
         // Assert
         result.TitleHierarchy.Should().HaveCount(6);
@@ -160,7 +160,7 @@ def foo():
         var filePath = await CreateTestFile("hierarchy-pop.md", content);
 
         // Act
-        var result = await _service.ExtractAsync(filePath);
+        var result = await _service.Extract(filePath);
 
         // Assert - Final hierarchy should be [H1, H2B]
         result.TitleHierarchy.Should().HaveCount(2);
@@ -185,7 +185,7 @@ def foo():
         var filePath = await CreateTestFile($"heading-{expectedLevel}.md", markdown);
 
         // Act
-        var result = await _service.ExtractAsync(filePath);
+        var result = await _service.Extract(filePath);
 
         // Assert
         result.Sections.Should().HaveCount(1);
@@ -205,7 +205,7 @@ def foo():
         var filePath = await CreateTestFile("multiple-headings.md", content);
 
         // Act
-        var result = await _service.ExtractAsync(filePath);
+        var result = await _service.Extract(filePath);
 
         // Assert
         result.Sections.Should().HaveCount(3);
@@ -229,7 +229,7 @@ public class Foo
         var filePath = await CreateTestFile("code-with-lang.md", content);
 
         // Act
-        var result = await _service.ExtractAsync(filePath);
+        var result = await _service.Extract(filePath);
 
         // Assert
         result.Sections.Should().HaveCount(1);
@@ -248,7 +248,7 @@ code without language
         var filePath = await CreateTestFile("code-no-lang.md", content);
 
         // Act
-        var result = await _service.ExtractAsync(filePath);
+        var result = await _service.Extract(filePath);
 
         // Assert
         result.Sections.Should().HaveCount(1);
@@ -273,7 +273,7 @@ console.log('world');
         var filePath = await CreateTestFile("multiple-code.md", content);
 
         // Act
-        var result = await _service.ExtractAsync(filePath);
+        var result = await _service.Extract(filePath);
 
         // Assert
         var codeBlocks = result.Sections.Where(s => s.Type == ContentType.CodeBlock).ToList();
@@ -295,7 +295,7 @@ code here
         var filePath = await CreateTestFile("nested-fences.md", content);
 
         // Act
-        var result = await _service.ExtractAsync(filePath);
+        var result = await _service.Extract(filePath);
 
         // Assert
         result.Sections.Should().Contain(s => s.Type == ContentType.CodeBlock);
@@ -313,7 +313,7 @@ code here
         var filePath = await CreateTestFile("simple-paragraph.md", content);
 
         // Act
-        var result = await _service.ExtractAsync(filePath);
+        var result = await _service.Extract(filePath);
 
         // Assert
         result.Sections.Should().HaveCount(1);
@@ -331,7 +331,7 @@ This is line three.";
         var filePath = await CreateTestFile("multiline-paragraph.md", content);
 
         // Act
-        var result = await _service.ExtractAsync(filePath);
+        var result = await _service.Extract(filePath);
 
         // Assert
         result.Sections.Should().HaveCount(1);
@@ -353,7 +353,7 @@ Paragraph three.";
         var filePath = await CreateTestFile("multiple-paragraphs.md", content);
 
         // Act
-        var result = await _service.ExtractAsync(filePath);
+        var result = await _service.Extract(filePath);
 
         // Assert
         var paragraphs = result.Sections.Where(s => s.Type == ContentType.Paragraph).ToList();
@@ -371,7 +371,7 @@ code
         var filePath = await CreateTestFile("para-before-code.md", content);
 
         // Act
-        var result = await _service.ExtractAsync(filePath);
+        var result = await _service.Extract(filePath);
 
         // Assert
         result.Sections.Should().HaveCount(2);
@@ -391,7 +391,7 @@ code
         var filePath = await CreateTestFile("empty.md", string.Empty);
 
         // Act
-        var result = await _service.ExtractAsync(filePath);
+        var result = await _service.Extract(filePath);
 
         // Assert
         result.Sections.Should().BeEmpty();
@@ -406,7 +406,7 @@ code
         var filePath = await CreateTestFile("whitespace.md", "   \n  \n\t\n  ");
 
         // Act
-        var result = await _service.ExtractAsync(filePath);
+        var result = await _service.Extract(filePath);
 
         // Assert
         result.Sections.Should().BeEmpty();
@@ -426,7 +426,7 @@ code
         await File.WriteAllTextAsync(filePath, "# Small file");
 
         // Act & Assert - Small file should work
-        var result = await _service.ExtractAsync(filePath);
+        var result = await _service.Extract(filePath);
         result.Should().NotBeNull();
 
         // The actual >50MB test would require integration testing
@@ -441,7 +441,7 @@ code
         // Act & Assert
         await Assert.ThrowsAsync<FileNotFoundException>(async () =>
         {
-            await _service.ExtractAsync(nonExistent);
+            await _service.Extract(nonExistent);
         });
     }
 
@@ -451,7 +451,7 @@ code
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(async () =>
         {
-            await _service.ExtractAsync(null!);
+            await _service.Extract(null!);
         });
     }
 
@@ -461,7 +461,7 @@ code
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(async () =>
         {
-            await _service.ExtractAsync(string.Empty);
+            await _service.Extract(string.Empty);
         });
     }
 
@@ -497,7 +497,7 @@ Final paragraph.
         var filePath = await CreateTestFile("complex.md", content);
 
         // Act
-        var result = await _service.ExtractAsync(filePath);
+        var result = await _service.Extract(filePath);
 
         // Assert
         result.Sections.Should().HaveCountGreaterThan(5);
@@ -544,7 +544,7 @@ MIT
         var filePath = await CreateTestFile("README.md", content);
 
         // Act
-        var result = await _service.ExtractAsync(filePath);
+        var result = await _service.Extract(filePath);
 
         // Assert
         result.Sections.Should().NotBeEmpty();

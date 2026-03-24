@@ -23,7 +23,7 @@ internal sealed class AgentExecutor : IAgentExecutor
         WriteIndented = false
     };
 
-    public async Task<AgentResult> ExecuteAsync(
+    public async Task<AgentResult> Execute(
         AgentDefinition definition, string goal, object? context, CancellationToken ct)
     {
         var sw = Stopwatch.StartNew();
@@ -92,7 +92,7 @@ internal sealed class AgentExecutor : IAgentExecutor
 
             foreach (var toolCall in toolCalls)
             {
-                var observation = await ExecuteToolAsync(toolCall, toolRegistry, ct);
+                var observation = await ExecuteTool(toolCall, toolRegistry, ct);
 
                 // Truncate observation if it exceeds the limit
                 var truncatedObservation = TruncateToTokenLimit(
@@ -128,7 +128,7 @@ internal sealed class AgentExecutor : IAgentExecutor
         };
     }
 
-    public async IAsyncEnumerable<AgentStep> StreamAsync(
+    public async IAsyncEnumerable<AgentStep> Stream(
         AgentDefinition definition, string goal,
         [EnumeratorCancellation] CancellationToken ct)
     {
@@ -168,7 +168,7 @@ internal sealed class AgentExecutor : IAgentExecutor
 
             foreach (var toolCall in toolCalls)
             {
-                var observation = await ExecuteToolAsync(toolCall, toolRegistry, ct);
+                var observation = await ExecuteTool(toolCall, toolRegistry, ct);
                 var truncatedObservation = TruncateToTokenLimit(
                     observation, definition.MaxToolResultTokens);
 
@@ -422,7 +422,7 @@ internal sealed class AgentExecutor : IAgentExecutor
 
     // ── Tool execution ──
 
-    private static async Task<string> ExecuteToolAsync(
+    private static async Task<string> ExecuteTool(
         ToolCall toolCall, Dictionary<string, GeneratedTool> registry, CancellationToken ct)
     {
         if (!registry.TryGetValue(toolCall.Name, out var tool))

@@ -23,15 +23,15 @@ public sealed class MemoryCacheStoreSpec
 
     [Fact]
     public Task FetchAsync_hit_before_expiration_returns_value()
-        => SpecAsync(nameof(FetchAsync_hit_before_expiration_returns_value), async () =>
+        => Spec(nameof(FetchAsync_hit_before_expiration_returns_value), async () =>
         {
             using var cache = new MemoryCache(new MemoryCacheOptions());
             var store = CreateStore(cache);
             var key = new CacheKey("memory-hit");
             var options = new CacheEntryOptions { AbsoluteTtl = TimeSpan.FromSeconds(1) };
 
-            await store.SetAsync(key, CacheValue.FromString("value"), options, CancellationToken.None);
-            var result = await store.FetchAsync(key, options, CancellationToken.None);
+            await store.Set(key, CacheValue.FromString("value"), options, CancellationToken.None);
+            var result = await store.Fetch(key, options, CancellationToken.None);
 
             result.Hit.Should().BeTrue();
             result.Value!.ToText().Should().Be("value");
@@ -39,23 +39,23 @@ public sealed class MemoryCacheStoreSpec
 
     [Fact]
     public Task FetchAsync_returns_miss_after_expiration_when_stale_disabled()
-        => SpecAsync(nameof(FetchAsync_returns_miss_after_expiration_when_stale_disabled), async () =>
+        => Spec(nameof(FetchAsync_returns_miss_after_expiration_when_stale_disabled), async () =>
         {
             using var cache = new MemoryCache(new MemoryCacheOptions());
             var store = CreateStore(cache);
             var key = new CacheKey("memory-expire");
             var options = new CacheEntryOptions { AbsoluteTtl = TimeSpan.FromMilliseconds(75) };
 
-            await store.SetAsync(key, CacheValue.FromString("value"), options, CancellationToken.None);
+            await store.Set(key, CacheValue.FromString("value"), options, CancellationToken.None);
             await Task.Delay(150);
 
-            var result = await store.FetchAsync(key, options, CancellationToken.None);
+            var result = await store.Fetch(key, options, CancellationToken.None);
             result.Hit.Should().BeFalse();
         });
 
     [Fact]
     public Task FetchAsync_serves_stale_when_enabled()
-        => SpecAsync(nameof(FetchAsync_serves_stale_when_enabled), async () =>
+        => Spec(nameof(FetchAsync_serves_stale_when_enabled), async () =>
         {
             using var cache = new MemoryCache(new MemoryCacheOptions());
             var store = CreateStore(cache, enableStale: true);
@@ -66,43 +66,43 @@ public sealed class MemoryCacheStoreSpec
                 AllowStaleFor = TimeSpan.FromMilliseconds(200)
             };
 
-            await store.SetAsync(key, CacheValue.FromString("value"), options, CancellationToken.None);
+            await store.Set(key, CacheValue.FromString("value"), options, CancellationToken.None);
             await Task.Delay(120);
 
-            var result = await store.FetchAsync(key, options, CancellationToken.None);
+            var result = await store.Fetch(key, options, CancellationToken.None);
             result.Hit.Should().BeTrue();
             result.Value!.ToText().Should().Be("value");
         });
 
     [Fact]
     public Task ExistsAsync_returns_false_after_expiration_when_stale_disabled()
-        => SpecAsync(nameof(ExistsAsync_returns_false_after_expiration_when_stale_disabled), async () =>
+        => Spec(nameof(ExistsAsync_returns_false_after_expiration_when_stale_disabled), async () =>
         {
             using var cache = new MemoryCache(new MemoryCacheOptions());
             var store = CreateStore(cache);
             var key = new CacheKey("memory-exists-expired");
             var options = new CacheEntryOptions { AbsoluteTtl = TimeSpan.FromMilliseconds(50) };
 
-            await store.SetAsync(key, CacheValue.FromString("value"), options, CancellationToken.None);
+            await store.Set(key, CacheValue.FromString("value"), options, CancellationToken.None);
             await Task.Delay(90);
 
-            var exists = await store.ExistsAsync(key, CancellationToken.None);
+            var exists = await store.Exists(key, CancellationToken.None);
             exists.Should().BeFalse();
         });
 
     [Fact]
     public Task EnumerateByTagAsync_returns_tagged_entries()
-        => SpecAsync(nameof(EnumerateByTagAsync_returns_tagged_entries), async () =>
+        => Spec(nameof(EnumerateByTagAsync_returns_tagged_entries), async () =>
         {
             using var cache = new MemoryCache(new MemoryCacheOptions());
             var store = CreateStore(cache, enableStale: true);
             var key = new CacheKey("memory-tag");
             var options = new CacheEntryOptions().WithTags("alpha");
 
-            await store.SetAsync(key, CacheValue.FromString("value"), options, CancellationToken.None);
+            await store.Set(key, CacheValue.FromString("value"), options, CancellationToken.None);
 
             var items = new List<TaggedCacheKey>();
-            await foreach (var item in store.EnumerateByTagAsync("alpha", CancellationToken.None))
+            await foreach (var item in store.EnumerateByTag("alpha", CancellationToken.None))
             {
                 items.Add(item);
             }
@@ -112,18 +112,18 @@ public sealed class MemoryCacheStoreSpec
 
     [Fact]
     public Task RemoveAsync_prunes_tag_index()
-        => SpecAsync(nameof(RemoveAsync_prunes_tag_index), async () =>
+        => Spec(nameof(RemoveAsync_prunes_tag_index), async () =>
         {
             using var cache = new MemoryCache(new MemoryCacheOptions());
             var store = CreateStore(cache, enableStale: true);
             var key = new CacheKey("memory-remove");
             var options = new CacheEntryOptions().WithTags("beta");
 
-            await store.SetAsync(key, CacheValue.FromString("value"), options, CancellationToken.None);
-            await store.RemoveAsync(key, CancellationToken.None);
+            await store.Set(key, CacheValue.FromString("value"), options, CancellationToken.None);
+            await store.Remove(key, CancellationToken.None);
 
             var results = new List<TaggedCacheKey>();
-            await foreach (var item in store.EnumerateByTagAsync("beta", CancellationToken.None))
+            await foreach (var item in store.EnumerateByTag("beta", CancellationToken.None))
             {
                 results.Add(item);
             }
@@ -142,11 +142,11 @@ public sealed class MemoryCacheStoreSpec
         return new MemoryCacheStore(cache, options, NullLogger<MemoryCacheStore>.Instance);
     }
 
-    private Task SpecAsync(string scenario, Func<Task> body)
+    private Task Spec(string scenario, Func<Task> body)
         => TestPipeline.For<MemoryCacheStoreSpec>(_output, scenario)
             .Assert(async _ =>
             {
                 await body().ConfigureAwait(false);
             })
-            .RunAsync();
+            .Run();
 }

@@ -24,37 +24,37 @@ public sealed class TagPipelineHooks : IModelHook<TagPipeline>
 
     public int Order => 0;
 
-    public Task OnBeforeFetchAsync(HookContext<TagPipeline> ctx, string id) => Task.CompletedTask;
+    public Task OnBeforeFetch(HookContext<TagPipeline> ctx, string id) => Task.CompletedTask;
 
-    public Task OnAfterFetchAsync(HookContext<TagPipeline> ctx, TagPipeline? model) => Task.CompletedTask;
+    public Task OnAfterFetch(HookContext<TagPipeline> ctx, TagPipeline? model) => Task.CompletedTask;
 
-    public Task OnBeforeSaveAsync(HookContext<TagPipeline> ctx, TagPipeline model)
+    public Task OnBeforeSave(HookContext<TagPipeline> ctx, TagPipeline model)
     {
         Normalize(model);
         return Task.CompletedTask;
     }
 
-    public Task OnBeforeDeleteAsync(HookContext<TagPipeline> ctx, TagPipeline model) => Task.CompletedTask;
+    public Task OnBeforeDelete(HookContext<TagPipeline> ctx, TagPipeline model) => Task.CompletedTask;
 
-    public async Task OnAfterSaveAsync(HookContext<TagPipeline> ctx, TagPipeline model)
+    public async Task OnAfterSave(HookContext<TagPipeline> ctx, TagPipeline model)
     {
         Invalidate(model);
-        await InvalidateLinkedRulesAsync(ctx, model.RuleIds).ConfigureAwait(false);
+        await InvalidateLinkedRules(ctx, model.RuleIds).ConfigureAwait(false);
     }
 
-    public async Task OnAfterDeleteAsync(HookContext<TagPipeline> ctx, TagPipeline model)
+    public async Task OnAfterDelete(HookContext<TagPipeline> ctx, TagPipeline model)
     {
         Invalidate(model);
-        await InvalidateLinkedRulesAsync(ctx, model.RuleIds).ConfigureAwait(false);
+        await InvalidateLinkedRules(ctx, model.RuleIds).ConfigureAwait(false);
     }
 
-    public Task OnBeforePatchAsync(HookContext<TagPipeline> ctx, string id, object patch) => Task.CompletedTask;
+    public Task OnBeforePatch(HookContext<TagPipeline> ctx, string id, object patch) => Task.CompletedTask;
 
-    public async Task OnAfterPatchAsync(HookContext<TagPipeline> ctx, TagPipeline model)
+    public async Task OnAfterPatch(HookContext<TagPipeline> ctx, TagPipeline model)
     {
         Normalize(model);
         Invalidate(model);
-        await InvalidateLinkedRulesAsync(ctx, model.RuleIds).ConfigureAwait(false);
+        await InvalidateLinkedRules(ctx, model.RuleIds).ConfigureAwait(false);
     }
 
     private static void Normalize(TagPipeline pipeline)
@@ -90,7 +90,7 @@ public sealed class TagPipelineHooks : IModelHook<TagPipeline>
         _cache.Remove(cacheKey);
     }
 
-    private async Task InvalidateLinkedRulesAsync(HookContext<TagPipeline> ctx, IReadOnlyCollection<string>? ruleIds)
+    private async Task InvalidateLinkedRules(HookContext<TagPipeline> ctx, IReadOnlyCollection<string>? ruleIds)
     {
         if (ruleIds == null || ruleIds.Count == 0)
         {

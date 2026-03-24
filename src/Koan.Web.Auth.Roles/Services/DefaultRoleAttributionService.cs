@@ -26,7 +26,7 @@ public sealed class DefaultRoleAttributionService : IRoleAttributionService
         _bootstrap = bootstrap;
     }
 
-    public async Task<RoleAttributionResult> ComputeAsync(ClaimsPrincipal user, RoleAttributionContext? context = null, CancellationToken ct = default)
+    public async Task<RoleAttributionResult> Compute(ClaimsPrincipal user, RoleAttributionContext? context = null, CancellationToken ct = default)
     {
         if (user?.Identity?.IsAuthenticated != true)
             return RoleAttributionResult.Empty;
@@ -57,7 +57,7 @@ public sealed class DefaultRoleAttributionService : IRoleAttributionService
         {
             try
             {
-                await c.ContributeAsync(user, roles, perms, context, ct);
+                await c.Contribute(user, roles, perms, context, ct);
             }
             catch (Exception ex)
             {
@@ -66,7 +66,7 @@ public sealed class DefaultRoleAttributionService : IRoleAttributionService
         }
 
         // 5) Bootstrap elevation gates (one-time)
-        await TryApplyBootstrapAsync(user, roles, ct);
+        await TryApplyBootstrap(user, roles, ct);
 
         // 6) Dev fallback: ensure at least a reader role if configured and no roles found
         if (roles.Count == 0 && opts.DevFallback.Enabled && IsDevelopment())
@@ -83,14 +83,14 @@ public sealed class DefaultRoleAttributionService : IRoleAttributionService
     return result;
     }
 
-    private async Task TryApplyBootstrapAsync(ClaimsPrincipal user, HashSet<string> roles, CancellationToken ct)
+    private async Task TryApplyBootstrap(ClaimsPrincipal user, HashSet<string> roles, CancellationToken ct)
     {
     var opts = _options.CurrentValue;
     var mode = opts.Bootstrap?.Mode ?? "None";
         if (string.Equals(mode, "None", StringComparison.OrdinalIgnoreCase)) return;
 
         // If an admin is already bootstrapped, do nothing
-        try { if (await _bootstrap.IsAdminBootstrappedAsync(ct)) return; }
+        try { if (await _bootstrap.IsAdminBootstrapped(ct)) return; }
         catch { return; }
 
         // Only elevate when the current principal lacks admin already
@@ -126,7 +126,7 @@ public sealed class DefaultRoleAttributionService : IRoleAttributionService
 
         try
         {
-            await _bootstrap.MarkAdminBootstrappedAsync(userId, mode, ct);
+            await _bootstrap.MarkAdminBootstrapped(userId, mode, ct);
             roles.Add("admin");
             _logger.LogInformation("Koan.Web.Auth.Roles: admin bootstrap applied for {UserId} via {Mode}", userId, mode);
         }

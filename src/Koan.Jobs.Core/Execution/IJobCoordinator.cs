@@ -16,5 +16,5 @@ internal interface IJobCoordinator
     Task Cancel<TJob, TContext, TResult>(string jobId, CancellationToken cancellationToken)
         where TJob : Job<TJob, TContext, TResult>, new();
 
-    Task<IReadOnlyList<JobExecution>> GetExecutionsAsync(string jobId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<JobExecution>> GetExecutions(string jobId, CancellationToken cancellationToken);
 }

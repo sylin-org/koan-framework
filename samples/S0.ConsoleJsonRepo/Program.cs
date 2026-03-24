@@ -42,7 +42,7 @@ await Todo.AllStream()
         }
     })
     .Save()
-    .ExecuteAsync();
+    .Execute();
 
 var after = await Todo.All();
 Console.WriteLine("After pipeline mutation:");

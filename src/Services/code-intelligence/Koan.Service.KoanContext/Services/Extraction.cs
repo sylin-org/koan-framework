@@ -32,10 +32,10 @@ public class Extraction
         _logger.LogInformation("File size limit set to {MaxFileSizeMB} MB", maxFileSizeMB);
     }
 
-    public Task<ExtractedDocument> ExtractAsync(string filePath, CancellationToken cancellationToken = default)
-        => ExtractAsync(filePath, relativePath: null, cancellationToken);
+    public Task<ExtractedDocument> Extract(string filePath, CancellationToken cancellationToken = default)
+        => Extract(filePath, relativePath: null, cancellationToken);
 
-    public async Task<ExtractedDocument> ExtractAsync(
+    public async Task<ExtractedDocument> Extract(
         string filePath,
         string? relativePath,
         CancellationToken cancellationToken = default)
@@ -84,7 +84,7 @@ public class Extraction
                 TitleHierarchy: Array.Empty<string>());
         }
 
-        var fullText = await File.ReadAllTextAsync(filePath, cancellationToken);
+        var fullText = await File.ReadAllText(filePath, cancellationToken);
 
         if (string.IsNullOrWhiteSpace(fullText))
         {

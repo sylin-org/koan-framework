@@ -20,7 +20,7 @@ internal sealed class AniListParser : Services.IMediaParser
         _logger = logger;
     }
 
-    public async Task<List<Media>> ParsePageAsync(string rawJson, MediaType mediaType, CancellationToken ct = default)
+    public async Task<List<Media>> ParsePage(string rawJson, MediaType mediaType, CancellationToken ct = default)
     {
         var result = new List<Media>();
 
@@ -46,7 +46,7 @@ internal sealed class AniListParser : Services.IMediaParser
             {
                 if (ct.IsCancellationRequested) break;
 
-                var mediaItem = await ParseMediaItemAsync(m, mediaType, ct);
+                var mediaItem = await ParseMediaItem(m, mediaType, ct);
                 if (mediaItem != null)
                 {
                     result.Add(mediaItem);
@@ -61,7 +61,7 @@ internal sealed class AniListParser : Services.IMediaParser
         return result;
     }
 
-    private Task<Media?> ParseMediaItemAsync(JToken item, MediaType mediaType, CancellationToken ct = default)
+    private Task<Media?> ParseMediaItem(JToken item, MediaType mediaType, CancellationToken ct = default)
     {
         try
         {

@@ -15,7 +15,7 @@ public partial class CustomerValidationContributor : ICanonPipelineContributor<C
     public CanonPipelinePhase Phase => CanonPipelinePhase.Validation;
 
     /// <inheritdoc />
-    public async ValueTask<CanonizationEvent?> ExecuteAsync(
+    public async ValueTask<CanonizationEvent?> Execute(
         CanonPipelineContext<Customer> context,
         CancellationToken cancellationToken)
     {

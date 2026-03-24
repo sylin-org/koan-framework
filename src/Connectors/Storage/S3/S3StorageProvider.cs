@@ -50,7 +50,7 @@ public sealed class S3StorageProvider : IStorageProvider, IStatOperations, IServ
         SupportsServerSideCopy: true
     );
 
-    public async Task WriteAsync(string container, string key, Stream content, string? contentType, CancellationToken ct = default)
+    public async Task Write(string container, string key, Stream content, string? contentType, CancellationToken ct = default)
     {
         var client = GetClient();
         var bucket = ResolveBucket(container);
@@ -66,7 +66,7 @@ public sealed class S3StorageProvider : IStorageProvider, IStatOperations, IServ
         await client.PutObjectAsync(args, ct);
     }
 
-    public async Task<Stream> OpenReadAsync(string container, string key, CancellationToken ct = default)
+    public async Task<Stream> OpenRead(string container, string key, CancellationToken ct = default)
     {
         var client = GetClient();
         var bucket = ResolveBucket(container);
@@ -97,7 +97,7 @@ public sealed class S3StorageProvider : IStorageProvider, IStatOperations, IServ
         return ms;
     }
 
-    public async Task<(Stream Stream, long? Length)> OpenReadRangeAsync(string container, string key, long? from, long? to, CancellationToken ct = default)
+    public async Task<(Stream Stream, long? Length)> OpenReadRange(string container, string key, long? from, long? to, CancellationToken ct = default)
     {
         var client = GetClient();
         var bucket = ResolveBucket(container);
@@ -125,7 +125,7 @@ public sealed class S3StorageProvider : IStorageProvider, IStatOperations, IServ
         return (ms, length);
     }
 
-    public async Task<bool> DeleteAsync(string container, string key, CancellationToken ct = default)
+    public async Task<bool> Delete(string container, string key, CancellationToken ct = default)
     {
         var client = GetClient();
         var bucket = ResolveBucket(container);
@@ -142,11 +142,11 @@ public sealed class S3StorageProvider : IStorageProvider, IStatOperations, IServ
         }
     }
 
-    public async Task<bool> ExistsAsync(string container, string key, CancellationToken ct = default)
+    public async Task<bool> Exists(string container, string key, CancellationToken ct = default)
     {
         try
         {
-            var stat = await HeadAsync(container, key, ct);
+            var stat = await Head(container, key, ct);
             return stat is not null;
         }
         catch
@@ -155,7 +155,7 @@ public sealed class S3StorageProvider : IStorageProvider, IStatOperations, IServ
         }
     }
 
-    public async Task<ObjectStat?> HeadAsync(string container, string key, CancellationToken ct = default)
+    public async Task<ObjectStat?> Head(string container, string key, CancellationToken ct = default)
     {
         var client = GetClient();
         var bucket = ResolveBucket(container);
@@ -177,7 +177,7 @@ public sealed class S3StorageProvider : IStorageProvider, IStatOperations, IServ
         }
     }
 
-    public async Task<bool> CopyAsync(string sourceContainer, string sourceKey, string targetContainer, string targetKey, CancellationToken ct = default)
+    public async Task<bool> Copy(string sourceContainer, string sourceKey, string targetContainer, string targetKey, CancellationToken ct = default)
     {
         var client = GetClient();
         var srcBucket = ResolveBucket(sourceContainer);
@@ -193,7 +193,7 @@ public sealed class S3StorageProvider : IStorageProvider, IStatOperations, IServ
         return true;
     }
 
-    public async IAsyncEnumerable<StorageObjectInfo> ListObjectsAsync(
+    public async IAsyncEnumerable<StorageObjectInfo> ListObjects(
         string container,
         string? prefix = null,
         [EnumeratorCancellation] CancellationToken ct = default)
@@ -393,21 +393,21 @@ public sealed class S3StorageProvider : IStorageProvider, IStatOperations, IServ
         return $"{prefix}-{container}";
     }
 
-    public async Task<Uri> PresignReadAsync(string container, string key, TimeSpan expiry, CancellationToken ct = default)
+    public async Task<Uri> PresignRead(string container, string key, TimeSpan expiry, CancellationToken ct = default)
     {
-        return await PresignViaMossAsync(container, key, "GET", expiry, null, ct);
+        return await PresignViaMoss(container, key, "GET", expiry, null, ct);
     }
 
-    public async Task<Uri> PresignWriteAsync(string container, string key, TimeSpan expiry, string? contentType = null, CancellationToken ct = default)
+    public async Task<Uri> PresignWrite(string container, string key, TimeSpan expiry, string? contentType = null, CancellationToken ct = default)
     {
-        return await PresignViaMossAsync(container, key, "PUT", expiry, contentType, ct);
+        return await PresignViaMoss(container, key, "PUT", expiry, contentType, ct);
     }
 
     /// <summary>
     /// Sends a presign request to the Moss-native presign endpoint.
     /// POST {MossEndpoint}/api/v1/storage/s3/presign
     /// </summary>
-    private async Task<Uri> PresignViaMossAsync(
+    private async Task<Uri> PresignViaMoss(
         string container, string key, string method, TimeSpan expiry,
         string? contentType, CancellationToken ct)
     {

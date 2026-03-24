@@ -36,7 +36,7 @@ public sealed class TransactionBasicsSpec
     public async Task Transaction_defers_entity_saves_until_commit()
     {
         await TestPipeline.For<TransactionBasicsSpec>(_output, nameof(Transaction_defers_entity_saves_until_commit))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
@@ -72,7 +72,7 @@ public sealed class TransactionBasicsSpec
                         countDuringTransaction.Should().Be(0, "entities should not be persisted during transaction");
 
                         // Commit explicitly
-                        await EntityContext.CommitAsync();
+                        await EntityContext.Commit();
                     }
 
                     // After commit - entities should be persisted
@@ -91,14 +91,14 @@ public sealed class TransactionBasicsSpec
                 entity1.Should().NotBeNull();
                 entity2.Should().NotBeNull();
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
     public async Task Transaction_rollback_discards_pending_changes()
     {
         await TestPipeline.For<TransactionBasicsSpec>(_output, nameof(Transaction_rollback_discards_pending_changes))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
@@ -123,7 +123,7 @@ public sealed class TransactionBasicsSpec
                         await entity.Save();
 
                         // Rollback explicitly
-                        await EntityContext.RollbackAsync();
+                        await EntityContext.Rollback();
                     }
 
                     // After rollback - entity should NOT be persisted
@@ -136,14 +136,14 @@ public sealed class TransactionBasicsSpec
 
                 entity.Should().NotBeNull();
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
     public async Task Transaction_auto_commits_on_dispose()
     {
         await TestPipeline.For<TransactionBasicsSpec>(_output, nameof(Transaction_auto_commits_on_dispose))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
@@ -180,14 +180,14 @@ public sealed class TransactionBasicsSpec
 
                 entity.Should().NotBeNull();
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
     public async Task Transaction_tracks_delete_operations()
     {
         await TestPipeline.For<TransactionBasicsSpec>(_output, nameof(Transaction_tracks_delete_operations))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
@@ -221,7 +221,7 @@ public sealed class TransactionBasicsSpec
                         var countDuringTransaction = await TodoEntity.Count;
                         countDuringTransaction.Should().Be(1, "entity should still exist during transaction");
 
-                        await EntityContext.CommitAsync();
+                        await EntityContext.Commit();
                     }
 
                     // After commit - entity should be deleted
@@ -234,14 +234,14 @@ public sealed class TransactionBasicsSpec
 
                 entity.Should().NotBeNull();
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
     public async Task Nested_transactions_throw_exception()
     {
         await TestPipeline.For<TransactionBasicsSpec>(_output, nameof(Nested_transactions_throw_exception))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Assert(static async _ =>
             {
                 InvalidOperationException? exception = null;
@@ -267,14 +267,14 @@ public sealed class TransactionBasicsSpec
 
                 await Task.CompletedTask;
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
     public async Task Transaction_context_is_accessible()
     {
         await TestPipeline.For<TransactionBasicsSpec>(_output, nameof(Transaction_context_is_accessible))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Assert(static async _ =>
             {
                 // Outside transaction
@@ -299,6 +299,6 @@ public sealed class TransactionBasicsSpec
                 inTransactionFlag.Should().BeTrue("should be in transaction inside using block");
                 transactionName.Should().Be("context-test");
             })
-            .RunAsync();
+            .Run();
     }
 }

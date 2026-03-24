@@ -48,7 +48,7 @@ internal sealed class RedisInvalidationListener : IHostedService, IAsyncDisposab
 
         var subscriber = _multiplexer.GetSubscriber();
         _subscription = await subscriber.SubscribeAsync(_store.Channel);
-        _subscription.OnMessage(async message => await HandleMessageAsync(message.Message));
+        _subscription.OnMessage(async message => await HandleMessage(message.Message));
         _started = true;
         _logger.LogInformation("Redis cache invalidation listener subscribed to channel {Channel}.", _store.Channel);
     }
@@ -92,12 +92,12 @@ internal sealed class RedisInvalidationListener : IHostedService, IAsyncDisposab
         }
     }
 
-    private async Task HandleMessageAsync(RedisValue payload)
+    private async Task HandleMessage(RedisValue payload)
     {
         try
         {
             var message = RedisCacheJsonConverter.DeserializeInvalidation(payload);
-            await _store.HandleInvalidationMessageAsync(message, CancellationToken.None);
+            await _store.HandleInvalidationMessage(message, CancellationToken.None);
             _logger.LogDebug("Processed Redis cache invalidation for key {Key}.", message.Key);
         }
         catch (Exception ex)

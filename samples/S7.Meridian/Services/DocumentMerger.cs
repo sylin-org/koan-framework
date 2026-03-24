@@ -19,7 +19,7 @@ namespace Koan.Samples.Meridian.Services;
 
 public interface IDocumentMerger
 {
-    Task<Deliverable> MergeAsync(DocumentPipeline pipeline, IReadOnlyList<ExtractedField> extractions, CancellationToken ct);
+    Task<Deliverable> Merge(DocumentPipeline pipeline, IReadOnlyList<ExtractedField> extractions, CancellationToken ct);
 }
 
 public sealed class DocumentMerger : IDocumentMerger
@@ -67,7 +67,7 @@ public sealed class DocumentMerger : IDocumentMerger
         _logger = logger;
     }
 
-    public async Task<Deliverable> MergeAsync(DocumentPipeline pipeline, IReadOnlyList<ExtractedField> extractions, CancellationToken ct)
+    public async Task<Deliverable> Merge(DocumentPipeline pipeline, IReadOnlyList<ExtractedField> extractions, CancellationToken ct)
     {
         if (extractions.Count == 0)
         {
@@ -92,7 +92,7 @@ public sealed class DocumentMerger : IDocumentMerger
         var sourceCache = new Dictionary<string, SourceDocument?>(StringComparer.OrdinalIgnoreCase);
         var passageCache = new Dictionary<string, Passage?>(StringComparer.OrdinalIgnoreCase);
 
-        var priorDeliverables = (await Deliverable.Query(d => d.PipelineId == pipeline.Id, ct).ConfigureAwait(false)).ToList();
+        var priorDeliverables = (await Deliverable.Query(d => d.PipelineId == pipeline.Id, ct).ConfigureAwait(false)).ToListAsync();
         var nextVersion = priorDeliverables.Count + 1;
 
         foreach (var group in groups)
@@ -106,7 +106,7 @@ public sealed class DocumentMerger : IDocumentMerger
             totalConflicts += Math.Max(0, candidates.Count - 1);
 
             var descriptor = ResolvePolicy(group.Key);
-            var mergeResult = await ApplyPolicyAsync(group.Key, candidates, descriptor, sourceCache, ct).ConfigureAwait(false);
+            var mergeResult = await ApplyPolicy(group.Key, candidates, descriptor, sourceCache, ct).ConfigureAwait(false);
 
             autoResolved += mergeResult.Rejected.Count;
 
@@ -178,7 +178,7 @@ public sealed class DocumentMerger : IDocumentMerger
 
             if (_options.Merge.EnableCitations && hasCanonicalContent && !string.IsNullOrWhiteSpace(formattedValue))
             {
-                var footnote = await BuildFootnoteAsync(savedAccepted, mergeResult.ValueToken, footnotes.Count + 1, sourceCache, passageCache, ct).ConfigureAwait(false);
+                var footnote = await BuildFootnote(savedAccepted, mergeResult.ValueToken, footnotes.Count + 1, sourceCache, passageCache, ct).ConfigureAwait(false);
                 if (footnote is { } info)
                 {
                     footnotes.Add(info);
@@ -196,7 +196,7 @@ public sealed class DocumentMerger : IDocumentMerger
                 _logger.LogDebug("Canonical field {TemplateKey} populated: value={Value}, formatted={Formatted}",
                     templateKey, clonedValue.ToString(Formatting.None), formattedValue);
 
-                var evidenceToken = await BuildEvidenceTokenAsync(savedAccepted, sourceCache, passageCache, ct).ConfigureAwait(false);
+                var evidenceToken = await BuildEvidenceToken(savedAccepted, sourceCache, passageCache, ct).ConfigureAwait(false);
                 if (evidenceToken is not null && HasSubstantiveValue(evidenceToken))
                 {
                     evidence[templateKey] = evidenceToken;
@@ -246,7 +246,7 @@ public sealed class DocumentMerger : IDocumentMerger
                     metadata["explanation"] = mergeResult.Explanation!;
                 }
 
-                await _runLog.AppendAsync(new RunLog
+                await _runLog.Append(new RunLog
                 {
                     PipelineId = pipeline.Id,
                     Stage = "merge",
@@ -313,12 +313,12 @@ public sealed class DocumentMerger : IDocumentMerger
         string? pdfKey = null;
         try
         {
-            var pdfBytes = await _pdfRenderer.RenderAsync(markdown, ct).ConfigureAwait(false);
+            var pdfBytes = await _pdfRenderer.Render(markdown, ct).ConfigureAwait(false);
             if (pdfBytes.Length > 0)
             {
                 await using var pdfStream = new MemoryStream(pdfBytes, writable: false);
                 var fileName = $"{pipeline.Id}-{now:yyyyMMddHHmmss}.pdf";
-                pdfKey = await _deliverableStorage.StoreAsync(pdfStream, fileName, "application/pdf", ct).ConfigureAwait(false);
+                pdfKey = await _deliverableStorage.Store(pdfStream, fileName, "application/pdf", ct).ConfigureAwait(false);
             }
         }
         catch (Exception ex)
@@ -368,7 +368,7 @@ public sealed class DocumentMerger : IDocumentMerger
         };
         await snapshot.Save(ct).ConfigureAwait(false);
 
-        await _runLog.AppendAsync(new RunLog
+        await _runLog.Append(new RunLog
         {
             PipelineId = pipeline.Id,
             Stage = "quality",
@@ -388,7 +388,7 @@ public sealed class DocumentMerger : IDocumentMerger
             }
         }, ct).ConfigureAwait(false);
 
-        await _runLog.AppendAsync(new RunLog
+        await _runLog.Append(new RunLog
         {
             PipelineId = pipeline.Id,
             Stage = "render",
@@ -446,7 +446,7 @@ public sealed class DocumentMerger : IDocumentMerger
         };
     }
 
-    private async Task<FieldMergeResult> ApplyPolicyAsync(
+    private async Task<FieldMergeResult> ApplyPolicy(
         string fieldPath,
         List<ExtractedField> candidates,
         MergePolicyDescriptor descriptor,
@@ -501,7 +501,7 @@ public sealed class DocumentMerger : IDocumentMerger
 
         FieldMergeResult result = descriptor.Strategy switch
         {
-            MergeStrategyType.SourcePrecedence => await ApplySourcePrecedenceAsync(candidates, descriptor, sourceCache, ct),
+            MergeStrategyType.SourcePrecedence => await ApplySourcePrecedence(candidates, descriptor, sourceCache, ct),
             MergeStrategyType.Latest => ApplyLatest(candidates, descriptor),
             MergeStrategyType.Consensus => ApplyConsensus(candidates, descriptor),
             MergeStrategyType.Collection => ApplyCollection(candidates, descriptor),
@@ -513,7 +513,7 @@ public sealed class DocumentMerger : IDocumentMerger
         return result with { ValueToken = transformed };
     }
 
-    private async Task<FieldMergeResult> ApplySourcePrecedenceAsync(
+    private async Task<FieldMergeResult> ApplySourcePrecedence(
         List<ExtractedField> candidates,
         MergePolicyDescriptor descriptor,
         Dictionary<string, SourceDocument?> sourceCache,
@@ -524,7 +524,7 @@ public sealed class DocumentMerger : IDocumentMerger
         var ranked = new List<(ExtractedField Field, int Priority, string SourceType)>();
         foreach (var candidate in candidates)
         {
-            var doc = await GetSourceDocumentAsync(candidate.SourceDocumentId, sourceCache, ct);
+            var doc = await GetSourceDocument(candidate.SourceDocumentId, sourceCache, ct);
             var sourceType = doc?.SourceType ?? MeridianConstants.SourceTypes.Unspecified;
             var priority = precedence.FindIndex(type => string.Equals(type, sourceType, StringComparison.OrdinalIgnoreCase));
             if (priority < 0)
@@ -745,7 +745,7 @@ public sealed class DocumentMerger : IDocumentMerger
         }
     }
 
-    private async Task<Footnote?> BuildFootnoteAsync(
+    private async Task<Footnote?> BuildFootnote(
         ExtractedField accepted,
     JToken? valueToken,
         int index,
@@ -770,8 +770,8 @@ public sealed class DocumentMerger : IDocumentMerger
         var section = evidence.Section ?? GetMetadataValue(evidence, "section");
         var page = evidence.Page ?? TryParseNullableInt(GetMetadataValue(evidence, "page"));
 
-        var source = await GetSourceDocumentAsync(sourceId, sourceCache, ct).ConfigureAwait(false);
-        var passage = await GetPassageAsync(passageId, passageCache, ct).ConfigureAwait(false);
+        var source = await GetSourceDocument(sourceId, sourceCache, ct).ConfigureAwait(false);
+        var passage = await GetPassage(passageId, passageCache, ct).ConfigureAwait(false);
 
         var builder = new StringBuilder();
         builder.Append(source?.OriginalFileName ?? "Source");
@@ -826,7 +826,7 @@ public sealed class DocumentMerger : IDocumentMerger
         return new Footnote(index, builder.ToString());
     }
 
-    private async Task<JObject?> BuildEvidenceTokenAsync(
+    private async Task<JObject?> BuildEvidenceToken(
         ExtractedField accepted,
         Dictionary<string, SourceDocument?> sourceCache,
         Dictionary<string, Passage?> passageCache,
@@ -849,8 +849,8 @@ public sealed class DocumentMerger : IDocumentMerger
         var section = evidence.Section ?? GetMetadataValue(evidence, "section");
         var page = evidence.Page ?? TryParseNullableInt(GetMetadataValue(evidence, "page"));
 
-        var source = await GetSourceDocumentAsync(sourceId, sourceCache, ct).ConfigureAwait(false);
-        var passage = await GetPassageAsync(passageId, passageCache, ct).ConfigureAwait(false);
+        var source = await GetSourceDocument(sourceId, sourceCache, ct).ConfigureAwait(false);
+        var passage = await GetPassage(passageId, passageCache, ct).ConfigureAwait(false);
 
         var textualEvidence = !string.IsNullOrWhiteSpace(evidence.OriginalText)
             ? evidence.OriginalText
@@ -1151,7 +1151,7 @@ public sealed class DocumentMerger : IDocumentMerger
         return null;
     }
 
-    private static async Task<SourceDocument?> GetSourceDocumentAsync(string? id, Dictionary<string, SourceDocument?> cache, CancellationToken ct)
+    private static async Task<SourceDocument?> GetSourceDocument(string? id, Dictionary<string, SourceDocument?> cache, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(id))
         {
@@ -1168,7 +1168,7 @@ public sealed class DocumentMerger : IDocumentMerger
         return loaded;
     }
 
-    private static async Task<Passage?> GetPassageAsync(string? id, Dictionary<string, Passage?> cache, CancellationToken ct)
+    private static async Task<Passage?> GetPassage(string? id, Dictionary<string, Passage?> cache, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(id))
         {

@@ -31,7 +31,7 @@ internal sealed class TestCapableAdapter : IAiAdapter, IChatAdapter, IEmbedAdapt
 
     public bool CanServe(AiChatRequest request) => HasCapability(AiCapability.Chat);
 
-    public Task<AiChatResponse> ChatAsync(AiChatRequest request, CancellationToken ct = default)
+    public Task<AiChatResponse> Chat(AiChatRequest request, CancellationToken ct = default)
         => Task.FromResult(new AiChatResponse
         {
             Text = $"Response from {Id}",
@@ -39,7 +39,7 @@ internal sealed class TestCapableAdapter : IAiAdapter, IChatAdapter, IEmbedAdapt
             AdapterId = Id
         });
 
-    public async IAsyncEnumerable<AiChatChunk> StreamAsync(
+    public async IAsyncEnumerable<AiChatChunk> Stream(
         AiChatRequest request,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
@@ -47,14 +47,14 @@ internal sealed class TestCapableAdapter : IAiAdapter, IChatAdapter, IEmbedAdapt
         yield return new AiChatChunk { DeltaText = $"Streamed from {Id}", Model = "test-model" };
     }
 
-    public Task<AiEmbeddingsResponse> EmbedAsync(AiEmbeddingsRequest request, CancellationToken ct = default)
+    public Task<AiEmbeddingsResponse> Embed(AiEmbeddingsRequest request, CancellationToken ct = default)
         => Task.FromResult(new AiEmbeddingsResponse
         {
             Vectors = request.Input.Select(_ => new float[] { 0.1f, 0.2f, 0.3f }).ToList(),
             Model = "test-embed"
         });
 
-    public Task<IReadOnlyList<AiModelDescriptor>> ListModelsAsync(CancellationToken ct = default)
+    public Task<IReadOnlyList<AiModelDescriptor>> ListModels(CancellationToken ct = default)
         => Task.FromResult<IReadOnlyList<AiModelDescriptor>>(
             [new AiModelDescriptor { Name = "test-model", AdapterId = Id }]);
 }
@@ -65,7 +65,7 @@ internal sealed class TestModelManager : IAiModelManager
 
     public TestModelManager(string adapterId) => _adapterId = adapterId;
 
-    public Task<AiModelOperationResult> EnsureInstalledAsync(
+    public Task<AiModelOperationResult> EnsureInstalled(
         AiModelOperationRequest request, CancellationToken ct)
         => Task.FromResult(new AiModelOperationResult
         {
@@ -74,14 +74,14 @@ internal sealed class TestModelManager : IAiModelManager
             Message = $"Model {request.Model} installed on {_adapterId}"
         });
 
-    public Task<AiModelOperationResult> RefreshAsync(
+    public Task<AiModelOperationResult> Refresh(
         AiModelOperationRequest request, CancellationToken ct)
         => Task.FromResult(new AiModelOperationResult { Success = true });
 
-    public Task<AiModelOperationResult> FlushAsync(
+    public Task<AiModelOperationResult> Flush(
         AiModelOperationRequest request, CancellationToken ct)
         => Task.FromResult(new AiModelOperationResult { Success = true });
 
-    public Task<IReadOnlyList<AiModelDescriptor>> ListManagedModelsAsync(CancellationToken ct)
+    public Task<IReadOnlyList<AiModelDescriptor>> ListManagedModels(CancellationToken ct)
         => Task.FromResult<IReadOnlyList<AiModelDescriptor>>([]);
 }

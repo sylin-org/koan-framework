@@ -42,7 +42,7 @@ public class IncrementalIndexer
         _tagResolver = tagResolver ?? throw new ArgumentNullException(nameof(tagResolver));
     }
 
-    public async Task ProcessFileChangesAsync(
+    public async Task ProcessFileChanges(
         string projectId,
         List<FileChange> changes,
         CancellationToken cancellationToken = default)
@@ -73,7 +73,7 @@ public class IncrementalIndexer
                 {
                     try
                     {
-                        await ProcessSingleFileChangeAsync(project, change, extraction, chunking, embedding, cancellationToken);
+                        await ProcessSingleFileChange(project, change, extraction, chunking, embedding, cancellationToken);
                     }
                     catch (Exception ex)
                     {
@@ -107,7 +107,7 @@ public class IncrementalIndexer
         }
     }
 
-    private async Task ProcessSingleFileChangeAsync(
+    private async Task ProcessSingleFileChange(
         Project project,
         FileChange change,
         Extraction extraction,
@@ -120,7 +120,7 @@ public class IncrementalIndexer
         switch (change.Type)
         {
             case FileChangeType.Deleted:
-                await _chunkMaintenance.RemoveFileAsync(
+                await _chunkMaintenance.RemoveFile(
                     relativePath,
                     deleteIndexedFile: true,
                     deleteVectors: true,
@@ -129,7 +129,7 @@ public class IncrementalIndexer
 
             case FileChangeType.Modified:
                 // Delete old chunks
-                await _chunkMaintenance.RemoveFileAsync(
+                await _chunkMaintenance.RemoveFile(
                     relativePath,
                     deleteIndexedFile: false,
                     deleteVectors: true,
@@ -138,13 +138,13 @@ public class IncrementalIndexer
                 // Re-index if file still exists
                 if (File.Exists(change.Path))
                 {
-                    await IndexSingleFileAsync(project, change.Path, extraction, chunking, embedding, cancellationToken);
+                    await IndexSingleFile(project, change.Path, extraction, chunking, embedding, cancellationToken);
                 }
                 break;
         }
     }
 
-    private async Task IndexSingleFileAsync(
+    private async Task IndexSingleFile(
         Project project,
         string filePath,
         Extraction extraction,
@@ -154,7 +154,7 @@ public class IncrementalIndexer
     {
         var relativePath = Path.GetRelativePath(project.RootPath, filePath);
         var fileInfo = new FileInfo(filePath);
-        var fileHash = await FileHasher.ComputeSha256Async(filePath, cancellationToken);
+        var fileHash = await FileHasher.ComputeSha256(filePath, cancellationToken);
 
         var indexedFileResults = await IndexedFile.Query(
             f => f.RelativePath == relativePath,
@@ -174,7 +174,7 @@ public class IncrementalIndexer
         }
 
         // 2. Extract content and derive metadata
-        var extracted = await extraction.ExtractAsync(
+        var extracted = await extraction.Extract(
             filePath,
             relativePath,
             cancellationToken);
@@ -188,14 +188,14 @@ public class IncrementalIndexer
             language: null,
             frontmatter: frontmatter.Metadata,
             fileTags: frontmatter.Tags);
-        var fileTagResult = await _tagResolver.ResolveAsync(fileTagInput, cancellationToken);
+        var fileTagResult = await _tagResolver.Resolve(fileTagInput, cancellationToken);
         indexedFile.SetTagEnvelope(fileTagResult.Envelope);
         await indexedFile.Save(cancellationToken);
 
         var inheritedTags = GetInheritedTags(fileTagResult.Envelope);
 
         // Chunk content
-        await foreach (var chunk in chunking.ChunkAsync(
+        await foreach (var chunk in chunking.Chunk(
             extracted,
             project.Id.ToString(),
             commitSha: null,
@@ -204,7 +204,7 @@ public class IncrementalIndexer
             var provenance = ComputeProvenance(extracted.FullText, chunk.StartOffset, chunk.EndOffset);
 
             // Generate embedding
-            var embeddingVector = await embedding.EmbedAsync(chunk.Text, cancellationToken);
+            var embeddingVector = await embedding.Embed(chunk.Text, cancellationToken);
 
             // Create Chunk entity (within partition context, linked to IndexedFile)
             var docChunk = Chunk.Create(
@@ -225,7 +225,7 @@ public class IncrementalIndexer
             docChunk.FileHash = fileHash;
 
             var chunkTagInput = fileTagInput.ForChunk(chunk.Language, chunk.Text, inheritedTags);
-            var chunkTagResult = await _tagResolver.ResolveAsync(chunkTagInput, cancellationToken);
+            var chunkTagResult = await _tagResolver.Resolve(chunkTagInput, cancellationToken);
             docChunk.SetTagEnvelope(chunkTagResult.Envelope);
 
             // Save to relational store

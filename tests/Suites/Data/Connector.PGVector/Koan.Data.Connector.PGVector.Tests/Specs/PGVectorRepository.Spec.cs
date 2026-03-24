@@ -19,7 +19,7 @@ public class PGVectorRepositorySpec : PGVectorTestBase
         var repo = await CreateRepositoryAsync<Article>();
 
         // Act & Assert
-        await using var conn = await GetConnectionAsync();
+        await using var conn = await GetConnection();
         var tableExists = await Dapper.SqlMapper.ExecuteScalarAsync<bool>(conn,
             "SELECT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'article_vector')");
 
@@ -35,10 +35,10 @@ public class PGVectorRepositorySpec : PGVectorTestBase
         var articleId = "article-1";
 
         // Act
-        await repo.UpsertAsync(articleId, embedding, new { Category = "Tech" });
+        await repo.Upsert(articleId, embedding, new { Category = "Tech" });
 
         // Assert
-        var retrieved = await repo.GetEmbeddingAsync(articleId);
+        var retrieved = await repo.GetEmbedding(articleId);
 
         retrieved.Should().NotBeNull();
         retrieved!.Length.Should().Be(384);
@@ -58,11 +58,11 @@ public class PGVectorRepositorySpec : PGVectorTestBase
         var articleId = "article-update";
 
         // Act
-        await repo.UpsertAsync(articleId, embedding1);
-        await repo.UpsertAsync(articleId, embedding2); // Update
+        await repo.Upsert(articleId, embedding1);
+        await repo.Upsert(articleId, embedding2); // Update
 
         // Assert
-        var retrieved = await repo.GetEmbeddingAsync(articleId);
+        var retrieved = await repo.GetEmbedding(articleId);
         var similarity = CosineSimilarity(embedding2, retrieved!);
         similarity.Should().BeGreaterThan(0.99f);
     }
@@ -80,13 +80,13 @@ public class PGVectorRepositorySpec : PGVectorTestBase
         }
 
         // Act
-        var affected = await repo.UpsertManyAsync(items);
+        var affected = await repo.UpsertMany(items);
 
         // Assert
         affected.Should().Be(100);
 
         // Verify random sample
-        var sample = await repo.GetEmbeddingAsync("bulk-42");
+        var sample = await repo.GetEmbedding("bulk-42");
         sample.Should().NotBeNull();
     }
 
@@ -101,14 +101,14 @@ public class PGVectorRepositorySpec : PGVectorTestBase
         for (int i = 0; i < 10; i++)
         {
             var embedding = GenerateRandomEmbedding(384);
-            await repo.UpsertAsync($"doc-{i}", embedding);
+            await repo.Upsert($"doc-{i}", embedding);
         }
 
         // Insert one very similar to query
-        await repo.UpsertAsync("doc-similar", queryEmbedding);
+        await repo.Upsert("doc-similar", queryEmbedding);
 
         // Act
-        var results = await repo.SearchAsync(new VectorQueryOptions(
+        var results = await repo.Search(new VectorQueryOptions(
             Query: queryEmbedding,
             TopK: 5
         ));
@@ -131,12 +131,12 @@ public class PGVectorRepositorySpec : PGVectorTestBase
         // Arrange
         var repo = await CreateRepositoryAsync<Article>();
 
-        await repo.UpsertAsync("tech-1", GenerateRandomEmbedding(384), new { Category = "Tech" });
-        await repo.UpsertAsync("tech-2", GenerateRandomEmbedding(384), new { Category = "Tech" });
-        await repo.UpsertAsync("health-1", GenerateRandomEmbedding(384), new { Category = "Health" });
+        await repo.Upsert("tech-1", GenerateRandomEmbedding(384), new { Category = "Tech" });
+        await repo.Upsert("tech-2", GenerateRandomEmbedding(384), new { Category = "Tech" });
+        await repo.Upsert("health-1", GenerateRandomEmbedding(384), new { Category = "Health" });
 
         // Act
-        var results = await repo.SearchAsync(new VectorQueryOptions(
+        var results = await repo.Search(new VectorQueryOptions(
             Query: GenerateRandomEmbedding(384),
             TopK: 10,
             Filter: new { Category = "Tech" }
@@ -152,15 +152,15 @@ public class PGVectorRepositorySpec : PGVectorTestBase
     {
         // Arrange
         var repo = await CreateRepositoryAsync<Article>();
-        await repo.UpsertAsync("delete-me", GenerateRandomEmbedding(384));
+        await repo.Upsert("delete-me", GenerateRandomEmbedding(384));
 
         // Act
-        var deleted = await repo.DeleteAsync("delete-me");
+        var deleted = await repo.Delete("delete-me");
 
         // Assert
         deleted.Should().BeTrue();
 
-        var retrieved = await repo.GetEmbeddingAsync("delete-me");
+        var retrieved = await repo.GetEmbedding("delete-me");
         retrieved.Should().BeNull();
     }
 
@@ -175,7 +175,7 @@ public class PGVectorRepositorySpec : PGVectorTestBase
         {
             var id = $"bulk-delete-{i}";
             ids.Add(id);
-            await repo.UpsertAsync(id, GenerateRandomEmbedding(384));
+            await repo.Upsert(id, GenerateRandomEmbedding(384));
         }
 
         // Act
@@ -185,7 +185,7 @@ public class PGVectorRepositorySpec : PGVectorTestBase
         affected.Should().Be(50);
 
         // Verify deletion
-        var retrieved = await repo.GetEmbeddingAsync("bulk-delete-25");
+        var retrieved = await repo.GetEmbedding("bulk-delete-25");
         retrieved.Should().BeNull();
     }
 
@@ -198,11 +198,11 @@ public class PGVectorRepositorySpec : PGVectorTestBase
         var ids = new List<string> { "multi-1", "multi-2", "multi-3" };
         foreach (var id in ids)
         {
-            await repo.UpsertAsync(id, GenerateRandomEmbedding(384));
+            await repo.Upsert(id, GenerateRandomEmbedding(384));
         }
 
         // Act
-        var embeddings = await repo.GetEmbeddingsAsync(ids);
+        var embeddings = await repo.GetEmbeddings(ids);
 
         // Assert
         embeddings.Should().HaveCount(3);
@@ -217,14 +217,14 @@ public class PGVectorRepositorySpec : PGVectorTestBase
 
         for (int i = 0; i < 10; i++)
         {
-            await repo.UpsertAsync($"flush-{i}", GenerateRandomEmbedding(384));
+            await repo.Upsert($"flush-{i}", GenerateRandomEmbedding(384));
         }
 
         // Act
-        await repo.FlushAsync();
+        await repo.Flush();
 
         // Assert
-        var results = await repo.SearchAsync(new VectorQueryOptions(
+        var results = await repo.Search(new VectorQueryOptions(
             Query: GenerateRandomEmbedding(384),
             TopK: 100
         ));
@@ -240,12 +240,12 @@ public class PGVectorRepositorySpec : PGVectorTestBase
 
         for (int i = 0; i < 25; i++)
         {
-            await repo.UpsertAsync($"export-{i}", GenerateRandomEmbedding(384), new { Index = i });
+            await repo.Upsert($"export-{i}", GenerateRandomEmbedding(384), new { Index = i });
         }
 
         // Act
         var exported = new List<VectorExportItem<string>>();
-        await foreach (var batch in repo.ExportAllAsync(batchSize: 10))
+        await foreach (var batch in repo.ExportAll(batchSize: 10))
         {
             exported.AddRange(batch.Items);
         }
@@ -280,7 +280,7 @@ public class PGVectorRepositorySpec : PGVectorTestBase
         var repo = await CreateRepositoryAsync<Article>();
 
         // Act & Assert
-        await using var conn = await GetConnectionAsync();
+        await using var conn = await GetConnection();
 
         // Verify table name follows DATA-0087 (includes "_vector" suffix)
         var tableExists = await Dapper.SqlMapper.ExecuteScalarAsync<bool>(conn,
@@ -308,11 +308,11 @@ public class PGVectorRepositorySpec : PGVectorTestBase
             items.Add(($"perf-{i}", GenerateRandomEmbedding(384), new { Category = i % 10 }));
         }
 
-        await repo.UpsertManyAsync(items);
+        await repo.UpsertMany(items);
 
         // Act
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        var results = await repo.SearchAsync(new VectorQueryOptions(
+        var results = await repo.Search(new VectorQueryOptions(
             Query: GenerateRandomEmbedding(384),
             TopK: 10
         ));
@@ -332,7 +332,7 @@ public class PGVectorRepositorySpec : PGVectorTestBase
         var repo = await CreateRepositoryAsync<Article>();
 
         // Act
-        var affected = await repo.UpsertManyAsync(new List<(string, float[], object?)>());
+        var affected = await repo.UpsertMany(new List<(string, float[], object?)>());
 
         // Assert
         affected.Should().Be(0);
@@ -358,7 +358,7 @@ public class PGVectorRepositorySpec : PGVectorTestBase
         var repo = await CreateRepositoryAsync<Article>();
 
         // Act
-        var embeddings = await repo.GetEmbeddingsAsync(new List<string>());
+        var embeddings = await repo.GetEmbeddings(new List<string>());
 
         // Assert
         embeddings.Should().BeEmpty();
@@ -371,7 +371,7 @@ public class PGVectorRepositorySpec : PGVectorTestBase
         var repo = await CreateRepositoryAsync<Article>();
 
         // Act
-        var deleted = await repo.DeleteAsync("does-not-exist");
+        var deleted = await repo.Delete("does-not-exist");
 
         // Assert
         deleted.Should().BeFalse();
@@ -384,7 +384,7 @@ public class PGVectorRepositorySpec : PGVectorTestBase
         var repo = await CreateRepositoryAsync<Article>();
 
         // Act
-        var embedding = await repo.GetEmbeddingAsync("does-not-exist");
+        var embedding = await repo.GetEmbedding("does-not-exist");
 
         // Assert
         embedding.Should().BeNull();

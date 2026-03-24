@@ -79,7 +79,7 @@ internal sealed class RecsService : IRecsService
         _settingsProvider = settingsProvider;
     }
 
-    public async Task<(IReadOnlyList<Recommendation> items, bool degraded)> QueryAsync(
+    public async Task<(IReadOnlyList<Recommendation> items, bool degraded)> Query(
         RecsQuery query,
         string? userIdOverride,
         CancellationToken ct)
@@ -280,7 +280,7 @@ internal sealed class RecsService : IRecsService
         }
     }
 
-    public async Task RateAsync(string userId, string mediaId, int rating, CancellationToken ct)
+    public async Task Rate(string userId, string mediaId, int rating, CancellationToken ct)
     {
         _logger?.LogInformation("Rating: user={UserId} media={MediaId} rating={Rating}", userId, mediaId, rating);
 
@@ -426,7 +426,7 @@ internal sealed class RecsService : IRecsService
     /// Should be called whenever the user's library changes (add/remove/rate).
     /// Uses item vectors weighted by ratings (or default 0.8 for unrated items).
     /// </summary>
-    public async Task RebuildUserPrefVectorAsync(string userId, CancellationToken ct = default)
+    public async Task RebuildUserPrefVector(string userId, CancellationToken ct = default)
     {
         try
         {

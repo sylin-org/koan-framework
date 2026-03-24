@@ -48,7 +48,7 @@ public sealed class CacheRepositoryDecoratorSpec
 
     [Fact]
     public Task GetAsync_uses_cache_after_first_fetch()
-        => SpecAsync(nameof(GetAsync_uses_cache_after_first_fetch), async () =>
+        => Spec(nameof(GetAsync_uses_cache_after_first_fetch), async () =>
         {
             using var context = CacheTestContext.Create();
             var registry = CreateRegistry();
@@ -62,8 +62,8 @@ public sealed class CacheRepositoryDecoratorSpec
             decorated.Should().BeAssignableTo<IDataRepository<TestEntity, Guid>>();
 
             var cached = (IDataRepository<TestEntity, Guid>)decorated!;
-            var first = await cached.GetAsync(id);
-            var second = await cached.GetAsync(id);
+            var first = await cached.Get(id);
+            var second = await cached.Get(id);
 
             repository.GetCalls.Should().Be(1, "second invocation should read from cache");
             first.Should().NotBeNull();
@@ -74,7 +74,7 @@ public sealed class CacheRepositoryDecoratorSpec
 
     [Fact]
     public Task Upsert_and_delete_maintain_cache_entries()
-        => SpecAsync(nameof(Upsert_and_delete_maintain_cache_entries), async () =>
+        => Spec(nameof(Upsert_and_delete_maintain_cache_entries), async () =>
         {
             using var context = CacheTestContext.Create();
             var registry = CreateRegistry();
@@ -87,12 +87,12 @@ public sealed class CacheRepositoryDecoratorSpec
             var cached = (IDataRepository<TestEntity, Guid>)decorated!;
 
             var entity = new TestEntity { Name = "beta" };
-            var saved = await cached.UpsertAsync(entity);
+            var saved = await cached.Upsert(entity);
 
             saved.Id.Should().NotBe(Guid.Empty);
             context.Store.StoredValues.ContainsKey($"test:{saved.Id}").Should().BeTrue();
 
-            var deleted = await cached.DeleteAsync(saved.Id);
+            var deleted = await cached.Delete(saved.Id);
             deleted.Should().BeTrue();
             context.Store.StoredValues.ContainsKey($"test:{saved.Id}").Should().BeFalse();
         });
@@ -104,12 +104,12 @@ public sealed class CacheRepositoryDecoratorSpec
                 body();
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 
-    private Task SpecAsync(string scenario, Func<Task> body)
+    private Task Spec(string scenario, Func<Task> body)
         => TestPipeline.For<CacheRepositoryDecoratorSpec>(_output, scenario)
             .Assert(async _ => await body().ConfigureAwait(false))
-            .RunAsync();
+            .Run();
 
     private static ICachePolicyRegistry CreateRegistry()
     {
@@ -149,14 +149,14 @@ public sealed class CacheRepositoryDecoratorSpec
             _entries[entity.Id] = Clone(entity);
         }
 
-        public Task<TestEntity?> GetAsync(Guid id, CancellationToken ct = default)
+        public Task<TestEntity?> Get(Guid id, CancellationToken ct = default)
         {
             GetCalls++;
             _entries.TryGetValue(id, out var entity);
             return Task.FromResult(entity is null ? null : Clone(entity));
         }
 
-        public Task<IReadOnlyList<TestEntity?>> GetManyAsync(IEnumerable<Guid> ids, CancellationToken ct = default)
+        public Task<IReadOnlyList<TestEntity?>> GetMany(IEnumerable<Guid> ids, CancellationToken ct = default)
         {
             var idList = ids as IReadOnlyList<Guid> ?? ids.ToList();
             var results = new TestEntity?[idList.Count];
@@ -168,13 +168,13 @@ public sealed class CacheRepositoryDecoratorSpec
             return Task.FromResult((IReadOnlyList<TestEntity?>)results);
         }
 
-        public Task<IReadOnlyList<TestEntity>> QueryAsync(object? query, CancellationToken ct = default)
+        public Task<IReadOnlyList<TestEntity>> Query(object? query, CancellationToken ct = default)
             => throw new NotSupportedException();
 
-        public Task<CountResult> CountAsync(CountRequest<TestEntity> request, CancellationToken ct = default)
+        public Task<CountResult> Count(CountRequest<TestEntity> request, CancellationToken ct = default)
             => throw new NotSupportedException();
 
-        public Task<TestEntity> UpsertAsync(TestEntity model, CancellationToken ct = default)
+        public Task<TestEntity> Upsert(TestEntity model, CancellationToken ct = default)
         {
             if (model.Id == Guid.Empty)
             {
@@ -185,13 +185,13 @@ public sealed class CacheRepositoryDecoratorSpec
             return Task.FromResult(Clone(model));
         }
 
-        public Task<bool> DeleteAsync(Guid id, CancellationToken ct = default)
+        public Task<bool> Delete(Guid id, CancellationToken ct = default)
         {
             var removed = _entries.Remove(id);
             return Task.FromResult(removed);
         }
 
-        public Task<int> UpsertManyAsync(IEnumerable<TestEntity> models, CancellationToken ct = default)
+        public Task<int> UpsertMany(IEnumerable<TestEntity> models, CancellationToken ct = default)
         {
             var count = 0;
             foreach (var model in models)
@@ -208,7 +208,7 @@ public sealed class CacheRepositoryDecoratorSpec
             return Task.FromResult(count);
         }
 
-        public Task<int> DeleteManyAsync(IEnumerable<Guid> ids, CancellationToken ct = default)
+        public Task<int> DeleteMany(IEnumerable<Guid> ids, CancellationToken ct = default)
         {
             var count = 0;
             foreach (var id in ids)
@@ -222,14 +222,14 @@ public sealed class CacheRepositoryDecoratorSpec
             return Task.FromResult(count);
         }
 
-        public Task<int> DeleteAllAsync(CancellationToken ct = default)
+        public Task<int> DeleteAll(CancellationToken ct = default)
         {
             var count = _entries.Count;
             _entries.Clear();
             return Task.FromResult(count);
         }
 
-        public Task<long> RemoveAllAsync(RemoveStrategy strategy, CancellationToken ct = default)
+        public Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default)
         {
             var count = _entries.Count;
             _entries.Clear();
@@ -311,7 +311,7 @@ public sealed class CacheRepositoryDecoratorSpec
 
         public ConcurrentDictionary<string, (CacheValue Value, CacheEntryOptions Options)> StoredValues => _entries;
 
-        public ValueTask<CacheFetchResult> FetchAsync(CacheKey key, CacheEntryOptions options, CancellationToken ct)
+        public ValueTask<CacheFetchResult> Fetch(CacheKey key, CacheEntryOptions options, CancellationToken ct)
         {
             if (_entries.TryGetValue(key.Value, out var entry))
             {
@@ -321,29 +321,29 @@ public sealed class CacheRepositoryDecoratorSpec
             return ValueTask.FromResult(CacheFetchResult.Miss(options));
         }
 
-        public ValueTask SetAsync(CacheKey key, CacheValue value, CacheEntryOptions options, CancellationToken ct)
+        public ValueTask Set(CacheKey key, CacheValue value, CacheEntryOptions options, CancellationToken ct)
         {
             _entries[key.Value] = (value, options);
             return ValueTask.CompletedTask;
         }
 
-        public ValueTask<bool> RemoveAsync(CacheKey key, CancellationToken ct)
+        public ValueTask<bool> Remove(CacheKey key, CancellationToken ct)
         {
             var removed = _entries.TryRemove(key.Value, out _);
             return ValueTask.FromResult(removed);
         }
 
-        public ValueTask TouchAsync(CacheKey key, CacheEntryOptions options, CancellationToken ct)
+        public ValueTask Touch(CacheKey key, CacheEntryOptions options, CancellationToken ct)
         {
             return ValueTask.CompletedTask;
         }
 
-        public ValueTask PublishInvalidationAsync(CacheKey key, CacheEntryOptions options, CancellationToken ct)
+        public ValueTask PublishInvalidation(CacheKey key, CacheEntryOptions options, CancellationToken ct)
         {
             return ValueTask.CompletedTask;
         }
 
-        public async IAsyncEnumerable<TaggedCacheKey> EnumerateByTagAsync(string tag, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+        public async IAsyncEnumerable<TaggedCacheKey> EnumerateByTag(string tag, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
         {
             foreach (var kvp in _entries)
             {
@@ -356,7 +356,7 @@ public sealed class CacheRepositoryDecoratorSpec
             await Task.CompletedTask;
         }
 
-        public ValueTask<bool> ExistsAsync(CacheKey key, CancellationToken ct)
+        public ValueTask<bool> Exists(CacheKey key, CancellationToken ct)
         {
             var exists = _entries.ContainsKey(key.Value);
             return ValueTask.FromResult(exists);
@@ -372,13 +372,13 @@ public sealed class CacheRepositoryDecoratorSpec
         public ValueTask<CacheValue> SerializeAsync<T>(T value, CacheEntryOptions options, CancellationToken ct)
             => ValueTask.FromResult(CacheValue.FromString(value?.ToString() ?? string.Empty));
 
-        public ValueTask<CacheValue> SerializeAsync(object value, Type runtimeType, CacheEntryOptions options, CancellationToken ct)
+        public ValueTask<CacheValue> Serialize(object value, Type runtimeType, CacheEntryOptions options, CancellationToken ct)
             => ValueTask.FromResult(CacheValue.FromString(value?.ToString() ?? string.Empty));
 
         public ValueTask<T?> DeserializeAsync<T>(CacheValue value, CancellationToken ct)
             => ValueTask.FromResult((T?)(object?)value.ToText());
 
-        public ValueTask<object?> DeserializeAsync(CacheValue value, Type returnType, CancellationToken ct)
+        public ValueTask<object?> Deserialize(CacheValue value, Type returnType, CancellationToken ct)
             => ValueTask.FromResult((object?)value.ToText());
     }
 
@@ -394,7 +394,7 @@ public sealed class CacheRepositoryDecoratorSpec
             return ValueTask.FromResult(CacheValue.FromJson(json));
         }
 
-        public ValueTask<CacheValue> SerializeAsync(object value, Type runtimeType, CacheEntryOptions options, CancellationToken ct)
+        public ValueTask<CacheValue> Serialize(object value, Type runtimeType, CacheEntryOptions options, CancellationToken ct)
         {
             var json = JsonConvert.SerializeObject(value, runtimeType, settings: null);
             return ValueTask.FromResult(CacheValue.FromJson(json));
@@ -412,7 +412,7 @@ public sealed class CacheRepositoryDecoratorSpec
             return ValueTask.FromResult(result);
         }
 
-        public ValueTask<object?> DeserializeAsync(CacheValue value, Type returnType, CancellationToken ct)
+        public ValueTask<object?> Deserialize(CacheValue value, Type returnType, CancellationToken ct)
         {
             var json = value.ToText();
             if (string.IsNullOrEmpty(json))

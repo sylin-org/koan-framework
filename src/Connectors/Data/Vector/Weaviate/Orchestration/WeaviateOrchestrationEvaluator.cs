@@ -103,7 +103,7 @@ public class WeaviateOrchestrationEvaluator : BaseOrchestrationEvaluator
         }
     }
 
-    protected override async Task<DependencyDescriptor> CreateDependencyDescriptorAsync(IConfiguration configuration, OrchestrationContext context)
+    protected override async Task<DependencyDescriptor> CreateDependencyDescriptor(IConfiguration configuration, OrchestrationContext context)
     {
         // Create environment variables for the container
         var environment = new Dictionary<string, string>(context.EnvironmentVariables)

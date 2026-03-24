@@ -29,7 +29,7 @@ public class RecsController(IRecsService recs, IBandCacheService bandCache) : Co
         if (useSlidingWindow)
         {
             // New pagination: Use band cache service
-            var (items, degraded) = await bandCache.GetPageAsync(
+            var (items, degraded) = await bandCache.GetPage(
                 req,
                 req.Offset!.Value,
                 req.Limit!.Value,
@@ -40,7 +40,7 @@ public class RecsController(IRecsService recs, IBandCacheService bandCache) : Co
         else
         {
             // Legacy pagination: Use original RecsService logic
-            var (items, degraded) = await recs.QueryAsync(req, userIdOverride, ct);
+            var (items, degraded) = await recs.Query(req, userIdOverride, ct);
             return Ok(new { items, degraded });
         }
     }
@@ -48,7 +48,7 @@ public class RecsController(IRecsService recs, IBandCacheService bandCache) : Co
     [HttpPost("rate")]
     public IActionResult Rate([FromBody] RateRequest req)
     {
-        recs.RateAsync(req.UserId, req.MediaId, req.Rating, HttpContext.RequestAborted).GetAwaiter().GetResult();
+        recs.Rate(req.UserId, req.MediaId, req.Rating, HttpContext.RequestAborted).GetAwaiter().GetResult();
         return Ok(new { ok = true });
     }
 }

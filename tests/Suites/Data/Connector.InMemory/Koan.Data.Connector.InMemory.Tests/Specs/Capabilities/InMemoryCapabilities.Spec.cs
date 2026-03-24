@@ -18,7 +18,7 @@ public sealed class InMemoryCapabilitiesSpec
     public async Task Repository_reports_linq_and_atomic_write_capabilities()
     {
         await TestPipeline.For<InMemoryCapabilitiesSpec>(_output, nameof(Repository_reports_linq_and_atomic_write_capabilities))
-            .Using<InMemoryConnectorFixture>("fixture", static ctx => InMemoryConnectorFixture.CreateAsync(ctx))
+            .Using<InMemoryConnectorFixture>("fixture", static ctx => InMemoryConnectorFixture.Create(ctx))
             .Arrange(static async ctx =>
             {
                 var fixture = ctx.GetRequiredItem<InMemoryConnectorFixture>("fixture");
@@ -41,11 +41,11 @@ public sealed class InMemoryCapabilitiesSpec
                 writeCaps.Writes.Should().HaveFlag(WriteCapabilities.BulkDelete);
                 writeCaps.Writes.Should().HaveFlag(WriteCapabilities.AtomicBatch);
 
-                await CapabilityProbe.UpsertAsync(new CapabilityProbe { Name = "cap" });
+                await CapabilityProbe.Upsert(new CapabilityProbe { Name = "cap" });
                 var count = await CapabilityProbe.Count.Exact();
                 count.Should().Be(1);
             })
-            .RunAsync();
+            .Run();
     }
 
     private sealed class CapabilityProbe : Entity<CapabilityProbe>

@@ -25,7 +25,7 @@ public sealed class ZenGardenInitializationProviderTests
         var initializationProvider = provider.GetRequiredService<IZenGardenInitializationProvider>();
         var intent = ZenGardenConnectionIntent.ForOffering("mongodb");
 
-        var resolved = await initializationProvider.ResolveAsync(intent);
+        var resolved = await initializationProvider.Resolve(intent);
 
         resolved.Should().NotBeNull();
         resolved!.ToolFqid.Should().Be("mongodb");
@@ -46,7 +46,7 @@ public sealed class ZenGardenInitializationProviderTests
             new StubBinding("mongo", "mongodb"));
 
         var initializationProvider = provider.GetRequiredService<IZenGardenInitializationProvider>();
-        var resolved = await initializationProvider.ResolveAsync(ZenGardenConnectionIntent.ForOffering("mongodb"));
+        var resolved = await initializationProvider.Resolve(ZenGardenConnectionIntent.ForOffering("mongodb"));
 
         resolved.Should().BeNull();
     }
@@ -64,7 +64,7 @@ public sealed class ZenGardenInitializationProviderTests
             new StubBinding("mongo", "mongodb"));
 
         var initializationProvider = provider.GetRequiredService<IZenGardenInitializationProvider>();
-        var resolved = await initializationProvider.ResolveAsync(ZenGardenConnectionIntent.ForOffering("mongodb"));
+        var resolved = await initializationProvider.Resolve(ZenGardenConnectionIntent.ForOffering("mongodb"));
 
         resolved.Should().NotBeNull();
         resolved!.ToolFqid.Should().Be("mongodb:dev");
@@ -90,7 +90,7 @@ public sealed class ZenGardenInitializationProviderTests
             new StubBinding("ollama", "ollama"));
 
         var initializationProvider = provider.GetRequiredService<IZenGardenInitializationProvider>();
-        var resolved = await initializationProvider.ResolveAsync(ZenGardenConnectionIntent.ForOffering("ollama"));
+        var resolved = await initializationProvider.Resolve(ZenGardenConnectionIntent.ForOffering("ollama"));
 
         resolved.Should().NotBeNull();
         resolved!.ToolFqid.Should().Be("ollama@adopted");
@@ -126,7 +126,7 @@ public sealed class ZenGardenInitializationProviderTests
             new StubBinding("mongo", "mongodb"));
 
         var initializationProvider = provider.GetRequiredService<IZenGardenInitializationProvider>();
-        var resolved = await initializationProvider.ResolveAsync(ZenGardenConnectionIntent.ForOffering("mongodb"));
+        var resolved = await initializationProvider.Resolve(ZenGardenConnectionIntent.ForOffering("mongodb"));
 
         resolved.Should().NotBeNull();
         // GetConnectionString uses prefix matching — passes replica set URLs through untouched
@@ -146,7 +146,7 @@ public sealed class ZenGardenInitializationProviderTests
             new StubBinding("mongo", "mongodb"));
 
         var initializationProvider = provider.GetRequiredService<IZenGardenInitializationProvider>();
-        var resolved = await initializationProvider.ResolveAsync(ZenGardenConnectionIntent.ForOffering("mongodb"));
+        var resolved = await initializationProvider.Resolve(ZenGardenConnectionIntent.ForOffering("mongodb"));
 
         resolved.Should().NotBeNull();
         // Both methods work for single-host URLs
@@ -176,7 +176,7 @@ public sealed class ZenGardenInitializationProviderTests
             new StubBinding("ollama", "ollama"));
 
         var initializationProvider = provider.GetRequiredService<IZenGardenInitializationProvider>();
-        var receipt = await initializationProvider.WishCapabilitiesAsync(
+        var receipt = await initializationProvider.WishCapabilities(
             ZenGardenConnectionIntent.ForOffering("ollama", capabilities: ["llama3.2", "nomic-embed-text"]));
 
         receipt.Should().NotBeNull();
@@ -215,7 +215,7 @@ public sealed class ZenGardenInitializationProviderTests
             new StubBinding("ollama", "ollama"));
 
         var initializationProvider = provider.GetRequiredService<IZenGardenInitializationProvider>();
-        var resolved = await initializationProvider.ResolveAsync(
+        var resolved = await initializationProvider.Resolve(
             ZenGardenConnectionIntent.ForOffering("ollama", capabilities: ["llama3.2", "nomic-embed-text"]));
 
         resolved.Should().NotBeNull();
@@ -254,7 +254,7 @@ public sealed class ZenGardenInitializationProviderTests
             new StubBinding("ollama", "ollama"));
 
         var initializationProvider = provider.GetRequiredService<IZenGardenInitializationProvider>();
-        var resolved = await initializationProvider.ResolveAsync(
+        var resolved = await initializationProvider.Resolve(
             ZenGardenConnectionIntent.ForOffering("ollama", capabilities: ["llama3.2", "nomic-embed-text"]));
 
         resolved.Should().NotBeNull();
@@ -320,7 +320,7 @@ public sealed class ZenGardenInitializationProviderTests
             throw new NotSupportedException();
         }
 
-        public Task<IReadOnlyList<ZenGardenToolSnapshot>> CatalogAsync(
+        public Task<IReadOnlyList<ZenGardenToolSnapshot>> Catalog(
             ZenGardenSubscription subscription,
             CancellationToken cancellationToken = default)
         {
@@ -331,7 +331,7 @@ public sealed class ZenGardenInitializationProviderTests
             return Task.FromResult<IReadOnlyList<ZenGardenToolSnapshot>>(results);
         }
 
-        public ValueTask<ZenGardenCapabilityWish> WishAsync(
+        public ValueTask<ZenGardenCapabilityWish> Wish(
             string offering,
             IReadOnlyList<string> capabilities,
             ZenGardenCapabilityWishOptions? options = null,

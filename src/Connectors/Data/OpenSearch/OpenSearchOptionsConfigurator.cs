@@ -160,7 +160,7 @@ internal sealed class OpenSearchOptionsConfigurator : AdapterOptionsConfigurator
             };
 
             // Use autonomous discovery coordinator
-            var discoveryTask = _discoveryCoordinator.DiscoverServiceAsync("opensearch", context);
+            var discoveryTask = _discoveryCoordinator.DiscoverService("opensearch", context);
             var result = discoveryTask.GetAwaiter().GetResult();
 
             if (result.IsSuccessful)

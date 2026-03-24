@@ -38,7 +38,7 @@ public class BackupInventoryHealthCheck : IHealthCheck
             if (inventory == null)
             {
                 _logger.LogDebug("Backup inventory not cached, building now...");
-                inventory = await _discoveryService.BuildInventoryAsync(cancellationToken);
+                inventory = await _discoveryService.BuildInventory(cancellationToken);
             }
 
             var data = new Dictionary<string, object>

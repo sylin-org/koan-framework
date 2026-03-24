@@ -73,7 +73,7 @@ public class BenchmarkJob : Job<BenchmarkJob, BenchmarkRequest, BenchmarkResult>
         });
 
         // Run the benchmark with progress reporting
-        var result = await benchmarkService.RunBenchmarkAsync(context, benchmarkProgress, cancellationToken);
+        var result = await benchmarkService.RunBenchmark(context, benchmarkProgress, cancellationToken);
 
         return result;
     }

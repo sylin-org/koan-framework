@@ -22,7 +22,7 @@ public sealed class PipelineQualityController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<PipelineQualitySnapshot?>> GetLatest(string pipelineId, CancellationToken ct)
     {
-        var snapshot = await _dashboard.GetLatestAsync(pipelineId, ct);
+        var snapshot = await _dashboard.GetLatest(pipelineId, ct);
         if (snapshot is null)
         {
             return NotFound();
@@ -39,7 +39,7 @@ public sealed class PipelineQualityController : ControllerBase
             take = 10;
         }
 
-        var history = await _dashboard.GetHistoryAsync(pipelineId, take, ct);
+        var history = await _dashboard.GetHistory(pipelineId, take, ct);
         return Ok(history);
     }
 }

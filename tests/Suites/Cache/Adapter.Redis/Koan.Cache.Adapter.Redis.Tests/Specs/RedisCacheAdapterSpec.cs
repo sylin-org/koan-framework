@@ -40,8 +40,8 @@ public sealed class RedisCacheAdapterSpec
 
                 await using var providerA = BuildServiceProvider(fixture.ConnectionString!, keyPrefix, tagPrefix, channel);
                 await using var providerB = BuildServiceProvider(fixture.ConnectionString!, keyPrefix, tagPrefix, channel);
-                await using var hostedA = await StartHostedServicesAsync(providerA, ctx.Cancellation).ConfigureAwait(false);
-                await using var hostedB = await StartHostedServicesAsync(providerB, ctx.Cancellation).ConfigureAwait(false);
+                await using var hostedA = await StartHostedServices(providerA, ctx.Cancellation).ConfigureAwait(false);
+                await using var hostedB = await StartHostedServices(providerB, ctx.Cancellation).ConfigureAwait(false);
 
                 var clientA = providerA.GetRequiredService<ICacheClient>();
                 var clientB = providerB.GetRequiredService<ICacheClient>();
@@ -51,22 +51,22 @@ public sealed class RedisCacheAdapterSpec
                     .WithAbsoluteTtl(TimeSpan.FromMinutes(5))
                     .WithTags("redis-integration", token);
 
-                await writer.SetAsync("payload", ctx.Cancellation).ConfigureAwait(false);
+                await writer.Set("payload", ctx.Cancellation).ConfigureAwait(false);
 
                 var reader = clientB.CreateEntry<string>(key);
-                var value = await reader.GetAsync(ctx.Cancellation).ConfigureAwait(false);
+                var value = await reader.Get(ctx.Cancellation).ConfigureAwait(false);
                 value.Should().Be("payload");
 
-                var tagCount = await clientB.CountTagsAsync(new[] { "redis-integration" }, ctx.Cancellation).ConfigureAwait(false);
+                var tagCount = await clientB.CountTags(new[] { "redis-integration" }, ctx.Cancellation).ConfigureAwait(false);
                 tagCount.Should().Be(1);
 
-                var removed = await clientB.FlushTagsAsync(new[] { "redis-integration" }, ctx.Cancellation).ConfigureAwait(false);
+                var removed = await clientB.FlushTags(new[] { "redis-integration" }, ctx.Cancellation).ConfigureAwait(false);
                 removed.Should().Be(1);
 
-                var afterFlush = await reader.GetAsync(ctx.Cancellation).ConfigureAwait(false);
+                var afterFlush = await reader.Get(ctx.Cancellation).ConfigureAwait(false);
                 afterFlush.Should().BeNull();
             })
-            .RunAsync();
+            .Run();
 
     [Fact]
     public Task Stale_entries_expire_after_allowance()
@@ -87,7 +87,7 @@ public sealed class RedisCacheAdapterSpec
                 var channel = $"koan-cache-{token}-stale";
 
                 await using var provider = BuildServiceProvider(fixture.ConnectionString!, keyPrefix, tagPrefix, channel);
-                await using var hosted = await StartHostedServicesAsync(provider, ctx.Cancellation).ConfigureAwait(false);
+                await using var hosted = await StartHostedServices(provider, ctx.Cancellation).ConfigureAwait(false);
 
                 var client = provider.GetRequiredService<ICacheClient>();
 
@@ -96,20 +96,20 @@ public sealed class RedisCacheAdapterSpec
                     .WithAbsoluteTtl(TimeSpan.FromMilliseconds(150))
                     .AllowStaleFor(TimeSpan.FromMilliseconds(200));
 
-                await entry.SetAsync("payload", ctx.Cancellation).ConfigureAwait(false);
+                await entry.Set("payload", ctx.Cancellation).ConfigureAwait(false);
 
                 await Task.Delay(TimeSpan.FromMilliseconds(175), ctx.Cancellation).ConfigureAwait(false);
-                var stale = await entry.GetAsync(ctx.Cancellation).ConfigureAwait(false);
+                var stale = await entry.Get(ctx.Cancellation).ConfigureAwait(false);
                 stale.Should().Be("payload");
 
                 await Task.Delay(TimeSpan.FromMilliseconds(250), ctx.Cancellation).ConfigureAwait(false);
-                var final = await entry.GetAsync(ctx.Cancellation).ConfigureAwait(false);
+                var final = await entry.Get(ctx.Cancellation).ConfigureAwait(false);
                 final.Should().BeNull();
 
                 var exists = await entry.Exists(ctx.Cancellation).ConfigureAwait(false);
                 exists.Should().BeFalse();
             })
-            .RunAsync();
+            .Run();
 
     private static ServiceProvider BuildServiceProvider(string connectionString, string keyPrefix, string tagPrefix, string channelName)
     {
@@ -142,12 +142,12 @@ public sealed class RedisCacheAdapterSpec
         return provider;
     }
 
-    private static async ValueTask<IAsyncDisposable> StartHostedServicesAsync(ServiceProvider provider, CancellationToken cancellation)
+    private static async ValueTask<IAsyncDisposable> StartHostedServices(ServiceProvider provider, CancellationToken cancellation)
     {
         var hosted = provider.GetServices<IHostedService>().ToArray();
         foreach (var service in hosted)
         {
-            await service.StartAsync(cancellation).ConfigureAwait(false);
+            await service.Start(cancellation).ConfigureAwait(false);
         }
 
         return new HostedServicesScope(hosted);

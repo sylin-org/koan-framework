@@ -17,7 +17,7 @@ public class NoteIngestionService : INoteIngestionService
         _logger = logger;
     }
 
-    public async Task<Note> IngestFileAsync(
+    public async Task<Note> IngestFile(
         Stream content, string fileName, string? contentType, string spaceId, CancellationToken ct = default)
     {
         var mimeType = contentType ?? ResolveMimeType(fileName);
@@ -27,7 +27,7 @@ public class NoteIngestionService : INoteIngestionService
             "Ingesting file {FileName} ({MimeType}) into space {SpaceId} using {Extractor}",
             fileName, mimeType, spaceId, extractor.GetType().Name);
 
-        var blocks = await extractor.ExtractAsync(content, mimeType, ct);
+        var blocks = await extractor.Extract(content, mimeType, ct);
 
         var note = new Note
         {
@@ -46,7 +46,7 @@ public class NoteIngestionService : INoteIngestionService
         return note;
     }
 
-    public async Task<Note> IngestUrlAsync(string url, string spaceId, CancellationToken ct = default)
+    public async Task<Note> IngestUrl(string url, string spaceId, CancellationToken ct = default)
     {
         _logger.LogInformation("Ingesting URL {Url} into space {SpaceId}", url, spaceId);
 
@@ -76,7 +76,7 @@ public class NoteIngestionService : INoteIngestionService
         return note;
     }
 
-    public async Task<Note> IngestTextAsync(string text, string? title, string spaceId, CancellationToken ct = default)
+    public async Task<Note> IngestText(string text, string? title, string spaceId, CancellationToken ct = default)
     {
         _logger.LogInformation("Ingesting text into space {SpaceId}", spaceId);
 

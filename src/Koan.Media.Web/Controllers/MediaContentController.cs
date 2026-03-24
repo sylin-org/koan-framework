@@ -74,7 +74,7 @@ public abstract class MediaContentController<TEntity> : ControllerBase where TEn
             if (from is null && to is null)
             {
                 // No valid range parsed; treat as full content
-                return await SendFullAsync(key, stat, ct);
+                return await SendFull(key, stat, ct);
             }
 
             if (from is null)
@@ -110,7 +110,7 @@ public abstract class MediaContentController<TEntity> : ControllerBase where TEn
             return File(stream, ResolveContentType(stat, key));
         }
 
-        return await SendFullAsync(key, stat, ct);
+        return await SendFull(key, stat, ct);
     }
 
     [HttpHead("{**key}")]
@@ -126,7 +126,7 @@ public abstract class MediaContentController<TEntity> : ControllerBase where TEn
         return Ok();
     }
 
-    private async Task<IActionResult> SendFullAsync(string key, ObjectStat stat, CancellationToken ct)
+    private async Task<IActionResult> SendFull(string key, ObjectStat stat, CancellationToken ct)
     {
         var full = await StorageEntity<TEntity>.OpenRead(key, ct);
         SetEntityHeaders(stat, key);

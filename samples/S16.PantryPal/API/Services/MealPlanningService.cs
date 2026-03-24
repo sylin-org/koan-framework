@@ -6,14 +6,14 @@ namespace S16.PantryPal.Services;
 
 public interface IMealPlanningService
 {
-    Task<IReadOnlyList<object>> SuggestRecipesAsync(SuggestRecipesRequest request, CancellationToken ct = default);
-    Task<MealPlan> CreateMealPlanAsync(CreateMealPlanRequest request, CancellationToken ct = default);
-    Task<(ShoppingList List, IReadOnlyList<ShoppingItem> Items)> GenerateShoppingListAsync(string planId, CancellationToken ct = default);
+    Task<IReadOnlyList<object>> SuggestRecipes(SuggestRecipesRequest request, CancellationToken ct = default);
+    Task<MealPlan> CreateMealPlan(CreateMealPlanRequest request, CancellationToken ct = default);
+    Task<(ShoppingList List, IReadOnlyList<ShoppingItem> Items)> GenerateShoppingList(string planId, CancellationToken ct = default);
 }
 
 public sealed class MealPlanningService : IMealPlanningService
 {
-    public async Task<IReadOnlyList<object>> SuggestRecipesAsync(SuggestRecipesRequest request, CancellationToken ct = default)
+    public async Task<IReadOnlyList<object>> SuggestRecipes(SuggestRecipesRequest request, CancellationToken ct = default)
     {
         var pantryItems = await PantryItem.All();
         var availableItems = pantryItems.Where(i => i.Status == "available").ToList();
@@ -64,7 +64,7 @@ public sealed class MealPlanningService : IMealPlanningService
         return scored;
     }
 
-    public async Task<MealPlan> CreateMealPlanAsync(CreateMealPlanRequest request, CancellationToken ct = default)
+    public async Task<MealPlan> CreateMealPlan(CreateMealPlanRequest request, CancellationToken ct = default)
     {
         var plan = new MealPlan
         {
@@ -77,7 +77,7 @@ public sealed class MealPlanningService : IMealPlanningService
         return plan;
     }
 
-    public async Task<(ShoppingList List, IReadOnlyList<ShoppingItem> Items)> GenerateShoppingListAsync(string planId, CancellationToken ct = default)
+    public async Task<(ShoppingList List, IReadOnlyList<ShoppingItem> Items)> GenerateShoppingList(string planId, CancellationToken ct = default)
     {
         var plan = await MealPlan.Get(planId);
         if (plan == null) throw new InvalidOperationException("Meal plan not found");

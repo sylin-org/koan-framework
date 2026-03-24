@@ -111,7 +111,7 @@ public sealed class CacheFacadeSpec
     private Task Spec(string scenario, Func<Task> body)
         => TestPipeline.For<CacheFacadeSpec>(_output, scenario)
             .Assert(async _ => await body().ConfigureAwait(false))
-            .RunAsync();
+            .Run();
 
     private Task SpecWithClient(string scenario, Func<FakeCacheClient, Task> body)
         => TestPipeline.For<CacheFacadeSpec>(_output, scenario)
@@ -134,7 +134,7 @@ public sealed class CacheFacadeSpec
                     AppHost.Current = previous;
                 }
             })
-            .RunAsync();
+            .Run();
 
     private sealed class FakeCacheClient : ICacheClient
     {
@@ -162,7 +162,7 @@ public sealed class CacheFacadeSpec
         public CacheScopeHandle BeginScope(string scopeId, string? region = null)
             => new(scopeId, region, null);
 
-        public ValueTask<long> FlushTagsAsync(IReadOnlyCollection<string> tags, CancellationToken ct)
+        public ValueTask<long> FlushTags(IReadOnlyCollection<string> tags, CancellationToken ct)
         {
             FlushCalls++;
             LastFlushTags = tags;
@@ -170,7 +170,7 @@ public sealed class CacheFacadeSpec
             return ValueTask.FromResult(FlushResult);
         }
 
-        public ValueTask<long> CountTagsAsync(IReadOnlyCollection<string> tags, CancellationToken ct)
+        public ValueTask<long> CountTags(IReadOnlyCollection<string> tags, CancellationToken ct)
         {
             CountCalls++;
             LastCountTags = tags;
@@ -178,7 +178,7 @@ public sealed class CacheFacadeSpec
             return ValueTask.FromResult(CountResult);
         }
 
-        public ValueTask<CacheFetchResult> GetAsync(CacheKey key, CacheEntryOptions options, CancellationToken ct)
+        public ValueTask<CacheFetchResult> Get(CacheKey key, CacheEntryOptions options, CancellationToken ct)
             => throw new NotSupportedException();
 
         public ValueTask<T?> GetAsync<T>(CacheKey key, CacheEntryOptions options, CancellationToken ct)
@@ -187,7 +187,7 @@ public sealed class CacheFacadeSpec
         public ValueTask<T?> GetOrAddAsync<T>(CacheKey key, Func<CancellationToken, ValueTask<T?>> valueFactory, CacheEntryOptions options, CancellationToken ct)
             => throw new NotSupportedException();
 
-        public ValueTask<bool> ExistsAsync(CacheKey key, CacheEntryOptions options, CancellationToken ct)
+        public ValueTask<bool> Exists(CacheKey key, CacheEntryOptions options, CancellationToken ct)
         {
             ExistsCalls++;
             LastExistsKey = key;
@@ -199,10 +199,10 @@ public sealed class CacheFacadeSpec
         public ValueTask SetAsync<T>(CacheKey key, T value, CacheEntryOptions options, CancellationToken ct)
             => throw new NotSupportedException();
 
-        public ValueTask<bool> RemoveAsync(CacheKey key, CancellationToken ct)
+        public ValueTask<bool> Remove(CacheKey key, CancellationToken ct)
             => throw new NotSupportedException();
 
-        public ValueTask TouchAsync(CacheKey key, CacheEntryOptions options, CancellationToken ct)
+        public ValueTask Touch(CacheKey key, CacheEntryOptions options, CancellationToken ct)
             => throw new NotSupportedException();
     }
 }

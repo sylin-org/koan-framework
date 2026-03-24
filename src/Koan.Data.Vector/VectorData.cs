@@ -44,7 +44,7 @@ public static class VectorData<TEntity>
 
         // No transaction - execute immediately
         var normalized = NormalizeMetadata(metadata);
-        return Repo.UpsertAsync(entity.Id, vector.ToArray(), normalized, ct);
+        return Repo.Upsert(entity.Id, vector.ToArray(), normalized, ct);
     }
 
     /// <summary>
@@ -81,7 +81,7 @@ public static class VectorData<TEntity>
             entitySaved = true;
 
             var normalized = NormalizeMetadata(metadata);
-            await Repo.UpsertAsync(entity.Id, vector.ToArray(), normalized, ct);
+            await Repo.Upsert(entity.Id, vector.ToArray(), normalized, ct);
             // Both succeeded
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -119,7 +119,7 @@ public static class VectorData<TEntity>
             return 0;
 
         var vectors = list.Select(x => (x.Entity.Id, x.Vector.ToArray(), (object?)NormalizeMetadata(x.Metadata))).ToList();
-        return await Repo.UpsertManyAsync(vectors, ct);
+        return await Repo.UpsertMany(vectors, ct);
     }
 
     /// <summary>
@@ -159,12 +159,12 @@ public static class VectorData<TEntity>
 
         // Save vectors to vector store
         var vectors = list.Select(x => (x.Entity.Id, x.Vector.ToArray(), (object?)NormalizeMetadata(x.Metadata))).ToList();
-        await Repo.UpsertManyAsync(vectors, ct);
+        await Repo.UpsertMany(vectors, ct);
 
         return new BatchResult(affected, 0, 0);
     }
 
-    public static Task<int> UpsertManyAsync(IEnumerable<(string Id, float[] Embedding, object? Metadata)> items, CancellationToken ct = default)
+    public static Task<int> UpsertMany(IEnumerable<(string Id, float[] Embedding, object? Metadata)> items, CancellationToken ct = default)
     {
         var materialized = items as IList<(string Id, float[] Embedding, object? Metadata)> ?? items.ToList();
         if (materialized.Count == 0)
@@ -176,11 +176,11 @@ public static class VectorData<TEntity>
             .Select(x => (x.Id, x.Embedding, (object?)NormalizeMetadata(x.Metadata)))
             .ToList();
 
-        return Repo.UpsertManyAsync(normalized, ct);
+        return Repo.UpsertMany(normalized, ct);
     }
 
-    public static Task<VectorQueryResult<string>> SearchAsync(VectorQueryOptions options, CancellationToken ct = default)
-        => Repo.SearchAsync(options, ct);
+    public static Task<VectorQueryResult<string>> Search(VectorQueryOptions options, CancellationToken ct = default)
+        => Repo.Search(options, ct);
 
     private static IDictionary<string, object?>? NormalizeMetadata(object? metadata)
     {

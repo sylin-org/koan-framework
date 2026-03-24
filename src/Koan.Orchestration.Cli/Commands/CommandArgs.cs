@@ -92,5 +92,5 @@ internal sealed class CommandArgs
 
 internal interface ICliCommand
 {
-    Task<int> ExecuteAsync(CommandArgs args);
+    Task<int> Execute(CommandArgs args);
 }

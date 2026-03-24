@@ -15,27 +15,27 @@ public interface ITrainingRuntime
     TrainMethod[] SupportedMethods { get; }
 
     /// <summary>Check if this runtime is available.</summary>
-    Task<bool> IsAvailableAsync(CancellationToken ct = default);
+    Task<bool> IsAvailable(CancellationToken ct = default);
 
     /// <summary>Launch a training job.</summary>
-    Task<TrainingJob> LaunchAsync(
+    Task<TrainingJob> Launch(
         TrainOptions options,
         IProgress<TrainingProgress>? progress = null,
         CancellationToken ct = default);
 
     /// <summary>Launch a custom script job.</summary>
-    Task<TrainingJob> LaunchScriptAsync(
+    Task<TrainingJob> LaunchScript(
         RunOptions options,
         IProgress<TrainingProgress>? progress = null,
         CancellationToken ct = default);
 
     /// <summary>Get job status.</summary>
-    Task<TrainingJob> StatusAsync(string jobId, CancellationToken ct = default);
+    Task<TrainingJob> Status(string jobId, CancellationToken ct = default);
 
     /// <summary>Cancel a running job.</summary>
-    Task CancelAsync(string jobId, CancellationToken ct = default);
+    Task Cancel(string jobId, CancellationToken ct = default);
 
     /// <summary>Resume from checkpoint.</summary>
-    Task<TrainingJob> ResumeAsync(
+    Task<TrainingJob> Resume(
         string jobId, string? checkpoint = null, CancellationToken ct = default);
 }

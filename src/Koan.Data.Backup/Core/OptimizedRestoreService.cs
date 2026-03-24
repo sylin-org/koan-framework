@@ -58,7 +58,7 @@ public class OptimizedRestoreService : IRestoreService
                     OptimizationLevel = options.OptimizationLevel
                 };
 
-                preparationContext = await optimizedRepo.PrepareForRestoreAsync(prepOptions, ct);
+                preparationContext = await optimizedRepo.PrepareForRestore(prepOptions, ct);
                 _logger.LogInformation("Prepared {EntityType} for optimized restore ({OptimizationLevel})",
                     typeof(TEntity).Name, options.OptimizationLevel);
             }
@@ -81,7 +81,7 @@ public class OptimizedRestoreService : IRestoreService
             {
                 try
                 {
-                    await optimizedRepo.RestoreNormalOperationAsync(preparationContext, ct);
+                    await optimizedRepo.RestoreNormalOperation(preparationContext, ct);
                     _logger.LogInformation("Restored normal operation for {EntityType}", typeof(TEntity).Name);
                 }
                 catch (Exception ex)
@@ -92,7 +92,7 @@ public class OptimizedRestoreService : IRestoreService
         }
     }
 
-    public async Task RestoreAllEntitiesAsync(
+    public async Task RestoreAllEntities(
         string backupName,
         GlobalRestoreOptions? options = null,
         CancellationToken ct = default)
@@ -152,7 +152,7 @@ public class OptimizedRestoreService : IRestoreService
             if (options.ValidateBeforeRestore)
             {
                 _logger.LogInformation("Validating backup before restore...");
-                var viabilityReport = await TestRestoreViabilityAsync(backupName, ct);
+                var viabilityReport = await TestRestoreViability(backupName, ct);
                 if (!viabilityReport.IsViable)
                 {
                     throw new InvalidOperationException($"Backup is not viable for restore: {string.Join(", ", viabilityReport.Issues)}");
@@ -198,7 +198,7 @@ public class OptimizedRestoreService : IRestoreService
         }
     }
 
-    public async Task RestoreSelectedAsync(
+    public async Task RestoreSelected(
         string backupName,
         Func<EntityBackupInfo, bool> filter,
         GlobalRestoreOptions? options = null,
@@ -211,10 +211,10 @@ public class OptimizedRestoreService : IRestoreService
         var modifiedOptions = options ?? new GlobalRestoreOptions();
         modifiedOptions.IncludeEntityTypes = selectedEntities.Select(e => e.EntityType).ToArray();
 
-        await RestoreAllEntitiesAsync(backupName, modifiedOptions, ct);
+        await RestoreAllEntities(backupName, modifiedOptions, ct);
     }
 
-    public async Task<Abstractions.RestoreViabilityReport> TestRestoreViabilityAsync(string backupName, CancellationToken ct = default)
+    public async Task<Abstractions.RestoreViabilityReport> TestRestoreViability(string backupName, CancellationToken ct = default)
     {
         var report = new Abstractions.RestoreViabilityReport
         {
@@ -295,13 +295,13 @@ public class OptimizedRestoreService : IRestoreService
         return report;
     }
 
-    public Task<Abstractions.RestoreProgress> GetRestoreProgressAsync(string restoreId, CancellationToken ct = default)
+    public Task<Abstractions.RestoreProgress> GetRestoreProgress(string restoreId, CancellationToken ct = default)
     {
         _activeRestores.TryGetValue(restoreId, out var progress);
         return Task.FromResult(progress ?? new Abstractions.RestoreProgress { RestoreId = restoreId, Status = Abstractions.RestoreStatus.Completed });
     }
 
-    public Task CancelRestoreAsync(string restoreId, CancellationToken ct = default)
+    public Task CancelRestore(string restoreId, CancellationToken ct = default)
     {
         if (_activeRestores.TryGetValue(restoreId, out var progress))
         {
@@ -318,9 +318,9 @@ public class OptimizedRestoreService : IRestoreService
         where TKey : notnull
     {
         var backupPath = await FindBackupPath(backupName, options.StorageProfile, ct);
-        using var archive = await _storageService.OpenBackupArchiveAsync(backupPath, options.StorageProfile, ct);
+        using var archive = await _storageService.OpenBackupArchive(backupPath, options.StorageProfile, ct);
 
-        var manifest = await _storageService.LoadManifestAsync(archive, ct);
+        var manifest = await _storageService.LoadManifest(archive, ct);
         var entityInfo = manifest.Entities.FirstOrDefault(e => e.EntityType == typeof(TEntity).Name);
 
         if (entityInfo == null)
@@ -342,7 +342,7 @@ public class OptimizedRestoreService : IRestoreService
             {
                 if (!options.DryRun)
                 {
-                    await Data<TEntity, TKey>.UpsertManyAsync(batch, ct);
+                    await Data<TEntity, TKey>.UpsertMany(batch, ct);
                 }
                 totalRestored += batch.Count;
                 batch.Clear();
@@ -356,7 +356,7 @@ public class OptimizedRestoreService : IRestoreService
         {
             if (!options.DryRun)
             {
-                await Data<TEntity, TKey>.UpsertManyAsync(batch, ct);
+                await Data<TEntity, TKey>.UpsertMany(batch, ct);
             }
             totalRestored += batch.Count;
         }
@@ -395,7 +395,7 @@ public class OptimizedRestoreService : IRestoreService
 
             // Load backup data
             var backupPath = await FindBackupPath(backupName, options.StorageProfile, ct);
-            using var archive = await _storageService.OpenBackupArchiveAsync(backupPath, options.StorageProfile, ct);
+            using var archive = await _storageService.OpenBackupArchive(backupPath, options.StorageProfile, ct);
 
             // Read entities as objects
             var entities = new List<object>();
@@ -459,15 +459,15 @@ public class OptimizedRestoreService : IRestoreService
     private async Task<BackupManifest> LoadBackupManifest(string backupName, string storageProfile, CancellationToken ct)
     {
         var backupPath = await FindBackupPath(backupName, storageProfile, ct);
-        using var archive = await _storageService.OpenBackupArchiveAsync(backupPath, storageProfile, ct);
-        return await _storageService.LoadManifestAsync(archive, ct);
+        using var archive = await _storageService.OpenBackupArchive(backupPath, storageProfile, ct);
+        return await _storageService.LoadManifest(archive, ct);
     }
 
     private async Task<string> FindBackupPath(string backupName, string storageProfile, CancellationToken ct)
     {
 
         // First try to find by exact backup name
-        var backup = await _discoveryService.GetBackupAsync(backupName, ct);
+        var backup = await _discoveryService.GetBackup(backupName, ct);
 
         if (backup != null)
         {
@@ -478,7 +478,7 @@ public class OptimizedRestoreService : IRestoreService
         }
 
         // If not found by name, try to discover backups in the specified storage profile
-        var catalog = await _discoveryService.DiscoverByStorageProfileAsync(storageProfile, ct);
+        var catalog = await _discoveryService.DiscoverByStorageProfile(storageProfile, ct);
         backup = catalog.Backups.FirstOrDefault(b =>
             b.Name.Equals(backupName, StringComparison.OrdinalIgnoreCase) ||
             b.Id.Equals(backupName, StringComparison.OrdinalIgnoreCase));

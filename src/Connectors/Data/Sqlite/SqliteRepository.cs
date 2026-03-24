@@ -245,7 +245,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         return pooledConn; // Return wrapper, not raw connection
     }
 
-    private Task EnsureOrchestratedAsync(SqliteConnection conn, CancellationToken ct)
+    private Task EnsureOrchestrated(SqliteConnection conn, CancellationToken ct)
     {
         var table = TableName;
         var cacheKey = BuildCacheKey(conn, table);
@@ -254,17 +254,17 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             ("table", table),
             ("dataSource", conn.DataSource));
         // Singleflight: dedupe in-flight ensure per DataSource::Table
-        return Singleflight.RunAsync(cacheKey, token => EnsureOrchestratedCoreAsync(conn, table, cacheKey, token), ct);
+        return Singleflight.Run(cacheKey, token => EnsureOrchestratedCore(conn, table, cacheKey, token), ct);
     }
 
     private void EnsureOrchestrated(SqliteConnection conn)
-        => EnsureOrchestratedAsync(conn, CancellationToken.None).GetAwaiter().GetResult();
+        => EnsureOrchestrated(conn, CancellationToken.None).GetAwaiter().GetResult();
 
-    public async Task EnsureHealthyAsync(CancellationToken ct)
+    public async Task EnsureHealthy(CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         using var conn = CreateConnection();
-        await EnsureOrchestratedAsync(conn, ct);
+        await EnsureOrchestrated(conn, ct);
     }
 
     public void InvalidateHealth()
@@ -280,7 +280,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         }
     }
 
-    private async Task EnsureOrchestratedCoreAsync(SqliteConnection conn, string table, string cacheKey, CancellationToken ct)
+    private async Task EnsureOrchestratedCore(SqliteConnection conn, string table, string cacheKey, CancellationToken ct)
     {
         if (_healthyCache.TryGetValue(cacheKey, out var healthy) && healthy) return;
         var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
@@ -426,7 +426,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         return typeof(string);
     }
 
-    public async Task<TEntity?> GetAsync(TKey id, CancellationToken ct = default)
+    public async Task<TEntity?> Get(TKey id, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = SqliteTelemetry.Activity.StartActivity("sqlite.get");
@@ -436,7 +436,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         return row == default ? null : FromRow(row);
     }
 
-    public async Task<IReadOnlyList<TEntity?>> GetManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity?>> GetMany(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = SqliteTelemetry.Activity.StartActivity("sqlite.get.many");
@@ -469,7 +469,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         return results;
     }
 
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(object? query, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:all");
@@ -480,7 +480,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         return rows.Select(FromRow).ToList();
     }
 
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(object? query, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:all+opts");
@@ -492,7 +492,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         return rows.Select(FromRow).ToList();
     }
 
-    public async Task<CountResult> CountAsync(CountRequest<TEntity> request, CancellationToken ct = default)
+    public async Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = SqliteTelemetry.Activity.StartActivity("sqlite.count");
@@ -517,7 +517,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             catch (NotSupportedException)
             {
                 // Fallback to materialize + count
-                var all = await QueryAsync((object?)null, ct);
+                var all = await Query((object?)null, ct);
                 var count = (long)all.AsQueryable().Count(request.Predicate);
                 return CountResult.Exact(count);
             }
@@ -548,7 +548,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         return CountResult.Exact(totalCount);
     }
 
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
     {
         // Translate predicate to SQL WHERE via relational LINQ translator
         ct.ThrowIfCancellationRequested();
@@ -578,12 +578,12 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         catch (NotSupportedException)
         {
             // Safe fallback: in-memory filtering for unsupported shapes
-            var all = await QueryAsync((object?)null, ct);
+            var all = await Query((object?)null, ct);
             return all.AsQueryable().Where(predicate).ToList();
         }
     }
 
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:linq+opts");
@@ -610,13 +610,13 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         }
         catch (NotSupportedException)
         {
-            var all = await QueryAsync((object?)null, options, ct);
+            var all = await Query((object?)null, options, ct);
             return all.AsQueryable().Where(predicate).ToList();
         }
     }
 
 
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(string sql, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(string sql, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:string");
@@ -663,7 +663,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         }
     }
 
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(string sql, object? parameters, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(string sql, object? parameters, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:string:param");
@@ -710,7 +710,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         }
     }
 
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(string sql, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(string sql, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:string+opts");
@@ -746,7 +746,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         }
     }
 
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(string sql, object? parameters, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(string sql, object? parameters, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:string:param+opts");
@@ -783,16 +783,16 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     }
 
 
-    public async Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)
+    public async Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
     {
-        await UpsertManyAsync(new[] { model }, ct);
+        await UpsertMany(new[] { model }, ct);
         return model;
     }
 
-    public async Task<bool> DeleteAsync(TKey id, CancellationToken ct = default)
-        => await DeleteManyAsync(new[] { id }, ct).ContinueWith(t => t.Result > 0, ct);
+    public async Task<bool> Delete(TKey id, CancellationToken ct = default)
+        => await DeleteMany(new[] { id }, ct).ContinueWith(t => t.Result > 0, ct);
 
-    public async Task<int> UpsertManyAsync(IEnumerable<TEntity> models, CancellationToken ct = default)
+    public async Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default)
     {
         using var conn = Open();
         // Let SQLite use autocommit - don't impose transaction control at adapter level
@@ -825,20 +825,20 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         return count;
     }
 
-    public async Task<int> DeleteManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    public async Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
         using var conn = Open();
         var count = await conn.ExecuteAsync($"DELETE FROM [{TableName}] WHERE Id IN @Ids", new { Ids = ids.Select(i => i!.ToString()!).ToArray() });
         return count;
     }
 
-    public async Task<int> DeleteAllAsync(CancellationToken ct = default)
+    public async Task<int> DeleteAll(CancellationToken ct = default)
     {
         using var conn = Open();
         return await conn.ExecuteAsync($"DELETE FROM [{TableName}]");
     }
 
-    public async Task<long> RemoveAllAsync(RemoveStrategy strategy, CancellationToken ct = default)
+    public async Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default)
     {
         using var conn = Open();
 
@@ -849,7 +849,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
 
         // SQLite has no TRUNCATE - both strategies use DELETE
         var countRequest = new CountRequest<TEntity>();
-        var countResult = await CountAsync(countRequest, ct);
+        var countResult = await Count(countRequest, ct);
         await conn.ExecuteAsync($"DELETE FROM [{TableName}]", ct);
 
         if (effectiveStrategy == RemoveStrategy.Fast)
@@ -876,12 +876,12 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         public IBatchSet<TEntity, TKey> Delete(TKey id) { _deletes.Add(id); return this; }
         public IBatchSet<TEntity, TKey> Clear() { _adds.Clear(); _updates.Clear(); _deletes.Clear(); _mutations.Clear(); return this; }
 
-        public async Task<BatchResult> SaveAsync(BatchOptions? options = null, CancellationToken ct = default)
+        public async Task<BatchResult> Save(BatchOptions? options = null, CancellationToken ct = default)
         {
             // Apply mutations by loading entities then queueing as updates
             foreach (var (id, mutate) in _mutations)
             {
-                var current = await repo.GetAsync(id, ct);
+                var current = await repo.Get(id, ct);
                 if (current is not null) { mutate(current); _updates.Add(current); }
             }
             var upserts = _adds.Concat(_updates);
@@ -890,8 +890,8 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             var requireAtomic = options?.RequireAtomic == true;
             if (!requireAtomic)
             {
-                if (upserts.Any()) await repo.UpsertManyAsync(upserts, ct);
-                if (_deletes.Any()) deleted = await repo.DeleteManyAsync(_deletes, ct);
+                if (upserts.Any()) await repo.UpsertMany(upserts, ct);
+                if (_deletes.Any()) deleted = await repo.DeleteMany(_deletes, ct);
                 return new BatchResult(added, updated, deleted);
             }
 
@@ -1178,7 +1178,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             System.Diagnostics.Debug.WriteLine($"[DDL] CreateTableWithColumns: {sql}");
             using var cmd = conn.CreateCommand();
             cmd.CommandText = sql;
-            var result = cmd.ExecuteNonQuery();
+            var result = cmd.ExecuteNonQueryAsync();
             System.Diagnostics.Debug.WriteLine($"[DDL] CREATE TABLE result: {result}");
             // Emit PRAGMA table_info for debugging (debug builds only)
 #if DEBUG
@@ -1257,7 +1257,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             using var cmd = conn.CreateCommand();
             cmd.CommandText = "SELECT 1 FROM sqlite_master WHERE type='table' AND name=@t";
             cmd.Parameters.AddWithValue("@t", table);
-            return cmd.ExecuteScalar() is not null;
+            return cmd.ExecuteScalarAsync() is not null;
         }
         public bool ColumnExists(string schema, string table, string column)
         {
@@ -1288,7 +1288,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             var tname = string.IsNullOrWhiteSpace(table) ? tableName : table;
             System.Diagnostics.Debug.WriteLine($"[DDL] CreateTableIdJson: table={tname}, idColumn={idColumn}, jsonColumn={jsonColumn}");
             cmd.CommandText = $"CREATE TABLE IF NOT EXISTS [{tname}] ([{idColumn}] TEXT PRIMARY KEY, [{jsonColumn}] TEXT NOT NULL)";
-            cmd.ExecuteNonQuery();
+            cmd.ExecuteNonQueryAsync();
         }
         public void AddComputedColumnFromJson(string schema, string table, string column, string jsonPath, bool persisted)
         {
@@ -1304,7 +1304,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             {
                 using var cmd = conn.CreateCommand();
                 cmd.CommandText = $"ALTER TABLE [{table}] ADD COLUMN [{column}] {type}";
-                var result = cmd.ExecuteNonQuery();
+                var result = cmd.ExecuteNonQueryAsync();
                 System.Diagnostics.Debug.WriteLine($"[DDL] ALTER TABLE result: {result}");
             }
             catch (Exception ex)
@@ -1318,7 +1318,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             var cols = string.Join(", ", columns.Select(c => $"[{c}]"));
             using var cmd = conn.CreateCommand();
             cmd.CommandText = $"CREATE {(unique ? "UNIQUE " : string.Empty)}INDEX IF NOT EXISTS [{indexName}] ON [{table}] ({cols})";
-            cmd.ExecuteNonQuery();
+            cmd.ExecuteNonQueryAsync();
         }
     }
 
@@ -1348,7 +1348,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
 
         public PooledConnection Rent()
         {
-            _semaphore.Wait();
+            _semaphore.WaitAsync();
 
             // Try to get an existing connection from the pool
             if (_availableConnections.TryTake(out var conn))

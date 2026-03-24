@@ -155,7 +155,7 @@ internal sealed class PostgresOptionsConfigurator : AdapterOptionsConfigurator<P
                 context.Parameters["password"] = password;
 
             // Use autonomous discovery coordinator
-            var discoveryTask = _discoveryCoordinator.DiscoverServiceAsync("postgres", context);
+            var discoveryTask = _discoveryCoordinator.DiscoverService("postgres", context);
             var result = discoveryTask.GetAwaiter().GetResult();
 
             if (result.IsSuccessful)

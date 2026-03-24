@@ -17,7 +17,7 @@ public sealed class CacheSingleflightRegistrySpec
 
     [Fact]
     public Task RunAsync_enforces_exclusive_access_for_same_key()
-        => SpecAsync(nameof(RunAsync_enforces_exclusive_access_for_same_key), async () =>
+        => Spec(nameof(RunAsync_enforces_exclusive_access_for_same_key), async () =>
         {
             var registry = new CacheSingleflightRegistry();
             var firstEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -66,7 +66,7 @@ public sealed class CacheSingleflightRegistrySpec
 
     [Fact]
     public Task RunAsync_timeout_when_lock_not_acquired_within_window()
-        => SpecAsync(nameof(RunAsync_timeout_when_lock_not_acquired_within_window), async () =>
+        => Spec(nameof(RunAsync_timeout_when_lock_not_acquired_within_window), async () =>
         {
             var registry = new CacheSingleflightRegistry();
             var firstEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -104,13 +104,13 @@ public sealed class CacheSingleflightRegistrySpec
                 body();
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 
-    private Task SpecAsync(string scenario, Func<Task> body)
+    private Task Spec(string scenario, Func<Task> body)
         => TestPipeline.For<CacheSingleflightRegistrySpec>(_output, scenario)
             .Assert(async _ =>
             {
                 await body().ConfigureAwait(false);
             })
-            .RunAsync();
+            .Run();
 }

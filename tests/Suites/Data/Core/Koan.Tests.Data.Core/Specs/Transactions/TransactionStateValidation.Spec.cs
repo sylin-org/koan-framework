@@ -45,7 +45,7 @@ public sealed class TransactionStateValidationSpec
     public async Task Operations_execute_immediately_without_transaction()
     {
         await TestPipeline.For<TransactionStateValidationSpec>(_output, nameof(Operations_execute_immediately_without_transaction))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition = EnsurePartition(ctx);
@@ -75,7 +75,7 @@ public sealed class TransactionStateValidationSpec
                     fakeRepo.ContainsVector(entity.Id).Should().BeTrue("vector should be persisted immediately");
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -85,7 +85,7 @@ public sealed class TransactionStateValidationSpec
     public async Task Operations_deferred_during_active_transaction()
     {
         await TestPipeline.For<TransactionStateValidationSpec>(_output, nameof(Operations_deferred_during_active_transaction))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition = EnsurePartition(ctx);
@@ -115,7 +115,7 @@ public sealed class TransactionStateValidationSpec
                         var fakeRepo = runtime.VectorService.GetFakeRepository<TodoEntity, string>();
                         fakeRepo.VectorCount.Should().Be(0, "vectors should not be persisted during transaction");
 
-                        await EntityContext.CommitAsync();
+                        await EntityContext.Commit();
                     }
 
                     // After commit - all operations should be persisted
@@ -126,7 +126,7 @@ public sealed class TransactionStateValidationSpec
                     fakeRepoAfterCommit.VectorCount.Should().Be(1, "vector should be persisted after commit");
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -136,7 +136,7 @@ public sealed class TransactionStateValidationSpec
     public async Task Transactions_isolated_by_partition()
     {
         await TestPipeline.For<TransactionStateValidationSpec>(_output, nameof(Transactions_isolated_by_partition))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition1 = $"partition1-{ctx.ExecutionId:n}";
@@ -164,7 +164,7 @@ public sealed class TransactionStateValidationSpec
                         var count = await TodoEntity.Count;
                         count.Should().Be(0);
 
-                        await EntityContext.CommitAsync();
+                        await EntityContext.Commit();
                     }
 
                     // Should be committed in partition1
@@ -178,7 +178,7 @@ public sealed class TransactionStateValidationSpec
                     using (EntityContext.Transaction("tx2"))
                     {
                         await entity2.Save();
-                        await EntityContext.CommitAsync();
+                        await EntityContext.Commit();
                     }
 
                     var count = await TodoEntity.Count;
@@ -192,7 +192,7 @@ public sealed class TransactionStateValidationSpec
                     count.Should().Be(1, "partition1 should still have 1 entity");
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -202,7 +202,7 @@ public sealed class TransactionStateValidationSpec
     public async Task Commit_without_transaction_is_noop()
     {
         await TestPipeline.For<TransactionStateValidationSpec>(_output, nameof(Commit_without_transaction_is_noop))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition = EnsurePartition(ctx);
@@ -215,11 +215,11 @@ public sealed class TransactionStateValidationSpec
                 using (var _ = EntityContext.Partition(partition))
                 {
                     // Commit without transaction should not throw
-                    var act = async () => await EntityContext.CommitAsync();
+                    var act = async () => await EntityContext.Commit();
                     await act.Should().NotThrowAsync("commit without transaction should be no-op");
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -229,7 +229,7 @@ public sealed class TransactionStateValidationSpec
     public async Task Rollback_without_transaction_is_noop()
     {
         await TestPipeline.For<TransactionStateValidationSpec>(_output, nameof(Rollback_without_transaction_is_noop))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition = EnsurePartition(ctx);
@@ -242,11 +242,11 @@ public sealed class TransactionStateValidationSpec
                 using (var _ = EntityContext.Partition(partition))
                 {
                     // Rollback without transaction should not throw
-                    var act = async () => await EntityContext.RollbackAsync();
+                    var act = async () => await EntityContext.Rollback();
                     await act.Should().NotThrowAsync("rollback without transaction should be no-op");
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -256,7 +256,7 @@ public sealed class TransactionStateValidationSpec
     public async Task Double_commit_after_first_commit_is_noop()
     {
         await TestPipeline.For<TransactionStateValidationSpec>(_output, nameof(Double_commit_after_first_commit_is_noop))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition = EnsurePartition(ctx);
@@ -273,10 +273,10 @@ public sealed class TransactionStateValidationSpec
                     using (EntityContext.Transaction("double-commit"))
                     {
                         await entity.Save();
-                        await EntityContext.CommitAsync();
+                        await EntityContext.Commit();
 
                         // Second commit should be no-op (transaction already committed)
-                        var act = async () => await EntityContext.CommitAsync();
+                        var act = async () => await EntityContext.Commit();
                         await act.Should().NotThrowAsync("double commit should be no-op");
                     }
 
@@ -284,7 +284,7 @@ public sealed class TransactionStateValidationSpec
                     count.Should().Be(1, "entity should be persisted once");
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -294,7 +294,7 @@ public sealed class TransactionStateValidationSpec
     public async Task Rollback_after_commit_is_noop()
     {
         await TestPipeline.For<TransactionStateValidationSpec>(_output, nameof(Rollback_after_commit_is_noop))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition = EnsurePartition(ctx);
@@ -311,10 +311,10 @@ public sealed class TransactionStateValidationSpec
                     using (EntityContext.Transaction("rollback-after-commit"))
                     {
                         await entity.Save();
-                        await EntityContext.CommitAsync();
+                        await EntityContext.Commit();
 
                         // Rollback after commit should be no-op
-                        var act = async () => await EntityContext.RollbackAsync();
+                        var act = async () => await EntityContext.Rollback();
                         await act.Should().NotThrowAsync("rollback after commit should be no-op");
                     }
 
@@ -323,7 +323,7 @@ public sealed class TransactionStateValidationSpec
                     count.Should().Be(1, "entity should remain persisted");
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -333,7 +333,7 @@ public sealed class TransactionStateValidationSpec
     public async Task Commit_after_rollback_is_noop()
     {
         await TestPipeline.For<TransactionStateValidationSpec>(_output, nameof(Commit_after_rollback_is_noop))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition = EnsurePartition(ctx);
@@ -350,10 +350,10 @@ public sealed class TransactionStateValidationSpec
                     using (EntityContext.Transaction("commit-after-rollback"))
                     {
                         await entity.Save();
-                        await EntityContext.RollbackAsync();
+                        await EntityContext.Rollback();
 
                         // Commit after rollback should be no-op
-                        var act = async () => await EntityContext.CommitAsync();
+                        var act = async () => await EntityContext.Commit();
                         await act.Should().NotThrowAsync("commit after rollback should be no-op");
                     }
 
@@ -362,7 +362,7 @@ public sealed class TransactionStateValidationSpec
                     count.Should().Be(0, "entity should not be persisted after rollback");
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -372,7 +372,7 @@ public sealed class TransactionStateValidationSpec
     public async Task Transaction_dispose_without_commit_rolls_back()
     {
         await TestPipeline.For<TransactionStateValidationSpec>(_output, nameof(Transaction_dispose_without_commit_rolls_back))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition = EnsurePartition(ctx);
@@ -397,7 +397,7 @@ public sealed class TransactionStateValidationSpec
                     count.Should().Be(0, "entity should be rolled back on dispose");
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -407,7 +407,7 @@ public sealed class TransactionStateValidationSpec
     public async Task Transaction_executes_operations_in_queue_order()
     {
         await TestPipeline.For<TransactionStateValidationSpec>(_output, nameof(Transaction_executes_operations_in_queue_order))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition = EnsurePartition(ctx);
@@ -436,7 +436,7 @@ public sealed class TransactionStateValidationSpec
                         await entity3.Save();
                         await Vector<TodoEntity>.Save(entity2.Id, embedding2);
 
-                        await EntityContext.CommitAsync();
+                        await EntityContext.Commit();
                     }
 
                     // Verify all operations committed
@@ -453,7 +453,7 @@ public sealed class TransactionStateValidationSpec
                     ops[1].Id.Should().Be(entity2.Id, "second vector operation should be entity2");
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -463,7 +463,7 @@ public sealed class TransactionStateValidationSpec
     public async Task Empty_transaction_commits_successfully()
     {
         await TestPipeline.For<TransactionStateValidationSpec>(_output, nameof(Empty_transaction_commits_successfully))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition = EnsurePartition(ctx);
@@ -478,12 +478,12 @@ public sealed class TransactionStateValidationSpec
                     using (EntityContext.Transaction("empty-tx"))
                     {
                         // No operations
-                        var act = async () => await EntityContext.CommitAsync();
+                        var act = async () => await EntityContext.Commit();
                         await act.Should().NotThrowAsync("empty transaction should commit successfully");
                     }
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     #region Helper Methods

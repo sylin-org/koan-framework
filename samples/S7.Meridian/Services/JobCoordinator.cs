@@ -11,7 +11,7 @@ namespace Koan.Samples.Meridian.Services;
 
 public interface IJobCoordinator
 {
-    Task<ProcessingJob> ScheduleAsync(string pipelineId, IEnumerable<string> documentIds, CancellationToken ct);
+    Task<ProcessingJob> Schedule(string pipelineId, IEnumerable<string> documentIds, CancellationToken ct);
 }
 
 public sealed class JobCoordinator : IJobCoordinator
@@ -23,7 +23,7 @@ public sealed class JobCoordinator : IJobCoordinator
         _logger = logger;
     }
 
-    public async Task<ProcessingJob> ScheduleAsync(string pipelineId, IEnumerable<string> documentIds, CancellationToken ct)
+    public async Task<ProcessingJob> Schedule(string pipelineId, IEnumerable<string> documentIds, CancellationToken ct)
     {
         var ids = documentIds
             .Where(id => !string.IsNullOrWhiteSpace(id))
@@ -44,7 +44,7 @@ public sealed class JobCoordinator : IJobCoordinator
         // Retry loop for optimistic concurrency
         for (int attempt = 0; attempt < MaxRetries; attempt++)
         {
-            var existing = await ProcessingJob.FindPendingAsync(pipelineId, ct);
+            var existing = await ProcessingJob.FindPending(pipelineId, ct);
 
             if (existing is not null)
             {

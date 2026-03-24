@@ -27,7 +27,7 @@ public class PulseController : ControllerBase
     {
         try
         {
-            var briefing = await _pulseService.GenerateAsync(spaceId, ct);
+            var briefing = await _pulseService.Generate(spaceId, ct);
             return Ok(briefing);
         }
         catch (Exception ex)

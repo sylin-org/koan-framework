@@ -25,7 +25,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
                 return BadRequest(new { error = "MediaType is required. Please specify a media type or 'all' to import all types." });
             }
 
-            var id = seeder.StartAsync(req.Source, req.MediaType, req.Limit, req.Overwrite, HttpContext.RequestAborted).GetAwaiter().GetResult();
+            var id = seeder.Start(req.Source, req.MediaType, req.Limit, req.Overwrite, HttpContext.RequestAborted).GetAwaiter().GetResult();
             return Ok(new { jobId = id });
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("import is already in progress"))
@@ -125,21 +125,21 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
             UpdatedAt = DateTimeOffset.UtcNow
         };
         Models.SettingsDoc.UpsertMany(new[] { doc }, HttpContext.RequestAborted).GetAwaiter().GetResult();
-        provider.InvalidateAsync(HttpContext.RequestAborted).GetAwaiter().GetResult();
+        provider.Invalidate(HttpContext.RequestAborted).GetAwaiter().GetResult();
         return Ok(new { preferTagsWeight = ptw, maxPreferredTags = mpt, diversityWeight = dw, censoredTagsPenaltyWeight = ctpw });
     }
 
     [HttpGet("seed/status/{jobId}")]
     public IActionResult GetStatus([FromRoute] string jobId)
     {
-        var status = seeder.GetStatusAsync(jobId, HttpContext.RequestAborted).GetAwaiter().GetResult();
+        var status = seeder.GetStatus(jobId, HttpContext.RequestAborted).GetAwaiter().GetResult();
         return Ok(status);
     }
 
     [HttpGet("stats")]
     public IActionResult GetStats()
     {
-        var (media, contentPieces, vectors) = seeder.GetStatsAsync(HttpContext.RequestAborted).GetAwaiter().GetResult();
+        var (media, contentPieces, vectors) = seeder.GetStats(HttpContext.RequestAborted).GetAwaiter().GetResult();
         return Ok(new { media, contentPieces, vectors });
     }
 
@@ -152,14 +152,14 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
     [HttpPost("tags/rebuild")] // on-demand tag import/catalog rebuild
     public async Task<IActionResult> RebuildTags([FromServices] S5.Recs.Services.ISeedService seeder, CancellationToken ct)
     {
-        var n = await seeder.RebuildTagCatalogAsync(ct);
+        var n = await seeder.RebuildTagCatalog(ct);
         return Ok(new { updated = n });
     }
 
     [HttpPost("genres/rebuild")] // on-demand genre catalog rebuild
     public async Task<IActionResult> RebuildGenres([FromServices] S5.Recs.Services.ISeedService seeder, CancellationToken ct)
     {
-        var n = await seeder.RebuildGenreCatalogAsync(ct);
+        var n = await seeder.RebuildGenreCatalog(ct);
         return Ok(new { updated = n });
     }
 
@@ -368,7 +368,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
         _logger.LogInformation("------------- Starting vector-only upsert for {Count} items (limit {Limit})",
             items.Count, req.Limit?.ToString() ?? "none (all)");
 
-        var id = await seeder.StartVectorUpsertAsync(items, HttpContext.RequestAborted);
+        var id = await seeder.StartVectorUpsert(items, HttpContext.RequestAborted);
         return Ok(new { jobId = id, count = items.Count, limit = req.Limit });
     }
 
@@ -382,7 +382,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
         var ct = HttpContext.RequestAborted;
         while (!ct.IsCancellationRequested)
         {
-            var status = await seeder.GetStatusAsync(jobId, ct);
+            var status = await seeder.GetStatus(jobId, ct);
             await HttpContext.Response.WriteAsync($"data: {Newtonsoft.Json.JsonConvert.SerializeObject(status)}\n\n", ct);
             await HttpContext.Response.Body.FlushAsync(ct);
             await Task.Delay(1000, ct);
@@ -394,7 +394,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
     [HttpGet("cache/list")]
     public async Task<IActionResult> ListCaches([FromServices] Services.IRawCacheService cache, CancellationToken ct)
     {
-        var manifests = await cache.ListCachesAsync(ct);
+        var manifests = await cache.ListCaches(ct);
         return Ok(new { count = manifests.Count, caches = manifests });
     }
 
@@ -412,7 +412,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
         // If no source/mediaType specified, iterate through ALL unique combinations
         if (string.IsNullOrWhiteSpace(req.Source) || string.IsNullOrWhiteSpace(req.MediaType))
         {
-            var allManifests = await cache.ListCachesAsync(ct);
+            var allManifests = await cache.ListCaches(ct);
             var uniqueCombinations = allManifests
                 .Select(m => new { m.Source, m.MediaType })
                 .Distinct()
@@ -523,7 +523,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
         if (!string.IsNullOrWhiteSpace(specificJobId))
         {
             // Process single specific job
-            var manifest = await cache.GetManifestAsync(source, mediaType, specificJobId, ct);
+            var manifest = await cache.GetManifest(source, mediaType, specificJobId, ct);
             if (manifest == null)
             {
                 _logger.LogWarning("Cache not found: {Source}/{MediaType}/{JobId}", source, mediaType, specificJobId);
@@ -534,7 +534,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
         else
         {
             // Process ALL jobs for this source/mediaType in chronological order (oldest first)
-            var allManifests = await cache.ListCachesAsync(ct);
+            var allManifests = await cache.ListCaches(ct);
             jobsToProcess = allManifests
                 .Where(m => m.Source.Equals(source, StringComparison.OrdinalIgnoreCase) &&
                            m.MediaType.Equals(mediaType, StringComparison.OrdinalIgnoreCase))
@@ -561,9 +561,9 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
             _logger.LogInformation("Rebuild: processing job {JobId} (fetched {FetchedAt:u})",
                 job.JobId, job.FetchedAt);
 
-            await foreach (var (pageNum, rawJson) in cache.ReadPagesAsync(job.Source, job.MediaType, job.JobId, CancellationToken.None))
+            await foreach (var (pageNum, rawJson) in cache.ReadPages(job.Source, job.MediaType, job.JobId, CancellationToken.None))
             {
-                var parsedMedia = await parser.ParsePageAsync(rawJson, mediaTypeEntity, CancellationToken.None);
+                var parsedMedia = await parser.ParsePage(rawJson, mediaTypeEntity, CancellationToken.None);
 
                 if (parsedMedia.Count > 0)
                 {
@@ -592,7 +592,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
     [HttpPost("flush/cache")]
     public async Task<IActionResult> FlushCache([FromServices] Services.IRawCacheService cache, CancellationToken ct)
     {
-        var count = await cache.FlushAllAsync(ct);
+        var count = await cache.FlushAll(ct);
         return Ok(new { flushed = "cache", count });
     }
 
@@ -1047,7 +1047,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
                 Overwrite: request.Overwrite
             );
 
-            var jobIds = await orchestrator.QueueImportAsync(
+            var jobIds = await orchestrator.QueueImport(
                 request.Source,
                 mediaTypeIds,
                 options,
@@ -1113,7 +1113,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
                 }
             }
 
-            var progress = await orchestrator.GetProgressAsync(jobIds, ct);
+            var progress = await orchestrator.GetProgress(jobIds, ct);
 
             return Ok(progress);
         }

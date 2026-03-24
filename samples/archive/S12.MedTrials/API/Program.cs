@@ -40,7 +40,7 @@ if (app.Environment.IsDevelopment())
     try { Directory.CreateDirectory(dataPath); } catch { /* best effort */ }
 }
 
-app.Run();
+app.RunAsync();
 
 namespace S12.MedTrials
 {

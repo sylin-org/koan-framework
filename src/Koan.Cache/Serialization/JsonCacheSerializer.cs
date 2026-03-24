@@ -17,21 +17,21 @@ public sealed class JsonCacheSerializer : ICacheSerializer
         => true;
 
     public ValueTask<CacheValue> SerializeAsync<T>(T value, CacheEntryOptions options, CancellationToken ct)
-        => SerializeInternalAsync(value, typeof(T), ct);
+        => SerializeInternal(value, typeof(T), ct);
 
-    public ValueTask<CacheValue> SerializeAsync(object value, Type runtimeType, CacheEntryOptions options, CancellationToken ct)
-        => SerializeInternalAsync(value, runtimeType, ct);
+    public ValueTask<CacheValue> Serialize(object value, Type runtimeType, CacheEntryOptions options, CancellationToken ct)
+        => SerializeInternal(value, runtimeType, ct);
 
     public ValueTask<T?> DeserializeAsync<T>(CacheValue value, CancellationToken ct)
         => DeserializeInternalAsync<T>(value, typeof(T), ct);
 
-    public async ValueTask<object?> DeserializeAsync(CacheValue value, Type returnType, CancellationToken ct)
+    public async ValueTask<object?> Deserialize(CacheValue value, Type returnType, CancellationToken ct)
     {
         var result = await DeserializeInternalAsync<object?>(value, returnType, ct);
         return result;
     }
 
-    private static ValueTask<CacheValue> SerializeInternalAsync(object? value, Type runtimeType, CancellationToken ct)
+    private static ValueTask<CacheValue> SerializeInternal(object? value, Type runtimeType, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         if (value is null)

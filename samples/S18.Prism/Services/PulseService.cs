@@ -12,7 +12,7 @@ public class PulseService : IPulseService
         _logger = logger;
     }
 
-    public async Task<PulseBriefing> GenerateAsync(string spaceId, CancellationToken ct = default)
+    public async Task<PulseBriefing> Generate(string spaceId, CancellationToken ct = default)
     {
         _logger.LogInformation("Generating pulse briefing for space {SpaceId}", spaceId);
 
@@ -53,7 +53,7 @@ public class PulseService : IPulseService
                     Date: n.SourcePublishedAt ?? n.CreatedAt.UtcDateTime))
                 .ToList();
 
-            var summary = await GenerateGroupSummaryAsync(originGroup.Key, originGroup.ToList(), ct);
+            var summary = await GenerateGroupSummary(originGroup.Key, originGroup.ToList(), ct);
 
             groups.Add(new PulseGroup(
                 Origin: originGroup.Key.ToString(),
@@ -86,7 +86,7 @@ public class PulseService : IPulseService
         return briefing;
     }
 
-    private async Task<string> GenerateGroupSummaryAsync(
+    private async Task<string> GenerateGroupSummary(
         NoteOrigin origin, List<Note> notes, CancellationToken ct)
     {
         if (notes.Count == 0)

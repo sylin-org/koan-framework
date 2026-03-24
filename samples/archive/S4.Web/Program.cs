@@ -7,7 +7,7 @@ builder.Services.AddKoan();
 var app = builder.Build();
 
 // Static files are wired by Koan.Web; no explicit calls needed here.
-app.Run();
+app.RunAsync();
 
 namespace S4.Web
 {

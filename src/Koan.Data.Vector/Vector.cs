@@ -99,16 +99,16 @@ public class Vector<TEntity> where TEntity : class, IEntity<string>
         }
 
         // No transaction - execute immediately
-        return Repo.UpsertAsync(id, embedding, metadata, ct);
+        return Repo.Upsert(id, embedding, metadata, ct);
     }
 
     // Save a single vector point; returns affected count (0|1)
     public static Task<int> Save((string Id, float[] Embedding, object? Metadata) item, CancellationToken ct = default)
-        => VectorData<TEntity>.UpsertManyAsync(new[] { item }, ct);
+        => VectorData<TEntity>.UpsertMany(new[] { item }, ct);
 
     // Save a batch of vector points; returns total affected
     public static Task<int> Save(IEnumerable<(string Id, float[] Embedding, object? Metadata)> items, CancellationToken ct = default)
-        => VectorData<TEntity>.UpsertManyAsync(items, ct);
+        => VectorData<TEntity>.UpsertMany(items, ct);
 
     // Delete one or many
     public static Task<bool> Delete(string id, CancellationToken ct = default)
@@ -124,15 +124,15 @@ public class Vector<TEntity> where TEntity : class, IEntity<string>
         }
 
         // No transaction - execute immediately
-        return Repo.DeleteAsync(id, ct);
+        return Repo.Delete(id, ct);
     }
 
     public static Task<int> Delete(IEnumerable<string> ids, CancellationToken ct = default)
-        => Repo.DeleteManyAsync(ids, ct);
+        => Repo.DeleteMany(ids, ct);
 
     // Ensure backing vector index exists (if provider supports it)
     public static Task EnsureCreated(CancellationToken ct = default)
-        => Repo.VectorEnsureCreatedAsync(ct);
+        => Repo.VectorEnsureCreated(ct);
 
     // Index maintenance via instructions (optional; provider-dependent)
     public static async Task<bool> Clear(CancellationToken ct = default)
@@ -147,7 +147,7 @@ public class Vector<TEntity> where TEntity : class, IEntity<string>
     /// Each adapter implements this according to its provider's capabilities.
     /// </summary>
     public static Task Flush(CancellationToken ct = default)
-        => Repo.FlushAsync(ct);
+        => Repo.Flush(ct);
 
     public static async Task<bool> Rebuild(CancellationToken ct = default)
     {
@@ -171,18 +171,18 @@ public class Vector<TEntity> where TEntity : class, IEntity<string>
     /// Returns null if no vector exists for the given ID.
     /// </summary>
     public static Task<float[]?> GetEmbedding(string id, CancellationToken ct = default)
-        => Repo.GetEmbeddingAsync(id, ct);
+        => Repo.GetEmbedding(id, ct);
 
     /// <summary>
     /// Retrieves embedding vectors for multiple entities by IDs.
     /// Returns a dictionary mapping IDs to embeddings. Missing IDs are omitted.
     /// </summary>
     public static Task<Dictionary<string, float[]>> GetEmbeddings(IEnumerable<string> ids, CancellationToken ct = default)
-        => Repo.GetEmbeddingsAsync(ids, ct);
+        => Repo.GetEmbeddings(ids, ct);
 
     // Search overloads
     public static Task<VectorQueryResult<string>> Search(VectorQueryOptions options, CancellationToken ct = default)
-        => VectorData<TEntity>.SearchAsync(options, ct);
+        => VectorData<TEntity>.Search(options, ct);
 
     /// <summary>
     /// Unified search interface supporting both pure vector and hybrid (semantic + keyword) search.
@@ -205,7 +205,7 @@ public class Vector<TEntity> where TEntity : class, IEntity<string>
         string? continuationToken = null,
         string? vectorName = null,
         CancellationToken ct = default)
-        => VectorData<TEntity>.SearchAsync(new VectorQueryOptions(
+        => VectorData<TEntity>.Search(new VectorQueryOptions(
             Query: vector,
             TopK: topK,
             ContinuationToken: continuationToken,

@@ -46,7 +46,7 @@ public class TypeScriptSdkSnapshotSpec : IClassFixture<TestPipelineFixture>
         var baselinePath = Path.Combine(snapshotDir, "koan-code-mode.d.ts.baseline");
         if (!File.Exists(baselinePath))
         {
-            File.WriteAllText(baselinePath, generated, Encoding.UTF8);
+            File.WriteAllTextAsync(baselinePath, generated, Encoding.UTF8);
             return; // First-run initialization; treat as pass.
         }
         var baselineRaw = File.ReadAllText(baselinePath, Encoding.UTF8);
@@ -55,7 +55,7 @@ public class TypeScriptSdkSnapshotSpec : IClassFixture<TestPipelineFixture>
         if (IsPlaceholder(baseline))
         {
             // Upgrade placeholder with actual generated snapshot silently
-            File.WriteAllText(baselinePath, generated, Encoding.UTF8);
+            File.WriteAllTextAsync(baselinePath, generated, Encoding.UTF8);
             return; // Do not fail; baseline established.
         }
 

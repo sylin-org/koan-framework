@@ -39,7 +39,7 @@ internal class MessagingLifecycleService : KoanFluentServiceBase
         _providers = providers;
     }
 
-    public override async Task ExecuteCoreAsync(CancellationToken cancellationToken)
+    public override async Task ExecuteCore(CancellationToken cancellationToken)
     {
         try
         {
@@ -58,12 +58,12 @@ internal class MessagingLifecycleService : KoanFluentServiceBase
             catch { /* ignore diagnostics failures */ }
 
             // Phase 2: Initialize messaging provider
-            var provider = await SelectAndInitializeProviderAsync(cancellationToken);
+            var provider = await SelectAndInitializeProvider(cancellationToken);
 
             if (provider == null)
             {
                 Logger.LogWarning("[Messaging] No providers available - messages will remain buffered");
-                await EmitEventAsync(Koan.Core.Events.KoanServiceEvents.Messaging.Failed, new MessagingFailedEventArgs
+                await EmitEvent(Koan.Core.Events.KoanServiceEvents.Messaging.Failed, new MessagingFailedEventArgs
                 {
                     Reason = "No providers available",
                     FailedAt = DateTimeOffset.UtcNow
@@ -72,14 +72,14 @@ internal class MessagingLifecycleService : KoanFluentServiceBase
             }
 
             // Phase 3: Go live and create consumers
-            await _proxy.GoLiveAsync(provider, cancellationToken);
+            await _proxy.GoLive(provider, cancellationToken);
 
             // Create consumers for all registered handlers
-            await handlerRegistry.CreateConsumersAsync(provider, cancellationToken);
+            await handlerRegistry.CreateConsumers(provider, cancellationToken);
 
             Logger.LogInformation("[Messaging] System ready - {HandlerCount} consumers active", handlerCount);
 
-            await EmitEventAsync(Koan.Core.Events.KoanServiceEvents.Messaging.Ready, new MessagingReadyEventArgs
+            await EmitEvent(Koan.Core.Events.KoanServiceEvents.Messaging.Ready, new MessagingReadyEventArgs
             {
                 HandlerCount = handlerCount,
                 ProviderName = provider.GetType().Name,
@@ -93,7 +93,7 @@ internal class MessagingLifecycleService : KoanFluentServiceBase
         {
             Logger.LogError(ex, "[Messaging] Failed to start messaging lifecycle");
 
-            await EmitEventAsync(Koan.Core.Events.KoanServiceEvents.Messaging.Failed, new MessagingFailedEventArgs
+            await EmitEvent(Koan.Core.Events.KoanServiceEvents.Messaging.Failed, new MessagingFailedEventArgs
             {
                 Reason = ex.Message,
                 FailedAt = DateTimeOffset.UtcNow,
@@ -112,7 +112,7 @@ internal class MessagingLifecycleService : KoanFluentServiceBase
         return Task.CompletedTask;
     }
 
-    private async Task<IMessageBus?> SelectAndInitializeProviderAsync(CancellationToken cancellationToken)
+    private async Task<IMessageBus?> SelectAndInitializeProvider(CancellationToken cancellationToken)
     {
         var availableProviders = _providers.ToList();
 
@@ -145,7 +145,7 @@ internal class MessagingLifecycleService : KoanFluentServiceBase
                     }
 
                     // Check if provider can connect
-                    var canConnect = await provider.CanConnectAsync(cancellationToken);
+                    var canConnect = await provider.CanConnect(cancellationToken);
 
                     if (!canConnect)
                     {
@@ -164,10 +164,10 @@ internal class MessagingLifecycleService : KoanFluentServiceBase
                     }
 
                     // Initialize the provider
-                    var bus = await provider.CreateBusAsync(cancellationToken);
+                    var bus = await provider.CreateBus(cancellationToken);
 
                     // Verify it's actually working
-                    var isHealthy = await bus.IsHealthyAsync(cancellationToken);
+                    var isHealthy = await bus.IsHealthy(cancellationToken);
 
                     if (!isHealthy)
                     {

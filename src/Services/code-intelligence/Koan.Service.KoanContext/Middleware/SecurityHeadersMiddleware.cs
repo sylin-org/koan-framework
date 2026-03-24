@@ -18,7 +18,7 @@ public class SecurityHeadersMiddleware
             ?? new SecurityHeadersOptions();
     }
 
-    public async Task InvokeAsync(HttpContext context)
+    public async Task Invoke(HttpContext context)
     {
         // Content Security Policy (XSS Protection)
         if (_options.EnableCsp)

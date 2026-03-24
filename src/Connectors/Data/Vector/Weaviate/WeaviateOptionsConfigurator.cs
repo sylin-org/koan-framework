@@ -184,7 +184,7 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
                 ("mode", context.OrchestrationMode.ToString()));
 
             // Use autonomous discovery coordinator
-            var discoveryTask = _discoveryCoordinator.DiscoverServiceAsync("weaviate", context);
+            var discoveryTask = _discoveryCoordinator.DiscoverService("weaviate", context);
             var result = discoveryTask.GetAwaiter().GetResult();
 
             if (result.IsSuccessful)
@@ -299,7 +299,7 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
         try
         {
             var resolved = _zenGardenInitializationProvider
-                .ResolveAsync(intent)
+                .Resolve(intent)
                 .GetAwaiter()
                 .GetResult();
 

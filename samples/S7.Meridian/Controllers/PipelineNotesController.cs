@@ -86,7 +86,7 @@ public sealed class PipelineNotesController : ControllerBase
         if (request.ReProcess)
         {
             // Get all documents for this pipeline
-            var documents = await pipeline.LoadDocumentsAsync(ct);
+            var documents = await pipeline.LoadDocuments(ct);
 
             var documentIds = documents
                 .Where(d => !d.IsVirtual)
@@ -97,7 +97,7 @@ public sealed class PipelineNotesController : ControllerBase
 
             if (documentIds.Count > 0)
             {
-                var job = await _jobCoordinator.ScheduleAsync(pipelineId, documentIds, ct);
+                var job = await _jobCoordinator.Schedule(pipelineId, documentIds, ct);
                 jobId = job.Id;
             }
         }
@@ -135,7 +135,7 @@ public sealed class PipelineNotesController : ControllerBase
 
         if (reProcess)
         {
-            var documents = await pipeline.LoadDocumentsAsync(ct);
+            var documents = await pipeline.LoadDocuments(ct);
 
             var documentIds = documents
                 .Where(d => !d.IsVirtual)
@@ -146,7 +146,7 @@ public sealed class PipelineNotesController : ControllerBase
 
             if (documentIds.Count > 0)
             {
-                await _jobCoordinator.ScheduleAsync(pipelineId, documentIds, ct);
+                await _jobCoordinator.Schedule(pipelineId, documentIds, ct);
             }
         }
 

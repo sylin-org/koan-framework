@@ -11,7 +11,7 @@ public sealed partial class DockerProvider : IHostingProvider
     public string Id => "docker";
     public int Priority => 100; // Windows-first default
 
-    public async Task<(bool Ok, string? Reason)> IsAvailableAsync(CancellationToken ct = default)
+    public async Task<(bool Ok, string? Reason)> IsAvailable(CancellationToken ct = default)
     {
         try
         {
@@ -120,7 +120,7 @@ public sealed partial class DockerProvider : IHostingProvider
         var services = code == 0 && !string.IsNullOrWhiteSpace(stdout)
             ? ParseComposePsJson(stdout)
             : new List<(string Service, string State, string? Health)>();
-        var (ok, _) = await IsAvailableAsync(ct);
+        var (ok, _) = await IsAvailable(ct);
         var engineVer = ok ? (await Run(DockerCli, "version --format '{{.Server.Version}}'", ct)).StdOut.Trim() : "";
         return new ProviderStatus(Id, engineVer, services);
     }

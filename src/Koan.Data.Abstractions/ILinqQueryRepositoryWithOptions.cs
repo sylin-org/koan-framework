@@ -10,5 +10,5 @@ public interface ILinqQueryRepositoryWithOptions<TEntity, TKey> : ILinqQueryRepo
     where TEntity : IEntity<TKey>
     where TKey : notnull
 {
-    new Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default);
+    new Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default);
 }

@@ -13,7 +13,7 @@ internal interface ITrackedOperation
     /// <summary>
     /// Execute the operation using the repository.
     /// </summary>
-    Task ExecuteAsync(CancellationToken ct);
+    Task Execute(CancellationToken ct);
 
     /// <summary>
     /// Get the adapter hint for this operation (for grouping).
@@ -39,7 +39,7 @@ internal sealed class SaveOperation<TEntity, TKey> : ITrackedOperation
         _partition = partition;
     }
 
-    public async Task ExecuteAsync(CancellationToken ct)
+    public async Task Execute(CancellationToken ct)
     {
         var partition = _partition ?? _context.Partition;
 
@@ -48,7 +48,7 @@ internal sealed class SaveOperation<TEntity, TKey> : ITrackedOperation
             adapter: string.IsNullOrWhiteSpace(_context.Adapter) ? null : _context.Adapter,
             partition: partition);
 
-        await Data<TEntity, TKey>.UpsertAsync(_entity, ct);
+        await Data<TEntity, TKey>.Upsert(_entity, ct);
     }
 
     public string GetAdapterHint()
@@ -75,7 +75,7 @@ internal sealed class DeleteOperation<TEntity, TKey> : ITrackedOperation
         _partition = partition;
     }
 
-    public async Task ExecuteAsync(CancellationToken ct)
+    public async Task Execute(CancellationToken ct)
     {
         var partition = _partition ?? _context.Partition;
 
@@ -84,7 +84,7 @@ internal sealed class DeleteOperation<TEntity, TKey> : ITrackedOperation
             adapter: string.IsNullOrWhiteSpace(_context.Adapter) ? null : _context.Adapter,
             partition: partition);
 
-        await Data<TEntity, TKey>.DeleteAsync(_id, ct);
+        await Data<TEntity, TKey>.Delete(_id, ct);
     }
 
     public string GetAdapterHint()
@@ -120,7 +120,7 @@ internal sealed class VectorSaveOperation<TEntity, TKey> : ITrackedOperation
         _partition = partition;
     }
 
-    public async Task ExecuteAsync(CancellationToken ct)
+    public async Task Execute(CancellationToken ct)
     {
         var partition = _partition ?? _context.Partition;
 
@@ -181,7 +181,7 @@ internal sealed class VectorDeleteOperation<TEntity, TKey> : ITrackedOperation
         _partition = partition;
     }
 
-    public async Task ExecuteAsync(CancellationToken ct)
+    public async Task Execute(CancellationToken ct)
     {
         var partition = _partition ?? _context.Partition;
 

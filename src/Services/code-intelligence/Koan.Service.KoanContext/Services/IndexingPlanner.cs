@@ -30,7 +30,7 @@ public sealed class IndexingPlanner
     /// <param name="projectRootPath">Absolute project root path.</param>
     /// <param name="forceReindex">When true, treat every discovered file as changed.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    public async Task<IndexingPlan> PlanAsync(
+    public async Task<IndexingPlan> Plan(
         string projectId,
         string projectRootPath,
         bool forceReindex = false,
@@ -68,8 +68,8 @@ public sealed class IndexingPlanner
         _logger.LogDebug("Loaded manifest with {Count} files", manifest.Count);
 
         var discoveredFiles = await _discovery
-            .DiscoverAsync(projectRootPath, cancellationToken: cancellationToken)
-            .ToListAsync(cancellationToken);
+            .Discover(projectRootPath, cancellationToken: cancellationToken)
+            .ToList(cancellationToken);
 
         var discoveredPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -91,7 +91,7 @@ public sealed class IndexingPlanner
                 continue;
             }
 
-            var currentHash = await FileHasher.ComputeSha256Async(file.AbsolutePath, cancellationToken);
+            var currentHash = await FileHasher.ComputeSha256(file.AbsolutePath, cancellationToken);
 
             if (string.Equals(currentHash, existing.ContentHash, StringComparison.Ordinal))
             {

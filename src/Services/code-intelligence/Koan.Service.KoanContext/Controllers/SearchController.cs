@@ -81,7 +81,7 @@ public class SearchController : ControllerBase
             }
             else if (!string.IsNullOrWhiteSpace(request.PathContext))
             {
-                var resolvedProject = await _projectResolver.ResolveProjectByPathAsync(
+                var resolvedProject = await _projectResolver.ResolveProjectByPath(
                     request.PathContext,
                     cancellationToken: cancellationToken);
 
@@ -100,7 +100,7 @@ public class SearchController : ControllerBase
             }
             else if (!string.IsNullOrWhiteSpace(request.LibraryId))
             {
-                var resolvedProject = await _projectResolver.ResolveProjectAsync(
+                var resolvedProject = await _projectResolver.ResolveProject(
                     libraryId: request.LibraryId,
                     workingDirectory: null,
                     httpContext: HttpContext,
@@ -116,7 +116,7 @@ public class SearchController : ControllerBase
             }
             else if (!string.IsNullOrWhiteSpace(request.WorkingDirectory))
             {
-                var resolvedProject = await _projectResolver.ResolveProjectAsync(
+                var resolvedProject = await _projectResolver.ResolveProject(
                     libraryId: null,
                     workingDirectory: request.WorkingDirectory,
                     httpContext: HttpContext,
@@ -166,7 +166,7 @@ public class SearchController : ControllerBase
                 includeReasoning: request.IncludeReasoning,
                 languages: request.Languages);
 
-            var result = await _retrieval.SearchAsync(
+            var result = await _retrieval.Search(
                 projectId,
                 context,
                 cancellationToken);
@@ -282,7 +282,7 @@ public class SearchController : ControllerBase
                     includeReasoning: request.IncludeReasoning,
                     languages: request.Languages);
 
-                var result = await _retrieval.SearchAsync(projectId, context, cancellationToken);
+                var result = await _retrieval.Search(projectId, context, cancellationToken);
 
                 foreach (var chunk in result.Chunks)
                 {

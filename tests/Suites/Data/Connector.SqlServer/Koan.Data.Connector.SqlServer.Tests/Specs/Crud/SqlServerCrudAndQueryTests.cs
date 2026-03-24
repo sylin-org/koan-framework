@@ -20,7 +20,7 @@ public class SqlServerCrudAndQueryTests : IClassFixture<Support.SqlServerAutoFix
 	public async Task Upsert_query_count_and_paging()
 	{
 		using var partition = BeginPartition("crud-core");
-		var (available, repo, linqRepo) = await PrepareAsync();
+		var (available, repo, linqRepo) = await Prepare();
 		if (!available)
 		{
 			return;
@@ -35,16 +35,16 @@ public class SqlServerCrudAndQueryTests : IClassFixture<Support.SqlServerAutoFix
 			})
 			.ToArray();
 
-		await repo.UpsertManyAsync(people, default);
+		await repo.UpsertMany(people, default);
 
-		var all = await repo.QueryAsync(null, default);
+		var all = await repo.Query(null, default);
 		all.Should().HaveCount(25);
 
-		var page = await linqRepo.QueryAsync(x => x.Age >= 20, default);
+		var page = await linqRepo.Query(x => x.Age >= 20, default);
 		page.Should().HaveCount(5);
 		page.First().Name.Should().Be("P-2");
 
-		var countResult = await repo.CountAsync(new CountRequest<Person>
+		var countResult = await repo.Count(new CountRequest<Person>
 		{
 			Predicate = x => x.Age >= 20
 		});
@@ -52,7 +52,7 @@ public class SqlServerCrudAndQueryTests : IClassFixture<Support.SqlServerAutoFix
 		countResult.IsEstimate.Should().BeFalse();
 		countResult.Value.Should().Be(15);
 
-		var fetched = await repo.GetAsync("10", default);
+		var fetched = await repo.Get("10", default);
 		fetched.Should().NotBeNull();
 
 		var updated = new Person
@@ -62,10 +62,10 @@ public class SqlServerCrudAndQueryTests : IClassFixture<Support.SqlServerAutoFix
 			Age = (fetched!.Age) + 5
 		};
 
-		await repo.UpsertAsync(updated, default);
-		(await repo.GetAsync("10", default))!.Name.Should().Be("Updated-10");
+		await repo.Upsert(updated, default);
+		(await repo.Get("10", default))!.Name.Should().Be("Updated-10");
 
-		var countAfterUpdate = await repo.CountAsync(new CountRequest<Person>
+		var countAfterUpdate = await repo.Count(new CountRequest<Person>
 		{
 			Predicate = x => x.Age >= 20
 		});
@@ -73,17 +73,17 @@ public class SqlServerCrudAndQueryTests : IClassFixture<Support.SqlServerAutoFix
 	countAfterUpdate.IsEstimate.Should().BeFalse();
 	countAfterUpdate.Value.Should().Be(16);
 
-		var removed = await repo.DeleteAsync("1", default);
+		var removed = await repo.Delete("1", default);
 		removed.Should().BeTrue();
-		(await repo.GetAsync("1", default)).Should().BeNull();
+		(await repo.Get("1", default)).Should().BeNull();
 
-		var removedMany = await repo.DeleteManyAsync(new[] { "2", "3" }, default);
+		var removedMany = await repo.DeleteMany(new[] { "2", "3" }, default);
 		removedMany.Should().Be(2);
 
-		var remaining = await repo.QueryAsync(null, default);
+		var remaining = await repo.Query(null, default);
 		remaining.Should().HaveCount(22);
 
-		var finalCount = await repo.CountAsync(new CountRequest<Person>
+		var finalCount = await repo.Count(new CountRequest<Person>
 		{
 			Predicate = x => x.Age >= 20
 		});
@@ -92,7 +92,7 @@ public class SqlServerCrudAndQueryTests : IClassFixture<Support.SqlServerAutoFix
 		finalCount.IsEstimate.Should().BeFalse();
 	}
 
-	private async Task<(bool Available, IDataRepository<Person, string> Repo, ILinqQueryRepository<Person, string> LinqRepo)> PrepareAsync()
+	private async Task<(bool Available, IDataRepository<Person, string> Repo, ILinqQueryRepository<Person, string> LinqRepo)> Prepare()
 	{
 		if (_fx.SkipTests)
 		{

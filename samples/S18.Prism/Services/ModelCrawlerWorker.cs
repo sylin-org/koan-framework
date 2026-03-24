@@ -51,7 +51,7 @@ public sealed class ModelCrawlerWorker : BackgroundService
         {
             try
             {
-                await CrawlAsync(stoppingToken);
+                await Crawl(stoppingToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -66,7 +66,7 @@ public sealed class ModelCrawlerWorker : BackgroundService
         _logger.LogInformation("ModelCrawlerWorker stopped");
     }
 
-    private async Task CrawlAsync(CancellationToken ct)
+    private async Task Crawl(CancellationToken ct)
     {
         var categories = _configuration
             .GetSection("Prism:ModelCrawler:SeedCategories")
@@ -84,7 +84,7 @@ public sealed class ModelCrawlerWorker : BackgroundService
 
             try
             {
-                var (newCount, updatedCount) = await CrawlCategoryAsync(category, ct);
+                var (newCount, updatedCount) = await CrawlCategory(category, ct);
                 totalNew += newCount;
                 totalUpdated += updatedCount;
 
@@ -102,7 +102,7 @@ public sealed class ModelCrawlerWorker : BackgroundService
             totalNew, totalUpdated);
     }
 
-    private async Task<(int NewCount, int UpdatedCount)> CrawlCategoryAsync(
+    private async Task<(int NewCount, int UpdatedCount)> CrawlCategory(
         string category, CancellationToken ct)
     {
         var url = $"{HfModelsUrl}?pipeline_tag={category}&limit={ModelsPerCategory}&sort=downloads&direction=-1";

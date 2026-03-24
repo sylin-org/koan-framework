@@ -6,6 +6,6 @@ public interface IContentExtractor
 {
     string[] SupportedMimeTypes { get; }
     int Priority { get; }
-    Task<IReadOnlyList<ContentBlock>> ExtractAsync(
+    Task<IReadOnlyList<ContentBlock>> Extract(
         Stream content, string mimeType, CancellationToken ct = default);
 }

@@ -45,7 +45,7 @@ internal sealed class ZenGardenInitializationProvider : IZenGardenInitialization
         return _offeringByAdapter.TryGetValue(adapterId.Trim().ToLowerInvariant(), out offering!);
     }
 
-    public async ValueTask<ZenGardenCapabilityWishReceipt?> WishCapabilitiesAsync(
+    public async ValueTask<ZenGardenCapabilityWishReceipt?> WishCapabilities(
         ZenGardenConnectionIntent intent,
         CancellationToken cancellationToken = default)
     {
@@ -58,7 +58,7 @@ internal sealed class ZenGardenInitializationProvider : IZenGardenInitialization
         ZenGardenCapabilityWish wish;
         try
         {
-            wish = await _client.WishAsync(
+            wish = await _client.Wish(
                 intent.ToOfferingSelector(),
                 intent.Capabilities,
                 options: null,
@@ -86,7 +86,7 @@ internal sealed class ZenGardenInitializationProvider : IZenGardenInitialization
         };
     }
 
-    public async ValueTask<ZenGardenOfferingResolution?> ResolveAsync(
+    public async ValueTask<ZenGardenOfferingResolution?> Resolve(
         ZenGardenConnectionIntent intent,
         CancellationToken cancellationToken = default)
     {
@@ -95,10 +95,10 @@ internal sealed class ZenGardenInitializationProvider : IZenGardenInitialization
         var selector = intent.ToOfferingSelector();
         var subscription = ZenGardenSubscription.ForOffering(selector);
 
-        var snapshot = await ResolveReadySnapshotAsync(subscription, cancellationToken).ConfigureAwait(false);
+        var snapshot = await ResolveReadySnapshot(subscription, cancellationToken).ConfigureAwait(false);
         if (snapshot is null && string.IsNullOrWhiteSpace(intent.Instance))
         {
-            snapshot = await ResolveReadyInstanceSnapshotAsync(intent, cancellationToken).ConfigureAwait(false);
+            snapshot = await ResolveReadyInstanceSnapshot(intent, cancellationToken).ConfigureAwait(false);
         }
 
         if (snapshot is null)
@@ -112,21 +112,21 @@ internal sealed class ZenGardenInitializationProvider : IZenGardenInitialization
 
         if (intent.Capabilities.Count > 0)
         {
-            await EnsureCapabilitiesWishfullyAsync(intent, snapshot, cancellationToken).ConfigureAwait(false);
+            await EnsureCapabilitiesWishfully(intent, snapshot, cancellationToken).ConfigureAwait(false);
         }
 
         return MapResolution(snapshot);
     }
 
-    private async Task<ZenGardenToolSnapshot?> ResolveReadySnapshotAsync(
+    private async Task<ZenGardenToolSnapshot?> ResolveReadySnapshot(
         ZenGardenSubscription subscription,
         CancellationToken cancellationToken)
     {
-        var tools = await CatalogAsync(subscription, cancellationToken).ConfigureAwait(false);
+        var tools = await Catalog(subscription, cancellationToken).ConfigureAwait(false);
         return tools.FirstOrDefault(tool => tool.Ready);
     }
 
-    private async Task<ZenGardenToolSnapshot?> ResolveReadyInstanceSnapshotAsync(
+    private async Task<ZenGardenToolSnapshot?> ResolveReadyInstanceSnapshot(
         ZenGardenConnectionIntent intent,
         CancellationToken cancellationToken)
     {
@@ -139,7 +139,7 @@ internal sealed class ZenGardenInitializationProvider : IZenGardenInitialization
             ToolType = ZenGardenToolType.Offering
         };
 
-        var tools = await CatalogAsync(broadSubscription, cancellationToken).ConfigureAwait(false);
+        var tools = await Catalog(broadSubscription, cancellationToken).ConfigureAwait(false);
         if (tools.Count == 0)
         {
             return null;
@@ -167,14 +167,14 @@ internal sealed class ZenGardenInitializationProvider : IZenGardenInitialization
         return matched;
     }
 
-    private async Task<IReadOnlyList<ZenGardenToolSnapshot>> CatalogAsync(
+    private async Task<IReadOnlyList<ZenGardenToolSnapshot>> Catalog(
         ZenGardenSubscription subscription,
         CancellationToken cancellationToken)
     {
         IReadOnlyList<ZenGardenToolSnapshot> tools;
         try
         {
-            tools = await _client.CatalogAsync(subscription, cancellationToken).ConfigureAwait(false);
+            tools = await _client.Catalog(subscription, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -185,7 +185,7 @@ internal sealed class ZenGardenInitializationProvider : IZenGardenInitialization
         return tools;
     }
 
-    private async Task EnsureCapabilitiesWishfullyAsync(
+    private async Task EnsureCapabilitiesWishfully(
         ZenGardenConnectionIntent intent,
         ZenGardenToolSnapshot snapshot,
         CancellationToken cancellationToken)
@@ -219,7 +219,7 @@ internal sealed class ZenGardenInitializationProvider : IZenGardenInitialization
         }
 
         _wishScheduleCache[cacheKey] = now;
-        var receipt = await WishCapabilitiesAsync(intent, cancellationToken).ConfigureAwait(false);
+        var receipt = await WishCapabilities(intent, cancellationToken).ConfigureAwait(false);
         if (receipt is null)
         {
             _logger.LogDebug(

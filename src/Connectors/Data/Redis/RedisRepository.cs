@@ -40,7 +40,7 @@ internal sealed class RedisRepository<TEntity, TKey> :
 
     private IDatabase Db() => _muxer.GetDatabase(_options.Value.Database);
 
-    public async Task<TEntity?> GetAsync(TKey id, CancellationToken ct = default)
+    public async Task<TEntity?> Get(TKey id, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var key = $"{Keyspace()}:{id}";
@@ -49,7 +49,7 @@ internal sealed class RedisRepository<TEntity, TKey> :
     return JsonConvert.DeserializeObject<TEntity>(v!);
     }
 
-    public async Task<IReadOnlyList<TEntity?>> GetManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity?>> GetMany(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
@@ -71,7 +71,7 @@ internal sealed class RedisRepository<TEntity, TKey> :
         return results;
     }
 
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(object? query, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var pageSize = Math.Max(1, Math.Min(_options.Value.DefaultPageSize, _options.Value.MaxPageSize));
@@ -79,7 +79,7 @@ internal sealed class RedisRepository<TEntity, TKey> :
         return items;
     }
 
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(object? query, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var page = options?.Page is int p && p > 1 ? p : 1;
@@ -89,7 +89,7 @@ internal sealed class RedisRepository<TEntity, TKey> :
         return items;
     }
 
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var pageSize = Math.Max(1, Math.Min(_options.Value.DefaultPageSize, _options.Value.MaxPageSize));
@@ -97,7 +97,7 @@ internal sealed class RedisRepository<TEntity, TKey> :
         return items.AsQueryable().Where(predicate).ToList();
     }
 
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var page = options?.Page is int p && p > 1 ? p : 1;
@@ -107,7 +107,7 @@ internal sealed class RedisRepository<TEntity, TKey> :
         return items.AsQueryable().Where(predicate).ToList();
     }
 
-    public async Task<CountResult> CountAsync(CountRequest<TEntity> request, CancellationToken ct = default)
+    public async Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
 
@@ -123,7 +123,7 @@ internal sealed class RedisRepository<TEntity, TKey> :
         return CountResult.Exact((long)total);
     }
 
-    public async Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)
+    public async Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var key = $"{Keyspace()}:{model.Id}";
@@ -132,14 +132,14 @@ internal sealed class RedisRepository<TEntity, TKey> :
         return model;
     }
 
-    public async Task<bool> DeleteAsync(TKey id, CancellationToken ct = default)
+    public async Task<bool> Delete(TKey id, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var key = $"{Keyspace()}:{id}";
         return await Db().KeyDeleteAsync(key);
     }
 
-    public async Task<int> UpsertManyAsync(IEnumerable<TEntity> models, CancellationToken ct = default)
+    public async Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
     var arr = models as TEntity[] ?? models.ToArray();
@@ -148,14 +148,14 @@ internal sealed class RedisRepository<TEntity, TKey> :
         return arr.Length;
     }
 
-    public async Task<int> DeleteManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    public async Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var keys = ids.Select(id => (RedisKey)$"{Keyspace()}:{id}").ToArray();
         return (int)await Db().KeyDeleteAsync(keys);
     }
 
-    public async Task<int> DeleteAllAsync(CancellationToken ct = default)
+    public async Task<int> DeleteAll(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var (items, _) = await ScanAll(page: 1, size: int.MaxValue, ct);
@@ -164,7 +164,7 @@ internal sealed class RedisRepository<TEntity, TKey> :
         return (int)await Db().KeyDeleteAsync(keys);
     }
 
-    public async Task<long> RemoveAllAsync(RemoveStrategy strategy, CancellationToken ct = default)
+    public async Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var (items, _) = await ScanAll(page: 1, size: int.MaxValue, ct);
@@ -205,7 +205,7 @@ internal sealed class RedisRepository<TEntity, TKey> :
                 // Nothing to create for Redis; consider connection + ping
                 return Task.FromResult((TResult)(object)true);
             case Abstractions.Instructions.DataInstructions.Clear:
-                return (Task<TResult>)(object)DeleteAllAsync(ct);
+                return (Task<TResult>)(object)DeleteAll(ct);
             default:
                 throw new NotSupportedException($"Instruction '{instruction.Name}' not supported by Redis adapter for {typeof(TEntity).Name}.");
         }
@@ -221,7 +221,7 @@ internal sealed class RedisRepository<TEntity, TKey> :
             // Fallback: no server available (e.g., cloud); approximate by key pattern without counts
             var pattern = $"{Keyspace()}:*";
             var keys = new List<RedisKey>();
-            var iter = db.Execute("SCAN", 0, "MATCH", pattern, "COUNT", 1000);
+            var iter = db.ExecuteAsync("SCAN", 0, "MATCH", pattern, "COUNT", 1000);
             // Best-effort: stop after first page since SCAN via Execute is not strongly typed here
             // Consumers should supply filters to avoid huge scans.
             foreach (var k in db.Multiplexer.GetServers().SelectMany(s => s.Keys(db.Database, pattern: pattern)).Take(page * size))
@@ -273,7 +273,7 @@ internal sealed class RedisRepository<TEntity, TKey> :
         public IBatchSet<TEntity, TKey> Update(TKey id, Action<TEntity> mutate) { _mutations.Add((id, mutate)); return this; }
         public IBatchSet<TEntity, TKey> Clear() { _adds.Clear(); _updates.Clear(); _deletes.Clear(); _mutations.Clear(); return this; }
 
-        public async Task<BatchResult> SaveAsync(BatchOptions? options = null, CancellationToken ct = default)
+        public async Task<BatchResult> Save(BatchOptions? options = null, CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
             if (options?.RequireAtomic == true)
@@ -282,13 +282,13 @@ internal sealed class RedisRepository<TEntity, TKey> :
             foreach (var (id, mutate) in _mutations)
             {
                 ct.ThrowIfCancellationRequested();
-                var cur = await _repo.GetAsync(id, ct);
+                var cur = await _repo.Get(id, ct);
                 if (cur is not null) { mutate(cur); _updates.Add(cur); }
             }
             var addCount = 0; var updCount = 0; var delCount = 0;
-            if (_adds.Count != 0) { addCount = await _repo.UpsertManyAsync(_adds, ct); }
-            if (_updates.Count != 0) { updCount = await _repo.UpsertManyAsync(_updates, ct); }
-            if (_deletes.Count != 0) { delCount = await _repo.DeleteManyAsync(_deletes, ct); }
+            if (_adds.Count != 0) { addCount = await _repo.UpsertMany(_adds, ct); }
+            if (_updates.Count != 0) { updCount = await _repo.UpsertMany(_updates, ct); }
+            if (_deletes.Count != 0) { delCount = await _repo.DeleteMany(_deletes, ct); }
             return new BatchResult(addCount, updCount, delCount);
         }
     }

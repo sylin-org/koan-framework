@@ -27,7 +27,7 @@ public sealed class ChunkMaintenanceService
     /// <param name="deleteIndexedFile">When true, also delete the IndexedFile manifest entry.</param>
     /// <param name="deleteVectors">When true, remove vector entries for each chunk.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    public async Task<ChunkMaintenanceResult> RemoveFileAsync(
+    public async Task<ChunkMaintenanceResult> RemoveFile(
         string relativePath,
         bool deleteIndexedFile,
         bool deleteVectors = true,
@@ -44,12 +44,12 @@ public sealed class ChunkMaintenanceService
         var chunkIds = new List<string>();
         var snapshotsRemoved = 0;
 
-        var indexedFile = await GetIndexedFileAsync(relativePath, cancellationToken);
+        var indexedFile = await GetIndexedFile(relativePath, cancellationToken);
         var chunks = await Chunk.Query(c => c.IndexedFileId == indexedFile.Id, cancellationToken);
 
         foreach (var chunk in chunks)
         {
-            snapshotsRemoved += await RemoveVectorSnapshotAsync(chunk.Id, cancellationToken);
+            snapshotsRemoved += await RemoveVectorSnapshot(chunk.Id, cancellationToken);
 
             if (deleteVectors)
             {
@@ -97,7 +97,7 @@ public sealed class ChunkMaintenanceService
     /// <param name="deleteIndexedFiles">When true, also delete indexed file manifest entries.</param>
     /// <param name="deleteVectors">When true, remove vector entries for each chunk.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    public async Task<ChunkBulkMaintenanceResult> RemoveAllChunksAsync(
+    public async Task<ChunkBulkMaintenanceResult> RemoveAllChunks(
         bool deleteIndexedFiles,
         bool deleteVectors = true,
         CancellationToken cancellationToken = default)
@@ -113,7 +113,7 @@ public sealed class ChunkMaintenanceService
         {
             chunkCount++;
 
-            snapshotsRemoved += await RemoveVectorSnapshotAsync(chunk.Id, cancellationToken);
+            snapshotsRemoved += await RemoveVectorSnapshot(chunk.Id, cancellationToken);
 
             if (deleteVectors)
             {
@@ -156,7 +156,7 @@ public sealed class ChunkMaintenanceService
             manifestDeleted);
     }
 
-    private static async Task<IndexedFile> GetIndexedFileAsync(string relativePath, CancellationToken cancellationToken)
+    private static async Task<IndexedFile> GetIndexedFile(string relativePath, CancellationToken cancellationToken)
     {
         var indexedFiles = await IndexedFile.Query(f => f.RelativePath == relativePath, cancellationToken);
         var indexedFile = indexedFiles.FirstOrDefault();
@@ -168,7 +168,7 @@ public sealed class ChunkMaintenanceService
         return indexedFile;
     }
 
-    private static async Task<int> RemoveVectorSnapshotAsync(string chunkId, CancellationToken cancellationToken)
+    private static async Task<int> RemoveVectorSnapshot(string chunkId, CancellationToken cancellationToken)
     {
         using (EntityContext.With(partition: null))
         {
@@ -186,7 +186,7 @@ public sealed class ChunkMaintenanceService
     /// <summary>
     /// Removes the supplied set of file paths by delegating to <see cref="RemoveFileAsync"/>.
     /// </summary>
-    public async Task<IReadOnlyList<ChunkMaintenanceResult>> RemoveFilesAsync(
+    public async Task<IReadOnlyList<ChunkMaintenanceResult>> RemoveFiles(
         IEnumerable<string> relativePaths,
         bool deleteIndexedFile,
         bool deleteVectors = true,
@@ -197,7 +197,7 @@ public sealed class ChunkMaintenanceService
         var results = new List<ChunkMaintenanceResult>();
         foreach (var path in relativePaths.Distinct(StringComparer.OrdinalIgnoreCase))
         {
-            var result = await RemoveFileAsync(path, deleteIndexedFile, deleteVectors, cancellationToken);
+            var result = await RemoveFile(path, deleteIndexedFile, deleteVectors, cancellationToken);
             results.Add(result);
         }
 

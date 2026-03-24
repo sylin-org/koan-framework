@@ -27,13 +27,13 @@ public static class StorageObjectExtensions
     public static Task<ObjectStat?> Head(this IStorageObject obj, CancellationToken ct = default)
     {
         var (profile, container) = ResolveBindingFromInstance(obj);
-        return Storage().HeadAsync(profile, container, obj.Key, ct);
+        return Storage().Head(profile, container, obj.Key, ct);
     }
 
     public static Task<bool> Delete(this IStorageObject obj, CancellationToken ct = default)
     {
         var (profile, container) = ResolveBindingFromInstance(obj);
-        return Storage().DeleteAsync(profile, container, obj.Key, ct);
+        return Storage().Delete(profile, container, obj.Key, ct);
     }
 
     public static async Task<TTarget> CopyTo<TTarget>(this IStorageObject obj, CancellationToken ct = default)
@@ -45,7 +45,7 @@ public static class StorageObjectExtensions
                                  .FirstOrDefault();
         var profile = binding?.Profile ?? string.Empty;
         var container = binding?.Container ?? string.Empty;
-        var result = await Storage().TransferToProfileAsync(obj.Provider ?? string.Empty, obj.Container ?? string.Empty, obj.Key, profile, container, deleteSource: false, ct);
+        var result = await Storage().TransferToProfile(obj.Provider ?? string.Empty, obj.Container ?? string.Empty, obj.Key, profile, container, deleteSource: false, ct);
 
         // If TTarget derives from StorageEntity<TTarget>, hydrate metadata; else return a minimal proxy via StorageObject cast if possible
         if (Activator.CreateInstance<TTarget>() is Model.StorageEntity<TTarget> se)
@@ -75,7 +75,7 @@ public static class StorageObjectExtensions
                                  .FirstOrDefault();
         var profile = binding?.Profile ?? string.Empty;
         var container = binding?.Container ?? string.Empty;
-        var result = await Storage().TransferToProfileAsync(obj.Provider ?? string.Empty, obj.Container ?? string.Empty, obj.Key, profile, container, deleteSource: true, ct);
+        var result = await Storage().TransferToProfile(obj.Provider ?? string.Empty, obj.Container ?? string.Empty, obj.Key, profile, container, deleteSource: true, ct);
 
         if (Activator.CreateInstance<TTarget>() is Model.StorageEntity<TTarget> se)
         {

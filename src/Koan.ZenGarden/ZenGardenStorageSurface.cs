@@ -32,7 +32,7 @@ public sealed class ZenGardenStorageSurface
         {
             ToolType = ZenGardenToolType.SeedBank
         };
-        return ZenGarden.Client.CatalogAsync(subscription, cancellationToken);
+        return ZenGarden.Client.Catalog(subscription, cancellationToken);
     }
 
     public async Task<ZenGardenToolSnapshot?> Catalog(
@@ -40,7 +40,7 @@ public sealed class ZenGardenStorageSurface
         CancellationToken cancellationToken = default)
     {
         var subscription = ZenGardenSubscription.ForStorage(seedBank);
-        var tools = await ZenGarden.Client.CatalogAsync(subscription, cancellationToken);
+        var tools = await ZenGarden.Client.Catalog(subscription, cancellationToken);
         return tools.FirstOrDefault();
     }
 
@@ -103,10 +103,10 @@ internal sealed class StorageContentChangeSubscription : IDisposable
         _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
 
         // Start the SSE listener loop
-        _ = Task.Run(() => ListenForTicksAsync(_cts.Token));
+        _ = Task.Run(() => ListenForTicks(_cts.Token));
     }
 
-    private async Task ListenForTicksAsync(CancellationToken ct)
+    private async Task ListenForTicks(CancellationToken ct)
     {
         while (!ct.IsCancellationRequested)
         {
@@ -143,13 +143,13 @@ internal sealed class StorageContentChangeSubscription : IDisposable
                         if (eventType.Equals("storage-tick", StringComparison.OrdinalIgnoreCase))
                         {
                             // Next data line contains tick info; pull changes
-                            await PullChangesAsync(boundEndpoint, ct);
+                            await PullChanges(boundEndpoint, ct);
                         }
                     }
                     else if (line.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
                     {
                         // A data event without explicit event type — treat as tick
-                        await PullChangesAsync(boundEndpoint, ct);
+                        await PullChanges(boundEndpoint, ct);
                     }
                 }
             }
@@ -165,7 +165,7 @@ internal sealed class StorageContentChangeSubscription : IDisposable
         }
     }
 
-    private async Task PullChangesAsync(string endpoint, CancellationToken ct)
+    private async Task PullChanges(string endpoint, CancellationToken ct)
     {
         try
         {

@@ -11,7 +11,7 @@ public sealed class PodmanProvider : IHostingProvider
     public string Id => "podman";
     public int Priority => 50; // Lower than Docker on Windows-first systems
 
-    public async Task<(bool Ok, string? Reason)> IsAvailableAsync(CancellationToken ct = default)
+    public async Task<(bool Ok, string? Reason)> IsAvailable(CancellationToken ct = default)
     {
         try
         {
@@ -110,7 +110,7 @@ public sealed class PodmanProvider : IHostingProvider
         var services = code == 0 && !string.IsNullOrWhiteSpace(stdout)
             ? ParseComposePsJson(stdout)
             : new List<(string Service, string State, string? Health)>();
-        var (ok, _) = await IsAvailableAsync(ct);
+        var (ok, _) = await IsAvailable(ct);
         var ver = ok ? GetVersionSafe() : string.Empty;
         return new ProviderStatus(Id, ver, services);
     }

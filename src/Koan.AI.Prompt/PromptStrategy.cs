@@ -19,7 +19,7 @@ public abstract record PromptStrategy
     public static PromptStrategy Pinned(int version) => new PinnedStrategy(version);
 
     /// <summary>Resolve a PromptEntry using this strategy.</summary>
-    internal abstract Task<PromptEntry?> ResolveAsync(
+    internal abstract Task<PromptEntry?> Resolve(
         string name, CancellationToken ct = default);
 }
 
@@ -27,7 +27,7 @@ internal sealed record ABTestStrategy : PromptStrategy
 {
     private static readonly Random Rng = Random.Shared;
 
-    internal override async Task<PromptEntry?> ResolveAsync(
+    internal override async Task<PromptEntry?> Resolve(
         string name, CancellationToken ct)
     {
         var entries = await PromptEntry.FindAllActive(name, ct);
@@ -40,7 +40,7 @@ internal sealed record CanaryStrategy(double Percentage) : PromptStrategy
 {
     private static readonly Random Rng = Random.Shared;
 
-    internal override async Task<PromptEntry?> ResolveAsync(
+    internal override async Task<PromptEntry?> Resolve(
         string name, CancellationToken ct)
     {
         var entries = await PromptEntry.FindAllActive(name, ct);
@@ -55,7 +55,7 @@ internal sealed record CanaryStrategy(double Percentage) : PromptStrategy
 
 internal sealed record LatestStrategy : PromptStrategy
 {
-    internal override async Task<PromptEntry?> ResolveAsync(
+    internal override async Task<PromptEntry?> Resolve(
         string name, CancellationToken ct)
     {
         return await PromptEntry.FindActive(name, ct);
@@ -64,7 +64,7 @@ internal sealed record LatestStrategy : PromptStrategy
 
 internal sealed record PinnedStrategy(int Version) : PromptStrategy
 {
-    internal override async Task<PromptEntry?> ResolveAsync(
+    internal override async Task<PromptEntry?> Resolve(
         string name, CancellationToken ct)
     {
         return await PromptEntry.FindVersion(name, Version, ct);

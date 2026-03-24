@@ -41,7 +41,7 @@ internal sealed class AiAdapterContributorInitializer : IHostedService
             try
             {
                 KoanLog.BootDebug(_logger, "ai.contributors", "start", ("contributor", contributorName));
-                await contributor.ContributeAsync(scope.ServiceProvider, cancellationToken).ConfigureAwait(false);
+                await contributor.Contribute(scope.ServiceProvider, cancellationToken).ConfigureAwait(false);
                 KoanLog.BootDebug(_logger, "ai.contributors", "complete", ("contributor", contributorName));
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

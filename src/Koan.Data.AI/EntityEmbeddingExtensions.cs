@@ -126,13 +126,13 @@ public static class EntityEmbeddingExtensions
     {
         if (string.IsNullOrEmpty(partition))
         {
-            return await Data<TEntity, string>.GetAsync(entityId, ct);
+            return await Data<TEntity, string>.Get(entityId, ct);
         }
         else
         {
             using (EntityContext.Partition(partition))
             {
-                return await Data<TEntity, string>.GetAsync(entityId, ct);
+                return await Data<TEntity, string>.Get(entityId, ct);
             }
         }
     }

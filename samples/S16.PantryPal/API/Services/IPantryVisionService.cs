@@ -11,7 +11,7 @@ public interface IPantryVisionService
     /// <summary>
     /// Process uploaded pantry photo and detect items with bounding boxes.
     /// </summary>
-    Task<VisionProcessingResult> ProcessPhotoAsync(
+    Task<VisionProcessingResult> ProcessPhoto(
         string photoId,
         Stream imageStream,
         VisionProcessingOptions options,
@@ -20,7 +20,7 @@ public interface IPantryVisionService
     /// <summary>
     /// Learn from user corrections to improve future detections.
     /// </summary>
-    Task LearnFromCorrectionAsync(
+    Task LearnFromCorrection(
         string originalName,
         string correctedName,
         string? correctedQuantity,

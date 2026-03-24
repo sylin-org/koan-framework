@@ -21,7 +21,7 @@ public sealed class PostgresCapabilitiesSpec
         await TestPipeline.For<PostgresCapabilitiesSpec>(_output, nameof(Repository_reports_expected_capabilities))
             .RequireDocker()
             .UsingPostgresContainer(database: databaseName)
-            .Using<PostgresConnectorFixture>("fixture", static ctx => PostgresConnectorFixture.CreateAsync(ctx))
+            .Using<PostgresConnectorFixture>("fixture", static ctx => PostgresConnectorFixture.Create(ctx))
             .Arrange(static async ctx =>
             {
                 var fixture = ctx.GetRequiredItem<PostgresConnectorFixture>("fixture");
@@ -47,14 +47,14 @@ public sealed class PostgresCapabilitiesSpec
                 var partition = fixture.EnsurePartition(ctx);
                 await using var lease = fixture.LeasePartition(partition);
 
-                await CapabilityProbe.UpsertAsync(new CapabilityProbe { Name = "cap" });
+                await CapabilityProbe.Upsert(new CapabilityProbe { Name = "cap" });
                 var count = await CapabilityProbe.Count.Exact();
                 count.Should().Be(1);
 
                 var linqQuery = await CapabilityProbe.Query(p => p.Name == "cap");
                 linqQuery.Should().ContainSingle();
             })
-            .RunAsync();
+            .Run();
     }
 
     private sealed class CapabilityProbe : Entity<CapabilityProbe>

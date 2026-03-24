@@ -11,7 +11,7 @@ namespace Koan.Mcp.Diagnostics;
 
 public interface IMcpCapabilityReporter
 {
-    Task<McpCapabilityDocument> GetCapabilitiesAsync(CancellationToken cancellationToken);
+    Task<McpCapabilityDocument> GetCapabilities(CancellationToken cancellationToken);
 }
 
 public sealed class HttpSseCapabilityReporter : IMcpCapabilityReporter
@@ -25,7 +25,7 @@ public sealed class HttpSseCapabilityReporter : IMcpCapabilityReporter
         _options = options ?? throw new ArgumentNullException(nameof(options));
     }
 
-    public Task<McpCapabilityDocument> GetCapabilitiesAsync(CancellationToken cancellationToken)
+    public Task<McpCapabilityDocument> GetCapabilities(CancellationToken cancellationToken)
     {
         var options = _options.CurrentValue;
 

@@ -74,7 +74,7 @@ public sealed class LMStudioOrchestrationEvaluator : BaseOrchestrationEvaluator
         {
             Logger?.LogDebug("[LMStudio] Validating host {Host}", hostResult.HostEndpoint);
             var baseUrl = EnsureHttpUrl(hostResult.HostEndpoint!);
-            return await TryLmStudioConnectionAsync(baseUrl);
+            return await TryLmStudioConnection(baseUrl);
         }
         catch (Exception ex)
         {
@@ -83,7 +83,7 @@ public sealed class LMStudioOrchestrationEvaluator : BaseOrchestrationEvaluator
         }
     }
 
-    protected override async Task<DependencyDescriptor> CreateDependencyDescriptorAsync(IConfiguration configuration, OrchestrationContext context)
+    protected override async Task<DependencyDescriptor> CreateDependencyDescriptor(IConfiguration configuration, OrchestrationContext context)
     {
         var environment = new Dictionary<string, string>(context.EnvironmentVariables)
         {
@@ -115,7 +115,7 @@ public sealed class LMStudioOrchestrationEvaluator : BaseOrchestrationEvaluator
         });
     }
 
-    private async Task<bool> TryLmStudioConnectionAsync(string baseUrl)
+    private async Task<bool> TryLmStudioConnection(string baseUrl)
     {
         try
         {

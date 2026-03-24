@@ -19,8 +19,8 @@ public class OrchestratedExecutionSpec : IClassFixture<JobsCoreTestPipelineFixtu
     var job = _fixture.CreateTestJob();
 
     // Act
-    await orchestrator.ExecuteAsync(job);
-    var status = await orchestrator.GetJobStatusAsync(job.Id);
+    await orchestrator.Execute(job);
+    var status = await orchestrator.GetJobStatus(job.Id);
 
     // Assert
     status.Should().Be("Completed");

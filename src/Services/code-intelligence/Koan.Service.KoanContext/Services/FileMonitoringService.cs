@@ -44,13 +44,13 @@ public class FileMonitoringService : IHostedService, IDisposable
 
         foreach (var project in projects)
         {
-            await StartWatchingProjectAsync(project, cancellationToken);
+            await StartWatchingProject(project, cancellationToken);
         }
 
         _logger.LogInformation("Started monitoring {Count} projects", _watchers.Count);
     }
 
-    public async Task StartWatchingProjectAsync(Project project, CancellationToken cancellationToken = default)
+    public async Task StartWatchingProject(Project project, CancellationToken cancellationToken = default)
     {
         if (_watchers.ContainsKey(project.Id))
         {
@@ -85,7 +85,7 @@ public class FileMonitoringService : IHostedService, IDisposable
             _watchers[project.Id] = watcher;
             _debounceQueues[project.RootPath] = new DebouncingQueue(
                 _options.DebounceMilliseconds,
-                async changes => await ProcessChangesAsync(project, changes));
+                async changes => await ProcessChanges(project, changes));
 
             // Cache gitignore parser for this project
             _gitignoreParsers[project.Id] = GitignoreParser.LoadFromDirectory(project.RootPath);
@@ -199,8 +199,8 @@ public class FileMonitoringService : IHostedService, IDisposable
             _ = Task.Run(async () =>
             {
                 await Task.Delay(_options.RestartDelayMilliseconds);
-                await StopWatchingProjectAsync(project.Id);
-                await StartWatchingProjectAsync(project);
+                await StopWatchingProject(project.Id);
+                await StartWatchingProject(project);
             });
         }
     }
@@ -248,7 +248,7 @@ public class FileMonitoringService : IHostedService, IDisposable
         return false;
     }
 
-    private async Task ProcessChangesAsync(Project project, List<FileChange> changes)
+    private async Task ProcessChanges(Project project, List<FileChange> changes)
     {
         using var scope = _serviceProvider.CreateScope();
         var incrementalIndexer = scope.ServiceProvider
@@ -257,10 +257,10 @@ public class FileMonitoringService : IHostedService, IDisposable
         _logger.LogInformation("Processing {Count} file changes for project {Name}",
             changes.Count, project.Name);
 
-        await incrementalIndexer.ProcessFileChangesAsync(project.Id, changes);
+        await incrementalIndexer.ProcessFileChanges(project.Id, changes);
     }
 
-    public async Task StopWatchingProjectAsync(string projectId)
+    public async Task StopWatchingProject(string projectId)
     {
         if (_watchers.TryRemove(projectId, out var watcher))
         {

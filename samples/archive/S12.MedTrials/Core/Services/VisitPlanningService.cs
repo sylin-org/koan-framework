@@ -21,7 +21,7 @@ public sealed class VisitPlanningService : IVisitPlanningService
         _logger = logger;
     }
 
-    public async Task<VisitPlanningResult> PlanAsync(VisitPlanningRequest request, CancellationToken ct)
+    public async Task<VisitPlanningResult> Plan(VisitPlanningRequest request, CancellationToken ct)
     {
         if (request is null) throw new ArgumentNullException(nameof(request));
         if (string.IsNullOrWhiteSpace(request.TrialSiteId))
@@ -147,7 +147,7 @@ public sealed class VisitPlanningService : IVisitPlanningService
             try
             {
                 var prompt = BuildPlannerPrompt(visitList, adjustments, request, maxPerDay);
-                var response = await ai.PromptAsync(new AiChatRequest
+                var response = await ai.Prompt(new AiChatRequest
                 {
                     Model = string.IsNullOrWhiteSpace(request.Model) ? null : request.Model,
                     Messages =

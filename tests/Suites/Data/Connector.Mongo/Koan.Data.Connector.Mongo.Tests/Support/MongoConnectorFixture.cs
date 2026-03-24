@@ -39,7 +39,7 @@ internal sealed class MongoConnectorFixture : IAsyncDisposable
 
     public string CollectionPrefix { get; }
 
-    public static ValueTask<MongoConnectorFixture> CreateAsync(TestContext ctx)
+    public static ValueTask<MongoConnectorFixture> Create(TestContext ctx)
     {
         if (ctx is null)
         {
@@ -159,7 +159,7 @@ internal sealed class MongoConnectorFixture : IAsyncDisposable
     {
         try
         {
-            await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+            await asyncDisposable.Dispose().ConfigureAwait(false);
         }
         catch
         {

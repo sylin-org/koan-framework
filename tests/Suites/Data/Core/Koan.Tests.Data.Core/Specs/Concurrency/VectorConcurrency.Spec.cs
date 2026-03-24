@@ -45,7 +45,7 @@ public sealed class VectorConcurrencySpec
     public async Task Concurrent_entity_saves_without_transactions()
     {
         await TestPipeline.For<VectorConcurrencySpec>(_output, nameof(Concurrent_entity_saves_without_transactions))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition = EnsurePartition(ctx);
@@ -77,7 +77,7 @@ public sealed class VectorConcurrencySpec
                     entityIds.Should().OnlyHaveUniqueItems("all entity IDs should be unique");
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -87,7 +87,7 @@ public sealed class VectorConcurrencySpec
     public async Task Concurrent_vector_saves_without_transactions()
     {
         await TestPipeline.For<VectorConcurrencySpec>(_output, nameof(Concurrent_vector_saves_without_transactions))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition = EnsurePartition(ctx);
@@ -125,7 +125,7 @@ public sealed class VectorConcurrencySpec
                     fakeRepo.VectorCount.Should().Be(10, "all vectors should be saved concurrently");
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -135,7 +135,7 @@ public sealed class VectorConcurrencySpec
     public async Task Concurrent_transactions_in_different_partitions()
     {
         await TestPipeline.For<VectorConcurrencySpec>(_output, nameof(Concurrent_transactions_in_different_partitions))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 // Don't set a single partition - each task will use its own
@@ -159,7 +159,7 @@ public sealed class VectorConcurrencySpec
                                 await entity.Save();
                                 await Vector<TodoEntity>.Save(entity.Id, embedding);
 
-                                await EntityContext.CommitAsync();
+                                await EntityContext.Commit();
 
                                 return (Partition: partition, EntityId: entity.Id);
                             }
@@ -185,7 +185,7 @@ public sealed class VectorConcurrencySpec
                     }
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -195,7 +195,7 @@ public sealed class VectorConcurrencySpec
     public async Task Concurrent_reads_and_writes_without_transaction()
     {
         await TestPipeline.For<VectorConcurrencySpec>(_output, nameof(Concurrent_reads_and_writes_without_transaction))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition = EnsurePartition(ctx);
@@ -242,7 +242,7 @@ public sealed class VectorConcurrencySpec
                     }
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -252,7 +252,7 @@ public sealed class VectorConcurrencySpec
     public async Task Concurrent_save_with_vector_calls()
     {
         await TestPipeline.For<VectorConcurrencySpec>(_output, nameof(Concurrent_save_with_vector_calls))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition = EnsurePartition(ctx);
@@ -292,7 +292,7 @@ public sealed class VectorConcurrencySpec
                     entityIds.Should().OnlyHaveUniqueItems();
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -302,7 +302,7 @@ public sealed class VectorConcurrencySpec
     public async Task Stress_test_many_concurrent_operations()
     {
         await TestPipeline.For<VectorConcurrencySpec>(_output, nameof(Stress_test_many_concurrent_operations))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition = EnsurePartition(ctx);
@@ -341,7 +341,7 @@ public sealed class VectorConcurrencySpec
                     entityIds.Should().OnlyHaveUniqueItems("all IDs should be unique");
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -351,7 +351,7 @@ public sealed class VectorConcurrencySpec
     public async Task Concurrent_vector_searches()
     {
         await TestPipeline.For<VectorConcurrencySpec>(_output, nameof(Concurrent_vector_searches))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition = EnsurePartition(ctx);
@@ -392,7 +392,7 @@ public sealed class VectorConcurrencySpec
                         count.Should().BeGreaterThan(0, "search should return results"));
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     #region Helper Methods

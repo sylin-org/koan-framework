@@ -29,7 +29,7 @@ internal sealed class InMemoryJobSweeper : KoanBackgroundServiceBase
     public override string Name => "Koan.Jobs.InMemorySweep";
     public override bool IsCritical => false;
 
-    public override async Task ExecuteCoreAsync(CancellationToken cancellationToken)
+    public override async Task ExecuteCore(CancellationToken cancellationToken)
     {
         if (_options.InMemory.SweepIntervalSeconds <= 0)
         {
@@ -45,7 +45,7 @@ internal sealed class InMemoryJobSweeper : KoanBackgroundServiceBase
         {
             try
             {
-                await _store.SweepAsync(completedRetention, faultedRetention, cancellationToken);
+                await _store.Sweep(completedRetention, faultedRetention, cancellationToken);
             }
             catch (Exception ex)
             {

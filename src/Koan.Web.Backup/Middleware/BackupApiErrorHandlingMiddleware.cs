@@ -20,7 +20,7 @@ public class BackupApiErrorHandlingMiddleware
         _logger = logger;
     }
 
-    public async Task InvokeAsync(HttpContext context)
+    public async Task Invoke(HttpContext context)
     {
         try
         {
@@ -29,11 +29,11 @@ public class BackupApiErrorHandlingMiddleware
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unhandled exception occurred in backup API");
-            await HandleExceptionAsync(context, ex);
+            await HandleException(context, ex);
         }
     }
 
-    private async Task HandleExceptionAsync(HttpContext context, Exception exception)
+    private async Task HandleException(HttpContext context, Exception exception)
     {
         context.Response.ContentType = "application/json";
 

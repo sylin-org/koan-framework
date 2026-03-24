@@ -54,7 +54,7 @@ public class Discovery
         _pathValidator = pathValidator ?? throw new ArgumentNullException(nameof(pathValidator));
     }
 
-    public async IAsyncEnumerable<DiscoveredFile> DiscoverAsync(
+    public async IAsyncEnumerable<DiscoveredFile> Discover(
         string projectPath,
         string? docsPath = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -84,13 +84,13 @@ public class Discovery
         _logger.LogInformation("Discovering files (code + markdown) in {SearchPath}", searchPath);
 
         // Discover markdown files
-        await foreach (var file in DiscoverMarkdownFilesAsync(searchPath, normalizedProjectPath, cancellationToken))
+        await foreach (var file in DiscoverMarkdownFiles(searchPath, normalizedProjectPath, cancellationToken))
         {
             yield return file;
         }
 
         // Discover code files
-        await foreach (var file in DiscoverCodeFilesAsync(searchPath, normalizedProjectPath, cancellationToken))
+        await foreach (var file in DiscoverCodeFiles(searchPath, normalizedProjectPath, cancellationToken))
         {
             yield return file;
         }
@@ -127,7 +127,7 @@ public class Discovery
         return normalizedCombined;
     }
 
-    private async IAsyncEnumerable<DiscoveredFile> DiscoverMarkdownFilesAsync(
+    private async IAsyncEnumerable<DiscoveredFile> DiscoverMarkdownFiles(
         string searchPath,
         string projectPath,
         [EnumeratorCancellation] CancellationToken cancellationToken)
@@ -202,7 +202,7 @@ public class Discovery
         _logger.LogInformation("Discovered {FileCount} markdown files", fileCount);
     }
 
-    private async IAsyncEnumerable<DiscoveredFile> DiscoverCodeFilesAsync(
+    private async IAsyncEnumerable<DiscoveredFile> DiscoverCodeFiles(
         string searchPath,
         string projectPath,
         [EnumeratorCancellation] CancellationToken cancellationToken)
@@ -319,7 +319,7 @@ public class Discovery
         return FileType.Unknown;
     }
 
-    public async Task<string?> GetCommitShaAsync(string projectPath)
+    public async Task<string?> GetCommitSha(string projectPath)
     {
         var gitHeadPath = Path.Combine(projectPath, ".git", "HEAD");
 
@@ -331,7 +331,7 @@ public class Discovery
 
         try
         {
-            var headContent = await File.ReadAllTextAsync(gitHeadPath);
+            var headContent = await File.ReadAllText(gitHeadPath);
 
             if (string.IsNullOrWhiteSpace(headContent))
             {
@@ -363,7 +363,7 @@ public class Discovery
 
                 if (File.Exists(refFile))
                 {
-                    var sha = await File.ReadAllTextAsync(refFile);
+                    var sha = await File.ReadAllText(refFile);
                     var trimmedSha = sha.Trim();
 
                     if (!string.IsNullOrWhiteSpace(trimmedSha))

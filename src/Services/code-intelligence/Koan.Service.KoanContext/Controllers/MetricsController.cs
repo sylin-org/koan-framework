@@ -42,7 +42,7 @@ public class MetricsController : ControllerBase
     {
         try
         {
-            var summary = await _metrics.GetSummaryAsync();
+            var summary = await _metrics.GetSummary();
 
             return Ok(new
             {
@@ -96,7 +96,7 @@ public class MetricsController : ControllerBase
                 });
             }
 
-            var performance = await _metrics.GetPerformanceMetricsAsync(period);
+            var performance = await _metrics.GetPerformanceMetrics(period);
 
             return Ok(new
             {
@@ -204,7 +204,7 @@ public class MetricsController : ControllerBase
     {
         try
         {
-            var metrics = await _enhancedMetrics.GetVectorQueueHealthAsync(cancellationToken);
+            var metrics = await _enhancedMetrics.GetVectorQueueHealth(cancellationToken);
 
             return Ok(new
             {
@@ -247,7 +247,7 @@ public class MetricsController : ControllerBase
     {
         try
         {
-            var metrics = await _enhancedMetrics.GetComponentHealthAsync(cancellationToken);
+            var metrics = await _enhancedMetrics.GetComponentHealth(cancellationToken);
 
             return Ok(new
             {
@@ -289,7 +289,7 @@ public class MetricsController : ControllerBase
     {
         try
         {
-            var metrics = await _enhancedMetrics.GetJobSystemMetricsAsync(cancellationToken);
+            var metrics = await _enhancedMetrics.GetJobSystemMetrics(cancellationToken);
 
             return Ok(new
             {
@@ -332,7 +332,7 @@ public class MetricsController : ControllerBase
     {
         try
         {
-            var metrics = await _enhancedMetrics.GetVectorDbMetricsAsync(cancellationToken);
+            var metrics = await _enhancedMetrics.GetVectorDbMetrics(cancellationToken);
 
             return Ok(new
             {
@@ -373,7 +373,7 @@ public class MetricsController : ControllerBase
     {
         try
         {
-            var metrics = await _enhancedMetrics.GetStorageMetricsAsync(cancellationToken);
+            var metrics = await _enhancedMetrics.GetStorageMetrics(cancellationToken);
 
             return Ok(new
             {
@@ -465,9 +465,9 @@ public class MetricsController : ControllerBase
     {
         try
         {
-            var vectorQueue = await _enhancedMetrics.GetVectorQueueHealthAsync(cancellationToken);
-            var components = await _enhancedMetrics.GetComponentHealthAsync(cancellationToken);
-            var jobs = await _enhancedMetrics.GetJobSystemMetricsAsync(cancellationToken);
+            var vectorQueue = await _enhancedMetrics.GetVectorQueueHealth(cancellationToken);
+            var components = await _enhancedMetrics.GetComponentHealth(cancellationToken);
+            var jobs = await _enhancedMetrics.GetJobSystemMetrics(cancellationToken);
             var searchStats = _metricsCollector.CalculateSearchStats(TimeSpan.FromHours(1));
 
             // Aggregate critical alerts

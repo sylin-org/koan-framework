@@ -68,7 +68,7 @@ internal sealed class HuggingFaceAdapter : IAiAdapter
     public IAiModelManager? ModelManager => _modelManager ??= new HuggingFaceModelManager(this, _client, _options, _logger);
     private HuggingFaceModelManager? _modelManager;
 
-    public async Task<IReadOnlyList<AiModelDescriptor>> ListModelsAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<AiModelDescriptor>> ListModels(CancellationToken ct = default)
     {
         // HuggingFace Hub doesn't list all models without a query;
         // return empty for enumeration and rely on search.
@@ -180,7 +180,7 @@ internal sealed class HuggingFaceModelManager : IAiModelManager
         _logger = logger;
     }
 
-    public async Task<AiModelOperationResult> EnsureInstalledAsync(
+    public async Task<AiModelOperationResult> EnsureInstalled(
         AiModelOperationRequest request, CancellationToken ct = default)
     {
         var modelId = request.Model;
@@ -194,7 +194,7 @@ internal sealed class HuggingFaceModelManager : IAiModelManager
             };
         }
 
-        var info = await _client.GetModelInfoAsync(modelId, ct);
+        var info = await _client.GetModelInfo(modelId, ct);
         if (info is null)
         {
             return new AiModelOperationResult
@@ -204,7 +204,7 @@ internal sealed class HuggingFaceModelManager : IAiModelManager
             };
         }
 
-        var files = await _client.ListFilesAsync(modelId, ct);
+        var files = await _client.ListFiles(modelId, ct);
         var modelFile = HuggingFaceAdapter.SelectModelFile(files, null);
 
         if (modelFile is null)
@@ -221,7 +221,7 @@ internal sealed class HuggingFaceModelManager : IAiModelManager
 
         if (!File.Exists(outputPath))
         {
-            await _client.DownloadFileAsync(modelId, modelFile.FileName, outputPath, progress: null, ct);
+            await _client.DownloadFile(modelId, modelFile.FileName, outputPath, progress: null, ct);
         }
         else
         {
@@ -237,7 +237,7 @@ internal sealed class HuggingFaceModelManager : IAiModelManager
             var configPath = Path.Combine(modelDir, "config.json");
             if (!File.Exists(configPath))
             {
-                await _client.DownloadFileAsync(modelId, "config.json", configPath, progress: null, ct);
+                await _client.DownloadFile(modelId, "config.json", configPath, progress: null, ct);
             }
         }
 
@@ -252,7 +252,7 @@ internal sealed class HuggingFaceModelManager : IAiModelManager
             var tokPath = Path.Combine(modelDir, tokFile.FileName);
             if (!File.Exists(tokPath))
             {
-                await _client.DownloadFileAsync(modelId, tokFile.FileName, tokPath, progress: null, ct);
+                await _client.DownloadFile(modelId, tokFile.FileName, tokPath, progress: null, ct);
             }
         }
 
@@ -273,14 +273,14 @@ internal sealed class HuggingFaceModelManager : IAiModelManager
         };
     }
 
-    public Task<AiModelOperationResult> RefreshAsync(
+    public Task<AiModelOperationResult> Refresh(
         AiModelOperationRequest request, CancellationToken ct = default)
     {
         // Re-download by delegating to EnsureInstalledAsync (could delete cache first)
-        return EnsureInstalledAsync(request, ct);
+        return EnsureInstalled(request, ct);
     }
 
-    public Task<AiModelOperationResult> FlushAsync(
+    public Task<AiModelOperationResult> Flush(
         AiModelOperationRequest request, CancellationToken ct = default)
     {
         var modelId = request.Model;
@@ -299,7 +299,7 @@ internal sealed class HuggingFaceModelManager : IAiModelManager
         });
     }
 
-    public Task<IReadOnlyList<AiModelDescriptor>> ListManagedModelsAsync(CancellationToken ct = default)
+    public Task<IReadOnlyList<AiModelDescriptor>> ListManagedModels(CancellationToken ct = default)
     {
         // List models in the cache directory
         IReadOnlyList<AiModelDescriptor> empty = Array.Empty<AiModelDescriptor>();

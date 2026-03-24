@@ -54,7 +54,7 @@ public sealed class CanonizationOptionsSpec
 
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 
     [Fact]
     public Task WithTag_and_Copy_create_detached_instances()
@@ -75,7 +75,7 @@ public sealed class CanonizationOptionsSpec
 
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 
     [Fact]
     public Task WithRequestedViews_normalizes_inputs()
@@ -90,5 +90,5 @@ public sealed class CanonizationOptionsSpec
 
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 }

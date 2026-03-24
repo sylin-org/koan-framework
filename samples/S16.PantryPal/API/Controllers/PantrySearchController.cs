@@ -16,7 +16,7 @@ public sealed class PantrySearchController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> Get([FromQuery] string? q, [FromQuery] int? topK, CancellationToken ct)
     {
-        var (items, degraded) = await _svc.SearchAsync(q, topK, ct);
+        var (items, degraded) = await _svc.Search(q, topK, ct);
         Response.Headers["X-Search-Degraded"] = degraded ? "1" : "0";
         return Ok(items);
     }

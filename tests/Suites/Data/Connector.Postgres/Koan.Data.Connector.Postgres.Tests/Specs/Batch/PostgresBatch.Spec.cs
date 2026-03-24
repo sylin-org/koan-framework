@@ -20,7 +20,7 @@ public sealed class PostgresBatchSpec
         await TestPipeline.For<PostgresBatchSpec>(_output, nameof(Batch_operations_apply_atomically))
             .RequireDocker()
             .UsingPostgresContainer(database: databaseName)
-            .Using<PostgresConnectorFixture>("fixture", static ctx => PostgresConnectorFixture.CreateAsync(ctx))
+            .Using<PostgresConnectorFixture>("fixture", static ctx => PostgresConnectorFixture.Create(ctx))
             .Arrange(static async ctx =>
             {
                 var fixture = ctx.GetRequiredItem<PostgresConnectorFixture>("fixture");
@@ -34,15 +34,15 @@ public sealed class PostgresBatchSpec
                 var partition = fixture.EnsurePartition(ctx);
                 await using var lease = fixture.LeasePartition(partition);
 
-                var toUpdate = await InventoryItem.UpsertAsync(new InventoryItem { Name = "Widget", Quantity = 5 });
-                var toDelete = await InventoryItem.UpsertAsync(new InventoryItem { Name = "Spare", Quantity = 3 });
+                var toUpdate = await InventoryItem.Upsert(new InventoryItem { Name = "Widget", Quantity = 5 });
+                var toDelete = await InventoryItem.Upsert(new InventoryItem { Name = "Spare", Quantity = 3 });
 
                 var batch = InventoryItem.Batch();
                 batch.Add(new InventoryItem { Name = "New", Quantity = 7 });
                 batch.Update(toUpdate.Id, item => item.Quantity = 11);
                 batch.Delete(toDelete.Id);
 
-                var result = await batch.SaveAsync();
+                var result = await batch.Save();
                 result.Added.Should().Be(1);
                 result.Updated.Should().Be(1);
                 result.Deleted.Should().Be(1);
@@ -52,7 +52,7 @@ public sealed class PostgresBatchSpec
                 remaining.Should().ContainSingle(item => item.Name == "Widget" && item.Quantity == 11);
                 remaining.Should().ContainSingle(item => item.Name == "New" && item.Quantity == 7);
             })
-            .RunAsync();
+            .Run();
     }
 
     private sealed class InventoryItem : Entity<InventoryItem>

@@ -22,7 +22,7 @@ public static class Eval
         ModelRef model, DatasetRef data, string[] metrics, CancellationToken ct = default)
     {
         var service = ResolveService();
-        return await service.MeasureAsync(model, data, metrics, ct);
+        return await service.Measure(model, data, metrics, ct);
     }
 
     // ── Quality Gates ──
@@ -35,7 +35,7 @@ public static class Eval
         Action<IGateBuilder> require, CancellationToken ct = default)
     {
         var service = ResolveService();
-        return await service.GateAsync(model, baseline, data, require, ct);
+        return await service.Gate(model, baseline, data, require, ct);
     }
 
     // ── Comparison ──
@@ -45,7 +45,7 @@ public static class Eval
         ModelRef[] models, DatasetRef data, string[] metrics, CancellationToken ct = default)
     {
         var service = ResolveService();
-        return await service.CompareAsync(models, data, metrics, ct);
+        return await service.Compare(models, data, metrics, ct);
     }
 
     // ── Regression ──
@@ -56,7 +56,7 @@ public static class Eval
         double threshold = 0.01, CancellationToken ct = default)
     {
         var service = ResolveService();
-        return await service.RegressAsync(current, baseline, data, threshold, ct);
+        return await service.Regress(current, baseline, data, threshold, ct);
     }
 
     // ── Drift ──
@@ -66,7 +66,7 @@ public static class Eval
         EvalResult baseline, EvalResult current, CancellationToken ct = default)
     {
         var service = ResolveService();
-        return await service.DriftAsync(baseline, current, ct);
+        return await service.Drift(baseline, current, ct);
     }
 
     // ── Internal ──

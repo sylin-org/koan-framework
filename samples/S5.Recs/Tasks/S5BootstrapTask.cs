@@ -22,17 +22,17 @@ internal sealed class S5BootstrapTask : IScheduledTask, IOnStartup, IHasTimeout
     // Bound by scheduler; also enforces a ceiling for our internal polling loop
     public TimeSpan Timeout => TimeSpan.FromMinutes(5);
 
-    public async Task RunAsync(CancellationToken ct)
+    public async Task Run(CancellationToken ct)
     {
         // Quick check: skip only if both docs and vectors are present; otherwise seed to ensure vectors
-        var (media, _, vectors) = await _seeder.GetStatsAsync(ct);
+        var (media, _, vectors) = await _seeder.GetStats(ct);
         await CensorTagBootstrapper.EnsureCensorTagsPopulated(ct);
         if (media > 0 && vectors > 0)
         {
             _logger?.LogInformation("S5 bootstrap: dataset already present (media={Media}, vectors={Vectors}). Skipping seeding.", media, vectors);
             // Best-effort ensure catalogs exist
-            _ = _seeder.RebuildTagCatalogAsync(ct);
-            _ = _seeder.RebuildGenreCatalogAsync(ct);
+            _ = _seeder.RebuildTagCatalog(ct);
+            _ = _seeder.RebuildGenreCatalog(ct);
             return;
         }
         // Only run if no media exists at all - just ensure reference data is set up
@@ -40,7 +40,7 @@ internal sealed class S5BootstrapTask : IScheduledTask, IOnStartup, IHasTimeout
         {
             _logger?.LogInformation("S5 bootstrap: no media found, ensuring reference data is seeded...");
             var bootstrapper = new Services.DataBootstrapper();
-            await bootstrapper.SeedReferenceDataAsync(ct);
+            await bootstrapper.SeedReferenceData(ct);
 
             // Wait a moment for the data to be committed
             await Task.Delay(1000, ct);

@@ -12,7 +12,7 @@ namespace Koan.Context.Services;
 /// <param name="cancellationToken">Cancellation token for the operation.</param>
 /// <param name="progress">Optional progress reporter for indexing telemetry.</param>
 /// <returns>Indexing result produced by the indexing pipeline.</returns>
-public delegate Task<IndexingResult> IndexProjectAsync(
+public delegate Task<IndexingResult> IndexProject(
     string projectId,
     bool force,
     CancellationToken cancellationToken,

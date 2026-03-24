@@ -182,7 +182,7 @@ public static class AddKoanGraphQlExtensions
                     bool ignore = ctx.ArgumentValue<bool?>("ignoreCase") ?? false;
                     int page = ctx.ArgumentValue<int?>("page") ?? 1;
                     int size = ctx.ArgumentValue<int?>("size") ?? KoanWebConstants.Defaults.DefaultPageSize;
-                    return await res.GetItemsAsync(ctx, q, filter, ignore, page, size);
+                    return await res.GetItems(ctx, q, filter, ignore, page, size);
                 });
 
             d.Field(ToGraphQlFieldName(nameRaw))
@@ -192,7 +192,7 @@ public static class AddKoanGraphQlExtensions
             {
                 var res = (dynamic)ctx.Service(resolverType);
                 var id = ctx.ArgumentValue<string>("id");
-                return await res.GetByIdAsync(ctx, id);
+                return await res.GetById(ctx, id);
             });
         }));
 
@@ -225,7 +225,7 @@ public static class AddKoanGraphQlExtensions
                         bool ignore = ctx.ArgumentValue<bool?>("ignoreCase") ?? false;
                         int page = ctx.ArgumentValue<int?>("page") ?? 1;
                         int size = ctx.ArgumentValue<int?>("size") ?? KoanWebConstants.Defaults.DefaultPageSize;
-                        return await res.GetItemsAsync(ctx, q, filter, ignore, page, size);
+                        return await res.GetItems(ctx, q, filter, ignore, page, size);
                     });
             }));
         }
@@ -241,7 +241,7 @@ public static class AddKoanGraphQlExtensions
                     {
                         var res = (dynamic)ctx.Service(resolverType);
                         var id = ctx.ArgumentValue<string>("id");
-                        return await res.GetByIdAsync(ctx, id);
+                        return await res.GetById(ctx, id);
                     });
             }));
         }
@@ -286,7 +286,7 @@ public static class AddKoanGraphQlExtensions
                 {
                     var res = (dynamic)ctx.Service(resolverType);
                     var input = ctx.ArgumentValue<object>("input");
-                    return await res.UpsertAsync(ctx, input);
+                    return await res.Upsert(ctx, input);
                 });
         }));
 
@@ -303,7 +303,7 @@ public static class AddKoanGraphQlExtensions
                     {
                         var res = (dynamic)ctx.Service(resolverType);
                         var input = ctx.ArgumentValue<object>("input");
-                        return await res.UpsertAsync(ctx, input);
+                        return await res.Upsert(ctx, input);
                     });
             }));
         }
@@ -510,7 +510,7 @@ public static class AddKoanGraphQlExtensions
             return opts;
         }
 
-        public async Task<object> GetItemsAsync(IResolverContext ctx, string? q, string? filterJson, bool ignoreCase, int page, int size)
+        public async Task<object> GetItems(IResolverContext ctx, string? q, string? filterJson, bool ignoreCase, int page, int size)
         {
             var http = ctx.Service<IHttpContextAccessor>().HttpContext;
             if (http is null) throw new InvalidOperationException("HttpContext not available");
@@ -523,11 +523,11 @@ public static class AddKoanGraphQlExtensions
                 var hctx = new HookContext<TEntity>(requestCtx);
                 var runner = GetRunner(http);
 
-                var auth = await runner.AuthorizeAsync(hctx, new AuthorizeRequest { Method = "POST", Action = ActionType.Read, Scope = ActionScope.Collection });
+                var auth = await runner.Authorize(hctx, new AuthorizeRequest { Method = "POST", Action = ActionType.Read, Scope = ActionScope.Collection });
                 if (auth is AuthorizeDecision.Forbid fbd) throw new GraphQLException(ErrorBuilder.New().SetMessage(fbd.Reason ?? "Forbidden").SetCode("FORBIDDEN").Build());
                 if (auth is AuthorizeDecision.Challenge) throw new GraphQLException(ErrorBuilder.New().SetMessage("Unauthorized").SetCode("UNAUTHORIZED").Build());
 
-                if (!await runner.BuildOptionsAsync(hctx, opts) || !await runner.BeforeCollectionAsync(hctx, opts))
+                if (!await runner.BuildOptions(hctx, opts) || !await runner.BeforeCollection(hctx, opts))
                 {
                     return new CollectionPayload<TEntity> { Items = Array.Empty<TEntity>(), TotalCount = 0 };
                 }
@@ -541,33 +541,33 @@ public static class AddKoanGraphQlExtensions
                     {
                         if (!JsonFilterBuilder.TryBuild<TEntity>(filterJson!, out var pr, out var error, new JsonFilterBuilder.BuildOptions { IgnoreCase = ignoreCase }))
                             throw new GraphQLException(ErrorBuilder.New().SetMessage(error ?? "Invalid filter").SetCode("BAD_FILTER").Build());
-                        items = await lrepo.QueryAsync(pr!, ctx.RequestAborted);
+                        items = await lrepo.Query(pr!, ctx.RequestAborted);
                         try
                         {
                             var countRequest = new CountRequest<TEntity> { Predicate = pr };
-                            var countResult = await repo.CountAsync(countRequest, ctx.RequestAborted);
+                            var countResult = await repo.Count(countRequest, ctx.RequestAborted);
                             total = countResult.Value;
                         }
                         catch { total = items.Count; }
                     }
                     else if (!string.IsNullOrWhiteSpace(opts.Q) && repo is IStringQueryRepository<TEntity, string> srepo)
                     {
-                        items = await srepo.QueryAsync(opts.Q!, ctx.RequestAborted);
+                        items = await srepo.Query(opts.Q!, ctx.RequestAborted);
                         try
                         {
                             var countRequest = new CountRequest<TEntity> { RawQuery = opts.Q };
-                            var countResult = await repo.CountAsync(countRequest, ctx.RequestAborted);
+                            var countResult = await repo.Count(countRequest, ctx.RequestAborted);
                             total = countResult.Value;
                         }
                         catch { total = items.Count; }
                     }
                     else
                     {
-                        items = await repo.QueryAsync(null, ctx.RequestAborted);
+                        items = await repo.Query(null, ctx.RequestAborted);
                         try
                         {
                             var countRequest = new CountRequest<TEntity>();
-                            var countResult = await repo.CountAsync(countRequest, ctx.RequestAborted);
+                            var countResult = await repo.Count(countRequest, ctx.RequestAborted);
                             total = countResult.Value;
                         }
                         catch { total = items.Count; }
@@ -578,13 +578,13 @@ public static class AddKoanGraphQlExtensions
                 var skip = (opts.Page - 1) * opts.PageSize;
                 list = list.Skip(skip).Take(opts.PageSize).ToList();
 
-                if (!await runner.AfterCollectionAsync(hctx, list))
+                if (!await runner.AfterCollection(hctx, list))
                 {
                     return new CollectionPayload<TEntity> { Items = Array.Empty<TEntity>(), TotalCount = 0 };
                 }
 
                 var payload = new CollectionPayload<TEntity> { Items = list, TotalCount = total };
-                var emit = await runner.EmitCollectionAsync(hctx, payload);
+                var emit = await runner.EmitCollection(hctx, payload);
                 return emit.replaced ? emit.payload : payload;
             }
             catch (Exception ex)
@@ -598,7 +598,7 @@ public static class AddKoanGraphQlExtensions
             }
         }
 
-        public async Task<TEntity?> GetByIdAsync(IResolverContext ctx, string id)
+        public async Task<TEntity?> GetById(IResolverContext ctx, string id)
         {
             var http = ctx.Service<IHttpContextAccessor>().HttpContext;
             if (http is null) throw new InvalidOperationException("HttpContext not available");
@@ -611,16 +611,16 @@ public static class AddKoanGraphQlExtensions
                 var hctx = new HookContext<TEntity>(requestCtx);
                 var runner = GetRunner(http);
 
-                var auth = await runner.AuthorizeAsync(hctx, new AuthorizeRequest { Method = "POST", Action = ActionType.Read, Scope = ActionScope.Model, Id = id });
+                var auth = await runner.Authorize(hctx, new AuthorizeRequest { Method = "POST", Action = ActionType.Read, Scope = ActionScope.Model, Id = id });
                 if (auth is AuthorizeDecision.Forbid fbd) throw new GraphQLException(ErrorBuilder.New().SetMessage(fbd.Reason ?? "Forbidden").SetCode("FORBIDDEN").Build());
                 if (auth is AuthorizeDecision.Challenge) throw new GraphQLException(ErrorBuilder.New().SetMessage("Unauthorized").SetCode("UNAUTHORIZED").Build());
 
-                if (!await runner.BeforeModelFetchAsync(hctx, id)) return default;
-                var model = await Data<TEntity, string>.GetAsync(id, ctx.RequestAborted);
-                await runner.AfterModelFetchAsync(hctx, model);
+                if (!await runner.BeforeModelFetch(hctx, id)) return default;
+                var model = await Data<TEntity, string>.Get(id, ctx.RequestAborted);
+                await runner.AfterModelFetch(hctx, model);
                 if (model is null) return default;
 
-                var emit = await runner.EmitModelAsync(hctx, model);
+                var emit = await runner.EmitModel(hctx, model);
                 return emit.replaced ? (TEntity)emit.payload : model;
             }
             catch (Exception ex)
@@ -634,7 +634,7 @@ public static class AddKoanGraphQlExtensions
             }
         }
 
-        public async Task<TEntity> UpsertAsync(IResolverContext ctx, object input)
+        public async Task<TEntity> Upsert(IResolverContext ctx, object input)
         {
             var http = ctx.Service<IHttpContextAccessor>().HttpContext;
             if (http is null) throw new InvalidOperationException("HttpContext not available");
@@ -660,15 +660,15 @@ public static class AddKoanGraphQlExtensions
                     }
                 }
 
-                var auth = await runner.AuthorizeAsync(hctx, new AuthorizeRequest { Method = "POST", Action = ActionType.Write, Scope = ActionScope.Model });
+                var auth = await runner.Authorize(hctx, new AuthorizeRequest { Method = "POST", Action = ActionType.Write, Scope = ActionScope.Model });
                 if (auth is AuthorizeDecision.Forbid fbd) throw new GraphQLException(ErrorBuilder.New().SetMessage(fbd.Reason ?? "Forbidden").SetCode("FORBIDDEN").Build());
                 if (auth is AuthorizeDecision.Challenge) throw new GraphQLException(ErrorBuilder.New().SetMessage("Unauthorized").SetCode("UNAUTHORIZED").Build());
 
-                await runner.BeforeSaveAsync(hctx, model);
+                await runner.BeforeSave(hctx, model);
                 var saved = await model.Upsert<TEntity, string>(ctx.RequestAborted);
-                await runner.AfterSaveAsync(hctx, saved);
+                await runner.AfterSave(hctx, saved);
 
-                var emit = await runner.EmitModelAsync(hctx, saved);
+                var emit = await runner.EmitModel(hctx, saved);
                 return emit.replaced ? (TEntity)emit.payload : saved;
             }
             catch (Exception ex)
@@ -700,102 +700,102 @@ public static class AddKoanGraphQlExtensions
             _emit = sp.GetServices<IEmitHook<TEntity>>().OrderBy(i => i.Order).ToArray();
         }
 
-        public async Task<AuthorizeDecision> AuthorizeAsync(HookContext<TEntity> ctx, AuthorizeRequest req)
+        public async Task<AuthorizeDecision> Authorize(HookContext<TEntity> ctx, AuthorizeRequest req)
         {
             foreach (var h in _auth)
             {
-                var d = await h.OnAuthorizeAsync(ctx, req);
+                var d = await h.OnAuthorize(ctx, req);
                 if (d is AuthorizeDecision.Forbid or AuthorizeDecision.Challenge) return d;
             }
             return AuthorizeDecision.Allowed();
         }
 
-        public async Task<bool> BuildOptionsAsync(HookContext<TEntity> ctx, QueryOptions opts)
+        public async Task<bool> BuildOptions(HookContext<TEntity> ctx, QueryOptions opts)
         {
             foreach (var h in _opts)
             {
-                await h.OnBuildingOptionsAsync(ctx, opts);
+                await h.OnBuildingOptions(ctx, opts);
                 if (ctx.IsShortCircuited) return false;
             }
             return true;
         }
 
-        public async Task<bool> BeforeCollectionAsync(HookContext<TEntity> ctx, QueryOptions opts)
+        public async Task<bool> BeforeCollection(HookContext<TEntity> ctx, QueryOptions opts)
         {
             foreach (var h in _col)
             {
-                await h.OnBeforeFetchAsync(ctx, opts);
+                await h.OnBeforeFetch(ctx, opts);
                 if (ctx.IsShortCircuited) return false;
             }
             return true;
         }
 
-        public async Task<bool> AfterCollectionAsync(HookContext<TEntity> ctx, List<TEntity> items)
+        public async Task<bool> AfterCollection(HookContext<TEntity> ctx, List<TEntity> items)
         {
             foreach (var h in _col)
             {
-                await h.OnAfterFetchAsync(ctx, items);
+                await h.OnAfterFetch(ctx, items);
                 if (ctx.IsShortCircuited) return false;
             }
             return true;
         }
 
-        public async Task<bool> BeforeModelFetchAsync(HookContext<TEntity> ctx, string id)
+        public async Task<bool> BeforeModelFetch(HookContext<TEntity> ctx, string id)
         {
             foreach (var h in _model)
             {
-                await h.OnBeforeFetchAsync(ctx, id);
+                await h.OnBeforeFetch(ctx, id);
                 if (ctx.IsShortCircuited) return false;
             }
             return true;
         }
 
-        public async Task<bool> AfterModelFetchAsync(HookContext<TEntity> ctx, TEntity? model)
+        public async Task<bool> AfterModelFetch(HookContext<TEntity> ctx, TEntity? model)
         {
             foreach (var h in _model)
             {
-                await h.OnAfterFetchAsync(ctx, model);
+                await h.OnAfterFetch(ctx, model);
                 if (ctx.IsShortCircuited) return false;
             }
             return true;
         }
 
-        public async Task<bool> BeforeSaveAsync(HookContext<TEntity> ctx, TEntity model)
+        public async Task<bool> BeforeSave(HookContext<TEntity> ctx, TEntity model)
         {
             foreach (var h in _model)
             {
-                await h.OnBeforeSaveAsync(ctx, model);
+                await h.OnBeforeSave(ctx, model);
                 if (ctx.IsShortCircuited) return false;
             }
             return true;
         }
 
-        public async Task<bool> AfterSaveAsync(HookContext<TEntity> ctx, TEntity model)
+        public async Task<bool> AfterSave(HookContext<TEntity> ctx, TEntity model)
         {
             foreach (var h in _model)
             {
-                await h.OnAfterSaveAsync(ctx, model);
+                await h.OnAfterSave(ctx, model);
                 if (ctx.IsShortCircuited) return false;
             }
             return true;
         }
 
-        public async Task<(bool replaced, object payload)> EmitCollectionAsync(HookContext<TEntity> ctx, object payload)
+        public async Task<(bool replaced, object payload)> EmitCollection(HookContext<TEntity> ctx, object payload)
         {
             foreach (var h in _emit)
             {
-                var d = await h.OnEmitCollectionAsync(ctx, payload);
+                var d = await h.OnEmitCollection(ctx, payload);
                 if (d is EmitDecision.Replace rep) return (true, rep.Payload);
                 if (ctx.IsShortCircuited) return (true, ctx.ShortCircuitResult!);
             }
             return (false, payload);
         }
 
-        public async Task<(bool replaced, object payload)> EmitModelAsync(HookContext<TEntity> ctx, object payload)
+        public async Task<(bool replaced, object payload)> EmitModel(HookContext<TEntity> ctx, object payload)
         {
             foreach (var h in _emit)
             {
-                var d = await h.OnEmitModelAsync(ctx, payload);
+                var d = await h.OnEmitModel(ctx, payload);
                 if (d is EmitDecision.Replace rep) return (true, rep.Payload);
                 if (ctx.IsShortCircuited) return (true, ctx.ShortCircuitResult!);
             }

@@ -14,10 +14,10 @@ public interface IAiPipelineStage<TOutput>
     /// <summary>
     /// Execute the pipeline stage and return the result.
     /// </summary>
-    Task<TOutput> ExecuteAsync(CancellationToken ct = default);
+    Task<TOutput> Execute(CancellationToken ct = default);
 
     /// <summary>
     /// Stream results from the pipeline stage (if supported).
     /// </summary>
-    IAsyncEnumerable<TOutput> StreamAsync(CancellationToken ct = default);
+    IAsyncEnumerable<TOutput> Stream(CancellationToken ct = default);
 }

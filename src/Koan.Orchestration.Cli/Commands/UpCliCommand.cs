@@ -9,7 +9,7 @@ internal sealed class UpCliCommand : ICliCommand
 
     public UpCliCommand(CommandRuntime runtime) => _runtime = runtime;
 
-    public Task<int> ExecuteAsync(CommandArgs args)
+    public Task<int> Execute(CommandArgs args)
     {
         var output = args.GetValue("file") ?? Constants.DefaultComposePath;
         var explain = args.HasFlag("explain");
@@ -26,7 +26,7 @@ internal sealed class UpCliCommand : ICliCommand
         var noManifest = args.HasFlag("no-launch-manifest");
         var conflicts = args.GetValue("conflicts");
 
-        return _runtime.ExecuteUpAsync(new CommandRuntime.UpCommandOptions(
+        return _runtime.ExecuteUp(new CommandRuntime.UpCommandOptions(
             output,
             explain,
             dryRun,

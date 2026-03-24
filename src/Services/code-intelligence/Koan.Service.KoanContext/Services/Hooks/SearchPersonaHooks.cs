@@ -24,34 +24,34 @@ public sealed class SearchPersonaHooks : IModelHook<SearchPersona>
 
     public int Order => 0;
 
-    public Task OnBeforeFetchAsync(HookContext<SearchPersona> ctx, string id) => Task.CompletedTask;
+    public Task OnBeforeFetch(HookContext<SearchPersona> ctx, string id) => Task.CompletedTask;
 
-    public Task OnAfterFetchAsync(HookContext<SearchPersona> ctx, SearchPersona? model) => Task.CompletedTask;
+    public Task OnAfterFetch(HookContext<SearchPersona> ctx, SearchPersona? model) => Task.CompletedTask;
 
-    public Task OnBeforeSaveAsync(HookContext<SearchPersona> ctx, SearchPersona model)
+    public Task OnBeforeSave(HookContext<SearchPersona> ctx, SearchPersona model)
     {
         Normalize(model);
         return Task.CompletedTask;
     }
 
-    public Task OnBeforeDeleteAsync(HookContext<SearchPersona> ctx, SearchPersona model) => Task.CompletedTask;
+    public Task OnBeforeDelete(HookContext<SearchPersona> ctx, SearchPersona model) => Task.CompletedTask;
 
-    public Task OnBeforePatchAsync(HookContext<SearchPersona> ctx, string id, object patch) => Task.CompletedTask;
+    public Task OnBeforePatch(HookContext<SearchPersona> ctx, string id, object patch) => Task.CompletedTask;
 
-    public Task OnAfterPatchAsync(HookContext<SearchPersona> ctx, SearchPersona model)
+    public Task OnAfterPatch(HookContext<SearchPersona> ctx, SearchPersona model)
     {
         Normalize(model);
         Invalidate(model.Name);
         return Task.CompletedTask;
     }
 
-    public Task OnAfterSaveAsync(HookContext<SearchPersona> ctx, SearchPersona model)
+    public Task OnAfterSave(HookContext<SearchPersona> ctx, SearchPersona model)
     {
         Invalidate(model.Name);
         return Task.CompletedTask;
     }
 
-    public Task OnAfterDeleteAsync(HookContext<SearchPersona> ctx, SearchPersona model)
+    public Task OnAfterDelete(HookContext<SearchPersona> ctx, SearchPersona model)
     {
         Invalidate(model.Name);
         return Task.CompletedTask;

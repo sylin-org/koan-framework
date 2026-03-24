@@ -34,7 +34,7 @@ public sealed class ZenGardenContainerResolutionTests
                 KoiDiscoveryEnabled = false
             });
 
-        var tools = await client.CatalogAsync(ZenGardenSubscription.ForOffering("ollama"));
+        var tools = await client.Catalog(ZenGardenSubscription.ForOffering("ollama"));
 
         tools.Should().ContainSingle();
         handler.RequestHosts.Should().Contain("moss-container");
@@ -65,7 +65,7 @@ public sealed class ZenGardenContainerResolutionTests
                 KoiDiscoveryEnabled = false
             });
 
-        var act = async () => await client.CatalogAsync(ZenGardenSubscription.ForOffering("ollama"));
+        var act = async () => await client.Catalog(ZenGardenSubscription.ForOffering("ollama"));
 
         await act.Should()
             .ThrowAsync<InvalidOperationException>()

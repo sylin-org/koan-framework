@@ -19,7 +19,7 @@ public class FallbackSpec : IClassFixture<MediaCoreTestPipelineFixture>
     var file = _fixture.CreateTestMediaFile("input.unknown");
 
     // Act
-    var result = await media.ProcessAsync(file);
+    var result = await media.Process(file);
 
     // Assert
     result.Should().NotBeNull();

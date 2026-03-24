@@ -100,7 +100,7 @@ internal sealed class VaultOptionsConfigurator(IConfiguration config, ILogger<Va
             };
 
             // Use centralized service discovery
-            var discoveryTask = serviceDiscovery.DiscoverServiceAsync("vault", discoveryOptions);
+            var discoveryTask = serviceDiscovery.DiscoverService("vault", discoveryOptions);
             var result = discoveryTask.GetAwaiter().GetResult();
 
             logger.LogInformation("Vault discovered via {Method}: {ServiceUrl}",

@@ -17,7 +17,7 @@ public sealed class UrlBuilder
         _logger = logger;
     }
 
-    public async Task<string?> GenerateUrlAsync(
+    public async Task<string?> GenerateUrl(
         string projectRootPath,
         string relativePath,
         string? commitSha = null,
@@ -37,7 +37,7 @@ public sealed class UrlBuilder
         }
 
         // Detect git remote
-        var remoteInfo = await DetectGitRemoteAsync(projectRootPath, cancellationToken);
+        var remoteInfo = await DetectGitRemote(projectRootPath, cancellationToken);
         if (remoteInfo == null)
         {
             return null;
@@ -47,7 +47,7 @@ public sealed class UrlBuilder
         return BuildUrl(remoteInfo, relativePath, commitSha, startLine, endLine);
     }
 
-    private async Task<RemoteUrlInfo?> DetectGitRemoteAsync(
+    private async Task<RemoteUrlInfo?> DetectGitRemote(
         string projectRootPath,
         CancellationToken cancellationToken)
     {
@@ -78,7 +78,7 @@ public sealed class UrlBuilder
             }
 
             var output = await process.StandardOutput.ReadToEndAsync(cancellationToken);
-            await process.WaitForExitAsync(cancellationToken);
+            await process.WaitForExit(cancellationToken);
 
             if (process.ExitCode != 0)
             {

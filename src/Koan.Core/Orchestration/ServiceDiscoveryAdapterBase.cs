@@ -26,7 +26,7 @@ public abstract class ServiceDiscoveryAdapterBase : IServiceDiscoveryAdapter
     public virtual string[] Aliases => Array.Empty<string>();
     public virtual int Priority => 10;
 
-    public async Task<AdapterDiscoveryResult> DiscoverAsync(
+    public async Task<AdapterDiscoveryResult> Discover(
         DiscoveryContext context,
         CancellationToken cancellationToken = default)
     {

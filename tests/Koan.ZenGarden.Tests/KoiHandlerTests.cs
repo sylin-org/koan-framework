@@ -50,7 +50,7 @@ public sealed class KoiHandlerTests : IDisposable
         // The empty events stream will close immediately causing a reconnect loop, so we assert
         // on the snapshot captured at the time of the TopologyReset event rather than the
         // handler's current state (which may have already transitioned to Reconnecting).
-        await WaitForConditionAsync(
+        await WaitForCondition(
             () => events.Any(e => e.Kind == KoiTopologyEventKind.TopologyReset),
             TimeSpan.FromSeconds(5));
 
@@ -73,7 +73,7 @@ public sealed class KoiHandlerTests : IDisposable
 
         using var handler = CreateHandler();
         handler.Start();
-        await WaitForStateAsync(handler, KoiHandlerState.NotDetected, TimeSpan.FromSeconds(3));
+        await WaitForState(handler, KoiHandlerState.NotDetected, TimeSpan.FromSeconds(3));
 
         handler.State.Should().Be(KoiHandlerState.NotDetected);
         handler.CurrentSnapshot.Should().BeSameAs(KoiTopologySnapshot.Empty);
@@ -115,7 +115,7 @@ public sealed class KoiHandlerTests : IDisposable
         });
 
         handler.Start();
-        await WaitForStateAsync(handler, KoiHandlerState.Connected, TimeSpan.FromSeconds(5));
+        await WaitForState(handler, KoiHandlerState.Connected, TimeSpan.FromSeconds(5));
         events.Count.Should().BeGreaterThan(0);
 
         var countBefore = events.Count;
@@ -154,7 +154,7 @@ public sealed class KoiHandlerTests : IDisposable
 
         using var handler = CreateHandler();
         handler.Start();
-        await WaitForStateAsync(handler, KoiHandlerState.Connected, TimeSpan.FromSeconds(5));
+        await WaitForState(handler, KoiHandlerState.Connected, TimeSpan.FromSeconds(5));
 
         handler.CurrentSnapshot.Stones.Should().ContainSingle(
             "duplicate mDNS entries with same stone_id should be deduped");
@@ -189,7 +189,7 @@ public sealed class KoiHandlerTests : IDisposable
         handler.Start();
 
         // Wait for the handler to process the event stream entry
-        await WaitForConditionAsync(
+        await WaitForCondition(
             () => events.Any(e => e.Kind == KoiTopologyEventKind.StoneChanged),
             TimeSpan.FromSeconds(5));
 
@@ -225,7 +225,7 @@ public sealed class KoiHandlerTests : IDisposable
 
         handler.Start();
 
-        await WaitForConditionAsync(
+        await WaitForCondition(
             () => events.Any(e => e.Kind == KoiTopologyEventKind.StoneOffline),
             TimeSpan.FromSeconds(5));
 
@@ -344,7 +344,7 @@ public sealed class KoiHandlerTests : IDisposable
         return new KoiHandler(opts, NullLogger<KoiHandler>.Instance, _httpClient);
     }
 
-    private static async Task WaitForStateAsync(IKoiHandler handler, KoiHandlerState expected, TimeSpan timeout)
+    private static async Task WaitForState(IKoiHandler handler, KoiHandlerState expected, TimeSpan timeout)
     {
         var deadline = DateTime.UtcNow + timeout;
         while (DateTime.UtcNow < deadline)
@@ -354,7 +354,7 @@ public sealed class KoiHandlerTests : IDisposable
         }
     }
 
-    private static async Task WaitForConditionAsync(Func<bool> condition, TimeSpan timeout)
+    private static async Task WaitForCondition(Func<bool> condition, TimeSpan timeout)
     {
         var deadline = DateTime.UtcNow + timeout;
         while (DateTime.UtcNow < deadline)

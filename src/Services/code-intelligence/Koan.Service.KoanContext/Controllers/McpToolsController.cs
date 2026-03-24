@@ -86,7 +86,7 @@ public class McpToolsController : ControllerBase
                 request.Query);
 
             // Resolve project from working directory (auto-creates if needed)
-            var project = await _projectResolver.ResolveProjectAsync(
+            var project = await _projectResolver.ResolveProject(
                 libraryId: null,
                 workingDirectory: request.WorkingDirectory,
                 httpContext: HttpContext,
@@ -99,7 +99,7 @@ public class McpToolsController : ControllerBase
                     "Working directory {WorkingDirectory} did not resolve to a project. Falling back to multi-project search.",
                     request.WorkingDirectory);
 
-                return await SearchAllProjectsAsync(request, cancellationToken);
+                return await SearchAllProjects(request, cancellationToken);
             }
 
             // Check indexing status and handle appropriately
@@ -168,7 +168,7 @@ public class McpToolsController : ControllerBase
                 includeReasoning: request.IncludeReasoning ?? false,
                 languages: request.Languages);
 
-            var result = await _retrieval.SearchAsync(
+            var result = await _retrieval.Search(
                 project.Id,
                 context,
                 cancellationToken);
@@ -206,7 +206,7 @@ public class McpToolsController : ControllerBase
         }
     }
 
-    private async Task<IActionResult> SearchAllProjectsAsync(
+    private async Task<IActionResult> SearchAllProjects(
         GetReferencesRequest request,
         CancellationToken cancellationToken)
     {
@@ -256,7 +256,7 @@ public class McpToolsController : ControllerBase
                 includeReasoning: false,
                 languages: request.Languages);
 
-            var result = await _retrieval.SearchAsync(project.Id, context, cancellationToken);
+            var result = await _retrieval.Search(project.Id, context, cancellationToken);
 
             if (result.Chunks.Count == 0)
             {

@@ -42,7 +42,7 @@ public class Sensor : Entity<Sensor, string>
 
     public DateTimeOffset? LastSeenAt { get; set; }  // track when we last heard from this Pi
 
-    public static async Task<Sensor> EnsureAsync(string serial, CancellationToken ct = default)
+    public static async Task<Sensor> Ensure(string serial, CancellationToken ct = default)
     {
         // "ensure" = get it if exists, create if doesn't
         var normalized = (serial ?? string.Empty).Trim();

@@ -37,7 +37,7 @@ public sealed class StorageService : IStorageService
         }
     }
 
-    public async Task<StorageObject> PutAsync(string profile, string container, string key, Stream content, string? contentType, CancellationToken ct = default)
+    public async Task<StorageObject> Put(string profile, string container, string key, Stream content, string? contentType, CancellationToken ct = default)
     {
         var (provider, resolvedContainer) = Resolve(profile, container);
 
@@ -79,7 +79,7 @@ public sealed class StorageService : IStorageService
             // Determine size if available
             try { size = content.Length - originalPos; } catch { size = 0; }
 
-            await provider.WriteAsync(resolvedContainer, key, content, contentType, ct);
+            await provider.Write(resolvedContainer, key, content, contentType, ct);
         }
         else
         {
@@ -106,14 +106,14 @@ public sealed class StorageService : IStorageService
             // Intentionally keep reported size as 0 for non-seekable uploads (contract: size unknown)
             // Tests assert this behavior. We still write the full buffered content.
             size = 0;
-            await provider.WriteAsync(resolvedContainer, key, ms, contentType, ct);
+            await provider.Write(resolvedContainer, key, ms, contentType, ct);
         }
 
         // If seekable and size could not be determined, attempt best-effort stat.
         // For non-seekable uploads we intentionally leave size as 0.
         if (wasSeekable && size == 0 && provider is IStatOperations statOps)
         {
-            var stat = await statOps.HeadAsync(resolvedContainer, key, ct);
+            var stat = await statOps.Head(resolvedContainer, key, ct);
             if (stat?.Length is long len) size = len;
         }
 
@@ -133,39 +133,39 @@ public sealed class StorageService : IStorageService
         };
     }
 
-    public Task<Stream> ReadAsync(string profile, string container, string key, CancellationToken ct = default)
+    public Task<Stream> Read(string profile, string container, string key, CancellationToken ct = default)
     {
         var (provider, resolvedContainer) = Resolve(profile, container);
-        return provider.OpenReadAsync(resolvedContainer, key, ct);
+        return provider.OpenRead(resolvedContainer, key, ct);
     }
 
-    public Task<(Stream Stream, long? Length)> ReadRangeAsync(string profile, string container, string key, long? from, long? to, CancellationToken ct = default)
+    public Task<(Stream Stream, long? Length)> ReadRange(string profile, string container, string key, long? from, long? to, CancellationToken ct = default)
     {
         var (provider, resolvedContainer) = Resolve(profile, container);
-        return provider.OpenReadRangeAsync(resolvedContainer, key, from, to, ct);
+        return provider.OpenReadRange(resolvedContainer, key, from, to, ct);
     }
 
-    public Task<bool> DeleteAsync(string profile, string container, string key, CancellationToken ct = default)
+    public Task<bool> Delete(string profile, string container, string key, CancellationToken ct = default)
     {
         var (provider, resolvedContainer) = Resolve(profile, container);
-        return provider.DeleteAsync(resolvedContainer, key, ct);
+        return provider.Delete(resolvedContainer, key, ct);
     }
 
-    public async Task<bool> ExistsAsync(string profile, string container, string key, CancellationToken ct = default)
+    public async Task<bool> Exists(string profile, string container, string key, CancellationToken ct = default)
     {
         var (provider, resolvedContainer) = Resolve(profile, container);
-        return await provider.ExistsAsync(resolvedContainer, key, ct);
+        return await provider.Exists(resolvedContainer, key, ct);
     }
 
-    public async Task<ObjectStat?> HeadAsync(string profile, string container, string key, CancellationToken ct = default)
+    public async Task<ObjectStat?> Head(string profile, string container, string key, CancellationToken ct = default)
     {
         var (provider, resolvedContainer) = Resolve(profile, container);
         if (provider is IStatOperations stat)
-            return await stat.HeadAsync(resolvedContainer, key, ct);
+            return await stat.Head(resolvedContainer, key, ct);
         // Fallback: infer length via range 0-0 or full open (best-effort)
         try
         {
-            using var s = await provider.OpenReadAsync(resolvedContainer, key, ct);
+            using var s = await provider.OpenRead(resolvedContainer, key, ct);
             long? len = null;
             try { len = s.CanSeek ? s.Length : null; } catch { }
             return new ObjectStat(len, null, null, null);
@@ -173,7 +173,7 @@ public sealed class StorageService : IStorageService
         catch { return null; }
     }
 
-    public async Task<StorageObject> TransferToProfileAsync(string sourceProfile, string sourceContainer, string key, string targetProfile, string? targetContainer = null, bool deleteSource = false, CancellationToken ct = default)
+    public async Task<StorageObject> TransferToProfile(string sourceProfile, string sourceContainer, string key, string targetProfile, string? targetContainer = null, bool deleteSource = false, CancellationToken ct = default)
     {
         // Resolve source and target providers/containers
         var (src, srcContainer) = Resolve(sourceProfile, sourceContainer);
@@ -182,13 +182,13 @@ public sealed class StorageService : IStorageService
         // Attempt server-side copy when possible
         if (ReferenceEquals(src, dst) && (src is IServerSideCopy ssc))
         {
-            var ok = await ssc.CopyAsync(srcContainer, key, dstContainer, key, ct);
+            var ok = await ssc.Copy(srcContainer, key, dstContainer, key, ct);
             if (ok)
             {
                 if (deleteSource && !(srcContainer == dstContainer))
-                    await src.DeleteAsync(srcContainer, key, ct);
+                    await src.Delete(srcContainer, key, ct);
                 // Compose StorageObject with best-effort stat
-                var stat = await HeadAsync(targetProfile, dstContainer, key, ct);
+                var stat = await Head(targetProfile, dstContainer, key, ct);
                 return new StorageObject
                 {
                     Id = $"{dst.Name}:{dstContainer}:{key}",
@@ -207,34 +207,34 @@ public sealed class StorageService : IStorageService
         }
 
         // Stream copy fallback
-        await using var read = await src.OpenReadAsync(srcContainer, key, ct);
-        var obj = await PutAsync(targetProfile, dstContainer, key, read, null, ct);
+        await using var read = await src.OpenRead(srcContainer, key, ct);
+        var obj = await Put(targetProfile, dstContainer, key, read, null, ct);
         if (deleteSource)
-            await src.DeleteAsync(srcContainer, key, ct);
+            await src.Delete(srcContainer, key, ct);
         return obj;
     }
 
-    public Task<Uri> PresignReadAsync(string profile, string container, string key, TimeSpan expiry, CancellationToken ct = default)
+    public Task<Uri> PresignRead(string profile, string container, string key, TimeSpan expiry, CancellationToken ct = default)
     {
         var (provider, resolvedContainer) = Resolve(profile, container);
         if (provider is IPresignOperations presign)
-            return presign.PresignReadAsync(resolvedContainer, key, expiry, ct);
+            return presign.PresignRead(resolvedContainer, key, expiry, ct);
         throw new NotSupportedException("Provider does not support presigned reads.");
     }
 
-    public Task<Uri> PresignWriteAsync(string profile, string container, string key, TimeSpan expiry, string? contentType = null, CancellationToken ct = default)
+    public Task<Uri> PresignWrite(string profile, string container, string key, TimeSpan expiry, string? contentType = null, CancellationToken ct = default)
     {
         var (provider, resolvedContainer) = Resolve(profile, container);
         if (provider is IPresignOperations presign)
-            return presign.PresignWriteAsync(resolvedContainer, key, expiry, contentType, ct);
+            return presign.PresignWrite(resolvedContainer, key, expiry, contentType, ct);
         throw new NotSupportedException("Provider does not support presigned writes.");
     }
 
-    public IAsyncEnumerable<StorageObjectInfo> ListObjectsAsync(string profile, string container, string? prefix = null, CancellationToken ct = default)
+    public IAsyncEnumerable<StorageObjectInfo> ListObjects(string profile, string container, string? prefix = null, CancellationToken ct = default)
     {
         var (provider, resolvedContainer) = Resolve(profile, container);
         if (provider is IListOperations listOps)
-            return listOps.ListObjectsAsync(resolvedContainer, prefix, ct);
+            return listOps.ListObjects(resolvedContainer, prefix, ct);
         throw new NotSupportedException("Provider does not support object listing.");
     }
 

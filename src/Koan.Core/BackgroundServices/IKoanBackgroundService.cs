@@ -15,12 +15,12 @@ public interface IKoanBackgroundService
     /// <summary>
     /// Main execution method for the background service
     /// </summary>
-    Task ExecuteAsync(CancellationToken cancellationToken);
+    Task Execute(CancellationToken cancellationToken);
 
     /// <summary>
     /// Check if the service is ready to start execution
     /// </summary>
-    Task<bool> IsReadyAsync(CancellationToken cancellationToken = default) => Task.FromResult(true);
+    Task<bool> IsReady(CancellationToken cancellationToken = default) => Task.FromResult(true);
 }
 
 /// <summary>
@@ -31,7 +31,7 @@ public interface IKoanPokableService : IKoanBackgroundService
     /// <summary>
     /// Handles external commands/triggers sent to this service
     /// </summary>
-    Task HandleCommandAsync(ServiceCommand command, CancellationToken cancellationToken = default);
+    Task HandleCommand(ServiceCommand command, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Gets the command types this service can handle

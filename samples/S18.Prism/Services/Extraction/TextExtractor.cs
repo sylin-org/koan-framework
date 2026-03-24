@@ -9,7 +9,7 @@ public class TextExtractor : IContentExtractor
 
     public int Priority => 100;
 
-    public async Task<IReadOnlyList<ContentBlock>> ExtractAsync(
+    public async Task<IReadOnlyList<ContentBlock>> Extract(
         Stream content, string mimeType, CancellationToken ct = default)
     {
         using var reader = new StreamReader(content, leaveOpen: true);

@@ -38,7 +38,7 @@ internal sealed class AiProvenancePublisher : BackgroundService
         {
             // Allow the hosting pipeline to finish building adapters before capturing state.
             await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
-            await PublishSnapshotAsync(stoppingToken).ConfigureAwait(false);
+            await PublishSnapshot(stoppingToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -50,16 +50,16 @@ internal sealed class AiProvenancePublisher : BackgroundService
         }
     }
 
-    private async Task PublishSnapshotAsync(CancellationToken ct)
+    private async Task PublishSnapshot(CancellationToken ct)
     {
         var registry = ProvenanceRegistry.Instance;
         var module = registry.GetOrCreateModule(AiPillarManifest.PillarCode, "Koan.AI");
 
-        await PublishAdapterRosterAsync(module, ct).ConfigureAwait(false);
+        await PublishAdapterRoster(module, ct).ConfigureAwait(false);
         PublishSourceHealth(module);
     }
 
-    private Task PublishAdapterRosterAsync(ProvenanceModuleWriter module, CancellationToken ct)
+    private Task PublishAdapterRoster(ProvenanceModuleWriter module, CancellationToken ct)
     {
         var summaries = new List<string>();
 

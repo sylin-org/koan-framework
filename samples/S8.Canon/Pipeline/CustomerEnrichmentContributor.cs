@@ -14,7 +14,7 @@ public class CustomerEnrichmentContributor : ICanonPipelineContributor<Customer>
     public CanonPipelinePhase Phase => CanonPipelinePhase.Aggregation;
 
     /// <inheritdoc />
-    public async ValueTask<CanonizationEvent?> ExecuteAsync(
+    public async ValueTask<CanonizationEvent?> Execute(
         CanonPipelineContext<Customer> context,
         CancellationToken cancellationToken)
     {

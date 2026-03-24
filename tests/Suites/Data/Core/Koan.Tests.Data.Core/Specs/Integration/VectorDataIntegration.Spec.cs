@@ -46,7 +46,7 @@ public sealed class VectorDataIntegrationSpec
     public async Task Complete_workflow_entity_and_vector_save_in_transaction()
     {
         await TestPipeline.For<VectorDataIntegrationSpec>(_output, nameof(Complete_workflow_entity_and_vector_save_in_transaction))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition = EnsurePartition(ctx);
@@ -83,7 +83,7 @@ public sealed class VectorDataIntegrationSpec
                         fakeRepo.VectorCount.Should().Be(0, "vector should not be persisted during transaction");
 
                         // Commit
-                        await EntityContext.CommitAsync();
+                        await EntityContext.Commit();
                     }
 
                     // Verify both persisted
@@ -103,7 +103,7 @@ public sealed class VectorDataIntegrationSpec
                     retrievedVector.Should().HaveCount(1536);
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -113,7 +113,7 @@ public sealed class VectorDataIntegrationSpec
     public async Task SaveWithVector_saves_entity_and_vector_atomically()
     {
         await TestPipeline.For<VectorDataIntegrationSpec>(_output, nameof(SaveWithVector_saves_entity_and_vector_atomically))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition = EnsurePartition(ctx);
@@ -146,7 +146,7 @@ public sealed class VectorDataIntegrationSpec
                     fakeRepo.ContainsVector(article.Id).Should().BeTrue();
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -156,7 +156,7 @@ public sealed class VectorDataIntegrationSpec
     public async Task Transaction_saves_multiple_entities_with_vectors_atomically()
     {
         await TestPipeline.For<VectorDataIntegrationSpec>(_output, nameof(Transaction_saves_multiple_entities_with_vectors_atomically))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition = EnsurePartition(ctx);
@@ -188,7 +188,7 @@ public sealed class VectorDataIntegrationSpec
                         await article3.Save();
                         await Vector<ArticleEntity>.Save(article3.Id, embedding3);
 
-                        await EntityContext.CommitAsync();
+                        await EntityContext.Commit();
                     }
 
                     // Verify all entities saved
@@ -204,7 +204,7 @@ public sealed class VectorDataIntegrationSpec
                     fakeRepo.ContainsVector(article3.Id).Should().BeTrue();
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -214,7 +214,7 @@ public sealed class VectorDataIntegrationSpec
     public async Task Transaction_rollback_discards_entity_and_vector()
     {
         await TestPipeline.For<VectorDataIntegrationSpec>(_output, nameof(Transaction_rollback_discards_entity_and_vector))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition = EnsurePartition(ctx);
@@ -241,7 +241,7 @@ public sealed class VectorDataIntegrationSpec
                         await Vector<ArticleEntity>.Save(article.Id, embedding);
 
                         // Rollback
-                        await EntityContext.RollbackAsync();
+                        await EntityContext.Rollback();
                     }
 
                     // Verify nothing persisted
@@ -252,7 +252,7 @@ public sealed class VectorDataIntegrationSpec
                     fakeRepo.VectorCount.Should().Be(0, "vector should be rolled back");
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -281,7 +281,7 @@ public sealed class VectorDataIntegrationSpec
     public async Task Vector_search_returns_semantically_similar_results()
     {
         await TestPipeline.For<VectorDataIntegrationSpec>(_output, nameof(Vector_search_returns_semantically_similar_results))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition = EnsurePartition(ctx);
@@ -323,7 +323,7 @@ public sealed class VectorDataIntegrationSpec
                     topTwo.Should().Contain(m => m.Id == article2.Id);
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -333,7 +333,7 @@ public sealed class VectorDataIntegrationSpec
     public async Task Delete_entity_and_vector_together()
     {
         await TestPipeline.For<VectorDataIntegrationSpec>(_output, nameof(Delete_entity_and_vector_together))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition = EnsurePartition(ctx);
@@ -371,7 +371,7 @@ public sealed class VectorDataIntegrationSpec
                     fakeRepo.ContainsVector(article.Id).Should().BeFalse("vector should be deleted");
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -381,7 +381,7 @@ public sealed class VectorDataIntegrationSpec
     public async Task Update_entity_and_vector_together()
     {
         await TestPipeline.For<VectorDataIntegrationSpec>(_output, nameof(Update_entity_and_vector_together))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition = EnsurePartition(ctx);
@@ -422,7 +422,7 @@ public sealed class VectorDataIntegrationSpec
                     currentVector.Should().NotBeEquivalentTo(originalEmbedding, "vector should be updated");
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     #region Helper Methods

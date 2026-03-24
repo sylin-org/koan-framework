@@ -83,7 +83,7 @@ public sealed class RedisCacheAdapterRegistrar : ICacheAdapterRegistrar
         {
             try
             {
-                var result = coordinator.DiscoverServiceAsync(Constants.Discovery.WellKnownServiceName, new DiscoveryContext
+                var result = coordinator.DiscoverService(Constants.Discovery.WellKnownServiceName, new DiscoveryContext
                 {
                     OrchestrationMode = KoanEnv.OrchestrationMode
                 }).GetAwaiter().GetResult();

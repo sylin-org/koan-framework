@@ -95,7 +95,7 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
         return true;
     }
 
-    public async Task<AiChatResponse> ChatAsync(AiChatRequest request, CancellationToken ct = default)
+    public async Task<AiChatResponse> Chat(AiChatRequest request, CancellationToken ct = default)
     {
         var httpClient = GetHttpClientForRequest(request.InternalConnectionString);
         var model = ResolveModel(request.Model);
@@ -131,11 +131,11 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
         };
     }
 
-    public async IAsyncEnumerable<AiChatChunk> StreamAsync(
+    public async IAsyncEnumerable<AiChatChunk> Stream(
         AiChatRequest request,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
-        await WaitForReadinessAsync(null, ct);
+        await WaitForReadiness(null, ct);
 
         var httpClient = GetHttpClientForRequest(request.InternalConnectionString);
         var model = ResolveModel(request.Model);
@@ -177,7 +177,7 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
         }
     }
 
-    public async Task<AiEmbeddingsResponse> EmbedAsync(AiEmbeddingsRequest request, CancellationToken ct = default)
+    public async Task<AiEmbeddingsResponse> Embed(AiEmbeddingsRequest request, CancellationToken ct = default)
     {
         var httpClient = GetHttpClientForRequest(request.InternalConnectionString);
         var model = ResolveModel(request.Model);
@@ -217,7 +217,7 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
         };
     }
 
-    public async Task<IReadOnlyList<AiModelDescriptor>> ListModelsAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<AiModelDescriptor>> ListModels(CancellationToken ct = default)
     {
         var httpClient = GetHttpClientForRequest(null);
         using var message = new HttpRequestMessage(HttpMethod.Get, Constants.Discovery.ModelsPath);
@@ -256,7 +256,7 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
         return Task.FromResult(_stateManager.IsReady);
     }
 
-    public async Task WaitForReadinessAsync(TimeSpan? timeout = null, CancellationToken ct = default)
+    public async Task WaitForReadiness(TimeSpan? timeout = null, CancellationToken ct = default)
     {
         var initTask = EnsureInitializationStarted();
 
@@ -278,7 +278,7 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
 
         try
         {
-            await _stateManager.WaitAsync(effective, ct);
+            await _stateManager.Wait(effective, ct);
         }
         catch (TimeoutException ex)
         {
@@ -303,14 +303,14 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
     public TimeSpan Timeout => _readiness.Timeout > TimeSpan.Zero ? _readiness.Timeout : _readinessDefaults.DefaultTimeout;
     public bool EnableReadinessGating => _readiness.EnableReadinessGating;
 
-    protected override async Task InitializeAdapterAsync(CancellationToken cancellationToken = default)
+    protected override async Task InitializeAdapter(CancellationToken cancellationToken = default)
     {
         ApplyConfiguredBaseAddress();
         _ = EnsureInitializationStarted();
 
         try
         {
-            await WaitForReadinessAsync(ReadinessTimeout, cancellationToken);
+            await WaitForReadiness(ReadinessTimeout, cancellationToken);
         }
         catch (AdapterNotReadyException ex)
         {
@@ -319,7 +319,7 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
     }
 
     [OrchestrationAware]
-    public async Task InitializeWithOrchestrationAsync(UnifiedServiceMetadata orchestrationContext, CancellationToken cancellationToken = default)
+    public async Task InitializeWithOrchestration(UnifiedServiceMetadata orchestrationContext, CancellationToken cancellationToken = default)
     {
         _orchestrationContext = orchestrationContext;
         ApplyConfiguredBaseAddress();
@@ -327,7 +327,7 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
         _ = EnsureInitializationStarted();
         try
         {
-            await WaitForReadinessAsync(ReadinessTimeout, cancellationToken);
+            await WaitForReadiness(ReadinessTimeout, cancellationToken);
         }
         catch (AdapterNotReadyException ex)
         {
@@ -335,7 +335,7 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
         }
     }
 
-    protected override async Task<IReadOnlyDictionary<string, object?>?> CheckAdapterHealthAsync(CancellationToken cancellationToken = default)
+    protected override async Task<IReadOnlyDictionary<string, object?>?> CheckAdapterHealth(CancellationToken cancellationToken = default)
     {
         try
         {
@@ -381,7 +381,7 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
         }
     }
 
-    protected override Task<IReadOnlyDictionary<string, object?>?> GetAdapterBootstrapMetadataAsync(CancellationToken cancellationToken = default)
+    protected override Task<IReadOnlyDictionary<string, object?>?> GetAdapterBootstrapMetadata(CancellationToken cancellationToken = default)
     {
         var metadata = new Dictionary<string, object?>
         {
@@ -410,14 +410,14 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
             if (task is null)
             {
                 _stateManager.TransitionTo(AdapterReadinessState.Initializing);
-                task = _initializationTask = InitializeReadinessAsync();
+                task = _initializationTask = InitializeReadiness();
             }
         }
 
         return task;
     }
 
-    private async Task InitializeReadinessAsync()
+    private async Task InitializeReadiness()
     {
         ApplyConfiguredBaseAddress();
 
@@ -429,8 +429,8 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
                 timeoutCts.CancelAfter(ReadinessTimeout);
             }
 
-            await VerifyModelsEndpointAsync(timeoutCts.Token);
-            var defaultReady = await EnsureDefaultModelAvailableAsync(timeoutCts.Token);
+            await VerifyModelsEndpoint(timeoutCts.Token);
+            var defaultReady = await EnsureDefaultModelAvailable(timeoutCts.Token);
 
             var newState = defaultReady ? AdapterReadinessState.Ready : AdapterReadinessState.Degraded;
             _stateManager.TransitionTo(newState);
@@ -449,7 +449,7 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
         }
     }
 
-    private async Task VerifyModelsEndpointAsync(CancellationToken ct)
+    private async Task VerifyModelsEndpoint(CancellationToken ct)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, Constants.Discovery.ModelsPath);
         AttachAuth(request);
@@ -458,7 +458,7 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
         response.EnsureSuccessStatusCode();
     }
 
-    private async Task<bool> EnsureDefaultModelAvailableAsync(CancellationToken ct)
+    private async Task<bool> EnsureDefaultModelAvailable(CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(_defaultModel))
         {
@@ -467,7 +467,7 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
 
         try
         {
-            var models = await ListModelsAsync(ct);
+            var models = await ListModels(ct);
             return models.Any(m => string.Equals(m.Name, _defaultModel, StringComparison.OrdinalIgnoreCase) ||
                                    string.Equals(m.Family, _defaultModel, StringComparison.OrdinalIgnoreCase));
         }

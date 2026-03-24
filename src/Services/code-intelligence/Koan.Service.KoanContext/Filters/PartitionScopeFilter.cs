@@ -9,7 +9,7 @@ namespace Koan.Context.Filters;
 /// </summary>
 public sealed class PartitionScopeFilter : IAsyncActionFilter
 {
-    public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
+    public async Task OnActionExecution(ActionExecutingContext context, ActionExecutionDelegate next)
     {
         using var scope = EntityContext.With(partition: null);
         await next();

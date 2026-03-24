@@ -29,7 +29,7 @@ internal sealed class KoanAdminManifestService : IKoanAdminManifestService
         _healthAggregator = healthAggregator;
     }
 
-    public Task<KoanAdminManifest> BuildAsync(CancellationToken cancellationToken = default)
+    public Task<KoanAdminManifest> Build(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -54,7 +54,7 @@ internal sealed class KoanAdminManifestService : IKoanAdminManifestService
         return Task.FromResult(manifest);
     }
 
-    public Task<KoanAdminHealthDocument> GetHealthAsync(CancellationToken cancellationToken = default)
+    public Task<KoanAdminHealthDocument> GetHealth(CancellationToken cancellationToken = default)
         => Task.FromResult(BuildHealth());
 
     private KoanAdminHealthDocument BuildHealth()

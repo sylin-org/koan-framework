@@ -136,7 +136,7 @@ public sealed class KoiResolutionChainTests : IDisposable
             }
         };
 
-        await koiHandler.FireEventAsync(offlineEvent);
+        await koiHandler.FireEvent(offlineEvent);
 
         // The eviction happened internally — verify by checking the handler's subscriber was invoked
         koiHandler.EventsFired.Should().Be(1);
@@ -173,7 +173,7 @@ public sealed class KoiResolutionChainTests : IDisposable
             }
         };
 
-        await koiHandler.FireEventAsync(resetEvent);
+        await koiHandler.FireEvent(resetEvent);
 
         koiHandler.EventsFired.Should().Be(1);
     }
@@ -219,7 +219,7 @@ public sealed class KoiResolutionChainTests : IDisposable
             return new FakeHandle(this, id);
         }
 
-        public async Task FireEventAsync(KoiTopologyEvent evt)
+        public async Task FireEvent(KoiTopologyEvent evt)
         {
             (Guid Id, Func<KoiTopologyEvent, CancellationToken, ValueTask> Handler)[] snapshot;
             lock (_lock) snapshot = [.. _subscribers];

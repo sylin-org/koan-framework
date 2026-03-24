@@ -40,7 +40,7 @@ public sealed class DocumentsController : ControllerBase
             return NotFound();
         }
 
-        var documents = await pipeline.LoadDocumentsAsync(ct).ConfigureAwait(false);
+        var documents = await pipeline.LoadDocuments(ct).ConfigureAwait(false);
         return Ok(documents);
     }
 
@@ -77,7 +77,7 @@ public sealed class DocumentsController : ControllerBase
             return BadRequest("At least one file is required.");
         }
 
-    var result = await _ingestion.IngestAsync(pipelineId, collected, force, typeHint, ct).ConfigureAwait(false);
+    var result = await _ingestion.Ingest(pipelineId, collected, force, typeHint, ct).ConfigureAwait(false);
         var newIds = result.NewDocuments
             .Select(d => d.Id)
             .Where(id => !string.IsNullOrWhiteSpace(id))
@@ -171,7 +171,7 @@ public sealed class DocumentsController : ControllerBase
 
         var saved = await document.Save(ct).ConfigureAwait(false);
 
-        await _runLog.AppendAsync(new RunLog
+        await _runLog.Append(new RunLog
         {
             PipelineId = pipeline.Id ?? string.Empty,
             Stage = "classify-override",
@@ -189,7 +189,7 @@ public sealed class DocumentsController : ControllerBase
             }
         }, ct).ConfigureAwait(false);
 
-        var job = await _jobs.ScheduleAsync(pipeline.Id!, new[] { saved.Id! }, ct).ConfigureAwait(false);
+        var job = await _jobs.Schedule(pipeline.Id!, new[] { saved.Id! }, ct).ConfigureAwait(false);
 
         var response = new DocumentTypeOverrideResponse
         {

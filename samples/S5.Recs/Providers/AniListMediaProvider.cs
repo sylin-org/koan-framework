@@ -25,7 +25,7 @@ internal sealed class AniListMediaProvider(
     // Job ID for current fetch operation (set by FetchStreamAsync)
     private string? _currentJobId;
 
-    public async Task<List<Media>> FetchAsync(MediaType mediaType, int limit, CancellationToken ct)
+    public async Task<List<Media>> Fetch(MediaType mediaType, int limit, CancellationToken ct)
     {
         // AniList only supports ANIME and MANGA media types
         if (!IsMediaTypeSupported(mediaType))
@@ -36,7 +36,7 @@ internal sealed class AniListMediaProvider(
 
         var list = new List<Media>(capacity: Math.Max(100, Math.Min(2000, limit)));
 
-        await foreach (var batch in FetchStreamAsync(mediaType, limit, ct))
+        await foreach (var batch in FetchStream(mediaType, limit, ct))
         {
             list.AddRange(batch);
             if (list.Count >= limit) break;
@@ -45,7 +45,7 @@ internal sealed class AniListMediaProvider(
         return list.Take(limit).ToList();
     }
 
-    public async IAsyncEnumerable<List<Media>> FetchStreamAsync(MediaType mediaType, int limit, [EnumeratorCancellation] CancellationToken ct)
+    public async IAsyncEnumerable<List<Media>> FetchStream(MediaType mediaType, int limit, [EnumeratorCancellation] CancellationToken ct)
     {
         // AniList only supports ANIME and MANGA media types
         if (!IsMediaTypeSupported(mediaType))
@@ -64,7 +64,7 @@ internal sealed class AniListMediaProvider(
         DateTimeOffset? incrementalThreshold = null;
         if (cacheService != null)
         {
-            var latestManifest = await cacheService.GetLatestManifestAsync(Code, mediaType.Name, ct);
+            var latestManifest = await cacheService.GetLatestManifest(Code, mediaType.Name, ct);
             if (latestManifest != null)
             {
                 incrementalThreshold = latestManifest.FetchedAt;
@@ -117,7 +117,7 @@ internal sealed class AniListMediaProvider(
                 {
                     var delay = ComputeBackoff(transientRetries, 8000);
                     transientRetries++;
-                    var body = await SafeReadBodyAsync(res, ct);
+                    var body = await SafeReadBody(res, ct);
                     logger?.LogWarning("AniList non-success {Status} on page {Page}. Backing off {DelayMs} ms (retry {Retry}). Body={Body}",
                         (int)res.StatusCode, pageNum, delay.TotalMilliseconds, transientRetries, body);
                     await Task.Delay(delay, ct);
@@ -137,7 +137,7 @@ internal sealed class AniListMediaProvider(
                     {
                         try
                         {
-                            await cacheService.WritePageAsync(Code, mediaType.Name, _currentJobId, pageNum, txt, ct);
+                            await cacheService.WritePage(Code, mediaType.Name, _currentJobId, pageNum, txt, ct);
                         }
                         catch (Exception cacheEx)
                         {
@@ -259,7 +259,7 @@ internal sealed class AniListMediaProvider(
                     TotalPages = pageNum - 1,
                     TotalItems = totalFetched
                 };
-                await cacheService.WriteManifestAsync(Code, mediaType.Name, _currentJobId, manifest, ct);
+                await cacheService.WriteManifest(Code, mediaType.Name, _currentJobId, manifest, ct);
             }
             catch (Exception ex)
             {
@@ -524,7 +524,7 @@ internal sealed class AniListMediaProvider(
         return null;
     }
 
-    private static async Task<string> SafeReadBodyAsync(HttpResponseMessage res, CancellationToken ct)
+    private static async Task<string> SafeReadBody(HttpResponseMessage res, CancellationToken ct)
     {
         try { return await res.Content.ReadAsStringAsync(ct); } catch { return string.Empty; }
     }

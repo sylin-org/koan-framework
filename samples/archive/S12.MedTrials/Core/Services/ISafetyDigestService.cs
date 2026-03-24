@@ -6,5 +6,5 @@ namespace S12.MedTrials.Services;
 
 public interface ISafetyDigestService
 {
-    Task<SafetySummaryResult> SummariseAsync(SafetySummaryRequest request, CancellationToken ct);
+    Task<SafetySummaryResult> Summarise(SafetySummaryRequest request, CancellationToken ct);
 }

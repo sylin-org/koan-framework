@@ -77,10 +77,10 @@ internal sealed class CacheClient : ICacheClient
         return new CacheEntryBuilder<T>(this, key, options);
     }
 
-    public async ValueTask<CacheFetchResult> GetAsync(CacheKey key, CacheEntryOptions options, CancellationToken ct)
+    public async ValueTask<CacheFetchResult> Get(CacheKey key, CacheEntryOptions options, CancellationToken ct)
     {
         var normalized = ApplyScope(options);
-        var result = await _store.FetchAsync(key, normalized, ct);
+        var result = await _store.Fetch(key, normalized, ct);
         if (result.Hit)
         {
             _instrumentation.RecordHit(key.Value, _store.ProviderName);
@@ -109,53 +109,53 @@ internal sealed class CacheClient : ICacheClient
         return ExecuteGetOrAddAsync(key, valueFactory, options, ct);
     }
 
-    public ValueTask<bool> ExistsAsync(CacheKey key, CacheEntryOptions options, CancellationToken ct)
+    public ValueTask<bool> Exists(CacheKey key, CacheEntryOptions options, CancellationToken ct)
     {
         _ = ApplyScope(options);
-        return _store.ExistsAsync(key, ct);
+        return _store.Exists(key, ct);
     }
 
     public async ValueTask SetAsync<T>(CacheKey key, T value, CacheEntryOptions options, CancellationToken ct)
     {
         if (value is null)
         {
-            await RemoveAsync(key, ct);
+            await Remove(key, ct);
             return;
         }
 
         var normalized = ApplyScope(options);
         var serializer = ResolveSerializer(typeof(T), normalized.ContentKind);
-        var cacheValue = await serializer.SerializeAsync(value!, normalized, ct);
-        await _store.SetAsync(key, cacheValue, normalized, ct);
+        var cacheValue = await serializer.Serialize(value!, typeof(T), normalized, ct);
+        await _store.Set(key, cacheValue, normalized, ct);
         _instrumentation.RecordSet(key.Value, _store.ProviderName);
 
         if (normalized.ForcePublishInvalidation)
         {
-            await _store.PublishInvalidationAsync(key, normalized, ct);
+            await _store.PublishInvalidation(key, normalized, ct);
             _instrumentation.RecordInvalidation(key.Value, _store.ProviderName, "publish");
         }
     }
 
-    public async ValueTask<bool> RemoveAsync(CacheKey key, CancellationToken ct)
+    public async ValueTask<bool> Remove(CacheKey key, CancellationToken ct)
     {
-        var success = await _store.RemoveAsync(key, ct);
+        var success = await _store.Remove(key, ct);
         _instrumentation.RecordRemove(key.Value, _store.ProviderName, success);
         if (!success && _store.Capabilities.SupportsPubSubInvalidation)
         {
-            await _store.PublishInvalidationAsync(key, new CacheEntryOptions(), ct);
+            await _store.PublishInvalidation(key, new CacheEntryOptions(), ct);
             _instrumentation.RecordInvalidation(key.Value, _store.ProviderName, "missing");
         }
 
         return success;
     }
 
-    public ValueTask TouchAsync(CacheKey key, CacheEntryOptions options, CancellationToken ct)
+    public ValueTask Touch(CacheKey key, CacheEntryOptions options, CancellationToken ct)
     {
         var normalized = ApplyScope(options);
-        return _store.TouchAsync(key, normalized, ct);
+        return _store.Touch(key, normalized, ct);
     }
 
-    public async ValueTask<long> FlushTagsAsync(IReadOnlyCollection<string> tags, CancellationToken ct)
+    public async ValueTask<long> FlushTags(IReadOnlyCollection<string> tags, CancellationToken ct)
     {
         if (tags is null)
         {
@@ -177,11 +177,11 @@ internal sealed class CacheClient : ICacheClient
         {
             ct.ThrowIfCancellationRequested();
 
-            await foreach (var entry in _store.EnumerateByTagAsync(tag, ct))
+            await foreach (var entry in _store.EnumerateByTag(tag, ct))
             {
                 if (entry.IsExpired(now))
                 {
-                    await RemoveAsync(entry.Key, ct);
+                    await Remove(entry.Key, ct);
                     continue;
                 }
 
@@ -194,7 +194,7 @@ internal sealed class CacheClient : ICacheClient
         {
             ct.ThrowIfCancellationRequested();
 
-            if (await RemoveAsync(key, ct))
+            if (await Remove(key, ct))
             {
                 removed++;
             }
@@ -203,7 +203,7 @@ internal sealed class CacheClient : ICacheClient
         return removed;
     }
 
-    public async ValueTask<long> CountTagsAsync(IReadOnlyCollection<string> tags, CancellationToken ct)
+    public async ValueTask<long> CountTags(IReadOnlyCollection<string> tags, CancellationToken ct)
     {
         if (tags is null)
         {
@@ -225,11 +225,11 @@ internal sealed class CacheClient : ICacheClient
         {
             ct.ThrowIfCancellationRequested();
 
-            await foreach (var entry in _store.EnumerateByTagAsync(tag, ct))
+            await foreach (var entry in _store.EnumerateByTag(tag, ct))
             {
                 if (entry.IsExpired(now))
                 {
-                    await RemoveAsync(entry.Key, ct);
+                    await Remove(entry.Key, ct);
                     continue;
                 }
 
@@ -242,7 +242,7 @@ internal sealed class CacheClient : ICacheClient
 
     internal async ValueTask<(bool Found, T? Value)> TryGetValueAsync<T>(CacheKey key, CacheEntryOptions options, CancellationToken ct)
     {
-        var result = await GetAsync(key, options, ct);
+        var result = await Get(key, options, ct);
         if (!result.Hit || result.Value is null)
         {
             return (false, default);

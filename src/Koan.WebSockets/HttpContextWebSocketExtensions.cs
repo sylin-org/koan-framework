@@ -18,7 +18,7 @@ public static class HttpContextWebSocketExtensions
     /// <param name="options">Optional adapter configuration.</param>
     /// <param name="cancellationToken">A cancellation token that aborts the handshake.</param>
     /// <returns>A bidirectional <see cref="WebSocketStream"/>.</returns>
-    public static async Task<WebSocketStream> AcceptWebSocketStreamAsync(
+    public static async Task<WebSocketStream> AcceptWebSocketStream(
         this HttpContext context,
         WebSocketStreamOptions? options = null,
         CancellationToken cancellationToken = default)

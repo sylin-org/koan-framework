@@ -22,7 +22,7 @@ namespace Koan.AI.Connector.LMStudio.Initialization;
 
 internal sealed class LMStudioAdapterContributor : IAiAdapterContributor
 {
-    public async ValueTask ContributeAsync(IServiceProvider services, CancellationToken cancellationToken)
+    public async ValueTask Contribute(IServiceProvider services, CancellationToken cancellationToken)
     {
         var configuration = services.GetRequiredService<IConfiguration>();
         var sourceRegistry = services.GetRequiredService<IAiSourceRegistry>();
@@ -65,7 +65,7 @@ internal sealed class LMStudioAdapterContributor : IAiAdapterContributor
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     var url = explicitUrls[i];
-                    var caps = await GetCapabilitiesAsync(url, defaultModel, cancellationToken).ConfigureAwait(false);
+                    var caps = await GetCapabilities(url, defaultModel, cancellationToken).ConfigureAwait(false);
                     members.Add(new AiMemberDefinition
                     {
                         Name = $"lmstudio::explicit-{i + 1}",
@@ -91,7 +91,7 @@ internal sealed class LMStudioAdapterContributor : IAiAdapterContributor
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         var url = additionalUrls[i];
-                        var caps = await GetCapabilitiesAsync(url, defaultModel, cancellationToken).ConfigureAwait(false);
+                        var caps = await GetCapabilities(url, defaultModel, cancellationToken).ConfigureAwait(false);
                         members.Add(new AiMemberDefinition
                         {
                             Name = $"lmstudio::additional-{i + 1}",
@@ -216,7 +216,7 @@ internal sealed class LMStudioAdapterContributor : IAiAdapterContributor
             ct.ThrowIfCancellationRequested();
             if (await IsHealthy(url, ct).ConfigureAwait(false))
             {
-                var caps = await GetCapabilitiesAsync(url, defaultModel, ct).ConfigureAwait(false);
+                var caps = await GetCapabilities(url, defaultModel, ct).ConfigureAwait(false);
                 results.Add(new AiMemberDefinition
                 {
                     Name = name,
@@ -253,7 +253,7 @@ internal sealed class LMStudioAdapterContributor : IAiAdapterContributor
         }
     }
 
-    private static Task<IReadOnlyDictionary<string, AiCapabilityConfig>> GetCapabilitiesAsync(string baseUrl, string? defaultModel, CancellationToken ct)
+    private static Task<IReadOnlyDictionary<string, AiCapabilityConfig>> GetCapabilities(string baseUrl, string? defaultModel, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
 

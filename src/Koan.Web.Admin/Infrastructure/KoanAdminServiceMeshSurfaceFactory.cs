@@ -6,7 +6,7 @@ namespace Koan.Web.Admin.Infrastructure;
 
 internal static class KoanAdminServiceMeshSurfaceFactory
 {
-    public static async Task<KoanAdminServiceMeshSurface> CaptureAsync(
+    public static async Task<KoanAdminServiceMeshSurface> Capture(
         IKoanServiceMesh mesh,
         IServiceProvider serviceProvider,
         CancellationToken cancellationToken)

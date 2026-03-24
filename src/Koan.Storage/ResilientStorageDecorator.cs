@@ -72,16 +72,16 @@ public sealed class ResilientStorageDecorator : IStorageProvider, IStatOperation
         }
 
         // Fire-and-forget WAL replay
-        _ = Task.Run(() => ReplayWalAsync(CancellationToken.None));
+        _ = Task.Run(() => ReplayWal(CancellationToken.None));
     }
 
-    public async Task WriteAsync(string container, string key, Stream content, string? contentType, CancellationToken ct = default)
+    public async Task Write(string container, string key, Stream content, string? contentType, CancellationToken ct = default)
     {
         if (!IsCircuitOpen())
         {
             try
             {
-                await _inner.WriteAsync(container, key, content, contentType, ct);
+                await _inner.Write(container, key, content, contentType, ct);
                 return;
             }
             catch (Exception ex) when (IsTransportFailure(ex))
@@ -93,14 +93,14 @@ public sealed class ResilientStorageDecorator : IStorageProvider, IStatOperation
             }
         }
 
-        await WriteToWalAsync(container, key, content, contentType, ct);
+        await WriteToWal(container, key, content, contentType, ct);
     }
 
-    public async Task<Stream> OpenReadAsync(string container, string key, CancellationToken ct = default)
+    public async Task<Stream> OpenRead(string container, string key, CancellationToken ct = default)
     {
         if (!IsCircuitOpen())
         {
-            return await _inner.OpenReadAsync(container, key, ct);
+            return await _inner.OpenRead(container, key, ct);
         }
 
         // Try to read from WAL staging
@@ -114,12 +114,12 @@ public sealed class ResilientStorageDecorator : IStorageProvider, IStatOperation
             $"Storage provider '{_inner.Name}' is unavailable and key '{key}' is not in the local WAL.");
     }
 
-    public async Task<(Stream Stream, long? Length)> OpenReadRangeAsync(
+    public async Task<(Stream Stream, long? Length)> OpenReadRange(
         string container, string key, long? from, long? to, CancellationToken ct = default)
     {
         if (!IsCircuitOpen())
         {
-            return await _inner.OpenReadRangeAsync(container, key, from, to, ct);
+            return await _inner.OpenReadRange(container, key, from, to, ct);
         }
 
         // Try WAL staging for range reads
@@ -134,7 +134,7 @@ public sealed class ResilientStorageDecorator : IStorageProvider, IStatOperation
             var fs = new FileStream(stagingPath, FileMode.Open, FileAccess.Read, FileShare.Read);
             fs.Seek(start, SeekOrigin.Begin);
             var ms = new MemoryStream((int)Math.Min(length, int.MaxValue));
-            await CopyRangeAsync(fs, ms, length, ct);
+            await CopyRange(fs, ms, length, ct);
             fs.Dispose();
             ms.Position = 0;
             return (ms, length);
@@ -144,13 +144,13 @@ public sealed class ResilientStorageDecorator : IStorageProvider, IStatOperation
             $"Storage provider '{_inner.Name}' is unavailable and key '{key}' is not in the local WAL.");
     }
 
-    public async Task<bool> DeleteAsync(string container, string key, CancellationToken ct = default)
+    public async Task<bool> Delete(string container, string key, CancellationToken ct = default)
     {
         if (!IsCircuitOpen())
         {
             try
             {
-                return await _inner.DeleteAsync(container, key, ct);
+                return await _inner.Delete(container, key, ct);
             }
             catch (Exception ex) when (IsTransportFailure(ex))
             {
@@ -169,11 +169,11 @@ public sealed class ResilientStorageDecorator : IStorageProvider, IStatOperation
         return true;
     }
 
-    public async Task<bool> ExistsAsync(string container, string key, CancellationToken ct = default)
+    public async Task<bool> Exists(string container, string key, CancellationToken ct = default)
     {
         if (!IsCircuitOpen())
         {
-            return await _inner.ExistsAsync(container, key, ct);
+            return await _inner.Exists(container, key, ct);
         }
 
         // Check WAL staging as best-effort
@@ -181,12 +181,12 @@ public sealed class ResilientStorageDecorator : IStorageProvider, IStatOperation
         return File.Exists(stagingPath);
     }
 
-    public async Task<ObjectStat?> HeadAsync(string container, string key, CancellationToken ct = default)
+    public async Task<ObjectStat?> Head(string container, string key, CancellationToken ct = default)
     {
         if (!IsCircuitOpen())
         {
             if (_inner is IStatOperations stat)
-                return await stat.HeadAsync(container, key, ct);
+                return await stat.Head(container, key, ct);
             return null;
         }
 
@@ -205,7 +205,7 @@ public sealed class ResilientStorageDecorator : IStorageProvider, IStatOperation
         lock (_stateLock) return _circuitOpen;
     }
 
-    private async Task WriteToWalAsync(string container, string key, Stream content, string? contentType, CancellationToken ct)
+    private async Task WriteToWal(string container, string key, Stream content, string? contentType, CancellationToken ct)
     {
         var walDir = GetWalDirectory(container);
         var stagingDir = Path.Combine(walDir, "staging");
@@ -257,7 +257,7 @@ public sealed class ResilientStorageDecorator : IStorageProvider, IStatOperation
         }
     }
 
-    private async Task ReplayWalAsync(CancellationToken ct)
+    private async Task ReplayWal(CancellationToken ct)
     {
         lock (_stateLock)
         {
@@ -273,7 +273,7 @@ public sealed class ResilientStorageDecorator : IStorageProvider, IStatOperation
             var walDirs = Directory.GetDirectories(_walBasePath);
             foreach (var walDir in walDirs)
             {
-                await ReplayWalDirectoryAsync(walDir, ct);
+                await ReplayWalDirectory(walDir, ct);
             }
         }
         catch (Exception ex)
@@ -286,7 +286,7 @@ public sealed class ResilientStorageDecorator : IStorageProvider, IStatOperation
         }
     }
 
-    private async Task ReplayWalDirectoryAsync(string walDir, CancellationToken ct)
+    private async Task ReplayWalDirectory(string walDir, CancellationToken ct)
     {
         var journalPath = Path.Combine(walDir, "journal.jsonl");
         if (!File.Exists(journalPath)) return;
@@ -315,10 +315,10 @@ public sealed class ResilientStorageDecorator : IStorageProvider, IStatOperation
                 switch (entry.Op)
                 {
                     case WalOp.Put:
-                        await ReplayPutAsync(walDir, entry, ct);
+                        await ReplayPut(walDir, entry, ct);
                         break;
                     case WalOp.Delete:
-                        await _inner.DeleteAsync(entry.Container, entry.Key, ct);
+                        await _inner.Delete(entry.Container, entry.Key, ct);
                         break;
                 }
                 replayedCount++;
@@ -355,7 +355,7 @@ public sealed class ResilientStorageDecorator : IStorageProvider, IStatOperation
         }
     }
 
-    private async Task ReplayPutAsync(string walDir, WalEntry entry, CancellationToken ct)
+    private async Task ReplayPut(string walDir, WalEntry entry, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(entry.StagingFile))
             return;
@@ -368,7 +368,7 @@ public sealed class ResilientStorageDecorator : IStorageProvider, IStatOperation
         }
 
         await using var fs = new FileStream(stagingPath, FileMode.Open, FileAccess.Read, FileShare.Read, 64 * 1024, FileOptions.Asynchronous);
-        await _inner.WriteAsync(entry.Container, entry.Key, fs, entry.ContentType, ct);
+        await _inner.Write(entry.Container, entry.Key, fs, entry.ContentType, ct);
     }
 
     private string GetWalDirectory(string container)
@@ -437,7 +437,7 @@ public sealed class ResilientStorageDecorator : IStorageProvider, IStatOperation
         return false;
     }
 
-    private static async Task CopyRangeAsync(Stream from, Stream to, long bytesToCopy, CancellationToken ct)
+    private static async Task CopyRange(Stream from, Stream to, long bytesToCopy, CancellationToken ct)
     {
         var buffer = new byte[64 * 1024];
         long remaining = bytesToCopy;

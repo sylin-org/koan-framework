@@ -41,7 +41,7 @@ public sealed class OrchestrationAwareServiceDiscoveryV2 : IOrchestrationAwareSe
         try
         {
             // "Adapter, discover yourself"
-            var result = _coordinator.DiscoverServiceAsync(serviceName, context).GetAwaiter().GetResult();
+            var result = _coordinator.DiscoverService(serviceName, context).GetAwaiter().GetResult();
 
             if (result.IsSuccessful)
             {
@@ -61,7 +61,7 @@ public sealed class OrchestrationAwareServiceDiscoveryV2 : IOrchestrationAwareSe
         }
     }
 
-    public async Task<ServiceDiscoveryResult> DiscoverServiceAsync(
+    public async Task<ServiceDiscoveryResult> DiscoverService(
         string serviceName,
         ServiceDiscoveryOptions discovery,
         CancellationToken cancellationToken = default)
@@ -79,7 +79,7 @@ public sealed class OrchestrationAwareServiceDiscoveryV2 : IOrchestrationAwareSe
         try
         {
             // "Adapter, discover yourself"
-            var adapterResult = await _coordinator.DiscoverServiceAsync(serviceName, context, cancellationToken);
+            var adapterResult = await _coordinator.DiscoverService(serviceName, context, cancellationToken);
 
             if (adapterResult.IsSuccessful)
             {

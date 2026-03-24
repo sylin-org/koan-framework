@@ -36,7 +36,7 @@ public sealed class CrossAdapterTransactionsSpec
     public async Task Transaction_coordinates_saves_across_multiple_adapters()
     {
         await TestPipeline.For<CrossAdapterTransactionsSpec>(_output, nameof(Transaction_coordinates_saves_across_multiple_adapters))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
@@ -76,7 +76,7 @@ public sealed class CrossAdapterTransactionsSpec
                     }
 
                     // Commit both
-                    await EntityContext.CommitAsync();
+                    await EntityContext.Commit();
                 }
 
                 // Verify both were persisted
@@ -96,14 +96,14 @@ public sealed class CrossAdapterTransactionsSpec
                 entitySqlite.Should().NotBeNull();
                 entityJson.Should().NotBeNull();
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
     public async Task Transaction_rollback_discards_changes_across_all_adapters()
     {
         await TestPipeline.For<CrossAdapterTransactionsSpec>(_output, nameof(Transaction_rollback_discards_changes_across_all_adapters))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
@@ -143,7 +143,7 @@ public sealed class CrossAdapterTransactionsSpec
                     }
 
                     // Rollback - discard all tracked operations
-                    await EntityContext.RollbackAsync();
+                    await EntityContext.Rollback();
                 }
 
                 // Verify neither was persisted
@@ -163,14 +163,14 @@ public sealed class CrossAdapterTransactionsSpec
                 entity1.Should().NotBeNull();
                 entity2.Should().NotBeNull();
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
     public async Task Transaction_groups_operations_by_adapter()
     {
         await TestPipeline.For<CrossAdapterTransactionsSpec>(_output, nameof(Transaction_groups_operations_by_adapter))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
@@ -199,7 +199,7 @@ public sealed class CrossAdapterTransactionsSpec
                         }
                     }
 
-                    await EntityContext.CommitAsync();
+                    await EntityContext.Commit();
                 }
 
                 // Verify all were persisted
@@ -217,14 +217,14 @@ public sealed class CrossAdapterTransactionsSpec
 
                 entities.Should().HaveCount(10);
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
     public async Task Transaction_capabilities_reflect_involved_adapters()
     {
         await TestPipeline.For<CrossAdapterTransactionsSpec>(_output, nameof(Transaction_capabilities_reflect_involved_adapters))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
@@ -254,7 +254,7 @@ public sealed class CrossAdapterTransactionsSpec
                     // Get capabilities
                     capabilities = EntityContext.Capabilities;
 
-                    await EntityContext.CommitAsync();
+                    await EntityContext.Commit();
                 }
 
                 capabilities.Should().NotBeNull();
@@ -263,14 +263,14 @@ public sealed class CrossAdapterTransactionsSpec
                 capabilities.SupportsLocalTransactions.Should().BeTrue();
                 capabilities.SupportsDistributedTransactions.Should().BeFalse("best-effort atomicity only");
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
     public async Task Transaction_with_mixed_saves_and_deletes()
     {
         await TestPipeline.For<CrossAdapterTransactionsSpec>(_output, nameof(Transaction_with_mixed_saves_and_deletes))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
@@ -309,7 +309,7 @@ public sealed class CrossAdapterTransactionsSpec
                         await newEntity.Save();
                     }
 
-                    await EntityContext.CommitAsync();
+                    await EntityContext.Commit();
                 }
 
                 // Verify operations
@@ -331,6 +331,6 @@ public sealed class CrossAdapterTransactionsSpec
                 entityToDelete.Should().NotBeNull();
                 newEntity.Should().NotBeNull();
             })
-            .RunAsync();
+            .Run();
     }
 }

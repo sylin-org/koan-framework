@@ -15,27 +15,27 @@ public interface IRestoreService
     /// <summary>
     /// Restores all entities from a backup
     /// </summary>
-    Task RestoreAllEntitiesAsync(string backupName, GlobalRestoreOptions? options = null, CancellationToken ct = default);
+    Task RestoreAllEntities(string backupName, GlobalRestoreOptions? options = null, CancellationToken ct = default);
 
     /// <summary>
     /// Restores selected entities based on filter
     /// </summary>
-    Task RestoreSelectedAsync(string backupName, Func<EntityBackupInfo, bool> filter, GlobalRestoreOptions? options = null, CancellationToken ct = default);
+    Task RestoreSelected(string backupName, Func<EntityBackupInfo, bool> filter, GlobalRestoreOptions? options = null, CancellationToken ct = default);
 
     /// <summary>
     /// Tests restore viability without actually restoring
     /// </summary>
-    Task<RestoreViabilityReport> TestRestoreViabilityAsync(string backupName, CancellationToken ct = default);
+    Task<RestoreViabilityReport> TestRestoreViability(string backupName, CancellationToken ct = default);
 
     /// <summary>
     /// Gets restore progress for monitoring
     /// </summary>
-    Task<RestoreProgress> GetRestoreProgressAsync(string restoreId, CancellationToken ct = default);
+    Task<RestoreProgress> GetRestoreProgress(string restoreId, CancellationToken ct = default);
 
     /// <summary>
     /// Cancels an ongoing restore operation
     /// </summary>
-    Task CancelRestoreAsync(string restoreId, CancellationToken ct = default);
+    Task CancelRestore(string restoreId, CancellationToken ct = default);
 }
 
 public class RestoreViabilityReport

@@ -24,7 +24,7 @@ public sealed class ZenGardenCapabilitiesTests : IClassFixture<ZenGardenFixture>
             return;
         }
 
-        var tools = await _fixture.Client.CatalogAsync(new ZenGardenSubscription
+        var tools = await _fixture.Client.Catalog(new ZenGardenSubscription
         {
             ToolType = ZenGardenToolType.Offering
         });
@@ -42,7 +42,7 @@ public sealed class ZenGardenCapabilitiesTests : IClassFixture<ZenGardenFixture>
             return;
         }
 
-        var tools = await _fixture.Client.CatalogAsync(new ZenGardenSubscription
+        var tools = await _fixture.Client.Catalog(new ZenGardenSubscription
         {
             ToolType = ZenGardenToolType.SeedBank
         });
@@ -60,7 +60,7 @@ public sealed class ZenGardenCapabilitiesTests : IClassFixture<ZenGardenFixture>
             return;
         }
 
-        var selected = await SelectOfferingAsync();
+        var selected = await SelectOffering();
         if (selected is null)
         {
             _output.WriteLine("No offering available in garden; nothing to validate for offering subscription.");
@@ -68,7 +68,7 @@ public sealed class ZenGardenCapabilitiesTests : IClassFixture<ZenGardenFixture>
         }
 
         var offeringName = selected.ToolFqid;
-        var firstEvent = await CaptureInitialEventAsync(
+        var firstEvent = await CaptureInitialEvent(
             ZenGardenSubscription.ForOffering(offeringName),
             TimeSpan.FromSeconds(15));
 
@@ -87,7 +87,7 @@ public sealed class ZenGardenCapabilitiesTests : IClassFixture<ZenGardenFixture>
             return;
         }
 
-        var offerings = await _fixture.Client.CatalogAsync(new ZenGardenSubscription
+        var offerings = await _fixture.Client.Catalog(new ZenGardenSubscription
         {
             ToolType = ZenGardenToolType.Offering
         });
@@ -105,7 +105,7 @@ public sealed class ZenGardenCapabilitiesTests : IClassFixture<ZenGardenFixture>
         var token = capability.Value[0];
         var offeringName = selected.ToolFqid;
 
-        var firstEvent = await CaptureInitialEventAsync(
+        var firstEvent = await CaptureInitialEvent(
             ZenGardenSubscription.ForOffering(offeringName).Require(token),
             TimeSpan.FromSeconds(30));
 
@@ -123,7 +123,7 @@ public sealed class ZenGardenCapabilitiesTests : IClassFixture<ZenGardenFixture>
             return;
         }
 
-        var storageTools = await _fixture.Client.CatalogAsync(new ZenGardenSubscription
+        var storageTools = await _fixture.Client.Catalog(new ZenGardenSubscription
         {
             ToolType = ZenGardenToolType.SeedBank
         });
@@ -136,7 +136,7 @@ public sealed class ZenGardenCapabilitiesTests : IClassFixture<ZenGardenFixture>
         }
 
         var seedBankName = Core.ToolFqid.Parse(selected.ToolFqid).ToString();
-        var firstEvent = await CaptureInitialEventAsync(
+        var firstEvent = await CaptureInitialEvent(
             ZenGardenSubscription.ForStorage(seedBankName),
             TimeSpan.FromSeconds(15));
 
@@ -147,23 +147,23 @@ public sealed class ZenGardenCapabilitiesTests : IClassFixture<ZenGardenFixture>
             ZenGardenAvailabilityEventKind.Offline);
     }
 
-    private async Task<ZenGardenToolSnapshot?> SelectOfferingAsync()
+    private async Task<ZenGardenToolSnapshot?> SelectOffering()
     {
-        var preferred = await _fixture.Client.CatalogAsync(
+        var preferred = await _fixture.Client.Catalog(
             ZenGardenSubscription.ForOffering(_fixture.PreferredOffering));
         if (preferred.Count > 0)
         {
             return preferred[0];
         }
 
-        var all = await _fixture.Client.CatalogAsync(new ZenGardenSubscription
+        var all = await _fixture.Client.Catalog(new ZenGardenSubscription
         {
             ToolType = ZenGardenToolType.Offering
         });
         return all.FirstOrDefault();
     }
 
-    private async Task<ZenGardenAvailabilityEvent> CaptureInitialEventAsync(
+    private async Task<ZenGardenAvailabilityEvent> CaptureInitialEvent(
         ZenGardenSubscription subscription,
         TimeSpan timeout)
     {

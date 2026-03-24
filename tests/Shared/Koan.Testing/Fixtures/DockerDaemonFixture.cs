@@ -21,7 +21,7 @@ public sealed class DockerDaemonFixture : IAsyncDisposable, IInitializableFixtur
     {
         ArgumentNullException.ThrowIfNull(context);
         context.Diagnostics.Info("docker.probe.begin");
-        _probe = await DockerEnvironment.ProbeAsync().ConfigureAwait(false);
+        _probe = await DockerEnvironment.Probe().ConfigureAwait(false);
         context.Diagnostics.Info("docker.probe.end", new
         {
             available = _probe.Available,

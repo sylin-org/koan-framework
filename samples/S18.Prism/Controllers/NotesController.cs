@@ -43,7 +43,7 @@ public class NotesController : EntityController<Note>
                 return BadRequest(new { Error = "spaceId is required" });
 
             await using var stream = file.OpenReadStream();
-            var note = await _ingestion.IngestFileAsync(
+            var note = await _ingestion.IngestFile(
                 stream, file.FileName, file.ContentType, spaceId, ct);
 
             return CreatedAtAction("GetById", new { id = note.Id }, note);
@@ -72,7 +72,7 @@ public class NotesController : EntityController<Note>
             if (string.IsNullOrWhiteSpace(request.Text))
                 return BadRequest(new { Error = "text is required" });
 
-            var note = await _ingestion.IngestTextAsync(
+            var note = await _ingestion.IngestText(
                 request.Text, request.Title, request.SpaceId, ct);
 
             return CreatedAtAction("GetById", new { id = note.Id }, note);
@@ -132,7 +132,7 @@ public class NotesController : EntityController<Note>
             if (string.IsNullOrWhiteSpace(request.Url))
                 return BadRequest(new { Error = "url is required" });
 
-            var note = await _ingestion.IngestUrlAsync(request.Url, request.SpaceId, ct);
+            var note = await _ingestion.IngestUrl(request.Url, request.SpaceId, ct);
 
             return CreatedAtAction("GetById", new { id = note.Id }, note);
         }

@@ -32,7 +32,7 @@ public class Chunker
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async IAsyncEnumerable<ChunkedContent> ChunkAsync(
+    public async IAsyncEnumerable<ChunkedContent> Chunk(
         ExtractedDocument document,
         string projectId,
         string? commitSha = null,
@@ -201,7 +201,7 @@ public class Chunker
                 }
 
                 // Split large section
-                await foreach (var largeChunk in SplitLargeSectionAsync(
+                await foreach (var largeChunk in SplitLargeSection(
                     section,
                     projectId,
                     document.RelativePath,
@@ -431,7 +431,7 @@ public class Chunker
     /// Splits a section larger than max tokens at sentence boundaries
     /// QA Issue #19 FIX: Handle massive sections
     /// </summary>
-    private async IAsyncEnumerable<ChunkedContent> SplitLargeSectionAsync(
+    private async IAsyncEnumerable<ChunkedContent> SplitLargeSection(
         ContentSection section,
         string projectId,
         string filePath,
@@ -446,7 +446,7 @@ public class Chunker
 
         if (sentences.Count == 1 && EstimateTokens(sentences[0]) > TargetTokensMax)
         {
-            await foreach (var chunk in SplitByTokenWindowAsync(
+            await foreach (var chunk in SplitByTokenWindow(
                 sentences[0],
                 projectId,
                 filePath,
@@ -517,7 +517,7 @@ public class Chunker
         }
     }
 
-    private async IAsyncEnumerable<ChunkedContent> SplitByTokenWindowAsync(
+    private async IAsyncEnumerable<ChunkedContent> SplitByTokenWindow(
         string text,
         string projectId,
         string filePath,

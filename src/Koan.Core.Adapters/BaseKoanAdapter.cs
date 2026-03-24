@@ -33,11 +33,11 @@ public abstract class BaseKoanAdapter : IKoanAdapter
     // IHealthContributor implementation
     public virtual bool IsCritical => true;
 
-    public async Task<HealthReport> CheckAsync(CancellationToken ct = default)
+    public async Task<HealthReport> Check(CancellationToken ct = default)
     {
         try
         {
-            var metadata = await CheckAdapterHealthAsync(ct);
+            var metadata = await CheckAdapterHealth(ct);
             var state = metadata?.ContainsKey("status") == true && metadata["status"]?.ToString() == "unhealthy"
                 ? HealthState.Unhealthy
                 : HealthState.Healthy;
@@ -51,15 +51,15 @@ public abstract class BaseKoanAdapter : IKoanAdapter
         }
     }
 
-    async Task<IReadOnlyDictionary<string, object?>?> IKoanAdapter.GetBootstrapMetadataAsync(CancellationToken cancellationToken)
+    async Task<IReadOnlyDictionary<string, object?>?> IKoanAdapter.GetBootstrapMetadata(CancellationToken cancellationToken)
     {
-        return await GetAdapterBootstrapMetadataAsync(cancellationToken);
+        return await GetAdapterBootstrapMetadata(cancellationToken);
     }
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         Logger.LogDebug("[{AdapterId}] Initializing adapter", AdapterId);
-        await InitializeAdapterAsync(cancellationToken);
+        await InitializeAdapter(cancellationToken);
         Logger.LogInformation("[{AdapterId}] Adapter initialized successfully", AdapterId);
     }
 
@@ -78,9 +78,9 @@ public abstract class BaseKoanAdapter : IKoanAdapter
     }
 
     // Template methods for derived classes
-    protected abstract Task InitializeAdapterAsync(CancellationToken cancellationToken = default);
-    protected abstract Task<IReadOnlyDictionary<string, object?>?> CheckAdapterHealthAsync(CancellationToken cancellationToken = default);
-    protected abstract Task<IReadOnlyDictionary<string, object?>?> GetAdapterBootstrapMetadataAsync(CancellationToken cancellationToken = default);
+    protected abstract Task InitializeAdapter(CancellationToken cancellationToken = default);
+    protected abstract Task<IReadOnlyDictionary<string, object?>?> CheckAdapterHealth(CancellationToken cancellationToken = default);
+    protected abstract Task<IReadOnlyDictionary<string, object?>?> GetAdapterBootstrapMetadata(CancellationToken cancellationToken = default);
 
     // Configuration helpers
     protected TOptions GetOptions<TOptions>() where TOptions : class, new()

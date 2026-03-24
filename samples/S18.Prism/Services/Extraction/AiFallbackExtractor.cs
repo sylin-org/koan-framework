@@ -15,7 +15,7 @@ public class AiFallbackExtractor : IContentExtractor
 
     public int Priority => 0; // Lowest priority — only used when no specific extractor matches
 
-    public async Task<IReadOnlyList<ContentBlock>> ExtractAsync(
+    public async Task<IReadOnlyList<ContentBlock>> Extract(
         Stream content, string mimeType, CancellationToken ct = default)
     {
         _logger.LogInformation(

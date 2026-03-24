@@ -18,7 +18,7 @@ public sealed class FolderWatchPullAdapter : ISourcePullAdapter
 
     public SourceType SupportedType => SourceType.FolderWatch;
 
-    public async Task<List<Note>> PullAsync(Source source, CancellationToken ct)
+    public async Task<List<Note>> Pull(Source source, CancellationToken ct)
     {
         var config = SourceConfigParser.Parse<FolderWatchConfig>(source.Configuration);
 

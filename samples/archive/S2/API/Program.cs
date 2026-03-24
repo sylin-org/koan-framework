@@ -31,7 +31,7 @@ builder.Services
 var app = builder.Build();
 // Enable Swagger UI per policy: Dev by default; in non-dev only when Koan__Web__Swagger__Enabled=true or Koan_MAGIC_ENABLE_SWAGGER=true
 app.UseKoanSwagger();
-app.Run();
+app.RunAsync();
 
 namespace S2.Api
 {

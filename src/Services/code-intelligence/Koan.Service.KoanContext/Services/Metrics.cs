@@ -21,9 +21,9 @@ public class Metrics
     /// <summary>
     /// Get dashboard summary metrics
     /// </summary>
-    public async Task<MetricsSummary> GetSummaryAsync()
+    public async Task<MetricsSummary> GetSummary()
     {
-        return await _cache.GetOrCreateAsync(SummaryCacheKey, async entry =>
+        return await _cache.GetOrCreate(SummaryCacheKey, async entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = CacheDuration;
 
@@ -100,11 +100,11 @@ public class Metrics
     /// <summary>
     /// Get performance metrics over a time period
     /// </summary>
-    public async Task<PerformanceTrends> GetPerformanceMetricsAsync(string period = "24h")
+    public async Task<PerformanceTrends> GetPerformanceMetrics(string period = "24h")
     {
         var cacheKey = $"{PerformanceCacheKey}:{period}";
 
-        return await _cache.GetOrCreateAsync(cacheKey, async entry =>
+        return await _cache.GetOrCreate(cacheKey, async entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = CacheDuration;
 

@@ -5,16 +5,16 @@ public interface IEntityEndpointService<TEntity, TKey>
     where TEntity : class
     where TKey : notnull
 {
-    Task<EntityCollectionResult<TEntity>> GetCollectionAsync(EntityCollectionRequest request);
-    Task<EntityCollectionResult<TEntity>> QueryAsync(EntityQueryRequest request);
-    Task<EntityModelResult<TEntity>> GetNewAsync(EntityGetNewRequest request);
-    Task<EntityModelResult<TEntity>> GetByIdAsync(EntityGetByIdRequest<TKey> request);
-    Task<EntityModelResult<TEntity>> UpsertAsync(EntityUpsertRequest<TEntity> request);
-    Task<EntityEndpointResult> UpsertManyAsync(EntityUpsertManyRequest<TEntity> request);
-    Task<EntityModelResult<TEntity>> DeleteAsync(EntityDeleteRequest<TKey> request);
-    Task<EntityEndpointResult> DeleteManyAsync(EntityDeleteManyRequest<TKey> request);
-    Task<EntityEndpointResult> DeleteByQueryAsync(EntityDeleteByQueryRequest request);
-    Task<EntityEndpointResult> DeleteAllAsync(EntityDeleteAllRequest request);
-    Task<EntityModelResult<TEntity>> PatchAsync(EntityPatchRequest<TEntity, TKey> request);
+    Task<EntityCollectionResult<TEntity>> GetCollection(EntityCollectionRequest request);
+    Task<EntityCollectionResult<TEntity>> Query(EntityQueryRequest request);
+    Task<EntityModelResult<TEntity>> GetNew(EntityGetNewRequest request);
+    Task<EntityModelResult<TEntity>> GetById(EntityGetByIdRequest<TKey> request);
+    Task<EntityModelResult<TEntity>> Upsert(EntityUpsertRequest<TEntity> request);
+    Task<EntityEndpointResult> UpsertMany(EntityUpsertManyRequest<TEntity> request);
+    Task<EntityModelResult<TEntity>> Delete(EntityDeleteRequest<TKey> request);
+    Task<EntityEndpointResult> DeleteMany(EntityDeleteManyRequest<TKey> request);
+    Task<EntityEndpointResult> DeleteByQuery(EntityDeleteByQueryRequest request);
+    Task<EntityEndpointResult> DeleteAll(EntityDeleteAllRequest request);
+    Task<EntityModelResult<TEntity>> Patch(EntityPatchRequest<TEntity, TKey> request);
 }
 

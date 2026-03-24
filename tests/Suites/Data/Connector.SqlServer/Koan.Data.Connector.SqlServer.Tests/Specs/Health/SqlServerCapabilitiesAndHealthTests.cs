@@ -21,7 +21,7 @@ public class SqlServerCapabilitiesAndHealthTests : IClassFixture<Support.SqlServ
 
         var contributors = _fx.ServiceProvider.GetRequiredService<IEnumerable<IHealthContributor>>();
         var sql = contributors.First(c => c.Name == "data:sqlserver");
-        var report = await sql.CheckAsync(default);
+        var report = await sql.Check(default);
         report.State.Should().Be(HealthState.Healthy);
 
         var data = _fx.Data;

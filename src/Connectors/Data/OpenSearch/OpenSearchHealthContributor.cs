@@ -15,7 +15,7 @@ public sealed class OpenSearchHealthContributor(
     public string Name => "data:opensearch";
     public bool IsCritical => true;
 
-    public async Task<HealthReport> CheckAsync(CancellationToken ct = default)
+    public async Task<HealthReport> Check(CancellationToken ct = default)
     {
         try
         {
@@ -24,7 +24,7 @@ public sealed class OpenSearchHealthContributor(
             var path = "/_cluster/health";
             var full = new Uri(http.BaseAddress!, path).AbsoluteUri;
             logger?.LogDebug("OpenSearch health: GET {Url}", full);
-            var resp = await http.GetAsync(path, ct);
+            var resp = await http.Get(path, ct);
             if (!resp.IsSuccessStatusCode)
             {
                 var txt = await resp.Content.ReadAsStringAsync(ct);

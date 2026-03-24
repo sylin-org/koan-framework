@@ -47,7 +47,7 @@ public sealed class VectorErrorInjectionSpec
     public async Task SaveWithVector_vector_upsert_failure_throws_coordination_exception_with_entity_saved()
     {
         await TestPipeline.For<VectorErrorInjectionSpec>(_output, nameof(SaveWithVector_vector_upsert_failure_throws_coordination_exception_with_entity_saved))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
@@ -105,7 +105,7 @@ public sealed class VectorErrorInjectionSpec
                 var fakeRepo = runtime.VectorService.GetFakeRepository<TodoEntity, string>();
                 fakeRepo.ContainsVector(entity.Id).Should().BeFalse("vector should not be persisted");
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -115,7 +115,7 @@ public sealed class VectorErrorInjectionSpec
     public async Task SaveWithVector_custom_vector_exception_wrapped_in_coordination_exception()
     {
         await TestPipeline.For<VectorErrorInjectionSpec>(_output, nameof(SaveWithVector_custom_vector_exception_wrapped_in_coordination_exception))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
@@ -153,7 +153,7 @@ public sealed class VectorErrorInjectionSpec
                 caughtException!.InnerException.Should().BeOfType<InvalidOperationException>();
                 caughtException.InnerException!.Message.Should().Contain("quota exceeded");
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -163,7 +163,7 @@ public sealed class VectorErrorInjectionSpec
     public async Task Vector_save_failure_outside_coordination_throws_unwrapped_exception()
     {
         await TestPipeline.For<VectorErrorInjectionSpec>(_output, nameof(Vector_save_failure_outside_coordination_throws_unwrapped_exception))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
@@ -192,7 +192,7 @@ public sealed class VectorErrorInjectionSpec
                         .WithMessage("*Invalid embedding dimension*");
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -202,7 +202,7 @@ public sealed class VectorErrorInjectionSpec
     public async Task Vector_delete_failure_propagates_exception()
     {
         await TestPipeline.For<VectorErrorInjectionSpec>(_output, nameof(Vector_delete_failure_propagates_exception))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
@@ -226,7 +226,7 @@ public sealed class VectorErrorInjectionSpec
                         .WithMessage("*not permitted*");
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -236,7 +236,7 @@ public sealed class VectorErrorInjectionSpec
     public async Task Transaction_rollback_after_vector_error_discards_entity_and_vector()
     {
         await TestPipeline.For<VectorErrorInjectionSpec>(_output, nameof(Transaction_rollback_after_vector_error_discards_entity_and_vector))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
@@ -267,7 +267,7 @@ public sealed class VectorErrorInjectionSpec
                         catch (ArgumentException)
                         {
                             // Expected error - rollback transaction
-                            await EntityContext.RollbackAsync();
+                            await EntityContext.Rollback();
                         }
                     }
 
@@ -279,7 +279,7 @@ public sealed class VectorErrorInjectionSpec
                     fakeRepo.ContainsVector(entity.Id).Should().BeFalse("vector should be rolled back");
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -289,7 +289,7 @@ public sealed class VectorErrorInjectionSpec
     public async Task Vector_search_failure_throws_configured_exception()
     {
         await TestPipeline.For<VectorErrorInjectionSpec>(_output, nameof(Vector_search_failure_throws_configured_exception))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
@@ -314,7 +314,7 @@ public sealed class VectorErrorInjectionSpec
                         .WithMessage("*timeout*");
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -324,7 +324,7 @@ public sealed class VectorErrorInjectionSpec
     public async Task Transaction_with_mixed_operations_one_vector_failure_rolls_back_all()
     {
         await TestPipeline.For<VectorErrorInjectionSpec>(_output, nameof(Transaction_with_mixed_operations_one_vector_failure_rolls_back_all))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
@@ -364,7 +364,7 @@ public sealed class VectorErrorInjectionSpec
                         catch (ArgumentException)
                         {
                             // Expected - rollback
-                            await EntityContext.RollbackAsync();
+                            await EntityContext.Rollback();
                         }
 
                         // entity3 operations never execute due to rollback
@@ -378,7 +378,7 @@ public sealed class VectorErrorInjectionSpec
                     fakeRepo.VectorCount.Should().Be(0, "all vector saves should be rolled back");
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -388,7 +388,7 @@ public sealed class VectorErrorInjectionSpec
     public async Task FakeVectorRepository_tracks_all_operations_for_inspection()
     {
         await TestPipeline.For<VectorErrorInjectionSpec>(_output, nameof(FakeVectorRepository_tracks_all_operations_for_inspection))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition = EnsurePartition(ctx);
@@ -416,7 +416,7 @@ public sealed class VectorErrorInjectionSpec
                 op.Id.Should().Be(entity.Id);
                 op.Embedding.Should().HaveCount(1536);
             })
-            .RunAsync();
+            .Run();
     }
 
     #region Helper Methods

@@ -22,7 +22,7 @@ public sealed class MongoCapabilitiesSpec
         await TestPipeline.For<MongoCapabilitiesSpec>(_output, nameof(Repository_reports_expected_capabilities))
             .RequireDocker()
             .UsingMongoContainer(database: databaseName)
-            .Using<MongoConnectorFixture>("fixture", static ctx => MongoConnectorFixture.CreateAsync(ctx))
+            .Using<MongoConnectorFixture>("fixture", static ctx => MongoConnectorFixture.Create(ctx))
             .Arrange(static async ctx =>
             {
                 var fixture = ctx.GetRequiredItem<MongoConnectorFixture>("fixture");
@@ -46,11 +46,11 @@ public sealed class MongoCapabilitiesSpec
                 writeCaps.Writes.Should().HaveFlag(WriteCapabilities.AtomicBatch);
                 writeCaps.Writes.Should().HaveFlag(WriteCapabilities.FastRemove);
 
-                await CapabilityProbe.UpsertAsync(new CapabilityProbe { Name = "cap" });
+                await CapabilityProbe.Upsert(new CapabilityProbe { Name = "cap" });
                 var count = await CapabilityProbe.Count.Exact();
                 count.Should().Be(1);
             })
-            .RunAsync();
+            .Run();
     }
 
     private sealed class CapabilityProbe : Entity<CapabilityProbe>

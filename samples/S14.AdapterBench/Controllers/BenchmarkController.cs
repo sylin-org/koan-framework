@@ -114,7 +114,7 @@ public class BenchmarkController : ControllerBase
             }
         });
 
-        var result = await _benchmarkService.RunBenchmarkAsync(request, progress, cancellationToken);
+        var result = await _benchmarkService.RunBenchmark(request, progress, cancellationToken);
         return Ok(result);
     }
 

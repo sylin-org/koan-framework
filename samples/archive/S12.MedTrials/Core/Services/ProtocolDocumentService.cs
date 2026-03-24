@@ -21,7 +21,7 @@ public sealed class ProtocolDocumentService : IProtocolDocumentService
         _logger = logger;
     }
 
-    public async Task<ProtocolDocumentIngestionResult> IngestAsync(ProtocolDocumentIngestionRequest request, CancellationToken ct)
+    public async Task<ProtocolDocumentIngestionResult> Ingest(ProtocolDocumentIngestionRequest request, CancellationToken ct)
     {
         if (request is null) throw new ArgumentNullException(nameof(request));
         if (string.IsNullOrWhiteSpace(request.Content))
@@ -127,7 +127,7 @@ public sealed class ProtocolDocumentService : IProtocolDocumentService
             document.Diagnostics);
     }
 
-    public async Task<ProtocolDocumentQueryResult> QueryAsync(ProtocolDocumentQueryRequest request, CancellationToken ct)
+    public async Task<ProtocolDocumentQueryResult> Query(ProtocolDocumentQueryRequest request, CancellationToken ct)
     {
         if (request is null) throw new ArgumentNullException(nameof(request));
         if (string.IsNullOrWhiteSpace(request.Query))

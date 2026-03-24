@@ -26,11 +26,11 @@ public interface IZenGardenClient : IDisposable
         Func<ZenGardenCapabilityProgressEvent, CancellationToken, ValueTask> handler,
         ZenGardenCapabilityWatchOptions? options = null);
 
-    Task<IReadOnlyList<ZenGardenToolSnapshot>> CatalogAsync(
+    Task<IReadOnlyList<ZenGardenToolSnapshot>> Catalog(
         ZenGardenSubscription subscription,
         CancellationToken cancellationToken = default);
 
-    ValueTask<ZenGardenCapabilityWish> WishAsync(
+    ValueTask<ZenGardenCapabilityWish> Wish(
         string offering,
         IReadOnlyList<string> capabilities,
         ZenGardenCapabilityWishOptions? options = null,

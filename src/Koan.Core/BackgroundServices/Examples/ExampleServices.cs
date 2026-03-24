@@ -13,7 +13,7 @@ public class SystemHealthMonitor : KoanBackgroundServiceBase
     public SystemHealthMonitor(ILogger<SystemHealthMonitor> logger, IConfiguration configuration)
         : base(logger, configuration) { }
 
-    public override async Task ExecuteCoreAsync(CancellationToken cancellationToken)
+    public override async Task ExecuteCore(CancellationToken cancellationToken)
     {
         using var periodicTimer = new PeriodicTimer(TimeSpan.FromMinutes(5));
 
@@ -25,7 +25,7 @@ public class SystemHealthMonitor : KoanBackgroundServiceBase
         }
     }
 
-    public override async Task<HealthReport> CheckAsync(CancellationToken cancellationToken = default)
+    public override async Task<HealthReport> Check(CancellationToken cancellationToken = default)
     {
         // Custom health check logic
         await Task.Delay(100, cancellationToken); // Simulate health check
@@ -45,7 +45,7 @@ public class DataCleanupService : KoanPokablePeriodicServiceBase
     public DataCleanupService(ILogger<DataCleanupService> logger, IConfiguration configuration)
         : base(logger, configuration) { }
 
-    protected override async Task ExecutePeriodicAsync(CancellationToken cancellationToken)
+    protected override async Task ExecutePeriodic(CancellationToken cancellationToken)
     {
         Logger.LogInformation("Starting data cleanup...");
         
@@ -56,7 +56,7 @@ public class DataCleanupService : KoanPokablePeriodicServiceBase
     }
 
     [ServiceAction("check-queue")]
-    public async Task CheckQueueAsync(CancellationToken cancellationToken)
+    public async Task CheckQueue(CancellationToken cancellationToken)
     {
         Logger.LogInformation("Checking cleanup queue for pending work...");
         await Task.Delay(1000, cancellationToken);
@@ -74,19 +74,19 @@ public class TranslationService : KoanFluentServiceBase
     public TranslationService(ILogger<TranslationService> logger, IConfiguration configuration) 
         : base(logger, configuration) { }
 
-    public override async Task ExecuteCoreAsync(CancellationToken cancellationToken)
+    public override async Task ExecuteCore(CancellationToken cancellationToken)
     {
         // This service is primarily event-driven, so just wait
         await Task.Delay(Timeout.Infinite, cancellationToken);
     }
 
     [ServiceAction("translate", RequiresParameters = true, ParametersType = typeof(TranslationOptions))]
-    public async Task TranslateAsync(TranslationOptions options, CancellationToken cancellationToken)
+    public async Task Translate(TranslationOptions options, CancellationToken cancellationToken)
     {
         Logger.LogInformation("Starting translation from {From} to {To} for file {FileId}", 
             options.From, options.To, options.FileId);
         
-    await EmitEventAsync(Koan.Core.Events.KoanServiceEvents.Translation.Started, new TranslationEventArgs 
+    await EmitEvent(Koan.Core.Events.KoanServiceEvents.Translation.Started, new TranslationEventArgs 
         { 
             FileId = options.FileId, 
             From = options.From, 
@@ -98,7 +98,7 @@ public class TranslationService : KoanFluentServiceBase
             // Simulate translation work
             await Task.Delay(10000, cancellationToken);
             
-            await EmitEventAsync(Koan.Core.Events.KoanServiceEvents.Translation.Completed, new TranslationEventArgs 
+            await EmitEvent(Koan.Core.Events.KoanServiceEvents.Translation.Completed, new TranslationEventArgs 
             { 
                 FileId = options.FileId, 
                 From = options.From, 
@@ -109,7 +109,7 @@ public class TranslationService : KoanFluentServiceBase
         }
         catch (Exception ex)
         {
-            await EmitEventAsync(Koan.Core.Events.KoanServiceEvents.Translation.Failed, new TranslationErrorArgs 
+            await EmitEvent(Koan.Core.Events.KoanServiceEvents.Translation.Failed, new TranslationErrorArgs 
             { 
                 FileId = options.FileId, 
                 Error = ex.Message 
@@ -129,7 +129,7 @@ public class DatabaseMigrationService : KoanStartupServiceBase
     public DatabaseMigrationService(ILogger<DatabaseMigrationService> logger, IConfiguration configuration)
         : base(logger, configuration) { }
 
-    public override async Task ExecuteCoreAsync(CancellationToken cancellationToken)
+    public override async Task ExecuteCore(CancellationToken cancellationToken)
     {
         Logger.LogInformation("Starting database migration...");
         
@@ -139,7 +139,7 @@ public class DatabaseMigrationService : KoanStartupServiceBase
         Logger.LogInformation("Database migration completed successfully");
     }
 
-    public override async Task<bool> IsReadyAsync(CancellationToken cancellationToken = default)
+    public override async Task<bool> IsReady(CancellationToken cancellationToken = default)
     {
         // Simulate database connectivity check
         await Task.Delay(100, cancellationToken);
@@ -155,7 +155,7 @@ public class NotificationService : KoanFluentServiceBase
     public NotificationService(ILogger<NotificationService> logger, IConfiguration configuration)
         : base(logger, configuration) { }
 
-    public override async Task ExecuteCoreAsync(CancellationToken cancellationToken)
+    public override async Task ExecuteCore(CancellationToken cancellationToken)
     {
         // Subscribe to translation events using the fluent API
     await KoanServices.On<TranslationService>(Koan.Core.Events.KoanServiceEvents.Translation.Completed).Do<TranslationEventArgs>(async args =>
@@ -169,7 +169,7 @@ public class NotificationService : KoanFluentServiceBase
                     args.FileId, args.Error);
                 await SendErrorNotification(args.FileId, args.Error);
             })
-            .SubscribeAsync();
+            .Subscribe();
 
         // Keep service running
         await Task.Delay(Timeout.Infinite, cancellationToken);

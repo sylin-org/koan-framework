@@ -2,7 +2,7 @@ namespace S18.Prism.Services;
 
 public interface IPulseService
 {
-    Task<PulseBriefing> GenerateAsync(string spaceId, CancellationToken ct = default);
+    Task<PulseBriefing> Generate(string spaceId, CancellationToken ct = default);
 }
 
 public sealed record PulseBriefing

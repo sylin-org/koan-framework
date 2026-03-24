@@ -14,7 +14,7 @@ internal sealed class MsSqlDdlExecutor : IRelationalDdlExecutor
         cmd.CommandText = "SELECT 1 FROM sys.tables t JOIN sys.schemas s ON t.schema_id=s.schema_id WHERE t.name=@t AND s.name=@s";
         cmd.Parameters.Add(new SqlParameter("@t", table));
         cmd.Parameters.Add(new SqlParameter("@s", schema));
-        try { var o = cmd.ExecuteScalar(); return o != null; } catch { return false; }
+        try { var o = cmd.ExecuteScalarAsync(); return o != null; } catch { return false; }
     }
 
     public bool ColumnExists(string schema, string table, string column)
@@ -27,7 +27,7 @@ WHERE t.name = @t AND s.name = @s AND c.name = @c";
         cmd.Parameters.Add(new SqlParameter("@t", table));
         cmd.Parameters.Add(new SqlParameter("@s", schema));
         cmd.Parameters.Add(new SqlParameter("@c", column));
-        try { var o = cmd.ExecuteScalar(); return o != null; } catch { return false; }
+        try { var o = cmd.ExecuteScalarAsync(); return o != null; } catch { return false; }
     }
 
     public void CreateTableIdJson(string schema, string table, string idColumn = "Id", string jsonColumn = "Json")
@@ -41,7 +41,7 @@ BEGIN
         [{jsonColumn}] NVARCHAR(MAX) NOT NULL
     );
 END";
-        cmd.ExecuteNonQuery();
+        cmd.ExecuteNonQueryAsync();
     }
 
     // Create table with provided columns (Id, Json already included in columns list expected by orchestrator)
@@ -83,7 +83,7 @@ BEGIN
 {defs}
     );
 END";
-        try { cmd.ExecuteNonQuery(); } catch { }
+        try { cmd.ExecuteNonQueryAsync(); } catch { }
 
         // Create indexes for any indexed columns
         for (int i = 0; i < columns.Count; i++)
@@ -102,7 +102,7 @@ END";
         using var cmd = _conn.CreateCommand();
         var persist = persisted ? " PERSISTED" : string.Empty;
         cmd.CommandText = $"ALTER TABLE [{schema}].[{table}] ADD [{column}] AS JSON_VALUE([Json], '{jsonPath}'){persist}";
-        try { cmd.ExecuteNonQuery(); } catch { }
+        try { cmd.ExecuteNonQueryAsync(); } catch { }
     }
 
     public void AddPhysicalColumn(string schema, string table, string column, Type clrType, bool nullable)
@@ -111,7 +111,7 @@ END";
         var sqlType = MapType(clrType);
         var nullSql = nullable ? " NULL" : " NOT NULL";
         cmd.CommandText = $"ALTER TABLE [{schema}].[{table}] ADD [{column}] {sqlType}{nullSql}";
-        try { cmd.ExecuteNonQuery(); } catch { }
+        try { cmd.ExecuteNonQueryAsync(); } catch { }
     }
 
     public void CreateIndex(string schema, string table, string indexName, IReadOnlyList<string> columns, bool unique)
@@ -121,7 +121,7 @@ END";
         var cols = string.Join(", ", columns.Select(c => $"[{c}]"));
         cmd.CommandText = $@"IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'{indexName}' AND object_id = OBJECT_ID(N'[{schema}].[{table}]'))
 CREATE {uq}INDEX [{indexName}] ON [{schema}].[{table}] ({cols});";
-        try { cmd.ExecuteNonQuery(); } catch { }
+        try { cmd.ExecuteNonQueryAsync(); } catch { }
     }
 
     private static string MapType(Type clr)

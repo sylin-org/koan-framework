@@ -8,7 +8,7 @@ public sealed class ZenGardenCapabilitySurface
         ZenGardenCapabilityWishOptions? options = null,
         CancellationToken cancellationToken = default)
     {
-        return ZenGarden.Client.WishAsync(offering, capabilities, options, cancellationToken);
+        return ZenGarden.Client.Wish(offering, capabilities, options, cancellationToken);
     }
 
     public IDisposable On(

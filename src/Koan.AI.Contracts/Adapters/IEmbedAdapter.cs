@@ -8,5 +8,5 @@ namespace Koan.AI.Contracts.Adapters;
 public interface IEmbedAdapter : IAiAdapter
 {
     /// <summary>Generate embeddings for the given input texts.</summary>
-    Task<AiEmbeddingsResponse> EmbedAsync(AiEmbeddingsRequest request, CancellationToken ct = default);
+    Task<AiEmbeddingsResponse> Embed(AiEmbeddingsRequest request, CancellationToken ct = default);
 }

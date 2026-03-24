@@ -53,7 +53,7 @@ public class KoanAutoRegistrar : IKoanAutoRegistrar
             }
 
             // Discover RabbitMQ service
-            var discoveryTask = serviceDiscovery.DiscoverServiceAsync("rabbitmq", discoveryOptions);
+            var discoveryTask = serviceDiscovery.DiscoverService("rabbitmq", discoveryOptions);
             var result = discoveryTask.GetAwaiter().GetResult();
 
             var method = $"orchestration-{result.DiscoveryMethod}";

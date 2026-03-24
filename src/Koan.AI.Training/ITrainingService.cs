@@ -8,12 +8,12 @@ namespace Koan.AI.Training;
 /// </summary>
 public interface ITrainingService
 {
-    Task<TrainingJob> TrainAsync(TrainOptions options, IProgress<TrainingProgress>? progress = null, CancellationToken ct = default);
-    Task<TrainingJob> RunAsync(RunOptions options, IProgress<TrainingProgress>? progress = null, CancellationToken ct = default);
-    Task<TrainingJob> AlignAsync(AlignOptions options, CancellationToken ct = default);
-    Task<TrainingEstimate> EstimateAsync(TrainOptions options, CancellationToken ct = default);
-    Task<TrainingJob> StatusAsync(string jobId, CancellationToken ct = default);
-    Task CancelAsync(string jobId, CancellationToken ct = default);
-    Task<TrainingJob> ResumeAsync(string jobId, string? checkpoint = null, CancellationToken ct = default);
-    Task<IReadOnlyList<TrainingJob>> ListAsync(CancellationToken ct = default);
+    Task<TrainingJob> Train(TrainOptions options, IProgress<TrainingProgress>? progress = null, CancellationToken ct = default);
+    Task<TrainingJob> Run(RunOptions options, IProgress<TrainingProgress>? progress = null, CancellationToken ct = default);
+    Task<TrainingJob> Align(AlignOptions options, CancellationToken ct = default);
+    Task<TrainingEstimate> Estimate(TrainOptions options, CancellationToken ct = default);
+    Task<TrainingJob> Status(string jobId, CancellationToken ct = default);
+    Task Cancel(string jobId, CancellationToken ct = default);
+    Task<TrainingJob> Resume(string jobId, string? checkpoint = null, CancellationToken ct = default);
+    Task<IReadOnlyList<TrainingJob>> List(CancellationToken ct = default);
 }

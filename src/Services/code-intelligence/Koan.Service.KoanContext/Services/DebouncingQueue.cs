@@ -32,7 +32,7 @@ public class DebouncingQueue
             // Reset debounce timer
             _debounceTimer?.Dispose();
             _debounceTimer = new Timer(
-                async _ => await FlushAsync(),
+                async _ => await Flush(),
                 null,
                 _debounceMilliseconds,
                 Timeout.Infinite);
@@ -42,7 +42,7 @@ public class DebouncingQueue
     /// <summary>
     /// Flushes all pending changes to the process action
     /// </summary>
-    private async Task FlushAsync()
+    private async Task Flush()
     {
         if (_pending.IsEmpty) return;
 

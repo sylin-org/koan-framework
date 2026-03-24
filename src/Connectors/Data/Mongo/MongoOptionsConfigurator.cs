@@ -157,7 +157,7 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
                 ("user", username ?? "(none)"));
 
             // Use autonomous discovery coordinator
-            var discoveryTask = _discoveryCoordinator.DiscoverServiceAsync("mongo", context);
+            var discoveryTask = _discoveryCoordinator.DiscoverService("mongo", context);
             var result = discoveryTask.GetAwaiter().GetResult();
 
             if (result.IsSuccessful)
@@ -275,7 +275,7 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
         try
         {
             var resolved = _zenGardenInitializationProvider
-                .ResolveAsync(intent)
+                .Resolve(intent)
                 .GetAwaiter()
                 .GetResult();
 

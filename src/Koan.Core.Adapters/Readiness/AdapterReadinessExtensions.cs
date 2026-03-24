@@ -34,7 +34,7 @@ public static class AdapterReadinessExtensions
                 break;
             case ReadinessPolicy.Hold:
                 var timeout = (adapter as IAdapterReadinessConfiguration)?.Timeout;
-                await readiness.WaitForReadinessAsync(timeout, ct);
+                await readiness.WaitForReadiness(timeout, ct);
                 break;
             case ReadinessPolicy.Degrade:
                 break;
@@ -84,7 +84,7 @@ public static class AdapterReadinessExtensions
                 break;
             case ReadinessPolicy.Hold:
                 var timeout = (adapter as IAdapterReadinessConfiguration)?.Timeout;
-                await readiness.WaitForReadinessAsync(timeout, ct);
+                await readiness.WaitForReadiness(timeout, ct);
                 break;
             case ReadinessPolicy.Degrade:
                 break;
@@ -163,7 +163,7 @@ public static class AdapterReadinessExtensions
                (ex.GetType().Name.Contains("Schema") && message.Contains("not found"));
     }
 
-    public static async Task WithReadinessAsync(this object adapter, Func<Task> operation, CancellationToken ct = default)
+    public static async Task WithReadiness(this object adapter, Func<Task> operation, CancellationToken ct = default)
     {
         await adapter.WithReadinessAsync(async () =>
         {

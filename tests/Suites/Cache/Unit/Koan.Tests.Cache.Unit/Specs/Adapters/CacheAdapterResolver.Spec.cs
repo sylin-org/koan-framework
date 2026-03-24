@@ -63,5 +63,5 @@ public sealed class CacheAdapterResolverSpec
                 body();
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 }

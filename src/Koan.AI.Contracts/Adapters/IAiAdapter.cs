@@ -30,5 +30,5 @@ public interface IAiAdapter
     bool HasCapability(string capability) => Capabilities.Contains(capability);
 
     /// <summary>Lists models available through this adapter.</summary>
-    Task<IReadOnlyList<AiModelDescriptor>> ListModelsAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<AiModelDescriptor>> ListModels(CancellationToken ct = default);
 }

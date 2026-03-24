@@ -36,7 +36,7 @@ public sealed class TransactionErrorHandlingSpec
     public async Task Commit_without_transaction_throws_exception()
     {
         await TestPipeline.For<TransactionErrorHandlingSpec>(_output, nameof(Commit_without_transaction_throws_exception))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Assert(static async _ =>
             {
                 InvalidOperationException? exception = null;
@@ -44,7 +44,7 @@ public sealed class TransactionErrorHandlingSpec
                 try
                 {
                     // Attempt to commit without transaction
-                    await EntityContext.CommitAsync();
+                    await EntityContext.Commit();
                 }
                 catch (InvalidOperationException ex)
                 {
@@ -54,14 +54,14 @@ public sealed class TransactionErrorHandlingSpec
                 exception.Should().NotBeNull("commit without transaction should throw");
                 exception!.Message.Should().Contain("No active transaction");
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
     public async Task Rollback_without_transaction_throws_exception()
     {
         await TestPipeline.For<TransactionErrorHandlingSpec>(_output, nameof(Rollback_without_transaction_throws_exception))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Assert(static async _ =>
             {
                 InvalidOperationException? exception = null;
@@ -69,7 +69,7 @@ public sealed class TransactionErrorHandlingSpec
                 try
                 {
                     // Attempt to rollback without transaction
-                    await EntityContext.RollbackAsync();
+                    await EntityContext.Rollback();
                 }
                 catch (InvalidOperationException ex)
                 {
@@ -79,14 +79,14 @@ public sealed class TransactionErrorHandlingSpec
                 exception.Should().NotBeNull("rollback without transaction should throw");
                 exception!.Message.Should().Contain("No active transaction");
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
     public async Task Double_commit_throws_exception()
     {
         await TestPipeline.For<TransactionErrorHandlingSpec>(_output, nameof(Double_commit_throws_exception))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Assert(static async _ =>
             {
                 InvalidOperationException? exception = null;
@@ -95,10 +95,10 @@ public sealed class TransactionErrorHandlingSpec
                 {
                     using (EntityContext.Transaction("double-commit-test"))
                     {
-                        await EntityContext.CommitAsync();
+                        await EntityContext.Commit();
 
                         // Attempt to commit again
-                        await EntityContext.CommitAsync();
+                        await EntityContext.Commit();
                     }
                 }
                 catch (InvalidOperationException ex)
@@ -109,14 +109,14 @@ public sealed class TransactionErrorHandlingSpec
                 exception.Should().NotBeNull("double commit should throw");
                 exception!.Message.Should().Contain("already been completed");
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
     public async Task Empty_transaction_commits_successfully()
     {
         await TestPipeline.For<TransactionErrorHandlingSpec>(_output, nameof(Empty_transaction_commits_successfully))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Assert(static async _ =>
             {
                 var success = false;
@@ -124,20 +124,20 @@ public sealed class TransactionErrorHandlingSpec
                 // Transaction with no operations
                 using (EntityContext.Transaction("empty-transaction"))
                 {
-                    await EntityContext.CommitAsync();
+                    await EntityContext.Commit();
                     success = true;
                 }
 
                 success.Should().BeTrue("empty transaction should commit successfully");
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
     public async Task Transaction_with_same_entity_saved_multiple_times()
     {
         await TestPipeline.For<TransactionErrorHandlingSpec>(_output, nameof(Transaction_with_same_entity_saved_multiple_times))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
@@ -162,7 +162,7 @@ public sealed class TransactionErrorHandlingSpec
                         entity.Description = "Version 3";
                         await entity.Save();
 
-                        await EntityContext.CommitAsync();
+                        await EntityContext.Commit();
                     }
 
                     // Verify final version was persisted
@@ -173,14 +173,14 @@ public sealed class TransactionErrorHandlingSpec
 
                 entity.Should().NotBeNull();
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
     public async Task Transaction_context_restored_after_exception()
     {
         await TestPipeline.For<TransactionErrorHandlingSpec>(_output, nameof(Transaction_context_restored_after_exception))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Assert(static async _ =>
             {
                 var beforeTransaction = EntityContext.InTransaction;
@@ -205,14 +205,14 @@ public sealed class TransactionErrorHandlingSpec
 
                 await Task.CompletedTask;
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
     public async Task Transaction_with_partition_routing()
     {
         await TestPipeline.For<TransactionErrorHandlingSpec>(_output, nameof(Transaction_with_partition_routing))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
@@ -242,7 +242,7 @@ public sealed class TransactionErrorHandlingSpec
                         await entity2.Save();
                     }
 
-                    await EntityContext.CommitAsync();
+                    await EntityContext.Commit();
                 }
 
                 // Verify entities in respective partitions
@@ -267,14 +267,14 @@ public sealed class TransactionErrorHandlingSpec
                 entity1.Should().NotBeNull();
                 entity2.Should().NotBeNull();
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
     public async Task Transaction_with_adapter_and_partition_routing()
     {
         await TestPipeline.For<TransactionErrorHandlingSpec>(_output, nameof(Transaction_with_adapter_and_partition_routing))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
@@ -304,7 +304,7 @@ public sealed class TransactionErrorHandlingSpec
                         await entity2.Save();
                     }
 
-                    await EntityContext.CommitAsync();
+                    await EntityContext.Commit();
                 }
 
                 // Verify entities
@@ -324,6 +324,6 @@ public sealed class TransactionErrorHandlingSpec
                 entity1.Should().NotBeNull();
                 entity2.Should().NotBeNull();
             })
-            .RunAsync();
+            .Run();
     }
 }

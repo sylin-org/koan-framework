@@ -53,7 +53,7 @@ public sealed class MongoContainerFixture : IAsyncDisposable, IInitializableFixt
 
         context.Diagnostics.Info("mongo.fixture.initialize", new { dockerKey = DockerFixtureKey, database = Database });
 
-        if (TryGetExplicitConnectionString(out var explicitConnection) && await CanPingAsync(explicitConnection!, context.Cancellation).ConfigureAwait(false))
+        if (TryGetExplicitConnectionString(out var explicitConnection) && await CanPing(explicitConnection!, context.Cancellation).ConfigureAwait(false))
         {
             ConnectionString = EnsureDatabase(explicitConnection!, Database);
             IsAvailable = true;
@@ -62,7 +62,7 @@ public sealed class MongoContainerFixture : IAsyncDisposable, IInitializableFixt
         }
 
         var localhost = "mongodb://localhost:27017";
-        if (await CanPingAsync(localhost, context.Cancellation).ConfigureAwait(false))
+        if (await CanPing(localhost, context.Cancellation).ConfigureAwait(false))
         {
             ConnectionString = EnsureDatabase(localhost, Database);
             IsAvailable = true;
@@ -111,7 +111,7 @@ public sealed class MongoContainerFixture : IAsyncDisposable, IInitializableFixt
             var mappedPort = container.GetMappedPublicPort(MongoPort);
             var connection = EnsureDatabase($"mongodb://localhost:{mappedPort}", Database);
 
-            if (!await CanPingAsync(connection, context.Cancellation).ConfigureAwait(false))
+            if (!await CanPing(connection, context.Cancellation).ConfigureAwait(false))
             {
                 throw new InvalidOperationException("Unable to ping Mongo container.");
             }
@@ -126,9 +126,9 @@ public sealed class MongoContainerFixture : IAsyncDisposable, IInitializableFixt
         {
             var missingMessage = mmex?.Message ?? ex.Message;
             context.Diagnostics.Warn("mongo.fixture.testcontainers.missingmethod", new { message = missingMessage });
-            await DisposeContainerSilentlyAsync(container).ConfigureAwait(false);
+            await DisposeContainerSilently(container).ConfigureAwait(false);
 
-            var (ok, connection, failureReason) = await TryStartWithDockerCliAsync(context).ConfigureAwait(false);
+            var (ok, connection, failureReason) = await TryStartWithDockerCli(context).ConfigureAwait(false);
             if (ok && connection is not null)
             {
                 ConnectionString = connection;
@@ -144,7 +144,7 @@ public sealed class MongoContainerFixture : IAsyncDisposable, IInitializableFixt
         {
             UnavailableReason = $"Failed to start Mongo container: {ex.GetType().Name}: {ex.Message}";
             context.Diagnostics.Error("mongo.fixture.container.failed", new { message = ex.Message }, ex);
-            await DisposeContainerSilentlyAsync(container).ConfigureAwait(false);
+            await DisposeContainerSilently(container).ConfigureAwait(false);
             return;
         }
     }
@@ -167,7 +167,7 @@ public sealed class MongoContainerFixture : IAsyncDisposable, IInitializableFixt
 
     public async ValueTask DisposeAsync()
     {
-        await DisposeContainerSilentlyAsync().ConfigureAwait(false);
+        await DisposeContainerSilently().ConfigureAwait(false);
     }
 
     private static bool TryGetExplicitConnectionString(out string? connectionString)
@@ -196,7 +196,7 @@ public sealed class MongoContainerFixture : IAsyncDisposable, IInitializableFixt
         return builder.ToString();
     }
 
-    private static async Task<bool> CanPingAsync(string connectionString, CancellationToken cancellation = default)
+    private static async Task<bool> CanPing(string connectionString, CancellationToken cancellation = default)
     {
         try
         {
@@ -218,7 +218,7 @@ public sealed class MongoContainerFixture : IAsyncDisposable, IInitializableFixt
         }
     }
 
-    private async ValueTask DisposeContainerSilentlyAsync(TestcontainersContainer? container = null)
+    private async ValueTask DisposeContainerSilently(TestcontainersContainer? container = null)
     {
         var target = container ?? _container;
         if (target is not null)
@@ -247,14 +247,14 @@ public sealed class MongoContainerFixture : IAsyncDisposable, IInitializableFixt
             _container = null;
         }
 
-        await StopCliContainerAsync().ConfigureAwait(false);
+        await StopCliContainer().ConfigureAwait(false);
     }
 
-    private async Task<(bool ok, string? connectionString, string? failureReason)> TryStartWithDockerCliAsync(TestContext context)
+    private async Task<(bool ok, string? connectionString, string? failureReason)> TryStartWithDockerCli(TestContext context)
     {
         var containerName = $"koan-mongo-{Guid.NewGuid():N}";
         var runArgs = $"run --rm -d --name {containerName} -p 127.0.0.1::{MongoPort} mongo:7";
-        var (runOk, runStdout, runStderr, runExitCode) = await RunDockerCommandAsync(runArgs, context.Cancellation).ConfigureAwait(false);
+        var (runOk, runStdout, runStderr, runExitCode) = await RunDockerCommand(runArgs, context.Cancellation).ConfigureAwait(false);
 
         if (!runOk)
         {
@@ -271,7 +271,7 @@ public sealed class MongoContainerFixture : IAsyncDisposable, IInitializableFixt
 
         for (var attempt = 0; attempt < 5 && !portOk; attempt++)
         {
-            (portOk, portStdout, portStderr, portExitCode) = await RunDockerCommandAsync($"port {containerName} {MongoPort}/tcp", context.Cancellation).ConfigureAwait(false);
+            (portOk, portStdout, portStderr, portExitCode) = await RunDockerCommand($"port {containerName} {MongoPort}/tcp", context.Cancellation).ConfigureAwait(false);
             if (portOk && !string.IsNullOrWhiteSpace(portStdout))
             {
                 break;
@@ -292,7 +292,7 @@ public sealed class MongoContainerFixture : IAsyncDisposable, IInitializableFixt
         if (!portOk || string.IsNullOrWhiteSpace(portStdout))
         {
             context.Diagnostics.Warn("mongo.fixture.dockercli.port.failed", new { exitCode = portExitCode, stdout = Truncate(portStdout), stderr = Truncate(portStderr) });
-            await StopCliContainerAsync().ConfigureAwait(false);
+            await StopCliContainer().ConfigureAwait(false);
             return (false, null, "Failed to determine published Mongo port from docker CLI");
         }
 
@@ -300,7 +300,7 @@ public sealed class MongoContainerFixture : IAsyncDisposable, IInitializableFixt
         if (hostPort == 0)
         {
             context.Diagnostics.Warn("mongo.fixture.dockercli.port.parse", new { stdout = Truncate(portStdout) });
-            await StopCliContainerAsync().ConfigureAwait(false);
+            await StopCliContainer().ConfigureAwait(false);
             return (false, null, "Unable to parse published Mongo port from docker CLI output");
         }
 
@@ -308,7 +308,7 @@ public sealed class MongoContainerFixture : IAsyncDisposable, IInitializableFixt
         var connected = false;
         for (var attempt = 0; attempt < 60 && !context.Cancellation.IsCancellationRequested; attempt++)
         {
-            if (await CanPingAsync(connection, context.Cancellation).ConfigureAwait(false))
+            if (await CanPing(connection, context.Cancellation).ConfigureAwait(false))
             {
                 connected = true;
                 break;
@@ -327,8 +327,8 @@ public sealed class MongoContainerFixture : IAsyncDisposable, IInitializableFixt
         if (!connected)
         {
             context.Diagnostics.Warn("mongo.fixture.dockercli.connect.timeout", new { port = hostPort });
-            await DumpDockerLogsAsync(containerName, context.Cancellation, context).ConfigureAwait(false);
-            await StopCliContainerAsync().ConfigureAwait(false);
+            await DumpDockerLogs(containerName, context.Cancellation, context).ConfigureAwait(false);
+            await StopCliContainer().ConfigureAwait(false);
             return (false, null, $"Mongo container did not respond on localhost:{hostPort} within timeout");
         }
 
@@ -339,7 +339,7 @@ public sealed class MongoContainerFixture : IAsyncDisposable, IInitializableFixt
         return (true, connection, null);
     }
 
-    private async Task<(bool ok, string stdout, string stderr, int exitCode)> RunDockerCommandAsync(string arguments, CancellationToken cancellation)
+    private async Task<(bool ok, string stdout, string stderr, int exitCode)> RunDockerCommand(string arguments, CancellationToken cancellation)
     {
         var psi = CreateDockerProcessStartInfo(arguments);
         Process? process = null;
@@ -461,7 +461,7 @@ public sealed class MongoContainerFixture : IAsyncDisposable, IInitializableFixt
         return value.Length <= max ? value : value[..max] + "…";
     }
 
-    private async Task DumpDockerLogsAsync(string containerName, CancellationToken cancellation, TestContext context)
+    private async Task DumpDockerLogs(string containerName, CancellationToken cancellation, TestContext context)
     {
         if (string.IsNullOrWhiteSpace(containerName))
         {
@@ -470,7 +470,7 @@ public sealed class MongoContainerFixture : IAsyncDisposable, IInitializableFixt
 
         try
         {
-            var (ok, stdout, stderr, exitCode) = await RunDockerCommandAsync($"logs {containerName}", cancellation).ConfigureAwait(false);
+            var (ok, stdout, stderr, exitCode) = await RunDockerCommand($"logs {containerName}", cancellation).ConfigureAwait(false);
             if (!ok)
             {
                 context.Diagnostics.Debug("mongo.fixture.dockercli.logs.failed", new { exitCode, stderr = Truncate(stderr), stdout = Truncate(stdout) });
@@ -485,7 +485,7 @@ public sealed class MongoContainerFixture : IAsyncDisposable, IInitializableFixt
         }
     }
 
-    private async ValueTask StopCliContainerAsync()
+    private async ValueTask StopCliContainer()
     {
         if (string.IsNullOrWhiteSpace(_cliContainerId))
         {
@@ -494,7 +494,7 @@ public sealed class MongoContainerFixture : IAsyncDisposable, IInitializableFixt
 
         try
         {
-            await RunDockerCommandAsync($"rm -f {_cliContainerId}", CancellationToken.None).ConfigureAwait(false);
+            await RunDockerCommand($"rm -f {_cliContainerId}", CancellationToken.None).ConfigureAwait(false);
         }
         catch
         {

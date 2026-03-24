@@ -28,7 +28,7 @@ public class MockPantryVisionService : IPantryVisionService
         ("spinach", new[] { "leafy greens", "baby spinach", "fresh spinach" }, "produce", "bunch")
     };
 
-    public async Task<VisionProcessingResult> ProcessPhotoAsync(
+    public async Task<VisionProcessingResult> ProcessPhoto(
         string photoId,
         Stream imageStream,
         VisionProcessingOptions options,
@@ -174,7 +174,7 @@ public class MockPantryVisionService : IPantryVisionService
         };
     }
 
-    public Task LearnFromCorrectionAsync(
+    public Task LearnFromCorrection(
         string originalName,
         string correctedName,
         string? correctedQuantity,

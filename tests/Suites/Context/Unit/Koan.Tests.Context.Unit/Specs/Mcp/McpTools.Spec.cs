@@ -162,22 +162,22 @@ public class McpTools_Spec
         var project = CreateProject(projectId);
 
         _projectResolverMock
-            .Setup(x => x.ResolveProjectAsync(
+            .Setup(x => x.ResolveProject(
                 projectId.ToString(),
                 null,
                 It.IsAny<HttpContext?>(),
                 true,
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(project);
+            .Returns(project);
 
         var resultPayload = CreateSearchResult();
 
         _retrievalMock
-            .Setup(x => x.SearchAsync(
+            .Setup(x => x.Search(
                 project.Id.ToString(),
                 It.IsAny<SearchRequestContext>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(resultPayload);
+            .Returns(resultPayload);
 
         var request = new GetLibraryDocsRequest("test query", LibraryId: projectId.ToString());
 
@@ -200,19 +200,19 @@ public class McpTools_Spec
         var project = CreateProject(projectId);
 
         _projectResolverMock
-            .Setup(x => x.ResolveProjectByPathAsync(
+            .Setup(x => x.ResolveProjectByPath(
                 "C:/repo",
                 true,
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(project);
+            .Returns(project);
 
         var resultPayload = CreateSearchResult();
         _retrievalMock
-            .Setup(x => x.SearchAsync(
+            .Setup(x => x.Search(
                 project.Id.ToString(),
                 It.IsAny<SearchRequestContext>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(resultPayload);
+            .Returns(resultPayload);
 
         var request = new GetLibraryDocsRequest("test query", PathContext: "C:/repo");
 

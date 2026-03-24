@@ -96,7 +96,7 @@ public sealed class GardenAwareEndpointManager<TConnection> : IDisposable where 
 
         _subscription = ZenGarden.Client.Subscribe(
             subscription,
-            OnAvailabilityEventAsync,
+            OnAvailabilityEvent,
             new ZenGardenWatchOptions { EmitInitialState = true });
     }
 
@@ -173,7 +173,7 @@ public sealed class GardenAwareEndpointManager<TConnection> : IDisposable where 
         }
     }
 
-    private ValueTask OnAvailabilityEventAsync(ZenGardenAvailabilityEvent evt, CancellationToken ct)
+    private ValueTask OnAvailabilityEvent(ZenGardenAvailabilityEvent evt, CancellationToken ct)
     {
         switch (evt.Kind)
         {

@@ -33,7 +33,7 @@ internal sealed class DefaultPolicyContributor<TModel> : ICanonPipelineContribut
     public CanonPipelinePhase Phase => CanonPipelinePhase.Policy;
 
     /// <inheritdoc />
-    public ValueTask<CanonizationEvent?> ExecuteAsync(CanonPipelineContext<TModel> context, CancellationToken cancellationToken)
+    public ValueTask<CanonizationEvent?> Execute(CanonPipelineContext<TModel> context, CancellationToken cancellationToken)
     {
         if (context is null)
         {

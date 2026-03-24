@@ -25,7 +25,7 @@ public sealed class EvalGateIntegrationTests
         ModelRef model = "my-model";
         var data = new DatasetRef("test-data");
 
-        var result = await service.GateAsync(
+        var result = await service.Gate(
             model, baseline: null, data,
             g => g.Metric(Metric.F1, min: 0.0));
 
@@ -41,7 +41,7 @@ public sealed class EvalGateIntegrationTests
         ModelRef model = "my-model";
         var data = new DatasetRef("test-data");
 
-        var act = () => service.GateAsync(
+        var act = () => service.Gate(
             model, baseline: null, data,
             g => g.Metric(Metric.F1, min: 0.9));
 
@@ -59,7 +59,7 @@ public sealed class EvalGateIntegrationTests
         ModelRef baseline = "baseline-model";
         var data = new DatasetRef("test-data");
 
-        var result = await service.GateAsync(
+        var result = await service.Gate(
             model, baseline, data,
             g => g.Metric(Metric.Accuracy, min: 0.0).NoRegression(0.02));
 
@@ -82,7 +82,7 @@ public sealed class EvalGateIntegrationTests
         var data = new DatasetRef("test-data");
 
         // No regression when both return same value
-        var result = await service.GateAsync(
+        var result = await service.Gate(
             model, baseline, data,
             g => g.Metric(Metric.F1, min: 0.0).NoRegression(0.02));
 
@@ -100,7 +100,7 @@ public sealed class EvalGateIntegrationTests
         ModelRef model = "my-model";
         var data = new DatasetRef("test-data");
 
-        var act = () => service.GateAsync(
+        var act = () => service.Gate(
             model, baseline: null, data,
             g => g.Metric(Metric.F1, min: 0.5));
 
@@ -115,7 +115,7 @@ public sealed class EvalGateIntegrationTests
         ModelRef model = "test-model";
         var data = new DatasetRef("test-data");
 
-        var result = await service.MeasureAsync(
+        var result = await service.Measure(
             model, data, [Metric.Accuracy, Metric.F1, Metric.Precision]);
 
         result.Passed.Should().BeTrue();
@@ -133,7 +133,7 @@ public sealed class EvalGateIntegrationTests
         var models = new ModelRef[] { "model-a", "model-b", "model-c" };
         var data = new DatasetRef("test-data");
 
-        var results = await service.CompareAsync(models, data, [Metric.Accuracy]);
+        var results = await service.Compare(models, data, [Metric.Accuracy]);
 
         results.Should().HaveCount(3);
     }
@@ -148,7 +148,7 @@ public sealed class EvalGateIntegrationTests
         var current = new EvalResult(
             "current", [new EvalScore(Metric.Accuracy, 0.85)], Passed: true);
 
-        var drift = await service.DriftAsync(baseline, current);
+        var drift = await service.Drift(baseline, current);
 
         drift.Status.Should().Be(DriftStatus.OK);
         drift.Score.Should().Be(0.0);

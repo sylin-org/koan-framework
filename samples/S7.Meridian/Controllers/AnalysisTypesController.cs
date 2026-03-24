@@ -29,13 +29,13 @@ public sealed class AnalysisTypesController : EntityController<AnalysisType>
     }
 
     [HttpPost(MeridianConstants.AnalysisTypeCatalog.AiSuggestSegment)]
-    public async Task<ActionResult<AnalysisTypeAiSuggestResponse>> SuggestAsync(
+    public async Task<ActionResult<AnalysisTypeAiSuggestResponse>> Suggest(
         [FromBody] AnalysisTypeAiSuggestRequest request,
         CancellationToken ct)
     {
         try
         {
-            var response = await _authoring.SuggestAsync(request, ct).ConfigureAwait(false);
+            var response = await _authoring.Suggest(request, ct).ConfigureAwait(false);
 
             if (response.Warnings?.Count > 0)
             {
@@ -57,13 +57,13 @@ public sealed class AnalysisTypesController : EntityController<AnalysisType>
     }
 
     [HttpPost("ai-create")]
-    public async Task<ActionResult<AnalysisType>> CreateWithAiAsync(
+    public async Task<ActionResult<AnalysisType>> CreateWithAi(
         [FromBody] AnalysisTypeAiSuggestRequest request,
         CancellationToken ct)
     {
         try
         {
-            var response = await _authoring.SuggestAsync(request, ct).ConfigureAwait(false);
+            var response = await _authoring.Suggest(request, ct).ConfigureAwait(false);
             var draft = response.Draft;
 
             if (response.Warnings?.Count > 0)
@@ -118,7 +118,7 @@ public sealed class AnalysisTypesController : EntityController<AnalysisType>
     /// GET /api/analysistypes/codes
     /// </summary>
     [HttpGet("codes")]
-    public async Task<ActionResult> GetTypeCodesAsync(CancellationToken ct)
+    public async Task<ActionResult> GetTypeCodes(CancellationToken ct)
     {
         var analysisTypes = await AnalysisType.All(ct).ConfigureAwait(false);
 

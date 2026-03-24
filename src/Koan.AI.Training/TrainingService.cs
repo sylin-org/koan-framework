@@ -19,23 +19,23 @@ internal sealed class TrainingService : ITrainingService
         _registry = registry;
     }
 
-    public async Task<TrainingJob> TrainAsync(
+    public async Task<TrainingJob> Train(
         TrainOptions options, IProgress<TrainingProgress>? progress, CancellationToken ct)
     {
         var adapter = AdapterResolver.Resolve(_registry, AiCapability.Train, options.Compute?.PreferredNode);
         var runtime = ResolveTrainingRuntime(adapter);
-        return await runtime.LaunchAsync(options, progress, ct);
+        return await runtime.Launch(options, progress, ct);
     }
 
-    public async Task<TrainingJob> RunAsync(
+    public async Task<TrainingJob> Run(
         RunOptions options, IProgress<TrainingProgress>? progress, CancellationToken ct)
     {
         var adapter = AdapterResolver.Resolve(_registry, AiCapability.Train, options.Compute?.PreferredNode);
         var runtime = ResolveTrainingRuntime(adapter);
-        return await runtime.LaunchScriptAsync(options, progress, ct);
+        return await runtime.LaunchScript(options, progress, ct);
     }
 
-    public async Task<TrainingJob> AlignAsync(AlignOptions options, CancellationToken ct)
+    public async Task<TrainingJob> Align(AlignOptions options, CancellationToken ct)
     {
         var adapter = AdapterResolver.Resolve(_registry, AiCapability.Align, options.Compute?.PreferredNode);
         var runtime = ResolveTrainingRuntime(adapter);
@@ -55,10 +55,10 @@ internal sealed class TrainingService : ITrainingService
             Compute = options.Compute
         };
 
-        return await runtime.LaunchAsync(trainOptions, null, ct);
+        return await runtime.Launch(trainOptions, null, ct);
     }
 
-    public Task<TrainingEstimate> EstimateAsync(TrainOptions options, CancellationToken ct)
+    public Task<TrainingEstimate> Estimate(TrainOptions options, CancellationToken ct)
     {
         var trainAdapters = AdapterResolver.ResolveAll(_registry, AiCapability.Train);
 
@@ -79,7 +79,7 @@ internal sealed class TrainingService : ITrainingService
         return Task.FromResult(estimate);
     }
 
-    public async Task<TrainingJob> StatusAsync(string jobId, CancellationToken ct)
+    public async Task<TrainingJob> Status(string jobId, CancellationToken ct)
     {
         var trainAdapters = AdapterResolver.ResolveAll(_registry, AiCapability.Train);
 
@@ -90,7 +90,7 @@ internal sealed class TrainingService : ITrainingService
 
             try
             {
-                return await runtime.StatusAsync(jobId, ct);
+                return await runtime.Status(jobId, ct);
             }
             catch
             {
@@ -102,7 +102,7 @@ internal sealed class TrainingService : ITrainingService
             $"Job '{jobId}' not found in any registered training adapter.");
     }
 
-    public async Task CancelAsync(string jobId, CancellationToken ct)
+    public async Task Cancel(string jobId, CancellationToken ct)
     {
         var trainAdapters = AdapterResolver.ResolveAll(_registry, AiCapability.Train);
 
@@ -113,7 +113,7 @@ internal sealed class TrainingService : ITrainingService
 
             try
             {
-                await runtime.CancelAsync(jobId, ct);
+                await runtime.Cancel(jobId, ct);
                 return;
             }
             catch
@@ -126,7 +126,7 @@ internal sealed class TrainingService : ITrainingService
             $"Job '{jobId}' not found in any registered training adapter.");
     }
 
-    public async Task<TrainingJob> ResumeAsync(string jobId, string? checkpoint, CancellationToken ct)
+    public async Task<TrainingJob> Resume(string jobId, string? checkpoint, CancellationToken ct)
     {
         var trainAdapters = AdapterResolver.ResolveAll(_registry, AiCapability.Train);
 
@@ -137,7 +137,7 @@ internal sealed class TrainingService : ITrainingService
 
             try
             {
-                return await runtime.ResumeAsync(jobId, checkpoint, ct);
+                return await runtime.Resume(jobId, checkpoint, ct);
             }
             catch
             {
@@ -149,7 +149,7 @@ internal sealed class TrainingService : ITrainingService
             $"Job '{jobId}' not found in any registered training adapter.");
     }
 
-    public Task<IReadOnlyList<TrainingJob>> ListAsync(CancellationToken ct)
+    public Task<IReadOnlyList<TrainingJob>> List(CancellationToken ct)
     {
         IReadOnlyList<TrainingJob> empty = [];
         return Task.FromResult(empty);

@@ -25,7 +25,7 @@ public sealed class MongoCrudSpec
         await TestPipeline.For<MongoCrudSpec>(_output, nameof(Upsert_query_count_and_remove_flow))
             .RequireDocker()
             .UsingMongoContainer(database: databaseName)
-            .Using<MongoConnectorFixture>("fixture", static ctx => MongoConnectorFixture.CreateAsync(ctx))
+            .Using<MongoConnectorFixture>("fixture", static ctx => MongoConnectorFixture.Create(ctx))
             .Arrange(static async ctx =>
             {
                 var fixture = ctx.GetRequiredItem<MongoConnectorFixture>("fixture");
@@ -39,7 +39,7 @@ public sealed class MongoCrudSpec
 
                 await using var lease = fixture.LeasePartition(partition);
 
-                var saved = await Person.UpsertAsync(new Person { Name = "Ada", Age = 34 });
+                var saved = await Person.Upsert(new Person { Name = "Ada", Age = 34 });
                 saved.Id.Should().NotBeNullOrWhiteSpace();
                 var originalTimestamp = saved.LastUpdated;
 
@@ -57,14 +57,14 @@ public sealed class MongoCrudSpec
 
                 var updated = filtered.First();
                 updated.Name = "Bobby";
-                await Person.UpsertAsync(updated);
+                await Person.Upsert(updated);
 
                 var fetched = await Person.Get(updated.Id);
                 fetched.Should().NotBeNull();
                 fetched!.Name.Should().Be("Bobby");
                 fetched.LastUpdated.Should().NotBe(originalTimestamp);
 
-                var count = await Data<Person, string>.CountAsync(p => p.Name != "Ada", partition);
+                var count = await Data<Person, string>.Count(p => p.Name != "Ada", partition);
                 count.Should().Be(2);
 
                 var removed = await Person.Remove(saved.Id, new DataQueryOptions { Partition = partition });
@@ -73,7 +73,7 @@ public sealed class MongoCrudSpec
                 var remaining = await Person.All(partition);
                 remaining.Should().HaveCount(2);
             })
-            .RunAsync();
+            .Run();
     }
 
     private sealed class Person : Entity<Person>

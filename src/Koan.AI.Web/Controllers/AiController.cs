@@ -40,7 +40,7 @@ public sealed class AiController : ControllerBase
         {
             try
             {
-                var list = await a.ListModelsAsync(ct);
+                var list = await a.ListModels(ct);
                 results.AddRange(list);
             }
             catch { /* ignore unavailable adapter */ }
@@ -83,32 +83,32 @@ public sealed class AiController : ControllerBase
 
     [HttpPost(Constants.Routes.AdapterModelInstall)]
     public Task<IActionResult> InstallModel(string adapterId, [FromBody] AiModelOperationRequest request, CancellationToken ct)
-        => ExecuteModelOperationAsync(adapterId, request, static (manager, payload, token) => manager.EnsureInstalledAsync(payload, token), ct);
+        => ExecuteModelOperation(adapterId, request, static (manager, payload, token) => manager.EnsureInstalled(payload, token), ct);
 
     [HttpPost(Constants.Routes.AdapterModelRefresh)]
     public Task<IActionResult> RefreshModel(string adapterId, [FromBody] AiModelOperationRequest request, CancellationToken ct)
-        => ExecuteModelOperationAsync(adapterId, request, static (manager, payload, token) => manager.RefreshAsync(payload, token), ct);
+        => ExecuteModelOperation(adapterId, request, static (manager, payload, token) => manager.Refresh(payload, token), ct);
 
     [HttpPost(Constants.Routes.AdapterModelFlush)]
     public Task<IActionResult> FlushModel(string adapterId, [FromBody] AiModelOperationRequest request, CancellationToken ct)
-        => ExecuteModelOperationAsync(adapterId, request, static (manager, payload, token) => manager.FlushAsync(payload, token), ct);
+        => ExecuteModelOperation(adapterId, request, static (manager, payload, token) => manager.Flush(payload, token), ct);
 
     [HttpPost(Constants.Routes.Chat)]
     public async Task<ActionResult<AiChatResponse>> Chat([FromBody] AiChatRequest request, CancellationToken ct)
     {
-        var res = await _ai.PromptAsync(request, ct);
+        var res = await _ai.Prompt(request, ct);
         return Ok(res);
     }
 
     [HttpPost(Constants.Routes.ChatStream)]
     public IActionResult ChatStream([FromBody] AiChatRequest request, CancellationToken ct)
-        => SseActionResult.StreamText(StreamDeltasAsync(request, ct));
+        => SseActionResult.StreamText(StreamDeltas(request, ct));
 
-    private async IAsyncEnumerable<string> StreamDeltasAsync(
+    private async IAsyncEnumerable<string> StreamDeltas(
         AiChatRequest request,
         [EnumeratorCancellation] CancellationToken ct)
     {
-        await foreach (var chunk in _ai.StreamAsync(request, ct))
+        await foreach (var chunk in _ai.Stream(request, ct))
         {
             var payload = chunk.DeltaText;
             if (string.IsNullOrEmpty(payload))
@@ -123,11 +123,11 @@ public sealed class AiController : ControllerBase
     [HttpPost(Constants.Routes.Embeddings)]
     public async Task<ActionResult<AiEmbeddingsResponse>> Embeddings([FromBody] AiEmbeddingsRequest request, CancellationToken ct)
     {
-        var res = await _ai.EmbedAsync(request, ct);
+        var res = await _ai.Embed(request, ct);
         return Ok(res);
     }
 
-    private async Task<IActionResult> ExecuteModelOperationAsync(
+    private async Task<IActionResult> ExecuteModelOperation(
         string adapterId,
         AiModelOperationRequest request,
         Func<IAiModelManager, AiModelOperationRequest, CancellationToken, Task<AiModelOperationResult>> operation,

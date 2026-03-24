@@ -37,7 +37,7 @@ internal sealed class AdapterBackedEmbeddingGenerator : IEmbeddingGenerator<stri
             request = request with { Model = resolution.EffectiveModel };
         }
 
-        var response = await embedAdapter.EmbedAsync(request, cancellationToken).ConfigureAwait(false);
+        var response = await embedAdapter.Embed(request, cancellationToken).ConfigureAwait(false);
 
         _logger.LogInformation(
             "Generated embeddings via adapter {Adapter} ({Category}) for model {Model}",

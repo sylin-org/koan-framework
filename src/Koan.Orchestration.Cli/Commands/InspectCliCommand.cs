@@ -8,7 +8,7 @@ internal sealed class InspectCliCommand : ICliCommand
 
     public InspectCliCommand(CommandRuntime runtime) => _runtime = runtime;
 
-    public Task<int> ExecuteAsync(CommandArgs args)
+    public Task<int> Execute(CommandArgs args)
     {
         var json = args.HasFlag("json");
         var quiet = args.HasFlag("quiet");
@@ -18,7 +18,7 @@ internal sealed class InspectCliCommand : ICliCommand
         var portOverride = ParseNullableInt(args.GetValue("port"));
         var exposeInternals = args.HasFlag("expose-internals");
 
-        return _runtime.ExecuteInspectAsync(new CommandRuntime.InspectCommandOptions(json, quiet, engine, profile, basePort, portOverride, exposeInternals));
+        return _runtime.ExecuteInspect(new CommandRuntime.InspectCommandOptions(json, quiet, engine, profile, basePort, portOverride, exposeInternals));
     }
 
     private static int? ParseNullableInt(string? value)

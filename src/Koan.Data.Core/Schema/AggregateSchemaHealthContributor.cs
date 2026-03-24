@@ -16,13 +16,13 @@ internal sealed class AggregateSchemaHealthContributor<TEntity, TKey> : ISchemaH
         _services = services;
     }
 
-    public async Task EnsureHealthyAsync(CancellationToken ct)
+    public async Task EnsureHealthy(CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
     var repo = global::Koan.Data.Core.AggregateConfigs.Get<TEntity, TKey>(_services).Repository;
         if (repo is ISchemaHealthContributor<TEntity, TKey> contributor)
         {
-            await contributor.EnsureHealthyAsync(ct);
+            await contributor.EnsureHealthy(ct);
         }
     }
 

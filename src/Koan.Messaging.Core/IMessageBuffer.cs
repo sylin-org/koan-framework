@@ -19,7 +19,7 @@ public interface IMessageBuffer
     /// Flushes all buffered messages to the live message bus.
     /// Returns the number of messages successfully flushed.
     /// </summary>
-    Task<int> FlushToAsync(IMessageBus bus, CancellationToken cancellationToken = default);
+    Task<int> FlushTo(IMessageBus bus, CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Number of messages currently buffered.
@@ -56,7 +56,7 @@ internal class InMemoryMessageBuffer : IMessageBuffer
         return Task.CompletedTask;
     }
     
-    public async Task<int> FlushToAsync(IMessageBus bus, CancellationToken cancellationToken = default)
+    public async Task<int> FlushTo(IMessageBus bus, CancellationToken cancellationToken = default)
     {
         var flushed = 0;
         

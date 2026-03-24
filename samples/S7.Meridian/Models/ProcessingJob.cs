@@ -53,7 +53,7 @@ public sealed class ProcessingJob : Entity<ProcessingJob>
 
     public int ProgressPercent => (int)Math.Round(Progress * 100, MidpointRounding.AwayFromZero);
 
-    public static async Task<ProcessingJob?> FindPendingAsync(string pipelineId, CancellationToken ct)
+    public static async Task<ProcessingJob?> FindPending(string pipelineId, CancellationToken ct)
     {
         var pending = await Query(j =>
             j.PipelineId == pipelineId &&
@@ -64,7 +64,7 @@ public sealed class ProcessingJob : Entity<ProcessingJob>
             .FirstOrDefault();
     }
 
-    public static async Task<(ProcessingJob? Job, bool Cancelled)> TryCancelPendingAsync(string jobId, CancellationToken ct)
+    public static async Task<(ProcessingJob? Job, bool Cancelled)> TryCancelPending(string jobId, CancellationToken ct)
     {
         var job = await Get(jobId, ct).ConfigureAwait(false);
         if (job is null)
@@ -95,7 +95,7 @@ public sealed class ProcessingJob : Entity<ProcessingJob>
         return (job, true);
     }
 
-    public static async Task<ProcessingJob?> TryClaimAsync(string pipelineId, string workerId, CancellationToken ct)
+    public static async Task<ProcessingJob?> TryClaim(string pipelineId, string workerId, CancellationToken ct)
     {
         var now = DateTime.UtcNow;
         var staleCutoff = now - HeartbeatGracePeriod;
@@ -125,7 +125,7 @@ public sealed class ProcessingJob : Entity<ProcessingJob>
         return job;
     }
 
-    public static async Task<ProcessingJob?> TryClaimAnyAsync(string workerId, CancellationToken ct)
+    public static async Task<ProcessingJob?> TryClaimAny(string workerId, CancellationToken ct)
     {
         var now = DateTime.UtcNow;
         var staleCutoff = now - HeartbeatGracePeriod;
@@ -154,7 +154,7 @@ public sealed class ProcessingJob : Entity<ProcessingJob>
         return job;
     }
 
-    public static async Task SignalHeartbeatAsync(string jobId, CancellationToken ct)
+    public static async Task SignalHeartbeat(string jobId, CancellationToken ct)
     {
         var job = await Get(jobId, ct);
         if (job is null)

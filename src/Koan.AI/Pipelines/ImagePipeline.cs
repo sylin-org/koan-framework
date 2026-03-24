@@ -181,7 +181,7 @@ public sealed class ImagePipeline : IAiPipelineStage<byte[]>
         }
 
         using var stream = new MemoryStream(bytes);
-        return await storageService.PutAsync(
+        return await storageService.Put(
             profile ?? "",
             container ?? "",
             key,
@@ -230,15 +230,15 @@ public sealed class ImagePipeline : IAiPipelineStage<byte[]>
     /// <summary>
     /// Execute pipeline and return image bytes.
     /// </summary>
-    public Task<byte[]> ExecuteAsync(CancellationToken ct = default)
+    public Task<byte[]> Execute(CancellationToken ct = default)
         => ToBytes(ct);
 
     /// <summary>
     /// Stream image bytes as single item.
     /// </summary>
-    public async IAsyncEnumerable<byte[]> StreamAsync([EnumeratorCancellation] CancellationToken ct = default)
+    public async IAsyncEnumerable<byte[]> Stream([EnumeratorCancellation] CancellationToken ct = default)
     {
-        yield return await ExecuteAsync(ct);
+        yield return await Execute(ct);
     }
 
     // ============================================================================
@@ -277,7 +277,7 @@ public sealed class ImagePipeline : IAiPipelineStage<byte[]>
         var storageService = GetStorageService();
         var (profile, container) = ResolveStorageBinding<TEntity>();
 
-        return await storageService.PutAsync(
+        return await storageService.Put(
             profile,
             container,
             filename,

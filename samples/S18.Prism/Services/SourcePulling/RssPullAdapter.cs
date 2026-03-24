@@ -24,7 +24,7 @@ public sealed class RssPullAdapter : ISourcePullAdapter
 
     public SourceType SupportedType => SourceType.Rss;
 
-    public async Task<List<Note>> PullAsync(Source source, CancellationToken ct)
+    public async Task<List<Note>> Pull(Source source, CancellationToken ct)
     {
         var config = SourceConfigParser.Parse<RssConfig>(source.Configuration);
 

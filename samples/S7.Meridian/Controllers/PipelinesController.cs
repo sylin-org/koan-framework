@@ -52,7 +52,7 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
             return NotFound();
         }
 
-        var documents = await pipeline.LoadDocumentsAsync(ct).ConfigureAwait(false);
+        var documents = await pipeline.LoadDocuments(ct).ConfigureAwait(false);
 
         _logger.LogInformation(
             "GetPipelineGraph for {PipelineId}: Pipeline.DocumentIds={PipelineDocIds}, LoadedDocuments={LoadedCount}, LoadedIds=[{LoadedIds}], LoadedStatuses=[{Statuses}]",
@@ -62,12 +62,12 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
             string.Join(", ", documents.Select(d => d.Id)),
             string.Join(", ", documents.Select(d => $"{d.Id}:{d.Status}")));
 
-        var deliverable = await GetLatestDeliverableAsync(pipeline, ct).ConfigureAwait(false);
+        var deliverable = await GetLatestDeliverable(pipeline, ct).ConfigureAwait(false);
 
         JToken? canonical = null;
         if (deliverable is not null)
         {
-            var canonicalJson = await _renderer.RenderJsonAsync(deliverable, ct).ConfigureAwait(false);
+            var canonicalJson = await _renderer.RenderJson(deliverable, ct).ConfigureAwait(false);
             canonical = TryParseCanonical(canonicalJson);
         }
 
@@ -80,8 +80,8 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
 
         var pipelineKey = pipeline.Id ?? pipelineId;
 
-        var jobSnapshots = await PipelineSnapshotMapper.LoadJobSnapshotsAsync(pipelineKey, ct).ConfigureAwait(false);
-        var runSnapshots = await PipelineSnapshotMapper.LoadRunLogSnapshotsAsync(pipelineKey, ct).ConfigureAwait(false);
+        var jobSnapshots = await PipelineSnapshotMapper.LoadJobSnapshots(pipelineKey, ct).ConfigureAwait(false);
+        var runSnapshots = await PipelineSnapshotMapper.LoadRunLogSnapshots(pipelineKey, ct).ConfigureAwait(false);
 
         var graph = new PipelineGraph
         {
@@ -167,7 +167,7 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
     {
         try
         {
-            var response = await _bootstrapService.CreateFromFilesAsync(files, ct);
+            var response = await _bootstrapService.CreateFromFiles(files, ct);
             return Created($"/api/pipelines/{response.PipelineId}", response);
         }
         catch (InvalidOperationException ex)
@@ -215,7 +215,7 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
 
         await pipeline.Save(ct).ConfigureAwait(false);
 
-        await _runLog.AppendAsync(new RunLog
+        await _runLog.Append(new RunLog
         {
             PipelineId = pipeline.Id ?? string.Empty,
             Stage = "analysis-override",
@@ -236,7 +236,7 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
         ProcessingJob? job = null;
         if (documents.Count > 0)
         {
-            job = await _jobs.ScheduleAsync(pipeline.Id!, documents, ct).ConfigureAwait(false);
+            job = await _jobs.Schedule(pipeline.Id!, documents, ct).ConfigureAwait(false);
         }
 
         var response = new AnalysisTypeOverrideResponse
@@ -251,7 +251,7 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
         return Accepted(response);
     }
 
-    private static async Task<Deliverable?> GetLatestDeliverableAsync(DocumentPipeline pipeline, CancellationToken ct)
+    private static async Task<Deliverable?> GetLatestDeliverable(DocumentPipeline pipeline, CancellationToken ct)
     {
         var pipelineId = pipeline.Id ?? string.Empty;
         Console.WriteLine($"[Meridian] Deliverable lookup start pipeline={pipelineId} directId={pipeline.DeliverableId ?? "<null>"}");

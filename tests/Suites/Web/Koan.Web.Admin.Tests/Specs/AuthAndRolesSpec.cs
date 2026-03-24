@@ -14,7 +14,7 @@ public class AuthAndRolesSpec : IClassFixture<WebAdminTestPipelineFixture>
     [Fact(DisplayName = "Web: Auth and roles regression - policies and discovery")]
     public async Task AuthAndRoles_PoliciesAndDiscovery()
     {
-    var response = await _fixture.HttpGetAsync("/admin/auth/roles");
+    var response = await _fixture.HttpGet("/admin/auth/roles");
     response.Should().NotBeNull();
     response.StatusCode.Should().Be(200);
     var json = await response.Content.ReadAsStringAsync();

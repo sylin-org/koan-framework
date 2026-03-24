@@ -16,7 +16,7 @@ namespace Koan.Samples.Meridian.Services;
 
 public interface IAnalysisTypeAuthoringService
 {
-    Task<AnalysisTypeAiSuggestResponse> SuggestAsync(AnalysisTypeAiSuggestRequest request, CancellationToken ct);
+    Task<AnalysisTypeAiSuggestResponse> Suggest(AnalysisTypeAiSuggestRequest request, CancellationToken ct);
 }
 
 public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
@@ -50,7 +50,7 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
         _logger = logger;
     }
 
-    public async Task<AnalysisTypeAiSuggestResponse> SuggestAsync(AnalysisTypeAiSuggestRequest request, CancellationToken ct)
+    public async Task<AnalysisTypeAiSuggestResponse> Suggest(AnalysisTypeAiSuggestRequest request, CancellationToken ct)
     {
         if (request is null)
         {
@@ -111,7 +111,7 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
             ["prompt"] = request.Prompt.Truncate(120)
         };
 
-        await _auditor.RecordAsync(
+        await _auditor.Record(
             "AnalysisType",
             draft.Name,
             requestSummary,

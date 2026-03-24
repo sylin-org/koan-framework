@@ -96,25 +96,25 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
     public async Task<Stream> OpenRead(CancellationToken ct = default)
     {
         var (profile, container) = InstanceBinding();
-        return await Storage().ReadAsync(profile, container, Key, ct);
+        return await Storage().Read(profile, container, Key, ct);
     }
 
     public async Task<(Stream Stream, long? Length)> OpenReadRange(long? from = null, long? to = null, CancellationToken ct = default)
     {
         var (profile, container) = InstanceBinding();
-        return await Storage().ReadRangeAsync(profile, container, Key, from, to, ct);
+        return await Storage().ReadRange(profile, container, Key, from, to, ct);
     }
 
     public async Task<ObjectStat?> Head(CancellationToken ct = default)
     {
         var (profile, container) = InstanceBinding();
-        return await Storage().HeadAsync(profile, container, Key, ct);
+        return await Storage().Head(profile, container, Key, ct);
     }
 
     public async Task<bool> Delete(CancellationToken ct = default)
     {
         var (profile, container) = InstanceBinding();
-        return await Storage().DeleteAsync(profile, container, Key, ct);
+        return await Storage().Delete(profile, container, Key, ct);
     }
 
     public async Task<TTarget> CopyTo<TTarget>(CancellationToken ct = default)
@@ -125,7 +125,7 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
             ? ("", "")
             : InstanceBinding();
         var (targetProfile, targetContainer) = ResolveBindingFor<TTarget>();
-        var obj = await Storage().TransferToProfileAsync(sourceProfile, sourceContainer, Key, targetProfile, targetContainer, deleteSource: false, ct);
+        var obj = await Storage().TransferToProfile(sourceProfile, sourceContainer, Key, targetProfile, targetContainer, deleteSource: false, ct);
         return To<TTarget>(obj);
     }
 
@@ -136,7 +136,7 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
             ? ("", "")
             : InstanceBinding();
         var (targetProfile, targetContainer) = ResolveBindingFor<TTarget>();
-        var obj = await Storage().TransferToProfileAsync(sourceProfile, sourceContainer, Key, targetProfile, targetContainer, deleteSource: true, ct);
+        var obj = await Storage().TransferToProfile(sourceProfile, sourceContainer, Key, targetProfile, targetContainer, deleteSource: true, ct);
         return To<TTarget>(obj);
     }
 
@@ -160,19 +160,19 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
     public static Task<Stream> OpenRead(string key, CancellationToken ct = default)
     {
         var (profile, container) = ResolveBinding();
-        return Storage().ReadAsync(profile, container, key, ct);
+        return Storage().Read(profile, container, key, ct);
     }
 
     public static Task<(Stream Stream, long? Length)> OpenReadRange(string key, long? from = null, long? to = null, CancellationToken ct = default)
     {
         var (profile, container) = ResolveBinding();
-        return Storage().ReadRangeAsync(profile, container, key, from, to, ct);
+        return Storage().ReadRange(profile, container, key, from, to, ct);
     }
 
     public static Task<ObjectStat?> Head(string key, CancellationToken ct = default)
     {
         var (profile, container) = ResolveBinding();
-        return Storage().HeadAsync(profile, container, key, ct);
+        return Storage().Head(profile, container, key, ct);
     }
 
     // Map from StorageObject to TEntity (shallow copy of storage metadata)

@@ -123,7 +123,7 @@ public sealed class AgentBuilder
         CancellationToken ct = default)
     {
         var executor = ResolveExecutor();
-        return await executor.ExecuteAsync(Build(), goal, context, ct);
+        return await executor.Execute(Build(), goal, context, ct);
     }
 
     /// <summary>Stream the agent's reasoning steps as they occur.</summary>
@@ -132,7 +132,7 @@ public sealed class AgentBuilder
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var executor = ResolveExecutor();
-        await foreach (var step in executor.StreamAsync(Build(), goal, ct))
+        await foreach (var step in executor.Stream(Build(), goal, ct))
         {
             yield return step;
         }
@@ -183,6 +183,6 @@ public sealed record AgentDefinition(
 /// </summary>
 public interface IAgentExecutor
 {
-    Task<AgentResult> ExecuteAsync(AgentDefinition definition, string goal, object? context, CancellationToken ct);
-    IAsyncEnumerable<AgentStep> StreamAsync(AgentDefinition definition, string goal, CancellationToken ct);
+    Task<AgentResult> Execute(AgentDefinition definition, string goal, object? context, CancellationToken ct);
+    IAsyncEnumerable<AgentStep> Stream(AgentDefinition definition, string goal, CancellationToken ct);
 }

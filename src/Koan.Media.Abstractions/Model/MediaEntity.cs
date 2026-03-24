@@ -45,6 +45,6 @@ public abstract class MediaEntity<TEntity> : Koan.Storage.Model.StorageEntity<TE
         var container = inst.Container ?? attr?.Container ?? string.Empty;
         var svc = (Koan.Core.Hosting.App.AppHost.Current?.GetService(typeof(IStorageService)) as IStorageService)
                 ?? throw new InvalidOperationException("IStorageService not available");
-        return await svc.ReadAsync(profile, container, key, ct);
+        return await svc.Read(profile, container, key, ct);
     }
 }

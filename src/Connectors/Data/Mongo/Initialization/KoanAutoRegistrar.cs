@@ -242,7 +242,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 Parameters = parameters.Count > 0 ? parameters : null
             };
 
-            var result = adapter.DiscoverAsync(context).GetAwaiter().GetResult();
+            var result = adapter.Discover(context).GetAwaiter().GetResult();
             if (result.IsSuccessful && !string.IsNullOrWhiteSpace(result.ServiceUrl))
             {
                 return result.ServiceUrl!;

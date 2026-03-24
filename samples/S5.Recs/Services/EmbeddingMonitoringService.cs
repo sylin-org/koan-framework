@@ -234,7 +234,7 @@ public class EmbeddingMonitoringService : BackgroundService
         logger.LogInformation("Export complete");
 
         // In production: Upload to S3/Azure Blob for disaster recovery
-        // await _blobStorage.UploadAsync(outputPath, "embeddings-backup");
+        // await _blobStorage.Upload(outputPath, "embeddings-backup");
     }
 
     /// <summary>

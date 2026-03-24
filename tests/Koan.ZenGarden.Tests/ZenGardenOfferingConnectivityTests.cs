@@ -32,7 +32,7 @@ public sealed class ZenGardenOfferingConnectivityTests : IClassFixture<ZenGarden
             return;
         }
 
-        var candidates = await FindOfferingCandidatesAsync("mongodb");
+        var candidates = await FindOfferingCandidates("mongodb");
         if (candidates.Count == 0)
         {
             _output.WriteLine("No mongodb offering found in the garden; skipping mongo connectivity probe.");
@@ -43,13 +43,13 @@ public sealed class ZenGardenOfferingConnectivityTests : IClassFixture<ZenGarden
         var provider = scope.GetRequiredService<IZenGardenInitializationProvider>();
         ZenGardenConnectionIntent.TryParse("zen-garden://mongodb", out var intent).Should().BeTrue();
 
-        var resolved = await provider.ResolveAsync(intent!);
+        var resolved = await provider.Resolve(intent!);
         resolved.Should().NotBeNull(DescribeFailure("mongodb", candidates));
 
         var mongoUri = ZenGardenEndpointContractHandler.ResolveMongoEndpointOrThrow(resolved!);
         mongoUri.Should().NotBeNullOrWhiteSpace("mongodb offering must expose a usable mongodb URI");
 
-        await AssertMongoPingAsync(mongoUri!);
+        await AssertMongoPing(mongoUri!);
     }
 
     [Fact]
@@ -60,7 +60,7 @@ public sealed class ZenGardenOfferingConnectivityTests : IClassFixture<ZenGarden
             return;
         }
 
-        var candidates = await FindOfferingCandidatesAsync("ollama");
+        var candidates = await FindOfferingCandidates("ollama");
         if (candidates.Count == 0)
         {
             _output.WriteLine("No ollama offering found in the garden; skipping ollama connectivity probe.");
@@ -71,13 +71,13 @@ public sealed class ZenGardenOfferingConnectivityTests : IClassFixture<ZenGarden
         var provider = scope.GetRequiredService<IZenGardenInitializationProvider>();
         ZenGardenConnectionIntent.TryParse("zen-garden://ollama", out var intent).Should().BeTrue();
 
-        var resolved = await provider.ResolveAsync(intent!);
+        var resolved = await provider.Resolve(intent!);
         resolved.Should().NotBeNull(DescribeFailure("ollama", candidates));
 
         var endpoint = ZenGardenEndpointContractHandler.ResolveOllamaEndpointOrThrow(resolved!);
         endpoint.Should().NotBeNullOrWhiteSpace("ollama offering must expose an HTTP endpoint");
 
-        await AssertOllamaTagsAsync(endpoint!);
+        await AssertOllamaTags(endpoint!);
     }
 
     private bool EnsureGardenAvailable()
@@ -102,9 +102,9 @@ public sealed class ZenGardenOfferingConnectivityTests : IClassFixture<ZenGarden
         return false;
     }
 
-    private async Task<IReadOnlyList<ZenGardenToolSnapshot>> FindOfferingCandidatesAsync(string offering)
+    private async Task<IReadOnlyList<ZenGardenToolSnapshot>> FindOfferingCandidates(string offering)
     {
-        var all = await _fixture.Client.CatalogAsync(new ZenGardenSubscription
+        var all = await _fixture.Client.Catalog(new ZenGardenSubscription
         {
             ToolType = ZenGardenToolType.Offering
         });
@@ -142,7 +142,7 @@ public sealed class ZenGardenOfferingConnectivityTests : IClassFixture<ZenGarden
         return services.BuildServiceProvider();
     }
 
-    private static async Task AssertMongoPingAsync(string connectionString)
+    private static async Task AssertMongoPing(string connectionString)
     {
         var settings = MongoClientSettings.FromConnectionString(connectionString);
         settings.ConnectTimeout = TimeSpan.FromSeconds(5);
@@ -159,7 +159,7 @@ public sealed class ZenGardenOfferingConnectivityTests : IClassFixture<ZenGarden
         okValue.ToDouble().Should().BeGreaterThanOrEqualTo(1.0);
     }
 
-    private static async Task AssertOllamaTagsAsync(string endpoint)
+    private static async Task AssertOllamaTags(string endpoint)
     {
         if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri))
         {

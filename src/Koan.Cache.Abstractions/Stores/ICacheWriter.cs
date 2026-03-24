@@ -8,7 +8,7 @@ public interface ICacheWriter
 {
     ValueTask SetAsync<T>(CacheKey key, T value, CacheEntryOptions options, CancellationToken ct);
 
-    ValueTask<bool> RemoveAsync(CacheKey key, CancellationToken ct);
+    ValueTask<bool> Remove(CacheKey key, CancellationToken ct);
 
-    ValueTask TouchAsync(CacheKey key, CacheEntryOptions options, CancellationToken ct);
+    ValueTask Touch(CacheKey key, CacheEntryOptions options, CancellationToken ct);
 }

@@ -133,7 +133,7 @@ internal sealed class SqliteOptionsConfigurator : AdapterOptionsConfigurator<Sql
             };
 
             // Use autonomous discovery coordinator
-            var discoveryTask = _discoveryCoordinator.DiscoverServiceAsync("sqlite", context);
+            var discoveryTask = _discoveryCoordinator.DiscoverService("sqlite", context);
             var result = discoveryTask.GetAwaiter().GetResult();
 
             if (result.IsSuccessful)

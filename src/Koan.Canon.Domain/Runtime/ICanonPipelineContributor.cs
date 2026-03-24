@@ -19,5 +19,5 @@ public interface ICanonPipelineContributor<TModel>
     /// <summary>
     /// Executes the contributor logic.
     /// </summary>
-    ValueTask<CanonizationEvent?> ExecuteAsync(CanonPipelineContext<TModel> context, CancellationToken cancellationToken);
+    ValueTask<CanonizationEvent?> Execute(CanonPipelineContext<TModel> context, CancellationToken cancellationToken);
 }

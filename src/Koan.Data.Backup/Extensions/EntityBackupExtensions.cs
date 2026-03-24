@@ -107,7 +107,7 @@ public static class EntityBackupExtensions
         where TKey : notnull
     {
         var discoveryService = GetDiscoveryService();
-        var catalog = await discoveryService.DiscoverAllBackupsAsync(ct: ct);
+        var catalog = await discoveryService.DiscoverAllBackups(ct: ct);
         return catalog.Backups
             .Where(b => b.EntityTypes?.Contains(typeof(TEntity).Name) == true)
             .ToArray();
@@ -139,7 +139,7 @@ public static class EntityBackupExtensions
         where TKey : notnull
     {
         var discoveryService = GetDiscoveryService();
-        return await discoveryService.GetBackupAsync(backupName, ct);
+        return await discoveryService.GetBackup(backupName, ct);
     }
 
     private static IBackupService GetBackupService()
@@ -218,7 +218,7 @@ public static class DataBackup
         where TKey : notnull
     {
         var discoveryService = GetDiscoveryService();
-        var catalog = await discoveryService.DiscoverAllBackupsAsync(ct: ct);
+        var catalog = await discoveryService.DiscoverAllBackups(ct: ct);
         return catalog.Backups
             .Where(b => b.EntityTypes?.Contains(typeof(TEntity).Name) == true)
             .ToArray();

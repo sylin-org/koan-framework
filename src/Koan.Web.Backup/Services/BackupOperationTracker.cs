@@ -12,62 +12,62 @@ public interface IBackupOperationTracker
     /// <summary>
     /// Start tracking a new backup operation
     /// </summary>
-    Task<string> StartBackupOperationAsync(string backupName, CancellationToken cancellationToken);
+    Task<string> StartBackupOperation(string backupName, CancellationToken cancellationToken);
 
     /// <summary>
     /// Start tracking a new restore operation
     /// </summary>
-    Task<string> StartRestoreOperationAsync(string backupName, CancellationToken cancellationToken);
+    Task<string> StartRestoreOperation(string backupName, CancellationToken cancellationToken);
 
     /// <summary>
     /// Update progress for a backup operation
     /// </summary>
-    Task UpdateBackupProgressAsync(string operationId, BackupProgressInfo progress);
+    Task UpdateBackupProgress(string operationId, BackupProgressInfo progress);
 
     /// <summary>
     /// Update progress for a restore operation
     /// </summary>
-    Task UpdateRestoreProgressAsync(string operationId, RestoreProgressInfo progress);
+    Task UpdateRestoreProgress(string operationId, RestoreProgressInfo progress);
 
     /// <summary>
     /// Mark a backup operation as completed successfully
     /// </summary>
-    Task CompleteBackupOperationAsync(string operationId, Data.Backup.Models.BackupManifest result);
+    Task CompleteBackupOperation(string operationId, Data.Backup.Models.BackupManifest result);
 
     /// <summary>
     /// Mark a restore operation as completed successfully
     /// </summary>
-    Task CompleteRestoreOperationAsync(string operationId, RestoreResult result);
+    Task CompleteRestoreOperation(string operationId, RestoreResult result);
 
     /// <summary>
     /// Mark an operation as failed
     /// </summary>
-    Task FailOperationAsync(string operationId, string errorMessage);
+    Task FailOperation(string operationId, string errorMessage);
 
     /// <summary>
     /// Cancel an operation
     /// </summary>
-    Task CancelOperationAsync(string operationId);
+    Task CancelOperation(string operationId);
 
     /// <summary>
     /// Get backup operation status
     /// </summary>
-    Task<BackupOperationResponse?> GetBackupOperationAsync(string operationId);
+    Task<BackupOperationResponse?> GetBackupOperation(string operationId);
 
     /// <summary>
     /// Get restore operation status
     /// </summary>
-    Task<RestoreOperationResponse?> GetRestoreOperationAsync(string operationId);
+    Task<RestoreOperationResponse?> GetRestoreOperation(string operationId);
 
     /// <summary>
     /// Get all active operations
     /// </summary>
-    Task<IEnumerable<string>> GetActiveOperationsAsync();
+    Task<IEnumerable<string>> GetActiveOperations();
 
     /// <summary>
     /// Clean up completed operations older than specified time
     /// </summary>
-    Task CleanupCompletedOperationsAsync(TimeSpan olderThan);
+    Task CleanupCompletedOperations(TimeSpan olderThan);
 }
 
 /// <summary>
@@ -84,7 +84,7 @@ public class InMemoryBackupOperationTracker : IBackupOperationTracker
         _logger = logger;
     }
 
-    public Task<string> StartBackupOperationAsync(string backupName, CancellationToken cancellationToken)
+    public Task<string> StartBackupOperation(string backupName, CancellationToken cancellationToken)
     {
         var operationId = Guid.NewGuid().ToString("N");
         var operation = new BackupOperationResponse
@@ -104,7 +104,7 @@ public class InMemoryBackupOperationTracker : IBackupOperationTracker
         return Task.FromResult(operationId);
     }
 
-    public Task<string> StartRestoreOperationAsync(string backupName, CancellationToken cancellationToken)
+    public Task<string> StartRestoreOperation(string backupName, CancellationToken cancellationToken)
     {
         var operationId = Guid.NewGuid().ToString("N");
         var operation = new RestoreOperationResponse
@@ -124,7 +124,7 @@ public class InMemoryBackupOperationTracker : IBackupOperationTracker
         return Task.FromResult(operationId);
     }
 
-    public Task UpdateBackupProgressAsync(string operationId, BackupProgressInfo progress)
+    public Task UpdateBackupProgress(string operationId, BackupProgressInfo progress)
     {
         if (_backupOperations.TryGetValue(operationId, out var operation))
         {
@@ -144,7 +144,7 @@ public class InMemoryBackupOperationTracker : IBackupOperationTracker
         return Task.CompletedTask;
     }
 
-    public Task UpdateRestoreProgressAsync(string operationId, RestoreProgressInfo progress)
+    public Task UpdateRestoreProgress(string operationId, RestoreProgressInfo progress)
     {
         if (_restoreOperations.TryGetValue(operationId, out var operation))
         {
@@ -164,7 +164,7 @@ public class InMemoryBackupOperationTracker : IBackupOperationTracker
         return Task.CompletedTask;
     }
 
-    public Task CompleteBackupOperationAsync(string operationId, Data.Backup.Models.BackupManifest result)
+    public Task CompleteBackupOperation(string operationId, Data.Backup.Models.BackupManifest result)
     {
         if (_backupOperations.TryGetValue(operationId, out var operation))
         {
@@ -180,7 +180,7 @@ public class InMemoryBackupOperationTracker : IBackupOperationTracker
         return Task.CompletedTask;
     }
 
-    public Task CompleteRestoreOperationAsync(string operationId, RestoreResult result)
+    public Task CompleteRestoreOperation(string operationId, RestoreResult result)
     {
         if (_restoreOperations.TryGetValue(operationId, out var operation))
         {
@@ -196,7 +196,7 @@ public class InMemoryBackupOperationTracker : IBackupOperationTracker
         return Task.CompletedTask;
     }
 
-    public Task FailOperationAsync(string operationId, string errorMessage)
+    public Task FailOperation(string operationId, string errorMessage)
     {
         // Try backup operations first
         if (_backupOperations.TryGetValue(operationId, out var backupOperation))
@@ -222,7 +222,7 @@ public class InMemoryBackupOperationTracker : IBackupOperationTracker
         return Task.CompletedTask;
     }
 
-    public Task CancelOperationAsync(string operationId)
+    public Task CancelOperation(string operationId)
     {
         // Try backup operations first
         if (_backupOperations.TryGetValue(operationId, out var backupOperation))
@@ -246,19 +246,19 @@ public class InMemoryBackupOperationTracker : IBackupOperationTracker
         return Task.CompletedTask;
     }
 
-    public Task<BackupOperationResponse?> GetBackupOperationAsync(string operationId)
+    public Task<BackupOperationResponse?> GetBackupOperation(string operationId)
     {
         _backupOperations.TryGetValue(operationId, out var operation);
         return Task.FromResult(operation);
     }
 
-    public Task<RestoreOperationResponse?> GetRestoreOperationAsync(string operationId)
+    public Task<RestoreOperationResponse?> GetRestoreOperation(string operationId)
     {
         _restoreOperations.TryGetValue(operationId, out var operation);
         return Task.FromResult(operation);
     }
 
-    public Task<IEnumerable<string>> GetActiveOperationsAsync()
+    public Task<IEnumerable<string>> GetActiveOperations()
     {
         var activeBackups = _backupOperations.Values
             .Where(op => op.Status == BackupOperationStatus.Running || op.Status == BackupOperationStatus.Queued)
@@ -276,7 +276,7 @@ public class InMemoryBackupOperationTracker : IBackupOperationTracker
         return Task.FromResult(allActive);
     }
 
-    public Task CleanupCompletedOperationsAsync(TimeSpan olderThan)
+    public Task CleanupCompletedOperations(TimeSpan olderThan)
     {
         var cutoffTime = DateTimeOffset.UtcNow.Subtract(olderThan);
         var removedCount = 0;

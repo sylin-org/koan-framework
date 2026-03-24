@@ -55,7 +55,7 @@ public sealed class ServiceProviderFixture : IAsyncDisposable, IInitializableFix
             return task;
         }
 
-        _serviceProvider.Dispose();
+        _serviceProvider.DisposeAsync();
         _serviceProvider = null;
         return ValueTask.CompletedTask;
     }

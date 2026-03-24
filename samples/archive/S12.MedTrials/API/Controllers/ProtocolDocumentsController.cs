@@ -22,14 +22,14 @@ public sealed class ProtocolDocumentsController : EntityController<ProtocolDocum
     [HttpPost("ingest")]
     public async Task<ActionResult<ProtocolDocumentIngestionResult>> Ingest([FromBody] ProtocolDocumentIngestionRequest request, CancellationToken ct)
     {
-        var result = await _documents.IngestAsync(request, ct);
+        var result = await _documents.Ingest(request, ct);
         return Ok(result);
     }
 
     [HttpPost("search")]
     public async Task<ActionResult<ProtocolDocumentQueryResult>> Search([FromBody] ProtocolDocumentQueryRequest request, CancellationToken ct)
     {
-        var result = await _documents.QueryAsync(request, ct);
+        var result = await _documents.Query(request, ct);
         return Ok(result);
     }
 }

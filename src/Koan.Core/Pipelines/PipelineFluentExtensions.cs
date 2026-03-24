@@ -116,5 +116,5 @@ public static class PipelineFluentExtensions
     /// Executes the pipeline.
     /// </summary>
     public static Task ExecuteAsync<TEntity>(this PipelineBuilder<TEntity> builder, CancellationToken cancellationToken = default)
-        => builder is null ? throw new ArgumentNullException(nameof(builder)) : builder.ExecuteAsync(cancellationToken);
+        => builder is null ? throw new ArgumentNullException(nameof(builder)) : builder.Execute(cancellationToken);
 }

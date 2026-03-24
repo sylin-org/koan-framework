@@ -5,6 +5,6 @@ namespace g1c1.GardenCoop.Hosting;
 
 public static class GardenSeederRunner
 {
-    public static Task EnsureSampleDataAsync(WebApplication app, CancellationToken cancellationToken = default)
-        => GardenSeeder.EnsureSampleDataAsync(app.Services, app.Logger, cancellationToken);
+    public static Task EnsureSampleData(WebApplication app, CancellationToken cancellationToken = default)
+        => GardenSeeder.EnsureSampleData(app.Services, app.Logger, cancellationToken);
 }

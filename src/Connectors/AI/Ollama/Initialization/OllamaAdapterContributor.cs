@@ -24,7 +24,7 @@ namespace Koan.AI.Connector.Ollama.Initialization;
 
 internal sealed class OllamaAdapterContributor : IAiAdapterContributor
 {
-    public async ValueTask ContributeAsync(IServiceProvider services, CancellationToken cancellationToken)
+    public async ValueTask Contribute(IServiceProvider services, CancellationToken cancellationToken)
     {
         var configuration = services.GetRequiredService<IConfiguration>();
         var sourceRegistry = services.GetRequiredService<IAiSourceRegistry>();
@@ -68,7 +68,7 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
             if (!string.IsNullOrWhiteSpace(configuredConnectionString))
             {
                 explicitModeRequested = true;
-                if (await TryCreateMemberFromConnectionAsync(
+                if (await TryCreateMemberFromConnection(
                         configuredConnectionString,
                         "ollama::connection",
                         0,
@@ -99,7 +99,7 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     var raw = explicitUrls[i];
-                    var member = await TryCreateMemberFromConnectionAsync(
+                    var member = await TryCreateMemberFromConnection(
                         raw,
                         $"ollama::explicit-{i + 1}",
                         members.Count,
@@ -124,7 +124,7 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
                 KoanLog.BootInfo(logger, LogActions.Discovery, "discovery-mode");
 
                 var autoDiscovered = false;
-                var zenMember = await TryCreateAutoZenGardenMemberAsync(
+                var zenMember = await TryCreateAutoZenGardenMember(
                     ollamaConfig,
                     zenGardenProvider,
                     defaultModel,
@@ -153,7 +153,7 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         var raw = additionalUrls[i];
-                        var member = await TryCreateMemberFromConnectionAsync(
+                        var member = await TryCreateMemberFromConnection(
                             raw,
                             $"ollama::additional-{i + 1}",
                             members.Count,
@@ -225,7 +225,7 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
         }
     }
 
-    private static async Task<AiMemberDefinition?> TryCreateAutoZenGardenMemberAsync(
+    private static async Task<AiMemberDefinition?> TryCreateAutoZenGardenMember(
         IConfigurationSection ollamaConfig,
         IZenGardenInitializationProvider? zenGardenProvider,
         string? defaultModel,
@@ -246,7 +246,7 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
         ZenGardenOfferingResolution? resolved;
         try
         {
-            resolved = await zenGardenProvider.ResolveAsync(resolveIntent, ct).ConfigureAwait(false);
+            resolved = await zenGardenProvider.Resolve(resolveIntent, ct).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -274,7 +274,7 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
         }
 
         var modelHint = ResolveModelHint(defaultModel, requiredCapabilities, resolved);
-        var caps = await GetCapabilitiesAsync(endpoint, modelHint, ct).ConfigureAwait(false);
+        var caps = await GetCapabilities(endpoint, modelHint, ct).ConfigureAwait(false);
         return new AiMemberDefinition
         {
             Name = "ollama::zengarden",
@@ -286,7 +286,7 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
         };
     }
 
-    private static async Task<AiMemberDefinition?> TryCreateMemberFromConnectionAsync(
+    private static async Task<AiMemberDefinition?> TryCreateMemberFromConnection(
         string rawConnection,
         string memberName,
         int order,
@@ -323,7 +323,7 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
             ZenGardenOfferingResolution? resolved;
             try
             {
-                resolved = await zenGardenProvider.ResolveAsync(intent, ct).ConfigureAwait(false);
+                resolved = await zenGardenProvider.Resolve(intent, ct).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -347,7 +347,7 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
             modelHint = ResolveModelHint(defaultModel, intent.Capabilities, resolved);
         }
 
-        var caps = await GetCapabilitiesAsync(endpoint, modelHint, ct).ConfigureAwait(false);
+        var caps = await GetCapabilities(endpoint, modelHint, ct).ConfigureAwait(false);
         return new AiMemberDefinition
         {
             Name = memberName,
@@ -588,7 +588,7 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
                 ("name", candidates[0].Name),
                 ("url", candidates[0].Url));
 
-            var caps = await GetCapabilitiesAsync(candidates[0].Url, defaultModel, ct).ConfigureAwait(false);
+            var caps = await GetCapabilities(candidates[0].Url, defaultModel, ct).ConfigureAwait(false);
             results.Add(new AiMemberDefinition
             {
                 Name = candidates[0].Name,
@@ -632,7 +632,7 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
         for (int i = 0; i < ordered.Count; i++)
         {
             var candidate = ordered[i];
-            var caps = await GetCapabilitiesAsync(candidate.Url, defaultModel, ct).ConfigureAwait(false);
+            var caps = await GetCapabilities(candidate.Url, defaultModel, ct).ConfigureAwait(false);
             results.Add(new AiMemberDefinition
             {
                 Name = candidate.Name,
@@ -662,7 +662,7 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
         }
     }
 
-    private static Task<IReadOnlyDictionary<string, AiCapabilityConfig>> GetCapabilitiesAsync(string baseUrl, string? defaultModel, CancellationToken ct)
+    private static Task<IReadOnlyDictionary<string, AiCapabilityConfig>> GetCapabilities(string baseUrl, string? defaultModel, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
 

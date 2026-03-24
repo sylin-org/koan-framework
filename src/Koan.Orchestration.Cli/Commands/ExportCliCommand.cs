@@ -9,7 +9,7 @@ internal sealed class ExportCliCommand : ICliCommand
 
     public ExportCliCommand(CommandRuntime runtime) => _runtime = runtime;
 
-    public Task<int> ExecuteAsync(CommandArgs args)
+    public Task<int> Execute(CommandArgs args)
     {
         var format = args.Positionals.FirstOrDefault() ?? "compose";
         var output = args.GetValue("out") ?? Constants.DefaultComposePath;
@@ -19,7 +19,7 @@ internal sealed class ExportCliCommand : ICliCommand
         var exposeInternals = args.HasFlag("expose-internals");
         var noManifest = args.HasFlag("no-launch-manifest");
 
-        return _runtime.ExecuteExportAsync(new CommandRuntime.ExportCommandOptions(format, output, profile, basePort, portOverride, exposeInternals, noManifest));
+        return _runtime.ExecuteExport(new CommandRuntime.ExportCommandOptions(format, output, profile, basePort, portOverride, exposeInternals, noManifest));
     }
 
     private static int? ParseNullableInt(string? value)

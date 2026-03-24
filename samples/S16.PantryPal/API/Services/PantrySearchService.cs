@@ -11,7 +11,7 @@ namespace S16.PantryPal.Services;
 /// </summary>
 public sealed class PantrySearchService : IPantrySearchService
 {
-    public async Task<(IReadOnlyList<PantryItem> items, bool degraded)> SearchAsync(string? query, int? topK, CancellationToken ct)
+    public async Task<(IReadOnlyList<PantryItem> items, bool degraded)> Search(string? query, int? topK, CancellationToken ct)
     {
         var size = topK.GetValueOrDefault(25);
         if (size <= 0) size = 25;

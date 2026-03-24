@@ -17,7 +17,7 @@ namespace Koan.Context.Services;
 /// </summary>
 public interface ISearchService
 {
-    Task<SearchResult> SearchAsync(
+    Task<SearchResult> Search(
         string projectId,
         SearchRequestContext request,
         CancellationToken cancellationToken = default);
@@ -51,7 +51,7 @@ public class Search : ISearchService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task<SearchResult> SearchAsync(
+    public async Task<SearchResult> Search(
         string projectId,
         SearchRequestContext request,
         CancellationToken cancellationToken = default)
@@ -59,7 +59,7 @@ public class Search : ISearchService
         var stopwatch = Stopwatch.StartNew();
         var warnings = new List<string>();
 
-        var persona = await ResolvePersonaAsync(request.PersonaId, cancellationToken);
+        var persona = await ResolvePersona(request.PersonaId, cancellationToken);
         var tokenBudget = Math.Clamp(
             Math.Min(request.MaxTokens, persona.MaxTokens),
             MinTokenBudget,
@@ -119,13 +119,13 @@ public class Search : ISearchService
             using (EntityContext.Partition(projectId))
             {
                 var cacheKey = $"embedding:{request.Query}";
-                var queryEmbedding = await _embeddingCache.GetOrCreateAsync(
+                var queryEmbedding = await _embeddingCache.GetOrCreate(
                     cacheKey,
                     async entry =>
                     {
                         entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1);
                         _logger.LogInformation("Generating embedding for query: {Query}", request.Query);
-                        var embedding = await _embedding.EmbedAsync(request.Query, cancellationToken);
+                        var embedding = await _embedding.Embed(request.Query, cancellationToken);
                         _logger.LogInformation("Generated embedding with dimension: {Dimension}", embedding.Length);
                         return embedding;
                     });
@@ -392,7 +392,7 @@ public class Search : ISearchService
         return parts.Length == 0 ? sanitized : parts[0];
     }
 
-    private async Task<SearchPersona> ResolvePersonaAsync(string? personaId, CancellationToken ct)
+    private async Task<SearchPersona> ResolvePersona(string? personaId, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(personaId))
         {
@@ -409,7 +409,7 @@ public class Search : ISearchService
         var normalizedPersonaId = personaId.Trim().ToLowerInvariant();
         var cacheKey = Constants.CacheKeys.Persona(normalizedPersonaId);
 
-        var persona = await _embeddingCache.GetOrCreateAsync(cacheKey, async entry =>
+        var persona = await _embeddingCache.GetOrCreate(cacheKey, async entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30);
 

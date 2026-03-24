@@ -9,7 +9,7 @@ internal sealed class SqliteHealthContributor(IOptions<SqliteOptions> options) :
 {
     public string Name => "data:sqlite";
     public bool IsCritical => true;
-    public async Task<HealthReport> CheckAsync(CancellationToken ct = default)
+    public async Task<HealthReport> Check(CancellationToken ct = default)
     {
         try
         {

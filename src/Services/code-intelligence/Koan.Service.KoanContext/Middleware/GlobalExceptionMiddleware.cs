@@ -33,7 +33,7 @@ public class GlobalExceptionMiddleware
         _environment = environment ?? throw new ArgumentNullException(nameof(environment));
     }
 
-    public async Task InvokeAsync(HttpContext context)
+    public async Task Invoke(HttpContext context)
     {
         try
         {
@@ -41,11 +41,11 @@ public class GlobalExceptionMiddleware
         }
         catch (Exception ex)
         {
-            await HandleExceptionAsync(context, ex);
+            await HandleException(context, ex);
         }
     }
 
-    private async Task HandleExceptionAsync(HttpContext context, Exception exception)
+    private async Task HandleException(HttpContext context, Exception exception)
     {
         // Generate correlation ID for tracking
         var correlationId = Guid.NewGuid().ToString();

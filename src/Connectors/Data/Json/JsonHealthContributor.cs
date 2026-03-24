@@ -9,7 +9,7 @@ internal sealed class JsonHealthContributor(IOptions<JsonDataOptions> options) :
     public string Name => "data:json";
     public bool IsCritical => true;
 
-    public Task<HealthReport> CheckAsync(CancellationToken ct = default)
+    public Task<HealthReport> Check(CancellationToken ct = default)
     {
         var path = options.Value.DirectoryPath;
         var data = new Dictionary<string, object?> { ["path"] = path };

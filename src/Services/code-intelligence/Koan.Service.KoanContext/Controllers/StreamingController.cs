@@ -76,7 +76,7 @@ public class StreamingController : ControllerBase
     {
         _logger.LogInformation("Starting SSE stream for job {JobId}", jobId);
 
-        var (job, fetchError, cancelled) = await TryGetJobAsync(jobId, cancellationToken);
+        var (job, fetchError, cancelled) = await TryGetJob(jobId, cancellationToken);
         if (cancelled)
         {
             _logger.LogInformation("SSE stream cancelled for job {JobId}", jobId);
@@ -103,7 +103,7 @@ public class StreamingController : ControllerBase
 
         while (!cancellationToken.IsCancellationRequested)
         {
-            var (currentJob, error, jobCancelled) = await TryGetJobAsync(jobId, cancellationToken);
+            var (currentJob, error, jobCancelled) = await TryGetJob(jobId, cancellationToken);
             if (jobCancelled)
             {
                 _logger.LogInformation("SSE stream cancelled for job {JobId}", jobId);
@@ -142,7 +142,7 @@ public class StreamingController : ControllerBase
 
             yield return CreateEnvelope("heartbeat", new { timestamp = DateTime.UtcNow });
 
-            if (!await WaitAsync(JobPollInterval, cancellationToken))
+            if (!await Wait(JobPollInterval, cancellationToken))
             {
                 _logger.LogInformation("SSE stream cancelled for job {JobId}", jobId);
                 yield break;
@@ -158,7 +158,7 @@ public class StreamingController : ControllerBase
 
         while (!cancellationToken.IsCancellationRequested)
         {
-            var (jobs, error, cancelled) = await TryQueryActiveJobsAsync(cancellationToken);
+            var (jobs, error, cancelled) = await TryQueryActiveJobs(cancellationToken);
             if (cancelled)
             {
                 _logger.LogInformation("SSE stream for all jobs cancelled");
@@ -202,7 +202,7 @@ public class StreamingController : ControllerBase
                 activeJobs = jobs.Count
             });
 
-            if (!await WaitAsync(AllJobsPollInterval, cancellationToken))
+            if (!await Wait(AllJobsPollInterval, cancellationToken))
             {
                 _logger.LogInformation("SSE stream for all jobs cancelled");
                 yield break;
@@ -210,7 +210,7 @@ public class StreamingController : ControllerBase
         }
     }
 
-    private static async Task<(Job? Job, Exception? Error, bool Cancelled)> TryGetJobAsync(string jobId, CancellationToken cancellationToken)
+    private static async Task<(Job? Job, Exception? Error, bool Cancelled)> TryGetJob(string jobId, CancellationToken cancellationToken)
     {
         try
         {
@@ -227,7 +227,7 @@ public class StreamingController : ControllerBase
         }
     }
 
-    private static async Task<(IReadOnlyList<Job> Jobs, Exception? Error, bool Cancelled)> TryQueryActiveJobsAsync(CancellationToken cancellationToken)
+    private static async Task<(IReadOnlyList<Job> Jobs, Exception? Error, bool Cancelled)> TryQueryActiveJobs(CancellationToken cancellationToken)
     {
         try
         {
@@ -248,7 +248,7 @@ public class StreamingController : ControllerBase
         }
     }
 
-    private static async Task<bool> WaitAsync(TimeSpan interval, CancellationToken cancellationToken)
+    private static async Task<bool> Wait(TimeSpan interval, CancellationToken cancellationToken)
     {
         try
         {

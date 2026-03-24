@@ -26,7 +26,7 @@ public sealed class PgVectorExtensionManager
     /// Ensures pgvector extension is installed and enabled.
     /// Idempotent - safe to call multiple times.
     /// </summary>
-    public async Task EnsureExtensionAsync(NpgsqlConnection conn, CancellationToken ct = default)
+    public async Task EnsureExtension(NpgsqlConnection conn, CancellationToken ct = default)
     {
         if (_extensionEnsured) return;
 

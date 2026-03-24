@@ -31,7 +31,7 @@ internal sealed class JobProgressBroker
         return subscription;
     }
 
-    public Task PublishAsync(Job job, CancellationToken cancellationToken)
+    public Task Publish(Job job, CancellationToken cancellationToken)
     {
         var update = new JobProgressUpdate
         {
@@ -40,10 +40,10 @@ internal sealed class JobProgressBroker
             EstimatedCompletion = job.EstimatedCompletion,
             UpdatedAt = DateTimeOffset.UtcNow
         };
-        return PublishAsync(job.Id, update, cancellationToken);
+        return Publish(job.Id, update, cancellationToken);
     }
 
-    public async Task PublishAsync(string jobId, JobProgressUpdate update, CancellationToken cancellationToken)
+    public async Task Publish(string jobId, JobProgressUpdate update, CancellationToken cancellationToken)
     {
         if (!_subscriptions.TryGetValue(jobId, out var bucket))
             return;
@@ -57,7 +57,7 @@ internal sealed class JobProgressBroker
         foreach (var subscription in targets)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            await subscription.InvokeAsync(update);
+            await subscription.Invoke(update);
         }
     }
 
@@ -92,7 +92,7 @@ internal sealed class JobProgressSubscription : IDisposable
 
     internal string JobId { get; }
 
-    internal Task InvokeAsync(JobProgressUpdate update)
+    internal Task Invoke(JobProgressUpdate update)
     {
         if (Volatile.Read(ref _disposed) == 1)
             return Task.CompletedTask;

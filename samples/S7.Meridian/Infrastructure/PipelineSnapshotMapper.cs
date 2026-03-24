@@ -10,7 +10,7 @@ namespace Koan.Samples.Meridian.Infrastructure;
 
 internal static class PipelineSnapshotMapper
 {
-    public static async Task<IReadOnlyList<JobSnapshot>> LoadJobSnapshotsAsync(string pipelineId, CancellationToken ct)
+    public static async Task<IReadOnlyList<JobSnapshot>> LoadJobSnapshots(string pipelineId, CancellationToken ct)
     {
         var jobs = await ProcessingJob.Query(job => job.PipelineId == pipelineId, ct).ConfigureAwait(false);
 
@@ -21,7 +21,7 @@ internal static class PipelineSnapshotMapper
             .ToArray();
     }
 
-    public static async Task<IReadOnlyList<RunLogSnapshot>> LoadRunLogSnapshotsAsync(string pipelineId, CancellationToken ct)
+    public static async Task<IReadOnlyList<RunLogSnapshot>> LoadRunLogSnapshots(string pipelineId, CancellationToken ct)
     {
         var logs = await RunLog.Query(log => log.PipelineId == pipelineId, ct).ConfigureAwait(false);
 

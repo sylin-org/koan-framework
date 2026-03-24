@@ -41,7 +41,7 @@ internal sealed class PostgresConnectorFixture : IAsyncDisposable
 
     public string Database { get; }
 
-    public static ValueTask<PostgresConnectorFixture> CreateAsync(TestContext ctx)
+    public static ValueTask<PostgresConnectorFixture> Create(TestContext ctx)
     {
         ArgumentNullException.ThrowIfNull(ctx);
 
@@ -149,7 +149,7 @@ internal sealed class PostgresConnectorFixture : IAsyncDisposable
     {
         try
         {
-            await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+            await asyncDisposable.Dispose().ConfigureAwait(false);
         }
         catch
         {

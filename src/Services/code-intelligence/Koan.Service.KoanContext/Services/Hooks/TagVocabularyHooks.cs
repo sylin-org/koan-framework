@@ -23,37 +23,37 @@ public sealed class TagVocabularyHooks : IModelHook<TagVocabularyEntry>
 
     public int Order => 0;
 
-    public Task OnBeforeFetchAsync(HookContext<TagVocabularyEntry> ctx, string id)
+    public Task OnBeforeFetch(HookContext<TagVocabularyEntry> ctx, string id)
         => Task.CompletedTask;
 
-    public Task OnAfterFetchAsync(HookContext<TagVocabularyEntry> ctx, TagVocabularyEntry? model)
+    public Task OnAfterFetch(HookContext<TagVocabularyEntry> ctx, TagVocabularyEntry? model)
         => Task.CompletedTask;
 
-    public Task OnBeforeSaveAsync(HookContext<TagVocabularyEntry> ctx, TagVocabularyEntry model)
+    public Task OnBeforeSave(HookContext<TagVocabularyEntry> ctx, TagVocabularyEntry model)
     {
         Normalize(model);
         return Task.CompletedTask;
     }
 
-    public Task OnAfterSaveAsync(HookContext<TagVocabularyEntry> ctx, TagVocabularyEntry model)
+    public Task OnAfterSave(HookContext<TagVocabularyEntry> ctx, TagVocabularyEntry model)
     {
         Invalidate();
         return Task.CompletedTask;
     }
 
-    public Task OnBeforeDeleteAsync(HookContext<TagVocabularyEntry> ctx, TagVocabularyEntry model)
+    public Task OnBeforeDelete(HookContext<TagVocabularyEntry> ctx, TagVocabularyEntry model)
         => Task.CompletedTask;
 
-    public Task OnAfterDeleteAsync(HookContext<TagVocabularyEntry> ctx, TagVocabularyEntry model)
+    public Task OnAfterDelete(HookContext<TagVocabularyEntry> ctx, TagVocabularyEntry model)
     {
         Invalidate();
         return Task.CompletedTask;
     }
 
-    public Task OnBeforePatchAsync(HookContext<TagVocabularyEntry> ctx, string id, object patch)
+    public Task OnBeforePatch(HookContext<TagVocabularyEntry> ctx, string id, object patch)
         => Task.CompletedTask;
 
-    public Task OnAfterPatchAsync(HookContext<TagVocabularyEntry> ctx, TagVocabularyEntry model)
+    public Task OnAfterPatch(HookContext<TagVocabularyEntry> ctx, TagVocabularyEntry model)
     {
         Normalize(model);
         Invalidate();

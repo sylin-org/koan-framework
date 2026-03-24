@@ -42,7 +42,7 @@ public class {parameters.ClassName} : BaseKoanAdapter
     {{
     }}
 
-    protected override async Task InitializeAdapterAsync(CancellationToken cancellationToken = default)
+    protected override async Task InitializeAdapter(CancellationToken cancellationToken = default)
     {{
         var connectionString = GetConnectionString();
         if (string.IsNullOrEmpty(connectionString))
@@ -59,7 +59,7 @@ public class {parameters.ClassName} : BaseKoanAdapter
         Logger.LogInformation(""[{{AdapterId}}] {parameters.DisplayName} connection established"", AdapterId);
     }}
 
-    protected override async Task<IReadOnlyDictionary<string, object?>?> CheckAdapterHealthAsync(CancellationToken cancellationToken = default)
+    protected override async Task<IReadOnlyDictionary<string, object?>?> CheckAdapterHealth(CancellationToken cancellationToken = default)
     {{
         try
         {{
@@ -89,7 +89,7 @@ public class {parameters.ClassName} : BaseKoanAdapter
         }}
     }}
 
-    protected override Task<IReadOnlyDictionary<string, object?>?> GetAdapterBootstrapMetadataAsync(CancellationToken cancellationToken = default)
+    protected override Task<IReadOnlyDictionary<string, object?>?> GetAdapterBootstrapMetadata(CancellationToken cancellationToken = default)
     {{
         var metadata = new Dictionary<string, object?>
         {{

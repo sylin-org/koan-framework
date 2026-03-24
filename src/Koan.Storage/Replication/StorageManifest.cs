@@ -78,7 +78,7 @@ public sealed class StorageManifest
     /// Loads manifest entries from a JSONL file. Merges into current state
     /// (later lines for the same key overwrite earlier ones).
     /// </summary>
-    public async Task LoadAsync(string path, CancellationToken ct = default)
+    public async Task Load(string path, CancellationToken ct = default)
     {
         if (!File.Exists(path))
             return;
@@ -106,7 +106,7 @@ public sealed class StorageManifest
     /// Persists the full manifest to a JSONL file (compacted — one line per entry).
     /// Writes atomically via temp file + rename.
     /// </summary>
-    public async Task SaveAsync(string path, CancellationToken ct = default)
+    public async Task Save(string path, CancellationToken ct = default)
     {
         var dir = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(dir))

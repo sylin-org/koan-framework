@@ -23,7 +23,7 @@ public sealed class ZenGardenCapabilityWishTests
                 StreamReconnectDelaySeconds = 30
             });
 
-        var wish = await client.WishAsync("ollama", ["model1", "model2"]);
+        var wish = await client.Wish("ollama", ["model1", "model2"]);
 
         wish.ToolFqid.Should().Be("ollama");
         wish.Status.Should().Be("in_progress");
@@ -47,7 +47,7 @@ public sealed class ZenGardenCapabilityWishTests
                 StreamReconnectDelaySeconds = 30
             });
 
-        var wish = await client.WishAsync("ollama", ["model1"]);
+        var wish = await client.Wish("ollama", ["model1"]);
 
         var tcs = new TaskCompletionSource<ZenGardenCapabilityProgressEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
         using var subscription = client.SubscribeCapability(

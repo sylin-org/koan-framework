@@ -6,5 +6,5 @@ namespace S12.MedTrials.Services;
 
 public interface IVisitPlanningService
 {
-    Task<VisitPlanningResult> PlanAsync(VisitPlanningRequest request, CancellationToken ct);
+    Task<VisitPlanningResult> Plan(VisitPlanningRequest request, CancellationToken ct);
 }

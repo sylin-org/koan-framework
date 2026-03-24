@@ -151,7 +151,7 @@ internal sealed class LMStudioOptionsConfigurator : AdapterOptionsConfigurator<L
                 ("mode", context.OrchestrationMode.ToString()),
                 ("requiredModel", defaultModel ?? "(none)"));
 
-            var result = _discoveryCoordinator.DiscoverServiceAsync(Constants.Adapter.Type, context)
+            var result = _discoveryCoordinator.DiscoverService(Constants.Adapter.Type, context)
                 .GetAwaiter().GetResult();
 
             if (result.IsSuccessful)

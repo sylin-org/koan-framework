@@ -10,7 +10,7 @@ public interface ICacheClient : ICacheReader, ICacheWriter
 
     CacheScopeHandle BeginScope(string scopeId, string? region = null);
 
-    ValueTask<long> FlushTagsAsync(IReadOnlyCollection<string> tags, CancellationToken ct);
+    ValueTask<long> FlushTags(IReadOnlyCollection<string> tags, CancellationToken ct);
 
-    ValueTask<long> CountTagsAsync(IReadOnlyCollection<string> tags, CancellationToken ct);
+    ValueTask<long> CountTags(IReadOnlyCollection<string> tags, CancellationToken ct);
 }

@@ -24,13 +24,13 @@ public class SemanticSearchSpec : PGVectorTestBase
         var healthArticle = CreateEmbeddingWithBias(384, seed: 200); // Health (different)
         var financeArticle = CreateEmbeddingWithBias(384, seed: 300); // Finance (different)
 
-        await repo.UpsertAsync("ml-basics", mlArticle1, new { Title = "ML Basics", Category = "Tech" });
-        await repo.UpsertAsync("ml-advanced", mlArticle2, new { Title = "Advanced ML", Category = "Tech" });
-        await repo.UpsertAsync("health-tips", healthArticle, new { Title = "Health Tips", Category = "Health" });
-        await repo.UpsertAsync("finance-101", financeArticle, new { Title = "Finance 101", Category = "Finance" });
+        await repo.Upsert("ml-basics", mlArticle1, new { Title = "ML Basics", Category = "Tech" });
+        await repo.Upsert("ml-advanced", mlArticle2, new { Title = "Advanced ML", Category = "Tech" });
+        await repo.Upsert("health-tips", healthArticle, new { Title = "Health Tips", Category = "Health" });
+        await repo.Upsert("finance-101", financeArticle, new { Title = "Finance 101", Category = "Finance" });
 
         // Act - Search with ML article embedding
-        var results = await repo.SearchAsync(new VectorQueryOptions(
+        var results = await repo.Search(new VectorQueryOptions(
             Query: mlArticle1,
             TopK: 3
         ));
@@ -60,13 +60,13 @@ public class SemanticSearchSpec : PGVectorTestBase
         // Insert articles across categories with varying similarity
         var techEmbedding = CreateEmbeddingWithBias(384, seed: 100);
 
-        await repo.UpsertAsync("tech-1", techEmbedding, new { Category = "Tech", Popularity = 100 });
-        await repo.UpsertAsync("tech-2", CreateEmbeddingWithBias(384, seed: 101), new { Category = "Tech", Popularity = 50 });
-        await repo.UpsertAsync("health-1", CreateEmbeddingWithBias(384, seed: 200), new { Category = "Health", Popularity = 200 });
-        await repo.UpsertAsync("finance-1", CreateEmbeddingWithBias(384, seed: 300), new { Category = "Finance", Popularity = 150 });
+        await repo.Upsert("tech-1", techEmbedding, new { Category = "Tech", Popularity = 100 });
+        await repo.Upsert("tech-2", CreateEmbeddingWithBias(384, seed: 101), new { Category = "Tech", Popularity = 50 });
+        await repo.Upsert("health-1", CreateEmbeddingWithBias(384, seed: 200), new { Category = "Health", Popularity = 200 });
+        await repo.Upsert("finance-1", CreateEmbeddingWithBias(384, seed: 300), new { Category = "Finance", Popularity = 150 });
 
         // Act - Semantic search within Tech category only
-        var results = await repo.SearchAsync(new VectorQueryOptions(
+        var results = await repo.Search(new VectorQueryOptions(
             Query: techEmbedding,
             TopK: 10,
             Filter: new { Category = "Tech" }
@@ -94,12 +94,12 @@ public class SemanticSearchSpec : PGVectorTestBase
         var similar2 = CreateEmbeddingWithBias(384, seed: 110); // Somewhat similar
         var dissimilar = CreateEmbeddingWithBias(384, seed: 500); // Very different
 
-        await repo.UpsertAsync("rec-perfect", similar1, new { Type = "recommendation" });
-        await repo.UpsertAsync("rec-good", similar2, new { Type = "recommendation" });
-        await repo.UpsertAsync("rec-poor", dissimilar, new { Type = "recommendation" });
+        await repo.Upsert("rec-perfect", similar1, new { Type = "recommendation" });
+        await repo.Upsert("rec-good", similar2, new { Type = "recommendation" });
+        await repo.Upsert("rec-poor", dissimilar, new { Type = "recommendation" });
 
         // Act - Get recommendations
-        var recommendations = await repo.SearchAsync(new VectorQueryOptions(
+        var recommendations = await repo.Search(new VectorQueryOptions(
             Query: userProfile,
             TopK: 2
         ));
@@ -126,13 +126,13 @@ public class SemanticSearchSpec : PGVectorTestBase
         var healthCentroid = CreateEmbeddingWithBias(384, seed: 200);
         var financeCentroid = CreateEmbeddingWithBias(384, seed: 300);
 
-        await repo.UpsertAsync("category-tech", techCentroid, new { Type = "centroid", Category = "Tech" });
-        await repo.UpsertAsync("category-health", healthCentroid, new { Type = "centroid", Category = "Health" });
-        await repo.UpsertAsync("category-finance", financeCentroid, new { Type = "centroid", Category = "Finance" });
+        await repo.Upsert("category-tech", techCentroid, new { Type = "centroid", Category = "Tech" });
+        await repo.Upsert("category-health", healthCentroid, new { Type = "centroid", Category = "Health" });
+        await repo.Upsert("category-finance", financeCentroid, new { Type = "centroid", Category = "Finance" });
 
         // Act - Classify new document (close to health centroid)
         var newDocument = CreateEmbeddingWithBias(384, seed: 205);
-        var classification = await repo.SearchAsync(new VectorQueryOptions(
+        var classification = await repo.Search(new VectorQueryOptions(
             Query: newDocument,
             TopK: 1,
             Filter: new { Type = "centroid" }
@@ -153,12 +153,12 @@ public class SemanticSearchSpec : PGVectorTestBase
         var nearDuplicate = CreateEmbeddingWithBias(384, seed: 100); // Same seed = very similar
         var uniqueDoc = CreateEmbeddingWithBias(384, seed: 500);
 
-        await repo.UpsertAsync("doc-original", originalDoc, new { Status = "published" });
-        await repo.UpsertAsync("doc-duplicate", nearDuplicate, new { Status = "draft" });
-        await repo.UpsertAsync("doc-unique", uniqueDoc, new { Status = "published" });
+        await repo.Upsert("doc-original", originalDoc, new { Status = "published" });
+        await repo.Upsert("doc-duplicate", nearDuplicate, new { Status = "draft" });
+        await repo.Upsert("doc-unique", uniqueDoc, new { Status = "published" });
 
         // Act - Find duplicates of original
-        var duplicates = await repo.SearchAsync(new VectorQueryOptions(
+        var duplicates = await repo.Search(new VectorQueryOptions(
             Query: originalDoc,
             TopK: 3
         ));
@@ -186,13 +186,13 @@ public class SemanticSearchSpec : PGVectorTestBase
         var germanEmbedding = CreateEmbeddingWithBias(384, seed: 103);
         var spanishEmbedding = CreateEmbeddingWithBias(384, seed: 104);
 
-        await repo.UpsertAsync("en-article", englishEmbedding, new { Language = "en", Topic = "AI" });
-        await repo.UpsertAsync("fr-article", frenchEmbedding, new { Language = "fr", Topic = "AI" });
-        await repo.UpsertAsync("de-article", germanEmbedding, new { Language = "de", Topic = "AI" });
-        await repo.UpsertAsync("es-article", spanishEmbedding, new { Language = "es", Topic = "Health" });
+        await repo.Upsert("en-article", englishEmbedding, new { Language = "en", Topic = "AI" });
+        await repo.Upsert("fr-article", frenchEmbedding, new { Language = "fr", Topic = "AI" });
+        await repo.Upsert("de-article", germanEmbedding, new { Language = "de", Topic = "AI" });
+        await repo.Upsert("es-article", spanishEmbedding, new { Language = "es", Topic = "Health" });
 
         // Act - Search with English query
-        var results = await repo.SearchAsync(new VectorQueryOptions(
+        var results = await repo.Search(new VectorQueryOptions(
             Query: englishEmbedding,
             TopK: 3
         ));
@@ -223,19 +223,19 @@ public class SemanticSearchSpec : PGVectorTestBase
             // Batch in groups of 100 for efficient insertion
             if (items.Count == 100)
             {
-                await repo.UpsertManyAsync(items);
+                await repo.UpsertMany(items);
                 items.Clear();
             }
         }
 
         if (items.Count > 0)
         {
-            await repo.UpsertManyAsync(items);
+            await repo.UpsertMany(items);
         }
 
         // Act
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        var results = await repo.SearchAsync(new VectorQueryOptions(
+        var results = await repo.Search(new VectorQueryOptions(
             Query: CreateEmbeddingWithBias(384, seed: 5000),
             TopK: 10
         ));

@@ -54,7 +54,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
         {
             return await execTask;
         }
-        await using var ctx = await OpenAsync(ct);
+        await using var ctx = await Open(ct);
         await using var cmd = CreateCommand(ctx.Connection, sql, ToDictionary(parameters), ctx.Transaction);
         cmd.CommandTimeout = (int)_timeout.TotalSeconds;
         return await cmd.ExecuteNonQueryAsync(ct);
@@ -66,7 +66,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
         {
             return await execTask;
         }
-        await using var ctx = await OpenAsync(ct);
+        await using var ctx = await Open(ct);
         await using var cmd = CreateCommand(ctx.Connection, sql, ToDictionary(parameters), ctx.Transaction);
         cmd.CommandTimeout = (int)_timeout.TotalSeconds;
         var res = await cmd.ExecuteScalarAsync(ct);
@@ -102,7 +102,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
                 }
             }
         }
-        await using var ctx = await OpenAsync(ct);
+        await using var ctx = await Open(ct);
         await using var cmd = CreateCommand(ctx.Connection, sql, ToDictionary(parameters), ctx.Transaction);
         cmd.CommandTimeout = (int)_timeout.TotalSeconds;
         using var reader = await cmd.ExecuteReaderAsync(ct);
@@ -162,7 +162,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
         return false;
     }
 
-    private async Task<ConnCtx> OpenAsync(CancellationToken ct)
+    private async Task<ConnCtx> Open(CancellationToken ct)
     {
         var (provider, connStr) = Resolve();
         var conn = CreateConnection(_sp, provider, connStr);

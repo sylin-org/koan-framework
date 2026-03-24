@@ -9,17 +9,17 @@ public interface IServiceQueryBuilder
     /// <summary>
     /// Get current service status
     /// </summary>
-    Task<ServiceStatus> GetStatusAsync();
+    Task<ServiceStatus> GetStatus();
 
     /// <summary>
     /// Get service health information
     /// </summary>
-    Task<ServiceHealth> GetHealthAsync();
+    Task<ServiceHealth> GetHealth();
 
     /// <summary>
     /// Get detailed service information
     /// </summary>
-    Task<ServiceInfo> GetInfoAsync();
+    Task<ServiceInfo> GetInfo();
 }
 
 /// <summary>
@@ -52,7 +52,7 @@ public interface IServiceActionBuilder
     /// <summary>
     /// Execute the configured actions
     /// </summary>
-    Task ExecuteAsync(CancellationToken cancellationToken = default);
+    Task Execute(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Set action priority
@@ -80,7 +80,7 @@ public interface IServiceEventBuilder
     IServiceEventBuilder Do(Func<Task> handler);
     IServiceEventBuilder Once();
     IServiceEventBuilder WithFilter<TEventArgs>(Func<TEventArgs, bool> filter);
-    Task<IDisposable> SubscribeAsync();
+    Task<IDisposable> Subscribe();
 // ...existing code...
 
 /// <summary>
@@ -91,16 +91,16 @@ public interface IServiceQueryBuilder
     /// <summary>
     /// Get current service status
     /// </summary>
-    Task<ServiceStatus> GetStatusAsync();
+    Task<ServiceStatus> GetStatus();
 
     /// <summary>
     /// Get service health information
     /// </summary>
-    Task<ServiceHealth> GetHealthAsync();
+    Task<ServiceHealth> GetHealth();
 
     /// <summary>
     /// Get detailed service information
     /// </summary>
-    Task<ServiceInfo> GetInfoAsync();
+    Task<ServiceInfo> GetInfo();
 }
 }

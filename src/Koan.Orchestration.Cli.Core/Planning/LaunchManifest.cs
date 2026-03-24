@@ -64,9 +64,9 @@ internal static class LaunchManifest
                 }
             }
             catch { }
-            File.WriteAllText(path, json);
+            File.WriteAllTextAsync(path, json);
             var gi = Path.Combine(dir!, ".gitignore");
-            try { if (!File.Exists(gi)) File.WriteAllText(gi, "*\n!compose.yml\n"); } catch { }
+            try { if (!File.Exists(gi)) File.WriteAllTextAsync(gi, "*\n!compose.yml\n"); } catch { }
         }
         catch { }
     }

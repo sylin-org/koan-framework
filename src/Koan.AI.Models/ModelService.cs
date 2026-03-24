@@ -25,7 +25,7 @@ internal sealed class ModelService : IModelService
 
     // ── Discovery (catalog operations) ──
 
-    public async Task<IReadOnlyList<ModelEntry>> SearchAsync(string query, string? source, CancellationToken ct)
+    public async Task<IReadOnlyList<ModelEntry>> Search(string query, string? source, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(query))
         {
@@ -49,7 +49,7 @@ internal sealed class ModelService : IModelService
         // Remote adapters with ModelList capability
         foreach (var adapter in adapters)
         {
-            var models = await adapter.ListModelsAsync(ct);
+            var models = await adapter.ListModels(ct);
             results.AddRange(models
                 .Where(m => m.Name.Contains(query, StringComparison.OrdinalIgnoreCase))
                 .Select(ToModelEntry));
@@ -58,7 +58,7 @@ internal sealed class ModelService : IModelService
         return results.DistinctBy(m => m.HubId).ToList().AsReadOnly();
     }
 
-    public async Task<IReadOnlyList<ModelEntry>> SearchAsync(ModelQuery query, CancellationToken ct)
+    public async Task<IReadOnlyList<ModelEntry>> Search(ModelQuery query, CancellationToken ct)
     {
         var all = await ModelEntry.All(ct);
 
@@ -107,7 +107,7 @@ internal sealed class ModelService : IModelService
         return filtered.Take(query.MaxResults).ToList().AsReadOnly();
     }
 
-    public async Task<ModelEntry?> InspectAsync(string id, CancellationToken ct)
+    public async Task<ModelEntry?> Inspect(string id, CancellationToken ct)
     {
         // Check local catalog first
         var results = await ModelEntry.Query(m => m.HubId == id, ct);
@@ -121,7 +121,7 @@ internal sealed class ModelService : IModelService
         // Try all adapters
         foreach (var adapter in _registry.All)
         {
-            var models = await adapter.ListModelsAsync(ct);
+            var models = await adapter.ListModels(ct);
             var match = models.FirstOrDefault(m =>
                 string.Equals(m.Name, id, StringComparison.OrdinalIgnoreCase));
 
@@ -134,7 +134,7 @@ internal sealed class ModelService : IModelService
         return null;
     }
 
-    public async Task<IReadOnlyList<ModelEntry>> HistoryAsync(string name, CancellationToken ct)
+    public async Task<IReadOnlyList<ModelEntry>> History(string name, CancellationToken ct)
     {
         var results = await ModelEntry.Query(m => m.HubId == name, ct);
         return results.OrderByDescending(m => m.Version).ToList().AsReadOnly();
@@ -142,7 +142,7 @@ internal sealed class ModelService : IModelService
 
     // ── Lifecycle (catalog operations) ──
 
-    public async Task<IReadOnlyList<ModelEntry>> ListAsync(ModelStatus? status, CancellationToken ct)
+    public async Task<IReadOnlyList<ModelEntry>> List(ModelStatus? status, CancellationToken ct)
     {
         var all = await ModelEntry.All(ct);
         var allList = new List<ModelEntry>(all);
@@ -151,7 +151,7 @@ internal sealed class ModelService : IModelService
         var listAdapters = AdapterResolver.ResolveAll(_registry, AiCapability.ModelList);
         foreach (var adapter in listAdapters)
         {
-            var adapterModels = await adapter.ListModelsAsync(ct);
+            var adapterModels = await adapter.ListModels(ct);
             foreach (var am in adapterModels)
             {
                 if (!allList.Any(m => string.Equals(m.HubId, am.Name, StringComparison.OrdinalIgnoreCase)))
@@ -176,7 +176,7 @@ internal sealed class ModelService : IModelService
         };
     }
 
-    public async Task<ModelEntry> RegisterAsync(string path, string? name, Lineage? lineage, CancellationToken ct)
+    public async Task<ModelEntry> Register(string path, string? name, Lineage? lineage, CancellationToken ct)
     {
         var entry = new ModelEntry
         {
@@ -191,7 +191,7 @@ internal sealed class ModelService : IModelService
         return entry;
     }
 
-    public async Task RemoveAsync(string modelId, CancellationToken ct)
+    public async Task Remove(string modelId, CancellationToken ct)
     {
         // Try adapter with ModelRemove capability first
         var removeAdapters = AdapterResolver.ResolveAll(_registry, AiCapability.ModelRemove);
@@ -199,14 +199,14 @@ internal sealed class ModelService : IModelService
         {
             if (adapter.ModelManager is { } manager)
             {
-                await manager.FlushAsync(new AiModelOperationRequest { Model = modelId }, ct);
+                await manager.Flush(new AiModelOperationRequest { Model = modelId }, ct);
             }
         }
 
         await ModelEntry.Remove(modelId, ct);
     }
 
-    public async Task PruneAsync(int keep, CancellationToken ct)
+    public async Task Prune(int keep, CancellationToken ct)
     {
         var all = await ModelEntry.All(ct);
 
@@ -221,7 +221,7 @@ internal sealed class ModelService : IModelService
         }
     }
 
-    public Task<IReadOnlyList<ModelHealthReport>> HealthAsync(CancellationToken ct)
+    public Task<IReadOnlyList<ModelHealthReport>> Health(CancellationToken ct)
     {
         IReadOnlyList<ModelHealthReport> empty = Array.Empty<ModelHealthReport>();
         return Task.FromResult(empty);
@@ -229,7 +229,7 @@ internal sealed class ModelService : IModelService
 
     // ── Pull (via adapter with Pull capability) ──
 
-    public async Task<ModelEntry> PullAsync(
+    public async Task<ModelEntry> Pull(
         string id, string? to, ModelFormat? format,
         IProgress<ModelPullProgress>? progress, CancellationToken ct)
     {
@@ -244,7 +244,7 @@ internal sealed class ModelService : IModelService
             Percent = 0
         });
 
-        var result = await manager.EnsureInstalledAsync(
+        var result = await manager.EnsureInstalled(
             new AiModelOperationRequest { Model = id }, ct);
 
         if (!result.Success)
@@ -283,9 +283,9 @@ internal sealed class ModelService : IModelService
 
     // ── Format Conversion (via adapter with Convert capability) ──
 
-    public async Task<JobRef> ConvertAsync(string modelId, ModelFormat to, Quantization quantization, CancellationToken ct)
+    public async Task<JobRef> Convert(string modelId, ModelFormat to, Quantization quantization, CancellationToken ct)
     {
-        var model = await InspectAsync(modelId, ct)
+        var model = await Inspect(modelId, ct)
             ?? throw new InvalidOperationException($"Model '{modelId}' not found in catalog.");
 
         var adapter = AdapterResolver.Resolve(_registry, AiCapability.Convert);
@@ -294,7 +294,7 @@ internal sealed class ModelService : IModelService
                 $"Adapter '{adapter.Id}' has Convert capability but no ModelManager.");
 
         // Delegate conversion to the adapter's model manager
-        var result = await manager.EnsureInstalledAsync(
+        var result = await manager.EnsureInstalled(
             new AiModelOperationRequest
             {
                 Model = modelId,
@@ -331,15 +331,15 @@ internal sealed class ModelService : IModelService
         return new JobRef(converted.Id, JobStatus.Completed);
     }
 
-    public async Task<JobRef> QuantizeAsync(string modelId, Quantization quantization, string? calibrationDataset, CancellationToken ct)
+    public async Task<JobRef> Quantize(string modelId, Quantization quantization, string? calibrationDataset, CancellationToken ct)
     {
-        var model = await InspectAsync(modelId, ct)
+        var model = await Inspect(modelId, ct)
             ?? throw new InvalidOperationException($"Model '{modelId}' not found in catalog.");
 
-        return await ConvertAsync(modelId, model.Format, quantization, ct);
+        return await Convert(modelId, model.Format, quantization, ct);
     }
 
-    public Task<ModelEntry> MergeAsync(string baseModelId, string adapterId, string? outputName, CancellationToken ct)
+    public Task<ModelEntry> Merge(string baseModelId, string adapterId, string? outputName, CancellationToken ct)
     {
         throw new InvalidOperationException(
             "LoRA merge requires a training runtime. Use Training.Run() with a merge script.");
@@ -347,9 +347,9 @@ internal sealed class ModelService : IModelService
 
     // ── Deployment (via adapter with Serve.* capability) ──
 
-    public async Task DeployAsync(string modelId, string? runtimeId, DeployOptions? options, CancellationToken ct)
+    public async Task Deploy(string modelId, string? runtimeId, DeployOptions? options, CancellationToken ct)
     {
-        var model = await InspectAsync(modelId, ct)
+        var model = await Inspect(modelId, ct)
             ?? throw new InvalidOperationException($"Model '{modelId}' not found in catalog.");
 
         var serveCapability = $"Serve.{model.Format}";
@@ -358,7 +358,7 @@ internal sealed class ModelService : IModelService
             ?? throw new InvalidOperationException(
                 $"Adapter '{adapter.Id}' can serve {model.Format} but has no ModelManager for deployment.");
 
-        var result = await manager.EnsureInstalledAsync(
+        var result = await manager.EnsureInstalled(
             new AiModelOperationRequest { Model = modelId }, ct);
 
         if (!result.Success)
@@ -374,9 +374,9 @@ internal sealed class ModelService : IModelService
         }
     }
 
-    public async Task<IReadOnlyList<ModelRoute>> RoutesAsync(string modelId, CancellationToken ct)
+    public async Task<IReadOnlyList<ModelRoute>> Routes(string modelId, CancellationToken ct)
     {
-        var model = await InspectAsync(modelId, ct)
+        var model = await Inspect(modelId, ct)
             ?? throw new InvalidOperationException($"Model '{modelId}' not found in catalog.");
 
         var routes = new List<ModelRoute>();
@@ -422,7 +422,7 @@ internal sealed class ModelService : IModelService
 
     // ── Versioning ──
 
-    public async Task RollbackAsync(string name, string toVersion, CancellationToken ct)
+    public async Task Rollback(string name, string toVersion, CancellationToken ct)
     {
         if (!int.TryParse(toVersion.TrimStart('v'), out var version))
             throw new ArgumentException($"Invalid version format: '{toVersion}'. Expected 'v3' or '3'.");
@@ -450,7 +450,7 @@ internal sealed class ModelService : IModelService
                 var adapter = _registry.Get(runtimeId);
                 if (adapter?.ModelManager is { } manager)
                 {
-                    await manager.EnsureInstalledAsync(
+                    await manager.EnsureInstalled(
                         new AiModelOperationRequest { Model = target.HubId }, ct);
                 }
             }
@@ -461,9 +461,9 @@ internal sealed class ModelService : IModelService
         }
     }
 
-    public async Task<ModelEntry?> AuditAsync(string name, DateTime at, CancellationToken ct)
+    public async Task<ModelEntry?> Audit(string name, DateTime at, CancellationToken ct)
     {
-        var history = await HistoryAsync(name, ct);
+        var history = await History(name, ct);
         return history.FirstOrDefault(m =>
             m.Lineage?.TrainedAt <= at || m.LastUsed <= at);
     }

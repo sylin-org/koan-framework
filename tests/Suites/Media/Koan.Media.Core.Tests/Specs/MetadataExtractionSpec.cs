@@ -19,7 +19,7 @@ public class MetadataExtractionSpec : IClassFixture<MediaCoreTestPipelineFixture
     var file = _fixture.CreateTestMediaFile("input.jpg");
 
     // Act
-    var metadata = await media.ExtractMetadataAsync(file);
+    var metadata = await media.ExtractMetadata(file);
 
     // Assert
     metadata.Should().ContainKey("width");

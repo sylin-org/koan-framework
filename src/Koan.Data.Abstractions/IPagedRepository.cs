@@ -6,7 +6,7 @@ namespace Koan.Data.Abstractions;
 
 public interface IPagedRepository<TEntity, TKey> where TEntity : IEntity<TKey>
 {
-    Task<PagedRepositoryResult<TEntity>> QueryPageAsync(
+    Task<PagedRepositoryResult<TEntity>> QueryPage(
         object? query,
         DataQueryOptions options,
         CancellationToken ct = default);

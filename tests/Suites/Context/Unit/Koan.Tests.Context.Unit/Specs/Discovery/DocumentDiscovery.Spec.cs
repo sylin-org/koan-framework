@@ -73,7 +73,7 @@ public class DocumentDiscovery_Spec : IDisposable
         // Act & Assert
         await Assert.ThrowsAsync<SecurityException>(async () =>
         {
-            await _service.DiscoverAsync(_testDir, maliciousPath).ToListAsync();
+            await _service.Discover(_testDir, maliciousPath).ToListAsync();
         });
     }
 
@@ -86,7 +86,7 @@ public class DocumentDiscovery_Spec : IDisposable
         // Act & Assert
         await Assert.ThrowsAsync<SecurityException>(async () =>
         {
-            await _service.DiscoverAsync(_testDir, absolutePath).ToListAsync();
+            await _service.Discover(_testDir, absolutePath).ToListAsync();
         });
     }
 
@@ -99,7 +99,7 @@ public class DocumentDiscovery_Spec : IDisposable
         // Act & Assert
         await Assert.ThrowsAsync<SecurityException>(async () =>
         {
-            await _service.DiscoverAsync(_testDir, maliciousPath).ToListAsync();
+            await _service.Discover(_testDir, maliciousPath).ToListAsync();
         });
     }
 
@@ -117,7 +117,7 @@ public class DocumentDiscovery_Spec : IDisposable
         // This test validates the logic exists, actual symlink testing requires integration tests
 
         // Act
-        var files = await _service.DiscoverAsync(_testDir).ToListAsync();
+        var files = await _service.Discover(_testDir).ToListAsync();
 
         // Assert
         files.Should().HaveCount(1);
@@ -140,7 +140,7 @@ public class DocumentDiscovery_Spec : IDisposable
         // Note: In production, this would be caught by FileInfo.Length check
 
         // Act
-        var files = await _service.DiscoverAsync(_testDir).ToListAsync();
+        var files = await _service.Discover(_testDir).ToListAsync();
 
         // Assert - should find at least the normal file
         files.Should().Contain(f => f.RelativePath.Contains("normal.md"));
@@ -163,7 +163,7 @@ public class DocumentDiscovery_Spec : IDisposable
         await File.WriteAllTextAsync(guide, "# Guide");
 
         // Act
-        var files = await _service.DiscoverAsync(_testDir).ToListAsync();
+        var files = await _service.Discover(_testDir).ToListAsync();
 
         // Assert
         files.Should().HaveCount(2);
@@ -184,7 +184,7 @@ public class DocumentDiscovery_Spec : IDisposable
         await File.WriteAllTextAsync(npmFile, "# NPM Package");
 
         // Act
-        var files = await _service.DiscoverAsync(_testDir).ToListAsync();
+        var files = await _service.Discover(_testDir).ToListAsync();
 
         // Assert
         files.Should().HaveCount(1);
@@ -211,7 +211,7 @@ public class DocumentDiscovery_Spec : IDisposable
         await File.WriteAllTextAsync(excludedFile, "# Ignored");
 
         // Act
-        var files = await _service.DiscoverAsync(_testDir).ToListAsync();
+        var files = await _service.Discover(_testDir).ToListAsync();
 
         // Assert
         files.Should().HaveCount(1);
@@ -228,7 +228,7 @@ public class DocumentDiscovery_Spec : IDisposable
         await File.WriteAllTextAsync(guide, "# Guide");
 
         // Act
-        var files = await _service.DiscoverAsync(_testDir, "documentation").ToListAsync();
+        var files = await _service.Discover(_testDir, "documentation").ToListAsync();
 
         // Assert
         files.Should().HaveCount(1);
@@ -244,7 +244,7 @@ public class DocumentDiscovery_Spec : IDisposable
         // Act & Assert
         await Assert.ThrowsAsync<DirectoryNotFoundException>(async () =>
         {
-            await _service.DiscoverAsync(nonExistent).ToListAsync();
+            await _service.Discover(nonExistent).ToListAsync();
         });
     }
 
@@ -252,7 +252,7 @@ public class DocumentDiscovery_Spec : IDisposable
     public async Task DiscoverAsync_EmptyDirectory_ReturnsEmpty()
     {
         // Act
-        var files = await _service.DiscoverAsync(_testDir).ToListAsync();
+        var files = await _service.Discover(_testDir).ToListAsync();
 
         // Assert
         files.Should().BeEmpty();
@@ -271,7 +271,7 @@ public class DocumentDiscovery_Spec : IDisposable
         await File.WriteAllTextAsync(guide, "# Guide");
 
         // Act
-        var files = await _service.DiscoverAsync(_testDir).ToListAsync();
+        var files = await _service.Discover(_testDir).ToListAsync();
 
         // Assert
         files.Should().HaveCount(3);
@@ -288,7 +288,7 @@ public class DocumentDiscovery_Spec : IDisposable
     public async Task GetCommitShaAsync_NoGitDirectory_ReturnsNull()
     {
         // Act
-        var sha = await _service.GetCommitShaAsync(_testDir);
+        var sha = await _service.GetCommitSha(_testDir);
 
         // Assert
         sha.Should().BeNull();
@@ -309,7 +309,7 @@ public class DocumentDiscovery_Spec : IDisposable
         await File.WriteAllTextAsync(mainRef, "abc123def456\n");
 
         // Act
-        var sha = await _service.GetCommitShaAsync(_testDir);
+        var sha = await _service.GetCommitSha(_testDir);
 
         // Assert
         sha.Should().Be("abc123def456");
@@ -326,7 +326,7 @@ public class DocumentDiscovery_Spec : IDisposable
         await File.WriteAllTextAsync(headFile, "deadbeef123456\n");
 
         // Act
-        var sha = await _service.GetCommitShaAsync(_testDir);
+        var sha = await _service.GetCommitSha(_testDir);
 
         // Assert
         sha.Should().Be("deadbeef123456");
@@ -343,7 +343,7 @@ public class DocumentDiscovery_Spec : IDisposable
         await File.WriteAllTextAsync(headFile, "ref:"); // Too short - QA Issue #5
 
         // Act
-        var sha = await _service.GetCommitShaAsync(_testDir);
+        var sha = await _service.GetCommitSha(_testDir);
 
         // Assert
         sha.Should().BeNull();
@@ -369,7 +369,7 @@ public class DocumentDiscovery_Spec : IDisposable
         await File.WriteAllTextAsync(headFile, "   \n  ");
 
         // Act
-        var sha = await _service.GetCommitShaAsync(_testDir);
+        var sha = await _service.GetCommitSha(_testDir);
 
         // Assert
         sha.Should().BeNull();
@@ -386,7 +386,7 @@ public class DocumentDiscovery_Spec : IDisposable
         await File.WriteAllTextAsync(headFile, "ref: refs/heads/nonexistent");
 
         // Act
-        var sha = await _service.GetCommitShaAsync(_testDir);
+        var sha = await _service.GetCommitSha(_testDir);
 
         // Assert
         sha.Should().BeNull();
@@ -421,7 +421,7 @@ public class DocumentDiscovery_Spec : IDisposable
         await File.WriteAllTextAsync(pyFile, "print('hello')");
 
         // Act
-        var files = await _service.DiscoverAsync(_testDir).ToListAsync();
+        var files = await _service.Discover(_testDir).ToListAsync();
 
         // Assert
         files.Should().HaveCount(3);
@@ -453,7 +453,7 @@ public class DocumentDiscovery_Spec : IDisposable
         await File.WriteAllTextAsync(codeFile, content);
 
         // Act
-        var files = await _service.DiscoverAsync(_testDir).ToListAsync();
+        var files = await _service.Discover(_testDir).ToListAsync();
 
         // Assert
         files.Should().HaveCount(1);
@@ -477,7 +477,7 @@ public class DocumentDiscovery_Spec : IDisposable
         await File.WriteAllTextAsync(mdFile, "# Guide\nContent here");
 
         // Act
-        var files = await _service.DiscoverAsync(_testDir).ToListAsync();
+        var files = await _service.Discover(_testDir).ToListAsync();
 
         // Assert
         files.Should().HaveCount(2, "should find exactly 2 files (1 code, 1 markdown)");
@@ -501,7 +501,7 @@ public class DocumentDiscovery_Spec : IDisposable
         // This test validates the logic exists
 
         // Act
-        var files = await _service.DiscoverAsync(_testDir).ToListAsync();
+        var files = await _service.Discover(_testDir).ToListAsync();
 
         // Assert
         files.Should().Contain(f => f.RelativePath.Contains("small.cs"));
@@ -521,7 +521,7 @@ public class DocumentDiscovery_Spec : IDisposable
         await File.WriteAllTextAsync(normalFile, "using System;");
 
         // Act
-        var files = await _service.DiscoverAsync(_testDir).ToListAsync();
+        var files = await _service.Discover(_testDir).ToListAsync();
 
         // Assert
         files.Should().HaveCount(1);
@@ -544,7 +544,7 @@ public class DocumentDiscovery_Spec : IDisposable
         await File.WriteAllTextAsync(npmFile, "module.exports = {};");
 
         // Act
-        var files = await _service.DiscoverAsync(_testDir).ToListAsync();
+        var files = await _service.Discover(_testDir).ToListAsync();
 
         // Assert
         files.Should().HaveCount(1);
@@ -561,7 +561,7 @@ public class DocumentDiscovery_Spec : IDisposable
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(async () =>
         {
-            await _service.DiscoverAsync(null!).ToListAsync();
+            await _service.Discover(null!).ToListAsync();
         });
     }
 
@@ -571,7 +571,7 @@ public class DocumentDiscovery_Spec : IDisposable
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(async () =>
         {
-            await _service.DiscoverAsync(string.Empty).ToListAsync();
+            await _service.Discover(string.Empty).ToListAsync();
         });
     }
 
@@ -588,7 +588,7 @@ public class DocumentDiscovery_Spec : IDisposable
         // Act & Assert
         await Assert.ThrowsAsync<OperationCanceledException>(async () =>
         {
-            await _service.DiscoverAsync(_testDir, cancellationToken: cts.Token).ToListAsync();
+            await _service.Discover(_testDir, cancellationToken: cts.Token).ToListAsync();
         });
     }
 

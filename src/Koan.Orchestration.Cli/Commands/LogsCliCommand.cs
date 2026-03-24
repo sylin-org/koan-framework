@@ -8,7 +8,7 @@ internal sealed class LogsCliCommand : ICliCommand
 
     public LogsCliCommand(CommandRuntime runtime) => _runtime = runtime;
 
-    public Task<int> ExecuteAsync(CommandArgs args)
+    public Task<int> Execute(CommandArgs args)
     {
         var follow = args.HasFlag("-f") || args.HasFlag("follow");
         var tail = ParseNullableInt(args.GetValue("tail"));
@@ -16,7 +16,7 @@ internal sealed class LogsCliCommand : ICliCommand
         var since = args.GetValue("since");
         var engine = args.GetValue("engine");
 
-        return _runtime.ExecuteLogsAsync(new CommandRuntime.LogsCommandOptions(follow, tail, service, since, engine));
+        return _runtime.ExecuteLogs(new CommandRuntime.LogsCommandOptions(follow, tail, service, since, engine));
     }
 
     private static int? ParseNullableInt(string? value)

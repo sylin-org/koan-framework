@@ -17,9 +17,9 @@ public sealed class BinaryCacheSerializer : ICacheSerializer
         => type == typeof(byte[]) || type == typeof(ReadOnlyMemory<byte>) || type == typeof(Memory<byte>) || type == typeof(Stream);
 
     public ValueTask<CacheValue> SerializeAsync<T>(T value, CacheEntryOptions options, CancellationToken ct)
-        => SerializeAsync(value!, typeof(T), options, ct);
+        => Serialize(value!, typeof(T), options, ct);
 
-    public ValueTask<CacheValue> SerializeAsync(object value, Type runtimeType, CacheEntryOptions options, CancellationToken ct)
+    public ValueTask<CacheValue> Serialize(object value, Type runtimeType, CacheEntryOptions options, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         if (value is byte[] buffer)
@@ -40,7 +40,7 @@ public sealed class BinaryCacheSerializer : ICacheSerializer
         if (value is Stream stream)
         {
             using var ms = new MemoryStream();
-            stream.CopyTo(ms);
+            stream.CopyToAsync(ms);
             return ValueTask.FromResult(CacheValue.FromBytes(ms.ToArray(), runtimeType));
         }
 
@@ -54,7 +54,7 @@ public sealed class BinaryCacheSerializer : ICacheSerializer
         return ValueTask.FromResult(result);
     }
 
-    public ValueTask<object?> DeserializeAsync(CacheValue value, Type returnType, CancellationToken ct)
+    public ValueTask<object?> Deserialize(CacheValue value, Type returnType, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         var result = Convert(value, returnType);

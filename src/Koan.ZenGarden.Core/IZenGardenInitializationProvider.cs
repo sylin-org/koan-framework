@@ -14,7 +14,7 @@ public interface IZenGardenInitializationProvider
     /// Resolves a parsed Zen Garden intent to an offering endpoint.
     /// Returns null when the offering cannot be resolved or is not ready.
     /// </summary>
-    ValueTask<ZenGardenOfferingResolution?> ResolveAsync(
+    ValueTask<ZenGardenOfferingResolution?> Resolve(
         ZenGardenConnectionIntent intent,
         CancellationToken cancellationToken = default);
 
@@ -22,7 +22,7 @@ public interface IZenGardenInitializationProvider
     /// Fires a non-blocking wishful capability ensure request and returns a request receipt.
     /// Returns null when capability wish cannot be scheduled.
     /// </summary>
-    ValueTask<ZenGardenCapabilityWishReceipt?> WishCapabilitiesAsync(
+    ValueTask<ZenGardenCapabilityWishReceipt?> WishCapabilities(
         ZenGardenConnectionIntent intent,
         CancellationToken cancellationToken = default);
 }

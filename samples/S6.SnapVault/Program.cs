@@ -57,7 +57,7 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Set AppHost.Current to enable entity operations before app.Run()
+// Set AppHost.Current to enable entity operations before app.RunAsync()
 Koan.Core.Hosting.App.AppHost.Current ??= app.Services;
 
 // Seed default analysis styles (S5.Recs pattern)
@@ -71,7 +71,7 @@ logger.LogInformation(
     "ZenGarden model advisor: vision={Vision}, embedding={Embedding}, chat={Chat}",
     vision ?? "(pending)", embedding ?? "(pending)", chat ?? "(pending)");
 
-await AnalysisStyleSeeder.SeedDefaultStylesAsync(logger);
+await AnalysisStyleSeeder.SeedDefaultStyles(logger);
 
 // Configure middleware pipeline
 if (app.Environment.IsDevelopment())
@@ -95,4 +95,4 @@ app.MapFallbackToFile("index.html");
 // Map SignalR hubs
 app.MapHub<PhotoProcessingHub>("/hubs/processing");
 
-app.Run();
+app.RunAsync();

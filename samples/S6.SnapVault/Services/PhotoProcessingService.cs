@@ -35,7 +35,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
         _promptFactory = promptFactory;
     }
 
-    public async Task<PhotoAsset> ProcessUploadAsync(string? eventId, IFormFile file, string jobId, CancellationToken ct = default)
+    public async Task<PhotoAsset> ProcessUpload(string? eventId, IFormFile file, string jobId, CancellationToken ct = default)
     {
         _logger.LogInformation("Processing upload: {FileName} for event {EventId} (job: {JobId})", file.FileName, eventId ?? "auto", jobId);
 
@@ -49,11 +49,11 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
         };
 
         // Helper method for emitting progress events
-        async Task EmitProgressAsync(string photoId, string status, string stage, string? error = null)
+        async Task EmitProgress(string photoId, string status, string stage, string? error = null)
         {
             try
             {
-                await _hubContext.Clients.Group($"job:{jobId}").SendAsync("PhotoProgress", new PhotoProgressEvent
+                await _hubContext.Clients.Group($"job:{jobId}").Send("PhotoProgress", new PhotoProgressEvent
                 {
                     JobId = jobId,
                     PhotoId = photoId,
@@ -71,7 +71,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
 
         try
         {
-            await EmitProgressAsync("", "processing", "upload");
+            await EmitProgress("", "processing", "upload");
 
             // Open source stream
             using var sourceStream = file.OpenReadStream();
@@ -79,26 +79,26 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             // Extract dimensions before transformations
             using (var dimensionCheck = new MemoryStream())
             {
-                await sourceStream.CopyToAsync(dimensionCheck, ct);
+                await sourceStream.CopyTo(dimensionCheck, ct);
                 dimensionCheck.Position = 0;
                 sourceStream.Position = 0;
 
-                var info = await Image.IdentifyAsync(dimensionCheck, ct);
+                var info = await Image.Identify(dimensionCheck, ct);
                 photo.Width = info.Width;
                 photo.Height = info.Height;
             }
 
-            await EmitProgressAsync("", "processing", "exif");
+            await EmitProgress("", "processing", "exif");
 
             // Extract EXIF metadata (including capture date)
-            await ExtractExifMetadataAsync(photo, sourceStream, ct);
+            await ExtractExifMetadata(photo, sourceStream, ct);
             sourceStream.Position = 0;
 
             // If no eventId provided, auto-create or get daily event based on capture date
             if (string.IsNullOrEmpty(eventId))
             {
                 var eventDate = photo.CapturedAt ?? photo.UploadedAt;
-                var dailyEvent = await GetOrCreateDailyEventAsync(eventDate, ct);
+                var dailyEvent = await GetOrCreateDailyEvent(eventDate, ct);
                 photo.EventId = dailyEvent.Id;
                 _logger.LogInformation("Auto-assigned photo to daily event: {EventName}", dailyEvent.Name);
             }
@@ -110,7 +110,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             photo.ContentType = fullResEntity.ContentType;
             photo.Size = fullResEntity.Size;
 
-            await EmitProgressAsync(photo.Id, "processing", "thumbnails");
+            await EmitProgress(photo.Id, "processing", "thumbnails");
 
             // Use DX-0047 fluent API to create derivatives
             // Branch 1: Gallery view (1200px max)
@@ -152,37 +152,37 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
 
             photo.RetinaThumbnailMediaId = retinaEntity.Id;
 
-            await galleryResult.DisposeAsync();
+            await galleryResult.Dispose();
 
             // Save photo entity (without AI metadata yet)
             await photo.Save(ct);
 
             // Update job progress
-            await UpdateJobProgressAsync(jobId, ct);
+            await UpdateJobProgress(jobId, ct);
 
             // Update event photo count
-            await UpdateEventPhotoCountAsync(photo.EventId, ct);
+            await UpdateEventPhotoCount(photo.EventId, ct);
 
             _logger.LogInformation(
                 "Photo processed: {PhotoId} ({Width}x{Height}) -> Gallery: {GalleryId}, Retina: {RetinaId}, Masonry: {MasonryId}, Thumbnail: {ThumbId}",
                 photo.Id, photo.Width, photo.Height, photo.GalleryMediaId, photo.RetinaThumbnailMediaId, photo.MasonryThumbnailMediaId, photo.ThumbnailMediaId);
 
-            await EmitProgressAsync(photo.Id, "processing", "ai-description");
+            await EmitProgress(photo.Id, "processing", "ai-description");
 
             // Generate AI metadata asynchronously (with SignalR updates)
             _ = Task.Run(async () =>
             {
                 try
                 {
-                    await GenerateAIMetadataAsync(photo, CancellationToken.None);
+                    await GenerateAIMetadata(photo, CancellationToken.None);
 
                     // Emit completion event after AI processing
-                    await EmitProgressAsync(photo.Id, "completed", "completed");
+                    await EmitProgress(photo.Id, "completed", "completed");
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Failed to generate AI metadata for photo {PhotoId}", photo.Id);
-                    await EmitProgressAsync(photo.Id, "failed", "ai-description", ex.Message);
+                    await EmitProgress(photo.Id, "failed", "ai-description", ex.Message);
                 }
             }, CancellationToken.None);
 
@@ -190,7 +190,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             await photo.Save(ct);
 
             // Emit progress for basic processing complete (AI still running in background)
-            await EmitProgressAsync(photo.Id, "processing", "completed");
+            await EmitProgress(photo.Id, "processing", "completed");
 
             return photo;
         }
@@ -199,7 +199,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             _logger.LogError(ex, "Failed to process photo {FileName}", file.FileName);
             photo.ProcessingStatus = ProcessingStatus.Failed;
 
-            await EmitProgressAsync(photo.Id ?? "", "failed", "upload", ex.Message);
+            await EmitProgress(photo.Id ?? "", "failed", "upload", ex.Message);
 
             // Update job with error
             try
@@ -220,7 +220,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
         }
     }
 
-    public async Task<PhotoAsset> GenerateAIMetadataAsync(PhotoAsset photo, CancellationToken ct = default)
+    public async Task<PhotoAsset> GenerateAIMetadata(PhotoAsset photo, CancellationToken ct = default)
     {
         // Transaction coordination: Ensures atomic commits across entity + vector operations
         // [Embedding] attribute handles embedding generation and vectorization automatically via lifecycle hooks
@@ -231,7 +231,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             _logger.LogInformation("Generating AI metadata for photo {PhotoId}", photo.Id);
 
             // Generate detailed description using vision AI
-            await GenerateDetailedDescriptionAsync(photo, null, ct);
+            await GenerateDetailedDescription(photo, null, ct);
 
             // [Embedding] attribute automatically:
             // 1. Calls photo.ToEmbeddingText() to build search text
@@ -241,7 +241,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             await photo.Save(ct);
 
             // Commit atomically (both entity + vector, or neither)
-            await EntityContext.CommitAsync(ct);
+            await EntityContext.Commit(ct);
 
             _logger.LogInformation("AI metadata generated for photo {PhotoId} (attribute-driven, transactional)", photo.Id);
 
@@ -252,7 +252,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             _logger.LogError(ex, "Failed to generate AI metadata for photo {PhotoId}, rolling back transaction", photo.Id);
 
             // Rollback discards both entity + vector operations
-            await EntityContext.RollbackAsync(ct);
+            await EntityContext.Rollback(ct);
 
             // Save failed status (outside transaction)
             photo.ProcessingStatus = ProcessingStatus.Failed;
@@ -262,7 +262,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
         }
     }
 
-    public async Task<List<PhotoAsset>> SemanticSearchAsync(string query, string? eventId = null, double alpha = 0.5, int topK = 20, CancellationToken ct = default)
+    public async Task<List<PhotoAsset>> SemanticSearch(string query, string? eventId = null, double alpha = 0.5, int topK = 20, CancellationToken ct = default)
     {
         try
         {
@@ -330,12 +330,12 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
         return photos.Take(topK).ToList();
     }
 
-    private async Task ExtractExifMetadataAsync(PhotoAsset photo, Stream stream, CancellationToken ct)
+    private async Task ExtractExifMetadata(PhotoAsset photo, Stream stream, CancellationToken ct)
     {
         try
         {
             stream.Position = 0;
-            using var image = await Image.LoadAsync(stream, ct);
+            using var image = await Image.Load(stream, ct);
 
             var exif = image.Metadata.ExifProfile;
             if (exif == null) return;
@@ -409,7 +409,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
     {
         var originalPosition = stream.Position;
         stream.Position = 0;
-        var info = await Image.IdentifyAsync(stream, ct);
+        var info = await Image.Identify(stream, ct);
         stream.Position = originalPosition;
         return (info.Width, info.Height);
     }
@@ -578,14 +578,14 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
     /// Generate structured AI analysis for a photo using vision model
     /// Uses factory pattern for prompt assembly with entity-based style customization
     /// </summary>
-    private async Task GenerateDetailedDescriptionAsync(PhotoAsset photo, string? analysisStyleId = null, CancellationToken ct = default)
+    private async Task GenerateDetailedDescription(PhotoAsset photo, string? analysisStyleId = null, CancellationToken ct = default)
     {
         try
         {
             var stopwatch = Stopwatch.StartNew();
 
             // Resolve analysis style entity (requested → last used → null=default)
-            var styleEntity = await ResolveAnalysisStyleAsync(analysisStyleId, photo, ct);
+            var styleEntity = await ResolveAnalysisStyle(analysisStyleId, photo, ct);
             var effectiveStyleName = styleEntity?.Name ?? "default";
 
             _logger.LogInformation(
@@ -626,7 +626,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             else if (styleEntity.IsSmartStyle)
             {
                 // Smart mode: classify first, then render for detected style
-                var detectedStyle = await ClassifyImageStyleAsync(photo, imageBytes, ct);
+                var detectedStyle = await ClassifyImageStyle(photo, imageBytes, ct);
                 prompt = _promptFactory.RenderPromptFor(detectedStyle);
                 effectiveStyleName = $"smart→{detectedStyle.Name}";
             }
@@ -680,7 +680,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
     /// <summary>
     /// Resolve the analysis style entity to use based on priority: explicit request → last used → null (default)
     /// </summary>
-    private async Task<AnalysisStyle?> ResolveAnalysisStyleAsync(string? requestedId, PhotoAsset photo, CancellationToken ct)
+    private async Task<AnalysisStyle?> ResolveAnalysisStyle(string? requestedId, PhotoAsset photo, CancellationToken ct)
     {
         // Priority 1: Explicit request
         if (!string.IsNullOrEmpty(requestedId))
@@ -714,7 +714,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
     /// Classify image style for smart mode using two-stage analysis
     /// Caches result in PhotoAsset.InferredStyleId to avoid repeated classification
     /// </summary>
-    private async Task<AnalysisStyle> ClassifyImageStyleAsync(PhotoAsset photo, byte[] imageBytes, CancellationToken ct)
+    private async Task<AnalysisStyle> ClassifyImageStyle(PhotoAsset photo, byte[] imageBytes, CancellationToken ct)
     {
         // Check cache first
         if (!string.IsNullOrEmpty(photo.InferredStyleId))
@@ -784,7 +784,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
     /// Get or create a daily event for the given date
     /// Event name format: "October 1, 2025"
     /// </summary>
-    private async Task<Event> GetOrCreateDailyEventAsync(DateTime date, CancellationToken ct)
+    private async Task<Event> GetOrCreateDailyEvent(DateTime date, CancellationToken ct)
     {
         // Normalize to date only (UTC)
         var normalizedDate = date.Date;
@@ -829,7 +829,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
     /// <summary>
     /// Update job progress by incrementing processed photo count
     /// </summary>
-    private async Task UpdateJobProgressAsync(string jobId, CancellationToken ct)
+    private async Task UpdateJobProgress(string jobId, CancellationToken ct)
     {
         try
         {
@@ -847,7 +847,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
                     job.CompletedAt = DateTime.UtcNow;
 
                     // Emit job completion event
-                    await _hubContext.Clients.Group($"job:{jobId}").SendAsync("JobCompleted", new JobCompletionEvent
+                    await _hubContext.Clients.Group($"job:{jobId}").Send("JobCompleted", new JobCompletionEvent
                     {
                         JobId = jobId,
                         Status = job.Status == ProcessingStatus.Completed ? "completed" : "partial-success",
@@ -870,7 +870,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
     /// <summary>
     /// Update event photo count and status
     /// </summary>
-    private async Task UpdateEventPhotoCountAsync(string eventId, CancellationToken ct)
+    private async Task UpdateEventPhotoCount(string eventId, CancellationToken ct)
     {
         try
         {
@@ -893,7 +893,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
     /// Regenerate AI analysis for a photo while preserving locked facts
     /// "Reroll with holds" mechanic - locked facts are buffered and reapplied after regeneration
     /// </summary>
-    public async Task<PhotoAsset> RegenerateAIAnalysisAsync(string photoId, string? analysisStyle = null, CancellationToken ct = default)
+    public async Task<PhotoAsset> RegenerateAIAnalysis(string photoId, string? analysisStyle = null, CancellationToken ct = default)
     {
         _logger.LogInformation("Regenerating AI analysis for photo {PhotoId}", photoId);
 
@@ -936,7 +936,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             }
 
             // 2. Regenerate AI analysis (this will replace photo.AiAnalysis)
-            await GenerateDetailedDescriptionAsync(photo, analysisStyle, ct);
+            await GenerateDetailedDescription(photo, analysisStyle, ct);
 
             // 3. Restore locked content (add them back if missing, overwrite if present)
             if (photo.AiAnalysis != null)
@@ -969,7 +969,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             await photo.Save(ct);
 
             // Commit atomically (both entity + vector, or neither)
-            await EntityContext.CommitAsync(ct);
+            await EntityContext.Commit(ct);
 
             var lockedItems = new List<string>();
             if (summaryWasLocked) lockedItems.Add("summary");
@@ -992,7 +992,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             _logger.LogError(ex, "Failed to regenerate AI analysis for photo {PhotoId}, rolling back transaction", photoId);
 
             // Rollback discards both entity + vector operations
-            await EntityContext.RollbackAsync(ct);
+            await EntityContext.Rollback(ct);
 
             throw;
         }

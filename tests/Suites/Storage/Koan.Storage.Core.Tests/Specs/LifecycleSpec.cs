@@ -19,10 +19,10 @@ public class LifecycleSpec : IClassFixture<StorageCoreTestPipelineFixture>
     var file = _fixture.CreateTestFile();
 
     // Act
-    await storage.UploadAsync(file);
-    var exists = await storage.ExistsAsync(file.Path);
-    await storage.DeleteAsync(file.Path);
-    var existsAfterDelete = await storage.ExistsAsync(file.Path);
+    await storage.Upload(file);
+    var exists = await storage.Exists(file.Path);
+    await storage.Delete(file.Path);
+    var existsAfterDelete = await storage.Exists(file.Path);
 
     // Assert
     exists.Should().BeTrue();

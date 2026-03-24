@@ -27,15 +27,15 @@ public interface ICacheEntryBuilder<T>
 
     ICacheEntryBuilder<T> WithConsistency(CacheConsistencyMode mode);
 
-    ValueTask<T?> GetAsync(CancellationToken ct);
+    ValueTask<T?> Get(CancellationToken ct);
 
-    ValueTask<T?> GetOrAddAsync(Func<CancellationToken, ValueTask<T?>> valueFactory, CancellationToken ct);
+    ValueTask<T?> GetOrAdd(Func<CancellationToken, ValueTask<T?>> valueFactory, CancellationToken ct);
 
-    ValueTask SetAsync(T value, CancellationToken ct);
+    ValueTask Set(T value, CancellationToken ct);
 
-    ValueTask RemoveAsync(CancellationToken ct);
+    ValueTask Remove(CancellationToken ct);
 
-    ValueTask TouchAsync(CancellationToken ct);
+    ValueTask Touch(CancellationToken ct);
 
     ValueTask<bool> Exists(CancellationToken ct);
 }

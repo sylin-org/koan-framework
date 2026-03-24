@@ -46,13 +46,13 @@ internal sealed class JsonRepository<TEntity, TKey> :
 
     private readonly IOptions<JsonDataOptions> _options;
 
-    public Task<TEntity?> GetAsync(TKey id, CancellationToken ct = default)
+    public Task<TEntity?> Get(TKey id, CancellationToken ct = default)
     {
         var store = ResolveStore();
         return Task.FromResult(store.TryGetValue(id, out var value) ? value : null);
     }
 
-    public Task<IReadOnlyList<TEntity?>> GetManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    public Task<IReadOnlyList<TEntity?>> GetMany(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var store = ResolveStore();
@@ -67,7 +67,7 @@ internal sealed class JsonRepository<TEntity, TKey> :
         return Task.FromResult((IReadOnlyList<TEntity?>)results);
     }
 
-    public Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default)
+    public Task<IReadOnlyList<TEntity>> Query(object? query, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var store = ResolveStore();
@@ -77,7 +77,7 @@ internal sealed class JsonRepository<TEntity, TKey> :
         return Task.FromResult((IReadOnlyList<TEntity>)result);
     }
 
-    public Task<IReadOnlyList<TEntity>> QueryAsync(object? query, DataQueryOptions? options, CancellationToken ct = default)
+    public Task<IReadOnlyList<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var store = ResolveStore();
@@ -90,7 +90,7 @@ internal sealed class JsonRepository<TEntity, TKey> :
         return Task.FromResult((IReadOnlyList<TEntity>)list);
     }
 
-    public Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
+    public Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var store = ResolveStore();
@@ -99,7 +99,7 @@ internal sealed class JsonRepository<TEntity, TKey> :
         return Task.FromResult((IReadOnlyList<TEntity>)list);
     }
 
-    public Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
+    public Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var store = ResolveStore();
@@ -112,7 +112,7 @@ internal sealed class JsonRepository<TEntity, TKey> :
         return Task.FromResult((IReadOnlyList<TEntity>)list);
     }
 
-    public Task<CountResult> CountAsync(CountRequest<TEntity> request, CancellationToken ct = default)
+    public Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var store = ResolveStore();
@@ -131,7 +131,7 @@ internal sealed class JsonRepository<TEntity, TKey> :
         return Task.FromResult(new CountResult(total, false));
     }
 
-    public Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)
+    public Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var (name, store) = ResolveNameAndStore();
@@ -140,7 +140,7 @@ internal sealed class JsonRepository<TEntity, TKey> :
         return Task.FromResult(model);
     }
 
-    public Task<bool> DeleteAsync(TKey id, CancellationToken ct = default)
+    public Task<bool> Delete(TKey id, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var (name, store) = ResolveNameAndStore();
@@ -149,7 +149,7 @@ internal sealed class JsonRepository<TEntity, TKey> :
         return Task.FromResult(ok);
     }
 
-    public Task<int> UpsertManyAsync(IEnumerable<TEntity> models, CancellationToken ct = default)
+    public Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var (name, store) = ResolveNameAndStore();
@@ -163,7 +163,7 @@ internal sealed class JsonRepository<TEntity, TKey> :
         return Task.FromResult(count);
     }
 
-    public Task<int> DeleteManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    public Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var (name, store) = ResolveNameAndStore();
@@ -177,7 +177,7 @@ internal sealed class JsonRepository<TEntity, TKey> :
         return Task.FromResult(count);
     }
 
-    public Task<int> DeleteAllAsync(CancellationToken ct = default)
+    public Task<int> DeleteAll(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var (name, store) = ResolveNameAndStore();
@@ -187,7 +187,7 @@ internal sealed class JsonRepository<TEntity, TKey> :
         return Task.FromResult(deleted);
     }
 
-    public Task<long> RemoveAllAsync(RemoveStrategy strategy, CancellationToken ct = default)
+    public Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var (name, store) = ResolveNameAndStore();
@@ -212,7 +212,7 @@ internal sealed class JsonRepository<TEntity, TKey> :
                     // Touch the set file to ensure presence
                     var name = ComputePhysicalName();
                     var path = _files.GetOrAdd(name, n => Path.Combine(_baseDir, SanitizeFileName(n) + ".json"));
-                    if (!File.Exists(path)) File.WriteAllText(path, "[]");
+                    if (!File.Exists(path)) File.WriteAllTextAsync(path, "[]");
                     object result = true;
                     return Task.FromResult((TResult)result);
                 }
@@ -247,7 +247,7 @@ internal sealed class JsonRepository<TEntity, TKey> :
         var path = _files.GetOrAdd(physicalName, n => Path.Combine(_baseDir, SanitizeFileName(n) + ".json"));
         var list = store.Values.ToList();
     var json = JsonConvert.SerializeObject(list, _json);
-        File.WriteAllText(path, json);
+        File.WriteAllTextAsync(path, json);
     }
 
     private ConcurrentDictionary<TKey, TEntity> ResolveStore()
@@ -300,7 +300,7 @@ internal sealed class JsonRepository<TEntity, TKey> :
         public IBatchSet<TEntity, TKey> Update(TKey id, Action<TEntity> mutate) { _mutations.Add((id, mutate)); return this; }
         public IBatchSet<TEntity, TKey> Clear() { _adds.Clear(); _updates.Clear(); _deletes.Clear(); _mutations.Clear(); return this; }
 
-        public Task<BatchResult> SaveAsync(BatchOptions? options = null, CancellationToken ct = default)
+        public Task<BatchResult> Save(BatchOptions? options = null, CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
             // If strict atomic batches are required, JSON adapter cannot guarantee; follow contract and signal not supported

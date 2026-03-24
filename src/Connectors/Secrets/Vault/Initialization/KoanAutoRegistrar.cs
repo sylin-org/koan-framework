@@ -104,7 +104,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 }
 
                 // Discover Vault service
-                var discoveryTask = serviceDiscovery.DiscoverServiceAsync("vault", discoveryOptions);
+                var discoveryTask = serviceDiscovery.DiscoverService("vault", discoveryOptions);
                 var result = discoveryTask.GetAwaiter().GetResult();
 
                 var method = $"orchestration-{result.DiscoveryMethod}";

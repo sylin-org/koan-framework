@@ -15,13 +15,13 @@ public static class FileHasher
     /// Computes a SHA256 hash for the supplied file path.
     /// </summary>
     /// <exception cref="ArgumentException">Thrown when <paramref name="filePath"/> is null or whitespace.</exception>
-    public static async Task<string> ComputeSha256Async(string filePath, CancellationToken cancellationToken = default)
+    public static async Task<string> ComputeSha256(string filePath, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
 
         await using var stream = File.OpenRead(filePath);
         using var sha256 = SHA256.Create();
-        var hashBytes = await sha256.ComputeHashAsync(stream, cancellationToken);
+        var hashBytes = await sha256.ComputeHash(stream, cancellationToken);
         return Convert.ToHexString(hashBytes);
     }
 }

@@ -81,7 +81,7 @@ internal sealed class ZenGardenModelAdvisor : IAiModelAdvisor, IDisposable
         // If cache expired or empty, trigger async refresh (non-blocking for callers)
         if (snapshot is null || snapshot.IsExpired(_options.RecommendationCacheTtlSeconds))
         {
-            _ = RefreshInBackgroundAsync();
+            _ = RefreshInBackground();
         }
 
         // Return from cache if available (even if expired — stale is better than nothing)
@@ -93,13 +93,13 @@ internal sealed class ZenGardenModelAdvisor : IAiModelAdvisor, IDisposable
         return null;
     }
 
-    private async Task RefreshInBackgroundAsync()
+    private async Task RefreshInBackground()
     {
         if (!_refreshLock.Wait(0)) return; // Another refresh is already in progress
 
         try
         {
-            var proxyUri = await ResolveProxyEndpointAsync();
+            var proxyUri = await ResolveProxyEndpoint();
             if (proxyUri is null)
             {
                 _logger.LogDebug("Cannot resolve orchestrator proxy endpoint — skipping recommendation refresh");
@@ -160,7 +160,7 @@ internal sealed class ZenGardenModelAdvisor : IAiModelAdvisor, IDisposable
         }
     }
 
-    private async Task<Uri?> ResolveProxyEndpointAsync()
+    private async Task<Uri?> ResolveProxyEndpoint()
     {
         // 1. Explicit endpoint from options (highest priority)
         if (!string.IsNullOrWhiteSpace(_options.OrchestratorProxyEndpoint))
@@ -179,7 +179,7 @@ internal sealed class ZenGardenModelAdvisor : IAiModelAdvisor, IDisposable
             try
             {
                 var intent = ZenGardenConnectionIntent.ForOffering("ollama", "orchestrator");
-                var resolved = await _initProvider.ResolveAsync(intent).ConfigureAwait(false);
+                var resolved = await _initProvider.Resolve(intent).ConfigureAwait(false);
                 var endpoint = resolved?.GetUri("http", "https");
 
                 if (!string.IsNullOrWhiteSpace(endpoint) &&

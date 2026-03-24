@@ -58,7 +58,7 @@ internal sealed class JobProgressTracker : IJobProgress
         SchedulePersistence();
     }
 
-    internal Task FlushAsync(CancellationToken cancellationToken)
+    internal Task Flush(CancellationToken cancellationToken)
     {
         var tasks = _pending.ToArray();
         if (tasks.Length == 0)
@@ -68,7 +68,7 @@ internal sealed class JobProgressTracker : IJobProgress
 
     private void SchedulePersistence()
     {
-        var updateTask = PersistAsync();
+        var updateTask = Persist();
         _pending.Add(updateTask);
         updateTask.ContinueWith(t =>
         {
@@ -80,12 +80,12 @@ internal sealed class JobProgressTracker : IJobProgress
         }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
     }
 
-    private async Task PersistAsync()
+    private async Task Persist()
     {
         try
         {
-            await _store.UpdateAsync(_job, _metadata, _cancellationToken);
-            await _broker.PublishAsync(_job, _cancellationToken);
+            await _store.Update(_job, _metadata, _cancellationToken);
+            await _broker.Publish(_job, _cancellationToken);
         }
         catch (OperationCanceledException)
         {

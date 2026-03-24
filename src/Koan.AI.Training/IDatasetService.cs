@@ -17,7 +17,7 @@ public interface IDatasetService
         DataFormat format = DataFormat.Instruction,
         CancellationToken ct = default);
 
-    Task<DatasetRef> FromFileAsync(string path, CancellationToken ct = default);
+    Task<DatasetRef> FromFile(string path, CancellationToken ct = default);
 
-    Task<DatasetAnalysis> AnalyzeAsync(DatasetRef dataset, string? tokenizer = null, CancellationToken ct = default);
+    Task<DatasetAnalysis> Analyze(DatasetRef dataset, string? tokenizer = null, CancellationToken ct = default);
 }

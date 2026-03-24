@@ -8,7 +8,7 @@ namespace Koan.Samples.Meridian.Services;
 
 public interface IPassageIndexer
 {
-    Task IndexAsync(string pipelineId, List<Passage> passages, CancellationToken ct);
+    Task Index(string pipelineId, List<Passage> passages, CancellationToken ct);
 }
 
 public sealed class PassageIndexer : IPassageIndexer
@@ -24,7 +24,7 @@ public sealed class PassageIndexer : IPassageIndexer
         _alerts = alerts;
     }
 
-    public async Task IndexAsync(string pipelineId, List<Passage> passages, CancellationToken ct)
+    public async Task Index(string pipelineId, List<Passage> passages, CancellationToken ct)
     {
         if (passages.Count == 0)
         {
@@ -70,7 +70,7 @@ public sealed class PassageIndexer : IPassageIndexer
                 await passage.Save(ct);
 
                 // Atomic commit: Both entity + vector, or neither
-                await EntityContext.CommitAsync(ct);
+                await EntityContext.Commit(ct);
 
                 successCount++;
                 _logger.LogDebug("Indexed passage {PassageId} (transactional)", passage.Id);
@@ -80,7 +80,7 @@ public sealed class PassageIndexer : IPassageIndexer
                 failureCount++;
 
                 // Rollback discards both entity and vector operations
-                await EntityContext.RollbackAsync(ct);
+                await EntityContext.Rollback(ct);
 
                 _logger.LogError(ex, "Failed to index passage {PassageId}, transaction rolled back", passage.Id);
             }

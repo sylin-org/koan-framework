@@ -54,7 +54,7 @@ builder.Services.AddScoped<IndexProjectAsync>(sp =>
 {
     var indexer = sp.GetRequiredService<Indexer>();
     return (string projectId, bool force, CancellationToken cancellationToken, IProgress<IndexingProgress>? progress) =>
-        indexer.IndexProjectAsync(projectId, progress, cancellationToken, force);
+        indexer.IndexProject(projectId, progress, cancellationToken, force);
 });
 
 // ✅ ENHANCED METRICS & INSTRUMENTATION

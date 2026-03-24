@@ -33,7 +33,7 @@ internal sealed class CommandRuntime
     public Profile ResolveEffectiveProfile(string? optionValue)
         => ResolveProfile(optionValue ?? Environment.GetEnvironmentVariable("Koan_ENV"));
 
-    public async Task<int> ExecuteExportAsync(ExportCommandOptions options)
+    public async Task<int> ExecuteExport(ExportCommandOptions options)
     {
         var profile = ResolveEffectiveProfile(options.Profile);
         var plan = BuildPlan(profile, options.BasePort, options.PortOverride, options.ExposeInternals, persistLaunchManifest: !options.NoLaunchManifest, autoAvoidPorts: profile != Profile.Prod);
@@ -45,7 +45,7 @@ internal sealed class CommandRuntime
         }
 
         var exporter = new ComposeExporter();
-        await exporter.GenerateAsync(plan, profile, options.OutputPath);
+        await exporter.Generate(plan, profile, options.OutputPath);
         Console.WriteLine($"compose exported -> {options.OutputPath}");
 
         var conflicts = Planner.FindConflictingPorts(plan.Services.SelectMany(s => s.Ports.Select(p => p.Host)));
@@ -57,10 +57,10 @@ internal sealed class CommandRuntime
         return 0;
     }
 
-    public async Task<int> ExecuteDoctorAsync(DoctorCommandOptions options)
+    public async Task<int> ExecuteDoctor(DoctorCommandOptions options)
     {
-        var provider = await SelectProviderAsync(options.Engine);
-        var availability = await provider.IsAvailableAsync();
+        var provider = await SelectProvider(options.Engine);
+        var availability = await provider.IsAvailable();
         var engineInfo = provider.EngineInfo();
         var order = string.Join(", ", ResolveProviderOrder());
 
@@ -83,7 +83,7 @@ internal sealed class CommandRuntime
         return availability.Ok ? 0 : 3;
     }
 
-    public async Task<int> ExecuteUpAsync(UpCommandOptions options)
+    public async Task<int> ExecuteUp(UpCommandOptions options)
     {
         var profile = ResolveEffectiveProfile(options.Profile);
         var timeout = options.TimeoutSeconds.HasValue && options.TimeoutSeconds.Value > 0
@@ -116,9 +116,9 @@ internal sealed class CommandRuntime
 
         Directory.CreateDirectory(Path.GetDirectoryName(options.OutputPath) ?? string.Empty);
         var exporter = new ComposeExporter();
-        await exporter.GenerateAsync(plan, profile, options.OutputPath);
+        await exporter.Generate(plan, profile, options.OutputPath);
 
-        var provider = await SelectProviderAsync(options.Engine);
+        var provider = await SelectProvider(options.Engine);
         var conflicts = Planner.FindConflictingPorts(plan.Services.SelectMany(s => s.Ports.Select(p => p.Host)));
 
         var verbosity = (options.Verbose ? 1 : 0) + (options.Trace ? 2 : 0) - (options.Quiet ? 1 : 0);
@@ -174,17 +174,17 @@ internal sealed class CommandRuntime
         }
     }
 
-    public async Task<int> ExecuteDownAsync(DownCommandOptions options)
+    public async Task<int> ExecuteDown(DownCommandOptions options)
     {
-        var provider = await SelectProviderAsync(options.Engine);
+        var provider = await SelectProvider(options.Engine);
         await provider.Down(options.OutputPath ?? Constants.DefaultComposePath, new StopOptions(RemoveVolumes: options.RemoveVolumes));
         return 0;
     }
 
-    public async Task<int> ExecuteStatusAsync(StatusCommandOptions options)
+    public async Task<int> ExecuteStatus(StatusCommandOptions options)
     {
         var profile = ResolveEffectiveProfile(options.Profile);
-        var provider = await SelectProviderAsync(options.Engine);
+        var provider = await SelectProvider(options.Engine);
         var status = await provider.Status(new StatusOptions(Service: null));
 
         if (options.Json)
@@ -236,7 +236,7 @@ internal sealed class CommandRuntime
         return 0;
     }
 
-    public async Task<int> ExecuteInspectAsync(InspectCommandOptions options)
+    public async Task<int> ExecuteInspect(InspectCommandOptions options)
     {
         if (options.Quiet) return 0;
 
@@ -267,7 +267,7 @@ internal sealed class CommandRuntime
         var availability = new List<object>();
         foreach (var p in providers)
         {
-            var (ok, reason) = await p.IsAvailableAsync();
+            var (ok, reason) = await p.IsAvailable();
             var info = p.EngineInfo();
             availability.Add(new { id = p.Id, available = ok, reason, engine = new { info.Name, info.Version, info.Endpoint } });
         }
@@ -570,9 +570,9 @@ internal sealed class CommandRuntime
         return 0;
     }
 
-    public async Task<int> ExecuteLogsAsync(LogsCommandOptions options)
+    public async Task<int> ExecuteLogs(LogsCommandOptions options)
     {
-        var provider = await SelectProviderAsync(options.Engine);
+        var provider = await SelectProvider(options.Engine);
         await foreach (var line in provider.Logs(new LogsOptions(Service: options.Service, Follow: options.Follow, Tail: options.Tail, Since: options.Since)))
         {
             Console.WriteLine(Orchestration.Redaction.RedactText(line));
@@ -609,7 +609,7 @@ internal sealed class CommandRuntime
         return new Plan(plan.Profile, Transform());
     }
 
-    private async Task<IHostingProvider> SelectProviderAsync(string? engine)
+    private async Task<IHostingProvider> SelectProvider(string? engine)
     {
         var providers = new List<IHostingProvider> { new DockerProvider(), new PodmanProvider() };
         if (!string.IsNullOrWhiteSpace(engine))
@@ -617,13 +617,13 @@ internal sealed class CommandRuntime
             var forced = providers.FirstOrDefault(p => string.Equals(p.Id, engine, StringComparison.OrdinalIgnoreCase));
             if (forced is not null)
             {
-                var (ok, _) = await forced.IsAvailableAsync();
+                var (ok, _) = await forced.IsAvailable();
                 if (ok) return forced;
             }
         }
         foreach (var p in OrderByPreference(providers))
         {
-            var (ok, _) = await p.IsAvailableAsync();
+            var (ok, _) = await p.IsAvailable();
             if (ok) return p;
         }
         return new DockerProvider();

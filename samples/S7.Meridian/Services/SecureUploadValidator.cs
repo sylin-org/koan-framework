@@ -5,7 +5,7 @@ namespace Koan.Samples.Meridian.Services;
 
 public interface ISecureUploadValidator
 {
-    Task ValidateAsync(IFormFile file, CancellationToken ct);
+    Task Validate(IFormFile file, CancellationToken ct);
 }
 
 public sealed class SecureUploadValidator : ISecureUploadValidator
@@ -20,7 +20,7 @@ public sealed class SecureUploadValidator : ISecureUploadValidator
     private static readonly long MaxFileSizeBytes = 50 * 1024 * 1024; // 50 MB
     private static readonly Regex SuspiciousNameRegex = new(@"(\.|%2e){2,}", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    public async Task ValidateAsync(IFormFile file, CancellationToken ct)
+    public async Task Validate(IFormFile file, CancellationToken ct)
     {
         if (file is null)
         {

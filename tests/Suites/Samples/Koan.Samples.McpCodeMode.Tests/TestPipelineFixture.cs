@@ -60,7 +60,7 @@ public class TestPipelineFixture : KoanTestPipelineFixtureBase
                 object? result = null;
                 if (method == "tools/list")
                 {
-                    var list = await handler.ListToolsAsync(ctx.RequestAborted);
+                    var list = await handler.ListTools(ctx.RequestAborted);
                     result = JToken.FromObject(list!);
                 }
                 else if (method == "tools/call")
@@ -69,7 +69,7 @@ public class TestPipelineFixture : KoanTestPipelineFixtureBase
                     var name = @params["name"]!.Value<string>()!;
                     JObject? arguments = @params["arguments"] as JObject;
                     var callParams = new Koan.Mcp.Hosting.McpRpcHandler.ToolsCallParams { Name = name, Arguments = arguments };
-                    var callResult = await handler.CallToolAsync(callParams, ctx.RequestAborted);
+                    var callResult = await handler.CallTool(callParams, ctx.RequestAborted);
                     if (callResult.Success && callResult.Result is not null)
                     {
                         result = callResult.Result; // flatten inner result payload (matches tests expectation)
@@ -84,12 +84,12 @@ public class TestPipelineFixture : KoanTestPipelineFixtureBase
                     ctx.Response.StatusCode = 400;
                     var err = JsonConvert.SerializeObject(new { jsonrpc = "2.0", error = new { code = -32601, message = "Method not found" }, id });
                     ctx.Response.ContentType = "application/json";
-                    await ctx.Response.WriteAsync(err, ctx.RequestAborted);
+                    await ctx.Response.Write(err, ctx.RequestAborted);
                     return;
                 }
                 var payload = JsonConvert.SerializeObject(new { jsonrpc = "2.0", result, id });
                 ctx.Response.ContentType = "application/json";
-                await ctx.Response.WriteAsync(payload, ctx.RequestAborted);
+                await ctx.Response.Write(payload, ctx.RequestAborted);
             });
             endpoints.MapKoanMcpEndpoints();
             endpoints.MapControllers();

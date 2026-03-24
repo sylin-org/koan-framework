@@ -16,7 +16,7 @@ public class PantrySearchServiceTests
             await new PantryItem { Name = $"Seed{i}", Status = "available" }.Save();
 
         var svc = new PantrySearchService();
-        var (items, degraded) = await svc.SearchAsync(null, 10, CancellationToken.None);
+        var (items, degraded) = await svc.Search(null, 10, CancellationToken.None);
         items.Should().NotBeEmpty();
         degraded.Should().BeFalse();
     }
@@ -29,7 +29,7 @@ public class PantrySearchServiceTests
         await new PantryItem { Name = "Almond Milk", Status = "available", Category = "dairy" }.Save();
 
         var svc = new PantrySearchService();
-        var (items, degraded) = await svc.SearchAsync("milk", 10, CancellationToken.None);
+        var (items, degraded) = await svc.Search("milk", 10, CancellationToken.None);
         items.Should().OnlyContain(i => (i.Name ?? "").Contains("Milk", StringComparison.OrdinalIgnoreCase));
         items.Should().HaveCountGreaterOrEqualTo(2);
         degraded.Should().BeTrue(); // lexical fallback likely (unless vectors available)
@@ -43,7 +43,7 @@ public class PantrySearchServiceTests
         await new PantryItem { Name = "Apple Juice", Category = "beverage", Status = "available" }.Save();
 
         var svc = new PantrySearchService();
-        var (items, _) = await svc.SearchAsync("apple onion", 10, CancellationToken.None);
+        var (items, _) = await svc.Search("apple onion", 10, CancellationToken.None);
         items.Should().NotBeEmpty();
         items.Any(i => (i.Name ?? "").Contains("Apple", StringComparison.OrdinalIgnoreCase)).Should().BeTrue();
         items.Any(i => (i.Name ?? "").Contains("Onion", StringComparison.OrdinalIgnoreCase)).Should().BeTrue();

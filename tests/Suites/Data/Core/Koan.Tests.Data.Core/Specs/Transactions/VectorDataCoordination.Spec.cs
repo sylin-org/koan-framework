@@ -43,7 +43,7 @@ public sealed class VectorDataCoordinationSpec
     public async Task SaveWithVector_with_transaction_defers_both_operations()
     {
         await TestPipeline.For<VectorDataCoordinationSpec>(_output, nameof(SaveWithVector_with_transaction_defers_both_operations))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition = EnsurePartition(ctx);
@@ -81,7 +81,7 @@ public sealed class VectorDataCoordinationSpec
                         var vectorExists = await TryGetVector(entity.Id);
                         vectorExists.Should().BeFalse("vector should not be persisted during transaction");
 
-                        await EntityContext.CommitAsync();
+                        await EntityContext.Commit();
                     }
 
                     // Both should be persisted after commit
@@ -97,7 +97,7 @@ public sealed class VectorDataCoordinationSpec
                     retrieved!.Title.Should().Be("SaveWithVector Test");
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -108,7 +108,7 @@ public sealed class VectorDataCoordinationSpec
     public async Task SaveWithVector_without_transaction_executes_sequentially()
     {
         await TestPipeline.For<VectorDataCoordinationSpec>(_output, nameof(SaveWithVector_without_transaction_executes_sequentially))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition = EnsurePartition(ctx);
@@ -145,7 +145,7 @@ public sealed class VectorDataCoordinationSpec
                     vectorExists.Should().BeTrue("vector should be persisted immediately");
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -157,7 +157,7 @@ public sealed class VectorDataCoordinationSpec
     public async Task SaveWithVector_vector_failure_after_entity_save_throws_coordination_exception()
     {
         await TestPipeline.For<VectorDataCoordinationSpec>(_output, nameof(SaveWithVector_vector_failure_after_entity_save_throws_coordination_exception))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition = EnsurePartition(ctx);
@@ -221,7 +221,7 @@ public sealed class VectorDataCoordinationSpec
                     vectorExists.Should().BeFalse("vector should not exist after failure");
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -232,7 +232,7 @@ public sealed class VectorDataCoordinationSpec
     public async Task SaveWithVector_entity_failure_throws_original_exception()
     {
         await TestPipeline.For<VectorDataCoordinationSpec>(_output, nameof(SaveWithVector_entity_failure_throws_original_exception))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition = EnsurePartition(ctx);
@@ -282,7 +282,7 @@ public sealed class VectorDataCoordinationSpec
                     }
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -292,7 +292,7 @@ public sealed class VectorDataCoordinationSpec
     public async Task SaveWithVector_with_metadata_stores_metadata_in_vector_db()
     {
         await TestPipeline.For<VectorDataCoordinationSpec>(_output, nameof(SaveWithVector_with_metadata_stores_metadata_in_vector_db))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition = EnsurePartition(ctx);
@@ -334,7 +334,7 @@ public sealed class VectorDataCoordinationSpec
                     vectorExists.Should().BeTrue("vector with metadata should be persisted");
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     #region Helper Methods

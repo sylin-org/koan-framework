@@ -5,7 +5,7 @@ namespace S18.Prism.Initialization;
 
 public static class SpaceSeeder
 {
-    public static async Task SeedDefaultsAsync(ILogger logger)
+    public static async Task SeedDefaults(ILogger logger)
     {
         logger.LogInformation("Seeding default spaces...");
 

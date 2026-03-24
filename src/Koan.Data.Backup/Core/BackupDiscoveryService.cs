@@ -30,7 +30,7 @@ public class BackupDiscoveryService : IBackupDiscoveryService
         _logger = logger;
     }
 
-    public async Task<BackupCatalog> DiscoverAllBackupsAsync(DiscoveryOptions? options = null, CancellationToken ct = default)
+    public async Task<BackupCatalog> DiscoverAllBackups(DiscoveryOptions? options = null, CancellationToken ct = default)
     {
         options ??= new DiscoveryOptions();
         var stopwatch = Stopwatch.StartNew();
@@ -45,7 +45,7 @@ public class BackupDiscoveryService : IBackupDiscoveryService
         try
         {
             // Get all storage profiles to scan
-            var profilesToScan = options.StorageProfiles ?? await GetAllStorageProfilesAsync(ct);
+            var profilesToScan = options.StorageProfiles ?? await GetAllStorageProfiles(ct);
 
             // Discover backups from each profile with controlled concurrency
             using var semaphore = new SemaphoreSlim(options.MaxConcurrency);
@@ -54,7 +54,7 @@ public class BackupDiscoveryService : IBackupDiscoveryService
                 await semaphore.WaitAsync(ct);
                 try
                 {
-                    return await DiscoverByStorageProfileAsync(profile, ct);
+                    return await DiscoverByStorageProfile(profile, ct);
                 }
                 finally
                 {
@@ -96,7 +96,7 @@ public class BackupDiscoveryService : IBackupDiscoveryService
         }
     }
 
-    public async Task<BackupCatalog> DiscoverByStorageProfileAsync(string storageProfile, CancellationToken ct = default)
+    public async Task<BackupCatalog> DiscoverByStorageProfile(string storageProfile, CancellationToken ct = default)
     {
         var stopwatch = Stopwatch.StartNew();
         _logger.LogDebug("Discovering backups in storage profile: {StorageProfile}", storageProfile);
@@ -113,7 +113,7 @@ public class BackupDiscoveryService : IBackupDiscoveryService
             // List backup files from storage using the new listing capability
             try
             {
-                await foreach (var file in _storageService.ListObjectsAsync(storageProfile, "backups", null, ct))
+                await foreach (var file in _storageService.ListObjects(storageProfile, "backups", null, ct))
                 {
                     try
                     {
@@ -156,10 +156,10 @@ public class BackupDiscoveryService : IBackupDiscoveryService
         }
     }
 
-    public async Task<BackupCatalog> QueryBackupsAsync(BackupQuery query, CancellationToken ct = default)
+    public async Task<BackupCatalog> QueryBackups(BackupQuery query, CancellationToken ct = default)
     {
         // First discover all backups
-        var allBackups = await DiscoverAllBackupsAsync(ct: ct);
+        var allBackups = await DiscoverAllBackups(ct: ct);
 
         // Apply filters
         var filteredBackups = allBackups.Backups.AsEnumerable();
@@ -256,10 +256,10 @@ public class BackupDiscoveryService : IBackupDiscoveryService
         };
     }
 
-    public async Task<BackupInfo?> GetBackupAsync(string backupId, CancellationToken ct = default)
+    public async Task<BackupInfo?> GetBackup(string backupId, CancellationToken ct = default)
     {
         // Try to find by exact ID match first
-        var allBackups = await DiscoverAllBackupsAsync(ct: ct);
+        var allBackups = await DiscoverAllBackups(ct: ct);
         var backup = allBackups.Backups.FirstOrDefault(b => b.Id == backupId);
 
         if (backup != null)
@@ -271,7 +271,7 @@ public class BackupDiscoveryService : IBackupDiscoveryService
         return backup;
     }
 
-    public async Task<BackupValidationResult> ValidateBackupAsync(string backupId, CancellationToken ct = default)
+    public async Task<BackupValidationResult> ValidateBackup(string backupId, CancellationToken ct = default)
     {
         var stopwatch = Stopwatch.StartNew();
         var result = new BackupValidationResult
@@ -282,7 +282,7 @@ public class BackupDiscoveryService : IBackupDiscoveryService
 
         try
         {
-            var backup = await GetBackupAsync(backupId, ct);
+            var backup = await GetBackup(backupId, ct);
             if (backup == null)
             {
                 result.IsValid = false;
@@ -295,10 +295,10 @@ public class BackupDiscoveryService : IBackupDiscoveryService
             try
             {
                 var backupPath = GenerateBackupPath(backup.Name, backup.CreatedAt);
-                using var archive = await _backupStorageService.OpenBackupArchiveAsync(backupPath, backup.StorageProfile, ct);
+                using var archive = await _backupStorageService.OpenBackupArchive(backupPath, backup.StorageProfile, ct);
 
                 // Load and validate manifest
-                var manifest = await _backupStorageService.LoadManifestAsync(archive, ct);
+                var manifest = await _backupStorageService.LoadManifest(archive, ct);
 
                 // Basic validation checks
                 if (manifest.Status != BackupStatus.Completed)
@@ -335,7 +335,7 @@ public class BackupDiscoveryService : IBackupDiscoveryService
         return result;
     }
 
-    public async Task RefreshCatalogAsync(CancellationToken ct = default)
+    public async Task RefreshCatalog(CancellationToken ct = default)
     {
         _logger.LogInformation("Refreshing backup catalog cache");
 
@@ -345,14 +345,14 @@ public class BackupDiscoveryService : IBackupDiscoveryService
         }
 
         // Trigger a fresh discovery
-        await DiscoverAllBackupsAsync(new DiscoveryOptions { UseFastPath = true }, ct);
+        await DiscoverAllBackups(new DiscoveryOptions { UseFastPath = true }, ct);
 
         _logger.LogInformation("Backup catalog cache refreshed");
     }
 
-    public async Task<BackupCatalogStats> GetCatalogStatsAsync(CancellationToken ct = default)
+    public async Task<BackupCatalogStats> GetCatalogStats(CancellationToken ct = default)
     {
-        var catalog = await DiscoverAllBackupsAsync(ct: ct);
+        var catalog = await DiscoverAllBackups(ct: ct);
         return catalog.Stats;
     }
 
@@ -389,8 +389,8 @@ public class BackupDiscoveryService : IBackupDiscoveryService
             {
                 // Use the full file key as backup path
                 var backupPath = file.Key;
-                using var archive = await _backupStorageService.OpenBackupArchiveAsync(backupPath, storageProfile, ct);
-                manifest = await _backupStorageService.LoadManifestAsync(archive, ct);
+                using var archive = await _backupStorageService.OpenBackupArchive(backupPath, storageProfile, ct);
+                manifest = await _backupStorageService.LoadManifest(archive, ct);
             }
             catch (Exception ex)
             {
@@ -450,7 +450,7 @@ public class BackupDiscoveryService : IBackupDiscoveryService
         };
     }
 
-    private Task<string[]> GetAllStorageProfilesAsync(CancellationToken ct)
+    private Task<string[]> GetAllStorageProfiles(CancellationToken ct)
     {
         // This is a simplified implementation - in reality you'd get this from your storage configuration
         // For now, return a default profile

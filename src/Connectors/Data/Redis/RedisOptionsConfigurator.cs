@@ -137,7 +137,7 @@ internal sealed class RedisOptionsConfigurator : AdapterOptionsConfigurator<Redi
                 context.Parameters["password"] = password;
 
             // Use autonomous discovery coordinator
-            var discoveryTask = _discoveryCoordinator.DiscoverServiceAsync("redis", context);
+            var discoveryTask = _discoveryCoordinator.DiscoverService("redis", context);
             var result = discoveryTask.GetAwaiter().GetResult();
 
             if (result.IsSuccessful)

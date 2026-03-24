@@ -95,7 +95,7 @@ public sealed class ChainBuilder
     public async Task<ChainResult> Run(object? variables = null, CancellationToken ct = default)
     {
         var executor = ResolveExecutor();
-        return await executor.ExecuteAsync(Build(), variables, ct);
+        return await executor.Execute(Build(), variables, ct);
     }
 
     /// <summary>Stream the chain output as chunks.</summary>
@@ -104,7 +104,7 @@ public sealed class ChainBuilder
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var executor = ResolveExecutor();
-        await foreach (var chunk in executor.StreamAsync(Build(), variables, ct))
+        await foreach (var chunk in executor.Stream(Build(), variables, ct))
         {
             yield return chunk;
         }
@@ -174,6 +174,6 @@ public sealed record ChainStep(ChainStepKind Kind, string Value)
 /// </summary>
 public interface IChainExecutor
 {
-    Task<ChainResult> ExecuteAsync(ChainDefinition definition, object? variables, CancellationToken ct);
-    IAsyncEnumerable<ChainChunk> StreamAsync(ChainDefinition definition, object? variables, CancellationToken ct);
+    Task<ChainResult> Execute(ChainDefinition definition, object? variables, CancellationToken ct);
+    IAsyncEnumerable<ChainChunk> Stream(ChainDefinition definition, object? variables, CancellationToken ct);
 }

@@ -52,7 +52,7 @@ public class EntityController : ControllerBase
     {
         try
         {
-            var discovery = await _entityDiscoveryService.DiscoverAllEntitiesAsync(ct);
+            var discovery = await _entityDiscoveryService.DiscoverAllEntities(ct);
             return Ok(discovery.Entities.ToArray());
         }
         catch (Exception ex)
@@ -85,7 +85,7 @@ public class EntityController : ControllerBase
                 entityType, request.Name);
 
             // Find the entity type in discovered entities
-            var discovery = await _entityDiscoveryService.DiscoverAllEntitiesAsync(ct);
+            var discovery = await _entityDiscoveryService.DiscoverAllEntities(ct);
             var entityInfo = discovery.Entities.FirstOrDefault(e =>
                 string.Equals(e.EntityType.Name, entityType, StringComparison.OrdinalIgnoreCase));
 
@@ -95,7 +95,7 @@ public class EntityController : ControllerBase
             }
 
             // Start tracking the operation
-            var operationId = await _operationTracker.StartBackupOperationAsync(request.Name, ct);
+            var operationId = await _operationTracker.StartBackupOperation(request.Name, ct);
 
             // Start the backup operation asynchronously using reflection
             _ = Task.Run(async () =>
@@ -104,7 +104,7 @@ public class EntityController : ControllerBase
                 {
                     var options = MapToBackupOptions(request);
 
-                    await _operationTracker.UpdateBackupProgressAsync(operationId, new BackupProgressInfo
+                    await _operationTracker.UpdateBackupProgress(operationId, new BackupProgressInfo
                     {
                         CurrentStage = $"Backing up {entityType}",
                         PercentComplete = 0,
@@ -113,17 +113,17 @@ public class EntityController : ControllerBase
 
                     // Use reflection to call the generic backup method
                     var result = await BackupEntityByReflection(entityInfo, request.Name, options, ct);
-                    await _operationTracker.CompleteBackupOperationAsync(operationId, result);
+                    await _operationTracker.CompleteBackupOperation(operationId, result);
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Entity backup operation {OperationId} for {EntityType} failed",
                         operationId, entityType);
-                    await _operationTracker.FailOperationAsync(operationId, ex.Message);
+                    await _operationTracker.FailOperation(operationId, ex.Message);
                 }
             }, ct);
 
-            var response = await _operationTracker.GetBackupOperationAsync(operationId);
+            var response = await _operationTracker.GetBackupOperation(operationId);
             return Accepted(response);
         }
         catch (Exception ex)
@@ -158,7 +158,7 @@ public class EntityController : ControllerBase
                 entityType, backupName);
 
             // Verify backup exists and contains the entity type
-            var backupInfo = await _backupDiscoveryService.GetBackupAsync(backupName, ct);
+            var backupInfo = await _backupDiscoveryService.GetBackup(backupName, ct);
             if (backupInfo == null)
             {
                 return NotFound(new { error = "Backup not found", backupName });
@@ -173,7 +173,7 @@ public class EntityController : ControllerBase
             }
 
             // Find the entity type in discovered entities
-            var discovery = await _entityDiscoveryService.DiscoverAllEntitiesAsync(ct);
+            var discovery = await _entityDiscoveryService.DiscoverAllEntities(ct);
             var entityInfo = discovery.Entities.FirstOrDefault(e =>
                 string.Equals(e.EntityType.Name, entityType, StringComparison.OrdinalIgnoreCase));
 
@@ -183,7 +183,7 @@ public class EntityController : ControllerBase
             }
 
             // Start tracking the operation
-            var operationId = await _operationTracker.StartRestoreOperationAsync(backupName, ct);
+            var operationId = await _operationTracker.StartRestoreOperation(backupName, ct);
 
             // Start the restore operation asynchronously using reflection
             _ = Task.Run(async () =>
@@ -192,7 +192,7 @@ public class EntityController : ControllerBase
                 {
                     var options = MapToRestoreOptions(request);
 
-                    await _operationTracker.UpdateRestoreProgressAsync(operationId, new RestoreProgressInfo
+                    await _operationTracker.UpdateRestoreProgress(operationId, new RestoreProgressInfo
                     {
                         CurrentStage = $"Restoring {entityType}",
                         PercentComplete = 0,
@@ -223,17 +223,17 @@ public class EntityController : ControllerBase
                         }
                     };
 
-                    await _operationTracker.CompleteRestoreOperationAsync(operationId, restoreResult);
+                    await _operationTracker.CompleteRestoreOperation(operationId, restoreResult);
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Entity restore operation {OperationId} for {EntityType} failed",
                         operationId, entityType);
-                    await _operationTracker.FailOperationAsync(operationId, ex.Message);
+                    await _operationTracker.FailOperation(operationId, ex.Message);
                 }
             }, ct);
 
-            var response = await _operationTracker.GetRestoreOperationAsync(operationId);
+            var response = await _operationTracker.GetRestoreOperation(operationId);
             return Accepted(response);
         }
         catch (Exception ex)
@@ -274,7 +274,7 @@ public class EntityController : ControllerBase
                 EntityTypes = new[] { entityType }
             };
 
-            var catalog = await _backupDiscoveryService.QueryBackupsAsync(query, ct);
+            var catalog = await _backupDiscoveryService.QueryBackups(query, ct);
 
             var response = new BackupCatalogResponse
             {

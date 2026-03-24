@@ -206,22 +206,22 @@ public sealed class AiConversationBuilder
         return request;
     }
 
-    public Task<AiChatResponse> SendAsync(CancellationToken ct = default)
-        => _ai.PromptAsync(Build(), ct);
+    public Task<AiChatResponse> Send(CancellationToken ct = default)
+        => _ai.Prompt(Build(), ct);
 
-    public Task<AiChatResponse> AskAsync(string message, CancellationToken ct = default)
+    public Task<AiChatResponse> Ask(string message, CancellationToken ct = default)
     {
         WithUser(message);
-        return SendAsync(ct);
+        return Send(ct);
     }
 
-    public IAsyncEnumerable<AiChatChunk> StreamAsync(CancellationToken ct = default)
-        => _ai.StreamAsync(Build(), ct);
+    public IAsyncEnumerable<AiChatChunk> Stream(CancellationToken ct = default)
+        => _ai.Stream(Build(), ct);
 
-    public IAsyncEnumerable<AiChatChunk> StreamAsync(string message, CancellationToken ct = default)
+    public IAsyncEnumerable<AiChatChunk> Stream(string message, CancellationToken ct = default)
     {
         WithUser(message);
-        return _ai.StreamAsync(Build(), ct);
+        return _ai.Stream(Build(), ct);
     }
 
     private AiConversationBuilder AddTextMessage(string role, string text)

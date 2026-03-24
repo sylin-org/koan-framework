@@ -65,7 +65,7 @@ public sealed class ReadinessStateManager
         StateChanged?.Invoke(this, new ReadinessStateChangedEventArgs(previous, newState));
     }
 
-    public Task WaitAsync(TimeSpan timeout, CancellationToken ct)
+    public Task Wait(TimeSpan timeout, CancellationToken ct)
     {
         if (IsReady)
         {

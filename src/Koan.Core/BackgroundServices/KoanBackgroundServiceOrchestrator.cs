@@ -137,12 +137,12 @@ public class KoanBackgroundServiceOrchestrator : BackgroundService, IHealthContr
                 _logger.LogTrace("Starting startup service: {ServiceName} (Order: {Order})",
                     service.Name, service.StartupOrder);
 
-                await service.IsReadyAsync(cancellationToken);
+                await service.IsReady(cancellationToken);
 
                 using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 cts.CancelAfter(TimeSpan.FromSeconds(_options.StartupTimeoutSeconds));
 
-                var task = service.ExecuteAsync(cts.Token);
+                var task = service.Execute(cts.Token);
 
                 // For startup services, wait for completion or timeout
                 try
@@ -186,10 +186,10 @@ public class KoanBackgroundServiceOrchestrator : BackgroundService, IHealthContr
             {
                 _logger.LogTrace("Starting background service: {ServiceName}", service.Name);
 
-                await service.IsReadyAsync(cancellationToken);
+                await service.IsReady(cancellationToken);
 
                 var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                var task = Task.Run(() => service.ExecuteAsync(cts.Token), cts.Token);
+                var task = Task.Run(() => service.Execute(cts.Token), cts.Token);
 
                 _runningServices.Add(new ServiceExecutionContext
                 {
@@ -253,7 +253,7 @@ public class KoanBackgroundServiceOrchestrator : BackgroundService, IHealthContr
         return true;
     }
 
-    public Task<HealthReport> CheckAsync(CancellationToken cancellationToken = default)
+    public Task<HealthReport> Check(CancellationToken cancellationToken = default)
     {
         var failedServices = _runningServices
             .Where(ctx => ctx.Task.IsCompleted && ctx.Task.IsFaulted)

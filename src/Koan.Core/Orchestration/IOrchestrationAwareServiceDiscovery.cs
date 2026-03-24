@@ -23,7 +23,7 @@ public interface IOrchestrationAwareServiceDiscovery
     /// <param name="discovery">Service discovery configuration including health checking</param>
     /// <param name="cancellationToken">Cancellation token for health checks</param>
     /// <returns>First healthy service URL found, or configured fallback</returns>
-    Task<ServiceDiscoveryResult> DiscoverServiceAsync(string serviceName, ServiceDiscoveryOptions discovery, CancellationToken cancellationToken = default);
+    Task<ServiceDiscoveryResult> DiscoverService(string serviceName, ServiceDiscoveryOptions discovery, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Get the current orchestration mode being used for service resolution.

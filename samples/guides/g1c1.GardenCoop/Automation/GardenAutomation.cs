@@ -65,13 +65,13 @@ public static class GardenAutomation
                         {
                             PlotId = plotId,
                             MemberId = plot.MemberId
-                        }.ActivateAsync($"Low soil humidity (avg={average:F1}) – consider watering today.", ct);
+                        }.Activate($"Low soil humidity (avg={average:F1}) – consider watering today.", ct);
                     }
                 }
                 else if (active is not null)
                 {
                     // readings recovered above threshold - auto-acknowledge the reminder
-                    await active.AcknowledgeAsync("Soil humidity back above threshold.", ct);
+                    await active.Acknowledge("Soil humidity back above threshold.", ct);
                 }
             });
     }

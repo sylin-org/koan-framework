@@ -151,7 +151,7 @@ internal sealed class PostgresRepository<
         var cacheKey = BuildCacheKey(conn, table);
         try
         {
-            EnsureOrchestratedAsync(conn, cacheKey, CancellationToken.None).GetAwaiter().GetResult();
+            EnsureOrchestrated(conn, cacheKey, CancellationToken.None).GetAwaiter().GetResult();
         }
         catch
         {
@@ -159,7 +159,7 @@ internal sealed class PostgresRepository<
         }
     }
 
-    private Task EnsureOrchestratedAsync(NpgsqlConnection conn, string cacheKey, CancellationToken ct)
+    private Task EnsureOrchestrated(NpgsqlConnection conn, string cacheKey, CancellationToken ct)
     {
         var table = TableName;
         if (_healthyCache.TryGetValue(cacheKey, out var healthy) && healthy)
@@ -167,7 +167,7 @@ internal sealed class PostgresRepository<
             return Task.CompletedTask;
         }
 
-        return Singleflight.RunAsync(cacheKey, async runCt =>
+        return Singleflight.Run(cacheKey, async runCt =>
         {
             if (_healthyCache.TryGetValue(cacheKey, out var cached) && cached)
             {
@@ -203,7 +203,7 @@ internal sealed class PostgresRepository<
         }, ct);
     }
 
-    public async Task EnsureHealthyAsync(CancellationToken ct)
+    public async Task EnsureHealthy(CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         var table = TableName;
@@ -212,7 +212,7 @@ internal sealed class PostgresRepository<
         var cacheKey = BuildCacheKey(conn, table);
         try
         {
-            await EnsureOrchestratedAsync(conn, cacheKey, ct);
+            await EnsureOrchestrated(conn, cacheKey, ct);
         }
         catch (Exception ex)
         {
@@ -248,7 +248,7 @@ internal sealed class PostgresRepository<
             ""Id"" text PRIMARY KEY,
             ""Json"" jsonb NOT NULL
         );";
-        cmd.ExecuteNonQuery();
+        cmd.ExecuteNonQueryAsync();
 
         // Create expression indexes for projected properties if marked [Index]
         var projections = ProjectionResolver.Get(typeof(TEntity));
@@ -269,7 +269,7 @@ internal sealed class PostgresRepository<
             using var idx = conn.CreateCommand();
             // index on extracted text value for ordering/filtering
             idx.CommandText = $"CREATE INDEX IF NOT EXISTS \"{indexName}\" ON {QualifiedTable} ((\"Json\" #>> '{{{propPath}}}'))";
-            idx.ExecuteNonQuery();
+            idx.ExecuteNonQueryAsync();
         }
         catch { }
     }
@@ -281,7 +281,7 @@ internal sealed class PostgresRepository<
         cmd.CommandText = "SELECT 1 FROM information_schema.tables WHERE table_schema = @s AND table_name = @t";
         cmd.Parameters.AddWithValue("s", schema);
         cmd.Parameters.AddWithValue("t", table);
-        try { var o = cmd.ExecuteScalar(); return o != null; } catch { return false; }
+        try { var o = cmd.ExecuteScalarAsync(); return o != null; } catch { return false; }
     }
 
     private (string schema, string table) ResolveSchemaAndTable()
@@ -311,7 +311,7 @@ internal sealed class PostgresRepository<
         return (optimized.Id.ToString()!, optimized.Json);
     }
 
-    public async Task<TEntity?> GetAsync(TKey id, CancellationToken ct = default)
+    public async Task<TEntity?> Get(TKey id, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = PgTelemetry.Activity.StartActivity("pg.get");
@@ -342,7 +342,7 @@ internal sealed class PostgresRepository<
         return row == default ? null : FromRow(row);
     }
 
-    public async Task<IReadOnlyList<TEntity?>> GetManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity?>> GetMany(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = PgTelemetry.Activity.StartActivity("pg.get.many");
@@ -393,7 +393,7 @@ internal sealed class PostgresRepository<
         return results;
     }
 
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(object? query, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = PgTelemetry.Activity.StartActivity("pg.query:all");
@@ -404,7 +404,7 @@ internal sealed class PostgresRepository<
         return rows.Select(FromRow).ToList();
     }
 
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(object? query, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = PgTelemetry.Activity.StartActivity("pg.query:all+opts");
@@ -416,7 +416,7 @@ internal sealed class PostgresRepository<
         return rows.Select(FromRow).ToList();
     }
 
-    public async Task<CountResult> CountAsync(CountRequest<TEntity> request, CancellationToken ct = default)
+    public async Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = PgTelemetry.Activity.StartActivity("pg.count");
@@ -454,12 +454,12 @@ internal sealed class PostgresRepository<
             {
                 var (whereSql, parameters) = translator.Translate(request.Predicate);
                 whereSql = RewriteWhereForProjection(whereSql);
-                return await CountWhereAsync(whereSql, parameters);
+                return await CountWhere(whereSql, parameters);
             }
             catch (NotSupportedException)
             {
                 var compiled = request.Predicate.Compile();
-                var all = await QueryAsync((object?)null, ct);
+                var all = await Query((object?)null, ct);
                 var count = (long)all.Count(compiled);
                 return CountResult.Exact(count);
             }
@@ -477,7 +477,7 @@ internal sealed class PostgresRepository<
         return CountResult.Exact(totalCount);
     }
 
-    private async Task<CountResult> CountWhereAsync(string whereSql, IReadOnlyList<object?> parameters)
+    private async Task<CountResult> CountWhere(string whereSql, IReadOnlyList<object?> parameters)
     {
         await using var conn = Open();
         var sql = $"SELECT COUNT(1) FROM {QualifiedTable} WHERE {whereSql}";
@@ -487,7 +487,7 @@ internal sealed class PostgresRepository<
         return CountResult.Exact(count);
     }
 
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = PgTelemetry.Activity.StartActivity("pg.query:linq");
@@ -507,12 +507,12 @@ internal sealed class PostgresRepository<
         catch (NotSupportedException)
         {
             var compiled = predicate.Compile();
-            var all = await QueryAsync((object?)null, ct);
+            var all = await Query((object?)null, ct);
             return all.Where(compiled).ToList();
         }
     }
 
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = PgTelemetry.Activity.StartActivity("pg.query:linq+opts");
@@ -533,12 +533,12 @@ internal sealed class PostgresRepository<
         catch (NotSupportedException)
         {
             var compiled = predicate.Compile();
-            var all = await QueryAsync((object?)null, options, ct);
+            var all = await Query((object?)null, options, ct);
             return all.Where(compiled).ToList();
         }
     }
 
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(string sql, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(string sql, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = PgTelemetry.Activity.StartActivity("pg.query:string");
@@ -558,7 +558,7 @@ internal sealed class PostgresRepository<
         }
     }
 
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(string sql, object? parameters, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(string sql, object? parameters, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = PgTelemetry.Activity.StartActivity("pg.query:string:param");
@@ -578,7 +578,7 @@ internal sealed class PostgresRepository<
         }
     }
 
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(string sql, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(string sql, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = PgTelemetry.Activity.StartActivity("pg.query:string+opts");
@@ -599,7 +599,7 @@ internal sealed class PostgresRepository<
         }
     }
 
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(string sql, object? parameters, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(string sql, object? parameters, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = PgTelemetry.Activity.StartActivity("pg.query:string:param+opts");
@@ -621,13 +621,13 @@ internal sealed class PostgresRepository<
     }
 
 
-    public async Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)
-    { await UpsertManyAsync(new[] { model }, ct); return model; }
+    public async Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
+    { await UpsertMany(new[] { model }, ct); return model; }
 
-    public async Task<bool> DeleteAsync(TKey id, CancellationToken ct = default)
-        => await DeleteManyAsync(new[] { id }, ct).ContinueWith(t => t.Result > 0, ct);
+    public async Task<bool> Delete(TKey id, CancellationToken ct = default)
+        => await DeleteMany(new[] { id }, ct).ContinueWith(t => t.Result > 0, ct);
 
-    public async Task<int> UpsertManyAsync(IEnumerable<TEntity> models, CancellationToken ct = default)
+    public async Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default)
     {
         await using var conn = Open();
         await using var tx = await conn.BeginTransactionAsync(ct);
@@ -643,7 +643,7 @@ internal sealed class PostgresRepository<
         return count;
     }
 
-    public async Task<int> DeleteManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    public async Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
         await using var conn = Open();
         // Apply optimization to all IDs for bulk delete
@@ -661,13 +661,13 @@ internal sealed class PostgresRepository<
         return await conn.ExecuteAsync($"DELETE FROM {QualifiedTable} WHERE \"Id\" = ANY(@Ids)", new { Ids = optimizedIds });
     }
 
-    public async Task<int> DeleteAllAsync(CancellationToken ct = default)
+    public async Task<int> DeleteAll(CancellationToken ct = default)
     {
         await using var conn = Open();
         return await conn.ExecuteAsync($"DELETE FROM {QualifiedTable}");
     }
 
-    public async Task<long> RemoveAllAsync(RemoveStrategy strategy, CancellationToken ct = default)
+    public async Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default)
     {
         await using var conn = Open();
 
@@ -693,7 +693,7 @@ internal sealed class PostgresRepository<
 
         // Safe path: DELETE (fires hooks if registered)
         var countRequest = new CountRequest<TEntity>();
-        var countResult = await CountAsync(countRequest, ct);
+        var countResult = await Count(countRequest, ct);
         await conn.ExecuteAsync($"DELETE FROM {QualifiedTable}", ct);
         return countResult.Value;
     }
@@ -713,11 +713,11 @@ internal sealed class PostgresRepository<
         public IBatchSet<TEntity, TKey> Delete(TKey id) { _deletes.Add(id); return this; }
         public IBatchSet<TEntity, TKey> Clear() { _adds.Clear(); _updates.Clear(); _deletes.Clear(); _mutations.Clear(); return this; }
 
-        public async Task<BatchResult> SaveAsync(BatchOptions? options = null, CancellationToken ct = default)
+        public async Task<BatchResult> Save(BatchOptions? options = null, CancellationToken ct = default)
         {
             foreach (var (id, mutate) in _mutations)
             {
-                var current = await repo.GetAsync(id, ct);
+                var current = await repo.Get(id, ct);
                 if (current is not null) { mutate(current); _updates.Add(current); }
             }
             var upserts = _adds.Concat(_updates);
@@ -725,8 +725,8 @@ internal sealed class PostgresRepository<
             var requireAtomic = options?.RequireAtomic == true;
             if (!requireAtomic)
             {
-                if (upserts.Any()) await repo.UpsertManyAsync(upserts, ct);
-                var deleted = 0; if (_deletes.Any()) deleted = await repo.DeleteManyAsync(_deletes, ct);
+                if (upserts.Any()) await repo.UpsertMany(upserts, ct);
+                var deleted = 0; if (_deletes.Any()) deleted = await repo.DeleteMany(_deletes, ct);
                 return new BatchResult(added, updated, deleted);
             }
 
@@ -779,7 +779,7 @@ internal sealed class PostgresRepository<
                     var ddl = new PgDdlExecutor(conn, _options.SearchPath);
                     var feats = new PostgresStoreFeatures();
                     var key = $"{conn.Host}/{conn.Database}::{TableName}";
-                    await Singleflight.RunAsync(key, async kct =>
+                    await Singleflight.Run(key, async kct =>
                     {
                         await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, kct);
                         _healthyCache[key] = true;
@@ -873,7 +873,7 @@ internal sealed class PostgresRepository<
             cmd.CommandText = "SELECT 1 FROM information_schema.tables WHERE table_schema = @s AND table_name = @t";
             cmd.Parameters.AddWithValue("@s", schema ?? (searchPath ?? "public"));
             cmd.Parameters.AddWithValue("@t", table);
-            return cmd.ExecuteScalar() is not null;
+            return cmd.ExecuteScalarAsync() is not null;
         }
         public bool ColumnExists(string schema, string table, string column)
         {
@@ -882,14 +882,14 @@ internal sealed class PostgresRepository<
             cmd.Parameters.AddWithValue("@s", schema ?? (searchPath ?? "public"));
             cmd.Parameters.AddWithValue("@t", table);
             cmd.Parameters.AddWithValue("@c", column);
-            return cmd.ExecuteScalar() is not null;
+            return cmd.ExecuteScalarAsync() is not null;
         }
         public void CreateTableIdJson(string schema, string table, string idColumn = "Id", string jsonColumn = "Json")
         {
             var sch = schema ?? (searchPath ?? "public");
             using var cmd = conn.CreateCommand();
             cmd.CommandText = $"CREATE TABLE IF NOT EXISTS \"{Qual(sch)}\".\"{Qual(table)}\" (\"{Qual(idColumn)}\" text PRIMARY KEY, \"{Qual(jsonColumn)}\" jsonb NOT NULL)";
-            cmd.ExecuteNonQuery();
+            cmd.ExecuteNonQueryAsync();
         }
         public void CreateTableWithColumns(string schema, string table, List<(string Name, Type ClrType, bool Nullable, bool IsComputed, string? JsonPath, bool IsIndexed)> columns)
         {
@@ -925,7 +925,7 @@ internal sealed class PostgresRepository<
             }
 
             cmd.CommandText = $"CREATE TABLE IF NOT EXISTS \"{Qual(sch)}\".\"{Qual(table)}\" ({defs});";
-            try { cmd.ExecuteNonQuery(); } catch { }
+            try { cmd.ExecuteNonQueryAsync(); } catch { }
 
             // Create indexes for indexed columns
             for (int i = 0; i < columns.Count; i++)
@@ -936,7 +936,7 @@ internal sealed class PostgresRepository<
                     var ix = $"IX_{table}_{c.Name}";
                     using var cmd2 = conn.CreateCommand();
                     cmd2.CommandText = $"CREATE INDEX IF NOT EXISTS \"{Qual(ix)}\" ON \"{Qual(sch)}\".\"{Qual(table)}\" (\"{Qual(c.Name)}\");";
-                    try { cmd2.ExecuteNonQuery(); } catch { }
+                    try { cmd2.ExecuteNonQueryAsync(); } catch { }
                 }
             }
         }
@@ -949,7 +949,7 @@ internal sealed class PostgresRepository<
             // @p like $.Prop -> use substring to strip '$.'; simple helper for tests
             var p = conn.CreateCommand();
             cmd.Parameters.AddWithValue("@p", jsonPath);
-            cmd.ExecuteNonQuery();
+            cmd.ExecuteNonQueryAsync();
         }
         public void AddPhysicalColumn(string schema, string table, string column, Type clrType, bool nullable)
         {
@@ -957,7 +957,7 @@ internal sealed class PostgresRepository<
             string pgType = clrType == typeof(int) ? "integer" : clrType == typeof(long) ? "bigint" : clrType == typeof(bool) ? "boolean" : clrType == typeof(DateTime) ? "timestamp with time zone" : "text";
             using var cmd = conn.CreateCommand();
             cmd.CommandText = $"ALTER TABLE \"{Qual(sch)}\".\"{Qual(table)}\" ADD COLUMN IF NOT EXISTS \"{Qual(column)}\" {pgType} {(nullable ? "" : "NOT NULL")}";
-            cmd.ExecuteNonQuery();
+            cmd.ExecuteNonQueryAsync();
         }
         public void CreateIndex(string schema, string table, string indexName, IReadOnlyList<string> columns, bool unique)
         {
@@ -965,7 +965,7 @@ internal sealed class PostgresRepository<
             var cols = string.Join(", ", columns.Select(c => "\"" + Qual(c) + "\""));
             using var cmd = conn.CreateCommand();
             cmd.CommandText = $"CREATE {(unique ? "UNIQUE " : string.Empty)}INDEX IF NOT EXISTS \"{Qual(indexName)}\" ON \"{Qual(sch)}\".\"{Qual(table)}\" ({cols})";
-            cmd.ExecuteNonQuery();
+            cmd.ExecuteNonQueryAsync();
         }
     }
 

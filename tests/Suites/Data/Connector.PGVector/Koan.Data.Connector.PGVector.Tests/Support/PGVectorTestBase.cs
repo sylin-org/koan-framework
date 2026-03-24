@@ -100,18 +100,18 @@ public abstract class PGVectorTestBase : IAsyncLifetime
         var repository = factory!.Create<TEntity, string>(ServiceProvider) as PGVectorRepository<TEntity, string>;
 
         // Ensure schema created
-        await repository!.VectorEnsureCreatedAsync();
+        await repository!.VectorEnsureCreated();
 
         return repository;
     }
 
-    protected async Task<NpgsqlConnection> GetConnectionAsync()
+    protected async Task<NpgsqlConnection> GetConnection()
     {
         if (ConnectionString == null)
             throw new InvalidOperationException("ConnectionString not initialized");
 
         var conn = new NpgsqlConnection(ConnectionString);
-        await conn.OpenAsync();
+        await conn.Open();
         return conn;
     }
 

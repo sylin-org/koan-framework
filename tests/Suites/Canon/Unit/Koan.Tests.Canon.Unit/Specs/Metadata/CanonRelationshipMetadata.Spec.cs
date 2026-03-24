@@ -32,7 +32,7 @@ public sealed class CanonRelationshipMetadataSpec
 
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 
     [Fact]
     public Task Child_relationships_scan_cached_assemblies()
@@ -49,7 +49,7 @@ public sealed class CanonRelationshipMetadataSpec
 
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 
     [Canon]
     private sealed class Order : CanonEntity<Order>

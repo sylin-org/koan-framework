@@ -15,11 +15,11 @@ internal sealed class CouchbaseHealthContributor(IOptions<CouchbaseOptions> opti
     public string Name => "data:couchbase";
     public bool IsCritical => true;
 
-    public async Task<HealthReport> CheckAsync(CancellationToken ct = default)
+    public async Task<HealthReport> Check(CancellationToken ct = default)
     {
         try
         {
-            var context = await provider.GetCollectionContextAsync(options.Value.Collection ?? string.Empty, ct);
+            var context = await provider.GetCollectionContext(options.Value.Collection ?? string.Empty, ct);
             await context.Cluster.PingAsync(new PingOptions().CancellationToken(ct));
             return new HealthReport(Name, HealthState.Healthy, null, null, new Dictionary<string, object?>
             {

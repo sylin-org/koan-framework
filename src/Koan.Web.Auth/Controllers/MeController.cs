@@ -22,7 +22,7 @@ public sealed class MeController(IExternalIdentityStore identities) : Controller
 
         var displayName = User.FindFirstValue("name") ?? User.Identity?.Name;
         var picture = User.FindFirstValue("picture");
-        var links = await identities.GetByUserAsync(userId, ct);
+        var links = await identities.GetByUser(userId, ct);
 
         var dto = new CurrentUserDto
         {

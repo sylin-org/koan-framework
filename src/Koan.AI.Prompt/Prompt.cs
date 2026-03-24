@@ -131,7 +131,7 @@ public sealed class Prompt
     public static async Task<Prompt> Load(
         string name, PromptStrategy strategy, CancellationToken ct = default)
     {
-        var entry = await strategy.ResolveAsync(name, ct);
+        var entry = await strategy.Resolve(name, ct);
         return entry?.ToPrompt() ?? throw new PromptNotFoundException(name);
     }
 

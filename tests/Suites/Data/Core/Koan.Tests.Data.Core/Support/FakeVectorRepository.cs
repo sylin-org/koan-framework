@@ -49,7 +49,7 @@ public sealed class FakeVectorRepository<TEntity, TKey> : IVectorSearchRepositor
         }
     }
 
-    public Task UpsertAsync(TKey id, float[] embedding, object? metadata = null, CancellationToken ct = default)
+    public Task Upsert(TKey id, float[] embedding, object? metadata = null, CancellationToken ct = default)
     {
         if (ThrowOnUpsert)
         {
@@ -73,7 +73,7 @@ public sealed class FakeVectorRepository<TEntity, TKey> : IVectorSearchRepositor
         return Task.CompletedTask;
     }
 
-    public Task<int> UpsertManyAsync(IEnumerable<(TKey Id, float[] Embedding, object? Metadata)> items, CancellationToken ct = default)
+    public Task<int> UpsertMany(IEnumerable<(TKey Id, float[] Embedding, object? Metadata)> items, CancellationToken ct = default)
     {
         if (ThrowOnUpsert)
         {
@@ -97,7 +97,7 @@ public sealed class FakeVectorRepository<TEntity, TKey> : IVectorSearchRepositor
         return Task.FromResult(count);
     }
 
-    public Task<bool> DeleteAsync(TKey id, CancellationToken ct = default)
+    public Task<bool> Delete(TKey id, CancellationToken ct = default)
     {
         if (ThrowOnDelete)
         {
@@ -107,7 +107,7 @@ public sealed class FakeVectorRepository<TEntity, TKey> : IVectorSearchRepositor
         return Task.FromResult(_vectors.TryRemove(id, out _));
     }
 
-    public Task<int> DeleteManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    public Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
         if (ThrowOnDelete)
         {
@@ -126,12 +126,12 @@ public sealed class FakeVectorRepository<TEntity, TKey> : IVectorSearchRepositor
         return Task.FromResult(count);
     }
 
-    public Task<float[]?> GetEmbeddingAsync(TKey id, CancellationToken ct = default)
+    public Task<float[]?> GetEmbedding(TKey id, CancellationToken ct = default)
     {
         return Task.FromResult(_vectors.TryGetValue(id, out var entry) ? entry.Embedding : null);
     }
 
-    public Task<Dictionary<TKey, float[]>> GetEmbeddingsAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    public Task<Dictionary<TKey, float[]>> GetEmbeddings(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
         var result = new Dictionary<TKey, float[]>();
         foreach (var id in ids)
@@ -145,7 +145,7 @@ public sealed class FakeVectorRepository<TEntity, TKey> : IVectorSearchRepositor
         return Task.FromResult(result);
     }
 
-    public Task<VectorQueryResult<TKey>> SearchAsync(VectorQueryOptions options, CancellationToken ct = default)
+    public Task<VectorQueryResult<TKey>> Search(VectorQueryOptions options, CancellationToken ct = default)
     {
         if (ThrowOnSearch)
         {
@@ -174,7 +174,7 @@ public sealed class FakeVectorRepository<TEntity, TKey> : IVectorSearchRepositor
         ));
     }
 
-    public Task FlushAsync(CancellationToken ct = default)
+    public Task Flush(CancellationToken ct = default)
     {
         _vectors.Clear();
         lock (_lock)

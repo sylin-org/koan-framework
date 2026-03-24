@@ -50,7 +50,7 @@ public class ChunkerServiceSpec : IDisposable
         var doc = CreateDocumentWithText(text);
 
         // Act
-        var chunks = await _service.ChunkAsync(doc, _testProjectId, _testCommit).ToListAsync();
+        var chunks = await _service.Chunk(doc, _testProjectId, _testCommit).ToListAsync();
 
         // Assert
         if (string.IsNullOrWhiteSpace(text))
@@ -77,7 +77,7 @@ public class ChunkerServiceSpec : IDisposable
         var doc = CreateDocumentWithText(text);
 
         // Act
-        var chunks = await _service.ChunkAsync(doc, _testProjectId, _testCommit).ToListAsync();
+        var chunks = await _service.Chunk(doc, _testProjectId, _testCommit).ToListAsync();
 
         // Assert
         chunks.Should().HaveCount(1);
@@ -92,7 +92,7 @@ public class ChunkerServiceSpec : IDisposable
         var doc = CreateDocumentWithText(text);
 
         // Act
-        var chunks = await _service.ChunkAsync(doc, _testProjectId, _testCommit).ToListAsync();
+        var chunks = await _service.Chunk(doc, _testProjectId, _testCommit).ToListAsync();
 
         // Assert
         chunks.Should().HaveCountGreaterThan(1);
@@ -126,7 +126,7 @@ public class ChunkerServiceSpec : IDisposable
             TitleHierarchy: new List<string>());
 
         // Act
-        var chunks = await _service.ChunkAsync(doc, _testProjectId, _testCommit).ToListAsync();
+        var chunks = await _service.Chunk(doc, _testProjectId, _testCommit).ToListAsync();
 
         // Assert
         chunks.Should().HaveCountGreaterThan(4); // At least 5 chunks for 5000 tokens
@@ -148,7 +148,7 @@ public class ChunkerServiceSpec : IDisposable
         var doc = CreateDocumentWithText(distinctText);
 
         // Act
-        var chunks = await _service.ChunkAsync(doc, _testProjectId, _testCommit).ToListAsync();
+        var chunks = await _service.Chunk(doc, _testProjectId, _testCommit).ToListAsync();
 
         // Assert
         if (chunks.Count > 1)
@@ -181,7 +181,7 @@ public class ChunkerServiceSpec : IDisposable
             TitleHierarchy: new List<string>());
 
         // Act
-        var chunks = await _service.ChunkAsync(doc, _testProjectId, _testCommit).ToListAsync();
+        var chunks = await _service.Chunk(doc, _testProjectId, _testCommit).ToListAsync();
 
         // Assert
         if (chunks.Count > 1)
@@ -220,7 +220,7 @@ public class ChunkerServiceSpec : IDisposable
             TitleHierarchy: new List<string> { "Document" });
 
         // Act
-        var chunks = await _service.ChunkAsync(doc, _testProjectId, _testCommit).ToListAsync();
+        var chunks = await _service.Chunk(doc, _testProjectId, _testCommit).ToListAsync();
 
         // Assert
         chunks.Should().HaveCountGreaterThanOrEqualTo(2);
@@ -248,7 +248,7 @@ public class ChunkerServiceSpec : IDisposable
             TitleHierarchy: new List<string>());
 
         // Act
-        var chunks = await _service.ChunkAsync(doc, _testProjectId, _testCommit).ToListAsync();
+        var chunks = await _service.Chunk(doc, _testProjectId, _testCommit).ToListAsync();
 
         // Assert
         var titleChanges = chunks.Select(c => c.Title).Distinct().ToList();
@@ -287,7 +287,7 @@ public class ChunkerServiceSpec : IDisposable
             TitleHierarchy: new List<string>());
 
         // Act
-        var chunks = await _service.ChunkAsync(doc, _testProjectId, _testCommit).ToListAsync();
+        var chunks = await _service.Chunk(doc, _testProjectId, _testCommit).ToListAsync();
 
         // Assert
         chunks.Should().HaveCountLessThan(20, "small sections should be grouped");
@@ -316,7 +316,7 @@ public class ChunkerServiceSpec : IDisposable
             TitleHierarchy: new List<string> { "Large Document" });
 
         // Act
-        var chunks = await _service.ChunkAsync(doc, _testProjectId, _testCommit).ToListAsync();
+        var chunks = await _service.Chunk(doc, _testProjectId, _testCommit).ToListAsync();
 
         // Assert
         chunks.Should().HaveCountGreaterThan(1, "large section should be split");
@@ -344,7 +344,7 @@ public class ChunkerServiceSpec : IDisposable
             TitleHierarchy: new List<string>());
 
         // Act
-        var chunks = await _service.ChunkAsync(doc, _testProjectId, _testCommit).ToListAsync();
+        var chunks = await _service.Chunk(doc, _testProjectId, _testCommit).ToListAsync();
 
         // Assert
         chunks.Should().AllSatisfy(chunk => chunk.Language.Should().Be("javascript"));
@@ -366,7 +366,7 @@ public class ChunkerServiceSpec : IDisposable
             TitleHierarchy: new List<string>());
 
         // Act
-        var chunks = await _service.ChunkAsync(doc, _testProjectId, _testCommit).ToListAsync();
+        var chunks = await _service.Chunk(doc, _testProjectId, _testCommit).ToListAsync();
 
         // Assert
         chunks.Should().BeEmpty();
@@ -389,7 +389,7 @@ public class ChunkerServiceSpec : IDisposable
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(async () =>
         {
-            await _service.ChunkAsync(doc, null!, _testCommit).ToListAsync();
+            await _service.Chunk(doc, null!, _testCommit).ToListAsync();
         });
     }
 
@@ -399,7 +399,7 @@ public class ChunkerServiceSpec : IDisposable
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentNullException>(async () =>
         {
-            await _service.ChunkAsync(null!, _testProjectId, _testCommit).ToListAsync();
+            await _service.Chunk(null!, _testProjectId, _testCommit).ToListAsync();
         });
     }
 
@@ -428,7 +428,7 @@ public class ChunkerServiceSpec : IDisposable
         // Act & Assert
         await Assert.ThrowsAsync<OperationCanceledException>(async () =>
         {
-            await _service.ChunkAsync(doc, _testProjectId, _testCommit, cts.Token).ToListAsync();
+            await _service.Chunk(doc, _testProjectId, _testCommit, cts.Token).ToListAsync();
         });
     }
 
@@ -443,7 +443,7 @@ public class ChunkerServiceSpec : IDisposable
         var doc = CreateDocumentWithText(new string('a', 5000));
 
         // Act
-        var chunks = await _service.ChunkAsync(doc, _testProjectId, _testCommit).ToListAsync();
+        var chunks = await _service.Chunk(doc, _testProjectId, _testCommit).ToListAsync();
 
         // Assert
         chunks.Should().AllSatisfy(chunk => chunk.ProjectId.Should().Be(_testProjectId));
@@ -464,7 +464,7 @@ public class ChunkerServiceSpec : IDisposable
             TitleHierarchy: new List<string>());
 
         // Act
-        var chunks = await _service.ChunkAsync(doc, _testProjectId, _testCommit).ToListAsync();
+        var chunks = await _service.Chunk(doc, _testProjectId, _testCommit).ToListAsync();
 
         // Assert
         chunks.Should().AllSatisfy(chunk => chunk.FilePath.Should().Be("docs/doc.md"));
@@ -488,7 +488,7 @@ public class ChunkerServiceSpec : IDisposable
             TitleHierarchy: new List<string>());
 
         // Act
-        var chunks = await _service.ChunkAsync(doc, _testProjectId, _testCommit).ToListAsync();
+        var chunks = await _service.Chunk(doc, _testProjectId, _testCommit).ToListAsync();
 
         // Assert
         foreach (var chunk in chunks)

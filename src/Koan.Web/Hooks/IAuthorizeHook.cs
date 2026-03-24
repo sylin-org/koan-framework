@@ -5,5 +5,5 @@ namespace Koan.Web.Hooks;
 /// </summary>
 public interface IAuthorizeHook<TEntity> : IOrderedHook
 {
-    Task<AuthorizeDecision> OnAuthorizeAsync(HookContext<TEntity> ctx, AuthorizeRequest req);
+    Task<AuthorizeDecision> OnAuthorize(HookContext<TEntity> ctx, AuthorizeRequest req);
 }

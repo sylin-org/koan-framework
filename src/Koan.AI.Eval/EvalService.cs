@@ -19,7 +19,7 @@ internal sealed class EvalService : IEvalService
         _registry = registry;
     }
 
-    public async Task<EvalResult> MeasureAsync(
+    public async Task<EvalResult> Measure(
         ModelRef model, DatasetRef data, string[] metrics, CancellationToken ct = default)
     {
         EnsureMetricCapability();
@@ -27,14 +27,14 @@ internal sealed class EvalService : IEvalService
         var scores = new List<EvalScore>();
         foreach (var metric in metrics)
         {
-            var value = await ComputeMetricAsync(model, data, metric, ct);
+            var value = await ComputeMetric(model, data, metric, ct);
             scores.Add(new EvalScore(metric, value));
         }
 
         return new EvalResult(model, scores.AsReadOnly(), Passed: true);
     }
 
-    public async Task<EvalResult> GateAsync(
+    public async Task<EvalResult> Gate(
         ModelRef model, ModelRef? baseline, DatasetRef data,
         Action<IGateBuilder> require, CancellationToken ct = default)
     {
@@ -55,7 +55,7 @@ internal sealed class EvalService : IEvalService
         var modelScores = new Dictionary<string, double>();
         foreach (var metric in metricNames)
         {
-            modelScores[metric] = await ComputeMetricAsync(model, data, metric, ct);
+            modelScores[metric] = await ComputeMetric(model, data, metric, ct);
         }
 
         // Measure the baseline if needed for no-regression checks.
@@ -66,7 +66,7 @@ internal sealed class EvalService : IEvalService
             baselineScores = new Dictionary<string, double>();
             foreach (var metric in metricNames)
             {
-                baselineScores[metric] = await ComputeMetricAsync(baseline, data, metric, ct);
+                baselineScores[metric] = await ComputeMetric(baseline, data, metric, ct);
             }
         }
 
@@ -127,7 +127,7 @@ internal sealed class EvalService : IEvalService
         return new EvalResult(model, resultScores, Passed: true);
     }
 
-    public async Task<IReadOnlyList<EvalResult>> CompareAsync(
+    public async Task<IReadOnlyList<EvalResult>> Compare(
         ModelRef[] models, DatasetRef data, string[] metrics, CancellationToken ct = default)
     {
         EnsureMetricCapability();
@@ -135,7 +135,7 @@ internal sealed class EvalService : IEvalService
         var results = new List<EvalResult>();
         foreach (var model in models)
         {
-            var result = await MeasureAsync(model, data, metrics, ct);
+            var result = await Measure(model, data, metrics, ct);
             results.Add(result);
         }
 
@@ -146,7 +146,7 @@ internal sealed class EvalService : IEvalService
             .AsReadOnly();
     }
 
-    public async Task<EvalResult> RegressAsync(
+    public async Task<EvalResult> Regress(
         ModelRef current, ModelRef baseline, DatasetRef data,
         double threshold = 0.01, CancellationToken ct = default)
     {
@@ -154,7 +154,7 @@ internal sealed class EvalService : IEvalService
 
         try
         {
-            return await GateAsync(current, baseline, data,
+            return await Gate(current, baseline, data,
                 g => g.NoRegression(threshold), ct);
         }
         catch (GateFailedException ex)
@@ -167,7 +167,7 @@ internal sealed class EvalService : IEvalService
         }
     }
 
-    public Task<DriftResult> DriftAsync(
+    public Task<DriftResult> Drift(
         EvalResult baseline, EvalResult current, CancellationToken ct = default)
     {
         var baselineScores = baseline.Scores.ToDictionary(s => s.Metric, s => s.Value);
@@ -222,7 +222,7 @@ internal sealed class EvalService : IEvalService
         });
     }
 
-    public async Task<EvalResult> BenchmarkAsync(
+    public async Task<EvalResult> Benchmark(
         ModelRef model, DatasetRef data, CancellationToken ct = default)
     {
         var standardMetrics = new[]
@@ -230,7 +230,7 @@ internal sealed class EvalService : IEvalService
             Metric.Accuracy, Metric.F1, Metric.Perplexity, Metric.Coherence
         };
 
-        return await MeasureAsync(model, data, standardMetrics, ct);
+        return await Measure(model, data, standardMetrics, ct);
     }
 
     // ── Internal Helpers ──
@@ -246,7 +246,7 @@ internal sealed class EvalService : IEvalService
         }
     }
 
-    private Task<double> ComputeMetricAsync(
+    private Task<double> ComputeMetric(
         ModelRef model, DatasetRef data, string metric, CancellationToken ct)
     {
         // Resolve adapter with MetricCompute capability

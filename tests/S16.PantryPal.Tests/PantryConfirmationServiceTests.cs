@@ -11,10 +11,10 @@ public class PantryConfirmationServiceTests
 {
     private sealed class FakeVisionService : IPantryVisionService
     {
-        public Task<VisionProcessingResult> ProcessPhotoAsync(string photoId, Stream image, VisionProcessingOptions options, CancellationToken ct = default) =>
+        public Task<VisionProcessingResult> ProcessPhoto(string photoId, Stream image, VisionProcessingOptions options, CancellationToken ct = default) =>
             Task.FromResult(new VisionProcessingResult { Success = true, Detections = Array.Empty<PantryDetection>(), ProcessingTimeMs = 10 });
 
-        public Task LearnFromCorrectionAsync(string originalName, string correctedName, string? correctedQuantity, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task LearnFromCorrection(string originalName, string correctedName, string? correctedQuantity, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private sealed class FakeParser : IPantryInputParser
@@ -40,7 +40,7 @@ public class PantryConfirmationServiceTests
         await photo.Save();
 
         var svc = new PantryConfirmationService();
-        var result = await svc.ConfirmDetectionsAsync(photo.Id, new [] { new DetectionConfirmation{ DetectionId = "d1", UserInput = "2 lbs" } }, new FakeVisionService(), new FakeParser());
+        var result = await svc.ConfirmDetections(photo.Id, new [] { new DetectionConfirmation{ DetectionId = "d1", UserInput = "2 lbs" } }, new FakeVisionService(), new FakeParser());
 
         result.Should().HaveCount(1);
         var item = result.Single();

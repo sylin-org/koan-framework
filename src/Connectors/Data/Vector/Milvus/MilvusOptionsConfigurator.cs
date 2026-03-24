@@ -184,7 +184,7 @@ internal sealed class MilvusOptionsConfigurator : AdapterOptionsConfigurator<Mil
                 context.Parameters["token"] = token;
 
             // Use autonomous discovery coordinator
-            var discoveryTask = _discoveryCoordinator.DiscoverServiceAsync("milvus", context);
+            var discoveryTask = _discoveryCoordinator.DiscoverService("milvus", context);
             var result = discoveryTask.GetAwaiter().GetResult();
 
             if (result.IsSuccessful)

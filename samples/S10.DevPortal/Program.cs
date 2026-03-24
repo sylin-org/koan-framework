@@ -20,7 +20,7 @@ if (app.Environment.IsDevelopment())
     try { Directory.CreateDirectory(dataPath); } catch { /* best effort */ }
 }
 
-app.Run();
+app.RunAsync();
 
 // Make Program public for testing
 namespace S10.DevPortal

@@ -58,7 +58,7 @@ public sealed class AiConversationBuilderSpec
                 request.Options.Profile.Should().Be("support");
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 
     [Fact]
     public Task SendAsync_delegates_to_underlying_ai()
@@ -69,13 +69,13 @@ public sealed class AiConversationBuilderSpec
                 var builder = new AiConversationBuilder(fake)
                     .WithUser("ping");
 
-                var response = await builder.SendAsync(CancellationToken.None);
+                var response = await builder.Send(CancellationToken.None);
 
                 response.Text.Should().Be("ok");
                 fake.LastRequest.Should().NotBeNull();
                 fake.LastRequest!.Messages.Should().ContainSingle(m => m.Role == "user" && m.Content == "ping");
             })
-            .RunAsync();
+            .Run();
 
     [Fact]
     public Task AskAsync_appends_user_turn_before_sending()
@@ -86,37 +86,37 @@ public sealed class AiConversationBuilderSpec
                 var builder = new AiConversationBuilder(fake)
                     .WithSystem("sys");
 
-                await builder.AskAsync("hello", CancellationToken.None);
+                await builder.Ask("hello", CancellationToken.None);
 
                 fake.LastRequest.Should().NotBeNull();
                 fake.LastRequest!.Messages.Should().Contain(m => m.Role == "system");
                 fake.LastRequest!.Messages.Should().Contain(m => m.Role == "user" && m.Content == "hello");
             })
-            .RunAsync();
+            .Run();
 
     private sealed class FakePipeline : IAiPipeline
     {
         public AiChatRequest? LastRequest { get; private set; }
 
-        public Task<AiChatResponse> PromptAsync(AiChatRequest request, CancellationToken ct = default)
+        public Task<AiChatResponse> Prompt(AiChatRequest request, CancellationToken ct = default)
         {
             LastRequest = request;
             return Task.FromResult(new AiChatResponse { Text = "ok" });
         }
 
-        public IAsyncEnumerable<AiChatChunk> StreamAsync(AiChatRequest request, CancellationToken ct = default)
+        public IAsyncEnumerable<AiChatChunk> Stream(AiChatRequest request, CancellationToken ct = default)
         {
             LastRequest = request;
             return EmptyStream(ct);
         }
 
-        public Task<AiEmbeddingsResponse> EmbedAsync(AiEmbeddingsRequest request, CancellationToken ct = default)
+        public Task<AiEmbeddingsResponse> Embed(AiEmbeddingsRequest request, CancellationToken ct = default)
             => Task.FromResult(new AiEmbeddingsResponse());
 
-        public Task<string> PromptAsync(string message, string? model = null, AiPromptOptions? opts = null, CancellationToken ct = default)
+        public Task<string> Prompt(string message, string? model = null, AiPromptOptions? opts = null, CancellationToken ct = default)
             => Task.FromResult("ok");
 
-        public IAsyncEnumerable<AiChatChunk> StreamAsync(string message, string? model = null, AiPromptOptions? opts = null, CancellationToken ct = default)
+        public IAsyncEnumerable<AiChatChunk> Stream(string message, string? model = null, AiPromptOptions? opts = null, CancellationToken ct = default)
             => EmptyStream(ct);
 
         private static async IAsyncEnumerable<AiChatChunk> EmptyStream([EnumeratorCancellation] CancellationToken ct = default)

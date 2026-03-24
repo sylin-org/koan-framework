@@ -9,7 +9,7 @@ namespace Koan.AI.Connector.HuggingFace.Initialization;
 /// </summary>
 internal sealed class HuggingFaceAdapterContributor : IAiAdapterContributor
 {
-    public ValueTask ContributeAsync(IServiceProvider services, CancellationToken cancellationToken)
+    public ValueTask Contribute(IServiceProvider services, CancellationToken cancellationToken)
     {
         var registry = services.GetRequiredService<IAiAdapterRegistry>();
         var adapter = services.GetRequiredService<HuggingFaceAdapter>();

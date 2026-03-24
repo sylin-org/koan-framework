@@ -21,14 +21,14 @@ public static class Compute
     public static async Task<ComputeResource?> Available(CancellationToken ct = default)
     {
         var service = ResolveService();
-        return await service.AvailableAsync(ct);
+        return await service.Available(ct);
     }
 
     /// <summary>Returns all known compute resources across local and network.</summary>
     public static async Task<IReadOnlyList<ComputeResource>> Fleet(CancellationToken ct = default)
     {
         var service = ResolveService();
-        return await service.FleetAsync(ct);
+        return await service.Fleet(ct);
     }
 
     // ── Resolution ──
@@ -38,7 +38,7 @@ public static class Compute
         ComputeRequirement workload, CancellationToken ct = default)
     {
         var service = ResolveService();
-        return await service.ResolveAsync(workload, ct);
+        return await service.Resolve(workload, ct);
     }
 
     // ── Requirement Builders ──
@@ -73,7 +73,7 @@ public static class Compute
     public static async Task<bool> Check(ReadinessSpec readinessSpec, CancellationToken ct = default)
     {
         var service = ResolveService();
-        return await service.CheckAsync(readinessSpec, ct);
+        return await service.Check(readinessSpec, ct);
     }
 
     // ── Internal ──

@@ -40,7 +40,7 @@ internal sealed class HealthProbeScheduler : KoanFluentServiceBase
         _lifetime = lifetime;
     }
 
-    public override async Task ExecuteCoreAsync(CancellationToken stoppingToken)
+    public override async Task ExecuteCore(CancellationToken stoppingToken)
     {
         if (!_opt.Enabled)
         {
@@ -107,7 +107,7 @@ internal sealed class HealthProbeScheduler : KoanFluentServiceBase
                     KoanLog.HealthDebug(Logger, LogActions.Scheduler, "broadcast",
                         ("count", dueComponents.Count));
 
-                    await EmitEventAsync(Koan.Core.Events.KoanServiceEvents.Health.ProbeBroadcast, new ProbeBroadcastEventArgs
+                    await EmitEvent(Koan.Core.Events.KoanServiceEvents.Health.ProbeBroadcast, new ProbeBroadcastEventArgs
                     {
                         ComponentCount = dueComponents.Count,
                         BroadcastAt = DateTimeOffset.UtcNow
@@ -119,7 +119,7 @@ internal sealed class HealthProbeScheduler : KoanFluentServiceBase
                     {
                         _agg.RequestProbe(ProbeReason.TtlExpiry, component, stoppingToken);
 
-                        await EmitEventAsync(Koan.Core.Events.KoanServiceEvents.Health.ProbeScheduled, new ProbeScheduledEventArgs
+                        await EmitEvent(Koan.Core.Events.KoanServiceEvents.Health.ProbeScheduled, new ProbeScheduledEventArgs
                         {
                             Component = component,
                             Reason = "TTL Expiry",
@@ -157,7 +157,7 @@ internal sealed class HealthProbeScheduler : KoanFluentServiceBase
 
         if (string.IsNullOrEmpty(component))
         {
-            await EmitEventAsync(Koan.Core.Events.KoanServiceEvents.Health.ProbeBroadcast, new ProbeBroadcastEventArgs
+            await EmitEvent(Koan.Core.Events.KoanServiceEvents.Health.ProbeBroadcast, new ProbeBroadcastEventArgs
             {
                 ComponentCount = 0, // Unknown count for manual broadcast
                 BroadcastAt = DateTimeOffset.UtcNow
@@ -165,7 +165,7 @@ internal sealed class HealthProbeScheduler : KoanFluentServiceBase
         }
         else
         {
-            await EmitEventAsync(Koan.Core.Events.KoanServiceEvents.Health.ProbeScheduled, new ProbeScheduledEventArgs
+            await EmitEvent(Koan.Core.Events.KoanServiceEvents.Health.ProbeScheduled, new ProbeScheduledEventArgs
             {
                 Component = component,
                 Reason = "Manual",

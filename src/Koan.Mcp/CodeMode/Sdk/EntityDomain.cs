@@ -144,7 +144,7 @@ internal sealed class EntityOperationsProxy
             }
         }
 
-        var result = _executor.ExecuteAsync(tool.Name, args, default).GetAwaiter().GetResult();
+        var result = _executor.Execute(tool.Name, args, default).GetAwaiter().GetResult();
 
         return ConvertToJavaScriptObject(result);
     }
@@ -179,7 +179,7 @@ internal sealed class EntityOperationsProxy
             }
         }
 
-        var result = _executor.ExecuteAsync(tool.Name, args, default).GetAwaiter().GetResult();
+        var result = _executor.Execute(tool.Name, args, default).GetAwaiter().GetResult();
 
         return ConvertToJavaScriptObject(result);
     }
@@ -211,7 +211,7 @@ internal sealed class EntityOperationsProxy
             }
         }
 
-        _executor.ExecuteAsync(tool.Name, args, default).GetAwaiter().GetResult();
+        _executor.Execute(tool.Name, args, default).GetAwaiter().GetResult();
 
         return 1; // Successfully deleted
     }
@@ -262,7 +262,7 @@ internal sealed class EntityOperationsProxy
             }
         }
 
-        var result = _executor.ExecuteAsync(tool.Name, args, default).GetAwaiter().GetResult();
+        var result = _executor.Execute(tool.Name, args, default).GetAwaiter().GetResult();
 
         // Extract count from result
         return ExtractCount(result);
@@ -296,7 +296,7 @@ internal sealed class EntityOperationsProxy
         _metrics.IncrementCalls();
         var tool = FindTool(EntityEndpointOperationKind.Collection);
         var argsObj = args != null ? _json.FromObject(args) : new JObject();
-        var result = _executor.ExecuteAsync(tool.Name, (JObject)argsObj, default).GetAwaiter().GetResult();
+        var result = _executor.Execute(tool.Name, (JObject)argsObj, default).GetAwaiter().GetResult();
         return ConvertToJavaScriptObject(result);
     }
 

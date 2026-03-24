@@ -24,19 +24,19 @@ public abstract class KoanBackgroundServiceBase : BackgroundService, IKoanBackgr
     public virtual string Name => GetType().Name;
     public virtual bool IsCritical => false;
 
-    public abstract Task ExecuteCoreAsync(CancellationToken cancellationToken);
+    public abstract Task ExecuteCore(CancellationToken cancellationToken);
 
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
-        => ExecuteCoreAsync(stoppingToken);
+        => ExecuteCore(stoppingToken);
 
-    Task IKoanBackgroundService.ExecuteAsync(CancellationToken cancellationToken) => ExecuteCoreAsync(cancellationToken);
+    Task IKoanBackgroundService.Execute(CancellationToken cancellationToken) => ExecuteCore(cancellationToken);
 
-    public virtual Task<bool> IsReadyAsync(CancellationToken cancellationToken = default)
+    public virtual Task<bool> IsReady(CancellationToken cancellationToken = default)
     {
         return Task.FromResult(true);
     }
 
-    public virtual Task<HealthReport> CheckAsync(CancellationToken cancellationToken = default)
+    public virtual Task<HealthReport> Check(CancellationToken cancellationToken = default)
     {
         var uptime = DateTimeOffset.UtcNow - StartedAt;
         return Task.FromResult(HealthReport.Healthy($"{Name} is running (uptime: {uptime:hh\\:mm\\:ss})"));
@@ -68,7 +68,7 @@ public abstract class KoanFluentServiceBase : KoanBackgroundServiceBase, IKoanPo
         typeof(StatusCommand)
     };
 
-    public virtual async Task HandleCommandAsync(ServiceCommand command, CancellationToken cancellationToken = default)
+    public virtual async Task HandleCommand(ServiceCommand command, CancellationToken cancellationToken = default)
     {
         Logger.LogInformation("Handling command {CommandType} with correlation ID {CorrelationId}",
             command.GetType().Name, command.CorrelationId);
@@ -102,7 +102,7 @@ public abstract class KoanFluentServiceBase : KoanBackgroundServiceBase, IKoanPo
     /// <summary>
     /// Execute a named action with parameters
     /// </summary>
-    public async Task ExecuteActionAsync(string actionName, object? parameters = null, CancellationToken cancellationToken = default)
+    public async Task ExecuteAction(string actionName, object? parameters = null, CancellationToken cancellationToken = default)
     {
         if (!_actionHandlers.TryGetValue(actionName, out var handler))
         {
@@ -116,7 +116,7 @@ public abstract class KoanFluentServiceBase : KoanBackgroundServiceBase, IKoanPo
     /// <summary>
     /// Emit an event to all subscribers
     /// </summary>
-    protected internal async Task EmitEventAsync(string eventName, object? eventArgs = null)
+    protected internal async Task EmitEvent(string eventName, object? eventArgs = null)
     {
         if (!_eventSubscriptions.TryGetValue(eventName, out var subscriptions) || !subscriptions.Any())
             return;
@@ -231,7 +231,7 @@ public abstract class KoanFluentServiceBase : KoanBackgroundServiceBase, IKoanPo
 
     protected virtual async Task HandleHealthCheck(HealthCheckCommand command, CancellationToken cancellationToken)
     {
-        var health = await CheckAsync(cancellationToken);
+        var health = await Check(cancellationToken);
     Logger.LogInformation("Health check result for {ServiceName}: {Status}", Name, health.State);
     }
 
@@ -281,9 +281,9 @@ public abstract class KoanPokablePeriodicServiceBase : KoanFluentServiceBase, IK
         typeof(StatusCommand)
     };
 
-    protected sealed override async Task ExecuteAsync(CancellationToken cancellationToken) => await ExecuteCoreAsync(cancellationToken);
+    protected sealed override async Task ExecuteAsync(CancellationToken cancellationToken) => await ExecuteCore(cancellationToken);
 
-    public override async Task ExecuteCoreAsync(CancellationToken cancellationToken)
+    public override async Task ExecuteCore(CancellationToken cancellationToken)
     {
         StartedAt = DateTimeOffset.UtcNow;
 
@@ -328,7 +328,7 @@ public abstract class KoanPokablePeriodicServiceBase : KoanFluentServiceBase, IK
 
         try
         {
-            await ExecutePeriodicAsync(cancellationToken);
+            await ExecutePeriodic(cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -344,7 +344,7 @@ public abstract class KoanPokablePeriodicServiceBase : KoanFluentServiceBase, IK
         }
     }
 
-    protected abstract Task ExecutePeriodicAsync(CancellationToken cancellationToken);
+    protected abstract Task ExecutePeriodic(CancellationToken cancellationToken);
 
     protected override async Task OnTriggerNow(CancellationToken cancellationToken)
     {
@@ -352,7 +352,7 @@ public abstract class KoanPokablePeriodicServiceBase : KoanFluentServiceBase, IK
         await ExecuteWork(cancellationToken);
     }
 
-    public override async Task HandleCommandAsync(ServiceCommand command, CancellationToken cancellationToken = default)
+    public override async Task HandleCommand(ServiceCommand command, CancellationToken cancellationToken = default)
     {
         switch (command)
         {
@@ -365,7 +365,7 @@ public abstract class KoanPokablePeriodicServiceBase : KoanFluentServiceBase, IK
                 await OnProcessBatch(processBatch.BatchSize, processBatch.Filter, cancellationToken);
                 break;
             default:
-                await base.HandleCommandAsync(command, cancellationToken);
+                await base.HandleCommand(command, cancellationToken);
                 break;
         }
     }

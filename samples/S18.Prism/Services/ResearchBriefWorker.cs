@@ -24,7 +24,7 @@ public class ResearchBriefWorker : BackgroundService
         {
             try
             {
-                await ExecuteDueBriefsAsync(stoppingToken);
+                await ExecuteDueBriefs(stoppingToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -37,7 +37,7 @@ public class ResearchBriefWorker : BackgroundService
         _logger.LogInformation("ResearchBriefWorker stopped");
     }
 
-    private async Task ExecuteDueBriefsAsync(CancellationToken ct)
+    private async Task ExecuteDueBriefs(CancellationToken ct)
     {
         var briefs = await ResearchBrief.Query(b => b.Enabled, ct);
 

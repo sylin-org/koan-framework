@@ -94,7 +94,7 @@ namespace Koan.Messaging
             if (intercepted is IQueuedMessage queuedMessage)
             {
                 // Route to specific queue
-                await SendToQueueAsync(proxy, queuedMessage.QueueName, queuedMessage.Payload, cancellationToken);
+                await SendToQueue(proxy, queuedMessage.QueueName, queuedMessage.Payload, cancellationToken);
             }
             else
             {
@@ -111,7 +111,7 @@ namespace Koan.Messaging
         /// <summary>
         /// Sends a message to a specific queue using the provider's queue-specific routing.
         /// </summary>
-        private static async Task SendToQueueAsync(object proxy, string queueName, object payload, CancellationToken cancellationToken)
+        private static async Task SendToQueue(object proxy, string queueName, object payload, CancellationToken cancellationToken)
         {
             // Try to find SendToQueueAsync method on the provider
             var sendToQueueMethod = proxy.GetType().GetMethod("SendToQueueAsync");
@@ -214,7 +214,7 @@ namespace Koan.Messaging
         /// Creates message consumers for all registered handlers.
         /// Called during Phase 3 of the messaging lifecycle.
         /// </summary>
-        public async Task CreateConsumersAsync(IMessageBus bus, CancellationToken cancellationToken = default)
+        public async Task CreateConsumers(IMessageBus bus, CancellationToken cancellationToken = default)
         {
             foreach (var (messageType, handler) in _handlers)
             {

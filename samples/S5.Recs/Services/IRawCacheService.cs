@@ -9,42 +9,42 @@ public interface IRawCacheService
     /// <summary>
     /// Write a raw page response to cache.
     /// </summary>
-    Task WritePageAsync(string source, string mediaType, string jobId, int pageNum, string rawJson, CancellationToken ct = default);
+    Task WritePage(string source, string mediaType, string jobId, int pageNum, string rawJson, CancellationToken ct = default);
 
     /// <summary>
     /// Read all cached pages for a specific job.
     /// </summary>
-    IAsyncEnumerable<(int PageNum, string RawJson)> ReadPagesAsync(string source, string mediaType, string jobId, CancellationToken ct = default);
+    IAsyncEnumerable<(int PageNum, string RawJson)> ReadPages(string source, string mediaType, string jobId, CancellationToken ct = default);
 
     /// <summary>
     /// List all available cache manifests.
     /// </summary>
-    Task<List<CacheManifest>> ListCachesAsync(CancellationToken ct = default);
+    Task<List<CacheManifest>> ListCaches(CancellationToken ct = default);
 
     /// <summary>
     /// Get a specific cache manifest.
     /// </summary>
-    Task<CacheManifest?> GetManifestAsync(string source, string mediaType, string jobId, CancellationToken ct = default);
+    Task<CacheManifest?> GetManifest(string source, string mediaType, string jobId, CancellationToken ct = default);
 
     /// <summary>
     /// Get the most recent cache manifest for a source/mediaType combination (for incremental imports).
     /// </summary>
-    Task<CacheManifest?> GetLatestManifestAsync(string source, string mediaType, CancellationToken ct = default);
+    Task<CacheManifest?> GetLatestManifest(string source, string mediaType, CancellationToken ct = default);
 
     /// <summary>
     /// Write cache manifest metadata.
     /// </summary>
-    Task WriteManifestAsync(string source, string mediaType, string jobId, CacheManifest manifest, CancellationToken ct = default);
+    Task WriteManifest(string source, string mediaType, string jobId, CacheManifest manifest, CancellationToken ct = default);
 
     /// <summary>
     /// Delete all cached raw responses.
     /// </summary>
-    Task<int> FlushAllAsync(CancellationToken ct = default);
+    Task<int> FlushAll(CancellationToken ct = default);
 
     /// <summary>
     /// Delete cached responses for a specific source/mediaType combination.
     /// </summary>
-    Task<int> FlushAsync(string? source = null, string? mediaType = null, CancellationToken ct = default);
+    Task<int> Flush(string? source = null, string? mediaType = null, CancellationToken ct = default);
 }
 
 /// <summary>

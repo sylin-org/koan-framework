@@ -67,5 +67,5 @@ public sealed class CacheEntryOptionsSpec
                 body();
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 }

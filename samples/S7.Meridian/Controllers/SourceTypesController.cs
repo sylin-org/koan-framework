@@ -28,13 +28,13 @@ public sealed class SourceTypesController : EntityController<SourceType>
     }
 
     [HttpPost(MeridianConstants.SourceTypeCatalog.AiSuggestSegment)]
-    public async Task<ActionResult<SourceTypeAiSuggestResponse>> SuggestAsync(
+    public async Task<ActionResult<SourceTypeAiSuggestResponse>> Suggest(
         [FromBody] SourceTypeAiSuggestRequest request,
         CancellationToken ct)
     {
         try
         {
-            var response = await _authoring.SuggestAsync(request, ct);
+            var response = await _authoring.Suggest(request, ct);
             return Ok(response);
         }
         catch (ArgumentException ex)
@@ -49,7 +49,7 @@ public sealed class SourceTypesController : EntityController<SourceType>
     /// GET /api/sourcetypes/codes
     /// </summary>
     [HttpGet("codes")]
-    public async Task<ActionResult> GetTypeCodesAsync(CancellationToken ct)
+    public async Task<ActionResult> GetTypeCodes(CancellationToken ct)
     {
         var sourceTypes = await SourceType.All(ct);
 

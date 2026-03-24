@@ -20,45 +20,45 @@ internal sealed class DefaultEntityHookPipeline<TEntity> : IEntityHookPipeline<T
     public HookContext<TEntity> CreateContext(EntityRequestContext requestContext)
         => new HookContext<TEntity>(requestContext);
 
-    public Task<AuthorizeDecision> AuthorizeAsync(HookContext<TEntity> context, AuthorizeRequest request)
-        => _runner.AuthorizeAsync(context, request);
+    public Task<AuthorizeDecision> Authorize(HookContext<TEntity> context, AuthorizeRequest request)
+        => _runner.Authorize(context, request);
 
-    public Task<bool> BuildOptionsAsync(HookContext<TEntity> context, QueryOptions options)
-        => _runner.BuildOptionsAsync(context, options);
+    public Task<bool> BuildOptions(HookContext<TEntity> context, QueryOptions options)
+        => _runner.BuildOptions(context, options);
 
-    public Task<bool> BeforeCollectionAsync(HookContext<TEntity> context, QueryOptions options)
-        => _runner.BeforeCollectionAsync(context, options);
+    public Task<bool> BeforeCollection(HookContext<TEntity> context, QueryOptions options)
+        => _runner.BeforeCollection(context, options);
 
-    public Task<bool> AfterCollectionAsync(HookContext<TEntity> context, List<TEntity> items)
-        => _runner.AfterCollectionAsync(context, items);
+    public Task<bool> AfterCollection(HookContext<TEntity> context, List<TEntity> items)
+        => _runner.AfterCollection(context, items);
 
-    public Task<bool> BeforeModelFetchAsync(HookContext<TEntity> context, string id)
-        => _runner.BeforeModelFetchAsync(context, id);
+    public Task<bool> BeforeModelFetch(HookContext<TEntity> context, string id)
+        => _runner.BeforeModelFetch(context, id);
 
-    public Task<bool> AfterModelFetchAsync(HookContext<TEntity> context, TEntity? model)
-        => _runner.AfterModelFetchAsync(context, model);
+    public Task<bool> AfterModelFetch(HookContext<TEntity> context, TEntity? model)
+        => _runner.AfterModelFetch(context, model);
 
-    public Task<bool> BeforeSaveAsync(HookContext<TEntity> context, TEntity model)
-        => _runner.BeforeSaveAsync(context, model);
+    public Task<bool> BeforeSave(HookContext<TEntity> context, TEntity model)
+        => _runner.BeforeSave(context, model);
 
-    public Task<bool> AfterSaveAsync(HookContext<TEntity> context, TEntity model)
-        => _runner.AfterSaveAsync(context, model);
+    public Task<bool> AfterSave(HookContext<TEntity> context, TEntity model)
+        => _runner.AfterSave(context, model);
 
-    public Task<bool> BeforeDeleteAsync(HookContext<TEntity> context, TEntity model)
-        => _runner.BeforeDeleteAsync(context, model);
+    public Task<bool> BeforeDelete(HookContext<TEntity> context, TEntity model)
+        => _runner.BeforeDelete(context, model);
 
-    public Task<bool> AfterDeleteAsync(HookContext<TEntity> context, TEntity model)
-        => _runner.AfterDeleteAsync(context, model);
+    public Task<bool> AfterDelete(HookContext<TEntity> context, TEntity model)
+        => _runner.AfterDelete(context, model);
 
-    public Task<bool> BeforePatchAsync(HookContext<TEntity> context, string id, object patch)
-        => _runner.BeforePatchAsync(context, id, patch);
+    public Task<bool> BeforePatch(HookContext<TEntity> context, string id, object patch)
+        => _runner.BeforePatch(context, id, patch);
 
-    public Task<bool> AfterPatchAsync(HookContext<TEntity> context, TEntity model)
-        => _runner.AfterPatchAsync(context, model);
+    public Task<bool> AfterPatch(HookContext<TEntity> context, TEntity model)
+        => _runner.AfterPatch(context, model);
 
-    public Task<(bool replaced, object payload)> EmitCollectionAsync(HookContext<TEntity> context, object payload)
-        => _runner.EmitCollectionAsync(context, payload);
+    public Task<(bool replaced, object payload)> EmitCollection(HookContext<TEntity> context, object payload)
+        => _runner.EmitCollection(context, payload);
 
-    public Task<(bool replaced, object payload)> EmitModelAsync(HookContext<TEntity> context, object payload)
-        => _runner.EmitModelAsync(context, payload);
+    public Task<(bool replaced, object payload)> EmitModel(HookContext<TEntity> context, object payload)
+        => _runner.EmitModel(context, payload);
 }

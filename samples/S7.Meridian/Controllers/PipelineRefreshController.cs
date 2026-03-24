@@ -25,7 +25,7 @@ public sealed class PipelineRefreshController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<ActionResult> RefreshAsync(string pipelineId, CancellationToken ct)
+    public async Task<ActionResult> Refresh(string pipelineId, CancellationToken ct)
     {
         var pipeline = await DocumentPipeline.Get(pipelineId, ct);
         if (pipeline is null)
@@ -41,7 +41,7 @@ public sealed class PipelineRefreshController : ControllerBase
         _logger.LogInformation("Pipeline {PipelineId} refresh found {Count} documents in pipeline.DocumentIds: {DocumentIds}",
             pipelineId, docList.Count, string.Join(", ", docList));
 
-        var existing = await ProcessingJob.FindPendingAsync(pipelineId, ct);
+        var existing = await ProcessingJob.FindPending(pipelineId, ct);
 
         if (docList.Count == 0)
         {
@@ -69,7 +69,7 @@ public sealed class PipelineRefreshController : ControllerBase
         }
         else
         {
-            job = await _jobs.ScheduleAsync(pipelineId, docList, ct);
+            job = await _jobs.Schedule(pipelineId, docList, ct);
         }
 
         pipeline.Status = PipelineStatus.Queued;

@@ -146,7 +146,7 @@ internal sealed class SqlServerOptionsConfigurator : AdapterOptionsConfigurator<
             context.Parameters["password"] = "Your_password123";
 
             // Use autonomous discovery coordinator
-            var discoveryTask = _discoveryCoordinator.DiscoverServiceAsync("mssql", context);
+            var discoveryTask = _discoveryCoordinator.DiscoverService("mssql", context);
             var result = discoveryTask.GetAwaiter().GetResult();
 
             if (result.IsSuccessful)

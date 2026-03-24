@@ -35,13 +35,13 @@ public sealed class ServiceAuthenticator : IServiceAuthenticator
         _configuration = configuration;
     }
 
-    public async Task<string> GetServiceTokenAsync(string targetService, string[]? scopes = null, CancellationToken ct = default)
+    public async Task<string> GetServiceToken(string targetService, string[]? scopes = null, CancellationToken ct = default)
     {
-        var tokenInfo = await GetServiceTokenInfoAsync(targetService, scopes, ct);
+        var tokenInfo = await GetServiceTokenInfo(targetService, scopes, ct);
         return tokenInfo.AccessToken;
     }
 
-    public async Task<ServiceTokenInfo> GetServiceTokenInfoAsync(string targetService, string[]? scopes = null, CancellationToken ct = default)
+    public async Task<ServiceTokenInfo> GetServiceTokenInfo(string targetService, string[]? scopes = null, CancellationToken ct = default)
     {
         scopes ??= _options.DefaultScopes;
         var cacheKey = BuildCacheKey(targetService, scopes);
@@ -64,7 +64,7 @@ public sealed class ServiceAuthenticator : IServiceAuthenticator
         _logger.LogDebug("Acquiring new token for service {TargetService} with scopes {Scopes}",
             targetService, string.Join(",", scopes));
 
-        var tokenInfo = await AcquireTokenAsync(targetService, scopes, ct);
+        var tokenInfo = await AcquireToken(targetService, scopes, ct);
 
         // Cache the token
         if (_options.EnableTokenCaching)
@@ -76,7 +76,7 @@ public sealed class ServiceAuthenticator : IServiceAuthenticator
         return tokenInfo;
     }
 
-    public async Task InvalidateTokenAsync(string targetService, CancellationToken ct = default)
+    public async Task InvalidateToken(string targetService, CancellationToken ct = default)
     {
         // Remove all cached tokens for this service
         var cacheKeysToRemove = new List<string>();
@@ -87,7 +87,7 @@ public sealed class ServiceAuthenticator : IServiceAuthenticator
         await Task.CompletedTask;
     }
 
-    private async Task<ServiceTokenInfo> AcquireTokenAsync(string targetService, string[] scopes, CancellationToken ct)
+    private async Task<ServiceTokenInfo> AcquireToken(string targetService, string[] scopes, CancellationToken ct)
     {
         var clientId = GetClientId();
         var clientSecret = GetClientSecret(clientId);

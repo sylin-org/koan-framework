@@ -18,9 +18,9 @@ public class WorkerLifecycleSpec : IClassFixture<JobsCoreTestPipelineFixture>
     var worker = _fixture.GetWorker();
 
     // Act
-    await worker.StartAsync();
+    await worker.Start();
     var isRunning = worker.IsRunning;
-    await worker.StopAsync();
+    await worker.Stop();
 
     // Assert
     isRunning.Should().BeTrue();

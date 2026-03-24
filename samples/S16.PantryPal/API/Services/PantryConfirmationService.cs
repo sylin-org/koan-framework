@@ -6,12 +6,12 @@ namespace S16.PantryPal.Services;
 
 public interface IPantryConfirmationService
 {
-    Task<IReadOnlyList<PantryItem>> ConfirmDetectionsAsync(string photoId, IEnumerable<DetectionConfirmation> confirmations, IPantryVisionService visionService, IPantryInputParser parser, CancellationToken ct = default);
+    Task<IReadOnlyList<PantryItem>> ConfirmDetections(string photoId, IEnumerable<DetectionConfirmation> confirmations, IPantryVisionService visionService, IPantryInputParser parser, CancellationToken ct = default);
 }
 
 public sealed class PantryConfirmationService : IPantryConfirmationService
 {
-    public async Task<IReadOnlyList<PantryItem>> ConfirmDetectionsAsync(string photoId, IEnumerable<DetectionConfirmation> confirmations, IPantryVisionService visionService, IPantryInputParser parser, CancellationToken ct = default)
+    public async Task<IReadOnlyList<PantryItem>> ConfirmDetections(string photoId, IEnumerable<DetectionConfirmation> confirmations, IPantryVisionService visionService, IPantryInputParser parser, CancellationToken ct = default)
     {
         var photo = await PantryPhoto.Get(photoId);
         if (photo == null) throw new InvalidOperationException("Photo not found");
@@ -59,7 +59,7 @@ public sealed class PantryConfirmationService : IPantryConfirmationService
 
             if (!string.IsNullOrWhiteSpace(confirmation.UserInput))
             {
-                await visionService.LearnFromCorrectionAsync(candidate.Name, item.Name, confirmation.UserInput!, ct);
+                await visionService.LearnFromCorrection(candidate.Name, item.Name, confirmation.UserInput!, ct);
             }
 
             detection.Status = "confirmed";

@@ -25,7 +25,7 @@ public class HttpContextWebSocketExtensionsTests
             LeaveOpen = true
         };
 
-        await using (var stream = await context.AcceptWebSocketStreamAsync(options))
+        await using (var stream = await context.AcceptWebSocketStream(options))
         {
             stream.Should().NotBeNull();
             feature.Accepted.Should().BeTrue();
@@ -46,7 +46,7 @@ public class HttpContextWebSocketExtensionsTests
         var context = CreateHttpContext(feature);
 
         await FluentActions
-            .Invoking(() => context.AcceptWebSocketStreamAsync())
+            .Invoking(() => context.AcceptWebSocketStream())
             .Should()
             .ThrowAsync<InvalidOperationException>();
     }
@@ -58,7 +58,7 @@ public class HttpContextWebSocketExtensionsTests
         var feature = new TestWebSocketFeature { IsWebSocketRequest = true, WebSocketToReturn = socket };
         var context = CreateHttpContext(feature);
 
-        await using (var stream = await context.AcceptWebSocketStreamAsync())
+        await using (var stream = await context.AcceptWebSocketStream())
         {
             var payload = new byte[] { 42 };
             await stream.WriteAsync(payload, 0, payload.Length, CancellationToken.None);
@@ -76,7 +76,7 @@ public class HttpContextWebSocketExtensionsTests
         cts.Cancel();
 
         await FluentActions
-            .Invoking(() => context.AcceptWebSocketStreamAsync(cancellationToken: cts.Token))
+            .Invoking(() => context.AcceptWebSocketStream(cancellationToken: cts.Token))
             .Should()
             .ThrowAsync<OperationCanceledException>();
 

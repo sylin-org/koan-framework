@@ -122,7 +122,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         {
             var dockerAvailable = new DockerContainerManager(
                 new Microsoft.Extensions.Logging.Abstractions.NullLogger<DockerContainerManager>())
-                .IsDockerAvailableAsync().Result;
+                .IsDockerAvailable().Result;
             module.AddSetting("Orchestration:DockerAvailable", dockerAvailable.ToString());
         }
         catch

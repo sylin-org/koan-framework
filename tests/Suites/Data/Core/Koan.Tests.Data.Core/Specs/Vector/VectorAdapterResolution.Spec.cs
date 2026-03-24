@@ -37,7 +37,7 @@ public sealed class VectorAdapterResolutionSpec
                 (repo as FakeVectorRepo<EntityWithVectorAdapter, string>)!.ProviderName.Should().Be("foo");
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
@@ -70,7 +70,7 @@ public sealed class VectorAdapterResolutionSpec
                 (repo as FakeVectorRepo<EntityWithSourceOnly, string>)!.ProviderName.Should().Be("bar");
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
@@ -95,7 +95,7 @@ public sealed class VectorAdapterResolutionSpec
                 (repo as FakeVectorRepo<EntityWithSourceOnly, string>)!.ProviderName.Should().Be("json");
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
     }
 
     private sealed class FakeVectorRepo<TEntity, TKey> : IVectorSearchRepository<TEntity, TKey>
@@ -109,19 +109,19 @@ public sealed class VectorAdapterResolutionSpec
 
         public string ProviderName { get; }
 
-        public Task UpsertAsync(TKey id, float[] embedding, object? metadata = null, CancellationToken ct = default)
+        public Task Upsert(TKey id, float[] embedding, object? metadata = null, CancellationToken ct = default)
             => Task.CompletedTask;
 
-        public Task<int> UpsertManyAsync(IEnumerable<(TKey Id, float[] Embedding, object? Metadata)> items, CancellationToken ct = default)
+        public Task<int> UpsertMany(IEnumerable<(TKey Id, float[] Embedding, object? Metadata)> items, CancellationToken ct = default)
             => Task.FromResult(0);
 
-        public Task<bool> DeleteAsync(TKey id, CancellationToken ct = default)
+        public Task<bool> Delete(TKey id, CancellationToken ct = default)
             => Task.FromResult(true);
 
-        public Task<int> DeleteManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+        public Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
             => Task.FromResult(0);
 
-        public Task<VectorQueryResult<TKey>> SearchAsync(VectorQueryOptions options, CancellationToken ct = default)
+        public Task<VectorQueryResult<TKey>> Search(VectorQueryOptions options, CancellationToken ct = default)
             => Task.FromResult(new VectorQueryResult<TKey>(Array.Empty<VectorMatch<TKey>>(), null));
     }
 

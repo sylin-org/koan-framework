@@ -93,7 +93,7 @@ app.UseKoanWebBackupDevelopment();
 
 // TestProvider endpoints are auto-mapped by its auto-registrar in Development.
 
-app.Run();
+app.RunAsync();
 
 namespace S5.Recs
 {

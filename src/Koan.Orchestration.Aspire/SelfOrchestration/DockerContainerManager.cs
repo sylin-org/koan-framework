@@ -17,24 +17,24 @@ public class DockerContainerManager : IKoanContainerManager
         _logger = logger;
     }
 
-    public async Task<string> StartContainerAsync(DependencyDescriptor dependency, string appInstance, string sessionId, CancellationToken cancellationToken = default)
+    public async Task<string> StartContainer(DependencyDescriptor dependency, string appInstance, string sessionId, CancellationToken cancellationToken = default)
     {
         var containerName = $"{dependency.Name}-{appInstance}";
 
         // Check if container already exists and is running
-        if (await IsContainerRunningAsync(containerName, cancellationToken))
+        if (await IsContainerRunning(containerName, cancellationToken))
         {
             _logger.LogInformation("Container {ContainerName} already running", containerName);
             return containerName;
         }
 
         // Stop and remove any existing container with the same name
-        await StopContainerAsync(containerName, cancellationToken);
+        await StopContainer(containerName, cancellationToken);
 
         var dockerCommand = BuildDockerRunCommand(dependency, containerName, appInstance, sessionId);
         _logger.LogDebug("Starting container with command: {Command}", dockerCommand);
 
-        var result = await ExecuteDockerCommandAsync(dockerCommand, cancellationToken);
+        var result = await ExecuteDockerCommand(dockerCommand, cancellationToken);
         if (result.ExitCode != 0)
         {
             _logger.LogError("Failed to start container {ContainerName}. Error: {Error}", containerName, result.Error);
@@ -45,19 +45,19 @@ public class DockerContainerManager : IKoanContainerManager
         return containerName;
     }
 
-    public async Task StopContainerAsync(string containerName, CancellationToken cancellationToken = default)
+    public async Task StopContainer(string containerName, CancellationToken cancellationToken = default)
     {
         try
         {
             // First try to stop gracefully
-            var stopResult = await ExecuteDockerCommandAsync($"stop {containerName}", cancellationToken);
+            var stopResult = await ExecuteDockerCommand($"stop {containerName}", cancellationToken);
             if (stopResult.ExitCode == 0)
             {
                 _logger.LogDebug("Stopped container: {ContainerName}", containerName);
             }
 
             // Then remove the container
-            var removeResult = await ExecuteDockerCommandAsync($"rm {containerName}", cancellationToken);
+            var removeResult = await ExecuteDockerCommand($"rm {containerName}", cancellationToken);
             if (removeResult.ExitCode == 0)
             {
                 _logger.LogDebug("Removed container: {ContainerName}", containerName);
@@ -69,11 +69,11 @@ public class DockerContainerManager : IKoanContainerManager
         }
     }
 
-    public async Task<bool> IsContainerRunningAsync(string containerName, CancellationToken cancellationToken = default)
+    public async Task<bool> IsContainerRunning(string containerName, CancellationToken cancellationToken = default)
     {
         try
         {
-            var result = await ExecuteDockerCommandAsync($"ps -q --filter name={containerName}", cancellationToken);
+            var result = await ExecuteDockerCommand($"ps -q --filter name={containerName}", cancellationToken);
             return result.ExitCode == 0 && !string.IsNullOrWhiteSpace(result.Output);
         }
         catch
@@ -82,11 +82,11 @@ public class DockerContainerManager : IKoanContainerManager
         }
     }
 
-    public async Task<bool> IsDockerAvailableAsync(CancellationToken cancellationToken = default)
+    public async Task<bool> IsDockerAvailable(CancellationToken cancellationToken = default)
     {
         try
         {
-            var result = await ExecuteDockerCommandAsync("version", cancellationToken);
+            var result = await ExecuteDockerCommand("version", cancellationToken);
             return result.ExitCode == 0;
         }
         catch
@@ -95,7 +95,7 @@ public class DockerContainerManager : IKoanContainerManager
         }
     }
 
-    public async Task<bool> WaitForContainerHealthyAsync(string containerName, DependencyDescriptor dependency, CancellationToken cancellationToken = default)
+    public async Task<bool> WaitForContainerHealthy(string containerName, DependencyDescriptor dependency, CancellationToken cancellationToken = default)
     {
         var timeout = dependency.HealthTimeout;
         var startTime = DateTime.UtcNow;
@@ -104,7 +104,7 @@ public class DockerContainerManager : IKoanContainerManager
         {
             if (!string.IsNullOrEmpty(dependency.HealthCheckCommand))
             {
-                var healthResult = await ExecuteDockerCommandAsync($"exec {containerName} {dependency.HealthCheckCommand}", cancellationToken);
+                var healthResult = await ExecuteDockerCommand($"exec {containerName} {dependency.HealthCheckCommand}", cancellationToken);
                 if (healthResult.ExitCode == 0)
                 {
                     _logger.LogDebug("Container {ContainerName} is healthy", containerName);
@@ -114,7 +114,7 @@ public class DockerContainerManager : IKoanContainerManager
             else
             {
                 // Simple check - is the container still running?
-                if (await IsContainerRunningAsync(containerName, cancellationToken))
+                if (await IsContainerRunning(containerName, cancellationToken))
                 {
                     // Wait a bit for the service to start inside the container
                     await Task.Delay(1000, cancellationToken);
@@ -130,19 +130,19 @@ public class DockerContainerManager : IKoanContainerManager
         return false;
     }
 
-    public async Task CleanupSessionContainersAsync(string sessionId, CancellationToken cancellationToken = default)
+    public async Task CleanupSessionContainers(string sessionId, CancellationToken cancellationToken = default)
     {
         try
         {
             // Get all containers with the session label
-            var containersResult = await ExecuteDockerCommandAsync($"ps -aq --filter label=koan.session={sessionId}", cancellationToken);
+            var containersResult = await ExecuteDockerCommand($"ps -aq --filter label=koan.session={sessionId}", cancellationToken);
             if (containersResult.ExitCode == 0 && !string.IsNullOrWhiteSpace(containersResult.Output))
             {
                 var containerIds = containersResult.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
                 foreach (var containerId in containerIds)
                 {
-                    await ExecuteDockerCommandAsync($"stop {containerId}", cancellationToken);
-                    await ExecuteDockerCommandAsync($"rm {containerId}", cancellationToken);
+                    await ExecuteDockerCommand($"stop {containerId}", cancellationToken);
+                    await ExecuteDockerCommand($"rm {containerId}", cancellationToken);
                 }
                 _logger.LogInformation("Cleaned up {Count} containers for session {SessionId}", containerIds.Length, sessionId);
             }
@@ -153,12 +153,12 @@ public class DockerContainerManager : IKoanContainerManager
         }
     }
 
-    public async Task CleanupOrphanedKoanContainersAsync(CancellationToken cancellationToken = default)
+    public async Task CleanupOrphanedKoanContainers(CancellationToken cancellationToken = default)
     {
         try
         {
             // Get all containers with Koan auto-cleanup label
-            var containersResult = await ExecuteDockerCommandAsync("ps -aq --filter label=koan.auto-cleanup=true", cancellationToken);
+            var containersResult = await ExecuteDockerCommand("ps -aq --filter label=koan.auto-cleanup=true", cancellationToken);
             if (containersResult.ExitCode == 0 && !string.IsNullOrWhiteSpace(containersResult.Output))
             {
                 var containerIds = containersResult.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
@@ -167,7 +167,7 @@ public class DockerContainerManager : IKoanContainerManager
                 foreach (var containerId in containerIds)
                 {
                     // Get container details to determine if it's orphaned
-                    var inspectResult = await ExecuteDockerCommandAsync($"inspect {containerId} --format '{{{{.State.Status}}}} {{{{index .Config.Labels \"koan.session\"}}}} {{{{index .Config.Labels \"koan.created\"}}}}'", cancellationToken);
+                    var inspectResult = await ExecuteDockerCommand($"inspect {containerId} --format '{{{{.State.Status}}}} {{{{index .Config.Labels \"koan.session\"}}}} {{{{index .Config.Labels \"koan.created\"}}}}'", cancellationToken);
 
                     if (inspectResult.ExitCode == 0)
                     {
@@ -186,8 +186,8 @@ public class DockerContainerManager : IKoanContainerManager
                                 _logger.LogWarning("Cleaning up orphaned Koan container {ContainerId} from session {SessionId} created {Created}",
                                     containerId, sessionId, created);
 
-                                await ExecuteDockerCommandAsync($"stop {containerId}", cancellationToken);
-                                await ExecuteDockerCommandAsync($"rm {containerId}", cancellationToken);
+                                await ExecuteDockerCommand($"stop {containerId}", cancellationToken);
+                                await ExecuteDockerCommand($"rm {containerId}", cancellationToken);
                                 cleanedCount++;
                             }
                         }
@@ -206,7 +206,7 @@ public class DockerContainerManager : IKoanContainerManager
         }
     }
 
-    public async Task CleanupAppInstanceContainersAsync(CancellationToken cancellationToken = default)
+    public async Task CleanupAppInstanceContainers(CancellationToken cancellationToken = default)
     {
         try
         {
@@ -220,7 +220,7 @@ public class DockerContainerManager : IKoanContainerManager
             }
 
             // Get all containers for this app instance but different sessions (crashed instances)
-            var containersResult = await ExecuteDockerCommandAsync($"ps -aq --filter label=koan.app-instance={currentAppInstance}", cancellationToken);
+            var containersResult = await ExecuteDockerCommand($"ps -aq --filter label=koan.app-instance={currentAppInstance}", cancellationToken);
             if (containersResult.ExitCode == 0 && !string.IsNullOrWhiteSpace(containersResult.Output))
             {
                 var containerIds = containersResult.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
@@ -229,7 +229,7 @@ public class DockerContainerManager : IKoanContainerManager
                 foreach (var containerId in containerIds)
                 {
                     // Get container session ID to check if it's from a different session
-                    var inspectResult = await ExecuteDockerCommandAsync($"inspect {containerId} --format '{{{{index .Config.Labels \"koan.session\"}}}}'", cancellationToken);
+                    var inspectResult = await ExecuteDockerCommand($"inspect {containerId} --format '{{{{index .Config.Labels \"koan.session\"}}}}'", cancellationToken);
 
                     if (inspectResult.ExitCode == 0 && !string.IsNullOrWhiteSpace(inspectResult.Output))
                     {
@@ -241,8 +241,8 @@ public class DockerContainerManager : IKoanContainerManager
                             _logger.LogInformation("Cleaning up container {ContainerId} from crashed app instance (session {SessionId})",
                                 containerId, containerSessionId);
 
-                            await ExecuteDockerCommandAsync($"stop {containerId}", cancellationToken);
-                            await ExecuteDockerCommandAsync($"rm {containerId}", cancellationToken);
+                            await ExecuteDockerCommand($"stop {containerId}", cancellationToken);
+                            await ExecuteDockerCommand($"rm {containerId}", cancellationToken);
                             cleanedCount++;
                         }
                     }
@@ -310,7 +310,7 @@ public class DockerContainerManager : IKoanContainerManager
         return cmd.ToString();
     }
 
-    private async Task<DockerCommandResult> ExecuteDockerCommandAsync(string arguments, CancellationToken cancellationToken = default)
+    private async Task<DockerCommandResult> ExecuteDockerCommand(string arguments, CancellationToken cancellationToken = default)
     {
         try
         {

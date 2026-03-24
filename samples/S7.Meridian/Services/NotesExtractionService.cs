@@ -20,7 +20,7 @@ public interface INotesExtractionService
     /// Extract field values from free-text Authoritative Notes using AI interpretation
     /// with fuzzy field name matching.
     /// </summary>
-    Task<List<ExtractedField>> ExtractFromNotesAsync(
+    Task<List<ExtractedField>> ExtractFromNotes(
         DocumentPipeline pipeline,
         string virtualDocumentId,
         CancellationToken ct);
@@ -52,7 +52,7 @@ public sealed class NotesExtractionService : INotesExtractionService
         _options = options;
     }
 
-    public async Task<List<ExtractedField>> ExtractFromNotesAsync(
+    public async Task<List<ExtractedField>> ExtractFromNotes(
         DocumentPipeline pipeline,
         string virtualDocumentId,
         CancellationToken ct)
@@ -111,7 +111,7 @@ public sealed class NotesExtractionService : INotesExtractionService
 
             var extractionTime = DateTime.UtcNow - extractionStarted;
 
-            await _runLog.AppendAsync(new RunLog
+            await _runLog.Append(new RunLog
             {
                 PipelineId = pipeline.Id,
                 Stage = "notes-extraction",
@@ -139,7 +139,7 @@ public sealed class NotesExtractionService : INotesExtractionService
                 "Failed to extract from Authoritative Notes for pipeline {PipelineId}",
                 pipeline.Id);
 
-            await _runLog.AppendAsync(new RunLog
+            await _runLog.Append(new RunLog
             {
                 PipelineId = pipeline.Id,
                 Stage = "notes-extraction",

@@ -47,7 +47,7 @@ public class {parameters.ClassName} : BaseKoanAdapter
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
     }}
 
-    protected override async Task InitializeAdapterAsync(CancellationToken cancellationToken = default)
+    protected override async Task InitializeAdapter(CancellationToken cancellationToken = default)
     {{
         var baseUrl = GetConnectionString();
         if (string.IsNullOrEmpty(baseUrl))
@@ -63,12 +63,12 @@ public class {parameters.ClassName} : BaseKoanAdapter
         Logger.LogInformation(""[{{AdapterId}}] Initializing {parameters.DisplayName} connection"", AdapterId);
 
         // TODO: Test connectivity
-        // Example: await TestConnectivityAsync(cancellationToken);
+        // Example: await TestConnectivity(cancellationToken);
 
         Logger.LogInformation(""[{{AdapterId}}] {parameters.DisplayName} connection established"", AdapterId);
     }}
 
-    protected override async Task<IReadOnlyDictionary<string, object?>?> CheckAdapterHealthAsync(CancellationToken cancellationToken = default)
+    protected override async Task<IReadOnlyDictionary<string, object?>?> CheckAdapterHealth(CancellationToken cancellationToken = default)
     {{
         try
         {{
@@ -92,7 +92,7 @@ public class {parameters.ClassName} : BaseKoanAdapter
             // Example:
             // try
             // {{
-            //     var models = await ListModelsAsync(cancellationToken);
+            //     var models = await ListModels(cancellationToken);
             //     healthData[""available_models""] = models.Count;
             // }}
             // catch (Exception ex)
@@ -113,7 +113,7 @@ public class {parameters.ClassName} : BaseKoanAdapter
         }}
     }}
 
-    protected override Task<IReadOnlyDictionary<string, object?>?> GetAdapterBootstrapMetadataAsync(CancellationToken cancellationToken = default)
+    protected override Task<IReadOnlyDictionary<string, object?>?> GetAdapterBootstrapMetadata(CancellationToken cancellationToken = default)
     {{
         var metadata = new Dictionary<string, object?>
         {{
@@ -129,12 +129,12 @@ public class {parameters.ClassName} : BaseKoanAdapter
 
     // TODO: Add AI/Vector specific methods
     // Example:
-    // public async Task<string> GenerateResponseAsync(string prompt, CancellationToken cancellationToken = default)
+    // public async Task<string> GenerateResponse(string prompt, CancellationToken cancellationToken = default)
     // {{
     //     // Implementation for text generation
     // }}
     //
-    // public async Task<float[]> GetEmbeddingsAsync(string text, CancellationToken cancellationToken = default)
+    // public async Task<float[]> GetEmbeddings(string text, CancellationToken cancellationToken = default)
     // {{
     //     // Implementation for embeddings
     // }}

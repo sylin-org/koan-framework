@@ -22,7 +22,7 @@ public sealed class MongoPartitionSpec
         await TestPipeline.For<MongoPartitionSpec>(_output, nameof(Partition_scopes_isolate_entities))
             .RequireDocker()
             .UsingMongoContainer(database: databaseName)
-            .Using<MongoConnectorFixture>("fixture", static ctx => MongoConnectorFixture.CreateAsync(ctx))
+            .Using<MongoConnectorFixture>("fixture", static ctx => MongoConnectorFixture.Create(ctx))
             .Arrange(static async ctx =>
             {
                 var fixture = ctx.GetRequiredItem<MongoConnectorFixture>("fixture");
@@ -39,13 +39,13 @@ public sealed class MongoPartitionSpec
 
                 await using (fixture.LeasePartition(partitionA))
                 {
-                    await TenantRecord.UpsertAsync(new TenantRecord { Name = "A1" });
-                    await TenantRecord.UpsertAsync(new TenantRecord { Name = "A2" });
+                    await TenantRecord.Upsert(new TenantRecord { Name = "A1" });
+                    await TenantRecord.Upsert(new TenantRecord { Name = "A2" });
                 }
 
                 await using (fixture.LeasePartition(partitionB))
                 {
-                    await TenantRecord.UpsertAsync(new TenantRecord { Name = "B1" });
+                    await TenantRecord.Upsert(new TenantRecord { Name = "B1" });
                 }
 
                 var defaultScope = await TenantRecord.All();
@@ -71,7 +71,7 @@ public sealed class MongoPartitionSpec
                 var partitionBAfterDelete = await TenantRecord.All(partitionB);
                 partitionBAfterDelete.Should().HaveCount(1);
             })
-            .RunAsync();
+            .Run();
     }
 
     private sealed class TenantRecord : Entity<TenantRecord>

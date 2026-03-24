@@ -6,9 +6,9 @@ namespace Koan.Samples.Meridian.Services;
 
 public interface IDocumentStorage
 {
-    Task<string> StoreAsync(Stream content, string fileName, string? contentType, CancellationToken ct = default);
-    Task<Stream> OpenReadAsync(string storageKey, CancellationToken ct = default);
-    Task DeleteAsync(string storageKey, CancellationToken ct = default);
+    Task<string> Store(Stream content, string fileName, string? contentType, CancellationToken ct = default);
+    Task<Stream> OpenRead(string storageKey, CancellationToken ct = default);
+    Task Delete(string storageKey, CancellationToken ct = default);
 }
 
 public sealed class DocumentStorageOptions
@@ -29,17 +29,17 @@ public sealed class DocumentStorage : IDocumentStorage
         _options = options;
     }
 
-    public async Task<string> StoreAsync(Stream content, string fileName, string? contentType, CancellationToken ct = default)
+    public async Task<string> Store(Stream content, string fileName, string? contentType, CancellationToken ct = default)
     {
         var extension = Path.GetExtension(fileName);
         var key = $"{_options.Prefix}{Guid.CreateVersion7()}{extension}";
-        await _storage.PutAsync(_options.Profile, _options.Container, key, content, contentType, ct);
+        await _storage.Put(_options.Profile, _options.Container, key, content, contentType, ct);
         return key;
     }
 
-    public Task<Stream> OpenReadAsync(string storageKey, CancellationToken ct = default)
-        => _storage.ReadAsync(_options.Profile, _options.Container, storageKey, ct);
+    public Task<Stream> OpenRead(string storageKey, CancellationToken ct = default)
+        => _storage.Read(_options.Profile, _options.Container, storageKey, ct);
 
-    public Task DeleteAsync(string storageKey, CancellationToken ct = default)
-        => _storage.DeleteAsync(_options.Profile, _options.Container, storageKey, ct);
+    public Task Delete(string storageKey, CancellationToken ct = default)
+        => _storage.Delete(_options.Profile, _options.Container, storageKey, ct);
 }

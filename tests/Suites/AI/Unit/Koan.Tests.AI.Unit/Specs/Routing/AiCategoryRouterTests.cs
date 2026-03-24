@@ -369,11 +369,11 @@ public sealed class AiCategoryRouterTests
         public string Name => Id;
         public string Type => Id;
         public bool CanServe(AiChatRequest request) => true;
-        public Task<AiChatResponse> ChatAsync(AiChatRequest request, CancellationToken ct = default)
+        public Task<AiChatResponse> Chat(AiChatRequest request, CancellationToken ct = default)
             => Task.FromResult(new AiChatResponse { AdapterId = Id });
-        public async IAsyncEnumerable<AiChatChunk> StreamAsync(AiChatRequest request, [EnumeratorCancellation] CancellationToken ct = default)
+        public async IAsyncEnumerable<AiChatChunk> Stream(AiChatRequest request, [EnumeratorCancellation] CancellationToken ct = default)
         { await Task.CompletedTask; yield break; }
-        public Task<IReadOnlyList<AiModelDescriptor>> ListModelsAsync(CancellationToken ct = default)
+        public Task<IReadOnlyList<AiModelDescriptor>> ListModels(CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<AiModelDescriptor>>(Array.Empty<AiModelDescriptor>());
     }
 
@@ -383,9 +383,9 @@ public sealed class AiCategoryRouterTests
         public string Id { get; }
         public string Name => Id;
         public string Type => Id;
-        public Task<AiEmbeddingsResponse> EmbedAsync(AiEmbeddingsRequest request, CancellationToken ct = default)
+        public Task<AiEmbeddingsResponse> Embed(AiEmbeddingsRequest request, CancellationToken ct = default)
             => Task.FromResult(new AiEmbeddingsResponse { Model = request.Model ?? Id });
-        public Task<IReadOnlyList<AiModelDescriptor>> ListModelsAsync(CancellationToken ct = default)
+        public Task<IReadOnlyList<AiModelDescriptor>> ListModels(CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<AiModelDescriptor>>(Array.Empty<AiModelDescriptor>());
     }
 
@@ -395,9 +395,9 @@ public sealed class AiCategoryRouterTests
         public string Id { get; }
         public string Name => Id;
         public string Type => Id;
-        public Task<OcrResponse> RecognizeAsync(OcrRequest request, CancellationToken ct = default)
+        public Task<OcrResponse> Recognize(OcrRequest request, CancellationToken ct = default)
             => Task.FromResult(new OcrResponse { Text = "recognized" });
-        public Task<IReadOnlyList<AiModelDescriptor>> ListModelsAsync(CancellationToken ct = default)
+        public Task<IReadOnlyList<AiModelDescriptor>> ListModels(CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<AiModelDescriptor>>(Array.Empty<AiModelDescriptor>());
     }
 
@@ -408,13 +408,13 @@ public sealed class AiCategoryRouterTests
         public string Name => Id;
         public string Type => Id;
         public bool CanServe(AiChatRequest request) => true;
-        public Task<AiChatResponse> ChatAsync(AiChatRequest request, CancellationToken ct = default)
+        public Task<AiChatResponse> Chat(AiChatRequest request, CancellationToken ct = default)
             => Task.FromResult(new AiChatResponse { AdapterId = Id });
-        public async IAsyncEnumerable<AiChatChunk> StreamAsync(AiChatRequest request, [EnumeratorCancellation] CancellationToken ct = default)
+        public async IAsyncEnumerable<AiChatChunk> Stream(AiChatRequest request, [EnumeratorCancellation] CancellationToken ct = default)
         { await Task.CompletedTask; yield break; }
-        public Task<AiEmbeddingsResponse> EmbedAsync(AiEmbeddingsRequest request, CancellationToken ct = default)
+        public Task<AiEmbeddingsResponse> Embed(AiEmbeddingsRequest request, CancellationToken ct = default)
             => Task.FromResult(new AiEmbeddingsResponse { Model = request.Model ?? Id });
-        public Task<IReadOnlyList<AiModelDescriptor>> ListModelsAsync(CancellationToken ct = default)
+        public Task<IReadOnlyList<AiModelDescriptor>> ListModels(CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<AiModelDescriptor>>(Array.Empty<AiModelDescriptor>());
     }
 

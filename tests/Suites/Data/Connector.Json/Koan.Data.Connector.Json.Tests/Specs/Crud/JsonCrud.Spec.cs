@@ -21,7 +21,7 @@ public sealed class JsonCrudSpec
     public async Task Upsert_query_count_and_remove_flow()
     {
         await TestPipeline.For<JsonCrudSpec>(_output, nameof(Upsert_query_count_and_remove_flow))
-            .Using<JsonConnectorFixture>("fixture", static ctx => JsonConnectorFixture.CreateAsync(ctx))
+            .Using<JsonConnectorFixture>("fixture", static ctx => JsonConnectorFixture.Create(ctx))
             .Arrange(static async ctx =>
             {
                 var fixture = ctx.GetRequiredItem<JsonConnectorFixture>("fixture");
@@ -37,7 +37,7 @@ public sealed class JsonCrudSpec
 
                 await using var lease = fixture.LeasePartition(partition);
 
-                var saved = await Person.UpsertAsync(new Person { Name = "Ada", Age = 34 });
+                var saved = await Person.Upsert(new Person { Name = "Ada", Age = 34 });
                 saved.Id.Should().NotBeNullOrWhiteSpace();
                 var originalTimestamp = saved.LastUpdated;
 
@@ -57,14 +57,14 @@ public sealed class JsonCrudSpec
                 var updated = filtered.First(p => p.Name == "Bob");
                 updated.Name = "Bobby";
                 updated.Age = 43;
-                await Person.UpsertAsync(updated);
+                await Person.Upsert(updated);
 
                 var fetched = await Person.Get(updated.Id);
                 fetched.Should().NotBeNull();
                 fetched!.Name.Should().Be("Bobby");
                 fetched.LastUpdated.Should().BeOnOrAfter(originalTimestamp);
 
-                var count = await Data<Person, string>.CountAsync(p => p.Age >= 40, partition);
+                var count = await Data<Person, string>.Count(p => p.Age >= 40, partition);
                 count.Should().Be(3);
 
                 var page = await Person.Page(1, 2);
@@ -81,7 +81,7 @@ public sealed class JsonCrudSpec
                 remaining.Should().HaveCount(1);
                 remaining[0].Name.Should().Be("Grace");
             })
-            .RunAsync();
+            .Run();
     }
 
     private sealed class Person : Entity<Person>

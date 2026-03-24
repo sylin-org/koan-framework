@@ -11,10 +11,10 @@ namespace Koan.AI.Contracts;
 /// </summary>
 public interface IAiPipeline
 {
-    Task<AiChatResponse> PromptAsync(AiChatRequest request, CancellationToken ct = default);
-    IAsyncEnumerable<AiChatChunk> StreamAsync(AiChatRequest request, CancellationToken ct = default);
-    Task<AiEmbeddingsResponse> EmbedAsync(AiEmbeddingsRequest request, CancellationToken ct = default);
+    Task<AiChatResponse> Prompt(AiChatRequest request, CancellationToken ct = default);
+    IAsyncEnumerable<AiChatChunk> Stream(AiChatRequest request, CancellationToken ct = default);
+    Task<AiEmbeddingsResponse> Embed(AiEmbeddingsRequest request, CancellationToken ct = default);
 
-    Task<string> PromptAsync(string message, string? model = null, AiPromptOptions? opts = null, CancellationToken ct = default);
-    IAsyncEnumerable<AiChatChunk> StreamAsync(string message, string? model = null, AiPromptOptions? opts = null, CancellationToken ct = default);
+    Task<string> Prompt(string message, string? model = null, AiPromptOptions? opts = null, CancellationToken ct = default);
+    IAsyncEnumerable<AiChatChunk> Stream(string message, string? model = null, AiPromptOptions? opts = null, CancellationToken ct = default);
 }

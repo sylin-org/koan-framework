@@ -37,7 +37,7 @@ public sealed class SqlServerAutoFixture : IRelationalTestFixture<Specs.Count.Sq
         {
             if (OperatingSystem.IsWindows())
             {
-                if (await TryUseLocalDbAsync())
+                if (await TryUseLocalDb())
                 {
                     // LocalDB ready
                 }
@@ -48,7 +48,7 @@ public sealed class SqlServerAutoFixture : IRelationalTestFixture<Specs.Count.Sq
                 try
                 {
                     Environment.SetEnvironmentVariable("TESTCONTAINERS_RYUK_DISABLED", "true");
-                    var probe = await DockerEnvironment.ProbeAsync();
+                    var probe = await DockerEnvironment.Probe();
                     if (!probe.Available)
                     {
                         SkipTests = true;
@@ -156,7 +156,7 @@ public sealed class SqlServerAutoFixture : IRelationalTestFixture<Specs.Count.Sq
     {
     }
 
-    private async Task<bool> TryUseLocalDbAsync()
+    private async Task<bool> TryUseLocalDb()
     {
         try
         {

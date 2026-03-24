@@ -16,7 +16,7 @@ namespace Koan.Samples.Meridian.Services;
 
 public interface IPdfRenderer
 {
-    Task<byte[]> RenderAsync(string markdown, CancellationToken ct = default);
+    Task<byte[]> Render(string markdown, CancellationToken ct = default);
 }
 
 public sealed class PandocPdfRenderer : IPdfRenderer
@@ -42,7 +42,7 @@ public sealed class PandocPdfRenderer : IPdfRenderer
         _logger = logger;
     }
 
-    public async Task<byte[]> RenderAsync(string markdown, CancellationToken ct = default)
+    public async Task<byte[]> Render(string markdown, CancellationToken ct = default)
     {
         var pandoc = _options.Rendering.Pandoc;
         if (!pandoc.Enabled)
@@ -109,7 +109,7 @@ public sealed class PandocPdfRenderer : IPdfRenderer
         var builder = new StringBuilder();
         string? line;
 
-        while ((line = reader.ReadLine()) != null)
+        while ((line = reader.ReadLineAsync()) != null)
         {
             if (BlockedLatexTokens.Any(token => line.Contains(token, StringComparison.OrdinalIgnoreCase)))
             {

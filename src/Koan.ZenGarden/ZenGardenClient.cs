@@ -101,7 +101,7 @@ public sealed class ZenGardenClient : IZenGardenClient
 
         if (_koiHandler is not null)
         {
-            _koiSubscription = _koiHandler.OnTopologyEvent(OnKoiTopologyEventAsync);
+            _koiSubscription = _koiHandler.OnTopologyEvent(OnKoiTopologyEvent);
             _koiHandler.Start();
         }
     }
@@ -137,7 +137,7 @@ public sealed class ZenGardenClient : IZenGardenClient
 
         if (registration.Options.EmitInitialState)
         {
-            _ = EmitInitialStateAsync(registration, _lifetimeCts.Token);
+            _ = EmitInitialState(registration, _lifetimeCts.Token);
         }
 
         return new SubscriptionHandle(this, registration.Id);
@@ -171,7 +171,7 @@ public sealed class ZenGardenClient : IZenGardenClient
 
         if (registration.Options.EmitInitialState)
         {
-            _ = EmitCapabilityInitialStateAsync(registration, _lifetimeCts.Token);
+            _ = EmitCapabilityInitialState(registration, _lifetimeCts.Token);
         }
 
         return new CapabilitySubscriptionHandle(this, registration.Id);
@@ -199,13 +199,13 @@ public sealed class ZenGardenClient : IZenGardenClient
 
         if (registration.Options.EmitInitialState)
         {
-            _ = EmitCapabilityInitialStateAsync(registration, _lifetimeCts.Token);
+            _ = EmitCapabilityInitialState(registration, _lifetimeCts.Token);
         }
 
         return new CapabilitySubscriptionHandle(this, registration.Id);
     }
 
-    public async Task<IReadOnlyList<ZenGardenToolSnapshot>> CatalogAsync(
+    public async Task<IReadOnlyList<ZenGardenToolSnapshot>> Catalog(
         ZenGardenSubscription subscription,
         CancellationToken cancellationToken = default)
     {
@@ -215,7 +215,7 @@ public sealed class ZenGardenClient : IZenGardenClient
             throw new ArgumentNullException(nameof(subscription));
         }
 
-        using var response = await GetSnapshotWithRecoveryAsync(subscription, cancellationToken);
+        using var response = await GetSnapshotWithRecovery(subscription, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -243,7 +243,7 @@ public sealed class ZenGardenClient : IZenGardenClient
         return filtered;
     }
 
-    public async ValueTask<ZenGardenCapabilityWish> WishAsync(
+    public async ValueTask<ZenGardenCapabilityWish> Wish(
         string offering,
         IReadOnlyList<string> capabilities,
         ZenGardenCapabilityWishOptions? options = null,
@@ -267,7 +267,7 @@ public sealed class ZenGardenClient : IZenGardenClient
             ?? throw new InvalidOperationException("Failed to normalize offering selector.");
         var offeringSelector = Core.ToolFqid.Parse(toolFqid).ToString();
 
-        var snapshot = await ResolveCurrentToolSnapshotAsync(toolFqid, cancellationToken).ConfigureAwait(false);
+        var snapshot = await ResolveCurrentToolSnapshot(toolFqid, cancellationToken).ConfigureAwait(false);
         var requested = requestedRequirements.Select(static x => x.Canonical).ToArray();
         var satisfied = EvaluateSatisfiedCapabilities(requestedRequirements, snapshot).ToArray();
         var missing = requested
@@ -300,7 +300,7 @@ public sealed class ZenGardenClient : IZenGardenClient
 
         _capabilityWishes[wish.RequestId] = registration;
 
-        await PublishCapabilityProgressAsync(
+        await PublishCapabilityProgress(
             kind: wish.IsFulfilled
                 ? ZenGardenCapabilityProgressEventKind.Fulfilled
                 : wish.Satisfied.Count > 0
@@ -323,7 +323,7 @@ public sealed class ZenGardenClient : IZenGardenClient
 
         foreach (var requirement in requestedRequirements.Where(r => missing.Contains(r.Canonical, StringComparer.OrdinalIgnoreCase)))
         {
-            var ensureResponse = await EnsureCapabilityWishfullyAsync(
+            var ensureResponse = await EnsureCapabilityWishfully(
                 offeringSelector,
                 requirement,
                 wishOptions,
@@ -347,7 +347,7 @@ public sealed class ZenGardenClient : IZenGardenClient
                 };
             });
 
-            await PublishCapabilityProgressAsync(
+            await PublishCapabilityProgress(
                 ZenGardenCapabilityProgressEventKind.Failed,
                 registration,
                 previous,
@@ -368,7 +368,7 @@ public sealed class ZenGardenClient : IZenGardenClient
                 };
             });
 
-            await PublishCapabilityProgressAsync(
+            await PublishCapabilityProgress(
                 ZenGardenCapabilityProgressEventKind.InProgress,
                 registration,
                 previous,
@@ -443,7 +443,7 @@ public sealed class ZenGardenClient : IZenGardenClient
         }
     }
 
-    private async Task EmitInitialStateAsync(SubscriptionRegistration registration, CancellationToken ct)
+    private async Task EmitInitialState(SubscriptionRegistration registration, CancellationToken ct)
     {
         try
         {
@@ -455,7 +455,7 @@ public sealed class ZenGardenClient : IZenGardenClient
                 ? registration.Subscription with { Requires = Array.Empty<ZenGardenCapabilityRequirement>() }
                 : registration.Subscription;
 
-            var tools = await CatalogAsync(catalogSubscription, ct);
+            var tools = await Catalog(catalogSubscription, ct);
             foreach (var snapshot in tools)
             {
                 if (ct.IsCancellationRequested)
@@ -496,7 +496,7 @@ public sealed class ZenGardenClient : IZenGardenClient
         }
     }
 
-    private async Task EmitCapabilityInitialStateAsync(CapabilitySubscriptionRegistration registration, CancellationToken ct)
+    private async Task EmitCapabilityInitialState(CapabilitySubscriptionRegistration registration, CancellationToken ct)
     {
         try
         {
@@ -541,16 +541,16 @@ public sealed class ZenGardenClient : IZenGardenClient
             return;
         }
 
-        _streamLoopTask = Task.Run(() => RunStreamLoopAsync(_lifetimeCts.Token), _lifetimeCts.Token);
+        _streamLoopTask = Task.Run(() => RunStreamLoop(_lifetimeCts.Token), _lifetimeCts.Token);
     }
 
-    private async Task RunStreamLoopAsync(CancellationToken ct)
+    private async Task RunStreamLoop(CancellationToken ct)
     {
         while (!ct.IsCancellationRequested)
         {
             try
             {
-                await ConsumeStreamAsync(ct);
+                await ConsumeStream(ct);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -572,9 +572,9 @@ public sealed class ZenGardenClient : IZenGardenClient
         }
     }
 
-    private async Task ConsumeStreamAsync(CancellationToken ct)
+    private async Task ConsumeStream(CancellationToken ct)
     {
-        using var response = await OpenStreamWithRecoveryAsync(ct);
+        using var response = await OpenStreamWithRecovery(ct);
         response.EnsureSuccessStatusCode();
 
         await using var stream = await response.Content.ReadAsStreamAsync(ct);
@@ -597,7 +597,7 @@ public sealed class ZenGardenClient : IZenGardenClient
                 if (data.Length > 0)
                 {
                     var payload = data.ToString();
-                    await ProcessStreamEventAsync(eventName, eventId, payload, ct);
+                    await ProcessStreamEvent(eventName, eventId, payload, ct);
                 }
 
                 eventName = "message";
@@ -634,7 +634,7 @@ public sealed class ZenGardenClient : IZenGardenClient
         }
     }
 
-    private async Task ProcessStreamEventAsync(string eventName, string? eventId, string payloadJson, CancellationToken ct)
+    private async Task ProcessStreamEvent(string eventName, string? eventId, string payloadJson, CancellationToken ct)
     {
         if (!string.IsNullOrWhiteSpace(eventId))
         {
@@ -659,60 +659,60 @@ public sealed class ZenGardenClient : IZenGardenClient
         switch (eventName.Trim())
         {
             case "tools.snapshot":
-                await ApplySnapshotAsync(eventPayload, eventId, ct);
+                await ApplySnapshot(eventPayload, eventId, ct);
                 break;
             case "tool.upsert":
                 if (TryParseSnapshot(eventPayload, out var upsertSnapshot))
                 {
-                    await ApplyUpsertAsync(upsertSnapshot, eventId, cursor, ct);
+                    await ApplyUpsert(upsertSnapshot, eventId, cursor, ct);
                 }
                 break;
             case "tool.remove":
-                await ApplyRemoveAsync(eventPayload, eventId, cursor, ct);
+                await ApplyRemove(eventPayload, eventId, cursor, ct);
                 break;
             case "tools.heartbeat":
-                await TryHydrateTopologyThrottledAsync(ct);
+                await TryHydrateTopologyThrottled(ct);
                 break;
             default:
-                await TryProcessGenericEventAsync(eventPayload, eventId, cursor, ct);
+                await TryProcessGenericEvent(eventPayload, eventId, cursor, ct);
                 break;
         }
     }
 
-    private async Task ApplySnapshotAsync(JsonElement payload, string? eventId, CancellationToken ct)
+    private async Task ApplySnapshot(JsonElement payload, string? eventId, CancellationToken ct)
     {
         foreach (var snapshot in ParseToolList(payload))
         {
-            await ApplyUpsertAsync(snapshot, eventId, _cursor, ct);
+            await ApplyUpsert(snapshot, eventId, _cursor, ct);
         }
 
         if (TryGetProperty(payload, "replay", out var replay) && replay.ValueKind == JsonValueKind.Array)
         {
             foreach (var item in replay.EnumerateArray())
             {
-                await TryProcessGenericEventAsync(item, eventId, _cursor, ct);
+                await TryProcessGenericEvent(item, eventId, _cursor, ct);
             }
         }
     }
 
-    private async Task TryProcessGenericEventAsync(JsonElement payload, string? eventId, long? cursor, CancellationToken ct)
+    private async Task TryProcessGenericEvent(JsonElement payload, string? eventId, long? cursor, CancellationToken ct)
     {
         var inner = ExtractDataOrSelf(payload);
         var candidateEvent = ReadString(payload, "event") ?? ReadString(payload, "type");
 
         if (string.Equals(candidateEvent, "tool.remove", StringComparison.OrdinalIgnoreCase))
         {
-            await ApplyRemoveAsync(inner, eventId, cursor, ct);
+            await ApplyRemove(inner, eventId, cursor, ct);
             return;
         }
 
         if (TryParseSnapshot(inner, out var snapshot))
         {
-            await ApplyUpsertAsync(snapshot, eventId, cursor, ct);
+            await ApplyUpsert(snapshot, eventId, cursor, ct);
         }
     }
 
-    private async Task ApplyUpsertAsync(
+    private async Task ApplyUpsert(
         ZenGardenToolSnapshot current,
         string? eventId,
         long? cursor,
@@ -730,11 +730,11 @@ public sealed class ZenGardenClient : IZenGardenClient
 
         _tools[current.ToolFqid] = current;
         TryEnrichTopologyFromSnapshot(current);
-        await PublishDerivedEventsAsync(current, previous, eventId, cursor, ct);
-        await PublishCapabilityUpdatesAsync(current, eventId, cursor, ct);
+        await PublishDerivedEvents(current, previous, eventId, cursor, ct);
+        await PublishCapabilityUpdates(current, eventId, cursor, ct);
     }
 
-    private async Task ApplyRemoveAsync(JsonElement payload, string? eventId, long? cursor, CancellationToken ct)
+    private async Task ApplyRemove(JsonElement payload, string? eventId, long? cursor, CancellationToken ct)
     {
         var toolFqid = ReadString(payload, "fqid") ?? ReadString(payload, "tool_fqid");
         if (string.IsNullOrWhiteSpace(toolFqid))
@@ -767,11 +767,11 @@ public sealed class ZenGardenClient : IZenGardenClient
             UpdatedAt = DateTimeOffset.UtcNow
         };
 
-        await PublishDerivedEventsAsync(current, previous, eventId, cursor, ct);
-        await PublishCapabilityUpdatesAsync(current, eventId, cursor, ct);
+        await PublishDerivedEvents(current, previous, eventId, cursor, ct);
+        await PublishCapabilityUpdates(current, eventId, cursor, ct);
     }
 
-    private async Task PublishDerivedEventsAsync(
+    private async Task PublishDerivedEvents(
         ZenGardenToolSnapshot current,
         ZenGardenToolSnapshot? previous,
         string? eventId,
@@ -890,7 +890,7 @@ public sealed class ZenGardenClient : IZenGardenClient
         }
     }
 
-    private async Task PublishCapabilityUpdatesAsync(
+    private async Task PublishCapabilityUpdates(
         ZenGardenToolSnapshot current,
         string? eventId,
         long? cursor,
@@ -951,7 +951,7 @@ public sealed class ZenGardenClient : IZenGardenClient
 
             if (kind is not null && previousWish is not null)
             {
-                await PublishCapabilityProgressAsync(
+                await PublishCapabilityProgress(
                     kind.Value,
                     registration,
                     previousWish,
@@ -963,7 +963,7 @@ public sealed class ZenGardenClient : IZenGardenClient
         }
     }
 
-    private async Task PublishCapabilityProgressAsync(
+    private async Task PublishCapabilityProgress(
         ZenGardenCapabilityProgressEventKind kind,
         CapabilityWishRegistration registration,
         ZenGardenCapabilityWish? previous,
@@ -1025,14 +1025,14 @@ public sealed class ZenGardenClient : IZenGardenClient
         }
     }
 
-    private async Task<ZenGardenToolSnapshot?> ResolveCurrentToolSnapshotAsync(string toolFqid, CancellationToken ct)
+    private async Task<ZenGardenToolSnapshot?> ResolveCurrentToolSnapshot(string toolFqid, CancellationToken ct)
     {
         if (_tools.TryGetValue(toolFqid, out var current))
         {
             return current;
         }
 
-        var scoped = await CatalogAsync(new ZenGardenSubscription
+        var scoped = await Catalog(new ZenGardenSubscription
         {
             ToolType = Models.ZenGardenToolType.Offering,
             ToolFqid = toolFqid
@@ -1043,7 +1043,7 @@ public sealed class ZenGardenClient : IZenGardenClient
             return scoped[0];
         }
 
-        var broad = await CatalogAsync(new ZenGardenSubscription
+        var broad = await Catalog(new ZenGardenSubscription
         {
             ToolType = Models.ZenGardenToolType.Offering
         }, ct).ConfigureAwait(false);
@@ -1159,13 +1159,13 @@ public sealed class ZenGardenClient : IZenGardenClient
         return ZenGardenCapabilityProgressEventKind.Requested;
     }
 
-    private async Task<HttpResponseMessage> GetSnapshotWithRecoveryAsync(
+    private async Task<HttpResponseMessage> GetSnapshotWithRecovery(
         ZenGardenSubscription subscription,
         CancellationToken ct)
     {
         for (var attempt = 0; attempt < 2; attempt++)
         {
-            var endpoint = await EnsureBoundEndpointAsync(ct, forceRediscovery: attempt > 0);
+            var endpoint = await EnsureBoundEndpoint(ct, forceRediscovery: attempt > 0);
             var uri = BuildSnapshotUri(endpoint, subscription, since: null);
 
             try
@@ -1186,15 +1186,15 @@ public sealed class ZenGardenClient : IZenGardenClient
             }
         }
 
-        var fallbackEndpoint = await EnsureBoundEndpointAsync(ct, forceRediscovery: true);
+        var fallbackEndpoint = await EnsureBoundEndpoint(ct, forceRediscovery: true);
         return await _httpClient.GetAsync(BuildSnapshotUri(fallbackEndpoint, subscription, since: null), ct);
     }
 
-    private async Task<HttpResponseMessage> OpenStreamWithRecoveryAsync(CancellationToken ct)
+    private async Task<HttpResponseMessage> OpenStreamWithRecovery(CancellationToken ct)
     {
         for (var attempt = 0; attempt < 2; attempt++)
         {
-            var endpoint = await EnsureBoundEndpointAsync(ct, forceRediscovery: attempt > 0);
+            var endpoint = await EnsureBoundEndpoint(ct, forceRediscovery: attempt > 0);
             using var request = new HttpRequestMessage(HttpMethod.Get, BuildStreamUri(endpoint, _cursor));
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
 
@@ -1221,7 +1221,7 @@ public sealed class ZenGardenClient : IZenGardenClient
             }
         }
 
-        var finalEndpoint = await EnsureBoundEndpointAsync(ct, forceRediscovery: true);
+        var finalEndpoint = await EnsureBoundEndpoint(ct, forceRediscovery: true);
         using var finalRequest = new HttpRequestMessage(HttpMethod.Get, BuildStreamUri(finalEndpoint, _cursor));
         finalRequest.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
         if (!string.IsNullOrWhiteSpace(_lastEventId))
@@ -1232,7 +1232,7 @@ public sealed class ZenGardenClient : IZenGardenClient
         return await _httpClient.SendAsync(finalRequest, HttpCompletionOption.ResponseHeadersRead, ct);
     }
 
-    private async Task<CapabilityEnsureResult> EnsureCapabilityWishfullyAsync(
+    private async Task<CapabilityEnsureResult> EnsureCapabilityWishfully(
         string offeringSelector,
         ZenGardenCapabilityRequirement requirement,
         ZenGardenCapabilityWishOptions options,
@@ -1247,7 +1247,7 @@ public sealed class ZenGardenClient : IZenGardenClient
 
         for (var attempt = 0; attempt < 2; attempt++)
         {
-            var endpoint = await EnsureBoundEndpointAsync(ct, forceRediscovery: attempt > 0).ConfigureAwait(false);
+            var endpoint = await EnsureBoundEndpoint(ct, forceRediscovery: attempt > 0).ConfigureAwait(false);
             var uri = BuildCapabilityEnsureUri(endpoint, offeringSelector);
 
             try
@@ -1329,10 +1329,10 @@ public sealed class ZenGardenClient : IZenGardenClient
         return null;
     }
 
-    private async Task<string> EnsureBoundEndpointAsync(CancellationToken ct, bool forceRediscovery = false)
+    private async Task<string> EnsureBoundEndpoint(CancellationToken ct, bool forceRediscovery = false)
     {
         ThrowIfDisposed();
-        await SeedFromPersistedRosterAsync(ct).ConfigureAwait(false);
+        await SeedFromPersistedRoster(ct).ConfigureAwait(false);
         var containerized = IsContainerizedRuntime();
 
         // 1. Currently bound Stone (skip when force-rediscovering after a failure)
@@ -1349,7 +1349,7 @@ public sealed class ZenGardenClient : IZenGardenClient
         var selector = ResolvePreferredSelector();
         if (!string.IsNullOrWhiteSpace(selector))
         {
-            var selected = await ResolveStoneFromSelectorAsync(selector, ct);
+            var selected = await ResolveStoneFromSelector(selector, ct);
             if (selected is not null)
             {
                 return BindStone(selected).Endpoint;
@@ -1364,14 +1364,14 @@ public sealed class ZenGardenClient : IZenGardenClient
         }
 
         // 4. Preferred Stone name (soft affinity)
-        var preferred = await ResolvePreferredStoneNameAsync(ct);
+        var preferred = await ResolvePreferredStoneName(ct);
         if (preferred is not null)
         {
             return BindStone(preferred).Endpoint;
         }
 
         // 5. In-memory cache (includes seeded persisted entries)
-        var cached = await ResolveFromCacheAsync(ct);
+        var cached = await ResolveFromCache(ct);
         if (cached is not null)
         {
             return BindStone(cached).Endpoint;
@@ -1381,14 +1381,14 @@ public sealed class ZenGardenClient : IZenGardenClient
         if (containerized)
         {
             TryResolveContainerHostEndpoint(out var configuredContainerEndpoint);
-            var hostStone = await ResolveContainerHostStoneAsync(ct).ConfigureAwait(false);
+            var hostStone = await ResolveContainerHostStone(ct).ConfigureAwait(false);
             if (hostStone is not null)
             {
                 return BindStone(hostStone).Endpoint;
             }
 
             // 7. Persisted roster re-read (catches sibling container writes since seeding)
-            var fallbackPersisted = await ResolveFromPersistedRosterAsync(ct);
+            var fallbackPersisted = await ResolveFromPersistedRoster(ct);
             if (fallbackPersisted is not null)
             {
                 return BindStone(fallbackPersisted).Endpoint;
@@ -1442,12 +1442,12 @@ public sealed class ZenGardenClient : IZenGardenClient
 
         if (_options.EnableDiscovery)
         {
-            var discovered = await DiscoverStonesAsync(
+            var discovered = await DiscoverStones(
                 ResolveDiscoveryTimeout(),
                 waitForAll: true,
                 ct);
 
-            var reachable = await FindFirstReachableAsync(discovered, ct);
+            var reachable = await FindFirstReachable(discovered, ct);
             if (reachable is not null)
             {
                 return BindStone(reachable).Endpoint;
@@ -1463,7 +1463,7 @@ public sealed class ZenGardenClient : IZenGardenClient
             "Unable to resolve a Moss endpoint. Configure Koan:ZenGarden:Endpoint or GARDEN_STONE, or ensure UDP discovery on port 7184 is available.");
     }
 
-    private async Task<CachedMossStone?> ResolveContainerHostStoneAsync(CancellationToken ct)
+    private async Task<CachedMossStone?> ResolveContainerHostStone(CancellationToken ct)
     {
         if (!TryResolveContainerHostEndpoint(out var endpoint))
         {
@@ -1477,7 +1477,7 @@ public sealed class ZenGardenClient : IZenGardenClient
             LastSeenUtc = DateTimeOffset.UtcNow
         };
 
-        if (!await IsMossReachableAsync(candidate, ct).ConfigureAwait(false))
+        if (!await IsMossReachable(candidate, ct).ConfigureAwait(false))
         {
             return null;
         }
@@ -1502,7 +1502,7 @@ public sealed class ZenGardenClient : IZenGardenClient
         return null;
     }
 
-    private async Task<CachedMossStone?> ResolveStoneFromSelectorAsync(string selector, CancellationToken ct)
+    private async Task<CachedMossStone?> ResolveStoneFromSelector(string selector, CancellationToken ct)
     {
         if (TryNormalizeAbsoluteEndpoint(selector, out var endpoint))
         {
@@ -1513,7 +1513,7 @@ public sealed class ZenGardenClient : IZenGardenClient
                 LastSeenUtc = DateTimeOffset.UtcNow
             };
 
-            if (await IsMossReachableAsync(candidate, ct))
+            if (await IsMossReachable(candidate, ct))
             {
                 return CacheStone(candidate);
             }
@@ -1530,7 +1530,7 @@ public sealed class ZenGardenClient : IZenGardenClient
                 continue;
             }
 
-            if (await IsMossReachableAsync(cached, ct))
+            if (await IsMossReachable(cached, ct))
             {
                 return CacheStone(cached with { LastSeenUtc = DateTimeOffset.UtcNow });
             }
@@ -1541,7 +1541,7 @@ public sealed class ZenGardenClient : IZenGardenClient
             return null;
         }
 
-        var discovered = await DiscoverStonesAsync(
+        var discovered = await DiscoverStones(
             ResolveDiscoveryTimeout(),
             waitForAll: true,
             ct);
@@ -1553,7 +1553,7 @@ public sealed class ZenGardenClient : IZenGardenClient
                 continue;
             }
 
-            if (await IsMossReachableAsync(stone, ct))
+            if (await IsMossReachable(stone, ct))
             {
                 return CacheStone(stone);
             }
@@ -1562,7 +1562,7 @@ public sealed class ZenGardenClient : IZenGardenClient
         return null;
     }
 
-    private async Task<CachedMossStone?> ResolveFromCacheAsync(CancellationToken ct)
+    private async Task<CachedMossStone?> ResolveFromCache(CancellationToken ct)
     {
         PurgeExpiredCacheEntries();
         var cached = _stoneCache.Values
@@ -1572,7 +1572,7 @@ public sealed class ZenGardenClient : IZenGardenClient
 
         foreach (var stone in cached)
         {
-            if (await IsMossReachableAsync(stone, ct))
+            if (await IsMossReachable(stone, ct))
             {
                 return CacheStone(stone with { LastSeenUtc = DateTimeOffset.UtcNow });
             }
@@ -1581,7 +1581,7 @@ public sealed class ZenGardenClient : IZenGardenClient
         return null;
     }
 
-    private async Task SeedFromPersistedRosterAsync(CancellationToken ct)
+    private async Task SeedFromPersistedRoster(CancellationToken ct)
     {
         if (Interlocked.CompareExchange(ref _persistedRosterSeeded, 1, 0) != 0)
         {
@@ -1593,7 +1593,7 @@ public sealed class ZenGardenClient : IZenGardenClient
         {
             try
             {
-                var persisted = await _rosterStore.LoadAsync(ct).ConfigureAwait(false);
+                var persisted = await _rosterStore.Load(ct).ConfigureAwait(false);
                 var now = DateTimeOffset.UtcNow;
                 foreach (var stone in persisted)
                 {
@@ -1621,10 +1621,10 @@ public sealed class ZenGardenClient : IZenGardenClient
         }
 
         // 2. Moss topology (garden-topology.json) — fills gaps from Moss's mesh view
-        await SeedFromMossTopologyAsync(ct).ConfigureAwait(false);
+        await SeedFromMossTopology(ct).ConfigureAwait(false);
     }
 
-    private async Task SeedFromMossTopologyAsync(CancellationToken ct)
+    private async Task SeedFromMossTopology(CancellationToken ct)
     {
         try
         {
@@ -1709,7 +1709,7 @@ public sealed class ZenGardenClient : IZenGardenClient
         }
     }
 
-    private async Task<CachedMossStone?> ResolvePreferredStoneNameAsync(CancellationToken ct)
+    private async Task<CachedMossStone?> ResolvePreferredStoneName(CancellationToken ct)
     {
         var preferred = ResolvePreferredStoneNameValue();
         if (string.IsNullOrWhiteSpace(preferred))
@@ -1724,7 +1724,7 @@ public sealed class ZenGardenClient : IZenGardenClient
                 continue;
             }
 
-            if (await IsMossReachableAsync(stone, ct))
+            if (await IsMossReachable(stone, ct))
             {
                 return CacheStone(stone with { LastSeenUtc = DateTimeOffset.UtcNow });
             }
@@ -1735,7 +1735,7 @@ public sealed class ZenGardenClient : IZenGardenClient
             return null;
         }
 
-        var discovered = await DiscoverStonesAsync(
+        var discovered = await DiscoverStones(
             ResolveDiscoveryTimeout(),
             waitForAll: true,
             ct);
@@ -1747,7 +1747,7 @@ public sealed class ZenGardenClient : IZenGardenClient
                 continue;
             }
 
-            if (await IsMossReachableAsync(stone, ct))
+            if (await IsMossReachable(stone, ct))
             {
                 return CacheStone(stone);
             }
@@ -1773,7 +1773,7 @@ public sealed class ZenGardenClient : IZenGardenClient
         return null;
     }
 
-    private async Task<CachedMossStone?> ResolveFromPersistedRosterAsync(CancellationToken ct)
+    private async Task<CachedMossStone?> ResolveFromPersistedRoster(CancellationToken ct)
     {
         if (_rosterStore is null)
         {
@@ -1783,7 +1783,7 @@ public sealed class ZenGardenClient : IZenGardenClient
         IReadOnlyList<CachedMossStone> persisted;
         try
         {
-            persisted = await _rosterStore.LoadAsync(ct).ConfigureAwait(false);
+            persisted = await _rosterStore.Load(ct).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -1814,7 +1814,7 @@ public sealed class ZenGardenClient : IZenGardenClient
 
         foreach (var stone in candidates)
         {
-            if (await IsMossReachableAsync(stone, ct).ConfigureAwait(false))
+            if (await IsMossReachable(stone, ct).ConfigureAwait(false))
             {
                 return CacheStone(stone with { LastSeenUtc = now });
             }
@@ -1875,7 +1875,7 @@ public sealed class ZenGardenClient : IZenGardenClient
         {
             try
             {
-                await _rosterStore.PersistAsync(snapshot).ConfigureAwait(false);
+                await _rosterStore.Persist(snapshot).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -1886,7 +1886,7 @@ public sealed class ZenGardenClient : IZenGardenClient
 
     // ── Koi topology event interception ────────────────────────────────
 
-    private ValueTask OnKoiTopologyEventAsync(KoiTopologyEvent evt, CancellationToken ct)
+    private ValueTask OnKoiTopologyEvent(KoiTopologyEvent evt, CancellationToken ct)
     {
         switch (evt.Kind)
         {
@@ -2079,7 +2079,7 @@ public sealed class ZenGardenClient : IZenGardenClient
     /// Fetches the full topology from the bound Moss and caches all known stones.
     /// Called after bind and periodically on heartbeat to keep the roster warm.
     /// </summary>
-    private async Task HydrateTopologyFromMossAsync(CancellationToken ct)
+    private async Task HydrateTopologyFromMoss(CancellationToken ct)
     {
         var bound = _boundStone;
         if (bound is null)
@@ -2164,7 +2164,7 @@ public sealed class ZenGardenClient : IZenGardenClient
         {
             try
             {
-                await HydrateTopologyFromMossAsync(ct).ConfigureAwait(false);
+                await HydrateTopologyFromMoss(ct).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -2173,7 +2173,7 @@ public sealed class ZenGardenClient : IZenGardenClient
         }, CancellationToken.None);
     }
 
-    private async Task TryHydrateTopologyThrottledAsync(CancellationToken ct)
+    private async Task TryHydrateTopologyThrottled(CancellationToken ct)
     {
         var elapsed = DateTimeOffset.UtcNow - _lastTopologyHydration;
         if (elapsed < TimeSpan.FromMinutes(Constants.Moss.TopologyHydrationIntervalMinutes))
@@ -2181,16 +2181,16 @@ public sealed class ZenGardenClient : IZenGardenClient
             return;
         }
 
-        await HydrateTopologyFromMossAsync(ct).ConfigureAwait(false);
+        await HydrateTopologyFromMoss(ct).ConfigureAwait(false);
     }
 
-    private async Task<CachedMossStone?> FindFirstReachableAsync(
+    private async Task<CachedMossStone?> FindFirstReachable(
         IReadOnlyList<CachedMossStone> stones,
         CancellationToken ct)
     {
         foreach (var stone in stones)
         {
-            if (await IsMossReachableAsync(stone, ct))
+            if (await IsMossReachable(stone, ct))
             {
                 return CacheStone(stone with { LastSeenUtc = DateTimeOffset.UtcNow });
             }
@@ -2270,7 +2270,7 @@ public sealed class ZenGardenClient : IZenGardenClient
         }
     }
 
-    private async Task<bool> IsMossReachableAsync(CachedMossStone stone, CancellationToken ct)
+    private async Task<bool> IsMossReachable(CachedMossStone stone, CancellationToken ct)
     {
         var healthUri = BuildHealthUri(stone.Endpoint);
 
@@ -2288,7 +2288,7 @@ public sealed class ZenGardenClient : IZenGardenClient
         }
     }
 
-    private async Task<IReadOnlyList<CachedMossStone>> DiscoverStonesAsync(
+    private async Task<IReadOnlyList<CachedMossStone>> DiscoverStones(
         TimeSpan timeout,
         bool waitForAll,
         CancellationToken cancellationToken)

@@ -21,7 +21,7 @@ internal sealed class InMemoryJobStore : IJobStore
         _index = index;
     }
 
-    public Task<Job> CreateAsync(Job job, JobStoreMetadata metadata, CancellationToken cancellationToken)
+    public Task<Job> Create(Job job, JobStoreMetadata metadata, CancellationToken cancellationToken)
     {
         // Store in memory - no database persistence
         job.LastModified = DateTimeOffset.UtcNow;
@@ -30,13 +30,13 @@ internal sealed class InMemoryJobStore : IJobStore
         return Task.FromResult(job);
     }
 
-    public Task<Job?> GetAsync(string jobId, JobStoreMetadata metadata, CancellationToken cancellationToken)
+    public Task<Job?> Get(string jobId, JobStoreMetadata metadata, CancellationToken cancellationToken)
     {
         _jobs.TryGetValue(jobId, out var job);
         return Task.FromResult(job);
     }
 
-    public Task<Job> UpdateAsync(Job job, JobStoreMetadata metadata, CancellationToken cancellationToken)
+    public Task<Job> Update(Job job, JobStoreMetadata metadata, CancellationToken cancellationToken)
     {
         // Update in memory - no database persistence
         job.LastModified = DateTimeOffset.UtcNow;
@@ -45,7 +45,7 @@ internal sealed class InMemoryJobStore : IJobStore
         return Task.FromResult(job);
     }
 
-    public Task RemoveAsync(string jobId, JobStoreMetadata metadata, CancellationToken cancellationToken)
+    public Task Remove(string jobId, JobStoreMetadata metadata, CancellationToken cancellationToken)
     {
         _jobs.TryRemove(jobId, out _);
         _executions.TryRemove(jobId, out _);
@@ -53,7 +53,7 @@ internal sealed class InMemoryJobStore : IJobStore
         return Task.CompletedTask;
     }
 
-    public Task<JobExecution> CreateExecutionAsync(JobExecution execution, JobStoreMetadata metadata, CancellationToken cancellationToken)
+    public Task<JobExecution> CreateExecution(JobExecution execution, JobStoreMetadata metadata, CancellationToken cancellationToken)
     {
         var list = _executions.GetOrAdd(execution.JobId, _ => new List<JobExecution>());
         lock (list)
@@ -63,7 +63,7 @@ internal sealed class InMemoryJobStore : IJobStore
         return Task.FromResult(execution);
     }
 
-    public Task<JobExecution> UpdateExecutionAsync(JobExecution execution, JobStoreMetadata metadata, CancellationToken cancellationToken)
+    public Task<JobExecution> UpdateExecution(JobExecution execution, JobStoreMetadata metadata, CancellationToken cancellationToken)
     {
         var list = _executions.GetOrAdd(execution.JobId, _ => new List<JobExecution>());
         lock (list)
@@ -81,7 +81,7 @@ internal sealed class InMemoryJobStore : IJobStore
         return Task.FromResult(execution);
     }
 
-    public Task<IReadOnlyList<JobExecution>> ListExecutionsAsync(string jobId, JobStoreMetadata metadata, CancellationToken cancellationToken)
+    public Task<IReadOnlyList<JobExecution>> ListExecutions(string jobId, JobStoreMetadata metadata, CancellationToken cancellationToken)
     {
         if (_executions.TryGetValue(jobId, out var list))
         {
@@ -93,7 +93,7 @@ internal sealed class InMemoryJobStore : IJobStore
         return Task.FromResult((IReadOnlyList<JobExecution>)Array.Empty<JobExecution>());
     }
 
-    internal Task SweepAsync(TimeSpan completedRetention, TimeSpan faultedRetention, CancellationToken cancellationToken = default)
+    internal Task Sweep(TimeSpan completedRetention, TimeSpan faultedRetention, CancellationToken cancellationToken = default)
     {
         var now = DateTimeOffset.UtcNow;
 

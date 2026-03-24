@@ -32,7 +32,7 @@ internal sealed class DatasetService : IDatasetService
         return Task.FromResult(new DatasetRef(id, hash));
     }
 
-    public Task<DatasetRef> FromFileAsync(string path, CancellationToken ct = default)
+    public Task<DatasetRef> FromFile(string path, CancellationToken ct = default)
     {
         _ = ct;
 
@@ -56,7 +56,7 @@ internal sealed class DatasetService : IDatasetService
         return Task.FromResult(new DatasetRef(id, hash));
     }
 
-    public Task<DatasetAnalysis> AnalyzeAsync(
+    public Task<DatasetAnalysis> Analyze(
         DatasetRef dataset,
         string? tokenizer = null,
         CancellationToken ct = default)

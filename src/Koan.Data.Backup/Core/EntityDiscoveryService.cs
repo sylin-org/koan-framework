@@ -23,7 +23,7 @@ public class EntityDiscoveryService : IEntityDiscoveryService
         _logger = logger;
     }
 
-    public Task<EntityDiscoveryResult> DiscoverAllEntitiesAsync(CancellationToken ct = default)
+    public Task<EntityDiscoveryResult> DiscoverAllEntities(CancellationToken ct = default)
     {
         var stopwatch = Stopwatch.StartNew();
         _logger.LogInformation("Starting entity discovery...");
@@ -114,9 +114,9 @@ public class EntityDiscoveryService : IEntityDiscoveryService
         return Task.FromResult(result);
     }
 
-    public async Task WarmupAllEntitiesAsync(CancellationToken ct = default)
+    public async Task WarmupAllEntities(CancellationToken ct = default)
     {
-        var discovered = _currentDiscovery ?? await DiscoverAllEntitiesAsync(ct);
+        var discovered = _currentDiscovery ?? await DiscoverAllEntities(ct);
         var stopwatch = Stopwatch.StartNew();
 
         _logger.LogInformation("Warming up {Count} discovered entities...", discovered.Entities.Count);
@@ -159,12 +159,12 @@ public class EntityDiscoveryService : IEntityDiscoveryService
         return AggregateConfigsExtensions.GetAllRegisteredEntities();
     }
 
-    public async Task RefreshDiscoveryAsync(CancellationToken ct = default)
+    public async Task RefreshDiscovery(CancellationToken ct = default)
     {
         _logger.LogInformation("Refreshing entity discovery cache...");
         _discoveryCache.Clear();
         _currentDiscovery = null;
-        await DiscoverAllEntitiesAsync(ct);
+        await DiscoverAllEntities(ct);
     }
 
     public EntityDiscoveryResult GetDiscoveryStats()
@@ -239,7 +239,7 @@ public class EntityDiscoveryService : IEntityDiscoveryService
         return Convert.ToHexString(System.Text.Encoding.UTF8.GetBytes(combined)).ToLowerInvariant();
     }
 
-    public Task<BackupInventory> BuildInventoryAsync(CancellationToken ct = default)
+    public Task<BackupInventory> BuildInventory(CancellationToken ct = default)
     {
         var stopwatch = Stopwatch.StartNew();
         _logger.LogInformation("Building backup inventory...");

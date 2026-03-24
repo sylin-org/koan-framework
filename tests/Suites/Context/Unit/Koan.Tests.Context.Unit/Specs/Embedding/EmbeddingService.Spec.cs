@@ -38,8 +38,8 @@ public class EmbeddingServiceSpec : IDisposable
         _service = new EmbeddingService(_aiMock.Object, _cache, _loggerMock.Object, "test-model");
 
         // Default mock behavior - return test embedding
-        _aiMock.Setup(x => x.EmbedAsync(It.IsAny<AiEmbeddingsRequest>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new AiEmbeddingsResponse { Vectors = { _testEmbedding } });
+        _aiMock.Setup(x => x.Embed(It.IsAny<AiEmbeddingsRequest>(), It.IsAny<CancellationToken>()))
+            .Returns(new AiEmbeddingsResponse { Vectors = { _testEmbedding } });
     }
 
     public void Dispose()
@@ -56,11 +56,11 @@ public class EmbeddingServiceSpec : IDisposable
         var text = "test text";
 
         // Act
-        var result = await _service.EmbedAsync(text);
+        var result = await _service.Embed(text);
 
         // Assert
         result.Should().Equal(_testEmbedding);
-        _aiMock.Verify(x => x.EmbedAsync(
+        _aiMock.Verify(x => x.Embed(
             It.Is<AiEmbeddingsRequest>(r => r.Input.Contains(text)),
             It.IsAny<CancellationToken>()), Times.Once);
     }
@@ -70,14 +70,14 @@ public class EmbeddingServiceSpec : IDisposable
     {
         // Arrange
         var text = "test text";
-        await _service.EmbedAsync(text); // First call
+        await _service.Embed(text); // First call
 
         // Act
-        var result = await _service.EmbedAsync(text); // Second call
+        var result = await _service.Embed(text); // Second call
 
         // Assert
         result.Should().Equal(_testEmbedding);
-        _aiMock.Verify(x => x.EmbedAsync(It.IsAny<AiEmbeddingsRequest>(), It.IsAny<CancellationToken>()),
+        _aiMock.Verify(x => x.Embed(It.IsAny<AiEmbeddingsRequest>(), It.IsAny<CancellationToken>()),
             Times.Once, "should only call AI provider once, second call should use cache");
 
         _loggerMock.Verify(x => x.Log(
@@ -93,11 +93,11 @@ public class EmbeddingServiceSpec : IDisposable
     public async Task EmbedAsync_DifferentText_CreatesSeparateCacheEntries()
     {
         // Arrange & Act
-        var result1 = await _service.EmbedAsync("text one");
-        var result2 = await _service.EmbedAsync("text two");
+        var result1 = await _service.Embed("text one");
+        var result2 = await _service.Embed("text two");
 
         // Assert
-        _aiMock.Verify(x => x.EmbedAsync(It.IsAny<AiEmbeddingsRequest>(), It.IsAny<CancellationToken>()),
+        _aiMock.Verify(x => x.Embed(It.IsAny<AiEmbeddingsRequest>(), It.IsAny<CancellationToken>()),
             Times.Exactly(2), "different texts should not share cache entries");
     }
 
@@ -109,11 +109,11 @@ public class EmbeddingServiceSpec : IDisposable
         var service2 = new EmbeddingService(_aiMock.Object, _cache, _loggerMock.Object, "model-b");
 
         // Act
-        await service1.EmbedAsync("same text");
-        await service2.EmbedAsync("same text");
+        await service1.Embed("same text");
+        await service2.Embed("same text");
 
         // Assert
-        _aiMock.Verify(x => x.EmbedAsync(It.IsAny<AiEmbeddingsRequest>(), It.IsAny<CancellationToken>()),
+        _aiMock.Verify(x => x.Embed(It.IsAny<AiEmbeddingsRequest>(), It.IsAny<CancellationToken>()),
             Times.Exactly(2), "different models should not share cache");
     }
 
@@ -129,11 +129,11 @@ public class EmbeddingServiceSpec : IDisposable
     public async Task EmbedAsync_EmptyText_ReturnsEmptyArray(string? emptyText)
     {
         // Act
-        var result = await _service.EmbedAsync(emptyText!);
+        var result = await _service.Embed(emptyText!);
 
         // Assert
         result.Should().BeEmpty();
-        _aiMock.Verify(x => x.EmbedAsync(It.IsAny<AiEmbeddingsRequest>(), It.IsAny<CancellationToken>()),
+        _aiMock.Verify(x => x.Embed(It.IsAny<AiEmbeddingsRequest>(), It.IsAny<CancellationToken>()),
             Times.Never, "should not call AI provider for empty text");
 
         _loggerMock.Verify(x => x.Log(
@@ -154,8 +154,8 @@ public class EmbeddingServiceSpec : IDisposable
     {
         // Arrange
         var callCount = 0;
-        _aiMock.Setup(x => x.EmbedAsync(It.IsAny<AiEmbeddingsRequest>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(() =>
+        _aiMock.Setup(x => x.Embed(It.IsAny<AiEmbeddingsRequest>(), It.IsAny<CancellationToken>()))
+            .Returns(() =>
             {
                 callCount++;
                 if (callCount < 2)
@@ -166,7 +166,7 @@ public class EmbeddingServiceSpec : IDisposable
             });
 
         // Act
-        var result = await _service.EmbedAsync("test");
+        var result = await _service.Embed("test");
 
         // Assert
         result.Should().Equal(_testEmbedding);
@@ -185,13 +185,13 @@ public class EmbeddingServiceSpec : IDisposable
     public async Task EmbedAsync_PersistentFailure_ThrowsAfterRetries()
     {
         // Arrange
-        _aiMock.Setup(x => x.EmbedAsync(It.IsAny<AiEmbeddingsRequest>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new HttpRequestException("Persistent error"));
+        _aiMock.Setup(x => x.Embed(It.IsAny<AiEmbeddingsRequest>(), It.IsAny<CancellationToken>()))
+            .Throws(new HttpRequestException("Persistent error"));
 
         // Act & Assert
         await Assert.ThrowsAsync<HttpRequestException>(async () =>
         {
-            await _service.EmbedAsync("test");
+            await _service.Embed("test");
         });
 
         _loggerMock.Verify(x => x.Log(
@@ -210,8 +210,8 @@ public class EmbeddingServiceSpec : IDisposable
     {
         // Arrange
         var callCount = 0;
-        _aiMock.Setup(x => x.EmbedAsync(It.IsAny<AiEmbeddingsRequest>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(() =>
+        _aiMock.Setup(x => x.Embed(It.IsAny<AiEmbeddingsRequest>(), It.IsAny<CancellationToken>()))
+            .Returns(() =>
             {
                 callCount++;
                 if (callCount < 2)
@@ -222,7 +222,7 @@ public class EmbeddingServiceSpec : IDisposable
             });
 
         // Act
-        var result = await _service.EmbedAsync("test");
+        var result = await _service.Embed("test");
 
         // Assert
         result.Should().Equal(_testEmbedding);
@@ -237,11 +237,11 @@ public class EmbeddingServiceSpec : IDisposable
     public async Task EmbedBatchAsync_EmptyList_ReturnsEmptyDictionary()
     {
         // Act
-        var result = await _service.EmbedBatchAsync(new List<string>());
+        var result = await _service.EmbedBatch(new List<string>());
 
         // Assert
         result.Should().BeEmpty();
-        _aiMock.Verify(x => x.EmbedAsync(It.IsAny<AiEmbeddingsRequest>(), It.IsAny<CancellationToken>()),
+        _aiMock.Verify(x => x.Embed(It.IsAny<AiEmbeddingsRequest>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -252,17 +252,17 @@ public class EmbeddingServiceSpec : IDisposable
         var texts = new[] { "text1", "text2", "text3" };
         foreach (var text in texts)
         {
-            await _service.EmbedAsync(text); // Pre-populate cache
+            await _service.Embed(text); // Pre-populate cache
         }
 
         _aiMock.Invocations.Clear(); // Reset mock call tracking
 
         // Act
-        var result = await _service.EmbedBatchAsync(texts);
+        var result = await _service.EmbedBatch(texts);
 
         // Assert
         result.Should().HaveCount(3);
-        _aiMock.Verify(x => x.EmbedAsync(It.IsAny<AiEmbeddingsRequest>(), It.IsAny<CancellationToken>()),
+        _aiMock.Verify(x => x.Embed(It.IsAny<AiEmbeddingsRequest>(), It.IsAny<CancellationToken>()),
             Times.Never, "all items cached, no AI calls needed");
     }
 
@@ -270,25 +270,25 @@ public class EmbeddingServiceSpec : IDisposable
     public async Task EmbedBatchAsync_MixedCachedAndUncached_OnlyCallsForUncached()
     {
         // Arrange
-        await _service.EmbedAsync("cached1"); // Pre-cache one
-        await _service.EmbedAsync("cached2"); // Pre-cache another
+        await _service.Embed("cached1"); // Pre-cache one
+        await _service.Embed("cached2"); // Pre-cache another
 
         _aiMock.Invocations.Clear();
 
         var embedding1 = Enumerable.Range(0, 384).Select(i => (float)i).ToArray();
         var embedding2 = Enumerable.Range(0, 384).Select(i => (float)(i + 1)).ToArray();
 
-        _aiMock.Setup(x => x.EmbedAsync(It.IsAny<AiEmbeddingsRequest>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new AiEmbeddingsResponse { Vectors = { embedding1, embedding2 } });
+        _aiMock.Setup(x => x.Embed(It.IsAny<AiEmbeddingsRequest>(), It.IsAny<CancellationToken>()))
+            .Returns(new AiEmbeddingsResponse { Vectors = { embedding1, embedding2 } });
 
         var texts = new[] { "cached1", "new1", "cached2", "new2" };
 
         // Act
-        var result = await _service.EmbedBatchAsync(texts);
+        var result = await _service.EmbedBatch(texts);
 
         // Assert
         result.Should().HaveCount(4);
-        _aiMock.Verify(x => x.EmbedAsync(
+        _aiMock.Verify(x => x.Embed(
             It.Is<AiEmbeddingsRequest>(r => r.Input.Count == 2), // Only uncached items
             It.IsAny<CancellationToken>()), Times.Once);
 
@@ -306,14 +306,14 @@ public class EmbeddingServiceSpec : IDisposable
     {
         // Arrange
         var texts = new[] { "valid1", "", "valid2", "   ", "valid3" };
-        _aiMock.Setup(x => x.EmbedAsync(It.IsAny<AiEmbeddingsRequest>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(() => new AiEmbeddingsResponse
+        _aiMock.Setup(x => x.Embed(It.IsAny<AiEmbeddingsRequest>(), It.IsAny<CancellationToken>()))
+            .Returns(() => new AiEmbeddingsResponse
             {
                 Vectors = { _testEmbedding, _testEmbedding, _testEmbedding }
             });
 
         // Act
-        var result = await _service.EmbedBatchAsync(texts);
+        var result = await _service.EmbedBatch(texts);
 
         // Assert
         result.Should().HaveCount(3, "empty texts should be skipped");
@@ -330,14 +330,14 @@ public class EmbeddingServiceSpec : IDisposable
         var embeddings = texts.Select((t, i) =>
             Enumerable.Range(i * 100, 384).Select(x => (float)x).ToArray()).ToList();
 
-        _aiMock.Setup(x => x.EmbedAsync(It.IsAny<AiEmbeddingsRequest>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new AiEmbeddingsResponse
+        _aiMock.Setup(x => x.Embed(It.IsAny<AiEmbeddingsRequest>(), It.IsAny<CancellationToken>()))
+            .Returns(new AiEmbeddingsResponse
             {
                 Vectors = { embeddings[0], embeddings[1], embeddings[2] }
             });
 
         // Act
-        var result = await _service.EmbedBatchAsync(texts);
+        var result = await _service.EmbedBatch(texts);
 
         // Assert
         result["zebra"].Should().Equal(embeddings[0]);
@@ -350,13 +350,13 @@ public class EmbeddingServiceSpec : IDisposable
     {
         // Arrange
         var texts = new[] { "text1", "text2", "text3" };
-        _aiMock.Setup(x => x.EmbedAsync(It.IsAny<AiEmbeddingsRequest>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new AiEmbeddingsResponse { Vectors = { _testEmbedding } }); // Only 1 vector for 3 texts
+        _aiMock.Setup(x => x.Embed(It.IsAny<AiEmbeddingsRequest>(), It.IsAny<CancellationToken>()))
+            .Returns(new AiEmbeddingsResponse { Vectors = { _testEmbedding } }); // Only 1 vector for 3 texts
 
         // Act & Assert
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
         {
-            await _service.EmbedBatchAsync(texts);
+            await _service.EmbedBatch(texts);
         });
     }
 
@@ -368,13 +368,13 @@ public class EmbeddingServiceSpec : IDisposable
     public async Task EmbedAsync_ProviderReturnsNoVectors_ThrowsException()
     {
         // Arrange
-        _aiMock.Setup(x => x.EmbedAsync(It.IsAny<AiEmbeddingsRequest>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new AiEmbeddingsResponse { Vectors = { } }); // Empty vectors
+        _aiMock.Setup(x => x.Embed(It.IsAny<AiEmbeddingsRequest>(), It.IsAny<CancellationToken>()))
+            .Returns(new AiEmbeddingsResponse { Vectors = { } }); // Empty vectors
 
         // Act & Assert
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
         {
-            await _service.EmbedAsync("test");
+            await _service.Embed("test");
         });
     }
 
@@ -385,13 +385,13 @@ public class EmbeddingServiceSpec : IDisposable
         var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        _aiMock.Setup(x => x.EmbedAsync(It.IsAny<AiEmbeddingsRequest>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new OperationCanceledException());
+        _aiMock.Setup(x => x.Embed(It.IsAny<AiEmbeddingsRequest>(), It.IsAny<CancellationToken>()))
+            .Throws(new OperationCanceledException());
 
         // Act & Assert
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
         {
-            await _service.EmbedAsync("test", cts.Token);
+            await _service.Embed("test", cts.Token);
         });
     }
 

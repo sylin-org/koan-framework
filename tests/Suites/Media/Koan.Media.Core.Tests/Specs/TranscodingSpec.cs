@@ -19,7 +19,7 @@ public class TranscodingSpec : IClassFixture<MediaCoreTestPipelineFixture>
     var file = _fixture.CreateTestMediaFile("input.mp4");
 
     // Act
-    var transcoded = await media.TranscodeAsync(file, "audio/mp3");
+    var transcoded = await media.Transcode(file, "audio/mp3");
 
     // Assert
     transcoded.Should().NotBeNull();

@@ -88,14 +88,14 @@ public sealed class StdioTransport : BackgroundService
         _startedAtUtc = DateTimeOffset.UtcNow;
         _lastHeartbeatUtc = _startedAtUtc;
 
-        var heartbeatTask = RunHeartbeatAsync(options.Transport.HeartbeatInterval, transportLogger, linkedCts.Token, options);
+        var heartbeatTask = RunHeartbeat(options.Transport.HeartbeatInterval, transportLogger, linkedCts.Token, options);
 
         _logger.LogInformation("Starting MCP STDIO transport with {ToolCount} tools across {EntityCount} entities.", _toolCount, _entityCount);
         transportLogger.LogInformation("STDIO transport online with {ToolCount} tools.", _toolCount);
         PublishTransportHealth(HealthStatus.Healthy, "STDIO transport online.", options, _entityCount, _toolCount);
 
         var handler = _server.CreateHandler();
-        var runTask = _server.RunAsync(handler, input, output, linkedCts.Token);
+        var runTask = _server.Run(handler, input, output, linkedCts.Token);
         _sessionTask = runTask;
 
         try
@@ -180,7 +180,7 @@ public sealed class StdioTransport : BackgroundService
         await base.StopAsync(cancellationToken);
     }
 
-    private async Task RunHeartbeatAsync(TimeSpan interval, ILogger transportLogger, CancellationToken cancellationToken, McpServerOptions options)
+    private async Task RunHeartbeat(TimeSpan interval, ILogger transportLogger, CancellationToken cancellationToken, McpServerOptions options)
     {
         if (interval <= TimeSpan.Zero)
         {

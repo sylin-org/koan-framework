@@ -28,7 +28,7 @@ internal sealed class KoanAiPipeline : IAiPipeline
         _logger = logger;
     }
 
-    public async Task<AiChatResponse> PromptAsync(AiChatRequest request, CancellationToken ct = default)
+    public async Task<AiChatResponse> Prompt(AiChatRequest request, CancellationToken ct = default)
     {
         var messages = ChatMessageMapper.ToChatMessages(request.Messages);
         var options = ChatOptionsMapper.CreateChatOptions(request);
@@ -40,7 +40,7 @@ internal sealed class KoanAiPipeline : IAiPipeline
         return mapped;
     }
 
-    public async IAsyncEnumerable<AiChatChunk> StreamAsync(AiChatRequest request, [EnumeratorCancellation] CancellationToken ct = default)
+    public async IAsyncEnumerable<AiChatChunk> Stream(AiChatRequest request, [EnumeratorCancellation] CancellationToken ct = default)
     {
         var messages = ChatMessageMapper.ToChatMessages(request.Messages);
         var options = ChatOptionsMapper.CreateChatOptions(request);
@@ -55,7 +55,7 @@ internal sealed class KoanAiPipeline : IAiPipeline
         _logger.LogDebug("Koan AI pipeline streamed {ChunkCount} chunks", index);
     }
 
-    public async Task<AiEmbeddingsResponse> EmbedAsync(AiEmbeddingsRequest request, CancellationToken ct = default)
+    public async Task<AiEmbeddingsResponse> Embed(AiEmbeddingsRequest request, CancellationToken ct = default)
     {
         var options = ChatOptionsMapper.CreateEmbeddingOptions(request);
         var embeddings = await _embeddingGenerator.GenerateAsync(request.Input, options, ct).ConfigureAwait(false);
@@ -65,7 +65,7 @@ internal sealed class KoanAiPipeline : IAiPipeline
         return mapped;
     }
 
-    public async Task<string> PromptAsync(string message, string? model = null, AiPromptOptions? opts = null, CancellationToken ct = default)
+    public async Task<string> Prompt(string message, string? model = null, AiPromptOptions? opts = null, CancellationToken ct = default)
     {
         var request = new AiChatRequest
         {
@@ -77,11 +77,11 @@ internal sealed class KoanAiPipeline : IAiPipeline
             Options = opts,
         };
 
-        var response = await PromptAsync(request, ct).ConfigureAwait(false);
+        var response = await Prompt(request, ct).ConfigureAwait(false);
         return response.Text;
     }
 
-    public async IAsyncEnumerable<AiChatChunk> StreamAsync(string message, string? model = null, AiPromptOptions? opts = null, [EnumeratorCancellation] CancellationToken ct = default)
+    public async IAsyncEnumerable<AiChatChunk> Stream(string message, string? model = null, AiPromptOptions? opts = null, [EnumeratorCancellation] CancellationToken ct = default)
     {
         var request = new AiChatRequest
         {
@@ -93,7 +93,7 @@ internal sealed class KoanAiPipeline : IAiPipeline
             Options = opts,
         };
 
-        await foreach (var chunk in StreamAsync(request, ct).ConfigureAwait(false))
+        await foreach (var chunk in Stream(request, ct).ConfigureAwait(false))
         {
             yield return chunk;
         }

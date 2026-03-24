@@ -17,7 +17,7 @@ public sealed class CrossProviderDataMovementSpec
     public async Task Adapter_switches_route_between_json_and_sqlite()
     {
         await TestPipeline.For<CrossProviderDataMovementSpec>(_output, nameof(Adapter_switches_route_between_json_and_sqlite))
-            .Using<DataCoreRuntimeFixture>("runtime", static ctx => DataCoreRuntimeFixture.CreateAsync(ctx, includeSqlite: true))
+            .Using<DataCoreRuntimeFixture>("runtime", static ctx => DataCoreRuntimeFixture.Create(ctx, includeSqlite: true))
             .Arrange(static ctx =>
             {
                 TestHooks.ResetDataConfigs();
@@ -31,15 +31,15 @@ public sealed class CrossProviderDataMovementSpec
                 runtime.BindHost();
                 runtime.ResetEntityCaches();
 
-                await Data<TestEntity, string>.DeleteAllAsync();
+                await Data<TestEntity, string>.DeleteAll();
                 using (EntityContext.Adapter("json"))
                 {
-                    await Data<TestEntity, string>.DeleteAllAsync();
+                    await Data<TestEntity, string>.DeleteAll();
                 }
 
                 using (EntityContext.Adapter("sqlite"))
                 {
-                    await Data<TestEntity, string>.DeleteAllAsync();
+                    await Data<TestEntity, string>.DeleteAll();
                 }
 
                 var title = $"Cross Provider Test {Guid.CreateVersion7():n}";
@@ -47,13 +47,13 @@ public sealed class CrossProviderDataMovementSpec
 
                 using (EntityContext.Adapter("json"))
                 {
-                    var saved = await Data<TestEntity, string>.UpsertAsync(entity);
+                    var saved = await Data<TestEntity, string>.Upsert(entity);
                     saved.Id.Should().NotBeNullOrWhiteSpace();
                 }
 
                 using (EntityContext.Adapter("sqlite"))
                 {
-                    var saved = await Data<TestEntity, string>.UpsertAsync(entity);
+                    var saved = await Data<TestEntity, string>.Upsert(entity);
                     saved.Id.Should().NotBeNullOrWhiteSpace();
                 }
 
@@ -75,7 +75,7 @@ public sealed class CrossProviderDataMovementSpec
                 runtime.SqlitePath.Should().NotBeNull();
                 File.Exists(runtime.SqlitePath!).Should().BeTrue();
             })
-            .RunAsync();
+            .Run();
     }
 
     private sealed class TestEntity : Entity<TestEntity, string>

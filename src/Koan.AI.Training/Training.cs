@@ -25,7 +25,7 @@ public static class Training
         CancellationToken ct = default)
     {
         var options = new TrainOptions { Base = @base, Data = data, Method = method };
-        return await ResolveService().TrainAsync(options, progress: null, ct);
+        return await ResolveService().Train(options, progress: null, ct);
     }
 
     /// <summary>Start a training job with full options and optional progress reporting.</summary>
@@ -34,7 +34,7 @@ public static class Training
         IProgress<TrainingProgress>? progress = null,
         CancellationToken ct = default)
     {
-        return await ResolveService().TrainAsync(options, progress, ct);
+        return await ResolveService().Train(options, progress, ct);
     }
 
     // ── Script escape hatch ──
@@ -45,7 +45,7 @@ public static class Training
         IProgress<TrainingProgress>? progress = null,
         CancellationToken ct = default)
     {
-        return await ResolveService().RunAsync(options, progress, ct);
+        return await ResolveService().Run(options, progress, ct);
     }
 
     // ── Alignment ──
@@ -55,7 +55,7 @@ public static class Training
         AlignOptions options,
         CancellationToken ct = default)
     {
-        return await ResolveService().AlignAsync(options, ct);
+        return await ResolveService().Align(options, ct);
     }
 
     // ── Comparison ──
@@ -77,7 +77,7 @@ public static class Training
         foreach (var variation in variations)
         {
             var opts = variation with { Base = @base, Data = data };
-            var job = await service.TrainAsync(opts, progress: null, ct);
+            var job = await service.Train(opts, progress: null, ct);
             jobs.Add(job);
         }
 
@@ -91,7 +91,7 @@ public static class Training
         TrainOptions options,
         CancellationToken ct = default)
     {
-        return await ResolveService().EstimateAsync(options, ct);
+        return await ResolveService().Estimate(options, ct);
     }
 
     // ── Job lifecycle ──
@@ -101,7 +101,7 @@ public static class Training
         string jobId,
         CancellationToken ct = default)
     {
-        return await ResolveService().StatusAsync(jobId, ct);
+        return await ResolveService().Status(jobId, ct);
     }
 
     /// <summary>Cancel a running training job.</summary>
@@ -109,7 +109,7 @@ public static class Training
         string jobId,
         CancellationToken ct = default)
     {
-        await ResolveService().CancelAsync(jobId, ct);
+        await ResolveService().Cancel(jobId, ct);
     }
 
     /// <summary>Resume a training job from a checkpoint.</summary>
@@ -118,14 +118,14 @@ public static class Training
         string? checkpoint = null,
         CancellationToken ct = default)
     {
-        return await ResolveService().ResumeAsync(jobId, checkpoint, ct);
+        return await ResolveService().Resume(jobId, checkpoint, ct);
     }
 
     /// <summary>List all training jobs.</summary>
     public static async Task<IReadOnlyList<TrainingJob>> List(
         CancellationToken ct = default)
     {
-        return await ResolveService().ListAsync(ct);
+        return await ResolveService().List(ct);
     }
 
     // ── Internal ──

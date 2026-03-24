@@ -20,7 +20,7 @@ public sealed class KoanServiceDiscovery : IServiceDiscovery
         _httpClient = httpClient;
     }
 
-    public async Task<ServiceEndpoint> ResolveServiceAsync(string serviceId, CancellationToken ct = default)
+    public async Task<ServiceEndpoint> ResolveService(string serviceId, CancellationToken ct = default)
     {
         _logger.LogDebug("Resolving service endpoint for {ServiceId}", serviceId);
 
@@ -62,7 +62,7 @@ public sealed class KoanServiceDiscovery : IServiceDiscovery
         throw new ServiceDiscoveryException(serviceId, errorMessage);
     }
 
-    public async Task<ServiceEndpoint[]> DiscoverServicesAsync(CancellationToken ct = default)
+    public async Task<ServiceEndpoint[]> DiscoverServices(CancellationToken ct = default)
     {
         // For now, return empty array - this would be implemented for service registry scenarios
         _logger.LogDebug("Service discovery not yet implemented");
@@ -70,7 +70,7 @@ public sealed class KoanServiceDiscovery : IServiceDiscovery
         return Array.Empty<ServiceEndpoint>();
     }
 
-    public Task RegisterServiceAsync(ServiceRegistration registration, CancellationToken ct = default)
+    public Task RegisterService(ServiceRegistration registration, CancellationToken ct = default)
     {
         // For now, this is a no-op - would be implemented for service registry scenarios
         _logger.LogDebug("Service registration not yet implemented for {ServiceId}", registration.ServiceId);

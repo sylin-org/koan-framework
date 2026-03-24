@@ -57,7 +57,7 @@ public class IndexingService : IIndexingService
         // QA Issue #2 FIX: Retry policy for batch vector saves
         _retryPolicy = Policy
             .Handle<Exception>()
-            .WaitAndRetryAsync(
+            .WaitAndRetry(
                 retryCount: 3,
                 sleepDurationProvider: retryAttempt =>
                     TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)) +
@@ -72,7 +72,7 @@ public class IndexingService : IIndexingService
                 });
     }
 
-    public async Task<IndexingResult> IndexProjectAsync(
+    public async Task<IndexingResult> IndexProject(
         string projectId,
         IProgress<IndexingProgress>? progress = null,
         CancellationToken cancellationToken = default)
@@ -92,7 +92,7 @@ public class IndexingService : IIndexingService
 
             // 2. Create indexing job
             job = IndexingJob.Create(projectId, totalFiles: 0); // Will update after planning
-            await IndexingJob.UpsertAsync(job, cancellationToken);
+            await IndexingJob.Upsert(job, cancellationToken);
 
             _logger.LogInformation(
                 "Starting indexing for project {ProjectId} at path {Path} (Job: {JobId})",
@@ -101,10 +101,10 @@ public class IndexingService : IIndexingService
                 job.Id);
 
             // Get commit SHA for provenance
-            var commitSha = await _discovery.GetCommitShaAsync(project.RootPath);
+            var commitSha = await _discovery.GetCommitSha(project.RootPath);
 
             // 3. Plan differential scan
-            var plan = await PlanIndexingAsync(projectId, project.RootPath, cancellationToken);
+            var plan = await PlanIndexing(projectId, project.RootPath, cancellationToken);
 
             // 4. Update job with plan statistics
             job.Status = JobStatus.Indexing;
@@ -114,7 +114,7 @@ public class IndexingService : IIndexingService
             job.MetadataOnlyFiles = plan.MetadataOnlyFiles.Count;
             job.SkippedFiles = plan.SkippedFiles.Count;
             job.CurrentOperation = $"Indexing {plan.TotalFilesToProcess} files...";
-            await IndexingJob.UpsertAsync(job, cancellationToken);
+            await IndexingJob.Upsert(job, cancellationToken);
 
             _logger.LogInformation(
                 "Plan: {NewFiles} new, {ChangedFiles} changed, {MetadataOnly} metadata-only, " +
@@ -166,7 +166,7 @@ public class IndexingService : IIndexingService
 
                             _logger.LogInformation("📊 [DEBUG] Calling GetActualChunkStatsAsync for progressive update...");
                             // Update project's live stats (still inside partition context)
-                            var (currentCount, currentBytes) = await GetActualChunkStatsAsync(projectId, cancellationToken);
+                            var (currentCount, currentBytes) = await GetActualChunkStats(projectId, cancellationToken);
 
                             _logger.LogInformation(
                                 "📊 [DEBUG] Retrieved stats: {Count} chunks, {Bytes:N0} bytes. Updating project...",
@@ -177,7 +177,7 @@ public class IndexingService : IIndexingService
                             project.IndexedBytes = currentBytes;
                             project.UpdatedAt = DateTime.UtcNow;
                             project.Status = IndexingStatus.Indexing;
-                            await Project.UpsertAsync(project, cancellationToken);
+                            await Project.Upsert(project, cancellationToken);
 
                             _logger.LogInformation(
                                 "📊 [DEBUG] Project saved with DocumentCount={Count}, IndexedBytes={Bytes:N0}",
@@ -187,7 +187,7 @@ public class IndexingService : IIndexingService
                             // Exit partition context temporarily to update job in root table
                             using (EntityContext.Partition(null))
                             {
-                                await IndexingJob.UpsertAsync(job, cancellationToken);
+                                await IndexingJob.Upsert(job, cancellationToken);
                             }
                         }
 
@@ -201,11 +201,11 @@ public class IndexingService : IIndexingService
                         // Delete existing chunks if this is a changed file
                         if (plan.ChangedFiles.Contains(file))
                         {
-                            await DeleteChunksForFileAsync(projectId, file.RelativePath, cancellationToken);
+                            await DeleteChunksForFile(projectId, file.RelativePath, cancellationToken);
                         }
 
                         // Extract content
-                        var extracted = await _extraction.ExtractAsync(
+                        var extracted = await _extraction.Extract(
                             file.AbsolutePath,
                             file.RelativePath,
                             cancellationToken);
@@ -213,7 +213,7 @@ public class IndexingService : IIndexingService
                         var fileChunks = 0;
 
                         // Chunk content
-                        await foreach (var chunk in _chunking.ChunkAsync(
+                        await foreach (var chunk in _chunking.Chunk(
                             extracted,
                             projectId.ToString(),
                             commitSha,
@@ -222,7 +222,7 @@ public class IndexingService : IIndexingService
                             var provenance = ComputeProvenance(extracted.FullText, chunk.StartOffset, chunk.EndOffset);
 
                             // Generate embedding
-                            var embedding = await _embedding.EmbedAsync(chunk.Text, cancellationToken);
+                            var embedding = await _embedding.Embed(chunk.Text, cancellationToken);
 
                             // Create DocumentChunk entity
                             var docChunk = DocumentChunk.Create(
@@ -240,7 +240,7 @@ public class IndexingService : IIndexingService
                             docChunk.EndLine = provenance.EndLine;
 
                             // Save to relational store
-                            await DocumentChunk.UpsertAsync(docChunk, cancellationToken);
+                            await DocumentChunk.Upsert(docChunk, cancellationToken);
 
                             // Add to vector batch
                             batch.Add((
@@ -268,7 +268,7 @@ public class IndexingService : IIndexingService
                             if (batch.Count >= BatchSize)
                             {
                                 cancellationToken.ThrowIfCancellationRequested();
-                                await SaveVectorBatchAsync(batch, cancellationToken);
+                                await SaveVectorBatch(batch, cancellationToken);
                                 vectorsSaved += batch.Count;
                                 batch.Clear();
 
@@ -278,7 +278,7 @@ public class IndexingService : IIndexingService
 
                         // Update IndexedFile manifest
                         var fileInfo = new FileInfo(file.AbsolutePath);
-                        var fileHash = await ComputeFileHashAsync(file.AbsolutePath, cancellationToken);
+                        var fileHash = await ComputeFileHash(file.AbsolutePath, cancellationToken);
 
                         var indexedFileResults = await IndexedFile.Query(
                             f => f.ProjectId == projectId && f.RelativePath == file.RelativePath,
@@ -304,7 +304,7 @@ public class IndexingService : IIndexingService
                                 fileChunks);
                         }
 
-                        await IndexedFile.UpsertAsync(indexedFile, cancellationToken);
+                        await IndexedFile.Upsert(indexedFile, cancellationToken);
 
                         filesProcessed++;
                         job.ProcessedFiles = filesProcessed;
@@ -326,7 +326,7 @@ public class IndexingService : IIndexingService
                 // Save remaining vectors
                 if (batch.Count > 0)
                 {
-                    await SaveVectorBatchAsync(batch, cancellationToken);
+                    await SaveVectorBatch(batch, cancellationToken);
                     vectorsSaved += batch.Count;
                     job.VectorsSaved = vectorsSaved;
                 }
@@ -346,7 +346,7 @@ public class IndexingService : IIndexingService
                         {
                             indexedFile.LastModified = fileInfo.LastWriteTimeUtc;
                             indexedFile.SizeBytes = fileInfo.Length;
-                            await IndexedFile.UpsertAsync(indexedFile, cancellationToken);
+                            await IndexedFile.Upsert(indexedFile, cancellationToken);
                         }
                     }
                     catch (Exception ex)
@@ -360,7 +360,7 @@ public class IndexingService : IIndexingService
                 {
                     try
                     {
-                        await DeleteChunksForFileAsync(projectId, deletedPath, cancellationToken);
+                        await DeleteChunksForFile(projectId, deletedPath, cancellationToken);
 
                         // Remove from manifest
                         var indexedFileResults = await IndexedFile.Query(
@@ -382,7 +382,7 @@ public class IndexingService : IIndexingService
 
             // 8. Query actual chunk count and bytes from vector store
             _logger.LogInformation("🏁 [DEBUG] FINAL COMPLETION: Calling GetActualChunkStatsAsync...");
-            var (actualCount, actualBytes) = await GetActualChunkStatsAsync(projectId, cancellationToken);
+            var (actualCount, actualBytes) = await GetActualChunkStats(projectId, cancellationToken);
 
             _logger.LogInformation(
                 "🏁 [DEBUG] FINAL STATS: {Count} chunks, {Bytes:N0} bytes. Calling MarkIndexed()...",
@@ -398,7 +398,7 @@ public class IndexingService : IIndexingService
                 project.IndexedBytes,
                 project.Status);
 
-            await Project.UpsertAsync(project, cancellationToken);
+            await Project.Upsert(project, cancellationToken);
 
             _logger.LogInformation(
                 "🏁 [DEBUG] Project saved with final stats: DocumentCount={Count}, IndexedBytes={Bytes:N0}",
@@ -411,7 +411,7 @@ public class IndexingService : IIndexingService
             // Exit partition context to update job in root table
             using (EntityContext.Partition(null))
             {
-                await IndexingJob.UpsertAsync(job, cancellationToken);
+                await IndexingJob.Upsert(job, cancellationToken);
             }
 
             stopwatch.Stop();
@@ -444,7 +444,7 @@ public class IndexingService : IIndexingService
                 // Exit partition context to update job in root table
                 using (EntityContext.Partition(null))
                 {
-                    await IndexingJob.UpsertAsync(job, cancellationToken);
+                    await IndexingJob.Upsert(job, cancellationToken);
                 }
             }
 
@@ -468,11 +468,11 @@ public class IndexingService : IIndexingService
     /// QA Issue #2 FIX: Uses Polly retry policy for resilience
     /// QA Issue #29 FIX: Instance method with logger access
     /// </summary>
-    private async Task SaveVectorBatchAsync(
+    private async Task SaveVectorBatch(
         List<(string Id, float[] Embedding, object? Metadata)> batch,
         CancellationToken cancellationToken)
     {
-        await _retryPolicy.ExecuteAsync(async () =>
+        await _retryPolicy.Execute(async () =>
         {
             _logger.LogDebug("Saving batch of {Count} vectors to partition-aware storage", batch.Count);
 
@@ -495,7 +495,7 @@ public class IndexingService : IIndexingService
     /// 4. Unchanged (timestamp same) → SkippedFiles
     /// 5. Deleted (in manifest, not on disk) → DeletedFiles
     /// </remarks>
-    private async Task<IndexingPlan> PlanIndexingAsync(
+    private async Task<IndexingPlan> PlanIndexing(
         string projectId,
         string projectRootPath,
         CancellationToken cancellationToken)
@@ -518,8 +518,8 @@ public class IndexingService : IIndexingService
 
         // 2. Discover current files
         var discoveredFiles = await _discovery
-            .DiscoverAsync(projectRootPath, cancellationToken: cancellationToken)
-            .ToListAsync(cancellationToken);
+            .Discover(projectRootPath, cancellationToken: cancellationToken)
+            .ToList(cancellationToken);
 
         _logger.LogDebug("Discovered {Count} files on disk", discoveredFiles.Count);
 
@@ -550,7 +550,7 @@ public class IndexingService : IIndexingService
             }
 
             // Slow path: compute hash to detect content changes
-            var currentHash = await ComputeFileHashAsync(file.AbsolutePath, cancellationToken);
+            var currentHash = await ComputeFileHash(file.AbsolutePath, cancellationToken);
 
             if (currentHash == existing.FileHash)
             {
@@ -600,7 +600,7 @@ public class IndexingService : IIndexingService
     /// <summary>
     /// Deletes all chunks and vectors for a file
     /// </summary>
-    private async Task DeleteChunksForFileAsync(
+    private async Task DeleteChunksForFile(
         string projectId,
         string relativePath,
         CancellationToken cancellationToken)
@@ -674,13 +674,13 @@ public class IndexingService : IIndexingService
     /// <summary>
     /// Computes SHA256 hash of a file
     /// </summary>
-    private static async Task<string> ComputeFileHashAsync(
+    private static async Task<string> ComputeFileHash(
         string filePath,
         CancellationToken cancellationToken)
     {
         using var sha256 = System.Security.Cryptography.SHA256.Create();
         await using var fileStream = File.OpenRead(filePath);
-        var hashBytes = await sha256.ComputeHashAsync(fileStream, cancellationToken);
+        var hashBytes = await sha256.ComputeHash(fileStream, cancellationToken);
         return Convert.ToHexString(hashBytes);
     }
 
@@ -690,7 +690,7 @@ public class IndexingService : IIndexingService
     /// <remarks>
     /// Provides accurate counters by querying actual state instead of relying on run-time counters
     /// </remarks>
-    private async Task<(int count, long bytes)> GetActualChunkStatsAsync(
+    private async Task<(int count, long bytes)> GetActualChunkStats(
         string projectId,
         CancellationToken cancellationToken)
     {

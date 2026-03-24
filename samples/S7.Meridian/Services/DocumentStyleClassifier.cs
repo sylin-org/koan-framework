@@ -19,7 +19,7 @@ namespace Koan.Samples.Meridian.Services;
 
 public interface IDocumentStyleClassifier
 {
-    Task<DocumentStyleClassification> ClassifyAsync(
+    Task<DocumentStyleClassification> Classify(
         SourceDocument document,
         CancellationToken ct = default);
 }
@@ -40,7 +40,7 @@ public sealed class DocumentStyleClassifier : IDocumentStyleClassifier
         _logger = logger;
     }
 
-    public async Task<DocumentStyleClassification> ClassifyAsync(
+    public async Task<DocumentStyleClassification> Classify(
         SourceDocument document,
         CancellationToken ct = default)
     {

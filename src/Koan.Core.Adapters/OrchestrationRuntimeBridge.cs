@@ -94,7 +94,7 @@ public static class OrchestrationRuntimeBridge
     /// <summary>
     /// Initialize adapter with orchestration context if supported
     /// </summary>
-    public static async Task<bool> TryInitializeWithOrchestrationAsync(
+    public static async Task<bool> TryInitializeWithOrchestration(
         IKoanAdapter adapter,
         UnifiedServiceMetadata orchestrationContext,
         ILogger logger,

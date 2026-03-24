@@ -132,7 +132,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     /// This method is called after all services are registered and the service provider is built.
     /// It builds the backup inventory and emits warnings for uncovered entities.
     /// </remarks>
-    public static async Task ValidateBackupInventoryAsync(IServiceProvider services, ILogger logger)
+    public static async Task ValidateBackupInventory(IServiceProvider services, ILogger logger)
     {
         try
         {
@@ -145,7 +145,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
             Log.BootDebug(LogActions.Inventory, "building", ("module", "Koan.Data.Backup"));
 
-            var inventory = await discoveryService.BuildInventoryAsync();
+            var inventory = await discoveryService.BuildInventory();
             _cachedInventory = inventory;
 
             // Emit inventory summary

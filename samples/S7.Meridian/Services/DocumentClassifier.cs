@@ -17,7 +17,7 @@ namespace Koan.Samples.Meridian.Services;
 
 public interface IDocumentClassifier
 {
-    Task<ClassificationResult> ClassifyAsync(SourceDocument document, CancellationToken ct);
+    Task<ClassificationResult> Classify(SourceDocument document, CancellationToken ct);
 }
 
 public readonly record struct ClassificationResult(string TypeId, double Confidence, ClassificationMethod Method, int Version, string Reason);
@@ -45,7 +45,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
         _logger = logger;
     }
 
-    public async Task<ClassificationResult> ClassifyAsync(SourceDocument document, CancellationToken ct)
+    public async Task<ClassificationResult> Classify(SourceDocument document, CancellationToken ct)
     {
         if (document is null)
         {
@@ -85,7 +85,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
         }
 
         // Stage 2: Vector similarity
-        var vector = await EvaluateVectorSimilarityAsync(document, text, types, ct);
+        var vector = await EvaluateVectorSimilarity(document, text, types, ct);
         if (vector.HasValue && vector.Value.Confidence >= _options.Classification.VectorConfidenceThreshold)
         {
             _logger.LogDebug("Document {DocumentId} classified via vector similarity as {TypeId} ({Confidence:P0}). Reason: {Reason}",
@@ -94,7 +94,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
         }
 
         // Stage 3: LLM fallback
-        var llm = await EvaluateLlmAsync(document, text, types, ct);
+        var llm = await EvaluateLlm(document, text, types, ct);
         if (llm.HasValue)
         {
             _logger.LogDebug("Document {DocumentId} classified via LLM as {TypeId} ({Confidence:P0}). Reason: {Reason}",
@@ -190,7 +190,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
         return best;
     }
 
-    private async Task<ClassificationResult?> EvaluateVectorSimilarityAsync(
+    private async Task<ClassificationResult?> EvaluateVectorSimilarity(
         SourceDocument document,
         string text,
         IReadOnlyList<SourceType> types,
@@ -224,7 +224,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
 
         foreach (var type in types)
         {
-            var embedding = await GetTypeEmbeddingAsync(type, ct);
+            var embedding = await GetTypeEmbedding(type, ct);
             if (embedding is null || embedding.Length == 0)
             {
                 continue;
@@ -246,7 +246,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
         return new ClassificationResult(bestType.Id, bestSimilarity, ClassificationMethod.Vector, bestType.Version, $"Cosine similarity {bestSimilarity:P0} against type embedding");
     }
 
-    private async Task<ClassificationResult?> EvaluateLlmAsync(
+    private async Task<ClassificationResult?> EvaluateLlm(
         SourceDocument document,
         string text,
         IReadOnlyList<SourceType> types,
@@ -449,7 +449,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
             type.ExpectedPageCountMax);
     }
 
-    private async Task<float[]?> GetTypeEmbeddingAsync(SourceType type, CancellationToken ct)
+    private async Task<float[]?> GetTypeEmbedding(SourceType type, CancellationToken ct)
     {
         if (type.TypeEmbedding is { Length: > 0 } embedding && type.TypeEmbeddingVersion == type.Version)
         {

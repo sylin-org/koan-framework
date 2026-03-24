@@ -148,7 +148,7 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
         }
     }
 
-    public async Task CommitAsync(CancellationToken ct = default)
+    public async Task Commit(CancellationToken ct = default)
     {
         ThrowIfCompleted();
 
@@ -163,7 +163,7 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
                 _operationsByAdapter.Count);
 
             // Execute operations per adapter (best-effort atomicity)
-            await ExecuteOperationsAsync(ct);
+            await ExecuteOperations(ct);
 
             _isCompleted = true;
             stopwatch.Stop();
@@ -197,7 +197,7 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
         }
     }
 
-    public async Task RollbackAsync(CancellationToken ct = default)
+    public async Task Rollback(CancellationToken ct = default)
     {
         ThrowIfCompleted();
 
@@ -249,7 +249,7 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
             TrackedOperationCount: operationCount);
     }
 
-    private async Task ExecuteOperationsAsync(CancellationToken ct)
+    private async Task ExecuteOperations(CancellationToken ct)
     {
         var executedAdapters = new List<string>();
 
@@ -287,7 +287,7 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
 
                 try
                 {
-                    await operation.ExecuteAsync(ct);
+                    await operation.Execute(ct);
                 }
                 catch (Exception ex)
                 {

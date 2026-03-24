@@ -404,7 +404,7 @@ partial class TypeScriptSdkGenerator
             {
                 try
                 {
-                    File.WriteAllText(path, finalContent, Encoding.UTF8);
+                    File.WriteAllTextAsync(path, finalContent, Encoding.UTF8);
                     _logger.LogInformation("TypeScript SDK definitions written to {Path} ({Length} chars, hashed-bytes {HashedBytes}, hash {Hash})", path, finalContent.Length, hashedBytesLength, hash);
                     return;
                 }

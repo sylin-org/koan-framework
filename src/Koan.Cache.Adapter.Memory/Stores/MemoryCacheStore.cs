@@ -36,7 +36,7 @@ internal sealed class MemoryCacheStore : ICacheStore
         SupportsRegionScoping: false,
         Hints: new HashSet<string>(new[] { "tags", "stale-while-revalidate", "singleflight" }, StringComparer.OrdinalIgnoreCase));
 
-    public ValueTask<CacheFetchResult> FetchAsync(CacheKey key, CacheEntryOptions options, CancellationToken ct)
+    public ValueTask<CacheFetchResult> Fetch(CacheKey key, CacheEntryOptions options, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         if (!_cache.TryGetValue(key.Value, out CacheEnvelope? envelope) || envelope is null)
@@ -72,7 +72,7 @@ internal sealed class MemoryCacheStore : ICacheStore
             envelope.StaleUntil));
     }
 
-    public ValueTask SetAsync(CacheKey key, CacheValue value, CacheEntryOptions options, CancellationToken ct)
+    public ValueTask Set(CacheKey key, CacheValue value, CacheEntryOptions options, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         var now = DateTimeOffset.UtcNow;
@@ -131,7 +131,7 @@ internal sealed class MemoryCacheStore : ICacheStore
         return ValueTask.CompletedTask;
     }
 
-    public ValueTask<bool> RemoveAsync(CacheKey key, CancellationToken ct)
+    public ValueTask<bool> Remove(CacheKey key, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         var existed = _cache.TryGetValue(key.Value, out CacheEnvelope? envelope);
@@ -144,18 +144,18 @@ internal sealed class MemoryCacheStore : ICacheStore
         return ValueTask.FromResult(existed);
     }
 
-    public ValueTask TouchAsync(CacheKey key, CacheEntryOptions options, CancellationToken ct)
+    public ValueTask Touch(CacheKey key, CacheEntryOptions options, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         if (_cache.TryGetValue(key.Value, out CacheEnvelope? envelope) && envelope is not null)
         {
-            return SetAsync(key, envelope.Value, envelope.Options, ct);
+            return Set(key, envelope.Value, envelope.Options, ct);
         }
 
         return ValueTask.CompletedTask;
     }
 
-    public ValueTask<bool> ExistsAsync(CacheKey key, CancellationToken ct)
+    public ValueTask<bool> Exists(CacheKey key, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         if (!_cache.TryGetValue(key.Value, out CacheEnvelope? envelope) || envelope is null)
@@ -181,13 +181,13 @@ internal sealed class MemoryCacheStore : ICacheStore
         return ValueTask.FromResult(true);
     }
 
-    public ValueTask PublishInvalidationAsync(CacheKey key, CacheEntryOptions options, CancellationToken ct)
+    public ValueTask PublishInvalidation(CacheKey key, CacheEntryOptions options, CancellationToken ct)
     {
         // No-op for in-memory implementation; nothing to publish.
         return ValueTask.CompletedTask;
     }
 
-    public async IAsyncEnumerable<TaggedCacheKey> EnumerateByTagAsync(string tag, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    public async IAsyncEnumerable<TaggedCacheKey> EnumerateByTag(string tag, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
         if (!_tagIndex.TryGetValue(tag, out var keys))
         {

@@ -95,7 +95,7 @@ public class RabbitMqOrchestrationEvaluator : BaseOrchestrationEvaluator
             var connectionString = BuildRabbitMqConnectionString(hostResult.HostEndpoint!, username, password);
 
             // Try to connect with the configured credentials
-            var isValid = await TryRabbitMqConnectionAsync(connectionString);
+            var isValid = await TryRabbitMqConnection(connectionString);
 
             Logger?.LogDebug("[RabbitMQ] Credential validation result: {IsValid}", isValid);
             return isValid;
@@ -107,7 +107,7 @@ public class RabbitMqOrchestrationEvaluator : BaseOrchestrationEvaluator
         }
     }
 
-    protected override async Task<DependencyDescriptor> CreateDependencyDescriptorAsync(IConfiguration configuration, OrchestrationContext context)
+    protected override async Task<DependencyDescriptor> CreateDependencyDescriptor(IConfiguration configuration, OrchestrationContext context)
     {
         // Get configuration values
         var username = Configuration.ReadFirst(configuration, "guest",
@@ -174,7 +174,7 @@ public class RabbitMqOrchestrationEvaluator : BaseOrchestrationEvaluator
         }
     }
 
-    private static async Task<bool> TryRabbitMqConnectionAsync(string connectionString)
+    private static async Task<bool> TryRabbitMqConnection(string connectionString)
     {
         try
         {

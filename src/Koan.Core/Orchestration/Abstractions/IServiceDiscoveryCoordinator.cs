@@ -6,7 +6,7 @@ namespace Koan.Core.Orchestration.Abstractions;
 public interface IServiceDiscoveryCoordinator
 {
     /// <summary>Delegate discovery to registered adapter for service name</summary>
-    Task<AdapterDiscoveryResult> DiscoverServiceAsync(
+    Task<AdapterDiscoveryResult> DiscoverService(
         string serviceName,
         DiscoveryContext? context = null,
         CancellationToken cancellationToken = default);

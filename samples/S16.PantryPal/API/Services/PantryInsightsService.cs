@@ -4,12 +4,12 @@ namespace S16.PantryPal.Services;
 
 public interface IPantryInsightsService
 {
-    Task<PantryStats> GetStatsAsync(CancellationToken ct = default);
+    Task<PantryStats> GetStats(CancellationToken ct = default);
 }
 
 public sealed class PantryInsightsService : IPantryInsightsService
 {
-    public async Task<PantryStats> GetStatsAsync(CancellationToken ct = default)
+    public async Task<PantryStats> GetStats(CancellationToken ct = default)
     {
         var items = (await PantryItem.All()).ToList();
         var now = DateTime.UtcNow;

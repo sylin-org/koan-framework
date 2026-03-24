@@ -9,7 +9,7 @@ internal sealed class PostgresHealthContributor(IOptions<PostgresOptions> option
 {
     public string Name => "data:postgres";
     public bool IsCritical => true;
-    public async Task<HealthReport> CheckAsync(CancellationToken ct = default)
+    public async Task<HealthReport> Check(CancellationToken ct = default)
     {
         try
         {

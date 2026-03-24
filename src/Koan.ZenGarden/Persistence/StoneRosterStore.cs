@@ -27,7 +27,7 @@ internal sealed class StoneRosterStore : IStoneRosterStore
         _logger = logger;
     }
 
-    public async Task<IReadOnlyList<CachedMossStone>> LoadAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<CachedMossStone>> Load(CancellationToken ct = default)
     {
         try
         {
@@ -63,7 +63,7 @@ internal sealed class StoneRosterStore : IStoneRosterStore
         }
     }
 
-    public async Task PersistAsync(IEnumerable<CachedMossStone> stones, CancellationToken ct = default)
+    public async Task Persist(IEnumerable<CachedMossStone> stones, CancellationToken ct = default)
     {
         await _writeLock.WaitAsync(ct).ConfigureAwait(false);
         try
@@ -71,7 +71,7 @@ internal sealed class StoneRosterStore : IStoneRosterStore
             var incoming = stones.ToList();
 
             // Merge with existing entries from disk (sibling containers may have written)
-            var existing = await ReadFileQuietlyAsync(ct).ConfigureAwait(false);
+            var existing = await ReadFileQuietly(ct).ConfigureAwait(false);
 
             var merged = new Dictionary<string, CachedMossStone>(StringComparer.OrdinalIgnoreCase);
             foreach (var stone in existing)
@@ -149,7 +149,7 @@ internal sealed class StoneRosterStore : IStoneRosterStore
             .ToArray();
     }
 
-    private async Task<List<CachedMossStone>> ReadFileQuietlyAsync(CancellationToken ct)
+    private async Task<List<CachedMossStone>> ReadFileQuietly(CancellationToken ct)
     {
         try
         {

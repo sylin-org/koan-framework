@@ -28,11 +28,11 @@ public sealed class SseResultsTests
             options.DefaultEvent = "delta";
         });
 
-        var source = GetNumbersAsync();
+        var source = GetNumbers();
         var result = SseResults.StreamJson(source);
 
         await result.ExecuteAsync(context);
-        var payload = ReadBody(context);
+        var payload = await ReadBody(context);
 
         payload.Should().Contain("event: delta");
         payload.Should().Contain("data: {\"Value\":1}");
@@ -43,11 +43,11 @@ public sealed class SseResultsTests
     public async Task StreamText_HonorsExplicitEventName()
     {
         var context = CreateHttpContext();
-        var source = GetStringsAsync();
+        var source = GetStrings();
         var result = SseResults.StreamText(source, eventName: "token");
 
         await result.ExecuteAsync(context);
-        var payload = ReadBody(context);
+        var payload = await ReadBody(context);
 
         payload.Should().Contain("event: token");
         payload.Should().Contain("data: first");
@@ -67,12 +67,12 @@ public sealed class SseResultsTests
     public async Task ActionResult_StreamText_WritesResponse()
     {
         var context = CreateHttpContext();
-        var action = SseActionResult.StreamText(GetStringsAsync(), eventName: "delta");
+        var action = SseActionResult.StreamText(GetStrings(), eventName: "delta");
         var actionContext = new ActionContext(context, new RouteData(), new ActionDescriptor());
 
         await action.ExecuteResultAsync(actionContext);
 
-        var payload = ReadBody(context);
+        var payload = await ReadBody(context);
         payload.Should().Contain("event: delta");
         payload.Should().Contain("data: first");
     }
@@ -86,7 +86,7 @@ public sealed class SseResultsTests
         var result = SseResults.StreamEnvelopes(envelopes);
         await result.ExecuteAsync(context);
 
-        var payload = ReadBody(context);
+        var payload = await ReadBody(context);
         payload.Should().Contain("event: heartbeat");
         payload.Should().Contain("event: custom");
     }
@@ -110,14 +110,14 @@ public sealed class SseResultsTests
         return context;
     }
 
-    private static string ReadBody(DefaultHttpContext context)
+    private static async Task<string> ReadBody(DefaultHttpContext context)
     {
         context.Response.Body.Seek(0, SeekOrigin.Begin);
         using var reader = new StreamReader(context.Response.Body, Encoding.UTF8, leaveOpen: true);
-        return reader.ReadToEnd();
+        return await reader.ReadToEndAsync();
     }
 
-    private static async IAsyncEnumerable<TestMessage> GetNumbersAsync()
+    private static async IAsyncEnumerable<TestMessage> GetNumbers()
     {
         for (var i = 1; i <= 2; i++)
         {
@@ -126,7 +126,7 @@ public sealed class SseResultsTests
         }
     }
 
-    private static async IAsyncEnumerable<string> GetStringsAsync()
+    private static async IAsyncEnumerable<string> GetStrings()
     {
         yield return "first";
         await Task.Yield();

@@ -10,5 +10,5 @@ namespace Koan.AI.Contracts.Adapters;
 public interface IOcrAdapter : IAiAdapter
 {
     /// <summary>Extract text from an image.</summary>
-    Task<OcrResponse> RecognizeAsync(OcrRequest request, CancellationToken ct = default);
+    Task<OcrResponse> Recognize(OcrRequest request, CancellationToken ct = default);
 }

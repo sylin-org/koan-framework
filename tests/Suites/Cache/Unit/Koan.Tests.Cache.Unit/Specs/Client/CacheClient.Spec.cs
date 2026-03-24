@@ -38,24 +38,24 @@ public sealed class CacheClientSpec
 
     [Fact]
     public Task SetAsync_null_value_removes_entry()
-        => SpecAsync(nameof(SetAsync_null_value_removes_entry), async () =>
+        => Spec(nameof(SetAsync_null_value_removes_entry), async () =>
         {
             using var context = CacheClientContext.Create();
             var key = new CacheKey("null-removal");
 
-            await context.Store.SetAsync(key, CacheValue.FromString("existing"), new CacheEntryOptions(), CancellationToken.None);
+            await context.Store.Set(key, CacheValue.FromString("existing"), new CacheEntryOptions(), CancellationToken.None);
 
             var entry = context.Client.CreateEntry<string>(key);
-            await entry.SetAsync(null!, CancellationToken.None);
+            await entry.Set(null!, CancellationToken.None);
 
             context.Store.Removes.Should().Be(1);
-            var fetch = await context.Store.FetchAsync(key, new CacheEntryOptions(), CancellationToken.None);
+            var fetch = await context.Store.Fetch(key, new CacheEntryOptions(), CancellationToken.None);
             fetch.Hit.Should().BeFalse();
         });
 
     [Fact]
     public Task SetAsync_force_publish_triggers_invalidation()
-        => SpecAsync(nameof(SetAsync_force_publish_triggers_invalidation), async () =>
+        => Spec(nameof(SetAsync_force_publish_triggers_invalidation), async () =>
         {
             using var context = CacheClientContext.Create();
             var key = new CacheKey("publish-on-set");
@@ -63,14 +63,14 @@ public sealed class CacheClientSpec
             var entry = context.Client.CreateEntry<string>(key)
                 .PublishInvalidation();
 
-            await entry.SetAsync("payload", CancellationToken.None);
+            await entry.Set("payload", CancellationToken.None);
 
             context.Store.PublishCount.Should().Be(1);
         });
 
     [Fact]
     public Task SetAsync_string_content_uses_string_serializer()
-        => SpecAsync(nameof(SetAsync_string_content_uses_string_serializer), async () =>
+        => Spec(nameof(SetAsync_string_content_uses_string_serializer), async () =>
         {
             using var context = CacheClientContext.Create();
             var key = new CacheKey("string-content");
@@ -78,7 +78,7 @@ public sealed class CacheClientSpec
             var entry = context.Client.CreateEntry<string>(key)
                 .WithContentKind(CacheContentKind.String);
 
-            await entry.SetAsync("payload", CancellationToken.None);
+            await entry.Set("payload", CancellationToken.None);
 
             context.StringSerializer.SerializeCalls.Should().Be(1);
             context.JsonSerializer.SerializeCalls.Should().Be(0);
@@ -86,16 +86,16 @@ public sealed class CacheClientSpec
 
     [Fact]
     public Task TouchAsync_existing_entry_uses_scoped_options()
-        => SpecAsync(nameof(TouchAsync_existing_entry_uses_scoped_options), async () =>
+        => Spec(nameof(TouchAsync_existing_entry_uses_scoped_options), async () =>
         {
             using var context = CacheClientContext.Create();
             var key = new CacheKey("touch-existing");
 
-            await context.Store.SetAsync(key, CacheValue.FromString("value"), new CacheEntryOptions(), CancellationToken.None);
+            await context.Store.Set(key, CacheValue.FromString("value"), new CacheEntryOptions(), CancellationToken.None);
 
             using (context.Client.BeginScope("tenant-touch", "region-west"))
             {
-                await context.Client.TouchAsync(key, new CacheEntryOptions(), CancellationToken.None);
+                await context.Client.Touch(key, new CacheEntryOptions(), CancellationToken.None);
             }
 
             context.Store.Touches.Should().Be(1);
@@ -107,12 +107,12 @@ public sealed class CacheClientSpec
 
     [Fact]
     public Task TouchAsync_missing_entry_is_noop()
-        => SpecAsync(nameof(TouchAsync_missing_entry_is_noop), async () =>
+        => Spec(nameof(TouchAsync_missing_entry_is_noop), async () =>
         {
             using var context = CacheClientContext.Create();
             var key = new CacheKey("touch-missing");
 
-            var act = () => context.Client.TouchAsync(key, new CacheEntryOptions(), CancellationToken.None).AsTask();
+            var act = () => context.Client.Touch(key, new CacheEntryOptions(), CancellationToken.None).AsTask();
 
             await act.Should().NotThrowAsync();
 
@@ -142,7 +142,7 @@ public sealed class CacheClientSpec
 
     [Fact]
     public Task GetOrAddAsync_deduplicates_concurrent_work()
-        => SpecAsync(nameof(GetOrAddAsync_deduplicates_concurrent_work), async () =>
+        => Spec(nameof(GetOrAddAsync_deduplicates_concurrent_work), async () =>
         {
             using var context = CacheClientContext.Create();
             var key = new CacheKey("singleflight");
@@ -159,7 +159,7 @@ public sealed class CacheClientSpec
                 .WithAbsoluteTtl(TimeSpan.FromMinutes(1));
 
             var tasks = Enumerable.Range(0, 5)
-                .Select(_ => builder.GetOrAddAsync(Factory, CancellationToken.None).AsTask())
+                .Select(_ => builder.GetOrAdd(Factory, CancellationToken.None).AsTask())
                 .ToArray();
 
             var results = await Task.WhenAll(tasks);
@@ -170,15 +170,15 @@ public sealed class CacheClientSpec
 
     [Fact]
     public Task GetAsync_deserializes_stored_value()
-        => SpecAsync(nameof(GetAsync_deserializes_stored_value), async () =>
+        => Spec(nameof(GetAsync_deserializes_stored_value), async () =>
         {
             using var context = CacheClientContext.Create();
             var key = new CacheKey("deserialize-test");
 
-            await context.Store.SetAsync(key, CacheValue.FromString("{\"Value\":5}"), new CacheEntryOptions(), CancellationToken.None);
+            await context.Store.Set(key, CacheValue.FromString("{\"Value\":5}"), new CacheEntryOptions(), CancellationToken.None);
 
             var builder = context.Client.CreateEntry<TestPayload>(key);
-            var result = await builder.GetAsync(CancellationToken.None);
+            var result = await builder.Get(CancellationToken.None);
 
             result.Should().NotBeNull();
             result!.Value.Should().Be(5);
@@ -186,13 +186,13 @@ public sealed class CacheClientSpec
 
     [Fact]
     public Task Exists_when_present_returns_true()
-        => SpecAsync(nameof(Exists_when_present_returns_true), async () =>
+        => Spec(nameof(Exists_when_present_returns_true), async () =>
         {
             using var context = CacheClientContext.Create();
             var key = new CacheKey("exists-present");
 
             var entry = context.Client.CreateEntry<string>(key);
-            await entry.SetAsync("value", CancellationToken.None);
+            await entry.Set("value", CancellationToken.None);
 
             var exists = await entry.Exists(CancellationToken.None);
             exists.Should().BeTrue();
@@ -200,7 +200,7 @@ public sealed class CacheClientSpec
 
     [Fact]
     public Task Exists_when_missing_returns_false()
-        => SpecAsync(nameof(Exists_when_missing_returns_false), async () =>
+        => Spec(nameof(Exists_when_missing_returns_false), async () =>
         {
             using var context = CacheClientContext.Create();
             var key = new CacheKey("exists-missing");
@@ -213,16 +213,16 @@ public sealed class CacheClientSpec
 
     [Fact]
     public Task FlushTagsAsync_removes_tagged_entries()
-        => SpecAsync(nameof(FlushTagsAsync_removes_tagged_entries), async () =>
+        => Spec(nameof(FlushTagsAsync_removes_tagged_entries), async () =>
         {
             using var context = CacheClientContext.Create();
             var first = context.Client.CreateEntry<string>(new CacheKey("tagged-1")).WithTags("todos");
             var second = context.Client.CreateEntry<string>(new CacheKey("tagged-2")).WithTags("todos", "open");
 
-            await first.SetAsync("one", CancellationToken.None);
-            await second.SetAsync("two", CancellationToken.None);
+            await first.Set("one", CancellationToken.None);
+            await second.Set("two", CancellationToken.None);
 
-            var removed = await context.Client.FlushTagsAsync(new[] { "todos" }, CancellationToken.None);
+            var removed = await context.Client.FlushTags(new[] { "todos" }, CancellationToken.None);
 
             removed.Should().Be(2);
             context.Store.StoredValues.Should().BeEmpty();
@@ -230,16 +230,16 @@ public sealed class CacheClientSpec
 
     [Fact]
     public Task CountTagsAsync_deduplicates_keys_across_tags()
-        => SpecAsync(nameof(CountTagsAsync_deduplicates_keys_across_tags), async () =>
+        => Spec(nameof(CountTagsAsync_deduplicates_keys_across_tags), async () =>
         {
             using var context = CacheClientContext.Create();
             var first = context.Client.CreateEntry<string>(new CacheKey("count-1")).WithTags("todos", "open");
             var second = context.Client.CreateEntry<string>(new CacheKey("count-2")).WithTags("todos");
 
-            await first.SetAsync("one", CancellationToken.None);
-            await second.SetAsync("two", CancellationToken.None);
+            await first.Set("one", CancellationToken.None);
+            await second.Set("two", CancellationToken.None);
 
-            var count = await context.Client.CountTagsAsync(new[] { "todos", "open" }, CancellationToken.None);
+            var count = await context.Client.CountTags(new[] { "todos", "open" }, CancellationToken.None);
 
             count.Should().Be(2);
         });
@@ -251,15 +251,15 @@ public sealed class CacheClientSpec
                 body();
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 
-    private Task SpecAsync(string scenario, Func<Task> body)
+    private Task Spec(string scenario, Func<Task> body)
         => TestPipeline.For<CacheClientSpec>(_output, scenario)
             .Assert(async _ =>
             {
                 await body().ConfigureAwait(false);
             })
-            .RunAsync();
+            .Run();
 
     private sealed record TestPayload(int Value);
 
@@ -326,7 +326,7 @@ public sealed class CacheClientSpec
         public List<string> TouchedKeys { get; } = new();
         public CacheEntryOptions? LastTouchedOptions { get; private set; }
 
-        public ValueTask<CacheFetchResult> FetchAsync(CacheKey key, CacheEntryOptions options, CancellationToken ct)
+        public ValueTask<CacheFetchResult> Fetch(CacheKey key, CacheEntryOptions options, CancellationToken ct)
         {
             if (_entries.TryGetValue(key.Value, out var entry))
             {
@@ -336,20 +336,20 @@ public sealed class CacheClientSpec
             return ValueTask.FromResult(CacheFetchResult.Miss(options));
         }
 
-        public ValueTask SetAsync(CacheKey key, CacheValue value, CacheEntryOptions options, CancellationToken ct)
+        public ValueTask Set(CacheKey key, CacheValue value, CacheEntryOptions options, CancellationToken ct)
         {
             _entries[key.Value] = (value, options);
             return ValueTask.CompletedTask;
         }
 
-        public ValueTask<bool> RemoveAsync(CacheKey key, CancellationToken ct)
+        public ValueTask<bool> Remove(CacheKey key, CancellationToken ct)
         {
             var removed = _entries.TryRemove(key.Value, out _);
             Removes++;
             return ValueTask.FromResult(removed);
         }
 
-        public ValueTask TouchAsync(CacheKey key, CacheEntryOptions options, CancellationToken ct)
+        public ValueTask Touch(CacheKey key, CacheEntryOptions options, CancellationToken ct)
         {
             if (_entries.ContainsKey(key.Value))
             {
@@ -365,13 +365,13 @@ public sealed class CacheClientSpec
             return ValueTask.CompletedTask;
         }
 
-        public ValueTask PublishInvalidationAsync(CacheKey key, CacheEntryOptions options, CancellationToken ct)
+        public ValueTask PublishInvalidation(CacheKey key, CacheEntryOptions options, CancellationToken ct)
         {
             PublishCount++;
             return ValueTask.CompletedTask;
         }
 
-        public async IAsyncEnumerable<TaggedCacheKey> EnumerateByTagAsync(string tag, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+        public async IAsyncEnumerable<TaggedCacheKey> EnumerateByTag(string tag, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
         {
             foreach (var kvp in _entries)
             {
@@ -384,7 +384,7 @@ public sealed class CacheClientSpec
             await Task.CompletedTask;
         }
 
-        public ValueTask<bool> ExistsAsync(CacheKey key, CancellationToken ct)
+        public ValueTask<bool> Exists(CacheKey key, CancellationToken ct)
         {
             var exists = _entries.ContainsKey(key.Value);
             return ValueTask.FromResult(exists);
@@ -404,7 +404,7 @@ public sealed class CacheClientSpec
             return ValueTask.FromResult(CacheValue.FromString(value?.ToString() ?? string.Empty));
         }
 
-        public ValueTask<CacheValue> SerializeAsync(object value, Type runtimeType, CacheEntryOptions options, CancellationToken ct)
+        public ValueTask<CacheValue> Serialize(object value, Type runtimeType, CacheEntryOptions options, CancellationToken ct)
         {
             SerializeCalls++;
             return ValueTask.FromResult(CacheValue.FromString(value?.ToString() ?? string.Empty));
@@ -416,7 +416,7 @@ public sealed class CacheClientSpec
             return ValueTask.FromResult((T?)(object?)text);
         }
 
-        public ValueTask<object?> DeserializeAsync(CacheValue value, Type returnType, CancellationToken ct)
+        public ValueTask<object?> Deserialize(CacheValue value, Type returnType, CancellationToken ct)
         {
             return ValueTask.FromResult((object?)value.ToText());
         }
@@ -436,7 +436,7 @@ public sealed class CacheClientSpec
             return ValueTask.FromResult(CacheValue.FromString(payload));
         }
 
-        public ValueTask<CacheValue> SerializeAsync(object value, Type runtimeType, CacheEntryOptions options, CancellationToken ct)
+        public ValueTask<CacheValue> Serialize(object value, Type runtimeType, CacheEntryOptions options, CancellationToken ct)
         {
             SerializeCalls++;
             var payload = value is null ? string.Empty : Newtonsoft.Json.JsonConvert.SerializeObject(value);
@@ -451,7 +451,7 @@ public sealed class CacheClientSpec
                 : Newtonsoft.Json.JsonConvert.DeserializeObject<T>(payload));
         }
 
-        public ValueTask<object?> DeserializeAsync(CacheValue value, Type returnType, CancellationToken ct)
+        public ValueTask<object?> Deserialize(CacheValue value, Type returnType, CancellationToken ct)
         {
             var payload = value.ToText();
             return ValueTask.FromResult(string.IsNullOrWhiteSpace(payload)

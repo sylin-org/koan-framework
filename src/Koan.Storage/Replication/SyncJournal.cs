@@ -74,7 +74,7 @@ public sealed class SyncJournal
     /// <summary>
     /// Loads journal entries from a JSONL file into memory.
     /// </summary>
-    public async Task LoadAsync(string path, CancellationToken ct = default)
+    public async Task Load(string path, CancellationToken ct = default)
     {
         if (!File.Exists(path))
             return;
@@ -115,7 +115,7 @@ public sealed class SyncJournal
     public static void Truncate(string journalPath)
     {
         if (File.Exists(journalPath))
-            File.WriteAllText(journalPath, string.Empty);
+            File.WriteAllTextAsync(journalPath, string.Empty);
     }
 }
 

@@ -24,7 +24,7 @@ public sealed class OrganizationProfilesController : EntityController<Organizati
             return NotFound(new { message = $"OrganizationProfile with ID '{id}' not found." });
         }
 
-        await profile.ActivateAsync(ct);
+        await profile.Activate(ct);
 
         return Ok(new { message = $"OrganizationProfile '{profile.Name}' activated successfully.", active = true });
     }
@@ -35,7 +35,7 @@ public sealed class OrganizationProfilesController : EntityController<Organizati
     [HttpGet("active")]
     public async Task<IActionResult> GetActive(CancellationToken ct)
     {
-        var profile = await OrganizationProfile.GetActiveAsync(ct);
+        var profile = await OrganizationProfile.GetActive(ct);
         if (profile == null)
         {
             return NotFound(new { message = "No active OrganizationProfile found." });

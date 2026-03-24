@@ -53,7 +53,7 @@ public sealed class FactCategorizationMap : Entity<FactCategorizationMap>
     /// <summary>
     /// Get existing categorization map by catalog hash, or return null if not cached.
     /// </summary>
-    public static async Task<FactCategorizationMap?> GetByCatalogHashAsync(
+    public static async Task<FactCategorizationMap?> GetByCatalogHash(
         string catalogHash,
         CancellationToken ct = default)
     {
@@ -64,7 +64,7 @@ public sealed class FactCategorizationMap : Entity<FactCategorizationMap>
     /// <summary>
     /// Save this categorization map with the catalog hash.
     /// </summary>
-    public static async Task<FactCategorizationMap> SaveWithHashAsync(
+    public static async Task<FactCategorizationMap> SaveWithHash(
         string catalogHash,
         List<SemanticBatch> batches,
         CancellationToken ct = default)

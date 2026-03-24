@@ -113,7 +113,7 @@ public class SettingsController : ControllerBase
     {
         try
         {
-            var summary = await _tagSeedInitializer.EnsureSeededAsync(force: true, cancellationToken).ConfigureAwait(false);
+            var summary = await _tagSeedInitializer.EnsureSeeded(force: true, cancellationToken).ConfigureAwait(false);
             return Ok(summary);
         }
         catch (Exception ex)

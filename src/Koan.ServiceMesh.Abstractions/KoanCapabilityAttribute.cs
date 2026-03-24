@@ -8,7 +8,7 @@ namespace Koan.ServiceMesh.Abstractions;
 /// <example>
 /// <code>
 /// [KoanCapability("translate")]
-/// public Task&lt;TranslationResult&gt; TranslateTextAsync(...) { }
+/// public Task&lt;TranslationResult&gt; TranslateText(...) { }
 /// // Capability: "translate" (not "translate-text")
 /// </code>
 /// </example>

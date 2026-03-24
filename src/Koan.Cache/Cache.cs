@@ -40,7 +40,7 @@ public static class Cache
     public static ValueTask<bool> Exists(string key, CancellationToken ct = default)
     {
         var cacheKey = new CacheKey(key);
-        return Client.ExistsAsync(cacheKey, new CacheEntryOptions(), ct);
+        return Client.Exists(cacheKey, new CacheEntryOptions(), ct);
     }
 
     public static CacheTagSet Tags(params string[] tags)

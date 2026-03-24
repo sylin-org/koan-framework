@@ -61,5 +61,5 @@ public sealed class CacheScopeAccessorSpec
                 body();
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 }

@@ -6,6 +6,6 @@ namespace S12.MedTrials.Services;
 
 public interface IProtocolDocumentService
 {
-    Task<ProtocolDocumentIngestionResult> IngestAsync(ProtocolDocumentIngestionRequest request, CancellationToken ct);
-    Task<ProtocolDocumentQueryResult> QueryAsync(ProtocolDocumentQueryRequest request, CancellationToken ct);
+    Task<ProtocolDocumentIngestionResult> Ingest(ProtocolDocumentIngestionRequest request, CancellationToken ct);
+    Task<ProtocolDocumentQueryResult> Query(ProtocolDocumentQueryRequest request, CancellationToken ct);
 }

@@ -40,7 +40,7 @@ public sealed class VectorSyncWorker : BackgroundService
         {
             try
             {
-                await ProcessPendingSnapshotsAsync(stoppingToken);
+                await ProcessPendingSnapshots(stoppingToken);
             }
             catch (Exception ex)
             {
@@ -60,7 +60,7 @@ public sealed class VectorSyncWorker : BackgroundService
         _logger.LogInformation("VectorSyncWorker stopped");
     }
 
-    private async Task ProcessPendingSnapshotsAsync(CancellationToken cancellationToken)
+    private async Task ProcessPendingSnapshots(CancellationToken cancellationToken)
     {
         if (_deletedJobIds.Count > 1024)
         {
@@ -95,7 +95,7 @@ public sealed class VectorSyncWorker : BackgroundService
             cancellationToken.ThrowIfCancellationRequested();
             var previousState = snapshot.State;
 
-            await ProcessSnapshotAsync(snapshot, cancellationToken);
+            await ProcessSnapshot(snapshot, cancellationToken);
 
             if (snapshot.State == VectorSyncState.Synced && previousState != VectorSyncState.Synced)
             {
@@ -118,7 +118,7 @@ public sealed class VectorSyncWorker : BackgroundService
         }
     }
 
-    private async Task ProcessSnapshotAsync(ChunkVectorState snapshot, CancellationToken cancellationToken)
+    private async Task ProcessSnapshot(ChunkVectorState snapshot, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(snapshot.JobId))
         {
@@ -160,7 +160,7 @@ public sealed class VectorSyncWorker : BackgroundService
             snapshot.MarkSynced();
             await snapshot.Save(cancellationToken);
 
-            await UpdateJobProgressAsync(snapshot.JobId, cancellationToken);
+            await UpdateJobProgress(snapshot.JobId, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -185,11 +185,11 @@ public sealed class VectorSyncWorker : BackgroundService
                     snapshot.ChunkId);
             }
 
-            await UpdateJobProgressAsync(snapshot.JobId, cancellationToken);
+            await UpdateJobProgress(snapshot.JobId, cancellationToken);
         }
     }
 
-    private async Task UpdateJobProgressAsync(string jobId, CancellationToken cancellationToken)
+    private async Task UpdateJobProgress(string jobId, CancellationToken cancellationToken)
     {
         if (_deletedJobIds.Contains(jobId))
         {

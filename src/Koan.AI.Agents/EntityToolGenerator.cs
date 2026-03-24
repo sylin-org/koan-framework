@@ -64,7 +64,7 @@ internal static class EntityToolGenerator
             Description: $"Semantic vector search over {entityType.Name} entities. " +
                          $"Returns the most relevant results based on meaning similarity.",
             ParametersSchema: JsonSerializer.Serialize(schema, JsonOptions),
-            Execute: async (args, ct) => await ExecuteSearchAsync(entityType, args, ct));
+            Execute: async (args, ct) => await ExecuteSearch(entityType, args, ct));
     }
 
     // ── Tool builders ──
@@ -85,7 +85,7 @@ internal static class EntityToolGenerator
             Name: $"{typeName}_get",
             Description: $"Retrieve a single {entityType.Name} entity by its ID.",
             ParametersSchema: JsonSerializer.Serialize(schema, JsonOptions),
-            Execute: async (args, ct) => await ExecuteGetAsync(entityType, args, ct));
+            Execute: async (args, ct) => await ExecuteGet(entityType, args, ct));
     }
 
     private static GeneratedTool BuildQueryTool(Type entityType, string typeName)
@@ -103,7 +103,7 @@ internal static class EntityToolGenerator
             Name: $"{typeName}_query",
             Description: $"Query {entityType.Name} entities. Returns up to 'limit' results.",
             ParametersSchema: JsonSerializer.Serialize(schema, JsonOptions),
-            Execute: async (args, ct) => await ExecuteQueryAsync(entityType, args, ct));
+            Execute: async (args, ct) => await ExecuteQuery(entityType, args, ct));
     }
 
     private static GeneratedTool BuildSaveTool(Type entityType, string typeName)
@@ -121,7 +121,7 @@ internal static class EntityToolGenerator
             Name: $"{typeName}_save",
             Description: $"Create or update a {entityType.Name} entity. Provide the entity data as a JSON object.",
             ParametersSchema: JsonSerializer.Serialize(schema, JsonOptions),
-            Execute: async (args, ct) => await ExecuteSaveAsync(entityType, args, ct));
+            Execute: async (args, ct) => await ExecuteSave(entityType, args, ct));
     }
 
     private static GeneratedTool BuildDeleteTool(Type entityType, string typeName)
@@ -140,7 +140,7 @@ internal static class EntityToolGenerator
             Name: $"{typeName}_delete",
             Description: $"Delete a {entityType.Name} entity by its ID.",
             ParametersSchema: JsonSerializer.Serialize(schema, JsonOptions),
-            Execute: async (args, ct) => await ExecuteDeleteAsync(entityType, args, ct));
+            Execute: async (args, ct) => await ExecuteDelete(entityType, args, ct));
     }
 
     // ── Property schema generation ──
@@ -190,7 +190,7 @@ internal static class EntityToolGenerator
 
     // ── Tool execution ──
 
-    private static async Task<string> ExecuteGetAsync(
+    private static async Task<string> ExecuteGet(
         Type entityType, Dictionary<string, object?> args, CancellationToken ct)
     {
         if (!args.TryGetValue("id", out var idObj) || idObj is null)
@@ -226,7 +226,7 @@ internal static class EntityToolGenerator
         }
     }
 
-    private static async Task<string> ExecuteQueryAsync(
+    private static async Task<string> ExecuteQuery(
         Type entityType, Dictionary<string, object?> args, CancellationToken ct)
     {
         var limit = 10;
@@ -279,7 +279,7 @@ internal static class EntityToolGenerator
         }
     }
 
-    private static async Task<string> ExecuteSaveAsync(
+    private static async Task<string> ExecuteSave(
         Type entityType, Dictionary<string, object?> args, CancellationToken ct)
     {
         if (!args.TryGetValue("data", out var dataObj) || dataObj is null)
@@ -293,7 +293,7 @@ internal static class EntityToolGenerator
             if (entity is null)
                 return JsonSerializer.Serialize(new { error = $"Failed to deserialize data as {entityType.Name}" });
 
-            // Call Entity<T>.UpsertAsync(entity, ct)
+            // Call Entity<T>.Upsert(entity, ct)
             var upsertMethod = FindStaticMethod(entityType, "UpsertAsync", entityType, typeof(CancellationToken));
             if (upsertMethod is not null)
             {
@@ -309,7 +309,7 @@ internal static class EntityToolGenerator
         }
     }
 
-    private static async Task<string> ExecuteDeleteAsync(
+    private static async Task<string> ExecuteDelete(
         Type entityType, Dictionary<string, object?> args, CancellationToken ct)
     {
         if (!args.TryGetValue("id", out var idObj) || idObj is null)
@@ -344,7 +344,7 @@ internal static class EntityToolGenerator
         }
     }
 
-    private static async Task<string> ExecuteSearchAsync(
+    private static async Task<string> ExecuteSearch(
         Type entityType, Dictionary<string, object?> args, CancellationToken ct)
     {
         if (!args.TryGetValue("text", out var textObj) || textObj is null)

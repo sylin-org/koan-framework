@@ -31,7 +31,7 @@ public class SourcePullWorker : BackgroundService
         {
             try
             {
-                await PullDueSourcesAsync(stoppingToken);
+                await PullDueSources(stoppingToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -44,7 +44,7 @@ public class SourcePullWorker : BackgroundService
         _logger.LogInformation("SourcePullWorker stopped");
     }
 
-    private async Task PullDueSourcesAsync(CancellationToken ct)
+    private async Task PullDueSources(CancellationToken ct)
     {
         var sources = await Source.Query(s => s.Enabled, ct);
 
@@ -68,7 +68,7 @@ public class SourcePullWorker : BackgroundService
 
             try
             {
-                var notes = await adapter.PullAsync(source, ct);
+                var notes = await adapter.Pull(source, ct);
 
                 source.LastPulledAt = DateTime.UtcNow;
                 source.TotalItemsPulled += notes.Count;

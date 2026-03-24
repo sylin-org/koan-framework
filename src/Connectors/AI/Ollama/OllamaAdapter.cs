@@ -68,9 +68,9 @@ internal sealed class OllamaAdapter : IChatAdapter, IEmbedAdapter
 
     public bool CanServe(AiChatRequest request) => true;
 
-    public async Task<AiChatResponse> ChatAsync(AiChatRequest request, CancellationToken ct = default)
+    public async Task<AiChatResponse> Chat(AiChatRequest request, CancellationToken ct = default)
     {
-        using var lease = await AcquireConcurrencySlotAsync(ct).ConfigureAwait(false);
+        using var lease = await AcquireConcurrencySlot(ct).ConfigureAwait(false);
 
         var http = GetHttpClientForRequest(request.InternalConnectionString);
         var model = request.Model ?? _defaultModel;
@@ -125,11 +125,11 @@ internal sealed class OllamaAdapter : IChatAdapter, IEmbedAdapter
         };
     }
 
-    public async IAsyncEnumerable<AiChatChunk> StreamAsync(
+    public async IAsyncEnumerable<AiChatChunk> Stream(
         AiChatRequest request,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
-        using var lease = await AcquireConcurrencySlotAsync(ct).ConfigureAwait(false);
+        using var lease = await AcquireConcurrencySlot(ct).ConfigureAwait(false);
 
         var http = GetHttpClientForRequest(request.InternalConnectionString);
         var model = request.Model ?? _defaultModel;
@@ -182,9 +182,9 @@ internal sealed class OllamaAdapter : IChatAdapter, IEmbedAdapter
         }
     }
 
-    public async Task<AiEmbeddingsResponse> EmbedAsync(AiEmbeddingsRequest request, CancellationToken ct = default)
+    public async Task<AiEmbeddingsResponse> Embed(AiEmbeddingsRequest request, CancellationToken ct = default)
     {
-        using var lease = await AcquireConcurrencySlotAsync(ct).ConfigureAwait(false);
+        using var lease = await AcquireConcurrencySlot(ct).ConfigureAwait(false);
 
         var http = GetHttpClientForRequest(request.InternalConnectionString);
         var model = request.Model ?? _defaultModel;
@@ -218,11 +218,11 @@ internal sealed class OllamaAdapter : IChatAdapter, IEmbedAdapter
         return new AiEmbeddingsResponse { Vectors = vectors, Model = model, Dimension = dimension };
     }
 
-    public async Task<IReadOnlyList<AiModelDescriptor>> ListModelsAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<AiModelDescriptor>> ListModels(CancellationToken ct = default)
     {
-        using var lease = await AcquireConcurrencySlotAsync(ct).ConfigureAwait(false);
+        using var lease = await AcquireConcurrencySlot(ct).ConfigureAwait(false);
 
-        var doc = await FetchTagsAsync(ct).ConfigureAwait(false);
+        var doc = await FetchTags(ct).ConfigureAwait(false);
         var models = new List<AiModelDescriptor>();
 
         foreach (var model in doc?.models ?? Enumerable.Empty<OllamaTag>())
@@ -239,7 +239,7 @@ internal sealed class OllamaAdapter : IChatAdapter, IEmbedAdapter
         return models;
     }
 
-    private async Task<OllamaTagsResponse?> FetchTagsAsync(CancellationToken ct)
+    private async Task<OllamaTagsResponse?> FetchTags(CancellationToken ct)
     {
         using var resp = await _http.GetAsync("/api/tags", ct).ConfigureAwait(false);
         if (!resp.IsSuccessStatusCode)
@@ -263,7 +263,7 @@ internal sealed class OllamaAdapter : IChatAdapter, IEmbedAdapter
         return _http;
     }
 
-    private async Task<SemaphoreReleaser?> AcquireConcurrencySlotAsync(CancellationToken ct)
+    private async Task<SemaphoreReleaser?> AcquireConcurrencySlot(CancellationToken ct)
     {
         if (_concurrencyLimiter is null)
         {

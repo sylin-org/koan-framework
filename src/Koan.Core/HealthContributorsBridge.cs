@@ -51,11 +51,11 @@ internal sealed class HealthContributorsBridge : IHostedService
         }
     }
 
-    private async Task RunContributorAsync(IHealthContributor c, CancellationToken ct)
+    private async Task RunContributor(IHealthContributor c, CancellationToken ct)
     {
         try
         {
-            var report = await c.CheckAsync(ct);
+            var report = await c.Check(ct);
             var status = report.State switch
             {
                 HealthState.Healthy => HealthStatus.Healthy,
@@ -90,7 +90,7 @@ internal sealed class HealthContributorsBridge : IHostedService
     {
         try
         {
-            var report = c.CheckAsync(ct).GetAwaiter().GetResult();
+            var report = c.Check(ct).GetAwaiter().GetResult();
             var status = report.State switch
             {
                 HealthState.Healthy => HealthStatus.Healthy,

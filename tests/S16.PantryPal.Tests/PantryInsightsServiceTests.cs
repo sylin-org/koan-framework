@@ -19,7 +19,7 @@ public class PantryInsightsServiceTests
     await oldBread.Save();
 
         var svc = new PantryInsightsService();
-        var stats = await svc.GetStatsAsync();
+        var stats = await svc.GetStats();
 
         stats.TotalItems.Should().BeGreaterOrEqualTo(3);
         stats.Expired.Should().BeGreaterOrEqualTo(1);

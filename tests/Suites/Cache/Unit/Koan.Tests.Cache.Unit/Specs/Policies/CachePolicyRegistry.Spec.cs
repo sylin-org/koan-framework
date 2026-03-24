@@ -26,7 +26,7 @@ public sealed class CachePolicyRegistrySpec
             registry.TryGetPolicy(typeof(PolicyTarget), out var typeDescriptor).Should().BeTrue();
             typeDescriptor!.Tags.Should().BeEquivalentTo("alpha", "tenant:42");
 
-            var method = typeof(PolicyTarget).GetMethod(nameof(PolicyTarget.LoadAsync))!;
+            var method = typeof(PolicyTarget).GetMethod(nameof(PolicyTarget.Load))!;
             registry.TryGetPolicy(method, out var memberDescriptor).Should().BeTrue();
             memberDescriptor!.KeyTemplate.Should().Be("policy:method:{arg}");
 
@@ -50,7 +50,7 @@ public sealed class CachePolicyRegistrySpec
                 body();
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 
 }
 
@@ -58,7 +58,7 @@ public sealed class CachePolicyRegistrySpec
 public sealed class PolicyTarget
 {
     [CachePolicy(CacheScope.EntityQuery, "policy:method:{arg}")]
-    public void LoadAsync()
+    public void Load()
     {
     }
 }

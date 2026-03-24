@@ -27,7 +27,7 @@ internal sealed class OllamaModelManager : IAiModelManager
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task<AiModelOperationResult> EnsureInstalledAsync(AiModelOperationRequest request, CancellationToken ct = default)
+    public async Task<AiModelOperationResult> EnsureInstalled(AiModelOperationRequest request, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(request.Model))
         {
@@ -56,13 +56,13 @@ internal sealed class OllamaModelManager : IAiModelManager
         return AiModelOperationResult.Succeeded(descriptor, performed: true, "Model pulled successfully.");
     }
 
-    public async Task<AiModelOperationResult> RefreshAsync(AiModelOperationRequest request, CancellationToken ct = default)
+    public async Task<AiModelOperationResult> Refresh(AiModelOperationRequest request, CancellationToken ct = default)
     {
         // Ollama re-pull is the same endpoint — it will re-download if needed
-        return await EnsureInstalledAsync(request, ct).ConfigureAwait(false);
+        return await EnsureInstalled(request, ct).ConfigureAwait(false);
     }
 
-    public async Task<AiModelOperationResult> FlushAsync(AiModelOperationRequest request, CancellationToken ct = default)
+    public async Task<AiModelOperationResult> Flush(AiModelOperationRequest request, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(request.Model))
         {
@@ -96,7 +96,7 @@ internal sealed class OllamaModelManager : IAiModelManager
         return AiModelOperationResult.Succeeded(descriptor, performed: true, "Model deleted successfully.");
     }
 
-    public async Task<IReadOnlyList<AiModelDescriptor>> ListManagedModelsAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<AiModelDescriptor>> ListManagedModels(CancellationToken ct = default)
     {
         using var resp = await _http.GetAsync("/api/tags", ct).ConfigureAwait(false);
 

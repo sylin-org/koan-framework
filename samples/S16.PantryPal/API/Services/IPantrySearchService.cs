@@ -11,5 +11,5 @@ public interface IPantrySearchService
     /// <param name="topK">Maximum results requested (default 25, max 200).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Results plus a flag indicating whether the search was degraded (fallback path).</returns>
-    Task<(IReadOnlyList<PantryItem> items, bool degraded)> SearchAsync(string? query, int? topK, CancellationToken ct);
+    Task<(IReadOnlyList<PantryItem> items, bool degraded)> Search(string? query, int? topK, CancellationToken ct);
 }

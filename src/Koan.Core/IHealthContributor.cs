@@ -6,5 +6,5 @@ public interface IHealthContributor
 {
     string Name { get; }
     bool IsCritical { get; }
-    Task<HealthReport> CheckAsync(CancellationToken ct = default);
+    Task<HealthReport> Check(CancellationToken ct = default);
 }

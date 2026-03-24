@@ -7,37 +7,37 @@ public interface IBackupDiscoveryService
     /// <summary>
     /// Discovers all available backups across all storage profiles
     /// </summary>
-    Task<BackupCatalog> DiscoverAllBackupsAsync(DiscoveryOptions? options = null, CancellationToken ct = default);
+    Task<BackupCatalog> DiscoverAllBackups(DiscoveryOptions? options = null, CancellationToken ct = default);
 
     /// <summary>
     /// Discovers backups in a specific storage profile
     /// </summary>
-    Task<BackupCatalog> DiscoverByStorageProfileAsync(string storageProfile, CancellationToken ct = default);
+    Task<BackupCatalog> DiscoverByStorageProfile(string storageProfile, CancellationToken ct = default);
 
     /// <summary>
     /// Queries backups using filter criteria
     /// </summary>
-    Task<BackupCatalog> QueryBackupsAsync(BackupQuery query, CancellationToken ct = default);
+    Task<BackupCatalog> QueryBackups(BackupQuery query, CancellationToken ct = default);
 
     /// <summary>
     /// Gets a specific backup by ID
     /// </summary>
-    Task<BackupInfo?> GetBackupAsync(string backupId, CancellationToken ct = default);
+    Task<BackupInfo?> GetBackup(string backupId, CancellationToken ct = default);
 
     /// <summary>
     /// Validates a backup's integrity
     /// </summary>
-    Task<BackupValidationResult> ValidateBackupAsync(string backupId, CancellationToken ct = default);
+    Task<BackupValidationResult> ValidateBackup(string backupId, CancellationToken ct = default);
 
     /// <summary>
     /// Refreshes the backup catalog cache
     /// </summary>
-    Task RefreshCatalogAsync(CancellationToken ct = default);
+    Task RefreshCatalog(CancellationToken ct = default);
 
     /// <summary>
     /// Gets catalog statistics
     /// </summary>
-    Task<BackupCatalogStats> GetCatalogStatsAsync(CancellationToken ct = default);
+    Task<BackupCatalogStats> GetCatalogStats(CancellationToken ct = default);
 }
 
 public class BackupCatalog

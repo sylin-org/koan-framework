@@ -34,7 +34,7 @@ internal sealed class RoleBootstrapHostedService(
                     if (opt.PolicyBindings.Count > 0)
                         await bindings.UpsertMany(opt.PolicyBindings.Select(p => new SeedBindingDto(p.Id, p.Requirement)), cancellationToken);
 
-                    await snapshot.ReloadAsync(cancellationToken);
+                    await snapshot.Reload(cancellationToken);
                     logger.LogInformation("Koan.Web.Auth.Roles: initial seed applied from configuration template.");
                 }
                 else

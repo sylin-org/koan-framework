@@ -10,7 +10,7 @@ public sealed class WeaviateHealthContributor(IHttpClientFactory httpFactory, IO
     public string Name => "data:weaviate";
     public bool IsCritical => true;
 
-    public async Task<HealthReport> CheckAsync(CancellationToken ct = default)
+    public async Task<HealthReport> Check(CancellationToken ct = default)
     {
         try
         {

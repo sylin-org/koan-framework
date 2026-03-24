@@ -7,5 +7,5 @@ public interface IRoleMapContributor
     /// <summary>
     /// Contribute roles and permissions inferred from the given principal. Implementations should be resilient and never throw.
     /// </summary>
-    Task ContributeAsync(ClaimsPrincipal principal, ISet<string> roles, ISet<string> permissions, RoleAttributionContext? ctx, CancellationToken ct);
+    Task Contribute(ClaimsPrincipal principal, ISet<string> roles, ISet<string> permissions, RoleAttributionContext? ctx, CancellationToken ct);
 }

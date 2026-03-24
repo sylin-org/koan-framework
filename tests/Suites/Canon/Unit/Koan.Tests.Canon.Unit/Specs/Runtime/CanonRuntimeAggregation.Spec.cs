@@ -52,7 +52,7 @@ public sealed class CanonRuntimeAggregationSpec
 
                 assertion.Which.Message.Should().Contain("requires at least one aggregation key value");
             })
-            .RunAsync();
+            .Run();
 
     [Fact]
     public Task Aggregation_merges_existing_identities_and_records_lineage()
@@ -154,7 +154,7 @@ public sealed class CanonRuntimeAggregationSpec
 
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 
     [Fact]
     public Task Source_of_truth_policies_preserve_existing_when_incoming_not_authoritative()
@@ -234,7 +234,7 @@ public sealed class CanonRuntimeAggregationSpec
 
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 
     [Fact]
     public Task Source_of_truth_policies_accept_authoritative_incoming_sources()
@@ -320,7 +320,7 @@ public sealed class CanonRuntimeAggregationSpec
 
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 
     private sealed class StubCanonPersistence : ICanonPersistence
     {
@@ -355,12 +355,12 @@ public sealed class CanonRuntimeAggregationSpec
             return Task.FromResult(stage);
         }
 
-        public Task<CanonIndex?> GetIndexAsync(string entityType, string key, CancellationToken cancellationToken)
+        public Task<CanonIndex?> GetIndex(string entityType, string key, CancellationToken cancellationToken)
         {
             return Task.FromResult(_lookup(entityType, key));
         }
 
-        public Task UpsertIndexAsync(CanonIndex index, CancellationToken cancellationToken)
+        public Task UpsertIndex(CanonIndex index, CancellationToken cancellationToken)
         {
             _upserts.Add(index);
             return Task.CompletedTask;

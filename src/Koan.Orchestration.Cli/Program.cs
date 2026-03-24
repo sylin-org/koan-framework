@@ -1,4 +1,4 @@
 using Koan.Orchestration.Cli;
 
-return await CliApplication.RunAsync(args);
+return await CliApplication.Run(args);
 

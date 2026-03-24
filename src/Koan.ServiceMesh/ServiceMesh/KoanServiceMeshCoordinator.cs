@@ -44,20 +44,20 @@ internal class KoanServiceMeshCoordinator : BackgroundService
         {
             // Initial discovery broadcast
             _logger.LogInformation("Koan:services:coordinator broadcasting discovery request");
-            await _serviceMesh.DiscoverAsync(stoppingToken);
+            await _serviceMesh.Discover(stoppingToken);
 
             // Wait briefly for responses
             await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
 
             // Initial announcement
             _logger.LogInformation("Koan:services:coordinator announcing services");
-            await _serviceMesh.AnnounceAsync(stoppingToken);
+            await _serviceMesh.Announce(stoppingToken);
 
             // Start maintenance task (listens for announcements, cleans stale instances)
-            var maintenanceTask = _serviceMesh.MaintainAsync(stoppingToken);
+            var maintenanceTask = _serviceMesh.Maintain(stoppingToken);
 
             // Start heartbeat task (periodic announcements)
-            var heartbeatTask = HeartbeatLoopAsync(descriptor.HeartbeatInterval, stoppingToken);
+            var heartbeatTask = HeartbeatLoop(descriptor.HeartbeatInterval, stoppingToken);
 
             // Wait for cancellation
             await Task.WhenAll(maintenanceTask, heartbeatTask);
@@ -73,7 +73,7 @@ internal class KoanServiceMeshCoordinator : BackgroundService
         }
     }
 
-    private async Task HeartbeatLoopAsync(TimeSpan heartbeatInterval, CancellationToken stoppingToken)
+    private async Task HeartbeatLoop(TimeSpan heartbeatInterval, CancellationToken stoppingToken)
     {
         _logger.LogInformation(
             "Koan:services:coordinator heartbeat started (interval: {Seconds}s)",
@@ -86,7 +86,7 @@ internal class KoanServiceMeshCoordinator : BackgroundService
                 await Task.Delay(heartbeatInterval, stoppingToken);
 
                 _logger.LogDebug("Koan:services:coordinator sending heartbeat");
-                await _serviceMesh.AnnounceAsync(stoppingToken);
+                await _serviceMesh.Announce(stoppingToken);
             }
             catch (OperationCanceledException)
             {

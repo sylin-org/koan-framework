@@ -27,7 +27,7 @@ internal sealed class AiHealthSubscriber : IHostedService
     public Task StartAsync(CancellationToken cancellationToken)
     {
         // Targeted subscription for component "ai"
-        _sub = _agg.Subscribe("ai", e => { _ = PushAsync(); });
+        _sub = _agg.Subscribe("ai", e => { _ = Push(); });
         // Optionally also respond to broadcasts by pushing
         _handler ??= OnProbeRequested;
         _agg.ProbeRequested += _handler;
@@ -42,7 +42,7 @@ internal sealed class AiHealthSubscriber : IHostedService
         return Task.CompletedTask;
     }
 
-    private Task PushAsync()
+    private Task Push()
     {
         try
         {
@@ -71,6 +71,6 @@ internal sealed class AiHealthSubscriber : IHostedService
     private EventHandler<ProbeRequestedEventArgs>? _handler;
     private void OnProbeRequested(object? sender, ProbeRequestedEventArgs e)
     {
-        if (e.Component is null) _ = PushAsync();
+        if (e.Component is null) _ = Push();
     }
 }

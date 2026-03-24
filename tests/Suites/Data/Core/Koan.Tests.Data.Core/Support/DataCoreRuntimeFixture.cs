@@ -36,7 +36,7 @@ internal sealed class DataCoreRuntimeFixture : IAsyncDisposable
 
     public FakeVectorService VectorService => _vectorService;
 
-    public static ValueTask<DataCoreRuntimeFixture> CreateAsync(TestContext ctx, bool includeSqlite = false)
+    public static ValueTask<DataCoreRuntimeFixture> Create(TestContext ctx, bool includeSqlite = false)
     {
         if (ctx is null)
         {

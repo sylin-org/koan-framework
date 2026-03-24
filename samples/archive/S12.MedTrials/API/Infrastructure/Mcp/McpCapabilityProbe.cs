@@ -36,7 +36,7 @@ internal sealed class McpCapabilityProbe : BackgroundService
                 continue;
             }
 
-            await ProbeAsync(options, stoppingToken);
+            await Probe(options, stoppingToken);
 
             var delay = options.GetProbeInterval();
             try
@@ -50,7 +50,7 @@ internal sealed class McpCapabilityProbe : BackgroundService
         }
     }
 
-    private async Task ProbeAsync(McpBridgeOptions options, CancellationToken ct)
+    private async Task Probe(McpBridgeOptions options, CancellationToken ct)
     {
         var baseUri = options.TryGetBaseUri();
         if (baseUri is null)
@@ -63,7 +63,7 @@ internal sealed class McpCapabilityProbe : BackgroundService
         {
             var client = _httpClientFactory.CreateClient(McpHttpClientNames.McpBridge);
             var requestUri = new Uri(baseUri, "capabilities");
-            using var response = await client.GetAsync(requestUri, ct);
+            using var response = await client.Get(requestUri, ct);
             response.EnsureSuccessStatusCode();
 
             if (!options.LogCapabilities)

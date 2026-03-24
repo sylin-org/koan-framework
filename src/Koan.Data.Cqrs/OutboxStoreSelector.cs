@@ -28,7 +28,7 @@ internal sealed class OutboxStoreSelector : IOutboxStore
         _inner = ranked.First().Factory.Create(sp);
     }
 
-    public Task AppendAsync(OutboxEntry entry, CancellationToken ct = default) => _inner.AppendAsync(entry, ct);
-    public Task<IReadOnlyList<OutboxEntry>> DequeueAsync(int max = 100, CancellationToken ct = default) => _inner.DequeueAsync(max, ct);
-    public Task MarkProcessedAsync(string id, CancellationToken ct = default) => _inner.MarkProcessedAsync(id, ct);
+    public Task Append(OutboxEntry entry, CancellationToken ct = default) => _inner.Append(entry, ct);
+    public Task<IReadOnlyList<OutboxEntry>> Dequeue(int max = 100, CancellationToken ct = default) => _inner.Dequeue(max, ct);
+    public Task MarkProcessed(string id, CancellationToken ct = default) => _inner.MarkProcessed(id, ct);
 }

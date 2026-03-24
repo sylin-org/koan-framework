@@ -72,7 +72,7 @@ public static class TestImageHelper
         var originalPosition = stream.Position;
         stream.Position = 0;
 
-        var info = await Image.IdentifyAsync(stream);
+        var info = await Image.Identify(stream);
         stream.Position = originalPosition;
 
         return (info.Width, info.Height);

@@ -9,7 +9,7 @@ namespace Koan.Web.Auth.Roles.Contributors;
 /// </summary>
 public sealed class DefaultCapabilityContributor : IRoleMapContributor
 {
-    public Task ContributeAsync(ClaimsPrincipal principal, ISet<string> roles, ISet<string> permissions, RoleAttributionContext? ctx, CancellationToken ct)
+    public Task Contribute(ClaimsPrincipal principal, ISet<string> roles, ISet<string> permissions, RoleAttributionContext? ctx, CancellationToken ct)
     {
         // No-op in V1: we rely on raw claim extraction and policy-to-role binding.
         return Task.CompletedTask;

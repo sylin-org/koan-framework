@@ -42,7 +42,7 @@ public class Embedding
             .Handle<HttpRequestException>()
             .Or<TaskCanceledException>()
             .Or<TimeoutException>()
-            .WaitAndRetryAsync(
+            .WaitAndRetry(
                 retryCount: 3,
                 sleepDurationProvider: retryAttempt =>
                     TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)) +
@@ -57,7 +57,7 @@ public class Embedding
                 });
     }
 
-    public async Task<float[]> EmbedAsync(string text, CancellationToken cancellationToken = default)
+    public async Task<float[]> Embed(string text, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(text))
         {
@@ -78,7 +78,7 @@ public class Embedding
         // Generate embedding with retry
         try
         {
-            var embedding = await _retryPolicy.ExecuteAsync(async () =>
+            var embedding = await _retryPolicy.Execute(async () =>
             {
                 var request = new AiEmbeddingsRequest
                 {
@@ -86,7 +86,7 @@ public class Embedding
                 };
                 request.Input.Add(text);
 
-                var response = await _ai.EmbedAsync(request, cancellationToken);
+                var response = await _ai.Embed(request, cancellationToken);
 
                 if (response.Vectors.Count == 0)
                 {
@@ -117,7 +117,7 @@ public class Embedding
         }
     }
 
-    public async Task<Dictionary<string, float[]>> EmbedBatchAsync(
+    public async Task<Dictionary<string, float[]>> EmbedBatch(
         IEnumerable<string> texts,
         CancellationToken cancellationToken = default)
     {
@@ -169,7 +169,7 @@ public class Embedding
         {
             try
             {
-                var embeddings = await _retryPolicy.ExecuteAsync(async () =>
+                var embeddings = await _retryPolicy.Execute(async () =>
                 {
                     var request = new AiEmbeddingsRequest
                     {
@@ -177,7 +177,7 @@ public class Embedding
                     };
                     request.Input.AddRange(uncachedTexts);
 
-                    var response = await _ai.EmbedAsync(request, cancellationToken);
+                    var response = await _ai.Embed(request, cancellationToken);
 
                     if (response.Vectors.Count != uncachedTexts.Count)
                     {

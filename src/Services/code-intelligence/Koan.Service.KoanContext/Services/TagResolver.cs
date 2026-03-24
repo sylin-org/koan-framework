@@ -24,10 +24,10 @@ public class TagResolver
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task<TagResolutionResult> ResolveAsync(TagResolverInput input, CancellationToken cancellationToken = default)
+    public async Task<TagResolutionResult> Resolve(TagResolverInput input, CancellationToken cancellationToken = default)
     {
-        var snapshot = await GetPipelineSnapshotAsync(input.PipelineName, cancellationToken);
-        var vocabulary = await GetVocabularySnapshotAsync(cancellationToken);
+        var snapshot = await GetPipelineSnapshot(input.PipelineName, cancellationToken);
+        var vocabulary = await GetVocabularySnapshot(cancellationToken);
 
         var emitted = new Dictionary<string, ResolvedTag>(StringComparer.Ordinal);
         var audit = new List<TagAuditEntry>();
@@ -206,7 +206,7 @@ public class TagResolver
         return string.Equals(pattern, language, StringComparison.OrdinalIgnoreCase);
     }
 
-    private async Task<TagPipelineSnapshot> GetPipelineSnapshotAsync(string? pipelineName, CancellationToken cancellationToken)
+    private async Task<TagPipelineSnapshot> GetPipelineSnapshot(string? pipelineName, CancellationToken cancellationToken)
     {
         using var partitionScope = EntityContext.With(partition: null);
         var targetPipelineName = string.IsNullOrWhiteSpace(pipelineName)
@@ -214,7 +214,7 @@ public class TagResolver
             : pipelineName.Trim().ToLowerInvariant();
         var cacheKey = Constants.CacheKeys.TagPipeline(targetPipelineName);
 
-        return await _cache.GetOrCreateAsync(cacheKey, async entry =>
+        return await _cache.GetOrCreate(cacheKey, async entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10);
             var pipelineQuery = await TagPipeline.Query(p => p.Name == targetPipelineName, cancellationToken);
@@ -239,12 +239,12 @@ public class TagResolver
         }) ?? new TagPipelineSnapshot(new TagPipeline { Name = targetPipelineName, RuleIds = new List<string>() }, Array.Empty<TagRule>());
     }
 
-    private async Task<TagVocabularySnapshot> GetVocabularySnapshotAsync(CancellationToken cancellationToken)
+    private async Task<TagVocabularySnapshot> GetVocabularySnapshot(CancellationToken cancellationToken)
     {
         using var partitionScope = EntityContext.With(partition: null);
         const string cacheKey = Constants.CacheKeys.TagVocabulary;
 
-        return await _cache.GetOrCreateAsync(cacheKey, async entry =>
+        return await _cache.GetOrCreate(cacheKey, async entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30);
 

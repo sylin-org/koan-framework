@@ -7,10 +7,10 @@ public class QuotaStrictSpec : IClassFixture<StrictQuotaTestPipelineFixture>
     private readonly StrictQuotaTestPipelineFixture _fx;
     public QuotaStrictSpec(StrictQuotaTestPipelineFixture fx) => _fx = fx;
 
-    private async Task<JToken> CallAsync(string name, object args)
+    private async Task<JToken> Call(string name, object args)
     {
         var json = JObject.FromObject(args);
-        var resultObj = await _fx.InvokeRpcAsync("tools/call", Guid.NewGuid().ToString("n"), name, json);
+        var resultObj = await _fx.InvokeRpc("tools/call", Guid.NewGuid().ToString("n"), name, json);
         return JToken.FromObject(resultObj!);
     }
 
@@ -18,7 +18,7 @@ public class QuotaStrictSpec : IClassFixture<StrictQuotaTestPipelineFixture>
     public async Task Quota_ShouldEnforceDeterministically()
     {
         var code = "function run() { SDK.Entities.Todo.upsert({ title: 'a'}); SDK.Entities.Todo.upsert({ title: 'b'}); SDK.Entities.Todo.upsert({ title: 'c'}); SDK.Out.answer('done'); }";
-    var result = await CallAsync("koan.code.execute", new { code, correlationId = "strict-maxsdk" });
+    var result = await Call("koan.code.execute", new { code, correlationId = "strict-maxsdk" });
     result["ErrorCode"]!.Value<string>().Should().Be("sdk_calls_exceeded");
     }
 
@@ -26,7 +26,7 @@ public class QuotaStrictSpec : IClassFixture<StrictQuotaTestPipelineFixture>
     public async Task RequireAnswer_ShouldAlwaysEnforce()
     {
         var code = "function run() { SDK.Entities.Todo.upsert({ title: 'x'}); }"; // no answer
-    var result = await CallAsync("koan.code.execute", new { code, correlationId = "strict-miss-answer" });
+    var result = await Call("koan.code.execute", new { code, correlationId = "strict-miss-answer" });
     result["ErrorCode"]!.Value<string>().Should().Be("missing_answer");
     }
 
@@ -34,7 +34,7 @@ public class QuotaStrictSpec : IClassFixture<StrictQuotaTestPipelineFixture>
     public async Task Success_ShouldReturnDiagnostics()
     {
         var code = "function run() { SDK.Entities.Todo.upsert({ title: 'ok'}); SDK.Out.answer('yes'); }"; // 1 call <= quota
-    var result = await CallAsync("koan.code.execute", new { code, correlationId = "strict-success" });
+    var result = await Call("koan.code.execute", new { code, correlationId = "strict-success" });
     result["text"]!.Value<string>().Should().Be("yes");
     }
 }

@@ -22,7 +22,7 @@ var app = builder.Build();
 
 app.UseCors();
 
-app.Run();
+app.RunAsync();
 
 namespace S12.MedTrials.McpService
 {

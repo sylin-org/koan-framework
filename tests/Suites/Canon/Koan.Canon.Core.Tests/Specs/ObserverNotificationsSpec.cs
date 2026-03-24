@@ -19,7 +19,7 @@ public class ObserverNotificationsSpec : IClassFixture<CanonCoreTestPipelineFixt
     var entity = _fixture.CreateTestEntity();
 
     // Act
-    await observer.NotifyAsync(entity, "created");
+    await observer.Notify(entity, "created");
     var notifications = observer.GetNotifications(entity.Id);
 
     // Assert

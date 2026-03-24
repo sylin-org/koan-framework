@@ -14,7 +14,7 @@ public class BackupEndpointSpec : IClassFixture<WebAdminTestPipelineFixture>
     [Fact(DisplayName = "Web: Backup endpoint returns expected data")]
     public async Task BackupEndpoint_ReturnsExpectedData()
     {
-    var response = await _fixture.HttpGetAsync("/admin/backup");
+    var response = await _fixture.HttpGet("/admin/backup");
     response.Should().NotBeNull();
     response.StatusCode.Should().Be(200);
     var content = await response.Content.ReadAsStringAsync();

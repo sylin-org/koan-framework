@@ -108,13 +108,13 @@ public sealed class TextPipeline : IAiPipelineStage<string>
     /// <summary>
     /// Execute pipeline and return the text input (passthrough).
     /// </summary>
-    public Task<string> ExecuteAsync(CancellationToken ct = default)
+    public Task<string> Execute(CancellationToken ct = default)
         => Task.FromResult(_input);
 
     /// <summary>
     /// Stream the text input as single item.
     /// </summary>
-    public async IAsyncEnumerable<string> StreamAsync([EnumeratorCancellation] CancellationToken ct = default)
+    public async IAsyncEnumerable<string> Stream([EnumeratorCancellation] CancellationToken ct = default)
     {
         yield return _input;
         await Task.CompletedTask;

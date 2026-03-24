@@ -8,10 +8,10 @@ internal sealed class DoctorCliCommand : ICliCommand
 
     public DoctorCliCommand(CommandRuntime runtime) => _runtime = runtime;
 
-    public Task<int> ExecuteAsync(CommandArgs args)
+    public Task<int> Execute(CommandArgs args)
     {
         var engine = args.GetValue("engine");
         var json = args.HasFlag("json");
-        return _runtime.ExecuteDoctorAsync(new CommandRuntime.DoctorCommandOptions(engine, json));
+        return _runtime.ExecuteDoctor(new CommandRuntime.DoctorCommandOptions(engine, json));
     }
 }

@@ -55,14 +55,14 @@ public class RestoreController : ControllerBase
             _logger.LogInformation("Starting global restore from backup '{BackupName}'", backupName);
 
             // Verify backup exists
-            var backupInfo = await _backupDiscoveryService.GetBackupAsync(backupName, ct);
+            var backupInfo = await _backupDiscoveryService.GetBackup(backupName, ct);
             if (backupInfo == null)
             {
                 return NotFound(new { error = "Backup not found", backupName });
             }
 
             // Start tracking the operation
-            var operationId = await _operationTracker.StartRestoreOperationAsync(backupName, ct);
+            var operationId = await _operationTracker.StartRestoreOperation(backupName, ct);
 
             // Start the restore operation asynchronously
             _ = Task.Run(async () =>
@@ -71,13 +71,13 @@ public class RestoreController : ControllerBase
                 {
                     var options = MapToGlobalRestoreOptions(request);
 
-                    await _operationTracker.UpdateRestoreProgressAsync(operationId, new RestoreProgressInfo
+                    await _operationTracker.UpdateRestoreProgress(operationId, new RestoreProgressInfo
                     {
                         CurrentStage = "Validating backup",
                         PercentComplete = 0
                     });
 
-                    await _restoreService.RestoreAllEntitiesAsync(backupName, options, ct);
+                    await _restoreService.RestoreAllEntities(backupName, options, ct);
 
                     var restoreResult = new RestoreResult
                     {
@@ -89,16 +89,16 @@ public class RestoreController : ControllerBase
                         EntityResults = Array.Empty<EntityRestoreResult>()
                     };
 
-                    await _operationTracker.CompleteRestoreOperationAsync(operationId, restoreResult);
+                    await _operationTracker.CompleteRestoreOperation(operationId, restoreResult);
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Global restore operation {OperationId} failed", operationId);
-                    await _operationTracker.FailOperationAsync(operationId, ex.Message);
+                    await _operationTracker.FailOperation(operationId, ex.Message);
                 }
             }, ct);
 
-            var response = await _operationTracker.GetRestoreOperationAsync(operationId);
+            var response = await _operationTracker.GetRestoreOperation(operationId);
             return Accepted(response);
         }
         catch (Exception ex)
@@ -128,7 +128,7 @@ public class RestoreController : ControllerBase
         {
             _logger.LogInformation("Testing restore viability for backup '{BackupName}'", backupName);
 
-            var report = await _restoreService.TestRestoreViabilityAsync(backupName, ct);
+            var report = await _restoreService.TestRestoreViability(backupName, ct);
             return Ok(report);
         }
         catch (Exception ex)
@@ -149,7 +149,7 @@ public class RestoreController : ControllerBase
     public async Task<ActionResult<RestoreOperationResponse>> GetRestoreOperation(
         [Required] string operationId)
     {
-        var operation = await _operationTracker.GetRestoreOperationAsync(operationId);
+        var operation = await _operationTracker.GetRestoreOperation(operationId);
 
         if (operation == null)
         {
@@ -171,7 +171,7 @@ public class RestoreController : ControllerBase
     public async Task<ActionResult<RestoreOperationResponse>> CancelRestoreOperation(
         [Required] string operationId)
     {
-        var operation = await _operationTracker.GetRestoreOperationAsync(operationId);
+        var operation = await _operationTracker.GetRestoreOperation(operationId);
 
         if (operation == null)
         {
@@ -193,9 +193,9 @@ public class RestoreController : ControllerBase
             return BadRequest(new { error = "Operation cannot be cancelled", status = operation.Status.ToString() });
         }
 
-        await _operationTracker.CancelOperationAsync(operationId);
+        await _operationTracker.CancelOperation(operationId);
 
-        var updatedOperation = await _operationTracker.GetRestoreOperationAsync(operationId);
+        var updatedOperation = await _operationTracker.GetRestoreOperation(operationId);
         return Ok(updatedOperation);
     }
 

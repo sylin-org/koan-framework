@@ -38,7 +38,7 @@ internal sealed class AdapterBackedChatClient : IChatClient
             request = request with { Model = resolution.EffectiveModel };
         }
 
-        var response = await chatAdapter.ChatAsync(request, cancellationToken).ConfigureAwait(false);
+        var response = await chatAdapter.Chat(request, cancellationToken).ConfigureAwait(false);
 
         _logger.LogInformation(
             "AI prompt served by adapter {Adapter} ({Category}) via {Source}/{Member}",
@@ -71,7 +71,7 @@ internal sealed class AdapterBackedChatClient : IChatClient
         }
 
         var index = 0;
-        await foreach (var chunk in chatAdapter.StreamAsync(request, cancellationToken).ConfigureAwait(false))
+        await foreach (var chunk in chatAdapter.Stream(request, cancellationToken).ConfigureAwait(false))
         {
             _logger.LogDebug(
                 "Streaming chunk {ChunkIndex} from adapter {Adapter}",

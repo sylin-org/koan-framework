@@ -186,7 +186,7 @@ if (orchestratorUri is not null)
 
         foreach (var capability in capabilities)
         {
-            var body = await orchestratorHttp.GetStringAsync($"/v1/recommendations?capability={capability}");
+            var body = await orchestratorHttp.GetString($"/v1/recommendations?capability={capability}");
             var recs = JsonSerializer.Deserialize<OrchestratorRecommendations>(body, snakeJson);
 
             if (recs?.Recommendations is { Count: > 0 })
@@ -233,7 +233,7 @@ if (orchestratorUri is not null)
                 stream = false
             });
 
-            var chatResponse = await orchestratorHttp.PostAsync("/api/chat",
+            var chatResponse = await orchestratorHttp.Post("/api/chat",
                 new StringContent(chatPayload, System.Text.Encoding.UTF8, "application/json"));
             var chatBody = await chatResponse.Content.ReadAsStringAsync();
 
@@ -258,7 +258,7 @@ if (orchestratorUri is not null)
                 input = "The zen garden is quiet"
             });
 
-            var embedResponse = await orchestratorHttp.PostAsync("/api/embed",
+            var embedResponse = await orchestratorHttp.Post("/api/embed",
                 new StringContent(embedPayload, System.Text.Encoding.UTF8, "application/json"));
             var embedBody = await embedResponse.Content.ReadAsStringAsync();
 
@@ -298,8 +298,8 @@ using (var scope = host.Services.CreateScope())
     var aiSources = services.GetRequiredService<IAiSourceRegistry>();
 
     Console.WriteLine("[Diagnostics] Resolving connection intents...");
-    var mongoResolved = await resolver.ResolveAsync(ZenGardenConnectionIntent.ForOffering("mongodb"));
-    var ollamaResolved = await resolver.ResolveAsync(ZenGardenConnectionIntent.ForOffering("ollama"));
+    var mongoResolved = await resolver.Resolve(ZenGardenConnectionIntent.ForOffering("mongodb"));
+    var ollamaResolved = await resolver.Resolve(ZenGardenConnectionIntent.ForOffering("ollama"));
     var ollamaSource = aiSources.GetSource("ollama");
 
     var diagnostic = new
@@ -346,7 +346,7 @@ catch (Exception ex)
 
 Console.WriteLine();
 StepLog("Waiting for Ollama source readiness (post-initialization loop).");
-var ollamaReady = await WaitForOllamaChatReadinessAsync(
+var ollamaReady = await WaitForOllamaChatReadiness(
     host.Services,
     capabilityEvents,
     wishedCapabilities,
@@ -446,7 +446,7 @@ static ValueTask RecordCapabilityEvent(
     return ValueTask.CompletedTask;
 }
 
-static async Task<bool> WaitForOllamaChatReadinessAsync(
+static async Task<bool> WaitForOllamaChatReadiness(
     IServiceProvider rootServices,
     ConcurrentQueue<ZenGardenCapabilityEventEntry> capabilityEvents,
     IReadOnlyList<string> wishedCapabilities,
@@ -487,7 +487,7 @@ static async Task<bool> WaitForOllamaChatReadinessAsync(
             : $"{lastProgress.Kind} missing={string.Join(",", lastProgress.Missing)}";
         Console.WriteLine($"[Ollama][Wait] attempt={attempt} source-not-ready progress={progress}");
 
-        var refreshed = await RefreshOllamaContributorAsync(rootServices, token).ConfigureAwait(false);
+        var refreshed = await RefreshOllamaContributor(rootServices, token).ConfigureAwait(false);
         if (!refreshed)
         {
             Console.WriteLine("[Ollama][Wait] no Ollama contributor found to refresh.");
@@ -524,7 +524,7 @@ static bool TryGetOllamaChatStatus(
     return memberCount > 0;
 }
 
-static async Task<bool> RefreshOllamaContributorAsync(
+static async Task<bool> RefreshOllamaContributor(
     IServiceProvider rootServices,
     CancellationToken cancellationToken)
 {
@@ -538,7 +538,7 @@ static async Task<bool> RefreshOllamaContributorAsync(
             continue;
         }
 
-        await contributor.ContributeAsync(scope.ServiceProvider, cancellationToken).ConfigureAwait(false);
+        await contributor.Contribute(scope.ServiceProvider, cancellationToken).ConfigureAwait(false);
         return true;
     }
 

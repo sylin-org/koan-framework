@@ -37,10 +37,10 @@ public sealed class EntityEventPrior<TEntity> where TEntity : class
             return new ValueTask<TEntity?>(_value);
         }
 
-        return LoadAsync(cancellationToken);
+        return Load(cancellationToken);
     }
 
-    private async ValueTask<TEntity?> LoadAsync(CancellationToken cancellationToken)
+    private async ValueTask<TEntity?> Load(CancellationToken cancellationToken)
     {
         if (_loaded)
         {

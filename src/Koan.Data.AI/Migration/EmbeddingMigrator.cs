@@ -205,7 +205,7 @@ public static class EmbeddingMigrator
         foreach (var state in states)
         {
             // Check if entity still exists
-            var entity = await Data<TEntity, string>.GetAsync(state.EntityId, ct);
+            var entity = await Data<TEntity, string>.Get(state.EntityId, ct);
             if (entity == null)
             {
                 // Entity deleted - remove orphaned state

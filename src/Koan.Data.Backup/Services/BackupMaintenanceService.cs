@@ -30,7 +30,7 @@ public class BackupMaintenanceService : BackgroundService
         // Initial warmup if enabled
         if (_options.WarmupEntitiesOnStartup)
         {
-            await WarmupEntitiesAsync(stoppingToken);
+            await WarmupEntities(stoppingToken);
         }
 
         // Main maintenance loop
@@ -44,7 +44,7 @@ public class BackupMaintenanceService : BackgroundService
                     break;
 
                 using var scope = _serviceProvider.CreateScope();
-                await PerformMaintenanceTasksAsync(scope.ServiceProvider, stoppingToken);
+                await PerformMaintenanceTasks(scope.ServiceProvider, stoppingToken);
             }
             catch (TaskCanceledException)
             {
@@ -61,7 +61,7 @@ public class BackupMaintenanceService : BackgroundService
         _logger.LogInformation("Backup maintenance service stopped");
     }
 
-    private async Task WarmupEntitiesAsync(CancellationToken cancellationToken)
+    private async Task WarmupEntities(CancellationToken cancellationToken)
     {
         try
         {
@@ -70,7 +70,7 @@ public class BackupMaintenanceService : BackgroundService
             using var scope = _serviceProvider.CreateScope();
             var discoveryService = scope.ServiceProvider.GetRequiredService<IEntityDiscoveryService>();
 
-            await discoveryService.WarmupAllEntitiesAsync(cancellationToken);
+            await discoveryService.WarmupAllEntities(cancellationToken);
 
             _logger.LogInformation("Entity discovery warmup completed");
         }
@@ -80,34 +80,34 @@ public class BackupMaintenanceService : BackgroundService
         }
     }
 
-    private async Task PerformMaintenanceTasksAsync(IServiceProvider serviceProvider, CancellationToken cancellationToken)
+    private async Task PerformMaintenanceTasks(IServiceProvider serviceProvider, CancellationToken cancellationToken)
     {
         var tasks = new List<Task>();
 
         // Background entity discovery
         if (_options.EnableBackgroundMaintenance)
         {
-            tasks.Add(RefreshEntityDiscoveryAsync(serviceProvider, cancellationToken));
+            tasks.Add(RefreshEntityDiscovery(serviceProvider, cancellationToken));
         }
 
         // Backup catalog refresh
-        tasks.Add(RefreshBackupCatalogAsync(serviceProvider, cancellationToken));
+        tasks.Add(RefreshBackupCatalog(serviceProvider, cancellationToken));
 
         // Backup validation (sample)
-        tasks.Add(ValidateBackupsAsync(serviceProvider, cancellationToken));
+        tasks.Add(ValidateBackups(serviceProvider, cancellationToken));
 
         // Cleanup old backups
-        tasks.Add(CleanupOldBackupsAsync(serviceProvider, cancellationToken));
+        tasks.Add(CleanupOldBackups(serviceProvider, cancellationToken));
 
         await Task.WhenAll(tasks);
     }
 
-    private async Task RefreshEntityDiscoveryAsync(IServiceProvider serviceProvider, CancellationToken cancellationToken)
+    private async Task RefreshEntityDiscovery(IServiceProvider serviceProvider, CancellationToken cancellationToken)
     {
         try
         {
             var discoveryService = serviceProvider.GetRequiredService<IEntityDiscoveryService>();
-            await discoveryService.RefreshDiscoveryAsync(cancellationToken);
+            await discoveryService.RefreshDiscovery(cancellationToken);
             _logger.LogDebug("Entity discovery cache refreshed");
         }
         catch (Exception ex)
@@ -116,12 +116,12 @@ public class BackupMaintenanceService : BackgroundService
         }
     }
 
-    private async Task RefreshBackupCatalogAsync(IServiceProvider serviceProvider, CancellationToken cancellationToken)
+    private async Task RefreshBackupCatalog(IServiceProvider serviceProvider, CancellationToken cancellationToken)
     {
         try
         {
             var backupDiscoveryService = serviceProvider.GetRequiredService<IBackupDiscoveryService>();
-            await backupDiscoveryService.RefreshCatalogAsync(cancellationToken);
+            await backupDiscoveryService.RefreshCatalog(cancellationToken);
             _logger.LogDebug("Backup catalog refreshed");
         }
         catch (Exception ex)
@@ -130,14 +130,14 @@ public class BackupMaintenanceService : BackgroundService
         }
     }
 
-    private async Task ValidateBackupsAsync(IServiceProvider serviceProvider, CancellationToken cancellationToken)
+    private async Task ValidateBackups(IServiceProvider serviceProvider, CancellationToken cancellationToken)
     {
         try
         {
             var backupDiscoveryService = serviceProvider.GetRequiredService<IBackupDiscoveryService>();
 
             // Get a sample of backups to validate (not all, to avoid overload)
-            var catalog = await backupDiscoveryService.DiscoverAllBackupsAsync(ct: cancellationToken);
+            var catalog = await backupDiscoveryService.DiscoverAllBackups(ct: cancellationToken);
             var backupsToValidate = catalog.Backups
                 .Where(b => !b.LastValidatedAt.HasValue ||
                            b.LastValidatedAt.Value.AddDays(7) < DateTimeOffset.UtcNow)
@@ -148,7 +148,7 @@ public class BackupMaintenanceService : BackgroundService
             {
                 try
                 {
-                    var result = await backupDiscoveryService.ValidateBackupAsync(backup.Id, cancellationToken);
+                    var result = await backupDiscoveryService.ValidateBackup(backup.Id, cancellationToken);
                     if (!result.IsValid)
                     {
                         _logger.LogWarning("Backup {BackupId} validation failed: {Issues}",
@@ -178,7 +178,7 @@ public class BackupMaintenanceService : BackgroundService
         }
     }
 
-    private async Task CleanupOldBackupsAsync(IServiceProvider serviceProvider, CancellationToken cancellationToken)
+    private async Task CleanupOldBackups(IServiceProvider serviceProvider, CancellationToken cancellationToken)
     {
         try
         {
@@ -194,7 +194,7 @@ public class BackupMaintenanceService : BackgroundService
                 Take = 100 // Fixed number for cleanup
             };
 
-            var oldBackups = await backupDiscoveryService.QueryBackupsAsync(query, cancellationToken);
+            var oldBackups = await backupDiscoveryService.QueryBackups(query, cancellationToken);
 
             if (oldBackups.Backups.Any())
             {

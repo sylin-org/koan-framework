@@ -55,15 +55,15 @@ public sealed class MergePoliciesTests
             };
             await pipeline.Save(ct);
 
-            var financial = await CreateSourceDocumentAsync(pipeline.Id, "financial.pdf", MeridianConstants.SourceTypes.AuditedFinancial, now.AddMinutes(-30), ct);
-            var vendor = await CreateSourceDocumentAsync(pipeline.Id, "vendor.docx", MeridianConstants.SourceTypes.VendorPrescreen, now.AddMinutes(-20), ct);
-            var knowledge = await CreateSourceDocumentAsync(pipeline.Id, "knowledge.txt", MeridianConstants.SourceTypes.KnowledgeBase, now.AddMinutes(-10), ct);
+            var financial = await CreateSourceDocument(pipeline.Id, "financial.pdf", MeridianConstants.SourceTypes.AuditedFinancial, now.AddMinutes(-30), ct);
+            var vendor = await CreateSourceDocument(pipeline.Id, "vendor.docx", MeridianConstants.SourceTypes.VendorPrescreen, now.AddMinutes(-20), ct);
+            var knowledge = await CreateSourceDocument(pipeline.Id, "knowledge.txt", MeridianConstants.SourceTypes.KnowledgeBase, now.AddMinutes(-10), ct);
 
             var passages = new Dictionary<string, Passage>
             {
-                ["fin"] = await CreatePassageAsync(financial.Id, "Annual revenue reached $47.2M last year.", 12, "Financials", ct),
-                ["vendor"] = await CreatePassageAsync(vendor.Id, "Revenue reported at $39.5M from vendor questionnaire.", 4, "Financial Overview", ct),
-                ["kb"] = await CreatePassageAsync(knowledge.Id, "Estimated revenue of $40M across divisions.", 2, "Summary", ct)
+                ["fin"] = await CreatePassage(financial.Id, "Annual revenue reached $47.2M last year.", 12, "Financials", ct),
+                ["vendor"] = await CreatePassage(vendor.Id, "Revenue reported at $39.5M from vendor questionnaire.", 4, "Financial Overview", ct),
+                ["kb"] = await CreatePassage(knowledge.Id, "Estimated revenue of $40M across divisions.", 2, "Summary", ct)
             };
 
             var extractions = new List<ExtractedField>
@@ -80,7 +80,7 @@ public sealed class MergePoliciesTests
             };
 
             var merger = scopedProvider.GetRequiredService<IDocumentMerger>();
-            var deliverable = await merger.MergeAsync(pipeline, extractions, ct);
+            var deliverable = await merger.Merge(pipeline, extractions, ct);
 
             // Assertions: revenue transformed and precedence applied
             var mergedFields = await ExtractedField.Query(e => e.PipelineId == pipeline.Id, ct);
@@ -134,8 +134,8 @@ public sealed class MergePoliciesTests
                 AppHost.Current = previousHost;
             }
 
-            await scope.DisposeAsync();
-            await provider.DisposeAsync();
+            await scope.Dispose();
+            await provider.Dispose();
         }
     }
 
@@ -190,7 +190,7 @@ public sealed class MergePoliciesTests
         return (services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true }), deliverableStorage);
     }
 
-    private static async Task<SourceDocument> CreateSourceDocumentAsync(string pipelineId, string fileName, string sourceType, DateTime updatedAt, CancellationToken ct)
+    private static async Task<SourceDocument> CreateSourceDocument(string pipelineId, string fileName, string sourceType, DateTime updatedAt, CancellationToken ct)
     {
         var document = new SourceDocument
         {
@@ -214,7 +214,7 @@ public sealed class MergePoliciesTests
         return saved;
     }
 
-    private static async Task<Passage> CreatePassageAsync(string sourceDocumentId, string text, int page, string section, CancellationToken ct)
+    private static async Task<Passage> CreatePassage(string sourceDocumentId, string text, int page, string section, CancellationToken ct)
     {
         var passage = new Passage
         {
@@ -300,7 +300,7 @@ public sealed class MergePoliciesTests
     {
         private readonly ConcurrentDictionary<string, byte[]> _store = new(StringComparer.OrdinalIgnoreCase);
 
-        public async Task<string> StoreAsync(Stream content, string fileName, string? contentType, CancellationToken ct = default)
+        public async Task<string> Store(Stream content, string fileName, string? contentType, CancellationToken ct = default)
         {
             using var ms = new MemoryStream();
             await content.CopyToAsync(ms, ct).ConfigureAwait(false);
@@ -309,7 +309,7 @@ public sealed class MergePoliciesTests
             return key;
         }
 
-        public Task<Stream> OpenReadAsync(string storageKey, CancellationToken ct = default)
+        public Task<Stream> OpenRead(string storageKey, CancellationToken ct = default)
         {
             if (!_store.TryGetValue(storageKey, out var bytes))
             {
@@ -326,7 +326,7 @@ public sealed class MergePoliciesTests
 
         public IReadOnlyCollection<string> StoredPdfKeys => _store.Keys.ToList();
 
-        public async Task<string> StoreAsync(Stream content, string fileName, string? contentType, CancellationToken ct = default)
+        public async Task<string> Store(Stream content, string fileName, string? contentType, CancellationToken ct = default)
         {
             using var ms = new MemoryStream();
             await content.CopyToAsync(ms, ct).ConfigureAwait(false);
@@ -340,7 +340,7 @@ public sealed class MergePoliciesTests
     {
         private readonly ConcurrentDictionary<string, float[]> _entries = new(StringComparer.OrdinalIgnoreCase);
 
-        public Task<CachedEmbedding?> GetAsync(string contentHash, string modelId, string entityTypeName, CancellationToken ct = default)
+        public Task<CachedEmbedding?> Get(string contentHash, string modelId, string entityTypeName, CancellationToken ct = default)
         {
             var key = $"{entityTypeName}:{modelId}:{contentHash}";
             if (_entries.TryGetValue(key, out var vector))
@@ -358,21 +358,21 @@ public sealed class MergePoliciesTests
             return Task.FromResult<CachedEmbedding?>(null);
         }
 
-        public Task SetAsync(string contentHash, string modelId, float[] embedding, string entityTypeName, CancellationToken ct = default)
+        public Task Set(string contentHash, string modelId, float[] embedding, string entityTypeName, CancellationToken ct = default)
         {
             var key = $"{entityTypeName}:{modelId}:{contentHash}";
             _entries[key] = embedding;
             return Task.CompletedTask;
         }
 
-        public Task<int> FlushAsync(CancellationToken ct = default)
+        public Task<int> Flush(CancellationToken ct = default)
         {
             var count = _entries.Count;
             _entries.Clear();
             return Task.FromResult(count);
         }
 
-        public Task<CacheStats> GetStatsAsync(CancellationToken ct = default)
+        public Task<CacheStats> GetStats(CancellationToken ct = default)
         {
             return Task.FromResult(new CacheStats(_entries.Count, 0, null, null));
         }
@@ -380,7 +380,7 @@ public sealed class MergePoliciesTests
 
     private sealed class FakePdfRenderer : IPdfRenderer
     {
-        public Task<byte[]> RenderAsync(string markdown, CancellationToken ct = default)
+        public Task<byte[]> Render(string markdown, CancellationToken ct = default)
             => Task.FromResult(Encoding.UTF8.GetBytes(markdown));
     }
 }

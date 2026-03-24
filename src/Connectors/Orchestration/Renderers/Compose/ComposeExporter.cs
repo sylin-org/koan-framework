@@ -14,7 +14,7 @@ public sealed class ComposeExporter : IArtifactExporter
     public ExporterCapabilities Capabilities => new(false, true, false);
     public bool Supports(string format) => string.Equals(format, "compose", StringComparison.OrdinalIgnoreCase);
 
-    public async Task GenerateAsync(Plan plan, Profile profile, string outPath, CancellationToken ct = default)
+    public async Task Generate(Plan plan, Profile profile, string outPath, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(plan);
         if (string.IsNullOrWhiteSpace(outPath)) throw new ArgumentException("Output path required", nameof(outPath));

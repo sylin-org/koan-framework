@@ -28,5 +28,5 @@ public interface IPhotoProcessingQueue
     /// <summary>
     /// Wait asynchronously for items to become available
     /// </summary>
-    Task WaitForItemsAsync(CancellationToken ct);
+    Task WaitForItems(CancellationToken ct);
 }

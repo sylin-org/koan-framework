@@ -25,14 +25,14 @@ public sealed class PhotoSetService
     /// Create new session from definition
     /// Computes total count, stores query params for on-demand execution
     /// </summary>
-    public async Task<PhotoSetSession> CreateSessionAsync(
+    public async Task<PhotoSetSession> CreateSession(
         PhotoSetDefinition definition,
         CancellationToken ct = default)
     {
         _logger.LogInformation("[PhotoSetService] Creating session for context: {Context}", definition.Context);
 
         // Compute total count
-        int totalCount = await ComputeTotalCountAsync(definition, ct);
+        int totalCount = await ComputeTotalCount(definition, ct);
 
         // Create session with query definition
         var session = new PhotoSetSession
@@ -60,7 +60,7 @@ public sealed class PhotoSetService
     /// Execute query for specific range using session's query definition
     /// On-demand materialization - scales to millions of photos
     /// </summary>
-    public async Task<List<PhotoAsset>> ExecuteQueryAsync(
+    public async Task<List<PhotoAsset>> ExecuteQuery(
         PhotoSetSession session,
         int startIndex,
         int count,
@@ -71,7 +71,7 @@ public sealed class PhotoSetService
             session.Id, startIndex, startIndex + count);
 
         // Execute query with pagination
-        var photos = await ExecuteQueryWithPaginationAsync(
+        var photos = await ExecuteQueryWithPagination(
             session.Context,
             session.CollectionId,
             session.SearchQuery,
@@ -92,7 +92,7 @@ public sealed class PhotoSetService
     /// <summary>
     /// Compute total count for a query definition
     /// </summary>
-    private async Task<int> ComputeTotalCountAsync(
+    private async Task<int> ComputeTotalCount(
         PhotoSetDefinition definition,
         CancellationToken ct)
     {
@@ -139,7 +139,7 @@ public sealed class PhotoSetService
                 }
 
                 // For search, we need to execute the full search to get count
-                var searchResults = await _processingService.SemanticSearchAsync(
+                var searchResults = await _processingService.SemanticSearch(
                     query: definition.SearchQuery,
                     eventId: null,
                     alpha: definition.SearchAlpha ?? 0.5,
@@ -155,7 +155,7 @@ public sealed class PhotoSetService
     /// <summary>
     /// Execute query with pagination for specific range
     /// </summary>
-    private async Task<List<PhotoAsset>> ExecuteQueryWithPaginationAsync(
+    private async Task<List<PhotoAsset>> ExecuteQueryWithPagination(
         string context,
         string? collectionId,
         string? searchQuery,
@@ -231,7 +231,7 @@ public sealed class PhotoSetService
                 }
 
                 // Search returns pre-sorted results
-                var searchResults = await _processingService.SemanticSearchAsync(
+                var searchResults = await _processingService.SemanticSearch(
                     query: searchQuery,
                     eventId: null,
                     alpha: searchAlpha,

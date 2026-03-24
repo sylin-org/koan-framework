@@ -36,7 +36,7 @@ public sealed class PgVectorIndexBuilder
     /// <param name="m">Maximum number of connections per layer (16=balanced, 32=high quality)</param>
     /// <param name="efConstruction">Size of dynamic candidate list during construction (64=balanced, 128=high quality)</param>
     /// <param name="ct">Cancellation token</param>
-    public async Task CreateHnswIndexAsync(
+    public async Task CreateHnswIndex(
         string tableName,
         int m = 16,
         int efConstruction = 64,
@@ -73,7 +73,7 @@ public sealed class PgVectorIndexBuilder
     /// <param name="tableName">Vector table name (auto-includes "_vector" suffix per DATA-0087)</param>
     /// <param name="lists">Number of inverted lists/clusters (sqrt(rows) recommended)</param>
     /// <param name="ct">Cancellation token</param>
-    public async Task CreateIvfflatIndexAsync(
+    public async Task CreateIvfflatIndex(
         string tableName,
         int lists = 100,
         CancellationToken ct = default)
@@ -104,7 +104,7 @@ public sealed class PgVectorIndexBuilder
     /// Drops an existing index.
     /// Useful before bulk loading or when switching index types.
     /// </summary>
-    public async Task DropIndexAsync(string indexName, CancellationToken ct = default)
+    public async Task DropIndex(string indexName, CancellationToken ct = default)
     {
         using var activity = PGVectorTelemetry.Activity.StartActivity("vector.dropIndex");
 
@@ -119,7 +119,7 @@ public sealed class PgVectorIndexBuilder
     /// Rebuilds an existing index (REINDEX).
     /// Useful after bulk updates or when index becomes fragmented.
     /// </summary>
-    public async Task ReindexAsync(string indexName, CancellationToken ct = default)
+    public async Task Reindex(string indexName, CancellationToken ct = default)
     {
         using var activity = PGVectorTelemetry.Activity.StartActivity("vector.reindex");
 
@@ -135,7 +135,7 @@ public sealed class PgVectorIndexBuilder
     /// <summary>
     /// Gets index statistics: size, rows indexed, usage.
     /// </summary>
-    public async Task<IndexStats> GetIndexStatsAsync(string indexName)
+    public async Task<IndexStats> GetIndexStats(string indexName)
     {
         var sql = @"
             SELECT
@@ -155,7 +155,7 @@ public sealed class PgVectorIndexBuilder
     /// Analyzes table to update statistics.
     /// Run after bulk loading for optimal query planning.
     /// </summary>
-    public async Task AnalyzeTableAsync(string tableName, CancellationToken ct = default)
+    public async Task AnalyzeTable(string tableName, CancellationToken ct = default)
     {
         using var activity = PGVectorTelemetry.Activity.StartActivity("vector.analyzeTable");
 
@@ -170,7 +170,7 @@ public sealed class PgVectorIndexBuilder
     /// Vacuums table to reclaim storage and update statistics.
     /// Run after bulk deletes.
     /// </summary>
-    public async Task VacuumTableAsync(string tableName, CancellationToken ct = default)
+    public async Task VacuumTable(string tableName, CancellationToken ct = default)
     {
         using var activity = PGVectorTelemetry.Activity.StartActivity("vector.vacuumTable");
 

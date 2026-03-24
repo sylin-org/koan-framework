@@ -57,12 +57,12 @@ public class KoanDependencyOrchestrator : IKoanDependencyOrchestrator
         };
     }
 
-    public async Task<List<string>> StartDependenciesAsync(CancellationToken cancellationToken = default)
+    public async Task<List<string>> StartDependencies(CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Self-orchestration starting dependency discovery for session {SessionId}", _sessionId);
 
         // Discover dependencies using orchestration evaluators
-        var dependencies = await DiscoverRequiredDependenciesAsync(cancellationToken);
+        var dependencies = await DiscoverRequiredDependencies(cancellationToken);
 
         if (dependencies.Count == 0)
         {
@@ -79,12 +79,12 @@ public class KoanDependencyOrchestrator : IKoanDependencyOrchestrator
         {
             try
             {
-                var containerName = await _containerManager.StartContainerAsync(dependency, _appInstance, _sessionId, cancellationToken);
+                var containerName = await _containerManager.StartContainer(dependency, _appInstance, _sessionId, cancellationToken);
                 _managedDependencies.Add(dependency);
                 startedContainers.Add(containerName);
 
                 _logger.LogDebug("Waiting for {DependencyName} to become healthy...", dependency.Name);
-                var isHealthy = await _containerManager.WaitForContainerHealthyAsync(containerName, dependency, cancellationToken);
+                var isHealthy = await _containerManager.WaitForContainerHealthy(containerName, dependency, cancellationToken);
 
                 if (!isHealthy)
                 {
@@ -106,14 +106,14 @@ public class KoanDependencyOrchestrator : IKoanDependencyOrchestrator
         return startedContainers;
     }
 
-    public async Task StopDependenciesAsync(CancellationToken cancellationToken = default)
+    public async Task StopDependencies(CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Self-orchestration stopping {Count} dependencies for session {SessionId}",
             _managedDependencies.Count, _sessionId);
 
         try
         {
-            await _containerManager.CleanupSessionContainersAsync(_sessionId, cancellationToken);
+            await _containerManager.CleanupSessionContainers(_sessionId, cancellationToken);
             _managedDependencies.Clear();
             _logger.LogInformation("Self-orchestration cleanup completed");
         }
@@ -123,7 +123,7 @@ public class KoanDependencyOrchestrator : IKoanDependencyOrchestrator
         }
     }
 
-    public async Task<List<DependencyDescriptor>> GetManagedDependenciesAsync(CancellationToken cancellationToken = default)
+    public async Task<List<DependencyDescriptor>> GetManagedDependencies(CancellationToken cancellationToken = default)
     {
         return await Task.FromResult(_managedDependencies.ToList());
     }
@@ -143,7 +143,7 @@ public class KoanDependencyOrchestrator : IKoanDependencyOrchestrator
         return $"{appId}-{hashHex[..8].ToLowerInvariant()}";
     }
 
-    private async Task<List<DependencyDescriptor>> DiscoverRequiredDependenciesAsync(CancellationToken cancellationToken = default)
+    private async Task<List<DependencyDescriptor>> DiscoverRequiredDependencies(CancellationToken cancellationToken = default)
     {
         var dependencies = new List<DependencyDescriptor>();
 
@@ -165,7 +165,7 @@ public class KoanDependencyOrchestrator : IKoanDependencyOrchestrator
             try
             {
                 _logger.LogDebug("Evaluating {ServiceName} orchestration requirements", evaluator.ServiceName);
-                var decision = await evaluator.EvaluateAsync(_configuration, context);
+                var decision = await evaluator.Evaluate(_configuration, context);
                 return new { Evaluator = evaluator, Decision = decision };
             }
             catch (Exception ex)

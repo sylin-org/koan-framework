@@ -8,7 +8,7 @@ public sealed class ItemCsvTransformer : IEntityTransformer<Item, string>
 {
     public IReadOnlyList<string> AcceptContentTypes => new[] { "text/csv" };
 
-    public Task<object> TransformAsync(Item model, HttpContext httpContext)
+    public Task<object> Transform(Item model, HttpContext httpContext)
     {
         var sb = new StringBuilder();
         sb.AppendLine("Id,Name");
@@ -16,7 +16,7 @@ public sealed class ItemCsvTransformer : IEntityTransformer<Item, string>
         return Task.FromResult<object>(sb.ToString());
     }
 
-    public Task<object> TransformManyAsync(IEnumerable<Item> models, HttpContext httpContext)
+    public Task<object> TransformMany(IEnumerable<Item> models, HttpContext httpContext)
     {
         var sb = new StringBuilder();
         sb.AppendLine("Id,Name");
@@ -25,7 +25,7 @@ public sealed class ItemCsvTransformer : IEntityTransformer<Item, string>
         return Task.FromResult<object>(sb.ToString());
     }
 
-    public async Task<Item> ParseAsync(Stream body, string contentType, HttpContext httpContext)
+    public async Task<Item> Parse(Stream body, string contentType, HttpContext httpContext)
     {
         using var reader = new StreamReader(body, Encoding.UTF8, leaveOpen: true);
         var text = await reader.ReadToEndAsync();
@@ -35,7 +35,7 @@ public sealed class ItemCsvTransformer : IEntityTransformer<Item, string>
         return new Item { Id = cols[0], Name = cols.Length > 1 ? cols[1] : string.Empty };
     }
 
-    public async Task<IReadOnlyList<Item>> ParseManyAsync(Stream body, string contentType, HttpContext httpContext)
+    public async Task<IReadOnlyList<Item>> ParseMany(Stream body, string contentType, HttpContext httpContext)
     {
         using var reader = new StreamReader(body, Encoding.UTF8, leaveOpen: true);
         var text = await reader.ReadToEndAsync();

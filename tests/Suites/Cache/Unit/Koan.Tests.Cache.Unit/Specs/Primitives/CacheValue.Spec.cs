@@ -98,7 +98,7 @@ public sealed class CacheValueSpec
                 body();
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 
     private sealed record TestDocument(string Id);
 }

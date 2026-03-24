@@ -29,7 +29,7 @@ public class MealPlanningServiceTests
         await r.Save();
 
         var svc = new MealPlanningService();
-        var result = await svc.SuggestRecipesAsync(new SuggestRecipesRequest { DietaryRestrictions = new []{"vegetarian"}, MaxCookingMinutes = 45, Limit = 5 });
+        var result = await svc.SuggestRecipes(new SuggestRecipesRequest { DietaryRestrictions = new []{"vegetarian"}, MaxCookingMinutes = 45, Limit = 5 });
         result.Should().NotBeEmpty();
     }
 
@@ -37,7 +37,7 @@ public class MealPlanningServiceTests
     public async Task CreateMealPlan_ShouldPersist()
     {
         var svc = new MealPlanningService();
-        var plan = await svc.CreateMealPlanAsync(new CreateMealPlanRequest{ StartDate = DateTime.UtcNow.Date, EndDate = DateTime.UtcNow.Date.AddDays(2), Meals = Array.Empty<PlannedMeal>() });
+        var plan = await svc.CreateMealPlan(new CreateMealPlanRequest{ StartDate = DateTime.UtcNow.Date, EndDate = DateTime.UtcNow.Date.AddDays(2), Meals = Array.Empty<PlannedMeal>() });
         (await MealPlan.Get(plan.Id)).Should().NotBeNull();
     }
 }

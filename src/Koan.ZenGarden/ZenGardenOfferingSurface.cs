@@ -31,7 +31,7 @@ public sealed class ZenGardenOfferingSurface
         {
             ToolType = ZenGardenToolType.Offering
         };
-        return ZenGarden.Client.CatalogAsync(subscription, cancellationToken);
+        return ZenGarden.Client.Catalog(subscription, cancellationToken);
     }
 
     public async Task<ZenGardenToolSnapshot?> Catalog(
@@ -39,7 +39,7 @@ public sealed class ZenGardenOfferingSurface
         CancellationToken cancellationToken = default)
     {
         var subscription = ZenGardenSubscription.ForOffering(offering);
-        var tools = await ZenGarden.Client.CatalogAsync(subscription, cancellationToken);
+        var tools = await ZenGarden.Client.Catalog(subscription, cancellationToken);
         return tools.FirstOrDefault();
     }
 
@@ -50,6 +50,6 @@ public sealed class ZenGardenOfferingSurface
     {
         var subscription = ZenGardenSubscription.ForOffering(offering)
             .Require(requires.ToArray());
-        return ZenGarden.Client.CatalogAsync(subscription, cancellationToken);
+        return ZenGarden.Client.Catalog(subscription, cancellationToken);
     }
 }

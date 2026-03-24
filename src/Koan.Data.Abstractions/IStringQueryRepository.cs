@@ -6,6 +6,6 @@ namespace Koan.Data.Abstractions;
 
 public interface IStringQueryRepository<TEntity, TKey> where TEntity : IEntity<TKey>
 {
-    Task<IReadOnlyList<TEntity>> QueryAsync(string query, CancellationToken ct = default);
-    Task<IReadOnlyList<TEntity>> QueryAsync(string query, DataQueryOptions? options, CancellationToken ct = default);
+    Task<IReadOnlyList<TEntity>> Query(string query, CancellationToken ct = default);
+    Task<IReadOnlyList<TEntity>> Query(string query, DataQueryOptions? options, CancellationToken ct = default);
 }

@@ -32,7 +32,7 @@ public class Reminder : Entity<Reminder>
         return reminders.FirstOrDefault();
     }
 
-    public Task<Reminder> ActivateAsync(string notes, CancellationToken ct = default)
+    public Task<Reminder> Activate(string notes, CancellationToken ct = default)
     {
         // turn on the reminder
         Status = ReminderStatus.Active;
@@ -40,7 +40,7 @@ public class Reminder : Entity<Reminder>
         return this.Save(ct);
     }
 
-    public Task<Reminder> AcknowledgeAsync(string notes, CancellationToken ct = default)
+    public Task<Reminder> Acknowledge(string notes, CancellationToken ct = default)
     {
         // mark it done
         Status = ReminderStatus.Acknowledged;

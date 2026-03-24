@@ -8,7 +8,7 @@ internal sealed class StatusCliCommand : ICliCommand
 
     public StatusCliCommand(CommandRuntime runtime) => _runtime = runtime;
 
-    public Task<int> ExecuteAsync(CommandArgs args)
+    public Task<int> Execute(CommandArgs args)
     {
         var json = args.HasFlag("json");
         var engine = args.GetValue("engine");
@@ -18,7 +18,7 @@ internal sealed class StatusCliCommand : ICliCommand
         var exposeInternals = args.HasFlag("expose-internals");
         var noManifest = args.HasFlag("no-launch-manifest");
 
-        return _runtime.ExecuteStatusAsync(new CommandRuntime.StatusCommandOptions(json, engine, profile, basePort, portOverride, exposeInternals, noManifest));
+        return _runtime.ExecuteStatus(new CommandRuntime.StatusCommandOptions(json, engine, profile, basePort, portOverride, exposeInternals, noManifest));
     }
 
     private static int? ParseNullableInt(string? value)

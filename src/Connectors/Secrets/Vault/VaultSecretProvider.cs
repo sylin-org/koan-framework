@@ -22,7 +22,7 @@ public sealed class VaultSecretProvider : ISecretProvider
         _disabled = disabled;
     }
 
-    public async Task<SecretValue> GetAsync(SecretId id, CancellationToken ct = default)
+    public async Task<SecretValue> Get(SecretId id, CancellationToken ct = default)
     {
         // Respect provider intent if present
         if (id.Provider is { Length: > 0 } && !string.Equals(id.Provider, "vault", StringComparison.OrdinalIgnoreCase))

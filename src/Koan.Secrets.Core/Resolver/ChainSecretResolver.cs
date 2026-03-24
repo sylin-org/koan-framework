@@ -20,7 +20,7 @@ public sealed class ChainSecretResolver : ISecretResolver
         _logger = logger;
     }
 
-    public async Task<SecretValue> GetAsync(SecretId id, CancellationToken ct = default)
+    public async Task<SecretValue> Get(SecretId id, CancellationToken ct = default)
     {
         var cacheKey = ($"{id}");
         if (_cache.TryGetValue<SecretValue>(cacheKey, out var cached) && cached is not null) return cached;
@@ -29,7 +29,7 @@ public sealed class ChainSecretResolver : ISecretResolver
         {
             try
             {
-                var v = await p.GetAsync(id, ct);
+                var v = await p.Get(id, ct);
                 var ttl = v.Meta.Ttl ?? TimeSpan.FromMinutes(5);
                 _cache.Set(cacheKey, v, ttl);
                 return v;
@@ -42,7 +42,7 @@ public sealed class ChainSecretResolver : ISecretResolver
         throw new SecretNotFoundException(id.ToString());
     }
 
-    public async Task<string> ResolveAsync(string template, CancellationToken ct = default)
+    public async Task<string> Resolve(string template, CancellationToken ct = default)
     {
         if (string.IsNullOrEmpty(template)) return template ?? string.Empty;
         // quick scan to short-circuit when no placeholders
@@ -56,7 +56,7 @@ public sealed class ChainSecretResolver : ISecretResolver
         {
             var token = match.Groups[1].Value;
             var id = SecretId.Parse(token);
-            var v = await GetAsync(id, ct);
+            var v = await Get(id, ct);
             map[token] = v.AsString();
         }
         var s = template;

@@ -13,7 +13,7 @@ public class ExposureModeSpec : IClassFixture<TestPipelineFixture>
         // Arrange: force server options Exposure=null so ResolveExposureMode uses default Auto path
         // We can't reconfigure existing fixture services post-build easily, so we directly invoke list
         // expecting fallback logic to treat Auto as Full (see TODO in McpRpcHandler).
-        var listObj = await _fx.InvokeRpcAsync("tools/list", Guid.NewGuid().ToString("n"));
+        var listObj = await _fx.InvokeRpc("tools/list", Guid.NewGuid().ToString("n"));
         listObj.Should().NotBeNull();
         var root = JToken.FromObject(listObj!);
         var tools = root["tools"] as JArray ?? root as JArray; // fixture may return ToolsListResponse or direct array

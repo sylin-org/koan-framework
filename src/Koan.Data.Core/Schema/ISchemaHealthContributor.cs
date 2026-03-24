@@ -15,7 +15,7 @@ public interface ISchemaHealthContributor<TEntity, TKey>
     /// <summary>
     /// Ensure the backing store for the current entity (and active set) is healthy.
     /// </summary>
-    Task EnsureHealthyAsync(CancellationToken ct);
+    Task EnsureHealthy(CancellationToken ct);
 
     /// <summary>
     /// Invalidate any adapter-local caches so the next ensure recomputes schema health.

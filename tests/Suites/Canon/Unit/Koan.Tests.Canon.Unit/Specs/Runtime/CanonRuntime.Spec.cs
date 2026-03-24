@@ -25,7 +25,7 @@ public sealed class CanonRuntimeSpec
                 ctx.SetItem(PersistenceKey, persistence);
                 ctx.SetItem(RuntimeKey, runtime);
             })
-            .Act(ctx => new ValueTask(ExecuteCanonizeAsync(ctx)))
+            .Act(ctx => new ValueTask(ExecuteCanonize(ctx)))
             .Assert(ctx =>
             {
                 var result = ctx.GetRequiredItem<CanonizationResult<ContactCanon>>(ResultKey);
@@ -51,7 +51,7 @@ public sealed class CanonRuntimeSpec
                 index!.CanonicalId.Should().Be(result.Canonical.Id);
                 index.Attributes.Should().ContainKey("arrivalToken").WhoseValue.Should().Be(result.Canonical.Id);
             })
-            .RunAsync();
+            .Run();
 
     [Fact]
     public Task Stage_only_requests_create_stage_record()
@@ -62,7 +62,7 @@ public sealed class CanonRuntimeSpec
                 ctx.SetItem(PersistenceKey, persistence);
                 ctx.SetItem(RuntimeKey, runtime);
             })
-            .Act(ctx => new ValueTask(ExecuteStageOnlyAsync(ctx)))
+            .Act(ctx => new ValueTask(ExecuteStageOnly(ctx)))
             .Assert(ctx =>
             {
                 var result = ctx.GetRequiredItem<CanonizationResult<ContactCanon>>(StageResultKey);
@@ -87,7 +87,7 @@ public sealed class CanonRuntimeSpec
                 stage.Payload!.Email.Should().Be(email);
                 stage.Metadata.Should().ContainKey("runtime:stage-behavior").WhoseValue.Should().Be(CanonStageBehavior.StageOnly.ToString());
             })
-            .RunAsync();
+            .Run();
 
     private static (InMemoryCanonPersistence Persistence, CanonRuntime Runtime) BuildRuntime()
     {
@@ -108,7 +108,7 @@ public sealed class CanonRuntimeSpec
         return (persistence, builder.Build());
     }
 
-    private async Task ExecuteCanonizeAsync(TestContext ctx)
+    private async Task ExecuteCanonize(TestContext ctx)
     {
         var runtime = ctx.GetRequiredItem<ICanonRuntime>(RuntimeKey);
         var email = $"canon-{ctx.ExecutionId:N}@example.com";
@@ -129,7 +129,7 @@ public sealed class CanonRuntimeSpec
         ctx.SetItem(ResultKey, result);
     }
 
-    private async Task ExecuteStageOnlyAsync(TestContext ctx)
+    private async Task ExecuteStageOnly(TestContext ctx)
     {
         var runtime = ctx.GetRequiredItem<ICanonRuntime>(RuntimeKey);
         var email = $"stage-{ctx.ExecutionId:N}@example.com";
@@ -218,7 +218,7 @@ public sealed class CanonRuntimeSpec
             return Task.FromResult(stage);
         }
 
-        public Task<CanonIndex?> GetIndexAsync(string entityType, string key, CancellationToken cancellationToken)
+        public Task<CanonIndex?> GetIndex(string entityType, string key, CancellationToken cancellationToken)
         {
             lock (_gate)
             {
@@ -227,7 +227,7 @@ public sealed class CanonRuntimeSpec
             }
         }
 
-        public Task UpsertIndexAsync(CanonIndex index, CancellationToken cancellationToken)
+        public Task UpsertIndex(CanonIndex index, CancellationToken cancellationToken)
         {
             if (index is null)
             {
@@ -248,7 +248,7 @@ public sealed class CanonRuntimeSpec
 
     private sealed class NoopAuditSink : ICanonAuditSink
     {
-        public Task WriteAsync(IReadOnlyList<CanonAuditEntry> entries, CancellationToken cancellationToken)
+        public Task Write(IReadOnlyList<CanonAuditEntry> entries, CancellationToken cancellationToken)
             => Task.CompletedTask;
     }
 

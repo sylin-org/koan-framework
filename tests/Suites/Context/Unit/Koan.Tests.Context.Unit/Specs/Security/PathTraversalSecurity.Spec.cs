@@ -48,8 +48,8 @@ public class PathTraversalSecuritySpec
 
         // Act
         Func<Task> act = async () => await _discovery
-            .DiscoverAsync(maliciousPath)
-            .ToListAsync();
+            .Discover(maliciousPath)
+            .ToList();
 
         // Assert
         await act.Should().ThrowAsync<ArgumentException>()
@@ -69,8 +69,8 @@ public class PathTraversalSecuritySpec
         {
             // Act
             Func<Task> act = async () => await _discovery
-                .DiscoverAsync(maliciousPath)
-                .ToListAsync();
+                .Discover(maliciousPath)
+                .ToList();
 
             // Assert
             await act.Should().ThrowAsync<ArgumentException>()
@@ -90,8 +90,8 @@ public class PathTraversalSecuritySpec
 
         // Act
         Func<Task> act = async () => await _discovery
-            .DiscoverAsync(nonExistentPath)
-            .ToListAsync();
+            .Discover(nonExistentPath)
+            .ToList();
 
         // Assert
         await act.Should().ThrowAsync<DirectoryNotFoundException>();
@@ -114,8 +114,8 @@ public class PathTraversalSecuritySpec
         {
             // Act
             var files = await _discovery
-                .DiscoverAsync(testDir)
-                .ToListAsync();
+                .Discover(testDir)
+                .ToList();
 
             // Assert
             files.Should().NotContain(f => f.RelativePath.StartsWith("."));
@@ -145,8 +145,8 @@ public class PathTraversalSecuritySpec
         {
             // Act
             var files = await _discovery
-                .DiscoverAsync(testDir)
-                .ToListAsync();
+                .Discover(testDir)
+                .ToList();
 
             // Assert
             files.Should().NotContain(f => f.RelativePath.Contains(".git"));
@@ -183,8 +183,8 @@ public class PathTraversalSecuritySpec
 
             // Act
             var files = await _discovery
-                .DiscoverAsync(testDir)
-                .ToListAsync();
+                .Discover(testDir)
+                .ToList();
 
             // Assert
             files.Should().NotContain(f => f.RelativePath.Contains("link"));
@@ -217,8 +217,8 @@ public class PathTraversalSecuritySpec
         {
             // Act
             var files = await _discovery
-                .DiscoverAsync(testDir)
-                .ToListAsync();
+                .Discover(testDir)
+                .ToList();
 
             // Assert
             files.Should().HaveCount(1);
@@ -235,14 +235,14 @@ public class PathTraversalSecuritySpec
     {
         // Act & Assert
         Func<Task> actNull = async () => await _discovery
-            .DiscoverAsync(null!)
-            .ToListAsync();
+            .Discover(null!)
+            .ToList();
 
         await actNull.Should().ThrowAsync<ArgumentException>();
 
         Func<Task> actEmpty = async () => await _discovery
-            .DiscoverAsync("")
-            .ToListAsync();
+            .Discover("")
+            .ToList();
 
         await actEmpty.Should().ThrowAsync<ArgumentException>();
     }
@@ -255,8 +255,8 @@ public class PathTraversalSecuritySpec
 
         // Act
         Func<Task> act = async () => await _discovery
-            .DiscoverAsync(maliciousPath)
-            .ToListAsync();
+            .Discover(maliciousPath)
+            .ToList();
 
         // Assert
         await act.Should().ThrowAsync<ArgumentException>();
@@ -272,8 +272,8 @@ public class PathTraversalSecuritySpec
 
         // Act
         Func<Task> act = async () => await _discovery
-            .DiscoverAsync(longPath)
-            .ToListAsync();
+            .Discover(longPath)
+            .ToList();
 
         // Assert - Should throw either PathTooLongException or DirectoryNotFoundException
         await act.Should().ThrowAsync<ArgumentException>()
@@ -296,8 +296,8 @@ public class PathTraversalSecuritySpec
         {
             // Act
             var files = await _discovery
-                .DiscoverAsync(testDir)
-                .ToListAsync();
+                .Discover(testDir)
+                .ToList();
 
             // Assert
             files.Should().Contain(f => f.RelativePath == "safe.md");
@@ -319,7 +319,7 @@ public class PathTraversalSecuritySpec
 
         var largeFile = Path.Combine(testDir, "large.md");
         // Create 60MB file (exceeds 50MB limit)
-        await File.WriteAllBytesAsync(largeFile, new byte[60 * 1024 * 1024]);
+        await File.WriteAllBytes(largeFile, new byte[60 * 1024 * 1024]);
 
         var normalFile = Path.Combine(testDir, "normal.md");
         await File.WriteAllTextAsync(normalFile, "# Normal size");
@@ -328,8 +328,8 @@ public class PathTraversalSecuritySpec
         {
             // Act
             var files = await _discovery
-                .DiscoverAsync(testDir)
-                .ToListAsync();
+                .Discover(testDir)
+                .ToList();
 
             // Assert
             files.Should().NotContain(f => f.RelativePath == "large.md");
@@ -359,8 +359,8 @@ public class PathTraversalSecuritySpec
         {
             // Act
             var files = await _discovery
-                .DiscoverAsync(testDir)
-                .ToListAsync();
+                .Discover(testDir)
+                .ToList();
 
             // Assert
             files.Should().NotContain(f => f.RelativePath.Contains("node_modules"));
@@ -394,8 +394,8 @@ public class PathTraversalSecuritySpec
         {
             // Act
             var files = await _discovery
-                .DiscoverAsync(testDir)
-                .ToListAsync();
+                .Discover(testDir)
+                .ToList();
 
             // Assert
             files.Should().NotContain(f => f.RelativePath.Contains("bin"));
@@ -422,7 +422,7 @@ public class PathTraversalSecuritySpec
         {
             // Act - Run discovery concurrently
             var tasks = Enumerable.Range(0, 10)
-                .Select(_ => _discovery.DiscoverAsync(testDir).ToListAsync().AsTask())
+                .Select(_ => _discovery.Discover(testDir).ToList().AsTask())
                 .ToArray();
 
             var results = await Task.WhenAll(tasks);

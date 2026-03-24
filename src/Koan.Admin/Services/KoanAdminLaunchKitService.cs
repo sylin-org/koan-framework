@@ -40,7 +40,7 @@ internal sealed class KoanAdminLaunchKitService : IKoanAdminLaunchKitService
         _logger = logger;
     }
 
-    public Task<KoanAdminLaunchKitMetadata> GetMetadataAsync(CancellationToken cancellationToken = default)
+    public Task<KoanAdminLaunchKitMetadata> GetMetadata(CancellationToken cancellationToken = default)
     {
         var generate = _options.CurrentValue.Generate ?? new KoanAdminGenerateOptions();
         var profiles = NormalizeProfiles(generate.ComposeProfiles);
@@ -63,7 +63,7 @@ internal sealed class KoanAdminLaunchKitService : IKoanAdminLaunchKitService
         return Task.FromResult(metadata);
     }
 
-    public async Task<KoanAdminLaunchKitArchive> GenerateArchiveAsync(
+    public async Task<KoanAdminLaunchKitArchive> GenerateArchive(
         KoanAdminLaunchKitRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -81,7 +81,7 @@ internal sealed class KoanAdminLaunchKitService : IKoanAdminLaunchKitService
         var openApiClients = ResolveOpenApiClients(request.OpenApiClients, generate.OpenApiClients);
 
         var generatedAt = DateTimeOffset.UtcNow;
-        var manifest = await _manifestService.BuildAsync(cancellationToken);
+        var manifest = await _manifestService.Build(cancellationToken);
         var routes = _routes.Current;
 
         var files = new List<FileBuffer>();

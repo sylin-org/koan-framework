@@ -38,7 +38,7 @@ public sealed class OllamaAdapterContributorSpec
         using var provider = BuildServiceProvider(configuration, sourceRegistry, adapterRegistry);
 
         var contributor = new OllamaAdapterContributor();
-        await contributor.ContributeAsync(provider, CancellationToken.None);
+        await contributor.Contribute(provider, CancellationToken.None);
 
         sourceRegistry.RegisteredSources.Should().HaveCount(1);
         var source = sourceRegistry.RegisteredSources.Single();
@@ -85,7 +85,7 @@ public sealed class OllamaAdapterContributorSpec
         using var provider = BuildServiceProvider(configuration, sourceRegistry, adapterRegistry, zenGardenProvider);
 
         var contributor = new OllamaAdapterContributor();
-        await contributor.ContributeAsync(provider, CancellationToken.None);
+        await contributor.Contribute(provider, CancellationToken.None);
 
         var source = sourceRegistry.RegisteredSources.Single();
         source.Origin.Should().Be("explicit-config");
@@ -115,7 +115,7 @@ public sealed class OllamaAdapterContributorSpec
         using var provider = BuildServiceProvider(configuration, sourceRegistry, adapterRegistry, zenGardenProvider);
 
         var contributor = new OllamaAdapterContributor();
-        await contributor.ContributeAsync(provider, CancellationToken.None);
+        await contributor.Contribute(provider, CancellationToken.None);
 
         var source = sourceRegistry.RegisteredSources.Single();
         source.Origin.Should().Be("auto-discovery");
@@ -149,7 +149,7 @@ public sealed class OllamaAdapterContributorSpec
         using var provider = BuildServiceProvider(configuration, sourceRegistry, adapterRegistry, zenGardenProvider);
 
         var contributor = new OllamaAdapterContributor();
-        await contributor.ContributeAsync(provider, CancellationToken.None);
+        await contributor.Contribute(provider, CancellationToken.None);
 
         sourceRegistry.RegisteredSources.Should().ContainSingle();
         zenGardenProvider.ResolveRequests.Should().ContainSingle();
@@ -170,7 +170,7 @@ public sealed class OllamaAdapterContributorSpec
         using var provider = BuildServiceProvider(configuration, sourceRegistry, adapterRegistry);
 
         var contributor = new OllamaAdapterContributor();
-        await contributor.ContributeAsync(provider, CancellationToken.None);
+        await contributor.Contribute(provider, CancellationToken.None);
 
         sourceRegistry.RegisteredSources.Should().BeEmpty();
         adapterRegistry.All.Should().ContainSingle(adapter => adapter.Id == "ollama");
@@ -274,7 +274,7 @@ public sealed class OllamaAdapterContributorSpec
             return string.Equals(adapterId, "ollama", StringComparison.OrdinalIgnoreCase);
         }
 
-        public ValueTask<ZenGardenOfferingResolution?> ResolveAsync(
+        public ValueTask<ZenGardenOfferingResolution?> Resolve(
             ZenGardenConnectionIntent intent,
             CancellationToken cancellationToken = default)
         {
@@ -282,7 +282,7 @@ public sealed class OllamaAdapterContributorSpec
             return ValueTask.FromResult(_resolver(intent));
         }
 
-        public ValueTask<ZenGardenCapabilityWishReceipt?> WishCapabilitiesAsync(
+        public ValueTask<ZenGardenCapabilityWishReceipt?> WishCapabilities(
             ZenGardenConnectionIntent intent,
             CancellationToken cancellationToken = default)
         {

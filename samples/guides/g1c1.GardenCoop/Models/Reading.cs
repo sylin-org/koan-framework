@@ -60,7 +60,7 @@ public class Reading : Entity<Reading>  // inheriting from Entity<Reading> gives
                 if (!string.IsNullOrWhiteSpace(reading.SensorSerial))
                 {
                     // find or create the sensor - one call does it all
-                    var sensor = await Sensor.EnsureAsync(reading.SensorSerial, ct);
+                    var sensor = await Sensor.Ensure(reading.SensorSerial, ct);
 
                     // update sensor's last seen and capabilities
                     sensor.LastSeenAt = reading.SampledAt;

@@ -57,7 +57,7 @@ AppHost.Current ??= app.Services;
 
 // Seed default spaces
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
-await SpaceSeeder.SeedDefaultsAsync(logger);
+await SpaceSeeder.SeedDefaults(logger);
 
 app.UseCors();
 app.UseStaticFiles();
@@ -65,4 +65,4 @@ app.UseRouting();
 app.MapControllers();
 app.MapFallbackToFile("index.html");
 
-app.Run();
+app.RunAsync();

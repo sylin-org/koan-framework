@@ -29,7 +29,7 @@ public sealed class HackerNewsPullAdapter : ISourcePullAdapter
 
     public SourceType SupportedType => SourceType.HackerNews;
 
-    public async Task<List<Note>> PullAsync(Source source, CancellationToken ct)
+    public async Task<List<Note>> Pull(Source source, CancellationToken ct)
     {
         var config = SourceConfigParser.Parse<HackerNewsConfig>(source.Configuration);
 
@@ -59,7 +59,7 @@ public sealed class HackerNewsPullAdapter : ISourcePullAdapter
 
             try
             {
-                var story = await FetchStoryAsync(http, id, ct);
+                var story = await FetchStory(http, id, ct);
                 if (story is null)
                     continue;
 
@@ -140,7 +140,7 @@ public sealed class HackerNewsPullAdapter : ISourcePullAdapter
         return notes;
     }
 
-    private static async Task<HnStory?> FetchStoryAsync(HttpClient http, long id, CancellationToken ct)
+    private static async Task<HnStory?> FetchStory(HttpClient http, long id, CancellationToken ct)
     {
         var url = string.Format(ItemUrl, id);
         var json = await http.GetStringAsync(url, ct);

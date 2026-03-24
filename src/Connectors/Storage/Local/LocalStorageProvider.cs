@@ -20,7 +20,7 @@ public sealed class LocalStorageProvider : IStorageProvider, IStatOperations, IS
 
     public StorageProviderCapabilities Capabilities => new(true, true, false, true);
 
-    public async Task WriteAsync(string container, string key, Stream content, string? contentType, CancellationToken ct = default)
+    public async Task Write(string container, string key, Stream content, string? contentType, CancellationToken ct = default)
     {
         var path = GetPath(container, key);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
@@ -33,14 +33,14 @@ public sealed class LocalStorageProvider : IStorageProvider, IStatOperations, IS
         File.Move(temp, path);
     }
 
-    public Task<Stream> OpenReadAsync(string container, string key, CancellationToken ct = default)
+    public Task<Stream> OpenRead(string container, string key, CancellationToken ct = default)
     {
         var path = GetPath(container, key);
         var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 64 * 1024, FileOptions.Asynchronous | FileOptions.RandomAccess);
         return Task.FromResult<Stream>(fs);
     }
 
-    public async Task<(Stream Stream, long? Length)> OpenReadRangeAsync(string container, string key, long? from, long? to, CancellationToken ct = default)
+    public async Task<(Stream Stream, long? Length)> OpenReadRange(string container, string key, long? from, long? to, CancellationToken ct = default)
     {
         var path = GetPath(container, key);
         var fi = new FileInfo(path);
@@ -54,13 +54,13 @@ public sealed class LocalStorageProvider : IStorageProvider, IStatOperations, IS
         fs.Seek(start, SeekOrigin.Begin);
         var sliceLen = end - start + 1;
         var ms = new MemoryStream((int)Math.Min(sliceLen, int.MaxValue));
-        await CopyRangeAsync(fs, ms, sliceLen, ct);
+        await CopyRange(fs, ms, sliceLen, ct);
         ms.Position = 0;
         fs.Dispose();
         return (ms, sliceLen);
     }
 
-    public Task<bool> DeleteAsync(string container, string key, CancellationToken ct = default)
+    public Task<bool> Delete(string container, string key, CancellationToken ct = default)
     {
         var path = GetPath(container, key);
         if (!File.Exists(path)) return Task.FromResult(false);
@@ -68,13 +68,13 @@ public sealed class LocalStorageProvider : IStorageProvider, IStatOperations, IS
         return Task.FromResult(true);
     }
 
-    public Task<bool> ExistsAsync(string container, string key, CancellationToken ct = default)
+    public Task<bool> Exists(string container, string key, CancellationToken ct = default)
     {
         var path = GetPath(container, key);
         return Task.FromResult(File.Exists(path));
     }
 
-    public Task<ObjectStat?> HeadAsync(string container, string key, CancellationToken ct = default)
+    public Task<ObjectStat?> Head(string container, string key, CancellationToken ct = default)
     {
         var path = GetPath(container, key);
         if (!File.Exists(path)) return Task.FromResult<ObjectStat?>(null);
@@ -86,7 +86,7 @@ public sealed class LocalStorageProvider : IStorageProvider, IStatOperations, IS
         return Task.FromResult<ObjectStat?>(stat);
     }
 
-    public Task<bool> CopyAsync(string sourceContainer, string sourceKey, string targetContainer, string targetKey, CancellationToken ct = default)
+    public Task<bool> Copy(string sourceContainer, string sourceKey, string targetContainer, string targetKey, CancellationToken ct = default)
     {
         var src = GetPath(sourceContainer, sourceKey);
         var dst = GetPath(targetContainer, targetKey);
@@ -137,7 +137,7 @@ public sealed class LocalStorageProvider : IStorageProvider, IStatOperations, IS
         return Convert.ToHexString(bytes.AsSpan(0, 2)).ToLowerInvariant();
     }
 
-    public async IAsyncEnumerable<StorageObjectInfo> ListObjectsAsync(string container, string? prefix = null, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    public async IAsyncEnumerable<StorageObjectInfo> ListObjects(string container, string? prefix = null, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
         var basePath = _options.CurrentValue.BasePath ?? throw new InvalidOperationException("Local storage BasePath not configured.");
         var containerPath = Path.Combine(basePath, container ?? string.Empty);
@@ -170,7 +170,7 @@ public sealed class LocalStorageProvider : IStorageProvider, IStatOperations, IS
         }
 
         // Enumerate files recursively
-        await foreach (var filePath in EnumerateFilesAsync(searchPath, searchPattern, prefix, containerPath, ct))
+        await foreach (var filePath in EnumerateFiles(searchPath, searchPattern, prefix, containerPath, ct))
         {
             ct.ThrowIfCancellationRequested();
 
@@ -206,7 +206,7 @@ public sealed class LocalStorageProvider : IStorageProvider, IStatOperations, IS
         }
     }
 
-    private async IAsyncEnumerable<string> EnumerateFilesAsync(
+    private async IAsyncEnumerable<string> EnumerateFiles(
         string searchPath,
         string searchPattern,
         string? prefix,
@@ -247,7 +247,7 @@ public sealed class LocalStorageProvider : IStorageProvider, IStatOperations, IS
         }
     }
 
-    private static async Task CopyRangeAsync(Stream from, Stream to, long bytesToCopy, CancellationToken ct)
+    private static async Task CopyRange(Stream from, Stream to, long bytesToCopy, CancellationToken ct)
     {
         var buffer = new byte[64 * 1024];
         long remaining = bytesToCopy;

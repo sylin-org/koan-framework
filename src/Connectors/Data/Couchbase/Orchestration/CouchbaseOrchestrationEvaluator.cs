@@ -91,7 +91,7 @@ public sealed class CouchbaseOrchestrationEvaluator : BaseOrchestrationEvaluator
         }
     }
 
-    protected override Task<DependencyDescriptor> CreateDependencyDescriptorAsync(IConfiguration configuration, OrchestrationContext context)
+    protected override Task<DependencyDescriptor> CreateDependencyDescriptor(IConfiguration configuration, OrchestrationContext context)
     {
         var bucket = Configuration.ReadFirst(configuration, "Koan",
             Constants.Configuration.Keys.Bucket,

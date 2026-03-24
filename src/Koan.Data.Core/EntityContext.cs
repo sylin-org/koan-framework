@@ -183,7 +183,7 @@ public static class EntityContext
     /// </summary>
     /// <exception cref="InvalidOperationException">Thrown when not in a transaction</exception>
     /// <exception cref="TransactionException">Thrown when commit fails</exception>
-    public static Task CommitAsync(CancellationToken ct = default)
+    public static Task Commit(CancellationToken ct = default)
     {
         var current = _current.Value;
         if (current?.TransactionCoordinator == null)
@@ -192,7 +192,7 @@ public static class EntityContext
                 "No active transaction to commit. Use EntityContext.Transaction() to start a transaction.");
         }
 
-        return current.TransactionCoordinator.CommitAsync(ct);
+        return current.TransactionCoordinator.Commit(ct);
     }
 
     /// <summary>
@@ -200,7 +200,7 @@ public static class EntityContext
     /// All tracked operations will be discarded and marked as rolled back.
     /// </summary>
     /// <exception cref="InvalidOperationException">Thrown when not in a transaction</exception>
-    public static Task RollbackAsync(CancellationToken ct = default)
+    public static Task Rollback(CancellationToken ct = default)
     {
         var current = _current.Value;
         if (current?.TransactionCoordinator == null)
@@ -209,7 +209,7 @@ public static class EntityContext
                 "No active transaction to rollback. Use EntityContext.Transaction() to start a transaction.");
         }
 
-        return current.TransactionCoordinator.RollbackAsync(ct);
+        return current.TransactionCoordinator.Rollback(ct);
     }
 
     private static ITransactionCoordinator CreateTransactionCoordinator(string name)
@@ -266,12 +266,12 @@ public static class EntityContext
                     if (autoCommit)
                     {
                         // Auto-commit on successful dispose
-                        _coordinator.CommitAsync(default).GetAwaiter().GetResult();
+                        _coordinator.Commit(default).GetAwaiter().GetResult();
                     }
                     else
                     {
                         // Auto-rollback if auto-commit disabled
-                        _coordinator.RollbackAsync(default).GetAwaiter().GetResult();
+                        _coordinator.Rollback(default).GetAwaiter().GetResult();
                     }
                 }
             }

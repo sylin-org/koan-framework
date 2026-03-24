@@ -18,7 +18,7 @@ public abstract class TestFixtureHandle : IAsyncDisposable
 
     public abstract ValueTask DisposeAsync();
 
-    protected ValueTask DisposeCoreAsync(Func<ValueTask> dispose)
+    protected ValueTask DisposeCore(Func<ValueTask> dispose)
     {
         if (_disposed)
         {
@@ -41,5 +41,5 @@ public sealed class TestFixtureHandle<TFixture> : TestFixtureHandle where TFixtu
 
     public TFixture Instance { get; }
 
-    public override ValueTask DisposeAsync() => DisposeCoreAsync(() => Instance.DisposeAsync());
+    public override ValueTask DisposeAsync() => DisposeCore(() => Instance.DisposeAsync());
 }

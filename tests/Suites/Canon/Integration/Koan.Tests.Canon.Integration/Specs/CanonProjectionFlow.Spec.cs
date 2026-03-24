@@ -92,7 +92,7 @@ public sealed class CanonProjectionFlowSpec
 
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 
     private static void ConfigureServices(TestContext ctx, IServiceCollection services)
     {
@@ -282,7 +282,7 @@ public sealed class CanonProjectionFlowSpec
             return Task.FromResult(stage);
         }
 
-        public Task<CanonIndex?> GetIndexAsync(string entityType, string key, CancellationToken cancellationToken)
+        public Task<CanonIndex?> GetIndex(string entityType, string key, CancellationToken cancellationToken)
         {
             lock (_gate)
             {
@@ -291,7 +291,7 @@ public sealed class CanonProjectionFlowSpec
             }
         }
 
-        public Task UpsertIndexAsync(CanonIndex index, CancellationToken cancellationToken)
+        public Task UpsertIndex(CanonIndex index, CancellationToken cancellationToken)
         {
             if (index is null)
             {
@@ -403,7 +403,7 @@ public sealed class CanonProjectionFlowSpec
 
     private sealed class NoopAuditSink : ICanonAuditSink
     {
-        public Task WriteAsync(IReadOnlyList<CanonAuditEntry> entries, CancellationToken cancellationToken)
+        public Task Write(IReadOnlyList<CanonAuditEntry> entries, CancellationToken cancellationToken)
             => Task.CompletedTask;
     }
 

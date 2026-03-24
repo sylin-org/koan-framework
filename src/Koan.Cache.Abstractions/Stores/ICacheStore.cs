@@ -11,17 +11,17 @@ public interface ICacheStore
 
     CacheCapabilities Capabilities { get; }
 
-    ValueTask<CacheFetchResult> FetchAsync(CacheKey key, CacheEntryOptions options, CancellationToken ct);
+    ValueTask<CacheFetchResult> Fetch(CacheKey key, CacheEntryOptions options, CancellationToken ct);
 
-    ValueTask SetAsync(CacheKey key, CacheValue value, CacheEntryOptions options, CancellationToken ct);
+    ValueTask Set(CacheKey key, CacheValue value, CacheEntryOptions options, CancellationToken ct);
 
-    ValueTask<bool> RemoveAsync(CacheKey key, CancellationToken ct);
+    ValueTask<bool> Remove(CacheKey key, CancellationToken ct);
 
-    ValueTask TouchAsync(CacheKey key, CacheEntryOptions options, CancellationToken ct);
+    ValueTask Touch(CacheKey key, CacheEntryOptions options, CancellationToken ct);
 
-    ValueTask<bool> ExistsAsync(CacheKey key, CancellationToken ct);
+    ValueTask<bool> Exists(CacheKey key, CancellationToken ct);
 
-    ValueTask PublishInvalidationAsync(CacheKey key, CacheEntryOptions options, CancellationToken ct);
+    ValueTask PublishInvalidation(CacheKey key, CacheEntryOptions options, CancellationToken ct);
 
-    IAsyncEnumerable<TaggedCacheKey> EnumerateByTagAsync(string tag, CancellationToken ct);
+    IAsyncEnumerable<TaggedCacheKey> EnumerateByTag(string tag, CancellationToken ct);
 }

@@ -22,14 +22,14 @@ namespace Koan.Samples.Meridian.Services;
 
 public interface ISchemaGuidedExtractor
 {
-    Task<List<ExtractedField>> ExtractBatchAsync(
+    Task<List<ExtractedField>> ExtractBatch(
         SourceDocument document,
         SemanticBatch batch,
         FactCatalog catalog,
         string pipelineId,
         CancellationToken ct);
 
-    Task<List<ExtractedField>> ExtractBatchFromNotesAsync(
+    Task<List<ExtractedField>> ExtractBatchFromNotes(
         string notes,
         SemanticBatch batch,
         FactCatalog catalog,
@@ -53,7 +53,7 @@ public sealed class SchemaGuidedExtractor : ISchemaGuidedExtractor
         _logger = logger;
     }
 
-    public async Task<List<ExtractedField>> ExtractBatchAsync(
+    public async Task<List<ExtractedField>> ExtractBatch(
         SourceDocument document,
         SemanticBatch batch,
         FactCatalog catalog,
@@ -81,7 +81,7 @@ public sealed class SchemaGuidedExtractor : ISchemaGuidedExtractor
         if (documentStyle?.UsePassageRetrieval == true)
         {
             // Use RAG to get focused context
-            var passages = await RetrieveRelevantPassagesAsync(
+            var passages = await RetrieveRelevantPassages(
                 document, batch, catalog, documentStyle.PassageRetrievalTopK, ct);
 
             if (passages.Count > 0)
@@ -89,7 +89,7 @@ public sealed class SchemaGuidedExtractor : ISchemaGuidedExtractor
                 if (documentStyle.ExpandPassageContext)
                 {
                     // Expand passages with surrounding context for dialogues
-                    passages = await ExpandPassageContextAsync(
+                    passages = await ExpandPassageContext(
                         passages, documentStyle.ContextWindowSize, ct);
                 }
 
@@ -122,7 +122,7 @@ public sealed class SchemaGuidedExtractor : ISchemaGuidedExtractor
             documentStyle,
             usedPassageRetrieval);
 
-        var fields = await ExtractFieldsAsync(prompt, batch, catalog, pipelineId, document.Id, FieldSource.DocumentExtraction, ct);
+        var fields = await ExtractFields(prompt, batch, catalog, pipelineId, document.Id, FieldSource.DocumentExtraction, ct);
 
         _logger.LogInformation("Extracted {FieldCount}/{TotalFields} fields from document {DocumentId} for batch '{Batch}' (style: {Style}, RAG: {UsedRAG})",
             fields.Count, batch.FieldPaths.Count, document.Id, batch.CategoryName,
@@ -131,7 +131,7 @@ public sealed class SchemaGuidedExtractor : ISchemaGuidedExtractor
         return fields;
     }
 
-    public async Task<List<ExtractedField>> ExtractBatchFromNotesAsync(
+    public async Task<List<ExtractedField>> ExtractBatchFromNotes(
         string notes,
         SemanticBatch batch,
         FactCatalog catalog,
@@ -145,7 +145,7 @@ public sealed class SchemaGuidedExtractor : ISchemaGuidedExtractor
 
         var notesDocId = $"notes:{pipelineId}";
         var prompt = BuildNotesExtractionPrompt(notes, batch, catalog);
-        var fields = await ExtractFieldsAsync(prompt, batch, catalog, pipelineId, notesDocId, FieldSource.AuthoritativeNotes, ct);
+        var fields = await ExtractFields(prompt, batch, catalog, pipelineId, notesDocId, FieldSource.AuthoritativeNotes, ct);
 
         _logger.LogInformation("Extracted {FieldCount}/{TotalFields} fields from authoritative notes for batch '{Batch}'",
             fields.Count, batch.FieldPaths.Count, batch.CategoryName);
@@ -153,7 +153,7 @@ public sealed class SchemaGuidedExtractor : ISchemaGuidedExtractor
         return fields;
     }
 
-    private async Task<List<ExtractedField>> ExtractFieldsAsync(
+    private async Task<List<ExtractedField>> ExtractFields(
         string prompt,
         SemanticBatch batch,
         FactCatalog catalog,
@@ -484,7 +484,7 @@ public sealed class SchemaGuidedExtractor : ISchemaGuidedExtractor
     /// Retrieve relevant passages from the document using vector similarity search.
     /// Formulates a query from the semantic batch and fact catalog.
     /// </summary>
-    private async Task<List<Passage>> RetrieveRelevantPassagesAsync(
+    private async Task<List<Passage>> RetrieveRelevantPassages(
         SourceDocument document,
         SemanticBatch batch,
         FactCatalog catalog,
@@ -570,7 +570,7 @@ public sealed class SchemaGuidedExtractor : ISchemaGuidedExtractor
     /// Expand passages with surrounding context (for dialogue documents).
     /// Adds passages before and after each retrieved passage.
     /// </summary>
-    private async Task<List<Passage>> ExpandPassageContextAsync(
+    private async Task<List<Passage>> ExpandPassageContext(
         List<Passage> keyPassages,
         int windowSize,
         CancellationToken ct)

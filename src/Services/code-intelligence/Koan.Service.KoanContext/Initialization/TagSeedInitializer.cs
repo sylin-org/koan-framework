@@ -35,12 +35,12 @@ public sealed class TagSeedInitializer : IHostedService
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        await EnsureSeededAsync(force: false, cancellationToken).ConfigureAwait(false);
+        await EnsureSeeded(force: false, cancellationToken).ConfigureAwait(false);
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-    public async Task<TagSeedSummary> EnsureSeededAsync(bool force, CancellationToken cancellationToken)
+    public async Task<TagSeedSummary> EnsureSeeded(bool force, CancellationToken cancellationToken)
     {
         if (!force && _completed && _lastSummary is not null)
         {
@@ -68,10 +68,10 @@ public sealed class TagSeedInitializer : IHostedService
 
             var reports = new List<TagSeedReport>(4)
             {
-                await SeedVocabularyAsync(cancellationToken).ConfigureAwait(false),
-                await SeedRulesAsync(cancellationToken).ConfigureAwait(false),
-                await SeedPipelinesAsync(cancellationToken).ConfigureAwait(false),
-                await SeedPersonasAsync(cancellationToken).ConfigureAwait(false)
+                await SeedVocabulary(cancellationToken).ConfigureAwait(false),
+                await SeedRules(cancellationToken).ConfigureAwait(false),
+                await SeedPipelines(cancellationToken).ConfigureAwait(false),
+                await SeedPersonas(cancellationToken).ConfigureAwait(false)
             };
 
             cache.Remove(Constants.CacheKeys.TagVocabulary);
@@ -112,7 +112,7 @@ public sealed class TagSeedInitializer : IHostedService
         new TagVocabularySeed("sample", "Sample", new[] { "example", "snippet" })
     ];
 
-    private static async Task<TagSeedReport> SeedVocabularyAsync(CancellationToken cancellationToken)
+    private static async Task<TagSeedReport> SeedVocabulary(CancellationToken cancellationToken)
     {
         var created = 0;
         var updated = 0;
@@ -191,7 +191,7 @@ public sealed class TagSeedInitializer : IHostedService
             Priority: 70)
     ];
 
-    private static async Task<TagSeedReport> SeedRulesAsync(CancellationToken cancellationToken)
+    private static async Task<TagSeedReport> SeedRules(CancellationToken cancellationToken)
     {
         var created = 0;
         var updated = 0;
@@ -237,7 +237,7 @@ public sealed class TagSeedInitializer : IHostedService
             EnableAiFallback: false)
     ];
 
-    private static async Task<TagSeedReport> SeedPipelinesAsync(CancellationToken cancellationToken)
+    private static async Task<TagSeedReport> SeedPipelines(CancellationToken cancellationToken)
     {
         var created = 0;
         var updated = 0;
@@ -322,7 +322,7 @@ public sealed class TagSeedInitializer : IHostedService
             DefaultAll: new[] { "adr" })
     ];
 
-    private static async Task<TagSeedReport> SeedPersonasAsync(CancellationToken cancellationToken)
+    private static async Task<TagSeedReport> SeedPersonas(CancellationToken cancellationToken)
     {
         var created = 0;
         var updated = 0;

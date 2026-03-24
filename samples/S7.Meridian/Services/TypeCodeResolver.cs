@@ -15,16 +15,16 @@ namespace Koan.Samples.Meridian.Services;
 public interface ITypeCodeResolver
 {
     /// <summary>Gets all available analysis type codes from database.</summary>
-    Task<List<string>> GetAvailableAnalysisCodesAsync(CancellationToken ct = default);
+    Task<List<string>> GetAvailableAnalysisCodes(CancellationToken ct = default);
 
     /// <summary>Gets all available source type codes from database.</summary>
-    Task<List<string>> GetAvailableSourceCodesAsync(CancellationToken ct = default);
+    Task<List<string>> GetAvailableSourceCodes(CancellationToken ct = default);
 
     /// <summary>Resolves an analysis type code to its entity.</summary>
-    Task<AnalysisType?> ResolveAnalysisTypeAsync(string code, CancellationToken ct = default);
+    Task<AnalysisType?> ResolveAnalysisType(string code, CancellationToken ct = default);
 
     /// <summary>Resolves a source type code to its entity.</summary>
-    Task<SourceType?> ResolveSourceTypeAsync(string code, CancellationToken ct = default);
+    Task<SourceType?> ResolveSourceType(string code, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -39,7 +39,7 @@ public class TypeCodeResolver : ITypeCodeResolver
         _logger = logger;
     }
 
-    public async Task<List<string>> GetAvailableAnalysisCodesAsync(CancellationToken ct = default)
+    public async Task<List<string>> GetAvailableAnalysisCodes(CancellationToken ct = default)
     {
         var types = await AnalysisType.All(ct);
         return types
@@ -49,7 +49,7 @@ public class TypeCodeResolver : ITypeCodeResolver
             .ToList();
     }
 
-    public async Task<List<string>> GetAvailableSourceCodesAsync(CancellationToken ct = default)
+    public async Task<List<string>> GetAvailableSourceCodes(CancellationToken ct = default)
     {
         var types = await SourceType.All(ct);
         return types
@@ -59,7 +59,7 @@ public class TypeCodeResolver : ITypeCodeResolver
             .ToList();
     }
 
-    public async Task<AnalysisType?> ResolveAnalysisTypeAsync(string code, CancellationToken ct = default)
+    public async Task<AnalysisType?> ResolveAnalysisType(string code, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(code))
         {
@@ -81,7 +81,7 @@ public class TypeCodeResolver : ITypeCodeResolver
         return result;
     }
 
-    public async Task<SourceType?> ResolveSourceTypeAsync(string code, CancellationToken ct = default)
+    public async Task<SourceType?> ResolveSourceType(string code, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(code))
         {

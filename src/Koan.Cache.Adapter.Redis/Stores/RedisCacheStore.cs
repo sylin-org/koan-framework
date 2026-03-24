@@ -55,7 +55,7 @@ internal sealed class RedisCacheStore : ICacheStore
         SupportsRegionScoping: true,
         Hints: new HashSet<string>(new[] { "tags", "stale-while-revalidate", "singleflight", "pubsub" }, StringComparer.OrdinalIgnoreCase));
 
-    public async ValueTask<CacheFetchResult> FetchAsync(CacheKey key, CacheEntryOptions options, CancellationToken ct)
+    public async ValueTask<CacheFetchResult> Fetch(CacheKey key, CacheEntryOptions options, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
 
@@ -89,14 +89,14 @@ internal sealed class RedisCacheStore : ICacheStore
 
         if (staleUntil is { } finalExpiry && finalExpiry <= now)
         {
-            await EvictAsync(redisKey, envelope.Options.Tags);
+            await Evict(redisKey, envelope.Options.Tags);
             return CacheFetchResult.Miss(options);
         }
 
         var absoluteExpired = absoluteExpiration is { } abs && abs <= now;
         if (absoluteExpired && !_options.EnableStaleWhileRevalidate)
         {
-            await EvictAsync(redisKey, envelope.Options.Tags);
+            await Evict(redisKey, envelope.Options.Tags);
             return CacheFetchResult.Miss(options);
         }
 
@@ -107,19 +107,19 @@ internal sealed class RedisCacheStore : ICacheStore
 
         if (cachedOptions.SlidingTtl is { } sliding && !absoluteExpired)
         {
-            await RefreshSlidingTtlAsync(redisKey, key, envelope, cachedOptions, now);
+            await RefreshSlidingTtl(redisKey, key, envelope, cachedOptions, now);
         }
 
         return CacheFetchResult.HitResult(envelope.Value.ToCacheValue(), cachedOptions, absoluteExpiration, staleUntil);
     }
 
-    public ValueTask SetAsync(CacheKey key, CacheValue value, CacheEntryOptions options, CancellationToken ct)
+    public ValueTask Set(CacheKey key, CacheValue value, CacheEntryOptions options, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        return SetCoreAsync(key, value, options, ct, removeExisting: true);
+        return SetCore(key, value, options, ct, removeExisting: true);
     }
 
-    public async ValueTask<bool> RemoveAsync(CacheKey key, CancellationToken ct)
+    public async ValueTask<bool> Remove(CacheKey key, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
 
@@ -133,7 +133,7 @@ internal sealed class RedisCacheStore : ICacheStore
         try
         {
             var envelope = RedisCacheJsonConverter.DeserializeEnvelope(removed);
-            await RemoveTagsAsync(redisKey, envelope.Options.Tags);
+            await RemoveTags(redisKey, envelope.Options.Tags);
         }
         catch (Exception ex)
         {
@@ -143,7 +143,7 @@ internal sealed class RedisCacheStore : ICacheStore
         return true;
     }
 
-    public async ValueTask TouchAsync(CacheKey key, CacheEntryOptions options, CancellationToken ct)
+    public async ValueTask Touch(CacheKey key, CacheEntryOptions options, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
 
@@ -166,10 +166,10 @@ internal sealed class RedisCacheStore : ICacheStore
             return;
         }
 
-        await SetCoreAsync(key, envelope.Value.ToCacheValue(), envelope.Options.ToOptions(), ct, removeExisting: true);
+        await SetCore(key, envelope.Value.ToCacheValue(), envelope.Options.ToOptions(), ct, removeExisting: true);
     }
 
-    public async ValueTask<bool> ExistsAsync(CacheKey key, CancellationToken ct)
+    public async ValueTask<bool> Exists(CacheKey key, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
 
@@ -193,13 +193,13 @@ internal sealed class RedisCacheStore : ICacheStore
 
             if (staleUntil is { } finalExpiry && finalExpiry <= now)
             {
-                await EvictAsync(redisKey, envelope.Options.Tags);
+                await Evict(redisKey, envelope.Options.Tags);
                 return false;
             }
 
             if (!_options.EnableStaleWhileRevalidate && absoluteExpiration is { } absolute && absolute <= now)
             {
-                await EvictAsync(redisKey, envelope.Options.Tags);
+                await Evict(redisKey, envelope.Options.Tags);
                 return false;
             }
 
@@ -213,7 +213,7 @@ internal sealed class RedisCacheStore : ICacheStore
         }
     }
 
-    public ValueTask PublishInvalidationAsync(CacheKey key, CacheEntryOptions options, CancellationToken ct)
+    public ValueTask PublishInvalidation(CacheKey key, CacheEntryOptions options, CancellationToken ct)
     {
         if (!_options.EnablePubSubInvalidation || _subscriber is null)
         {
@@ -236,7 +236,7 @@ internal sealed class RedisCacheStore : ICacheStore
         return new ValueTask(_subscriber.PublishAsync(_channel, payload, CommandFlags.FireAndForget));
     }
 
-    public async IAsyncEnumerable<TaggedCacheKey> EnumerateByTagAsync(string tag, [EnumeratorCancellation] CancellationToken ct)
+    public async IAsyncEnumerable<TaggedCacheKey> EnumerateByTag(string tag, [EnumeratorCancellation] CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
 
@@ -282,7 +282,7 @@ internal sealed class RedisCacheStore : ICacheStore
         }
     }
 
-    private async ValueTask SetCoreAsync(CacheKey key, CacheValue value, CacheEntryOptions options, CancellationToken ct, bool removeExisting)
+    private async ValueTask SetCore(CacheKey key, CacheValue value, CacheEntryOptions options, CancellationToken ct, bool removeExisting)
     {
         var redisKey = BuildRedisKey(key);
         if (removeExisting)
@@ -293,7 +293,7 @@ internal sealed class RedisCacheStore : ICacheStore
                 try
                 {
                     var existingEnvelope = RedisCacheJsonConverter.DeserializeEnvelope(existing);
-                    await RemoveTagsAsync(redisKey, existingEnvelope.Options.Tags);
+                    await RemoveTags(redisKey, existingEnvelope.Options.Tags);
                 }
                 catch (Exception ex)
                 {
@@ -324,16 +324,16 @@ internal sealed class RedisCacheStore : ICacheStore
         if (expiry.HasValue && expiry.Value <= TimeSpan.Zero)
         {
             await _database.KeyDeleteAsync(redisKey);
-            await RemoveTagsAsync(redisKey, envelope.Options.Tags);
+            await RemoveTags(redisKey, envelope.Options.Tags);
             return;
         }
 
         var payload = RedisCacheJsonConverter.SerializeEnvelope(envelope);
         await _database.StringSetAsync(redisKey, payload, expiry);
-        await IndexTagsAsync(redisKey, envelope.Options.Tags, expiry);
+        await IndexTags(redisKey, envelope.Options.Tags, expiry);
     }
 
-    private async Task RefreshSlidingTtlAsync(RedisKey redisKey, CacheKey key, RedisCacheEnvelope envelope, CacheEntryOptions cachedOptions, DateTimeOffset now)
+    private async Task RefreshSlidingTtl(RedisKey redisKey, CacheKey key, RedisCacheEnvelope envelope, CacheEntryOptions cachedOptions, DateTimeOffset now)
     {
         var sliding = cachedOptions.SlidingTtl.GetValueOrDefault();
         if (sliding <= TimeSpan.Zero)
@@ -358,16 +358,16 @@ internal sealed class RedisCacheStore : ICacheStore
         var expiry = DetermineExpiry(now, newAbsolute, newStale);
         var payload = RedisCacheJsonConverter.SerializeEnvelope(envelope);
         await _database.StringSetAsync(redisKey, payload, expiry);
-        await IndexTagsAsync(redisKey, cachedOptions.Tags, expiry);
+        await IndexTags(redisKey, cachedOptions.Tags, expiry);
     }
 
-    internal async ValueTask HandleInvalidationMessageAsync(RedisInvalidationMessage message, CancellationToken ct)
+    internal async ValueTask HandleInvalidationMessage(RedisInvalidationMessage message, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
 
         var redisKey = ResolveRedisKey(message);
         await _database.KeyDeleteAsync(redisKey);
-        await RemoveTagsAsync(redisKey, message.Tags ?? Array.Empty<string>());
+        await RemoveTags(redisKey, message.Tags ?? Array.Empty<string>());
     }
 
     private RedisKey ResolveRedisKey(RedisInvalidationMessage message)
@@ -380,7 +380,7 @@ internal sealed class RedisCacheStore : ICacheStore
         return BuildRedisKey(new CacheKey(message.Key));
     }
 
-    private async Task IndexTagsAsync(RedisKey redisKey, IEnumerable<string> tags, TimeSpan? expiry)
+    private async Task IndexTags(RedisKey redisKey, IEnumerable<string> tags, TimeSpan? expiry)
     {
         var normalized = tags?.Where(static t => !string.IsNullOrWhiteSpace(t))
             .Select(static t => t.Trim())
@@ -410,7 +410,7 @@ internal sealed class RedisCacheStore : ICacheStore
         }
     }
 
-    private async Task RemoveTagsAsync(RedisKey redisKey, IEnumerable<string> tags)
+    private async Task RemoveTags(RedisKey redisKey, IEnumerable<string> tags)
     {
         if (tags is null)
         {
@@ -436,10 +436,10 @@ internal sealed class RedisCacheStore : ICacheStore
         }
     }
 
-    private async Task EvictAsync(RedisKey redisKey, IEnumerable<string> tags)
+    private async Task Evict(RedisKey redisKey, IEnumerable<string> tags)
     {
         await _database.KeyDeleteAsync(redisKey);
-        await RemoveTagsAsync(redisKey, tags);
+        await RemoveTags(redisKey, tags);
     }
 
     private static TimeSpan? DetermineExpiry(DateTimeOffset now, DateTimeOffset? absoluteExpiration, DateTimeOffset? staleUntil)

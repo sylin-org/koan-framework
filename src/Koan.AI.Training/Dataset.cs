@@ -37,7 +37,7 @@ public static class Dataset
         string path,
         CancellationToken ct = default)
     {
-        return await ResolveService().FromFileAsync(path, ct);
+        return await ResolveService().FromFile(path, ct);
     }
 
     /// <summary>
@@ -62,7 +62,7 @@ public static class Dataset
         string? tokenizer = null,
         CancellationToken ct = default)
     {
-        return await ResolveService().AnalyzeAsync(dataset, tokenizer, ct);
+        return await ResolveService().Analyze(dataset, tokenizer, ct);
     }
 
     // ── Internal ──

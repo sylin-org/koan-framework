@@ -18,7 +18,7 @@ namespace Koan.Samples.Meridian.Services;
 
 public interface IFactCategorizer
 {
-    Task<FactCategorizationMap> CategorizeAsync(
+    Task<FactCategorizationMap> Categorize(
         FactCatalog catalog,
         AnalysisType analysisType,
         CancellationToken ct);
@@ -40,14 +40,14 @@ public sealed class FactCategorizer : IFactCategorizer
         _logger = logger;
     }
 
-    public async Task<FactCategorizationMap> CategorizeAsync(
+    public async Task<FactCategorizationMap> Categorize(
         FactCatalog catalog,
         AnalysisType analysisType,
         CancellationToken ct)
     {
         // Check cache first
         var catalogHash = FactCategorizationMap.ComputeCatalogHash(catalog);
-        var cached = await FactCategorizationMap.GetByCatalogHashAsync(catalogHash, ct);
+        var cached = await FactCategorizationMap.GetByCatalogHash(catalogHash, ct);
 
         if (cached != null)
         {
@@ -94,7 +94,7 @@ public sealed class FactCategorizer : IFactCategorizer
         }
 
         // Save to cache
-        var map = await FactCategorizationMap.SaveWithHashAsync(catalogHash, batches, ct);
+        var map = await FactCategorizationMap.SaveWithHash(catalogHash, batches, ct);
 
         _logger.LogInformation("Generated {BatchCount} semantic batches for {FactCount} facts (hash: {Hash})",
             batches.Count, catalog.Facts.Count, catalogHash[..12]);

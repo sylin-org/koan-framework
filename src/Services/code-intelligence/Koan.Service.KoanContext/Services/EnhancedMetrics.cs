@@ -54,9 +54,9 @@ public class EnhancedMetrics
     /// - 🚨 OldestAge > 300s
     /// - 🚨 Failed > 0
     /// </remarks>
-    public async Task<VectorQueueHealthMetrics> GetVectorQueueHealthAsync(CancellationToken cancellationToken = default)
+    public async Task<VectorQueueHealthMetrics> GetVectorQueueHealth(CancellationToken cancellationToken = default)
     {
-        return await _cache.GetOrCreateAsync(VectorQueueCacheKey, async entry =>
+        return await _cache.GetOrCreate(VectorQueueCacheKey, async entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = CacheDuration;
 
@@ -169,25 +169,25 @@ public class EnhancedMetrics
     /// <summary>
     /// Gets comprehensive component health status
     /// </summary>
-    public async Task<ComponentHealthMetrics> GetComponentHealthAsync(CancellationToken cancellationToken = default)
+    public async Task<ComponentHealthMetrics> GetComponentHealth(CancellationToken cancellationToken = default)
     {
-        return await _cache.GetOrCreateAsync(ComponentHealthCacheKey, async entry =>
+        return await _cache.GetOrCreate(ComponentHealthCacheKey, async entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = CacheDuration;
 
             var components = new List<ComponentHealth>();
 
             // SQLite Health
-            components.Add(await CheckSQLiteHealthAsync(cancellationToken));
+            components.Add(await CheckSQLiteHealth(cancellationToken));
 
             // Weaviate Health (via vector query test)
-            components.Add(await CheckWeaviateHealthAsync(cancellationToken));
+            components.Add(await CheckWeaviateHealth(cancellationToken));
 
             // File Monitor Health
             components.Add(CheckFileMonitorHealth());
 
             // Vector Sync Worker Health
-            components.Add(await CheckVectorSyncWorkerHealthAsync(cancellationToken));
+            components.Add(await CheckVectorSyncWorkerHealth(cancellationToken));
 
             var overallHealthy = components.All(c => c.Status == HealthStatus.Healthy);
 
@@ -200,7 +200,7 @@ public class EnhancedMetrics
         }) ?? new ComponentHealthMetrics { OverallHealthy = false };
     }
 
-    private async Task<ComponentHealth> CheckSQLiteHealthAsync(CancellationToken cancellationToken)
+    private async Task<ComponentHealth> CheckSQLiteHealth(CancellationToken cancellationToken)
     {
         try
         {
@@ -229,7 +229,7 @@ public class EnhancedMetrics
         }
     }
 
-    private async Task<ComponentHealth> CheckWeaviateHealthAsync(CancellationToken cancellationToken)
+    private async Task<ComponentHealth> CheckWeaviateHealth(CancellationToken cancellationToken)
     {
         try
         {
@@ -292,7 +292,7 @@ public class EnhancedMetrics
         };
     }
 
-    private async Task<ComponentHealth> CheckVectorSyncWorkerHealthAsync(CancellationToken cancellationToken)
+    private async Task<ComponentHealth> CheckVectorSyncWorkerHealth(CancellationToken cancellationToken)
     {
         try
         {
@@ -373,9 +373,9 @@ public class EnhancedMetrics
     /// <summary>
     /// Gets job system performance metrics
     /// </summary>
-    public async Task<JobSystemMetrics> GetJobSystemMetricsAsync(CancellationToken cancellationToken = default)
+    public async Task<JobSystemMetrics> GetJobSystemMetrics(CancellationToken cancellationToken = default)
     {
-        return await _cache.GetOrCreateAsync(JobSystemCacheKey, async entry =>
+        return await _cache.GetOrCreate(JobSystemCacheKey, async entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = CacheDuration;
 
@@ -460,9 +460,9 @@ public class EnhancedMetrics
     /// <summary>
     /// Gets vector database storage and growth metrics
     /// </summary>
-    public async Task<VectorDbMetrics> GetVectorDbMetricsAsync(CancellationToken cancellationToken = default)
+    public async Task<VectorDbMetrics> GetVectorDbMetrics(CancellationToken cancellationToken = default)
     {
-        return await _cache.GetOrCreateAsync(VectorDbCacheKey, async entry =>
+        return await _cache.GetOrCreate(VectorDbCacheKey, async entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(30); // Slower refresh
 
@@ -525,9 +525,9 @@ public class EnhancedMetrics
     /// <summary>
     /// Gets SQLite storage and index freshness metrics
     /// </summary>
-    public async Task<StorageMetrics> GetStorageMetricsAsync(CancellationToken cancellationToken = default)
+    public async Task<StorageMetrics> GetStorageMetrics(CancellationToken cancellationToken = default)
     {
-        return await _cache.GetOrCreateAsync(StorageCacheKey, async entry =>
+        return await _cache.GetOrCreate(StorageCacheKey, async entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(30);
 

@@ -12,5 +12,5 @@ public interface ICanonAuditSink
     /// <summary>
     /// Writes audit entries.
     /// </summary>
-    Task WriteAsync(IReadOnlyList<CanonAuditEntry> entries, CancellationToken cancellationToken);
+    Task Write(IReadOnlyList<CanonAuditEntry> entries, CancellationToken cancellationToken);
 }

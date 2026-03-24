@@ -24,7 +24,7 @@ public sealed class StreamJsonRpcTransportDispatcher : IMcpTransportDispatcher
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task RunAsync(object target, Stream input, Stream output, CancellationToken cancellationToken)
+    public async Task Run(object target, Stream input, Stream output, CancellationToken cancellationToken)
     {
         if (target is null) throw new ArgumentNullException(nameof(target));
         if (input is null) throw new ArgumentNullException(nameof(input));

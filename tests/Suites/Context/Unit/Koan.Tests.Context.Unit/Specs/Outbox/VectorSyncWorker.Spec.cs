@@ -45,7 +45,7 @@ public class VectorSyncWorkerSpec : IAsyncLifetime
         }
     }
 
-    public Task DisposeAsync()
+    public async Task DisposeAsync()
     {
         _cts?.Cancel();
         _cts?.Dispose();
@@ -492,7 +492,7 @@ public class VectorSyncWorkerSpec : IAsyncLifetime
         var cts = new CancellationTokenSource();
 
         // Act
-        var workerTask = _worker.StartAsync(cts.Token);
+        var workerTask = _worker.Start(cts.Token);
         await Task.Delay(100); // Let it start
         await _worker.StopAsync(CancellationToken.None);
 
@@ -511,7 +511,7 @@ public class VectorSyncWorkerSpec : IAsyncLifetime
         var cts = new CancellationTokenSource();
 
         // Act - Start worker and immediately stop
-        await _worker.StartAsync(cts.Token);
+        await _worker.Start(cts.Token);
         await Task.Delay(100);
         await _worker.StopAsync(CancellationToken.None);
 
@@ -527,7 +527,7 @@ public class VectorSyncWorkerSpec : IAsyncLifetime
         var cts = new CancellationTokenSource();
 
         // Act
-        var workerTask = _worker.StartAsync(cts.Token);
+        var workerTask = _worker.Start(cts.Token);
         await Task.Delay(100);
         cts.Cancel(); // Cancel token
 

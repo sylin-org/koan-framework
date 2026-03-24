@@ -60,7 +60,10 @@ public abstract class KoanTestPipelineFixtureBase : IAsyncLifetime
         if (_host != null)
         {
             await _host.StopAsync();
-            _host.Dispose();
+            if (_host is IAsyncDisposable asyncDisposableHost)
+                await asyncDisposableHost.DisposeAsync();
+            else
+                _host.Dispose();
         }
     }
 }

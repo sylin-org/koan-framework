@@ -45,7 +45,7 @@ public sealed class ZenGardenFixture : IAsyncLifetime
 
         try
         {
-            await Client.CatalogAsync(
+            await Client.Catalog(
                 new ZenGardenSubscription { ToolType = ZenGardenToolType.Offering },
                 CancellationToken.None);
             IsAvailable = true;

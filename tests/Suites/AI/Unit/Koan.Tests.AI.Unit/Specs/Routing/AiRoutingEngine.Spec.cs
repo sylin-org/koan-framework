@@ -347,20 +347,20 @@ public sealed class AiRoutingEngineSpec
 
         public bool CanServe(AiChatRequest request) => true;
 
-        public Task<AiChatResponse> ChatAsync(AiChatRequest request, CancellationToken ct = default)
+        public Task<AiChatResponse> Chat(AiChatRequest request, CancellationToken ct = default)
             => Task.FromResult(new AiChatResponse { AdapterId = _id });
 
-        public async IAsyncEnumerable<AiChatChunk> StreamAsync(AiChatRequest request, [EnumeratorCancellation] CancellationToken ct = default)
+        public async IAsyncEnumerable<AiChatChunk> Stream(AiChatRequest request, [EnumeratorCancellation] CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
             await Task.CompletedTask;
             yield break;
         }
 
-        public Task<AiEmbeddingsResponse> EmbedAsync(AiEmbeddingsRequest request, CancellationToken ct = default)
+        public Task<AiEmbeddingsResponse> Embed(AiEmbeddingsRequest request, CancellationToken ct = default)
             => Task.FromResult(new AiEmbeddingsResponse { Model = request.Model ?? _id });
 
-        public Task<IReadOnlyList<AiModelDescriptor>> ListModelsAsync(CancellationToken ct = default)
+        public Task<IReadOnlyList<AiModelDescriptor>> ListModels(CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<AiModelDescriptor>>(Array.Empty<AiModelDescriptor>());
     }
 }

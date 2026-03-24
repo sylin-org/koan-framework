@@ -84,5 +84,5 @@ public sealed class CacheServiceCollectionExtensionsSpec
                 body();
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 }

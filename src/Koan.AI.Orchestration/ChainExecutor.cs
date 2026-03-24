@@ -20,7 +20,7 @@ internal sealed class ChainExecutor : IChainExecutor
         WriteIndented = false
     };
 
-    public async Task<ChainResult> ExecuteAsync(
+    public async Task<ChainResult> Execute(
         ChainDefinition definition, object? variables, CancellationToken ct)
     {
         var sw = Stopwatch.StartNew();
@@ -29,7 +29,7 @@ internal sealed class ChainExecutor : IChainExecutor
         foreach (var step in definition.Steps)
         {
             ct.ThrowIfCancellationRequested();
-            await ExecuteStepAsync(step, context, ct);
+            await ExecuteStep(step, context, ct);
         }
 
         sw.Stop();
@@ -42,7 +42,7 @@ internal sealed class ChainExecutor : IChainExecutor
         };
     }
 
-    public async IAsyncEnumerable<ChainChunk> StreamAsync(
+    public async IAsyncEnumerable<ChainChunk> Stream(
         ChainDefinition definition, object? variables,
         [EnumeratorCancellation] CancellationToken ct)
     {
@@ -53,7 +53,7 @@ internal sealed class ChainExecutor : IChainExecutor
         for (var i = 0; i < steps.Count - 1; i++)
         {
             ct.ThrowIfCancellationRequested();
-            await ExecuteStepAsync(steps[i], context, ct);
+            await ExecuteStep(steps[i], context, ct);
             yield return new ChainChunk { Step = steps[i].Kind.ToString() };
         }
 
@@ -81,7 +81,7 @@ internal sealed class ChainExecutor : IChainExecutor
             else
             {
                 // Non-chat final step: execute normally, emit result as single chunk
-                await ExecuteStepAsync(finalStep, context, ct);
+                await ExecuteStep(finalStep, context, ct);
                 yield return new ChainChunk
                 {
                     Step = finalStep.Kind.ToString(),
@@ -93,7 +93,7 @@ internal sealed class ChainExecutor : IChainExecutor
 
     // ── Step dispatch ──
 
-    private static async Task ExecuteStepAsync(
+    private static async Task ExecuteStep(
         ChainStep step, ChainContext context, CancellationToken ct)
     {
         context.IncrementStep();
@@ -101,15 +101,15 @@ internal sealed class ChainExecutor : IChainExecutor
         switch (step.Kind)
         {
             case ChainStepKind.Chat:
-                await ExecuteChatAsync(step, context, ct);
+                await ExecuteChat(step, context, ct);
                 break;
 
             case ChainStepKind.Prompt:
-                await ExecutePromptAsync(step, context, ct);
+                await ExecutePrompt(step, context, ct);
                 break;
 
             case ChainStepKind.Retrieve:
-                await ExecuteRetrieveAsync(step, context, ct);
+                await ExecuteRetrieve(step, context, ct);
                 break;
 
             case ChainStepKind.Parse:
@@ -117,27 +117,27 @@ internal sealed class ChainExecutor : IChainExecutor
                 break;
 
             case ChainStepKind.Classify:
-                await ExecuteClassifyAsync(step, context, ct);
+                await ExecuteClassify(step, context, ct);
                 break;
 
             case ChainStepKind.Branch:
-                await ExecuteBranchAsync(step, context, ct);
+                await ExecuteBranch(step, context, ct);
                 break;
 
             case ChainStepKind.Parallel:
-                await ExecuteParallelAsync(step, context, ct);
+                await ExecuteParallel(step, context, ct);
                 break;
 
             case ChainStepKind.Rerank:
-                await ExecuteRerankAsync(step, context, ct);
+                await ExecuteRerank(step, context, ct);
                 break;
 
             case ChainStepKind.Compress:
-                await ExecuteCompressAsync(step, context, ct);
+                await ExecuteCompress(step, context, ct);
                 break;
 
             case ChainStepKind.Moderate:
-                await ExecuteModerateAsync(step, context, ct);
+                await ExecuteModerate(step, context, ct);
                 break;
 
             case ChainStepKind.Tools:
@@ -150,7 +150,7 @@ internal sealed class ChainExecutor : IChainExecutor
 
     // ── Chat ──
 
-    private static async Task ExecuteChatAsync(
+    private static async Task ExecuteChat(
         ChainStep step, ChainContext context, CancellationToken ct)
     {
         var message = ResolveTemplate(step.Value, context);
@@ -164,7 +164,7 @@ internal sealed class ChainExecutor : IChainExecutor
 
     // ── Prompt ──
 
-    private static async Task ExecutePromptAsync(
+    private static async Task ExecutePrompt(
         ChainStep step, ChainContext context, CancellationToken ct)
     {
         var prompt = await Koan.AI.Prompt.Prompt.Load(step.Value, ct);
@@ -180,7 +180,7 @@ internal sealed class ChainExecutor : IChainExecutor
 
     // ── Retrieve ──
 
-    private static async Task ExecuteRetrieveAsync(
+    private static async Task ExecuteRetrieve(
         ChainStep step, ChainContext context, CancellationToken ct)
     {
         if (step.EntityType is null)
@@ -192,7 +192,7 @@ internal sealed class ChainExecutor : IChainExecutor
         var embedding = await Koan.AI.Client.Embed(queryText, ct);
 
         // Invoke Vector<T>.Search via reflection (entity type is runtime-determined)
-        var results = await InvokeVectorSearchAsync(
+        var results = await InvokeVectorSearch(
             step.EntityType, embedding, step.TopK, ct);
 
         // Store retrieved context and citations
@@ -236,7 +236,7 @@ internal sealed class ChainExecutor : IChainExecutor
 
     // ── Classify ──
 
-    private static async Task ExecuteClassifyAsync(
+    private static async Task ExecuteClassify(
         ChainStep step, ChainContext context, CancellationToken ct)
     {
         var categories = step.Categories
@@ -265,7 +265,7 @@ internal sealed class ChainExecutor : IChainExecutor
 
     // ── Branch ──
 
-    private static async Task ExecuteBranchAsync(
+    private static async Task ExecuteBranch(
         ChainStep step, ChainContext context, CancellationToken ct)
     {
         var branches = step.Branches
@@ -301,7 +301,7 @@ internal sealed class ChainExecutor : IChainExecutor
 
         var subDefinition = selectedBuilder.Build();
         var executor = new ChainExecutor();
-        var subResult = await executor.ExecuteAsync(subDefinition, context.VariablesAsObject(), ct);
+        var subResult = await executor.Execute(subDefinition, context.VariablesAsObject(), ct);
 
         context.SetOutput(subResult.Text);
         context.AddTokens(subResult.Metrics.TotalTokens);
@@ -309,7 +309,7 @@ internal sealed class ChainExecutor : IChainExecutor
 
     // ── Parallel ──
 
-    private static async Task ExecuteParallelAsync(
+    private static async Task ExecuteParallel(
         ChainStep step, ChainContext context, CancellationToken ct)
     {
         var chains = step.ParallelChains
@@ -321,7 +321,7 @@ internal sealed class ChainExecutor : IChainExecutor
         foreach (var (name, builder) in chains)
         {
             var subDefinition = builder.Build();
-            tasks.Add((name, executor.ExecuteAsync(subDefinition, context.VariablesAsObject(), ct)));
+            tasks.Add((name, executor.Execute(subDefinition, context.VariablesAsObject(), ct)));
         }
 
         await Task.WhenAll(tasks.Select(t => t.Task));
@@ -340,7 +340,7 @@ internal sealed class ChainExecutor : IChainExecutor
 
     // ── Rerank ──
 
-    private static async Task ExecuteRerankAsync(
+    private static async Task ExecuteRerank(
         ChainStep step, ChainContext context, CancellationToken ct)
     {
         // Rerank uses the AI model to re-score retrieved results
@@ -369,7 +369,7 @@ internal sealed class ChainExecutor : IChainExecutor
 
     // ── Compress ──
 
-    private static async Task ExecuteCompressAsync(
+    private static async Task ExecuteCompress(
         ChainStep step, ChainContext context, CancellationToken ct)
     {
         var text = context.LastOutput;
@@ -392,7 +392,7 @@ internal sealed class ChainExecutor : IChainExecutor
 
     // ── Moderate ──
 
-    private static async Task ExecuteModerateAsync(
+    private static async Task ExecuteModerate(
         ChainStep step, ChainContext context, CancellationToken ct)
     {
         var target = ResolveTemplate(step.Value, context);
@@ -441,7 +441,7 @@ internal sealed class ChainExecutor : IChainExecutor
     /// Invokes Vector&lt;T&gt;.Search via reflection since the entity type is known only at runtime.
     /// Returns (Id, Score, Metadata) tuples.
     /// </summary>
-    private static async Task<List<(string Id, double Score, object? Metadata)>> InvokeVectorSearchAsync(
+    private static async Task<List<(string Id, double Score, object? Metadata)>> InvokeVectorSearch(
         Type entityType, float[] embedding, int topK, CancellationToken ct)
     {
         var results = new List<(string Id, double Score, object? Metadata)>();

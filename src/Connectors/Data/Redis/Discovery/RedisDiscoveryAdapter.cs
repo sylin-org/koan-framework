@@ -32,7 +32,7 @@ public sealed class RedisDiscoveryAdapter : ServiceDiscoveryAdapterBase
             options.ConnectTimeout = (int)context.HealthCheckTimeout.TotalMilliseconds;
             options.SyncTimeout = (int)context.HealthCheckTimeout.TotalMilliseconds;
 
-            using var muxer = ConnectionMultiplexer.Connect(options);
+            using var muxer = await ConnectionMultiplexer.ConnectAsync(options);
             var database = muxer.GetDatabase();
             await database.PingAsync();
 

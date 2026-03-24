@@ -27,7 +27,7 @@ public sealed class ServiceAuthenticationHandler : DelegatingHandler
             {
                 try
                 {
-                    var token = await _authenticator.GetServiceTokenAsync(serviceId, ct: cancellationToken);
+                    var token = await _authenticator.GetServiceToken(serviceId, ct: cancellationToken);
                     request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
                     _logger.LogDebug("Added authentication token for service {ServiceId}", serviceId);
                 }

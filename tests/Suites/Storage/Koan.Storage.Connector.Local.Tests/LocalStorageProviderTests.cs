@@ -51,12 +51,12 @@ public class LocalStorageProviderTests : IDisposable
         // Act - Write
         await using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(content)))
         {
-            await _provider.WriteAsync(container, key, stream, "text/plain");
+            await _provider.Write(container, key, stream, "text/plain");
         }
 
         // Act - Read
         string readContent;
-        await using (var stream = await _provider.OpenReadAsync(container, key))
+        await using (var stream = await _provider.OpenRead(container, key))
         using (var reader = new StreamReader(stream))
         {
             readContent = await reader.ReadToEndAsync();
@@ -76,12 +76,12 @@ public class LocalStorageProviderTests : IDisposable
 
         await using (var stream = new MemoryStream(Encoding.UTF8.GetBytes("test")))
         {
-            await _provider.WriteAsync(container, existingKey, stream, "text/plain");
+            await _provider.Write(container, existingKey, stream, "text/plain");
         }
 
         // Act
-        var exists = await _provider.ExistsAsync(container, existingKey);
-        var missing = await _provider.ExistsAsync(container, missingKey);
+        var exists = await _provider.Exists(container, existingKey);
+        var missing = await _provider.Exists(container, missingKey);
 
         // Assert
         exists.Should().BeTrue();
@@ -97,12 +97,12 @@ public class LocalStorageProviderTests : IDisposable
 
         await using (var stream = new MemoryStream(Encoding.UTF8.GetBytes("delete me")))
         {
-            await _provider.WriteAsync(container, key, stream, "text/plain");
+            await _provider.Write(container, key, stream, "text/plain");
         }
 
         // Act
-        var deleted = await _provider.DeleteAsync(container, key);
-        var existsAfter = await _provider.ExistsAsync(container, key);
+        var deleted = await _provider.Delete(container, key);
+        var existsAfter = await _provider.Exists(container, key);
 
         // Assert
         deleted.Should().BeTrue();
@@ -117,7 +117,7 @@ public class LocalStorageProviderTests : IDisposable
         const string key = "does-not-exist.txt";
 
         // Act
-        var deleted = await _provider.DeleteAsync(container, key);
+        var deleted = await _provider.Delete(container, key);
 
         // Assert
         deleted.Should().BeFalse();
@@ -138,7 +138,7 @@ public class LocalStorageProviderTests : IDisposable
         Func<Task> act = async () =>
         {
             await using var stream = new MemoryStream(Encoding.UTF8.GetBytes("hack"));
-            await _provider.WriteAsync(container, maliciousKey, stream, null);
+            await _provider.Write(container, maliciousKey, stream, null);
         };
 
         // Assert
@@ -157,7 +157,7 @@ public class LocalStorageProviderTests : IDisposable
         Func<Task> act = async () =>
         {
             await using var stream = new MemoryStream(Encoding.UTF8.GetBytes("hack"));
-            await _provider.WriteAsync(container, maliciousKey, stream, null);
+            await _provider.Write(container, maliciousKey, stream, null);
         };
 
         // Assert
@@ -176,7 +176,7 @@ public class LocalStorageProviderTests : IDisposable
         Func<Task> act = async () =>
         {
             await using var stream = new MemoryStream(Encoding.UTF8.GetBytes("test"));
-            await _provider.WriteAsync(container, invalidKey, stream, null);
+            await _provider.Write(container, invalidKey, stream, null);
         };
 
         // Assert
@@ -194,10 +194,10 @@ public class LocalStorageProviderTests : IDisposable
         // Act
         await using (var stream = new MemoryStream(Encoding.UTF8.GetBytes("PDF content")))
         {
-            await _provider.WriteAsync(container, key, stream, "application/pdf");
+            await _provider.Write(container, key, stream, "application/pdf");
         }
 
-        var exists = await _provider.ExistsAsync(container, key);
+        var exists = await _provider.Exists(container, key);
 
         // Assert
         exists.Should().BeTrue();
@@ -218,11 +218,11 @@ public class LocalStorageProviderTests : IDisposable
         // Act - Write should use temp file + rename pattern
         await using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(content)))
         {
-            await _provider.WriteAsync(container, key, stream, "text/plain");
+            await _provider.Write(container, key, stream, "text/plain");
         }
 
         // Assert - File should exist and be readable
-        var exists = await _provider.ExistsAsync(container, key);
+        var exists = await _provider.Exists(container, key);
         exists.Should().BeTrue();
 
         // Verify no temp files left behind
@@ -241,18 +241,18 @@ public class LocalStorageProviderTests : IDisposable
         // Write v1
         await using (var stream = new MemoryStream(Encoding.UTF8.GetBytes("version 1")))
         {
-            await _provider.WriteAsync(container, key, stream, "text/plain");
+            await _provider.Write(container, key, stream, "text/plain");
         }
 
         // Act - Write v2
         await using (var stream = new MemoryStream(Encoding.UTF8.GetBytes("version 2")))
         {
-            await _provider.WriteAsync(container, key, stream, "text/plain");
+            await _provider.Write(container, key, stream, "text/plain");
         }
 
         // Assert - Should have v2 content
         string content;
-        await using (var stream = await _provider.OpenReadAsync(container, key))
+        await using (var stream = await _provider.OpenRead(container, key))
         using (var reader = new StreamReader(stream))
         {
             content = await reader.ReadToEndAsync();
@@ -275,11 +275,11 @@ public class LocalStorageProviderTests : IDisposable
 
         await using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(content)))
         {
-            await _provider.WriteAsync(container, key, stream, "text/plain");
+            await _provider.Write(container, key, stream, "text/plain");
         }
 
         // Act - Read bytes 5-10 (inclusive)
-        var (stream, length) = await _provider.OpenReadRangeAsync(container, key, from: 5, to: 10);
+        var (stream, length) = await _provider.OpenReadRange(container, key, from: 5, to: 10);
 
         // Assert
         length.Should().Be(6); // 6 bytes: positions 5,6,7,8,9,10
@@ -302,11 +302,11 @@ public class LocalStorageProviderTests : IDisposable
 
         await using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(content)))
         {
-            await _provider.WriteAsync(container, key, stream, "text/plain");
+            await _provider.Write(container, key, stream, "text/plain");
         }
 
         // Act - Read first 5 bytes
-        var (stream, length) = await _provider.OpenReadRangeAsync(container, key, from: 0, to: 4);
+        var (stream, length) = await _provider.OpenReadRange(container, key, from: 0, to: 4);
 
         // Assert
         await using (stream)
@@ -327,11 +327,11 @@ public class LocalStorageProviderTests : IDisposable
 
         await using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(content)))
         {
-            await _provider.WriteAsync(container, key, stream, "text/plain");
+            await _provider.Write(container, key, stream, "text/plain");
         }
 
         // Act - Read from byte 7 to end
-        var (stream, length) = await _provider.OpenReadRangeAsync(container, key, from: 7, to: null);
+        var (stream, length) = await _provider.OpenReadRange(container, key, from: 7, to: null);
 
         // Assert
         await using (stream)
@@ -356,12 +356,12 @@ public class LocalStorageProviderTests : IDisposable
 
         await using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(content)))
         {
-            await _provider.WriteAsync(container, key, stream, "text/plain");
+            await _provider.Write(container, key, stream, "text/plain");
         }
 
         // Act
         var statOps = (IStatOperations)_provider;
-        var stat = await statOps.HeadAsync(container, key);
+        var stat = await statOps.Head(container, key);
 
         // Assert
         stat.Should().NotBeNull();
@@ -378,7 +378,7 @@ public class LocalStorageProviderTests : IDisposable
 
         // Act
         var statOps = (IStatOperations)_provider;
-        var stat = await statOps.HeadAsync(container, key);
+        var stat = await statOps.Head(container, key);
 
         // Assert
         stat.Should().BeNull();
@@ -393,13 +393,13 @@ public class LocalStorageProviderTests : IDisposable
 
         await using (var stream = new MemoryStream(Encoding.UTF8.GetBytes("content")))
         {
-            await _provider.WriteAsync(container, key, stream, "text/plain");
+            await _provider.Write(container, key, stream, "text/plain");
         }
 
         // Act - Get ETag twice
         var statOps = (IStatOperations)_provider;
-        var stat1 = await statOps.HeadAsync(container, key);
-        var stat2 = await statOps.HeadAsync(container, key);
+        var stat1 = await statOps.Head(container, key);
+        var stat2 = await statOps.Head(container, key);
 
         // Assert - Should be same (stable)
         stat1!.ETag.Should().Be(stat2!.ETag);
@@ -420,18 +420,18 @@ public class LocalStorageProviderTests : IDisposable
 
         await using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(content)))
         {
-            await _provider.WriteAsync(container, sourceKey, stream, "text/plain");
+            await _provider.Write(container, sourceKey, stream, "text/plain");
         }
 
         // Act
         var copyOps = (IServerSideCopy)_provider;
-        var copied = await copyOps.CopyAsync(container, sourceKey, container, targetKey);
+        var copied = await copyOps.Copy(container, sourceKey, container, targetKey);
 
         // Assert
         copied.Should().BeTrue();
 
         // Verify target exists and has same content
-        await using (var stream = await _provider.OpenReadAsync(container, targetKey))
+        await using (var stream = await _provider.OpenRead(container, targetKey))
         using (var reader = new StreamReader(stream))
         {
             var targetContent = await reader.ReadToEndAsync();
@@ -450,16 +450,16 @@ public class LocalStorageProviderTests : IDisposable
 
         await using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(content)))
         {
-            await _provider.WriteAsync(sourceContainer, key, stream, "text/plain");
+            await _provider.Write(sourceContainer, key, stream, "text/plain");
         }
 
         // Act
         var copyOps = (IServerSideCopy)_provider;
-        var copied = await copyOps.CopyAsync(sourceContainer, key, targetContainer, key);
+        var copied = await copyOps.Copy(sourceContainer, key, targetContainer, key);
 
         // Assert
         copied.Should().BeTrue();
-        var existsInTarget = await _provider.ExistsAsync(targetContainer, key);
+        var existsInTarget = await _provider.Exists(targetContainer, key);
         existsInTarget.Should().BeTrue();
     }
 
@@ -477,12 +477,12 @@ public class LocalStorageProviderTests : IDisposable
         foreach (var key in keys)
         {
             await using var stream = new MemoryStream(Encoding.UTF8.GetBytes($"content of {key}"));
-            await _provider.WriteAsync(container, key, stream, "text/plain");
+            await _provider.Write(container, key, stream, "text/plain");
         }
 
         // Act
         var listOps = (IListOperations)_provider;
-        var objects = await listOps.ListObjectsAsync(container).ToListAsync();
+        var objects = await listOps.ListObjects(container).ToListAsync();
 
         // Assert
         objects.Should().HaveCount(3);
@@ -505,12 +505,12 @@ public class LocalStorageProviderTests : IDisposable
         foreach (var key in allKeys)
         {
             await using var stream = new MemoryStream(Encoding.UTF8.GetBytes("test"));
-            await _provider.WriteAsync(container, key, stream, "text/plain");
+            await _provider.Write(container, key, stream, "text/plain");
         }
 
         // Act - List with prefix
         var listOps = (IListOperations)_provider;
-        var filtered = await listOps.ListObjectsAsync(container, prefix: "2025/01/").ToListAsync();
+        var filtered = await listOps.ListObjects(container, prefix: "2025/01/").ToListAsync();
 
         // Assert
         filtered.Should().HaveCount(2);
@@ -529,7 +529,7 @@ public class LocalStorageProviderTests : IDisposable
 
         // Act
         var listOps = (IListOperations)_provider;
-        var objects = await listOps.ListObjectsAsync(container).ToListAsync();
+        var objects = await listOps.ListObjects(container).ToListAsync();
 
         // Assert
         objects.Should().BeEmpty();

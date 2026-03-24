@@ -23,7 +23,7 @@ internal sealed class IndexingResumptionWorker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await foreach (var request in _queue.ReadAllAsync(stoppingToken))
+        await foreach (var request in _queue.ReadAll(stoppingToken))
         {
             try
             {
@@ -53,7 +53,7 @@ internal sealed class IndexingResumptionWorker : BackgroundService
                     request.ProjectId,
                     request.PreviousStatus);
 
-                await indexer.IndexProjectAsync(
+                await indexer.IndexProject(
                     request.ProjectId,
                     progress: null,
                     cancellationToken: stoppingToken,

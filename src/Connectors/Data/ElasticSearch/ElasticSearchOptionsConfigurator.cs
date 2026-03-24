@@ -160,7 +160,7 @@ internal sealed class ElasticSearchOptionsConfigurator : AdapterOptionsConfigura
             };
 
             // Use autonomous discovery coordinator
-            var discoveryTask = _discoveryCoordinator.DiscoverServiceAsync("elasticsearch", context);
+            var discoveryTask = _discoveryCoordinator.DiscoverService("elasticsearch", context);
             var result = discoveryTask.GetAwaiter().GetResult();
 
             if (result.IsSuccessful)

@@ -13,7 +13,7 @@ public static class SqlitePerformanceConfigurator
     /// <summary>
     /// Configures a SQLite connection with performance-optimized PRAGMAs.
     /// </summary>
-    public static async Task ConfigureForPerformanceAsync(SqliteConnection connection, ILogger? logger = null)
+    public static async Task ConfigureForPerformance(SqliteConnection connection, ILogger? logger = null)
     {
         if (connection.State != System.Data.ConnectionState.Open)
         {
@@ -23,36 +23,36 @@ public static class SqlitePerformanceConfigurator
         logger?.LogInformation("Applying SQLite performance optimizations");
 
         // Use Write-Ahead Logging for better concurrency and performance
-        await ExecutePragmaAsync(connection, "PRAGMA journal_mode = WAL", logger);
+        await ExecutePragma(connection, "PRAGMA journal_mode = WAL", logger);
 
         // Disable synchronous mode for maximum write speed (trade-off: less durability)
         // NORMAL = fsync only at critical moments (good balance)
-        await ExecutePragmaAsync(connection, "PRAGMA synchronous = NORMAL", logger);
+        await ExecutePragma(connection, "PRAGMA synchronous = NORMAL", logger);
 
         // Increase cache size to 64MB (default is usually 2MB)
         // Negative value means KB, so -64000 = 64MB
-        await ExecutePragmaAsync(connection, "PRAGMA cache_size = -64000", logger);
+        await ExecutePragma(connection, "PRAGMA cache_size = -64000", logger);
 
         // Use memory for temp storage
-        await ExecutePragmaAsync(connection, "PRAGMA temp_store = MEMORY", logger);
+        await ExecutePragma(connection, "PRAGMA temp_store = MEMORY", logger);
 
         // Increase page size for better I/O efficiency (default is 4096)
         // Note: This only works on database creation
-        await ExecutePragmaAsync(connection, "PRAGMA page_size = 8192", logger);
+        await ExecutePragma(connection, "PRAGMA page_size = 8192", logger);
 
         // Enable memory-mapped I/O (256MB)
-        await ExecutePragmaAsync(connection, "PRAGMA mmap_size = 268435456", logger);
+        await ExecutePragma(connection, "PRAGMA mmap_size = 268435456", logger);
 
         // Optimize for write-heavy workloads
-        await ExecutePragmaAsync(connection, "PRAGMA locking_mode = EXCLUSIVE", logger);
+        await ExecutePragma(connection, "PRAGMA locking_mode = EXCLUSIVE", logger);
 
         // Auto-vacuum for better space management
-        await ExecutePragmaAsync(connection, "PRAGMA auto_vacuum = INCREMENTAL", logger);
+        await ExecutePragma(connection, "PRAGMA auto_vacuum = INCREMENTAL", logger);
 
         logger?.LogInformation("SQLite performance optimizations applied successfully");
     }
 
-    private static async Task ExecutePragmaAsync(SqliteConnection connection, string pragma, ILogger? logger)
+    private static async Task ExecutePragma(SqliteConnection connection, string pragma, ILogger? logger)
     {
         try
         {

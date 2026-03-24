@@ -186,7 +186,7 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
         {
             var userId = claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value ?? sub ?? string.Empty;
             var keyHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(sub ?? string.Empty)));
-            await identities.LinkAsync(new ExternalIdentity
+            await identities.Link(new ExternalIdentity
             {
                 UserId = userId,
                 Provider = provider,

@@ -41,34 +41,34 @@ public sealed class TagRuleHooks : IModelHook<TagRule>
 
     public int Order => 0;
 
-    public Task OnBeforeFetchAsync(HookContext<TagRule> ctx, string id) => Task.CompletedTask;
+    public Task OnBeforeFetch(HookContext<TagRule> ctx, string id) => Task.CompletedTask;
 
-    public Task OnAfterFetchAsync(HookContext<TagRule> ctx, TagRule? model) => Task.CompletedTask;
+    public Task OnAfterFetch(HookContext<TagRule> ctx, TagRule? model) => Task.CompletedTask;
 
-    public Task OnBeforeSaveAsync(HookContext<TagRule> ctx, TagRule model)
+    public Task OnBeforeSave(HookContext<TagRule> ctx, TagRule model)
     {
         Normalize(model);
         return Task.CompletedTask;
     }
 
-    public async Task OnAfterSaveAsync(HookContext<TagRule> ctx, TagRule model)
+    public async Task OnAfterSave(HookContext<TagRule> ctx, TagRule model)
     {
-        await InvalidatePipelinesAsync(ctx).ConfigureAwait(false);
+        await InvalidatePipelines(ctx).ConfigureAwait(false);
     }
 
-    public Task OnBeforeDeleteAsync(HookContext<TagRule> ctx, TagRule model) => Task.CompletedTask;
+    public Task OnBeforeDelete(HookContext<TagRule> ctx, TagRule model) => Task.CompletedTask;
 
-    public async Task OnAfterDeleteAsync(HookContext<TagRule> ctx, TagRule model)
+    public async Task OnAfterDelete(HookContext<TagRule> ctx, TagRule model)
     {
-        await InvalidatePipelinesAsync(ctx).ConfigureAwait(false);
+        await InvalidatePipelines(ctx).ConfigureAwait(false);
     }
 
-    public Task OnBeforePatchAsync(HookContext<TagRule> ctx, string id, object patch) => Task.CompletedTask;
+    public Task OnBeforePatch(HookContext<TagRule> ctx, string id, object patch) => Task.CompletedTask;
 
-    public async Task OnAfterPatchAsync(HookContext<TagRule> ctx, TagRule model)
+    public async Task OnAfterPatch(HookContext<TagRule> ctx, TagRule model)
     {
         Normalize(model);
-        await InvalidatePipelinesAsync(ctx).ConfigureAwait(false);
+        await InvalidatePipelines(ctx).ConfigureAwait(false);
     }
 
     private static void Normalize(TagRule model)
@@ -111,7 +111,7 @@ public sealed class TagRuleHooks : IModelHook<TagRule>
         }
     }
 
-    private async Task InvalidatePipelinesAsync(HookContext<TagRule> ctx)
+    private async Task InvalidatePipelines(HookContext<TagRule> ctx)
     {
         try
         {

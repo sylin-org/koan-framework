@@ -135,7 +135,7 @@ public static class ServiceDiscoveryExtensions
     /// <summary>
     /// Quick helper to discover a service URL for HTTP services.
     /// </summary>
-    public static async Task<string> DiscoverServiceUrlAsync(
+    public static async Task<string> DiscoverServiceUrl(
         this IOrchestrationAwareServiceDiscovery discovery,
         string serviceName,
         int defaultPort,
@@ -143,7 +143,7 @@ public static class ServiceDiscoveryExtensions
         CancellationToken cancellationToken = default)
     {
         var options = ForHttpService(serviceName, defaultPort, healthCheckPath);
-        var result = await discovery.DiscoverServiceAsync(serviceName, options, cancellationToken);
+        var result = await discovery.DiscoverService(serviceName, options, cancellationToken);
         return result.ServiceUrl;
     }
 

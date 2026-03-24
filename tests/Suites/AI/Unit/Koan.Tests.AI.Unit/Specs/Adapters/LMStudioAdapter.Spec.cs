@@ -66,9 +66,9 @@ public class LMStudioAdapterSpec
             ApiKey = "secret"
         });
 
-        await adapter.WaitForReadinessAsync(TimeSpan.FromSeconds(1));
+        await adapter.WaitForReadiness(TimeSpan.FromSeconds(1));
 
-        var response = await adapter.ChatAsync(new AiChatRequest
+        var response = await adapter.Chat(new AiChatRequest
         {
             Messages = new List<AiMessage>
             {
@@ -121,7 +121,7 @@ public class LMStudioAdapterSpec
         var adapter = CreateAdapter(handler);
 
         var chunks = new List<AiChatChunk>();
-        await foreach (var chunk in adapter.StreamAsync(new AiChatRequest
+        await foreach (var chunk in adapter.Stream(new AiChatRequest
         {
             Messages = new List<AiMessage> { new("user", "Hello?") }
         }))
@@ -174,9 +174,9 @@ public class LMStudioAdapterSpec
         });
 
         var adapter = CreateAdapter(handler);
-        await adapter.WaitForReadinessAsync(TimeSpan.FromSeconds(1));
+        await adapter.WaitForReadiness(TimeSpan.FromSeconds(1));
 
-        var response = await adapter.EmbedAsync(new AiEmbeddingsRequest
+        var response = await adapter.Embed(new AiEmbeddingsRequest
         {
             Model = "nomic-embed",
             Input = new List<string> { "a", "b" }
@@ -210,7 +210,7 @@ public class LMStudioAdapterSpec
             DefaultModel = "missing-model"
         });
 
-        await adapter.WaitForReadinessAsync(TimeSpan.FromSeconds(1));
+        await adapter.WaitForReadiness(TimeSpan.FromSeconds(1));
 
         adapter.ReadinessState.Should().Be(AdapterReadinessState.Degraded);
         adapter.IsReady.Should().BeTrue();

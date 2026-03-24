@@ -58,7 +58,7 @@ public class PantryController(
             UserId = userId
         };
 
-        var result = await visionService.ProcessPhotoAsync(
+        var result = await visionService.ProcessPhoto(
             photoRecord.Id,
             imageStream,
             options,
@@ -144,7 +144,7 @@ public class PantryController(
             // Learn from user corrections
             if (!string.IsNullOrWhiteSpace(confirmation.UserInput))
             {
-                await visionService.LearnFromCorrectionAsync(
+                await visionService.LearnFromCorrection(
                     candidate.Name,
                     item.Name,
                     confirmation.UserInput,

@@ -19,9 +19,9 @@ namespace Koan.Samples.Meridian.Services;
 
 public interface ITemplateRenderer
 {
-    Task<string> RenderMarkdownAsync(Deliverable deliverable, CancellationToken ct);
-    Task<string> RenderJsonAsync(Deliverable deliverable, CancellationToken ct);
-    Task<byte[]> RenderPdfAsync(Deliverable deliverable, CancellationToken ct);
+    Task<string> RenderMarkdown(Deliverable deliverable, CancellationToken ct);
+    Task<string> RenderJson(Deliverable deliverable, CancellationToken ct);
+    Task<byte[]> RenderPdf(Deliverable deliverable, CancellationToken ct);
 }
 
 public sealed class TemplateRenderer : ITemplateRenderer
@@ -36,7 +36,7 @@ public sealed class TemplateRenderer : ITemplateRenderer
         _pdfRenderer = pdfRenderer;
     }
 
-    public async Task<string> RenderMarkdownAsync(Deliverable deliverable, CancellationToken ct)
+    public async Task<string> RenderMarkdown(Deliverable deliverable, CancellationToken ct)
     {
         var pipeline = await DocumentPipeline.Get(deliverable.PipelineId, ct).ConfigureAwait(false);
         if (pipeline is null)
@@ -60,7 +60,7 @@ public sealed class TemplateRenderer : ITemplateRenderer
         var context = BuildTemplateContext(data);
 
         var renderer = _stubbleBuilder.Build();
-        var markdown = await renderer.RenderAsync(template, context).ConfigureAwait(false);
+        var markdown = await renderer.Render(template, context).ConfigureAwait(false);
 
         if (data.Footnotes.Count > 0)
         {
@@ -82,7 +82,7 @@ public sealed class TemplateRenderer : ITemplateRenderer
         return markdown;
     }
 
-    public Task<string> RenderJsonAsync(Deliverable deliverable, CancellationToken ct)
+    public Task<string> RenderJson(Deliverable deliverable, CancellationToken ct)
     {
         var data = ParseData(deliverable.DataJson);
         var resolvedFacts = BuildResolvedFacts(data);
@@ -94,17 +94,17 @@ public sealed class TemplateRenderer : ITemplateRenderer
         return Task.FromResult(data.Root.ToString(Formatting.Indented));
     }
 
-    public async Task<byte[]> RenderPdfAsync(Deliverable deliverable, CancellationToken ct)
+    public async Task<byte[]> RenderPdf(Deliverable deliverable, CancellationToken ct)
     {
         try
         {
-            var markdown = await RenderMarkdownAsync(deliverable, ct).ConfigureAwait(false);
+            var markdown = await RenderMarkdown(deliverable, ct).ConfigureAwait(false);
             if (string.IsNullOrWhiteSpace(markdown))
             {
                 return Array.Empty<byte>();
             }
 
-            return await _pdfRenderer.RenderAsync(markdown, ct).ConfigureAwait(false);
+            return await _pdfRenderer.Render(markdown, ct).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {

@@ -13,13 +13,13 @@ internal sealed class RoleBootstrapState : Entity<RoleBootstrapState>
 
 internal sealed class DefaultRoleBootstrapStateStore : IRoleBootstrapStateStore
 {
-    public async Task<bool> IsAdminBootstrappedAsync(CancellationToken ct = default)
+    public async Task<bool> IsAdminBootstrapped(CancellationToken ct = default)
     {
     var state = await RoleBootstrapState.Get("admin-bootstrap", ct);
         return state is not null;
     }
 
-    public async Task MarkAdminBootstrappedAsync(string userId, string mode, CancellationToken ct = default)
+    public async Task MarkAdminBootstrapped(string userId, string mode, CancellationToken ct = default)
     {
         var entity = new RoleBootstrapState { Id = "admin-bootstrap", UserId = userId, Mode = mode, When = DateTimeOffset.UtcNow };
     _ = await RoleBootstrapState.UpsertMany(new[] { entity }, ct);

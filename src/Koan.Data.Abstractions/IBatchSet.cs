@@ -2,7 +2,7 @@ namespace Koan.Data.Abstractions;
 
 /// <summary>
 /// A fluent accumulator for batched entity operations. Queue multiple adds, updates, and deletes,
-/// then commit them in a single <see cref="SaveAsync"/> call.
+/// then commit them in a single <see cref="Save"/> call.
 /// </summary>
 /// <typeparam name="TEntity">The entity type managed by this batch set.</typeparam>
 /// <typeparam name="TKey">The entity identifier type.</typeparam>
@@ -23,7 +23,7 @@ public interface IBatchSet<TEntity, TKey>
 
     /// <summary>
     /// Queues an update by loading the entity with <paramref name="id"/> and applying
-    /// <paramref name="mutate"/> before saving. The load is deferred until <see cref="SaveAsync"/>.
+    /// <paramref name="mutate"/> before saving. The load is deferred until <see cref="Save"/>.
     /// </summary>
     IBatchSet<TEntity, TKey> Update(TKey id, Action<TEntity> mutate);
 
@@ -39,5 +39,5 @@ public interface IBatchSet<TEntity, TKey>
     /// <param name="options">Optional batch execution options (timeout, conflict strategy, etc.).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>A <see cref="BatchResult"/> summarising the operations performed.</returns>
-    Task<BatchResult> SaveAsync(BatchOptions? options = null, CancellationToken ct = default);
+    Task<BatchResult> Save(BatchOptions? options = null, CancellationToken ct = default);
 }

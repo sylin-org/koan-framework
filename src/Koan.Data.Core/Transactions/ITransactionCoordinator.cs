@@ -60,12 +60,12 @@ public interface ITransactionCoordinator
     /// Opens local transaction per adapter, executes operations, commits all.
     /// </summary>
     /// <exception cref="TransactionException">If any adapter fails to commit</exception>
-    Task CommitAsync(CancellationToken ct = default);
+    Task Commit(CancellationToken ct = default);
 
     /// <summary>
     /// Rollback all tracked operations and mark transaction as completed.
     /// </summary>
-    Task RollbackAsync(CancellationToken ct = default);
+    Task Rollback(CancellationToken ct = default);
 
     /// <summary>
     /// Get capabilities for this transaction context.

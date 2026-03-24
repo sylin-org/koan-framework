@@ -11,16 +11,16 @@ public interface IRecsService
     /// <param name="query">Query parameters including filters, text search, etc.</param>
     /// <param name="userIdOverride">Optional user ID override (from auth context)</param>
     /// <param name="ct">Cancellation token</param>
-    Task<(IReadOnlyList<Recommendation> items, bool degraded)> QueryAsync(
+    Task<(IReadOnlyList<Recommendation> items, bool degraded)> Query(
         RecsQuery query,
         string? userIdOverride,
         CancellationToken ct);
 
-    Task RateAsync(string userId, string mediaId, int rating, CancellationToken ct);
+    Task Rate(string userId, string mediaId, int rating, CancellationToken ct);
 
     /// <summary>
     /// Rebuilds and caches the user preference vector from their library.
     /// Should be called whenever the user's library changes (add/remove/rate).
     /// </summary>
-    Task RebuildUserPrefVectorAsync(string userId, CancellationToken ct = default);
+    Task RebuildUserPrefVector(string userId, CancellationToken ct = default);
 }

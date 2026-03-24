@@ -18,20 +18,20 @@ internal sealed class ComputeService : IComputeService
         _localResource = new Lazy<ComputeResource>(DetectLocalCompute);
     }
 
-    public Task<ComputeResource?> AvailableAsync(CancellationToken ct = default)
+    public Task<ComputeResource?> Available(CancellationToken ct = default)
     {
         _ = ct;
         return Task.FromResult<ComputeResource?>(_localResource.Value);
     }
 
-    public Task<IReadOnlyList<ComputeResource>> FleetAsync(CancellationToken ct = default)
+    public Task<IReadOnlyList<ComputeResource>> Fleet(CancellationToken ct = default)
     {
         _ = ct;
         IReadOnlyList<ComputeResource> fleet = [_localResource.Value];
         return Task.FromResult(fleet);
     }
 
-    public Task<ComputeResolution> ResolveAsync(ComputeRequirement requirement, CancellationToken ct = default)
+    public Task<ComputeResolution> Resolve(ComputeRequirement requirement, CancellationToken ct = default)
     {
         _ = ct;
         var local = _localResource.Value;
@@ -60,7 +60,7 @@ internal sealed class ComputeService : IComputeService
         return Task.FromResult(fallbackResolution);
     }
 
-    public Task<bool> CheckAsync(ReadinessSpec spec, CancellationToken ct = default)
+    public Task<bool> Check(ReadinessSpec spec, CancellationToken ct = default)
     {
         _ = ct;
 

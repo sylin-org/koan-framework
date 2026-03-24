@@ -25,7 +25,7 @@ public static class Model
         string query, string? source = null, CancellationToken ct = default)
     {
         var service = ResolveService();
-        return await service.SearchAsync(query, source, ct);
+        return await service.Search(query, source, ct);
     }
 
     /// <summary>Search with structured filters.</summary>
@@ -33,7 +33,7 @@ public static class Model
         ModelQuery query, CancellationToken ct = default)
     {
         var service = ResolveService();
-        return await service.SearchAsync(query, ct);
+        return await service.Search(query, ct);
     }
 
     /// <summary>
@@ -50,7 +50,7 @@ public static class Model
         CancellationToken ct = default)
     {
         var service = ResolveService();
-        return await service.PullAsync(id, to, format, progress, ct);
+        return await service.Pull(id, to, format, progress, ct);
     }
 
     /// <summary>Get detailed metadata for a model.</summary>
@@ -58,7 +58,7 @@ public static class Model
         string id, CancellationToken ct = default)
     {
         var service = ResolveService();
-        return await service.InspectAsync(id, ct);
+        return await service.Inspect(id, ct);
     }
 
     // ── Transformation ──
@@ -74,7 +74,7 @@ public static class Model
         CancellationToken ct = default)
     {
         var service = ResolveService();
-        return await service.ConvertAsync(modelId, to, quantization, ct);
+        return await service.Convert(modelId, to, quantization, ct);
     }
 
     /// <summary>Quantize a model without format conversion.</summary>
@@ -85,7 +85,7 @@ public static class Model
         CancellationToken ct = default)
     {
         var service = ResolveService();
-        return await service.QuantizeAsync(modelId, quantization, calibrationDataset, ct);
+        return await service.Quantize(modelId, quantization, calibrationDataset, ct);
     }
 
     /// <summary>Merge a base model with a LoRA adapter.</summary>
@@ -96,7 +96,7 @@ public static class Model
         CancellationToken ct = default)
     {
         var service = ResolveService();
-        return await service.MergeAsync(baseModelId, adapterId, outputName, ct);
+        return await service.Merge(baseModelId, adapterId, outputName, ct);
     }
 
     // ── Deployment ──
@@ -112,7 +112,7 @@ public static class Model
         CancellationToken ct = default)
     {
         var service = ResolveService();
-        await service.DeployAsync(modelId, runtime, options, ct);
+        await service.Deploy(modelId, runtime, options, ct);
     }
 
     /// <summary>Show all viable format → runtime → compute paths for a model.</summary>
@@ -120,7 +120,7 @@ public static class Model
         string modelId, CancellationToken ct = default)
     {
         var service = ResolveService();
-        return await service.RoutesAsync(modelId, ct);
+        return await service.Routes(modelId, ct);
     }
 
     // ── Versioning & History ──
@@ -130,7 +130,7 @@ public static class Model
         string name, CancellationToken ct = default)
     {
         var service = ResolveService();
-        return await service.HistoryAsync(name, ct);
+        return await service.History(name, ct);
     }
 
     /// <summary>Instant swap to a previous model version.</summary>
@@ -138,7 +138,7 @@ public static class Model
         string name, string toVersion, CancellationToken ct = default)
     {
         var service = ResolveService();
-        await service.RollbackAsync(name, toVersion, ct);
+        await service.Rollback(name, toVersion, ct);
     }
 
     /// <summary>Full provenance at a point in time.</summary>
@@ -146,7 +146,7 @@ public static class Model
         string name, DateTime at, CancellationToken ct = default)
     {
         var service = ResolveService();
-        return await service.AuditAsync(name, at, ct);
+        return await service.Audit(name, at, ct);
     }
 
     // ── Registration (escape hatch) ──
@@ -161,7 +161,7 @@ public static class Model
         CancellationToken ct = default)
     {
         var service = ResolveService();
-        return await service.RegisterAsync(path, name, lineage, ct);
+        return await service.Register(path, name, lineage, ct);
     }
 
     // ── Lifecycle Management ──
@@ -171,7 +171,7 @@ public static class Model
         ModelStatus? status = null, CancellationToken ct = default)
     {
         var service = ResolveService();
-        return await service.ListAsync(status, ct);
+        return await service.List(status, ct);
     }
 
     /// <summary>Remove a model from local cache.</summary>
@@ -179,7 +179,7 @@ public static class Model
         string modelId, CancellationToken ct = default)
     {
         var service = ResolveService();
-        await service.RemoveAsync(modelId, ct);
+        await service.Remove(modelId, ct);
     }
 
     /// <summary>Remove least-recently-used models beyond the keep count.</summary>
@@ -187,7 +187,7 @@ public static class Model
         int keep = 5, CancellationToken ct = default)
     {
         var service = ResolveService();
-        await service.PruneAsync(keep, ct);
+        await service.Prune(keep, ct);
     }
 
     /// <summary>Per-model runtime health, latency, errors.</summary>
@@ -195,7 +195,7 @@ public static class Model
         CancellationToken ct = default)
     {
         var service = ResolveService();
-        return await service.HealthAsync(ct);
+        return await service.Health(ct);
     }
 
     // ── Internal ──

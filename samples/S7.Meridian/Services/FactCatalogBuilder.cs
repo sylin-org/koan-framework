@@ -12,7 +12,7 @@ namespace Koan.Samples.Meridian.Services;
 
 public interface IFactCatalogBuilder
 {
-    Task<FactCatalog> BuildAsync(
+    Task<FactCatalog> Build(
         DocumentPipeline pipeline,
         AnalysisType analysisType,
         CancellationToken ct);
@@ -31,7 +31,7 @@ public sealed class FactCatalogBuilder : IFactCatalogBuilder
         _logger = logger;
     }
 
-    public async Task<FactCatalog> BuildAsync(
+    public async Task<FactCatalog> Build(
         DocumentPipeline pipeline,
         AnalysisType analysisType,
         CancellationToken ct)
@@ -39,7 +39,7 @@ public sealed class FactCatalogBuilder : IFactCatalogBuilder
         var catalog = new FactCatalog();
 
         // Get active organization profile
-        var orgProfile = await OrganizationProfile.GetActiveAsync(ct);
+        var orgProfile = await OrganizationProfile.GetActive(ct);
 
         // Add organization-wide facts
         if (orgProfile != null)

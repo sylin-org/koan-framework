@@ -44,7 +44,7 @@ public sealed class VectorTransactionCoordinationSpec
     public async Task Vector_save_within_transaction_defers_execution()
     {
         await TestPipeline.For<VectorTransactionCoordinationSpec>(_output, nameof(Vector_save_within_transaction_defers_execution))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
@@ -84,7 +84,7 @@ public sealed class VectorTransactionCoordinationSpec
                         vectorExists.Should().BeFalse("vector should not be persisted during transaction");
 
                         // Commit
-                        await EntityContext.CommitAsync();
+                        await EntityContext.Commit();
                     }
 
                     // After commit - vector should exist
@@ -92,7 +92,7 @@ public sealed class VectorTransactionCoordinationSpec
                     vectorExistsAfterCommit.Should().BeTrue("vector should be persisted after commit");
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -103,7 +103,7 @@ public sealed class VectorTransactionCoordinationSpec
     public async Task Transaction_rollback_discards_vector_operations()
     {
         await TestPipeline.For<VectorTransactionCoordinationSpec>(_output, nameof(Transaction_rollback_discards_vector_operations))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition = EnsurePartition(ctx);
@@ -137,7 +137,7 @@ public sealed class VectorTransactionCoordinationSpec
                         await Vector<TodoEntity>.Save(entity.Id, embedding);
 
                         // Rollback explicitly
-                        await EntityContext.RollbackAsync();
+                        await EntityContext.Rollback();
                     }
 
                     // Vector should NOT exist after rollback
@@ -145,7 +145,7 @@ public sealed class VectorTransactionCoordinationSpec
                     vectorExists.Should().BeFalse("vector should be discarded after rollback");
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -156,7 +156,7 @@ public sealed class VectorTransactionCoordinationSpec
     public async Task Transaction_commits_mixed_entity_and_vector_operations_atomically()
     {
         await TestPipeline.For<VectorTransactionCoordinationSpec>(_output, nameof(Transaction_commits_mixed_entity_and_vector_operations_atomically))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition = EnsurePartition(ctx);
@@ -194,7 +194,7 @@ public sealed class VectorTransactionCoordinationSpec
                         var entityCount = await TodoEntity.Count;
                         entityCount.Should().Be(0, "entities should not be persisted during transaction");
 
-                        await EntityContext.CommitAsync();
+                        await EntityContext.Commit();
                     }
 
                     // All operations should be committed
@@ -208,7 +208,7 @@ public sealed class VectorTransactionCoordinationSpec
                     vector2Exists.Should().BeTrue("vector2 should be persisted");
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -219,7 +219,7 @@ public sealed class VectorTransactionCoordinationSpec
     public async Task Nested_transactions_throw_not_supported_exception()
     {
         await TestPipeline.For<VectorTransactionCoordinationSpec>(_output, nameof(Nested_transactions_throw_not_supported_exception))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition = EnsurePartition(ctx);
@@ -239,11 +239,11 @@ public sealed class VectorTransactionCoordinationSpec
                         act.Should().Throw<InvalidOperationException>()
                             .WithMessage("*nested transactions are not supported*");
 
-                        await EntityContext.RollbackAsync();
+                        await EntityContext.Rollback();
                     }
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -253,7 +253,7 @@ public sealed class VectorTransactionCoordinationSpec
     public async Task Vector_save_without_transaction_executes_immediately()
     {
         await TestPipeline.For<VectorTransactionCoordinationSpec>(_output, nameof(Vector_save_without_transaction_executes_immediately))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition = EnsurePartition(ctx);
@@ -284,7 +284,7 @@ public sealed class VectorTransactionCoordinationSpec
                     vectorExists.Should().BeTrue("vector should be persisted immediately without transaction");
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     /// <summary>
@@ -294,7 +294,7 @@ public sealed class VectorTransactionCoordinationSpec
     public async Task Transaction_defers_vector_delete_operations()
     {
         await TestPipeline.For<VectorTransactionCoordinationSpec>(_output, nameof(Transaction_defers_vector_delete_operations))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var partition = EnsurePartition(ctx);
@@ -332,7 +332,7 @@ public sealed class VectorTransactionCoordinationSpec
                         var vectorExistsDuring = await TryGetVector(entity.Id);
                         vectorExistsDuring.Should().BeTrue("vector should still exist during transaction");
 
-                        await EntityContext.CommitAsync();
+                        await EntityContext.Commit();
                     }
 
                     // Vector should be deleted after commit
@@ -340,7 +340,7 @@ public sealed class VectorTransactionCoordinationSpec
                     vectorExistsAfter.Should().BeFalse("vector should be deleted after commit");
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     #region Helper Methods

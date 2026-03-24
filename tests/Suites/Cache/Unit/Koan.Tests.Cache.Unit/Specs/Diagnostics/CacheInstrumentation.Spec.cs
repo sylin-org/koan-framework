@@ -55,5 +55,5 @@ public sealed class CacheInstrumentationSpec
                 measurements.Should().ContainKey("koan.cache.invalidations").WhoseValue.Should().Be(1);
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 }

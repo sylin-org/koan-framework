@@ -12,7 +12,7 @@ var app = builder.Build();
 
 // Static files are enabled by Koan.Web initialization; no explicit calls needed.
 
-app.Run();
+app.RunAsync();
 
 namespace S6.Auth
 {

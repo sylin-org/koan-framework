@@ -10,18 +10,18 @@ public interface IKoanServiceMesh
     /// Announce this service to the orchestrator channel.
     /// Called on startup and periodically for heartbeats.
     /// </summary>
-    Task AnnounceAsync(CancellationToken ct = default);
+    Task Announce(CancellationToken ct = default);
 
     /// <summary>
     /// Discover available services by broadcasting request to orchestrator channel.
     /// </summary>
-    Task DiscoverAsync(CancellationToken ct = default);
+    Task Discover(CancellationToken ct = default);
 
     /// <summary>
     /// Maintain service mesh (listen for announcements, clean stale instances).
     /// Runs continuously in background.
     /// </summary>
-    Task MaintainAsync(CancellationToken ct = default);
+    Task Maintain(CancellationToken ct = default);
 
     /// <summary>
     /// Get a service instance for the specified service ID.

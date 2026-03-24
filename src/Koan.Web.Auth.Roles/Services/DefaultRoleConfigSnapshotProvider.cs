@@ -27,7 +27,7 @@ public sealed class DefaultRoleConfigSnapshotProvider : IRoleConfigSnapshotProvi
 
     public RoleConfigSnapshot Get() => _snapshot;
 
-    public async Task ReloadAsync(CancellationToken ct = default)
+    public async Task Reload(CancellationToken ct = default)
     {
         var aliases = await _aliases.All(ct);
         var bindings = await _bindings.All(ct);

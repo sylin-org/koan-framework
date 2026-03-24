@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -9,7 +10,7 @@ namespace Koan.Web.Auth.Connector.Test.Controllers;
 public sealed class StaticController(IHostEnvironment env, IOptionsSnapshot<TestProviderOptions> opts) : ControllerBase
 {
     [HttpGet]
-    public IActionResult LoginPage()
+    public async Task<IActionResult> LoginPage()
     {
         var o = opts.Value;
         if (!(env.IsDevelopment() || o.Enabled)) return NotFound();
@@ -28,7 +29,7 @@ public sealed class StaticController(IHostEnvironment env, IOptionsSnapshot<Test
             if (s != null)
             {
                 using var reader = new StreamReader(s);
-                var html = reader.ReadToEnd();
+                var html = await reader.ReadToEndAsync();
                 return new ContentResult { ContentType = "text/html", Content = html };
             }
         }

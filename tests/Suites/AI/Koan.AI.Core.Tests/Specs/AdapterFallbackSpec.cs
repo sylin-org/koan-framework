@@ -22,7 +22,7 @@ public class AdapterFallbackSpec : IClassFixture<AICoreTestPipelineFixture>
     client.SimulatePrimaryFailure = true;
 
     // Act
-    var result = await client.CompleteAsync(prompt);
+    var result = await client.Complete(prompt);
 
     // Assert
     result.Should().NotBeNull();

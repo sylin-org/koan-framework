@@ -74,19 +74,19 @@ internal sealed class CachedRepository<TEntity, TKey> :
 
     public WriteCapabilities Writes => _writeCapabilitiesSource?.Writes ?? WriteCapabilities.None;
 
-    public Task<CountResult> CountAsync(CountRequest<TEntity> request, CancellationToken ct = default)
-        => _inner.CountAsync(request, ct);
+    public Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
+        => _inner.Count(request, ct);
 
-    public async Task<TEntity?> GetAsync(TKey id, CancellationToken ct = default)
+    public async Task<TEntity?> Get(TKey id, CancellationToken ct = default)
     {
         if (_entityPolicy.Strategy is CacheStrategy.NoCache or CacheStrategy.SetOnly or CacheStrategy.Invalidate)
         {
-            return await _inner.GetAsync(id, ct);
+            return await _inner.Get(id, ct);
         }
 
         if (!TryBuildEntityKey(null, id, out var key))
         {
-            return await _inner.GetAsync(id, ct);
+            return await _inner.Get(id, ct);
         }
 
         var options = _entityPolicy.ToOptions();
@@ -95,7 +95,7 @@ internal sealed class CachedRepository<TEntity, TKey> :
             case CacheStrategy.GetOrSet:
                 return await _cacheClient.GetOrAddAsync<TEntity>(key, async innerCt =>
                 {
-                    var value = await _inner.GetAsync(id, innerCt);
+                    var value = await _inner.Get(id, innerCt);
                     return value;
                 }, options, ct);
 
@@ -107,148 +107,148 @@ internal sealed class CachedRepository<TEntity, TKey> :
                         return cached;
                     }
 
-                    return await _inner.GetAsync(id, ct);
+                    return await _inner.Get(id, ct);
                 }
 
             default:
-                return await _inner.GetAsync(id, ct);
+                return await _inner.Get(id, ct);
         }
     }
 
-    public Task<IReadOnlyList<TEntity?>> GetManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    public Task<IReadOnlyList<TEntity?>> GetMany(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
         // Pass-through to inner repository
         // TODO: Future enhancement - implement batch caching strategy
-        return _inner.GetManyAsync(ids, ct);
+        return _inner.GetMany(ids, ct);
     }
 
-    public Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default)
-        => _inner.QueryAsync(query, ct);
+    public Task<IReadOnlyList<TEntity>> Query(object? query, CancellationToken ct = default)
+        => _inner.Query(query, ct);
 
-    public Task<IReadOnlyList<TEntity>> QueryAsync(object? query, DataQueryOptions? options, CancellationToken ct = default)
+    public Task<IReadOnlyList<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
     {
         if (_withOptions is null)
         {
-            return _inner.QueryAsync(query, ct);
+            return _inner.Query(query, ct);
         }
 
-        return _withOptions.QueryAsync(query, options, ct);
+        return _withOptions.Query(query, options, ct);
     }
 
-    public Task<IReadOnlyList<TEntity>> QueryAsync(string query, CancellationToken ct = default)
+    public Task<IReadOnlyList<TEntity>> Query(string query, CancellationToken ct = default)
     {
         if (_stringQuery is null)
         {
             throw new NotSupportedException($"Repository for {_entityName} does not support string queries.");
         }
 
-        return _stringQuery.QueryAsync(query, ct);
+        return _stringQuery.Query(query, ct);
     }
 
-    public Task<IReadOnlyList<TEntity>> QueryAsync(string query, DataQueryOptions? options, CancellationToken ct = default)
+    public Task<IReadOnlyList<TEntity>> Query(string query, DataQueryOptions? options, CancellationToken ct = default)
     {
         if (_stringQueryWithOptions is not null)
         {
-            return _stringQueryWithOptions.QueryAsync(query, options, ct);
+            return _stringQueryWithOptions.Query(query, options, ct);
         }
 
         if (_stringQuery is not null)
         {
-            return _stringQuery.QueryAsync(query, ct);
+            return _stringQuery.Query(query, ct);
         }
 
         throw new NotSupportedException($"Repository for {_entityName} does not support string queries.");
     }
 
-    public Task<IReadOnlyList<TEntity>> QueryAsync(string query, object? parameters, CancellationToken ct = default)
+    public Task<IReadOnlyList<TEntity>> Query(string query, object? parameters, CancellationToken ct = default)
     {
         if (_stringQueryWithOptions is not null)
         {
-            return _stringQueryWithOptions.QueryAsync(query, parameters, null, ct);
+            return _stringQueryWithOptions.Query(query, parameters, null, ct);
         }
 
         throw new NotSupportedException($"Repository for {_entityName} does not support parameterized string queries.");
     }
 
-    public Task<IReadOnlyList<TEntity>> QueryAsync(string query, object? parameters, DataQueryOptions? options, CancellationToken ct = default)
+    public Task<IReadOnlyList<TEntity>> Query(string query, object? parameters, DataQueryOptions? options, CancellationToken ct = default)
     {
         if (_stringQueryWithOptions is not null)
         {
-            return _stringQueryWithOptions.QueryAsync(query, parameters, options, ct);
+            return _stringQueryWithOptions.Query(query, parameters, options, ct);
         }
 
         throw new NotSupportedException($"Repository for {_entityName} does not support parameterized string queries.");
     }
 
-    public Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
+    public Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
     {
         if (_linq is null)
         {
             throw new NotSupportedException($"Repository for {_entityName} does not support LINQ queries.");
         }
 
-        return _linq.QueryAsync(predicate, ct);
+        return _linq.Query(predicate, ct);
     }
 
-    public Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
+    public Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
     {
         if (_linqWithOptions is not null)
         {
-            return _linqWithOptions.QueryAsync(predicate, options, ct);
+            return _linqWithOptions.Query(predicate, options, ct);
         }
 
         if (_linq is not null)
         {
-            return _linq.QueryAsync(predicate, ct);
+            return _linq.Query(predicate, ct);
         }
 
         throw new NotSupportedException($"Repository for {_entityName} does not support LINQ queries.");
     }
 
-    public async Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)
+    public async Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
     {
-        var result = await _inner.UpsertAsync(model, ct);
-        await HandleWriteAsync(result, ct);
+        var result = await _inner.Upsert(model, ct);
+        await HandleWrite(result, ct);
         return result;
     }
 
-    public async Task<int> UpsertManyAsync(IEnumerable<TEntity> models, CancellationToken ct = default)
+    public async Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default)
     {
         var materialized = models as IList<TEntity> ?? models.ToList();
-        var updated = await _inner.UpsertManyAsync(materialized, ct);
-        await HandleWriteAsync(materialized, ct);
+        var updated = await _inner.UpsertMany(materialized, ct);
+        await HandleWrite(materialized, ct);
         return updated;
     }
 
-    public async Task<bool> DeleteAsync(TKey id, CancellationToken ct = default)
+    public async Task<bool> Delete(TKey id, CancellationToken ct = default)
     {
-        var deleted = await _inner.DeleteAsync(id, ct);
+        var deleted = await _inner.Delete(id, ct);
         if (deleted)
         {
-            await RemoveAsync(id, ct);
+            await Remove(id, ct);
         }
 
         return deleted;
     }
 
-    public async Task<int> DeleteManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    public async Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
         var materialized = ids as IList<TKey> ?? ids.ToList();
-        var count = await _inner.DeleteManyAsync(materialized, ct);
+        var count = await _inner.DeleteMany(materialized, ct);
         if (count > 0)
         {
             foreach (var id in materialized)
             {
-                await RemoveAsync(id, ct);
+                await Remove(id, ct);
             }
         }
 
         return count;
     }
 
-    public async Task<int> DeleteAllAsync(CancellationToken ct = default)
+    public async Task<int> DeleteAll(CancellationToken ct = default)
     {
-        var count = await _inner.DeleteAllAsync(ct);
+        var count = await _inner.DeleteAll(ct);
         if (count > 0)
         {
             _logger.LogDebug("DeleteAll detected for {Entity}. Cached entries cannot be enumerated automatically; downstream policies should prefer tag-based invalidation.", _entityName);
@@ -257,9 +257,9 @@ internal sealed class CachedRepository<TEntity, TKey> :
         return count;
     }
 
-    public async Task<long> RemoveAllAsync(RemoveStrategy strategy, CancellationToken ct = default)
+    public async Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default)
     {
-        var removed = await _inner.RemoveAllAsync(strategy, ct);
+        var removed = await _inner.RemoveAll(strategy, ct);
         if (removed > 0)
         {
             _logger.LogDebug("RemoveAll({Strategy}) invoked for {Entity}; cached entries should be invalidated via tags.", strategy, _entityName);
@@ -289,14 +289,14 @@ internal sealed class CachedRepository<TEntity, TKey> :
         return await _instructionExecutor.ExecuteAsync<TResult>(instruction, ct);
     }
 
-    public Task EnsureHealthyAsync(CancellationToken ct)
+    public Task EnsureHealthy(CancellationToken ct)
     {
         if (_schemaContributor is null)
         {
             return Task.CompletedTask;
         }
 
-        return _schemaContributor.EnsureHealthyAsync(ct);
+        return _schemaContributor.EnsureHealthy(ct);
     }
 
     public void InvalidateHealth()
@@ -304,15 +304,15 @@ internal sealed class CachedRepository<TEntity, TKey> :
         _schemaContributor?.InvalidateHealth();
     }
 
-    private async ValueTask HandleWriteAsync(IEnumerable<TEntity> entities, CancellationToken ct)
+    private async ValueTask HandleWrite(IEnumerable<TEntity> entities, CancellationToken ct)
     {
         foreach (var entity in entities)
         {
-            await HandleWriteAsync(entity, ct);
+            await HandleWrite(entity, ct);
         }
     }
 
-    private async ValueTask HandleWriteAsync(TEntity entity, CancellationToken ct)
+    private async ValueTask HandleWrite(TEntity entity, CancellationToken ct)
     {
         if (_entityPolicy.Strategy is CacheStrategy.NoCache)
         {
@@ -334,12 +334,12 @@ internal sealed class CachedRepository<TEntity, TKey> :
                 break;
             case CacheStrategy.GetOnly:
             case CacheStrategy.Invalidate:
-                await _cacheClient.RemoveAsync(key.Value, ct);
+                await _cacheClient.Remove(key.Value, ct);
                 break;
         }
     }
 
-    private async ValueTask RemoveAsync(TKey id, CancellationToken ct)
+    private async ValueTask Remove(TKey id, CancellationToken ct)
     {
         if (_entityPolicy.Strategy is CacheStrategy.NoCache or CacheStrategy.SetOnly)
         {
@@ -351,7 +351,7 @@ internal sealed class CachedRepository<TEntity, TKey> :
             return;
         }
 
-        await _cacheClient.RemoveAsync(key, ct);
+        await _cacheClient.Remove(key, ct);
     }
 
     private CacheKey? ResolveKey(TEntity entity)
@@ -454,23 +454,23 @@ internal sealed class CachedRepository<TEntity, TKey> :
             return this;
         }
 
-        public async Task<BatchResult> SaveAsync(BatchOptions? options = null, CancellationToken ct = default)
+        public async Task<BatchResult> Save(BatchOptions? options = null, CancellationToken ct = default)
         {
-            var result = await _inner.SaveAsync(options, ct);
+            var result = await _inner.Save(options, ct);
 
             foreach (var entity in _upserts)
             {
-                await _outer.HandleWriteAsync(entity, ct);
+                await _outer.HandleWrite(entity, ct);
             }
 
             foreach (var id in _deletes)
             {
-                await _outer.RemoveAsync(id, ct);
+                await _outer.Remove(id, ct);
             }
 
             foreach (var id in _mutations)
             {
-                await _outer.RemoveAsync(id, ct);
+                await _outer.Remove(id, ct);
             }
 
             _upserts.Clear();

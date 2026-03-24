@@ -63,18 +63,18 @@ public class IndexingServiceSpec
             LastModified: DateTime.UtcNow,
             Type: FileType.Markdown)).ToList();
 
-        _discoveryMock.Setup(x => x.DiscoverAsync(
+        _discoveryMock.Setup(x => x.Discover(
             It.IsAny<string>(),
             It.IsAny<string?>(),
             It.IsAny<CancellationToken>()))
             .Returns(files.ToAsyncEnumerable());
 
-        _discoveryMock.Setup(x => x.GetCommitShaAsync(It.IsAny<string>()))
-            .ReturnsAsync("abc123");
+        _discoveryMock.Setup(x => x.GetCommitSha(It.IsAny<string>()))
+            .Returns("abc123");
 
         // Setup extraction
-        _extractionMock.Setup(x => x.ExtractAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((string path, CancellationToken ct) => new ExtractedDocument(
+        _extractionMock.Setup(x => x.Extract(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns((string path, CancellationToken ct) => new ExtractedDocument(
                 FilePath: path,
                 RelativePath: Path.GetFileName(path),
                 FullText: "test content",
@@ -85,7 +85,7 @@ public class IndexingServiceSpec
                 TitleHierarchy: new List<string> { "Test" }));
 
         // Setup chunking
-        _chunkingMock.Setup(x => x.ChunkAsync(
+        _chunkingMock.Setup(x => x.Chunk(
             It.IsAny<ExtractedDocument>(),
             It.IsAny<string>(),
             It.IsAny<string?>(),
@@ -105,8 +105,8 @@ public class IndexingServiceSpec
             });
 
         // Setup embedding
-        _embeddingMock.Setup(x => x.EmbedAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(_testEmbedding);
+        _embeddingMock.Setup(x => x.Embed(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(_testEmbedding);
     }
 
     #endregion
@@ -120,7 +120,7 @@ public class IndexingServiceSpec
         SetupSuccessfulPipeline(fileCount: 3, chunksPerFile: 5);
 
         // Act
-    var result = await _service.IndexProjectAsync(_testProjectIdString);
+    var result = await _service.IndexProject(_testProjectIdString);
 
         // Assert
         result.FilesProcessed.Should().Be(3);
@@ -137,23 +137,23 @@ public class IndexingServiceSpec
         SetupSuccessfulPipeline();
         var callOrder = new List<string>();
 
-        _discoveryMock.Setup(x => x.DiscoverAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+        _discoveryMock.Setup(x => x.Discover(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Callback(() => callOrder.Add("discover"))
             .Returns(new List<DiscoveredFile>
             {
                 new("/test/file.md", "file.md", 1000, DateTime.UtcNow, FileType.Markdown)
             }.ToAsyncEnumerable());
 
-        _extractionMock.Setup(x => x.ExtractAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _extractionMock.Setup(x => x.Extract(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Callback(() => callOrder.Add("extract"))
-            .ReturnsAsync(new ExtractedDocument("file.md", "file.md", string.Empty, new List<ContentSection>(), new List<string>()));
+            .Returns(new ExtractedDocument("file.md", "file.md", string.Empty, new List<ContentSection>(), new List<string>()));
 
-        _chunkingMock.Setup(x => x.ChunkAsync(It.IsAny<ExtractedDocument>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+        _chunkingMock.Setup(x => x.Chunk(It.IsAny<ExtractedDocument>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Callback(() => callOrder.Add("chunk"))
             .Returns(AsyncEnumerable.Empty<ChunkedContent>());
 
         // Act
-    await _service.IndexProjectAsync(_testProjectIdString);
+    await _service.IndexProject(_testProjectIdString);
 
         // Assert
         callOrder.Should().ContainInOrder("discover", "extract", "chunk");
@@ -170,15 +170,15 @@ public class IndexingServiceSpec
         SetupSuccessfulPipeline();
         string? capturedPartition = null;
 
-        _embeddingMock.Setup(x => x.EmbedAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _embeddingMock.Setup(x => x.Embed(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Callback(() =>
             {
                 capturedPartition = EntityContext.Current?.Partition;
             })
-            .ReturnsAsync(_testEmbedding);
+            .Returns(_testEmbedding);
 
         // Act
-    await _service.IndexProjectAsync(_testProjectIdString);
+    await _service.IndexProject(_testProjectIdString);
 
         // Assert
     capturedPartition.Should().Be(_testProjectIdString);
@@ -204,7 +204,7 @@ public class IndexingServiceSpec
         var progress = new Progress<IndexingProgress>(p => progressReports.Add(p));
 
         // Act
-    await _service.IndexProjectAsync(_testProjectIdString, progress);
+    await _service.IndexProject(_testProjectIdString, progress);
 
         // Assert
         progressReports.Should().NotBeEmpty();
@@ -222,7 +222,7 @@ public class IndexingServiceSpec
         var progress = new Progress<IndexingProgress>(p => progressReports.Add(p));
 
         // Act
-    await _service.IndexProjectAsync(_testProjectIdString, progress);
+    await _service.IndexProject(_testProjectIdString, progress);
 
         // Assert
         progressReports.Should().Contain(p => !string.IsNullOrEmpty(p.CurrentFile));
@@ -239,7 +239,7 @@ public class IndexingServiceSpec
         SetupSuccessfulPipeline(fileCount: 1, chunksPerFile: 150);
 
         // Act
-    var result = await _service.IndexProjectAsync(_testProjectIdString);
+    var result = await _service.IndexProject(_testProjectIdString);
 
         // Assert
         // Verify Vector<T>.Save was called twice (100 + 50)
@@ -262,13 +262,13 @@ public class IndexingServiceSpec
     {
         // Arrange
         SetupSuccessfulPipeline(fileCount: 3);
-        _extractionMock.Setup(x => x.ExtractAsync(
+        _extractionMock.Setup(x => x.Extract(
             It.Is<string>(p => p.Contains("file1")),
             It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new IOException("File access denied"));
+            .Throws(new IOException("File access denied"));
 
         // Act
-    var result = await _service.IndexProjectAsync(_testProjectIdString);
+    var result = await _service.IndexProject(_testProjectIdString);
 
         // Assert
         result.FilesProcessed.Should().Be(2, "should skip failing file and continue");
@@ -282,11 +282,11 @@ public class IndexingServiceSpec
     {
         // Arrange
         SetupSuccessfulPipeline();
-        _extractionMock.Setup(x => x.ExtractAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new InvalidOperationException("Test error"));
+        _extractionMock.Setup(x => x.Extract(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Throws(new InvalidOperationException("Test error"));
 
         // Act
-    var result = await _service.IndexProjectAsync(_testProjectIdString);
+    var result = await _service.IndexProject(_testProjectIdString);
 
         // Assert
         result.Errors.Should().NotBeEmpty();
@@ -305,7 +305,7 @@ public class IndexingServiceSpec
         // Act & Assert
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
         {
-            await _service.IndexProjectAsync(nonExistentProjectId.ToString());
+            await _service.IndexProject(nonExistentProjectId.ToString());
         });
     }
 
@@ -324,7 +324,7 @@ public class IndexingServiceSpec
         // Act & Assert
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
         {
-            await _service.IndexProjectAsync(_testProjectIdString, cancellationToken: cts.Token);
+            await _service.IndexProject(_testProjectIdString, cancellationToken: cts.Token);
         });
     }
 
@@ -336,7 +336,7 @@ public class IndexingServiceSpec
         var cts = new CancellationTokenSource();
 
         var processedFiles = 0;
-        _extractionMock.Setup(x => x.ExtractAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _extractionMock.Setup(x => x.Extract(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Callback(() =>
             {
                 processedFiles++;
@@ -345,12 +345,12 @@ public class IndexingServiceSpec
                     cts.Cancel();
                 }
             })
-            .ReturnsAsync(new ExtractedDocument("test.md", "test.md", string.Empty, new List<ContentSection>(), new List<string>()));
+            .Returns(new ExtractedDocument("test.md", "test.md", string.Empty, new List<ContentSection>(), new List<string>()));
 
         // Act & Assert
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
         {
-            await _service.IndexProjectAsync(_testProjectIdString, cancellationToken: cts.Token);
+            await _service.IndexProject(_testProjectIdString, cancellationToken: cts.Token);
         });
 
         processedFiles.Should().Be(5, "should stop after cancellation");
@@ -369,7 +369,7 @@ public class IndexingServiceSpec
         // Act (will fail due to Project entity, but we can verify the call)
         try
         {
-            await _service.IndexProjectAsync(_testProjectIdString);
+            await _service.IndexProject(_testProjectIdString);
         }
         catch
         {
@@ -377,7 +377,7 @@ public class IndexingServiceSpec
         }
 
         // Assert
-        _discoveryMock.Verify(x => x.GetCommitShaAsync(It.IsAny<string>()), Times.Once);
+        _discoveryMock.Verify(x => x.GetCommitSha(It.IsAny<string>()), Times.Once);
     }
 
     [Fact]
@@ -386,11 +386,11 @@ public class IndexingServiceSpec
         // Arrange
         const string expectedCommit = "test-commit-sha";
         SetupSuccessfulPipeline();
-        _discoveryMock.Setup(x => x.GetCommitShaAsync(It.IsAny<string>()))
-            .ReturnsAsync(expectedCommit);
+        _discoveryMock.Setup(x => x.GetCommitSha(It.IsAny<string>()))
+            .Returns(expectedCommit);
 
         string? capturedCommit = null;
-        _chunkingMock.Setup(x => x.ChunkAsync(
+        _chunkingMock.Setup(x => x.Chunk(
             It.IsAny<ExtractedDocument>(),
             It.IsAny<string>(),
             It.IsAny<string?>(),
@@ -404,7 +404,7 @@ public class IndexingServiceSpec
         // Act
         try
         {
-            await _service.IndexProjectAsync(_testProjectIdString);
+            await _service.IndexProject(_testProjectIdString);
         }
         catch
         {
@@ -426,7 +426,7 @@ public class IndexingServiceSpec
         SetupSuccessfulPipeline();
 
         // Act
-    await _service.IndexProjectAsync(_testProjectIdString);
+    await _service.IndexProject(_testProjectIdString);
 
         // Assert
         _loggerMock.Verify(x => x.Log(

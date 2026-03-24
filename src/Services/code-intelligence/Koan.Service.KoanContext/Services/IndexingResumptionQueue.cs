@@ -6,8 +6,8 @@ namespace Koan.Context.Services;
 
 public interface IIndexingResumptionQueue
 {
-    ValueTask EnqueueAsync(IndexingResumptionRequest request, CancellationToken cancellationToken);
-    IAsyncEnumerable<IndexingResumptionRequest> ReadAllAsync(CancellationToken cancellationToken);
+    ValueTask Enqueue(IndexingResumptionRequest request, CancellationToken cancellationToken);
+    IAsyncEnumerable<IndexingResumptionRequest> ReadAll(CancellationToken cancellationToken);
 }
 
 public sealed record IndexingResumptionRequest(string ProjectId, JobStatus PreviousStatus, TimeSpan Delay);
@@ -29,7 +29,7 @@ public sealed class IndexingResumptionQueue : IIndexingResumptionQueue
         _channel = Channel.CreateUnbounded<IndexingResumptionRequest>(options);
     }
 
-    public ValueTask EnqueueAsync(IndexingResumptionRequest request, CancellationToken cancellationToken)
+    public ValueTask Enqueue(IndexingResumptionRequest request, CancellationToken cancellationToken)
     {
         if (request is null) throw new ArgumentNullException(nameof(request));
 
@@ -45,14 +45,14 @@ public sealed class IndexingResumptionQueue : IIndexingResumptionQueue
         return WriteAsyncWithLog(request, cancellationToken);
     }
 
-    public IAsyncEnumerable<IndexingResumptionRequest> ReadAllAsync(CancellationToken cancellationToken)
+    public IAsyncEnumerable<IndexingResumptionRequest> ReadAll(CancellationToken cancellationToken)
     {
-        return _channel.Reader.ReadAllAsync(cancellationToken);
+        return _channel.Reader.ReadAll(cancellationToken);
     }
 
     private async ValueTask WriteAsyncWithLog(IndexingResumptionRequest request, CancellationToken cancellationToken)
     {
-        await _channel.Writer.WriteAsync(request, cancellationToken);
+        await _channel.Writer.Write(request, cancellationToken);
         _logger.LogDebug(
             "Queued indexing resume for project {ProjectId} with delay {DelaySeconds}s",
             request.ProjectId,

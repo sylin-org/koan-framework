@@ -7,14 +7,14 @@ internal static class CliApplication
 {
     private static readonly string[] HelpTokens = { "-h", "--help", "/?" };
 
-    public static Task<int> RunAsync(string[] args)
+    public static Task<int> Run(string[] args)
     {
         var runtime = new CommandRuntime();
         var commands = BuildCommandMap(runtime);
 
         if (args.Length == 0)
         {
-            return commands["inspect"].Command.ExecuteAsync(new CommandArgs(Array.Empty<string>()));
+            return commands["inspect"].Command.Execute(new CommandArgs(Array.Empty<string>()));
         }
 
         var commandName = args[0];
@@ -26,7 +26,7 @@ internal static class CliApplication
 
         if (string.Equals(commandName, "help", StringComparison.OrdinalIgnoreCase))
         {
-            return ExecuteHelpAsync(args.Skip(1).ToArray(), commands);
+            return ExecuteHelp(args.Skip(1).ToArray(), commands);
         }
 
         if (!commands.TryGetValue(commandName, out var definition))
@@ -43,7 +43,7 @@ internal static class CliApplication
             return Task.FromResult(0);
         }
 
-        return definition.Command.ExecuteAsync(commandArgs);
+        return definition.Command.Execute(commandArgs);
     }
 
     private static Dictionary<string, CommandDefinition> BuildCommandMap(CommandRuntime runtime)
@@ -58,7 +58,7 @@ internal static class CliApplication
             ["inspect"] = new(new InspectCliCommand(runtime), "inspect [--json]", "Detect project context, dependencies, and provider readiness.")
         };
 
-    private static Task<int> ExecuteHelpAsync(string[] helpArgs, Dictionary<string, CommandDefinition> commands)
+    private static Task<int> ExecuteHelp(string[] helpArgs, Dictionary<string, CommandDefinition> commands)
     {
         if (helpArgs.Length == 0)
         {

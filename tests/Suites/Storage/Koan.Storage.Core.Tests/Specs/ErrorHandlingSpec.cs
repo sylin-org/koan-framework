@@ -19,7 +19,7 @@ public class ErrorHandlingSpec : IClassFixture<StorageCoreTestPipelineFixture>
     var badPath = "/does/not/exist.txt";
 
     // Act
-    Func<Task> act = async () => await storage.DownloadAsync(badPath);
+    Func<Task> act = async () => await storage.Download(badPath);
 
     // Assert
     await act.Should().ThrowAsync<Exception>().WithMessage("*not found*");

@@ -92,7 +92,7 @@ public class ServiceBuilder<T> : IServiceBuilder<T>, IServiceActionBuilder, ISer
     }
 
     // Action execution
-    public async Task ExecuteAsync(CancellationToken cancellationToken = default)
+    public async Task Execute(CancellationToken cancellationToken = default)
     {
     var serviceRegistry = ServiceLocator.GetService<IServiceRegistry>();
     var service = serviceRegistry.GetService<T>();
@@ -114,12 +114,12 @@ public class ServiceBuilder<T> : IServiceBuilder<T>, IServiceActionBuilder, ISer
 
             var effectiveCt = cts?.Token ?? cancellationToken;
 
-            await fluentService.ExecuteActionAsync(action.Action, action.Parameters, effectiveCt);
+            await fluentService.ExecuteAction(action.Action, action.Parameters, effectiveCt);
         }
     }
 
     // Event subscription execution
-    public Task<IDisposable> SubscribeAsync()
+    public Task<IDisposable> Subscribe()
     {
     var serviceRegistry = ServiceLocator.GetService<IServiceRegistry>();
     var service = serviceRegistry.GetService<T>();
@@ -197,7 +197,7 @@ public class ServiceBuilder<T> : IServiceBuilder<T>, IServiceActionBuilder, ISer
 /// <typeparam name="T">The background service type</typeparam>
 public class ServiceQueryBuilder<T> : IServiceQueryBuilder where T : class, IKoanBackgroundService
 {
-    public Task<ServiceStatus> GetStatusAsync()
+    public Task<ServiceStatus> GetStatus()
     {
         var serviceRegistry = ServiceLocator.GetService<IServiceRegistry>();
         var service = serviceRegistry.GetService<T>();
@@ -213,14 +213,14 @@ public class ServiceQueryBuilder<T> : IServiceQueryBuilder where T : class, IKoa
         return Task.FromResult(status);
     }
 
-    public async Task<ServiceHealth> GetHealthAsync()
+    public async Task<ServiceHealth> GetHealth()
     {
         var serviceRegistry = ServiceLocator.GetService<IServiceRegistry>();
         var service = serviceRegistry.GetService<T>();
 
         if (service is IHealthContributor healthContributor)
         {
-            var healthReport = await healthContributor.CheckAsync();
+            var healthReport = await healthContributor.Check();
             return new ServiceHealth
             {
                 Name = service.Name,
@@ -245,7 +245,7 @@ public class ServiceQueryBuilder<T> : IServiceQueryBuilder where T : class, IKoa
         };
     }
 
-    public Task<ServiceInfo> GetInfoAsync()
+    public Task<ServiceInfo> GetInfo()
     {
         var serviceRegistry = ServiceLocator.GetService<IServiceRegistry>();
         var service = serviceRegistry.GetService<T>();

@@ -67,7 +67,7 @@ public sealed class ApiHealthSpec
                 var healthBody = await healthResponse.Content.ReadAsStringAsync(cancellation).ConfigureAwait(false);
                 healthBody.Should().Contain("ok");
 
-                var clearResponse = await client.DeleteAsync("/api/items/clear", cancellation).ConfigureAwait(false);
+                var clearResponse = await client.Delete("/api/items/clear", cancellation).ConfigureAwait(false);
                 if (!clearResponse.IsSuccessStatusCode)
                 {
                     var clearBody = await clearResponse.Content.ReadAsStringAsync(cancellation).ConfigureAwait(false);
@@ -95,6 +95,6 @@ public sealed class ApiHealthSpec
                 listDoc.RootElement.ValueKind.Should().Be(JsonValueKind.Array);
                 listDoc.RootElement.GetArrayLength().Should().BeGreaterThan(0);
             })
-            .RunAsync();
+            .Run();
     }
 }

@@ -9,11 +9,11 @@ internal interface IEntityTransformerInvoker
 {
     Type EntityType { get; }
 
-    Task<object?> ParseAsync(Stream body, string contentType, HttpContext httpContext);
+    Task<object?> Parse(Stream body, string contentType, HttpContext httpContext);
 
-    Task<object> ParseManyAsync(Stream body, string contentType, HttpContext httpContext);
+    Task<object> ParseMany(Stream body, string contentType, HttpContext httpContext);
 
-    Task<object> TransformAsync(object model, HttpContext httpContext);
+    Task<object> Transform(object model, HttpContext httpContext);
 
-    Task<object> TransformManyAsync(IEnumerable models, HttpContext httpContext);
+    Task<object> TransformMany(IEnumerable models, HttpContext httpContext);
 }

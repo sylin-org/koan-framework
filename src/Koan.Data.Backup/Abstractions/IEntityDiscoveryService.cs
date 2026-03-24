@@ -7,12 +7,12 @@ public interface IEntityDiscoveryService
     /// <summary>
     /// Discovers all <see cref="Koan.Data.Abstractions.IEntity{TKey}"/> implementations in the application domain.
     /// </summary>
-    Task<EntityDiscoveryResult> DiscoverAllEntitiesAsync(CancellationToken ct = default);
+    Task<EntityDiscoveryResult> DiscoverAllEntities(CancellationToken ct = default);
 
     /// <summary>
     /// Warms up all discovered entities by activating their AggregateConfigs
     /// </summary>
-    Task WarmupAllEntitiesAsync(CancellationToken ct = default);
+    Task WarmupAllEntities(CancellationToken ct = default);
 
     /// <summary>
     /// Gets the currently discovered entities (cached)
@@ -22,7 +22,7 @@ public interface IEntityDiscoveryService
     /// <summary>
     /// Clears the discovery cache and forces re-discovery
     /// </summary>
-    Task RefreshDiscoveryAsync(CancellationToken ct = default);
+    Task RefreshDiscovery(CancellationToken ct = default);
 
     /// <summary>
     /// Gets discovery statistics
@@ -48,5 +48,5 @@ public interface IEntityDiscoveryService
     /// </remarks>
     /// <param name="ct">Cancellation token</param>
     /// <returns>A <see cref="BackupInventory"/> containing included, excluded, and uncovered entities.</returns>
-    Task<BackupInventory> BuildInventoryAsync(CancellationToken ct = default);
+    Task<BackupInventory> BuildInventory(CancellationToken ct = default);
 }

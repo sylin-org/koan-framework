@@ -190,7 +190,7 @@ public sealed class RolesAdminController : ControllerBase
         foreach (var k in toDeleteBindings)
             await _bindings.Delete(k, ct);
 
-    await _snapshotProvider.ReloadAsync(ct);
+    await _snapshotProvider.Reload(ct);
     _cache.Clear(); // invalidate attribution cache
         return Ok(new { applied = true, diff });
     }
@@ -198,7 +198,7 @@ public sealed class RolesAdminController : ControllerBase
     [HttpPost(AuthRoutes.Reload)]
     public async Task<IActionResult> Reload(CancellationToken ct)
     {
-        await _snapshotProvider.ReloadAsync(ct);
+        await _snapshotProvider.Reload(ct);
         _cache.Clear();
         return NoContent();
     }

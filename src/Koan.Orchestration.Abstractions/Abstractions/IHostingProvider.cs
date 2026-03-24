@@ -4,7 +4,7 @@ public interface IHostingProvider
 {
     string Id { get; }
     int Priority { get; }
-    Task<(bool Ok, string? Reason)> IsAvailableAsync(CancellationToken ct = default);
+    Task<(bool Ok, string? Reason)> IsAvailable(CancellationToken ct = default);
 
     Task Up(string composePath, Profile profile, RunOptions options, CancellationToken ct = default);
     Task Down(string composePath, StopOptions options, CancellationToken ct = default);

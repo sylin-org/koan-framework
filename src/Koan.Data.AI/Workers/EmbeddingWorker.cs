@@ -50,7 +50,7 @@ public class EmbeddingWorker : BackgroundService
         {
             try
             {
-                var processedCount = await ProcessBatchAsync(stoppingToken);
+                var processedCount = await ProcessBatch(stoppingToken);
 
                 if (processedCount > 0)
                 {
@@ -66,7 +66,7 @@ public class EmbeddingWorker : BackgroundService
                 // Periodic cleanup of completed jobs
                 if (_options.Value.AutoCleanupCompleted)
                 {
-                    await CleanupCompletedJobsAsync(stoppingToken);
+                    await CleanupCompletedJobs(stoppingToken);
                 }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
@@ -82,7 +82,7 @@ public class EmbeddingWorker : BackgroundService
     /// <summary>
     /// Processes a batch of pending jobs across all entity types.
     /// </summary>
-    private async Task<int> ProcessBatchAsync(CancellationToken ct)
+    private async Task<int> ProcessBatch(CancellationToken ct)
     {
         var processedCount = 0;
 
@@ -95,7 +95,7 @@ public class EmbeddingWorker : BackgroundService
 
             try
             {
-                var count = await ProcessEntityTypeJobsAsync(entityType, ct);
+                var count = await ProcessEntityTypeJobs(entityType, ct);
                 processedCount += count;
             }
             catch (Exception ex)
@@ -110,7 +110,7 @@ public class EmbeddingWorker : BackgroundService
     /// <summary>
     /// Processes pending jobs for a specific entity type using reflection.
     /// </summary>
-    private async Task<int> ProcessEntityTypeJobsAsync(Type entityType, CancellationToken ct)
+    private async Task<int> ProcessEntityTypeJobs(Type entityType, CancellationToken ct)
     {
         // Use reflection to call ProcessJobsAsync<TEntity>
         var method = typeof(EmbeddingWorker)
@@ -156,7 +156,7 @@ public class EmbeddingWorker : BackgroundService
             try
             {
                 // Check rate limit before processing
-                await WaitForRateLimitAsync(ct);
+                await WaitForRateLimit(ct);
 
                 // Mark job as processing
                 job.Status = EmbedJobStatus.Processing;
@@ -223,7 +223,7 @@ public class EmbeddingWorker : BackgroundService
         try
         {
             // Load the entity to get fresh data
-            var entity = await Data<TEntity, string>.GetAsync(job.EntityId, ct);
+            var entity = await Data<TEntity, string>.Get(job.EntityId, ct);
             if (entity == null)
             {
                 throw new InvalidOperationException($"Entity {job.EntityId} not found");
@@ -384,7 +384,7 @@ public class EmbeddingWorker : BackgroundService
     /// <summary>
     /// Waits if rate limit is exceeded.
     /// </summary>
-    private async Task WaitForRateLimitAsync(CancellationToken ct)
+    private async Task WaitForRateLimit(CancellationToken ct)
     {
         if (_options.Value.GlobalRateLimitPerMinute <= 0)
             return; // Rate limiting disabled
@@ -428,7 +428,7 @@ public class EmbeddingWorker : BackgroundService
     /// <summary>
     /// Cleans up old completed jobs.
     /// </summary>
-    private async Task CleanupCompletedJobsAsync(CancellationToken ct)
+    private async Task CleanupCompletedJobs(CancellationToken ct)
     {
         try
         {
@@ -439,7 +439,7 @@ public class EmbeddingWorker : BackgroundService
                 if (!EmbeddingRegistry.AsyncEntityTypes.Contains(entityType))
                     continue;
 
-                await CleanupEntityTypeJobsAsync(entityType, cutoff, ct);
+                await CleanupEntityTypeJobs(entityType, cutoff, ct);
             }
         }
         catch (Exception ex)
@@ -451,7 +451,7 @@ public class EmbeddingWorker : BackgroundService
     /// <summary>
     /// Cleans up completed jobs for a specific entity type.
     /// </summary>
-    private async Task CleanupEntityTypeJobsAsync(Type entityType, DateTimeOffset cutoff, CancellationToken ct)
+    private async Task CleanupEntityTypeJobs(Type entityType, DateTimeOffset cutoff, CancellationToken ct)
     {
         var method = typeof(EmbeddingWorker)
             .GetMethod(nameof(CleanupJobsAsync), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)

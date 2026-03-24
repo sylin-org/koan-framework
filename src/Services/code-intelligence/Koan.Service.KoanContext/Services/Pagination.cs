@@ -55,7 +55,7 @@ public sealed class Pagination
             using var gzipStream = new GZipStream(inputStream, CompressionMode.Decompress);
             using var outputStream = new MemoryStream();
 
-            gzipStream.CopyTo(outputStream);
+            gzipStream.CopyToAsync(outputStream);
             var json = Encoding.UTF8.GetString(outputStream.ToArray());
 
             var data = JsonSerializer.Deserialize<ContinuationTokenData>(json);

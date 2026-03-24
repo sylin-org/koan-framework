@@ -11,8 +11,8 @@ public interface IChatAdapter : IAiAdapter
     bool CanServe(AiChatRequest request);
 
     /// <summary>Send a chat request and return the complete response.</summary>
-    Task<AiChatResponse> ChatAsync(AiChatRequest request, CancellationToken ct = default);
+    Task<AiChatResponse> Chat(AiChatRequest request, CancellationToken ct = default);
 
     /// <summary>Stream a chat response token-by-token.</summary>
-    IAsyncEnumerable<AiChatChunk> StreamAsync(AiChatRequest request, CancellationToken ct = default);
+    IAsyncEnumerable<AiChatChunk> Stream(AiChatRequest request, CancellationToken ct = default);
 }

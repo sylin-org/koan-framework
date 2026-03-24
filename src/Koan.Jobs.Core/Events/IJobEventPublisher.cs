@@ -7,10 +7,10 @@ namespace Koan.Jobs.Events;
 
 public interface IJobEventPublisher
 {
-    Task PublishQueuedAsync(Job job, CancellationToken cancellationToken);
-    Task PublishStartedAsync(Job job, CancellationToken cancellationToken);
-    Task PublishCompletedAsync(Job job, CancellationToken cancellationToken);
-    Task PublishFailedAsync(Job job, string? error, CancellationToken cancellationToken);
-    Task PublishCancelledAsync(Job job, CancellationToken cancellationToken);
-    Task PublishProgressAsync(Job job, JobProgressUpdate update, CancellationToken cancellationToken);
+    Task PublishQueued(Job job, CancellationToken cancellationToken);
+    Task PublishStarted(Job job, CancellationToken cancellationToken);
+    Task PublishCompleted(Job job, CancellationToken cancellationToken);
+    Task PublishFailed(Job job, string? error, CancellationToken cancellationToken);
+    Task PublishCancelled(Job job, CancellationToken cancellationToken);
+    Task PublishProgress(Job job, JobProgressUpdate update, CancellationToken cancellationToken);
 }

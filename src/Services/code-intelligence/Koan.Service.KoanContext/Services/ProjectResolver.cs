@@ -33,7 +33,7 @@ public class ProjectResolver
     /// <summary>
     /// Resolve project by ID, working directory, or HTTP context
     /// </summary>
-    public virtual async Task<Project?> ResolveProjectAsync(
+    public virtual async Task<Project?> ResolveProject(
         string? libraryId,
         string? workingDirectory,
         HttpContext? httpContext = null,
@@ -51,7 +51,7 @@ public class ProjectResolver
         if (!string.IsNullOrWhiteSpace(workingDirectory))
         {
             _logger.LogDebug("Resolving project by path: {Path}", workingDirectory);
-            return await ResolveProjectByPathAsync(workingDirectory, autoCreate, cancellationToken);
+            return await ResolveProjectByPath(workingDirectory, autoCreate, cancellationToken);
         }
 
         // Priority 3: HTTP headers (MCP transport context)
@@ -66,7 +66,7 @@ public class ProjectResolver
                 {
                     var contextPath = headerValue.ToString();
                     _logger.LogDebug("Resolving project from header {Header}: {Path}", headerKey, contextPath);
-                    return await ResolveProjectByPathAsync(contextPath, autoCreate, cancellationToken);
+                    return await ResolveProjectByPath(contextPath, autoCreate, cancellationToken);
                 }
             }
         }
@@ -78,7 +78,7 @@ public class ProjectResolver
     /// <summary>
     /// Resolve project from file path (detects git root, matches existing projects)
     /// </summary>
-    public virtual async Task<Project?> ResolveProjectByPathAsync(
+    public virtual async Task<Project?> ResolveProjectByPath(
         string pathContext,
         bool autoCreate = true,
         CancellationToken cancellationToken = default)
@@ -114,7 +114,7 @@ public class ProjectResolver
         if (_options.AutoCreate && autoCreate)
         {
             _logger.LogInformation("Auto-creating project at {Path}", projectRoot);
-            return await CreateProjectAsync(projectRoot, cancellationToken);
+            return await CreateProject(projectRoot, cancellationToken);
         }
 
         return null;
@@ -143,7 +143,7 @@ public class ProjectResolver
     /// <summary>
     /// Create new project from directory path
     /// </summary>
-    private async Task<Project> CreateProjectAsync(string path, CancellationToken cancellationToken)
+    private async Task<Project> CreateProject(string path, CancellationToken cancellationToken)
     {
         var project = Project.CreateFromDirectory(path);
         project.Status = IndexingStatus.NotIndexed;

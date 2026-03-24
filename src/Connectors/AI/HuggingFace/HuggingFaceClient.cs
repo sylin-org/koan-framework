@@ -42,7 +42,7 @@ internal sealed class HuggingFaceClient : IDisposable
     /// <summary>
     /// Search for models on HuggingFace Hub.
     /// </summary>
-    public async Task<IReadOnlyList<HfModelInfo>> SearchAsync(
+    public async Task<IReadOnlyList<HfModelInfo>> Search(
         string query, int limit, CancellationToken ct)
     {
         var encodedQuery = Uri.EscapeDataString(query);
@@ -60,7 +60,7 @@ internal sealed class HuggingFaceClient : IDisposable
     /// <summary>
     /// Get detailed metadata for a specific model.
     /// </summary>
-    public async Task<HfModelInfo?> GetModelInfoAsync(string modelId, CancellationToken ct)
+    public async Task<HfModelInfo?> GetModelInfo(string modelId, CancellationToken ct)
     {
         var encodedId = Uri.EscapeDataString(modelId);
         var url = $"api/models/{encodedId}";
@@ -81,7 +81,7 @@ internal sealed class HuggingFaceClient : IDisposable
     /// <summary>
     /// List files in a model repository.
     /// </summary>
-    public async Task<IReadOnlyList<HfFileInfo>> ListFilesAsync(string modelId, CancellationToken ct)
+    public async Task<IReadOnlyList<HfFileInfo>> ListFiles(string modelId, CancellationToken ct)
     {
         var encodedId = Uri.EscapeDataString(modelId);
         var url = $"api/models/{encodedId}/tree/main";
@@ -98,7 +98,7 @@ internal sealed class HuggingFaceClient : IDisposable
     /// <summary>
     /// Download a single file from a model repository with progress reporting.
     /// </summary>
-    public async Task DownloadFileAsync(
+    public async Task DownloadFile(
         string modelId, string fileName, string outputPath,
         IProgress<ModelPullProgress>? progress, CancellationToken ct)
     {

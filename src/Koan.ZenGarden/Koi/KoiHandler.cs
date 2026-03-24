@@ -48,7 +48,7 @@ internal sealed class KoiHandler : IKoiHandler
             return;
 
         _lifetimeCts = new CancellationTokenSource();
-        _ = RunAsync(_lifetimeCts.Token);
+        _ = Run(_lifetimeCts.Token);
     }
 
     public IDisposable OnTopologyEvent(Func<KoiTopologyEvent, CancellationToken, ValueTask> handler)
@@ -71,7 +71,7 @@ internal sealed class KoiHandler : IKoiHandler
 
     // ── Core loop ────────────────────────────────────────────────────────
 
-    private async Task RunAsync(CancellationToken ct)
+    private async Task Run(CancellationToken ct)
     {
         var backoff = TimeSpan.Zero;
 
@@ -83,7 +83,7 @@ internal sealed class KoiHandler : IKoiHandler
                     await Task.Delay(backoff, ct).ConfigureAwait(false);
 
                 // Probe Koi health
-                var healthy = await ProbeHealthAsync(ct).ConfigureAwait(false);
+                var healthy = await ProbeHealth(ct).ConfigureAwait(false);
                 if (!healthy)
                 {
                     if (_state != KoiHandlerState.NotDetected)
@@ -100,22 +100,22 @@ internal sealed class KoiHandler : IKoiHandler
                 // Connected — browse and stream
                 _koiDetectedAt ??= DateTimeOffset.UtcNow;
                 TransitionTo(KoiHandlerState.Connected);
-                await EmitAsync(KoiTopologyEventKind.KoiAvailable, ct).ConfigureAwait(false);
+                await Emit(KoiTopologyEventKind.KoiAvailable, ct).ConfigureAwait(false);
 
                 // Initial browse: snapshot the current topology
-                await BrowseStonesAsync(ct).ConfigureAwait(false);
+                await BrowseStones(ct).ConfigureAwait(false);
                 if (_options.KoiLanternDiscovery)
-                    await BrowseLanternsAsync(ct).ConfigureAwait(false);
+                    await BrowseLanterns(ct).ConfigureAwait(false);
 
                 PublishSnapshot();
                 _logger.LogInformation(
                     "Koi connected at {Endpoint} (v{Version}): discovered {StoneCount} stone(s), {LanternCount} lantern(s).",
                     _koiEndpoint, _koiVersion ?? "?", _snapshot.Stones.Count, _snapshot.Lanterns.Count);
-                await EmitAsync(KoiTopologyEventKind.TopologyReset, ct).ConfigureAwait(false);
+                await Emit(KoiTopologyEventKind.TopologyReset, ct).ConfigureAwait(false);
 
                 // Long-lived SSE event streams
                 if (_options.KoiContinuousDiscovery)
-                    await ConsumeEventsAsync(ct).ConfigureAwait(false);
+                    await ConsumeEvents(ct).ConfigureAwait(false);
                 else
                     await Task.Delay(Timeout.InfiniteTimeSpan, ct).ConfigureAwait(false);
             }
@@ -131,7 +131,7 @@ internal sealed class KoiHandler : IKoiHandler
                 {
                     _logger.LogWarning("Koi connection lost: {Message}. Reconnecting.", ex.Message);
                     TransitionTo(KoiHandlerState.Reconnecting);
-                    await EmitSafeAsync(KoiTopologyEventKind.KoiLost, ct).ConfigureAwait(false);
+                    await EmitSafe(KoiTopologyEventKind.KoiLost, ct).ConfigureAwait(false);
                 }
 
                 backoff = NextBackoff(backoff);
@@ -141,7 +141,7 @@ internal sealed class KoiHandler : IKoiHandler
 
     // ── Health probe ────────────────────────────────────────────────────
 
-    private async Task<bool> ProbeHealthAsync(CancellationToken ct)
+    private async Task<bool> ProbeHealth(CancellationToken ct)
     {
         try
         {
@@ -156,7 +156,7 @@ internal sealed class KoiHandler : IKoiHandler
                 return false;
 
             // Health returns {"ok":true}; version is on /v1/status
-            await TryFetchVersionAsync(linked.Token).ConfigureAwait(false);
+            await TryFetchVersion(linked.Token).ConfigureAwait(false);
 
             return true;
         }
@@ -167,7 +167,7 @@ internal sealed class KoiHandler : IKoiHandler
         }
     }
 
-    private async Task TryFetchVersionAsync(CancellationToken ct)
+    private async Task TryFetchVersion(CancellationToken ct)
     {
         try
         {
@@ -190,25 +190,25 @@ internal sealed class KoiHandler : IKoiHandler
 
     // ── Initial browse ──────────────────────────────────────────────────
 
-    private async Task BrowseStonesAsync(CancellationToken ct)
+    private async Task BrowseStones(CancellationToken ct)
     {
-        await foreach (var stone in BrowseServiceAsync(Constants.Koi.MossServiceType, ct).ConfigureAwait(false))
+        await foreach (var stone in BrowseService(Constants.Koi.MossServiceType, ct).ConfigureAwait(false))
         {
             if (stone is null) continue;
             _stones[stone.CacheKey] = stone;
         }
     }
 
-    private async Task BrowseLanternsAsync(CancellationToken ct)
+    private async Task BrowseLanterns(CancellationToken ct)
     {
-        await foreach (var lantern in BrowseLanternServiceAsync(ct).ConfigureAwait(false))
+        await foreach (var lantern in BrowseLanternService(ct).ConfigureAwait(false))
         {
             if (lantern is null) continue;
             _lanterns[lantern.Name] = lantern;
         }
     }
 
-    private async IAsyncEnumerable<DiscoveredStone?> BrowseServiceAsync(
+    private async IAsyncEnumerable<DiscoveredStone?> BrowseService(
         string serviceType, [EnumeratorCancellation] CancellationToken ct)
     {
         var uri = $"{_koiEndpoint}{Constants.Koi.BrowseEndpoint}?type={serviceType}&idle_for={(int)_options.KoiBrowseIdleTimeout.TotalSeconds}";
@@ -233,7 +233,7 @@ internal sealed class KoiHandler : IKoiHandler
         }
     }
 
-    private async IAsyncEnumerable<DiscoveredLantern?> BrowseLanternServiceAsync(
+    private async IAsyncEnumerable<DiscoveredLantern?> BrowseLanternService(
         [EnumeratorCancellation] CancellationToken ct)
     {
         var uri = $"{_koiEndpoint}{Constants.Koi.BrowseEndpoint}?type={Constants.Koi.LanternServiceType}&idle_for={(int)_options.KoiBrowseIdleTimeout.TotalSeconds}";
@@ -260,28 +260,28 @@ internal sealed class KoiHandler : IKoiHandler
 
     // ── Continuous SSE consumption ──────────────────────────────────────
 
-    private async Task ConsumeEventsAsync(CancellationToken ct)
+    private async Task ConsumeEvents(CancellationToken ct)
     {
         // Run Stone and Lantern event streams. Stones are required;
         // Lanterns are secondary. If Lantern stream fails, only Stones continue.
         if (_options.KoiLanternDiscovery)
         {
             var lanternCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            var lanternTask = ConsumeServiceEventsAsync(
+            var lanternTask = ConsumeServiceEvents(
                 Constants.Koi.LanternServiceType,
-                ProcessLanternEventAsync,
+                ProcessLanternEvent,
                 lanternCts.Token);
 
             try
             {
-                await ConsumeServiceEventsAsync(
+                await ConsumeServiceEvents(
                     Constants.Koi.MossServiceType,
-                    ProcessStoneEventAsync,
+                    ProcessStoneEvent,
                     ct).ConfigureAwait(false);
             }
             finally
             {
-                await lanternCts.CancelAsync();
+                lanternCts.Cancel();
                 lanternCts.Dispose();
                 try { await lanternTask.ConfigureAwait(false); }
                 catch (OperationCanceledException) { }
@@ -289,14 +289,14 @@ internal sealed class KoiHandler : IKoiHandler
         }
         else
         {
-            await ConsumeServiceEventsAsync(
+            await ConsumeServiceEvents(
                 Constants.Koi.MossServiceType,
-                ProcessStoneEventAsync,
+                ProcessStoneEvent,
                 ct).ConfigureAwait(false);
         }
     }
 
-    private async Task ConsumeServiceEventsAsync(
+    private async Task ConsumeServiceEvents(
         string serviceType,
         Func<string, ReadOnlyMemory<char>, CancellationToken, ValueTask> processor,
         CancellationToken ct)
@@ -329,7 +329,7 @@ internal sealed class KoiHandler : IKoiHandler
 
     // ── Stone event processing ──────────────────────────────────────────
 
-    private async ValueTask ProcessStoneEventAsync(string eventKind, ReadOnlyMemory<char> json, CancellationToken ct)
+    private async ValueTask ProcessStoneEvent(string eventKind, ReadOnlyMemory<char> json, CancellationToken ct)
     {
         switch (eventKind)
         {
@@ -343,9 +343,9 @@ internal sealed class KoiHandler : IKoiHandler
                 PublishSnapshot();
 
                 if (isNew)
-                    await EmitStoneAsync(KoiTopologyEventKind.StoneOnline, stone, null, ct).ConfigureAwait(false);
+                    await EmitStone(KoiTopologyEventKind.StoneOnline, stone, null, ct).ConfigureAwait(false);
                 else if (!stone.TopologyEquals(previous))
-                    await EmitStoneAsync(KoiTopologyEventKind.StoneChanged, stone, previous, ct).ConfigureAwait(false);
+                    await EmitStone(KoiTopologyEventKind.StoneChanged, stone, previous, ct).ConfigureAwait(false);
                 break;
             }
             case KoiEventKinds.Removed:
@@ -368,7 +368,7 @@ internal sealed class KoiHandler : IKoiHandler
                 if (removed is not null)
                 {
                     PublishSnapshot();
-                    await EmitStoneAsync(KoiTopologyEventKind.StoneOffline, removed, null, ct).ConfigureAwait(false);
+                    await EmitStone(KoiTopologyEventKind.StoneOffline, removed, null, ct).ConfigureAwait(false);
                 }
 
                 break;
@@ -379,7 +379,7 @@ internal sealed class KoiHandler : IKoiHandler
 
     // ── Lantern event processing ────────────────────────────────────────
 
-    private async ValueTask ProcessLanternEventAsync(string eventKind, ReadOnlyMemory<char> json, CancellationToken ct)
+    private async ValueTask ProcessLanternEvent(string eventKind, ReadOnlyMemory<char> json, CancellationToken ct)
     {
         switch (eventKind)
         {
@@ -393,7 +393,7 @@ internal sealed class KoiHandler : IKoiHandler
                 PublishSnapshot();
 
                 if (isNew)
-                    await EmitLanternAsync(KoiTopologyEventKind.LanternFound, lantern, ct).ConfigureAwait(false);
+                    await EmitLantern(KoiTopologyEventKind.LanternFound, lantern, ct).ConfigureAwait(false);
                 break;
             }
             case KoiEventKinds.Removed:
@@ -404,7 +404,7 @@ internal sealed class KoiHandler : IKoiHandler
                 if (_lanterns.TryRemove(name, out var removed))
                 {
                     PublishSnapshot();
-                    await EmitLanternAsync(KoiTopologyEventKind.LanternLost, removed, ct).ConfigureAwait(false);
+                    await EmitLantern(KoiTopologyEventKind.LanternLost, removed, ct).ConfigureAwait(false);
                 }
 
                 break;
@@ -436,13 +436,13 @@ internal sealed class KoiHandler : IKoiHandler
 
     // ── Event emission ──────────────────────────────────────────────────
 
-    private async ValueTask EmitAsync(KoiTopologyEventKind kind, CancellationToken ct)
+    private async ValueTask Emit(KoiTopologyEventKind kind, CancellationToken ct)
     {
         var evt = new KoiTopologyEvent { Kind = kind, Snapshot = _snapshot };
-        await DispatchAsync(evt, ct).ConfigureAwait(false);
+        await Dispatch(evt, ct).ConfigureAwait(false);
     }
 
-    private async ValueTask EmitStoneAsync(
+    private async ValueTask EmitStone(
         KoiTopologyEventKind kind, DiscoveredStone stone, DiscoveredStone? previous, CancellationToken ct)
     {
         var evt = new KoiTopologyEvent
@@ -452,10 +452,10 @@ internal sealed class KoiHandler : IKoiHandler
             Previous = previous,
             Snapshot = _snapshot
         };
-        await DispatchAsync(evt, ct).ConfigureAwait(false);
+        await Dispatch(evt, ct).ConfigureAwait(false);
     }
 
-    private async ValueTask EmitLanternAsync(
+    private async ValueTask EmitLantern(
         KoiTopologyEventKind kind, DiscoveredLantern lantern, CancellationToken ct)
     {
         var evt = new KoiTopologyEvent
@@ -464,14 +464,14 @@ internal sealed class KoiHandler : IKoiHandler
             Lantern = lantern,
             Snapshot = _snapshot
         };
-        await DispatchAsync(evt, ct).ConfigureAwait(false);
+        await Dispatch(evt, ct).ConfigureAwait(false);
     }
 
-    private ValueTask EmitSafeAsync(KoiTopologyEventKind kind, CancellationToken ct)
+    private ValueTask EmitSafe(KoiTopologyEventKind kind, CancellationToken ct)
     {
         try
         {
-            return EmitAsync(kind, ct);
+            return Emit(kind, ct);
         }
         catch
         {
@@ -479,7 +479,7 @@ internal sealed class KoiHandler : IKoiHandler
         }
     }
 
-    private async ValueTask DispatchAsync(KoiTopologyEvent evt, CancellationToken ct)
+    private async ValueTask Dispatch(KoiTopologyEvent evt, CancellationToken ct)
     {
         // Snapshot subscribers before iterating to avoid mutation during dispatch
         var subscribers = _subscribers.Values.ToArray();

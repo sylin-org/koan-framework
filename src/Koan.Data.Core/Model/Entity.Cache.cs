@@ -56,7 +56,7 @@ public abstract partial class Entity<TEntity, TKey>
                 return ValueTask.FromResult(0L);
             }
 
-            return client.FlushTagsAsync(resolved, ct);
+            return client.FlushTags(resolved, ct);
         }
 
         private static ValueTask<long> CountInternal(IEnumerable<string>? tags, CancellationToken ct)
@@ -68,7 +68,7 @@ public abstract partial class Entity<TEntity, TKey>
                 return ValueTask.FromResult(0L);
             }
 
-            return client.CountTagsAsync(resolved, ct);
+            return client.CountTags(resolved, ct);
         }
 
         private static ICacheClient ResolveClient()

@@ -124,7 +124,7 @@ public sealed class DocumentPipeline : Entity<DocumentPipeline>
         DocumentIds.RemoveAll(id => string.Equals(id, documentId, StringComparison.Ordinal));
     }
 
-    public async Task<List<SourceDocument>> LoadDocumentsAsync(CancellationToken ct = default)
+    public async Task<List<SourceDocument>> LoadDocuments(CancellationToken ct = default)
     {
         if (DocumentIds.Count == 0)
         {
@@ -148,7 +148,7 @@ public sealed class DocumentPipeline : Entity<DocumentPipeline>
             .ToList();
     }
 
-    public async Task<List<Passage>> LoadPassagesAsync(CancellationToken ct = default)
+    public async Task<List<Passage>> LoadPassages(CancellationToken ct = default)
     {
         if (DocumentIds.Count == 0)
         {

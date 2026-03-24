@@ -41,27 +41,27 @@ internal sealed class JobMaintenanceTask : IScheduledTask, IOnStartup, IHasTimeo
 
     public TimeSpan Timeout => TimeSpan.FromMinutes(2);
 
-    public async Task RunAsync(CancellationToken ct)
+    public async Task Run(CancellationToken ct)
     {
         _logger.LogInformation("Indexing job maintenance starting...");
 
         try
         {
             // 1. Recover stuck jobs (marks them as Cancelled)
-            var (stuckCount, stuckJobsToResume) = await RecoverStuckJobsAsync(ct);
+            var (stuckCount, stuckJobsToResume) = await RecoverStuckJobs(ct);
 
             // 2. Auto-resume interrupted jobs (if enabled)
             var resumedCount = 0;
             if (_autoResumeEnabled && stuckJobsToResume.Count > 0)
             {
-                resumedCount = await AutoResumeJobsAsync(stuckJobsToResume, ct);
+                resumedCount = await AutoResumeJobs(stuckJobsToResume, ct);
             }
 
             // 3. Clean up old terminal jobs
-            var cleanedCount = await CleanupOldJobsAsync(ct);
+            var cleanedCount = await CleanupOldJobs(ct);
 
             // 4. Enforce per-project job limits
-            var trimmedCount = await TrimExcessJobsPerProjectAsync(ct);
+            var trimmedCount = await TrimExcessJobsPerProject(ct);
 
             _logger.LogInformation(
                 "Indexing job maintenance complete: {StuckRecovered} stuck jobs recovered, " +
@@ -81,7 +81,7 @@ internal sealed class JobMaintenanceTask : IScheduledTask, IOnStartup, IHasTimeo
     /// Recovers jobs left in non-terminal states from previous sessions
     /// </summary>
     /// <returns>Tuple of (count of recovered jobs, list of jobs to potentially resume)</returns>
-    private async Task<(int count, List<(string projectId, JobStatus previousStatus)> jobsToResume)> RecoverStuckJobsAsync(CancellationToken ct)
+    private async Task<(int count, List<(string projectId, JobStatus previousStatus)> jobsToResume)> RecoverStuckJobs(CancellationToken ct)
     {
         var stuckJobs = await Job.Query(
             j => j.Status == JobStatus.Pending ||
@@ -154,7 +154,7 @@ internal sealed class JobMaintenanceTask : IScheduledTask, IOnStartup, IHasTimeo
     /// Fire-and-forget pattern - doesn't block startup.
     /// Supports configurable delay to prevent immediate resource usage.
     /// </remarks>
-    private async Task<int> AutoResumeJobsAsync(
+    private async Task<int> AutoResumeJobs(
         List<(string projectId, JobStatus previousStatus)> jobsToResume,
         CancellationToken ct)
     {
@@ -167,18 +167,18 @@ internal sealed class JobMaintenanceTask : IScheduledTask, IOnStartup, IHasTimeo
                 _autoResumeDelaySeconds,
                 jobsToResume.Count);
 
-            resumedCount = await EnqueueResumptionsAsync(jobsToResume, TimeSpan.FromSeconds(_autoResumeDelaySeconds), ct);
+            resumedCount = await EnqueueResumptions(jobsToResume, TimeSpan.FromSeconds(_autoResumeDelaySeconds), ct);
             return resumedCount;
         }
         _logger.LogInformation(
             "Auto-resume enabled (immediate): queuing {Count} interrupted indexing jobs",
             jobsToResume.Count);
 
-        resumedCount = await EnqueueResumptionsAsync(jobsToResume, TimeSpan.Zero, ct);
+        resumedCount = await EnqueueResumptions(jobsToResume, TimeSpan.Zero, ct);
         return resumedCount;
     }
 
-    private async Task<int> EnqueueResumptionsAsync(
+    private async Task<int> EnqueueResumptions(
         IEnumerable<(string projectId, JobStatus previousStatus)> jobs,
         TimeSpan delay,
         CancellationToken ct)
@@ -190,7 +190,7 @@ internal sealed class JobMaintenanceTask : IScheduledTask, IOnStartup, IHasTimeo
             ct.ThrowIfCancellationRequested();
 
             var request = new IndexingResumptionRequest(projectId, previousStatus, delay);
-            await _resumptionQueue.EnqueueAsync(request, ct);
+            await _resumptionQueue.Enqueue(request, ct);
             enqueued++;
         }
 
@@ -208,7 +208,7 @@ internal sealed class JobMaintenanceTask : IScheduledTask, IOnStartup, IHasTimeo
     /// <summary>
     /// Cleans up old terminal jobs to prevent unbounded growth
     /// </summary>
-    private async Task<int> CleanupOldJobsAsync(CancellationToken ct)
+    private async Task<int> CleanupOldJobs(CancellationToken ct)
     {
         var cutoffDate = DateTime.UtcNow.AddDays(-OldJobRetentionDays);
 
@@ -248,7 +248,7 @@ internal sealed class JobMaintenanceTask : IScheduledTask, IOnStartup, IHasTimeo
     /// Keeps the most recent N jobs per project, deletes older ones.
     /// This provides audit history while preventing table bloat.
     /// </remarks>
-    private async Task<int> TrimExcessJobsPerProjectAsync(CancellationToken ct)
+    private async Task<int> TrimExcessJobsPerProject(CancellationToken ct)
     {
         // Get all jobs grouped by project
         var allJobs = await Job.All(ct);

@@ -37,7 +37,7 @@ internal sealed class FakePipeline : IAiPipeline
         _onPrompt = onPrompt;
     }
 
-    public Task<AiChatResponse> PromptAsync(AiChatRequest request, CancellationToken ct = default)
+    public Task<AiChatResponse> Prompt(AiChatRequest request, CancellationToken ct = default)
     {
         _onPrompt?.Invoke(request);
         return Task.FromResult(new AiChatResponse
@@ -50,7 +50,7 @@ internal sealed class FakePipeline : IAiPipeline
         });
     }
 
-    public async IAsyncEnumerable<AiChatChunk> StreamAsync(
+    public async IAsyncEnumerable<AiChatChunk> Stream(
         AiChatRequest request,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
@@ -59,7 +59,7 @@ internal sealed class FakePipeline : IAiPipeline
         yield return new AiChatChunk { DeltaText = _text, Index = 0, Model = _model ?? "fake" };
     }
 
-    public Task<AiEmbeddingsResponse> EmbedAsync(AiEmbeddingsRequest request, CancellationToken ct = default)
+    public Task<AiEmbeddingsResponse> Embed(AiEmbeddingsRequest request, CancellationToken ct = default)
     {
         var vectors = request.Input.Select(_ => _embedVector ?? new float[] { 0.1f, 0.2f }).ToList();
         return Task.FromResult(new AiEmbeddingsResponse
@@ -70,10 +70,10 @@ internal sealed class FakePipeline : IAiPipeline
         });
     }
 
-    public Task<string> PromptAsync(string message, string? model = null, AiPromptOptions? opts = null, CancellationToken ct = default)
+    public Task<string> Prompt(string message, string? model = null, AiPromptOptions? opts = null, CancellationToken ct = default)
         => Task.FromResult(_text);
 
-    public async IAsyncEnumerable<AiChatChunk> StreamAsync(
+    public async IAsyncEnumerable<AiChatChunk> Stream(
         string message, string? model = null, AiPromptOptions? opts = null,
         [EnumeratorCancellation] CancellationToken ct = default)
     {

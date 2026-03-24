@@ -77,11 +77,11 @@ internal sealed class JobCoordinator : IJobCoordinator
 
         _logger.LogDebug("Queueing job {JobId} ({JobType}) with storage {StorageMode}", job.Id, typeof(TJob).Name, storageMode);
 
-        var saved = await store.CreateAsync(job, metadata, cancellationToken);
+        var saved = await store.Create(job, metadata, cancellationToken);
         if (saved is not TJob typed)
             throw new InvalidOperationException($"Store returned unexpected job type {saved.GetType().FullName}." );
 
-        await _eventPublisher.PublishQueuedAsync(typed, cancellationToken);
+        await _eventPublisher.PublishQueued(typed, cancellationToken);
 
         var baseType = typeof(TJob).BaseType;
         var genericArguments = baseType?.IsGenericType == true ? baseType.GetGenericArguments() : Array.Empty<Type>();
@@ -98,7 +98,7 @@ internal sealed class JobCoordinator : IJobCoordinator
             contextType,
             resultType);
 
-        await _queue.EnqueueAsync(queueItem, cancellationToken);
+        await _queue.Enqueue(queueItem, cancellationToken);
         return typed;
     }
 
@@ -106,7 +106,7 @@ internal sealed class JobCoordinator : IJobCoordinator
         where TJob : Job<TJob, TContext, TResult>, new()
     {
         var (store, metadata, _) = ResolveStore(jobId, JobStorageMode.InMemory);
-        var job = await store.GetAsync(jobId, metadata, cancellationToken);
+        var job = await store.Get(jobId, metadata, cancellationToken);
         return job as TJob;
     }
 
@@ -114,7 +114,7 @@ internal sealed class JobCoordinator : IJobCoordinator
         where TJob : Job<TJob, TContext, TResult>, new()
     {
         var (store, metadata, mode) = ResolveStore(jobId, _options.DefaultStore);
-        var job = await store.GetAsync(jobId, metadata, cancellationToken);
+        var job = await store.Get(jobId, metadata, cancellationToken);
         if (job == null)
             return;
 
@@ -135,19 +135,19 @@ internal sealed class JobCoordinator : IJobCoordinator
             job.Status = JobStatus.Cancelled;
             job.CompletedAt = DateTimeOffset.UtcNow;
             job.Duration = job.CompletedAt - job.CreatedAt;
-            await store.UpdateAsync(job, metadata, cancellationToken);
-            await _eventPublisher.PublishCancelledAsync(job, cancellationToken);
+            await store.Update(job, metadata, cancellationToken);
+            await _eventPublisher.PublishCancelled(job, cancellationToken);
         }
         else
         {
-            await store.UpdateAsync(job, metadata, cancellationToken);
+            await store.Update(job, metadata, cancellationToken);
         }
     }
 
-    public async Task<IReadOnlyList<JobExecution>> GetExecutionsAsync(string jobId, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<JobExecution>> GetExecutions(string jobId, CancellationToken cancellationToken)
     {
         var (store, metadata, _) = ResolveStore(jobId, _options.DefaultStore);
-        return await store.ListExecutionsAsync(jobId, metadata, cancellationToken);
+        return await store.ListExecutions(jobId, metadata, cancellationToken);
     }
 
     private (IJobStore Store, JobStoreMetadata Metadata, JobStorageMode Mode) ResolveStore(string jobId, JobStorageMode fallback)

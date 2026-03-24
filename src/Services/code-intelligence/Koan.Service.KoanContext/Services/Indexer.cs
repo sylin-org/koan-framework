@@ -95,7 +95,7 @@ public class Indexer
         // QA Issue #2 FIX: Retry policy for batch vector saves
         _retryPolicy = Policy
             .Handle<Exception>()
-            .WaitAndRetryAsync(
+            .WaitAndRetry(
                 retryCount: 3,
                 sleepDurationProvider: retryAttempt =>
                     TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)) +
@@ -110,7 +110,7 @@ public class Indexer
                 });
     }
 
-    public async Task<IndexingResult> IndexProjectAsync(
+    public async Task<IndexingResult> IndexProject(
         string projectId,
         IProgress<IndexingProgress>? progress = null,
         CancellationToken cancellationToken = default,
@@ -233,10 +233,10 @@ public class Indexer
             await project.Save(cancellationToken);
 
             // Get commit SHA for provenance
-            var commitSha = await _discovery.GetCommitShaAsync(project.RootPath);
+            var commitSha = await _discovery.GetCommitSha(project.RootPath);
 
             // 6. Plan differential scan
-            var plan = await _planner.PlanAsync(
+            var plan = await _planner.Plan(
                 projectId,
                 project.RootPath,
                 forceReindex: force,
@@ -285,7 +285,7 @@ public class Indexer
 
                 if (plan.OrphanedChunkFiles.Count > 0)
                 {
-                    var orphanResults = await _chunkMaintenance.RemoveFilesAsync(
+                    var orphanResults = await _chunkMaintenance.RemoveFiles(
                         plan.OrphanedChunkFiles,
                         deleteIndexedFile: false,
                         deleteVectors: true,
@@ -305,7 +305,7 @@ public class Indexer
 
                 if (plan.DeletedFiles.Count > 0)
                 {
-                    var deletedResults = await _chunkMaintenance.RemoveFilesAsync(
+                    var deletedResults = await _chunkMaintenance.RemoveFiles(
                         plan.DeletedFiles,
                         deleteIndexedFile: true,
                         deleteVectors: true,
@@ -368,7 +368,7 @@ public class Indexer
                             job.VectorsSaved = vectorsSaved;
 
                             // Update project's live stats
-                            var (currentCount, currentBytes) = await GetActualChunkStatsAsync(effectiveCt);
+                            var (currentCount, currentBytes) = await GetActualChunkStats(effectiveCt);
 
                             project.DocumentCount = currentCount;
                             project.IndexedBytes = currentBytes;
@@ -391,7 +391,7 @@ public class Indexer
 
                         if (changedLookup.Contains(file.RelativePath))
                         {
-                            await _chunkMaintenance.RemoveFileAsync(
+                            await _chunkMaintenance.RemoveFile(
                                 file.RelativePath,
                                 deleteIndexedFile: false,
                                 deleteVectors: true,
@@ -400,7 +400,7 @@ public class Indexer
 
                         // 1. Create/update IndexedFile FIRST (within partition context)
                         var fileInfo = new FileInfo(file.AbsolutePath);
-                        var fileHash = await FileHasher.ComputeSha256Async(file.AbsolutePath, effectiveCt);
+                        var fileHash = await FileHasher.ComputeSha256(file.AbsolutePath, effectiveCt);
 
                         var indexedFileResults = await IndexedFile.Query(
                             f => f.RelativePath == file.RelativePath,
@@ -420,7 +420,7 @@ public class Indexer
                         }
 
                         // 2. Extract content and derive metadata prior to saving manifest entry
-                        var extracted = await _extraction.ExtractAsync(
+                        var extracted = await _extraction.Extract(
                             file.AbsolutePath,
                             file.RelativePath,
                             effectiveCt);
@@ -433,7 +433,7 @@ public class Indexer
                             language: null,
                             frontmatter: frontmatter.Metadata,
                             fileTags: frontmatter.Tags);
-                        var fileTagResult = await _tagResolver.ResolveAsync(fileTagInput, effectiveCt);
+                        var fileTagResult = await _tagResolver.Resolve(fileTagInput, effectiveCt);
 
                         indexedFile.SetTagEnvelope(fileTagResult.Envelope);
                         await indexedFile.Save(effectiveCt);
@@ -443,7 +443,7 @@ public class Indexer
                         var fileChunks = 0;
 
                         // Chunk content
-                        await foreach (var chunk in _chunking.ChunkAsync(
+                        await foreach (var chunk in _chunking.Chunk(
                             extracted,
                             projectId.ToString(),
                             commitSha,
@@ -452,7 +452,7 @@ public class Indexer
                             var provenance = ComputeProvenance(extracted.FullText, chunk.StartOffset, chunk.EndOffset);
 
                             // Generate embedding
-                            var embedding = await _embedding.EmbedAsync(chunk.Text, effectiveCt);
+                            var embedding = await _embedding.Embed(chunk.Text, effectiveCt);
 
                             // Create Chunk entity (within partition context, linked to IndexedFile)
                             var docChunk = Chunk.Create(
@@ -474,7 +474,7 @@ public class Indexer
                             docChunk.FileHash = fileHash;
 
                             var chunkTagInput = fileTagInput.ForChunk(chunk.Language, chunk.Text, inheritedTags);
-                            var chunkTagResult = await _tagResolver.ResolveAsync(chunkTagInput, effectiveCt);
+                            var chunkTagResult = await _tagResolver.Resolve(chunkTagInput, effectiveCt);
                             docChunk.SetTagEnvelope(chunkTagResult.Envelope);
 
                             var chunkVersion = ChunkVersionCalculator.Calculate(projectId, docChunk);
@@ -525,7 +525,7 @@ public class Indexer
                             if (batch.Count >= BatchSize)
                             {
                                 effectiveCt.ThrowIfCancellationRequested();
-                                await SaveVectorBatchAsync(job.Id, batch, projectId, effectiveCt);
+                                await SaveVectorBatch(job.Id, batch, projectId, effectiveCt);
                                 vectorsSaved = chunksCreated;
                                 batch.Clear();
                             }
@@ -562,7 +562,7 @@ public class Indexer
                 // Save remaining vectors
                 if (batch.Count > 0)
                 {
-                    await SaveVectorBatchAsync(job.Id, batch, projectId, effectiveCt);
+                    await SaveVectorBatch(job.Id, batch, projectId, effectiveCt);
                     vectorsSaved = chunksCreated;
                     job.VectorsSaved = vectorsSaved;
                     job.LogOperation($"Completed indexing: {filesProcessed} files processed, {chunksCreated} chunks created");
@@ -570,7 +570,7 @@ public class Indexer
 
                 // 8. Query actual chunk count and bytes from vector store (within partition context)
                 _logger.LogInformation("🏁 [DEBUG] FINAL COMPLETION: Calling GetActualChunkStatsAsync...");
-                var (actualCount, actualBytes) = await GetActualChunkStatsAsync(cancellationToken);
+                var (actualCount, actualBytes) = await GetActualChunkStats(cancellationToken);
 
                 _logger.LogInformation(
                     "🏁 [DEBUG] FINAL STATS: {Count} chunks, {Bytes:N0} bytes. Calling MarkIndexed()...",
@@ -753,7 +753,7 @@ public class Indexer
     /// The background worker consumes these snapshots idempotently, guaranteeing that each
     /// chunk has at most one pending payload regardless of replays or restarts.
     /// </remarks>
-    private async Task SaveVectorBatchAsync(
+    private async Task SaveVectorBatch(
         string jobId,
         List<(string ChunkId, string IndexedFileId, string ChunkVersion, float[] Embedding, object? Metadata)> batch,
         string projectId,
@@ -857,7 +857,7 @@ public class Indexer
     /// Provides accurate counters by querying actual state instead of relying on run-time counters.
     /// Must be called within EntityContext.Partition() - partition context provides project isolation.
     /// </remarks>
-    private async Task<(int count, long bytes)> GetActualChunkStatsAsync(
+    private async Task<(int count, long bytes)> GetActualChunkStats(
         CancellationToken cancellationToken)
     {
         try

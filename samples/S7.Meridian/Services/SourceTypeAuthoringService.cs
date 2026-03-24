@@ -15,7 +15,7 @@ namespace Koan.Samples.Meridian.Services;
 
 public interface ISourceTypeAuthoringService
 {
-    Task<SourceTypeAiSuggestResponse> SuggestAsync(SourceTypeAiSuggestRequest request, CancellationToken ct);
+    Task<SourceTypeAiSuggestResponse> Suggest(SourceTypeAiSuggestRequest request, CancellationToken ct);
 }
 
 public sealed class SourceTypeAuthoringService : ISourceTypeAuthoringService
@@ -37,7 +37,7 @@ public sealed class SourceTypeAuthoringService : ISourceTypeAuthoringService
         _logger = logger;
     }
 
-    public async Task<SourceTypeAiSuggestResponse> SuggestAsync(SourceTypeAiSuggestRequest request, CancellationToken ct)
+    public async Task<SourceTypeAiSuggestResponse> Suggest(SourceTypeAiSuggestRequest request, CancellationToken ct)
     {
         if (request is null)
         {
@@ -81,7 +81,7 @@ public sealed class SourceTypeAuthoringService : ISourceTypeAuthoringService
             ["documentName"] = request.DocumentName ?? string.Empty
         };
 
-        await _auditor.RecordAsync(
+        await _auditor.Record(
             "SourceType",
             draft.Name,
             requestSummary,

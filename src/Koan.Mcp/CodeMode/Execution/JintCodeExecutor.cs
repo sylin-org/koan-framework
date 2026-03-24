@@ -40,7 +40,7 @@ public sealed class JintCodeExecutor : Koan.Mcp.CodeExecution.ICodeExecutor
         _codeModeOptions = codeModeOptions ?? throw new ArgumentNullException(nameof(codeModeOptions));
     }
 
-    public async Task<CodeExecutionResult> ExecuteAsync(CodeExecutionRequest request, CancellationToken cancellationToken = default)
+    public async Task<CodeExecutionResult> Execute(CodeExecutionRequest request, CancellationToken cancellationToken = default)
     {
         var code = request.Source;
         if (string.IsNullOrWhiteSpace(code))

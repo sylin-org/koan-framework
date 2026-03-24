@@ -26,7 +26,7 @@ public sealed class GitHubPullAdapter : ISourcePullAdapter
 
     public SourceType SupportedType => SourceType.GitHub;
 
-    public async Task<List<Note>> PullAsync(Source source, CancellationToken ct)
+    public async Task<List<Note>> Pull(Source source, CancellationToken ct)
     {
         var config = SourceConfigParser.Parse<GitHubConfig>(source.Configuration);
 
@@ -47,8 +47,8 @@ public sealed class GitHubPullAdapter : ISourcePullAdapter
             try
             {
                 var repoNotes = config.WatchReleases
-                    ? await PullLatestReleaseAsync(http, repo, source, ct)
-                    : await PullReadmeAsync(http, repo, source, ct);
+                    ? await PullLatestRelease(http, repo, source, ct)
+                    : await PullReadme(http, repo, source, ct);
 
                 notes.AddRange(repoNotes);
             }
@@ -61,7 +61,7 @@ public sealed class GitHubPullAdapter : ISourcePullAdapter
         return notes;
     }
 
-    private async Task<List<Note>> PullLatestReleaseAsync(
+    private async Task<List<Note>> PullLatestRelease(
         HttpClient http, string repo, Source source, CancellationToken ct)
     {
         var url = $"https://api.github.com/repos/{repo}/releases/latest";
@@ -129,7 +129,7 @@ public sealed class GitHubPullAdapter : ISourcePullAdapter
         return [note];
     }
 
-    private async Task<List<Note>> PullReadmeAsync(
+    private async Task<List<Note>> PullReadme(
         HttpClient http, string repo, Source source, CancellationToken ct)
     {
         var url = $"https://api.github.com/repos/{repo}/readme";
