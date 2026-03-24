@@ -123,7 +123,7 @@ public class SqlServerCrudAndQueryTests : IClassFixture<Support.SqlServerAutoFix
 
 	public class Person : Entity<Person>
 	{
-		public string Name { get; set; } = string.Empty;
+		public string Name { get; set; } = "";
 		public int Age { get; set; }
 	}
 }

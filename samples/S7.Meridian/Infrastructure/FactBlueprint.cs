@@ -14,8 +14,8 @@ public static class FactBlueprint
 {
     public sealed class FactAttribute
     {
-        public string Id { get; set; } = string.Empty;
-        public string Label { get; set; } = string.Empty;
+        public string Id { get; set; } = "";
+        public string Label { get; set; } = "";
         public string DataType { get; set; } = "string";
         public bool Required { get; set; }
             = false;
@@ -24,8 +24,8 @@ public static class FactBlueprint
 
     public sealed class FactCategory
     {
-        public string Id { get; set; } = string.Empty;
-        public string Label { get; set; } = string.Empty;
+        public string Id { get; set; } = "";
+        public string Label { get; set; } = "";
         public string? Description { get; set; }
             = null;
         public List<string> Synonyms { get; set; } = new();
@@ -35,9 +35,9 @@ public static class FactBlueprint
 
     public sealed class FieldMapping
     {
-        public string FieldPath { get; set; } = string.Empty;
-        public string CategoryId { get; set; } = string.Empty;
-        public string AttributeId { get; set; } = string.Empty;
+        public string FieldPath { get; set; } = "";
+        public string CategoryId { get; set; } = "";
+        public string AttributeId { get; set; } = "";
         public bool AllowSynthesis { get; set; }
             = false;
         public double MinimumConfidence { get; set; }

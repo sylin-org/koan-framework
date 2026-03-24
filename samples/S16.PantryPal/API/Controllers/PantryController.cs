@@ -240,7 +240,7 @@ public class PantryController(
 
 public class ConfirmDetectionsRequest
 {
-    public DetectionConfirmation[] Confirmations { get; set; } = Array.Empty<DetectionConfirmation>();
+    public DetectionConfirmation[] Confirmations { get; set; } = [];
 }
 
 public class DetectionConfirmation

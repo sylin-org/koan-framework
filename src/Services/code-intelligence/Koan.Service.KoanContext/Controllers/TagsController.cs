@@ -18,7 +18,7 @@ public sealed class TagsController : EntityController<TagVocabularyEntry>
 	{
 		if (entity is null)
 		{
-			return string.Empty;
+			return "";
 		}
 
 		return string.IsNullOrWhiteSpace(entity.Tag) ? base.GetDisplay(entity) : entity.Tag;

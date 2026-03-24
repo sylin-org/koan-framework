@@ -606,7 +606,7 @@ public record class VectorQueueHealthMetrics
 
 public record class VectorQueueProjectBreakdown
 {
-    public string ProjectId { get; init; } = string.Empty;
+    public string ProjectId { get; init; } = "";
     public int PendingCount { get; init; }
     public int RetryingCount { get; init; }
     public int FailedCount { get; init; }
@@ -622,9 +622,9 @@ public record ComponentHealthMetrics
 
 public record ComponentHealth
 {
-    public string Name { get; init; } = string.Empty;
+    public string Name { get; init; } = "";
     public HealthStatus Status { get; init; }
-    public string Message { get; init; } = string.Empty;
+    public string Message { get; init; } = "";
     public long? LatencyMs { get; init; }
     public DateTime LastChecked { get; init; }
 }
@@ -654,8 +654,8 @@ public record VectorDbMetrics
 
 public record VectorCollectionInfo
 {
-    public string ProjectId { get; init; } = string.Empty;
-    public string ProjectName { get; init; } = string.Empty;
+    public string ProjectId { get; init; } = "";
+    public string ProjectName { get; init; } = "";
     public int VectorCount { get; init; }
     public long EstimatedSizeBytes { get; init; }
 }

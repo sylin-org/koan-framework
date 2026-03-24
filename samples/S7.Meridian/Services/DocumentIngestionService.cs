@@ -292,7 +292,7 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
     {
         await _runLog.Append(new RunLog
         {
-            PipelineId = pipeline.Id ?? string.Empty,
+            PipelineId = pipeline.Id ?? "",
             Stage = "classify",
             DocumentId = document.Id,
             Status = mode,
@@ -302,7 +302,7 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
             {
                 ["typeId"] = document.ClassifiedTypeId ?? document.SourceType,
                 ["method"] = document.ClassificationMethod.ToString(),
-                ["reason"] = document.ClassificationReason ?? string.Empty,
+                ["reason"] = document.ClassificationReason ?? "",
                 ["confidence"] = document.ClassificationConfidence.ToString("0.00", CultureInfo.InvariantCulture)
             }
         }, ct).ConfigureAwait(false);
@@ -374,7 +374,7 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
             var metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
                 ["pipelineCount"] = pipelineIds.Count.ToString(CultureInfo.InvariantCulture),
-                ["ingestingPipeline"] = pipeline.Id ?? string.Empty
+                ["ingestingPipeline"] = pipeline.Id ?? ""
             };
 
             if (sharedWith.Count > 0)
@@ -391,7 +391,7 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
 
             await _runLog.Append(new RunLog
             {
-                PipelineId = pipeline.Id ?? string.Empty,
+                PipelineId = pipeline.Id ?? "",
                 Stage = "document-reuse",
                 DocumentId = document.Id,
                 StartedAt = timestamp,

@@ -337,7 +337,7 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
                 return null;
             }
 
-            endpoint = resolved.GetUri("http", "https") ?? string.Empty;
+            endpoint = resolved.GetUri("http", "https") ?? "";
             if (string.IsNullOrWhiteSpace(endpoint))
             {
                 KoanLog.BootWarning(logger, LogActions.ZenGarden, "intent-missing-endpoint", ("intent", rawConnection));
@@ -667,7 +667,7 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
         ct.ThrowIfCancellationRequested();
 
         var map = new Dictionary<string, AiCapabilityConfig>(StringComparer.OrdinalIgnoreCase);
-        var model = defaultModel ?? string.Empty;
+        var model = defaultModel ?? "";
         if (!string.IsNullOrWhiteSpace(model))
         {
             map["Chat"] = new AiCapabilityConfig { Model = model };
@@ -768,7 +768,7 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
     private static IReadOnlyDictionary<string, AiCapabilityConfig> BuildSourceCapabilities(IEnumerable<AiMemberDefinition> members, string? defaultModel)
     {
         var map = new Dictionary<string, AiCapabilityConfig>(StringComparer.OrdinalIgnoreCase);
-        var model = defaultModel ?? members.SelectMany(m => m.Capabilities?.Values ?? Array.Empty<AiCapabilityConfig>()).FirstOrDefault()?.Model ?? string.Empty;
+        var model = defaultModel ?? members.SelectMany(m => m.Capabilities?.Values ?? []).FirstOrDefault()?.Model ?? "";
         if (!string.IsNullOrWhiteSpace(model))
         {
             map["Chat"] = new AiCapabilityConfig { Model = model };

@@ -212,7 +212,7 @@ internal sealed class TransformerRegistry : ITransformerRegistry
         EnsureInitialized();
         if (!_map.TryGetValue(entityType, out var list) || list.Count == 0)
         {
-            return Array.Empty<string>();
+            return [];
         }
 
         return list

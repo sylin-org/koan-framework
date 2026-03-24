@@ -452,7 +452,7 @@ public sealed class ZenGardenClient : IZenGardenClient
             // capabilities are unsatisfied. Strip requirements so we get the full
             // tool list, then classify each tool locally below.
             var catalogSubscription = registration.Subscription.Requires.Count > 0
-                ? registration.Subscription with { Requires = Array.Empty<ZenGardenCapabilityRequirement>() }
+                ? registration.Subscription with { Requires = [] }
                 : registration.Subscription;
 
             var tools = await Catalog(catalogSubscription, ct);
@@ -1058,7 +1058,7 @@ public sealed class ZenGardenClient : IZenGardenClient
         IReadOnlyList<string> capabilities,
         ZenGardenCapabilityWishOptions? options)
     {
-        var parsed = ZenGardenCapabilityRequirement.ParseMany(capabilities ?? Array.Empty<string>());
+        var parsed = ZenGardenCapabilityRequirement.ParseMany(capabilities ?? []);
         var selector = ZenGardenSubscription.ForOffering(offering);
         if (selector.Requires.Count > 0)
         {
@@ -1091,7 +1091,7 @@ public sealed class ZenGardenClient : IZenGardenClient
     {
         if (requirements.Count == 0 || tool is null)
         {
-            return Array.Empty<string>();
+            return [];
         }
 
         var satisfied = new List<string>();
@@ -2451,7 +2451,7 @@ public sealed class ZenGardenClient : IZenGardenClient
 
     private static bool TryNormalizeAbsoluteEndpoint(string raw, out string endpoint)
     {
-        endpoint = string.Empty;
+        endpoint = "";
         if (string.IsNullOrWhiteSpace(raw))
         {
             return false;
@@ -2801,7 +2801,7 @@ public sealed class ZenGardenClient : IZenGardenClient
 
     private bool TryResolveContainerHostEndpoint(out string endpoint)
     {
-        endpoint = string.Empty;
+        endpoint = "";
 
         var hostSelector = NormalizeEndpointOrSelector(
             System.Environment.GetEnvironmentVariable(Constants.EnvironmentVariables.ContainerHost));
@@ -2951,7 +2951,7 @@ public sealed class ZenGardenClient : IZenGardenClient
     {
         if (!TryGetProperty(payload, "tools", out var tools) || tools.ValueKind != JsonValueKind.Array)
         {
-            return Array.Empty<ZenGardenToolSnapshot>();
+            return [];
         }
 
         var result = new List<ZenGardenToolSnapshot>();
@@ -3034,7 +3034,7 @@ public sealed class ZenGardenClient : IZenGardenClient
             return null;
         }
 
-        var uris = Array.Empty<string>();
+        string[] uris = [];
         if (TryGetProperty(serviceElement, "uris", out var urisElement) &&
             urisElement.ValueKind == JsonValueKind.Array)
         {
@@ -3095,7 +3095,7 @@ public sealed class ZenGardenClient : IZenGardenClient
         if (!TryGetProperty(payload, "aliases", out var aliasesElement) ||
             aliasesElement.ValueKind != JsonValueKind.Array)
         {
-            return Array.Empty<string>();
+            return [];
         }
 
         return aliasesElement.EnumerateArray()

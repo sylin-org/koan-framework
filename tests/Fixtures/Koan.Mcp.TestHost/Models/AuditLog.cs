@@ -7,6 +7,6 @@ namespace Koan.Mcp.TestHost.Models;
 [McpEntity(Name = "AuditLog", Description = "Read-only audit log", AllowMutations = false)]
 public sealed class AuditLog : Entity<AuditLog>
 {
-    public string Action { get; set; } = string.Empty;
-    public string Actor { get; set; } = string.Empty;
+    public string Action { get; set; } = "";
+    public string Actor { get; set; } = "";
 }

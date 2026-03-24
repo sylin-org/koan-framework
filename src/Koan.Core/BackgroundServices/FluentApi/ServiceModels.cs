@@ -37,9 +37,9 @@ public class ServiceInfo
     public string Type { get; set; } = "";
     public string Assembly { get; set; } = "";
     public bool IsRunning { get; set; }
-    public string[] SupportedActions { get; set; } = Array.Empty<string>();
-    public string[] SupportedEvents { get; set; } = Array.Empty<string>();
-    public string[] SupportedCommands { get; set; } = Array.Empty<string>();
+    public string[] SupportedActions { get; set; } = [];
+    public string[] SupportedEvents { get; set; } = [];
+    public string[] SupportedCommands { get; set; } = [];
     public Dictionary<string, object> Configuration { get; set; } = new();
 }
 

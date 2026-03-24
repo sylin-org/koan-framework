@@ -19,6 +19,6 @@ public static class PathMetadata
     public static string GetDirectoryKey(string relativePath)
     {
         var segments = GetPathSegments(relativePath);
-        return segments.Length == 0 ? string.Empty : string.Join('/', segments);
+        return segments.Length == 0 ? "" : string.Join('/', segments);
     }
 }

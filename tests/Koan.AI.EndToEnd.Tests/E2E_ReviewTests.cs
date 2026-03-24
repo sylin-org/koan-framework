@@ -121,7 +121,7 @@ public sealed class E2E_ReviewTests : IDisposable
 /// </summary>
 internal sealed class TestReviewEntity : IReviewable
 {
-    public string Message { get; set; } = string.Empty;
+    public string Message { get; set; } = "";
     public ReviewStatus ReviewStatus { get; set; } = ReviewStatus.Pending;
     public string? ReviewedBy { get; set; }
     public DateTime? ReviewedAt { get; set; }

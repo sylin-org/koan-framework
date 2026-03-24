@@ -18,7 +18,7 @@ public sealed class TagRulesController : EntityController<TagRule>
     {
         if (entity is null)
         {
-            return string.Empty;
+            return "";
         }
 
         return string.IsNullOrWhiteSpace(entity.Name) ? base.GetDisplay(entity) : entity.Name;

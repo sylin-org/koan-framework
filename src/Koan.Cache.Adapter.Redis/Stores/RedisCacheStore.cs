@@ -228,7 +228,7 @@ internal sealed class RedisCacheStore : ICacheStore
             NamespacedKey = BuildRedisKey(key).ToString(),
             Tags = options.Tags is { Count: > 0 } publishTags
                 ? publishTags.ToArray()
-                : Array.Empty<string>(),
+                : [],
             Region = options.Region,
             ScopeId = options.ScopeId
         });
@@ -367,7 +367,7 @@ internal sealed class RedisCacheStore : ICacheStore
 
         var redisKey = ResolveRedisKey(message);
         await _database.KeyDeleteAsync(redisKey);
-        await RemoveTags(redisKey, message.Tags ?? Array.Empty<string>());
+        await RemoveTags(redisKey, message.Tags ?? []);
     }
 
     private RedisKey ResolveRedisKey(RedisInvalidationMessage message)
@@ -385,7 +385,7 @@ internal sealed class RedisCacheStore : ICacheStore
         var normalized = tags?.Where(static t => !string.IsNullOrWhiteSpace(t))
             .Select(static t => t.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray() ?? Array.Empty<string>();
+            .ToArray() ?? [];
 
         if (normalized.Length == 0)
         {
@@ -477,7 +477,7 @@ internal sealed class RedisCacheStore : ICacheStore
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            return string.Empty;
+            return "";
         }
 
         var trimmed = value.Trim();
@@ -486,6 +486,6 @@ internal sealed class RedisCacheStore : ICacheStore
             trimmed = trimmed[..^1];
         }
 
-        return trimmed.Length == 0 ? string.Empty : trimmed + ":";
+        return trimmed.Length == 0 ? "" : trimmed + ":";
     }
 }

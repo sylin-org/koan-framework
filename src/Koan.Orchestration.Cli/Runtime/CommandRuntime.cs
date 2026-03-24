@@ -74,7 +74,7 @@ internal sealed class CommandRuntime
         Console.WriteLine("Doctor checks:");
         Console.WriteLine($"- Provider order: {order}");
         Console.WriteLine("- Compose exporter: OK");
-        Console.WriteLine($"- {provider.Id}: {(availability.Ok ? "OK" : "NOT AVAILABLE")} {(string.IsNullOrWhiteSpace(availability.Reason) ? string.Empty : "- " + Orchestration.Redaction.RedactText(availability.Reason))}");
+        Console.WriteLine($"- {provider.Id}: {(availability.Ok ? "OK" : "NOT AVAILABLE")} {(string.IsNullOrWhiteSpace(availability.Reason) ? "" : "- " + Orchestration.Redaction.RedactText(availability.Reason))}");
         if (!string.IsNullOrWhiteSpace(engineInfo.Version))
         {
             Console.WriteLine(Orchestration.Redaction.RedactText($"- Engine: {engineInfo.Name} {engineInfo.Version} ({engineInfo.Endpoint})"));
@@ -114,7 +114,7 @@ internal sealed class CommandRuntime
             }
         }
 
-        Directory.CreateDirectory(Path.GetDirectoryName(options.OutputPath) ?? string.Empty);
+        Directory.CreateDirectory(Path.GetDirectoryName(options.OutputPath) ?? "");
         var exporter = new ComposeExporter();
         await exporter.Generate(plan, profile, options.OutputPath);
 
@@ -127,7 +127,7 @@ internal sealed class CommandRuntime
             var engineInfo = provider.EngineInfo();
             Console.WriteLine($"provider: {provider.Id} | engine: {engineInfo.Name} {engineInfo.Version} | file: {options.OutputPath}");
             Console.WriteLine($"services: {plan.Services.Count}");
-            Console.WriteLine($"profile: {profile} | timeout: {timeout.TotalSeconds:n0}s{(options.BasePort.HasValue ? $" | base-port: {options.BasePort}" : string.Empty)}{(options.ConflictsMode is { } ? $" | conflicts: {options.ConflictsMode}" : string.Empty)}");
+            Console.WriteLine($"profile: {profile} | timeout: {timeout.TotalSeconds:n0}s{(options.BasePort.HasValue ? $" | base-port: {options.BasePort}" : "")}{(options.ConflictsMode is { } ? $" | conflicts: {options.ConflictsMode}" : "")}");
             Console.WriteLine($"networks: internal={OrchestrationConstants.InternalNetwork}, external={OrchestrationConstants.ExternalNetwork}");
             var appSvc = plan.Services.FirstOrDefault(s => s.Type == ServiceType.App);
             if (appSvc is not null && appSvc.Ports.Count > 0)
@@ -196,7 +196,7 @@ internal sealed class CommandRuntime
         Console.WriteLine($"provider: {status.Provider} | engine: {status.EngineVersion}");
         foreach (var s in status.Services)
         {
-            var health = s.Health is null ? string.Empty : $" ({s.Health})";
+            var health = s.Health is null ? "" : $" ({s.Health})";
             Console.WriteLine($"- {s.Service}: {s.State}{health}");
         }
 
@@ -309,10 +309,10 @@ internal sealed class CommandRuntime
         }
 
         var appSvcForJson = plan.Services.FirstOrDefault(s => s.Type == ServiceType.App);
-        var appIds = appSvcForJson is not null ? new[] { appSvcForJson.Id } : Array.Empty<string>();
+        var appIds = appSvcForJson is not null ? new[] { appSvcForJson.Id } : [];
         var appPorts = appSvcForJson is not null
             ? appSvcForJson.Ports.Select(p => new { host = p.Host, container = p.Container }).ToArray()
-            : Array.Empty<object>();
+            : [];
         var appMdForJson = appSvcForJson is null
             ? null
             : (manifestDetails?.FirstOrDefault(m => m.Id.Equals(appSvcForJson.Id, StringComparison.OrdinalIgnoreCase))
@@ -373,7 +373,7 @@ internal sealed class CommandRuntime
                         healthEndpoint = md?.HealthEndpoint,
                         provides = md?.Provides,
                         consumes = md?.Consumes,
-                        capabilities = md?.Capabilities ?? (md?.Provides is { Count: > 0 } ? md.Provides.ToDictionary(k => k, v => (string?)string.Empty) : null)
+                        capabilities = md?.Capabilities ?? (md?.Provides is { Count: > 0 } ? md.Provides.ToDictionary(k => k, v => (string?)"") : null)
                     };
                 }),
                 auth = authProviders is null && authCapabilities is null ? null : new
@@ -413,7 +413,7 @@ internal sealed class CommandRuntime
             var id = (string)p.GetType().GetProperty("id")!.GetValue(p)!;
             var available = (bool)p.GetType().GetProperty("available")!.GetValue(p)!;
             var eng = p.GetType().GetProperty("engine")!.GetValue(p)!;
-            var engVer = (string?)eng.GetType().GetProperty("Version")!.GetValue(eng) ?? string.Empty;
+            var engVer = (string?)eng.GetType().GetProperty("Version")!.GetValue(eng) ?? "";
             var status = available ? "OK" : "FAIL";
             Console.WriteLine($"{id,-13} {status,-9} {engVer}");
         }
@@ -438,13 +438,13 @@ internal sealed class CommandRuntime
             }
             var appCaps = appMd?.Capabilities is { Count: > 0 }
                 ? appMd.Capabilities
-                : (appMd?.Provides is { Count: > 0 } ? appMd.Provides.ToDictionary(k => k, v => (string?)string.Empty) : null);
+                : (appMd?.Provides is { Count: > 0 } ? appMd.Provides.ToDictionary(k => k, v => (string?)"") : null);
             if (appCaps is { Count: > 0 })
             {
                 var list = appCaps.Select(kv => string.IsNullOrWhiteSpace(kv.Value) ? kv.Key : $"{kv.Key}={kv.Value}").ToList();
                 const int max = 6;
                 var shown = list.Take(max).ToList();
-                var suffix = list.Count > max ? $"  +{list.Count - max} more" : string.Empty;
+                var suffix = list.Count > max ? $"  +{list.Count - max} more" : "";
                 Console.WriteLine($"{"",-13} {"CAPABILITIES",-13} {string.Join(", ", shown)}{suffix}");
             }
             Console.WriteLine();
@@ -470,7 +470,7 @@ internal sealed class CommandRuntime
             };
             var imageTag = s.Image ?? ((md?.ContainerImage, md?.DefaultTag) is (string img, string tag) && !string.IsNullOrWhiteSpace(img)
                 ? (string.IsNullOrWhiteSpace(tag) ? img : img + ":" + tag)
-                : string.Empty);
+                : "");
             Console.WriteLine($"{s.Id,-13} {ports,-13} {health,-9} {type,-11} {imageTag}");
             if (!string.IsNullOrWhiteSpace(md?.Name) && !md!.Name!.Equals(s.Id, StringComparison.OrdinalIgnoreCase))
             {
@@ -478,13 +478,13 @@ internal sealed class CommandRuntime
             }
             var svcCaps = md?.Capabilities is { Count: > 0 }
                 ? md.Capabilities
-                : (md?.Provides is { Count: > 0 } ? md.Provides.ToDictionary(k => k, v => (string?)string.Empty) : null);
+                : (md?.Provides is { Count: > 0 } ? md.Provides.ToDictionary(k => k, v => (string?)"") : null);
             if (svcCaps is { Count: > 0 })
             {
                 var caps = svcCaps.Select(kv => string.IsNullOrWhiteSpace(kv.Value) ? kv.Key : $"{kv.Key}={kv.Value}").ToList();
                 const int maxCaps = 6;
                 var shownCaps = caps.Take(maxCaps).ToList();
-                var suffixCaps = caps.Count > maxCaps ? $"  +{caps.Count - maxCaps} more" : string.Empty;
+                var suffixCaps = caps.Count > maxCaps ? $"  +{caps.Count - maxCaps} more" : "";
                 Console.WriteLine($"{"",-13} {"CAPABILITIES",-13} {string.Join(", ", shownCaps)}{suffixCaps}");
             }
         }
@@ -550,10 +550,10 @@ internal sealed class CommandRuntime
                 var name = string.IsNullOrWhiteSpace(s.Name) ? (md?.Name ?? s.Id) : s.Name!;
                 var extra = new List<string>();
                 if (!string.IsNullOrWhiteSpace(md?.QualifiedCode)) extra.Add(md!.QualifiedCode!);
-                if (!string.IsNullOrWhiteSpace(md?.ContainerImage)) extra.Add(md!.ContainerImage + (string.IsNullOrWhiteSpace(md!.DefaultTag) ? string.Empty : ":" + md!.DefaultTag));
+                if (!string.IsNullOrWhiteSpace(md?.ContainerImage)) extra.Add(md!.ContainerImage + (string.IsNullOrWhiteSpace(md!.DefaultTag) ? "" : ":" + md!.DefaultTag));
                 if (md?.DefaultPorts is { Length: > 0 }) extra.Add("ports:" + string.Join(',', md!.DefaultPorts!));
                 if (!string.IsNullOrWhiteSpace(md?.HealthEndpoint)) extra.Add("health:" + md!.HealthEndpoint);
-                Console.WriteLine($"{s.Id}  ({type}) - {name}{(extra.Count > 0 ? " | " + string.Join(" | ", extra) : string.Empty)}");
+                Console.WriteLine($"{s.Id}  ({type}) - {name}{(extra.Count > 0 ? " | " + string.Join(" | ", extra) : "")}");
             }
         }
         Console.WriteLine();
@@ -730,7 +730,7 @@ internal sealed class CommandRuntime
         for (var i = 0; i < parts.Length; i++)
         {
             var p = parts[i];
-            parts[i] = char.ToUpperInvariant(p[0]) + (p.Length > 1 ? p[1..] : string.Empty);
+            parts[i] = char.ToUpperInvariant(p[0]) + (p.Length > 1 ? p[1..] : "");
         }
         return string.Join(' ', parts);
     }

@@ -17,7 +17,7 @@ namespace Koan.AI.Models;
 public class ModelEntry : Entity<ModelEntry>
 {
     /// <summary>Hub identifier (e.g., "BAAI/bge-large-en-v1.5", "acme-support").</summary>
-    public string HubId { get; set; } = string.Empty;
+    public string HubId { get; set; } = "";
 
     /// <summary>Version within a model group (auto-incremented on training).</summary>
     public int Version { get; set; } = 1;

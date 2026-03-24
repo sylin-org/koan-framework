@@ -462,7 +462,7 @@ internal sealed class AgentExecutor : IAgentExecutor
             if (messages[i].Role == "assistant")
                 return messages[i].Content;
         }
-        return string.Empty;
+        return "";
     }
 
     /// <summary>

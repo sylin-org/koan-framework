@@ -45,9 +45,9 @@ public class DataSeeder : IKoanInitializer
                 {
                     Name = "Demo User",
                     HouseholdSize = 2,
-                    DietaryRestrictions = Array.Empty<string>(),
-                    Allergies = Array.Empty<string>(),
-                    DislikedIngredients = Array.Empty<string>(),
+                    DietaryRestrictions = [],
+                    Allergies = [],
+                    DislikedIngredients = [],
                     FavoriteIngredients = new[] { "chicken", "pasta", "cheese" },
                     FavoriteCuisines = new[] { "Italian", "Mexican" },
                     TargetCalories = 2000,

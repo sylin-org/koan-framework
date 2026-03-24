@@ -205,7 +205,7 @@ public class OptimizedRestoreService : IRestoreService
         CancellationToken ct = default)
     {
         // Load manifest and filter entities
-        var manifest = await LoadBackupManifest(backupName, options?.StorageProfile ?? string.Empty, ct);
+        var manifest = await LoadBackupManifest(backupName, options?.StorageProfile ?? "", ct);
         var selectedEntities = manifest.Entities.Where(filter).ToList();
 
         var modifiedOptions = options ?? new GlobalRestoreOptions();
@@ -224,7 +224,7 @@ public class OptimizedRestoreService : IRestoreService
         try
         {
             // Load and validate backup manifest
-            var manifest = await LoadBackupManifest(backupName, string.Empty, ct);
+            var manifest = await LoadBackupManifest(backupName, "", ct);
 
             var issues = new List<string>();
             var warnings = new List<string>();

@@ -354,7 +354,7 @@ public sealed class EmbeddingEdgeCasesSpec
     [Embedding(Policy = EmbeddingPolicy.AllStrings)]
     public class StringArrayEntity : Entity<StringArrayEntity>
     {
-        public string[] Tags { get; set; } = Array.Empty<string>();
+        public string[] Tags { get; set; } = [];
     }
 
     [Embedding(Policy = EmbeddingPolicy.FullJson, MaxDepth = 1)]

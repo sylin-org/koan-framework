@@ -140,7 +140,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
             .OrderBy(a => a.GetName().Name?.StartsWith("Koan.") == true ? 0 : 1)
             .SelectMany(a =>
             {
-                try { return a.GetTypes(); } catch { return Array.Empty<Type>(); }
+                try { return a.GetTypes(); } catch { return []; }
             })
             .FirstOrDefault(t => string.Equals(t.FullName, token, StringComparison.OrdinalIgnoreCase) || string.Equals(t.Name, token, StringComparison.Ordinal));
         return entityType is not null;

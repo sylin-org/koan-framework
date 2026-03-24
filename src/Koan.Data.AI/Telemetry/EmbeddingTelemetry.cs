@@ -419,7 +419,7 @@ public interface IMetricEntry
 public record EmbeddingMetricEntry : IMetricEntry
 {
     public DateTime Timestamp { get; init; }
-    public string EntityType { get; init; } = string.Empty;
+    public string EntityType { get; init; } = "";
     public string? Model { get; init; }
     public string? Provider { get; init; }
     public string? Source { get; init; }

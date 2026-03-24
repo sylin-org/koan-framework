@@ -16,7 +16,7 @@ namespace Koan.Samples.Meridian.Models;
 /// </summary>
 public sealed class FactCategorizationMap : Entity<FactCategorizationMap>
 {
-    public string CatalogHash { get; set; } = string.Empty;
+    public string CatalogHash { get; set; } = "";
     public List<SemanticBatch> Batches { get; set; } = new();
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
@@ -86,13 +86,13 @@ public sealed class FactCategorizationMap : Entity<FactCategorizationMap>
 public sealed class SemanticBatch
 {
     /// <summary>Unique batch identifier (e.g., "identity_tracking", "security_encryption").</summary>
-    public string BatchId { get; set; } = string.Empty;
+    public string BatchId { get; set; } = "";
 
     /// <summary>Human-readable category name (e.g., "Identity & Tracking").</summary>
-    public string CategoryName { get; set; } = string.Empty;
+    public string CategoryName { get; set; } = "";
 
     /// <summary>Description explaining the semantic relationship between facts in this batch.</summary>
-    public string CategoryDescription { get; set; } = string.Empty;
+    public string CategoryDescription { get; set; } = "";
 
     /// <summary>Field paths included in this batch (e.g., ["$.servicenow_id", "$.architect"]).</summary>
     public List<string> FieldPaths { get; set; } = new();

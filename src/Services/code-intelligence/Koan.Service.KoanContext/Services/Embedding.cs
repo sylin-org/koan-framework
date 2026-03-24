@@ -63,7 +63,7 @@ public class Embedding
         {
             // QA Issue #34 DECISION: Skip empty text instead of throwing
             _logger.LogDebug("Empty text provided to EmbedAsync, returning empty embedding");
-            return Array.Empty<float>();
+            return [];
         }
 
         var cacheKey = ComputeCacheKey(text, _defaultModel);

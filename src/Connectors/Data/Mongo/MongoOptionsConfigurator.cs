@@ -64,7 +64,7 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
             "Koan:Data:Password");
 
         var configuredConnectionString = ReadProviderConfiguration(
-            string.Empty,
+            "",
             MongoItems.ConnectionStringKeys);
 
         var requestedConnection = !string.IsNullOrWhiteSpace(configuredConnectionString)
@@ -101,14 +101,14 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
         }
         else
         {
-            options.ConnectionString = requestedConnection ?? string.Empty;
+            options.ConnectionString = requestedConnection ?? "";
             KoanLog.ConfigInfo(Logger, LogActions.Config, "connection-preconfigured");
         }
 
         options.Database = ReadProviderConfiguration(options.Database,
             MongoItems.DatabaseKeys)
             ?? options.Database
-            ?? string.Empty;
+            ?? "";
 
         KoanLog.ConfigInfo(Logger, LogActions.Config, LogOutcomeValues.Final,
             ("connection", options.ConnectionString ?? "(null)"),
@@ -194,7 +194,7 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
     private ZenGardenConnectionIntent BuildDefaultZenGardenIntent()
     {
         var configuredOffering = ReadProviderConfiguration(
-            string.Empty,
+            "",
             "Koan:Data:Mongo:ZenGarden:Offering");
 
         if (string.IsNullOrWhiteSpace(configuredOffering) &&
@@ -209,7 +209,7 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
         }
 
         var configuredInstance = ReadProviderConfiguration(
-            string.Empty,
+            "",
             "Koan:Data:Mongo:ZenGarden:Instance");
 
         return ZenGardenConnectionIntent.ForOffering(
@@ -222,10 +222,10 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
     {
         var sectionValues = Configuration
             .GetSection("Koan:Data:Mongo:ZenGarden:Capabilities")
-            .Get<string[]>() ?? Array.Empty<string>();
+            .Get<string[]>() ?? [];
 
         var singleValue = ReadProviderConfiguration(
-            string.Empty,
+            "",
             "Koan:Data:Mongo:ZenGarden:Capability");
 
         var parsed = new List<string>();
@@ -265,7 +265,7 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
         string? password,
         out string connectionString)
     {
-        connectionString = string.Empty;
+        connectionString = "";
         if (_zenGardenInitializationProvider is null)
         {
             KoanLog.ConfigDebug(Logger, LogActions.ZenGarden, "provider-missing");
@@ -320,7 +320,7 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
         string? password,
         out string connectionString)
     {
-        connectionString = string.Empty;
+        connectionString = "";
 
         // Primary path: native MongoDB connection string (supports replica sets with comma-separated hosts).
         // Uses GetConnectionString (prefix match) instead of GetUri (Uri.TryCreate) because
@@ -376,7 +376,7 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
         var rest = connectionString[(schemeEnd + 3)..];    // everything after "://"
 
         // Split existing auth from host portion
-        string existingAuth = string.Empty;
+        string existingAuth = "";
         var atIndex = rest.IndexOf('@');
         var slashIndex = rest.IndexOf('/');
         var questionIndex = rest.IndexOf('?');
@@ -408,7 +408,7 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
             else
             {
                 hosts = rest;
-                pathAndQuery = string.Empty;
+                pathAndQuery = "";
             }
         }
 
@@ -416,15 +416,15 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
         var auth = !string.IsNullOrWhiteSpace(existingAuth)
             ? existingAuth + "@"
             : !string.IsNullOrWhiteSpace(username)
-                ? $"{username}:{password ?? string.Empty}@"
-                : string.Empty;
+                ? $"{username}:{password ?? ""}@"
+                : "";
 
         // Apply database override (only if not already present in path)
         if (!string.IsNullOrWhiteSpace(databaseName))
         {
             // Extract existing path portion (before any '?')
             var existingPath = pathAndQuery;
-            var existingQuery = string.Empty;
+            var existingQuery = "";
             var qIdx = pathAndQuery.IndexOf('?');
             if (qIdx >= 0)
             {

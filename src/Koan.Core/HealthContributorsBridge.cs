@@ -71,7 +71,7 @@ internal sealed class HealthContributorsBridge : IHostedService
                 foreach (var kv in report.Data)
                 {
                     if (kv.Value is null) continue;
-                    dict[kv.Key] = kv.Value?.ToString() ?? string.Empty;
+                    dict[kv.Key] = kv.Value?.ToString() ?? "";
                 }
                 facts = dict;
             }
@@ -106,7 +106,7 @@ internal sealed class HealthContributorsBridge : IHostedService
                 foreach (var kv in report.Data)
                 {
                     if (kv.Value is null) continue;
-                    dict[kv.Key] = kv.Value?.ToString() ?? string.Empty;
+                    dict[kv.Key] = kv.Value?.ToString() ?? "";
                 }
                 facts = dict;
             }

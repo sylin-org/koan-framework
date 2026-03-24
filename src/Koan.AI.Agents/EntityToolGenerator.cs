@@ -294,7 +294,7 @@ internal static class EntityToolGenerator
                 return JsonSerializer.Serialize(new { error = $"Failed to deserialize data as {entityType.Name}" });
 
             // Call Entity<T>.Upsert(entity, ct)
-            var upsertMethod = FindStaticMethod(entityType, "UpsertAsync", entityType, typeof(CancellationToken));
+            var upsertMethod = FindStaticMethod(entityType, "Upsert", entityType, typeof(CancellationToken));
             if (upsertMethod is not null)
             {
                 var result = await InvokeAsyncMethod(upsertMethod, null, [entity, ct]);

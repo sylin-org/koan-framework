@@ -132,7 +132,7 @@ internal static class BackupProvenanceItems
         var buffer = new List<string>(items.Count);
         foreach (var item in items)
         {
-            var candidate = (item ?? string.Empty).Trim();
+            var candidate = (item ?? "").Trim();
             if (candidate.Length > 0)
             {
                 buffer.Add(candidate);

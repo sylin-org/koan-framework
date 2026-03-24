@@ -626,7 +626,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
         try
         {
             var options = _options.CurrentValue;
-            var collectionName = options.Collection ?? string.Empty;
+            var collectionName = options.Collection ?? "";
             await GetCollectionContext(collectionName, ct);
 
             if (_stateManager.State == AdapterReadinessState.Degraded)

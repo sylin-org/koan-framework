@@ -85,14 +85,14 @@ internal sealed class AniListParser : Services.IMediaParser
 
             // Arrays (genres, synonyms, tags) with filtering
             var genres = item["genres"] is JArray gArr
-                ? gArr.Select(x => x?.Value<string>() ?? string.Empty).Where(NotNullOrWhite).Select(NormalizeTokenString).ToArray()
-                : Array.Empty<string>();
+                ? gArr.Select(x => x?.Value<string>() ?? "").Where(NotNullOrWhite).Select(NormalizeTokenString).ToArray()
+                : [];
             var synonyms = item["synonyms"] is JArray syn
-                ? syn.Select(x => x?.Value<string>() ?? string.Empty).Where(NotNullOrWhite).Select(NormalizeTokenString).ToArray()
-                : Array.Empty<string>();
+                ? syn.Select(x => x?.Value<string>() ?? "").Where(NotNullOrWhite).Select(NormalizeTokenString).ToArray()
+                : [];
             var tags = item["tags"] is JArray tg
-                ? tg.Select(x => x?["name"]?.Value<string>() ?? string.Empty).Where(NotNullOrWhite).Select(NormalizeTokenString).Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
-                : Array.Empty<string>();
+                ? tg.Select(x => x?["name"]?.Value<string>() ?? "").Where(NotNullOrWhite).Select(NormalizeTokenString).Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
+                : [];
 
             // Synthetic NSFW tag from top-level isAdult property
             if (item["isAdult"]?.Value<bool>() == true)
@@ -106,7 +106,7 @@ internal sealed class AniListParser : Services.IMediaParser
             if (!string.IsNullOrWhiteSpace(descRaw))
             {
                 var decoded = WebUtility.HtmlDecode(descRaw);
-                var stripped = Regex.Replace(decoded, "<.*?>", string.Empty);
+                var stripped = Regex.Replace(decoded, "<.*?>", "");
                 synopsis = string.IsNullOrWhiteSpace(stripped) ? null : stripped.Replace("\n", " ").Trim();
             }
 

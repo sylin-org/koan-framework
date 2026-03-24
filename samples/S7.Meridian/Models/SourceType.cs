@@ -4,12 +4,12 @@ namespace Koan.Samples.Meridian.Models;
 
 public sealed class SourceType : Entity<SourceType>
 {
-    public string Name { get; set; } = string.Empty;
+    public string Name { get; set; } = "";
 
     /// <summary>Exclusive short code for this source type (e.g., "MEET", "INV", "CONT").</summary>
-    public string Code { get; set; } = string.Empty;
+    public string Code { get; set; } = "";
 
-    public string Description { get; set; } = string.Empty;
+    public string Description { get; set; } = "";
     public int Version { get; set; } = 1;
 
     public List<string> Tags { get; set; } = new();
@@ -28,8 +28,8 @@ public sealed class SourceType : Entity<SourceType>
         = null;
     public List<string> MimeTypes { get; set; } = new();
     public Dictionary<string, string> FieldQueries { get; set; } = new(StringComparer.OrdinalIgnoreCase);
-    public string Instructions { get; set; } = string.Empty;
-    public string OutputTemplate { get; set; } = string.Empty;
+    public string Instructions { get; set; } = "";
+    public string OutputTemplate { get; set; } = "";
 
     public float[]? TypeEmbedding { get; set; }
         = null;

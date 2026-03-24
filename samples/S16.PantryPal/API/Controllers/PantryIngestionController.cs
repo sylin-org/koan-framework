@@ -66,7 +66,7 @@ public class PantryIngestionController(
         if (result.Detections is { Length: >0 })
         {
             var existingItems = await PantryItem.Query(p => p.SourcePhotoId == photoRecord.Id, ct);
-            var existingNames = existingItems.Select(i => (i.Name ?? string.Empty).Trim().ToLowerInvariant()).ToHashSet();
+            var existingNames = existingItems.Select(i => (i.Name ?? "").Trim().ToLowerInvariant()).ToHashSet();
             foreach (var d in result.Detections)
             {
                 // Use top candidate as canonical name for duplicate detection
@@ -103,7 +103,7 @@ public class PantryIngestionController(
             // Shelf-life inference (post-confirm) for items missing ExpiresAt
             foreach (var item in confirmed)
             {
-                if (item.ExpiresAt == null && _opts.DefaultShelfLifeDaysByCategory.TryGetValue((item.Category ?? string.Empty).ToLowerInvariant(), out var days) && days > 0)
+                if (item.ExpiresAt == null && _opts.DefaultShelfLifeDaysByCategory.TryGetValue((item.Category ?? "").ToLowerInvariant(), out var days) && days > 0)
                 {
                     item.ExpiresAt = DateTime.UtcNow.AddDays(days);
                     await item.Save();

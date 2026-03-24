@@ -19,7 +19,7 @@ internal sealed class CouchbaseHealthContributor(IOptions<CouchbaseOptions> opti
     {
         try
         {
-            var context = await provider.GetCollectionContext(options.Value.Collection ?? string.Empty, ct);
+            var context = await provider.GetCollectionContext(options.Value.Collection ?? "", ct);
             await context.Cluster.PingAsync(new PingOptions().CancellationToken(ct));
             return new HealthReport(Name, HealthState.Healthy, null, null, new Dictionary<string, object?>
             {

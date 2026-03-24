@@ -33,7 +33,7 @@ public static partial class EmbeddingRegistry
     {
         if (_registeredTypes.IsEmpty)
         {
-            return Array.Empty<Type>();
+            return [];
         }
 
         return _registeredTypes.Keys.ToArray();
@@ -48,7 +48,7 @@ public static partial class EmbeddingRegistry
         {
             if (_registeredTypes.IsEmpty)
             {
-                return Array.Empty<Type>();
+                return [];
             }
 
             var snapshot = _registeredTypes.Keys.ToArray();

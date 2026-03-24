@@ -246,7 +246,7 @@ public sealed class McpRpcHandler
                 Result = new JObject { ["valid"] = false, ["error"] = "Missing required 'code' parameter" }
             };
         }
-        var code = codeNode?.Value<string>() ?? string.Empty;
+        var code = codeNode?.Value<string>() ?? "";
         if (jint.ValidateSyntax(code, out var error))
         {
             return new ToolsCallResult
@@ -389,7 +389,7 @@ public sealed class McpRpcHandler
     public sealed class ToolsListResponse
     {
         [JsonPropertyName("tools")]
-        public IReadOnlyList<ToolDescriptor> Tools { get; init; } = Array.Empty<ToolDescriptor>();
+        public IReadOnlyList<ToolDescriptor> Tools { get; init; } = [];
 
         [JsonPropertyName("next")]
         public object? Next { get; init; }

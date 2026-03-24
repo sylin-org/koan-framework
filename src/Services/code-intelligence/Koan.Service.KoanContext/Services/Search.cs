@@ -227,7 +227,7 @@ public class Search : ISearchService
                             FilePath: documentChunk.FilePath,
                             Title: documentChunk.Title ?? Path.GetFileName(documentChunk.FilePath),
                             Url: documentChunk.SourceUrl,
-                            CommitSha: documentChunk.CommitSha ?? string.Empty));
+                            CommitSha: documentChunk.CommitSha ?? ""));
                         sourceIndex[sourceKey] = index;
                     }
 
@@ -347,7 +347,7 @@ public class Search : ISearchService
             return new SearchInsights(
                 Topics: new Dictionary<string, int>(),
                 CompletenessLevel: "insufficient",
-                MissingTopics: Array.Empty<string>());
+                MissingTopics: []);
         }
 
         var topics = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -377,7 +377,7 @@ public class Search : ISearchService
         return new SearchInsights(
             Topics: topics,
             CompletenessLevel: completeness,
-            MissingTopics: Array.Empty<string>());
+            MissingTopics: []);
     }
 
     private static string ExtractTopic(string filePath)
@@ -614,16 +614,16 @@ public class Search : ISearchService
             ? new SearchInsights(
                 Topics: new Dictionary<string, int>(),
                 CompletenessLevel: "insufficient",
-                MissingTopics: Array.Empty<string>())
+                MissingTopics: [])
             : null;
 
         return new SearchResult(
-            Chunks: Array.Empty<SearchResultChunk>(),
+            Chunks: [],
             Metadata: metadata,
-            Sources: new SearchSources(0, Array.Empty<SourceFile>()),
+            Sources: new SearchSources(0, []),
             Insights: insights,
             ContinuationToken: null,
-            Warnings: warnings ?? Array.Empty<string>());
+            Warnings: warnings ?? []);
     }
 }
 

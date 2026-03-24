@@ -77,11 +77,11 @@ public sealed class RotateOperator : IMediaOperator
             if (query.TryGetValue(a, out var sv) && sv.Count > 0)
             {
                 var s0 = sv[0];
-                value = s0 ?? string.Empty;
+                value = s0 ?? "";
                 return true;
             }
         }
-        value = string.Empty;
+        value = "";
         return false;
     }
 }

@@ -78,7 +78,7 @@ public sealed class MongoCrudSpec
 
     private sealed class Person : Entity<Person>
     {
-        public string Name { get; set; } = string.Empty;
+        public string Name { get; set; } = "";
         public int Age { get; set; }
 
         [Timestamp]

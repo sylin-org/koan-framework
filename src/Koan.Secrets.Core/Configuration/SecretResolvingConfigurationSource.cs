@@ -61,7 +61,7 @@ public sealed class SecretResolvingConfigurationSource(IServiceProvider? service
         public void Set(string key, string? value) => _base[key] = value;
         public IChangeToken GetReloadToken() => _reload;
         public void Load() { }
-        public IEnumerable<string> GetChildKeys(IEnumerable<string> earlierKeys, string? parentPath) => _base.GetSection(parentPath ?? string.Empty).GetChildren().Select(c => c.Key);
+        public IEnumerable<string> GetChildKeys(IEnumerable<string> earlierKeys, string? parentPath) => _base.GetSection(parentPath ?? "").GetChildren().Select(c => c.Key);
 
         public void UpgradeResolverFrom(IServiceProvider sp)
         {

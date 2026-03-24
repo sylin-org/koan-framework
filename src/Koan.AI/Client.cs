@@ -201,7 +201,7 @@ public static class Client
         {
             Input = new() { text }
         }, ct);
-        return response.Vectors.FirstOrDefault() ?? Array.Empty<float>();
+        return response.Vectors.FirstOrDefault() ?? [];
     }
 
     /// <summary>
@@ -214,7 +214,7 @@ public static class Client
             Input = new() { text },
             Model = options.Model
         }, ct);
-        return response.Vectors.FirstOrDefault() ?? Array.Empty<float>();
+        return response.Vectors.FirstOrDefault() ?? [];
     }
 
     /// <summary>
@@ -243,7 +243,7 @@ public static class Client
             Input = new() { text }
         }, ct);
 
-        var vector = response.Vectors.FirstOrDefault() ?? Array.Empty<float>();
+        var vector = response.Vectors.FirstOrDefault() ?? [];
         return new EmbedResult
         {
             Vector = vector,

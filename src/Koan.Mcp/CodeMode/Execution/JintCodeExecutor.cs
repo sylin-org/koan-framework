@@ -257,7 +257,7 @@ public sealed class JintCodeExecutor : Koan.Mcp.CodeExecution.ICodeExecutor
             Success: false,
             Result: null,
             TextResponse: null,
-            Logs: Array.Empty<string>(),
+            Logs: [],
             Diagnostics: new CodeExecutionDiagnostics(
                 SdkCalls: sdkCalls,
                 CpuMs: cpuMs,

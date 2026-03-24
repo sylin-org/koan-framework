@@ -62,7 +62,7 @@ internal sealed class BandCacheService : IBandCacheService
             cache = await InitializeCache(query, userId, limit, ct);
             if (cache == null || cache.Count == 0)
             {
-                return (Array.Empty<Recommendation>(), true);
+                return ([], true);
             }
 
             cache.QueryHash = queryHash;

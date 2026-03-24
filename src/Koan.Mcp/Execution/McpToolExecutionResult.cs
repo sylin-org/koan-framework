@@ -70,7 +70,7 @@ public sealed class McpToolExecutionResult
             null,
             null,
             new Dictionary<string, string>(),
-            Array.Empty<string>(),
+            [],
             diagnostics ?? new JObject(),
             errorCode,
             errorMessage);

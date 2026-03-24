@@ -7,19 +7,19 @@ namespace Koan.Samples.Meridian.Models;
 
 public sealed class AnalysisType : Entity<AnalysisType>
 {
-    public string Name { get; set; } = string.Empty;
+    public string Name { get; set; } = "";
 
     /// <summary>Exclusive short code for this analysis type (e.g., "EAR", "VDD", "SEC").</summary>
-    public string Code { get; set; } = string.Empty;
+    public string Code { get; set; } = "";
 
-    public string Description { get; set; } = string.Empty;
+    public string Description { get; set; } = "";
     public int Version { get; set; } = 1;
 
     public List<string> Tags { get; set; } = new();
     public List<string> Descriptors { get; set; } = new();
-    public string Instructions { get; set; } = string.Empty;
-    public string OutputTemplate { get; set; } = string.Empty;
-    public string JsonSchema { get; set; } = string.Empty;
+    public string Instructions { get; set; } = "";
+    public string OutputTemplate { get; set; } = "";
+    public string JsonSchema { get; set; } = "";
     public List<FactBlueprint.FactCategory> FactCategories { get; set; } = new();
     public List<FactBlueprint.FieldMapping> FieldMappings { get; set; } = new();
 

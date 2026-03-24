@@ -366,7 +366,7 @@ internal sealed class ComputeService : IComputeService
         var separator = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? ';' : ':';
         var extensions = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
             ? new[] { ".exe", ".cmd", ".bat" }
-            : Array.Empty<string>();
+            : [];
 
         foreach (var dir in pathVar.Split(separator, StringSplitOptions.RemoveEmptyEntries))
         {

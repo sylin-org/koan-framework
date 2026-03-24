@@ -87,7 +87,7 @@ internal sealed class AiProvenancePublisher : BackgroundService
             .Description(KoanAiProvenanceItems.AdapterRoster.Description)
             .Value(summaries.Count > 0 ? string.Join("; ", summaries) : "(none)")
             .Source(ProvenanceSettingSource.Custom)
-            .Consumers(KoanAiProvenanceItems.AdapterRoster.DefaultConsumers?.ToArray() ?? Array.Empty<string>())
+            .Consumers(KoanAiProvenanceItems.AdapterRoster.DefaultConsumers?.ToArray() ?? [])
             .State(ProvenanceSettingState.Configured));
 
         return Task.CompletedTask;
@@ -103,7 +103,7 @@ internal sealed class AiProvenancePublisher : BackgroundService
                 .Description(KoanAiProvenanceItems.SourceMemberStatus.Description)
                 .Value("(no sources registered)")
                 .Source(ProvenanceSettingSource.Custom)
-                .Consumers(KoanAiProvenanceItems.SourceMemberStatus.DefaultConsumers?.ToArray() ?? Array.Empty<string>())
+                .Consumers(KoanAiProvenanceItems.SourceMemberStatus.DefaultConsumers?.ToArray() ?? [])
                 .State(ProvenanceSettingState.Default));
             return;
         }
@@ -126,7 +126,7 @@ internal sealed class AiProvenancePublisher : BackgroundService
             .Description(KoanAiProvenanceItems.SourceMemberStatus.Description)
             .Value(string.Join("; ", details))
             .Source(ProvenanceSettingSource.Custom)
-            .Consumers(KoanAiProvenanceItems.SourceMemberStatus.DefaultConsumers?.ToArray() ?? Array.Empty<string>())
+            .Consumers(KoanAiProvenanceItems.SourceMemberStatus.DefaultConsumers?.ToArray() ?? [])
             .State(ProvenanceSettingState.Configured));
     }
 }

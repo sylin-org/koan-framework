@@ -89,7 +89,7 @@ internal sealed class MemoryCacheStore : ICacheStore
         }
 
         var tagArray = options.Tags.Count == 0
-            ? Array.Empty<string>()
+            ? []
             : options.Tags.Where(static t => !string.IsNullOrWhiteSpace(t)).Select(static t => t.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
 
         var envelope = new CacheEnvelope(value, options, now, absoluteExpiration, staleUntil, tagArray);
@@ -120,7 +120,7 @@ internal sealed class MemoryCacheStore : ICacheStore
                 }
                 else
                 {
-                    RemoveTags(key.Value, Array.Empty<string>());
+                    RemoveTags(key.Value, []);
                 }
             },
             State = envelope

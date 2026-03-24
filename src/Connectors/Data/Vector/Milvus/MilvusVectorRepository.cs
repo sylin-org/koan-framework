@@ -373,7 +373,7 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
         }
         else if (!string.IsNullOrEmpty(_options.Username))
         {
-            var token = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_options.Username}:{_options.Password ?? string.Empty}"));
+            var token = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_options.Username}:{_options.Password ?? ""}"));
             _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", token);
         }
     }
@@ -382,7 +382,7 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
     {
         if (allowNotFound && response.StatusCode == HttpStatusCode.NotFound)
         {
-            return string.Empty;
+            return "";
         }
 
         if (!response.IsSuccessStatusCode)
@@ -411,7 +411,7 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
             return formattable.ToString(null, CultureInfo.InvariantCulture);
         }
 
-        return FormatString(id.ToString() ?? string.Empty);
+        return FormatString(id.ToString() ?? "");
     }
 
     private JValue FormatIdentifierValue(TKey id)
@@ -434,7 +434,7 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
         {
             string s => s,
             Guid guid => guid.ToString("N", CultureInfo.InvariantCulture),
-            _ => id.ToString() ?? string.Empty
+            _ => id.ToString() ?? ""
         };
 
     private string FormatString(string value)

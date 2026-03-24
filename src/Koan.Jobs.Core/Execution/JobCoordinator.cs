@@ -84,7 +84,7 @@ internal sealed class JobCoordinator : IJobCoordinator
         await _eventPublisher.PublishQueued(typed, cancellationToken);
 
         var baseType = typeof(TJob).BaseType;
-        var genericArguments = baseType?.IsGenericType == true ? baseType.GetGenericArguments() : Array.Empty<Type>();
+        var genericArguments = baseType?.IsGenericType == true ? baseType.GetGenericArguments() : [];
         var contextType = genericArguments.Length > 1 ? genericArguments[1] : typeof(object);
         var resultType = genericArguments.Length > 2 ? genericArguments[2] : typeof(object);
 

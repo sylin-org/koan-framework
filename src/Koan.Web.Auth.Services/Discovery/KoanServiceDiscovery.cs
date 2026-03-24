@@ -28,7 +28,7 @@ public sealed class KoanServiceDiscovery : IServiceDiscovery
         if (_options.ServiceEndpoints.TryGetValue(serviceId, out var manualUrl))
         {
             _logger.LogDebug("Found manual configuration for {ServiceId}: {Url}", serviceId, manualUrl);
-            return new ServiceEndpoint(serviceId, new Uri(manualUrl), Array.Empty<string>());
+            return new ServiceEndpoint(serviceId, new Uri(manualUrl), []);
         }
 
         // 2. Try environment variables
@@ -36,7 +36,7 @@ public sealed class KoanServiceDiscovery : IServiceDiscovery
         if (!string.IsNullOrEmpty(envUrl))
         {
             _logger.LogDebug("Found environment variable for {ServiceId}: {Url}", serviceId, envUrl);
-            return new ServiceEndpoint(serviceId, new Uri(envUrl), Array.Empty<string>());
+            return new ServiceEndpoint(serviceId, new Uri(envUrl), []);
         }
 
         // 3. Container-aware resolution (following Koan patterns)
@@ -52,7 +52,7 @@ public sealed class KoanServiceDiscovery : IServiceDiscovery
             if (await IsServiceReachable(candidate, ct))
             {
                 _logger.LogDebug("Service {ServiceId} reachable at {Url}", serviceId, candidate);
-                return new ServiceEndpoint(serviceId, new Uri(candidate), Array.Empty<string>());
+                return new ServiceEndpoint(serviceId, new Uri(candidate), []);
             }
         }
 
@@ -67,7 +67,7 @@ public sealed class KoanServiceDiscovery : IServiceDiscovery
         // For now, return empty array - this would be implemented for service registry scenarios
         _logger.LogDebug("Service discovery not yet implemented");
         await Task.CompletedTask;
-        return Array.Empty<ServiceEndpoint>();
+        return [];
     }
 
     public Task RegisterService(ServiceRegistration registration, CancellationToken ct = default)

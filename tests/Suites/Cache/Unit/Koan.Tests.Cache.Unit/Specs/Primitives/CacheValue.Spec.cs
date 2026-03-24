@@ -73,7 +73,7 @@ public sealed class CacheValueSpec
     public Task IsEmpty_when_payload_and_text_absent()
         => Spec(nameof(IsEmpty_when_payload_and_text_absent), () =>
         {
-            var fromEmpty = CacheValue.FromString(string.Empty);
+            var fromEmpty = CacheValue.FromString("");
             fromEmpty.IsEmpty.Should().BeTrue();
 
             var value = CacheValue.FromBytes(ReadOnlyMemory<byte>.Empty);

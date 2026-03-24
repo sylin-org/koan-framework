@@ -140,7 +140,7 @@ public abstract class AdapterOptionsConfigurator<TOptions> : IConfigureOptions<T
         {
             var defaultString = defaultValue as string;
             var result = Core.Configuration.ReadFirst(Configuration, providerKeys) ?? defaultString;
-            return (T)(object)(result ?? string.Empty);
+            return (T)(object)(result ?? "");
         }
         else if (typeof(T) == typeof(int))
         {
@@ -155,7 +155,7 @@ public abstract class AdapterOptionsConfigurator<TOptions> : IConfigureOptions<T
         else
         {
             // Fallback - try to read as string and convert
-            var stringResult = Core.Configuration.ReadFirst(Configuration, defaultValue?.ToString() ?? string.Empty, providerKeys);
+            var stringResult = Core.Configuration.ReadFirst(Configuration, defaultValue?.ToString() ?? "", providerKeys);
             try
             {
                 return (T)Convert.ChangeType(stringResult, typeof(T));

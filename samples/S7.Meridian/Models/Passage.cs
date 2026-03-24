@@ -11,13 +11,13 @@ namespace Koan.Samples.Meridian.Models;
     Version = 1)]
 public sealed class Passage : Entity<Passage>
 {
-    public string SourceDocumentId { get; set; } = string.Empty;
+    public string SourceDocumentId { get; set; } = "";
 
     public int SequenceNumber { get; set; }
         = 0;
 
-    public string Text { get; set; } = string.Empty;
-    public string TextHash { get; set; } = string.Empty;
+    public string Text { get; set; } = "";
+    public string TextHash { get; set; } = "";
 
     public int? PageNumber { get; set; }
         = null;

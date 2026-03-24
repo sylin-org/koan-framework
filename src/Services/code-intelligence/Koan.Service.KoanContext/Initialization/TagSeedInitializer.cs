@@ -418,9 +418,9 @@ public sealed class TagSeedInitializer : IHostedService
         IEnumerable<string>? DefaultAll = null,
         IEnumerable<string>? DefaultExclude = null)
     {
-        public IReadOnlyList<string> DefaultTagsAny { get; } = DefaultAny?.ToArray() ?? Array.Empty<string>();
-        public IReadOnlyList<string> DefaultTagsAll { get; } = DefaultAll?.ToArray() ?? Array.Empty<string>();
-        public IReadOnlyList<string> DefaultTagsExclude { get; } = DefaultExclude?.ToArray() ?? Array.Empty<string>();
+        public IReadOnlyList<string> DefaultTagsAny { get; } = DefaultAny?.ToArray() ?? [];
+        public IReadOnlyList<string> DefaultTagsAll { get; } = DefaultAll?.ToArray() ?? [];
+        public IReadOnlyList<string> DefaultTagsExclude { get; } = DefaultExclude?.ToArray() ?? [];
     }
 
     public sealed record TagSeedSummary(bool Completed, bool Forced, DateTimeOffset Timestamp, IReadOnlyList<TagSeedReport> Reports);

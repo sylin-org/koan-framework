@@ -113,8 +113,8 @@ public static class AggregateExtensions
         var (aggType, keyType) = ResolveAggregateContract(model.GetType());
         var data = DataService();
         var getRepo = typeof(IDataService).GetMethod(nameof(IDataService.GetRepository))!;
-        var repo = getRepo.MakeGenericMethod(aggType, keyType).Invoke(data, System.Array.Empty<object>())!;
-        var upsert = repo.GetType().GetMethod("UpsertAsync")!;
+        var repo = getRepo.MakeGenericMethod(aggType, keyType).Invoke(data, Array.Empty<object>())!;
+        var upsert = repo.GetType().GetMethod("Upsert")!;
         var task = (Task)upsert.Invoke(repo, new object[] { model, ct })!;
         await task;
         var resultProp = task.GetType().GetProperty("Result");
@@ -133,8 +133,8 @@ public static class AggregateExtensions
         var id = AggregateMetadata.GetIdValue(model) ?? throw new System.InvalidOperationException("Model has no identifier");
         var data = DataService();
         var getRepo = typeof(IDataService).GetMethod(nameof(IDataService.GetRepository))!;
-        var repo = getRepo.MakeGenericMethod(aggType, keyType).Invoke(data, System.Array.Empty<object>())!;
-        var del = repo.GetType().GetMethod("DeleteAsync")!;
+        var repo = getRepo.MakeGenericMethod(aggType, keyType).Invoke(data, Array.Empty<object>())!;
+        var del = repo.GetType().GetMethod("Delete")!;
         var task = (Task)del.Invoke(repo, new object[] { id, ct })!;
         await task;
         var resultProp = task.GetType().GetProperty("Result");

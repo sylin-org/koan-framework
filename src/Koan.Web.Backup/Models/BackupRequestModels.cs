@@ -13,7 +13,7 @@ public class CreateBackupRequest
     /// </summary>
     [Required]
     [StringLength(200, MinimumLength = 1)]
-    public string Name { get; set; } = string.Empty;
+    public string Name { get; set; } = "";
 
     /// <summary>
     /// Optional description of the backup
@@ -24,7 +24,7 @@ public class CreateBackupRequest
     /// <summary>
     /// Tags to apply to the backup
     /// </summary>
-    public string[] Tags { get; set; } = Array.Empty<string>();
+    public string[] Tags { get; set; } = [];
 
     /// <summary>
     /// Target partition name (optional, defaults to "root")
@@ -117,7 +117,7 @@ public class RestoreBackupRequest
     /// </summary>
     [Required]
     [StringLength(200, MinimumLength = 1)]
-    public string BackupName { get; set; } = string.Empty;
+    public string BackupName { get; set; } = "";
 
     /// <summary>
     /// Target partition name (optional)
@@ -226,7 +226,7 @@ public class EntityBackupRequest : CreateBackupRequest
     /// </summary>
     [Required]
     [StringLength(100, MinimumLength = 1)]
-    public string EntityType { get; set; } = string.Empty;
+    public string EntityType { get; set; } = "";
 }
 
 /// <summary>
@@ -239,5 +239,5 @@ public class EntityRestoreRequest : RestoreBackupRequest
     /// </summary>
     [Required]
     [StringLength(100, MinimumLength = 1)]
-    public string EntityType { get; set; } = string.Empty;
+    public string EntityType { get; set; } = "";
 }

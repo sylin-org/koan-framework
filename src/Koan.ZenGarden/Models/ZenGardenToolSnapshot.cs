@@ -21,7 +21,7 @@ public sealed record ZenGardenConnection
     public string? Hostname { get; init; }
     public string? Ip { get; init; }
     public int? Port { get; init; }
-    public IReadOnlyList<string> Uris { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<string> Uris { get; init; } = [];
 }
 
 public sealed record ZenGardenToolSnapshot
@@ -54,7 +54,7 @@ public sealed record ZenGardenToolSnapshot
     public string? StoneId { get; init; }
     public string? StoneName { get; init; }
     public string? StoneEndpoint { get; init; }
-    public IReadOnlyList<string> Aliases { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<string> Aliases { get; init; } = [];
     public ZenGardenConnection? Connection { get; init; }
     public IReadOnlyDictionary<string, IReadOnlyList<string>> Capabilities { get; init; }
         = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);

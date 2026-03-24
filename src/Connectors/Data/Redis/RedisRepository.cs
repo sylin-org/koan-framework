@@ -55,7 +55,7 @@ internal sealed class RedisRepository<TEntity, TKey> :
         var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
         if (idList.Count == 0)
         {
-            return Array.Empty<TEntity?>();
+            return [];
         }
 
         var keyspace = Keyspace();

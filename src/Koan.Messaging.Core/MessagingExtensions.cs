@@ -100,9 +100,9 @@ namespace Koan.Messaging
             {
                 // Default behavior: type-based routing
                 var concreteType = intercepted.GetType();
-                var sendAsyncMethod = proxy.GetType().GetMethod("SendAsync");
+                var sendAsyncMethod = proxy.GetType().GetMethod("Send");
                 if (sendAsyncMethod == null)
-                    throw new InvalidOperationException($"SendAsync method not found for type {concreteType.Name}");
+                    throw new InvalidOperationException($"Send method not found for type {concreteType.Name}");
                 var genericSendAsync = sendAsyncMethod.MakeGenericMethod(concreteType);
                 await (Task)genericSendAsync!.Invoke(proxy, new object[] { intercepted, cancellationToken })!;
             }
@@ -126,7 +126,7 @@ namespace Koan.Messaging
             {
                 // Fallback to regular SendAsync (for providers that don't support queue routing yet)
                 var concreteType = payload.GetType();
-                var sendAsyncMethod = proxy.GetType().GetMethod("SendAsync");
+                var sendAsyncMethod = proxy.GetType().GetMethod("Send");
                 if (sendAsyncMethod == null)
                     throw new InvalidOperationException($"Neither SendToQueueAsync nor SendAsync method found on provider {proxy.GetType().Name}");
                 var genericSendAsync = sendAsyncMethod.MakeGenericMethod(concreteType);

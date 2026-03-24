@@ -148,7 +148,7 @@ internal sealed class VectorSaveOperation<TEntity, TKey> : ITrackedOperation
             throw new InvalidOperationException($"No vector repository configured for {typeof(TEntity).Name}.");
 
         // Call UpsertAsync via reflection
-        var upsertMethod = repo.GetType().GetMethod("UpsertAsync");
+        var upsertMethod = repo.GetType().GetMethod("Upsert");
         if (upsertMethod == null)
             throw new InvalidOperationException("UpsertAsync method not found on vector repository.");
 
@@ -209,7 +209,7 @@ internal sealed class VectorDeleteOperation<TEntity, TKey> : ITrackedOperation
             throw new InvalidOperationException($"No vector repository configured for {typeof(TEntity).Name}.");
 
         // Call DeleteAsync via reflection
-        var deleteMethod = repo.GetType().GetMethod("DeleteAsync");
+        var deleteMethod = repo.GetType().GetMethod("Delete");
         if (deleteMethod == null)
             throw new InvalidOperationException("DeleteAsync method not found on vector repository.");
 

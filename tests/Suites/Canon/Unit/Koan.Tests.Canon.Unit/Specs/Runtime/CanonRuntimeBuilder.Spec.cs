@@ -115,7 +115,7 @@ public sealed class CanonRuntimeBuilderSpec
     {
         [AggregationKey]
         [AggregationPolicy(AggregationPolicyKind.SourceOfTruth, Source = "crm")]
-        public string Key { get; set; } = string.Empty;
+        public string Key { get; set; } = "";
     }
 
     private sealed class TestPersistence : ICanonPersistence

@@ -423,7 +423,7 @@ public sealed class EntityTransferDslSpec
 
     private sealed class TransferTodo : Entity<TransferTodo>
     {
-        public string Title { get; set; } = string.Empty;
+        public string Title { get; set; } = "";
         public bool Active { get; set; }
 
         [Timestamp]
@@ -432,6 +432,6 @@ public sealed class EntityTransferDslSpec
 
     private sealed class BasicNote : Entity<BasicNote>
     {
-        public string Content { get; set; } = string.Empty;
+        public string Content { get; set; } = "";
     }
 }

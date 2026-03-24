@@ -6,7 +6,7 @@ namespace Koan.Web.Admin.Contracts;
 public sealed record KoanAdminConfigurationSummary(
     IReadOnlyList<KoanAdminPillarSummary> Pillars)
 {
-    public static KoanAdminConfigurationSummary Empty { get; } = new(Array.Empty<KoanAdminPillarSummary>());
+    public static KoanAdminConfigurationSummary Empty { get; } = new([]);
 }
 
 public sealed record KoanAdminPillarSummary(

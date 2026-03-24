@@ -16,19 +16,19 @@ public sealed class ApplicationIdentityOptions
     public string? Description { get; set; }
     public string? ContactEmail { get; set; }
     public string? SupportUrl { get; set; }
-    public string[] Tags { get; set; } = Array.Empty<string>();
+    public string[] Tags { get; set; } = [];
 
     internal ApplicationIdentitySnapshot ToSnapshot()
     {
         var tags = Tags?.Where(static t => !string.IsNullOrWhiteSpace(t))
             .Select(static t => t.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray() ?? Array.Empty<string>();
+            .ToArray() ?? [];
 
         return new ApplicationIdentitySnapshot(
             string.IsNullOrWhiteSpace(Name) ? "Koan Application" : Name.Trim(),
             string.IsNullOrWhiteSpace(Code) ? "koan-app" : Code.Trim(),
-            Description?.Trim() ?? string.Empty,
+            Description?.Trim() ?? "",
             string.IsNullOrWhiteSpace(ContactEmail) ? null : ContactEmail!.Trim(),
             string.IsNullOrWhiteSpace(SupportUrl) ? null : SupportUrl!.Trim(),
             tags);
@@ -46,10 +46,10 @@ public readonly record struct ApplicationIdentitySnapshot(
     public static readonly ApplicationIdentitySnapshot Empty = new(
         "Koan Application",
         "koan-app",
-        string.Empty,
+        "",
         null,
         null,
-        Array.Empty<string>());
+        []);
 }
 
 internal static class ApplicationIdentityDefaults
@@ -71,7 +71,7 @@ internal static class ApplicationIdentityDefaults
             return;
         }
 
-        options.Tags ??= Array.Empty<string>();
+        options.Tags ??= [];
 
         var assembly = ResolveAssembly(env);
         var koanApp = assembly?.GetCustomAttribute<KoanAppAttribute>();
@@ -82,7 +82,7 @@ internal static class ApplicationIdentityDefaults
 
         options.Name = Coalesce(options.Name, koanApp?.Name, title, product, env?.ApplicationName, assemblyName, "Koan Application");
         options.Code = NormalizeCode(options.Code, options.Name, koanApp?.Code);
-        options.Description = Coalesce(options.Description, koanApp?.Description, description, string.Empty);
+        options.Description = Coalesce(options.Description, koanApp?.Description, description, "");
 
         if (string.IsNullOrWhiteSpace(options.ContactEmail))
         {
@@ -98,7 +98,7 @@ internal static class ApplicationIdentityDefaults
 
         if (koanApp is not null && koanApp.Tags.Length > 0)
         {
-            var existing = options.Tags ?? Array.Empty<string>();
+            var existing = options.Tags ?? [];
             options.Tags = existing
                 .Concat(koanApp.Tags)
                 .Where(static t => !string.IsNullOrWhiteSpace(t))
@@ -140,7 +140,7 @@ internal static class ApplicationIdentityDefaults
             }
         }
 
-        return string.Empty;
+        return "";
     }
 
     private static string NormalizeCode(string? existingCode, string? resolvedName, string? attributeCode)

@@ -180,7 +180,7 @@ public sealed class Prompt
             : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var key in _defaults.Keys)
-            provided.TryAdd(key, string.Empty);
+            provided.TryAdd(key, "");
 
         return Variables
             .Where(v => !provided.ContainsKey(v))
@@ -281,14 +281,14 @@ public sealed class Prompt
         if (obj is IDictionary<string, object?> objDict)
         {
             foreach (var (key, value) in objDict)
-                dict[key] = value?.ToString() ?? string.Empty;
+                dict[key] = value?.ToString() ?? "";
             return dict;
         }
 
         foreach (var prop in obj.GetType().GetProperties())
         {
             if (prop.CanRead)
-                dict[prop.Name] = prop.GetValue(obj)?.ToString() ?? string.Empty;
+                dict[prop.Name] = prop.GetValue(obj)?.ToString() ?? "";
         }
 
         return dict;

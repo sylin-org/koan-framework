@@ -54,7 +54,7 @@ public sealed class McpServerOptions
     /// <summary>
     /// Allowed origins when CORS is enabled.
     /// </summary>
-    public string[] AllowedOrigins { get; set; } = Array.Empty<string>();
+    public string[] AllowedOrigins { get; set; } = [];
 
     /// <summary>
     /// Controls whether the discovery endpoint (/capabilities) is published.
@@ -106,5 +106,5 @@ public sealed class McpEntityOverride
     public bool? RequireAuthentication { get; set; }
     public McpTransportMode? EnabledTransports { get; set; }
     public string? SchemaOverride { get; set; }
-    public string[] RequiredScopes { get; set; } = Array.Empty<string>();
+    public string[] RequiredScopes { get; set; } = [];
 }

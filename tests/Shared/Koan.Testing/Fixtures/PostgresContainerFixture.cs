@@ -230,7 +230,7 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
         var port = Environment.GetEnvironmentVariable("PGPORT");
         var database = Environment.GetEnvironmentVariable("PGDATABASE") ?? DefaultDatabase;
         var user = Environment.GetEnvironmentVariable("PGUSER") ?? DefaultUsername;
-        var password = Environment.GetEnvironmentVariable("PGPASSWORD") ?? string.Empty;
+        var password = Environment.GetEnvironmentVariable("PGPASSWORD") ?? "";
 
         if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(user))
         {
@@ -284,7 +284,7 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
         {
             Environment.GetEnvironmentVariable("PGPASSWORD"),
             DefaultPassword,
-            string.Empty
+            ""
         };
 
         foreach (var port in ports)
@@ -399,8 +399,8 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
         _cliContainerId = containerName;
 
         var portOk = false;
-        string portStdout = string.Empty;
-        string portStderr = string.Empty;
+        string portStdout = "";
+        string portStderr = "";
         var portExitCode = 0;
 
         for (var attempt = 0; attempt < 5 && !portOk; attempt++)
@@ -494,7 +494,7 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
             process = Process.Start(psi);
             if (process is null)
             {
-                return (false, string.Empty, "Failed to start docker process", -1);
+                return (false, "", "Failed to start docker process", -1);
             }
 
             var stdoutTask = process.StandardOutput.ReadToEndAsync();
@@ -517,11 +517,11 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
                 }
             }
 
-            return (false, string.Empty, "Cancelled", -1);
+            return (false, "", "Cancelled", -1);
         }
         catch (Exception ex)
         {
-            return (false, string.Empty, ex.Message, -1);
+            return (false, "", ex.Message, -1);
         }
         finally
         {
@@ -600,7 +600,7 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
     {
         if (string.IsNullOrEmpty(value))
         {
-            return string.Empty;
+            return "";
         }
 
         return value.Length <= max ? value : value[..max] + "…";

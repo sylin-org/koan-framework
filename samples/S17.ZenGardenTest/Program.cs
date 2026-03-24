@@ -603,7 +603,7 @@ sealed record ZenGardenCapabilityEventEntry(
 
 sealed class MongoNote : Entity<MongoNote>
 {
-    public string Text { get; set; } = string.Empty;
+    public string Text { get; set; } = "";
     public DateTimeOffset CreatedAtUtc { get; set; }
 }
 

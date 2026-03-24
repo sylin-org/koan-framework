@@ -335,7 +335,7 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
         if (idList.Count == 0)
         {
-            return Array.Empty<TEntity?>();
+            return [];
         }
 
         await using var conn = Open();

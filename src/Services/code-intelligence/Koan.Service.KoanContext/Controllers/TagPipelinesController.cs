@@ -18,7 +18,7 @@ public sealed class TagPipelinesController : EntityController<TagPipeline>
     {
         if (entity is null)
         {
-            return string.Empty;
+            return "";
         }
 
         return string.IsNullOrWhiteSpace(entity.Name) ? base.GetDisplay(entity) : entity.Name;

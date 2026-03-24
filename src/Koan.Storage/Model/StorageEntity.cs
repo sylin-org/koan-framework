@@ -15,7 +15,7 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
     where TEntity : class, IStorageObject
 {
     // IStorageObject properties (minimal baseline, derived types may add more fields)
-    public string Key { get; set; } = string.Empty;
+    public string Key { get; set; } = "";
     public string? Name { get; set; }
     public string? ContentType { get; set; }
     public long Size { get; set; }
@@ -31,8 +31,8 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
     {
         var t = typeof(TEntity);
         var attr = t.GetCustomAttributes(typeof(StorageBindingAttribute), inherit: false).OfType<StorageBindingAttribute>().FirstOrDefault();
-        var profile = attr?.Profile ?? string.Empty;
-        var container = overrideContainer ?? attr?.Container ?? string.Empty;
+        var profile = attr?.Profile ?? "";
+        var container = overrideContainer ?? attr?.Container ?? "";
         return (profile, container);
     }
 
@@ -144,8 +144,8 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
     {
         var t = typeof(T);
         var attr = t.GetCustomAttributes(typeof(StorageBindingAttribute), inherit: false).OfType<StorageBindingAttribute>().FirstOrDefault();
-        var profile = attr?.Profile ?? string.Empty;
-        var container = attr?.Container ?? string.Empty;
+        var profile = attr?.Profile ?? "";
+        var container = attr?.Container ?? "";
         return (profile, container);
     }
 

@@ -11,12 +11,12 @@ public class BackupOperationResponse
     /// <summary>
     /// Unique operation ID for tracking progress
     /// </summary>
-    public string OperationId { get; set; } = string.Empty;
+    public string OperationId { get; set; } = "";
 
     /// <summary>
     /// Name of the backup being created
     /// </summary>
-    public string BackupName { get; set; } = string.Empty;
+    public string BackupName { get; set; } = "";
 
     /// <summary>
     /// Current status of the operation
@@ -51,7 +51,7 @@ public class BackupOperationResponse
     /// <summary>
     /// URL to check operation status
     /// </summary>
-    public string StatusUrl { get; set; } = string.Empty;
+    public string StatusUrl { get; set; } = "";
 
     /// <summary>
     /// URL to cancel the operation (if still running)
@@ -67,12 +67,12 @@ public class RestoreOperationResponse
     /// <summary>
     /// Unique operation ID for tracking progress
     /// </summary>
-    public string OperationId { get; set; } = string.Empty;
+    public string OperationId { get; set; } = "";
 
     /// <summary>
     /// Name of the backup being restored
     /// </summary>
-    public string BackupName { get; set; } = string.Empty;
+    public string BackupName { get; set; } = "";
 
     /// <summary>
     /// Current status of the operation
@@ -107,7 +107,7 @@ public class RestoreOperationResponse
     /// <summary>
     /// URL to check operation status
     /// </summary>
-    public string StatusUrl { get; set; } = string.Empty;
+    public string StatusUrl { get; set; } = "";
 
     /// <summary>
     /// URL to cancel the operation (if still running)
@@ -128,7 +128,7 @@ public class BackupProgressInfo
     /// <summary>
     /// Current stage of the backup process
     /// </summary>
-    public string CurrentStage { get; set; } = string.Empty;
+    public string CurrentStage { get; set; } = "";
 
     /// <summary>
     /// Total number of entities to backup
@@ -194,7 +194,7 @@ public class RestoreProgressInfo
     /// <summary>
     /// Current stage of the restore process
     /// </summary>
-    public string CurrentStage { get; set; } = string.Empty;
+    public string CurrentStage { get; set; } = "";
 
     /// <summary>
     /// Total number of entities to restore
@@ -254,7 +254,7 @@ public class RestoreProgressInfo
     /// <summary>
     /// Recent error messages
     /// </summary>
-    public string[] RecentErrors { get; set; } = Array.Empty<string>();
+    public string[] RecentErrors { get; set; } = [];
 }
 
 /// <summary>
@@ -265,7 +265,7 @@ public class BackupCatalogResponse
     /// <summary>
     /// List of backup information
     /// </summary>
-    public BackupInfo[] Backups { get; set; } = Array.Empty<BackupInfo>();
+    public BackupInfo[] Backups { get; set; } = [];
 
     /// <summary>
     /// Total number of backups matching the query
@@ -326,7 +326,7 @@ public class BackupSystemStatusResponse
     /// <summary>
     /// Available storage profiles
     /// </summary>
-    public string[] AvailableStorageProfiles { get; set; } = Array.Empty<string>();
+    public string[] AvailableStorageProfiles { get; set; } = [];
 
     /// <summary>
     /// Total storage used by backups (in bytes)
@@ -495,7 +495,7 @@ public class RestoreResult
     /// <summary>
     /// Detailed results per entity type
     /// </summary>
-    public EntityRestoreResult[] EntityResults { get; set; } = Array.Empty<EntityRestoreResult>();
+    public EntityRestoreResult[] EntityResults { get; set; } = [];
 }
 
 /// <summary>
@@ -506,7 +506,7 @@ public class EntityRestoreResult
     /// <summary>
     /// Entity type name
     /// </summary>
-    public string EntityType { get; set; } = string.Empty;
+    public string EntityType { get; set; } = "";
 
     /// <summary>
     /// Number of items restored

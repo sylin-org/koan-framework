@@ -113,7 +113,7 @@ internal sealed class OllamaModelManager : IAiModelManager
         return (doc?.models ?? Enumerable.Empty<OllamaTag>())
             .Select(m => new AiModelDescriptor
             {
-                Name = m.name ?? string.Empty,
+                Name = m.name ?? "",
                 Family = m.model,
                 AdapterId = "ollama",
                 AdapterType = "ollama"

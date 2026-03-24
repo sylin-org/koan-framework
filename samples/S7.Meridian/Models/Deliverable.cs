@@ -5,9 +5,9 @@ namespace Koan.Samples.Meridian.Models;
 
 public sealed class Deliverable : Entity<Deliverable>
 {
-    public string PipelineId { get; set; } = string.Empty;
+    public string PipelineId { get; set; } = "";
 
-    public string DeliverableTypeId { get; set; } = string.Empty;
+    public string DeliverableTypeId { get; set; } = "";
     public int DeliverableTypeVersion { get; set; }
         = 1;
 
@@ -39,11 +39,11 @@ public sealed class Deliverable : Entity<Deliverable>
 
 public sealed class DeliverableMergeDecision
 {
-    public string FieldPath { get; set; } = string.Empty;
-    public string Strategy { get; set; } = string.Empty;
+    public string FieldPath { get; set; } = "";
+    public string Strategy { get; set; } = "";
     public string? Explanation { get; set; }
         = null;
-    public string AcceptedExtractionId { get; set; } = string.Empty;
+    public string AcceptedExtractionId { get; set; } = "";
     public List<string> RejectedExtractionIds { get; set; }
         = new();
     public List<string> SupportingExtractionIds { get; set; }

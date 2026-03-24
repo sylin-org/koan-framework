@@ -41,7 +41,7 @@ internal sealed class LMStudioOptionsConfigurator : AdapterOptionsConfigurator<L
     {
         KoanLog.ConfigInfo(Logger, LogActions.Config, LocalLogOutcomes.Start);
 
-        var explicitConnection = ReadProviderConfiguration(string.Empty,
+        var explicitConnection = ReadProviderConfiguration("",
             Constants.Configuration.Keys.ConnectionString,
             Constants.Configuration.Keys.AltConnectionString,
             "ConnectionStrings:LMStudio");
@@ -50,11 +50,11 @@ internal sealed class LMStudioOptionsConfigurator : AdapterOptionsConfigurator<L
             "Koan:Ai:Provider:LMStudio:BaseUrl",
             "Koan:Ai:LMStudio:BaseUrl");
 
-        var defaultModel = ReadProviderConfiguration(options.DefaultModel ?? string.Empty,
+        var defaultModel = ReadProviderConfiguration(options.DefaultModel ?? "",
             "Koan:Ai:Provider:LMStudio:DefaultModel",
             "Koan:Ai:LMStudio:DefaultModel");
 
-        var configuredApiKey = ReadProviderConfiguration(options.ApiKey ?? string.Empty,
+        var configuredApiKey = ReadProviderConfiguration(options.ApiKey ?? "",
             Constants.Configuration.Keys.ApiKey,
             Constants.Discovery.EnvKey);
 
@@ -93,7 +93,7 @@ internal sealed class LMStudioOptionsConfigurator : AdapterOptionsConfigurator<L
             "Koan:Ai:Provider:LMStudio:AutoDiscoveryEnabled",
             "Koan:Ai:LMStudio:AutoDiscoveryEnabled");
 
-        if (int.TryParse(ReadProviderConfiguration(string.Empty, "Koan:Ai:Provider:LMStudio:Weight"), out var weight))
+        if (int.TryParse(ReadProviderConfiguration("", "Koan:Ai:Provider:LMStudio:Weight"), out var weight))
         {
             options.Weight = weight;
         }
@@ -142,8 +142,8 @@ internal sealed class LMStudioOptionsConfigurator : AdapterOptionsConfigurator<L
                 HealthCheckTimeout = TimeSpan.FromMilliseconds(750),
                 Parameters = new Dictionary<string, object>
                 {
-                    ["requiredModel"] = defaultModel ?? string.Empty,
-                    ["apiKey"] = options.ApiKey ?? string.Empty
+                    ["requiredModel"] = defaultModel ?? "",
+                    ["apiKey"] = options.ApiKey ?? ""
                 }
             };
 

@@ -15,7 +15,7 @@ namespace Koan.Samples.Meridian.Models;
 public sealed class OrganizationProfile : Entity<OrganizationProfile>
 {
     /// <summary>User-friendly label (e.g., "Geisinger Healthcare").</summary>
-    public string Name { get; set; } = string.Empty;
+    public string Name { get; set; } = "";
 
     /// <summary>Only one profile can be active at a time.</summary>
     public bool Active { get; set; }

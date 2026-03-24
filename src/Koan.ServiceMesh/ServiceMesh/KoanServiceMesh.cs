@@ -382,7 +382,7 @@ internal class KoanServiceMesh : IKoanServiceMesh, IDisposable
     public IReadOnlyList<ServiceInstance> GetAllInstances(string serviceId)
     {
         if (!_services.TryGetValue(serviceId, out var instances))
-            return Array.Empty<ServiceInstance>();
+            return [];
 
         return instances.Values.ToArray();
     }
@@ -428,7 +428,7 @@ internal class ServiceAnnouncement
     public string ServiceId { get; set; } = "";
     public string HttpEndpoint { get; set; } = "";
     public string? ServiceChannelEndpoint { get; set; }
-    public string[] Capabilities { get; set; } = Array.Empty<string>();
+    public string[] Capabilities { get; set; } = [];
     public DateTime Timestamp { get; set; }
 }
 

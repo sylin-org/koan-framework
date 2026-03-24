@@ -43,7 +43,7 @@ public readonly struct CacheTagSet
     {
         if (tags is null)
         {
-            return Array.Empty<string>();
+            return [];
         }
 
         var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -57,6 +57,6 @@ public readonly struct CacheTagSet
             set.Add(tag.Trim());
         }
 
-        return set.Count == 0 ? Array.Empty<string>() : set.ToArray();
+        return set.Count == 0 ? [] : set.ToArray();
     }
 }

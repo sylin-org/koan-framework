@@ -85,7 +85,7 @@ internal sealed class SqliteDiscoveryAdapter : ServiceDiscoveryAdapterBase
     {
         try
         {
-            var trimmed = value?.Trim() ?? string.Empty;
+            var trimmed = value?.Trim() ?? "";
             if (string.IsNullOrEmpty(trimmed)) return "Data Source=./data/app.db";
 
             // If already properly formatted, return as-is

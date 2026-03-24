@@ -111,7 +111,7 @@ namespace Koan.Core.Provenance
         private readonly HashSet<string> _consumers = new(StringComparer.OrdinalIgnoreCase);
         private ProvenanceSettingState _state = ProvenanceSettingState.Unknown;
         private string _label;
-        private string _description = string.Empty;
+        private string _description = "";
 
         internal ProvenanceSettingBuilder(string key)
         {
@@ -133,7 +133,7 @@ namespace Koan.Core.Provenance
 
         public ProvenanceSettingBuilder Description(string? description)
         {
-            _description = description ?? string.Empty;
+            _description = description ?? "";
             return this;
         }
 
@@ -178,11 +178,11 @@ namespace Koan.Core.Provenance
         internal ProvenanceRegistry.SettingState Build(DateTimeOffset timestamp)
         {
             var consumers = _consumers.Count == 0
-                ? Array.Empty<string>()
+                ? []
                 : _consumers.OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToArray();
 
             var displayValue = _isSecret
-                ? (_redactor?.Invoke(_value) ?? Redaction.DeIdentify(_value ?? string.Empty))
+                ? (_redactor?.Invoke(_value) ?? Redaction.DeIdentify(_value ?? ""))
                 : _value;
 
             return new ProvenanceRegistry.SettingState(
@@ -202,7 +202,7 @@ namespace Koan.Core.Provenance
     public sealed class ProvenanceToolBuilder
     {
         private readonly string _name;
-        private string? _route = string.Empty;
+        private string? _route = "";
         private string? _description;
         private string? _capability;
 
@@ -231,7 +231,7 @@ namespace Koan.Core.Provenance
 
         internal ProvenanceRegistry.ToolState Build(DateTimeOffset timestamp)
         {
-            var route = string.IsNullOrWhiteSpace(_route) ? string.Empty : _route;
+            var route = string.IsNullOrWhiteSpace(_route) ? "" : _route;
             return new ProvenanceRegistry.ToolState(_name, route, _description, _capability, timestamp);
         }
     }
@@ -239,7 +239,7 @@ namespace Koan.Core.Provenance
     public sealed class ProvenanceNoteBuilder
     {
         private readonly string _key;
-        private string _message = string.Empty;
+        private string _message = "";
         private ProvenanceNoteKind _kind = ProvenanceNoteKind.Info;
 
         internal ProvenanceNoteBuilder(string key)
@@ -249,7 +249,7 @@ namespace Koan.Core.Provenance
 
         public ProvenanceNoteBuilder Message(string message)
         {
-            _message = message ?? string.Empty;
+            _message = message ?? "";
             return this;
         }
 

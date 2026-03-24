@@ -48,7 +48,7 @@ internal sealed class CqrsRepositoryDecorator<TEntity, TKey> : IDataRepository<T
         return repo.Count(request, ct);
     }
     public Task<IReadOnlyList<TEntity>> Query(System.Linq.Expressions.Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-    => (_routing.GetReadRepository<TEntity, TKey>() as ILinqQueryRepository<TEntity, TKey>)?.Query(predicate, ct) ?? Task.FromResult<IReadOnlyList<TEntity>>(Array.Empty<TEntity>());
+    => (_routing.GetReadRepository<TEntity, TKey>() as ILinqQueryRepository<TEntity, TKey>)?.Query(predicate, ct) ?? Task.FromResult<IReadOnlyList<TEntity>>([]);
 
     public async Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
     {
@@ -95,7 +95,7 @@ internal sealed class CqrsRepositoryDecorator<TEntity, TKey> : IDataRepository<T
     private async Task RecordOutbox(string op, TEntity? model, CancellationToken ct, TKey? id = default)
     {
         if (_outbox is null) return;
-        var entityId = id is not null ? id!.ToString()! : model is not null ? model.Id?.ToString() ?? string.Empty : string.Empty;
+        var entityId = id is not null ? id!.ToString()! : model is not null ? model.Id?.ToString() ?? "" : "";
     var payload = model is not null ? JsonConvert.SerializeObject(model) : "{}";
         var entry = new OutboxEntry(Guid.CreateVersion7().ToString("n"), DateTimeOffset.UtcNow, typeof(TEntity).AssemblyQualifiedName!, op, entityId, payload);
         await _outbox.Append(entry, ct);

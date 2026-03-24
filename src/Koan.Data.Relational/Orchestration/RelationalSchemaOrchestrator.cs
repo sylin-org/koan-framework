@@ -25,7 +25,7 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
         var required = GetRequiredColumns(entity, features);
         var missing = required.Where(c => !ddl.ColumnExists(schema, table, c)).ToArray();
         var state = ComputeState(ddl.TableExists(schema, table), missing.Length == 0);
-        _cache[table] = (state, missing, Array.Empty<string>());
+        _cache[table] = (state, missing, []);
         var options = _optionsMonitor.CurrentValue;
         var report = new Dictionary<string, object?>
         {

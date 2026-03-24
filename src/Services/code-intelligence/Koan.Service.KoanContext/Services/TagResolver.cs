@@ -133,8 +133,8 @@ public class TagResolver
         if (normalizedPattern.Contains("**"))
         {
             var segments = normalizedPattern.Split("**", StringSplitOptions.RemoveEmptyEntries);
-            var prefix = segments.Length > 0 ? segments[0] : string.Empty;
-            var suffix = segments.Length > 1 ? segments[1] : string.Empty;
+            var prefix = segments.Length > 0 ? segments[0] : "";
+            var suffix = segments.Length > 1 ? segments[1] : "";
             var matchesPrefix = string.IsNullOrEmpty(prefix) || normalizedPath.StartsWith(prefix, StringComparison.Ordinal);
             var matchesSuffix = string.IsNullOrEmpty(suffix) || normalizedPath.EndsWith(suffix, StringComparison.Ordinal);
             return matchesPrefix && matchesSuffix;
@@ -225,7 +225,7 @@ public class TagResolver
 
             if (ruleIds.Count == 0)
             {
-                rules = Array.Empty<TagRule>();
+                rules = [];
             }
             else
             {
@@ -236,7 +236,7 @@ public class TagResolver
             _logger.LogDebug("Loaded tag pipeline {Pipeline} with {RuleCount} rules", targetPipelineName, rules.Count);
 
             return new TagPipelineSnapshot(pipeline, rules);
-        }) ?? new TagPipelineSnapshot(new TagPipeline { Name = targetPipelineName, RuleIds = new List<string>() }, Array.Empty<TagRule>());
+        }) ?? new TagPipelineSnapshot(new TagPipeline { Name = targetPipelineName, RuleIds = new List<string>() }, []);
     }
 
     private async Task<TagVocabularySnapshot> GetVocabularySnapshot(CancellationToken cancellationToken)
@@ -290,7 +290,7 @@ public class TagResolver
         {
             if (string.IsNullOrWhiteSpace(value))
             {
-                return string.Empty;
+                return "";
             }
 
             var normalized = value.Trim().ToLowerInvariant();

@@ -119,5 +119,5 @@ public sealed class WeaviateConnectorSpec
 
 internal sealed class VectorNote : Entity<VectorNote>
 {
-    public string Title { get; set; } = string.Empty;
+    public string Title { get; set; } = "";
 }

@@ -12,7 +12,7 @@ public class PantryConfirmationServiceTests
     private sealed class FakeVisionService : IPantryVisionService
     {
         public Task<VisionProcessingResult> ProcessPhoto(string photoId, Stream image, VisionProcessingOptions options, CancellationToken ct = default) =>
-            Task.FromResult(new VisionProcessingResult { Success = true, Detections = Array.Empty<PantryDetection>(), ProcessingTimeMs = 10 });
+            Task.FromResult(new VisionProcessingResult { Success = true, Detections = [], ProcessingTimeMs = 10 });
 
         public Task LearnFromCorrection(string originalName, string correctedName, string? correctedQuantity, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }

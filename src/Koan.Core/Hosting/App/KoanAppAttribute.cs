@@ -10,5 +10,5 @@ public sealed class KoanAppAttribute : Attribute
     public string? Description { get; init; }
     public string? ContactEmail { get; init; }
     public string? SupportUrl { get; init; }
-    public string[] Tags { get; init; } = Array.Empty<string>();
+    public string[] Tags { get; init; } = [];
 }

@@ -116,12 +116,12 @@ internal sealed class KoanAdminManifestService : IKoanAdminManifestService
             .Select(setting => new KoanAdminModuleSetting(
                 setting.Key,
                 string.IsNullOrWhiteSpace(setting.Label) ? setting.Key : setting.Label,
-                setting.Description ?? string.Empty,
-                setting.Value ?? string.Empty,
+                setting.Description ?? "",
+                setting.Value ?? "",
                 setting.IsSecret,
                 ConvertSource(setting.Source),
-                setting.SourceKey ?? string.Empty,
-                setting.Consumers.Count == 0 ? Array.Empty<string>() : setting.Consumers.ToArray()))
+                setting.SourceKey ?? "",
+                setting.Consumers.Count == 0 ? [] : setting.Consumers.ToArray()))
             .ToList();
 
         var notes = module.Notes

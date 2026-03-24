@@ -10,6 +10,6 @@ internal sealed class TodoEntity : Entity<TodoEntity, string>
 {
     [Identifier]
     public override string Id { get; set; } = default!;
-    public string Title { get; set; } = string.Empty;
+    public string Title { get; set; } = "";
     public string? Description { get; set; }
 }

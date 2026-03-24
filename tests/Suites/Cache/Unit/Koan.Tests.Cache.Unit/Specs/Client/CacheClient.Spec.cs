@@ -401,13 +401,13 @@ public sealed class CacheClientSpec
         public ValueTask<CacheValue> SerializeAsync<T>(T value, CacheEntryOptions options, CancellationToken ct)
         {
             SerializeCalls++;
-            return ValueTask.FromResult(CacheValue.FromString(value?.ToString() ?? string.Empty));
+            return ValueTask.FromResult(CacheValue.FromString(value?.ToString() ?? ""));
         }
 
         public ValueTask<CacheValue> Serialize(object value, Type runtimeType, CacheEntryOptions options, CancellationToken ct)
         {
             SerializeCalls++;
-            return ValueTask.FromResult(CacheValue.FromString(value?.ToString() ?? string.Empty));
+            return ValueTask.FromResult(CacheValue.FromString(value?.ToString() ?? ""));
         }
 
         public ValueTask<T?> DeserializeAsync<T>(CacheValue value, CancellationToken ct)
@@ -432,14 +432,14 @@ public sealed class CacheClientSpec
         public ValueTask<CacheValue> SerializeAsync<T>(T value, CacheEntryOptions options, CancellationToken ct)
         {
             SerializeCalls++;
-            var payload = value is null ? string.Empty : Newtonsoft.Json.JsonConvert.SerializeObject(value);
+            var payload = value is null ? "" : Newtonsoft.Json.JsonConvert.SerializeObject(value);
             return ValueTask.FromResult(CacheValue.FromString(payload));
         }
 
         public ValueTask<CacheValue> Serialize(object value, Type runtimeType, CacheEntryOptions options, CancellationToken ct)
         {
             SerializeCalls++;
-            var payload = value is null ? string.Empty : Newtonsoft.Json.JsonConvert.SerializeObject(value);
+            var payload = value is null ? "" : Newtonsoft.Json.JsonConvert.SerializeObject(value);
             return ValueTask.FromResult(CacheValue.FromString(payload));
         }
 

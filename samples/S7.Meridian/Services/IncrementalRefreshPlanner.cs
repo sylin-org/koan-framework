@@ -59,7 +59,7 @@ public sealed class IncrementalRefreshPlan
             fieldsToPreserve: preserved,
             mode: "noop",
             reasons: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
-            changedDocuments: Array.Empty<string>());
+            changedDocuments: []);
     }
 
     public static IncrementalRefreshPlan Targeted(

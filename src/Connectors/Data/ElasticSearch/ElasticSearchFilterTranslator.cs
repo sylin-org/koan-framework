@@ -150,7 +150,7 @@ internal static class ElasticSearchFilterTranslator
 
     private static string Pattern(object? value)
     {
-        var raw = value?.ToString() ?? string.Empty;
+        var raw = value?.ToString() ?? "";
         return raw.Replace('%', '*');
     }
 }

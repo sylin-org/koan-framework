@@ -72,7 +72,7 @@ internal sealed class TransformerMediaTypesOperationTransformer : IOpenApiOperat
             return;
         }
 
-        if (getMethod.Invoke(registry, Array.Empty<object>()) is IReadOnlyList<string> list && list.Count > 0)
+        if (getMethod.Invoke(registry, []) is IReadOnlyList<string> list && list.Count > 0)
         {
             var responses = EnsureResponses(operation);
             if (!responses.TryGetValue("200", out var okResponse) || okResponse is not OpenApiResponse mutableResponse)
@@ -106,7 +106,7 @@ internal sealed class TransformerMediaTypesOperationTransformer : IOpenApiOperat
             return;
         }
 
-        if (getMethod.Invoke(registry, Array.Empty<object>()) is IReadOnlyList<string> list && list.Count > 0)
+        if (getMethod.Invoke(registry, []) is IReadOnlyList<string> list && list.Count > 0)
         {
             operation.RequestBody ??= new OpenApiRequestBody { Required = true };
             if (operation.RequestBody is OpenApiRequestBody requestBody)

@@ -10,9 +10,9 @@ namespace Koan.Context.Models;
 /// </summary>
 public class SearchPersona : Entity<SearchPersona>
 {
-    public string Name { get; set; } = string.Empty;
-    public string DisplayName { get; set; } = string.Empty;
-    public string Description { get; set; } = string.Empty;
+    public string Name { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public string Description { get; set; } = "";
     public float SemanticWeight { get; set; } = 0.6f;
     public float TagWeight { get; set; } = 0.3f;
     public float RecencyWeight { get; set; } = 0.1f;

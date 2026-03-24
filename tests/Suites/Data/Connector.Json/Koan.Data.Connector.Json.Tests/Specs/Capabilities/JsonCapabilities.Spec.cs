@@ -49,6 +49,6 @@ public sealed class JsonCapabilitiesSpec
 
     private sealed class CapabilityProbe : Entity<CapabilityProbe>
     {
-        public string Name { get; set; } = string.Empty;
+        public string Name { get; set; } = "";
     }
 }

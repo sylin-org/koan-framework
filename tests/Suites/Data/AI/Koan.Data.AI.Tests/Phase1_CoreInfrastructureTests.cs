@@ -218,7 +218,7 @@ public class Phase1_CoreInfrastructureTests
             Id = "test-1",
             Title = "Title",
             Content = "Content",
-            Tags = Array.Empty<string>()
+            Tags = []
         };
         var metadata = EmbeddingMetadata.Resolve<TestDocument>();
 

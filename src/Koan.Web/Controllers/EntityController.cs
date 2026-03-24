@@ -58,7 +58,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     private EntityRequestContextBuilder ContextBuilder => HttpContext.RequestServices.GetRequiredService<EntityRequestContextBuilder>();
 
     protected virtual string GetDisplay(TEntity e)
-        => e?.ToString() ?? string.Empty;
+        => e?.ToString() ?? "";
 
     private EntityRequestContext CreateRequestContext(QueryOptions options, CancellationToken ct)
         => ContextBuilder.Build(options, ct, HttpContext, HttpContext?.User);

@@ -97,7 +97,7 @@ public sealed class LMStudioOrchestrationEvaluator : BaseOrchestrationEvaluator
 
         if (!environment.ContainsKey(Constants.Discovery.EnvKey))
         {
-            environment[Constants.Discovery.EnvKey] = string.Empty;
+            environment[Constants.Discovery.EnvKey] = "";
         }
 
         return await Task.FromResult(new DependencyDescriptor

@@ -226,7 +226,7 @@ internal sealed class RecsService : IRecsService
             var filteredMedia = await ApplyFiltersInMemory(allMedia, query, userId, ct);
 
             // Apply censor penalty in fallback too (for consistency)
-            var censoredTags = (query.Filters?.ShowCensored ?? false) ? Array.Empty<string>() : await GetCensoredTags(ct);
+            var censoredTags = (query.Filters?.ShowCensored ?? false) ? [] : await GetCensoredTags(ct);
             var (_, _, _, censoredTagsPenaltyWeight) = _settingsProvider.GetEffective();
             var censorPenaltyMultiplier = 1.0 + censoredTagsPenaltyWeight; // e.g., 1 + (-0.7) = 0.3
 
@@ -361,7 +361,7 @@ internal sealed class RecsService : IRecsService
                 var anchorMedia = await Media.Get(anchorMediaId!, ct);
                 if (anchorMedia != null)
                 {
-                    var textAnchor = $"{anchorMedia.Title}\n\n{anchorMedia.Synopsis}\nGenres: {string.Join(", ", anchorMedia.Genres ?? Array.Empty<string>())}";
+                    var textAnchor = $"{anchorMedia.Title}\n\n{anchorMedia.Synopsis}\nGenres: {string.Join(", ", anchorMedia.Genres ?? [])}";
                     searchVector = await Koan.AI.Client.Embed(textAnchor, ct);
                 }
             }
@@ -686,7 +686,7 @@ internal sealed class RecsService : IRecsService
         // Genre filter
         if (query.Filters?.Genres is { Length: > 0 })
         {
-            filtered = filtered.Where(m => (m.Genres ?? Array.Empty<string>()).Intersect(query.Filters.Genres).Any());
+            filtered = filtered.Where(m => (m.Genres ?? []).Intersect(query.Filters.Genres).Any());
         }
 
         // Episodes filter
@@ -739,9 +739,9 @@ internal sealed class RecsService : IRecsService
     private async Task<string[]> GetCensoredTags(CancellationToken ct)
     {
         // Load from both configuration and database (same logic as TagsController)
-        var configTags = _tagOptions?.Value?.CensorTags ?? Array.Empty<string>();
+        var configTags = _tagOptions?.Value?.CensorTags ?? [];
         var doc = await CensorTagsDoc.Get("recs:censor-tags", ct);
-        var dbTags = doc?.Tags?.ToArray() ?? Array.Empty<string>();
+        var dbTags = doc?.Tags?.ToArray() ?? [];
 
         // Merge and deduplicate with case-insensitive comparison
         var merged = configTags.Concat(dbTags)
@@ -755,8 +755,8 @@ internal sealed class RecsService : IRecsService
     private static bool HasCensoredTags(Media media, string[] censoredTags)
     {
         // Check if media has any tags or genres that match the censored list (case-insensitive)
-        var allMediaTags = (media.Genres ?? Array.Empty<string>())
-            .Concat(media.Tags ?? Array.Empty<string>())
+        var allMediaTags = (media.Genres ?? [])
+            .Concat(media.Tags ?? [])
             .Where(t => !string.IsNullOrWhiteSpace(t));
 
         foreach (var mediaTag in allMediaTags)
@@ -782,12 +782,12 @@ internal sealed class RecsService : IRecsService
         }
 
         // Load censored tags for soft penalty (only if showCensored is false)
-        var censoredTags = showCensored ? Array.Empty<string>() : await GetCensoredTags(ct);
+        var censoredTags = showCensored ? [] : await GetCensoredTags(ct);
         var (_, _, _, censoredTagsPenaltyWeight) = _settingsProvider.GetEffective();
         var censorPenaltyMultiplier = 1.0 + censoredTagsPenaltyWeight; // e.g., 1 + (-0.7) = 0.3 (70% reduction)
 
         var preferTagsWeight = Math.Clamp(preferWeight ?? 0.2, 0, 1.0);
-        var preferTagsSet = new HashSet<string>((preferTags ?? Array.Empty<string>()).Take(3), StringComparer.OrdinalIgnoreCase);
+        var preferTagsSet = new HashSet<string>((preferTags ?? []).Take(3), StringComparer.OrdinalIgnoreCase);
 
         return media.Select(m =>
         {
@@ -798,7 +798,7 @@ internal sealed class RecsService : IRecsService
             var genreBoost = 0.0;
             if (profile?.GenreWeights is { Count: > 0 })
             {
-                foreach (var genre in m.Genres ?? Array.Empty<string>())
+                foreach (var genre in m.Genres ?? [])
                 {
                     if (profile.GenreWeights.TryGetValue(genre, out var weight))
                         genreBoost += weight;
@@ -806,7 +806,7 @@ internal sealed class RecsService : IRecsService
                 if ((m.Genres?.Length ?? 0) > 0)
                     genreBoost /= m.Genres!.Length;
 
-                foreach (var tag in m.Tags ?? Array.Empty<string>())
+                foreach (var tag in m.Tags ?? [])
                 {
                     if (profile.GenreWeights.TryGetValue(tag, out var weight))
                         genreBoost += (weight - 0.5);
@@ -817,7 +817,7 @@ internal sealed class RecsService : IRecsService
             var preferBoost = 0.0;
             if (preferTagsSet.Count > 0)
             {
-                var allKeys = (m.Genres ?? Array.Empty<string>()).Concat(m.Tags ?? Array.Empty<string>()).ToList();
+                var allKeys = (m.Genres ?? []).Concat(m.Tags ?? []).ToList();
                 if (allKeys.Count > 0)
                 {
                     var hits = allKeys.Count(k => preferTagsSet.Contains(k));
@@ -867,7 +867,7 @@ internal sealed class RecsService : IRecsService
 
     private static IEnumerable<Recommendation> ApplySort(IEnumerable<Recommendation> recommendations, string? sort)
     {
-        return (sort ?? string.Empty).ToLowerInvariant() switch
+        return (sort ?? "").ToLowerInvariant() switch
         {
             "rating" => recommendations.OrderByDescending(r => r.Media?.AverageScore ?? 0),
             "popular" => recommendations.OrderByDescending(r => r.Media?.Popularity ?? 0),
@@ -972,7 +972,7 @@ internal sealed class RecsService : IRecsService
             const double alpha = 0.3; // Learning rate
 
             // Update genre/tag preferences
-            foreach (var genre in media.Genres ?? Array.Empty<string>())
+            foreach (var genre in media.Genres ?? [])
             {
                 profile.GenreWeights.TryGetValue(genre, out var oldWeight);
                 var target = (rating - 1) / 4.0; // Convert 1-5 to 0-1 scale
@@ -980,7 +980,7 @@ internal sealed class RecsService : IRecsService
                 profile.GenreWeights[genre] = Math.Clamp(updated, 0, 1);
             }
 
-            foreach (var tag in media.Tags ?? Array.Empty<string>())
+            foreach (var tag in media.Tags ?? [])
             {
                 profile.GenreWeights.TryGetValue(tag, out var oldWeight);
                 var target = ((rating - 1) / 4.0) - 0.5; // Convert 1-5, center around 0.5
@@ -991,7 +991,7 @@ internal sealed class RecsService : IRecsService
             // Update preference vector using capability-first API (ADR-0014)
             try
             {
-                var textBlend = $"{media.Title}\n\n{media.Synopsis}\nTags: {string.Join(", ", (media.Genres ?? Array.Empty<string>()).Concat(media.Tags ?? Array.Empty<string>()))}";
+                var textBlend = $"{media.Title}\n\n{media.Synopsis}\nTags: {string.Join(", ", (media.Genres ?? []).Concat(media.Tags ?? []))}";
                 var vec = await Koan.AI.Client.Embed(textBlend, ct);
 
                 if (vec is { Length: > 0 })

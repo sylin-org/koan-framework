@@ -92,7 +92,7 @@ public sealed class LinqWhereTranslator<TEntity>
         if (m.Object is MemberExpression me && me.Expression is ParameterExpression && m.Method.DeclaringType == typeof(string))
         {
             var col = _dialect.QuoteIdent(me.Member.Name);
-            var raw = m.Arguments.Count == 1 ? Evaluate(m.Arguments[0])?.ToString() ?? string.Empty : string.Empty;
+            var raw = m.Arguments.Count == 1 ? Evaluate(m.Arguments[0])?.ToString() ?? "" : "";
             var arg = _dialect.EscapeLike(raw);
             var idx = _parameters.Count;
             switch (m.Method.Name)

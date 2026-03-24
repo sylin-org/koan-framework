@@ -119,7 +119,7 @@ internal sealed class CouchbaseDiscoveryAdapter : ServiceDiscoveryAdapterBase
     {
         try
         {
-            var trimmed = value?.Trim() ?? string.Empty;
+            var trimmed = value?.Trim() ?? "";
             if (string.IsNullOrEmpty(trimmed)) return "couchbase://localhost";
 
             // If already properly formatted, return as-is

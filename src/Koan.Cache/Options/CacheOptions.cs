@@ -6,7 +6,7 @@ namespace Koan.Cache.Options;
 
 public sealed class CacheOptions
 {
-    private static readonly string[] Empty = Array.Empty<string>();
+    private static readonly string[] Empty = [];
 
     [Required]
     public string Provider { get; set; } = "memory";

@@ -159,7 +159,7 @@ public sealed class PipelineNotesController : ControllerBase
 /// </summary>
 public sealed record NotesResponse
 {
-    public string PipelineId { get; init; } = string.Empty;
+    public string PipelineId { get; init; } = "";
     public string? AuthoritativeNotes { get; init; }
     public DateTime UpdatedAt { get; init; }
 }
@@ -187,7 +187,7 @@ public sealed record UpdateNotesRequest
 /// </summary>
 public sealed record UpdateNotesResponse
 {
-    public string PipelineId { get; init; } = string.Empty;
+    public string PipelineId { get; init; } = "";
     public string? AuthoritativeNotes { get; init; }
     public DateTime UpdatedAt { get; init; }
     public bool ReProcessScheduled { get; init; }

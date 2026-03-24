@@ -109,12 +109,12 @@ public class ErrorResponse
     /// <summary>
     /// Error title
     /// </summary>
-    public string Title { get; set; } = string.Empty;
+    public string Title { get; set; } = "";
 
     /// <summary>
     /// Detailed error description
     /// </summary>
-    public string Detail { get; set; } = string.Empty;
+    public string Detail { get; set; } = "";
 
     /// <summary>
     /// Request trace ID for debugging

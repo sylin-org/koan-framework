@@ -11,13 +11,13 @@ namespace Koan.Samples.Meridian.Models;
 public sealed class DocumentStyle : Entity<DocumentStyle>
 {
     /// <summary>Display name for this document style (e.g., "Sparse Form", "Dialogue").</summary>
-    public string Name { get; set; } = string.Empty;
+    public string Name { get; set; } = "";
 
     /// <summary>Short code for this style (e.g., "SPARSE", "DIALOGUE", "NARRATIVE").</summary>
-    public string Code { get; set; } = string.Empty;
+    public string Code { get; set; } = "";
 
     /// <summary>Description of this document style and when it applies.</summary>
-    public string Description { get; set; } = string.Empty;
+    public string Description { get; set; } = "";
 
     /// <summary>Version of this document style definition.</summary>
     public int Version { get; set; } = 1;
@@ -42,7 +42,7 @@ public sealed class DocumentStyle : Entity<DocumentStyle>
     /// Extraction strategy instructions for this document style.
     /// Describes how the classifier should approach fact extraction for this style.
     /// </summary>
-    public string ExtractionStrategy { get; set; } = string.Empty;
+    public string ExtractionStrategy { get; set; } = "";
 
     /// <summary>Whether this style should use RAG-based passage retrieval before extraction.</summary>
     public bool UsePassageRetrieval { get; set; } = false;

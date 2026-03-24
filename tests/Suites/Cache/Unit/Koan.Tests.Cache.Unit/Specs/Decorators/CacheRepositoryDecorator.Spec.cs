@@ -122,7 +122,7 @@ public sealed class CacheRepositoryDecoratorSpec
             SlidingTtl: null,
             AllowStaleFor: null,
             ForcePublishInvalidation: false,
-            Tags: Array.Empty<string>(),
+            Tags: [],
             Region: null,
             ScopeId: null,
             Metadata: new Dictionary<string, string>(),
@@ -135,7 +135,7 @@ public sealed class CacheRepositoryDecoratorSpec
     private sealed class TestEntity : IEntity<Guid>
     {
         public Guid Id { get; set; }
-        public string Name { get; set; } = string.Empty;
+        public string Name { get; set; } = "";
     }
 
     private sealed class TestRepository : IDataRepository<TestEntity, Guid>
@@ -370,10 +370,10 @@ public sealed class CacheRepositoryDecoratorSpec
         public bool CanHandle(Type type) => type == typeof(string);
 
         public ValueTask<CacheValue> SerializeAsync<T>(T value, CacheEntryOptions options, CancellationToken ct)
-            => ValueTask.FromResult(CacheValue.FromString(value?.ToString() ?? string.Empty));
+            => ValueTask.FromResult(CacheValue.FromString(value?.ToString() ?? ""));
 
         public ValueTask<CacheValue> Serialize(object value, Type runtimeType, CacheEntryOptions options, CancellationToken ct)
-            => ValueTask.FromResult(CacheValue.FromString(value?.ToString() ?? string.Empty));
+            => ValueTask.FromResult(CacheValue.FromString(value?.ToString() ?? ""));
 
         public ValueTask<T?> DeserializeAsync<T>(CacheValue value, CancellationToken ct)
             => ValueTask.FromResult((T?)(object?)value.ToText());
@@ -460,12 +460,12 @@ public sealed class CacheRepositoryDecoratorSpec
 
         public IReadOnlyList<CachePolicyDescriptor> GetPoliciesFor(Type targetType)
         {
-            return targetType == typeof(TestEntity) ? _policies : Array.Empty<CachePolicyDescriptor>();
+            return targetType == typeof(TestEntity) ? _policies : [];
         }
 
         public IReadOnlyList<CachePolicyDescriptor> GetPoliciesFor(MemberInfo member)
         {
-            return Array.Empty<CachePolicyDescriptor>();
+            return [];
         }
 
         public IReadOnlyList<CachePolicyDescriptor> GetAllPolicies()

@@ -37,12 +37,12 @@ public class SyncOperation : Entity<SyncOperation>
     /// <summary>
     /// ID of the Chunk entity this operation targets
     /// </summary>
-    public string ChunkId { get; set; } = string.Empty;
+    public string ChunkId { get; set; } = "";
 
     /// <summary>
     /// ID of the IndexedFile owning the chunk. Enables deduplication and reconciliation.
     /// </summary>
-    public string IndexedFileId { get; set; } = string.Empty;
+    public string IndexedFileId { get; set; } = "";
 
     /// <summary>
     /// ID of the Job that created this operation
@@ -52,7 +52,7 @@ public class SyncOperation : Entity<SyncOperation>
     /// VectorSyncWorker uses this to update job progress (VectorsSynced counter)
     /// and determine when the job is complete.
     /// </remarks>
-    public string JobId { get; set; } = string.Empty;
+    public string JobId { get; set; } = "";
 
     /// <summary>
     /// Project ID for this chunk (domain GUID, not formatted partition ID)
@@ -64,7 +64,7 @@ public class SyncOperation : Entity<SyncOperation>
     /// Architectural principle: Domain entities store domain identifiers (ProjectId),
     /// infrastructure code handles formatting (partition IDs are implementation details).
     /// </remarks>
-    public string ProjectId { get; set; } = string.Empty;
+    public string ProjectId { get; set; } = "";
 
     /// <summary>
     /// Serialized embedding vector (JSON array of floats)
@@ -73,7 +73,7 @@ public class SyncOperation : Entity<SyncOperation>
     /// Stored as JSON to avoid binary storage issues and enable inspection.
     /// Deserialized as float[] before sending to vector store.
     /// </remarks>
-    public string EmbeddingJson { get; set; } = string.Empty;
+    public string EmbeddingJson { get; set; } = "";
 
     /// <summary>
     /// Serialized metadata object (JSON)

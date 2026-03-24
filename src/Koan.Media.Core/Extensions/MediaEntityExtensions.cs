@@ -38,8 +38,8 @@ public static class MediaEntityExtensions
         var t = typeof(TEntity);
         var attr = t.GetCustomAttributes(typeof(Storage.Infrastructure.StorageBindingAttribute), inherit: false)
             .OfType<Storage.Infrastructure.StorageBindingAttribute>().FirstOrDefault();
-        var profile = attr?.Profile ?? string.Empty;
-        var container = instanceContainer ?? attr?.Container ?? string.Empty;
+        var profile = attr?.Profile ?? "";
+        var container = instanceContainer ?? attr?.Container ?? "";
         return (profile, container);
     }
 }

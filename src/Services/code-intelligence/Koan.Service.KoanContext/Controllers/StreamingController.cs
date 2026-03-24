@@ -240,11 +240,11 @@ public class StreamingController : ControllerBase
         }
         catch (OperationCanceledException)
         {
-            return (Array.Empty<Job>(), null, true);
+            return ([], null, true);
         }
         catch (Exception ex)
         {
-            return (Array.Empty<Job>(), ex, false);
+            return ([], ex, false);
         }
     }
 

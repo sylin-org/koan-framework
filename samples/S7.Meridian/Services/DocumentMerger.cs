@@ -157,8 +157,8 @@ public sealed class DocumentMerger : IDocumentMerger
                 PipelineId = pipeline.Id,
                 FieldPath = group.Key,
                 Strategy = mergeResult.Strategy,
-                Explanation = mergeResult.Explanation ?? string.Empty,
-                AcceptedExtractionId = savedAccepted.Id ?? string.Empty,
+                Explanation = mergeResult.Explanation ?? "",
+                AcceptedExtractionId = savedAccepted.Id ?? "",
                 RejectedExtractionIds = rejectedIds,
                 SupportingExtractionIds = supportingIds,
                 CollectionProvenance = mergeResult.CollectionProvenance ?? new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase),
@@ -171,7 +171,7 @@ public sealed class DocumentMerger : IDocumentMerger
             var hasCanonicalContent = HasSubstantiveValue(mergeResult.ValueToken);
             var formattedValue = hasCanonicalContent
                 ? FormatValueForTemplate(mergeResult.ValueToken)
-                : string.Empty;
+                : "";
 
             _logger.LogDebug("Field {FieldPath} → {TemplateKey}: hasContent={HasContent}, tokenType={TokenType}, formatted={FormattedValue}",
                 group.Key, templateKey, hasCanonicalContent, mergeResult.ValueToken?.Type, formattedValue);
@@ -225,7 +225,7 @@ public sealed class DocumentMerger : IDocumentMerger
                 FieldPath = group.Key,
                 Strategy = mergeResult.Strategy,
                 Explanation = mergeResult.Explanation,
-                AcceptedExtractionId = savedAccepted.Id ?? string.Empty,
+                AcceptedExtractionId = savedAccepted.Id ?? "",
                 RejectedExtractionIds = rejectedIds,
                 SupportingExtractionIds = supportingIds,
                 CollectionProvenance = mergeResult.CollectionProvenance ?? new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase)
@@ -237,7 +237,7 @@ public sealed class DocumentMerger : IDocumentMerger
                 {
                     ["strategy"] = mergeResult.Strategy,
                     ["candidateCount"] = candidates.Count.ToString(CultureInfo.InvariantCulture),
-                    ["acceptedExtractionId"] = savedAccepted.Id ?? string.Empty,
+                    ["acceptedExtractionId"] = savedAccepted.Id ?? "",
                     ["supportingCount"] = supportingIds.Count.ToString(CultureInfo.InvariantCulture)
                 };
 
@@ -647,7 +647,7 @@ public sealed class DocumentMerger : IDocumentMerger
 
                 var contributor = !string.IsNullOrWhiteSpace(candidate.SourceDocumentId)
                     ? candidate.SourceDocumentId!
-                    : candidate.Id ?? string.Empty;
+                    : candidate.Id ?? "";
 
                 if (!string.IsNullOrWhiteSpace(contributor) &&
                     !supporters.Any(existing => existing.Equals(contributor, StringComparison.OrdinalIgnoreCase)))
@@ -665,7 +665,7 @@ public sealed class DocumentMerger : IDocumentMerger
                     arrays.Skip(1)
                         .Aggregate(
                             new HashSet<string>(
-                                arrays.FirstOrDefault()?.Select(item => item.ToString(Formatting.None)) ?? Array.Empty<string>(),
+                                arrays.FirstOrDefault()?.Select(item => item.ToString(Formatting.None)) ?? [],
                                 StringComparer.OrdinalIgnoreCase),
                             (set, array) =>
                             {
@@ -854,13 +854,13 @@ public sealed class DocumentMerger : IDocumentMerger
 
         var textualEvidence = !string.IsNullOrWhiteSpace(evidence.OriginalText)
             ? evidence.OriginalText
-            : GetMetadataValue(evidence, "factSummary") ?? string.Empty;
+            : GetMetadataValue(evidence, "factSummary") ?? "";
 
         var token = new JObject
         {
-            ["sourceDocumentId"] = sourceId ?? string.Empty,
-            ["sourceFileName"] = source?.OriginalFileName ?? string.Empty,
-            ["passageId"] = passageId ?? string.Empty,
+            ["sourceDocumentId"] = sourceId ?? "",
+            ["sourceFileName"] = source?.OriginalFileName ?? "",
+            ["passageId"] = passageId ?? "",
             ["page"] = page,
             ["section"] = section,
             ["text"] = textualEvidence,
@@ -1007,17 +1007,17 @@ public sealed class DocumentMerger : IDocumentMerger
     {
         if (token is null || token.Type is JTokenType.Null or JTokenType.Undefined)
         {
-            return string.Empty;
+            return "";
         }
 
         return token.Type switch
         {
-            JTokenType.String => token.Value<string>() ?? string.Empty,
+            JTokenType.String => token.Value<string>() ?? "",
             JTokenType.Float or JTokenType.Integer => ((double)token).ToString("G", CultureInfo.InvariantCulture),
             JTokenType.Boolean => token.Value<bool>() ? "true" : "false",
             JTokenType.Date => token.Value<DateTime>().ToString("O", CultureInfo.InvariantCulture),
             JTokenType.Array => string.Join(", ", token.Values<JToken?>().Select(FormatValueForTemplate).Where(value => !string.IsNullOrWhiteSpace(value))),
-            JTokenType.Null or JTokenType.Undefined => string.Empty,
+            JTokenType.Null or JTokenType.Undefined => "",
             _ => token.ToString()
         };
     }

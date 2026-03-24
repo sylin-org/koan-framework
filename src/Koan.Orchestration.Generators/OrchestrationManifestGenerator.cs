@@ -95,9 +95,9 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
                     var full = a.AttributeClass?.ToDisplayString();
                     if (full == "Koan.Web.Auth.Attributes.AuthProviderDescriptorAttribute")
                     {
-                        string id = a.ConstructorArguments.Length > 0 ? a.ConstructorArguments[0].Value?.ToString() ?? string.Empty : string.Empty;
-                        string name = a.ConstructorArguments.Length > 1 ? a.ConstructorArguments[1].Value?.ToString() ?? string.Empty : string.Empty;
-                        string protocol = a.ConstructorArguments.Length > 2 ? a.ConstructorArguments[2].Value?.ToString() ?? string.Empty : string.Empty;
+                        string id = a.ConstructorArguments.Length > 0 ? a.ConstructorArguments[0].Value?.ToString() ?? "" : "";
+                        string name = a.ConstructorArguments.Length > 1 ? a.ConstructorArguments[1].Value?.ToString() ?? "" : "";
+                        string protocol = a.ConstructorArguments.Length > 2 ? a.ConstructorArguments[2].Value?.ToString() ?? "" : "";
                         string? icon = null;
                         foreach (var na in a.NamedArguments)
                         {
@@ -109,7 +109,7 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
                     else if (full == OrchestrationServiceManifestAttr)
                     {
                         // Capture declared service type per service id from assembly-level manifest
-                        string id = a.ConstructorArguments.Length > 0 ? a.ConstructorArguments[0].Value?.ToString() ?? string.Empty : string.Empty;
+                        string id = a.ConstructorArguments.Length > 0 ? a.ConstructorArguments[0].Value?.ToString() ?? "" : "";
                         int? t = null;
                         foreach (var na in a.NamedArguments)
                         {
@@ -187,7 +187,7 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
                                             {
                                                 foreach (var v in na.Value.Values)
                                                 {
-                                                    var kv = v.Value?.ToString() ?? string.Empty;
+                                                    var kv = v.Value?.ToString() ?? "";
                                                     var idx = kv.IndexOf('=');
                                                     if (idx > 0)
                                                     {
@@ -197,7 +197,7 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
                                                     }
                                                     else if (!string.IsNullOrWhiteSpace(kv))
                                                     {
-                                                        appCaps[kv] = string.Empty;
+                                                        appCaps[kv] = "";
                                                     }
                                                 }
                                             }
@@ -211,15 +211,15 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
                             {
                                 var appId = (code ?? "api").ToLowerInvariant();
                                 var appName = name ?? "App";
-                                var appPorts = port is int p && p > 0 ? new[] { p } : Array.Empty<int>();
+                                var appPorts = port is int p && p > 0 ? new[] { p } : [];
                                 // Container image left empty; planners/exporters can inject app image separately if needed.
-                                candidates.Add(new ServiceCandidate(appId, string.Empty, appPorts, new(), Array.Empty<string>(), new(), appCaps.Count > 0 ? appCaps : null,
+                                candidates.Add(new ServiceCandidate(appId, "", appPorts, new(), [], new(), appCaps.Count > 0 ? appCaps : null,
                                     scheme: null, host: null, endpointPort: null, uriPattern: null,
                                     localScheme: null, localHost: null, localPort: null, localPattern: null,
                                     healthPath: null, healthInterval: null, healthTimeout: null, healthRetries: null,
                                     kind: 0, type: 1,
                                     name: appName, qualifiedCode: null, subtype: null, deployment: 0, description: description,
-                                    provides: Array.Empty<string>(), consumes: Array.Empty<string>(), containerImage: null, defaultTag: null, version: 1));
+                                    provides: [], consumes: [], containerImage: null, defaultTag: null, version: 1));
                                 appServiceEmitted = true;
                             }
                         }
@@ -308,7 +308,7 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
                                             {
                                                 foreach (var v in na.Value.Values)
                                                 {
-                                                    var kv = v.Value?.ToString() ?? string.Empty;
+                                                    var kv = v.Value?.ToString() ?? "";
                                                     var idx = kv.IndexOf('=');
                                                     if (idx > 0)
                                                     {
@@ -414,7 +414,7 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
                                     }
                                     else
                                     {
-                                        var s = modeArg.Value?.ToString() ?? string.Empty;
+                                        var s = modeArg.Value?.ToString() ?? "";
                                         isContainer = s.IndexOf("Container", StringComparison.OrdinalIgnoreCase) >= 0;
                                     }
                                 }
@@ -480,7 +480,7 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
                     {
                         if (!string.IsNullOrWhiteSpace(sid) && (deployment ?? 0) == 0)
                         {
-                            var effectiveBase = containerImageOverride ?? (image?.Split(':').FirstOrDefault() ?? string.Empty);
+                            var effectiveBase = containerImageOverride ?? (image?.Split(':').FirstOrDefault() ?? "");
                             if (string.IsNullOrWhiteSpace(effectiveBase))
                                 context.ReportDiagnostic(Diagnostic.Create(DxContainerImageMissing, decl.Identifier.GetLocation(), sid));
                         }
@@ -497,7 +497,7 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
                         {
                             if ((deployment ?? 0) == 0)
                             {
-                                var safeImage = image ?? string.Empty;
+                                var safeImage = image ?? "";
                                 var baseImage = containerImageOverride ?? safeImage.Split(':')[0];
                                 if (string.IsNullOrWhiteSpace(baseImage))
                                     context.ReportDiagnostic(Diagnostic.Create(DxContainerImageMissing, decl.Identifier.GetLocation(), sid));
@@ -507,7 +507,7 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
                         // Info if defaultTag is 'latest'
                         try
                         {
-                            var safeImage = image ?? string.Empty;
+                            var safeImage = image ?? "";
                             var effectiveTag = defaultTagOverride ?? (safeImage.Contains(":") ? safeImage.Split(':')[1] : null);
                             if (string.Equals(effectiveTag, "latest", StringComparison.OrdinalIgnoreCase))
                                 context.ReportDiagnostic(Diagnostic.Create(DxLatestTag, decl.Identifier.GetLocation(), svcName ?? sid));
@@ -585,8 +585,8 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
                 .Append(Prop("appEnv", s.AppEnv))
                 // ARCH-0049 unified fields
                 .Append(',').Append(Prop("shortCode", s.Id))
-                .Append(',').Append(Prop("containerImage", (s.ContainerImage ?? (s.Image?.Split(':')?.FirstOrDefault() ?? string.Empty)) ?? string.Empty))
-                .Append(',').Append(Prop("defaultTag", (s.DefaultTag ?? ((s.Image != null && s.Image.Contains(":")) ? s.Image.Split(':')[1] : string.Empty)) ?? string.Empty))
+                .Append(',').Append(Prop("containerImage", (s.ContainerImage ?? (s.Image?.Split(':')?.FirstOrDefault() ?? "")) ?? ""))
+                .Append(',').Append(Prop("defaultTag", (s.DefaultTag ?? ((s.Image != null && s.Image.Contains(":")) ? s.Image.Split(':')[1] : "")) ?? ""))
                 .Append(',').Append(Prop("defaultPorts", s.Ports))
                 ;
             if (s.Kind is int kind) sb.Append(',').Append(Prop("kind", kind));
@@ -620,14 +620,14 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
         return sb.ToString();
     }
 
-    private static string Prop(string name, string value) => "\"" + name + "\": \"" + Escape(value ?? string.Empty) + "\"";
+    private static string Prop(string name, string value) => "\"" + name + "\": \"" + Escape(value ?? "") + "\"";
     private static string Prop(string name, int value) => "\"" + name + "\": " + value;
     private static string Prop(string name, int[] values) => "\"" + name + "\": [" + string.Join(",", values) + "]";
-    private static string Prop(string name, string[] values) => "\"" + name + "\": [" + string.Join(",", values.Select(v => "\"" + Escape(v ?? string.Empty) + "\"")) + "]";
+    private static string Prop(string name, string[] values) => "\"" + name + "\": [" + string.Join(",", values.Select(v => "\"" + Escape(v ?? "") + "\"")) + "]";
     private static string Prop(string name, Dictionary<string, string?> map) => "\"" + name + "\": " + FormatMap(map);
 
     private static string FormatMap(Dictionary<string, string?> map)
-    => "{" + string.Join(",", (map ?? new Dictionary<string, string?>()).Select(kv => "\"" + Escape(kv.Key ?? string.Empty) + "\": \"" + Escape(kv.Value ?? string.Empty) + "\"")) + "}";
+    => "{" + string.Join(",", (map ?? new Dictionary<string, string?>()).Select(kv => "\"" + Escape(kv.Key ?? "") + "\": \"" + Escape(kv.Value ?? "") + "\"")) + "}";
 
     private static string Escape(string s) => s.Replace("\\", "\\\\").Replace("\"", "\\\"");
 

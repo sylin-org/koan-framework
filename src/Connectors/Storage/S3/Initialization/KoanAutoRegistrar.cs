@@ -39,19 +39,19 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         var endpoint = Core.Configuration.Read(
             cfg,
             $"{S3StorageConstants.Configuration.Section}:{S3StorageConstants.Configuration.Keys.Endpoint}",
-            string.Empty) ?? string.Empty;
+            "") ?? "";
 
         var bucketPrefix = Core.Configuration.Read(
             cfg,
             $"{S3StorageConstants.Configuration.Section}:{S3StorageConstants.Configuration.Keys.BucketPrefix}",
-            string.Empty) ?? string.Empty;
+            "") ?? "";
 
         module.AddSetting("Endpoint", string.IsNullOrWhiteSpace(endpoint) ? "(zen-garden auto)" : endpoint);
         module.AddSetting("BucketPrefix", string.IsNullOrWhiteSpace(bucketPrefix) ? "(from AppIdentity)" : bucketPrefix);
         var mossEndpoint = Core.Configuration.Read(
             cfg,
             $"{S3StorageConstants.Configuration.Section}:MossEndpoint",
-            string.Empty) ?? string.Empty;
+            "") ?? "";
 
         module.AddSetting("MossEndpoint", string.IsNullOrWhiteSpace(mossEndpoint) ? "(auto from zen-garden)" : mossEndpoint);
         module.AddSetting("Capabilities", $"seek=true, range=true, presign={!string.IsNullOrWhiteSpace(mossEndpoint)}, copy=true, list=true");

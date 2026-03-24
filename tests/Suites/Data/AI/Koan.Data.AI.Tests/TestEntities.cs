@@ -14,7 +14,7 @@ public class TestDocument : Entity<TestDocument>
 {
     public string Title { get; set; } = "";
     public string Content { get; set; } = "";
-    public string[] Tags { get; set; } = Array.Empty<string>();
+    public string[] Tags { get; set; } = [];
 
     [EmbeddingIgnore]
     public string InternalId { get; set; } = "";

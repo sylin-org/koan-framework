@@ -129,11 +129,11 @@ public static class AddKoanGraphQlExtensions
                 {
                     var o = ctx.Parent<object>();
                     var t = o?.GetType();
-                    if (t is null) return string.Empty;
+                    if (t is null) return "";
                     string? pick(params string[] names)
                         => names.Select(n => t.GetProperty(n, BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase)?.GetValue(o) as string)
                                 .FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
-                    return pick("Display", "Name", "Title", "Label") ?? o!.ToString() ?? string.Empty;
+                    return pick("Display", "Name", "Title", "Label") ?? o!.ToString() ?? "";
                 });
             }));
 
@@ -408,7 +408,7 @@ public static class AddKoanGraphQlExtensions
         var parts = storageName
             .Replace('-', '_')
             .Split(new[] { '.', '_' }, StringSplitOptions.RemoveEmptyEntries)
-            .Select(p => char.ToUpperInvariant(p[0]) + (p.Length > 1 ? p[1..] : string.Empty));
+            .Select(p => char.ToUpperInvariant(p[0]) + (p.Length > 1 ? p[1..] : ""));
         var name = string.Concat(parts);
         if (name.Length > 0 && char.IsDigit(name[0])) name = "_" + name;
         return name;
@@ -428,7 +428,7 @@ public static class AddKoanGraphQlExtensions
 
     private static IEnumerable<Type> SafeGetTypes(Assembly a)
     {
-        try { return a.GetTypes(); } catch { return Array.Empty<Type>(); }
+        try { return a.GetTypes(); } catch { return []; }
     }
 
     public static IApplicationBuilder UseKoanGraphQl(this IApplicationBuilder app)
@@ -483,7 +483,7 @@ public static class AddKoanGraphQlExtensions
     private sealed class CollectionPayload<TEntity>
         where TEntity : class
     {
-        public IReadOnlyList<TEntity> Items { get; init; } = Array.Empty<TEntity>();
+        public IReadOnlyList<TEntity> Items { get; init; } = [];
         public long TotalCount { get; init; }
     }
 
@@ -529,7 +529,7 @@ public static class AddKoanGraphQlExtensions
 
                 if (!await runner.BuildOptions(hctx, opts) || !await runner.BeforeCollection(hctx, opts))
                 {
-                    return new CollectionPayload<TEntity> { Items = Array.Empty<TEntity>(), TotalCount = 0 };
+                    return new CollectionPayload<TEntity> { Items = [], TotalCount = 0 };
                 }
 
                 IReadOnlyList<TEntity> items;
@@ -580,7 +580,7 @@ public static class AddKoanGraphQlExtensions
 
                 if (!await runner.AfterCollection(hctx, list))
                 {
-                    return new CollectionPayload<TEntity> { Items = Array.Empty<TEntity>(), TotalCount = 0 };
+                    return new CollectionPayload<TEntity> { Items = [], TotalCount = 0 };
                 }
 
                 var payload = new CollectionPayload<TEntity> { Items = list, TotalCount = total };

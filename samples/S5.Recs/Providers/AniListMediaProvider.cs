@@ -18,7 +18,7 @@ internal sealed class AniListMediaProvider(
     public string Name => "AniList";
 
     // TODO: Will be populated after MediaType entities are seeded
-    public MediaType[] SupportedTypes => Array.Empty<MediaType>();
+    public MediaType[] SupportedTypes => [];
 
     private static readonly Uri AniListEndpoint = new("https://graphql.anilist.co/");
 
@@ -352,14 +352,14 @@ internal sealed class AniListMediaProvider(
 
             // Arrays (genres, synonyms, tags) with filtering
             var genres = item["genres"] is JArray gArr
-                ? gArr.Select(x => x?.Value<string>() ?? string.Empty).Where(NotNullOrWhite).Select(NormalizeTokenString).ToArray()
-                : Array.Empty<string>();
+                ? gArr.Select(x => x?.Value<string>() ?? "").Where(NotNullOrWhite).Select(NormalizeTokenString).ToArray()
+                : [];
             var synonyms = item["synonyms"] is JArray syn
-                ? syn.Select(x => x?.Value<string>() ?? string.Empty).Where(NotNullOrWhite).Select(NormalizeTokenString).ToArray()
-                : Array.Empty<string>();
+                ? syn.Select(x => x?.Value<string>() ?? "").Where(NotNullOrWhite).Select(NormalizeTokenString).ToArray()
+                : [];
             var tags = item["tags"] is JArray tg
-                ? tg.Select(x => x?["name"]?.Value<string>() ?? string.Empty).Where(NotNullOrWhite).Select(NormalizeTokenString).Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
-                : Array.Empty<string>();
+                ? tg.Select(x => x?["name"]?.Value<string>() ?? "").Where(NotNullOrWhite).Select(NormalizeTokenString).Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
+                : [];
 
             // Synthetic NSFW tag from top-level isAdult property
             if (item["isAdult"]?.Value<bool>() == true)
@@ -373,7 +373,7 @@ internal sealed class AniListMediaProvider(
             if (!string.IsNullOrWhiteSpace(descRaw))
             {
                 var decoded = WebUtility.HtmlDecode(descRaw);
-                var stripped = Regex.Replace(decoded, "<.*?>", string.Empty);
+                var stripped = Regex.Replace(decoded, "<.*?>", "");
                 synopsis = string.IsNullOrWhiteSpace(stripped) ? null : stripped.Replace("\n", " ").Trim();
             }
 
@@ -526,7 +526,7 @@ internal sealed class AniListMediaProvider(
 
     private static async Task<string> SafeReadBody(HttpResponseMessage res, CancellationToken ct)
     {
-        try { return await res.Content.ReadAsStringAsync(ct); } catch { return string.Empty; }
+        try { return await res.Content.ReadAsStringAsync(ct); } catch { return ""; }
     }
 
     private static int? ToNullableInt(JToken? t)

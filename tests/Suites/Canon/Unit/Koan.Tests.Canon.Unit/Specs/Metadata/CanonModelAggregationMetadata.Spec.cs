@@ -69,7 +69,7 @@ public sealed class CanonModelAggregationMetadataSpec
     {
         [AggregationKey]
         [AggregationPolicy(AggregationPolicyKind.SourceOfTruth, Source = "crm", Sources = new[] { "erp" })]
-        public string Email { get; set; } = string.Empty;
+        public string Email { get; set; } = "";
 
         [AggregationKey]
         [AggregationPolicy(AggregationPolicyKind.Max)]

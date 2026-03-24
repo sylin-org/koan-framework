@@ -17,25 +17,25 @@ public static class FrontmatterParser
 
         if (string.IsNullOrWhiteSpace(content))
         {
-            return new FrontmatterParseResult(metadata, Array.Empty<string>());
+            return new FrontmatterParseResult(metadata, []);
         }
 
         var normalized = content.Replace("\r\n", "\n");
         if (!normalized.StartsWith("---", StringComparison.Ordinal))
         {
-            return new FrontmatterParseResult(metadata, Array.Empty<string>());
+            return new FrontmatterParseResult(metadata, []);
         }
 
         var blockStart = normalized.IndexOf('\n');
         if (blockStart < 0)
         {
-            return new FrontmatterParseResult(metadata, Array.Empty<string>());
+            return new FrontmatterParseResult(metadata, []);
         }
 
         var blockEnd = normalized.IndexOf("\n---", blockStart + 1, StringComparison.Ordinal);
         if (blockEnd < 0)
         {
-            return new FrontmatterParseResult(metadata, Array.Empty<string>());
+            return new FrontmatterParseResult(metadata, []);
         }
 
         var frontmatterBlock = normalized.Substring(blockStart + 1, blockEnd - (blockStart + 1));

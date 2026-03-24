@@ -922,7 +922,7 @@ public class GuardTests
     public void NotBe_Empty_Array_WithEmptyArray_ThrowsArgumentException()
     {
         // Arrange
-        var items = Array.Empty<int>();
+        var items = [];
 
         // Act
         Action act = () => items.Must().NotBe.Empty();

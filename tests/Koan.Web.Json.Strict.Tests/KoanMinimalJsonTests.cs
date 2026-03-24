@@ -32,7 +32,7 @@ public sealed class KoanMinimalJsonTests
 
         var configurator = new KoanMinimalJsonOptionsConfigurator(
             global::Microsoft.Extensions.Options.Options.Create(settings),
-            Array.Empty<IJsonTypeInfoResolver>());
+            []);
 
         var jsonOptions = new JsonOptions();
         jsonOptions.SerializerOptions.AllowDuplicateProperties = true;
@@ -56,7 +56,7 @@ public sealed class KoanMinimalJsonTests
 
         var configurator = new KoanMinimalJsonOptionsConfigurator(
             global::Microsoft.Extensions.Options.Options.Create(settings),
-            Array.Empty<IJsonTypeInfoResolver>());
+            []);
 
         var jsonOptions = new JsonOptions();
         jsonOptions.SerializerOptions.AllowDuplicateProperties = true;

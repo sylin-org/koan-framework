@@ -748,7 +748,7 @@ public class Chunker
     private static string GetOverlapText(string text, int targetTokens)
     {
         if (string.IsNullOrEmpty(text))
-            return string.Empty;
+            return "";
 
         var targetChars = targetTokens * CharsPerToken;
 

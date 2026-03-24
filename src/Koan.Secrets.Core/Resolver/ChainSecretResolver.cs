@@ -44,7 +44,7 @@ public sealed class ChainSecretResolver : ISecretResolver
 
     public async Task<string> Resolve(string template, CancellationToken ct = default)
     {
-        if (string.IsNullOrEmpty(template)) return template ?? string.Empty;
+        if (string.IsNullOrEmpty(template)) return template ?? "";
         // quick scan to short-circuit when no placeholders
         _ = Placeholder.Replace(template, m => m.Groups[1].Value);
         // Now each matched token is a full secret URI

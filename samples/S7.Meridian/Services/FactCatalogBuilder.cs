@@ -53,7 +53,7 @@ public sealed class FactCatalogBuilder : IFactCatalogBuilder
                 {
                     FieldPath = $"$.{field.FieldName}",
                     FieldName = field.FieldName,
-                    Description = field.Description ?? string.Empty,
+                    Description = field.Description ?? "",
                     Examples = field.Examples ?? new List<string>(),
                     Source = "OrgProfile",
                     DataType = "string"
@@ -107,7 +107,7 @@ public sealed class FactCatalogBuilder : IFactCatalogBuilder
             {
                 FieldPath = canonicalPath,
                 FieldName = fieldName,
-                Description = fieldSchema.Description ?? string.Empty,
+                Description = fieldSchema.Description ?? "",
                 Examples = ExtractExamplesFromSchema(fieldSchema),
                 Source = "AnalysisType",
                 DataType = DescribeDataType(fieldSchema)

@@ -134,7 +134,7 @@ public static class Data<TEntity, TKey>
             {
                 return new QueryResult<TEntity>
                 {
-                    Items = Array.Empty<TEntity>(),
+                    Items = [],
                     TotalCount = outcome.Count,
                     Page = 1,
                     PageSize = 0,
@@ -190,7 +190,7 @@ public static class Data<TEntity, TKey>
             {
                 return new QueryResult<TEntity>
                 {
-                    Items = Array.Empty<TEntity>(),
+                    Items = [],
                     TotalCount = totalCount,
                     Page = 1,
                     PageSize = 0,

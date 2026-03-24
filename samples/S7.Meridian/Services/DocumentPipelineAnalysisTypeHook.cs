@@ -51,7 +51,7 @@ public sealed class DocumentPipelineAnalysisTypeHook : IModelHook<DocumentPipeli
                               previous.AnalysisTypeVersion != analysisType.Version;
 
         model.AnalysisTypeVersion = analysisType.Version;
-        model.AnalysisInstructions = (analysisType.Instructions ?? string.Empty).Trim();
+        model.AnalysisInstructions = (analysisType.Instructions ?? "").Trim();
         model.AnalysisTags = analysisType.Tags is { Count: > 0 }
             ? new List<string>(analysisType.Tags)
             : new List<string>();

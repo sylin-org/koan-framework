@@ -15,10 +15,10 @@ namespace Koan.AI.Prompt;
 public class PromptEntry : Entity<PromptEntry>
 {
     /// <summary>Logical name used for lookup (e.g., "support-response").</summary>
-    public string Name { get; set; } = string.Empty;
+    public string Name { get; set; } = "";
 
     /// <summary>The prompt content — either raw text or serialized builder config.</summary>
-    public string Content { get; set; } = string.Empty;
+    public string Content { get; set; } = "";
 
     /// <summary>System directive (separate from content for structured prompts).</summary>
     public string? SystemDirective { get; set; }

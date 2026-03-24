@@ -42,7 +42,7 @@ public sealed class TemplateRenderer : ITemplateRenderer
         if (pipeline is null)
         {
             _logger.LogWarning("Pipeline {PipelineId} missing while rendering deliverable {DeliverableId}.", deliverable.PipelineId, deliverable.Id);
-            return deliverable.RenderedMarkdown ?? string.Empty;
+            return deliverable.RenderedMarkdown ?? "";
         }
 
         var template = string.IsNullOrWhiteSpace(pipeline.TemplateMarkdown)
@@ -72,7 +72,7 @@ public sealed class TemplateRenderer : ITemplateRenderer
             foreach (var footnote in data.Footnotes.Select((token, index) => new { Token = token, Index = index + 1 }))
             {
                 var label = footnote.Token["index"]?.Value<int?>() ?? footnote.Index;
-                var content = footnote.Token["content"]?.Value<string>() ?? string.Empty;
+                var content = footnote.Token["content"]?.Value<string>() ?? "";
                 builder.AppendLine($"[^{label}]: {content}");
             }
 
@@ -101,7 +101,7 @@ public sealed class TemplateRenderer : ITemplateRenderer
             var markdown = await RenderMarkdown(deliverable, ct).ConfigureAwait(false);
             if (string.IsNullOrWhiteSpace(markdown))
             {
-                return Array.Empty<byte>();
+                return [];
             }
 
             return await _pdfRenderer.Render(markdown, ct).ConfigureAwait(false);
@@ -113,7 +113,7 @@ public sealed class TemplateRenderer : ITemplateRenderer
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to render PDF for deliverable {DeliverableId}.", deliverable.Id);
-            return Array.Empty<byte>();
+            return [];
         }
     }
 
@@ -221,13 +221,13 @@ public sealed class TemplateRenderer : ITemplateRenderer
 
             var formattedText = formattedToken?.Type switch
             {
-                null => string.Empty,
-                JTokenType.Null => string.Empty,
+                null => "",
+                JTokenType.Null => "",
                 _ => formattedToken!.ToString()
             };
 
             var primaryText = string.IsNullOrWhiteSpace(formattedText)
-                ? fieldToken?.ToString() ?? string.Empty
+                ? fieldToken?.ToString() ?? ""
                 : formattedText;
 
             var displayText = BuildDisplayText(primaryText);
@@ -291,7 +291,7 @@ public sealed class TemplateRenderer : ITemplateRenderer
                 continue;
             }
 
-            var content = obj["content"]?.Value<string>() ?? string.Empty;
+            var content = obj["content"]?.Value<string>() ?? "";
             lookup[index.Value] = content;
         }
 
@@ -304,13 +304,13 @@ public sealed class TemplateRenderer : ITemplateRenderer
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            return string.Empty;
+            return "";
         }
 
         return FootnoteMarkerRegex.Replace(value, match =>
         {
             var index = match.Groups["index"].Value;
-            return string.IsNullOrEmpty(index) ? string.Empty : $" [{index}]";
+            return string.IsNullOrEmpty(index) ? "" : $" [{index}]";
         }).Trim();
     }
 
@@ -318,7 +318,7 @@ public sealed class TemplateRenderer : ITemplateRenderer
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            return string.Empty;
+            return "";
         }
 
         var builder = new StringBuilder();
@@ -339,7 +339,7 @@ public sealed class TemplateRenderer : ITemplateRenderer
 
             var encodedContent = footnotes.TryGetValue(index, out var content)
                 ? WebUtility.HtmlEncode(content)
-                : string.Empty;
+                : "";
 
             builder.AppendFormat(CultureInfo.InvariantCulture,
                 "<sup class=\"fact-footnote\" data-footnote-index=\"{0}\" title=\"{1}\">[{0}]</sup>",
@@ -396,7 +396,7 @@ public sealed class TemplateRenderer : ITemplateRenderer
 
             var content = footnotes.TryGetValue(index, out var valueContent)
                 ? valueContent
-                : string.Empty;
+                : "";
 
             details.Add(new JObject
             {

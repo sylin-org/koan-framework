@@ -28,7 +28,7 @@ public static class AppBootstrapper
 
         bool AddAsm(Assembly a, bool isDiscovery = false)
         {
-            var name = a.GetName().Name ?? string.Empty;
+            var name = a.GetName().Name ?? "";
             if (!set.ContainsKey(name))
             {
                 set[name] = a;
@@ -133,7 +133,7 @@ public static class AppBootstrapper
     {
         static string Classify(Assembly asm)
         {
-            var name = asm.GetName().Name ?? string.Empty;
+            var name = asm.GetName().Name ?? "";
             if (name.StartsWith("Koan", StringComparison.OrdinalIgnoreCase)) return "koan";
             if (name.StartsWith("OpenTelemetry", StringComparison.OrdinalIgnoreCase)) return "telemetry";
             if (name.StartsWith("Microsoft.AspNetCore", StringComparison.OrdinalIgnoreCase) || name.StartsWith("Microsoft.Extensions", StringComparison.OrdinalIgnoreCase)) return "aspnet";
@@ -165,7 +165,7 @@ public static class AppBootstrapper
             @event = "assembly-scan",
             loaded = assemblies.Count,
             categories = breakdown,
-            discovered = discoveredAssemblies.Select(a => a.GetName().Name ?? string.Empty).ToArray()
+            discovered = discoveredAssemblies.Select(a => a.GetName().Name ?? "").ToArray()
         };
         Console.WriteLine(JsonSerializer.Serialize(payload));
 

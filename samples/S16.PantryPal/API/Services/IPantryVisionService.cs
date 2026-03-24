@@ -51,7 +51,7 @@ public class VisionProcessingResult
     public bool Success { get; set; }
     public string? ErrorMessage { get; set; }
 
-    public PantryDetection[] Detections { get; set; } = Array.Empty<PantryDetection>();
+    public PantryDetection[] Detections { get; set; } = [];
     public int ProcessingTimeMs { get; set; }
 
     public VisionMetrics Metrics { get; set; } = new();

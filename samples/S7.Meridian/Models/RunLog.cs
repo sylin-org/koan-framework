@@ -5,8 +5,8 @@ namespace Koan.Samples.Meridian.Models;
 
 public sealed class RunLog : Entity<RunLog>
 {
-    public string PipelineId { get; set; } = string.Empty;
-    public string Stage { get; set; } = string.Empty;
+    public string PipelineId { get; set; } = "";
+    public string Stage { get; set; } = "";
     public string? DocumentId { get; set; }
         = null;
     public string? FieldPath { get; set; }

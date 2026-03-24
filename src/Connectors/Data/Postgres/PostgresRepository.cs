@@ -92,7 +92,7 @@ internal sealed class PostgresRepository<
     }
 
     private string TableName => Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
-    private string QualifiedTable => (_options.SearchPath is { Length: > 0 } sp ? $"\"{sp}\"." : string.Empty) + "\"" + TableName.Replace("\"", "\"\"") + "\"";
+    private string QualifiedTable => (_options.SearchPath is { Length: > 0 } sp ? $"\"{sp}\"." : "") + "\"" + TableName.Replace("\"", "\"\"") + "\"";
 
     /// <summary>
     /// Applies storage optimization to entity before writing to PostgreSQL.
@@ -351,7 +351,7 @@ internal sealed class PostgresRepository<
         var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
         if (idList.Count == 0)
         {
-            return Array.Empty<TEntity?>();
+            return [];
         }
 
         await using var conn = Open();
@@ -919,7 +919,7 @@ internal sealed class PostgresRepository<
                 else
                 {
                     var pgType = col.ClrType == typeof(int) ? "integer" : col.ClrType == typeof(long) ? "bigint" : col.ClrType == typeof(bool) ? "boolean" : col.ClrType == typeof(DateTime) ? "timestamp with time zone" : "text";
-                    var nullSql = col.Nullable ? string.Empty : " NOT NULL";
+                    var nullSql = col.Nullable ? "" : " NOT NULL";
                     defs.Append($"\"{Qual(col.Name)}\" {pgType}{nullSql}");
                 }
             }
@@ -964,7 +964,7 @@ internal sealed class PostgresRepository<
             var sch = schema ?? (searchPath ?? "public");
             var cols = string.Join(", ", columns.Select(c => "\"" + Qual(c) + "\""));
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = $"CREATE {(unique ? "UNIQUE " : string.Empty)}INDEX IF NOT EXISTS \"{Qual(indexName)}\" ON \"{Qual(sch)}\".\"{Qual(table)}\" ({cols})";
+            cmd.CommandText = $"CREATE {(unique ? "UNIQUE " : "")}INDEX IF NOT EXISTS \"{Qual(indexName)}\" ON \"{Qual(sch)}\".\"{Qual(table)}\" ({cols})";
             cmd.ExecuteNonQueryAsync();
         }
     }

@@ -21,7 +21,7 @@ internal sealed class ZenGardenInitializationProvider : IZenGardenInitialization
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var binding in bindings ?? Array.Empty<IZenGardenOfferingBinding>())
+        foreach (var binding in bindings ?? [])
         {
             if (string.IsNullOrWhiteSpace(binding.AdapterId) || string.IsNullOrWhiteSpace(binding.Offering))
             {
@@ -36,7 +36,7 @@ internal sealed class ZenGardenInitializationProvider : IZenGardenInitialization
 
     public bool TryGetDefaultOffering(string adapterId, out string offering)
     {
-        offering = string.Empty;
+        offering = "";
         if (string.IsNullOrWhiteSpace(adapterId))
         {
             return false;
@@ -131,7 +131,7 @@ internal sealed class ZenGardenInitializationProvider : IZenGardenInitialization
         CancellationToken cancellationToken)
     {
         var requirements = intent.Capabilities.Count == 0
-            ? Array.Empty<ZenGardenCapabilityRequirement>()
+            ? []
             : ZenGardenCapabilityRequirement.ParseMany(intent.Capabilities).ToArray();
 
         var broadSubscription = new ZenGardenSubscription
@@ -179,7 +179,7 @@ internal sealed class ZenGardenInitializationProvider : IZenGardenInitialization
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Zen Garden catalog lookup failed for {ToolFqid}", subscription.ToolFqid);
-            return Array.Empty<ZenGardenToolSnapshot>();
+            return [];
         }
 
         return tools;
@@ -249,7 +249,7 @@ internal sealed class ZenGardenInitializationProvider : IZenGardenInitialization
             Hostname = snapshot.Connection?.Hostname,
             Ip = snapshot.Connection?.Ip,
             Port = snapshot.Connection?.Port,
-            Uris = snapshot.Connection?.Uris ?? Array.Empty<string>(),
+            Uris = snapshot.Connection?.Uris ?? [],
             Capabilities = snapshot.Capabilities
         };
     }

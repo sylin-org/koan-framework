@@ -11,7 +11,7 @@ public sealed class ProcessingJob : Entity<ProcessingJob>
 {
     private static readonly TimeSpan HeartbeatGracePeriod = TimeSpan.FromMinutes(5);
 
-    public string PipelineId { get; set; } = string.Empty;
+    public string PipelineId { get; set; } = "";
     public JobStatus Status { get; set; } = JobStatus.Pending;
     public int RetryCount { get; set; } = 0;
     public int Version { get; set; } = 1; // For optimistic concurrency control

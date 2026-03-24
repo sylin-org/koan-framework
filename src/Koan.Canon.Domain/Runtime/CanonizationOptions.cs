@@ -129,7 +129,7 @@ public sealed record CanonizationOptions
             throw new ArgumentNullException(nameof(views));
         }
 
-        return Copy() with { RequestedViews = views.Length == 0 ? Array.Empty<string>() : views.ToArray() };
+        return Copy() with { RequestedViews = views.Length == 0 ? [] : views.ToArray() };
     }
 
     private static Dictionary<string, string?> BuildMergedTags(IReadOnlyDictionary<string, string?> primary, IReadOnlyDictionary<string, string?> fallback)

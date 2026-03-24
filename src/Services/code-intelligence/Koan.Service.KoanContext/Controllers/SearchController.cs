@@ -345,7 +345,7 @@ public class SearchController : ControllerBase
                 Query: request.Query,
                 Alpha: 0.65f,
                 TokensRemaining: aggregateTokenBudget,
-                LastChunkId: string.Empty,
+                LastChunkId: "",
                 CreatedAt: DateTime.UtcNow,
                 Page: returnedChunks.Count == 0 ? 1 : (chunkOffset / Math.Max(returnedChunks.Count, 1)) + 1,
                 ProjectIds: request.ProjectIds,

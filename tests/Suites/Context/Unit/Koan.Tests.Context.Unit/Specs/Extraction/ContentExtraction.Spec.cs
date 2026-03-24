@@ -388,7 +388,7 @@ code
     public async Task ExtractAsync_EmptyFile_ReturnsEmptyResult()
     {
         // Arrange - QA Issue #23
-        var filePath = await CreateTestFile("empty.md", string.Empty);
+        var filePath = await CreateTestFile("empty.md", "");
 
         // Act
         var result = await _service.Extract(filePath);
@@ -461,7 +461,7 @@ code
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(async () =>
         {
-            await _service.Extract(string.Empty);
+            await _service.Extract("");
         });
     }
 

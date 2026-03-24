@@ -146,7 +146,7 @@ public class IndexingServiceSpec
 
         _extractionMock.Setup(x => x.Extract(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Callback(() => callOrder.Add("extract"))
-            .Returns(new ExtractedDocument("file.md", "file.md", string.Empty, new List<ContentSection>(), new List<string>()));
+            .Returns(new ExtractedDocument("file.md", "file.md", "", new List<ContentSection>(), new List<string>()));
 
         _chunkingMock.Setup(x => x.Chunk(It.IsAny<ExtractedDocument>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Callback(() => callOrder.Add("chunk"))
@@ -345,7 +345,7 @@ public class IndexingServiceSpec
                     cts.Cancel();
                 }
             })
-            .Returns(new ExtractedDocument("test.md", "test.md", string.Empty, new List<ContentSection>(), new List<string>()));
+            .Returns(new ExtractedDocument("test.md", "test.md", "", new List<ContentSection>(), new List<string>()));
 
         // Act & Assert
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>

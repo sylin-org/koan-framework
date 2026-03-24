@@ -39,7 +39,7 @@ public sealed class PantryStats
     public int ExpiringInWeek { get; init; }
     public int ExpiringInMonth { get; init; }
     public int Expired { get; init; }
-    public CategoryCount[] ByCategory { get; init; } = Array.Empty<CategoryCount>();
+    public CategoryCount[] ByCategory { get; init; } = [];
 }
 
 public record CategoryCount(string Category, int Count);

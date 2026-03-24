@@ -86,7 +86,7 @@ public class RestoreController : ControllerBase
                         TotalBytesProcessed = 0,
                         Duration = TimeSpan.Zero,
                         ErrorCount = 0,
-                        EntityResults = Array.Empty<EntityRestoreResult>()
+                        EntityResults = []
                     };
 
                     await _operationTracker.CompleteRestoreOperation(operationId, restoreResult);
@@ -223,7 +223,7 @@ public class RestoreController : ControllerBase
             // For now, returning empty result as placeholder
             var response = new RestoreHistoryResponse
             {
-                Operations = Array.Empty<RestoreOperationSummary>(),
+                Operations = [],
                 TotalCount = 0,
                 Page = page,
                 PageSize = pageSize
@@ -243,7 +243,7 @@ public class RestoreController : ControllerBase
         return new GlobalRestoreOptions
         {
             TargetPartition = request.TargetPartition,
-            StorageProfile = request.StorageProfile ?? string.Empty,
+            StorageProfile = request.StorageProfile ?? "",
             ReplaceExisting = request.ReplaceExisting,
             DisableConstraints = request.DisableConstraints,
             DisableIndexes = request.DisableIndexes,
@@ -271,7 +271,7 @@ public class RestoreHistoryResponse
     /// <summary>
     /// List of restore operation summaries
     /// </summary>
-    public RestoreOperationSummary[] Operations { get; set; } = Array.Empty<RestoreOperationSummary>();
+    public RestoreOperationSummary[] Operations { get; set; } = [];
 
     /// <summary>
     /// Total number of operations
@@ -302,12 +302,12 @@ public class RestoreOperationSummary
     /// <summary>
     /// Operation ID
     /// </summary>
-    public string OperationId { get; set; } = string.Empty;
+    public string OperationId { get; set; } = "";
 
     /// <summary>
     /// Backup name that was restored
     /// </summary>
-    public string BackupName { get; set; } = string.Empty;
+    public string BackupName { get; set; } = "";
 
     /// <summary>
     /// Operation status

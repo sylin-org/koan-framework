@@ -48,21 +48,21 @@ public sealed class RoleAttributionOptions
         // Modes: None | FirstUser | ClaimMatch
         public string Mode { get; set; } = "None";
         // ClaimMatch helpers
-        public string[] AdminEmails { get; set; } = Array.Empty<string>();
+        public string[] AdminEmails { get; set; } = [];
         public string ClaimType { get; set; } = System.Security.Claims.ClaimTypes.Email;
-        public string[] ClaimValues { get; set; } = Array.Empty<string>();
+        public string[] ClaimValues { get; set; } = [];
     }
 
     public sealed class RoleSeed
     {
-        public string Id { get; set; } = string.Empty;
+        public string Id { get; set; } = "";
         public string? Display { get; set; }
         public string? Description { get; set; }
     }
 
     public sealed class RolePolicyBindingSeed
     {
-        public string Id { get; set; } = string.Empty; // policy name
-        public string Requirement { get; set; } = string.Empty; // e.g., role:admin or perm:*
+        public string Id { get; set; } = ""; // policy name
+        public string Requirement { get; set; } = ""; // e.g., role:admin or perm:*
     }
 }

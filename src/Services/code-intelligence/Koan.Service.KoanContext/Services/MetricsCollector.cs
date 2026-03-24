@@ -432,8 +432,8 @@ public interface IMetricEntry
 public record SearchMetricEntry : IMetricEntry
 {
     public DateTime Timestamp { get; init; }
-    public string ProjectId { get; init; } = string.Empty;
-    public string Query { get; init; } = string.Empty;
+    public string ProjectId { get; init; } = "";
+    public string Query { get; init; } = "";
     public double LatencyMs { get; init; }
     public int ResultCount { get; init; }
     public bool Success { get; init; }
@@ -451,8 +451,8 @@ public record VectorQueueMetricEntry : IMetricEntry
 public record JobMetricEntry : IMetricEntry
 {
     public DateTime Timestamp { get; init; }
-    public string JobId { get; init; } = string.Empty;
-    public string ProjectId { get; init; } = string.Empty;
+    public string JobId { get; init; } = "";
+    public string ProjectId { get; init; } = "";
     public double DurationSeconds { get; init; }
     public bool Success { get; init; }
     public int FilesProcessed { get; init; }

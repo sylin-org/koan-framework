@@ -58,7 +58,7 @@ public static class FieldExpectationBuilder
 
 	public static FieldExpectation CreateFallback(string fieldPath, string displayName, JSchema schema)
 	{
-		var keywords = BuildKeywords(displayName, schema.Description, Array.Empty<string>());
+		var keywords = BuildKeywords(displayName, schema.Description, []);
 		return new FieldExpectation(
 			FieldPathCanonicalizer.Canonicalize(fieldPath),
 			displayName,
@@ -173,7 +173,7 @@ public static class FieldExpectationBuilder
 				.ToList();
 		}
 
-		return Array.Empty<string>();
+		return [];
 	}
 
 	private static IReadOnlyList<string> BuildKeywords(string displayName, string? description, IEnumerable<string> examples)

@@ -26,7 +26,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         module.Describe(ModuleVersion);
-        var basePath = Core.Configuration.Read(cfg, $"{LocalStorageConstants.Configuration.Section}:{LocalStorageConstants.Configuration.Keys.BasePath}", string.Empty) ?? string.Empty;
+        var basePath = Core.Configuration.Read(cfg, $"{LocalStorageConstants.Configuration.Section}:{LocalStorageConstants.Configuration.Keys.BasePath}", "") ?? "";
         module.AddSetting("BasePath", string.IsNullOrWhiteSpace(basePath) ? "(not set)" : basePath);
         module.AddSetting("Capabilities", "seek=true, range=true, presign=false, copy=true");
     }

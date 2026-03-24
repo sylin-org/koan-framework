@@ -10,7 +10,7 @@ public sealed class PGVectorOptions
     /// PostgreSQL connection string.
     /// Example: "Host=localhost;Port=5432;Database=mydb;Username=user;Password=pass"
     /// </summary>
-    public string ConnectionString { get; set; } = string.Empty;
+    public string ConnectionString { get; set; } = "";
 
     /// <summary>
     /// Default embedding dimension for new tables.

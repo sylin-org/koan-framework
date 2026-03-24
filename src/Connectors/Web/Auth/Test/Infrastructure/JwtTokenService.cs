@@ -108,7 +108,7 @@ public sealed class JwtTokenService
             var nameClaim = principal.FindFirst(JwtRegisteredClaimNames.Name) ??
                            principal.FindFirst(ClaimTypes.Name);
 
-            var email = emailClaim?.Value ?? subClaim?.Value ?? string.Empty;
+            var email = emailClaim?.Value ?? subClaim?.Value ?? "";
             var username = nameClaim?.Value ?? email;
 
             profile = new UserProfile(username, email, null);

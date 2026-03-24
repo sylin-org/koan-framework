@@ -606,7 +606,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
         }
         else if (!string.IsNullOrEmpty(_options.Username))
         {
-            var token = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_options.Username}:{_options.Password ?? string.Empty}"));
+            var token = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_options.Username}:{_options.Password ?? ""}"));
             _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", token);
         }
     }

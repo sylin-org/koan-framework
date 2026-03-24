@@ -57,7 +57,7 @@ public sealed class VisitPlanningService : IVisitPlanningService
         var visitList = query.ToList();
         if (visitList.Count == 0)
         {
-            return new VisitPlanningResult(Array.Empty<VisitAdjustment>(), true, "No visits found for the supplied criteria.", null, Array.Empty<VisitDiagnostic>());
+            return new VisitPlanningResult([], true, "No visits found for the supplied criteria.", null, []);
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -138,8 +138,8 @@ public sealed class VisitPlanningService : IVisitPlanningService
         }
 
         var ai = Ai.TryResolve();
-        var narrative = string.Empty;
-        var model = string.Empty;
+        var narrative = "";
+        var model = "";
         var degraded = false;
 
         if (ai is not null)
@@ -161,7 +161,7 @@ public sealed class VisitPlanningService : IVisitPlanningService
                 if (!string.IsNullOrWhiteSpace(response.Text))
                 {
                     narrative = response.Text.Trim();
-                    model = response.Model ?? request.Model ?? string.Empty;
+                    model = response.Model ?? request.Model ?? "";
                 }
                 else
                 {

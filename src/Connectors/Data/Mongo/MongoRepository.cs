@@ -191,7 +191,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
         var options = _options.CurrentValue;
         if (string.IsNullOrWhiteSpace(options.ConnectionString))
         {
-            return $"(inproc)|{options.Database ?? string.Empty}";
+            return $"(inproc)|{options.Database ?? ""}";
         }
         try
         {
@@ -203,7 +203,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
             var hostSegment = servers.Length != 0 ? string.Join(',', servers) : url.Url;
             var database = !string.IsNullOrWhiteSpace(url.DatabaseName)
                 ? url.DatabaseName
-                : options.Database ?? string.Empty;
+                : options.Database ?? "";
             return $"{hostSegment}|{database}";
         }
         catch
@@ -324,7 +324,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
             var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
             if (idList.Count == 0)
             {
-                return (IReadOnlyList<TEntity?>)Array.Empty<TEntity?>();
+                return (IReadOnlyList<TEntity?>)[];
             }
 
             var collection = await GetCollection(ct).ConfigureAwait(false);
@@ -678,7 +678,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
 
     private bool TryExtractComparison(ParameterExpression parameter, Expression fieldExpression, Expression valueExpression, out string fieldName, out object? value)
     {
-        fieldName = string.Empty;
+        fieldName = "";
         value = null;
 
         var candidate = StripConvert(fieldExpression) as MemberExpression;

@@ -21,7 +21,7 @@ public sealed class McpEntityAttribute : Attribute
     /// <summary>
     /// Scopes required before tools are exposed.
     /// </summary>
-    public string[] RequiredScopes { get; set; } = Array.Empty<string>();
+    public string[] RequiredScopes { get; set; } = [];
 
     /// <summary>
     /// When false mutation operations are filtered from the registry.

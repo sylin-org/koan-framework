@@ -23,7 +23,7 @@ public class TypeScriptSdkIntegritySpec : IClassFixture<TestPipelineFixture>
         text.Should().Contain("// integrity-sha256:", "hash footer must be appended");
 
         // Extract last non-empty line
-        var last = text.Replace("\r", string.Empty).Split('\n').Reverse().First(l => !string.IsNullOrWhiteSpace(l));
+        var last = text.Replace("\r", "").Split('\n').Reverse().First(l => !string.IsNullOrWhiteSpace(l));
         last.StartsWith("// integrity-sha256:").Should().BeTrue("footer must be final line");
 
         var declaredHash = last.Split(':', 2)[1].Trim();
@@ -48,7 +48,7 @@ public class TypeScriptSdkIntegritySpec : IClassFixture<TestPipelineFixture>
         }
 
         // Normalize CR removal exactly like generator does before hashing
-        hashedSegment = hashedSegment.Replace("\r", string.Empty);
+        hashedSegment = hashedSegment.Replace("\r", "");
         var recomputed = ComputeSha256(hashedSegment);
         recomputed.Should().Be(declaredHash, "computed hash should match declared footer");
     }

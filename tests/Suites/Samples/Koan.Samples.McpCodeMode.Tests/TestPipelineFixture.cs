@@ -121,7 +121,7 @@ internal sealed class TestEntityEndpointDescriptorProvider : IEntityEndpointDesc
     public EntityEndpointDescriptor Describe<TEntity, TKey>() where TEntity : class, IEntity<TKey> where TKey : notnull
     {
         var mi = _describeGeneric.MakeGenericMethod(typeof(TEntity), typeof(TKey));
-        var result = (EntityEndpointDescriptor)mi.Invoke(_inner, Array.Empty<object?>())!;
+        var result = (EntityEndpointDescriptor)mi.Invoke(_inner, [])!;
         return Enrich(result);
     }
 

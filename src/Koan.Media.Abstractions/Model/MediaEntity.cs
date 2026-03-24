@@ -41,8 +41,8 @@ public abstract class MediaEntity<TEntity> : Koan.Storage.Model.StorageEntity<TE
             .GetCustomAttributes(typeof(Koan.Storage.Infrastructure.StorageBindingAttribute), inherit: false)
             .OfType<Koan.Storage.Infrastructure.StorageBindingAttribute>()
             .FirstOrDefault();
-        var profile = attr?.Profile ?? string.Empty;
-        var container = inst.Container ?? attr?.Container ?? string.Empty;
+        var profile = attr?.Profile ?? "";
+        var container = inst.Container ?? attr?.Container ?? "";
         var svc = (Koan.Core.Hosting.App.AppHost.Current?.GetService(typeof(IStorageService)) as IStorageService)
                 ?? throw new InvalidOperationException("IStorageService not available");
         return await svc.Read(profile, container, key, ct);

@@ -13,7 +13,7 @@ public sealed class CanonPropertyFootprint
     /// <summary>
     /// Gets or sets the property name.
     /// </summary>
-    public string Property { get; set; } = string.Empty;
+    public string Property { get; set; } = "";
 
     /// <summary>
     /// Gets or sets the source key (integration or contributor) responsible for the value.

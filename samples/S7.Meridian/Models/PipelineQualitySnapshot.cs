@@ -4,7 +4,7 @@ namespace Koan.Samples.Meridian.Models;
 
 public sealed class PipelineQualitySnapshot : Entity<PipelineQualitySnapshot>
 {
-    public string PipelineId { get; set; } = string.Empty;
+    public string PipelineId { get; set; } = "";
     public int DeliverableVersion { get; set; }
         = 1;
 

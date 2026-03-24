@@ -78,6 +78,6 @@ public sealed class InMemoryInstructionsSpec
 
     private sealed class InstructionProbe : Entity<InstructionProbe>
     {
-        public string Name { get; set; } = string.Empty;
+        public string Name { get; set; } = "";
     }
 }

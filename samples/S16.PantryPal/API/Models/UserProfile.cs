@@ -22,12 +22,12 @@ public sealed class UserProfile : Entity<UserProfile>
     // ==========================================
 
     /// <summary>Dietary restrictions (e.g., vegetarian, vegan, gluten-free)</summary>
-    public string[] DietaryRestrictions { get; set; } = Array.Empty<string>();
+    public string[] DietaryRestrictions { get; set; } = [];
 
-    public string[] Allergies { get; set; } = Array.Empty<string>();
-    public string[] DislikedIngredients { get; set; } = Array.Empty<string>();
-    public string[] FavoriteIngredients { get; set; } = Array.Empty<string>();
-    public string[] FavoriteCuisines { get; set; } = Array.Empty<string>();
+    public string[] Allergies { get; set; } = [];
+    public string[] DislikedIngredients { get; set; } = [];
+    public string[] FavoriteIngredients { get; set; } = [];
+    public string[] FavoriteCuisines { get; set; } = [];
 
     // ==========================================
     // Nutrition Goals (daily targets)
@@ -48,7 +48,7 @@ public sealed class UserProfile : Entity<UserProfile>
     /// <summary>Max cooking time on weekends (minutes)</summary>
     public int MaxCookingTimeWeekend { get; set; } = 90;
 
-    public string[] AvailableEquipment { get; set; } = Array.Empty<string>();
+    public string[] AvailableEquipment { get; set; } = [];
 
     /// <summary>Cooking experience: beginner, intermediate, advanced</summary>
     public string ExperienceLevel { get; set; } = "intermediate";

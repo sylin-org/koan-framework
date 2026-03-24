@@ -256,7 +256,7 @@ public sealed class CanonRuntimeSpec
     private sealed class ContactCanon : CanonEntity<ContactCanon>
     {
         [AggregationKey]
-        public string Email { get; set; } = string.Empty;
+        public string Email { get; set; } = "";
 
         [AggregationKey]
         public string? PhoneNumber { get; set; }

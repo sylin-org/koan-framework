@@ -237,7 +237,7 @@ internal sealed class EntityOperationsProxy
         if (idsArg is IEnumerable<object> enumerable)
         {
             // Materialize to object[] with non-null string representations, preserving order
-            var materialized = enumerable.Select(id => (object?)(id?.ToString() ?? string.Empty)).ToArray();
+            var materialized = enumerable.Select(id => (object?)(id?.ToString() ?? "")).ToArray();
             idsArray = new JArray(materialized!); // safe: elements are non-null strings
         }
         else

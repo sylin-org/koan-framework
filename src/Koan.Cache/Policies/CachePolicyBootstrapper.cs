@@ -60,6 +60,6 @@ internal sealed class CachePolicyBootstrapper : IHostedService
         }
 
         var set = new HashSet<string>(options.PolicyAssemblies, StringComparer.OrdinalIgnoreCase);
-        return all.Where(a => set.Contains(a.GetName().Name ?? string.Empty));
+        return all.Where(a => set.Contains(a.GetName().Name ?? ""));
     }
 }

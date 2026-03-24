@@ -61,7 +61,7 @@ internal sealed class EntityInputTransformFormatter : InputFormatter
         }
         else entityType = modelType;
 
-        var contentType = http.Request.ContentType ?? string.Empty;
+        var contentType = http.Request.ContentType ?? "";
         var selection = _registry.ResolveForInput(entityType, contentType);
         if (selection is null)
         {

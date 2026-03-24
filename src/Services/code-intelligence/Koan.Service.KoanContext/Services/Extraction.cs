@@ -79,9 +79,9 @@ public class Extraction
             return new ExtractedDocument(
                 FilePath: filePath,
                 RelativePath: resolvedRelativePath,
-                FullText: string.Empty,
-                Sections: Array.Empty<ContentSection>(),
-                TitleHierarchy: Array.Empty<string>());
+                FullText: "",
+                Sections: [],
+                TitleHierarchy: []);
         }
 
         var fullText = await File.ReadAllText(filePath, cancellationToken);
@@ -93,8 +93,8 @@ public class Extraction
                 FilePath: filePath,
                 RelativePath: resolvedRelativePath,
                 FullText: fullText,
-                Sections: Array.Empty<ContentSection>(),
-                TitleHierarchy: Array.Empty<string>());
+                Sections: [],
+                TitleHierarchy: []);
         }
 
         var sections = new List<ContentSection>();

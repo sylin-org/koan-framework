@@ -106,7 +106,7 @@ internal static class MilvusFilterTranslator
             bool b => b ? "true" : "false",
             _ when value is Enum => Convert.ToInt64(value).ToString(System.Globalization.CultureInfo.InvariantCulture),
             IFormattable f => f.ToString(null, System.Globalization.CultureInfo.InvariantCulture),
-            _ => $"\"{value?.ToString()?.Replace("\"", "\\\"") ?? string.Empty}\""
+            _ => $"\"{value?.ToString()?.Replace("\"", "\\\"") ?? ""}\""
         };
     }
 }

@@ -39,7 +39,7 @@ internal sealed class CacheClient : ICacheClient
         ILogger<CacheClient> logger)
     {
         _store = store ?? throw new InvalidOperationException("ICacheStore is required. Ensure AddKoanCacheAdapter has been called.");
-        _serializers = serializers?.ToArray() ?? Array.Empty<ICacheSerializer>();
+        _serializers = serializers?.ToArray() ?? [];
         if (_serializers.Count == 0)
         {
             throw new InvalidOperationException("No cache serializers registered. Ensure AddKoanCache() was called.");
@@ -337,6 +337,6 @@ internal sealed class CacheClient : ICacheClient
             set.Add(tag.Trim());
         }
 
-        return set.Count == 0 ? Array.Empty<string>() : set.ToArray();
+        return set.Count == 0 ? [] : set.ToArray();
     }
 }

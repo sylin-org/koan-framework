@@ -53,7 +53,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
     [HttpPost("tags/censor/add")]
     public async Task<IActionResult> AddCensorTags([FromBody] CensorTagsRequest req, CancellationToken ct)
     {
-        var src = req?.Text ?? string.Empty;
+        var src = req?.Text ?? "";
         var parts = src
             .Replace("\r", "\n")
             .Split(new[] { '\n', ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
@@ -74,11 +74,11 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
     public async Task<IActionResult> ClearCensorTags(CancellationToken ct)
     {
         var doc = await Models.CensorTagsDoc.Get("recs:censor-tags", ct);
-        if (doc is null) return Ok(new { count = 0, tags = Array.Empty<string>() });
+        if (doc is null) return Ok(new { count = 0, tags = Array.Empty<object>() });
         doc.Tags = new List<string>();
         doc.UpdatedAt = DateTimeOffset.UtcNow;
         await Models.CensorTagsDoc.UpsertMany(new[] { doc }, ct);
-        return Ok(new { count = 0, tags = Array.Empty<string>() });
+        return Ok(new { count = 0, tags = Array.Empty<object>() });
     }
 
     public record RemoveCensorTagRequest(string? Tag);
@@ -86,7 +86,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
     [HttpPost("tags/censor/remove")]
     public async Task<IActionResult> RemoveCensorTag([FromBody] RemoveCensorTagRequest req, CancellationToken ct)
     {
-        var tag = (req?.Tag ?? string.Empty).Trim();
+        var tag = (req?.Tag ?? "").Trim();
         if (string.IsNullOrWhiteSpace(tag)) return BadRequest(new { error = "tag is required" });
         var doc = await Models.CensorTagsDoc.Get("recs:censor-tags", ct) ?? new Models.CensorTagsDoc { Id = "recs:censor-tags", Tags = new List<string>() };
         if (doc.Tags is null) doc.Tags = new List<string>();
@@ -236,9 +236,9 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
         var totalTagStatDocs = allTagStats.Count();
 
         // Apply the same filtering logic as /api/tags
-        var opt = tagOptions?.Value?.CensorTags ?? Array.Empty<string>();
+        var opt = tagOptions?.Value?.CensorTags ?? [];
         var doc = await Models.CensorTagsDoc.Get("recs:censor-tags", ct);
-        var dyn = doc?.Tags?.ToArray() ?? Array.Empty<string>();
+        var dyn = doc?.Tags?.ToArray() ?? [];
         var censor = opt.Concat(dyn).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
 
         var filteredTags = allTagStats.Where(t => !IsCensoredTag(t.Tag, censor)).ToList();
@@ -333,7 +333,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
     [HttpPost("tags/preemptive-filter/test")] // Test if a specific tag would be preemptively filtered
     public IActionResult TestPreemptiveFilter([FromBody] TestPreemptiveFilterRequest req)
     {
-        var tag = req?.Tag?.Trim() ?? string.Empty;
+        var tag = req?.Tag?.Trim() ?? "";
         if (string.IsNullOrWhiteSpace(tag))
         {
             return BadRequest(new { error = "tag is required" });

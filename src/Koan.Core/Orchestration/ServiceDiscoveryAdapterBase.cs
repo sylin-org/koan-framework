@@ -23,7 +23,7 @@ public abstract class ServiceDiscoveryAdapterBase : IServiceDiscoveryAdapter
     }
 
     public abstract string ServiceName { get; }
-    public virtual string[] Aliases => Array.Empty<string>();
+    public virtual string[] Aliases => [];
     public virtual int Priority => 10;
 
     public async Task<AdapterDiscoveryResult> Discover(

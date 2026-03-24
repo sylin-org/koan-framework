@@ -55,7 +55,7 @@ internal static class KoanConsoleBlocks
 
         if (registry is not null)
         {
-            builder.AddLine(string.Empty);
+            builder.AddLine("");
             builder.AddLine(FormatSectionDivider("Registry"));
             builder.AddLine(FormatKeyValue("Initializers", FormatInitializerSummary(registry.Value)));
             builder.AddLine(FormatKeyValue("AutoReg", registry.Value.AutoRegistrars.ToString()));
@@ -65,7 +65,7 @@ internal static class KoanConsoleBlocks
 
         if (uniqueModules.Count > 0)
         {
-            builder.AddLine(string.Empty);
+            builder.AddLine("");
             builder.AddLine(FormatSectionDivider("Inventory"));
 
             foreach (var module in uniqueModules)
@@ -74,7 +74,7 @@ internal static class KoanConsoleBlocks
             }
         }
 
-        builder.AddLine(string.Empty);
+        builder.AddLine("");
         builder.AddLine(FormatSectionDivider("Environment"));
         builder
             .AddLine(FormatKeyValue("InContainer", snapshot.InContainer ? "true" : "false"))
@@ -381,7 +381,7 @@ internal sealed class KoanConsoleBlockBuilder
 
     public KoanConsoleBlockBuilder AddLine(string? text)
     {
-        _lines.Add(text ?? string.Empty);
+        _lines.Add(text ?? "");
         return this;
     }
 
@@ -422,7 +422,7 @@ internal sealed class KoanConsoleBlockBuilder
     {
         if (string.IsNullOrEmpty(value))
         {
-            yield return string.Empty;
+            yield return "";
             yield break;
         }
 

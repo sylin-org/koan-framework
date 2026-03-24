@@ -206,21 +206,21 @@ public sealed class RolesAdminController : ControllerBase
     // Minimal DTOs implementing the contracts so callers can post simple payloads
     public sealed class RoleDto : IKoanAuthRole
     {
-        public string Id { get; set; } = string.Empty;
+        public string Id { get; set; } = "";
         public string? Display { get; set; }
         public string? Description { get; set; }
         public byte[]? RowVersion { get; set; }
     }
     public sealed class RoleAliasDto : IKoanAuthRoleAlias
     {
-        public string Id { get; set; } = string.Empty;
-        public string TargetRole { get; set; } = string.Empty;
+        public string Id { get; set; } = "";
+        public string TargetRole { get; set; } = "";
         public byte[]? RowVersion { get; set; }
     }
     public sealed class RolePolicyBindingDto : IKoanAuthRolePolicyBinding
     {
-        public string Id { get; set; } = string.Empty;
-        public string Requirement { get; set; } = string.Empty;
+        public string Id { get; set; } = "";
+        public string Requirement { get; set; } = "";
         public byte[]? RowVersion { get; set; }
     }
 }

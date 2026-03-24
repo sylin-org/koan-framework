@@ -205,7 +205,7 @@ public sealed class EmbeddingConventionDefaultsSpec
     public class StringArrayConventionEntity : Entity<StringArrayConventionEntity>
     {
         public string Title { get; set; } = "";
-        public string[] Tags { get; set; } = Array.Empty<string>();
+        public string[] Tags { get; set; } = [];
     }
 
     public class IgnoreWithoutAttributeEntity : Entity<IgnoreWithoutAttributeEntity>

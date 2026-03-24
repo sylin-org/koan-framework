@@ -35,19 +35,19 @@ internal sealed class StoneRosterStore : IStoneRosterStore
 
             if (!File.Exists(_filePath))
             {
-                return Array.Empty<CachedMossStone>();
+                return [];
             }
 
             var json = await File.ReadAllTextAsync(_filePath, ct).ConfigureAwait(false);
             if (string.IsNullOrWhiteSpace(json))
             {
-                return Array.Empty<CachedMossStone>();
+                return [];
             }
 
             var entries = JsonSerializer.Deserialize<List<CachedMossStone>>(json, SerializerOptions);
             if (entries is null || entries.Count == 0)
             {
-                return Array.Empty<CachedMossStone>();
+                return [];
             }
 
             var valid = FilterExpired(entries);
@@ -59,7 +59,7 @@ internal sealed class StoneRosterStore : IStoneRosterStore
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning(ex, "Failed to load persisted stone roster from {Path}", _filePath);
-            return Array.Empty<CachedMossStone>();
+            return [];
         }
     }
 

@@ -57,6 +57,6 @@ public sealed class EntityPartitionRoutingSpec
     {
         [Identifier]
         public override string Id { get; set; } = default!;
-        public string Title { get; set; } = string.Empty;
+        public string Title { get; set; } = "";
     }
 }

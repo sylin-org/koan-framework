@@ -82,7 +82,7 @@ public sealed class CrossProviderDataMovementSpec
     {
         [Identifier]
         public override string Id { get; set; } = default!;
-        public string Title { get; set; } = string.Empty;
+        public string Title { get; set; } = "";
         public int Value { get; set; }
     }
 }

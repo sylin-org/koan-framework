@@ -16,7 +16,7 @@ internal static class ProjectDependencyAnalyzer
     // Lightweight manifest service view used by Inspect
     public sealed class ManifestServiceDetails
     {
-        public string Id { get; set; } = string.Empty;
+        public string Id { get; set; } = "";
         public string? Name { get; set; }
         public int? Kind { get; set; } // ARCH-0049 ServiceKind
         public ServiceType? Type { get; set; } // legacy mapping if present
@@ -443,7 +443,7 @@ internal static class ProjectDependencyAnalyzer
             }
 
             if (string.IsNullOrEmpty(appAsmPath))
-                return new PlanDraft(Array.Empty<ServiceRequirement>(), IncludeApp: false, AppHttpPort: 0);
+                return new PlanDraft([], IncludeApp: false, AppHttpPort: 0);
 
             var allDlls = resolverProbePaths.Where(Directory.Exists)
                 .SelectMany(p2 => Directory.EnumerateFiles(p2, "*.dll", SearchOption.AllDirectories))
@@ -578,11 +578,11 @@ internal static class ProjectDependencyAnalyzer
                 if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(image)) continue;
 
                 int[] ports = (el["defaultPorts"] as JArray)?.Select(x => (int)x).ToArray()
-                    ?? (el["ports"] as JArray)?.Select(x => (int)x).ToArray() ?? Array.Empty<int>();
+                    ?? (el["ports"] as JArray)?.Select(x => (int)x).ToArray() ?? [];
                 var env = el["env"] is JObject envObj
                     ? envObj.Properties().ToDictionary(p => p.Name, p => (string?)p.Value, StringComparer.Ordinal)
                     : new Dictionary<string, string?>();
-                string[] volumes = (el["volumes"] as JArray)?.Select(x => (string?)x).Where(s => !string.IsNullOrEmpty(s)).Cast<string>().ToArray() ?? Array.Empty<string>();
+                string[] volumes = (el["volumes"] as JArray)?.Select(x => (string?)x).Where(s => !string.IsNullOrEmpty(s)).Cast<string>().ToArray() ?? [];
                 var appEnv = el["appEnv"] is JObject appEnvObj
                     ? appEnvObj.Properties().ToDictionary(p => p.Name, p => (string?)p.Value, StringComparer.Ordinal)
                     : new Dictionary<string, string?>();
@@ -639,7 +639,7 @@ internal static class ProjectDependencyAnalyzer
             {
                 var id = (string?)el["id"];
                 var name = (string?)el["name"];
-                var protocol = (string?)el["protocol"] ?? string.Empty;
+                var protocol = (string?)el["protocol"] ?? "";
                 var icon = (string?)el["icon"];
                 if (!string.IsNullOrWhiteSpace(id) && !string.IsNullOrWhiteSpace(name))
                     list.Add((id!, name!, protocol, icon));
@@ -653,24 +653,24 @@ internal static class ProjectDependencyAnalyzer
     {
         try
         {
-            if (!arg.ArgumentType.IsArray) return Array.Empty<int>();
+            if (!arg.ArgumentType.IsArray) return [];
             var list = arg.Value as IReadOnlyCollection<CustomAttributeTypedArgument>;
-            if (list is null) return Array.Empty<int>();
+            if (list is null) return [];
             return list.Select(x => (int)(x.Value ?? 0)).ToArray();
         }
-        catch { return Array.Empty<int>(); }
+        catch { return []; }
     }
 
     private static string[] ExtractStringArray(CustomAttributeTypedArgument arg)
     {
         try
         {
-            if (arg.ArgumentType is null || !arg.ArgumentType.IsArray) return Array.Empty<string>();
+            if (arg.ArgumentType is null || !arg.ArgumentType.IsArray) return [];
             var list = arg.Value as IReadOnlyCollection<CustomAttributeTypedArgument>;
-            if (list is null) return Array.Empty<string>();
-            return list.Select(x => x.Value?.ToString() ?? string.Empty).Where(s => !string.IsNullOrEmpty(s)).ToArray();
+            if (list is null) return [];
+            return list.Select(x => x.Value?.ToString() ?? "").Where(s => !string.IsNullOrEmpty(s)).ToArray();
         }
-        catch { return Array.Empty<string>(); }
+        catch { return []; }
     }
 
     private static void AddKv(Dictionary<string, string?> target, string kv)
@@ -695,7 +695,7 @@ internal static class ProjectDependencyAnalyzer
 
                 var env = new Dictionary<string, string?>();
                 var appEnv = new Dictionary<string, string?>();
-                var volumes = Array.Empty<string>();
+                string[] volumes = [];
                 ServiceType? type = null;
                 string? healthPath = null; int? healthInterval = null; int? healthTimeout = null; int? healthRetries = null;
                 foreach (var na in cad.NamedArguments)
@@ -744,7 +744,7 @@ internal static class ProjectDependencyAnalyzer
             foreach (var type in asm.GetTypes())
             {
                 if (!type.IsClass || type.IsAbstract) continue;
-                string? sid = null; string? image = null; int[] ports = Array.Empty<int>();
+                string? sid = null; string? image = null; int[] ports = [];
                 var env = new Dictionary<string, string?>();
                 var appEnv = new Dictionary<string, string?>();
                 var volumes = new List<string>();
@@ -791,7 +791,7 @@ internal static class ProjectDependencyAnalyzer
                             bool isContainer = false;
                             try
                             {
-                                if (modeArg.Value is int i) isContainer = i == 0; else isContainer = (modeArg.Value?.ToString() ?? string.Empty).IndexOf("Container", StringComparison.OrdinalIgnoreCase) >= 0;
+                                if (modeArg.Value is int i) isContainer = i == 0; else isContainer = (modeArg.Value?.ToString() ?? "").IndexOf("Container", StringComparison.OrdinalIgnoreCase) >= 0;
                             }
                             catch { }
                             if (isContainer)

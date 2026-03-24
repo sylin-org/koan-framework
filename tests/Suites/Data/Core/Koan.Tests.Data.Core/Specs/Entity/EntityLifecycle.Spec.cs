@@ -288,7 +288,7 @@ public sealed class EntityLifecycleSpec
     {
         [Identifier]
         public override string Id { get; set; } = default!;
-        public string Title { get; set; } = string.Empty;
+        public string Title { get; set; } = "";
         public int Revision { get; set; }
         public bool IsPublished { get; set; }
         public new static EntityEventsBuilder<LifecycleEntity, string> Events => Entity<LifecycleEntity, string>.Events;

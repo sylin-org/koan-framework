@@ -63,7 +63,7 @@ public sealed class StorageService : IStorageService
                     {
                         sha.TransformBlock(buffer, 0, read, null, 0);
                     }
-                    sha.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+                    sha.TransformFinalBlock([], 0, 0);
                     hashHex = Convert.ToHexString(sha.Hash!).ToLowerInvariant();
                 }
                 finally
@@ -94,7 +94,7 @@ public sealed class StorageService : IStorageService
                     sha.TransformBlock(buffer, 0, read, null, 0);
                     await ms.WriteAsync(buffer.AsMemory(0, read), ct);
                 }
-                sha.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+                sha.TransformFinalBlock([], 0, 0);
                 hashHex = Convert.ToHexString(sha.Hash!).ToLowerInvariant();
             }
             finally
@@ -177,7 +177,7 @@ public sealed class StorageService : IStorageService
     {
         // Resolve source and target providers/containers
         var (src, srcContainer) = Resolve(sourceProfile, sourceContainer);
-        var (dst, dstContainer) = Resolve(targetProfile, targetContainer ?? string.Empty);
+        var (dst, dstContainer) = Resolve(targetProfile, targetContainer ?? "");
 
         // Attempt server-side copy when possible
         if (ReferenceEquals(src, dst) && (src is IServerSideCopy ssc))

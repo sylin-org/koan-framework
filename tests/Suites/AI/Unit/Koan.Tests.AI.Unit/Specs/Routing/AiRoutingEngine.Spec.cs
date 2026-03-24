@@ -361,6 +361,6 @@ public sealed class AiRoutingEngineSpec
             => Task.FromResult(new AiEmbeddingsResponse { Model = request.Model ?? _id });
 
         public Task<IReadOnlyList<AiModelDescriptor>> ListModels(CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<AiModelDescriptor>>(Array.Empty<AiModelDescriptor>());
+            => Task.FromResult<IReadOnlyList<AiModelDescriptor>>([]);
     }
 }

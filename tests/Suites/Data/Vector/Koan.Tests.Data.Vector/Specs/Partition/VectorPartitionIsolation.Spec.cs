@@ -122,6 +122,6 @@ public class VectorPartitionIsolation_Spec
     // Test entity
     private class TestDocument : Koan.Data.Core.Model.Entity<TestDocument, string>
     {
-        public string Content { get; set; } = string.Empty;
+        public string Content { get; set; } = "";
     }
 }

@@ -54,7 +54,7 @@ public sealed class InMemoryBatchSpec
 
     private sealed class InventoryItem : Entity<InventoryItem>
     {
-        public string Name { get; set; } = string.Empty;
+        public string Name { get; set; } = "";
         public int Quantity { get; set; }
     }
 }

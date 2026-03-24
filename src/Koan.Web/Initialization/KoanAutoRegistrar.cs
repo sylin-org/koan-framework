@@ -40,7 +40,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         var csp = Koan.Core.Configuration.ReadWithSource(
             cfg,
             $"{ConfigurationConstants.Web.Section}:{ConfigurationConstants.Web.Keys.ContentSecurityPolicy}",
-            string.Empty);
+            "");
         var autoMap = Koan.Core.Configuration.ReadWithSource(
             cfg,
             $"{ConfigurationConstants.Web.Section}:{ConfigurationConstants.Web.Keys.AutoMapControllers}",

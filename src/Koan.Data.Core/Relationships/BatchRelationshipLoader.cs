@@ -40,7 +40,7 @@ namespace Koan.Data.Core.Relationships
                 if (parentIds.Count > 0)
                 {
                     var dataType = typeof(Data<,>).MakeGenericType(parentType, typeof(TKey));
-                    var method = dataType.GetMethod("GetAsync", new[] { typeof(TKey), typeof(CancellationToken) });
+                    var method = dataType.GetMethod("Get", new[] { typeof(TKey), typeof(CancellationToken) });
                     if (method is null)
                     {
                         continue;

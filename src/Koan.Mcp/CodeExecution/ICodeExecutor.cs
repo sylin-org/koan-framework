@@ -59,7 +59,7 @@ public sealed class NotImplementedCodeExecutor : ICodeExecutor
             Success: false,
             Result: null,
             TextResponse: null,
-            Logs: Array.Empty<string>(),
+            Logs: [],
             Diagnostics: new CodeExecutionDiagnostics(0, 0, 0, request.Source?.Length ?? 0, now, now),
             Error: new CodeExecutionError("CodeModeUnavailable", "Code execution runtime not yet configured.", null)
         ));

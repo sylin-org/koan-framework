@@ -22,7 +22,7 @@ internal static class ChatResponseMapper
 
     public static ChatResponse FromAiChatResponse(AiChatResponse response)
     {
-        return new ChatResponse(new ChatMessage(ChatRole.Assistant, response.Text ?? string.Empty))
+        return new ChatResponse(new ChatMessage(ChatRole.Assistant, response.Text ?? ""))
         {
             FinishReason = MapFinishReason(response.FinishReason),
             ModelId = response.Model,
@@ -67,7 +67,7 @@ internal static class ChatResponseMapper
 
     public static ChatResponseUpdate FromAiChatChunk(AiChatChunk chunk)
     {
-        return new ChatResponseUpdate(ChatRole.Assistant, chunk.DeltaText ?? string.Empty)
+        return new ChatResponseUpdate(ChatRole.Assistant, chunk.DeltaText ?? "")
         {
             ModelId = chunk.Model,
             ResponseId = chunk.AdapterId,

@@ -228,7 +228,7 @@ public sealed record ModelRoute
 /// <summary>Progress during model download.</summary>
 public sealed record ModelPullProgress
 {
-    public string Phase { get; init; } = string.Empty;
+    public string Phase { get; init; } = "";
     public double Percent { get; init; }
     public long BytesDownloaded { get; init; }
     public long? TotalBytes { get; init; }

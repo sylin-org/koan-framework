@@ -13,7 +13,7 @@ internal static class ChatMessageMapper
         foreach (var message in source)
         {
             var role = string.IsNullOrWhiteSpace(message.Role) ? ChatRole.User : new ChatRole(message.Role!);
-            var chatMessage = new ChatMessage(role, message.Content ?? string.Empty)
+            var chatMessage = new ChatMessage(role, message.Content ?? "")
             {
                 AuthorName = message.Name,
                 MessageId = message.ToolCallId,
@@ -41,7 +41,7 @@ internal static class ChatMessageMapper
 
                 if (chatMessage.Contents.Count == 0)
                 {
-                    chatMessage.Contents.Add(new TextContent(message.Content ?? string.Empty));
+                    chatMessage.Contents.Add(new TextContent(message.Content ?? ""));
                 }
             }
 
@@ -56,7 +56,7 @@ internal static class ChatMessageMapper
         List<AiMessage> result = new();
         foreach (var message in source)
         {
-            var text = message.Text ?? string.Empty;
+            var text = message.Text ?? "";
             var aiMessage = new AiMessage(message.Role.Value, text)
             {
                 Name = message.AuthorName,
@@ -66,7 +66,7 @@ internal static class ChatMessageMapper
             if (message.AdditionalProperties is { Count: > 0 })
             {
                 var metadata = message.AdditionalProperties
-                    .ToDictionary(static pair => pair.Key, static pair => pair.Value?.ToString() ?? string.Empty);
+                    .ToDictionary(static pair => pair.Key, static pair => pair.Value?.ToString() ?? "");
                 aiMessage = aiMessage with { Metadata = metadata };
             }
 

@@ -76,7 +76,7 @@ public sealed class CacheFacadeSpec
         {
             client.FlushResult = 2;
 
-            var removed = await CacheFacade.Tags("  Foo  ", "foo", "bar", "bar ", "baz", string.Empty).Flush();
+            var removed = await CacheFacade.Tags("  Foo  ", "foo", "bar", "bar ", "baz", "").Flush();
 
             removed.Should().Be(2);
             client.FlushCalls.Should().Be(1);

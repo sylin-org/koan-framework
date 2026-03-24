@@ -79,17 +79,17 @@ internal sealed class CouchbaseOptionsConfigurator : AdapterOptionsConfigurator<
             "Koan:Data:Bucket",
             "ConnectionStrings:Database");
 
-        options.Scope = ReadProviderConfiguration(options.Scope ?? string.Empty,
+        options.Scope = ReadProviderConfiguration(options.Scope ?? "",
             Infrastructure.Constants.Configuration.Keys.Scope) ?? options.Scope;
 
-        options.Collection = ReadProviderConfiguration(options.Collection ?? string.Empty,
+        options.Collection = ReadProviderConfiguration(options.Collection ?? "",
             Infrastructure.Constants.Configuration.Keys.Collection) ?? options.Collection;
 
-        options.Username = ReadProviderConfiguration(options.Username ?? string.Empty,
+        options.Username = ReadProviderConfiguration(options.Username ?? "",
             Infrastructure.Constants.Configuration.Keys.Username,
             "Koan:Data:Username") ?? options.Username;
 
-        options.Password = ReadProviderConfiguration(options.Password ?? string.Empty,
+        options.Password = ReadProviderConfiguration(options.Password ?? "",
             Infrastructure.Constants.Configuration.Keys.Password,
             "Koan:Data:Password") ?? options.Password;
 
@@ -100,7 +100,7 @@ internal sealed class CouchbaseOptionsConfigurator : AdapterOptionsConfigurator<
             options.QueryTimeout = TimeSpan.FromSeconds(queryTimeoutSeconds);
         }
 
-        options.DurabilityLevel = ReadProviderConfiguration(options.DurabilityLevel ?? string.Empty,
+        options.DurabilityLevel = ReadProviderConfiguration(options.DurabilityLevel ?? "",
             Infrastructure.Constants.Configuration.Keys.DurabilityLevel) ?? options.DurabilityLevel;
 
         Logger?.LogInformation("Final Couchbase Configuration");
@@ -173,7 +173,7 @@ internal sealed class CouchbaseOptionsConfigurator : AdapterOptionsConfigurator<
 
     private static string NormalizeCouchbaseConnectionString(string value)
     {
-        var trimmed = value?.Trim() ?? string.Empty;
+        var trimmed = value?.Trim() ?? "";
         if (string.IsNullOrEmpty(trimmed)) return "couchbase://localhost";
         if (trimmed.StartsWith("couchbase://", StringComparison.OrdinalIgnoreCase) ||
             trimmed.StartsWith("couchbases://", StringComparison.OrdinalIgnoreCase))

@@ -102,7 +102,7 @@ public sealed class CanonRuntime : ICanonRuntime
             entity.Metadata = metadata.Clone();
             var canonical = await _persistence.PersistCanonicalAsync(entity, cancellationToken);
             var resultMetadata = canonical.Metadata.Clone();
-            return new CanonizationResult<T>(canonical, CanonizationOutcome.Canonized, resultMetadata, Array.Empty<CanonizationEvent>(), effectiveOptions.ForceRebuild, effectiveOptions.SkipDistribution);
+            return new CanonizationResult<T>(canonical, CanonizationOutcome.Canonized, resultMetadata, [], effectiveOptions.ForceRebuild, effectiveOptions.SkipDistribution);
         }
 
         var events = new List<CanonizationEvent>(descriptor.Phases.Count);

@@ -166,12 +166,12 @@ public static class JsonFilterBuilder
         {
             // Coerce to non-null strings to avoid List<string?> nullability mismatch
             var items = ((JArray)arrayNode)
-                .Select(e => e.Type == JTokenType.String ? (e.Value<string>() ?? string.Empty) : (e.ToString() ?? string.Empty))
+                .Select(e => e.Type == JTokenType.String ? (e.Value<string>() ?? "") : (e.ToString() ?? ""))
                 .ToList();
             if (opts.IgnoreCase)
             {
                 items = items.Select(s => s.ToLowerInvariant()).ToList();
-                var loweredMember = Expression.Call(Expression.Coalesce(member, Expression.Constant(string.Empty)), nameof(string.ToLowerInvariant), Type.EmptyTypes);
+                var loweredMember = Expression.Call(Expression.Coalesce(member, Expression.Constant("")), nameof(string.ToLowerInvariant), Type.EmptyTypes);
                 var constExprLower = Expression.Constant(items);
                 var containsLower = typeof(Enumerable)
                     .GetMethods()
@@ -267,12 +267,12 @@ public static class JsonFilterBuilder
         if (member.Type == typeof(string))
         {
             var str = value.Type == JTokenType.String ? value.Value<string>() : value.ToString();
-            var (pattern, mode) = ClassifyPattern(str ?? string.Empty);
+            var (pattern, mode) = ClassifyPattern(str ?? "");
             // Receivers for string methods; coalesce only when invoking methods
             Expression receiverSensitive = member; // preserve null semantics for equality
-            Expression receiverInsensitive = Expression.Call(Expression.Coalesce(member, Expression.Constant(string.Empty)), nameof(string.ToLower), Type.EmptyTypes);
-            var constValue = Expression.Constant(opts.IgnoreCase ? (pattern ?? string.Empty).ToLower() : pattern, typeof(string));
-            var constEq = Expression.Constant(opts.IgnoreCase ? (str ?? string.Empty).ToLower() : str, typeof(string));
+            Expression receiverInsensitive = Expression.Call(Expression.Coalesce(member, Expression.Constant("")), nameof(string.ToLower), Type.EmptyTypes);
+            var constValue = Expression.Constant(opts.IgnoreCase ? (pattern ?? "").ToLower() : pattern, typeof(string));
+            var constEq = Expression.Constant(opts.IgnoreCase ? (str ?? "").ToLower() : str, typeof(string));
 
             // Important: use one-argument overloads for provider compatibility (e.g., Mongo LINQ v3)
             return mode switch
@@ -284,9 +284,9 @@ public static class JsonFilterBuilder
                             Expression.NotEqual(member, Expression.Constant(null, typeof(string))),
                             Expression.Equal(receiverInsensitive, constEq)))
                     : Expression.Equal(receiverSensitive, Expression.Constant(str, typeof(string))),
-                MatchMode.StartsWith => Expression.Call(opts.IgnoreCase ? receiverInsensitive : Expression.Coalesce(member, Expression.Constant(string.Empty)), nameof(string.StartsWith), Type.EmptyTypes, constValue),
-                MatchMode.EndsWith => Expression.Call(opts.IgnoreCase ? receiverInsensitive : Expression.Coalesce(member, Expression.Constant(string.Empty)), nameof(string.EndsWith), Type.EmptyTypes, constValue),
-                MatchMode.Contains => Expression.Call(opts.IgnoreCase ? receiverInsensitive : Expression.Coalesce(member, Expression.Constant(string.Empty)), nameof(string.Contains), Type.EmptyTypes, constValue),
+                MatchMode.StartsWith => Expression.Call(opts.IgnoreCase ? receiverInsensitive : Expression.Coalesce(member, Expression.Constant("")), nameof(string.StartsWith), Type.EmptyTypes, constValue),
+                MatchMode.EndsWith => Expression.Call(opts.IgnoreCase ? receiverInsensitive : Expression.Coalesce(member, Expression.Constant("")), nameof(string.EndsWith), Type.EmptyTypes, constValue),
+                MatchMode.Contains => Expression.Call(opts.IgnoreCase ? receiverInsensitive : Expression.Coalesce(member, Expression.Constant("")), nameof(string.Contains), Type.EmptyTypes, constValue),
                 _ => opts.IgnoreCase
                     ? Expression.Equal(receiverInsensitive, constEq)
                     : Expression.Equal(receiverSensitive, Expression.Constant(str, typeof(string)))

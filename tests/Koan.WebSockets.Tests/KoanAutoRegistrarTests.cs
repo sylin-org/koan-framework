@@ -76,7 +76,7 @@ public class KoanAutoRegistrarTests
         var registrar = new KoanAutoRegistrar();
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            [$"{ConfigurationSection}:SubProtocol"] = string.Empty
+            [$"{ConfigurationSection}:SubProtocol"] = ""
         });
 
         var environment = new FakeHostEnvironment();
@@ -144,7 +144,7 @@ public class KoanAutoRegistrarTests
 
         if (module is null)
         {
-            return ("web", Array.Empty<ProvenanceSetting>());
+            return ("web", []);
         }
 
         return (module.PillarCode, module.Settings.ToList());

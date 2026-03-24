@@ -104,7 +104,7 @@ public static class ServiceCollectionExtensions
         {
             var secretsType = Type.GetType("Koan.Secrets.Core.Configuration.SecretResolvingConfigurationExtensions, Koan.Secrets.Core", throwOnError: false, ignoreCase: false);
             var method = secretsType?.GetMethod(methodName, BindingFlags.Public | BindingFlags.Static);
-            method?.Invoke(null, args ?? Array.Empty<object?>());
+            method?.Invoke(null, args ?? []);
         }
         catch { /* optional */ }
     }

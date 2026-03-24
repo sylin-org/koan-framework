@@ -65,8 +65,8 @@ public class CatalogWorker : BackgroundService
     {
         // Extract tags from media items (tags + genres combined)
         var allTags = items
-            .SelectMany(m => m.Tags ?? Array.Empty<string>())
-            .Concat(items.SelectMany(m => m.Genres ?? Array.Empty<string>()))
+            .SelectMany(m => m.Tags ?? [])
+            .Concat(items.SelectMany(m => m.Genres ?? []))
             .Where(tag => !string.IsNullOrWhiteSpace(tag))
             .ToList();
 
@@ -102,7 +102,7 @@ public class CatalogWorker : BackgroundService
     {
         // Extract genres from media items
         var allGenres = items
-            .SelectMany(m => m.Genres ?? Array.Empty<string>())
+            .SelectMany(m => m.Genres ?? [])
             .Where(g => !string.IsNullOrWhiteSpace(g))
             .ToList();
 

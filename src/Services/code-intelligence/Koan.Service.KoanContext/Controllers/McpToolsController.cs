@@ -315,7 +315,7 @@ public class McpToolsController : ControllerBase
 
         var response = new GetReferencesResponse(
             ProjectName: "all-projects",
-            ProjectPath: string.Empty,
+            ProjectPath: "",
             Query: request.Query,
             Result: fallbackResult,
             HasMore: hasMore,

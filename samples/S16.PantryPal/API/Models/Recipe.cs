@@ -18,13 +18,13 @@ public sealed class Recipe : Entity<Recipe>
     public string Description { get; set; } = "";
 
     /// <summary>Cuisine types (e.g., Italian, Mexican, Thai, American)</summary>
-    public string[] Cuisines { get; set; } = Array.Empty<string>();
+    public string[] Cuisines { get; set; } = [];
 
     /// <summary>When to serve (e.g., breakfast, lunch, dinner, snack)</summary>
-    public string[] MealTypes { get; set; } = Array.Empty<string>();
+    public string[] MealTypes { get; set; } = [];
 
     /// <summary>Dietary tags (e.g., vegetarian, vegan, gluten-free, dairy-free)</summary>
-    public string[] DietaryTags { get; set; } = Array.Empty<string>();
+    public string[] DietaryTags { get; set; } = [];
 
     // ==========================================
     // Effort & Time
@@ -53,13 +53,13 @@ public sealed class Recipe : Entity<Recipe>
     // Ingredients (structured for smart matching)
     // ==========================================
 
-    public RecipeIngredient[] Ingredients { get; set; } = Array.Empty<RecipeIngredient>();
+    public RecipeIngredient[] Ingredients { get; set; } = [];
 
     // ==========================================
     // Instructions
     // ==========================================
 
-    public string[] Steps { get; set; } = Array.Empty<string>();
+    public string[] Steps { get; set; } = [];
 
     // ==========================================
     // Metadata
@@ -78,7 +78,7 @@ public sealed class Recipe : Entity<Recipe>
     public bool IsFreezerFriendly { get; set; }
 
     /// <summary>Required equipment (e.g., oven, blender, slow cooker)</summary>
-    public string[] RequiredEquipment { get; set; } = Array.Empty<string>();
+    public string[] RequiredEquipment { get; set; } = [];
 
     // ==========================================
     // AI Enhancement

@@ -401,8 +401,8 @@ public class BackupDiscoveryService : IBackupDiscoveryService
             {
                 Id = manifest?.Id ?? Guid.CreateVersion7().ToString(),
                 Name = manifest?.Name ?? backupName,
-                Description = manifest?.Description ?? string.Empty,
-                Tags = manifest?.Labels ?? Array.Empty<string>(),
+                Description = manifest?.Description ?? "",
+                Tags = manifest?.Labels ?? [],
                 CreatedAt = manifest?.CreatedAt ?? createdAt,
                 CompletedAt = manifest?.CompletedAt,
                 Status = manifest?.Status ?? BackupStatus.Unknown,
@@ -441,7 +441,7 @@ public class BackupDiscoveryService : IBackupDiscoveryService
                 b.HealthStatus == BackupHealthStatus.Corrupted),
             BackupsByStatus = backupList.GroupBy(b => b.Status.ToString()).ToDictionary(g => g.Key, g => g.Count()),
             BackupsByProvider = backupList
-                .SelectMany(b => b.Providers ?? Array.Empty<string>())
+                .SelectMany(b => b.Providers ?? [])
                 .GroupBy(p => p)
                 .ToDictionary(g => g.Key, g => g.Count()),
             SizeByStorageProfile = backupList.GroupBy(b => b.StorageProfile).ToDictionary(g => g.Key, g => g.Sum(b => b.SizeBytes)),
@@ -454,7 +454,7 @@ public class BackupDiscoveryService : IBackupDiscoveryService
     {
         // This is a simplified implementation - in reality you'd get this from your storage configuration
         // For now, return a default profile
-        return Task.FromResult(new[] { string.Empty }); // Empty string often represents the default profile
+        return Task.FromResult(new[] { "" }); // Empty string often represents the default profile
     }
 
     private string GenerateBackupPath(string backupName, DateTimeOffset createdAt)

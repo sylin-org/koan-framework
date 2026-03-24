@@ -7,13 +7,13 @@ namespace S1.Web;
 [DataAdapter("sqlite")]
 public sealed class Todo : Entity<Todo>
 {
-    public string Title { get; set; } = string.Empty;
-    public string Description { get; set; } = string.Empty;
+    public string Title { get; set; } = "";
+    public string Description { get; set; } = "";
     public bool IsCompleted { get; set; } = false;
 
     [Parent(typeof(User))]
-    public string UserId { get; set; } = string.Empty;
+    public string UserId { get; set; } = "";
 
     [Parent(typeof(Category))]
-    public string CategoryId { get; set; } = string.Empty;
+    public string CategoryId { get; set; } = "";
 }

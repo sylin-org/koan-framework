@@ -97,7 +97,7 @@ public abstract class EntitySoftDeleteController<TEntity, TKey> : ControllerBase
     [HttpPost("soft-delete")]
     public virtual async Task<IActionResult> SoftDeleteMany([FromBody] BulkOperation<TKey> op, CancellationToken ct)
     {
-        var ids = op?.Ids ?? Array.Empty<TKey>();
+        var ids = op?.Ids ?? [];
         var filter = op?.Filter;
         var from = (op?.Options as SoftDeleteOptions)?.FromSet;
 
@@ -209,7 +209,7 @@ public abstract class EntitySoftDeleteController<TEntity, TKey> : ControllerBase
     [HttpPost("soft-delete/restore")]
     public virtual async Task<IActionResult> RestoreMany([FromBody] BulkOperation<TKey> op, CancellationToken ct)
     {
-        var ids = op?.Ids ?? Array.Empty<TKey>();
+        var ids = op?.Ids ?? [];
         var target = (op?.Options as RestoreOptions)?.TargetSet;
         if (ids.Count == 0) return BadRequest(new { error = "ids are required for bulk restore" });
         _ = await Data<TEntity, TKey>.MovePartition(DeletedSet, string.IsNullOrWhiteSpace(target) ? "" : target!, e => ids.Contains(e.Id), null, 500, ct);

@@ -19,7 +19,7 @@ public class MediaController : ControllerBase
     [HttpGet("by-ids")]
     public async Task<IActionResult> GetByIds([FromQuery] string ids, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(ids)) return Ok(Array.Empty<Media>());
+        if (string.IsNullOrWhiteSpace(ids)) return Ok(Array.Empty<object>());
 
         var list = new List<Media>();
         foreach (var id in ids.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
@@ -66,7 +66,7 @@ public class MediaController : ControllerBase
         // Filter by genre
         if (!string.IsNullOrWhiteSpace(genre))
         {
-            filtered = filtered.Where(m => (m.Genres ?? Array.Empty<string>()).Contains(genre, StringComparer.OrdinalIgnoreCase));
+            filtered = filtered.Where(m => (m.Genres ?? []).Contains(genre, StringComparer.OrdinalIgnoreCase));
         }
 
         // Apply limit

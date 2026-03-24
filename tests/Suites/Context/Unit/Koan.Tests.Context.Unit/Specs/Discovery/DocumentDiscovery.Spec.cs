@@ -571,7 +571,7 @@ public class DocumentDiscovery_Spec : IDisposable
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(async () =>
         {
-            await _service.Discover(string.Empty).ToListAsync();
+            await _service.Discover("").ToListAsync();
         });
     }
 

@@ -123,7 +123,7 @@ internal sealed class AppRuntime : IAppRuntime
                 if (Activator.CreateInstance(registrarType) is not IKoanAutoRegistrar registrar) continue;
 
                 var hostEnv = env ?? new DefaultHostEnvironment();
-                var module = registry.GetOrCreateModule(string.Empty, registrar.ModuleName);
+                var module = registry.GetOrCreateModule("", registrar.ModuleName);
                 module.Describe(registrar.ModuleVersion);
                 registrar.Describe(module, cfg, hostEnv);
             }

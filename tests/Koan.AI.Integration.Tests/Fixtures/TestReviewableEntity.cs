@@ -11,7 +11,7 @@ internal sealed class TestReviewableEntity : IReviewable
     public string? ReviewedBy { get; set; }
     public DateTime? ReviewedAt { get; set; }
     public string? RejectionReason { get; set; }
-    public string Content { get; set; } = string.Empty;
+    public string Content { get; set; } = "";
     public string? OriginalContent { get; set; }
     public int Rating { get; set; }
     public List<string> Flags { get; set; } = [];

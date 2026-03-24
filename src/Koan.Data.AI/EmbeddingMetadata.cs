@@ -29,7 +29,7 @@ public class EmbeddingMetadata
 
     public EmbeddingPolicy Policy { get; init; }
     public string? Template { get; init; }
-    public string[] Properties { get; init; } = Array.Empty<string>();
+    public string[] Properties { get; init; } = [];
     public bool Async { get; init; }
     public string? Model { get; init; }
     public int BatchSize { get; init; }
@@ -37,7 +37,7 @@ public class EmbeddingMetadata
     public string? Source { get; init; }
     public int MaxTokens { get; init; }
     public int MaxDepth { get; init; }
-    public string[] Exclude { get; init; } = Array.Empty<string>();
+    public string[] Exclude { get; init; } = [];
     public bool WarnOnTruncation { get; init; }
     public int Version { get; init; }
 
@@ -111,7 +111,7 @@ public class EmbeddingMetadata
             Source = attr.Source,
             MaxTokens = attr.MaxTokens,
             MaxDepth = attr.MaxDepth,
-            Exclude = attr.Exclude ?? Array.Empty<string>(),
+            Exclude = attr.Exclude ?? [],
             WarnOnTruncation = attr.WarnOnTruncation,
             Version = attr.Version,
             LifecycleEnabled = true,
@@ -420,7 +420,7 @@ public class EmbeddingMetadata
                 .Select(p => p.Name)
                 .ToArray(),
 
-            EmbeddingPolicy.FullJson => Array.Empty<string>(),
+            EmbeddingPolicy.FullJson => [],
 
             EmbeddingPolicy.Explicit => throw new InvalidOperationException(
                 $"Type {entityType.Name} uses EmbeddingPolicy.Explicit but does not specify Properties or Template. " +

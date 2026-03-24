@@ -98,7 +98,7 @@ public sealed class DocumentsController : ControllerBase
 
             var reuseResponse = new DocumentIngestionResponse
             {
-                DocumentId = reusedIds.FirstOrDefault() ?? string.Empty,
+                DocumentId = reusedIds.FirstOrDefault() ?? "",
                 DocumentIds = reusedIds,
                 ReusedDocumentIds = reusedIds,
                 Status = "Uploaded"
@@ -114,7 +114,7 @@ public sealed class DocumentsController : ControllerBase
 
         var response = new DocumentIngestionResponse
         {
-            DocumentId = newIds.FirstOrDefault() ?? string.Empty,
+            DocumentId = newIds.FirstOrDefault() ?? "",
             DocumentIds = newIds,
             ReusedDocumentIds = reusedIds,
             JobId = null, // No auto-processing
@@ -173,7 +173,7 @@ public sealed class DocumentsController : ControllerBase
 
         await _runLog.Append(new RunLog
         {
-            PipelineId = pipeline.Id ?? string.Empty,
+            PipelineId = pipeline.Id ?? "",
             Stage = "classify-override",
             DocumentId = saved.Id,
             StartedAt = DateTime.UtcNow,
@@ -185,7 +185,7 @@ public sealed class DocumentsController : ControllerBase
                 ["previousMethod"] = previousMethod.ToString(),
                 ["newType"] = saved.SourceType,
                 ["confidence"] = saved.ClassificationConfidence.ToString("0.00", CultureInfo.InvariantCulture),
-                ["reason"] = saved.ClassificationReason ?? string.Empty
+                ["reason"] = saved.ClassificationReason ?? ""
             }
         }, ct).ConfigureAwait(false);
 
@@ -206,16 +206,16 @@ public sealed class DocumentsController : ControllerBase
 
 public sealed class DocumentIngestionResponse
 {
-    public string DocumentId { get; set; } = string.Empty;
+    public string DocumentId { get; set; } = "";
     public List<string> DocumentIds { get; set; } = new();
     public List<string> ReusedDocumentIds { get; set; } = new();
-    public string JobId { get; set; } = string.Empty;
-    public string Status { get; set; } = string.Empty;
+    public string JobId { get; set; } = "";
+    public string Status { get; set; } = "";
 }
 
 public sealed class DocumentTypeOverrideRequest
 {
-    public string TypeId { get; set; } = string.Empty;
+    public string TypeId { get; set; } = "";
     public double? Confidence { get; set; }
         = null;
     public int? TypeVersion { get; set; }
@@ -226,9 +226,9 @@ public sealed class DocumentTypeOverrideRequest
 
 public sealed class DocumentTypeOverrideResponse
 {
-    public string PipelineId { get; set; } = string.Empty;
-    public string DocumentId { get; set; } = string.Empty;
-    public string TypeId { get; set; } = string.Empty;
-    public string JobId { get; set; } = string.Empty;
-    public string Status { get; set; } = string.Empty;
+    public string PipelineId { get; set; } = "";
+    public string DocumentId { get; set; } = "";
+    public string TypeId { get; set; } = "";
+    public string JobId { get; set; } = "";
+    public string Status { get; set; } = "";
 }

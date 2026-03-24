@@ -38,7 +38,7 @@ internal sealed class CacheKeyTemplate
         if (_segments.Length == 0)
         {
             missingToken = false;
-            return string.Empty;
+            return "";
         }
 
         var builder = new StringBuilder();

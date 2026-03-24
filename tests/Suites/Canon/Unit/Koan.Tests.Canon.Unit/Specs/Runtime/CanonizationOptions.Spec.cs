@@ -85,7 +85,7 @@ public sealed class CanonizationOptionsSpec
                 var withViews = CanonizationOptions.Default.WithRequestedViews("canonical", "lineage");
                 withViews.RequestedViews.Should().BeEquivalentTo(new[] { "canonical", "lineage" });
 
-                var cleared = withViews.WithRequestedViews(Array.Empty<string>());
+                var cleared = withViews.WithRequestedViews([]);
                 cleared.RequestedViews.Should().BeEmpty();
 
                 return ValueTask.CompletedTask;

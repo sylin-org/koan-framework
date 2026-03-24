@@ -172,14 +172,14 @@ internal sealed class OutboxProcessor : KoanFluentServiceBase
         {
             var model = JsonConvert.DeserializeObject(entry.PayloadJson, entityType);
             if (model is null) return;
-            var upsertAsync = repo.GetType().GetMethod("UpsertAsync");
+            var upsertAsync = repo.GetType().GetMethod("Upsert");
             await (Task)upsertAsync!.Invoke(repo, new object?[] { model, ct })!;
             return;
         }
         if (string.Equals(entry.Operation, "Delete", StringComparison.OrdinalIgnoreCase))
         {
             var id = ConvertId(entry.EntityId, keyType);
-            var deleteAsync = repo.GetType().GetMethod("DeleteAsync");
+            var deleteAsync = repo.GetType().GetMethod("Delete");
             await (Task)deleteAsync!.Invoke(repo, new object?[] { id, ct })!;
             return;
         }

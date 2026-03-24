@@ -30,8 +30,8 @@ public sealed class MediaController : Koan.Media.Web.Controllers.MediaContentCon
     [HttpGet("{id:guid}/{*filename}")]
     public async Task<IActionResult> GetById(Guid id, string? filename, CancellationToken ct)
     {
-        var srcExt = System.IO.Path.GetExtension(filename ?? string.Empty);
-        var key = id.ToString("N") + (string.IsNullOrWhiteSpace(srcExt) ? string.Empty : srcExt.ToLowerInvariant());
+        var srcExt = System.IO.Path.GetExtension(filename ?? "");
+        var key = id.ToString("N") + (string.IsNullOrWhiteSpace(srcExt) ? "" : srcExt.ToLowerInvariant());
         var stat = await StorageEntity<ProfileMedia>.Head(key, ct);
         if (stat is null)
         {
@@ -54,7 +54,7 @@ public sealed class MediaController : Koan.Media.Web.Controllers.MediaContentCon
 
         // Canonical signature
         (string hash, string json) = SignatureUtility.BuildSignature(key, stat, ops);
-        var flairName = string.IsNullOrWhiteSpace(filename) ? (id.ToString("N") + (string.IsNullOrWhiteSpace(srcExt) ? string.Empty : srcExt)) : filename!;
+        var flairName = string.IsNullOrWhiteSpace(filename) ? (id.ToString("N") + (string.IsNullOrWhiteSpace(srcExt) ? "" : srcExt)) : filename!;
 
         // Variant storage path
         var variantKey = $"variants/{key}/{hash}/{flairName}";

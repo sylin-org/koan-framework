@@ -59,7 +59,7 @@ public sealed class VectorSchemaDescriptor
         return new VectorSchemaDescriptor(
             entityType,
             entityType.Name,
-            Array.Empty<VectorSchemaProperty>(),
+            [],
             Coerce,
             null,
             isFallback: true);

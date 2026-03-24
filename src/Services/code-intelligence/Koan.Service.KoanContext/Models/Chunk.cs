@@ -29,7 +29,7 @@ public class Chunk : Entity<Chunk>
     /// Provides GUID-based relationship instead of error-prone string matching.
     /// IndexedFile lives in root table, Chunk lives in partition table - cross-boundary FK is valid.
     /// </remarks>
-    public string IndexedFileId { get; set; } = string.Empty;
+    public string IndexedFileId { get; set; } = "";
 
     /// <summary>
     /// Relative file path within the project (denormalized for performance)
@@ -38,12 +38,12 @@ public class Chunk : Entity<Chunk>
     /// Denormalized from IndexedFile.RelativePath for fast search result display.
     /// Single source of truth is IndexedFile.RelativePath (via IndexedFileId FK).
     /// </remarks>
-    public string FilePath { get; set; } = string.Empty;
+    public string FilePath { get; set; } = "";
 
     /// <summary>
     /// Full text content of this chunk (indexed for BM25 hybrid search)
     /// </summary>
-    public string SearchText { get; set; } = string.Empty;
+    public string SearchText { get; set; } = "";
 
     /// <summary>
     /// Git commit SHA for provenance (if available)
@@ -118,7 +118,7 @@ public class Chunk : Entity<Chunk>
     /// <summary>
     /// Deterministic version hash used to reconcile vector payloads.
     /// </summary>
-    public string VectorVersion { get; set; } = string.Empty;
+    public string VectorVersion { get; set; } = "";
 
     /// <summary>
     /// Creates a new Chunk with required fields

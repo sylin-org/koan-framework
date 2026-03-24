@@ -38,7 +38,7 @@ public sealed class CachePolicyRegistrySpec
         => Spec(nameof(GetPoliciesFor_returns_empty_when_not_found), () =>
         {
             var registry = new CachePolicyRegistry(NullLogger<CachePolicyRegistry>.Instance);
-            registry.Rebuild(Array.Empty<Assembly>());
+            registry.Rebuild([]);
 
             registry.GetPoliciesFor(typeof(CachePolicyRegistrySpec)).Should().BeEmpty();
         });

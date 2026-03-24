@@ -12,8 +12,8 @@ public static class CensorTagBootstrapper
     public static async Task<List<string>> GetCandidateCensoredTags(CancellationToken ct)
     {
         var allDocs = await Media.All(ct);
-        var allTags = allDocs.SelectMany(m => m.Tags ?? Array.Empty<string>())
-            .Concat(allDocs.SelectMany(m => m.Genres ?? Array.Empty<string>()))
+        var allTags = allDocs.SelectMany(m => m.Tags ?? [])
+            .Concat(allDocs.SelectMany(m => m.Genres ?? []))
             .Select(t => t.Trim().ToLowerInvariant())
             .Where(t => !string.IsNullOrWhiteSpace(t))
             .Distinct()

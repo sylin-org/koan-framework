@@ -68,9 +68,9 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
         var hasUserExplicitEndpoint = !string.IsNullOrWhiteSpace(endpoint)
             && !string.Equals(endpoint, new WeaviateOptions().Endpoint, StringComparison.OrdinalIgnoreCase);
 
-        var apiKey = ReadProviderConfiguration(options.ApiKey ?? string.Empty, WeaviateItems.ApiKeyKeys);
+        var apiKey = ReadProviderConfiguration(options.ApiKey ?? "", WeaviateItems.ApiKeyKeys);
 
-        var explicitConnectionString = ReadProviderConfiguration(string.Empty, WeaviateItems.ConnectionStringKeys);
+        var explicitConnectionString = ReadProviderConfiguration("", WeaviateItems.ConnectionStringKeys);
 
         var requestedConnection = !string.IsNullOrWhiteSpace(explicitConnectionString)
             ? explicitConnectionString
@@ -121,7 +121,7 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
         else
         {
             KoanLog.ConfigInfo(Logger, LogActions.Config, "connection-preconfigured");
-            options.ConnectionString = requestedConnection ?? string.Empty;
+            options.ConnectionString = requestedConnection ?? "";
             if (!hasUserExplicitEndpoint)
                 options.Endpoint = options.ConnectionString;
         }
@@ -221,7 +221,7 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
     private ZenGardenConnectionIntent BuildDefaultZenGardenIntent()
     {
         var configuredOffering = ReadProviderConfiguration(
-            string.Empty,
+            "",
             "Koan:Data:Weaviate:ZenGarden:Offering");
 
         if (string.IsNullOrWhiteSpace(configuredOffering) &&
@@ -236,7 +236,7 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
         }
 
         var configuredInstance = ReadProviderConfiguration(
-            string.Empty,
+            "",
             "Koan:Data:Weaviate:ZenGarden:Instance");
 
         return ZenGardenConnectionIntent.ForOffering(
@@ -249,10 +249,10 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
     {
         var sectionValues = Configuration
             .GetSection("Koan:Data:Weaviate:ZenGarden:Capabilities")
-            .Get<string[]>() ?? Array.Empty<string>();
+            .Get<string[]>() ?? [];
 
         var singleValue = ReadProviderConfiguration(
-            string.Empty,
+            "",
             "Koan:Data:Weaviate:ZenGarden:Capability");
 
         var parsed = new List<string>();
@@ -289,7 +289,7 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
         ZenGardenConnectionIntent intent,
         out string connectionString)
     {
-        connectionString = string.Empty;
+        connectionString = "";
         if (_zenGardenInitializationProvider is null)
         {
             KoanLog.ConfigDebug(Logger, LogActions.ZenGarden, "provider-missing");
@@ -356,7 +356,7 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
 
     private static string NormalizeEndpoint(Uri uri)
     {
-        var port = uri.IsDefaultPort ? string.Empty : $":{uri.Port}";
+        var port = uri.IsDefaultPort ? "" : $":{uri.Port}";
         return $"{uri.Scheme}://{uri.Host}{port}";
     }
 

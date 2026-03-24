@@ -64,7 +64,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         catch (InvalidOperationException ex)
         {
             var bad = new BadRequestObjectResult(new { error = ex.Message });
-            return new EntityCollectionResult<TEntity>(context, Array.Empty<TEntity>(), 0, null, bad);
+            return new EntityCollectionResult<TEntity>(context, [], 0, null, bad);
         }
 
         if (queryResult.ExceededSafetyLimit)
@@ -82,7 +82,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
                 message = $"This endpoint allows at most {request.Policy.AbsoluteMaxRecords} records without pagination."
             };
             var tooLarge = new ObjectResult(errorPayload) { StatusCode = StatusCodes.Status413PayloadTooLarge };
-            return new EntityCollectionResult<TEntity>(context, Array.Empty<TEntity>(), queryResult.Total, null, tooLarge);
+            return new EntityCollectionResult<TEntity>(context, [], queryResult.Total, null, tooLarge);
         }
 
         var list = queryResult.Items.ToList();
@@ -177,7 +177,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         catch (InvalidOperationException ex)
         {
             var bad = new BadRequestObjectResult(new { error = ex.Message });
-            return new EntityCollectionResult<TEntity>(context, Array.Empty<TEntity>(), 0, null, bad);
+            return new EntityCollectionResult<TEntity>(context, [], 0, null, bad);
         }
 
         var list = repositoryItems.ToList();
@@ -236,7 +236,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
         var hookContext = _hookPipeline.CreateContext(context);
 
-        if (!await _hookPipeline.BeforeModelFetch(hookContext, request.Id?.ToString() ?? string.Empty))
+        if (!await _hookPipeline.BeforeModelFetch(hookContext, request.Id?.ToString() ?? ""))
         {
             return ModelShortCircuit(context, hookContext);
         }
@@ -369,7 +369,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         var writes = WriteCaps(repo);
         context.Headers["Koan-Write-Capabilities"] = writes.Writes.ToString();
         using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
-        var deleted = await Data<TEntity, TKey>.DeleteMany(request.Ids ?? Array.Empty<TKey>(), context.CancellationToken);
+        var deleted = await Data<TEntity, TKey>.DeleteMany(request.Ids ?? [], context.CancellationToken);
         return new EntityEndpointResult(context, new { deleted });
     }
 
@@ -400,7 +400,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
         var hookContext = _hookPipeline.CreateContext(context);
 
-        await _hookPipeline.BeforePatch(hookContext, request.Id?.ToString() ?? string.Empty, request.Patch!);
+        await _hookPipeline.BeforePatch(hookContext, request.Id?.ToString() ?? "", request.Patch!);
 
         using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var original = await Data<TEntity, TKey>.Get(request.Id!, context.CancellationToken);
@@ -723,14 +723,14 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
                ?? t.GetProperty("Title")?.GetValue(entity) as string
                ?? t.GetProperty("Label")?.GetValue(entity) as string
                ?? entity.ToString()
-               ?? string.Empty;
+               ?? "";
     }
 
     private static string[] BuildLinkHeaders(string basePath, IReadOnlyDictionary<string, string?> query, int page, int size, int totalPages)
     {
         if (string.IsNullOrWhiteSpace(basePath) || size <= 0 || totalPages <= 0)
         {
-            return Array.Empty<string>();
+            return [];
         }
 
         var links = new List<string>();
@@ -801,9 +801,9 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         var shortCircuit = hookContext.ShortCircuitPayload;
         if (shortCircuit is IActionResult action)
         {
-            return new EntityCollectionResult<TEntity>(context, Array.Empty<TEntity>(), 0, null, action);
+            return new EntityCollectionResult<TEntity>(context, [], 0, null, action);
         }
-        return new EntityCollectionResult<TEntity>(context, Array.Empty<TEntity>(), 0, shortCircuit, shortCircuit);
+        return new EntityCollectionResult<TEntity>(context, [], 0, shortCircuit, shortCircuit);
     }
 
     private static EntityModelResult<TEntity> ModelShortCircuit(EntityRequestContext context, HookContext<TEntity> hookContext)

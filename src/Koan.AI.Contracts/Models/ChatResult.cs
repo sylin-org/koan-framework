@@ -8,7 +8,7 @@ namespace Koan.AI.Contracts.Models;
 public sealed record ChatResult
 {
     /// <summary>Generated text response.</summary>
-    public string Text { get; init; } = string.Empty;
+    public string Text { get; init; } = "";
 
     /// <summary>Model that served the request.</summary>
     public string? Model { get; init; }

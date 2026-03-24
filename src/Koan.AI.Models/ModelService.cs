@@ -223,7 +223,7 @@ internal sealed class ModelService : IModelService
 
     public Task<IReadOnlyList<ModelHealthReport>> Health(CancellationToken ct)
     {
-        IReadOnlyList<ModelHealthReport> empty = Array.Empty<ModelHealthReport>();
+        IReadOnlyList<ModelHealthReport> empty = [];
         return Task.FromResult(empty);
     }
 

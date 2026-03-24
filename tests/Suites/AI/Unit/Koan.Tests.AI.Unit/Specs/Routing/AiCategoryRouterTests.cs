@@ -374,7 +374,7 @@ public sealed class AiCategoryRouterTests
         public async IAsyncEnumerable<AiChatChunk> Stream(AiChatRequest request, [EnumeratorCancellation] CancellationToken ct = default)
         { await Task.CompletedTask; yield break; }
         public Task<IReadOnlyList<AiModelDescriptor>> ListModels(CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<AiModelDescriptor>>(Array.Empty<AiModelDescriptor>());
+            => Task.FromResult<IReadOnlyList<AiModelDescriptor>>([]);
     }
 
     private sealed class EmbedOnlyAdapter : IEmbedAdapter
@@ -386,7 +386,7 @@ public sealed class AiCategoryRouterTests
         public Task<AiEmbeddingsResponse> Embed(AiEmbeddingsRequest request, CancellationToken ct = default)
             => Task.FromResult(new AiEmbeddingsResponse { Model = request.Model ?? Id });
         public Task<IReadOnlyList<AiModelDescriptor>> ListModels(CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<AiModelDescriptor>>(Array.Empty<AiModelDescriptor>());
+            => Task.FromResult<IReadOnlyList<AiModelDescriptor>>([]);
     }
 
     private sealed class OcrOnlyAdapter : IOcrAdapter
@@ -398,7 +398,7 @@ public sealed class AiCategoryRouterTests
         public Task<OcrResponse> Recognize(OcrRequest request, CancellationToken ct = default)
             => Task.FromResult(new OcrResponse { Text = "recognized" });
         public Task<IReadOnlyList<AiModelDescriptor>> ListModels(CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<AiModelDescriptor>>(Array.Empty<AiModelDescriptor>());
+            => Task.FromResult<IReadOnlyList<AiModelDescriptor>>([]);
     }
 
     private sealed class ChatEmbedAdapter : IChatAdapter, IEmbedAdapter
@@ -415,7 +415,7 @@ public sealed class AiCategoryRouterTests
         public Task<AiEmbeddingsResponse> Embed(AiEmbeddingsRequest request, CancellationToken ct = default)
             => Task.FromResult(new AiEmbeddingsResponse { Model = request.Model ?? Id });
         public Task<IReadOnlyList<AiModelDescriptor>> ListModels(CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<AiModelDescriptor>>(Array.Empty<AiModelDescriptor>());
+            => Task.FromResult<IReadOnlyList<AiModelDescriptor>>([]);
     }
 
     // ========================================================================

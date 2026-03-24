@@ -11,7 +11,7 @@ public class Job : Entity<Job>
     /// <summary>
     /// Project being indexed
     /// </summary>
-    public string ProjectId { get; set; } = string.Empty;
+    public string ProjectId { get; set; } = "";
 
     /// <summary>
     /// Current job status

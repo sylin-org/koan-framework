@@ -69,7 +69,7 @@ public sealed class SearchPersonaHooks : IModelHook<SearchPersona>
             ? persona.Name
             : persona.DisplayName.Trim();
         persona.Description = string.IsNullOrWhiteSpace(persona.Description)
-            ? string.Empty
+            ? ""
             : persona.Description.Trim();
 
         persona.SemanticWeight = Math.Clamp(persona.SemanticWeight, 0f, 1f);

@@ -292,8 +292,8 @@ public class SqlServerCountTests : IClassFixture<Support.SqlServerAutoFixture>
 
     public class CountTestEntity : Entity<CountTestEntity>
     {
-        public string Name { get; set; } = string.Empty;
+        public string Name { get; set; } = "";
         public int Value { get; set; }
-        public string Status { get; set; } = string.Empty;
+        public string Status { get; set; } = "";
     }
 }

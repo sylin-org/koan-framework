@@ -206,10 +206,10 @@ public sealed class VectorWorkflowSpec
         public Task<TestEntity?> Get(string id, CancellationToken ct = default) => Task.FromResult<TestEntity?>(null);
 
         public Task<IReadOnlyList<TestEntity?>> GetMany(IEnumerable<string> ids, CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<TestEntity?>>(Array.Empty<TestEntity?>());
+            => Task.FromResult<IReadOnlyList<TestEntity?>>([]);
 
         public Task<IReadOnlyList<TestEntity>> Query(object? query, CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<TestEntity>>(Array.Empty<TestEntity>());
+            => Task.FromResult<IReadOnlyList<TestEntity>>([]);
 
         public Task<CountResult> Count(CountRequest<TestEntity> request, CancellationToken ct = default)
             => Task.FromResult(new CountResult(0, false));
@@ -289,8 +289,8 @@ public sealed class VectorWorkflowSpec
     private sealed class TestEntity : Entity<TestEntity, string>
     {
         [Identifier]
-        public override string Id { get; set; } = string.Empty;
+        public override string Id { get; set; } = "";
 
-        public string Name { get; set; } = string.Empty;
+        public string Name { get; set; } = "";
     }
 }

@@ -394,7 +394,7 @@ public class BackupController : ControllerBase
             Description = request.Description,
             Tags = request.Tags,
             Partition = request.Partition,
-            StorageProfile = request.StorageProfile ?? string.Empty,
+            StorageProfile = request.StorageProfile ?? "",
             CompressionLevel = request.CompressionLevel,
             VerificationEnabled = request.VerificationEnabled,
             BatchSize = request.BatchSize,

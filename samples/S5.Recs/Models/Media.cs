@@ -38,10 +38,10 @@ public sealed class Media : Entity<Media>
     public string? TitleEnglish { get; set; }
     public string? TitleRomaji { get; set; }
     public string? TitleNative { get; set; }
-    public string[] Synonyms { get; set; } = Array.Empty<string>();
+    public string[] Synonyms { get; set; } = [];
 
-    public string[] Genres { get; set; } = Array.Empty<string>();
-    public string[] Tags { get; set; } = Array.Empty<string>();
+    public string[] Genres { get; set; } = [];
+    public string[] Tags { get; set; } = [];
 
     // Media-specific metrics (null for non-applicable types)
     public int? Episodes { get; set; }     // For series/episodic content

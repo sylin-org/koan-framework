@@ -75,7 +75,7 @@ public sealed class JsonInstructionsSpec
 
                 var jsonFiles = Directory.Exists(fixture.RootPath)
                     ? Directory.EnumerateFiles(fixture.RootPath, "*.json", SearchOption.AllDirectories).ToArray()
-                    : Array.Empty<string>();
+                    : [];
 
                 jsonFiles.Should().NotBeEmpty();
                 foreach (var path in jsonFiles)
@@ -89,6 +89,6 @@ public sealed class JsonInstructionsSpec
 
     private sealed class InstructionProbe : Entity<InstructionProbe>
     {
-        public string Name { get; set; } = string.Empty;
+        public string Name { get; set; } = "";
     }
 }

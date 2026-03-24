@@ -58,7 +58,7 @@ public sealed class KoanMcpAutoRegistrar : IKoanAutoRegistrar
                 usedDefault: requireAuth.UsedDefault);
         }
 
-        var route = Configuration.ReadWithSource(configuration, "Koan:Mcp:HttpSseRoute", string.Empty);
+        var route = Configuration.ReadWithSource(configuration, "Koan:Mcp:HttpSseRoute", "");
         if (!string.IsNullOrWhiteSpace(route.Value))
         {
             module.AddSetting(
@@ -177,7 +177,7 @@ public sealed class KoanMcpAutoRegistrar : IKoanAutoRegistrar
         }
 
         var values = resolved
-            .Select(v => (v.Value ?? string.Empty).Trim())
+            .Select(v => (v.Value ?? "").Trim())
             .Where(v => v.Length > 0)
             .ToArray();
 

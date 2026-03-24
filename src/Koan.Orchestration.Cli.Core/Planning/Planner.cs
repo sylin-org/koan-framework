@@ -276,7 +276,7 @@ internal static class Planner
                     s.Health.Retries
                 );
             }
-            services.Add(new ServiceSpec(s.Id, s.Image ?? string.Empty, env, ports, volumes, health, null, s.DependsOn?.ToArray() ?? Array.Empty<string>()));
+            services.Add(new ServiceSpec(s.Id, s.Image ?? "", env, ports, volumes, health, null, s.DependsOn?.ToArray() ?? []));
         }
         return new Plan(profile, services);
     }
@@ -376,7 +376,7 @@ internal static class Planner
         public List<Service> Services { get; set; } = new();
         public sealed class Service
         {
-            public string Id { get; set; } = string.Empty;
+            public string Id { get; set; } = "";
             public string? Image { get; set; }
             public Dictionary<string, string?>? Env { get; set; }
             public List<string>? Ports { get; set; }
@@ -567,8 +567,8 @@ internal static class Planner
                     var port = useLocal ? (r.LocalPort ?? r.ContainerPorts.FirstOrDefault()) : r.ContainerPorts.FirstOrDefault();
                     val = val
                         .Replace("{serviceId}", r.Id)
-                        .Replace("{port}", port == 0 ? string.Empty : port.ToString())
-                        .Replace("{scheme}", useLocal ? (r.LocalScheme ?? r.EndpointScheme ?? string.Empty) : (r.EndpointScheme ?? string.Empty))
+                        .Replace("{port}", port == 0 ? "" : port.ToString())
+                        .Replace("{scheme}", useLocal ? (r.LocalScheme ?? r.EndpointScheme ?? "") : (r.EndpointScheme ?? ""))
                         .Replace("{host}", useLocal ? (r.LocalHost ?? r.Id) : (r.EndpointHost ?? r.Id));
                     appEnv[kv.Key] = val;
                 }

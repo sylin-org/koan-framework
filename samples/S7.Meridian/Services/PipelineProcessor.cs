@@ -546,7 +546,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
         DocumentPipeline pipeline,
         CancellationToken ct)
     {
-        var notesContent = pipeline.AuthoritativeNotes ?? string.Empty;
+        var notesContent = pipeline.AuthoritativeNotes ?? "";
         var notesHash = TextExtractor.ComputeTextHash(notesContent);
 
         // Check for existing virtual document attached to this pipeline

@@ -15,7 +15,7 @@ internal sealed class KoanMinimalJsonOptionsConfigurator : IConfigureOptions<Jso
         IEnumerable<IJsonTypeInfoResolver> resolvers)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
-        _resolvers = resolvers ?? Array.Empty<IJsonTypeInfoResolver>();
+        _resolvers = resolvers ?? [];
     }
 
     public void Configure(JsonOptions options)

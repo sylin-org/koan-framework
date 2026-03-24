@@ -39,7 +39,7 @@ internal sealed class StartupProbeService : Microsoft.Extensions.Hosting.IHosted
                             foreach (var kv in report.Data)
                             {
                                 if (kv.Value is null) continue;
-                                dict[kv.Key] = kv.Value?.ToString() ?? string.Empty;
+                                dict[kv.Key] = kv.Value?.ToString() ?? "";
                             }
                             facts = dict;
                         }

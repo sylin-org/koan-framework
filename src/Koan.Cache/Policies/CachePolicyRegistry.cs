@@ -28,7 +28,7 @@ internal sealed class CachePolicyRegistry : ICachePolicyRegistry
     public IReadOnlyList<CachePolicyDescriptor> GetPoliciesFor(MemberInfo member)
         => _memberPolicies.TryGetValue(member, out var value)
             ? new[] { value }
-            : Array.Empty<CachePolicyDescriptor>();
+            : [];
 
     public IReadOnlyList<CachePolicyDescriptor> GetAllPolicies()
         => _allPolicies;
@@ -129,14 +129,14 @@ internal sealed class CachePolicyRegistry : ICachePolicyRegistry
         catch (Exception ex) when (ex is TypeLoadException or ReflectionTypeLoadException or FileNotFoundException or FileLoadException or BadImageFormatException)
         {
             _logger.LogWarning(ex, "Skipping cache policy attributes for {Target} due to reflection failure: {Message}", targetName, ex.Message);
-            return Array.Empty<CachePolicyAttribute>();
+            return [];
         }
     }
 
     private static CachePolicyDescriptor CreateDescriptor(CachePolicyAttribute attribute, MemberInfo? member, Type? declaringType)
     {
         var tags = attribute.Tags is null || attribute.Tags.Length == 0
-            ? Array.Empty<string>()
+            ? []
             : attribute.Tags.Select(t => t.Trim()).Where(t => t.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
 
         var metadata = attribute.Metadata is null || attribute.Metadata.Count == 0

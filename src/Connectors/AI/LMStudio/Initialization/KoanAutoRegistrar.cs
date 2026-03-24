@@ -66,7 +66,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
         var apiKey = KoanConfiguration.ReadFirstWithSource(
                 cfg,
-                defaults.ApiKey ?? string.Empty,
+                defaults.ApiKey ?? "",
                 Constants.Configuration.Keys.ApiKey,
                 Constants.Discovery.EnvKey);
 

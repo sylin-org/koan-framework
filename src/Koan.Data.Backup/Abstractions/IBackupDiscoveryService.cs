@@ -54,15 +54,15 @@ public class BackupInfo
 {
     public string Id { get; set; } = default!;
     public string Name { get; set; } = default!;
-    public string Description { get; set; } = string.Empty;
-    public string[] Tags { get; set; } = Array.Empty<string>();
+    public string Description { get; set; } = "";
+    public string[] Tags { get; set; } = [];
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? CompletedAt { get; set; }
     public BackupStatus Status { get; set; }
     public long SizeBytes { get; set; }
     public int EntityCount { get; set; }
-    public string ArchiveStorageKey { get; set; } = string.Empty;
-    public string ArchiveFileName { get; set; } = string.Empty;
+    public string ArchiveStorageKey { get; set; } = "";
+    public string ArchiveFileName { get; set; } = "";
     public string StorageProfile { get; set; } = default!;
     public string[]? EntityTypes { get; set; }
     public string[]? Providers { get; set; }

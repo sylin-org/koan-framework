@@ -71,11 +71,11 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
             canonical = TryParseCanonical(canonicalJson);
         }
 
-        var analysisTypeName = string.Empty;
+        var analysisTypeName = "";
         if (!string.IsNullOrWhiteSpace(pipeline.AnalysisTypeId))
         {
             var analysisType = await AnalysisType.Get(pipeline.AnalysisTypeId, ct).ConfigureAwait(false);
-            analysisTypeName = analysisType?.Name ?? string.Empty;
+            analysisTypeName = analysisType?.Name ?? "";
         }
 
         var pipelineKey = pipeline.Id ?? pipelineId;
@@ -87,7 +87,7 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
         {
             Pipeline = new PipelineSummary
             {
-                Id = pipeline.Id ?? string.Empty,
+                Id = pipeline.Id ?? "",
                 Name = pipeline.Name,
                 Description = pipeline.Description,
                 DeliverableTypeId = pipeline.DeliverableTypeId,
@@ -106,7 +106,7 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
             Documents = documents
                 .Select(doc => new DocumentSummary
                 {
-                    Id = doc.Id ?? string.Empty,
+                    Id = doc.Id ?? "",
                     OriginalFileName = doc.OriginalFileName,
                     SourceType = doc.SourceType,
                     ClassifiedTypeId = doc.ClassifiedTypeId,
@@ -124,7 +124,7 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
                 ? null
                 : new DeliverableSnapshot
                 {
-                    Id = deliverable.Id ?? string.Empty,
+                    Id = deliverable.Id ?? "",
                     DeliverableTypeId = deliverable.DeliverableTypeId,
                     DeliverableTypeVersion = deliverable.DeliverableTypeVersion,
                     DataHash = deliverable.DataHash,
@@ -217,7 +217,7 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
 
         await _runLog.Append(new RunLog
         {
-            PipelineId = pipeline.Id ?? string.Empty,
+            PipelineId = pipeline.Id ?? "",
             Stage = "analysis-override",
             StartedAt = DateTime.UtcNow,
             FinishedAt = DateTime.UtcNow,
@@ -228,7 +228,7 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
                 ["previousVersion"] = previousVersion.ToString(CultureInfo.InvariantCulture),
                 ["newAnalysisType"] = pipeline.AnalysisTypeId,
                 ["newVersion"] = pipeline.AnalysisTypeVersion.ToString(CultureInfo.InvariantCulture),
-                ["overrideReason"] = request.Reason ?? string.Empty
+                ["overrideReason"] = request.Reason ?? ""
             }
         }, ct).ConfigureAwait(false);
 
@@ -253,7 +253,7 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
 
     private static async Task<Deliverable?> GetLatestDeliverable(DocumentPipeline pipeline, CancellationToken ct)
     {
-        var pipelineId = pipeline.Id ?? string.Empty;
+        var pipelineId = pipeline.Id ?? "";
         Console.WriteLine($"[Meridian] Deliverable lookup start pipeline={pipelineId} directId={pipeline.DeliverableId ?? "<null>"}");
 
         if (!string.IsNullOrWhiteSpace(pipeline.DeliverableId))
@@ -335,18 +335,18 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
 
 public sealed class AnalysisTypeOverrideRequest
 {
-    public string AnalysisTypeId { get; set; } = string.Empty;
+    public string AnalysisTypeId { get; set; } = "";
     public string? Reason { get; set; }
         = null;
 }
 
 public sealed class AnalysisTypeOverrideResponse
 {
-    public string PipelineId { get; set; } = string.Empty;
-    public string AnalysisTypeId { get; set; } = string.Empty;
+    public string PipelineId { get; set; } = "";
+    public string AnalysisTypeId { get; set; } = "";
     public int AnalysisTypeVersion { get; set; }
         = 1;
     public string? JobId { get; set; }
         = null;
-    public string Status { get; set; } = string.Empty;
+    public string Status { get; set; } = "";
 }

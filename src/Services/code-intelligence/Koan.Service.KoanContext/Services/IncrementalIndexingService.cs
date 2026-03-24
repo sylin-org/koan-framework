@@ -250,7 +250,7 @@ public class IncrementalIndexer
                      Language = docChunk.Language,
                      FileHash = docChunk.FileHash,
                      FileLastModified = docChunk.FileLastModified,
-                     PathSegments = docChunk.PathSegments ?? Array.Empty<string>(),
+                     PathSegments = docChunk.PathSegments ?? [],
                      PrimaryTags = docChunk.Tags.Primary,
                      SecondaryTags = docChunk.Tags.Secondary,
                      FileTags = docChunk.Tags.File

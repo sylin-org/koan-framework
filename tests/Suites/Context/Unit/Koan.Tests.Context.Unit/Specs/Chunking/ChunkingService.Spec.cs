@@ -361,7 +361,7 @@ public class ChunkerServiceSpec : IDisposable
         var doc = new ExtractedDocument(
             FilePath: "empty.md",
             RelativePath: "empty.md",
-            FullText: string.Empty,
+            FullText: "",
             Sections: new List<ContentSection>(),
             TitleHierarchy: new List<string>());
 
@@ -513,7 +513,7 @@ public class ChunkerServiceSpec : IDisposable
         return new ExtractedDocument(
             FilePath: "test.md",
             RelativePath: "test.md",
-            FullText: text ?? string.Empty,
+            FullText: text ?? "",
             Sections: string.IsNullOrWhiteSpace(text)
                 ? new List<ContentSection>()
                 : new List<ContentSection>

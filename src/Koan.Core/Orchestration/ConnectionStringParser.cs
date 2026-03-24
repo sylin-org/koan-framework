@@ -318,17 +318,17 @@ public static class ConnectionStringParser
     private static string BuildMongo(ConnectionStringComponents components)
     {
         var auth = string.IsNullOrWhiteSpace(components.Username)
-            ? string.Empty
+            ? ""
             : string.IsNullOrWhiteSpace(components.Password)
                 ? $"{components.Username}@"
                 : $"{components.Username}:{components.Password}@";
 
         var database = string.IsNullOrWhiteSpace(components.Database)
-            ? string.Empty
+            ? ""
             : $"/{components.Database}";
 
         var query = components.Parameters.Count == 0
-            ? string.Empty
+            ? ""
             : "?" + string.Join("&", components.Parameters.Select(p => $"{p.Key}={p.Value}"));
 
         // Multi-host: port is embedded in Host (e.g. "host1:27017,host2:27017"), don't append :port

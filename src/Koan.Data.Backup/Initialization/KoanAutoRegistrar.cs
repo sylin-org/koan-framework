@@ -45,7 +45,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         var defaultStorageProfile = Configuration.ReadWithSource(
             cfg,
             BackupItems.DefaultStorageProfile.Key,
-            defaults.DefaultStorageProfile ?? string.Empty);
+            defaults.DefaultStorageProfile ?? "");
 
         var defaultBatchSize = Configuration.ReadWithSource(
             cfg,
@@ -275,7 +275,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         }
 
         var displayValues = resolved
-            .Select(v => (v.Value ?? string.Empty).Trim())
+            .Select(v => (v.Value ?? "").Trim())
             .Where(v => !string.IsNullOrEmpty(v))
             .ToArray();
 
@@ -296,7 +296,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         }
 
         var trimmed = items
-            .Select(i => (i ?? string.Empty).Trim())
+            .Select(i => (i ?? "").Trim())
             .Where(i => i.Length > 0)
             .ToArray();
 

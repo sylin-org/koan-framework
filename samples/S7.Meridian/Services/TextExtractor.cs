@@ -17,7 +17,7 @@ public interface ITextExtractor
 
 public sealed class TextExtractionResult
 {
-    public string Text { get; init; } = string.Empty;
+    public string Text { get; init; } = "";
     public double Confidence { get; init; } = 0.0;
     public int PageCount { get; init; } = 0;
     public string Method { get; init; } = "Unknown";
@@ -129,7 +129,7 @@ public sealed class TextExtractor : ITextExtractor
         {
             return new TextExtractionResult
             {
-                Text = string.Empty,
+                Text = "",
                 Confidence = 0.1,
                 PageCount = 0,
                 Method = "DocxEmpty"

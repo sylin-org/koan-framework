@@ -36,7 +36,7 @@ internal sealed class ChainExecutor : IChainExecutor
 
         return new ChainResult
         {
-            Text = context.LastOutput ?? string.Empty,
+            Text = context.LastOutput ?? "",
             Citations = context.Citations.Count > 0 ? context.Citations : null,
             Metrics = new ChainMetrics(context.TotalTokens, sw.Elapsed, context.StepCount)
         };
@@ -348,7 +348,7 @@ internal sealed class ChainExecutor : IChainExecutor
         if (string.IsNullOrEmpty(retrieved))
             return; // Nothing to rerank
 
-        var query = context.GetVariable("input") ?? context.LastOutput ?? string.Empty;
+        var query = context.GetVariable("input") ?? context.LastOutput ?? "";
 
         var rerankPrompt =
             $"Given the query: \"{query}\"\n\n" +
@@ -499,7 +499,7 @@ internal sealed class ChainExecutor : IChainExecutor
             foreach (var match in matches)
             {
                 var matchType = match.GetType();
-                var id = matchType.GetProperty("Id")?.GetValue(match)?.ToString() ?? string.Empty;
+                var id = matchType.GetProperty("Id")?.GetValue(match)?.ToString() ?? "";
                 var score = (double)(matchType.GetProperty("Score")?.GetValue(match) ?? 0.0);
                 var metadata = matchType.GetProperty("Metadata")?.GetValue(match);
                 results.Add((id, score, metadata));
@@ -552,7 +552,7 @@ internal sealed class ChainContext
             {
                 if (prop.CanRead)
                 {
-                    var value = prop.GetValue(variables)?.ToString() ?? string.Empty;
+                    var value = prop.GetValue(variables)?.ToString() ?? "";
                     ctx._variables[prop.Name] = value;
                 }
             }

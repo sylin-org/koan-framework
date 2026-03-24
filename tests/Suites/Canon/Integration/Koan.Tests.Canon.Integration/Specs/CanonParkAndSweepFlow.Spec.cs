@@ -61,7 +61,7 @@ public sealed class CanonParkAndSweepFlowSpec
                 result.Events.Should().ContainSingle(evt => evt.Phase == CanonPipelinePhase.Intake);
 
                 var stageEvent = result.Events.Single();
-                var stageId = stageEvent.Detail?.Replace("stage:", string.Empty);
+                var stageId = stageEvent.Detail?.Replace("stage:", "");
 
                 harness.StageRecords.Should().BeEmpty();
 
@@ -94,7 +94,7 @@ public sealed class CanonParkAndSweepFlowSpec
                 pipeline.AddStep(CanonPipelinePhase.Intake, (context, cancellationToken) =>
                 {
                     context.Metadata.SetOrigin(context.Options.Origin ?? "ingest");
-                    context.Metadata.SetTag("tenant", context.Options.Tags.TryGetValue("tenant", out var value) ? value ?? string.Empty : string.Empty);
+                    context.Metadata.SetTag("tenant", context.Options.Tags.TryGetValue("tenant", out var value) ? value ?? "" : "");
                     return ValueTask.CompletedTask;
                 });
             });

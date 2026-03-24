@@ -138,7 +138,7 @@ public sealed class ServicesAutoRegistrar : IKoanAutoRegistrar
         // Convert "translation" or "detect-language" → "Translation" or "DetectLanguage"
         var parts = kebabCase.Split('-');
         var result = string.Concat(parts.Select(p =>
-            p.Length > 0 ? char.ToUpperInvariant(p[0]) + p.Substring(1) : string.Empty));
+            p.Length > 0 ? char.ToUpperInvariant(p[0]) + p.Substring(1) : ""));
         return result;
     }
 
@@ -147,7 +147,7 @@ public sealed class ServicesAutoRegistrar : IKoanAutoRegistrar
         // Convert "detect-language" → "Detect Language"
         var parts = kebabCase.Split('-');
         var result = string.Join(" ", parts.Select(p =>
-            p.Length > 0 ? char.ToUpperInvariant(p[0]) + p.Substring(1) : string.Empty));
+            p.Length > 0 ? char.ToUpperInvariant(p[0]) + p.Substring(1) : ""));
         return result;
     }
 

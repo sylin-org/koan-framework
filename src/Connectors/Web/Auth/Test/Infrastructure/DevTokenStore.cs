@@ -40,7 +40,7 @@ public sealed class DevTokenStore
             {
                 if (string.IsNullOrWhiteSpace(kvp.Key)) continue;
                 if (!env.Claims.TryGetValue(kvp.Key, out var list)) env.Claims[kvp.Key] = list = new List<string>();
-                foreach (var v in kvp.Value ?? Array.Empty<string>())
+                foreach (var v in kvp.Value ?? [])
                 {
                     if (string.IsNullOrWhiteSpace(v)) continue;
                     if (!list.Contains(v)) list.Add(v);

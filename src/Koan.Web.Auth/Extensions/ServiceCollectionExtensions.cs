@@ -64,7 +64,7 @@ public static class ServiceCollectionExtensions
                         if (selection is not null && selection.HasProvider && selection.SupportsInteractiveChallenge)
                         {
                             var returnUrl = ResolveReturnUrl(ctx);
-                            var challengeUrl = BuildChallengeUrl(selection.ChallengePath ?? string.Empty, returnUrl);
+                            var challengeUrl = BuildChallengeUrl(selection.ChallengePath ?? "", returnUrl);
                             ctx.Response.Redirect(challengeUrl);
                             return Task.CompletedTask;
                         }
@@ -141,7 +141,7 @@ public static class ServiceCollectionExtensions
         if (string.IsNullOrWhiteSpace(returnUrl))
         {
             var path = context.Request.Path.HasValue ? context.Request.Path.Value ?? "/" : "/";
-            var qs = context.Request.QueryString.HasValue ? context.Request.QueryString.Value : string.Empty;
+            var qs = context.Request.QueryString.HasValue ? context.Request.QueryString.Value : "";
             returnUrl = string.IsNullOrWhiteSpace(qs) ? path : path + qs;
         }
 

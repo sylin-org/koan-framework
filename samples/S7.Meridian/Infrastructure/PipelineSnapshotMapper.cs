@@ -35,7 +35,7 @@ internal static class PipelineSnapshotMapper
     private static JobSnapshot MapJob(ProcessingJob job)
         => new()
         {
-            Id = job.Id ?? string.Empty,
+            Id = job.Id ?? "",
             Status = job.Status.ToString(),
             ProgressPercent = job.ProgressPercent,
             TotalDocuments = job.TotalDocuments,
@@ -50,7 +50,7 @@ internal static class PipelineSnapshotMapper
     private static RunLogSnapshot MapRunLog(RunLog log)
         => new()
         {
-            Id = log.Id ?? string.Empty,
+            Id = log.Id ?? "",
             Stage = log.Stage,
             Status = log.Status,
             DocumentId = log.DocumentId,

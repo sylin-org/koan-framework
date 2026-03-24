@@ -4,8 +4,8 @@ namespace Koan.Web.Auth.Services.Attributes;
 public sealed class KoanServiceAttribute : Attribute
 {
     public string ServiceId { get; }
-    public string[] ProvidedScopes { get; init; } = Array.Empty<string>();
-    public string Description { get; init; } = string.Empty;
+    public string[] ProvidedScopes { get; init; } = [];
+    public string Description { get; init; } = "";
 
     public KoanServiceAttribute(string serviceId)
     {

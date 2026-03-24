@@ -164,7 +164,7 @@ public static class KoanEnv
                 Infrastructure.Constants.Configuration.Env.DotnetEnvironment,
                 Infrastructure.Constants.Configuration.Env.AspNetCoreEnvironment
             )
-            ?? string.Empty;
+            ?? "";
         bool isDev = env?.IsDevelopment() ?? string.Equals(envName, "Development", StringComparison.OrdinalIgnoreCase);
         bool isProd = env?.IsProduction() ?? string.Equals(envName, "Production", StringComparison.OrdinalIgnoreCase);
         bool isStg = env?.IsStaging() ?? string.Equals(envName, "Staging", StringComparison.OrdinalIgnoreCase);

@@ -7,25 +7,25 @@ internal static class UserInfoMapper
     // Maps roles, permissions, and extra claims from a UserInfo JObject
     public static (string[] Roles, string[] Permissions, List<KeyValuePair<string, string>> Extras) Map(JObject user)
     {
-        if (user == null) return (Array.Empty<string>(), Array.Empty<string>(), new());
+        if (user == null) return ([], [], new());
 
         var rolesArr = user["roles"] as JArray;
         var permsArr = user["permissions"] as JArray;
         var claimsObj = user["claims"] as JObject;
 
         var roles = rolesArr != null
-            ? rolesArr.Select(t => t?.ToString() ?? string.Empty)
+            ? rolesArr.Select(t => t?.ToString() ?? "")
                       .Where(s => !string.IsNullOrWhiteSpace(s))
                       .Distinct(StringComparer.OrdinalIgnoreCase)
                       .ToArray()
-            : Array.Empty<string>();
+            : [];
 
         var perms = permsArr != null
-            ? permsArr.Select(t => t?.ToString() ?? string.Empty)
+            ? permsArr.Select(t => t?.ToString() ?? "")
                       .Where(s => !string.IsNullOrWhiteSpace(s))
                       .Distinct(StringComparer.OrdinalIgnoreCase)
                       .ToArray()
-            : Array.Empty<string>();
+            : [];
 
         var extras = new List<KeyValuePair<string, string>>();
         if (claimsObj != null)

@@ -358,7 +358,7 @@ public sealed class SchemaGuidedExtractor : ISchemaGuidedExtractor
 
         try
         {
-            var cleaned = JsonFence.Replace(rawResponse, string.Empty).Trim();
+            var cleaned = JsonFence.Replace(rawResponse, "").Trim();
             var json = JObject.Parse(cleaned);
 
             var fieldsToken = json["fields"];
@@ -625,7 +625,7 @@ public sealed class SchemaGuidedExtractor : ISchemaGuidedExtractor
     {
         if (passages.Count == 0)
         {
-            return string.Empty;
+            return "";
         }
 
         var sb = new StringBuilder();

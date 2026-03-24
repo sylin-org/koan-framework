@@ -35,7 +35,7 @@ public class McpTools_Spec
         IndexProjectAsync indexerStub = (projectId, force, cancellationToken, progress) =>
         {
             _indexCalls.Add((projectId, force));
-            return Task.FromResult(new IndexingResult(0, 0, 0, TimeSpan.Zero, Array.Empty<IndexingError>()));
+            return Task.FromResult(new IndexingResult(0, 0, 0, TimeSpan.Zero, []));
         };
         _controller = new McpToolsController(
             _retrievalMock.Object,
@@ -372,6 +372,6 @@ public class McpTools_Spec
                 }),
             Insights: null,
             ContinuationToken: null,
-            Warnings: Array.Empty<string>());
+            Warnings: []);
     }
 }

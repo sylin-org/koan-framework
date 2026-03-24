@@ -16,9 +16,9 @@ public class TypeScriptSdkSnapshotSpec : IClassFixture<TestPipelineFixture>
 
     private static string Sanitize(string raw)
     {
-        if (string.IsNullOrWhiteSpace(raw)) return string.Empty;
+        if (string.IsNullOrWhiteSpace(raw)) return "";
         // Normalize line endings + strip footer line if present
-        var cleaned = raw.Replace("\r", string.Empty);
+        var cleaned = raw.Replace("\r", "");
         var lines = cleaned.Split('\n');
         if (lines.Length > 0 && lines[^1].TrimStart().StartsWith("// integrity-sha256:"))
         {
@@ -76,8 +76,8 @@ public class TypeScriptSdkSnapshotSpec : IClassFixture<TestPipelineFixture>
         var sb = new StringBuilder();
         for (int i = 0; i < max; i++)
         {
-            var e = i < expLines.Length ? expLines[i] : string.Empty;
-            var a = i < actLines.Length ? actLines[i] : string.Empty;
+            var e = i < expLines.Length ? expLines[i] : "";
+            var a = i < actLines.Length ? actLines[i] : "";
             if (!string.Equals(e, a, StringComparison.Ordinal))
             {
                 sb.AppendLine($"@@ line {i + 1} @@");

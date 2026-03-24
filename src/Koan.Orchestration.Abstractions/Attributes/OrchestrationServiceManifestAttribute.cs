@@ -18,7 +18,7 @@ public sealed class OrchestrationServiceManifestAttribute : Attribute
     {
         Id = id;
         Image = image;
-        ContainerPorts = containerPorts ?? Array.Empty<int>();
+        ContainerPorts = containerPorts ?? [];
     }
 
     public string Id { get; }

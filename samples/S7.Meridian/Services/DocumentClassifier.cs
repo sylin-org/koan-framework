@@ -73,7 +73,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
             return new ClassificationResult(manualTypeId, confidence, ClassificationMethod.Manual, version, reason);
         }
 
-        var text = document.ExtractedText ?? string.Empty;
+        var text = document.ExtractedText ?? "";
 
         // Stage 1: Heuristic
         var heuristic = EvaluateHeuristics(document, text, types);
@@ -349,7 +349,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
     {
         if (string.IsNullOrWhiteSpace(content))
         {
-            return string.Empty;
+            return "";
         }
 
         return content.ToLowerInvariant();
@@ -359,7 +359,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
     {
         if (string.IsNullOrWhiteSpace(fileName))
         {
-            return string.Empty;
+            return "";
         }
 
         var lowered = fileName.ToLowerInvariant();
@@ -373,7 +373,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
     {
         if (string.IsNullOrWhiteSpace(phrase))
         {
-            return string.Empty;
+            return "";
         }
 
         var tokens = phrase

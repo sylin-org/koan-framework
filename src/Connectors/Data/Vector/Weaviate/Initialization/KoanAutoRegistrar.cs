@@ -176,7 +176,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         if (Uri.TryCreate(endpoint, UriKind.Absolute, out var uri))
         {
             var scheme = string.IsNullOrWhiteSpace(uri.Scheme) ? "http" : uri.Scheme;
-            var portSegment = uri.IsDefaultPort ? string.Empty : $":{uri.Port}";
+            var portSegment = uri.IsDefaultPort ? "" : $":{uri.Port}";
             return $"{scheme}://{uri.Host}{portSegment}";
         }
 

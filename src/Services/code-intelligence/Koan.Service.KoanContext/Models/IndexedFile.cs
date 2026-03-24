@@ -27,10 +27,10 @@ namespace Koan.Context.Models;
 public class IndexedFile : Entity<IndexedFile>
 {
     /// <summary>Relative path from project root</summary>
-    public string RelativePath { get; set; } = string.Empty;
+    public string RelativePath { get; set; } = "";
 
     /// <summary>SHA256 hash of file contents</summary>
-    public string ContentHash { get; set; } = string.Empty;
+    public string ContentHash { get; set; } = "";
 
     /// <summary>When this file was last indexed</summary>
     public DateTime LastIndexedAt { get; set; } = DateTime.UtcNow;

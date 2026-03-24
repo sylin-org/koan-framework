@@ -258,7 +258,7 @@ internal sealed class LMStudioAdapterContributor : IAiAdapterContributor
         ct.ThrowIfCancellationRequested();
 
         var map = new Dictionary<string, AiCapabilityConfig>(StringComparer.OrdinalIgnoreCase);
-        var model = defaultModel ?? string.Empty;
+        var model = defaultModel ?? "";
         if (!string.IsNullOrWhiteSpace(model))
         {
             map["Chat"] = new AiCapabilityConfig { Model = model };
@@ -309,7 +309,7 @@ internal sealed class LMStudioAdapterContributor : IAiAdapterContributor
     private static IReadOnlyDictionary<string, AiCapabilityConfig> BuildSourceCapabilities(IEnumerable<AiMemberDefinition> members, string? defaultModel)
     {
         var map = new Dictionary<string, AiCapabilityConfig>(StringComparer.OrdinalIgnoreCase);
-        var model = defaultModel ?? members.SelectMany(m => m.Capabilities?.Values ?? Array.Empty<AiCapabilityConfig>()).FirstOrDefault()?.Model ?? string.Empty;
+        var model = defaultModel ?? members.SelectMany(m => m.Capabilities?.Values ?? []).FirstOrDefault()?.Model ?? "";
         if (!string.IsNullOrWhiteSpace(model))
         {
             map["Chat"] = new AiCapabilityConfig { Model = model };

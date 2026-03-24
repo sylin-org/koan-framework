@@ -266,8 +266,8 @@ public sealed class RedisContainerFixture : IAsyncDisposable, IInitializableFixt
         _cliContainerId = containerName;
 
         var portOk = false;
-        string portStdout = string.Empty;
-        string portStderr = string.Empty;
+        string portStdout = "";
+        string portStderr = "";
         var portExitCode = 0;
 
         for (var attempt = 0; attempt < 5 && !portOk; attempt++)
@@ -350,7 +350,7 @@ public sealed class RedisContainerFixture : IAsyncDisposable, IInitializableFixt
             process = Process.Start(psi);
             if (process is null)
             {
-                return (false, string.Empty, "Failed to start docker process", -1);
+                return (false, "", "Failed to start docker process", -1);
             }
 
             var stdoutTask = process.StandardOutput.ReadToEndAsync();
@@ -373,11 +373,11 @@ public sealed class RedisContainerFixture : IAsyncDisposable, IInitializableFixt
                 }
             }
 
-            return (false, string.Empty, "Cancelled", -1);
+            return (false, "", "Cancelled", -1);
         }
         catch (Exception ex)
         {
-            return (false, string.Empty, ex.Message, -1);
+            return (false, "", ex.Message, -1);
         }
         finally
         {
@@ -483,7 +483,7 @@ public sealed class RedisContainerFixture : IAsyncDisposable, IInitializableFixt
     {
         if (string.IsNullOrEmpty(value))
         {
-            return string.Empty;
+            return "";
         }
 
         return value.Length <= max ? value : value[..max] + "…";

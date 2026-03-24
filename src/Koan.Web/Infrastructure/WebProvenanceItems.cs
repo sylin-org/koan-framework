@@ -35,7 +35,7 @@ internal static class WebProvenanceItems
         "Content Security Policy",
         "Explicit Content-Security-Policy directive applied to responses when non-empty.",
         MustSanitize: true,
-        DefaultValue: string.Empty,
+        DefaultValue: "",
         DefaultConsumers: SecurityConsumers);
 
     internal static readonly ProvenanceItem ApplicationUrl = new(

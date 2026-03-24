@@ -18,7 +18,7 @@ public sealed class SearchPersonasController : EntityController<SearchPersona>
     {
         if (entity is null)
         {
-            return string.Empty;
+            return "";
         }
 
         return string.IsNullOrWhiteSpace(entity.DisplayName) ? entity.Name : entity.DisplayName;

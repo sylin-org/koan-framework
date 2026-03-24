@@ -744,7 +744,7 @@ namespace Koan.Data.Core.Model
         {
             // Use reflection to call Data<TParent, TKey>.GetAsync
             var dataType = typeof(Data<,>).MakeGenericType(parentType, typeof(TKey));
-            var method = dataType.GetMethod("GetAsync", new[] { typeof(TKey), typeof(CancellationToken) });
+            var method = dataType.GetMethod("Get", new[] { typeof(TKey), typeof(CancellationToken) });
 
             if (method == null) return null;
 

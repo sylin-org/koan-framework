@@ -11,12 +11,12 @@ public class Project : Entity<Project>
     /// <summary>
     /// Display name (auto-derived from folder name)
     /// </summary>
-    public string Name { get; set; } = string.Empty;
+    public string Name { get; set; } = "";
 
     /// <summary>
     /// Absolute path to project root directory
     /// </summary>
-    public string RootPath { get; set; } = string.Empty;
+    public string RootPath { get; set; } = "";
 
     /// <summary>
     /// Optional subdirectory for documentation (e.g., "docs")

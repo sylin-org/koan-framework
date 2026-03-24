@@ -116,7 +116,7 @@ public static class AdapterReadinessExtensions
                 try
                 {
                     // Execute EnsureCreated instruction using reflection
-                    var executeMethod = executorType.GetMethod("ExecuteAsync")?.MakeGenericMethod(typeof(bool));
+                    var executeMethod = executorType.GetMethod("Execute")?.MakeGenericMethod(typeof(bool));
                     if (executeMethod != null)
                     {
                         var instruction = new Instruction(DataInstructions.EnsureCreated);
@@ -149,7 +149,7 @@ public static class AdapterReadinessExtensions
     /// </summary>
     private static bool IsSchemaRelatedFailure(Exception ex)
     {
-        var message = ex.Message?.ToLowerInvariant() ?? string.Empty;
+        var message = ex.Message?.ToLowerInvariant() ?? "";
 
         // Common schema-related failure patterns across providers
         return message.Contains("keyspace not found") ||           // Couchbase

@@ -189,7 +189,7 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
     {
         try
         {
-            var cleaned = rawResponse?.Trim() ?? string.Empty;
+            var cleaned = rawResponse?.Trim() ?? "";
 
             // Strip markdown code fences if present
             if (cleaned.StartsWith("```"))
@@ -251,10 +251,10 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
 
             var draft = new AnalysisTypeDraft
             {
-                Name = json["name"]?.Value<string>()?.Trim() ?? string.Empty,
-                Description = json["description"]?.Value<string>()?.Trim() ?? string.Empty,
-                Instructions = json["instructions"]?.Value<string>()?.Trim() ?? string.Empty,
-                OutputTemplate = FieldPathCanonicalizer.CanonicalizeTemplatePlaceholders(json["outputTemplate"]?.Value<string>()?.Trim() ?? string.Empty),
+                Name = json["name"]?.Value<string>()?.Trim() ?? "",
+                Description = json["description"]?.Value<string>()?.Trim() ?? "",
+                Instructions = json["instructions"]?.Value<string>()?.Trim() ?? "",
+                OutputTemplate = FieldPathCanonicalizer.CanonicalizeTemplatePlaceholders(json["outputTemplate"]?.Value<string>()?.Trim() ?? ""),
                 JsonSchema = schemaJson,
                 Tags = ExtractArray(json["tags"]),
                 Descriptors = ExtractArray(json["descriptors"])
@@ -288,9 +288,9 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
         {
             Name = name,
             Description = description,
-            Instructions = string.Empty,
-            OutputTemplate = string.Empty,
-            JsonSchema = string.Empty,
+            Instructions = "",
+            OutputTemplate = "",
+            JsonSchema = "",
             Tags = new List<string>(),
             Descriptors = new List<string>()
         };
@@ -365,7 +365,7 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
         draft.Instructions = draft.Instructions.Truncate(5000);
         draft.OutputTemplate = draft.OutputTemplate.Truncate(10000);
         draft.OutputTemplate = FieldPathCanonicalizer.CanonicalizeTemplatePlaceholders(draft.OutputTemplate);
-        draft.JsonSchema = draft.JsonSchema?.Truncate(16000) ?? string.Empty;
+        draft.JsonSchema = draft.JsonSchema?.Truncate(16000) ?? "";
         draft.JsonSchema = FieldPathCanonicalizer.CanonicalizeJsonSchema(draft.JsonSchema);
         draft.Tags = draft.Tags
                 .Where(value => !string.IsNullOrWhiteSpace(value))
@@ -409,7 +409,7 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
 
     private static bool DraftMeetsQuality(AnalysisTypeDraft draft, out string failureReason)
     {
-        failureReason = string.Empty;
+        failureReason = "";
 
         if (draft is null)
         {

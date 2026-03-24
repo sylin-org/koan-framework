@@ -11,12 +11,12 @@ public sealed class CanonizationRecord
     /// <summary>
     /// Canonical identifier associated with the record.
     /// </summary>
-    public string CanonicalId { get; init; } = string.Empty;
+    public string CanonicalId { get; init; } = "";
 
     /// <summary>
     /// CLR type name of the canonical entity.
     /// </summary>
-    public string EntityType { get; init; } = string.Empty;
+    public string EntityType { get; init; } = "";
 
     /// <summary>
     /// Pipeline phase that produced the record.

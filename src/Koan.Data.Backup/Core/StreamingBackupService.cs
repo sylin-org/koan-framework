@@ -47,7 +47,7 @@ public class StreamingBackupService : IBackupService
             Id = Guid.CreateVersion7().ToString(),
             Name = backupName,
             Description = options.Description ?? $"Backup of {typeof(TEntity).Name}",
-            Labels = options.Tags ?? Array.Empty<string>(),
+            Labels = options.Tags ?? [],
             CreatedAt = DateTimeOffset.UtcNow,
             Status = BackupStatus.InProgress,
             Version = "1.0"
@@ -120,7 +120,7 @@ public class StreamingBackupService : IBackupService
                 options.StorageProfile,
                 ct);
 
-            manifest.Verification.ArchiveContentHash = storageObject.ContentHash ?? string.Empty;
+            manifest.Verification.ArchiveContentHash = storageObject.ContentHash ?? "";
             manifest.Verification.ArchiveSizeBytes = storageObject.Size;
             // Update final progress
             progress.Status = BackupStatus.Completed;
@@ -188,7 +188,7 @@ public class StreamingBackupService : IBackupService
             Id = Guid.CreateVersion7().ToString(),
             Name = backupName,
             Description = options.Description ?? $"Backup of {allEntities.Count} entity types",
-            Labels = options.Tags ?? Array.Empty<string>(),
+            Labels = options.Tags ?? [],
             CreatedAt = DateTimeOffset.UtcNow,
             Status = BackupStatus.InProgress,
             Version = "1.0"
@@ -283,7 +283,7 @@ public class StreamingBackupService : IBackupService
                 options.StorageProfile,
                 ct);
 
-            manifest.Verification.ArchiveContentHash = storageObject.ContentHash ?? string.Empty;
+            manifest.Verification.ArchiveContentHash = storageObject.ContentHash ?? "";
             manifest.Verification.ArchiveSizeBytes = storageObject.Size;
             // Update final progress
             progress.Status = BackupStatus.Completed;

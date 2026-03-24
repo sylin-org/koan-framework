@@ -13,7 +13,7 @@ public class JobExecution : Entity<JobExecution>
     [Required]
     [Parent(typeof(Job))]
     [Index]
-    public string JobId { get; set; } = string.Empty;
+    public string JobId { get; set; } = "";
 
     [Required]
     public int AttemptNumber { get; set; }

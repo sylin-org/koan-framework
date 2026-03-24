@@ -465,8 +465,8 @@ internal enum WalOp
 internal sealed class WalEntry
 {
     public WalOp Op { get; set; }
-    public string Container { get; set; } = string.Empty;
-    public string Key { get; set; } = string.Empty;
+    public string Container { get; set; } = "";
+    public string Key { get; set; } = "";
     public string? ContentType { get; set; }
     public string? StagingFile { get; set; }
     public DateTimeOffset Timestamp { get; set; }

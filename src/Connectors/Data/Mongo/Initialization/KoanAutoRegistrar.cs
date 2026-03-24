@@ -151,13 +151,13 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
         var username = Configuration.ReadFirstWithSource(
             cfg,
-            string.Empty,
+            "",
             "Koan:Data:Mongo:Username",
             "Koan:Data:Username");
 
         var password = Configuration.ReadFirstWithSource(
             cfg,
-            string.Empty,
+            "",
             "Koan:Data:Mongo:Password",
             "Koan:Data:Password");
 

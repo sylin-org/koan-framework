@@ -7,10 +7,10 @@ internal sealed class MongoOutboxRecord
     [BsonId]
     public string Id { get; set; } = default!;
     public DateTimeOffset OccurredAt { get; set; }
-    public string EntityType { get; set; } = string.Empty;
-    public string Operation { get; set; } = string.Empty;
-    public string EntityId { get; set; } = string.Empty;
-    public string PayloadJson { get; set; } = string.Empty;
+    public string EntityType { get; set; } = "";
+    public string Operation { get; set; } = "";
+    public string EntityId { get; set; } = "";
+    public string PayloadJson { get; set; } = "";
     public Dictionary<string, string>? Headers { get; set; }
     public string? PartitionKey { get; set; }
     public string? DedupKey { get; set; }

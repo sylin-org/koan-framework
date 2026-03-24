@@ -16,14 +16,14 @@ public enum ReminderStatus
 public class Reminder : Entity<Reminder>
 {
     [Parent(typeof(Plot))]
-    public string PlotId { get; set; } = string.Empty;
+    public string PlotId { get; set; } = "";
 
     [Parent(typeof(Member))]
     public string? MemberId { get; set; }  // who should we nudge?
 
     public ReminderStatus Status { get; set; } = ReminderStatus.Idle;
 
-    public string Notes { get; set; } = string.Empty;
+    public string Notes { get; set; } = "";
 
     public static async Task<Reminder?> ActiveForPlot(string plotId, CancellationToken ct = default)
     {

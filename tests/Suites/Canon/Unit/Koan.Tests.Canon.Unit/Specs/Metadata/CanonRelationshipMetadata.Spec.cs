@@ -55,21 +55,21 @@ public sealed class CanonRelationshipMetadataSpec
     private sealed class Order : CanonEntity<Order>
     {
         [AggregationKey]
-        public string OrderNumber { get; set; } = string.Empty;
+        public string OrderNumber { get; set; } = "";
     }
 
     private sealed class OrderLine : CanonEntity<OrderLine>
     {
         [AggregationKey]
-        public string LineNumber { get; set; } = string.Empty;
+        public string LineNumber { get; set; } = "";
 
         [Parent(typeof(Order))]
-        public string OrderId { get; set; } = string.Empty;
+        public string OrderId { get; set; } = "";
     }
 
     private sealed class OrderAddress : CanonValueObject<OrderAddress>
     {
         [Parent(typeof(Order))]
-        public string OrderId { get; set; } = string.Empty;
+        public string OrderId { get; set; } = "";
     }
 }

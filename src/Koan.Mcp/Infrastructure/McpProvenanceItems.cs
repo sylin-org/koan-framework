@@ -119,7 +119,7 @@ internal static class McpProvenanceItems
         var buffer = new List<string>();
         foreach (var item in items)
         {
-            var value = (item ?? string.Empty).Trim();
+            var value = (item ?? "").Trim();
             if (value.Length > 0)
             {
                 buffer.Add(value);

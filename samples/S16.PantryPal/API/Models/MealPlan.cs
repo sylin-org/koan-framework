@@ -14,7 +14,7 @@ public sealed class MealPlan : Entity<MealPlan>
     public DateTime EndDate { get; set; }
 
     /// <summary>Planned meals within the date range</summary>
-    public PlannedMeal[] PlannedMeals { get; set; } = Array.Empty<PlannedMeal>();
+    public PlannedMeal[] PlannedMeals { get; set; } = [];
 
     public decimal EstimatedCost { get; set; }
     public string Status { get; set; } = "active";
@@ -45,7 +45,7 @@ public class PlannedMeal
     // User Feedback
     public int? Rating { get; set; }
     public string? Notes { get; set; }
-    public string[] Tags { get; set; } = Array.Empty<string>();
+    public string[] Tags { get; set; } = [];
 
     public int ActualServings { get; set; }
 }

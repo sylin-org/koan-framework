@@ -100,7 +100,7 @@ END";
     public void AddComputedColumnFromJson(string schema, string table, string column, string jsonPath, bool persisted)
     {
         using var cmd = _conn.CreateCommand();
-        var persist = persisted ? " PERSISTED" : string.Empty;
+        var persist = persisted ? " PERSISTED" : "";
         cmd.CommandText = $"ALTER TABLE [{schema}].[{table}] ADD [{column}] AS JSON_VALUE([Json], '{jsonPath}'){persist}";
         try { cmd.ExecuteNonQueryAsync(); } catch { }
     }
@@ -117,7 +117,7 @@ END";
     public void CreateIndex(string schema, string table, string indexName, IReadOnlyList<string> columns, bool unique)
     {
         using var cmd = _conn.CreateCommand();
-        var uq = unique ? "UNIQUE " : string.Empty;
+        var uq = unique ? "UNIQUE " : "";
         var cols = string.Join(", ", columns.Select(c => $"[{c}]"));
         cmd.CommandText = $@"IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'{indexName}' AND object_id = OBJECT_ID(N'[{schema}].[{table}]'))
 CREATE {uq}INDEX [{indexName}] ON [{schema}].[{table}] ({cols});";

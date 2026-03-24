@@ -272,7 +272,7 @@ public static class DockerEnvironment
     {
         if (string.IsNullOrEmpty(value))
         {
-            return string.Empty;
+            return "";
         }
 
         return value.Length <= MaxLogPayloadLength

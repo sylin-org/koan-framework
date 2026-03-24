@@ -258,7 +258,7 @@ public sealed class PipelineE2ETests
     {
         public Task<byte[]> Render(string markdown, CancellationToken ct = default)
         {
-            var bytes = Encoding.UTF8.GetBytes(markdown ?? string.Empty);
+            var bytes = Encoding.UTF8.GetBytes(markdown ?? "");
             return Task.FromResult(bytes);
         }
     }
@@ -333,7 +333,7 @@ public sealed class PipelineE2ETests
     {
         public Task<AiChatResponse> Prompt(AiChatRequest request, CancellationToken ct = default)
         {
-            var prompt = request.Messages.LastOrDefault()?.Content ?? string.Empty;
+            var prompt = request.Messages.LastOrDefault()?.Content ?? "";
             var response = ResolveResponse(prompt);
             return Task.FromResult(response);
         }
@@ -385,7 +385,7 @@ public sealed class PipelineE2ETests
         private static AiChatResponse ResolveResponse(string prompt)
         {
             var match = Regex.Match(prompt, @"Extract the value for '([^']+)'", RegexOptions.IgnoreCase);
-            var field = match.Success ? match.Groups[1].Value : string.Empty;
+            var field = match.Success ? match.Groups[1].Value : "";
 
             if (field.Equals("employees", StringComparison.OrdinalIgnoreCase))
             {

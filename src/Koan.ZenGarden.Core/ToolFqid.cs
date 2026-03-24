@@ -188,7 +188,7 @@ public readonly record struct ToolFqid
     {
         return Instance is not null
             ? $"{OfferingType}{Separator}{Instance}"
-            : OfferingType ?? string.Empty;
+            : OfferingType ?? "";
     }
 
     /// <summary>Implicit conversion from string (parses).</summary>

@@ -73,7 +73,7 @@ public static class MergeTransforms
         string raw = token.Type switch
         {
             JTokenType.Float or JTokenType.Integer => token.Value<double>().ToString(Culture),
-            _ => token.Value<string>() ?? string.Empty
+            _ => token.Value<string>() ?? ""
         };
 
         if (string.IsNullOrWhiteSpace(raw))
@@ -92,7 +92,7 @@ public static class MergeTransforms
             return token;
         }
 
-        var numericPart = match.Groups["value"].Value.Replace(",", string.Empty, StringComparison.Ordinal);
+        var numericPart = match.Groups["value"].Value.Replace(",", "", StringComparison.Ordinal);
         if (!decimal.TryParse(numericPart, NumberStyles.Any, Culture, out var amount))
         {
             return token;
@@ -137,7 +137,7 @@ public static class MergeTransforms
         string raw = token.Type switch
         {
             JTokenType.Float or JTokenType.Integer => token.Value<double>().ToString(Culture),
-            _ => token.Value<string>() ?? string.Empty
+            _ => token.Value<string>() ?? ""
         };
 
         if (string.IsNullOrWhiteSpace(raw))
@@ -175,7 +175,7 @@ public static class MergeTransforms
         foreach (var item in array)
         {
             var candidate = item.Type == JTokenType.String
-                ? item.Value<string>() ?? string.Empty
+                ? item.Value<string>() ?? ""
                 : item.ToString(Formatting.None);
 
             candidate = candidate.Trim();

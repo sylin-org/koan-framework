@@ -56,7 +56,7 @@ internal sealed class RedisInboxAnnouncementService : BackgroundService
             var exchange = ResolveExchange();
             await _channel.ExchangeDeclareAsync(exchange, type: "topic", durable: true, autoDelete: false, arguments: null, cancellationToken: stoppingToken);
 
-            var queue = (await _channel.QueueDeclareAsync(queue: string.Empty, durable: false, exclusive: true, autoDelete: true, arguments: null, cancellationToken: stoppingToken)).QueueName;
+            var queue = (await _channel.QueueDeclareAsync(queue: "", durable: false, exclusive: true, autoDelete: true, arguments: null, cancellationToken: stoppingToken)).QueueName;
             var busCode = _configuration["Koan:Messaging:DefaultBus"] ?? "rabbit";
             var group = _configuration["Koan:Messaging:DefaultGroup"] ?? "workers";
             var routingKey = $"Koan.discovery.ping.{busCode}.{group}";

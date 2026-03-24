@@ -12,7 +12,7 @@ public sealed record KoanAdminHealthDocument(
 {
     public static KoanAdminHealthDocument Empty { get; } = new(
         HealthStatus.Unknown,
-        Array.Empty<KoanAdminHealthComponent>(),
+        [],
         DateTimeOffset.MinValue
     );
 }

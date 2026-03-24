@@ -24,7 +24,7 @@ internal sealed class DataDiagnostics : IDataDiagnostics
                 var bags = new List<(string Key, string Type)>();
                 if (enumerateBags is not null)
                 {
-                    var entries = (System.Collections.IEnumerable)enumerateBags.Invoke(cfg, Array.Empty<object>())!;
+                    var entries = (System.Collections.IEnumerable)enumerateBags.Invoke(cfg, [])!;
                     foreach (var entry in entries)
                     {
                         var et = entry.GetType();

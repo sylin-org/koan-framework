@@ -7,7 +7,7 @@ namespace Koan.Cache.Abstractions.Policies;
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method | AttributeTargets.Struct, Inherited = true, AllowMultiple = true)]
 public sealed class CachePolicyAttribute : Attribute
 {
-    private static readonly string[] EmptyTags = Array.Empty<string>();
+    private static readonly string[] EmptyTags = [];
 
     public CachePolicyAttribute(CacheScope scope, string keyTemplate)
     {

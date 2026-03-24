@@ -194,7 +194,7 @@ internal static class AdminProvenanceItems
         var trimmed = new List<string>(items.Count);
         foreach (var item in items)
         {
-            var candidate = (item ?? string.Empty).Trim();
+            var candidate = (item ?? "").Trim();
             if (candidate.Length > 0)
             {
                 trimmed.Add(candidate);

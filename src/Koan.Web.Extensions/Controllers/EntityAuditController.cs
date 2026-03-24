@@ -61,7 +61,7 @@ public abstract class EntityAuditController<TEntity> : ControllerBase
         using var _ = Data<TEntity, string>.WithPartition(AuditSet);
         var all = await Data<TEntity, string>.All(ct);
         var prefix = id + "#v";
-        var items = all.Where(e => (e.Id ?? string.Empty).StartsWith(prefix, StringComparison.Ordinal)).ToList();
+        var items = all.Where(e => (e.Id ?? "").StartsWith(prefix, StringComparison.Ordinal)).ToList();
         return Ok(items);
     }
 
@@ -118,7 +118,7 @@ public abstract class EntityAuditController<TEntity> : ControllerBase
         var max = 0;
         foreach (var item in all)
         {
-            var curId = item.Id ?? string.Empty;
+            var curId = item.Id ?? "";
             if (!curId.StartsWith(prefix, StringComparison.Ordinal)) continue;
             var tail = curId.AsSpan(prefix.Length);
             if (int.TryParse(tail, out var v) && v > max) max = v;

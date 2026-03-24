@@ -43,7 +43,7 @@ public sealed record ZenGardenOfferingResolution
     /// <summary>
     /// Candidate URIs emitted by tools projection.
     /// </summary>
-    public IReadOnlyList<string> Uris { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<string> Uris { get; init; } = [];
 
     /// <summary>
     /// Current offering capabilities map.

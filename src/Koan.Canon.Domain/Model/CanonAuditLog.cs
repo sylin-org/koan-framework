@@ -9,15 +9,15 @@ namespace Koan.Canon.Domain.Model;
 public sealed class CanonAuditLog : Entity<CanonAuditLog>
 {
     [Index]
-    public string CanonicalId { get; set; } = string.Empty;
+    public string CanonicalId { get; set; } = "";
 
     [Index]
-    public string EntityType { get; set; } = string.Empty;
+    public string EntityType { get; set; } = "";
 
     [Index]
-    public string Property { get; set; } = string.Empty;
+    public string Property { get; set; } = "";
 
-    public string Policy { get; set; } = string.Empty;
+    public string Policy { get; set; } = "";
 
     public string? PreviousValue { get; set; }
 

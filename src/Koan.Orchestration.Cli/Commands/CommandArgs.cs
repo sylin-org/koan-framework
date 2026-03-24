@@ -62,7 +62,7 @@ internal sealed class CommandArgs
         => _options.TryGetValue(name, out var list) && list.Count > 0 ? list[^1] : null;
 
     public IReadOnlyList<string> GetValues(string name)
-        => _options.TryGetValue(name, out var list) ? list : Array.Empty<string>();
+        => _options.TryGetValue(name, out var list) ? list : [];
 
     public bool HasFlag(string name)
         => _flags.Contains(name) || _flags.Contains("--" + name) || _flags.Contains("-" + name.TrimStart('-'));
@@ -80,9 +80,9 @@ internal sealed class CommandArgs
     private static (string Name, string Value, bool HasValue) SplitOption(string token)
     {
         var idx = token.IndexOf('=');
-        if (idx < 0) return (token, string.Empty, false);
+        if (idx < 0) return (token, "", false);
         var name = token[..idx];
-        var value = idx + 1 < token.Length ? token[(idx + 1)..] : string.Empty;
+        var value = idx + 1 < token.Length ? token[(idx + 1)..] : "";
         return (name, value, true);
     }
 

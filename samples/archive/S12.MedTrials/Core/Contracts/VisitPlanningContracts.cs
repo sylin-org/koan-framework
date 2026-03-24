@@ -6,8 +6,8 @@ namespace S12.MedTrials.Contracts;
 
 public sealed class VisitPlanningRequest
 {
-    public string TrialSiteId { get; set; } = string.Empty;
-    public string[] ParticipantIds { get; set; } = Array.Empty<string>();
+    public string TrialSiteId { get; set; } = "";
+    public string[] ParticipantIds { get; set; } = [];
     public DateTimeOffset? StartWindow { get; set; }
     public DateTimeOffset? EndWindow { get; set; }
     public int MaxVisitsPerDay { get; set; } = 12;

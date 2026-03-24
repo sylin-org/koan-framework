@@ -100,7 +100,7 @@ public sealed class LocalStorageProvider : IStorageProvider, IStatOperations, IS
     {
         var basePath = _options.CurrentValue.BasePath ?? throw new InvalidOperationException("Local storage BasePath not configured.");
         var safeKey = SanitizeKey(key);
-        var path = Path.Combine(basePath, container ?? string.Empty, Shard(safeKey), safeKey);
+        var path = Path.Combine(basePath, container ?? "", Shard(safeKey), safeKey);
         var full = Path.GetFullPath(path);
         var fullBase = Path.GetFullPath(basePath);
         if (!full.StartsWith(fullBase, StringComparison.OrdinalIgnoreCase))
@@ -140,7 +140,7 @@ public sealed class LocalStorageProvider : IStorageProvider, IStatOperations, IS
     public async IAsyncEnumerable<StorageObjectInfo> ListObjects(string container, string? prefix = null, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
         var basePath = _options.CurrentValue.BasePath ?? throw new InvalidOperationException("Local storage BasePath not configured.");
-        var containerPath = Path.Combine(basePath, container ?? string.Empty);
+        var containerPath = Path.Combine(basePath, container ?? "");
 
         if (!Directory.Exists(containerPath))
             yield break;

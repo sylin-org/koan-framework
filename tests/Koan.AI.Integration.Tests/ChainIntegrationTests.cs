@@ -173,7 +173,7 @@ public sealed class ChainIntegrationTests
 
     private sealed class TestResponse
     {
-        public string Answer { get; set; } = string.Empty;
+        public string Answer { get; set; } = "";
         public double Confidence { get; set; }
     }
 }

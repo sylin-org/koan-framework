@@ -18,6 +18,6 @@ public static class Redaction
 
     public static string RedactText(string? input)
         => string.IsNullOrEmpty(input)
-            ? input ?? string.Empty
+            ? input ?? ""
             : RedactKv.Replace(input!, m => $"{m.Groups["k"].Value}{m.Groups["sep"].Value}***");
 }

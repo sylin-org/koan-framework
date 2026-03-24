@@ -115,7 +115,7 @@ public sealed class SyncJournal
     public static void Truncate(string journalPath)
     {
         if (File.Exists(journalPath))
-            File.WriteAllTextAsync(journalPath, string.Empty);
+            File.WriteAllTextAsync(journalPath, "");
     }
 }
 

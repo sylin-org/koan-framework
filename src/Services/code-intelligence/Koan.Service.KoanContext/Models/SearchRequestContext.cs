@@ -57,7 +57,7 @@ public sealed record SearchRequestContext(
             .Where(static id => !string.IsNullOrWhiteSpace(id))
             .Select(static id => id.Trim())
             .Distinct(StringComparer.Ordinal)
-            .ToArray() ?? Array.Empty<string>();
+            .ToArray() ?? [];
 
         var sanitizedTagsAny = TagEnvelope.NormalizeTags(tagsAny);
         var sanitizedTagsAll = TagEnvelope.NormalizeTags(tagsAll);

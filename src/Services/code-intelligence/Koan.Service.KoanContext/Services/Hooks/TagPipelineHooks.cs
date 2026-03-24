@@ -66,7 +66,7 @@ public sealed class TagPipelineHooks : IModelHook<TagPipeline>
 
         pipeline.Name = pipeline.Name.Trim().ToLowerInvariant();
         pipeline.Description = string.IsNullOrWhiteSpace(pipeline.Description)
-            ? string.Empty
+            ? ""
             : pipeline.Description.Trim();
 
         pipeline.RuleIds = (pipeline.RuleIds ?? new List<string>())

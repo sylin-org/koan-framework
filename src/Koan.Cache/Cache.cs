@@ -47,5 +47,5 @@ public static class Cache
         => new(Client, tags);
 
     public static CacheTagSet Tags(IEnumerable<string> tags)
-        => new(Client, tags ?? Array.Empty<string>());
+        => new(Client, tags ?? []);
 }

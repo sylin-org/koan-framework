@@ -119,7 +119,7 @@ internal sealed class OllamaAdapter : IChatAdapter, IEmbedAdapter
 
         return new AiChatResponse
         {
-            Text = doc.response ?? string.Empty,
+            Text = doc.response ?? "",
             FinishReason = doc.done_reason,
             Model = doc.model
         };
@@ -211,7 +211,7 @@ internal sealed class OllamaAdapter : IChatAdapter, IEmbedAdapter
             var doc = JsonConvert.DeserializeObject<OllamaEmbeddingsResponse>(json)
                       ?? throw new InvalidOperationException("Empty response from Ollama.");
 
-            vectors.Add(doc.embedding ?? Array.Empty<float>());
+            vectors.Add(doc.embedding ?? []);
         }
 
         var dimension = vectors.FirstOrDefault()?.Length ?? 0;
@@ -229,7 +229,7 @@ internal sealed class OllamaAdapter : IChatAdapter, IEmbedAdapter
         {
             models.Add(new AiModelDescriptor
             {
-                Name = model.name ?? string.Empty,
+                Name = model.name ?? "",
                 Family = model.model,
                 AdapterId = Id,
                 AdapterType = Type

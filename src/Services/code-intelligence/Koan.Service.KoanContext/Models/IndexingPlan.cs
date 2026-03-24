@@ -74,8 +74,8 @@ public class IndexingPlan
 /// </summary>
 public record FileManifestEntry
 {
-    public string RelativePath { get; init; } = string.Empty;
-    public string FileHash { get; init; } = string.Empty;
+    public string RelativePath { get; init; } = "";
+    public string FileHash { get; init; } = "";
     public DateTime LastModified { get; init; }
     public long SizeBytes { get; init; }
 }

@@ -20,7 +20,7 @@ internal sealed class FakeAuthoringAi : IAiPipeline
 {
     public Task<AiChatResponse> Prompt(AiChatRequest request, CancellationToken ct = default)
     {
-        var prompt = request.Messages.LastOrDefault()?.Content ?? string.Empty;
+        var prompt = request.Messages.LastOrDefault()?.Content ?? "";
         var text = prompt.Contains("\"fieldQueries\"", StringComparison.OrdinalIgnoreCase)
             ? BuildSourceTypeDraft()
             : BuildAnalysisTypeDraft();

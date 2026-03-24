@@ -56,7 +56,7 @@ public sealed class SlidingWindowCache
     /// Hash of query parameters (text, filters, userId, sort, etc.)
     /// Used to identify unique queries and invalidate cache on param changes
     /// </summary>
-    public string QueryHash { get; set; } = string.Empty;
+    public string QueryHash { get; set; } = "";
 
     /// <summary>
     /// Indicates if a background prefetch is currently in progress

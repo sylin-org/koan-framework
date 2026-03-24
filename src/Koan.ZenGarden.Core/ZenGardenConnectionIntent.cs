@@ -25,7 +25,7 @@ public sealed record ZenGardenConnectionIntent
     /// <summary>
     /// Optional required capabilities (bare by default, typed optional).
     /// </summary>
-    public IReadOnlyList<string> Capabilities { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<string> Capabilities { get; init; } = [];
 
     /// <summary>
     /// Creates an intent from offering metadata.
@@ -71,7 +71,7 @@ public sealed record ZenGardenConnectionIntent
 
         var queryIndex = payload.IndexOf('?', StringComparison.Ordinal);
         var target = queryIndex >= 0 ? payload[..queryIndex] : payload;
-        var query = queryIndex >= 0 ? payload[(queryIndex + 1)..] : string.Empty;
+        var query = queryIndex >= 0 ? payload[(queryIndex + 1)..] : "";
 
         target = target.Trim().TrimEnd('/');
         if (string.IsNullOrWhiteSpace(target))
@@ -125,7 +125,7 @@ public sealed record ZenGardenConnectionIntent
     {
         if (string.IsNullOrWhiteSpace(query))
         {
-            return Array.Empty<string>();
+            return [];
         }
 
         var values = new List<string>();
@@ -138,7 +138,7 @@ public sealed record ZenGardenConnectionIntent
                 continue;
             }
 
-            var value = separator >= 0 ? pair[(separator + 1)..] : string.Empty;
+            var value = separator >= 0 ? pair[(separator + 1)..] : "";
             if (string.IsNullOrWhiteSpace(value))
             {
                 continue;
@@ -154,7 +154,7 @@ public sealed record ZenGardenConnectionIntent
     {
         if (raw is null)
         {
-            return Array.Empty<string>();
+            return [];
         }
 
         var normalized = new List<string>();

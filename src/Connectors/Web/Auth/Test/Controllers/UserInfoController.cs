@@ -17,8 +17,8 @@ public sealed class UserInfoController(DevTokenStore store, IHostEnvironment env
     if (!store.TryGetToken(token, out var profile, out var envx)) { logger.LogDebug("TestProvider userinfo: invalid token"); return Unauthorized(); }
     logger.LogDebug("TestProvider userinfo: returning profile for {Email}", profile.Email);
     // Build claims payload
-    var roles = envx.Roles.Count > 0 ? envx.Roles.ToArray() : Array.Empty<string>();
-    var perms = envx.Permissions.Count > 0 ? envx.Permissions.ToArray() : Array.Empty<string>();
+    var roles = envx.Roles.Count > 0 ? envx.Roles.ToArray() : [];
+    var perms = envx.Permissions.Count > 0 ? envx.Permissions.ToArray() : [];
     var claims = envx.Claims.Count > 0 ? envx.Claims.ToDictionary(k => k.Key, v => v.Value.Count == 1 ? (object)v.Value[0] : (object)v.Value.ToArray()) : new Dictionary<string, object>();
     return Ok(new { id = profile.Email, username = profile.Username, email = profile.Email, roles, permissions = perms, claims });
     }

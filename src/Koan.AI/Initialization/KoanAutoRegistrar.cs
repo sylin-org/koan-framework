@@ -53,7 +53,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         var sourcesSection = configuration.GetSection("Koan:Ai:Sources");
         var configuredSources = sourcesSection.Exists()
             ? sourcesSection.GetChildren().Select(c => c.Key).Where(name => !string.IsNullOrWhiteSpace(name)).ToArray()
-            : Array.Empty<string>();
+            : [];
 
         if (configuredSources.Length > 0)
         {
@@ -76,7 +76,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                     continue;
                 }
 
-                var provider = child["Provider"] ?? string.Empty;
+                var provider = child["Provider"] ?? "";
                 var policy = child["Policy"] ?? "Fallback";
                 int members = 0;
                 if (!string.IsNullOrWhiteSpace(provider))
@@ -107,8 +107,8 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     private static void DescribeLegacyOllama(ProvenanceModuleWriter module, IConfiguration configuration)
     {
-        var baseUrl = Configuration.ReadWithSource(configuration, "Koan:Ai:Ollama:BaseUrl", string.Empty);
-        var defaultModel = Configuration.ReadWithSource(configuration, "Koan:Ai:Ollama:DefaultModel", string.Empty);
+        var baseUrl = Configuration.ReadWithSource(configuration, "Koan:Ai:Ollama:BaseUrl", "");
+        var defaultModel = Configuration.ReadWithSource(configuration, "Koan:Ai:Ollama:DefaultModel", "");
 
         if (!string.IsNullOrWhiteSpace(baseUrl.Value) || !baseUrl.UsedDefault)
         {

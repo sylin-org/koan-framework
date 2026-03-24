@@ -10,12 +10,12 @@ namespace Koan.Samples.Meridian.Models;
 
 public sealed class DocumentPipeline : Entity<DocumentPipeline>
 {
-    public string Name { get; set; } = string.Empty;
+    public string Name { get; set; } = "";
     public string? Description { get; set; }
         = "Evidence-backed narrative pipeline";
 
     /// <summary>Identifier of the deliverable type backing this pipeline.</summary>
-    public string DeliverableTypeId { get; set; } = string.Empty;
+    public string DeliverableTypeId { get; set; } = "";
 
     /// <summary>Version of the deliverable type snapshot applied to this pipeline.</summary>
     public int DeliverableTypeVersion { get; set; }
@@ -26,19 +26,19 @@ public sealed class DocumentPipeline : Entity<DocumentPipeline>
         = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>JSON schema describing the target deliverable.</summary>
-    public string SchemaJson { get; set; } = string.Empty;
+    public string SchemaJson { get; set; } = "";
 
     /// <summary>Markdown template rendered with the merged field payload.</summary>
     public string TemplateMarkdown { get; set; } = "# Meridian Deliverable\n";
 
     /// <summary>Identifier of the AnalysisType backing this pipeline.</summary>
-    public string AnalysisTypeId { get; set; } = string.Empty;
+    public string AnalysisTypeId { get; set; } = "";
 
     /// <summary>Version of the AnalysisType applied to this pipeline.</summary>
     public int AnalysisTypeVersion { get; set; } = 1;
 
     /// <summary>Analysis-level instructions appended to extraction prompts.</summary>
-    public string AnalysisInstructions { get; set; } = string.Empty;
+    public string AnalysisInstructions { get; set; } = "";
 
     /// <summary>Tags inherited from the AnalysisType (useful for filtering and telemetry).</summary>
     public List<string> AnalysisTags { get; set; } = new();

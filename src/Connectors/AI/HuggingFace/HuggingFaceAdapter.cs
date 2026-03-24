@@ -72,7 +72,7 @@ internal sealed class HuggingFaceAdapter : IAiAdapter
     {
         // HuggingFace Hub doesn't list all models without a query;
         // return empty for enumeration and rely on search.
-        return Array.Empty<AiModelDescriptor>();
+        return [];
     }
 
     // ── Internal helpers used by ModelManager ──
@@ -302,7 +302,7 @@ internal sealed class HuggingFaceModelManager : IAiModelManager
     public Task<IReadOnlyList<AiModelDescriptor>> ListManagedModels(CancellationToken ct = default)
     {
         // List models in the cache directory
-        IReadOnlyList<AiModelDescriptor> empty = Array.Empty<AiModelDescriptor>();
+        IReadOnlyList<AiModelDescriptor> empty = [];
         return Task.FromResult(empty);
     }
 }

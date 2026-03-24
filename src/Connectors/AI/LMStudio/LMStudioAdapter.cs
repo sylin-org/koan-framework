@@ -83,7 +83,7 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
             _readiness.Timeout = _readinessDefaults.DefaultTimeout;
         }
 
-        _defaultModel = _options.DefaultModel ?? string.Empty;
+        _defaultModel = _options.DefaultModel ?? "";
 
         ApplyConfiguredBaseAddress();
 
@@ -120,7 +120,7 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
                   ?? throw new InvalidOperationException("LM Studio returned an empty response.");
 
         var first = doc.choices?.FirstOrDefault();
-        var text = first?.message?.content ?? string.Empty;
+        var text = first?.message?.content ?? "";
 
         return new AiChatResponse
         {
@@ -206,7 +206,7 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
         var doc = JsonConvert.DeserializeObject<EmbeddingResponse>(body)
                   ?? throw new InvalidOperationException("LM Studio returned an empty embedding response.");
 
-        var vectors = doc.data?.Select(d => d.embedding?.ToArray() ?? Array.Empty<float>()).ToList() ?? new List<float[]>();
+        var vectors = doc.data?.Select(d => d.embedding?.ToArray() ?? []).ToList() ?? new List<float[]>();
         var dimension = vectors.FirstOrDefault()?.Length ?? 0;
 
         return new AiEmbeddingsResponse
@@ -230,12 +230,12 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
         var doc = JsonConvert.DeserializeObject<ModelsResponse>(body);
         if (doc?.data is null)
         {
-            return Array.Empty<AiModelDescriptor>();
+            return [];
         }
 
         return doc.data.Select(m => new AiModelDescriptor
         {
-            Name = m.id ?? string.Empty,
+            Name = m.id ?? "",
             Family = m.owned_by,
             AdapterId = AdapterId,
             AdapterType = Type
@@ -621,7 +621,7 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
             var parts = message.Parts.Select(p => new Dictionary<string, string>
             {
                 ["type"] = p.Type,
-                ["text"] = p.Text ?? string.Empty
+                ["text"] = p.Text ?? ""
             }).ToArray();
 
             return new

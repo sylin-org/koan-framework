@@ -108,7 +108,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 var result = discoveryTask.GetAwaiter().GetResult();
 
                 var method = $"orchestration-{result.DiscoveryMethod}";
-                var endpoint = Koan.Core.Redaction.DeIdentify(result.ServiceUrl ?? string.Empty);
+                var endpoint = Koan.Core.Redaction.DeIdentify(result.ServiceUrl ?? "");
 
                 module.AddSetting("Discovery.Method", method);
                 module.AddSetting("Discovery.Endpoint", endpoint);

@@ -31,7 +31,7 @@ public sealed class DefaultRoleAttributionService : IRoleAttributionService
         if (user?.Identity?.IsAuthenticated != true)
             return RoleAttributionResult.Empty;
 
-        var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? user.Identity?.Name ?? string.Empty;
+        var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? user.Identity?.Name ?? "";
         if (!string.IsNullOrEmpty(userId))
         {
             var cached = _cache.TryGet(userId);
@@ -108,7 +108,7 @@ public sealed class DefaultRoleAttributionService : IRoleAttributionService
         else if (string.Equals(mode, "ClaimMatch", StringComparison.OrdinalIgnoreCase))
         {
             var claimType = opts.Bootstrap?.ClaimType ?? ClaimTypes.Email;
-            var values = new HashSet<string>(opts.Bootstrap?.ClaimValues ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
+            var values = new HashSet<string>(opts.Bootstrap?.ClaimValues ?? [], StringComparer.OrdinalIgnoreCase);
             foreach (var c in user.FindAll(claimType))
             {
                 var v = c.Value;

@@ -90,7 +90,7 @@ internal sealed class InMemoryJobStore : IJobStore
                 return Task.FromResult((IReadOnlyList<JobExecution>)list.ToArray());
             }
         }
-        return Task.FromResult((IReadOnlyList<JobExecution>)Array.Empty<JobExecution>());
+        return Task.FromResult((IReadOnlyList<JobExecution>)[]);
     }
 
     internal Task Sweep(TimeSpan completedRetention, TimeSpan faultedRetention, CancellationToken cancellationToken = default)

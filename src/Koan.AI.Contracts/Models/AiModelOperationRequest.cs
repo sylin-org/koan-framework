@@ -8,7 +8,7 @@ namespace Koan.AI.Contracts.Models;
 public sealed record AiModelOperationRequest
 {
     /// <summary>The logical model identifier (e.g., "llama3", "mistral:7b").</summary>
-    public string Model { get; init; } = string.Empty;
+    public string Model { get; init; } = "";
 
     /// <summary>Optional version tag when the model identifier does not already include one.</summary>
     public string? Version { get; init; }

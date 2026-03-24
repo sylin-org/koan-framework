@@ -6,7 +6,7 @@ namespace Koan.AI.Contracts.Models;
 public record OcrResponse
 {
     /// <summary>Extracted text content.</summary>
-    public string Text { get; init; } = string.Empty;
+    public string Text { get; init; } = "";
 
     /// <summary>Format of the returned text.</summary>
     public OcrFormat Format { get; init; } = OcrFormat.PlainText;
@@ -27,7 +27,7 @@ public record OcrResponse
 public record OcrRegion
 {
     /// <summary>Text content of this region.</summary>
-    public string Text { get; init; } = string.Empty;
+    public string Text { get; init; } = "";
 
     /// <summary>Confidence score for this region (0.0–1.0).</summary>
     public double Confidence { get; init; }

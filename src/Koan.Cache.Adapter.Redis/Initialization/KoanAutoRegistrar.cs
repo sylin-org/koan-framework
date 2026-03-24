@@ -28,7 +28,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         {
             if (string.IsNullOrWhiteSpace(opts.Configuration) || string.Equals(opts.Configuration, "auto", StringComparison.OrdinalIgnoreCase))
             {
-                opts.Configuration = string.Empty; // marker for runtime resolution
+                opts.Configuration = ""; // marker for runtime resolution
             }
         });
     }

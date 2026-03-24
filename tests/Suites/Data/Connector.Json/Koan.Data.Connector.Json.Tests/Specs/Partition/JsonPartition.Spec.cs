@@ -70,7 +70,7 @@ public sealed class JsonPartitionSpec
 
                 var jsonFiles = Directory.Exists(fixture.RootPath)
                     ? Directory.EnumerateFiles(fixture.RootPath, "*.json", SearchOption.AllDirectories).ToArray()
-                    : Array.Empty<string>();
+                    : [];
 
                 jsonFiles.Should().NotBeEmpty("each partition should materialize its own json store");
             })
@@ -79,6 +79,6 @@ public sealed class JsonPartitionSpec
 
     private sealed class TenantRecord : Entity<TenantRecord>
     {
-        public string Name { get; set; } = string.Empty;
+        public string Name { get; set; } = "";
     }
 }

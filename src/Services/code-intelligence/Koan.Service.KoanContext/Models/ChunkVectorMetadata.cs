@@ -10,9 +10,9 @@ namespace Koan.Context.Models;
 public sealed class ChunkVectorMetadata : IVectorMetadataDictionary
 {
     [VectorProperty(VectorSchemaPropertyType.Text, Name = "searchText", Required = true, Searchable = true)]
-    public string SearchText { get; init; } = string.Empty;
+    public string SearchText { get; init; } = "";
     [VectorProperty(VectorSchemaPropertyType.Text, Name = "filePath", Filterable = true, Sortable = true)]
-    public string FilePath { get; init; } = string.Empty;
+    public string FilePath { get; init; } = "";
     [VectorProperty(VectorSchemaPropertyType.Text, Name = "commitSha")]
     public string? CommitSha { get; init; }
     [VectorProperty(VectorSchemaPropertyType.Long, Name = "startByteOffset", Sortable = true)]
@@ -34,13 +34,13 @@ public sealed class ChunkVectorMetadata : IVectorMetadataDictionary
     [VectorProperty(VectorSchemaPropertyType.DateTime, Name = "fileLastModified", Sortable = true)]
     public DateTime? FileLastModified { get; init; }
     [VectorProperty(VectorSchemaPropertyType.TextArray, Name = "pathSegments", Filterable = true)]
-    public IReadOnlyList<string> PathSegments { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<string> PathSegments { get; init; } = [];
     [VectorProperty(VectorSchemaPropertyType.TextArray, Name = "primaryTags", Filterable = true)]
-    public IReadOnlyList<string> PrimaryTags { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<string> PrimaryTags { get; init; } = [];
     [VectorProperty(VectorSchemaPropertyType.TextArray, Name = "secondaryTags", Filterable = true)]
-    public IReadOnlyList<string> SecondaryTags { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<string> SecondaryTags { get; init; } = [];
     [VectorProperty(VectorSchemaPropertyType.TextArray, Name = "fileTags", Filterable = true)]
-    public IReadOnlyList<string> FileTags { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<string> FileTags { get; init; } = [];
 
     public IReadOnlyDictionary<string, object?> ToDictionary()
     {

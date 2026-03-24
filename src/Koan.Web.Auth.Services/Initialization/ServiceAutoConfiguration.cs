@@ -153,7 +153,7 @@ public static class ServiceAutoConfiguration
             return new ServiceMetadata(
                 ServiceId: appName,
                 ProvidedScopes: new[] { "koan:service" },
-                Dependencies: Array.Empty<ServiceDependency>(),
+                Dependencies: [],
                 ControllerType: typeof(object) // Placeholder
             );
         }

@@ -14,7 +14,7 @@ internal static class CliApplication
 
         if (args.Length == 0)
         {
-            return commands["inspect"].Command.Execute(new CommandArgs(Array.Empty<string>()));
+            return commands["inspect"].Command.Execute(new CommandArgs([]));
         }
 
         var commandName = args[0];

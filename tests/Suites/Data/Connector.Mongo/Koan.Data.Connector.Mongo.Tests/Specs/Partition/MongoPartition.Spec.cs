@@ -76,6 +76,6 @@ public sealed class MongoPartitionSpec
 
     private sealed class TenantRecord : Entity<TenantRecord>
     {
-        public string Name { get; set; } = string.Empty;
+        public string Name { get; set; } = "";
     }
 }

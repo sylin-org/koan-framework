@@ -96,7 +96,7 @@ public sealed class PromptIntegrationTests
     // Test response type for OutputAs<T>()
     private sealed class TestClassificationResponse
     {
-        public string Category { get; set; } = string.Empty;
+        public string Category { get; set; } = "";
         public double Confidence { get; set; }
     }
 }

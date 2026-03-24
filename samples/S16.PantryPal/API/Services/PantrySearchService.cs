@@ -39,7 +39,7 @@ public sealed class PantrySearchService : IPantrySearchService
                 if (Koan.Data.Vector.Vector<PantryItem>.IsAvailable)
                 {
                     // Embedding intentionally omitted (noise). Provide real vector here when integrating an embedding service.
-                    var embedding = Array.Empty<float>(); // provider may fall back to text-only scoring
+                    float[] embedding = []; // provider may fall back to text-only scoring
                     var vr = await Koan.Data.Vector.Vector<PantryItem>.Search(vector: embedding, text: text, alpha: 0.5, topK: size, ct: ct);
                     var ordered = new List<PantryItem>();
                     foreach (var m in vr.Matches)
@@ -79,7 +79,7 @@ public sealed class PantrySearchService : IPantrySearchService
     private static bool MatchAny(PantryItem p, string[] terms)
     {
         if (terms.Length == 0) return true;
-        var fields = new[] { p.Name ?? string.Empty, p.Category ?? string.Empty, p.Status ?? string.Empty };
+        var fields = new[] { p.Name ?? "", p.Category ?? "", p.Status ?? "" };
         return terms.Any(t => fields.Any(f => f.Contains(t, StringComparison.OrdinalIgnoreCase)));
     }
 }

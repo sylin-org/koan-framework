@@ -78,7 +78,7 @@ public sealed class SourceTypeAuthoringService : ISourceTypeAuthoringService
         var metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["warnings"] = warnings.Count.ToString(),
-            ["documentName"] = request.DocumentName ?? string.Empty
+            ["documentName"] = request.DocumentName ?? ""
         };
 
         await _auditor.Record(
@@ -158,10 +158,10 @@ public sealed class SourceTypeAuthoringService : ISourceTypeAuthoringService
             var json = JObject.Parse(rawResponse);
             var draft = new SourceTypeDraft
             {
-                Name = json["name"]?.Value<string>()?.Trim() ?? string.Empty,
-                Description = json["description"]?.Value<string>()?.Trim() ?? string.Empty,
-                Instructions = json["instructions"]?.Value<string>()?.Trim() ?? string.Empty,
-                OutputTemplate = json["outputTemplate"]?.Value<string>()?.Trim() ?? string.Empty
+                Name = json["name"]?.Value<string>()?.Trim() ?? "",
+                Description = json["description"]?.Value<string>()?.Trim() ?? "",
+                Instructions = json["instructions"]?.Value<string>()?.Trim() ?? "",
+                OutputTemplate = json["outputTemplate"]?.Value<string>()?.Trim() ?? ""
             };
 
             draft.Tags = ExtractStringArray(json["tags"]);
@@ -187,7 +187,7 @@ public sealed class SourceTypeAuthoringService : ISourceTypeAuthoringService
                 foreach (var prop in queries.Properties())
                 {
                     var key = prop.Name.Trim();
-                    var value = prop.Value.Value<string>()?.Trim() ?? string.Empty;
+                    var value = prop.Value.Value<string>()?.Trim() ?? "";
                     if (!string.IsNullOrWhiteSpace(key) && !draft.FieldQueries.ContainsKey(key))
                     {
                         draft.FieldQueries[key] = value;
@@ -202,8 +202,8 @@ public sealed class SourceTypeAuthoringService : ISourceTypeAuthoringService
             warnings.Add($"Failed to parse AI response: {ex.Message}");
             return new SourceTypeDraft
             {
-                Instructions = string.Empty,
-                OutputTemplate = string.Empty
+                Instructions = "",
+                OutputTemplate = ""
             };
         }
     }
@@ -325,7 +325,7 @@ internal static class SourceTypeAuthoringExtensions
     {
         if (string.IsNullOrEmpty(value))
         {
-            return string.Empty;
+            return "";
         }
 
         var trimmed = value.Trim();

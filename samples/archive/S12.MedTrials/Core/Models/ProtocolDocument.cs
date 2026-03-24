@@ -17,12 +17,12 @@ public sealed class ProtocolDocument : Entity<ProtocolDocument>
     [Parent(typeof(TrialSite))]
     public string? TrialSiteId { get; set; }
 
-    public string Title { get; set; } = string.Empty;
+    public string Title { get; set; } = "";
     public string DocumentType { get; set; } = "Protocol";
     public string? Version { get; set; }
     public string? FileReference { get; set; }
-    public string ExtractedText { get; set; } = string.Empty;
-    public string[] Tags { get; set; } = Array.Empty<string>();
+    public string ExtractedText { get; set; } = "";
+    public string[] Tags { get; set; } = [];
     public DateTimeOffset EffectiveDate { get; set; } = DateTimeOffset.UtcNow;
     public ProtocolVectorState VectorState { get; set; } = ProtocolVectorState.Pending;
     public DateTimeOffset IngestedAt { get; set; } = DateTimeOffset.UtcNow;

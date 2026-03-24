@@ -18,7 +18,7 @@ public sealed class SqlServerAutoFixture : IRelationalTestFixture<Specs.Count.Sq
     private TestcontainersContainer? _container;
     private string? _localDbName;
 
-    public string ConnectionString { get; private set; } = string.Empty;
+    public string ConnectionString { get; private set; } = "";
     public IServiceProvider ServiceProvider { get; private set; } = default!;
     public IDataService Data { get; private set; } = default!;
     public bool SkipTests { get; private set; }

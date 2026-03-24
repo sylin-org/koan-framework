@@ -380,7 +380,7 @@ public sealed class CanonRuntimeAggregationSpec
     {
         [AggregationKey]
         [AggregationPolicy(AggregationPolicyKind.SourceOfTruth, Source = "crm", Sources = new[] { "erp" }, Fallback = AggregationPolicyKind.Latest)]
-        public string Primary { get; set; } = string.Empty;
+        public string Primary { get; set; } = "";
 
         [AggregationKey]
         [AggregationPolicy(AggregationPolicyKind.Latest)]

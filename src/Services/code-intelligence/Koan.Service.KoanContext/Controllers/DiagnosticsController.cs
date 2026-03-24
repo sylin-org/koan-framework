@@ -103,7 +103,7 @@ public class DiagnosticsController : ControllerBase
                     fileTags = c.Tags.File,
                     language = c.Language ?? "(null)",
                     title = c.Title ?? "(null)",
-                    pathSegments = c.PathSegments ?? Array.Empty<string>(),
+                    pathSegments = c.PathSegments ?? [],
                     tokenCount = c.TokenCount,
                     textPreview = c.SearchText.Length > 200 ? c.SearchText.Substring(0, 200) + "..." : c.SearchText
                 });

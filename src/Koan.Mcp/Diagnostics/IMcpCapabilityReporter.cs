@@ -71,8 +71,8 @@ public sealed class HttpSseCapabilityReporter : IMcpCapabilityReporter
 public sealed record McpCapabilityDocument
 {
     public string Version { get; init; } = "2.0";
-    public IReadOnlyList<McpTransportDescription> Transports { get; init; } = Array.Empty<McpTransportDescription>();
-    public IReadOnlyList<McpCapabilityTool> Tools { get; init; } = Array.Empty<McpCapabilityTool>();
+    public IReadOnlyList<McpTransportDescription> Transports { get; init; } = [];
+    public IReadOnlyList<McpCapabilityTool> Tools { get; init; } = [];
 }
 
 public sealed record McpTransportDescription

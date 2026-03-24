@@ -12,10 +12,10 @@ namespace Koan.Context.Models;
 /// </summary>
 public class TagRule : Entity<TagRule>
 {
-    public string Name { get; set; } = string.Empty;
+    public string Name { get; set; } = "";
     public string Scope { get; set; } = TagRuleScopes.File;
     public string MatcherType { get; set; } = TagRuleMatcherTypes.Path;
-    public string Pattern { get; set; } = string.Empty;
+    public string Pattern { get; set; } = "";
     public List<string> Tags { get; set; } = new();
     public float Confidence { get; set; } = 0.8f;
     public int Priority { get; set; } = 100;
@@ -61,7 +61,7 @@ public class TagRule : Entity<TagRule>
 public class TagPipeline : Entity<TagPipeline>
 {
     public string Name { get; set; } = "default";
-    public string Description { get; set; } = string.Empty;
+    public string Description { get; set; } = "";
     public List<string> RuleIds { get; set; } = new();
     public int MaxPrimaryTags { get; set; } = 6;
     public int MaxSecondaryTags { get; set; } = 10;
@@ -83,7 +83,7 @@ public class TagPipeline : Entity<TagPipeline>
         return new TagPipeline
         {
             Name = name,
-            Description = description ?? string.Empty,
+            Description = description ?? "",
             RuleIds = rules,
             MaxPrimaryTags = maxPrimary,
             MaxSecondaryTags = maxSecondary,
@@ -97,7 +97,7 @@ public class TagPipeline : Entity<TagPipeline>
 /// </summary>
 public class TagVocabularyEntry : Entity<TagVocabularyEntry>
 {
-    public string Tag { get; set; } = string.Empty;
+    public string Tag { get; set; } = "";
     public string? DisplayName { get; set; }
     public List<string> Synonyms { get; set; } = new();
     public bool IsPrimary { get; set; } = true;
@@ -142,11 +142,11 @@ public record TagEnvelope(
     IReadOnlyList<TagAuditEntry> Audit)
 {
     public static TagEnvelope Empty { get; } = new(
-        Array.Empty<string>(),
-        Array.Empty<string>(),
-        Array.Empty<string>(),
+        [],
+        [],
+        [],
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
-        Array.Empty<TagAuditEntry>());
+        []);
 
     public TagEnvelope Normalize()
     {
@@ -155,7 +155,7 @@ public record TagEnvelope(
             NormalizeTags(Secondary),
             NormalizeTags(File),
             NormalizeDictionary(Frontmatter),
-            Audit?.ToArray() ?? Array.Empty<TagAuditEntry>());
+            Audit?.ToArray() ?? []);
     }
 
     public TagEnvelope WithPrimary(IEnumerable<string>? tags) => this with { Primary = NormalizeTags(tags) };
@@ -168,13 +168,13 @@ public record TagEnvelope(
         => this with { Frontmatter = NormalizeDictionary(metadata) };
 
     public TagEnvelope WithAudit(IEnumerable<TagAuditEntry>? auditEntries)
-        => this with { Audit = auditEntries?.ToArray() ?? Array.Empty<TagAuditEntry>() };
+        => this with { Audit = auditEntries?.ToArray() ?? [] };
 
     public static IReadOnlyList<string> NormalizeTags(IEnumerable<string>? tags)
     {
         if (tags == null)
         {
-            return Array.Empty<string>();
+            return [];
         }
 
         return tags

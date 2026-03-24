@@ -26,7 +26,7 @@ public class MongoOrchestrationEvaluator : BaseOrchestrationEvaluator
     protected override bool IsServiceEnabled(IConfiguration configuration)
     {
         // MongoDB is enabled if connection string is configured (including "auto")
-        var connectionString = Configuration.ReadFirst(configuration, string.Empty,
+        var connectionString = Configuration.ReadFirst(configuration, "",
             MongoItems.ConnectionStringKeys);
 
         return !string.IsNullOrWhiteSpace(connectionString);
@@ -35,7 +35,7 @@ public class MongoOrchestrationEvaluator : BaseOrchestrationEvaluator
     protected override bool HasExplicitConfiguration(IConfiguration configuration)
     {
         // Check for explicit connection strings (not "auto")
-        var connectionString = Configuration.ReadFirst(configuration, string.Empty,
+        var connectionString = Configuration.ReadFirst(configuration, "",
             MongoItems.ConnectionStringKeys);
 
         return !string.IsNullOrWhiteSpace(connectionString) &&

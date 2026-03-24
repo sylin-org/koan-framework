@@ -196,13 +196,13 @@ public record TranslationOptions(string FileId, string From, string To);
 
 public record TranslationEventArgs
 {
-    public string FileId { get; init; } = string.Empty;
-    public string From { get; init; } = string.Empty;
-    public string To { get; init; } = string.Empty;
+    public string FileId { get; init; } = "";
+    public string From { get; init; } = "";
+    public string To { get; init; } = "";
 }
 
 public record TranslationErrorArgs
 {
-    public string FileId { get; init; } = string.Empty;
-    public string Error { get; init; } = string.Empty;
+    public string FileId { get; init; } = "";
+    public string Error { get; init; } = "";
 }

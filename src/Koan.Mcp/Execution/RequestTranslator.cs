@@ -242,7 +242,7 @@ public sealed class RequestTranslator
             {
                 var val = kv.Value;
                 if (val.Type == JTokenType.String)
-                    options.Extras[kv.Name] = val.Value<string>() ?? string.Empty;
+                    options.Extras[kv.Name] = val.Value<string>() ?? "";
                 else if (val.Type != JTokenType.Null)
                     options.Extras[kv.Name] = val.ToString(Newtonsoft.Json.Formatting.None);
             }
@@ -316,7 +316,7 @@ public sealed class RequestTranslator
 
     private static object ConvertValue(JToken node, Type targetType)
     {
-        if (targetType == typeof(string)) return node.Type == JTokenType.String ? (node.Value<string>() ?? string.Empty) : node.ToString();
+        if (targetType == typeof(string)) return node.Type == JTokenType.String ? (node.Value<string>() ?? "") : node.ToString();
 
         if (targetType.IsEnum)
         {

@@ -61,7 +61,7 @@ public static class FieldPathCanonicalizer
         var canonical = Canonicalize(fieldPath);
         if (canonical == "$")
         {
-            return string.Empty;
+            return "";
         }
 
         return canonical[2..]
@@ -76,7 +76,7 @@ public static class FieldPathCanonicalizer
     {
         if (string.IsNullOrWhiteSpace(template))
         {
-            return template ?? string.Empty;
+            return template ?? "";
         }
 
         static string ReplaceToken(Match match)
@@ -198,16 +198,16 @@ public static class FieldPathCanonicalizer
         var canonical = Canonicalize(fieldPath);
         if (canonical == "$")
         {
-            return string.Empty;
+            return "";
         }
 
         var segments = canonical[2..].Split('.', StringSplitOptions.RemoveEmptyEntries);
         return string.Join(" ", segments.Select(seg =>
         {
-            var sanitized = seg.Replace("[]", string.Empty, StringComparison.Ordinal);
+            var sanitized = seg.Replace("[]", "", StringComparison.Ordinal);
             if (sanitized.Length == 0)
             {
-                return string.Empty;
+                return "";
             }
 
             var words = sanitized.Split('_', StringSplitOptions.RemoveEmptyEntries);

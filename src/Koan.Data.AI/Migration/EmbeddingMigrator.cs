@@ -289,7 +289,7 @@ public static class EmbeddingMigrator
 /// </summary>
 public sealed class MigrationResult
 {
-    public string EntityType { get; init; } = string.Empty;
+    public string EntityType { get; init; } = "";
     public DateTimeOffset StartedAt { get; init; }
     public DateTimeOffset? CompletedAt { get; set; }
     public int TotalEntities { get; set; }

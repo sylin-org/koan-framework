@@ -147,7 +147,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             catch
             {
                 // Cache empty info to avoid repeated failures
-                info = (string.Empty, null);
+                info = ("", null);
                 _connectionInfoCache[cs] = info;
             }
         }
@@ -188,7 +188,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             }
             catch
             {
-                info = (string.Empty, null);
+                info = ("", null);
                 _connectionInfoCache[cs] = info;
             }
         }
@@ -229,7 +229,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             {
                 try
                 {
-                    if (ddl.TableExists(string.Empty, TableName) && required.All(cn => ddl.ColumnExists(string.Empty, TableName, cn)))
+                    if (ddl.TableExists("", TableName) && required.All(cn => ddl.ColumnExists("", TableName, cn)))
                     {
                         // Cache successful visibility check
                         _visibilityCache[cacheKey] = true;
@@ -305,9 +305,9 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                 allColumns.Add(("Id", typeof(string), false, false, null, false));
                 allColumns.Add(("Json", typeof(string), false, false, null, false));
                 foreach (var p in projections) allColumns.Add((p.ColumnName, typeof(string), true, true, "$." + p.Property.Name, p.IsIndexed));
-                ((dynamic)ddl).CreateTableWithColumns(string.Empty, table, allColumns);
+                ((dynamic)ddl).CreateTableWithColumns("", table, allColumns);
                 // update the table exists flag after creating
-                vTableExists = ddl.TableExists(string.Empty, table);
+                vTableExists = ddl.TableExists("", table);
             }
             catch { }
         }
@@ -316,8 +316,8 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         {
             if (!string.Equals(vState, "Healthy", StringComparison.OrdinalIgnoreCase))
             {
-                var missing = vReport.TryGetValue("MissingColumns", out var mc) && mc is string[] ms ? ms : Array.Empty<string>();
-                var extra = Array.Empty<string>();
+                var missing = vReport.TryGetValue("MissingColumns", out var mc) && mc is string[] ms ? ms : [];
+                string[] extra = [];
                 var policy = _relOptions.Materialization.ToString();
                 throw new SchemaMismatchException(typeof(TEntity).FullName!, table, policy, missing, extra, vDdlAllowed);
             }
@@ -343,7 +343,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                 {
                     allColumns.Add((p.ColumnName, typeof(string), true, true, "$." + p.Property.Name, p.IsIndexed));
                 }
-                ((dynamic)ddl).CreateTableWithColumns(string.Empty, table, allColumns);
+                ((dynamic)ddl).CreateTableWithColumns("", table, allColumns);
             }
             // Wait for expected projected columns to appear (poll with small backoff)
             try
@@ -354,7 +354,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                 var maxMs = 1000; // total wait time
                 while (sw.ElapsedMilliseconds < maxMs)
                 {
-                    var missing = required.Where(c => !ddl.ColumnExists(string.Empty, table, c)).ToArray();
+                    var missing = required.Where(c => !ddl.ColumnExists("", table, c)).ToArray();
                     if (missing.Length == 0) break;
                     Thread.Sleep(20);
                 }
@@ -445,7 +445,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
         if (idList.Count == 0)
         {
-            return Array.Empty<TEntity?>();
+            return [];
         }
 
         using var conn = Open();
@@ -938,7 +938,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     // Normalize to provider options for tests: override MatchingMode/DdlAllowed and compute missing projected columns
                     var projections = ProjectionResolver.Get(typeof(TEntity));
                     var required = projections.Select(p => p.ColumnName).ToArray();
-                    var tableExists = ddl.TableExists(string.Empty, TableName);
+                    var tableExists = ddl.TableExists("", TableName);
                     // Debug aid (suppressed in Release): PRAGMA table_info snapshot during validate
 #if DEBUG
                     try
@@ -959,14 +959,14 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                         System.Diagnostics.Debug.WriteLine($"[VALIDATE] PRAGMA table_info failed for {TableName}: {ex.Message}");
                     }
 #endif
-                    var missing = required.Where(c => !ddl.ColumnExists(string.Empty, TableName, c)).ToArray();
+                    var missing = required.Where(c => !ddl.ColumnExists("", TableName, c)).ToArray();
                     // Quick retry to avoid races where another operation creates columns concurrently
                     if (missing.Length > 0)
                     {
                         try
                         {
                             Thread.Sleep(30);
-                            missing = required.Where(c => !ddl.ColumnExists(string.Empty, TableName, c)).ToArray();
+                            missing = required.Where(c => !ddl.ColumnExists("", TableName, c)).ToArray();
                         }
                         catch { }
                     }
@@ -978,7 +978,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                         {
                             try
                             {
-                                var exists = ddl.ColumnExists(string.Empty, TableName, c);
+                                var exists = ddl.ColumnExists("", TableName, c);
                                 System.Diagnostics.Debug.WriteLine($"[VALIDATE] ColumnExists check: table={TableName}, column={c}, exists={exists}");
                             }
                             catch (Exception ex)
@@ -1031,7 +1031,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                         {
                             allColumns.Add((p.ColumnName, typeof(string), true, true, "$." + p.Property.Name, p.IsIndexed));
                         }
-                        ((dynamic)ddl).CreateTableWithColumns(string.Empty, TableName, allColumns);
+                        ((dynamic)ddl).CreateTableWithColumns("", TableName, allColumns);
                     }
                     object d_ok = true; return (TResult)d_ok;
                 }
@@ -1167,11 +1167,11 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                 else if (col.Name == "Json")
                     type = "TEXT NOT NULL";
                 else if (col.ClrType == typeof(int) || col.ClrType == typeof(long) || col.ClrType == typeof(bool))
-                    type = "INTEGER" + (col.Nullable ? string.Empty : " NOT NULL");
+                    type = "INTEGER" + (col.Nullable ? "" : " NOT NULL");
                 else if (col.ClrType == typeof(double))
-                    type = "REAL" + (col.Nullable ? string.Empty : " NOT NULL");
+                    type = "REAL" + (col.Nullable ? "" : " NOT NULL");
                 else
-                    type = "TEXT" + (col.Nullable ? string.Empty : " NOT NULL");
+                    type = "TEXT" + (col.Nullable ? "" : " NOT NULL");
                 colDefs.Add($"[{col.Name}] {type}");
             }
             var sql = $"CREATE TABLE IF NOT EXISTS [{tname}] (" + string.Join(", ", colDefs) + ")";
@@ -1236,7 +1236,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                 {
                     try
                     {
-                        if (TableExists(string.Empty, tname) && required.All(cn => ColumnExists(string.Empty, tname, cn)))
+                        if (TableExists("", tname) && required.All(cn => ColumnExists("", tname, cn)))
                         {
                             break;
                         }
@@ -1317,7 +1317,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         {
             var cols = string.Join(", ", columns.Select(c => $"[{c}]"));
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = $"CREATE {(unique ? "UNIQUE " : string.Empty)}INDEX IF NOT EXISTS [{indexName}] ON [{table}] ({cols})";
+            cmd.CommandText = $"CREATE {(unique ? "UNIQUE " : "")}INDEX IF NOT EXISTS [{indexName}] ON [{table}] ({cols})";
             cmd.ExecuteNonQueryAsync();
         }
     }
@@ -1418,15 +1418,15 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         [AllowNull]
         public string ConnectionString
         {
-            get => _connection?.ConnectionString ?? string.Empty;
+            get => _connection?.ConnectionString ?? "";
             set
             {
-                if (_connection != null) _connection.ConnectionString = value ?? string.Empty;
+                if (_connection != null) _connection.ConnectionString = value ?? "";
             }
         }
 
         public int ConnectionTimeout => _connection?.ConnectionTimeout ?? 0;
-        public string Database => _connection?.Database ?? string.Empty;
+        public string Database => _connection?.Database ?? "";
         public ConnectionState State => _connection?.State ?? ConnectionState.Closed;
 
         public IDbTransaction BeginTransaction() => _connection!.BeginTransaction();
@@ -1482,7 +1482,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     {
         if (ex.SqliteErrorCode != 1) return false; // generic SQL error; 1 often maps to no such table
         var name = TableName;
-        var msg = ex.Message ?? string.Empty;
+        var msg = ex.Message ?? "";
         // Relax: treat any "no such table" as retriable; we still ensure our table and retry once
         return msg.IndexOf("no such table", StringComparison.OrdinalIgnoreCase) >= 0;
     }
@@ -1491,7 +1491,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     private static bool IsNoSuchTable(SqliteException ex)
     {
         if (ex.SqliteErrorCode != 1) return false;
-        var msg = ex.Message ?? string.Empty;
+        var msg = ex.Message ?? "";
         return msg.IndexOf("no such table", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 

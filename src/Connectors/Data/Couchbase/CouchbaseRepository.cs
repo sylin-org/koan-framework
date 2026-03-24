@@ -158,7 +158,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
             if (idList.Count == 0)
             {
-                return (IReadOnlyList<TEntity?>)Array.Empty<TEntity?>();
+                return (IReadOnlyList<TEntity?>)[];
             }
 
             var ctx = await ResolveCollection(ct);

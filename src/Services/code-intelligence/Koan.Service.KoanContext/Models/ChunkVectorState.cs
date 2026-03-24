@@ -19,27 +19,27 @@ public sealed class ChunkVectorState : Entity<ChunkVectorState>
     /// <summary>
     /// Identifier of the chunk whose payload is stored.
     /// </summary>
-    public string ChunkId { get; set; } = string.Empty;
+    public string ChunkId { get; set; } = "";
 
     /// <summary>
     /// Owning indexing job identifier.
     /// </summary>
-    public string JobId { get; set; } = string.Empty;
+    public string JobId { get; set; } = "";
 
     /// <summary>
     /// Project identifier (raw GUID) for partition routing.
     /// </summary>
-    public string ProjectId { get; set; } = string.Empty;
+    public string ProjectId { get; set; } = "";
 
     /// <summary>
     /// Manifest identifier for relational provenance.
     /// </summary>
-    public string IndexedFileId { get; set; } = string.Empty;
+    public string IndexedFileId { get; set; } = "";
 
     /// <summary>
     /// Deterministic version hash representing the current chunk contents.
     /// </summary>
-    public string ChunkVersion { get; set; } = string.Empty;
+    public string ChunkVersion { get; set; } = "";
 
     /// <summary>
     /// Latest synchronization state for this payload.
@@ -79,7 +79,7 @@ public sealed class ChunkVectorState : Entity<ChunkVectorState>
     /// <summary>
     /// Serialized embedding payload.
     /// </summary>
-    public string EmbeddingJson { get; set; } = string.Empty;
+    public string EmbeddingJson { get; set; } = "";
 
     /// <summary>
     /// Serialized metadata payload.

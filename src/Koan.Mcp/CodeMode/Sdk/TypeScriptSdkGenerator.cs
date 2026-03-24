@@ -425,11 +425,11 @@ partial class TypeScriptSdkGenerator
 
     private static string StripExistingFooter(string content)
     {
-        if (string.IsNullOrWhiteSpace(content)) return string.Empty;
+        if (string.IsNullOrWhiteSpace(content)) return "";
         // Normalize to LF-only for deterministic hashing across platforms
-        var cleaned = content.Replace("\r", string.Empty);
+        var cleaned = content.Replace("\r", "");
         var lines = cleaned.Split('\n');
-        if (lines.Length == 0) return string.Empty;
+        if (lines.Length == 0) return "";
         var last = lines[^1].Trim();
         if (last.StartsWith("// integrity-sha256:"))
         {
@@ -441,7 +441,7 @@ partial class TypeScriptSdkGenerator
     private static string? ExtractFooterHash(string content)
     {
         if (string.IsNullOrWhiteSpace(content)) return null;
-        var lines = content.Replace("\r", string.Empty).Split('\n');
+        var lines = content.Replace("\r", "").Split('\n');
         for (var i = lines.Length - 1; i >= 0; i--)
         {
             var line = lines[i].Trim();

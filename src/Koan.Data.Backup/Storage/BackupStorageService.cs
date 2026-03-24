@@ -87,7 +87,7 @@ public class BackupStorageService
 
             await writer.FlushAsync();
             await entryStream.FlushAsync(ct);
-            hasher.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+            hasher.TransformFinalBlock([], 0, 0);
 
             var entityInfo = new EntityBackupInfo
             {

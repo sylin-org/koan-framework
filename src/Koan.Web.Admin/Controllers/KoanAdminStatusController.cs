@@ -76,12 +76,12 @@ public sealed class KoanAdminStatusController : ControllerBase
                     .Select(s => new KoanAdminModuleSurfaceSetting(
                         s.Key,
                         string.IsNullOrWhiteSpace(s.Label) ? s.Key : s.Label,
-                        s.Description ?? string.Empty,
+                        s.Description ?? "",
                         s.Secret ? SecretMask : s.Value,
                         s.Secret,
                         s.Source,
                         s.SourceKey,
-                        s.Consumers.Count == 0 ? Array.Empty<string>() : s.Consumers.ToArray()))
+                        s.Consumers.Count == 0 ? [] : s.Consumers.ToArray()))
                     .ToList();
                 var notes = m.Notes.ToList();
                 var tools = m.Tools

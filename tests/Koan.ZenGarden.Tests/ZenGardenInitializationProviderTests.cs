@@ -158,7 +158,7 @@ public sealed class ZenGardenInitializationProviderTests
     public void TryGetDefaultOffering_uses_registered_bindings()
     {
         using var provider = BuildScope(
-            new StubZenGardenClient(Array.Empty<ZenGardenToolSnapshot>()),
+            new StubZenGardenClient([]),
             new StubBinding("mongo", "mongodb"));
 
         var initializationProvider = provider.GetRequiredService<IZenGardenInitializationProvider>();
@@ -170,7 +170,7 @@ public sealed class ZenGardenInitializationProviderTests
     [Fact]
     public async Task WishCapabilitiesAsync_returns_receipt()
     {
-        var client = new StubZenGardenClient(Array.Empty<ZenGardenToolSnapshot>());
+        var client = new StubZenGardenClient([]);
         await using var provider = BuildScope(
             client,
             new StubBinding("ollama", "ollama"));

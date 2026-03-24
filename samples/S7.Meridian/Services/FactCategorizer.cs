@@ -173,7 +173,7 @@ public sealed class FactCategorizer : IFactCategorizer
     {
         try
         {
-            var cleaned = JsonFence.Replace(rawResponse, string.Empty).Trim();
+            var cleaned = JsonFence.Replace(rawResponse, "").Trim();
             var json = JObject.Parse(cleaned);
 
             var batchesToken = json["batches"];
@@ -188,9 +188,9 @@ public sealed class FactCategorizer : IFactCategorizer
 
             foreach (var token in array.OfType<JObject>())
             {
-                var batchId = token.Value<string>("batchId")?.Trim() ?? string.Empty;
-                var categoryName = token.Value<string>("categoryName")?.Trim() ?? string.Empty;
-                var categoryDescription = token.Value<string>("categoryDescription")?.Trim() ?? string.Empty;
+                var batchId = token.Value<string>("batchId")?.Trim() ?? "";
+                var categoryName = token.Value<string>("categoryName")?.Trim() ?? "";
+                var categoryDescription = token.Value<string>("categoryDescription")?.Trim() ?? "";
                 var fieldPathsToken = token["fieldPaths"];
 
                 if (string.IsNullOrWhiteSpace(batchId) || string.IsNullOrWhiteSpace(categoryName))

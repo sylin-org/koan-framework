@@ -8,7 +8,7 @@ namespace Koan.AI.Contracts.Models;
 public sealed record OcrResult
 {
     /// <summary>Extracted text content.</summary>
-    public string Text { get; init; } = string.Empty;
+    public string Text { get; init; } = "";
 
     /// <summary>Format of the returned text.</summary>
     public OcrFormat Format { get; init; } = OcrFormat.PlainText;

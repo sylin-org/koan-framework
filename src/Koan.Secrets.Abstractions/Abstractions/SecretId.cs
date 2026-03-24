@@ -33,6 +33,6 @@ public readonly record struct SecretId(string Scope, string Name, string? Versio
 
     public override string ToString() =>
         Provider is { Length: > 0 }
-            ? $"secret+{Provider}://{Scope}/{Name}{(Version is { Length: > 0 } ? $"?version={Version}" : string.Empty)}"
-            : $"secret://{Scope}/{Name}{(Version is { Length: > 0 } ? $"?version={Version}" : string.Empty)}";
+            ? $"secret+{Provider}://{Scope}/{Name}{(Version is { Length: > 0 } ? $"?version={Version}" : "")}"
+            : $"secret://{Scope}/{Name}{(Version is { Length: > 0 } ? $"?version={Version}" : "")}";
 }

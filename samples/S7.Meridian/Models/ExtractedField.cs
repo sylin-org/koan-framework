@@ -5,8 +5,8 @@ namespace Koan.Samples.Meridian.Models;
 
 public sealed class ExtractedField : Entity<ExtractedField>
 {
-    public string PipelineId { get; set; } = string.Empty;
-    public string FieldPath { get; set; } = string.Empty;
+    public string PipelineId { get; set; } = "";
+    public string FieldPath { get; set; } = "";
 
     public string? ValueJson { get; set; }
         = null;
@@ -66,7 +66,7 @@ public sealed class TextSpanEvidence
     public string? SourceDocumentId { get; set; }
         = null;
 
-    public string OriginalText { get; set; } = string.Empty;
+    public string OriginalText { get; set; } = "";
 
     public TextSpan? Span { get; set; }
         = null;

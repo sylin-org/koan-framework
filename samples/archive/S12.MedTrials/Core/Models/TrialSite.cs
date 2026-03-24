@@ -11,9 +11,9 @@ namespace S12.MedTrials.Models;
     RequiredScopes = new[] { "clinical:operations" })]
 public sealed class TrialSite : Entity<TrialSite>
 {
-    public string Name { get; set; } = string.Empty;
-    public string Location { get; set; } = string.Empty;
-    public string PrincipalInvestigator { get; set; } = string.Empty;
+    public string Name { get; set; } = "";
+    public string Location { get; set; } = "";
+    public string PrincipalInvestigator { get; set; } = "";
     public int EnrollmentTarget { get; set; }
     public int CurrentEnrollment { get; set; }
     public string RegulatoryStatus { get; set; } = "Pending";

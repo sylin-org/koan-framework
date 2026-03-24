@@ -8,7 +8,7 @@ internal sealed class LocalJsonMediaProvider(ILogger<LocalJsonMediaProvider>? lo
     public string Code => "local";
     public string Name => "Local JSON";
 
-    public MediaType[] SupportedTypes => Array.Empty<MediaType>();
+    public MediaType[] SupportedTypes => [];
 
     public Task<List<Media>> Fetch(MediaType mediaType, int limit, CancellationToken ct)
     {

@@ -5,8 +5,8 @@ namespace Koan.Data.Backup.Models;
 
 public class BackupManifest : StorageEntity<BackupManifest>
 {
-    public string Description { get; set; } = string.Empty;
-    public string[] Labels { get; set; } = Array.Empty<string>();
+    public string Description { get; set; } = "";
+    public string[] Labels { get; set; } = [];
     public DateTimeOffset? CompletedAt { get; set; }
     public TimeSpan Duration { get; set; }
     public BackupStatus Status { get; set; }
@@ -14,9 +14,9 @@ public class BackupManifest : StorageEntity<BackupManifest>
     public string Version { get; set; } = "1.0";
 
     // Archive metadata
-    public string StorageProfile { get; set; } = string.Empty;
-    public string ArchiveStorageKey { get; set; } = string.Empty;
-    public string ArchiveFileName { get; set; } = string.Empty;
+    public string StorageProfile { get; set; } = "";
+    public string ArchiveStorageKey { get; set; } = "";
+    public string ArchiveFileName { get; set; } = "";
 
     // Entity metadata
     public List<EntityBackupInfo> Entities { get; set; } = new();
@@ -77,12 +77,12 @@ public class EntityBackupInfo
 
 public class BackupVerification
 {
-    public string OverallChecksum { get; set; } = string.Empty;
+    public string OverallChecksum { get; set; } = "";
     public long TotalSizeBytes { get; set; }
     public int TotalItemCount { get; set; }
     public double CompressionRatio { get; set; }
     public bool IsValid { get; set; } = true;
-    public string ArchiveContentHash { get; set; } = string.Empty;
+    public string ArchiveContentHash { get; set; } = "";
     public long ArchiveSizeBytes { get; set; }
     public List<string> ValidationErrors { get; set; } = new();
 }

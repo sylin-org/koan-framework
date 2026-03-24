@@ -45,7 +45,7 @@ internal sealed class KoanAdminLaunchKitService : IKoanAdminLaunchKitService
         var generate = _options.CurrentValue.Generate ?? new KoanAdminGenerateOptions();
         var profiles = NormalizeProfiles(generate.ComposeProfiles);
         var defaultProfile = profiles.Length > 0 ? profiles[0] : "Default";
-        var openApiTemplates = generate.OpenApiClients?.Where(s => !string.IsNullOrWhiteSpace(s)).Select(NormalizeClient).Distinct(StringComparer.OrdinalIgnoreCase).ToArray() ?? Array.Empty<string>();
+        var openApiTemplates = generate.OpenApiClients?.Where(s => !string.IsNullOrWhiteSpace(s)).Select(NormalizeClient).Distinct(StringComparer.OrdinalIgnoreCase).ToArray() ?? [];
 
         var metadata = new KoanAdminLaunchKitMetadata(
             defaultProfile,
@@ -188,7 +188,7 @@ internal sealed class KoanAdminLaunchKitService : IKoanAdminLaunchKitService
 
     private static string[] ResolveOpenApiClients(IReadOnlyList<string>? requested, string[]? configured)
     {
-        IEnumerable<string> source = Array.Empty<string>();
+        IEnumerable<string> source = [];
 
         if (requested is not null && requested.Count > 0)
         {

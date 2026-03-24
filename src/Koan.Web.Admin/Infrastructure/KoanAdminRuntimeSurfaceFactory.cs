@@ -58,7 +58,7 @@ internal static class KoanAdminRuntimeSurfaceFactory
 
         var sanitizedFieldView = sanitizedFields is { Count: > 0 }
             ? sanitizedFields.Distinct(StringComparer.Ordinal).ToArray()
-            : Array.Empty<string>();
+            : [];
 
         return new KoanAdminRuntimeSurface(
             capturedAt,

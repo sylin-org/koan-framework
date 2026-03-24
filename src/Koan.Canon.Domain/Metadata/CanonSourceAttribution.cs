@@ -8,7 +8,7 @@ public sealed class CanonSourceAttribution
     /// <summary>
     /// Logical key representing the source (adapter, integration, etc.).
     /// </summary>
-    public string Key { get; set; } = string.Empty;
+    public string Key { get; set; } = "";
 
     /// <summary>
     /// Human friendly name for reporting.

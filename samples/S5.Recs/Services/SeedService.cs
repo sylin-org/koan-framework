@@ -42,7 +42,7 @@ internal sealed class SeedService : ISeedService
         _sp = sp;
         _logger = logger;
         // Discover providers via DI
-        var provs = (IEnumerable<IMediaProvider>?)_sp.GetService(typeof(IEnumerable<IMediaProvider>)) ?? Array.Empty<IMediaProvider>();
+        var provs = (IEnumerable<IMediaProvider>?)_sp.GetService(typeof(IEnumerable<IMediaProvider>)) ?? [];
         _providers = provs.ToDictionary(p => p.Code, StringComparer.OrdinalIgnoreCase);
     }
 

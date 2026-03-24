@@ -70,8 +70,8 @@ public sealed class ZenGardenCapabilityWishTests
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            var path = request.RequestUri?.AbsolutePath ?? string.Empty;
-            var query = request.RequestUri?.Query ?? string.Empty;
+            var path = request.RequestUri?.AbsolutePath ?? "";
+            var query = request.RequestUri?.Query ?? "";
 
             if (path.Equals("/health", StringComparison.OrdinalIgnoreCase))
             {

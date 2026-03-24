@@ -32,7 +32,7 @@ public class PipelineConfig
     /// <summary>Pipeline name (required).</summary>
     [Required(ErrorMessage = "Pipeline name is required")]
     [StringLength(200, MinimumLength = 1, ErrorMessage = "Pipeline name must be 1-200 characters")]
-    public string Name { get; set; } = string.Empty;
+    public string Name { get; set; } = "";
 
     /// <summary>Optional description of the pipeline.</summary>
     [StringLength(1000, ErrorMessage = "Description cannot exceed 1000 characters")]
@@ -140,7 +140,7 @@ public class ManifestEntry
     /// </summary>
     [Required(ErrorMessage = "Manifest entry must specify source type")]
     [StringLength(10, ErrorMessage = "Source type code cannot exceed 10 characters")]
-    public string Type { get; set; } = string.Empty;
+    public string Type { get; set; } = "";
 
     /// <summary>
     /// Optional notes about this specific document.

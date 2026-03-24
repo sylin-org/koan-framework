@@ -10,7 +10,7 @@ public sealed record ZenGardenSubscription
 {
     public ZenGardenToolType? ToolType { get; init; }
     public string? ToolFqid { get; init; }
-    public IReadOnlyList<ZenGardenCapabilityRequirement> Requires { get; init; } = Array.Empty<ZenGardenCapabilityRequirement>();
+    public IReadOnlyList<ZenGardenCapabilityRequirement> Requires { get; init; } = [];
 
     public static ZenGardenSubscription ForOffering(string offeringOrSelector)
     {
@@ -92,7 +92,7 @@ public sealed record ZenGardenSubscription
         }
 
         var trimmed = selector.Trim();
-        var requires = Array.Empty<ZenGardenCapabilityRequirement>();
+        ZenGardenCapabilityRequirement[] requires = [];
 
         var bracketStart = trimmed.IndexOf('[');
         if (bracketStart >= 0)

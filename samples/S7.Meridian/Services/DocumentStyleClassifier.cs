@@ -210,9 +210,9 @@ public sealed class DocumentStyleClassifier : IDocumentStyleClassifier
 
             var json = JObject.Parse(cleaned);
 
-            var styleCode = json.Value<string>("styleCode")?.Trim()?.ToUpperInvariant() ?? string.Empty;
+            var styleCode = json.Value<string>("styleCode")?.Trim()?.ToUpperInvariant() ?? "";
             var confidence = json.Value<double?>("confidence") ?? 0.0;
-            var reasoning = json.Value<string>("reasoning")?.Trim() ?? string.Empty;
+            var reasoning = json.Value<string>("reasoning")?.Trim() ?? "";
 
             if (string.IsNullOrWhiteSpace(styleCode))
             {
@@ -268,9 +268,9 @@ public sealed class DocumentStyleClassifier : IDocumentStyleClassifier
 /// </summary>
 public sealed class DocumentStyleClassification
 {
-    public string StyleCode { get; set; } = string.Empty;
+    public string StyleCode { get; set; } = "";
     public string? StyleId { get; set; }
     public int StyleVersion { get; set; }
     public double Confidence { get; set; }
-    public string Reasoning { get; set; } = string.Empty;
+    public string Reasoning { get; set; } = "";
 }

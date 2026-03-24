@@ -25,7 +25,7 @@ public sealed class CouchbaseOrchestrationEvaluator : BaseOrchestrationEvaluator
 
     protected override bool IsServiceEnabled(IConfiguration configuration)
     {
-        var cs = Configuration.ReadFirst(configuration, string.Empty,
+        var cs = Configuration.ReadFirst(configuration, "",
             Constants.Configuration.Keys.ConnectionString,
             Constants.Configuration.Keys.AltConnectionString,
             Constants.Configuration.Keys.ConnectionStringsCouchbase,
@@ -35,7 +35,7 @@ public sealed class CouchbaseOrchestrationEvaluator : BaseOrchestrationEvaluator
 
     protected override bool HasExplicitConfiguration(IConfiguration configuration)
     {
-        var cs = Configuration.ReadFirst(configuration, string.Empty,
+        var cs = Configuration.ReadFirst(configuration, "",
             Constants.Configuration.Keys.ConnectionString,
             Constants.Configuration.Keys.AltConnectionString,
             Constants.Configuration.Keys.ConnectionStringsCouchbase,
@@ -48,7 +48,7 @@ public sealed class CouchbaseOrchestrationEvaluator : BaseOrchestrationEvaluator
     protected override string[] GetAdditionalHostCandidates(IConfiguration configuration)
     {
         var hosts = new List<string>();
-        var configured = configuration.GetSection("Koan:Data:Couchbase:Hosts").Get<string[]>() ?? Array.Empty<string>();
+        var configured = configuration.GetSection("Koan:Data:Couchbase:Hosts").Get<string[]>() ?? [];
         hosts.AddRange(configured.Where(h => !string.IsNullOrWhiteSpace(h))!);
         var env = Environment.GetEnvironmentVariable("COUCHBASE_HOSTS");
         if (!string.IsNullOrWhiteSpace(env))
@@ -77,7 +77,7 @@ public sealed class CouchbaseOrchestrationEvaluator : BaseOrchestrationEvaluator
             if (!string.IsNullOrWhiteSpace(username))
             {
                 options.UserName = username;
-                options.Password = password ?? string.Empty;
+                options.Password = password ?? "";
             }
 
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));

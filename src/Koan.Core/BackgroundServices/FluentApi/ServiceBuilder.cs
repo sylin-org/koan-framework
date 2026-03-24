@@ -258,7 +258,7 @@ public class ServiceQueryBuilder<T> : IServiceQueryBuilder where T : class, IKoa
             IsRunning = true, // TODO: Implement actual status tracking
             SupportedActions = GetSupportedActions(service),
             SupportedEvents = GetSupportedEvents(service),
-            SupportedCommands = service is IKoanPokableService pokable ? pokable.SupportedCommands.Select(c => c.Name).ToArray() : Array.Empty<string>()
+            SupportedCommands = service is IKoanPokableService pokable ? pokable.SupportedCommands.Select(c => c.Name).ToArray() : []
         };
 
         return Task.FromResult(info);

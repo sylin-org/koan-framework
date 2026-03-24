@@ -4,7 +4,7 @@ namespace Koan.Web.Auth.Services.Attributes;
 public sealed class CallsServiceAttribute : Attribute
 {
     public string ServiceId { get; }
-    public string[] RequiredScopes { get; init; } = Array.Empty<string>();
+    public string[] RequiredScopes { get; init; } = [];
     public bool Optional { get; init; } = false;
 
     public CallsServiceAttribute(string serviceId)

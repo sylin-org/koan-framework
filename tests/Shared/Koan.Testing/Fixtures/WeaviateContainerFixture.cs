@@ -84,7 +84,7 @@ public sealed class WeaviateContainerFixture : IAsyncDisposable, IInitializableF
             .WithPortBinding(WeaviateHttpPort, assignRandomHostPort: true)
             .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(WeaviateHttpPort))
             .WithEnvironment("DEFAULT_VECTORIZER_MODULE", "none")
-            .WithEnvironment("ENABLE_MODULES", string.Empty)
+            .WithEnvironment("ENABLE_MODULES", "")
             .WithEnvironment("PERSISTENCE_DATA_PATH", "/var/lib/weaviate")
             .WithEnvironment("AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED", "true")
             .WithEnvironment("AUTHORIZATION_ADMINLIST_ENABLED", "false")
@@ -278,7 +278,7 @@ public sealed class WeaviateContainerFixture : IAsyncDisposable, IInitializableF
 
         _cliContainerId = containerName;
 
-        (bool ok, string stdout, string stderr, int exitCode) portResult = (false, string.Empty, string.Empty, 0);
+        (bool ok, string stdout, string stderr, int exitCode) portResult = (false, "", "", 0);
         for (var attempt = 0; attempt < 5 && !portResult.ok; attempt++)
         {
             portResult = await RunDockerCommand($"port {containerName} {WeaviateHttpPort}/tcp", context.Cancellation).ConfigureAwait(false);
@@ -329,7 +329,7 @@ public sealed class WeaviateContainerFixture : IAsyncDisposable, IInitializableF
             process = Process.Start(psi);
             if (process is null)
             {
-                return (false, string.Empty, "Failed to start docker process", -1);
+                return (false, "", "Failed to start docker process", -1);
             }
 
             var stdoutTask = process.StandardOutput.ReadToEndAsync();
@@ -351,11 +351,11 @@ public sealed class WeaviateContainerFixture : IAsyncDisposable, IInitializableF
                 }
             }
 
-            return (false, string.Empty, "Cancelled", -1);
+            return (false, "", "Cancelled", -1);
         }
         catch (Exception ex)
         {
-            return (false, string.Empty, ex.Message, -1);
+            return (false, "", ex.Message, -1);
         }
         finally
         {

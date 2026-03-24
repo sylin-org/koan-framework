@@ -72,8 +72,8 @@ public static class AuthenticationExtensions
                 builder.AddOpenIdConnect(id, o =>
                 {
                     o.SignInScheme = CookieScheme;
-                    o.Authority = p.Authority ?? string.Empty;
-                    o.ClientId = p.ClientId ?? string.Empty;
+                    o.Authority = p.Authority ?? "";
+                    o.ClientId = p.ClientId ?? "";
                     if (!string.IsNullOrEmpty(p.ClientSecret)) o.ClientSecret = p.ClientSecret;
                     o.ResponseType = "code";
                     o.UsePkce = true;
@@ -91,11 +91,11 @@ public static class AuthenticationExtensions
                 builder.AddOAuth(id, o =>
                 {
                     o.SignInScheme = CookieScheme;
-                    o.AuthorizationEndpoint = p.AuthorizationEndpoint ?? string.Empty;
-                    o.TokenEndpoint = p.TokenEndpoint ?? string.Empty;
-                    o.UserInformationEndpoint = p.UserInfoEndpoint ?? string.Empty;
-                    o.ClientId = p.ClientId ?? string.Empty;
-                    o.ClientSecret = p.ClientSecret ?? string.Empty;
+                    o.AuthorizationEndpoint = p.AuthorizationEndpoint ?? "";
+                    o.TokenEndpoint = p.TokenEndpoint ?? "";
+                    o.UserInformationEndpoint = p.UserInfoEndpoint ?? "";
+                    o.ClientId = p.ClientId ?? "";
+                    o.ClientSecret = p.ClientSecret ?? "";
                     o.CallbackPath = callback;
                     if (p.Scopes != null)
                     {

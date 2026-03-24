@@ -59,9 +59,9 @@ public static class EntityBackupExtensions
         var backupService = GetBackupService();
         var options = new BackupOptions
         {
-            Description = description ?? string.Empty,
-            Tags = tags ?? Array.Empty<string>(),
-            StorageProfile = storageProfile ?? string.Empty
+            Description = description ?? "",
+            Tags = tags ?? [],
+            StorageProfile = storageProfile ?? ""
         };
         return backupService.BackupEntityAsync<TEntity, TKey>(backupName, options, ct);
     }
