@@ -101,11 +101,11 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddHostedService<BackgroundCleanupWorker>();
     }
 
-    public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-        report.AddNote("Application services registered");
-        report.AddNote($"Environment: {env.EnvironmentName}");
+        module.Describe(ModuleVersion, "Application services");
+        module.AddNote("Application services registered");
+        module.AddNote($"Environment: {env.EnvironmentName}");
     }
 }
 ```
@@ -203,23 +203,42 @@ if (KoanEnv.IsDevelopment)
 
 ### Boot Report Structure
 
+The `Describe` method receives a `ProvenanceModuleWriter` — a fluent writer with the following API:
+
+| Method | Purpose |
+|--------|---------|
+| `module.Describe(version, description)` | Set module version and description text |
+| `module.AddNote(message)` | Append a plain-text note (extension method) |
+| `module.SetStatus(status, detail)` | Set operational status ("ok", "degraded", "error") |
+| `module.ClearStatus()` | Reset status to default |
+| `module.SetSetting(key, builder)` | Add a structured setting entry with source tracking |
+| `module.SetNote(key, builder)` | Add a structured note entry |
+| `module.AddTool(name, route, description)` | Register an exposed tool/endpoint in the report |
+
 ```csharp
-public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
+public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
 {
-    // Add module to report
-    report.AddModule(ModuleName, ModuleVersion);
+    // Set version and description
+    module.Describe(ModuleVersion, "Application services");
 
     // Add informational notes
-    report.AddNote("Services registered: TodoService, EmailService");
-    report.AddNote($"Data source: {cfg["Koan:Data:Sources:Default:Adapter"]}");
+    module.AddNote("Services registered: TodoService, EmailService");
+    module.AddNote($"Data source: {cfg["Koan:Data:Sources:Default:Adapter"]}");
 
-    // Add warnings if needed
+    // Add a structured setting with source information
+    module.SetSetting("Environment", b => b.Value(env.EnvironmentName));
+
+    // Report degraded status when optional config is missing
     if (!cfg.GetSection("Email:Smtp").Exists())
     {
-        report.AddWarning("Email configuration missing - notifications disabled");
+        module.SetStatus("degraded", "Email configuration missing — notifications disabled");
     }
 }
 ```
+
+> **Note:** There is no `AddWarning()` or `AddModule()`. Use `SetStatus("degraded", detail)` to signal
+> non-fatal configuration issues. The module identity is set via `module.Describe(version, description)`.
+
 
 ## Environment Detection
 

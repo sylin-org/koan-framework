@@ -126,7 +126,7 @@ Skills act as **intelligent indexes** into the full documentation, loading exact
 ## Framework Version
 
 **Aligned with:** Koan Framework v0.6.3
-**Last Updated:** 2025-11-03
+**Last Updated:** 2026-03-23
 
 ## Migration Notes
 

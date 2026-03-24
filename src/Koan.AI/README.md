@@ -2,7 +2,7 @@
 
 AI router and registry for Koan: plug multiple AI adapters and route prompts/embeddings.
 
-- Target framework: net9.0
+- Target framework: net10.0
 - License: Apache-2.0
 
 ## Install

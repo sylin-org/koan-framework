@@ -95,8 +95,12 @@ var todos = Enumerable.Range(0, 1000)
     .ToList();
 await todos.Save();
 
-// Batch operations - add/update/delete in one transaction
-await Todo.Batch()
+// Batch operations — returns IBatchSet<Todo, Guid>, committed with SaveAsync()
+// Atomicity: relational providers wrap all operations in a transaction;
+//            document providers (Mongo) execute sequentially (no distributed tx by default).
+// Size guidance: keep batches under ~1 000 items to stay within provider and memory limits.
+IBatchSet<Todo, Guid> batch = Todo.Batch();
+await batch
     .Add(new Todo { Title = "New task" })
     .Update(existingId, todo => todo.Completed = true)
     .Delete(oldId)

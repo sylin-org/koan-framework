@@ -23,6 +23,7 @@
 | **S10.DevPortal** | Framework capabilities showcase | ⭐⭐ Demo | ✅ Active |
 | **S14.AdapterBench** | Provider performance benchmarking | ⭐⭐ Demo | ✅ Active |
 | **S16.PantryPal** | Vision AI & MCP Code Mode | ⭐⭐⭐ Advanced | ✅ Active |
+| **S18.Prism** | Personal Knowledge Intelligence — AI-powered Pulse feed | ⭐⭐⭐⭐ Expert | ✅ Active |
 
 ---
 

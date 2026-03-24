@@ -13,28 +13,50 @@ description: Chat endpoints, embeddings, RAG workflows, vector search
 
 ### Chat Endpoints
 
+The AI facade is the **static `Client` class** — no DI injection needed. It resolves the configured
+pipeline automatically. For controller use, call `Client.ChatAsync()` directly.
+
 ```csharp
 public class ChatController : ControllerBase
 {
-    private readonly IAi _ai;
-
     [HttpPost]
     public async Task<IActionResult> Chat(
         [FromBody] ChatRequest request,
         CancellationToken ct)
     {
-        var response = await _ai.ChatAsync(new AiChatRequest
-        {
-            Model = "gpt-4",
-            Messages = request.Messages,
-            SystemPrompt = "You are a helpful assistant.",
-            Temperature = 0.7
-        }, ct);
-
+        var response = await Client.ChatAsync(request.Message, ct);
         return Ok(new { message = response.Content, usage = response.Usage });
+    }
+
+    // Streaming — use Server-Sent Events or chunked response
+    [HttpPost("stream")]
+    public async IAsyncEnumerable<string> Stream(
+        [FromBody] ChatRequest request,
+        [EnumeratorCancellation] CancellationToken ct)
+    {
+        await foreach (var chunk in Client.StreamAsync(request.Message, ct))
+            yield return chunk.Content;
     }
 }
 ```
+
+When you need to inject the pipeline (e.g., for testability), inject `IAiPipeline` and call
+`PromptAsync` / `StreamAsync` directly:
+
+```csharp
+public class SummaryService(IAiPipeline ai)
+{
+    public Task<AiChatResponse> Summarise(string text, CancellationToken ct) =>
+        ai.PromptAsync(new AiChatRequest
+        {
+            SystemPrompt = "Summarise the following text concisely.",
+            Messages = [new AiMessage { Role = "user", Content = text }]
+        }, ct);
+}
+```
+
+> **There is no `IAi` interface and no `ChatAsync` method on any injectable type.**
+> Use the static `Client` class for the default pipeline, or inject `IAiPipeline` when you need a testable seam.
 
 ### Entity with Embeddings
 
@@ -63,8 +85,6 @@ public class ProductSearch : Entity<ProductSearch>
 ```csharp
 public class KnowledgeBaseService
 {
-    private readonly IAi _ai;
-
     public async Task<string> AnswerQuestion(string question, CancellationToken ct)
     {
         // 1. Find relevant documents via vector search
@@ -73,13 +93,11 @@ public class KnowledgeBaseService
         // 2. Build context from documents
         var context = string.Join("\n\n", relevantDocs.Select(d => d.Content));
 
-        // 3. Query AI with context
-        var response = await _ai.ChatAsync(new AiChatRequest
-        {
-            Model = "gpt-4",
-            SystemPrompt = $"Answer based on this context:\n\n{context}",
-            Messages = new[] { new AiMessage { Role = "user", Content = question } }
-        }, ct);
+        // 3. Query AI with context — use the fluent conversation builder
+        var response = await Client.Converse()
+            .WithSystem($"Answer based on this context:\n\n{context}")
+            .WithUser(question)
+            .PromptAsync(ct);
 
         return response.Content;
     }

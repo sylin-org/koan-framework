@@ -4,10 +4,10 @@ domain: core
 title: "Koan Framework documentation"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2025-10-01
+last_updated: 2026-03-23
 framework_version: v0.6.3
 validation:
-  date_last_tested: 2025-10-01
+  date_last_tested: 2026-03-23
   status: verified
   scope: docs/index.md
 ---
@@ -52,7 +52,7 @@ Complete API documentation for all Koan modules:
 - **[Core](reference/core/index.md)** - Foundational abstractions and configuration
 - **[Data](reference/data/index.md)** - Entity-first data access across providers
 - **[Web](reference/web/index.md)** - ASP.NET Core integration and controllers
-- **[AI](reference/ai/index.md)** - Vector stores, embeddings, and agent endpoints
+- **[AI](reference/ai/index.md)** - Chat, embeddings, RAG, and AI lifecycle (Models, Prompts, Agents, Eval, Training, Review, Compute, Orchestration)
 - **[Auto-Generated API Docs](api/index.md)** - Complete API reference from code comments
 
 ### 🏗️ [Architecture](architecture/principles.md)
@@ -60,11 +60,13 @@ Complete API documentation for all Koan modules:
 Framework principles and design decisions:
 
 - **[Framework Principles](architecture/principles.md)** - Core architectural patterns
-- **[Architecture Decisions](decisions/index.md)** - Complete ADR system with 70+ decisions
+- **[Architecture Decisions](decisions/index.md)** - Complete ADR system with 230+ decisions
 
 ### 📂 [Case Studies](case-studies/s13-docmind/index.md)
 
-Scenario-first walkthroughs showing framework patterns in production samples.
+Scenario-first walkthroughs showing framework patterns in production samples:
+
+- **S18.Prism** — Personal Knowledge Intelligence dogfood (Mongo + Ollama + Weaviate, AI-powered Pulse feed, SPA frontend)
 
 ## Framework Features
 
