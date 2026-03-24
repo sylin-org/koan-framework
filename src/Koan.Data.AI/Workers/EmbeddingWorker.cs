@@ -15,36 +15,25 @@ namespace Koan.Data.AI.Workers;
 /// Background service that processes async embedding jobs from the queue.
 /// Part of ARCH-0070: Attribute-Driven AI Embeddings (Phase 3).
 /// </summary>
-public class EmbeddingWorker : BackgroundService
+public class EmbeddingWorker(
+    ILogger<EmbeddingWorker> logger,
+    IOptions<EmbeddingWorkerOptions> options,
+    EmbeddingTelemetry? telemetry = null) : BackgroundService
 {
-    private readonly ILogger<EmbeddingWorker> _logger;
-    private readonly IOptions<EmbeddingWorkerOptions> _options;
-    private readonly EmbeddingTelemetry? _telemetry;
-
     // Rate limiting: track embeddings generated per minute
     private readonly ConcurrentQueue<DateTimeOffset> _recentEmbeddings = new();
     private readonly SemaphoreSlim _rateLimitSemaphore = new(1, 1);
 
-    public EmbeddingWorker(
-        ILogger<EmbeddingWorker> logger,
-        IOptions<EmbeddingWorkerOptions> options,
-        EmbeddingTelemetry? telemetry = null)
-    {
-        _logger = logger;
-        _options = options;
-        _telemetry = telemetry;
-    }
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (!_options.Value.Enabled)
+        if (!options.Value.Enabled)
         {
-            _logger.LogInformation("EmbeddingWorker disabled via configuration");
+            logger.LogInformation("EmbeddingWorker disabled via configuration");
             return;
         }
 
-        _logger.LogInformation("EmbeddingWorker started (BatchSize={BatchSize}, RateLimit={RateLimit}/min)",
-            _options.Value.BatchSize, _options.Value.GlobalRateLimitPerMinute);
+        logger.LogInformation("EmbeddingWorker started (BatchSize={BatchSize}, RateLimit={RateLimit}/min)",
+            options.Value.BatchSize, options.Value.GlobalRateLimitPerMinute);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -55,28 +44,28 @@ public class EmbeddingWorker : BackgroundService
                 if (processedCount > 0)
                 {
                     // Jobs available - poll frequently
-                    await Task.Delay(_options.Value.PollInterval, stoppingToken);
+                    await Task.Delay(options.Value.PollInterval, stoppingToken);
                 }
                 else
                 {
                     // No jobs - poll less frequently
-                    await Task.Delay(_options.Value.IdlePollInterval, stoppingToken);
+                    await Task.Delay(options.Value.IdlePollInterval, stoppingToken);
                 }
 
                 // Periodic cleanup of completed jobs
-                if (_options.Value.AutoCleanupCompleted)
+                if (options.Value.AutoCleanupCompleted)
                 {
                     await CleanupCompletedJobs(stoppingToken);
                 }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logger.LogError(ex, "EmbeddingWorker encountered error in main loop");
+                logger.LogError(ex, "EmbeddingWorker encountered error in main loop");
                 await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
             }
         }
 
-        _logger.LogInformation("EmbeddingWorker stopped");
+        logger.LogInformation("EmbeddingWorker stopped");
     }
 
     /// <summary>
@@ -100,7 +89,7 @@ public class EmbeddingWorker : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to process jobs for entity type {EntityType}", entityType.Name);
+                logger.LogError(ex, "Failed to process jobs for entity type {EntityType}", entityType.Name);
             }
         }
 
@@ -119,7 +108,7 @@ public class EmbeddingWorker : BackgroundService
 
         if (method == null)
         {
-            _logger.LogError("Failed to find ProcessJobsAsync method for {EntityType}", entityType.Name);
+            logger.LogError("Failed to find ProcessJobsAsync method for {EntityType}", entityType.Name);
             return 0;
         }
 
@@ -141,13 +130,13 @@ public class EmbeddingWorker : BackgroundService
             ct))
             .OrderByDescending(j => j.Priority)
             .ThenBy(j => j.CreatedAt)
-            .Take(_options.Value.BatchSize)
+            .Take(options.Value.BatchSize)
             .ToList();
 
         if (!pendingJobs.Any())
             return 0;
 
-        _logger.LogDebug("Processing {Count} pending jobs for {EntityType}",
+        logger.LogDebug("Processing {Count} pending jobs for {EntityType}",
             pendingJobs.Count, typeof(TEntity).Name);
 
         var processedCount = 0;
@@ -172,12 +161,12 @@ public class EmbeddingWorker : BackgroundService
                 await job.Save(ct);
 
                 processedCount++;
-                _logger.LogDebug("Completed embedding job {JobId} for entity {EntityId}",
+                logger.LogDebug("Completed embedding job {JobId} for entity {EntityId}",
                     job.Id, job.EntityId);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to process embedding job {JobId}: {Error}",
+                logger.LogError(ex, "Failed to process embedding job {JobId}: {Error}",
                     job.Id, ex.Message);
 
                 await HandleJobFailureAsync(job, ex.Message, ct);
@@ -187,13 +176,13 @@ public class EmbeddingWorker : BackgroundService
         batchStopwatch.Stop();
 
         // Record batch processing metrics
-        _telemetry?.RecordBatchProcessing(
+        telemetry?.RecordBatchProcessing(
             entityType: typeof(TEntity).Name,
             batchSize: processedCount,
             durationSeconds: batchStopwatch.Elapsed.TotalSeconds);
 
         // Record queue processing metrics
-        _telemetry?.RecordQueueProcessing(
+        telemetry?.RecordQueueProcessing(
             count: processedCount,
             success: true,
             entityType: typeof(TEntity).Name);
@@ -204,7 +193,7 @@ public class EmbeddingWorker : BackgroundService
         var oldestPending = allPending.OrderBy(j => j.CreatedAt).FirstOrDefault();
         var oldestAge = oldestPending != null ? (DateTimeOffset.UtcNow - oldestPending.CreatedAt).TotalSeconds : 0.0;
 
-        _telemetry?.UpdateQueueState(
+        telemetry?.UpdateQueueState(
             pending: allPending.Count(),
             failed: allFailed.Count(),
             oldestAgeSeconds: oldestAge);
@@ -235,7 +224,7 @@ public class EmbeddingWorker : BackgroundService
 
             if (currentSignature != job.ContentSignature)
             {
-                _logger.LogWarning(
+                logger.LogWarning(
                     "Content signature changed for entity {EntityId} - regenerating embedding text",
                     job.EntityId);
 
@@ -244,7 +233,7 @@ public class EmbeddingWorker : BackgroundService
                 job.ContentSignature = currentSignature;
 
                 // Record cache invalidation
-                _telemetry?.RecordCacheInvalidation(typeof(TEntity).Name, "content_changed");
+                telemetry?.RecordCacheInvalidation(typeof(TEntity).Name, "content_changed");
             }
 
             // Estimate tokens for cost tracking
@@ -268,7 +257,7 @@ public class EmbeddingWorker : BackgroundService
                 estimatedTokens);
 
             // Record telemetry
-            _telemetry?.RecordEmbeddingGeneration(
+            telemetry?.RecordEmbeddingGeneration(
                 entityType: typeof(TEntity).Name,
                 model: metadata.Model ?? job.Model,
                 provider: metadata.Source?.Split('-').FirstOrDefault(),
@@ -313,7 +302,7 @@ public class EmbeddingWorker : BackgroundService
             var metadata = EmbeddingMetadata.Resolve<TEntity>();
             var estimatedTokens = EmbeddingMetadata.EstimateTokens(job.EmbeddingText);
 
-            _telemetry?.RecordEmbeddingGeneration(
+            telemetry?.RecordEmbeddingGeneration(
                 entityType: typeof(TEntity).Name,
                 model: metadata.Model ?? job.Model,
                 provider: metadata.Source?.Split('-').FirstOrDefault(),
@@ -340,13 +329,13 @@ public class EmbeddingWorker : BackgroundService
         job.Error = error;
         job.RetryCount++;
 
-        if (job.RetryCount >= _options.Value.MaxRetries)
+        if (job.RetryCount >= options.Value.MaxRetries)
         {
             // Permanently failed
             job.Status = EmbedJobStatus.FailedPermanent;
             job.CompletedAt = DateTimeOffset.UtcNow;
 
-            _logger.LogError(
+            logger.LogError(
                 "Embedding job {JobId} permanently failed after {Retries} retries: {Error}",
                 job.Id, job.RetryCount, error);
         }
@@ -356,9 +345,9 @@ public class EmbeddingWorker : BackgroundService
             job.Status = EmbedJobStatus.Failed;
 
             var delay = CalculateRetryDelay(job.RetryCount);
-            _logger.LogWarning(
+            logger.LogWarning(
                 "Embedding job {JobId} failed (retry {Retry}/{MaxRetries}), will retry in {Delay}: {Error}",
-                job.Id, job.RetryCount, _options.Value.MaxRetries, delay, error);
+                job.Id, job.RetryCount, options.Value.MaxRetries, delay, error);
 
             // Reset to pending after delay (simplified - in production might use scheduled jobs)
             await Task.Delay(delay, ct);
@@ -374,10 +363,10 @@ public class EmbeddingWorker : BackgroundService
     /// </summary>
     private TimeSpan CalculateRetryDelay(int retryCount)
     {
-        var delay = _options.Value.InitialRetryDelay.TotalSeconds *
-                    Math.Pow(_options.Value.RetryBackoffMultiplier, retryCount - 1);
+        var delay = options.Value.InitialRetryDelay.TotalSeconds *
+                    Math.Pow(options.Value.RetryBackoffMultiplier, retryCount - 1);
 
-        var clampedDelay = Math.Min(delay, _options.Value.MaxRetryDelay.TotalSeconds);
+        var clampedDelay = Math.Min(delay, options.Value.MaxRetryDelay.TotalSeconds);
         return TimeSpan.FromSeconds(clampedDelay);
     }
 
@@ -386,7 +375,7 @@ public class EmbeddingWorker : BackgroundService
     /// </summary>
     private async Task WaitForRateLimit(CancellationToken ct)
     {
-        if (_options.Value.GlobalRateLimitPerMinute <= 0)
+        if (options.Value.GlobalRateLimitPerMinute <= 0)
             return; // Rate limiting disabled
 
         await _rateLimitSemaphore.WaitAsync(ct);
@@ -402,9 +391,9 @@ public class EmbeddingWorker : BackgroundService
             }
 
             // Check if we're at the rate limit
-            while (_recentEmbeddings.Count >= _options.Value.GlobalRateLimitPerMinute)
+            while (_recentEmbeddings.Count >= options.Value.GlobalRateLimitPerMinute)
             {
-                _logger.LogDebug("Rate limit reached, waiting...");
+                logger.LogDebug("Rate limit reached, waiting...");
                 await Task.Delay(TimeSpan.FromSeconds(1), ct);
 
                 // Clean up old timestamps
@@ -432,7 +421,7 @@ public class EmbeddingWorker : BackgroundService
     {
         try
         {
-            var cutoff = DateTimeOffset.UtcNow - _options.Value.CompletedJobRetention;
+            var cutoff = DateTimeOffset.UtcNow - options.Value.CompletedJobRetention;
 
             foreach (var entityType in EmbeddingRegistry.GetRegisteredTypes())
             {
@@ -444,7 +433,7 @@ public class EmbeddingWorker : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to cleanup completed jobs");
+            logger.LogWarning(ex, "Failed to cleanup completed jobs");
         }
     }
 
@@ -482,7 +471,7 @@ public class EmbeddingWorker : BackgroundService
                 await EmbedJob<TEntity>.Remove(job.Id!, ct);
             }
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "Cleaned up {Count} completed jobs for {EntityType}",
                 oldJobs.Count, typeof(TEntity).Name);
         }

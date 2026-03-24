@@ -10,19 +10,13 @@ namespace Koan.AI.Training;
 /// Training service that resolves training operations through adapters
 /// with <see cref="AiCapability.Train"/> and <see cref="AiCapability.Align"/> capabilities.
 /// </summary>
-internal sealed class TrainingService : ITrainingService
+internal sealed class TrainingService(IAiAdapterRegistry registry) : ITrainingService
 {
-    private readonly IAiAdapterRegistry _registry;
-
-    public TrainingService(IAiAdapterRegistry registry)
-    {
-        _registry = registry;
-    }
 
     public async Task<TrainingJob> Train(
         TrainOptions options, IProgress<TrainingProgress>? progress, CancellationToken ct)
     {
-        var adapter = AdapterResolver.Resolve(_registry, AiCapability.Train, options.Compute?.PreferredNode);
+        var adapter = AdapterResolver.Resolve(registry, AiCapability.Train, options.Compute?.PreferredNode);
         var runtime = ResolveTrainingRuntime(adapter);
         return await runtime.Launch(options, progress, ct);
     }
@@ -30,14 +24,14 @@ internal sealed class TrainingService : ITrainingService
     public async Task<TrainingJob> Run(
         RunOptions options, IProgress<TrainingProgress>? progress, CancellationToken ct)
     {
-        var adapter = AdapterResolver.Resolve(_registry, AiCapability.Train, options.Compute?.PreferredNode);
+        var adapter = AdapterResolver.Resolve(registry, AiCapability.Train, options.Compute?.PreferredNode);
         var runtime = ResolveTrainingRuntime(adapter);
         return await runtime.LaunchScript(options, progress, ct);
     }
 
     public async Task<TrainingJob> Align(AlignOptions options, CancellationToken ct)
     {
-        var adapter = AdapterResolver.Resolve(_registry, AiCapability.Align, options.Compute?.PreferredNode);
+        var adapter = AdapterResolver.Resolve(registry, AiCapability.Align, options.Compute?.PreferredNode);
         var runtime = ResolveTrainingRuntime(adapter);
 
         var trainOptions = new TrainOptions
@@ -60,7 +54,7 @@ internal sealed class TrainingService : ITrainingService
 
     public Task<TrainingEstimate> Estimate(TrainOptions options, CancellationToken ct)
     {
-        var trainAdapters = AdapterResolver.ResolveAll(_registry, AiCapability.Train);
+        var trainAdapters = AdapterResolver.ResolveAll(registry, AiCapability.Train);
 
         var estimate = new TrainingEstimate
         {
@@ -81,7 +75,7 @@ internal sealed class TrainingService : ITrainingService
 
     public async Task<TrainingJob> Status(string jobId, CancellationToken ct)
     {
-        var trainAdapters = AdapterResolver.ResolveAll(_registry, AiCapability.Train);
+        var trainAdapters = AdapterResolver.ResolveAll(registry, AiCapability.Train);
 
         foreach (var adapter in trainAdapters)
         {
@@ -104,7 +98,7 @@ internal sealed class TrainingService : ITrainingService
 
     public async Task Cancel(string jobId, CancellationToken ct)
     {
-        var trainAdapters = AdapterResolver.ResolveAll(_registry, AiCapability.Train);
+        var trainAdapters = AdapterResolver.ResolveAll(registry, AiCapability.Train);
 
         foreach (var adapter in trainAdapters)
         {
@@ -128,7 +122,7 @@ internal sealed class TrainingService : ITrainingService
 
     public async Task<TrainingJob> Resume(string jobId, string? checkpoint, CancellationToken ct)
     {
-        var trainAdapters = AdapterResolver.ResolveAll(_registry, AiCapability.Train);
+        var trainAdapters = AdapterResolver.ResolveAll(registry, AiCapability.Train);
 
         foreach (var adapter in trainAdapters)
         {

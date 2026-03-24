@@ -10,17 +10,11 @@ using System.IO;
 
 namespace Koan.Cache.Policies;
 
-internal sealed class CachePolicyRegistry : ICachePolicyRegistry
+internal sealed class CachePolicyRegistry(ILogger<CachePolicyRegistry> logger) : ICachePolicyRegistry
 {
-    private readonly ILogger<CachePolicyRegistry> _logger;
     private ImmutableDictionary<Type, ImmutableArray<CachePolicyDescriptor>> _typePolicies = ImmutableDictionary<Type, ImmutableArray<CachePolicyDescriptor>>.Empty;
     private ImmutableDictionary<MemberInfo, CachePolicyDescriptor> _memberPolicies = ImmutableDictionary<MemberInfo, CachePolicyDescriptor>.Empty;
     private ImmutableArray<CachePolicyDescriptor> _allPolicies = ImmutableArray<CachePolicyDescriptor>.Empty;
-
-    public CachePolicyRegistry(ILogger<CachePolicyRegistry> logger)
-    {
-        _logger = logger;
-    }
 
     public IReadOnlyList<CachePolicyDescriptor> GetPoliciesFor(Type type)
         => _typePolicies.TryGetValue(type, out var value) ? value : ImmutableArray<CachePolicyDescriptor>.Empty;
@@ -115,7 +109,7 @@ internal sealed class CachePolicyRegistry : ICachePolicyRegistry
         _memberPolicies = memberBuilder.ToImmutable();
         _allPolicies = allBuilder.ToImmutable();
 
-        _logger.LogInformation("Cache policy registry rebuilt. {TypePolicyCount} type policies, {MemberPolicyCount} member policies.",
+        logger.LogInformation("Cache policy registry rebuilt. {TypePolicyCount} type policies, {MemberPolicyCount} member policies.",
             _typePolicies.Count, _memberPolicies.Count);
     }
 
@@ -128,7 +122,7 @@ internal sealed class CachePolicyRegistry : ICachePolicyRegistry
         }
         catch (Exception ex) when (ex is TypeLoadException or ReflectionTypeLoadException or FileNotFoundException or FileLoadException or BadImageFormatException)
         {
-            _logger.LogWarning(ex, "Skipping cache policy attributes for {Target} due to reflection failure: {Message}", targetName, ex.Message);
+            logger.LogWarning(ex, "Skipping cache policy attributes for {Target} due to reflection failure: {Message}", targetName, ex.Message);
             return [];
         }
     }

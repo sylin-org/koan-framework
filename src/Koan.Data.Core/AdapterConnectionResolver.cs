@@ -1,4 +1,5 @@
 using System;
+using Koan.Data.Core.Infrastructure;
 using Microsoft.Extensions.Configuration;
 
 namespace Koan.Data.Core;
@@ -12,9 +13,9 @@ public static class AdapterConnectionResolver
     /// Resolve connection string for adapter and source combination.
     ///
     /// Priority:
-    /// 1. Koan:Data:Sources:{source}:{providerId}:ConnectionString
+    /// 1. <see cref="ConfigurationConstants.Sources"/>.ConnectionString(source, providerId)
     /// 2. ConnectionStrings:{source}
-    /// 3. Koan:Data:{providerId}:ConnectionString (adapter default)
+    /// 3. <see cref="ConfigurationConstants.Adapter"/>.ConnectionString(providerId)
     /// 4. Fallback to "Default" source if current source != "Default"
     /// </summary>
     public static string ResolveConnectionString(
@@ -31,7 +32,7 @@ public static class AdapterConnectionResolver
         }
 
         // Priority 2: Koan:Data:Sources:{source}:{providerId}:ConnectionString
-        var sourceSpecific = config[$"Koan:Data:Sources:{source}:{providerId}:ConnectionString"];
+        var sourceSpecific = config[ConfigurationConstants.Sources.ConnectionString(source, providerId)];
         if (!string.IsNullOrWhiteSpace(sourceSpecific))
             return sourceSpecific;
 
@@ -41,7 +42,7 @@ public static class AdapterConnectionResolver
             return connStr;
 
         // Priority 4: Adapter defaults (Koan:Data:{providerId}:ConnectionString)
-        var adapterDefault = config[$"Koan:Data:{providerId}:ConnectionString"];
+        var adapterDefault = config[ConfigurationConstants.Adapter.ConnectionString(providerId)];
         if (!string.IsNullOrWhiteSpace(adapterDefault))
             return adapterDefault;
 
@@ -53,8 +54,8 @@ public static class AdapterConnectionResolver
 
         throw new InvalidOperationException(
             $"No connection string found for provider '{providerId}', source '{source}'. " +
-            $"Configure one of: Koan:Data:Sources:{source}:ConnectionString, " +
-            $"ConnectionStrings:{source}, or Koan:Data:{providerId}:ConnectionString");
+            $"Configure one of: {ConfigurationConstants.Sources.ConnectionString(source, providerId)}, " +
+            $"ConnectionStrings:{source}, or {ConfigurationConstants.Adapter.ConnectionString(providerId)}");
     }
 
     /// <summary>
@@ -83,7 +84,7 @@ public static class AdapterConnectionResolver
         }
 
         // Try source-specific config
-        var sourceKey = $"Koan:Data:Sources:{source}:{providerId}:{settingKey}";
+        var sourceKey = ConfigurationConstants.Sources.Setting(source, providerId, settingKey);
         var sourceValue = config[sourceKey];
         if (!string.IsNullOrWhiteSpace(sourceValue))
         {
@@ -98,7 +99,7 @@ public static class AdapterConnectionResolver
         }
 
         // Try adapter default
-        var adapterKey = $"Koan:Data:{providerId}:{settingKey}";
+        var adapterKey = ConfigurationConstants.Adapter.Setting(providerId, settingKey);
         var adapterValue = config[adapterKey];
         if (!string.IsNullOrWhiteSpace(adapterValue))
         {

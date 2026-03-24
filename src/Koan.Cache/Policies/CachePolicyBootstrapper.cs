@@ -11,19 +11,12 @@ using Microsoft.Extensions.Options;
 
 namespace Koan.Cache.Policies;
 
-internal sealed class CachePolicyBootstrapper : IHostedService
+internal sealed class CachePolicyBootstrapper(
+    CachePolicyRegistry registry,
+    IOptionsMonitor<CacheOptions> options,
+    ILogger<CachePolicyBootstrapper> logger) : IHostedService
 {
-    private readonly CachePolicyRegistry _registry;
-    private readonly IOptionsMonitor<CacheOptions> _options;
-    private readonly ILogger<CachePolicyBootstrapper> _logger;
     private AssemblyLoadEventHandler? _handler;
-
-    public CachePolicyBootstrapper(CachePolicyRegistry registry, IOptionsMonitor<CacheOptions> options, ILogger<CachePolicyBootstrapper> logger)
-    {
-        _registry = registry;
-        _options = options;
-        _logger = logger;
-    }
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
@@ -46,9 +39,9 @@ internal sealed class CachePolicyBootstrapper : IHostedService
 
     private void Rebuild()
     {
-        var opts = _options.CurrentValue;
+        var opts = options.CurrentValue;
         var assemblies = SelectAssemblies(opts);
-        _registry.Rebuild(assemblies);
+        registry.Rebuild(assemblies);
     }
 
     private static IEnumerable<Assembly> SelectAssemblies(CacheOptions options)

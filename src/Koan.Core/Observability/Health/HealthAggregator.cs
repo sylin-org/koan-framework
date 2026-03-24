@@ -3,18 +3,12 @@ using System.Collections.Concurrent;
 
 namespace Koan.Core.Observability.Health;
 
-internal sealed class HealthAggregator : IHealthAggregator
+internal sealed class HealthAggregator(HealthAggregatorOptions options) : IHealthAggregator
 {
-    private readonly HealthAggregatorOptions _options;
     private readonly ConcurrentDictionary<string, HealthSample> _samples = new(StringComparer.OrdinalIgnoreCase);
     private readonly object _probeLock = new();
     private DateTimeOffset _lastSnapshotAt = DateTimeOffset.MinValue;
     private readonly ConcurrentDictionary<string, List<Action<ProbeRequestedEventArgs>>> _scopedHandlers = new(StringComparer.OrdinalIgnoreCase);
-
-    public HealthAggregator(HealthAggregatorOptions options)
-    {
-        _options = options;
-    }
 
     public event EventHandler<ProbeRequestedEventArgs>? ProbeRequested;
 
@@ -24,7 +18,7 @@ internal sealed class HealthAggregator : IHealthAggregator
         {
             Component = component,
             Reason = reason,
-            NotAfterUtc = DateTimeOffset.UtcNow + _options.Policy.SnapshotStalenessWindow
+            NotAfterUtc = DateTimeOffset.UtcNow + options.Policy.SnapshotStalenessWindow
         };
         // Targeted: if scoped handlers exist for the component, invoke them and skip the general event
         bool invokedScoped = false;
@@ -78,21 +72,21 @@ internal sealed class HealthAggregator : IHealthAggregator
     {
         var now = DateTimeOffset.UtcNow;
         // Clamp message length
-        if (message is not null && message.Length > _options.Limits.MaxMessageLength)
-            message = message.Substring(0, _options.Limits.MaxMessageLength);
+        if (message is not null && message.Length > options.Limits.MaxMessageLength)
+            message = message.Substring(0, options.Limits.MaxMessageLength);
         // Clamp facts count and size (rough, by concatenating pairs)
         if (facts is not null)
         {
-            if (facts.Count > _options.Limits.MaxFactsCountPerComponent)
-                facts = facts.Take(_options.Limits.MaxFactsCountPerComponent).ToDictionary(k => k.Key, v => v.Value);
+            if (facts.Count > options.Limits.MaxFactsCountPerComponent)
+                facts = facts.Take(options.Limits.MaxFactsCountPerComponent).ToDictionary(k => k.Key, v => v.Value);
             var approxBytes = facts.Sum(kv => (kv.Key?.Length ?? 0) + (kv.Value?.Length ?? 0));
-            if (approxBytes > _options.Limits.MaxFactsBytesPerComponent)
+            if (approxBytes > options.Limits.MaxFactsBytesPerComponent)
             {
                 // Trim until under budget
                 var trimmed = new Dictionary<string, string>();
                 foreach (var kv in facts)
                 {
-                    if ((trimmed.Sum(x => x.Key.Length + x.Value.Length) + kv.Key.Length + kv.Value.Length) > _options.Limits.MaxFactsBytesPerComponent)
+                    if ((trimmed.Sum(x => x.Key.Length + x.Value.Length) + kv.Key.Length + kv.Value.Length) > options.Limits.MaxFactsBytesPerComponent)
                         break;
                     trimmed[kv.Key] = kv.Value;
                 }
@@ -102,8 +96,8 @@ internal sealed class HealthAggregator : IHealthAggregator
         // TTL is honored only if provided; clamp to bounds
         TimeSpan? effectiveTtl = ttl is null ? null :
             TimeSpan.FromMilliseconds(Math.Clamp(ttl.Value.TotalMilliseconds,
-                _options.Ttl.MinTtl.TotalMilliseconds,
-                _options.Ttl.MaxTtl.TotalMilliseconds));
+                options.Ttl.MinTtl.TotalMilliseconds,
+                options.Ttl.MaxTtl.TotalMilliseconds));
 
         var sample = new HealthSample(component, status, message, now, effectiveTtl, facts);
         _samples.AddOrUpdate(component, sample, (_, _) => sample);
@@ -130,7 +124,7 @@ internal sealed class HealthAggregator : IHealthAggregator
         HealthStatus overall = HealthStatus.Healthy;
         foreach (var s in list)
         {
-            if (_options.Policy.ConsiderOnlyCriticalForOverall)
+            if (options.Policy.ConsiderOnlyCriticalForOverall)
             {
                 var critical = s.Facts?.TryGetValue("critical", out var v) == true && string.Equals(v, "true", StringComparison.OrdinalIgnoreCase);
                 if (!critical) continue;
@@ -138,8 +132,8 @@ internal sealed class HealthAggregator : IHealthAggregator
             var status = s.Status;
             if (status == HealthStatus.Unknown)
             {
-                var required = _options.Policy.RequiredComponents.Any(r => string.Equals(r, s.Component, StringComparison.OrdinalIgnoreCase));
-                if (_options.Policy.TreatUnknownAsDegradedForRequired && required)
+                var required = options.Policy.RequiredComponents.Any(r => string.Equals(r, s.Component, StringComparison.OrdinalIgnoreCase));
+                if (options.Policy.TreatUnknownAsDegradedForRequired && required)
                     status = HealthStatus.Degraded;
                 else
                     continue;

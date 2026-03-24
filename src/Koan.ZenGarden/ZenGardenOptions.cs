@@ -1,3 +1,5 @@
+using Koan.ZenGarden.Infrastructure;
+
 namespace Koan.ZenGarden;
 
 /// <summary>
@@ -5,7 +7,7 @@ namespace Koan.ZenGarden;
 /// </summary>
 public sealed class ZenGardenOptions
 {
-    public const string SectionName = "Koan:ZenGarden";
+    public const string SectionName = ConfigurationConstants.Section;
 
     /// <summary>
     /// Optional explicit Moss endpoint (for example "http://stone-01:7185").

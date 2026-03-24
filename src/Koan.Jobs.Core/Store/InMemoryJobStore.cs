@@ -10,23 +10,17 @@ using Koan.Jobs.Support;
 
 namespace Koan.Jobs.Store;
 
-internal sealed class InMemoryJobStore : IJobStore
+internal sealed class InMemoryJobStore(JobIndexCache index) : IJobStore
 {
     private readonly ConcurrentDictionary<string, Job> _jobs = new();
     private readonly ConcurrentDictionary<string, List<JobExecution>> _executions = new();
-    private readonly JobIndexCache _index;
-
-    public InMemoryJobStore(JobIndexCache index)
-    {
-        _index = index;
-    }
 
     public Task<Job> Create(Job job, JobStoreMetadata metadata, CancellationToken cancellationToken)
     {
         // Store in memory - no database persistence
         job.LastModified = DateTimeOffset.UtcNow;
         _jobs[job.Id] = job;
-        _index.Set(new JobIndexEntry(job.Id, JobStorageMode.InMemory, null, null, metadata.Audit, job.GetType()));
+        index.Set(new JobIndexEntry(job.Id, JobStorageMode.InMemory, null, null, metadata.Audit, job.GetType()));
         return Task.FromResult(job);
     }
 
@@ -41,7 +35,7 @@ internal sealed class InMemoryJobStore : IJobStore
         // Update in memory - no database persistence
         job.LastModified = DateTimeOffset.UtcNow;
         _jobs[job.Id] = job;
-        _index.Set(new JobIndexEntry(job.Id, JobStorageMode.InMemory, null, null, metadata.Audit, job.GetType()));
+        index.Set(new JobIndexEntry(job.Id, JobStorageMode.InMemory, null, null, metadata.Audit, job.GetType()));
         return Task.FromResult(job);
     }
 
@@ -49,7 +43,7 @@ internal sealed class InMemoryJobStore : IJobStore
     {
         _jobs.TryRemove(jobId, out _);
         _executions.TryRemove(jobId, out _);
-        _index.Remove(jobId);
+        index.Remove(jobId);
         return Task.CompletedTask;
     }
 
@@ -109,7 +103,7 @@ internal sealed class InMemoryJobStore : IJobStore
         {
             _jobs.TryRemove(job.Id, out _);
             _executions.TryRemove(job.Id, out _);
-            _index.Remove(job.Id);
+            index.Remove(job.Id);
         }
 
         return Task.CompletedTask;

@@ -3,22 +3,13 @@ using Koan.Jobs.Model;
 
 namespace Koan.Jobs.Store;
 
-internal sealed class JobStoreResolver : IJobStoreResolver
+internal sealed class JobStoreResolver(InMemoryJobStore inMemory, EntityJobStore entity) : IJobStoreResolver
 {
-    private readonly InMemoryJobStore _inMemory;
-    private readonly EntityJobStore _entity;
-
-    public JobStoreResolver(InMemoryJobStore inMemory, EntityJobStore entity)
-    {
-        _inMemory = inMemory;
-        _entity = entity;
-    }
-
     public IJobStore Resolve(JobStorageMode mode)
         => mode switch
         {
-            JobStorageMode.InMemory => _inMemory,
-            JobStorageMode.Entity => _entity,
+            JobStorageMode.InMemory => inMemory,
+            JobStorageMode.Entity => entity,
             _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unknown job storage mode")
         };
 }

@@ -10,32 +10,22 @@ using System.Threading.Tasks;
 
 namespace Koan.Data.Backup.Core;
 
-public class BackupDiscoveryService : IBackupDiscoveryService
+public class BackupDiscoveryService(
+    IStorageService storageService,
+    BackupStorageService backupStorageService,
+    ILogger<BackupDiscoveryService> logger) : IBackupDiscoveryService
 {
-    private readonly IStorageService _storageService;
-    private readonly BackupStorageService _backupStorageService;
-    private readonly ILogger<BackupDiscoveryService> _logger;
     private readonly ConcurrentDictionary<string, BackupCatalog> _catalogCache = new();
     private readonly object _refreshLock = new();
 
     private static readonly Regex BackupFilePattern = new(@"^(.+)-(\d{8}-\d{6})\.zip$", RegexOptions.Compiled);
-
-    public BackupDiscoveryService(
-        IStorageService storageService,
-        BackupStorageService backupStorageService,
-        ILogger<BackupDiscoveryService> logger)
-    {
-        _storageService = storageService;
-        _backupStorageService = backupStorageService;
-        _logger = logger;
-    }
 
     public async Task<BackupCatalog> DiscoverAllBackups(DiscoveryOptions? options = null, CancellationToken ct = default)
     {
         options ??= new DiscoveryOptions();
         var stopwatch = Stopwatch.StartNew();
 
-        _logger.LogInformation("Starting backup discovery across all storage profiles");
+        logger.LogInformation("Starting backup discovery across all storage profiles");
 
         var catalog = new BackupCatalog
         {
@@ -72,7 +62,7 @@ public class BackupDiscoveryService : IBackupDiscoveryService
             // Calculate stats
             catalog.Stats = CalculateCatalogStats(allBackups);
 
-            _logger.LogInformation("Discovery completed. Found {BackupCount} backups across {ProfileCount} storage profiles in {Duration}ms",
+            logger.LogInformation("Discovery completed. Found {BackupCount} backups across {ProfileCount} storage profiles in {Duration}ms",
                 allBackups.Count, profilesToScan.Length, stopwatch.ElapsedMilliseconds);
 
             // Cache the result if using cache
@@ -90,7 +80,7 @@ public class BackupDiscoveryService : IBackupDiscoveryService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Backup discovery failed");
+            logger.LogError(ex, "Backup discovery failed");
             catalog.DiscoveryDuration = stopwatch.Elapsed;
             return catalog;
         }
@@ -99,7 +89,7 @@ public class BackupDiscoveryService : IBackupDiscoveryService
     public async Task<BackupCatalog> DiscoverByStorageProfile(string storageProfile, CancellationToken ct = default)
     {
         var stopwatch = Stopwatch.StartNew();
-        _logger.LogDebug("Discovering backups in storage profile: {StorageProfile}", storageProfile);
+        logger.LogDebug("Discovering backups in storage profile: {StorageProfile}", storageProfile);
 
         var catalog = new BackupCatalog
         {
@@ -113,7 +103,7 @@ public class BackupDiscoveryService : IBackupDiscoveryService
             // List backup files from storage using the new listing capability
             try
             {
-                await foreach (var file in _storageService.ListObjects(storageProfile, "backups", null, ct))
+                await foreach (var file in storageService.ListObjects(storageProfile, "backups", null, ct))
                 {
                     try
                     {
@@ -127,14 +117,14 @@ public class BackupDiscoveryService : IBackupDiscoveryService
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogWarning(ex, "Failed to process backup file {File} in profile {Profile}",
+                        logger.LogWarning(ex, "Failed to process backup file {File} in profile {Profile}",
                             file.Key, storageProfile);
                     }
                 }
             }
             catch (NotSupportedException)
             {
-                _logger.LogWarning("Storage provider for profile {StorageProfile} does not support listing operations. Cannot discover backups automatically.", storageProfile);
+                logger.LogWarning("Storage provider for profile {StorageProfile} does not support listing operations. Cannot discover backups automatically.", storageProfile);
                 // Return empty list when provider doesn't support listing
             }
 
@@ -143,14 +133,14 @@ public class BackupDiscoveryService : IBackupDiscoveryService
             catalog.Stats = CalculateCatalogStats(backups);
             catalog.DiscoveryDuration = stopwatch.Elapsed;
 
-            _logger.LogDebug("Found {BackupCount} backups in profile {StorageProfile} in {Duration}ms",
+            logger.LogDebug("Found {BackupCount} backups in profile {StorageProfile} in {Duration}ms",
                 backups.Count, storageProfile, stopwatch.ElapsedMilliseconds);
 
             return catalog;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to discover backups in storage profile {StorageProfile}", storageProfile);
+            logger.LogError(ex, "Failed to discover backups in storage profile {StorageProfile}", storageProfile);
             catalog.DiscoveryDuration = stopwatch.Elapsed;
             return catalog;
         }
@@ -295,10 +285,10 @@ public class BackupDiscoveryService : IBackupDiscoveryService
             try
             {
                 var backupPath = GenerateBackupPath(backup.Name, backup.CreatedAt);
-                using var archive = await _backupStorageService.OpenBackupArchive(backupPath, backup.StorageProfile, ct);
+                using var archive = await backupStorageService.OpenBackupArchive(backupPath, backup.StorageProfile, ct);
 
                 // Load and validate manifest
-                var manifest = await _backupStorageService.LoadManifest(archive, ct);
+                var manifest = await backupStorageService.LoadManifest(archive, ct);
 
                 // Basic validation checks
                 if (manifest.Status != BackupStatus.Completed)
@@ -322,7 +312,7 @@ public class BackupDiscoveryService : IBackupDiscoveryService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Backup validation failed for {BackupId}", backupId);
+            logger.LogError(ex, "Backup validation failed for {BackupId}", backupId);
             result.IsValid = false;
             result.Issues.Add($"Validation error: {ex.Message}");
             result.HealthStatus = BackupHealthStatus.Critical;
@@ -337,7 +327,7 @@ public class BackupDiscoveryService : IBackupDiscoveryService
 
     public async Task RefreshCatalog(CancellationToken ct = default)
     {
-        _logger.LogInformation("Refreshing backup catalog cache");
+        logger.LogInformation("Refreshing backup catalog cache");
 
         lock (_refreshLock)
         {
@@ -347,7 +337,7 @@ public class BackupDiscoveryService : IBackupDiscoveryService
         // Trigger a fresh discovery
         await DiscoverAllBackups(new DiscoveryOptions { UseFastPath = true }, ct);
 
-        _logger.LogInformation("Backup catalog cache refreshed");
+        logger.LogInformation("Backup catalog cache refreshed");
     }
 
     public async Task<BackupCatalogStats> GetCatalogStats(CancellationToken ct = default)
@@ -369,7 +359,7 @@ public class BackupDiscoveryService : IBackupDiscoveryService
             var match = BackupFilePattern.Match(fileName);
             if (!match.Success)
             {
-                _logger.LogWarning("Backup file {FileName} does not match expected pattern", fileName);
+                logger.LogWarning("Backup file {FileName} does not match expected pattern", fileName);
                 return null;
             }
 
@@ -379,7 +369,7 @@ public class BackupDiscoveryService : IBackupDiscoveryService
             // Try to parse the timestamp
             if (!DateTime.TryParseExact(timestamp, "yyyyMMdd-HHmmss", null, System.Globalization.DateTimeStyles.None, out var createdAt))
             {
-                _logger.LogWarning("Could not parse timestamp {Timestamp} from backup file {FileName}", timestamp, fileName);
+                logger.LogWarning("Could not parse timestamp {Timestamp} from backup file {FileName}", timestamp, fileName);
                 createdAt = lastModified.DateTime;
             }
 
@@ -389,12 +379,12 @@ public class BackupDiscoveryService : IBackupDiscoveryService
             {
                 // Use the full file key as backup path
                 var backupPath = file.Key;
-                using var archive = await _backupStorageService.OpenBackupArchive(backupPath, storageProfile, ct);
-                manifest = await _backupStorageService.LoadManifest(archive, ct);
+                using var archive = await backupStorageService.OpenBackupArchive(backupPath, storageProfile, ct);
+                manifest = await backupStorageService.LoadManifest(archive, ct);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Could not load manifest for backup {FileName}", fileName);
+                logger.LogWarning(ex, "Could not load manifest for backup {FileName}", fileName);
             }
 
             var backupInfo = new BackupInfo
@@ -421,7 +411,7 @@ public class BackupDiscoveryService : IBackupDiscoveryService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to create BackupInfo from file in profile {StorageProfile}", storageProfile);
+            logger.LogError(ex, "Failed to create BackupInfo from file in profile {StorageProfile}", storageProfile);
             return null;
         }
     }

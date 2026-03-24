@@ -1,4 +1,5 @@
 using Koan.Core.Modules;
+using Koan.Jobs.Infrastructure;
 using Koan.Jobs.Execution;
 using Koan.Jobs.Events;
 using Koan.Jobs.Options;
@@ -15,7 +16,7 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddKoanJobs(this IServiceCollection services)
     {
-        services.AddKoanOptions<JobsOptions>("Koan:Jobs");
+        services.AddKoanOptions<JobsOptions>(ConfigurationConstants.Section);
         services.TryAddSingleton<JobIndexCache>();
         services.TryAddSingleton<JobProgressBroker>();
         services.TryAddSingleton<InMemoryJobStore>();

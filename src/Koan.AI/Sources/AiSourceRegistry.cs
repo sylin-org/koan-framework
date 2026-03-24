@@ -5,6 +5,7 @@ using System.Linq;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Koan.AI.Contracts.Sources;
+using Koan.AI.Infrastructure;
 
 namespace Koan.AI.Sources;
 
@@ -21,7 +22,7 @@ public sealed class AiSourceRegistry : IAiSourceRegistry
         new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Auto-discover sources from IConfiguration at "Koan:Ai:Sources:{name}".
+    /// Auto-discover sources from IConfiguration at "<see cref="ConfigurationConstants.Sources.Section"/>:{name}".
     /// NO "Default" source creation - router handles election.
     /// </summary>
     public void DiscoverFromConfiguration(IConfiguration config, ILogger? logger = null)
@@ -37,7 +38,7 @@ public sealed class AiSourceRegistry : IAiSourceRegistry
 
     private void DiscoverExplicitSources(IConfiguration config, ILogger? logger)
     {
-        var sourcesSection = config.GetSection("Koan:Ai:Sources");
+        var sourcesSection = config.GetSection(ConfigurationConstants.Sources.Section);
 
         foreach (var sourceConfig in sourcesSection.GetChildren())
         {
@@ -123,7 +124,7 @@ public sealed class AiSourceRegistry : IAiSourceRegistry
 
     private void DiscoverLegacyOllamaConfig(IConfiguration config, ILogger? logger)
     {
-        var ollamaSection = config.GetSection("Koan:Ai:Ollama");
+        var ollamaSection = config.GetSection(ConfigurationConstants.Ollama.Section);
         if (!ollamaSection.Exists())
         {
             return;

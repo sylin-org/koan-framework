@@ -6,26 +6,19 @@ using Microsoft.Extensions.Options;
 
 namespace Koan.Web.Transformers;
 
-internal sealed class TransformerRegistry : ITransformerRegistry
+internal sealed class TransformerRegistry(IServiceProvider sp, IOptions<TransformerBindings> bindings) : ITransformerRegistry
 {
     private sealed record Registration(string ContentType, IEntityTransformerInvoker Invoker, int Priority);
 
     private readonly Dictionary<Type, List<Registration>> _map = new();
-    private readonly IServiceProvider _sp;
-    private readonly TransformerBindings _bindings;
+    private readonly TransformerBindings _bindings = bindings.Value;
     private bool _initialized;
-
-    public TransformerRegistry(IServiceProvider sp, IOptions<TransformerBindings> bindings)
-    {
-        _sp = sp;
-        _bindings = bindings.Value;
-    }
 
     private void EnsureInitialized()
     {
         if (_initialized) return;
         // Execute deferred bindings to populate registry from DI
-        foreach (var action in _bindings.Bindings.ToList()) action(_sp);
+        foreach (var action in _bindings.Bindings.ToList()) action(sp);
         _initialized = true;
     }
 

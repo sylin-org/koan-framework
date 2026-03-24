@@ -28,9 +28,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     {
         module.Describe(ModuleVersion);
         var provider = Koan.Core.Configuration.ReadWithSource(cfg, CacheConstants.Configuration.ProviderKey, "memory");
-        var diagnosticsEnabled = Koan.Core.Configuration.ReadWithSource(cfg, "Cache:EnableDiagnosticsEndpoint", true);
-        var defaultRegion = Koan.Core.Configuration.ReadWithSource(cfg, "Cache:DefaultRegion", CacheConstants.Configuration.DefaultRegion);
-        var singleflightTimeout = Koan.Core.Configuration.ReadWithSource(cfg, "Cache:DefaultSingleflightTimeout", TimeSpan.FromSeconds(5));
+        var diagnosticsEnabled = Koan.Core.Configuration.ReadWithSource(cfg, CacheConstants.Configuration.EnableDiagnosticsEndpoint, true);
+        var defaultRegion = Koan.Core.Configuration.ReadWithSource(cfg, CacheConstants.Configuration.DefaultRegionKey, CacheConstants.Configuration.DefaultRegion);
+        var singleflightTimeout = Koan.Core.Configuration.ReadWithSource(cfg, CacheConstants.Configuration.DefaultSingleflightTimeout, TimeSpan.FromSeconds(5));
 
         module.AddSetting(
             "Provider",

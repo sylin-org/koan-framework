@@ -8,17 +8,11 @@ namespace Koan.Data.Core.Events;
 /// Lazily loads the prior snapshot for an entity lifecycle operation.
 /// </summary>
 /// <typeparam name="TEntity">Entity type.</typeparam>
-public sealed class EntityEventPrior<TEntity> where TEntity : class
+public sealed class EntityEventPrior<TEntity>(Func<CancellationToken, ValueTask<TEntity?>> loader) where TEntity : class
 {
-    private readonly Func<CancellationToken, ValueTask<TEntity?>> _loader;
     private readonly object _sync = new();
     private bool _loaded;
     private TEntity? _value;
-
-    internal EntityEventPrior(Func<CancellationToken, ValueTask<TEntity?>> loader)
-    {
-        _loader = loader;
-    }
 
     internal static EntityEventPrior<TEntity> Empty { get; } = new(_ => new ValueTask<TEntity?>(result: null));
 
@@ -47,7 +41,7 @@ public sealed class EntityEventPrior<TEntity> where TEntity : class
             return _value;
         }
 
-        var value = await _loader(cancellationToken);
+        var value = await loader(cancellationToken);
         lock (_sync)
         {
             if (!_loaded)

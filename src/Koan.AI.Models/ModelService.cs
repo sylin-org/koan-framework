@@ -13,15 +13,9 @@ namespace Koan.AI.Models;
 /// through adapter capabilities via <see cref="Resolution.AdapterResolver"/>.
 /// One resolution pattern for everything: query capability, find adapter, delegate.
 /// </summary>
-internal sealed class ModelService : IModelService
+internal sealed class ModelService(IAiAdapterRegistry registry) : IModelService
 {
-    private readonly IAiAdapterRegistry _registry;
     private const string DefaultCacheDirectory = ".Koan/models";
-
-    public ModelService(IAiAdapterRegistry registry)
-    {
-        _registry = registry;
-    }
 
     // ── Discovery (catalog operations) ──
 
@@ -33,8 +27,8 @@ internal sealed class ModelService : IModelService
         }
 
         var adapters = source is not null
-            ? new List<IAiAdapter> { AdapterResolver.Resolve(_registry, AiCapability.ModelList, source) }
-            : AdapterResolver.ResolveAll(_registry, AiCapability.ModelList).ToList();
+            ? new List<IAiAdapter> { AdapterResolver.Resolve(registry, AiCapability.ModelList, source) }
+            : AdapterResolver.ResolveAll(registry, AiCapability.ModelList).ToList();
 
         var results = new List<ModelEntry>();
 
@@ -119,7 +113,7 @@ internal sealed class ModelService : IModelService
         }
 
         // Try all adapters
-        foreach (var adapter in _registry.All)
+        foreach (var adapter in registry.All)
         {
             var models = await adapter.ListModels(ct);
             var match = models.FirstOrDefault(m =>
@@ -148,7 +142,7 @@ internal sealed class ModelService : IModelService
         var allList = new List<ModelEntry>(all);
 
         // Also include models reported by adapters with ModelList capability
-        var listAdapters = AdapterResolver.ResolveAll(_registry, AiCapability.ModelList);
+        var listAdapters = AdapterResolver.ResolveAll(registry, AiCapability.ModelList);
         foreach (var adapter in listAdapters)
         {
             var adapterModels = await adapter.ListModels(ct);
@@ -194,7 +188,7 @@ internal sealed class ModelService : IModelService
     public async Task Remove(string modelId, CancellationToken ct)
     {
         // Try adapter with ModelRemove capability first
-        var removeAdapters = AdapterResolver.ResolveAll(_registry, AiCapability.ModelRemove);
+        var removeAdapters = AdapterResolver.ResolveAll(registry, AiCapability.ModelRemove);
         foreach (var adapter in removeAdapters)
         {
             if (adapter.ModelManager is { } manager)
@@ -233,7 +227,7 @@ internal sealed class ModelService : IModelService
         string id, string? to, ModelFormat? format,
         IProgress<ModelPullProgress>? progress, CancellationToken ct)
     {
-        var adapter = AdapterResolver.Resolve(_registry, AiCapability.Pull, to);
+        var adapter = AdapterResolver.Resolve(registry, AiCapability.Pull, to);
         var manager = adapter.ModelManager
             ?? throw new InvalidOperationException(
                 $"Adapter '{adapter.Id}' has Pull capability but no ModelManager.");
@@ -288,7 +282,7 @@ internal sealed class ModelService : IModelService
         var model = await Inspect(modelId, ct)
             ?? throw new InvalidOperationException($"Model '{modelId}' not found in catalog.");
 
-        var adapter = AdapterResolver.Resolve(_registry, AiCapability.Convert);
+        var adapter = AdapterResolver.Resolve(registry, AiCapability.Convert);
         var manager = adapter.ModelManager
             ?? throw new InvalidOperationException(
                 $"Adapter '{adapter.Id}' has Convert capability but no ModelManager.");
@@ -353,7 +347,7 @@ internal sealed class ModelService : IModelService
             ?? throw new InvalidOperationException($"Model '{modelId}' not found in catalog.");
 
         var serveCapability = $"Serve.{model.Format}";
-        var adapter = AdapterResolver.Resolve(_registry, serveCapability, runtimeId);
+        var adapter = AdapterResolver.Resolve(registry, serveCapability, runtimeId);
         var manager = adapter.ModelManager
             ?? throw new InvalidOperationException(
                 $"Adapter '{adapter.Id}' can serve {model.Format} but has no ModelManager for deployment.");
@@ -381,7 +375,7 @@ internal sealed class ModelService : IModelService
 
         var routes = new List<ModelRoute>();
 
-        foreach (var adapter in _registry.All)
+        foreach (var adapter in registry.All)
         {
             var serveCapability = $"Serve.{model.Format}";
             if (adapter.HasCapability(serveCapability))
@@ -447,7 +441,7 @@ internal sealed class ModelService : IModelService
             // Redeploy target to the same runtimes via adapter capabilities
             foreach (var runtimeId in deployedRuntimes)
             {
-                var adapter = _registry.Get(runtimeId);
+                var adapter = registry.Get(runtimeId);
                 if (adapter?.ModelManager is { } manager)
                 {
                     await manager.EnsureInstalled(

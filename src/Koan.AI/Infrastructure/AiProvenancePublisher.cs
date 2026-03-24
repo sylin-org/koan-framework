@@ -16,21 +16,11 @@ namespace Koan.AI.Infrastructure;
 /// <summary>
 /// Emits live adapter and source health snapshots into provenance once the application starts.
 /// </summary>
-internal sealed class AiProvenancePublisher : BackgroundService
+internal sealed class AiProvenancePublisher(
+    IAiAdapterRegistry adapters,
+    IAiSourceRegistry sources,
+    ILogger<AiProvenancePublisher> logger) : BackgroundService
 {
-    private readonly IAiAdapterRegistry _adapters;
-    private readonly IAiSourceRegistry _sources;
-    private readonly ILogger<AiProvenancePublisher> _logger;
-
-    public AiProvenancePublisher(
-        IAiAdapterRegistry adapters,
-        IAiSourceRegistry sources,
-        ILogger<AiProvenancePublisher> logger)
-    {
-        _adapters = adapters;
-        _sources = sources;
-        _logger = logger;
-    }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -46,7 +36,7 @@ internal sealed class AiProvenancePublisher : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to publish AI provenance snapshot");
+            logger.LogError(ex, "Failed to publish AI provenance snapshot");
         }
     }
 
@@ -63,7 +53,7 @@ internal sealed class AiProvenancePublisher : BackgroundService
     {
         var summaries = new List<string>();
 
-        foreach (var adapter in _adapters.All)
+        foreach (var adapter in adapters.All)
         {
             var summary = new StringBuilder();
             summary.Append(adapter.Id);
@@ -95,8 +85,8 @@ internal sealed class AiProvenancePublisher : BackgroundService
 
     private void PublishSourceHealth(ProvenanceModuleWriter module)
     {
-        var sources = _sources.GetAllSources();
-        if (sources.Count == 0)
+        var allSources = sources.GetAllSources();
+        if (allSources.Count == 0)
         {
             module.SetSetting(KoanAiProvenanceItems.SourceMemberStatus.Key, setting => setting
                 .Label(KoanAiProvenanceItems.SourceMemberStatus.Label)
@@ -108,8 +98,8 @@ internal sealed class AiProvenancePublisher : BackgroundService
             return;
         }
 
-        var details = new List<string>(sources.Count);
-        foreach (var source in sources.OrderByDescending(s => s.Priority))
+        var details = new List<string>(allSources.Count);
+        foreach (var source in allSources.OrderByDescending(s => s.Priority))
         {
             var memberSummaries = source.Members.Select(member =>
             {

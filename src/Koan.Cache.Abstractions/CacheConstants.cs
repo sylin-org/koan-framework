@@ -7,6 +7,9 @@ public static class CacheConstants
         public const string Section = "Cache";
         public const string ProviderKey = "Cache:Provider";
         public const string DefaultRegion = "default";
+        public const string EnableDiagnosticsEndpoint = "Cache:EnableDiagnosticsEndpoint";
+        public const string DefaultSingleflightTimeout = "Cache:DefaultSingleflightTimeout";
+        public const string DefaultRegionKey = "Cache:DefaultRegion";
 
         public static class Redis
         {

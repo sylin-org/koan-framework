@@ -7,6 +7,7 @@ using Koan.AI.Contracts;
 using Koan.AI.Contracts.Options;
 using Koan.AI.Contracts.Routing;
 using Koan.AI.Contracts.Sources;
+using Koan.AI.Infrastructure;
 using Koan.AI.Pipeline;
 using Koan.AI.Sources;
 using Koan.Core;
@@ -21,11 +22,11 @@ public static class ServiceCollectionExtensions
         // Register options
         if (config is not null)
         {
-            services.AddKoanOptions<AiOptions>(config, "Koan:Ai");
+            services.AddKoanOptions<AiOptions>(config, ConfigurationConstants.Section);
         }
         else
         {
-            services.AddKoanOptions<AiOptions>("Koan:Ai");
+            services.AddKoanOptions<AiOptions>(ConfigurationConstants.Section);
         }
 
         // Register source registry (ADR-0015: No group registry - sources contain members)

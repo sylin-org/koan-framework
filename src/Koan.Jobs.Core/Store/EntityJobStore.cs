@@ -8,20 +8,14 @@ using Koan.Jobs.Support;
 
 namespace Koan.Jobs.Store;
 
-internal sealed class EntityJobStore : IJobStore
+internal sealed class EntityJobStore(JobIndexCache index) : IJobStore
 {
-    private readonly JobIndexCache _index;
-
-    public EntityJobStore(JobIndexCache index)
-    {
-        _index = index;
-    }
 
     public async Task<Job> Create(Job job, JobStoreMetadata metadata, CancellationToken cancellationToken)
     {
         using var scope = EnterContext(metadata.Source, metadata.Partition);
         await job.Save(cancellationToken);
-        _index.Set(new JobIndexEntry(job.Id, JobStorageMode.Entity, metadata.Source, metadata.Partition, metadata.Audit, job.GetType()));
+        index.Set(new JobIndexEntry(job.Id, JobStorageMode.Entity, metadata.Source, metadata.Partition, metadata.Audit, job.GetType()));
         return job;
     }
 
@@ -31,7 +25,7 @@ internal sealed class EntityJobStore : IJobStore
         var job = await Job.Get(jobId, cancellationToken);
         if (job != null)
         {
-            _index.Set(new JobIndexEntry(job.Id, JobStorageMode.Entity, metadata.Source, metadata.Partition, metadata.Audit, job.GetType()));
+            index.Set(new JobIndexEntry(job.Id, JobStorageMode.Entity, metadata.Source, metadata.Partition, metadata.Audit, job.GetType()));
         }
         return job;
     }
@@ -40,7 +34,7 @@ internal sealed class EntityJobStore : IJobStore
     {
         using var scope = EnterContext(metadata.Source, metadata.Partition);
         await job.Save(cancellationToken);
-        _index.Set(new JobIndexEntry(job.Id, JobStorageMode.Entity, metadata.Source, metadata.Partition, metadata.Audit, job.GetType()));
+        index.Set(new JobIndexEntry(job.Id, JobStorageMode.Entity, metadata.Source, metadata.Partition, metadata.Audit, job.GetType()));
         return job;
     }
 
@@ -48,7 +42,7 @@ internal sealed class EntityJobStore : IJobStore
     {
         using var scope = EnterContext(metadata.Source, metadata.Partition);
         await Job.Remove(jobId, cancellationToken);
-        _index.Remove(jobId);
+        index.Remove(jobId);
     }
 
     public async Task<JobExecution> CreateExecution(JobExecution execution, JobStoreMetadata metadata, CancellationToken cancellationToken)

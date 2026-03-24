@@ -34,9 +34,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         var configuration = cfg ?? new ConfigurationBuilder().Build();
         var defaults = new AiOptions();
 
-        var autoDiscoveryOption = Configuration.ReadWithSource(configuration, "Koan:Ai:AutoDiscoveryEnabled", defaults.AutoDiscoveryEnabled);
-        var allowNonDevOption = Configuration.ReadWithSource(configuration, "Koan:Ai:AllowDiscoveryInNonDev", defaults.AllowDiscoveryInNonDev);
-        var policyOption = Configuration.ReadWithSource(configuration, "Koan:Ai:DefaultPolicy", defaults.DefaultPolicy);
+        var autoDiscoveryOption = Configuration.ReadWithSource(configuration, ConfigurationConstants.FullKey(ConfigurationConstants.Keys.AutoDiscoveryEnabled), defaults.AutoDiscoveryEnabled);
+        var allowNonDevOption = Configuration.ReadWithSource(configuration, ConfigurationConstants.FullKey(ConfigurationConstants.Keys.AllowDiscoveryInNonDev), defaults.AllowDiscoveryInNonDev);
+        var policyOption = Configuration.ReadWithSource(configuration, ConfigurationConstants.FullKey(ConfigurationConstants.Keys.DefaultPolicy), defaults.DefaultPolicy);
 
         module.PublishConfigValue(KoanAiProvenanceItems.AutoDiscoveryEnabled, autoDiscoveryOption);
         module.PublishConfigValue(KoanAiProvenanceItems.AllowDiscoveryOutsideDevelopment, allowNonDevOption);
@@ -50,7 +50,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     private static void DescribeConfiguredSources(ProvenanceModuleWriter module, IConfiguration configuration)
     {
-        var sourcesSection = configuration.GetSection("Koan:Ai:Sources");
+        var sourcesSection = configuration.GetSection(ConfigurationConstants.Sources.Section);
         var configuredSources = sourcesSection.Exists()
             ? sourcesSection.GetChildren().Select(c => c.Key).Where(name => !string.IsNullOrWhiteSpace(name)).ToArray()
             : [];
@@ -63,7 +63,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                     .Label(KoanAiProvenanceItems.ConfiguredSources.Label)
                     .Description(KoanAiProvenanceItems.ConfiguredSources.Description)
                     .Value(string.Join(", ", configuredSources))
-                    .Source(ProvenanceSettingSource.AppSettings, "Koan:Ai:Sources")
+                    .Source(ProvenanceSettingSource.AppSettings, ConfigurationConstants.Sources.Section)
                     .State(ProvenanceSettingState.Configured);
             });
 
@@ -107,8 +107,8 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     private static void DescribeLegacyOllama(ProvenanceModuleWriter module, IConfiguration configuration)
     {
-        var baseUrl = Configuration.ReadWithSource(configuration, "Koan:Ai:Ollama:BaseUrl", "");
-        var defaultModel = Configuration.ReadWithSource(configuration, "Koan:Ai:Ollama:DefaultModel", "");
+        var baseUrl = Configuration.ReadWithSource(configuration, ConfigurationConstants.Ollama.BaseUrl, "");
+        var defaultModel = Configuration.ReadWithSource(configuration, ConfigurationConstants.Ollama.DefaultModel, "");
 
         if (!string.IsNullOrWhiteSpace(baseUrl.Value) || !baseUrl.UsedDefault)
         {
@@ -120,7 +120,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             module.PublishConfigValue(KoanAiProvenanceItems.LegacyOllamaDefaultModel, defaultModel);
         }
 
-        var capabilitySection = configuration.GetSection("Koan:Ai:Ollama:Capabilities");
+        var capabilitySection = configuration.GetSection(ConfigurationConstants.Ollama.Capabilities);
         if (capabilitySection.Exists())
         {
             var capabilitySummaries = capabilitySection.GetChildren()

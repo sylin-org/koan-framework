@@ -10,14 +10,8 @@ namespace Koan.AI.Eval;
 /// Resolves metric computation through adapters with <see cref="AiCapability.MetricCompute"/>
 /// capability, then applies gate logic, comparison, and regression analysis.
 /// </summary>
-internal sealed class EvalService : IEvalService
+internal sealed class EvalService(IAiAdapterRegistry registry) : IEvalService
 {
-    private readonly IAiAdapterRegistry _registry;
-
-    public EvalService(IAiAdapterRegistry registry)
-    {
-        _registry = registry;
-    }
 
     public async Task<EvalResult> Measure(
         ModelRef model, DatasetRef data, string[] metrics, CancellationToken ct = default)
@@ -237,7 +231,7 @@ internal sealed class EvalService : IEvalService
 
     private void EnsureMetricCapability()
     {
-        var adapters = AdapterResolver.ResolveAll(_registry, AiCapability.MetricCompute);
+        var adapters = AdapterResolver.ResolveAll(registry, AiCapability.MetricCompute);
         if (adapters.Count == 0)
         {
             throw new InvalidOperationException(
@@ -250,11 +244,11 @@ internal sealed class EvalService : IEvalService
         ModelRef model, DatasetRef data, string metric, CancellationToken ct)
     {
         // Resolve adapter with MetricCompute capability
-        var adapter = AdapterResolver.Resolve(_registry, AiCapability.MetricCompute);
+        var adapter = AdapterResolver.Resolve(registry, AiCapability.MetricCompute);
 
         // Metric computation is delegated to the adapter infrastructure.
         // For LLM-judge metrics (coherence, relevance), a Chat-capable adapter
-        // would also be resolved: AdapterResolver.Resolve(_registry, AiCapability.Chat)
+        // would also be resolved: AdapterResolver.Resolve(registry, AiCapability.Chat)
         // The actual computation is adapter-specific. For now, return a placeholder
         // that will be filled when concrete metric adapters are implemented.
         _ = adapter; // Resolved to validate capability exists

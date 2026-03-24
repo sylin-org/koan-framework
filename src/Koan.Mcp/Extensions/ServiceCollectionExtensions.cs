@@ -6,6 +6,7 @@ using Koan.Mcp.CodeMode.Sdk;
 using Koan.Mcp.Diagnostics;
 using Koan.Mcp.Execution;
 using Koan.Mcp.Hosting;
+using Koan.Mcp.Infrastructure;
 using Koan.Mcp.Options;
 using Koan.Mcp.Schema;
 using Microsoft.Extensions.Configuration;
@@ -22,11 +23,11 @@ public static class ServiceCollectionExtensions
 
         if (configuration is not null)
         {
-            services.AddOptions<McpServerOptions>().Bind(configuration.GetSection("Koan:Mcp"));
+            services.AddOptions<McpServerOptions>().Bind(configuration.GetSection(ConfigurationConstants.Section));
         }
         else
         {
-            services.AddOptions<McpServerOptions>().BindConfiguration("Koan:Mcp");
+            services.AddOptions<McpServerOptions>().BindConfiguration(ConfigurationConstants.Section);
         }
 
         services.TryAddSingleton<SchemaBuilder>();
@@ -50,9 +51,9 @@ public static class ServiceCollectionExtensions
     // Code mode services
     // JSON facade (Newtonsoft-backed) for code-mode dynamic operations
     services.AddCodeModeJson();
-        services.AddOptions<CodeModeOptions>().BindConfiguration("Koan:Mcp:CodeMode");
-        services.AddOptions<SandboxOptions>().BindConfiguration("Koan:Mcp:CodeMode:Sandbox");
-        services.AddOptions<TypeScriptSdkOptions>().BindConfiguration("Koan:Mcp:CodeMode:TypeScript");
+        services.AddOptions<CodeModeOptions>().BindConfiguration(ConfigurationConstants.CodeMode.Section);
+        services.AddOptions<SandboxOptions>().BindConfiguration(ConfigurationConstants.CodeMode.Sandbox.Section);
+        services.AddOptions<TypeScriptSdkOptions>().BindConfiguration(ConfigurationConstants.CodeMode.TypeScript.Section);
         services.TryAddSingleton<Koan.Mcp.CodeExecution.ICodeExecutor, JintCodeExecutor>();
         services.TryAddSingleton<TypeScriptSdkGenerator>();
         services.TryAddSingleton<TypeScriptSdkProvider>();

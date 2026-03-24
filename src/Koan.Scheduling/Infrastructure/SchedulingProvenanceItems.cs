@@ -9,14 +9,14 @@ internal static class SchedulingProvenanceItems
     private static readonly IReadOnlyCollection<string> OrchestratorConsumers = new[] { "Koan.Scheduling.Orchestrator" };
 
     internal static readonly ProvenanceItem Enabled = new(
-        "Koan:Scheduling:Enabled",
+        ConfigurationConstants.FullKey(ConfigurationConstants.Keys.Enabled),
         "Scheduling Enabled",
         "Activates the background scheduler; disabled to prevent recurring jobs from running.",
         DefaultValue: BoolString(Defaults.Enabled),
         DefaultConsumers: OrchestratorConsumers);
 
     internal static readonly ProvenanceItem ReadinessGate = new(
-        "Koan:Scheduling:ReadinessGate",
+        ConfigurationConstants.FullKey(ConfigurationConstants.Keys.ReadinessGate),
         "Readiness Gate",
         "If true, the scheduler only marks healthy once scheduled jobs finish their first run.",
         DefaultValue: BoolString(Defaults.ReadinessGate),
