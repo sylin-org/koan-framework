@@ -51,8 +51,8 @@ internal sealed class MongoDiscoveryAdapter : ServiceDiscoveryAdapterBase
     {
         // Check MongoDB-specific configuration paths
         return _configuration.GetConnectionString("MongoDB") ??
-               _configuration["Koan:Data:Mongo:ConnectionString"] ??
-               _configuration["Koan:Data:ConnectionString"];
+               _configuration[Infrastructure.ConfigurationConstants.FullKey(Infrastructure.ConfigurationConstants.Keys.ConnectionString)] ??
+               _configuration[Infrastructure.ConfigurationConstants.DataFallback.ConnectionString];
     }
 
     /// <summary>MongoDB-specific environment variable handling</summary>

@@ -69,10 +69,12 @@ internal sealed class JobExecutor
             return;
         }
 
+        var customRetryPolicy = job as ICustomRetryPolicy;
         var descriptor = ResolveRetryPolicy(item.JobType);
+        var maxAttempts = customRetryPolicy != null ? int.MaxValue : descriptor.MaxAttempts;
         var attempt = await DetermineStartingAttempt(store, metadata, job.Id, item.AuditExecutions, cancellationToken);
 
-        while (attempt < descriptor.MaxAttempts)
+        while (attempt < maxAttempts)
         {
             cancellationToken.ThrowIfCancellationRequested();
             attempt++;
@@ -136,7 +138,11 @@ internal sealed class JobExecutor
 
             job.LastError = outcome.Error?.Message;
 
-            if (attempt >= descriptor.MaxAttempts)
+            var shouldRetry = customRetryPolicy != null
+                ? customRetryPolicy.ShouldRetry(attempt, outcome.Error ?? new Exception(outcome.Error?.Message ?? "Unknown error"))
+                : attempt < descriptor.MaxAttempts;
+
+            if (!shouldRetry)
             {
                 job.Status = JobStatus.Failed;
                 job.CompletedAt = DateTimeOffset.UtcNow;
@@ -146,7 +152,9 @@ internal sealed class JobExecutor
                 return;
             }
 
-            var delay = descriptor.ComputeDelay(attempt);
+            var delay = customRetryPolicy != null
+                ? customRetryPolicy.ComputeDelay(attempt, outcome.Error ?? new Exception(outcome.Error?.Message ?? "Unknown error"))
+                : descriptor.ComputeDelay(attempt);
             job.Status = JobStatus.Queued;
             job.QueuedAt = DateTimeOffset.UtcNow.Add(delay);
             await store.Update(job, metadata, cancellationToken);

@@ -14,7 +14,7 @@ namespace Koan.Core.BackgroundServices;
 /// </summary>
 public class KoanBackgroundServiceOptions
 {
-    public const string SectionName = "Koan:BackgroundServices";
+    public const string SectionName = Infrastructure.ConfigurationConstants.BackgroundServices.Section;
 
     public bool Enabled { get; set; } = true;
     public int StartupTimeoutSeconds { get; set; } = 120;

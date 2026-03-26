@@ -77,11 +77,11 @@ public class MongoOrchestrationEvaluator : BaseOrchestrationEvaluator
             // Get configured credentials
             var databaseName = GetDatabaseName(configuration);
             var username = Configuration.ReadFirst(configuration, "",
-                "Koan:Data:Mongo:Username",
-                "Koan:Data:Username");
+                Infrastructure.ConfigurationConstants.FullKey(Infrastructure.ConfigurationConstants.Keys.Username),
+                Infrastructure.ConfigurationConstants.DataFallback.Username);
             var password = Configuration.ReadFirst(configuration, "",
-                "Koan:Data:Mongo:Password",
-                "Koan:Data:Password");
+                Infrastructure.ConfigurationConstants.FullKey(Infrastructure.ConfigurationConstants.Keys.Password),
+                Infrastructure.ConfigurationConstants.DataFallback.Password);
 
             // Build connection string for validation
             var connectionString = BuildMongoConnectionString(hostResult.HostEndpoint!, databaseName, username, password);
@@ -104,11 +104,11 @@ public class MongoOrchestrationEvaluator : BaseOrchestrationEvaluator
         // Get configuration values
         var databaseName = GetDatabaseName(configuration);
         var username = Configuration.ReadFirst(configuration, "root",
-            "Koan:Data:Mongo:Username",
-            "Koan:Data:Username");
+            Infrastructure.ConfigurationConstants.FullKey(Infrastructure.ConfigurationConstants.Keys.Username),
+            Infrastructure.ConfigurationConstants.DataFallback.Username);
         var password = Configuration.ReadFirst(configuration, "mongodb",
-            "Koan:Data:Mongo:Password",
-            "Koan:Data:Password");
+            Infrastructure.ConfigurationConstants.FullKey(Infrastructure.ConfigurationConstants.Keys.Password),
+            Infrastructure.ConfigurationConstants.DataFallback.Password);
 
         // Create environment variables for the container
         var environment = new Dictionary<string, string>(context.EnvironmentVariables)
@@ -138,8 +138,8 @@ public class MongoOrchestrationEvaluator : BaseOrchestrationEvaluator
     private string GetDatabaseName(IConfiguration configuration)
     {
         return Configuration.ReadFirst(configuration, "KoanDatabase",
-            "Koan:Data:Mongo:Database",
-            "Koan:Data:Database",
+            Infrastructure.ConfigurationConstants.FullKey(Infrastructure.ConfigurationConstants.Keys.Database),
+            Infrastructure.ConfigurationConstants.DataFallback.Database,
             "ConnectionStrings:Database");
     }
 

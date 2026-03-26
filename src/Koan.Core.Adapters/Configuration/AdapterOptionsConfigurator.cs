@@ -70,8 +70,8 @@ public abstract class AdapterOptionsConfigurator<TOptions> : IConfigureOptions<T
 
         // Policy configuration with enum parsing
         var policyStr = Core.Configuration.ReadFirst(Configuration, config.Policy.ToString(),
-            $"Koan:Data:{ProviderName}:Readiness:Policy",
-            "Koan:Data:Readiness:Policy");
+            Infrastructure.ConfigurationConstants.Data.Readiness.PolicyForProvider(ProviderName),
+            Infrastructure.ConfigurationConstants.Data.Readiness.Policy);
 
         if (Enum.TryParse<ReadinessPolicy>(policyStr, out var policy))
         {
@@ -81,8 +81,8 @@ public abstract class AdapterOptionsConfigurator<TOptions> : IConfigureOptions<T
         // Timeout configuration with TimeSpan conversion
         var timeoutSecondsStr = Core.Configuration.ReadFirst(Configuration,
             ((int)config.Timeout.TotalSeconds).ToString(),
-            $"Koan:Data:{ProviderName}:Readiness:Timeout",
-            "Koan:Data:Readiness:Timeout");
+            Infrastructure.ConfigurationConstants.Data.Readiness.TimeoutForProvider(ProviderName),
+            Infrastructure.ConfigurationConstants.Data.Readiness.Timeout);
 
         if (int.TryParse(timeoutSecondsStr, out var timeoutSeconds) && timeoutSeconds > 0)
         {
@@ -95,7 +95,7 @@ public abstract class AdapterOptionsConfigurator<TOptions> : IConfigureOptions<T
 
         // Gating configuration
         config.EnableReadinessGating = Core.Configuration.Read(Configuration,
-            $"Koan:Data:{ProviderName}:Readiness:EnableReadinessGating",
+            Infrastructure.ConfigurationConstants.Data.Readiness.EnableReadinessGatingForProvider(ProviderName),
             config.EnableReadinessGating);
 
         KoanLog.ConfigDebug(Logger, LogActions.ReadinessConfiguration, LogOutcomes.Applied,
@@ -111,12 +111,12 @@ public abstract class AdapterOptionsConfigurator<TOptions> : IConfigureOptions<T
     protected void ConfigurePaging(IAdapterOptions options)
     {
         options.DefaultPageSize = Core.Configuration.ReadFirst(Configuration, options.DefaultPageSize,
-            $"Koan:Data:{ProviderName}:DefaultPageSize",
-            "Koan:Data:DefaultPageSize");
+            Infrastructure.ConfigurationConstants.Data.Paging.DefaultPageSizeForProvider(ProviderName),
+            Infrastructure.ConfigurationConstants.Data.Paging.DefaultPageSize);
 
         options.MaxPageSize = Core.Configuration.ReadFirst(Configuration, options.MaxPageSize,
-            $"Koan:Data:{ProviderName}:MaxPageSize",
-            "Koan:Data:MaxPageSize");
+            Infrastructure.ConfigurationConstants.Data.Paging.MaxPageSizeForProvider(ProviderName),
+            Infrastructure.ConfigurationConstants.Data.Paging.MaxPageSize);
 
         KoanLog.ConfigDebug(Logger, LogActions.PagingConfiguration, LogOutcomes.Applied,
             ("provider", ProviderName),

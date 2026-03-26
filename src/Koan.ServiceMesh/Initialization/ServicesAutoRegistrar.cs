@@ -88,21 +88,21 @@ public sealed class ServicesAutoRegistrar : IKoanAutoRegistrar
 
         serviceWriter.SetSetting("Port", setting => setting
             .Value(descriptor.Port.ToString())
-            .Source(ProvenanceSettingSource.AppSettings, $"Koan:Service:{descriptor.ServiceId}:Port"));
+            .Source(ProvenanceSettingSource.AppSettings, Infrastructure.ConfigurationConstants.FullKey(descriptor.ServiceId, Infrastructure.ConfigurationConstants.Keys.Port)));
 
         serviceWriter.SetSetting("HeartbeatInterval", setting => setting
             .Value(descriptor.HeartbeatInterval.ToString())
-            .Source(ProvenanceSettingSource.AppSettings, $"Koan:Service:{descriptor.ServiceId}:HeartbeatInterval"));
+            .Source(ProvenanceSettingSource.AppSettings, Infrastructure.ConfigurationConstants.FullKey(descriptor.ServiceId, Infrastructure.ConfigurationConstants.Keys.HeartbeatInterval)));
 
         serviceWriter.SetSetting("StaleThreshold", setting => setting
             .Value(descriptor.StaleThreshold.ToString())
-            .Source(ProvenanceSettingSource.AppSettings, $"Koan:Service:{descriptor.ServiceId}:StaleThreshold"));
+            .Source(ProvenanceSettingSource.AppSettings, Infrastructure.ConfigurationConstants.FullKey(descriptor.ServiceId, Infrastructure.ConfigurationConstants.Keys.StaleThreshold)));
 
         if (!string.IsNullOrEmpty(descriptor.ContainerImage))
         {
             serviceWriter.SetSetting("ContainerImage", setting => setting
                 .Value($"{descriptor.ContainerImage}:{descriptor.DefaultTag}")
-                .Source(ProvenanceSettingSource.AppSettings, $"Koan:Service:{descriptor.ServiceId}:ContainerImage"));
+                .Source(ProvenanceSettingSource.AppSettings, Infrastructure.ConfigurationConstants.FullKey(descriptor.ServiceId, Infrastructure.ConfigurationConstants.Keys.ContainerImage)));
         }
 
         serviceWriter.SetSetting("OrchestratorChannel", setting => setting

@@ -152,14 +152,14 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         var username = Configuration.ReadFirstWithSource(
             cfg,
             "",
-            "Koan:Data:Mongo:Username",
-            "Koan:Data:Username");
+            Infrastructure.ConfigurationConstants.FullKey(Infrastructure.ConfigurationConstants.Keys.Username),
+            Infrastructure.ConfigurationConstants.DataFallback.Username);
 
         var password = Configuration.ReadFirstWithSource(
             cfg,
             "",
-            "Koan:Data:Mongo:Password",
-            "Koan:Data:Password");
+            Infrastructure.ConfigurationConstants.FullKey(Infrastructure.ConfigurationConstants.Keys.Password),
+            Infrastructure.ConfigurationConstants.DataFallback.Password);
 
         var effectiveConnectionString = ResolveConnectionStringForReporting(
             cfg,

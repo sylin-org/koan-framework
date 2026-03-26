@@ -51,17 +51,17 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
 
         // MongoDB-specific configuration
         var databaseName = ReadProviderConfiguration(options.Database,
-            "Koan:Data:Mongo:Database",
-            "Koan:Data:Database",
+            Infrastructure.ConfigurationConstants.FullKey(Infrastructure.ConfigurationConstants.Keys.Database),
+            Infrastructure.ConfigurationConstants.DataFallback.Database,
             "ConnectionStrings:Database");
 
         var username = ReadProviderConfiguration("",
-            "Koan:Data:Mongo:Username",
-            "Koan:Data:Username");
+            Infrastructure.ConfigurationConstants.FullKey(Infrastructure.ConfigurationConstants.Keys.Username),
+            Infrastructure.ConfigurationConstants.DataFallback.Username);
 
         var password = ReadProviderConfiguration("",
-            "Koan:Data:Mongo:Password",
-            "Koan:Data:Password");
+            Infrastructure.ConfigurationConstants.FullKey(Infrastructure.ConfigurationConstants.Keys.Password),
+            Infrastructure.ConfigurationConstants.DataFallback.Password);
 
         var configuredConnectionString = ReadProviderConfiguration(
             "",
@@ -188,14 +188,14 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
 
     private bool IsAutoDetectionDisabled()
     {
-        return Koan.Core.Configuration.Read(Configuration, "Koan:Data:Mongo:DisableAutoDetection", false);
+        return Koan.Core.Configuration.Read(Configuration, Infrastructure.ConfigurationConstants.FullKey(Infrastructure.ConfigurationConstants.Keys.DisableAutoDetection), false);
     }
 
     private ZenGardenConnectionIntent BuildDefaultZenGardenIntent()
     {
         var configuredOffering = ReadProviderConfiguration(
             "",
-            "Koan:Data:Mongo:ZenGarden:Offering");
+            Infrastructure.ConfigurationConstants.ZenGarden.Offering);
 
         if (string.IsNullOrWhiteSpace(configuredOffering) &&
             _zenGardenInitializationProvider?.TryGetDefaultOffering("mongo", out var mappedOffering) == true)
@@ -210,7 +210,7 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
 
         var configuredInstance = ReadProviderConfiguration(
             "",
-            "Koan:Data:Mongo:ZenGarden:Instance");
+            Infrastructure.ConfigurationConstants.ZenGarden.Instance);
 
         return ZenGardenConnectionIntent.ForOffering(
             configuredOffering,
@@ -221,12 +221,12 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
     private IReadOnlyList<string> ReadZenGardenCapabilities()
     {
         var sectionValues = Configuration
-            .GetSection("Koan:Data:Mongo:ZenGarden:Capabilities")
+            .GetSection(Infrastructure.ConfigurationConstants.ZenGarden.Capabilities)
             .Get<string[]>() ?? [];
 
         var singleValue = ReadProviderConfiguration(
             "",
-            "Koan:Data:Mongo:ZenGarden:Capability");
+            Infrastructure.ConfigurationConstants.ZenGarden.Capability);
 
         var parsed = new List<string>();
         foreach (var raw in sectionValues)

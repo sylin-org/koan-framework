@@ -85,7 +85,7 @@ public abstract class BaseKoanAdapter : IKoanAdapter
     // Configuration helpers
     protected TOptions GetOptions<TOptions>() where TOptions : class, new()
     {
-        var sectionName = $"Koan:Services:{AdapterId}";
+        var sectionName = Infrastructure.ConfigurationConstants.Services.ForAdapter(AdapterId);
         var section = Configuration.GetSection(sectionName);
 
         var options = section.Get<TOptions>();
@@ -94,9 +94,9 @@ public abstract class BaseKoanAdapter : IKoanAdapter
             // Try legacy patterns for backward compatibility
             var legacySections = new[]
             {
-                $"Koan:AI:{AdapterId}",
-                $"Koan:Data:{AdapterId}",
-                $"Koan:Cache:{AdapterId}",
+                Infrastructure.ConfigurationConstants.Ai.ForAdapter(AdapterId),
+                Infrastructure.ConfigurationConstants.Data.ForProvider(AdapterId),
+                Infrastructure.ConfigurationConstants.Cache.ForAdapter(AdapterId),
                 AdapterId
             };
 
@@ -121,7 +121,7 @@ public abstract class BaseKoanAdapter : IKoanAdapter
             return connectionString;
 
         // Try service-specific configuration
-        var serviceSection = $"Koan:Services:{AdapterId}:ConnectionString";
+        var serviceSection = Infrastructure.ConfigurationConstants.Services.ConnectionString(AdapterId);
         connectionString = Configuration[serviceSection];
         if (!string.IsNullOrEmpty(connectionString))
             return connectionString;
@@ -129,9 +129,9 @@ public abstract class BaseKoanAdapter : IKoanAdapter
         // Try legacy patterns
         var legacyPatterns = new[]
         {
-            $"Koan:AI:{AdapterId}:BaseUrl",
-            $"Koan:Data:{AdapterId}:ConnectionString",
-            $"Koan:Cache:{AdapterId}:ConnectionString",
+            Infrastructure.ConfigurationConstants.Ai.BaseUrl(AdapterId),
+            Infrastructure.ConfigurationConstants.Data.ForProvider(AdapterId) + ":ConnectionString",
+            Infrastructure.ConfigurationConstants.Cache.ConnectionString(AdapterId),
             $"{AdapterId}:ConnectionString"
         };
 
@@ -147,7 +147,7 @@ public abstract class BaseKoanAdapter : IKoanAdapter
 
     protected bool IsEnabled()
     {
-        var enabledSection = $"Koan:Services:{AdapterId}:Enabled";
+        var enabledSection = Infrastructure.ConfigurationConstants.Services.Enabled(AdapterId);
         if (Configuration[enabledSection] != null)
         {
             return Configuration.GetValue<bool>(enabledSection, true);
@@ -156,9 +156,9 @@ public abstract class BaseKoanAdapter : IKoanAdapter
         // Check legacy patterns
         var legacyPatterns = new[]
         {
-            $"Koan:AI:{AdapterId}:Enabled",
-            $"Koan:Data:{AdapterId}:Enabled",
-            $"Koan:Cache:{AdapterId}:Enabled",
+            Infrastructure.ConfigurationConstants.Ai.Enabled(AdapterId),
+            Infrastructure.ConfigurationConstants.Data.ForProvider(AdapterId) + ":Enabled",
+            Infrastructure.ConfigurationConstants.Cache.Enabled(AdapterId),
             $"{AdapterId}:Enabled"
         };
 

@@ -37,8 +37,8 @@ public static class ServiceDiscoveryExtensions
             UrlHints = hints,
             ExplicitConfigurationSections = new[]
             {
-                $"Koan:Data:{serviceName}",
-                "Koan:Data",
+                Infrastructure.ConfigurationConstants.Data.ForService(serviceName),
+                Infrastructure.ConfigurationConstants.Data.Section,
                 "ConnectionStrings"
             }
         };
@@ -77,9 +77,9 @@ public static class ServiceDiscoveryExtensions
             HealthCheck = healthCheck,
             ExplicitConfigurationSections = new[]
             {
-                $"Koan:Services:{serviceName}",
-                $"Koan:AI:{serviceName}",
-                "Koan:Services",
+                Infrastructure.ConfigurationConstants.Services.ForService(serviceName),
+                Infrastructure.ConfigurationConstants.Ai.ForService(serviceName),
+                Infrastructure.ConfigurationConstants.Services.Section,
                 "ConnectionStrings"
             }
         };

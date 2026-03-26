@@ -72,8 +72,8 @@ public static class OrchestrationRuntimeBridge
         {
             var orchestrationConfig = new Dictionary<string, string?>
             {
-                [$"Koan:Services:{adapterId}:OrchestrationMode"] = "managed",
-                [$"Koan:Services:{adapterId}:ServiceKind"] = orchestrationContext.ServiceKind.ToString()
+                [Infrastructure.ConfigurationConstants.Services.OrchestrationMode(adapterId)] = "managed",
+                [Infrastructure.ConfigurationConstants.Services.ServiceKind(adapterId)] = orchestrationContext.ServiceKind.ToString()
             };
 
             bridgedConfig.AddInMemoryCollection(orchestrationConfig);

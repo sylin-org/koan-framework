@@ -226,7 +226,7 @@ public abstract class BaseOrchestrationEvaluator : IKoanOrchestrationEvaluator
 
     protected virtual OrchestrationOptions GetOrchestrationOptions(IConfiguration configuration)
     {
-        var section = configuration.GetSection("Koan:Orchestration");
+        var section = configuration.GetSection(Infrastructure.Constants.Configuration.Orchestration.Section);
         var options = new OrchestrationOptions();
 
         // Get global mode

@@ -54,7 +54,7 @@ public readonly record struct ApplicationIdentitySnapshot(
 
 internal static class ApplicationIdentityDefaults
 {
-    public const string ConfigurationSection = "Koan:Application";
+    public const string ConfigurationSection = Infrastructure.ConfigurationConstants.Application.Section;
 
     public static ApplicationIdentitySnapshot Resolve(IConfiguration? cfg, IHostEnvironment? env)
     {
@@ -86,13 +86,13 @@ internal static class ApplicationIdentityDefaults
 
         if (string.IsNullOrWhiteSpace(options.ContactEmail))
         {
-            var email = Coalesce(koanApp?.ContactEmail, Configuration.Read<string?>(cfg, "Koan:Application:ContactEmail", null));
+            var email = Coalesce(koanApp?.ContactEmail, Configuration.Read<string?>(cfg, Infrastructure.ConfigurationConstants.Application.ContactEmail, null));
             options.ContactEmail = string.IsNullOrWhiteSpace(email) ? options.ContactEmail : email;
         }
 
         if (string.IsNullOrWhiteSpace(options.SupportUrl))
         {
-            var url = Coalesce(koanApp?.SupportUrl, Configuration.Read<string?>(cfg, "Koan:Application:SupportUrl", null));
+            var url = Coalesce(koanApp?.SupportUrl, Configuration.Read<string?>(cfg, Infrastructure.ConfigurationConstants.Application.SupportUrl, null));
             options.SupportUrl = string.IsNullOrWhiteSpace(url) ? options.SupportUrl : url;
         }
 

@@ -72,7 +72,7 @@ public static class ServiceCollectionExtensions
         // Legacy health registry removed in greenfield; aggregator is the single source of truth
         // Health Aggregator (push-first)
         // Note: Fully qualify Options type to avoid collision with Koan.Core.HealthAggregatorOptions.
-        services.AddKoanOptions<Koan.Core.Observability.Health.HealthAggregatorOptions>("Koan:Health:Aggregator");
+        services.AddKoanOptions<Koan.Core.Observability.Health.HealthAggregatorOptions>(Infrastructure.ConfigurationConstants.Health.AggregatorSection);
         services.AddSingleton(sp => sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<Koan.Core.Observability.Health.HealthAggregatorOptions>>().Value);
         services.AddSingleton<Koan.Core.Observability.Health.IHealthAggregator, Koan.Core.Observability.Health.HealthAggregator>();
         // Bridge legacy contributors (registered by adapters) into aggregator
