@@ -65,12 +65,26 @@ public static class CacheServiceCollectionExtensions
 
         services.TryAddSingleton<CacheInstrumentation>();
 
+        // Store registry: individual adapters register concrete store singletons.
+        // LayeredCacheStore reads from the registry and becomes the single ICacheStore.
+        services.TryAddSingleton<CacheStoreRegistry>();
+        services.TryAddSingleton<ICacheStoreRegistry>(sp => sp.GetRequiredService<CacheStoreRegistry>());
+        services.TryAddSingleton<LayeredCacheStore>();
+
         // Default fallback: if no explicit adapter is registered, auto-register the bundled in-memory provider.
         // This ensures "Reference = Intent" — just adding Koan.Cache gets you a working cache.
         services.AddMemoryCache();
         services.AddKoanOptions<MemoryCacheAdapterOptions>(CacheConstants.Configuration.Memory.Section);
         services.TryAddSingleton<MemoryCacheStore>();
-        services.TryAdd(ServiceDescriptor.Singleton<ICacheStore>(sp => sp.GetRequiredService<MemoryCacheStore>()));
+
+        // The ICacheStore singleton is the LayeredCacheStore, which orchestrates L1/L2.
+        // Before returning it, we populate the registry with all known concrete stores.
+        services.TryAddSingleton<ICacheStore>(sp =>
+        {
+            var registry = sp.GetRequiredService<CacheStoreRegistry>();
+            PopulateStoreRegistry(sp, registry);
+            return sp.GetRequiredService<LayeredCacheStore>();
+        });
 
         services.PostConfigure<CacheOptions>(opts =>
         {
@@ -111,6 +125,72 @@ public static class CacheServiceCollectionExtensions
         });
 
         return services;
+    }
+
+    /// <summary>
+    /// Populates the store registry with all known concrete cache stores.
+    /// Each adapter registers its concrete type as a singleton; we resolve and register them here
+    /// so LayeredCacheStore can discover L1/L2 tiers via the registry.
+    /// </summary>
+    private static void PopulateStoreRegistry(IServiceProvider sp, CacheStoreRegistry registry)
+    {
+        // Always register the built-in memory store
+        var memoryStore = sp.GetService<MemoryCacheStore>();
+        if (memoryStore is not null)
+        {
+            registry.Register(memoryStore);
+        }
+
+        // Discover additional stores from adapter descriptors
+        var descriptors = sp.GetServices<CacheAdapterDescriptor>();
+        foreach (var descriptor in descriptors)
+        {
+            // Skip memory — already handled above
+            if (descriptor.Name.Equals("memory", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            // Resolve the concrete store by well-known naming convention:
+            // adapter descriptors carry the adapter name, and the concrete store
+            // is already registered as a singleton by the adapter registrar.
+            var store = ResolveStoreForAdapter(sp, descriptor.Name);
+            if (store is not null)
+            {
+                registry.Register(store);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Resolves the concrete ICacheStore for a named adapter.
+    /// Adapters register their concrete store type as a singleton (e.g., RedisCacheStore).
+    /// We look it up via IEnumerable of all registered ICacheStore-assignable singletons.
+    /// </summary>
+    private static ICacheStore? ResolveStoreForAdapter(IServiceProvider sp, string adapterName)
+    {
+        // Try to find a registered store whose ProviderName matches the adapter name.
+        // We cannot resolve IEnumerable<ICacheStore> because that would trigger the
+        // LayeredCacheStore factory (circular). Instead, resolve well-known concrete types
+        // by convention. Additional adapters can extend this via the registry directly.
+        return adapterName.ToLowerInvariant() switch
+        {
+            "redis" => ResolveByType(sp, "Koan.Cache.Adapter.Redis.Stores.RedisCacheStore"),
+            _ => null
+        };
+    }
+
+    private static ICacheStore? ResolveByType(IServiceProvider sp, string typeName)
+    {
+        // Try all loaded assemblies for the type
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            var type = assembly.GetType(typeName);
+            if (type is not null)
+            {
+                return sp.GetService(type) as ICacheStore;
+            }
+        }
+
+        return null;
     }
 
     private sealed class CacheOptionsValidator : IConfigureOptions<CacheOptions>

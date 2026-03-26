@@ -3,6 +3,7 @@ using Koan.Cache.Abstractions.Stores;
 using Koan.Cache.Adapters.Memory;
 using Koan.Cache.Extensions;
 using Koan.Cache.Options;
+using Koan.Cache.Stores;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -34,7 +35,8 @@ public sealed class CacheServiceCollectionExtensionsSpec
 
             using var provider = services.BuildServiceProvider();
             var store = provider.GetRequiredService<ICacheStore>();
-            store.Should().BeOfType<MemoryCacheStore>();
+            store.Should().BeOfType<LayeredCacheStore>();
+            store.ProviderName.Should().Be("memory");
 
             var options = provider.GetRequiredService<IOptions<CacheOptions>>().Value;
             options.Provider.Should().Be("memory");
@@ -54,7 +56,8 @@ public sealed class CacheServiceCollectionExtensionsSpec
 
             using var provider = services.BuildServiceProvider();
             var store = provider.GetRequiredService<ICacheStore>();
-            store.Should().BeOfType<MemoryCacheStore>();
+            store.Should().BeOfType<LayeredCacheStore>();
+            store.ProviderName.Should().Be("memory");
 
             var options = provider.GetRequiredService<IOptions<CacheOptions>>().Value;
             options.Provider.Should().Be("memory");

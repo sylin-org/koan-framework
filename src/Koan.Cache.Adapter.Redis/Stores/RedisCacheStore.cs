@@ -53,7 +53,9 @@ internal sealed class RedisCacheStore : ICacheStore
         SupportsPubSubInvalidation: true,
         SupportsCompareExchange: false,
         SupportsRegionScoping: true,
-        Hints: new HashSet<string>(new[] { "tags", "stale-while-revalidate", "singleflight", "pubsub" }, StringComparer.OrdinalIgnoreCase));
+        Hints: new HashSet<string>(new[] { "tags", "stale-while-revalidate", "singleflight", "pubsub" }, StringComparer.OrdinalIgnoreCase),
+        SupportsSharedAccess: true,
+        SupportsPersistence: true);
 
     public async ValueTask<CacheFetchResult> Fetch(CacheKey key, CacheEntryOptions options, CancellationToken ct)
     {

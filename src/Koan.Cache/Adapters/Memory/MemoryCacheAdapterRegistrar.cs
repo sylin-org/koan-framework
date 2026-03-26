@@ -27,7 +27,6 @@ public sealed class MemoryCacheAdapterRegistrar : ICacheAdapterRegistrar
         services.AddMemoryCache();
 
         services.TryAddSingleton<MemoryCacheStore>();
-        services.AddSingleton<ICacheStore>(sp => sp.GetRequiredService<MemoryCacheStore>());
 
         services.AddSingleton(new CacheAdapterDescriptor(Name, GetType(), "In-memory cache adapter"));
     }

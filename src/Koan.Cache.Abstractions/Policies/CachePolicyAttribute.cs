@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Koan.Cache.Abstractions.Primitives;
+using Koan.Cache.Abstractions.Stores;
 
 namespace Koan.Cache.Abstractions.Policies;
 
@@ -47,4 +48,19 @@ public sealed class CachePolicyAttribute : Attribute
     public Type? Provider { get; set; }
 
     public IDictionary<string, string> Metadata { get; init; } = new Dictionary<string, string>();
+
+    /// <summary>
+    /// Controls which cache tiers are used. Default: Layered (L1 + L2).
+    /// </summary>
+    public CacheTier Tier { get; init; } = CacheTier.Layered;
+
+    /// <summary>
+    /// Pin L1 (local) tier to a specific provider type. Null = auto-detect.
+    /// </summary>
+    public Type? LocalProvider { get; init; }
+
+    /// <summary>
+    /// Pin L2 (remote) tier to a specific provider type. Null = auto-detect.
+    /// </summary>
+    public Type? RemoteProvider { get; init; }
 }

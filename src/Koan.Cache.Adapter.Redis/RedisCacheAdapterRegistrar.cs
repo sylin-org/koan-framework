@@ -59,7 +59,6 @@ public sealed class RedisCacheAdapterRegistrar : ICacheAdapterRegistrar
         });
 
         services.AddSingleton<RedisCacheStore>();
-        services.AddSingleton<ICacheStore>(sp => sp.GetRequiredService<RedisCacheStore>());
         services.AddHostedService<RedisInvalidationListener>();
         services.AddSingleton(new CacheAdapterDescriptor(Name, GetType(), "Redis distributed cache adapter"));
     }

@@ -33,7 +33,9 @@ internal sealed class MemoryCacheStore : ICacheStore
         SupportsPubSubInvalidation: false,
         SupportsCompareExchange: false,
         SupportsRegionScoping: false,
-        Hints: new HashSet<string>(new[] { "tags", "stale-while-revalidate", "singleflight" }, StringComparer.OrdinalIgnoreCase));
+        Hints: new HashSet<string>(new[] { "tags", "stale-while-revalidate", "singleflight" }, StringComparer.OrdinalIgnoreCase),
+        SupportsSharedAccess: false,
+        SupportsPersistence: false);
 
     public ValueTask<CacheFetchResult> Fetch(CacheKey key, CacheEntryOptions options, CancellationToken ct)
     {
