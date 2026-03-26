@@ -2,8 +2,9 @@
 id: AI-0028
 slug: AI-0028-training-and-dataset
 domain: AI
-status: Proposed
+status: Accepted
 date: 2026-03-20
+implementation: "Implemented in src/Koan.AI.Training/ with Training.* and Dataset.* facades"
 ---
 
 # ADR: Training and Dataset — Entity-Native Bridge to ML Training

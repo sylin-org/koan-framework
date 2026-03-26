@@ -43,6 +43,8 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         module.PublishConfigValue(KoanAiProvenanceItems.DefaultRoutingPolicy, policyOption);
 
         DescribeConfiguredSources(module, configuration);
+        DescribeCategoryRouting(module, configuration);
+        DescribeActiveRecipe(module, configuration);
         DescribeLegacyOllama(module, configuration);
 
         module.AddNote("AI pipeline registered via Microsoft.Extensions.AI (default chat + embeddings bridged to existing adapters).");
@@ -103,6 +105,71 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                     .State(ProvenanceSettingState.Default);
             });
         }
+    }
+
+    private static void DescribeCategoryRouting(ProvenanceModuleWriter module, IConfiguration configuration)
+    {
+        var categories = new[] { "Chat", "Embed", "Ocr" };
+        var routingDetails = new List<string>();
+
+        foreach (var category in categories)
+        {
+            var source = configuration[$"Koan:Ai:{category}:Source"];
+            var model = configuration[$"Koan:Ai:{category}:Model"];
+            var via = configuration[$"Koan:Ai:{category}:Via"];
+
+            var parts = new List<string>();
+            if (!string.IsNullOrWhiteSpace(source)) parts.Add($"source={source}");
+            if (!string.IsNullOrWhiteSpace(model)) parts.Add($"model={model}");
+            if (!string.IsNullOrWhiteSpace(via)) parts.Add($"via={via}");
+
+            if (parts.Count > 0)
+            {
+                routingDetails.Add($"{category}: {string.Join(", ", parts)}");
+            }
+        }
+
+        if (routingDetails.Count > 0)
+        {
+            module.SetSetting(KoanAiProvenanceItems.CategoryRouting.Key, builder =>
+            {
+                builder
+                    .Label(KoanAiProvenanceItems.CategoryRouting.Label)
+                    .Description(KoanAiProvenanceItems.CategoryRouting.Description)
+                    .Value(string.Join("; ", routingDetails))
+                    .Source(ProvenanceSettingSource.AppSettings, "Koan:Ai:{Category}")
+                    .State(ProvenanceSettingState.Configured);
+            });
+        }
+    }
+
+    private static void DescribeActiveRecipe(ProvenanceModuleWriter module, IConfiguration configuration)
+    {
+        var recipeName = configuration["Koan:Ai:ActiveRecipe"];
+        if (string.IsNullOrWhiteSpace(recipeName))
+            return;
+
+        var section = configuration.GetSection($"Koan:Ai:Recipes:{recipeName}");
+        var bindings = section.Exists()
+            ? section.GetChildren()
+                .Where(c => !string.IsNullOrWhiteSpace(c.Value))
+                .Select(c => $"{c.Key}={c.Value}")
+                .ToArray()
+            : [];
+
+        module.SetSetting(KoanAiProvenanceItems.ActiveRecipe.Key, builder =>
+        {
+            builder
+                .Label(KoanAiProvenanceItems.ActiveRecipe.Label)
+                .Description(KoanAiProvenanceItems.ActiveRecipe.Description)
+                .Value(bindings.Length > 0
+                    ? $"{recipeName} ({string.Join(", ", bindings)})"
+                    : $"{recipeName} (no bindings found)")
+                .Source(ProvenanceSettingSource.AppSettings, "Koan:Ai:ActiveRecipe")
+                .State(bindings.Length > 0
+                    ? ProvenanceSettingState.Configured
+                    : ProvenanceSettingState.Unknown);
+        });
     }
 
     private static void DescribeLegacyOllama(ProvenanceModuleWriter module, IConfiguration configuration)

@@ -2,8 +2,9 @@
 id: AI-0022
 slug: AI-0022-unified-ai-lifecycle-vision
 domain: AI
-status: Proposed
+status: Accepted
 date: 2026-03-20
+implementation: "All eight lifecycle modules implemented in src/Koan.AI.*/"
 ---
 
 # ADR: Unified AI Lifecycle — Vision and Capability Expansion

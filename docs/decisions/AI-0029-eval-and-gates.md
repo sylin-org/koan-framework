@@ -2,8 +2,9 @@
 id: AI-0029
 slug: AI-0029-eval-and-gates
 domain: AI
-status: Proposed
+status: Accepted
 date: 2026-03-20
+implementation: "Implemented in src/Koan.AI.Eval/ with Eval.* facade"
 ---
 
 # ADR: Eval — Model Evaluation, Quality Gates, and Drift Detection

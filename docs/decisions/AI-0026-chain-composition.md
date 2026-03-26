@@ -2,8 +2,9 @@
 id: AI-0026
 slug: AI-0026-chain-composition
 domain: AI
-status: Proposed
+status: Accepted
 date: 2026-03-20
+implementation: "Implemented in src/Koan.AI.Orchestration/ with Chain.* facade"
 ---
 
 # ADR: Chain Composition — Typed, Immutable AI Pipeline Primitives

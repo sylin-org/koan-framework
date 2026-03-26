@@ -2,8 +2,9 @@
 id: AI-0025
 slug: AI-0025-prompt-primitive
 domain: AI
-status: Proposed
+status: Accepted
 date: 2026-03-20
+implementation: "Implemented in src/Koan.AI.Prompt/ with Prompt.* facade"
 ---
 
 # ADR: Uri-Inspired Prompt Primitive

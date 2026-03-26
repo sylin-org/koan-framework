@@ -10,10 +10,11 @@ namespace S6.SnapVault.Models;
 /// </summary>
 [StorageBinding(Profile = "cold", Container = "photos")]
 [Embedding(
-    Policy = EmbeddingPolicy.Explicit,
+    Policy = EmbeddingPolicy.AllStrings,
     Async = true,
     MaxTokens = 8191,
-    Version = 1)]
+    Version = 2,
+    Exclude = ["EventId", "InferredStyleId"])]
 public class PhotoAsset : MediaEntity<PhotoAsset>
 {
     // Event relationship
@@ -63,39 +64,9 @@ public class PhotoAsset : MediaEntity<PhotoAsset>
     // Processing
     public ProcessingStatus ProcessingStatus { get; set; } = ProcessingStatus.Pending;
 
-    /// <summary>
-    /// Converts photo metadata to embedding text for semantic search.
-    /// Called automatically by [Embedding] attribute lifecycle hook.
-    /// Prioritizes structured AI analysis, falls back to legacy fields.
-    /// </summary>
-    public string ToEmbeddingText()
-    {
-        var parts = new List<string>();
-
-        // Structured AI analysis first (best semantic content)
-        if (AiAnalysis != null)
-        {
-            parts.Add(AiAnalysis.ToEmbeddingText());
-        }
-
-        // Fallback to legacy fields if no structured analysis
-        if (!string.IsNullOrEmpty(OriginalFileName))
-            parts.Add($"Filename: {OriginalFileName}");
-
-        if (AutoTags.Any())
-            parts.Add($"Tags: {string.Join(", ", AutoTags)}");
-
-        if (!string.IsNullOrEmpty(MoodDescription))
-            parts.Add($"Mood: {MoodDescription}");
-
-        if (!string.IsNullOrEmpty(CameraModel))
-            parts.Add($"Camera: {CameraModel}");
-
-        if (Location != null)
-            parts.Add($"Location: {Location.Latitude}, {Location.Longitude}");
-
-        return string.Join("\n", parts);
-    }
+    // Embedding text extraction handled by framework via [Embedding(Policy=AllStrings)].
+    // All public string properties (excluding Id, EventId, InferredStyleId) are included by convention.
+    // AiAnalysis, AutoTags, DetectedObjects contribute via their string representations.
 }
 
 public class GpsCoordinates

@@ -2,8 +2,9 @@
 id: AI-0024
 slug: AI-0024-compute-fabric
 domain: AI
-status: Proposed
+status: Accepted
 date: 2026-03-20
+implementation: "Implemented in src/Koan.AI.Compute/ with Compute.* facade"
 ---
 
 # ADR: Compute Fabric — Hardware-Agnostic Compute Discovery and Routing

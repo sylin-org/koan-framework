@@ -37,7 +37,7 @@ This creates three problems:
 
 3. **`IAiAdapter` violates ISP.** An embedding-only provider (Cohere Embed, Voyage AI) must stub `ChatAsync` and `StreamAsync`. A chat-only provider stubs `EmbedAsync`. The monolithic interface forces providers to lie about their capabilities.
 
-Additionally, the framework lacks an OCR category despite OCR being a common AI operation with dedicated provider ecosystems (Azure Document Intelligence, Google Cloud Vision) and specialized models (GLM-OCR). Developers currently route OCR through `Client.Understand(imageBytes, prompt)` which is semantically vague and requires manual prompt engineering.
+Additionally, the framework lacks an OCR category despite OCR being a common AI operation with dedicated provider ecosystems (Azure Document Intelligence, Google Cloud Vision) and specialized models (GLM-OCR). Without a dedicated category, developers would route OCR through a generic `Client.Understand(imageBytes, prompt)` approach, which is semantically vague and requires manual prompt engineering.
 
 ## Decision
 
@@ -130,7 +130,7 @@ OcrResult result = await Client.OcrResult(screenshotBytes);
 // result.Text, result.Format, result.Confidence, result.Model
 ```
 
-The `Engine` facade is deprecated. `Client` is the single entry point at every tier.
+The `Engine` facade (considered during early design) is not implemented. `Client` is the single entry point at every tier.
 
 ### Part 3: Convention-Inferred Defaults
 
@@ -259,7 +259,7 @@ internal sealed class LMStudioAdapter : IChatAdapter, IEmbedAdapter { ... }
 internal sealed class AzureDocIntelAdapter : IOcrAdapter { ... }
 ```
 
-The legacy `IAiAdapter` with all methods remains as a convenience base during migration but is marked `[Obsolete]`.
+The monolithic `IAiAdapter` with all methods is not implemented. Adapters implement only the category-specific interfaces they support.
 
 ### Part 5: Category-Aware Routing
 
@@ -308,7 +308,7 @@ using (Client.Scope(all: "ollama-local"))
 }
 ```
 
-Internally backed by `AsyncLocal<ImmutableStack<AiCategoryScope>>` following the existing `AiContextScope` pattern, extended with per-category slots.
+Internally backed by `AsyncLocal<ImmutableStack<AiCategoryScope>>` with per-category slots.
 
 ### Part 7: Per-Category Options Types
 
@@ -324,7 +324,7 @@ public record ChatOptions
     public double? TopP { get; init; }
     public string? Source { get; init; }
     public string? ResponseFormat { get; init; }
-    public byte[]? Image { get; init; }           // multimodal (absorbs Understand)
+    public byte[]? Image { get; init; }           // multimodal input
     public string? ImageMimeType { get; init; }
 }
 
@@ -346,7 +346,7 @@ public record OcrOptions
 public enum OcrFormat { PlainText, Markdown, Structured }
 ```
 
-`ChatOptions` absorbs what `Client.Understand()` currently does via the `Image` property. The `Understand` method is deprecated.
+`ChatOptions` absorbs what a separate `Client.Understand()` method would have done via the `Image` property. `Understand` was a design alternative considered and not implemented.
 
 ### Part 8: Configuration
 
@@ -450,49 +450,55 @@ public class Article : Entity<Article> { ... }
   - Convention-inferred metadata makes `SemanticSearch<T>()` and `Client.Embed(entity)` work immediately during prototyping, before the developer has committed to attribute configuration.
 
 - **Negative / Trade-offs:**
-  - Breaking change: `IAiAdapter` splits into `IChatAdapter` + `IEmbedAdapter`. Existing adapter implementations must be updated. Mitigated by keeping legacy `IAiAdapter` as `[Obsolete]` during transition.
-  - `Client.Understand()` deprecated in favor of `Client.Chat(message, new ChatOptions { Image = ... })`. Existing call sites require migration.
-  - `Client.Context()` deprecated in favor of `Client.Scope()` with per-category parameters. Existing scoped routing code requires migration.
-  - `Engine` facade deprecated. Call sites using `Engine.Chat()` must migrate to `Client.Chat()`.
+  - `IAiAdapter` splits into `IChatAdapter` + `IEmbedAdapter`. The monolithic interface is not carried forward.
+  - `Client.Understand()` was considered as a separate method but is not implemented; its functionality is absorbed by `Client.Chat(message, new ChatOptions { Image = ... })`.
+  - `Client.Context()` was considered but is not implemented; `Client.Scope()` with per-category parameters covers this need from the start.
+  - `Engine` was considered as a separate facade but is not implemented; `Client` serves as the single entry point.
   - Convention inference adds a small reflection cost on first use per entity type. Mitigated by caching in `EmbeddingMetadata` (same pattern as current attribute-based caching).
   - `Via` delegation adds an indirection layer for task categories that may complicate debugging. Mitigated by boot report clearly showing delegation path.
 
 ## Implementation Notes
 
-1. **Phase 1: Adapter interface split.** Extract `IChatAdapter` and `IEmbedAdapter` from `IAiAdapter`. Update `OllamaAdapter` and `LMStudioAdapter` to implement both. Mark `IAiAdapter` as `[Obsolete]`. Update `AiRoutingEngine` to resolve by interface type.
+1. **Phase 1: Adapter interface split.** Define `IChatAdapter` and `IEmbedAdapter` as the primary adapter contracts. Implement `OllamaAdapter` and `LMStudioAdapter` against the category-specific interfaces. Update `AiRoutingEngine` to resolve by interface type.
 
 2. **Phase 2: Category routing.** Introduce `AiCategoryRoute` and `AiCategoryRouter`. Bind categories to configuration sections (`Koan:Ai:Chat`, `Koan:Ai:Embed`, `Koan:Ai:Ocr`). Implement `Via` delegation for task categories. Update `AiSourceRegistry` to support category-scoped source resolution.
 
-3. **Phase 3: Convention-inferred defaults.** Refactor `EmbeddingMetadata.Get<T>()` to `EmbeddingMetadata.Resolve<T>()` with convention fallback. Update `SemanticSearch<T>()` to use `Resolve` instead of `Get`. Add diagnostic guidance logging for empty vector results. Implement `AiContextMetadata` convention chain for Chat entity context. Implement `OcrMetadata` convention chain for entity OCR.
+3. **Phase 3: Convention-inferred defaults.** Implement `EmbeddingMetadata.Resolve<T>()` with convention fallback (never null). Implement `SemanticSearch<T>()` using `Resolve`. Add diagnostic guidance logging for empty vector results. Implement `AiContextMetadata` convention chain for Chat entity context. Implement `OcrMetadata` convention chain for entity OCR.
 
-4. **Phase 4: Client facade.** Add `Client.Embed(entity)` overload with convention support. Add `Client.Chat(message, entity)` overload with context serialization. Add `Client.Ocr(byte[])` and `Client.Ocr(entity)`. Add `Client.Scope()` with per-category parameters. Add `Client.ChatResult()`, `Client.EmbedResult()`, `Client.OcrResult()` rich-result variants. Deprecate `Client.Understand()`, `Client.Context()`, and `Engine.*`.
+4. **Phase 4: Client facade.** Add `Client.Embed(entity)` overload with convention support. Add `Client.Chat(message, entity)` overload with context serialization. Add `Client.Ocr(byte[])` and `Client.Ocr(entity)`. Add `Client.Scope()` with per-category parameters. Add `Client.ChatResult()`, `Client.EmbedResult()`, `Client.OcrResult()` rich-result variants. Note: `Client.Understand()`, `Client.Context()`, and `Engine` were design alternatives considered and not implemented — their functionality is absorbed into `Client.Chat()` with options and `Client.Scope()`.
 
 5. **Phase 5: OCR category.** Define `IOcrAdapter`, `OcrRequest`, `OcrResponse`, `OcrOptions`, `OcrResult`. Implement `Via: Chat` delegation (multimodal message with image parts and OCR prompt). Register `glm-ocr` as default OCR model. Add OCR convention resolver for entity `byte[]` properties.
 
 6. **Phase 6: Boot report and diagnostics.** Update `KoanAutoRegistrar.Describe()` to emit per-category routing entries. Add diagnostic guidance messages for convention-inferred empty results. Update admin surfaces.
 
-## Migration Notes
+## Design Alternatives Not Implemented
 
-- `IAiAdapter` implementations must adopt `IChatAdapter` and/or `IEmbedAdapter`. The legacy interface remains functional but deprecated. Adapter authors implement only the interfaces matching their provider capabilities.
-- `Client.Understand(imageBytes, prompt)` call sites migrate to `Client.Chat(prompt, new ChatOptions { Image = imageBytes })`.
-- `Client.Context(source, provider, model)` call sites migrate to `Client.Scope(all: source)` or per-category `Client.Scope(chat: source)`.
-- `Engine.Chat()` / `Engine.Embed()` call sites migrate to `Client.Chat()` / `Client.Embed()`.
-- `[Embedding(Source = "...", Model = "...")]` remains functional but becomes unnecessary when category-level configuration provides the same routing. Developers can remove `Source`/`Model` from attributes after configuring `Koan:Ai:Embed` in appsettings.
-- `EmbeddingMetadata.Get<T>()` call sites should migrate to `EmbeddingMetadata.Resolve<T>()`. The `Get` method is marked `[Obsolete]` and delegates to `Resolve` internally.
-- Existing tests that assert `InvalidOperationException` on missing `[Embedding]` attribute must be updated — the framework no longer throws for on-demand operations on undecorated entities.
+The following alternatives were considered during design and explicitly not carried forward:
+
+- **`Engine` facade** — A separate `Engine.Chat()` / `Engine.Embed()` entry point was considered but not implemented. `Client` serves as the single static facade at every tier.
+- **`Client.Understand(imageBytes, prompt)`** — A dedicated multimodal method was considered but not implemented. Image/multimodal input is handled via `Client.Chat(prompt, new ChatOptions { Image = imageBytes })`.
+- **`Client.Context(source, provider, model)`** — A flat scoping method was considered but not implemented. Per-category scoping via `Client.Scope(chat: source, embed: source)` is more expressive.
+- **Monolithic `IAiAdapter`** — A single adapter interface bundling all operations was considered but not implemented. ISP-compliant `IChatAdapter` / `IEmbedAdapter` / `IOcrAdapter` are used from the start.
+
+## Implementation Notes (Adapter & Metadata)
+
+- Adapter authors implement only the category interfaces matching their provider capabilities (`IChatAdapter`, `IEmbedAdapter`, or both).
+- `[Embedding(Source = "...", Model = "...")]` remains available for per-entity overrides but is unnecessary when category-level configuration provides the same routing.
+- `EmbeddingMetadata.Resolve<T>()` is the canonical resolution method, returning convention-inferred metadata when no attribute is present (never null).
 
 ## References
 
+- AI-0032 Intent-capability resolution with recipes (extends the resolution chain with a recipe layer between scope and advisor)
 - AI-0015 Canonical source-member architecture (source/member routing model)
 - AI-0019 Koan.AI zero-config integration on ME.AI (pipeline and registrar patterns)
 - AI-0020 Entity-first AI and transaction coordination (lifecycle integration, `[Embedding]` attribute)
 - AI-0008 Adapters and registry (adapter identity, capabilities, operations)
 - AI-0009 Multi-service routing and policies (fallback groups, health monitoring)
 - `src/Koan.AI/Client.cs` (current static facade)
-- `src/Koan.AI/Engine.cs` (deprecated by this ADR)
-- `src/Koan.AI/Context/AiContextScope.cs` (superseded by `Client.Scope()`)
+- `src/Koan.AI/Engine.cs` (design alternative considered, not implemented)
+- `src/Koan.AI/Context/AiContextScope.cs` (design alternative; `Client.Scope()` implemented instead)
 - `src/Koan.AI/Pipeline/AiRoutingEngine.cs` (extended with category routing)
-- `src/Koan.AI.Contracts/Adapters/IAiAdapter.cs` (split by this ADR)
+- `src/Koan.AI.Contracts/Adapters/IAiAdapter.cs` (replaced by category-specific interfaces in this ADR)
 - `src/Koan.AI.Contracts/Sources/AiSourceDefinition.cs` (Capabilities dict already keys on category names)
 - `src/Koan.Data.AI/EmbeddingMetadata.cs` (refactored to convention-first)
 - `src/Koan.Data.AI/EntityEmbeddingExtensions.cs` (SemanticSearch updated to use Resolve)

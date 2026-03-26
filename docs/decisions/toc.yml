@@ -130,6 +130,24 @@
       href: ARCH-0063-docs-ia-realignment-and-retrieval-improvements.md
     - name: ARCH-0065 AddKoan bootstrap lives in Koan.Core
       href: ARCH-0065-addkoan-bootstrap-rehome.md
+    - name: ARCH-0066 Boot report hub and Moss TXT record completeness
+      href: ARCH-0066-boot-report-hub-and-moss-txt-record-completeness.md
+    - name: ARCH-0067 Service organizational structure
+      href: ARCH-0067-service-organizational-structure.md
+    - name: ARCH-0068 Refactoring strategy — static vs DI
+      href: ARCH-0068-refactoring-strategy-static-vs-di.md
+    - name: ARCH-0069 S5 Recs partition-based import pipeline
+      href: ARCH-0069-s5-recs-partition-based-import-pipeline.md
+    - name: ARCH-0070 Attribute-driven AI embeddings
+      href: ARCH-0070-attribute-driven-ai-embeddings.md
+    - name: ARCH-0071 Partition context provider
+      href: ARCH-0071-partition-context-provider.md
+    - name: ARCH-0072 Drop Async method name suffix
+      href: ARCH-0072-drop-async-method-suffix.md
+    - name: ARCH-0073 Code modernization sweep
+      href: ARCH-0073-code-modernization-sweep.md
+    - name: ARCH-0074 Framework gap analysis and incremental plan
+      href: ARCH-0074-framework-gap-analysis-and-incremental-plan.md
 - name: Core (CORE)
   items:
     - name: CORE-0072 Source-generated registries

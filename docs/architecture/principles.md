@@ -148,7 +148,7 @@ public class CustomController : ControllerBase
 public class DataAutoRegistrar : IKoanAutoRegistrar
 {
     public string ModuleName => "Koan.Data";
-    public string? ModuleVersion => "v0.2.18";
+    public string? ModuleVersion => "v0.6.3";
 
     public void Initialize(IServiceCollection services)
     {
@@ -465,5 +465,5 @@ Emphasize BootReport observability and self-documenting systems as enterprise-gr
 - [Provider Transparency Showcase](../guides/data-modeling.md) - Multi-provider examples
 - [Auto-Registration Patterns](../reference/core/index.md) - Implementation details
 
-**Last Validation**: 2025-01-17 by Framework Specialist
-**Framework Version Tested**: v0.2.18+
+**Last Validation**: 2026-03-25 by Framework Specialist
+**Framework Version Tested**: v0.6.3

@@ -2,8 +2,9 @@
 id: AI-0030
 slug: AI-0030-review-queues
 domain: AI
-status: Proposed
+status: Accepted
 date: 2026-03-20
+implementation: "Implemented in src/Koan.AI.Review/ with Review.* facade"
 ---
 
 # ADR: Review Queues — Human-in-the-Loop Feedback Collection

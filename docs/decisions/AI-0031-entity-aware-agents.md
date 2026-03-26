@@ -2,8 +2,9 @@
 id: AI-0031
 slug: AI-0031-entity-aware-agents
 domain: AI
-status: Proposed
+status: Accepted
 date: 2026-03-20
+implementation: "Implemented in src/Koan.AI.Agents/ with Agent.* facade"
 ---
 
 # ADR: Entity-Aware Agents

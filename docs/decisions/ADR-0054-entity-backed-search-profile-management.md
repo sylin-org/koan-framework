@@ -1,11 +1,11 @@
 # ADR-0054: Entity-Backed Search Profile Management with Managed Taxonomies
 
-**Status:** Implementing (Week 2 Complete, Week 3 In Progress)
+**Status:** Paused (historical snapshot; tracked via ARCH-0074)
 **Date:** 2025-11-09
 **Context:** KoanContext semantic search intelligence and RAG quality improvements
 **Decision Makers:** Architecture review
 **Affected Components:** Koan.Service.KoanContext, Entity<T>, EntityController<T>, MCP SDK
-**Implementation Progress:** 🟡 Core complete (Weeks 1-2), MCP/Testing pending (Week 3)
+**Implementation Progress:** Paused — Core complete (Weeks 1-2), MCP/Testing deferred. Status: Implementation paused; tracked via ARCH-0074.
 
 ---
 
@@ -1195,8 +1195,8 @@ interface SearchAudience {
 ## Implementation Status
 
 **Last Updated:** 2025-11-09 (Post-Crash Analysis)
-**Current Phase:** Week 2 Complete, Week 3 Partial
-**Overall Status:** 🟡 Core implementation complete, MCP integration and testing pending
+**Current Phase:** Week 2 Complete, Week 3 Partial (historical snapshot)
+**Overall Status:** Implementation paused; tracked via ARCH-0074. Core implementation complete as of 2025-11-09.
 
 ### ✅ Completed Components
 
@@ -1493,4 +1493,4 @@ Koan.search({
 
 **Last Updated:** 2025-11-09 (Post-Crash Analysis)
 **Implementation Target:** Sprint 2025-Q4
-**Status:** 🟡 Week 2 complete, Week 3 in progress (MCP SDK + testing pending)
+**Status:** Implementation paused; tracked via ARCH-0074. Week 2 complete; Week 3 deferred.

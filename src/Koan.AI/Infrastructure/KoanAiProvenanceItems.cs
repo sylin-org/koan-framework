@@ -40,6 +40,16 @@ internal static class KoanAiProvenanceItems
         "Legacy Ollama Default Model",
         "Default model configured under Koan:Ai:Ollama:DefaultModel.");
 
+    internal static readonly ProvenanceItem ActiveRecipe = new(
+        "AiActiveRecipe",
+        "Active Recipe",
+        "Named recipe providing per-category model bindings (Koan:Ai:ActiveRecipe).");
+
+    internal static readonly ProvenanceItem CategoryRouting = new(
+        "AiCategoryRouting",
+        "Category Routing",
+        "Per-category (Chat, Embed, Ocr) source and model configuration.");
+
     internal static readonly ProvenanceItem AdapterRoster = new(
         "AiAdapterRoster",
         "Adapter Roster",

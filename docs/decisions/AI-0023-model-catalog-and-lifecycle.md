@@ -2,8 +2,9 @@
 id: AI-0023
 slug: AI-0023-model-catalog-and-lifecycle
 domain: AI
-status: Proposed
+status: Accepted
 date: 2026-03-20
+implementation: "Implemented in src/Koan.AI.Models/ with Model.* facade"
 ---
 
 # ADR: Model Catalog and Lifecycle — `Model.*` Facade
