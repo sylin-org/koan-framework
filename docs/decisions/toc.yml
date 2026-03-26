@@ -408,6 +408,10 @@
       href: DX-0042-narrative-samples-simple-entity-names.md
     - name: DX-0043 Connector naming for external integrations
       href: DX-0043-connector-naming-for-external-integrations.md
+- name: Jobs (JOBS)
+  items:
+    - name: JOBS-0001 Jobs pillar — entity-first task management
+      href: JOBS-0001-jobs-pillar-entity-first-task-management.md
 - name: Security (DEC)
   items:
     - name: DEC-0053 Service-to-service authentication

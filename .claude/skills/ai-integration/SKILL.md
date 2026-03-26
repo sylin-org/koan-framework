@@ -135,6 +135,73 @@ public class KnowledgeBaseService
 }
 ```
 
+## Category-Driven Routing (AI-0021)
+
+The AI subsystem routes operations by category (Chat, Embed, Ocr) with independent source/model configuration:
+
+```json
+{
+  "Koan": {
+    "Ai": {
+      "Chat": { "Source": "ollama-gpu", "Model": "llama3" },
+      "Embed": { "Source": "openai-prod", "Model": "text-embedding-3-small" },
+      "Ocr": { "Via": "Chat", "Model": "glm-ocr" }
+    }
+  }
+}
+```
+
+### Scoped Routing
+
+Override routing per-operation:
+```csharp
+using (Client.Scope(chat: "fast-local", embed: "cloud-prod"))
+{
+    var answer = await Client.Chat("Summarize this", ct);
+    var vector = await Client.Embed("search text", ct);
+}
+```
+
+## Entity-Aware AI (EntityAi)
+
+`EntityAi` in `Koan.Data.AI` bridges entities with AI operations using convention inference:
+
+```csharp
+// Embed entity content (convention: all string properties)
+float[] vector = await EntityAi.Embed(myNote, ct);
+
+// Chat with entity as context (injected as system prompt)
+string answer = await EntityAi.Chat("What are the key points?", myNote, ct);
+
+// OCR from entity's byte[] property
+string text = await EntityAi.Ocr(myDocument, ct);
+
+// Extract text without AI call
+string content = EntityAi.ExtractText(myNote);
+```
+
+Convention chain: `[Embedding]` attribute → AllStrings policy → JSON fallback.
+
+## Recipe Bindings (AI-0032)
+
+Named recipes bind capabilities to models. ML engineers author recipes, developers select them:
+
+```json
+{
+  "Koan": {
+    "Ai": {
+      "ActiveRecipe": "fast-local",
+      "Recipes": {
+        "fast-local": { "Chat": "phi3:mini", "Embed": "nomic-embed-text" },
+        "cloud-prod": { "Chat": "gpt-4o", "Embed": "text-embedding-3-large" }
+      }
+    }
+  }
+}
+```
+
+Recipes are sparse — missing keys mean "no opinion" (falls through to advisor/config).
+
 ## When This Skill Applies
 
 - ✅ Integrating AI features
@@ -143,10 +210,15 @@ public class KnowledgeBaseService
 - ✅ Embeddings generation
 - ✅ RAG workflows
 - ✅ AI-enriched entities
+- ✅ Per-category AI routing
+- ✅ Entity-aware AI operations
+- ✅ Recipe-based model selection
 
 ## Reference Documentation
 
 - **Full Guide:** `docs/guides/ai-integration.md`
 - **Vector How-To:** `docs/guides/ai-vector-howto.md`
+- **ADR:** `docs/decisions/AI-0021-category-driven-ai-with-convention-defaults.md` (Category-driven AI)
+- **ADR:** `docs/decisions/AI-0032-intent-capability-resolution-with-recipes.md` (Recipes)
 - **Sample:** `samples/S5.Recs/` (AI recommendation engine)
 - **Sample:** `samples/S16.PantryPal/` (Vision AI integration)

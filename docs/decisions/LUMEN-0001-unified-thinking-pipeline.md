@@ -12,6 +12,9 @@ Date: 2026-02-21
 
 Status: Accepted
 
+**Scope clarification**: This ADR documents a thinking pipeline unification in the companion Koi project,
+not in Koan Framework core. It is retained here for cross-project architectural reference.
+
 ## Context
 
 When tools were enabled on the web channel, Lumen lost all conversation context.
