@@ -1,6 +1,6 @@
 ﻿using System;
-using System.ComponentModel.DataAnnotations;
 using System.Linq;
+using Koan.Data.Abstractions.Annotations;
 using System.Threading.Tasks;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
@@ -92,7 +92,7 @@ public sealed class PostgresCrudSpec
     {
         public string Name { get; set; } = "";
         public int Age { get; set; }
-        [Timestamp]
+        [Timestamp(OnSave = true)]
         public DateTimeOffset LastUpdated { get; set; }
     }
 }

@@ -1,7 +1,7 @@
-﻿using System;
+using System;
 using System.ComponentModel.DataAnnotations;
 
-namespace Koan.Cache.Adapter.Memory.Options;
+namespace Koan.Cache.Adapters.Memory;
 
 public sealed class MemoryCacheAdapterOptions
 {

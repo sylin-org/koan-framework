@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Linq;
-using System.ComponentModel.DataAnnotations;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
 using Koan.Data.Connector.InMemory.Tests.Support;
@@ -75,7 +75,7 @@ public sealed class InMemoryCrudSpec
     {
         public string Name { get; set; } = "";
         public int Age { get; set; }
-        [Timestamp]
+        [Timestamp(OnSave = true)]
         public DateTimeOffset LastUpdated { get; set; }
     }
 }

@@ -1,6 +1,6 @@
 ﻿using FluentAssertions;
 using Koan.Cache.Adapters;
-using Koan.Cache.Adapter.Memory;
+using Koan.Cache.Adapters.Memory;
 using Koan.Cache.Adapter.Redis;
 using Koan.Testing;
 using Xunit.Abstractions;

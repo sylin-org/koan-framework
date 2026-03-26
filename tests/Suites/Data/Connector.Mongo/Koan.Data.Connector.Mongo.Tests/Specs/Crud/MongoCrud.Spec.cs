@@ -1,6 +1,6 @@
 ﻿using System;
-using System.ComponentModel.DataAnnotations;
 using System.Linq;
+using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
@@ -81,7 +81,7 @@ public sealed class MongoCrudSpec
         public string Name { get; set; } = "";
         public int Age { get; set; }
 
-        [Timestamp]
+        [Timestamp(OnSave = true)]
         public DateTimeOffset LastUpdated { get; set; }
     }
 }

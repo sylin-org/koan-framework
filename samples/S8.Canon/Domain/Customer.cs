@@ -1,5 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Koan.Canon.Domain.Model;
+using Koan.Data.Abstractions.Annotations;
+using TimestampAttribute = Koan.Data.Abstractions.Annotations.TimestampAttribute;
 
 namespace S8.Canon.Domain;
 
@@ -59,6 +61,6 @@ public class Customer : CanonEntity<Customer>
     /// <summary>
     /// Date when customer record was last updated.
     /// </summary>
-    [Timestamp]
+    [Timestamp(OnSave = true)]
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

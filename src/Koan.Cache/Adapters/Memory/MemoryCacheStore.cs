@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -6,12 +6,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using Koan.Cache.Abstractions.Primitives;
 using Koan.Cache.Abstractions.Stores;
-using Koan.Cache.Adapter.Memory.Options;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace Koan.Cache.Adapter.Memory.Stores;
+namespace Koan.Cache.Adapters.Memory;
 
 internal sealed class MemoryCacheStore : ICacheStore
 {

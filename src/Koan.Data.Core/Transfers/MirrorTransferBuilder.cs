@@ -9,6 +9,8 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Annotations;
+using TimestampAttribute = Koan.Data.Abstractions.Annotations.TimestampAttribute;
 
 namespace Koan.Data.Core.Transfers;
 

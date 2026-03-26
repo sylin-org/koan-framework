@@ -1,7 +1,7 @@
 ﻿using Koan.Data.Core.Model;
 using Koan.Data.Core.Transfers;
 using Koan.Tests.Data.Core.Support;
-using System.ComponentModel.DataAnnotations;
+using Koan.Data.Abstractions.Annotations;
 
 namespace Koan.Tests.Data.Core.Specs.Transfers;
 
@@ -426,7 +426,7 @@ public sealed class EntityTransferDslSpec
         public string Title { get; set; } = "";
         public bool Active { get; set; }
 
-        [Timestamp]
+        [Timestamp(OnSave = true)]
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     }
 

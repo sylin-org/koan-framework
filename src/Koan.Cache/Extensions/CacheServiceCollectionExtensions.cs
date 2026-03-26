@@ -4,6 +4,7 @@ using Koan.Cache.Abstractions.Policies;
 using Koan.Cache.Abstractions.Serialization;
 using Koan.Cache.Abstractions.Stores;
 using Koan.Cache.Adapters;
+using Koan.Cache.Adapters.Memory;
 using Koan.Cache.Options;
 using Koan.Cache.Policies;
 using Koan.Cache.Decorators;
@@ -13,6 +14,7 @@ using Koan.Cache.Singleflight;
 using Koan.Cache.Stores;
 using Koan.Cache.Diagnostics;
 using Koan.Core.Modules;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -63,10 +65,12 @@ public static class CacheServiceCollectionExtensions
 
         services.TryAddSingleton<CacheInstrumentation>();
 
-        services.TryAddSingleton<ICacheStore>(sp =>
-        {
-            throw new InvalidOperationException("No cache adapter has been registered. Call AddKoanCacheAdapter(\"memory\") or the provider-specific extension method.");
-        });
+        // Default fallback: if no explicit adapter is registered, auto-register the bundled in-memory provider.
+        // This ensures "Reference = Intent" — just adding Koan.Cache gets you a working cache.
+        services.AddMemoryCache();
+        services.AddKoanOptions<MemoryCacheAdapterOptions>(CacheConstants.Configuration.Memory.Section);
+        services.TryAddSingleton<MemoryCacheStore>();
+        services.TryAdd(ServiceDescriptor.Singleton<ICacheStore>(sp => sp.GetRequiredService<MemoryCacheStore>()));
 
         services.PostConfigure<CacheOptions>(opts =>
         {

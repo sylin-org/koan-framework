@@ -1,6 +1,6 @@
 ﻿using Koan.Cache.Abstractions.Adapters;
 using Koan.Cache.Abstractions.Stores;
-using Koan.Cache.Adapter.Memory.Stores;
+using Koan.Cache.Adapters.Memory;
 using Koan.Cache.Extensions;
 using Koan.Cache.Options;
 using Microsoft.Extensions.Configuration;
@@ -41,8 +41,8 @@ public sealed class CacheServiceCollectionExtensionsSpec
         });
 
     [Fact]
-    public Task AddKoanCache_throws_when_adapter_missing()
-        => Spec(nameof(AddKoanCache_throws_when_adapter_missing), () =>
+    public Task AddKoanCache_auto_registers_memory_fallback_when_no_explicit_adapter()
+        => Spec(nameof(AddKoanCache_auto_registers_memory_fallback_when_no_explicit_adapter), () =>
         {
             var configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?>())
@@ -53,10 +53,11 @@ public sealed class CacheServiceCollectionExtensionsSpec
             services.AddKoanCache(configuration);
 
             using var provider = services.BuildServiceProvider();
-            Func<ICacheStore> resolve = () => provider.GetRequiredService<ICacheStore>();
+            var store = provider.GetRequiredService<ICacheStore>();
+            store.Should().BeOfType<MemoryCacheStore>();
 
-            resolve.Should().Throw<InvalidOperationException>()
-                .WithMessage("*No cache adapter has been registered*");
+            var options = provider.GetRequiredService<IOptions<CacheOptions>>().Value;
+            options.Provider.Should().Be("memory");
         });
 
     [Fact]

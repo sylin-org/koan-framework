@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Koan.Data.Abstractions.Annotations;
+using TimestampAttribute = Koan.Data.Abstractions.Annotations.TimestampAttribute;
 using Koan.Data.Core.Model;
 
 namespace Koan.Jobs.Model;
@@ -56,6 +57,6 @@ public abstract partial class Job : Entity<Job>
     [Column(TypeName = "jsonb")]
     public Dictionary<string, object?> Metadata { get; set; } = new();
 
-    [Timestamp]
+    [Timestamp(OnSave = true)]
     public DateTimeOffset LastModified { get; set; }
 }

@@ -1,9 +1,7 @@
-﻿using System;
+using System;
 using Koan.Cache.Abstractions;
 using Koan.Cache.Abstractions.Adapters;
 using Koan.Cache.Abstractions.Stores;
-using Koan.Cache.Adapter.Memory.Options;
-using Koan.Cache.Adapter.Memory.Stores;
 using Koan.Cache.Extensions;
 using Koan.Core.Modules;
 using Microsoft.Extensions.Caching.Memory;
@@ -11,7 +9,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
-namespace Koan.Cache.Adapter.Memory;
+namespace Koan.Cache.Adapters.Memory;
 
 public sealed class MemoryCacheAdapterRegistrar : ICacheAdapterRegistrar
 {

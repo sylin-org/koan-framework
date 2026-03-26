@@ -39,5 +39,12 @@ public sealed class CachePolicyAttribute : Attribute
 
     public string? ScopeId { get; init; }
 
+    /// <summary>
+    /// Pins this cache policy to a specific cache provider type.
+    /// When set, the cache system routes entries through the specified provider
+    /// instead of the default registered <see cref="Koan.Cache.Abstractions.Stores.ICacheStore"/>.
+    /// </summary>
+    public Type? Provider { get; set; }
+
     public IDictionary<string, string> Metadata { get; init; } = new Dictionary<string, string>();
 }

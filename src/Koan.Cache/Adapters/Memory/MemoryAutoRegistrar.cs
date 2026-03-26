@@ -7,12 +7,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Koan.Core.Hosting.Bootstrap;
 
-namespace Koan.Cache.Adapter.Memory.Initialization;
+namespace Koan.Cache.Adapters.Memory;
 
-public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
+public sealed class MemoryAutoRegistrar : IKoanAutoRegistrar
 {
     public string ModuleName => "Koan.Cache.Adapter.Memory";
-    public string? ModuleVersion => typeof(KoanAutoRegistrar).Assembly.GetName().Version?.ToString();
+    public string? ModuleVersion => typeof(MemoryAutoRegistrar).Assembly.GetName().Version?.ToString();
 
     public void Initialize(IServiceCollection services)
     {
@@ -32,4 +32,3 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         module.AddSetting("EnableStaleWhileRevalidate", stale.ToString());
     }
 }
-
