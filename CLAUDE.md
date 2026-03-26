@@ -62,6 +62,21 @@ Framework knowledge is provided through **Agent Skills** in `.claude/skills/` th
 - **PatchNormalizer** (`Koan.Web.PatchOps`) - Normalize and validate JSON Patch operations
 - **EntityController<T>** (`Koan.Web.Controllers`) - Full REST API base controller with CRUD + Query + Patch
 
+### Cache
+- **LayeredCacheStore** (`Koan.Cache`) — Auto-layered L1 (local) + L2 (remote) cache orchestration
+- **EntityCacheExtensions** (`Koan.Cache`) — `entity.Uncache()`, `EntityCache<T>.Flush(id)`, `EntityCache<T>.FlushAll()`
+- **CachePolicyAttribute** (`Koan.Cache.Abstractions`) — `[CachePolicy(Tier = CacheTier.Layered)]` with `LocalProvider`/`RemoteProvider` pinning
+- **SqliteCacheStore** (`Koan.Cache.Adapter.Sqlite`) — Persistent local cache (`.Koan/cache/cache.db`)
+
+### Entity Lifecycle
+- **[Timestamp]** (`Koan.Data.Abstractions`) — `[Timestamp]` set-once on creation, `[Timestamp(OnSave = true)]` set on every save
+- **Entity Transfer** (`Koan.Data.Core`) — `Entity<T>.Copy()`, `.Move()`, `.Mirror()` fluent builders for cross-context transfers
+
+### AI — Entity-Aware Operations
+- **EntityAi** (`Koan.Data.AI`) — `EntityAi.Embed(entity)`, `.Chat(msg, entity)`, `.Ocr(entity)` with convention inference
+- **[MediaAnalysis]** (`Koan.Data.AI`) — `[MediaAnalysis(Analysis = Describe | Ocr)]` auto-processes media on upload
+- **MediaAnalysisEmbeddingBridge** (`Koan.Data.AI`) — Cross-modal search: analysis results feed into `[Embedding]` text
+
 ### Common Patterns
 - **Guard Clauses** (`Koan.Core.Utilities.Guard`) - `Must.NotBeNull()`, `Be.Positive()`, `NotBe.Default()`
 - **Entity Static Methods** - `Todo.Get(id)`, `Todo.Query(x => ...)`, `todo.Save()`, `todo.Delete()`

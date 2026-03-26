@@ -202,6 +202,34 @@ Named recipes bind capabilities to models. ML engineers author recipes, develope
 
 Recipes are sparse — missing keys mean "no opinion" (falls through to advisor/config).
 
+## Media Analysis (AI-0027)
+
+Automatic AI processing for media entities on upload/save:
+
+```csharp
+[MediaAnalysis(Analysis = MediaAnalysis.Describe | MediaAnalysis.Ocr, Async = true)]
+[Embedding]
+public class PhotoAsset : MediaEntity<PhotoAsset>
+{
+    public string? AiDescription { get; set; }   // Auto-populated by Describe
+    public string? OcrText { get; set; }         // Auto-populated by Ocr
+    public float[]? Embedding { get; set; }      // Auto-populated by [Embedding]
+}
+```
+
+Pipeline: Upload → Store → `[MediaAnalysis]` → `[Embedding]` → Save atomically.
+
+Analysis modes (combinable via flags):
+- **Describe** — Vision description of image/video content
+- **Ocr** — Extract text from images, PDFs, screenshots
+- **Transcribe** — Speech-to-text for audio/video (stub, future)
+- **Classify** — Content type categorization
+- **Extract** — Structured extraction via named Prompt
+
+Convention-detected property mapping: `AiDescription`, `OcrText`, `Transcript`, `Category`. Override with explicit property names in the attribute.
+
+Cross-modal search: analysis results automatically feed into `[Embedding]` text via `MediaAnalysisEmbeddingBridge`.
+
 ## When This Skill Applies
 
 - ✅ Integrating AI features
@@ -213,6 +241,7 @@ Recipes are sparse — missing keys mean "no opinion" (falls through to advisor/
 - ✅ Per-category AI routing
 - ✅ Entity-aware AI operations
 - ✅ Recipe-based model selection
+- ✅ Media AI processing ([MediaAnalysis] attribute)
 
 ## Reference Documentation
 
@@ -221,4 +250,5 @@ Recipes are sparse — missing keys mean "no opinion" (falls through to advisor/
 - **ADR:** `docs/decisions/AI-0021-category-driven-ai-with-convention-defaults.md` (Category-driven AI)
 - **ADR:** `docs/decisions/AI-0032-intent-capability-resolution-with-recipes.md` (Recipes)
 - **Sample:** `samples/S5.Recs/` (AI recommendation engine)
+- **ADR:** `docs/decisions/AI-0027-media-analysis-attribute.md` (Media Analysis Attribute)
 - **Sample:** `samples/S16.PantryPal/` (Vision AI integration)

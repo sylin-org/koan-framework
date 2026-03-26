@@ -87,6 +87,26 @@ public class Todo : Entity<Todo>
 }
 ```
 
+## Automatic Timestamps
+
+Use `[Timestamp]` to auto-manage creation and modification times:
+
+```csharp
+public class Order : Entity<Order>
+{
+    public string CustomerId { get; set; } = "";
+    public decimal Total { get; set; }
+
+    [Timestamp]                          // Set once on first save
+    public DateTimeOffset CreatedAt { get; set; }
+
+    [Timestamp(OnSave = true)]           // Updated on every save
+    public DateTimeOffset UpdatedAt { get; set; }
+}
+```
+
+No manual assignment needed — the framework's lifecycle hooks handle it via compiled expression trees for zero-overhead hot-path performance.
+
 ## When This Skill Applies
 
 - ✅ Designing domain models

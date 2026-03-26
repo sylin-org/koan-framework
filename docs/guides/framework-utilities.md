@@ -4,10 +4,10 @@ domain: core
 title: "Framework Utilities Guide"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2025-11-09
+last_updated: 2026-03-26
 framework_version: v0.6.3
 validation:
-  date_last_tested: 2025-11-09
+  date_last_tested: 2026-03-26
   status: verified
   scope: all-examples-tested
 related_guides:
@@ -677,6 +677,6 @@ Refer to [REFACTORING-LEDGER.md](../refactoring/REFACTORING-LEDGER.md) for plann
 
 ---
 
-**Last Updated**: 2026-03-23
+**Last Updated**: 2026-03-26
 **Maintained By**: Koan Framework Core Team
 **Related**: [ARCH-0068](../decisions/ARCH-0068-refactoring-strategy-static-vs-di.md), [Refactoring Ledger](../refactoring/REFACTORING-LEDGER.md)

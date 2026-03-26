@@ -1,6 +1,6 @@
 # ARCH-0074: Framework Gap Analysis and Incremental Implementation Plan
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-03-25
 **Deciders**: Enterprise Architect
 **Scope**: Cross-cutting — all pillars, dead code removal, documentation, test coverage
@@ -257,13 +257,27 @@ coverage.
 | 6.6 | `Koan.AI.Eval` | AI-0029 | `Eval.*` facade, `GateBuilder`, `Metric`, `DriftResult` | Validate quality gates vs ADR spec |
 | 6.7 | `Koan.AI.Review` | AI-0030 | `Review.*` facade, `ReviewQueue`, `ReviewAction` | Validate HITL feedback loops |
 | 6.8 | `Koan.AI.Agents` | AI-0031 | `Agent.*` facade, `AgentBuilder`, `AgentExecutor`, `EntityToolGenerator` | Validate entity-awareness vs ADR spec |
-| 6.9 | AI-0027 Media Analysis | AI-0027 | Unknown — needs investigation | Check if `[MediaAnalysis]` attribute exists |
+| 6.9 | AI-0027 Media Analysis | AI-0027 | `MediaAnalysisWorker`, `MediaAnalysisExecutor`, `MediaAnalysisEmbeddingBridge`, `MediaAnalysisRegistry` in `Koan.Data.AI` | **Implemented** — full processing pipeline |
 
 **DDD/SoC approach**:
 - Each module is already its own bounded context with internal services and auto-registrars.
 - Validation focuses on: does the implementation match the ADR contract? Are there gaps or drift?
 - Any delta found becomes a targeted fix, not a rewrite.
 - ADR statuses updated to Accepted with implementation notes after validation passes.
+
+---
+
+## Implementation Status (as of 2026-03-26)
+
+| Phase | Status | Commits | Highlights |
+|---|---|---|---|
+| **Phase 0** — Dead code removal | **Complete** | `ad0929ee` | 7 ghost dirs, 2 test suites, 9 dead files deleted |
+| **Phase 1** — AI-0021 convention inference | **Complete** | `ad0929ee` | `EntityAi` static class, boot report categories+recipes |
+| **Phase 2** — Test stabilization | **Complete** | `55dc2ea9` | 20 AI tests + 3 connector suites (Couchbase, ES, OpenSearch) |
+| **Phase 3** — Documentation consolidation | **Complete** | `9c00128e` | S16/S18 case studies, JOBS-0001 ADR, skills update |
+| **Phase 4** — Approved work streams | **Complete** | `6a979a56`, `7cccf7fd` | ~357 magic strings eliminated, Jobs M1-6, AI health monitoring |
+| **Phase 5** — Pillar expansion (partial) | **Partial** | `b9c04801`, `a273f91b` | [Timestamp(OnSave)], cache restructure (layered + SQLite), DATA-0079 accepted |
+| **Phase 6** — AI lifecycle validation | **Partial** | `0556bded` | 6.9 MediaAnalysis fully implemented; 6.1-6.8 pending validation |
 
 ---
 

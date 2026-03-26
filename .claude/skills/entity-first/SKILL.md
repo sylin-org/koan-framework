@@ -148,6 +148,14 @@ await foreach (var reading in Reading.QueryStream(
 
 **When to Stream:** Large datasets (>10k records), background jobs, ETL pipelines
 
+## Timestamp Auto-Update
+
+Entities can declare `[Timestamp]` properties for automatic time tracking:
+- `[Timestamp]` — set once (creation time)
+- `[Timestamp(OnSave = true)]` — refreshed on every save
+
+Works with batch operations (`UpsertMany`) — all entities in the batch receive the current timestamp.
+
 ## Anti-Patterns to Avoid
 
 ### ❌ WRONG: Manual Repository Pattern
