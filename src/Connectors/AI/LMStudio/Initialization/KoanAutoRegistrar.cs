@@ -55,14 +55,14 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         var baseUrl = KoanConfiguration.ReadFirstWithSource(
                 cfg,
                 defaults.BaseUrl,
-                Constants.Section + ":BaseUrl",
-                "Koan:Ai:LMStudio:BaseUrl");
+                Constants.Configuration.Keys.BaseUrl,
+                Constants.Configuration.Keys.AltBaseUrl);
 
         var defaultModel = KoanConfiguration.ReadFirstWithSource(
                 cfg,
                 defaults.DefaultModel ?? "none",
-                Constants.Section + ":DefaultModel",
-                "Koan:Ai:LMStudio:DefaultModel");
+                Constants.Configuration.Keys.DefaultModel,
+                Constants.Configuration.Keys.AltDefaultModel);
 
         var apiKey = KoanConfiguration.ReadFirstWithSource(
                 cfg,

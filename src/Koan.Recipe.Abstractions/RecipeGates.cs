@@ -6,9 +6,9 @@ public static class RecipeGates
 {
     public static bool ForcedOverridesEnabled(IConfiguration cfg, string recipeName)
     {
-        var global = cfg.GetValue<bool?>("Koan:Recipes:AllowOverrides") ?? false;
+        var global = cfg.GetValue<bool?>(Infrastructure.ConfigurationConstants.Keys.AllowOverrides) ?? false;
         if (!global) return false;
-        var per = cfg.GetValue<bool?>($"Koan:Recipes:{recipeName}:ForceOverrides") ?? false;
+        var per = cfg.GetValue<bool?>(Infrastructure.ConfigurationConstants.ForceOverrides(recipeName)) ?? false;
         return per;
     }
 }

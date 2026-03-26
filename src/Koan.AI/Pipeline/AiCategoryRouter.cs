@@ -24,6 +24,7 @@ internal sealed class AiCategoryRouter
     private readonly IAiAdapterRegistry _adapterRegistry;
     private readonly IAiSourceRegistry _sourceRegistry;
     private readonly AiOptions _options;
+    private readonly IAiRecipeProvider? _recipe;
     private readonly IAiModelAdvisor? _advisor;
     private readonly ILogger<AiCategoryRouter>? _logger;
 
@@ -53,12 +54,14 @@ internal sealed class AiCategoryRouter
         IAiAdapterRegistry adapterRegistry,
         IAiSourceRegistry sourceRegistry,
         IOptions<AiOptions> options,
+        IAiRecipeProvider? recipe = null,
         IAiModelAdvisor? advisor = null,
         ILogger<AiCategoryRouter>? logger = null)
     {
         _adapterRegistry = adapterRegistry;
         _sourceRegistry = sourceRegistry;
         _options = options.Value;
+        _recipe = recipe;
         _advisor = advisor;
         _logger = logger;
     }
@@ -77,10 +80,17 @@ internal sealed class AiCategoryRouter
         // Category config defaults
         var categoryOptions = GetCategoryOptions(category);
         var effectiveSource = scopeSource ?? categoryOptions?.Source;
-        var advisorModel = scopeModel is null ? _advisor?.GetRecommendedModel(category) : null;
-        var effectiveModel = scopeModel ?? advisorModel ?? categoryOptions?.Model ?? definition.DefaultModel;
 
-        if (advisorModel is not null)
+        // Recipe layer: human-curated bindings sit between scope and advisor (AI-0032)
+        var recipeModel = scopeModel is null ? _recipe?.GetModel(category) : null;
+        var advisorModel = scopeModel is null && recipeModel is null
+            ? _advisor?.GetRecommendedModel(category) : null;
+        var effectiveModel = scopeModel ?? recipeModel ?? advisorModel
+            ?? categoryOptions?.Model ?? definition.DefaultModel;
+
+        if (recipeModel is not null)
+            _logger?.LogDebug("Category {Category} using recipe-bound model: {Model}", category, recipeModel);
+        else if (advisorModel is not null)
             _logger?.LogDebug("Category {Category} using advisor-recommended model: {Model}", category, advisorModel);
 
         // Via delegation: if task category and no dedicated adapter, delegate to protocol category

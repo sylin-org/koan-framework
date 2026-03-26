@@ -523,6 +523,73 @@ resolution continues through the normal chain.
 Matching uses the same `MatchesSelector` logic as `GARDEN_STONE`: supports stone
 names, stone IDs, `host:port`, and `.local` suffixes.
 
+## AI Model Advisor
+
+`Koan.ZenGarden` registers `ZenGardenModelAdvisor` as `IAiModelAdvisor` (level 4 in the
+AI resolution chain, see AI-0032).
+
+Resolution chain for AI model selection:
+
+```
+1. Explicit ChatOptions.Model           (developer, per-request)
+2. Ambient AiCategoryScope              (developer, per-code-block)
+3. Active recipe binding                (ML engineer / DevOps, from Koan:Ai:Recipes)
+4. IAiModelAdvisor (this advisor)       (system, from orchestrator /v1/recommendations)
+5. Category configuration               (ops, Koan:Ai:{Category}:Model)
+6. Source/member default model           (framework)
+7. Hardcoded fallback                    (framework)
+```
+
+The advisor fetches `/v1/recommendations` from the Ollama orchestrator proxy and caches
+rank-1 models per capability. Cache is refreshed non-blocking (stale-while-revalidate).
+
+Proxy endpoint resolution priority:
+
+1. Explicit `Koan:ZenGarden:OrchestratorProxyEndpoint`
+2. Cached resolution from previous discovery
+3. Zen Garden offering resolution (`ollama::orchestrator` intent)
+
+Capability mapping (orchestrator wire → Koan category):
+
+| Wire | Koan Category |
+|------|---------------|
+| `chat` | `Chat` |
+| `embedding` | `Embed` |
+| `ocr` | `Ocr` |
+| `vision` | `Vision` |
+| `quick` | `Quick` |
+| `synthesis` | `Synthesis` |
+| `thinking` | `Thinking` |
+| `tools` | `Tools` |
+
+### AI Recipes
+
+Recipes are named capability-to-model bindings configured in `appsettings.json`:
+
+```json
+{
+  "Koan": {
+    "Ai": {
+      "ActiveRecipe": "production-balanced",
+      "Recipes": {
+        "production-balanced": {
+          "Chat": "qwen3.5:9b",
+          "Embed": "nomic-embed-text",
+          "Thinking": "qwq:32b"
+        }
+      }
+    }
+  }
+}
+```
+
+Recipes sit above the advisor (level 3 vs level 4). When a recipe binding exists for a
+capability, the advisor is not consulted for that capability. Omitted capabilities fall
+through to the advisor. Environment-scoped recipes use standard ASP.NET configuration
+layering (`appsettings.Production.json`).
+
+See ADR AI-0032 for full specification.
+
 ## Non-Goals
 
 - No backward compatibility wrappers for legacy discovery API.

@@ -48,7 +48,7 @@ public sealed class CouchbaseOrchestrationEvaluator : BaseOrchestrationEvaluator
     protected override string[] GetAdditionalHostCandidates(IConfiguration configuration)
     {
         var hosts = new List<string>();
-        var configured = configuration.GetSection("Koan:Data:Couchbase:Hosts").Get<string[]>() ?? [];
+        var configured = configuration.GetSection(Constants.Configuration.Keys.Hosts).Get<string[]>() ?? [];
         hosts.AddRange(configured.Where(h => !string.IsNullOrWhiteSpace(h))!);
         var env = Environment.GetEnvironmentVariable("COUCHBASE_HOSTS");
         if (!string.IsNullOrWhiteSpace(env))
@@ -70,8 +70,8 @@ public sealed class CouchbaseOrchestrationEvaluator : BaseOrchestrationEvaluator
         try
         {
             var (host, _) = ParseHost(hostResult.HostEndpoint);
-            var username = Configuration.ReadFirst(configuration, "", Constants.Configuration.Keys.Username, "Koan:Data:Username");
-            var password = Configuration.ReadFirst(configuration, "", Constants.Configuration.Keys.Password, "Koan:Data:Password");
+            var username = Configuration.ReadFirst(configuration, "", Constants.Configuration.Keys.Username, Constants.Configuration.Keys.AltUsername);
+            var password = Configuration.ReadFirst(configuration, "", Constants.Configuration.Keys.Password, Constants.Configuration.Keys.AltPassword);
             var connectionString = $"couchbase://{host}";
             var options = new global::Couchbase.ClusterOptions();
             if (!string.IsNullOrWhiteSpace(username))
@@ -95,14 +95,14 @@ public sealed class CouchbaseOrchestrationEvaluator : BaseOrchestrationEvaluator
     {
         var bucket = Configuration.ReadFirst(configuration, "Koan",
             Constants.Configuration.Keys.Bucket,
-            "Koan:Data:Bucket",
-            "ConnectionStrings:Database");
+            Constants.Configuration.Keys.AltBucket,
+            Constants.Configuration.Keys.ConnectionStringsDatabase);
         var username = Configuration.ReadFirst(configuration, "Administrator",
             Constants.Configuration.Keys.Username,
-            "Koan:Data:Username");
+            Constants.Configuration.Keys.AltUsername);
         var password = Configuration.ReadFirst(configuration, "couchbase",
             Constants.Configuration.Keys.Password,
-            "Koan:Data:Password");
+            Constants.Configuration.Keys.AltPassword);
 
         var descriptor = new DependencyDescriptor
         {

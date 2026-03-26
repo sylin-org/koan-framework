@@ -17,7 +17,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     public void Initialize(IServiceCollection services)
     {
         // Bind options from configuration at Koan:Media:Transforms
-        services.AddKoanOptions<MediaTransformOptions>("Koan:Media:Transforms");
+        services.AddKoanOptions<MediaTransformOptions>(Infrastructure.ConfigurationConstants.Keys.Transforms);
 
         services.AddSingleton<IMediaOperator, ResizeOperator>();
         services.AddSingleton<IMediaOperator, RotateOperator>();

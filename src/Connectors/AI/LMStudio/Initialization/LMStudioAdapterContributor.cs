@@ -48,7 +48,7 @@ internal sealed class LMStudioAdapterContributor : IAiAdapterContributor
                 return;
             }
 
-            var lmConfig = configuration.GetSection("Koan:Ai:LMStudio");
+            var lmConfig = configuration.GetSection(Constants.ShortSection);
             var defaultModel = GetDefaultModel(lmConfig, logger);
 
             var explicitUrls = lmConfig.GetSection("Urls").Get<string[]>();

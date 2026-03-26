@@ -4,6 +4,7 @@
 
 using AspNetCoreRateLimit;
 using Koan.Context.Middleware;
+using Koan.Service.KoanContext.Infrastructure;
 using Koan.Context.Services;
 using Koan.Context.Utilities;
 using Koan.Core;
@@ -38,9 +39,9 @@ builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>()
 
 // ✅ REGISTER FILE MONITORING & PROJECT RESOLUTION SERVICES
 builder.Services.Configure<FileMonitoringOptions>(
-    builder.Configuration.GetSection("Koan:Context:FileMonitoring"));
+    builder.Configuration.GetSection(ConfigurationConstants.FileMonitoring.Section));
 builder.Services.Configure<ProjectResolutionOptions>(
-    builder.Configuration.GetSection("Koan:Context:ProjectResolution"));
+    builder.Configuration.GetSection(ConfigurationConstants.ProjectResolution.Section));
 
 builder.Services.AddSingleton<ProjectResolver>();
 builder.Services.AddSingleton<TokenCounter, TokenCounter>();

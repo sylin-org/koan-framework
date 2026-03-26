@@ -54,8 +54,8 @@ internal sealed class SqlServerDiscoveryAdapter : ServiceDiscoveryAdapterBase
         // Check SQL Server-specific configuration paths
         return _configuration.GetConnectionString("SqlServer") ??
                _configuration.GetConnectionString("MSSQL") ??
-               _configuration["Koan:Data:SqlServer:ConnectionString"] ??
-               _configuration["Koan:Data:ConnectionString"];
+               _configuration[Infrastructure.Constants.Configuration.Keys.ConnectionString] ??
+               _configuration[Infrastructure.Constants.Configuration.DataFallback.ConnectionString];
     }
 
     /// <summary>SQL Server-specific environment variable handling</summary>

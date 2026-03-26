@@ -47,12 +47,12 @@ internal sealed class LMStudioOptionsConfigurator : AdapterOptionsConfigurator<L
             "ConnectionStrings:LMStudio");
 
         var configuredBaseUrl = ReadProviderConfiguration(options.BaseUrl,
-            "Koan:Ai:Provider:LMStudio:BaseUrl",
-            "Koan:Ai:LMStudio:BaseUrl");
+            Constants.Configuration.Keys.BaseUrl,
+            Constants.Configuration.Keys.AltBaseUrl);
 
         var defaultModel = ReadProviderConfiguration(options.DefaultModel ?? "",
-            "Koan:Ai:Provider:LMStudio:DefaultModel",
-            "Koan:Ai:LMStudio:DefaultModel");
+            Constants.Configuration.Keys.DefaultModel,
+            Constants.Configuration.Keys.AltDefaultModel);
 
         var configuredApiKey = ReadProviderConfiguration(options.ApiKey ?? "",
             Constants.Configuration.Keys.ApiKey,
@@ -90,15 +90,15 @@ internal sealed class LMStudioOptionsConfigurator : AdapterOptionsConfigurator<L
         }
 
         options.AutoDiscoveryEnabled = ReadProviderConfiguration(options.AutoDiscoveryEnabled,
-            "Koan:Ai:Provider:LMStudio:AutoDiscoveryEnabled",
-            "Koan:Ai:LMStudio:AutoDiscoveryEnabled");
+            Constants.Configuration.Keys.AutoDiscoveryEnabled,
+            Constants.Configuration.Keys.AltAutoDiscoveryEnabled);
 
-        if (int.TryParse(ReadProviderConfiguration("", "Koan:Ai:Provider:LMStudio:Weight"), out var weight))
+        if (int.TryParse(ReadProviderConfiguration("", Constants.Configuration.Keys.Weight), out var weight))
         {
             options.Weight = weight;
         }
 
-        var labelsSection = Configuration.GetSection("Koan:Ai:Provider:LMStudio:Labels");
+        var labelsSection = Configuration.GetSection(Constants.Configuration.Keys.Labels);
         if (labelsSection.Exists())
         {
             options.Labels = new Dictionary<string, string>();

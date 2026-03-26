@@ -57,8 +57,8 @@ internal sealed class SqliteDiscoveryAdapter : ServiceDiscoveryAdapterBase
     {
         // Check SQLite-specific configuration paths
         return _configuration.GetConnectionString("SQLite") ??
-               _configuration["Koan:Data:Sqlite:ConnectionString"] ??
-               _configuration["Koan:Data:ConnectionString"];
+               _configuration[Infrastructure.Constants.Configuration.Keys.ConnectionString] ??
+               _configuration[Infrastructure.Constants.Configuration.DataFallback.ConnectionString];
     }
 
     /// <summary>SQLite-specific environment variable handling</summary>

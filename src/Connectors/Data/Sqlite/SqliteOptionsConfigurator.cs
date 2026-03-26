@@ -159,7 +159,7 @@ internal sealed class SqliteOptionsConfigurator : AdapterOptionsConfigurator<Sql
 
     private bool IsAutoDetectionDisabled()
     {
-        return Koan.Core.Configuration.Read(Configuration, "Koan:Data:Sqlite:DisableAutoDetection", false);
+        return Koan.Core.Configuration.Read(Configuration, Infrastructure.Constants.Configuration.Keys.DisableAutoDetection, false);
     }
 
     private static string BuildSqliteConnectionString(string filePath)

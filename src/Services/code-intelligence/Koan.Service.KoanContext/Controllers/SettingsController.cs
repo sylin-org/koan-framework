@@ -1,4 +1,5 @@
 using Koan.Context.Initialization;
+using Koan.Service.KoanContext.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -40,59 +41,59 @@ public class SettingsController : ControllerBase
                 VectorStore = new
                 {
                     Provider = "weaviate",
-                    Host = _configuration["Koan:Orchestration:Weaviate:HostPort"] ?? "27501",
-                    Dimension = _configuration.GetValue<int>("Koan:Data:Weaviate:Dimension", 384),
-                    Metric = _configuration["Koan:Data:Weaviate:Metric"] ?? "cosine",
-                    DefaultTopK = _configuration.GetValue<int>("Koan:Data:Weaviate:DefaultTopK", 10),
-                    MaxTopK = _configuration.GetValue<int>("Koan:Data:Weaviate:MaxTopK", 100),
-                    TimeoutSeconds = _configuration.GetValue<int>("Koan:Data:Weaviate:TimeoutSeconds", 30)
+                    Host = _configuration[ConfigurationConstants.Data.OrchestrationWeaviateHostPort] ?? "27501",
+                    Dimension = _configuration.GetValue<int>(ConfigurationConstants.Weaviate.Dimension, 384),
+                    Metric = _configuration[ConfigurationConstants.Weaviate.Metric] ?? "cosine",
+                    DefaultTopK = _configuration.GetValue<int>(ConfigurationConstants.Weaviate.DefaultTopK, 10),
+                    MaxTopK = _configuration.GetValue<int>(ConfigurationConstants.Weaviate.MaxTopK, 100),
+                    TimeoutSeconds = _configuration.GetValue<int>(ConfigurationConstants.Weaviate.TimeoutSeconds, 30)
                 },
                 Database = new
                 {
-                    Provider = _configuration["Koan:Data:Sources:Default:Adapter"] ?? "sqlite",
-                    ConnectionString = MaskConnectionString(_configuration["Koan:Data:Sources:Default:ConnectionString"])
+                    Provider = _configuration[ConfigurationConstants.Data.SourcesDefaultAdapter] ?? "sqlite",
+                    ConnectionString = MaskConnectionString(_configuration[ConfigurationConstants.Data.SourcesDefaultConnectionString])
                 },
                 AI = new
                 {
                     Embedding = new
                     {
-                        Provider = _configuration["Koan:AI:Embedding:Provider"] ?? "ollama",
-                        Model = _configuration["Koan:AI:Embedding:Model"] ?? "all-minilm",
-                        Endpoint = _configuration["Koan:AI:Embedding:Endpoint"] ?? "http://localhost:11434"
+                        Provider = _configuration[ConfigurationConstants.Ai.EmbeddingProvider] ?? "ollama",
+                        Model = _configuration[ConfigurationConstants.Ai.EmbeddingModel] ?? "all-minilm",
+                        Endpoint = _configuration[ConfigurationConstants.Ai.EmbeddingEndpoint] ?? "http://localhost:11434"
                     }
                 },
                 Indexing = new
                 {
-                    ChunkSize = _configuration.GetValue<int>("Koan:Context:IndexingPerformance:IndexingChunkSize", 1024),
-                    MaxFileSizeMB = _configuration.GetValue<int>("Koan:Context:IndexingPerformance:MaxFileSizeMB", 100),
-                    MaxConcurrentJobs = _configuration.GetValue<int>("Koan:Context:IndexingPerformance:MaxConcurrentIndexingJobs", 2),
-                    EmbeddingBatchSize = _configuration.GetValue<int>("Koan:Context:IndexingPerformance:EmbeddingBatchSize", 50),
-                    EnableParallelProcessing = _configuration.GetValue<bool>("Koan:Context:IndexingPerformance:EnableParallelProcessing", true),
-                    MaxDegreeOfParallelism = _configuration.GetValue<int>("Koan:Context:IndexingPerformance:MaxDegreeOfParallelism", 4),
-                    DefaultTokenBudget = _configuration.GetValue<int>("Koan:Context:IndexingPerformance:DefaultTokenBudget", 5000)
+                    ChunkSize = _configuration.GetValue<int>(ConfigurationConstants.IndexingPerformance.IndexingChunkSize, 1024),
+                    MaxFileSizeMB = _configuration.GetValue<int>(ConfigurationConstants.IndexingPerformance.MaxFileSizeMB, 100),
+                    MaxConcurrentJobs = _configuration.GetValue<int>(ConfigurationConstants.IndexingPerformance.MaxConcurrentIndexingJobs, 2),
+                    EmbeddingBatchSize = _configuration.GetValue<int>(ConfigurationConstants.IndexingPerformance.EmbeddingBatchSize, 50),
+                    EnableParallelProcessing = _configuration.GetValue<bool>(ConfigurationConstants.IndexingPerformance.EnableParallelProcessing, true),
+                    MaxDegreeOfParallelism = _configuration.GetValue<int>(ConfigurationConstants.IndexingPerformance.MaxDegreeOfParallelism, 4),
+                    DefaultTokenBudget = _configuration.GetValue<int>(ConfigurationConstants.IndexingPerformance.DefaultTokenBudget, 5000)
                 },
                 FileMonitoring = new
                 {
-                    Enabled = _configuration.GetValue<bool>("Koan:Context:FileMonitoring:Enabled", true),
-                    DebounceMilliseconds = _configuration.GetValue<int>("Koan:Context:FileMonitoring:DebounceMilliseconds", 2000),
-                    MaxConcurrentReindexOperations = _configuration.GetValue<int>("Koan:Context:FileMonitoring:MaxConcurrentReindexOperations", 3)
+                    Enabled = _configuration.GetValue<bool>(ConfigurationConstants.FileMonitoring.Enabled, true),
+                    DebounceMilliseconds = _configuration.GetValue<int>(ConfigurationConstants.FileMonitoring.DebounceMilliseconds, 2000),
+                    MaxConcurrentReindexOperations = _configuration.GetValue<int>(ConfigurationConstants.FileMonitoring.MaxConcurrentReindexOperations, 3)
                 },
                 ProjectResolution = new
                 {
-                    AutoCreate = _configuration.GetValue<bool>("Koan:Context:ProjectResolution:AutoCreate", true),
-                    AutoIndex = _configuration.GetValue<bool>("Koan:Context:ProjectResolution:AutoIndex", true),
-                    MaxSizeGB = _configuration.GetValue<int>("Koan:Context:ProjectResolution:MaxSizeGB", 10)
+                    AutoCreate = _configuration.GetValue<bool>(ConfigurationConstants.ProjectResolution.AutoCreate, true),
+                    AutoIndex = _configuration.GetValue<bool>(ConfigurationConstants.ProjectResolution.AutoIndex, true),
+                    MaxSizeGB = _configuration.GetValue<int>(ConfigurationConstants.ProjectResolution.MaxSizeGB, 10)
                 },
                 JobMaintenance = new
                 {
-                    MaxJobsPerProject = _configuration.GetValue<int>("Koan:Context:JobMaintenance:MaxJobsPerProject", 50),
-                    JobRetentionDays = _configuration.GetValue<int>("Koan:Context:JobMaintenance:JobRetentionDays", 7),
-                    EnableAutomaticCleanup = _configuration.GetValue<bool>("Koan:Context:JobMaintenance:EnableAutomaticCleanup", true)
+                    MaxJobsPerProject = _configuration.GetValue<int>(ConfigurationConstants.JobMaintenance.MaxJobsPerProject, 50),
+                    JobRetentionDays = _configuration.GetValue<int>(ConfigurationConstants.JobMaintenance.JobRetentionDays, 7),
+                    EnableAutomaticCleanup = _configuration.GetValue<bool>(ConfigurationConstants.JobMaintenance.EnableAutomaticCleanup, true)
                 },
                 System = new
                 {
                     BaseUrl = _configuration["Urls"] ?? "http://localhost:27500",
-                    AutoResumeIndexing = _configuration.GetValue<bool>("Koan:Context:AutoResumeIndexing", true)
+                    AutoResumeIndexing = _configuration.GetValue<bool>(ConfigurationConstants.Keys.AutoResumeIndexing, true)
                 }
             };
 
@@ -141,7 +142,7 @@ public class SettingsController : ControllerBase
                 Success = true,
                 Message = "Vector store connection test successful",
                 Provider = "weaviate",
-                Endpoint = $"http://localhost:{_configuration["Koan:Orchestration:Weaviate:HostPort"]}"
+                Endpoint = $"http://localhost:{_configuration[ConfigurationConstants.Data.OrchestrationWeaviateHostPort]}"
             });
         }
         catch (Exception ex)
@@ -173,7 +174,7 @@ public class SettingsController : ControllerBase
             {
                 Success = true,
                 Message = "Database connection test successful",
-                Provider = _configuration["Koan:Data:Sources:Default:Adapter"]
+                Provider = _configuration[ConfigurationConstants.Data.SourcesDefaultAdapter]
             });
         }
         catch (Exception ex)

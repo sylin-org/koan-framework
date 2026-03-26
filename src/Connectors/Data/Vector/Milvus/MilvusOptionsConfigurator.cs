@@ -52,20 +52,20 @@ internal sealed class MilvusOptionsConfigurator : AdapterOptionsConfigurator<Mil
 
         // Read Milvus-specific configuration
         var endpoint = ReadProviderConfiguration(options.Endpoint,
-            "Koan:Data:Milvus:Endpoint");
+            Infrastructure.Constants.Configuration.Keys.Endpoint);
 
         var databaseName = ReadProviderConfiguration(options.DatabaseName,
-            "Koan:Data:Milvus:Database",
-            "Koan:Data:Milvus:DatabaseName");
+            Infrastructure.Constants.Configuration.Keys.Database,
+            Infrastructure.Constants.Configuration.Keys.DatabaseName);
 
         var username = ReadProviderConfiguration(options.Username ?? "",
-            "Koan:Data:Milvus:Username");
+            Infrastructure.Constants.Configuration.Keys.Username);
 
         var password = ReadProviderConfiguration(options.Password ?? "",
-            "Koan:Data:Milvus:Password");
+            Infrastructure.Constants.Configuration.Keys.Password);
 
         var token = ReadProviderConfiguration(options.Token ?? "",
-            "Koan:Data:Milvus:Token");
+            Infrastructure.Constants.Configuration.Keys.Token);
 
         var explicitConnectionString = ReadProviderConfiguration("",
             Infrastructure.Constants.Configuration.Keys.ConnectionString,
@@ -105,38 +105,38 @@ internal sealed class MilvusOptionsConfigurator : AdapterOptionsConfigurator<Mil
         // Configure Milvus-specific options
         options.CollectionName = ReadProviderConfiguration(
             options.CollectionName ?? "",
-            "Koan:Data:Milvus:Collection",
-            "Koan:Data:Milvus:CollectionName");
+            Infrastructure.Constants.Configuration.Keys.Collection,
+            Infrastructure.Constants.Configuration.Keys.CollectionName);
         options.PrimaryFieldName = ReadProviderConfiguration(
             options.PrimaryFieldName,
-            "Koan:Data:Milvus:PrimaryField",
-            "Koan:Data:Milvus:PrimaryFieldName");
+            Infrastructure.Constants.Configuration.Keys.PrimaryField,
+            Infrastructure.Constants.Configuration.Keys.PrimaryFieldName);
         options.VectorFieldName = ReadProviderConfiguration(
             options.VectorFieldName,
-            "Koan:Data:Milvus:VectorField",
-            "Koan:Data:Milvus:VectorFieldName");
+            Infrastructure.Constants.Configuration.Keys.VectorField,
+            Infrastructure.Constants.Configuration.Keys.VectorFieldName);
         options.MetadataFieldName = ReadProviderConfiguration(
             options.MetadataFieldName,
-            "Koan:Data:Milvus:MetadataField",
-            "Koan:Data:Milvus:MetadataFieldName");
+            Infrastructure.Constants.Configuration.Keys.MetadataField,
+            Infrastructure.Constants.Configuration.Keys.MetadataFieldName);
         options.Metric = ReadProviderConfiguration(
             options.Metric,
-            "Koan:Data:Milvus:Metric");
+            Infrastructure.Constants.Configuration.Keys.Metric);
         options.ConsistencyLevel = ReadProviderConfiguration(
             options.ConsistencyLevel,
-            "Koan:Data:Milvus:Consistency",
-            "Koan:Data:Milvus:ConsistencyLevel");
+            Infrastructure.Constants.Configuration.Keys.Consistency,
+            Infrastructure.Constants.Configuration.Keys.ConsistencyLevel);
         options.DefaultTimeoutSeconds = ReadProviderConfiguration(
             options.DefaultTimeoutSeconds,
-            "Koan:Data:Milvus:TimeoutSeconds");
+            Infrastructure.Constants.Configuration.Keys.TimeoutSeconds);
 
-        if (int.TryParse(ReadProviderConfiguration("", "Koan:Data:Milvus:Dimension"), out var dimension))
+        if (int.TryParse(ReadProviderConfiguration("", Infrastructure.Constants.Configuration.Keys.Dimension), out var dimension))
             options.Dimension = dimension;
 
         options.AutoCreateCollection = ReadProviderConfiguration(
             options.AutoCreateCollection,
-            "Koan:Data:Milvus:AutoCreate",
-            "Koan:Data:Milvus:AutoCreateCollection");
+            Infrastructure.Constants.Configuration.Keys.AutoCreate,
+            Infrastructure.Constants.Configuration.Keys.AutoCreateCollection);
 
         Logger?.LogInformation("Final Milvus Configuration");
         Logger?.LogInformation("Connection: {ConnectionString}", options.ConnectionString);
@@ -207,7 +207,7 @@ internal sealed class MilvusOptionsConfigurator : AdapterOptionsConfigurator<Mil
 
     private bool IsAutoDetectionDisabled()
     {
-        return Koan.Core.Configuration.Read(Configuration, "Koan:Data:Milvus:DisableAutoDetection", false);
+        return Koan.Core.Configuration.Read(Configuration, Infrastructure.Constants.Configuration.Keys.DisableAutoDetection, false);
     }
 }
 

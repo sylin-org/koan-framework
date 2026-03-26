@@ -114,9 +114,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
         foreach (var category in categories)
         {
-            var source = configuration[$"Koan:Ai:{category}:Source"];
-            var model = configuration[$"Koan:Ai:{category}:Model"];
-            var via = configuration[$"Koan:Ai:{category}:Via"];
+            var source = configuration[ConfigurationConstants.Category.Source(category)];
+            var model = configuration[ConfigurationConstants.Category.Model(category)];
+            var via = configuration[ConfigurationConstants.Category.Via(category)];
 
             var parts = new List<string>();
             if (!string.IsNullOrWhiteSpace(source)) parts.Add($"source={source}");
@@ -145,11 +145,11 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     private static void DescribeActiveRecipe(ProvenanceModuleWriter module, IConfiguration configuration)
     {
-        var recipeName = configuration["Koan:Ai:ActiveRecipe"];
+        var recipeName = configuration[ConfigurationConstants.Recipe.ActiveRecipe];
         if (string.IsNullOrWhiteSpace(recipeName))
             return;
 
-        var section = configuration.GetSection($"Koan:Ai:Recipes:{recipeName}");
+        var section = configuration.GetSection(ConfigurationConstants.Recipe.ForRecipe(recipeName));
         var bindings = section.Exists()
             ? section.GetChildren()
                 .Where(c => !string.IsNullOrWhiteSpace(c.Value))

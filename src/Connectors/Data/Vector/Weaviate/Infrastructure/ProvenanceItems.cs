@@ -7,48 +7,48 @@ internal static class WeaviateProvenanceItems
 {
     internal static readonly string[] ConnectionStringKeys =
     {
-        "Koan:Data:Weaviate:ConnectionString",
-        "Koan:Data:ConnectionString",
+        Constants.Configuration.Keys.ConnectionString,
+        Constants.Configuration.DataFallback.ConnectionString,
         "ConnectionStrings:Weaviate",
         "ConnectionStrings:weaviate"
     };
 
     internal static readonly string[] EndpointKeys =
     {
-        "Koan:Data:Weaviate:Endpoint",
-        "Koan:Data:Weaviate:BaseUrl",
+        Constants.Configuration.Keys.Endpoint,
+        Constants.Configuration.Keys.BaseUrl,
         "Weaviate:Endpoint"
     };
 
     internal static readonly string[] ApiKeyKeys =
     {
-        "Koan:Data:Weaviate:ApiKey",
-        "Koan:Data:Weaviate:Key"
+        Constants.Configuration.Keys.ApiKey,
+        Constants.Configuration.Keys.Key
     };
 
     internal static readonly string[] DefaultTopKKeys =
     {
-        "Koan:Data:Weaviate:DefaultTopK"
+        Constants.Configuration.Keys.DefaultTopK
     };
 
     internal static readonly string[] MaxTopKKeys =
     {
-        "Koan:Data:Weaviate:MaxTopK"
+        Constants.Configuration.Keys.MaxTopK
     };
 
     internal static readonly string[] DimensionKeys =
     {
-        "Koan:Data:Weaviate:Dimension"
+        Constants.Configuration.Keys.Dimension
     };
 
     internal static readonly string[] MetricKeys =
     {
-        "Koan:Data:Weaviate:Metric"
+        Constants.Configuration.Keys.Metric
     };
 
     internal static readonly string[] TimeoutKeys =
     {
-        "Koan:Data:Weaviate:TimeoutSeconds"
+        Constants.Configuration.Keys.TimeoutSeconds
     };
 
     private static readonly IReadOnlyCollection<string> ConnectionConsumers = new[]

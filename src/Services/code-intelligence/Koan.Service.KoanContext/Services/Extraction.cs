@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.RegularExpressions;
+using Koan.Service.KoanContext.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -26,7 +27,7 @@ public class Extraction
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         // Read max file size from configuration, default to 10MB
-        var maxFileSizeMB = configuration.GetValue<int>("Koan:Context:IndexingPerformance:MaxFileSizeMB", 10);
+        var maxFileSizeMB = configuration.GetValue<int>(ConfigurationConstants.IndexingPerformance.MaxFileSizeMB, 10);
         _maxFileSizeBytes = maxFileSizeMB * 1024L * 1024L;
 
         _logger.LogInformation("File size limit set to {MaxFileSizeMB} MB", maxFileSizeMB);

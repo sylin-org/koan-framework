@@ -13,5 +13,21 @@ public static class Constants
         {
             public const string Section = Configuration.Section + ":Profiles";
         }
+        public static class Outbox
+        {
+            /// <summary>
+            /// Pattern: Koan:Cqrs:Outbox:{adapterName}
+            /// </summary>
+            public static string ForAdapter(string adapterName) => $"{Configuration.Section}:Outbox:{adapterName}";
+        }
+
+        public static class DataSources
+        {
+            /// <summary>
+            /// Pattern: Koan:Data:Sources:{name}:{provider}:ConnectionString
+            /// </summary>
+            public static string ConnectionString(string name, string provider) =>
+                $"Koan:Data:Sources:{name}:{provider}:ConnectionString";
+        }
     }
 }

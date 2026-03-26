@@ -35,7 +35,7 @@ public class VaultOrchestrationEvaluator : BaseOrchestrationEvaluator
     {
         // Check for explicit Vault address configuration
         var explicitAddress = Configuration.ReadFirst(configuration, "",
-            "Koan:Secrets:Vault:Address",
+            VaultConstants.Keys.Address,
             "Vault:Address",
             "ConnectionStrings:vault",
             "ConnectionStrings:Vault");

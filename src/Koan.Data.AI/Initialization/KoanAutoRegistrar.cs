@@ -40,7 +40,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
         // Register EmbeddingWorkerOptions configuration
         services.AddOptions<EmbeddingWorkerOptions>()
-            .BindConfiguration("Koan:Data:AI:EmbeddingWorker")
+            .BindConfiguration(Infrastructure.ConfigurationConstants.Keys.EmbeddingWorker)
             .ValidateDataAnnotations();
 
         // Register telemetry (singleton for metric collection)

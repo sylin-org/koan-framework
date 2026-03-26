@@ -21,7 +21,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     public void Initialize(IServiceCollection services)
     {
         // Register PGVector options
-        services.AddKoanOptions<PGVectorOptions>("Koan:Vector:PGVector");
+        services.AddKoanOptions<PGVectorOptions>(Infrastructure.ConfigurationConstants.Section);
 
         // Register extension manager as singleton (shared state for version detection)
         services.AddSingleton<PgVectorExtensionManager>();

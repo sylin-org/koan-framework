@@ -51,17 +51,17 @@ internal sealed class ElasticSearchOptionsConfigurator : AdapterOptionsConfigura
 
         // Read ElasticSearch-specific configuration
         var endpoint = ReadProviderConfiguration(options.Endpoint,
-            "Koan:Data:ElasticSearch:Endpoint",
-            "Koan:Data:ElasticSearch:BaseUrl");
+            Infrastructure.Constants.Configuration.Keys.Endpoint,
+            Infrastructure.Constants.Configuration.Keys.BaseUrl);
 
         var apiKey = ReadProviderConfiguration(options.ApiKey ?? "",
-            "Koan:Data:ElasticSearch:ApiKey");
+            Infrastructure.Constants.Configuration.Keys.ApiKey);
 
         var username = ReadProviderConfiguration(options.Username ?? "",
-            "Koan:Data:ElasticSearch:Username");
+            Infrastructure.Constants.Configuration.Keys.Username);
 
         var password = ReadProviderConfiguration(options.Password ?? "",
-            "Koan:Data:ElasticSearch:Password");
+            Infrastructure.Constants.Configuration.Keys.Password);
 
         var explicitConnectionString = ReadProviderConfiguration("",
             Infrastructure.Constants.Configuration.Keys.ConnectionString,
@@ -99,35 +99,35 @@ internal sealed class ElasticSearchOptionsConfigurator : AdapterOptionsConfigura
         // Configure ElasticSearch-specific options
         options.IndexPrefix = ReadProviderConfiguration(
             options.IndexPrefix ?? "koan",
-            "Koan:Data:ElasticSearch:IndexPrefix");
+            Infrastructure.Constants.Configuration.Keys.IndexPrefix);
         options.IndexName = ReadProviderConfiguration(
             options.IndexName ?? "",
-            "Koan:Data:ElasticSearch:IndexName");
+            Infrastructure.Constants.Configuration.Keys.IndexName);
         options.VectorField = ReadProviderConfiguration(
             options.VectorField,
-            "Koan:Data:ElasticSearch:VectorField");
+            Infrastructure.Constants.Configuration.Keys.VectorField);
         options.MetadataField = ReadProviderConfiguration(
             options.MetadataField,
-            "Koan:Data:ElasticSearch:MetadataField");
+            Infrastructure.Constants.Configuration.Keys.MetadataField);
         options.IdField = ReadProviderConfiguration(
             options.IdField,
-            "Koan:Data:ElasticSearch:IdField");
+            Infrastructure.Constants.Configuration.Keys.IdField);
         options.SimilarityMetric = ReadProviderConfiguration(
             options.SimilarityMetric,
-            "Koan:Data:ElasticSearch:SimilarityMetric");
+            Infrastructure.Constants.Configuration.Keys.SimilarityMetric);
         options.RefreshMode = ReadProviderConfiguration(
             options.RefreshMode,
-            "Koan:Data:ElasticSearch:RefreshMode");
+            Infrastructure.Constants.Configuration.Keys.RefreshMode);
         options.DefaultTimeoutSeconds = ReadProviderConfiguration(
             options.DefaultTimeoutSeconds,
-            "Koan:Data:ElasticSearch:TimeoutSeconds");
+            Infrastructure.Constants.Configuration.Keys.TimeoutSeconds);
 
-        if (int.TryParse(ReadProviderConfiguration("", "Koan:Data:ElasticSearch:Dimension"), out var dimension))
+        if (int.TryParse(ReadProviderConfiguration("", Infrastructure.Constants.Configuration.Keys.Dimension), out var dimension))
             options.Dimension = dimension;
 
         options.DisableIndexAutoCreate = ReadProviderConfiguration(
             options.DisableIndexAutoCreate,
-            "Koan:Data:ElasticSearch:DisableIndexAutoCreate");
+            Infrastructure.Constants.Configuration.Keys.DisableIndexAutoCreate);
 
         Logger?.LogInformation("Final ElasticSearch Configuration");
         Logger?.LogInformation("Connection: {ConnectionString}", options.ConnectionString);
@@ -183,7 +183,7 @@ internal sealed class ElasticSearchOptionsConfigurator : AdapterOptionsConfigura
 
     private bool IsAutoDetectionDisabled()
     {
-        return Koan.Core.Configuration.Read(Configuration, "Koan:Data:ElasticSearch:DisableAutoDetection", false);
+        return Koan.Core.Configuration.Read(Configuration, Infrastructure.Constants.Configuration.Keys.DisableAutoDetection, false);
     }
 }
 

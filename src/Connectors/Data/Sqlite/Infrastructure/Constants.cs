@@ -32,6 +32,13 @@ public static class Constants
             public const string AltDdlPolicy = AltSection + ":DdlPolicy";
             public const string SchemaMatchingMode = Section + ":SchemaMatchingMode"; // Relaxed | Strict
             public const string AltSchemaMatchingMode = AltSection + ":SchemaMatchingMode";
+
+            public const string DisableAutoDetection = Section + ":DisableAutoDetection";
+        }
+
+        public static class DataFallback
+        {
+            public const string ConnectionString = "Koan:Data:ConnectionString";
         }
     }
 

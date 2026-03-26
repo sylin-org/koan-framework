@@ -14,9 +14,9 @@ public static class Constants
         /// </summary>
         public const int MaxProjectPathLength = 512;
 
-        public const string RestrictiveValidationFlag = "Koan:Context:Security:EnableRestrictivePathValidation";
-        public const string AllowedDirectoriesSection = "Koan:Context:Security:AllowedDirectories";
-        public const string MaxPathLengthKey = "Koan:Context:Security:MaxPathLength";
+        public const string RestrictiveValidationFlag = ConfigurationConstants.Security.Section + ":EnableRestrictivePathValidation";
+        public const string AllowedDirectoriesSection = ConfigurationConstants.Security.Section + ":AllowedDirectories";
+        public const string MaxPathLengthKey = ConfigurationConstants.Security.Section + ":MaxPathLength";
     }
 
     public static class Routes

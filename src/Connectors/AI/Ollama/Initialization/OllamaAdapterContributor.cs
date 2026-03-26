@@ -52,7 +52,7 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
                 return;
             }
 
-            var ollamaConfig = configuration.GetSection("Koan:Ai:Ollama");
+            var ollamaConfig = configuration.GetSection(Constants.Section);
             var defaultModel = GetDefaultModel(ollamaConfig, logger);
             var configuredConnectionString = ollamaConfig["ConnectionString"];
             var explicitUrls = ollamaConfig.GetSection("Urls").Get<string[]>();
@@ -734,9 +734,9 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
 
         var fallbackCandidates = new[]
         {
-            configuration["Koan:Ai:Ollama:BaseUrl"],
-            configuration["Koan:Ai:Ollama:Urls:0"],
-            configuration["Koan:Ai:Ollama:ConnectionString"]
+            configuration[Constants.Configuration.Keys.BaseUrl],
+            configuration[Constants.Configuration.Keys.Urls0],
+            configuration[Constants.Configuration.Keys.ConnectionString]
         };
 
         foreach (var raw in fallbackCandidates)

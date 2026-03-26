@@ -9,16 +9,24 @@ internal static class Constants
     {
         internal static class Keys
         {
-            public const string ConnectionString = "Koan:Data:ElasticSearch:ConnectionString";
+            public const string ConnectionString = Section + ":ConnectionString";
             public const string AltConnectionString = "Koan:Data:ConnectionString";
-            public const string Endpoint = "Koan:Data:ElasticSearch:Endpoint";
-            public const string BaseUrl = "Koan:Data:ElasticSearch:BaseUrl";
-            public const string IndexPrefix = "Koan:Data:ElasticSearch:IndexPrefix";
-            public const string IndexName = "Koan:Data:ElasticSearch:IndexName";
-            public const string VectorField = "Koan:Data:ElasticSearch:VectorField";
-            public const string MetadataField = "Koan:Data:ElasticSearch:MetadataField";
-            public const string SimilarityMetric = "Koan:Data:ElasticSearch:SimilarityMetric";
-            public const string TimeoutSeconds = "Koan:Data:ElasticSearch:TimeoutSeconds";
+            public const string Endpoint = Section + ":Endpoint";
+            public const string BaseUrl = Section + ":BaseUrl";
+            public const string ApiKey = Section + ":ApiKey";
+            public const string Username = Section + ":Username";
+            public const string Password = Section + ":Password";
+            public const string IndexPrefix = Section + ":IndexPrefix";
+            public const string IndexName = Section + ":IndexName";
+            public const string VectorField = Section + ":VectorField";
+            public const string MetadataField = Section + ":MetadataField";
+            public const string IdField = Section + ":IdField";
+            public const string SimilarityMetric = Section + ":SimilarityMetric";
+            public const string RefreshMode = Section + ":RefreshMode";
+            public const string TimeoutSeconds = Section + ":TimeoutSeconds";
+            public const string Dimension = Section + ":Dimension";
+            public const string DisableIndexAutoCreate = Section + ":DisableIndexAutoCreate";
+            public const string DisableAutoDetection = Section + ":DisableAutoDetection";
         }
     }
 }

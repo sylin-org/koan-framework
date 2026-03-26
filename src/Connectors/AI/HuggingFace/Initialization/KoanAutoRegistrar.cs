@@ -1,3 +1,4 @@
+using Koan.AI.Connector.HuggingFace.Infrastructure;
 using Koan.AI.Contracts.Adapters;
 using Koan.Core;
 using Koan.Core.Modules;
@@ -20,7 +21,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        services.AddKoanOptions<HuggingFaceOptions>("Koan:Ai:HuggingFace");
+        services.AddKoanOptions<HuggingFaceOptions>(ConfigurationConstants.Section);
         services.TryAddSingleton<HuggingFaceClient>();
         services.TryAddSingleton<HuggingFaceAdapter>();
 
@@ -32,7 +33,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     {
         module.Describe(ModuleVersion);
 
-        var section = cfg.GetSection("Koan:Ai:HuggingFace");
+        var section = cfg.GetSection(ConfigurationConstants.Section);
         var hasToken = !string.IsNullOrWhiteSpace(section["Token"])
                        || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("HF_TOKEN"));
 

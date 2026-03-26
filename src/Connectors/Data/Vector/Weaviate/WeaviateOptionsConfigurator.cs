@@ -222,7 +222,7 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
     {
         var configuredOffering = ReadProviderConfiguration(
             "",
-            "Koan:Data:Weaviate:ZenGarden:Offering");
+            Infrastructure.Constants.Configuration.ZenGarden.Offering);
 
         if (string.IsNullOrWhiteSpace(configuredOffering) &&
             _zenGardenInitializationProvider?.TryGetDefaultOffering("weaviate", out var mappedOffering) == true)
@@ -237,7 +237,7 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
 
         var configuredInstance = ReadProviderConfiguration(
             "",
-            "Koan:Data:Weaviate:ZenGarden:Instance");
+            Infrastructure.Constants.Configuration.ZenGarden.Instance);
 
         return ZenGardenConnectionIntent.ForOffering(
             configuredOffering,
@@ -248,12 +248,12 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
     private IReadOnlyList<string> ReadZenGardenCapabilities()
     {
         var sectionValues = Configuration
-            .GetSection("Koan:Data:Weaviate:ZenGarden:Capabilities")
+            .GetSection(Infrastructure.Constants.Configuration.ZenGarden.Capabilities)
             .Get<string[]>() ?? [];
 
         var singleValue = ReadProviderConfiguration(
             "",
-            "Koan:Data:Weaviate:ZenGarden:Capability");
+            Infrastructure.Constants.Configuration.ZenGarden.Capability);
 
         var parsed = new List<string>();
         foreach (var raw in sectionValues)

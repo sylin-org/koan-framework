@@ -6,7 +6,7 @@ namespace Koan.Recipe.Abstractions;
 
 public static class KoanRecipeServiceCollectionExtensions
 {
-    private const string ConfigRoot = "Koan:Recipes";
+    private const string ConfigRoot = Infrastructure.ConfigurationConstants.Section;
 
     public static IServiceCollection AddRecipe<T>(this IServiceCollection services)
         where T : class, IKoanRecipe

@@ -358,7 +358,7 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
     {
         if (string.IsNullOrWhiteSpace(_options.Endpoint))
         {
-            throw new InvalidOperationException("Koan:Data:Milvus:Endpoint must be configured.");
+            throw new InvalidOperationException($"{Infrastructure.Constants.Configuration.Keys.Endpoint} must be configured.");
         }
 
         _http.BaseAddress = new Uri(_options.Endpoint);

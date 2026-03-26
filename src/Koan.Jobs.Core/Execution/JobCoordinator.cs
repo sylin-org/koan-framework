@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -56,12 +57,15 @@ internal sealed class JobCoordinator : IJobCoordinator
         var metadata = new JobStoreMetadata(storageMode, source, partition, audit, _options.SerializerOptions);
         var store = _resolver.Resolve(storageMode);
 
+        var correlationId = request.CorrelationId
+            ?? Activity.Current?.TraceId.ToString();
+
         var job = new TJob
         {
             Status = JobStatus.Queued,
             QueuedAt = DateTimeOffset.UtcNow,
             CreatedAt = DateTimeOffset.UtcNow,
-            CorrelationId = request.CorrelationId,
+            CorrelationId = correlationId,
             Progress = 0d
         };
 

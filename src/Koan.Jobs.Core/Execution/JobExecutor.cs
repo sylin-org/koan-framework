@@ -1,8 +1,10 @@
 using System;
+using System.Diagnostics;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Jobs.Events;
+using Koan.Jobs.Infrastructure;
 using Koan.Jobs.Model;
 using Koan.Jobs.Options;
 using Koan.Jobs.Progress;
@@ -44,14 +46,22 @@ internal sealed class JobExecutor
 
     public async Task Execute(JobQueueItem item, CancellationToken cancellationToken)
     {
+        using var activity = JobsTelemetry.Source.StartActivity("job.execute", ActivityKind.Internal);
+        activity?.SetTag("job.id", item.JobId);
+        activity?.SetTag("job.type", item.JobType.Name);
+        activity?.SetTag("job.storage_mode", item.StorageMode.ToString());
+
         var metadata = new JobStoreMetadata(item.StorageMode, item.Source, item.Partition, item.AuditExecutions, _options.SerializerOptions);
         var store = _resolver.Resolve(item.StorageMode);
         var job = await store.Get(item.JobId, metadata, cancellationToken);
         if (job == null)
         {
             _logger.LogWarning("Job {JobId} not found in store {StorageMode}", item.JobId, item.StorageMode);
+            activity?.SetStatus(ActivityStatusCode.Error, "Job not found");
             return;
         }
+
+        activity?.SetTag("job.name", job.Name);
 
         if (!_index.TryGet(job.Id, out var entry))
         {
@@ -66,6 +76,8 @@ internal sealed class JobExecutor
             job.Duration = job.CompletedAt - job.CreatedAt;
             await store.Update(job, metadata, cancellationToken);
             await _eventPublisher.PublishCancelled(job, cancellationToken);
+            activity?.SetTag("job.status", "Cancelled");
+            activity?.SetStatus(ActivityStatusCode.Ok);
             return;
         }
 
@@ -78,6 +90,8 @@ internal sealed class JobExecutor
         {
             cancellationToken.ThrowIfCancellationRequested();
             attempt++;
+
+            activity?.SetTag("job.attempt", attempt);
 
             var execution = new JobExecution
             {
@@ -123,6 +137,8 @@ internal sealed class JobExecutor
                 job.Duration = job.CompletedAt - job.CreatedAt;
                 await store.Update(job, metadata, cancellationToken);
                 await _eventPublisher.PublishCompleted(job, cancellationToken);
+                activity?.SetTag("job.status", "Completed");
+                activity?.SetStatus(ActivityStatusCode.Ok);
                 return;
             }
 
@@ -133,10 +149,21 @@ internal sealed class JobExecutor
                 job.Duration = job.CompletedAt - job.CreatedAt;
                 await store.Update(job, metadata, cancellationToken);
                 await _eventPublisher.PublishCancelled(job, cancellationToken);
+                activity?.SetTag("job.status", "Cancelled");
+                activity?.SetStatus(ActivityStatusCode.Ok);
                 return;
             }
 
             job.LastError = outcome.Error?.Message;
+
+            if (outcome.Error != null)
+            {
+                activity?.AddEvent(new ActivityEvent("job.exception", tags: new ActivityTagsCollection
+                {
+                    { "exception.type", outcome.Error.GetType().FullName },
+                    { "exception.message", outcome.Error.Message }
+                }));
+            }
 
             var shouldRetry = customRetryPolicy != null
                 ? customRetryPolicy.ShouldRetry(attempt, outcome.Error ?? new Exception(outcome.Error?.Message ?? "Unknown error"))
@@ -149,6 +176,8 @@ internal sealed class JobExecutor
                 job.Duration = job.CompletedAt - job.CreatedAt;
                 await store.Update(job, metadata, cancellationToken);
                 await _eventPublisher.PublishFailed(job, outcome.Error?.Message, cancellationToken);
+                activity?.SetTag("job.status", "Failed");
+                activity?.SetStatus(ActivityStatusCode.Error, outcome.Error?.Message ?? "Job failed");
                 return;
             }
 

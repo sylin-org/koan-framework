@@ -76,8 +76,8 @@ internal sealed class CouchbaseOptionsConfigurator : AdapterOptionsConfigurator<
 
         options.Bucket = ReadProviderConfiguration(options.Bucket,
             Infrastructure.Constants.Configuration.Keys.Bucket,
-            "Koan:Data:Bucket",
-            "ConnectionStrings:Database");
+            Infrastructure.Constants.Configuration.Keys.AltBucket,
+            Infrastructure.Constants.Configuration.Keys.ConnectionStringsDatabase);
 
         options.Scope = ReadProviderConfiguration(options.Scope ?? "",
             Infrastructure.Constants.Configuration.Keys.Scope) ?? options.Scope;
@@ -87,11 +87,11 @@ internal sealed class CouchbaseOptionsConfigurator : AdapterOptionsConfigurator<
 
         options.Username = ReadProviderConfiguration(options.Username ?? "",
             Infrastructure.Constants.Configuration.Keys.Username,
-            "Koan:Data:Username") ?? options.Username;
+            Infrastructure.Constants.Configuration.Keys.AltUsername) ?? options.Username;
 
         options.Password = ReadProviderConfiguration(options.Password ?? "",
             Infrastructure.Constants.Configuration.Keys.Password,
-            "Koan:Data:Password") ?? options.Password;
+            Infrastructure.Constants.Configuration.Keys.AltPassword) ?? options.Password;
 
         var queryTimeoutSeconds = ReadProviderConfiguration(0,
             Infrastructure.Constants.Configuration.Keys.QueryTimeout);
@@ -168,7 +168,7 @@ internal sealed class CouchbaseOptionsConfigurator : AdapterOptionsConfigurator<
 
     private bool IsAutoDetectionDisabled()
     {
-        return Koan.Core.Configuration.Read(Configuration, "Koan:Data:Couchbase:DisableAutoDetection", false);
+        return Koan.Core.Configuration.Read(Configuration, Infrastructure.Constants.Configuration.Keys.DisableAutoDetection, false);
     }
 
     private static string NormalizeCouchbaseConnectionString(string value)

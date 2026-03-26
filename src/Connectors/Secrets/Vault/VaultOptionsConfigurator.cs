@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Koan.Core;
 using Koan.Core.Orchestration;
+using Koan.Secrets.Connector.Vault.Internal;
 
 namespace Koan.Secrets.Connector.Vault;
 
@@ -32,7 +33,7 @@ internal sealed class VaultOptionsConfigurator(IConfiguration config, ILogger<Va
 
         // Check for explicit address configuration first
         var explicitAddress = Configuration.ReadFirst(config, "",
-            "Koan:Secrets:Vault:Address",
+            VaultConstants.Keys.Address,
             "Vault:Address",
             "ConnectionStrings:vault",
             "ConnectionStrings:Vault");
@@ -122,7 +123,7 @@ internal sealed class VaultOptionsConfigurator(IConfiguration config, ILogger<Va
 
     private bool IsAutoDetectionDisabled()
     {
-        return Configuration.Read(config, "Koan:Secrets:Vault:DisableAutoDetection", false)
+        return Configuration.Read(config, VaultConstants.Keys.DisableAutoDetection, false)
                || Configuration.Read(config, "Koan_SECRETS_VAULT_DISABLE_AUTO_DETECTION", false);
     }
 

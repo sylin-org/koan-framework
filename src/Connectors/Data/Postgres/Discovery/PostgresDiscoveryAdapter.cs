@@ -54,8 +54,8 @@ internal sealed class PostgresDiscoveryAdapter : ServiceDiscoveryAdapterBase
         // Check PostgreSQL-specific configuration paths
         return _configuration.GetConnectionString("PostgreSQL") ??
                _configuration.GetConnectionString("Postgres") ??
-               _configuration["Koan:Data:Postgres:ConnectionString"] ??
-               _configuration["Koan:Data:ConnectionString"];
+               _configuration[Infrastructure.Constants.Configuration.Keys.ConnectionString] ??
+               _configuration[Infrastructure.Constants.Configuration.DataFallback.ConnectionString];
     }
 
     /// <summary>PostgreSQL-specific environment variable handling</summary>

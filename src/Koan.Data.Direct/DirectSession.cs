@@ -203,7 +203,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
             if (!string.IsNullOrWhiteSpace(byResolver))
                 return (providerHint, byResolver!);
 
-            var named = _cfg[$"ConnectionStrings:{value}"] ?? _cfg[$"Koan:Data:Sources:{value}:ConnectionString"];
+            var named = _cfg[$"ConnectionStrings:{value}"] ?? _cfg[Infrastructure.ConfigurationConstants.Keys.SourceConnectionString(value)];
             if (!string.IsNullOrWhiteSpace(named))
                 return (providerHint, named!);
 
@@ -219,7 +219,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
             }
 
             // Fallback: Try config-based resolution for backward compatibility
-            var byCfg = _cfg[$"ConnectionStrings:{_source}"] ?? _cfg[$"Koan:Data:Sources:{_source}:ConnectionString"];
+            var byCfg = _cfg[$"ConnectionStrings:{_source}"] ?? _cfg[Infrastructure.ConfigurationConstants.Keys.SourceConnectionString(_source)];
             if (!string.IsNullOrWhiteSpace(byCfg))
                 return (_source, byCfg!);
 
@@ -235,7 +235,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
                 return (_adapter, byResolver!);
 
             // Try adapter-specific config path
-            var adapterCfg = _cfg[$"Koan:Data:{_adapter}:ConnectionString"];
+            var adapterCfg = _cfg[Infrastructure.ConfigurationConstants.Keys.AdapterConnectionString(_adapter)];
             if (!string.IsNullOrWhiteSpace(adapterCfg))
                 return (_adapter, adapterCfg!);
 

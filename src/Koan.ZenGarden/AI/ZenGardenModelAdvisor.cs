@@ -11,6 +11,13 @@ namespace Koan.ZenGarden.AI;
 /// Fetches <c>/v1/recommendations</c> from the orchestrator proxy and caches rank-1 models
 /// per capability. When registered, <c>Client.Chat()</c>, <c>Client.Embed()</c>, etc.
 /// automatically use the best available model with zero application configuration.
+///
+/// This advisor sits at level 4 in the AI resolution chain (AI-0032):
+///   1. Explicit ChatOptions.Model → 2. AiCategoryScope → 3. Recipe binding
+///   → <b>4. This advisor</b> → 5. Category config → 6. Source default → 7. Fallback.
+///
+/// When a recipe is active (level 3), the advisor is only consulted for capabilities
+/// that the recipe does not bind.
 /// </summary>
 internal sealed class ZenGardenModelAdvisor : IAiModelAdvisor, IDisposable
 {

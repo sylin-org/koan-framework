@@ -17,6 +17,17 @@ internal static class Constants
         public static readonly TimeSpan ProcessingTtl = TimeSpan.FromHours(24);
     }
 
+    internal static class Messaging
+    {
+        public const string DefaultBus = "Koan:Messaging:DefaultBus";
+        public const string DefaultGroup = "Koan:Messaging:DefaultGroup";
+        public const string InboxEndpoint = "Koan:Messaging:Inbox:Endpoint";
+        public const string BusDefaultConnectionString = "Koan:Messaging:Buses:default:ConnectionString";
+        public const string BusRabbitConnectionString = "Koan:Messaging:Buses:rabbit:ConnectionString";
+        public const string BusDefaultRabbitMqExchange = "Koan:Messaging:Buses:default:RabbitMq:Exchange";
+        public const string BusRabbitRabbitMqExchange = "Koan:Messaging:Buses:rabbit:RabbitMq:Exchange";
+    }
+
     internal static class Diagnostics
     {
         public const string ModuleName = "Koan.Service.Inbox.Connector.Redis";

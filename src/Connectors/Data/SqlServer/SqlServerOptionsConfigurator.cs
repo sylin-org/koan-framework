@@ -169,7 +169,7 @@ internal sealed class SqlServerOptionsConfigurator : AdapterOptionsConfigurator<
 
     private bool IsAutoDetectionDisabled()
     {
-        return Koan.Core.Configuration.Read(Configuration, "Koan:Data:SqlServer:DisableAutoDetection", false);
+        return Koan.Core.Configuration.Read(Configuration, Infrastructure.Constants.Configuration.Keys.DisableAutoDetection, false);
     }
 
     private static string BuildSqlServerConnectionString(string hostname, int port)

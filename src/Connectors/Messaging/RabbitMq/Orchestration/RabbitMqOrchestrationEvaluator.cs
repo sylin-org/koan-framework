@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using Koan.Core;
 using Koan.Core.Orchestration;
+using Koan.Messaging.Connector.RabbitMq.Infrastructure;
 
 namespace Koan.Messaging.Connector.RabbitMq.Orchestration;
 
@@ -34,8 +35,8 @@ public class RabbitMqOrchestrationEvaluator : BaseOrchestrationEvaluator
     {
         // Check for explicit RabbitMQ connection configuration
         var explicitConnectionString = Configuration.ReadFirst(configuration, "",
-            "Koan:Messaging:RabbitMQ:ConnectionString",
-            "Koan:Messaging:ConnectionString",
+            ConfigurationConstants.Keys.ConnectionString,
+            ConfigurationConstants.Fallbacks.ConnectionString,
             "ConnectionStrings:rabbitmq",
             "ConnectionStrings:RabbitMQ",
             "ConnectionStrings:Messaging");
@@ -84,12 +85,12 @@ public class RabbitMqOrchestrationEvaluator : BaseOrchestrationEvaluator
 
             // Get configured credentials
             var username = Configuration.ReadFirst(configuration, "guest",
-                "Koan:Messaging:RabbitMQ:Username",
-                "Koan:Messaging:Username");
+                ConfigurationConstants.Keys.Username,
+                ConfigurationConstants.Fallbacks.Username);
 
             var password = Configuration.ReadFirst(configuration, "guest",
-                "Koan:Messaging:RabbitMQ:Password",
-                "Koan:Messaging:Password");
+                ConfigurationConstants.Keys.Password,
+                ConfigurationConstants.Fallbacks.Password);
 
             // Build connection string for validation
             var connectionString = BuildRabbitMqConnectionString(hostResult.HostEndpoint!, username, password);
@@ -111,12 +112,12 @@ public class RabbitMqOrchestrationEvaluator : BaseOrchestrationEvaluator
     {
         // Get configuration values
         var username = Configuration.ReadFirst(configuration, "guest",
-            "Koan:Messaging:RabbitMQ:Username",
-            "Koan:Messaging:Username");
+            ConfigurationConstants.Keys.Username,
+            ConfigurationConstants.Fallbacks.Username);
 
         var password = Configuration.ReadFirst(configuration, "guest",
-            "Koan:Messaging:RabbitMQ:Password",
-            "Koan:Messaging:Password");
+            ConfigurationConstants.Keys.Password,
+            ConfigurationConstants.Fallbacks.Password);
 
         // Create environment variables for the container
         var environment = new Dictionary<string, string>(context.EnvironmentVariables)

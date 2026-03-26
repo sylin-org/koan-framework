@@ -2,6 +2,18 @@ namespace Koan.AI.Connector.Ollama.Infrastructure;
 
 internal static class Constants
 {
+    public const string Section = "Koan:Ai:Ollama";
+
+    public static class Configuration
+    {
+        public static class Keys
+        {
+            public const string BaseUrl = Section + ":BaseUrl";
+            public const string ConnectionString = Section + ":ConnectionString";
+            public const string Urls0 = Section + ":Urls:0";
+        }
+    }
+
     public static class Discovery
     {
         public const int DefaultPort = 11434;

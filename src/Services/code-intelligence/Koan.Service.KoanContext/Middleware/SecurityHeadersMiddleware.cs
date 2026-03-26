@@ -1,3 +1,4 @@
+using Koan.Service.KoanContext.Infrastructure;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 
@@ -14,7 +15,7 @@ public class SecurityHeadersMiddleware
     public SecurityHeadersMiddleware(RequestDelegate next, IConfiguration configuration)
     {
         _next = next;
-        _options = configuration.GetSection("Koan:Context:Security:Headers").Get<SecurityHeadersOptions>()
+        _options = configuration.GetSection(ConfigurationConstants.Security.Headers).Get<SecurityHeadersOptions>()
             ?? new SecurityHeadersOptions();
     }
 

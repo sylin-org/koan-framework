@@ -1,4 +1,5 @@
 using Koan.Core.Modules;
+using Koan.Jobs.Archival;
 using Koan.Jobs.Infrastructure;
 using Koan.Jobs.Execution;
 using Koan.Jobs.Events;
@@ -29,6 +30,7 @@ public static class ServiceCollectionExtensions
 
         services.AddHostedService<JobWorkerService>();
         services.AddHostedService<InMemoryJobSweeper>();
+        services.AddHostedService<JobArchivalService>();
         return services;
     }
 }

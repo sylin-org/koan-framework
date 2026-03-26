@@ -17,7 +17,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     public void Initialize(IServiceCollection services)
     {
         // Standardized options binding/validation
-        services.AddKoanOptions<CqrsOptions>("Koan:Cqrs");
+        services.AddKoanOptions<CqrsOptions>(Infrastructure.Constants.Configuration.Section);
         services.TryAddSingleton<ICqrsRouting, CqrsRouting>();
         services.BindOutboxOptions<InMemoryOutboxOptions>("InMemory");
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IOutboxStoreFactory, InMemoryOutboxFactory>());

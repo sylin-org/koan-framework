@@ -29,6 +29,19 @@ public static class Constants
             public const string Separator = Section + ":Separator";
             public const string AltSeparator = AltSection + ":Separator";
             public const string EnsureCreatedSupported = Section + ":EnsureCreatedSupported";
+
+            public const string Database = Section + ":Database";
+            public const string Username = Section + ":Username";
+            public const string Password = Section + ":Password";
+            public const string DisableAutoDetection = Section + ":DisableAutoDetection";
+        }
+
+        public static class DataFallback
+        {
+            public const string ConnectionString = "Koan:Data:ConnectionString";
+            public const string Database = "Koan:Data:Database";
+            public const string Username = "Koan:Data:Username";
+            public const string Password = "Koan:Data:Password";
         }
     }
 }

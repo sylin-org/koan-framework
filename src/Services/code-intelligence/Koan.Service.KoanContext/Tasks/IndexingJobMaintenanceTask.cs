@@ -2,6 +2,7 @@ using Koan.Context.Models;
 using Koan.Context.Services;
 using Koan.Data.Core;
 using Koan.Scheduling;
+using Koan.Service.KoanContext.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -32,8 +33,8 @@ internal sealed class JobMaintenanceTask : IScheduledTask, IOnStartup, IHasTimeo
         IIndexingResumptionQueue resumptionQueue)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _autoResumeEnabled = configuration.GetValue("Koan:Context:AutoResumeIndexing", true);
-        _autoResumeDelaySeconds = configuration.GetValue("Koan:Context:AutoResumeDelay", 0);
+        _autoResumeEnabled = configuration.GetValue(ConfigurationConstants.Keys.AutoResumeIndexing, true);
+        _autoResumeDelaySeconds = configuration.GetValue(ConfigurationConstants.Keys.AutoResumeDelay, 0);
         _resumptionQueue = resumptionQueue ?? throw new ArgumentNullException(nameof(resumptionQueue));
     }
 

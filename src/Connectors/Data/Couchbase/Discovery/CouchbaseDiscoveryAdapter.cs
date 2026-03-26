@@ -91,8 +91,8 @@ internal sealed class CouchbaseDiscoveryAdapter : ServiceDiscoveryAdapterBase
     {
         // Check Couchbase-specific configuration paths
         return _configuration.GetConnectionString("Couchbase") ??
-               _configuration["Koan:Data:Couchbase:ConnectionString"] ??
-               _configuration["Koan:Data:ConnectionString"];
+               _configuration[Infrastructure.Constants.Configuration.Keys.ConnectionString] ??
+               _configuration[Infrastructure.Constants.Configuration.Keys.AltConnectionString];
     }
 
     /// <summary>Couchbase-specific environment variable handling</summary>

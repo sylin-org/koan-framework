@@ -12,7 +12,7 @@ public static class JsonAdapterRegistration
     /// </summary>
     public static IServiceCollection AddJsonAdapter(this IServiceCollection services, Action<JsonDataOptions>? configure = null)
     {
-        services.AddKoanOptions<JsonDataOptions>("Koan:Data:Json");
+        services.AddKoanOptions<JsonDataOptions>(Infrastructure.Constants.Configuration.Section_Data);
         if (configure is not null) services.Configure(configure);
         services.AddSingleton<IDataAdapterFactory, JsonAdapterFactory>();
         return services;

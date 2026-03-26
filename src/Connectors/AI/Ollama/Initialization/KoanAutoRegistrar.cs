@@ -18,7 +18,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     public void Initialize(IServiceCollection services)
     {
         // Register options
-        services.AddKoanOptions<OllamaOptions>("Koan:Ai:Ollama");
+        services.AddKoanOptions<OllamaOptions>(Infrastructure.Constants.Section);
 
         // Register the adapter contributor for zero-config initialization
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IAiAdapterContributor, OllamaAdapterContributor>());
