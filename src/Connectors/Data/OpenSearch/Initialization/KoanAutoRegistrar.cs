@@ -29,7 +29,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddSingleton<IConfigureOptions<OpenSearchOptions>, OpenSearchOptionsConfigurator>();
 
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<INamingDefaultsProvider, OpenSearchNamingDefaultsProvider>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, OpenSearchHealthContributor>());
 
         // Register OpenSearch discovery adapter (maintains "Reference = Intent")

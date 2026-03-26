@@ -24,7 +24,7 @@ public sealed class OpenSearchHealthContributor(
             var path = "/_cluster/health";
             var full = new Uri(http.BaseAddress!, path).AbsoluteUri;
             logger?.LogDebug("OpenSearch health: GET {Url}", full);
-            var resp = await http.Get(path, ct);
+            var resp = await http.GetAsync(path, ct);
             if (!resp.IsSuccessStatusCode)
             {
                 var txt = await resp.Content.ReadAsStringAsync(ct);

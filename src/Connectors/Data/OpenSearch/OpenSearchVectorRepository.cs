@@ -77,7 +77,7 @@ internal sealed class OpenSearchVectorRepository<TEntity, TKey> :
         var payload = document.ToString(Formatting.None);
         var docId = NormalizeId(id);
         var url = $"/{Uri.EscapeDataString(IndexName)}/_doc/{Uri.EscapeDataString(docId)}?refresh={_options.RefreshMode}";
-        var response = await _http.Put(url, new StringContent(payload, Encoding.UTF8, "application/json"), ct);
+        var response = await _http.PutAsync(url, new StringContent(payload, Encoding.UTF8, "application/json"), ct);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -151,7 +151,7 @@ internal sealed class OpenSearchVectorRepository<TEntity, TKey> :
 
         var docId = NormalizeId(id);
         var url = $"/{Uri.EscapeDataString(IndexName)}/_doc/{Uri.EscapeDataString(docId)}?refresh={_options.RefreshMode}";
-        var resp = await _http.Delete(url, ct);
+        var resp = await _http.DeleteAsync(url, ct);
 
         if (resp.StatusCode == HttpStatusCode.NotFound)
         {
@@ -410,7 +410,7 @@ internal sealed class OpenSearchVectorRepository<TEntity, TKey> :
             }
         };
 
-        var create = await _http.Put(url, new StringContent(body.ToString(Formatting.None), Encoding.UTF8, "application/json"), ct);
+        var create = await _http.PutAsync(url, new StringContent(body.ToString(Formatting.None), Encoding.UTF8, "application/json"), ct);
         if (!create.IsSuccessStatusCode && create.StatusCode != HttpStatusCode.BadRequest)
         {
             var text = await create.Content.ReadAsStringAsync(ct);
