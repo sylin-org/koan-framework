@@ -11,6 +11,7 @@ internal static class ConfigurationConstants
     public static class Keys
     {
         public const string EmbeddingWorker = Section + ":EmbeddingWorker";
+        public const string MediaAnalysisWorker = Section + ":MediaAnalysis";
     }
 
     /// <summary>

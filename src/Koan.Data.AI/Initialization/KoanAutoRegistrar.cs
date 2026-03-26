@@ -12,8 +12,9 @@ using Koan.Data.Core;  // For .Save() extension method
 namespace Koan.Data.AI.Initialization;
 
 /// <summary>
-/// Auto-registers [Embedding] entities discovered via source-generated registries and wires up entity lifecycle hooks.
-/// Automatically configures embedding generation on Save().
+/// Auto-registers [Embedding] and [MediaAnalysis] entities discovered via source-generated registries
+/// and assembly scanning, wiring up entity lifecycle hooks.
+/// Automatically configures embedding generation and media analysis on Save().
 /// </summary>
 public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 {
@@ -51,6 +52,48 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             .AddCheck<Health.EmbeddingHealthCheck>("embeddings", tags: new[] { "ai", "embeddings", "ready" });
 
         // Registry already populated by generators; nothing else to track here
+
+        // ============================================================
+        // [MediaAnalysis] support
+        // ============================================================
+
+        // Scan loaded assemblies for [MediaAnalysis] entities (no source generator yet)
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            try
+            {
+                foreach (var type in assembly.GetTypes())
+                {
+                    var attr = type.GetCustomAttribute<MediaAnalysisAttribute>();
+                    if (attr != null)
+                        MediaAnalysisRegistry.Register(type, attr.Async);
+                }
+            }
+            catch { /* Ignore assemblies that can't be reflected */ }
+        }
+
+        // Discover and register [MediaAnalysis] entities
+        var mediaTypes = MediaAnalysisRegistry.GetRegisteredTypes();
+        foreach (var entityType in mediaTypes)
+        {
+            var metadata = MediaAnalysisMetadata.Resolve(entityType);
+            if (metadata != null)
+            {
+                RegisterMediaAnalysisHooks(entityType);
+            }
+        }
+
+        // Register MediaAnalysisWorker as a hosted service
+        services.AddHostedService<Workers.MediaAnalysisWorker>();
+
+        // Register MediaAnalysisOptions configuration
+        services.AddOptions<Options.MediaAnalysisOptions>()
+            .BindConfiguration(Infrastructure.ConfigurationConstants.Keys.MediaAnalysisWorker)
+            .ValidateDataAnnotations();
+
+        // Register media analysis health check
+        services.AddHealthChecks()
+            .AddCheck<Health.MediaAnalysisHealthCheck>("media-analysis", tags: new[] { "ai", "media", "ready" });
     }
 
     public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
@@ -72,6 +115,20 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
             module.AddNote($"  • {type.Name}: {mode}, {metadata.Properties.Length} properties" +
                           (metadata.Async ? " [async queue]" : ""));
+        }
+
+        // Media analysis entities
+        var mediaTypes = MediaAnalysisRegistry.GetRegisteredTypes();
+        if (mediaTypes.Any())
+        {
+            module.AddNote($"Registered {mediaTypes.Count} media-analysis entities");
+            foreach (var type in mediaTypes.OrderBy(t => t.Name))
+            {
+                var meta = MediaAnalysisMetadata.Resolve(type);
+                if (meta != null)
+                    module.AddNote($"  • {type.Name}: modes={meta.Analysis}, version={meta.Version}" +
+                                  (meta.Async ? " [async]" : " [sync]"));
+            }
         }
     }
 
@@ -146,6 +203,136 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
         // Register the hook: Entity<T>.Events.AfterUpsert(EmbeddingHookAsync)
         afterUpsertMethod.Invoke(eventsBuilder, new[] { handler });
+    }
+
+    /// <summary>
+    /// Registers AfterUpsert hook for media analysis on the specified entity type.
+    /// Same reflection pattern as <see cref="RegisterEmbeddingHooks"/>.
+    /// </summary>
+    [RequiresUnreferencedCode("Media analysis hooks use reflection against entity lifecycle APIs.")]
+    [RequiresDynamicCode("Media analysis hooks create closed generic delegates at runtime.")]
+    private static void RegisterMediaAnalysisHooks([DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicMethods)] Type entityType)
+    {
+        var entityBaseType = FindEntityBaseType(entityType);
+        if (entityBaseType == null)
+        {
+            throw new InvalidOperationException(
+                $"Type {entityType.Name} has [MediaAnalysis] attribute but does not inherit from Entity<T> or Entity<T, TKey>.");
+        }
+
+        var genericArgs = entityBaseType.GetGenericArguments();
+        var keyType = genericArgs.Length == 2 ? genericArgs[1] : typeof(string);
+        if (keyType != typeof(string))
+        {
+            throw new InvalidOperationException(
+                $"Type {entityType.Name} has [MediaAnalysis] attribute but uses {keyType.Name} keys. " +
+                $"Media analysis currently only supports string keys.");
+        }
+
+        var eventsProperty = entityBaseType.GetProperty("Events", BindingFlags.Static | BindingFlags.Public);
+        if (eventsProperty == null)
+        {
+            throw new InvalidOperationException(
+                $"Type {entityType.Name} does not have a static Events property.");
+        }
+
+        var eventsBuilder = eventsProperty.GetValue(null);
+        if (eventsBuilder == null)
+        {
+            throw new InvalidOperationException(
+                $"Events property for {entityType.Name} returned null.");
+        }
+
+        var afterUpsertMethod = eventsBuilder.GetType().GetMethod("AfterUpsert", new[] { typeof(Func<,>).MakeGenericType(
+            typeof(Koan.Data.Core.Events.EntityEventContext<>).MakeGenericType(entityType),
+            typeof(ValueTask)) });
+
+        if (afterUpsertMethod == null)
+        {
+            throw new InvalidOperationException(
+                $"AfterUpsert method not found on Events for {entityType.Name}.");
+        }
+
+        var handlerType = typeof(Func<,>).MakeGenericType(
+            typeof(Koan.Data.Core.Events.EntityEventContext<>).MakeGenericType(entityType),
+            typeof(ValueTask));
+
+        var hookMethod = typeof(KoanAutoRegistrar).GetMethod(nameof(MediaAnalysisHookAsync), BindingFlags.Static | BindingFlags.NonPublic);
+        if (hookMethod == null)
+        {
+            throw new InvalidOperationException("MediaAnalysisHookAsync method not found.");
+        }
+
+        var genericHookMethod = hookMethod.MakeGenericMethod(entityType);
+        var handler = Delegate.CreateDelegate(handlerType, genericHookMethod);
+
+        afterUpsertMethod.Invoke(eventsBuilder, new[] { handler });
+    }
+
+    /// <summary>
+    /// Entity lifecycle hook that triggers media analysis after upsert.
+    /// Detects byte[] content changes, checks version, and queues or executes analysis.
+    /// </summary>
+    private static async ValueTask MediaAnalysisHookAsync<TEntity>(Koan.Data.Core.Events.EntityEventContext<TEntity> ctx)
+        where TEntity : class, Koan.Data.Abstractions.IEntity<string>
+    {
+        var entity = ctx.Current;
+        var metadata = MediaAnalysisMetadata.Resolve<TEntity>();
+        if (metadata == null) return;
+
+        // Load or create state
+        var stateId = MediaAnalysisState<TEntity>.MakeId(entity.Id);
+        var state = await MediaAnalysisState<TEntity>.Get(stateId, ctx.CancellationToken);
+
+        // Skip if version hasn't bumped and already analyzed
+        if (state != null && state.AnalyzedVersion >= metadata.Version && state.Status == MediaAnalysisStatus.Completed)
+            return;
+
+        if (metadata.Async)
+        {
+            // Queue for background processing
+            var newState = new MediaAnalysisState<TEntity>
+            {
+                Id = stateId,
+                EntityId = entity.Id,
+                Status = MediaAnalysisStatus.Queued,
+                AnalyzedVersion = 0, // Will be set on completion
+                AttemptCount = state?.AttemptCount ?? 0,
+            };
+            await newState.Save(ctx.CancellationToken);
+            return;
+        }
+
+        // Synchronous processing — extract bytes, run analysis, save
+        var bytes = EntityAi.ExtractBytes<TEntity>(entity);
+        if (bytes == null || bytes.Length == 0) return;
+
+        var results = await Workers.MediaAnalysisExecutor.Execute(entity, metadata, bytes, ctx.CancellationToken);
+
+        // Save entity with analysis results written by executor
+        await entity.Save(ctx.CancellationToken);
+
+        // Update state with completion info
+        var allCompleted = results.Values.All(m => m.Completed);
+        var anyCompleted = results.Values.Any(m => m.Completed);
+        var overallStatus = allCompleted
+            ? MediaAnalysisStatus.Completed
+            : anyCompleted
+                ? MediaAnalysisStatus.PartiallyCompleted
+                : MediaAnalysisStatus.Failed;
+
+        var completedState = new MediaAnalysisState<TEntity>
+        {
+            Id = stateId,
+            EntityId = entity.Id,
+            Status = overallStatus,
+            AnalyzedVersion = metadata.Version,
+            AttemptCount = (state?.AttemptCount ?? 0) + 1,
+            LastAttemptAt = DateTimeOffset.UtcNow,
+            CompletedAt = DateTimeOffset.UtcNow,
+            ModeStatuses = results,
+        };
+        await completedState.Save(ctx.CancellationToken);
     }
 
     /// <summary>

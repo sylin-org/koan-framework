@@ -2,7 +2,7 @@
 id: AI-0027
 slug: AI-0027-media-analysis-attribute
 domain: AI
-status: Proposed
+status: Accepted
 date: 2026-03-20
 ---
 

@@ -231,7 +231,7 @@ public static class EntityAi
     private static readonly string[] BytePropertyConventions =
         ["Data", "Content", "ImageData", "Bytes", "FileData", "RawBytes", "Binary"];
 
-    private static byte[]? ExtractBytes<TEntity>(TEntity entity) where TEntity : class
+    internal static byte[]? ExtractBytes<TEntity>(TEntity entity) where TEntity : class
     {
         var entityType = typeof(TEntity);
 
