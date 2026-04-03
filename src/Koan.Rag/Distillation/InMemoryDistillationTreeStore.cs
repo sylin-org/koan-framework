@@ -15,6 +15,7 @@ internal sealed class InMemoryDistillationTreeStore : IDistillationTreeStore
     private readonly ILogger<InMemoryDistillationTreeStore> _logger;
     private readonly ConcurrentDictionary<string, DistillationNode> _nodes = new();
     private readonly object _writeLock = new();
+    private readonly string _persistencePath;
     private long _currentVersion;
     private DateTimeOffset? _lastBuildTime;
 
@@ -27,11 +28,15 @@ internal sealed class InMemoryDistillationTreeStore : IDistillationTreeStore
     public InMemoryDistillationTreeStore(ILogger<InMemoryDistillationTreeStore> logger)
     {
         _logger = logger;
+        var partition = Koan.Data.Core.EntityContext.Current?.Partition ?? "default";
+        var basePath = Path.Combine(
+            AppContext.BaseDirectory, ".Koan", "cache", "rag", partition);
+        _persistencePath = Path.Combine(basePath, "distillation-tree.json");
     }
 
     public async Task Load(CancellationToken ct = default)
     {
-        var path = GetPersistencePath();
+        var path = _persistencePath;
         if (!File.Exists(path))
         {
             _logger.LogDebug("No persisted distillation tree at {Path}", path);
@@ -67,7 +72,7 @@ internal sealed class InMemoryDistillationTreeStore : IDistillationTreeStore
 
     public async Task Save(CancellationToken ct = default)
     {
-        var path = GetPersistencePath();
+        var path = _persistencePath;
 
         try
         {
@@ -175,14 +180,6 @@ internal sealed class InMemoryDistillationTreeStore : IDistillationTreeStore
         }
 
         return new DistillationTreeStats(totalNodes, maxLevel, _currentVersion, _lastBuildTime);
-    }
-
-    private static string GetPersistencePath()
-    {
-        var partition = Koan.Data.Core.EntityContext.Current?.Partition ?? "default";
-        var basePath = Path.Combine(
-            AppContext.BaseDirectory, ".Koan", "cache", "rag", partition);
-        return Path.Combine(basePath, "distillation-tree.json");
     }
 
     private sealed class TreeSnapshot

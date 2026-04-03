@@ -48,7 +48,7 @@ public sealed record DistillationNode
     public required string Summary { get; init; }
 
     /// <summary>Embedding of the summary text.</summary>
-    public required ReadOnlyMemory<float> Embedding { get; init; }
+    public required float[] Embedding { get; init; }
 
     /// <summary>IDs of child nodes (leaf chunk IDs at Level 1, tree node IDs at Level 2+).</summary>
     public IReadOnlyList<string> ChildNodeIds { get; init; } = [];

@@ -22,6 +22,7 @@ internal sealed class DiagonalGmmClustering : IClusteringStrategy
     private const int MaxEmIterations = 30;
     private const double ConvergenceThreshold = 1e-4;
     private const double SoftAssignmentThreshold = 0.1;
+    private const int BicEarlyStopPatience = 3;
 
     public DiagonalGmmClustering(ILogger<DiagonalGmmClustering> logger)
     {
@@ -55,8 +56,9 @@ internal sealed class DiagonalGmmClustering : IClusteringStrategy
             "GMM selected k={K} clusters for {N} embeddings (target was {Target})",
             optimalK, embeddings.Count, targetClusters);
 
-        // Step 3: Fit GMM with optimal k
-        var gmm = FitGmm(reduced, optimalK);
+        // Step 3: Use the cached GMM from BIC selection (avoids refitting)
+        var gmm = _cachedBestGmm ?? FitGmm(reduced, optimalK);
+        _cachedBestGmm = null;
 
         // Step 4: Soft assignment
         var assignments = SoftAssign(embeddings, reduced, gmm);
@@ -107,6 +109,8 @@ internal sealed class DiagonalGmmClustering : IClusteringStrategy
     {
         var bestK = 1;
         var bestBic = double.MaxValue;
+        GmmModel? bestGmm = null;
+        var consecutiveIncreases = 0;
 
         for (var k = 1; k <= maxK; k++)
         {
@@ -119,19 +123,30 @@ internal sealed class DiagonalGmmClustering : IClusteringStrategy
             {
                 bestBic = bic;
                 bestK = k;
+                bestGmm = gmm;
+                consecutiveIncreases = 0;
+            }
+            else
+            {
+                consecutiveIncreases++;
+                if (consecutiveIncreases >= BicEarlyStopPatience)
+                    break;
             }
         }
 
+        _cachedBestGmm = bestGmm;
         return bestK;
     }
 
+    private GmmModel? _cachedBestGmm;
+
     // ── Diagonal GMM with EM ────────────────────────────────────────────
 
-    private GmmModel FitGmm(float[][] data, int k)
+    private GmmModel FitGmm(float[][] data, int k, int seed = 42)
     {
         var n = data.Length;
         var d = data[0].Length;
-        var rng = new Random(42); // Deterministic for reproducibility
+        var rng = new Random(seed + k); // Deterministic but k-dependent for reproducibility
 
         // Initialize: random means from data, unit variance, equal weights
         var means = new double[k][];
@@ -152,23 +167,25 @@ internal sealed class DiagonalGmmClustering : IClusteringStrategy
 
         for (var iter = 0; iter < MaxEmIterations; iter++)
         {
-            // E-step: compute responsibilities
+            // E-step: compute responsibilities via log-sum-exp to prevent underflow
+            var logProbs = new double[k];
             for (var i = 0; i < n; i++)
             {
-                var total = 0.0;
+                var maxLogProb = double.NegativeInfinity;
                 for (var c = 0; c < k; c++)
                 {
-                    var logProb = Math.Log(weights[c] + 1e-300) +
+                    logProbs[c] = Math.Log(weights[c] + 1e-300) +
                                   DiagonalGaussianLogPdf(data[i], means[c], variances[c]);
-                    responsibilities[i, c] = Math.Exp(logProb);
-                    total += responsibilities[i, c];
+                    if (logProbs[c] > maxLogProb) maxLogProb = logProbs[c];
                 }
 
-                if (total > 0)
-                {
-                    for (var c = 0; c < k; c++)
-                        responsibilities[i, c] /= total;
-                }
+                var sumExp = 0.0;
+                for (var c = 0; c < k; c++)
+                    sumExp += Math.Exp(logProbs[c] - maxLogProb);
+                var logNorm = maxLogProb + Math.Log(sumExp + 1e-300);
+
+                for (var c = 0; c < k; c++)
+                    responsibilities[i, c] = Math.Exp(logProbs[c] - logNorm);
             }
 
             // M-step: update parameters
@@ -235,28 +252,28 @@ internal sealed class DiagonalGmmClustering : IClusteringStrategy
         for (var c = 0; c < k; c++)
             clusterMembers[c] = [];
 
-        // Compute responsibilities and assign to all clusters above threshold
+        // Compute responsibilities via log-sum-exp and assign to all clusters above threshold
+        var logProbs = new double[k];
         for (var i = 0; i < n; i++)
         {
-            var probs = new double[k];
-            var total = 0.0;
+            var maxLogProb = double.NegativeInfinity;
+            for (var c = 0; c < k; c++)
+            {
+                logProbs[c] = Math.Log(gmm.Weights[c] + 1e-300) +
+                              DiagonalGaussianLogPdf(reducedData[i], gmm.Means[c], gmm.Variances[c]);
+                if (logProbs[c] > maxLogProb) maxLogProb = logProbs[c];
+            }
+
+            var sumExp = 0.0;
+            for (var c = 0; c < k; c++)
+                sumExp += Math.Exp(logProbs[c] - maxLogProb);
+            var logNorm = maxLogProb + Math.Log(sumExp + 1e-300);
 
             for (var c = 0; c < k; c++)
             {
-                var logProb = Math.Log(gmm.Weights[c] + 1e-300) +
-                              DiagonalGaussianLogPdf(reducedData[i], gmm.Means[c], gmm.Variances[c]);
-                probs[c] = Math.Exp(logProb);
-                total += probs[c];
-            }
-
-            if (total > 0)
-            {
-                for (var c = 0; c < k; c++)
-                {
-                    probs[c] /= total;
-                    if (probs[c] >= SoftAssignmentThreshold)
-                        clusterMembers[c].Add(originalEmbeddings[i].Id);
-                }
+                var prob = Math.Exp(logProbs[c] - logNorm);
+                if (prob >= SoftAssignmentThreshold)
+                    clusterMembers[c].Add(originalEmbeddings[i].Id);
             }
         }
 
@@ -298,18 +315,24 @@ internal sealed class DiagonalGmmClustering : IClusteringStrategy
     {
         var logLikelihood = 0.0;
         var k = gmm.Weights.Length;
+        var componentLogProbs = new double[k];
 
         foreach (var point in data)
         {
-            var sampleLikelihood = 0.0;
+            // Log-sum-exp over components to prevent underflow
+            var maxLogProb = double.NegativeInfinity;
             for (var c = 0; c < k; c++)
             {
-                var logProb = Math.Log(gmm.Weights[c] + 1e-300) +
-                              DiagonalGaussianLogPdf(point, gmm.Means[c], gmm.Variances[c]);
-                sampleLikelihood += Math.Exp(logProb);
+                componentLogProbs[c] = Math.Log(gmm.Weights[c] + 1e-300) +
+                                       DiagonalGaussianLogPdf(point, gmm.Means[c], gmm.Variances[c]);
+                if (componentLogProbs[c] > maxLogProb) maxLogProb = componentLogProbs[c];
             }
 
-            logLikelihood += Math.Log(sampleLikelihood + 1e-300);
+            var sumExp = 0.0;
+            for (var c = 0; c < k; c++)
+                sumExp += Math.Exp(componentLogProbs[c] - maxLogProb);
+
+            logLikelihood += maxLogProb + Math.Log(sumExp + 1e-300);
         }
 
         return logLikelihood;

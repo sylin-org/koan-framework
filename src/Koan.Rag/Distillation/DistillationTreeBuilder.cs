@@ -60,7 +60,7 @@ internal sealed class DistillationTreeBuilder
         }
 
         var sw = Stopwatch.StartNew();
-        _currentVersion++;
+        var buildVersion = Interlocked.Increment(ref _currentVersion);
 
         var clusterFactor = _options.TreeClusterFactor;
         var maxDepth = _options.TreeMaxDepth
@@ -116,16 +116,17 @@ internal sealed class DistillationTreeBuilder
 
                 // Embed the summary
                 var embedding = await EmbedSummary(summary, ct);
+                if (embedding is null) continue;
 
                 var node = new DistillationNode
                 {
-                    Id = $"raptor:L{level}:c{cluster.ClusterId}:v{_currentVersion}",
+                    Id = $"raptor:L{level}:c{cluster.ClusterId}:v{buildVersion}",
                     Level = level,
                     Summary = summary,
-                    Embedding = new ReadOnlyMemory<float>(embedding),
+                    Embedding = embedding,
                     ChildNodeIds = cluster.MemberIds,
                     SourceDocumentIds = ExtractSourceDocuments(cluster.MemberIds),
-                    CorpusVersion = _currentVersion
+                    CorpusVersion = buildVersion
                 };
 
                 levelNodes.Add(node);
@@ -245,9 +246,11 @@ internal sealed class DistillationTreeBuilder
         }
     }
 
-    private static async Task<float[]> EmbedSummary(string summary, CancellationToken ct)
+    private static async Task<float[]?> EmbedSummary(string summary, CancellationToken ct)
     {
-        return await Koan.AI.Client.Embed(summary, ct);
+        try { return await Koan.AI.Client.Embed(summary, ct); }
+        catch (OperationCanceledException) { throw; }
+        catch { return null; }
     }
 
     private static IReadOnlyList<string> ExtractSourceDocuments(IReadOnlyList<string> memberIds)

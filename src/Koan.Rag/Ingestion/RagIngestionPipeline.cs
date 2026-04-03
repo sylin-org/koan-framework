@@ -26,6 +26,7 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
     private readonly IConceptGraphStore _graphStore;
     private readonly DistillationTreeBuilder _treeBuilder;
     private readonly IDistillationTreeStore _treeStore;
+    private readonly IDocumentSegmenter _segmenter;
     private readonly ILogger<RagIngestionPipeline> _logger;
     private readonly RagOptions _options;
 
@@ -37,6 +38,7 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
         IConceptGraphStore graphStore,
         DistillationTreeBuilder treeBuilder,
         IDistillationTreeStore treeStore,
+        IDocumentSegmenter segmenter,
         IOptions<RagOptions> options,
         ILogger<RagIngestionPipeline> logger)
     {
@@ -47,6 +49,7 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
         _graphStore = graphStore;
         _treeBuilder = treeBuilder;
         _treeStore = treeStore;
+        _segmenter = segmenter;
         _logger = logger;
         _options = options.Value;
     }
@@ -128,15 +131,17 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
 
             // 2. Embed child chunks and store in vector index
             var chunksCreated = 0;
+            var leafEmbeddings = new List<EmbeddingWithId>();
             foreach (var child in chunked.ChildChunks)
             {
                 ct.ThrowIfCancellationRequested();
 
                 var embedding = await Koan.AI.Client.Embed(child.Text, ct);
+                var chunkId = $"{documentId}:{child.Id}";
 
                 // Store chunk embedding with metadata linking to document and parent
                 await Koan.Data.Vector.Vector<TEntity>.Save(
-                    $"{documentId}:{child.Id}",
+                    chunkId,
                     embedding,
                     new Dictionary<string, object>
                     {
@@ -147,6 +152,7 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
                     },
                     ct);
 
+                leafEmbeddings.Add(new EmbeddingWithId(chunkId, embedding));
                 chunksCreated++;
             }
 
@@ -157,6 +163,10 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
                 entitiesExtracted = await ExtractAndResolveEntities(
                     chunked.ParentChunks, documentId, documentTitle, metadata, ct);
             }
+
+            // 4. Build per-document distillation tree if there are enough chunks
+            if (leafEmbeddings.Count >= 3)
+                await _treeBuilder.BuildTree(leafEmbeddings, metadata.Directive, ct);
 
             sw.Stop();
             return new RagIngestResult
@@ -315,7 +325,9 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
         {
             Entities = graphStats.EntityCount,
             Relationships = graphStats.RelationshipCount,
-            FreshnessScore = 1.0,
+            FreshnessScore = graphStats.LastPersisted.HasValue
+                ? Math.Max(0, 1.0 - (DateTimeOffset.UtcNow - graphStats.LastPersisted.Value).TotalDays / 30.0)
+                : 0.0,
             LastFullReindex = graphStats.LastPersisted,
             TreeNodes = treeStats.TotalNodes,
             TreeDepth = treeStats.TreeDepth,
@@ -339,6 +351,9 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
 
         // Clear concept graph
         await _graphStore.Clear(ct);
+
+        // Clear distillation tree
+        await _treeStore.Clear(ct);
     }
 
     // ── Internal Pipeline Steps ─────────────────────────────────────────
@@ -350,45 +365,107 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
     {
         _logger.LogDebug("Ingesting file {FilePath}", filePath);
 
-        // Multi-modal content extraction via content adapter registry
+        var fileInfo = new FileInfo(filePath);
+
+        // Large file path: segment first, then process each segment independently
+        if (_segmenter.CanSegment(filePath, fileInfo.Length))
+        {
+            var totalChunks = 0;
+            var totalEntities = 0;
+            var leafEmbeddings = new List<EmbeddingWithId>();
+            var documentId = Path.GetFileNameWithoutExtension(filePath);
+            var documentTitle = Path.GetFileName(filePath);
+
+            _logger.LogDebug("Segmenting large file '{File}'", filePath);
+
+            await foreach (var segment in _segmenter.Segment(filePath, ct))
+            {
+                ct.ThrowIfCancellationRequested();
+
+                var segText = System.Text.Encoding.UTF8.GetString(segment.Bytes);
+                if (string.IsNullOrWhiteSpace(segText)) continue;
+
+                var segTitle = segment.SectionTitle ?? documentTitle;
+                var chunked = await _chunker.Chunk(segText, segTitle, metadata.Directive, ct);
+
+                foreach (var child in chunked.ChildChunks)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    var embedding = await Koan.AI.Client.Embed(child.Text, ct);
+                    var chunkId = $"{documentId}:{segment.SegmentId}:{child.Id}";
+
+                    await Koan.Data.Vector.Vector<TEntity>.Save(
+                        chunkId,
+                        embedding,
+                        new Dictionary<string, object>
+                        {
+                            ["document_id"] = documentId,
+                            ["parent_id"] = child.ParentId ?? "",
+                            ["section"] = child.SectionTitle ?? segment.StructuralContext ?? "",
+                            ["title"] = documentTitle ?? "",
+                            ["is_child"] = true
+                        },
+                        ct);
+
+                    leafEmbeddings.Add(new EmbeddingWithId(chunkId, embedding));
+                    totalChunks++;
+                }
+
+                if (metadata.GraphStrategy != GraphStrategy.Lazy)
+                {
+                    totalEntities += await ExtractAndResolveEntities(
+                        chunked.ParentChunks, documentId, segTitle, metadata, ct);
+                }
+            }
+
+            if (leafEmbeddings.Count >= 3)
+                await _treeBuilder.BuildTree(leafEmbeddings, metadata.Directive, ct);
+
+            return (totalChunks, totalEntities);
+        }
+
+        // Standard path for small/non-text files
         var extractionResult = await _contentRegistry.ExtractFromFile(
             filePath, metadata.Directive, ct);
 
         if (string.IsNullOrWhiteSpace(extractionResult.Text))
             return (0, 0);
 
-        var documentId = Path.GetFileNameWithoutExtension(filePath);
-        var documentTitle = Path.GetFileName(filePath);
+        var docId = Path.GetFileNameWithoutExtension(filePath);
+        var docTitle = Path.GetFileName(filePath);
 
         _logger.LogDebug(
             "File '{File}' extracted via strategy '{Strategy}' ({Rounds} rounds)",
             filePath, extractionResult.StrategyUsed, extractionResult.RoundsExecuted);
 
         // Contextual chunking of the extracted text
-        var chunked = await _chunker.Chunk(
-            extractionResult.Text, documentTitle, metadata.Directive, ct);
+        var chunkedDoc = await _chunker.Chunk(
+            extractionResult.Text, docTitle, metadata.Directive, ct);
 
         // Embed child chunks and store with parent-child metadata
         var chunksCreated = 0;
-        foreach (var child in chunked.ChildChunks)
+        var docLeafEmbeddings = new List<EmbeddingWithId>();
+        foreach (var child in chunkedDoc.ChildChunks)
         {
             ct.ThrowIfCancellationRequested();
 
             var embedding = await Koan.AI.Client.Embed(child.Text, ct);
+            var chunkId = $"{docId}:{child.Id}";
 
             await Koan.Data.Vector.Vector<TEntity>.Save(
-                $"{documentId}:{child.Id}",
+                chunkId,
                 embedding,
                 new Dictionary<string, object>
                 {
-                    ["document_id"] = documentId,
+                    ["document_id"] = docId,
                     ["parent_id"] = child.ParentId ?? "",
                     ["section"] = child.SectionTitle ?? "",
-                    ["title"] = documentTitle ?? "",
+                    ["title"] = docTitle ?? "",
                     ["is_child"] = true
                 },
                 ct);
 
+            docLeafEmbeddings.Add(new EmbeddingWithId(chunkId, embedding));
             chunksCreated++;
         }
 
@@ -397,8 +474,12 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
         if (metadata.GraphStrategy != GraphStrategy.Lazy)
         {
             entitiesExtracted = await ExtractAndResolveEntities(
-                chunked.ParentChunks, documentId, documentTitle, metadata, ct);
+                chunkedDoc.ParentChunks, docId, docTitle, metadata, ct);
         }
+
+        // Build per-document distillation tree if there are enough chunks
+        if (docLeafEmbeddings.Count >= 3)
+            await _treeBuilder.BuildTree(docLeafEmbeddings, metadata.Directive, ct);
 
         return (chunksCreated, entitiesExtracted);
     }

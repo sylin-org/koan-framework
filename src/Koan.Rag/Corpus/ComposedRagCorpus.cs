@@ -24,10 +24,10 @@ internal sealed class ComposedRagCorpus : IComposedRagCorpus
         return result.Answer;
     }
 
-    public Task<string> Ask(string query, string focus, CancellationToken ct = default)
+    public async Task<string> Ask(string query, string focus, CancellationToken ct = default)
     {
-        // Focus propagates into the generation prompt
-        return Ask(query, ct);
+        var result = await AskResult($"{query}\n\n[Focus: {focus}]", ct);
+        return result.Answer;
     }
 
     public async Task<RagQueryResult> AskResult(string query, CancellationToken ct = default)

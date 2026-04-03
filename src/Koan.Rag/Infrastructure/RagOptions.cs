@@ -68,6 +68,10 @@ public sealed class RagOptions
     [Range(1, 10)]
     public int? TreeMaxDepth { get; set; }
 
+    /// <summary>Maximum file size in bytes for single-file ingestion. Default: 100 MB.</summary>
+    [Range(1_000_000, 1_000_000_000)]
+    public long MaxFileSizeBytes { get; set; } = 100 * 1024 * 1024;
+
     /// <summary>Per-stage model routing overrides. Keyed by stage name.</summary>
     public RagModelRouting Models { get; set; } = new();
 }
