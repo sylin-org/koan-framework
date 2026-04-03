@@ -50,15 +50,11 @@ internal sealed class DiagonalGmmClustering : IClusteringStrategy
 
         // Step 2: Select optimal k via BIC
         var maxK = Math.Min(targetClusters, Math.Min(MaxBicCandidates, embeddings.Count / 2));
-        var optimalK = SelectKViaBic(reduced, maxK);
+        var (optimalK, gmm) = SelectKViaBic(reduced, maxK);
 
         _logger.LogDebug(
             "GMM selected k={K} clusters for {N} embeddings (target was {Target})",
             optimalK, embeddings.Count, targetClusters);
-
-        // Step 3: Use the cached GMM from BIC selection (avoids refitting)
-        var gmm = _cachedBestGmm ?? FitGmm(reduced, optimalK);
-        _cachedBestGmm = null;
 
         // Step 4: Soft assignment
         var assignments = SoftAssign(embeddings, reduced, gmm);
@@ -105,7 +101,7 @@ internal sealed class DiagonalGmmClustering : IClusteringStrategy
 
     // ── BIC-Based K Selection ───────────────────────────────────────────
 
-    private int SelectKViaBic(float[][] data, int maxK)
+    private (int k, GmmModel model) SelectKViaBic(float[][] data, int maxK)
     {
         var bestK = 1;
         var bestBic = double.MaxValue;
@@ -134,11 +130,8 @@ internal sealed class DiagonalGmmClustering : IClusteringStrategy
             }
         }
 
-        _cachedBestGmm = bestGmm;
-        return bestK;
+        return (bestK, bestGmm!);
     }
-
-    private GmmModel? _cachedBestGmm;
 
     // ── Diagonal GMM with EM ────────────────────────────────────────────
 

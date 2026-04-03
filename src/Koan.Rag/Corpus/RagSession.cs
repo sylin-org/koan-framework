@@ -124,7 +124,7 @@ internal sealed class RagSession<TEntity> : IRagSession<TEntity> where TEntity :
     private Task DropOldestTurns()
     {
         // Remove oldest turns until under budget
-        while (_tokensUsed > _options.MaxTokenBudget && _history.Count > 2)
+        while (_tokensUsed > _options.MaxTokenBudget && _history.Count > 0)
         {
             var removed = _history[0];
             _tokensUsed -= EstimateTokens(removed.Content);

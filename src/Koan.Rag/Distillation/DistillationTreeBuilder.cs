@@ -27,6 +27,7 @@ internal sealed class DistillationTreeBuilder
     private readonly string? _summarizeModel;
 
     private long _currentVersion;
+    private readonly Dictionary<string, string> _leafTextCache = new();
 
     public DistillationTreeBuilder(
         IClusteringStrategy clustering,
@@ -42,17 +43,22 @@ internal sealed class DistillationTreeBuilder
     }
 
     /// <summary>
-    /// Build a distillation tree from leaf chunk embeddings. Recursively
-    /// clusters and summarizes until the adaptive depth limit or convergence.
+    /// Build a distillation tree from leaf chunk embeddings and their text.
+    /// Recursively clusters and summarizes until the adaptive depth limit.
     /// </summary>
-    /// <param name="leafEmbeddings">Leaf chunk embeddings with their IDs.</param>
+    /// <param name="leafEmbeddings">Leaf chunk embeddings with IDs and text for summarization.</param>
     /// <param name="directive">Corpus directive for summarization context.</param>
     /// <param name="ct">Cancellation token.</param>
     public async Task BuildTree(
-        IReadOnlyList<EmbeddingWithId> leafEmbeddings,
+        IReadOnlyList<EmbeddingWithText> leafEmbeddings,
         string? directive,
         CancellationToken ct)
     {
+        // Cache leaf texts for Level 1 summarization (keyed by chunk ID)
+        _leafTextCache.Clear();
+        foreach (var leaf in leafEmbeddings)
+            _leafTextCache[leaf.Id] = leaf.Text;
+
         if (leafEmbeddings.Count < 2)
         {
             _logger.LogDebug("Skipping tree build: only {Count} leaf chunks", leafEmbeddings.Count);
@@ -72,7 +78,10 @@ internal sealed class DistillationTreeBuilder
             leafEmbeddings.Count, maxDepth, clusterFactor);
 
         // Start with leaf embeddings as the current level's input
-        var currentLevel = leafEmbeddings;
+        // Convert to EmbeddingWithId for clustering (text is cached separately)
+        IReadOnlyList<EmbeddingWithId> currentLevel = leafEmbeddings
+            .Select(e => new EmbeddingWithId(e.Id, e.Embedding))
+            .ToList();
         var allNewNodes = new List<DistillationNode>();
 
         for (var level = 1; level <= maxDepth; level++)
@@ -194,10 +203,15 @@ internal sealed class DistillationTreeBuilder
                 continue;
             }
 
-            // Leaf chunk: ID is like "{documentId}:{childId}" — we'd need to load
-            // the chunk text from the vector store metadata. For now, use the ID
-            // as a placeholder. The real implementation would hydrate from chunk store.
-            texts.Add($"[Chunk: {memberId}]");
+            // Leaf chunk: look up cached text from ingestion
+            if (_leafTextCache.TryGetValue(memberId, out var leafText))
+            {
+                texts.Add(leafText);
+                continue;
+            }
+
+            // Fallback: chunk text not available (e.g., corpus-wide rebuild without cache)
+            _logger.LogDebug("No text available for leaf chunk {ChunkId}, skipping", memberId);
         }
 
         return string.Join("\n\n---\n\n", texts);

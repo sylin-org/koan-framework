@@ -10,6 +10,7 @@ using Koan.Rag.Ingestion;
 using Koan.Rag.Retrieval;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -33,32 +34,32 @@ public sealed class KoanRagAutoRegistrar : IKoanAutoRegistrar
     public void Initialize(IServiceCollection services)
     {
         // ── Core Services ───────────────────────────────────────────────
-        services.AddSingleton<IRagIngestionPipeline, RagIngestionPipeline>();
-        services.AddSingleton<IRagRetrievalPipeline, RagRetrievalPipeline>();
-        services.AddSingleton<IRagService, RagService>();
-        services.AddSingleton<IConceptGraphStore, Graph.InMemoryConceptGraphStore>();
+        services.TryAddSingleton<IRagIngestionPipeline, RagIngestionPipeline>();
+        services.TryAddSingleton<IRagRetrievalPipeline, RagRetrievalPipeline>();
+        services.TryAddSingleton<IRagService, RagService>();
+        services.TryAddSingleton<IConceptGraphStore, Graph.InMemoryConceptGraphStore>();
 
         // ── Pipeline Components ─────────────────────────────────────────
-        services.AddSingleton<Chunking.ContextualChunker>();
-        services.AddSingleton<Graph.EntityExtractor>();
-        services.AddSingleton<Graph.EntityResolver>();
-        services.AddSingleton<Evaluation.RagEvaluator>();
+        services.TryAddSingleton<Chunking.ContextualChunker>();
+        services.TryAddSingleton<Graph.EntityExtractor>();
+        services.TryAddSingleton<Graph.EntityResolver>();
+        services.TryAddSingleton<Evaluation.RagEvaluator>();
 
         // ── Content Adapters ────────────────────────────────────────────
-        services.AddSingleton<Content.Strategies.StrategyGenerator>();
-        services.AddSingleton<Content.ContentAdapterRegistry>();
-        services.AddSingleton<IContentAdapter, Content.Adapters.TextDocumentAdapter>();
-        services.AddSingleton<IContentAdapter, Content.Adapters.ImageAdapter>();
-        services.AddSingleton<IContentAdapter, Content.Adapters.AudioAdapter>();
-        services.AddSingleton<IContentAdapter, Content.Adapters.PdfAdapter>();
+        services.TryAddSingleton<Content.Strategies.StrategyGenerator>();
+        services.TryAddSingleton<Content.ContentAdapterRegistry>();
+        services.TryAddSingleton<IContentAdapter, Content.Adapters.TextDocumentAdapter>();
+        services.TryAddSingleton<IContentAdapter, Content.Adapters.ImageAdapter>();
+        services.TryAddSingleton<IContentAdapter, Content.Adapters.AudioAdapter>();
+        services.TryAddSingleton<IContentAdapter, Content.Adapters.PdfAdapter>();
 
         // ── Distillation Tree ───────────────────────────────────────────
-        services.AddSingleton<IClusteringStrategy, Distillation.DiagonalGmmClustering>();
-        services.AddSingleton<IDistillationTreeStore, Distillation.InMemoryDistillationTreeStore>();
-        services.AddSingleton<Distillation.DistillationTreeBuilder>();
+        services.TryAddSingleton<IClusteringStrategy, Distillation.DiagonalGmmClustering>();
+        services.TryAddSingleton<IDistillationTreeStore, Distillation.InMemoryDistillationTreeStore>();
+        services.TryAddSingleton<Distillation.DistillationTreeBuilder>();
 
         // ── Document Segmentation ───────────────────────────────────────
-        services.AddSingleton<IDocumentSegmenter, Segmentation.TextDocumentSegmenter>();
+        services.TryAddSingleton<IDocumentSegmenter, Segmentation.TextDocumentSegmenter>();
 
         // ── Configuration ───────────────────────────────────────────────
         services.AddOptions<RagOptions>()
@@ -139,6 +140,20 @@ public sealed class KoanRagAutoRegistrar : IKoanAutoRegistrar
             source: BootSettingSource.AppSettings);
         module.AddSetting("Rag:RerankEnabled", rerankEnabled,
             source: BootSettingSource.AppSettings);
+
+        // Report distillation tree stats if available
+        var treeStore = Koan.Core.Hosting.App.AppHost.Current
+            ?.GetService(typeof(IDistillationTreeStore)) as IDistillationTreeStore;
+        if (treeStore is not null)
+        {
+            var treeStats = treeStore.GetStats();
+            module.SetNote("distillation-tree", n => n
+                .Message($"Distillation tree: {treeStats.TotalNodes} nodes, " +
+                         $"depth {treeStats.TreeDepth}, version {treeStats.CurrentVersion}" +
+                         (treeStats.LastBuildTime.HasValue
+                             ? $", last built {treeStats.LastBuildTime.Value:u}"
+                             : ", not yet built")));
+        }
     }
 
     // ── Job Processor Registration (typed, no runtime reflection) ──────

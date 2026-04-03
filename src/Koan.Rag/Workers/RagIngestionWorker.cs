@@ -16,6 +16,7 @@ internal sealed class RagIngestionWorker(
     ILogger<RagIngestionWorker> logger,
     IOptions<RagOptions> options,
     IConceptGraphStore graphStore,
+    IDistillationTreeStore treeStore,
     RagJobProcessorRegistry processorRegistry) : BackgroundService
 {
     private readonly RagOptions _config = options.Value;
@@ -31,8 +32,9 @@ internal sealed class RagIngestionWorker(
             "RagIngestionWorker started (GraphStrategy={Strategy})",
             _config.GraphStrategy);
 
-        // Load persisted concept graph on startup
+        // Load persisted concept graph and distillation tree on startup
         await graphStore.Load(stoppingToken);
+        await treeStore.Load(stoppingToken);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -54,8 +56,9 @@ internal sealed class RagIngestionWorker(
             }
         }
 
-        // Persist graph state on shutdown
+        // Persist graph and tree state on shutdown
         await graphStore.Save(CancellationToken.None);
+        await treeStore.Save(CancellationToken.None);
         logger.LogInformation("RagIngestionWorker stopped");
     }
 

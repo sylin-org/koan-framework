@@ -109,7 +109,9 @@ internal sealed class RagRetrievalPipeline : IRagRetrievalPipeline
             // Add vector search results
             foreach (var match in searchResult.Matches.Take(_options.RerankTopN))
             {
-                var entity = await Koan.Data.Core.Data<TEntity, string>.Get(match.Id, ct);
+                // Extract document ID from composite chunk ID (format: "docId:chunkId")
+                var documentId = match.Id.Contains(':') ? match.Id[..match.Id.IndexOf(':')] : match.Id;
+                var entity = await Koan.Data.Core.Data<TEntity, string>.Get(documentId, ct);
                 if (entity is not null)
                 {
                     var text = EntityAi.ExtractText(entity);
@@ -211,7 +213,9 @@ internal sealed class RagRetrievalPipeline : IRagRetrievalPipeline
         var contextParts = new List<string>();
         foreach (var match in searchResult.Matches.Take(_options.RerankTopN))
         {
-            var entity = await Koan.Data.Core.Data<TEntity, string>.Get(match.Id, ct);
+            // Extract document ID from composite chunk ID (format: "docId:chunkId")
+            var documentId = match.Id.Contains(':') ? match.Id[..match.Id.IndexOf(':')] : match.Id;
+            var entity = await Koan.Data.Core.Data<TEntity, string>.Get(documentId, ct);
             if (entity is not null)
             {
                 var text = EntityAi.ExtractText(entity);
@@ -271,12 +275,14 @@ internal sealed class RagRetrievalPipeline : IRagRetrievalPipeline
         var chunks = new List<RagChunk>();
         foreach (var match in searchResult.Matches)
         {
-            var entity = await Koan.Data.Core.Data<TEntity, string>.Get(match.Id, ct);
+            // Extract document ID from composite chunk ID (format: "docId:chunkId")
+            var documentId = match.Id.Contains(':') ? match.Id[..match.Id.IndexOf(':')] : match.Id;
+            var entity = await Koan.Data.Core.Data<TEntity, string>.Get(documentId, ct);
             var text = entity is not null ? EntityAi.ExtractText(entity) : $"[Chunk {match.Id}]";
 
             chunks.Add(new RagChunk(
                 ChunkId: match.Id,
-                DocumentId: match.Id,
+                DocumentId: documentId,
                 Text: text,
                 Score: match.Score));
         }

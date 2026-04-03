@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using Koan.Rag.Abstractions;
 using Microsoft.Extensions.Logging;
 
@@ -212,13 +213,13 @@ internal sealed class RagEvaluator
     private static double ParseScore(string response)
     {
         var cleaned = response.Trim();
-        if (double.TryParse(cleaned, out var score))
+        if (double.TryParse(cleaned, NumberStyles.Float, CultureInfo.InvariantCulture, out var score))
             return Math.Clamp(score, 0.0, 1.0);
 
         // Try to extract a number from the response
         foreach (var word in cleaned.Split(' ', '\n'))
         {
-            if (double.TryParse(word.Trim(',', '.', '(', ')'), out var extracted))
+            if (double.TryParse(word.Trim(',', '.', '(', ')'), NumberStyles.Float, CultureInfo.InvariantCulture, out var extracted))
                 return Math.Clamp(extracted, 0.0, 1.0);
         }
 

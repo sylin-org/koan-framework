@@ -131,7 +131,7 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
 
             // 2. Embed child chunks and store in vector index
             var chunksCreated = 0;
-            var leafEmbeddings = new List<EmbeddingWithId>();
+            var leafEmbeddings = new List<EmbeddingWithText>();
             foreach (var child in chunked.ChildChunks)
             {
                 ct.ThrowIfCancellationRequested();
@@ -152,7 +152,7 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
                     },
                     ct);
 
-                leafEmbeddings.Add(new EmbeddingWithId(chunkId, embedding));
+                leafEmbeddings.Add(new EmbeddingWithText(chunkId, embedding, child.Text));
                 chunksCreated++;
             }
 
@@ -372,8 +372,8 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
         {
             var totalChunks = 0;
             var totalEntities = 0;
-            var leafEmbeddings = new List<EmbeddingWithId>();
-            var documentId = Path.GetFileNameWithoutExtension(filePath);
+            var leafEmbeddings = new List<EmbeddingWithText>();
+            var documentId = ComputeDocumentId(filePath);
             var documentTitle = Path.GetFileName(filePath);
 
             _logger.LogDebug("Segmenting large file '{File}'", filePath);
@@ -407,7 +407,7 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
                         },
                         ct);
 
-                    leafEmbeddings.Add(new EmbeddingWithId(chunkId, embedding));
+                    leafEmbeddings.Add(new EmbeddingWithText(chunkId, embedding, child.Text));
                     totalChunks++;
                 }
 
@@ -431,7 +431,7 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
         if (string.IsNullOrWhiteSpace(extractionResult.Text))
             return (0, 0);
 
-        var docId = Path.GetFileNameWithoutExtension(filePath);
+        var docId = ComputeDocumentId(filePath);
         var docTitle = Path.GetFileName(filePath);
 
         _logger.LogDebug(
@@ -444,7 +444,7 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
 
         // Embed child chunks and store with parent-child metadata
         var chunksCreated = 0;
-        var docLeafEmbeddings = new List<EmbeddingWithId>();
+        var docLeafEmbeddings = new List<EmbeddingWithText>();
         foreach (var child in chunkedDoc.ChildChunks)
         {
             ct.ThrowIfCancellationRequested();
@@ -465,7 +465,7 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
                 },
                 ct);
 
-            docLeafEmbeddings.Add(new EmbeddingWithId(chunkId, embedding));
+            docLeafEmbeddings.Add(new EmbeddingWithText(chunkId, embedding, child.Text));
             chunksCreated++;
         }
 
@@ -566,6 +566,15 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
         }
 
         return new GraphDelta { AddedRelationships = addedRelationships };
+    }
+
+    private static string ComputeDocumentId(string filePath)
+    {
+        var normalized = Path.GetFullPath(filePath);
+        var hash = System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(normalized));
+        var shortHash = Convert.ToHexStringLower(hash[..8]);
+        return $"{Path.GetFileNameWithoutExtension(filePath)}-{shortHash}";
     }
 
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, System.Reflection.PropertyInfo?> _titlePropertyCache = new();
