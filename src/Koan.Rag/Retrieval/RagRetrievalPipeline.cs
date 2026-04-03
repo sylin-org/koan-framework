@@ -106,15 +106,21 @@ internal sealed class RagRetrievalPipeline : IRagRetrievalPipeline
             // ── Step 3: Build context from retrieved chunks ─────────────
             var contextParts = new List<string>();
 
-            // Add vector search results
-            foreach (var match in searchResult.Matches.Take(_options.RerankTopN))
+            // Add vector search results — load entities in parallel
+            var matchSubset = searchResult.Matches.Take(_options.RerankTopN).ToList();
+            var hydrationTasks = matchSubset.Select(match =>
             {
-                // Extract document ID from composite chunk ID (format: "docId:chunkId")
                 var documentId = match.Id.Contains(':') ? match.Id[..match.Id.IndexOf(':')] : match.Id;
-                var entity = await Koan.Data.Core.Data<TEntity, string>.Get(documentId, ct);
-                if (entity is not null)
+                return Koan.Data.Core.Data<TEntity, string>.Get(documentId, ct);
+            }).ToList();
+
+            var hydratedEntities = await Task.WhenAll(hydrationTasks);
+
+            for (var i = 0; i < hydratedEntities.Length; i++)
+            {
+                if (hydratedEntities[i] is not null)
                 {
-                    var text = EntityAi.ExtractText(entity);
+                    var text = EntityAi.ExtractText(hydratedEntities[i]!);
                     if (!string.IsNullOrWhiteSpace(text))
                         contextParts.Add(text);
                 }
@@ -146,8 +152,11 @@ internal sealed class RagRetrievalPipeline : IRagRetrievalPipeline
             var userPrompt = BuildUserPrompt(query, context, options.IncludeCitations);
 
             var genSw = Stopwatch.StartNew();
-            var answer = await Koan.AI.Client.Chat(
-                $"{systemPrompt}\n\n{userPrompt}", ct);
+            var chatOptions = new Koan.AI.Contracts.Options.ChatOptions
+            {
+                SystemPrompt = systemPrompt
+            };
+            var answer = await Koan.AI.Client.Chat(userPrompt, chatOptions, ct);
             genSw.Stop();
 
             trace.Add(new RagToolInvocation(
@@ -211,14 +220,20 @@ internal sealed class RagRetrievalPipeline : IRagRetrievalPipeline
             yield break;
 
         var contextParts = new List<string>();
-        foreach (var match in searchResult.Matches.Take(_options.RerankTopN))
+        var streamMatchSubset = searchResult.Matches.Take(_options.RerankTopN).ToList();
+        var streamHydrationTasks = streamMatchSubset.Select(match =>
         {
-            // Extract document ID from composite chunk ID (format: "docId:chunkId")
             var documentId = match.Id.Contains(':') ? match.Id[..match.Id.IndexOf(':')] : match.Id;
-            var entity = await Koan.Data.Core.Data<TEntity, string>.Get(documentId, ct);
-            if (entity is not null)
+            return Koan.Data.Core.Data<TEntity, string>.Get(documentId, ct);
+        }).ToList();
+
+        var streamEntities = await Task.WhenAll(streamHydrationTasks);
+
+        for (var i = 0; i < streamEntities.Length; i++)
+        {
+            if (streamEntities[i] is not null)
             {
-                var text = EntityAi.ExtractText(entity);
+                var text = EntityAi.ExtractText(streamEntities[i]!);
                 if (!string.IsNullOrWhiteSpace(text))
                     contextParts.Add(text);
             }
@@ -230,10 +245,13 @@ internal sealed class RagRetrievalPipeline : IRagRetrievalPipeline
         var context = string.Join("\n\n---\n\n", contextParts);
         var systemPrompt = BuildSystemPrompt(options.Focus, metadata.Directive);
         var userPrompt = BuildUserPrompt(query, context, options.IncludeCitations);
-        var fullPrompt = $"{systemPrompt}\n\n{userPrompt}";
+        var streamOptions = new Koan.AI.Contracts.Options.ChatOptions
+        {
+            SystemPrompt = systemPrompt
+        };
 
         // Stream generation token by token
-        await foreach (var token in Koan.AI.Client.Stream(fullPrompt, ct))
+        await foreach (var token in Koan.AI.Client.Stream(userPrompt, streamOptions, ct))
         {
             yield return token;
         }
@@ -271,18 +289,28 @@ internal sealed class RagRetrievalPipeline : IRagRetrievalPipeline
             topK: maxResults,
             ct: ct);
 
-        // Load actual entity text for each result
+        // Load actual entity text for each result in parallel
+        var searchMatches = searchResult.Matches.ToList();
+        var documentIds = searchMatches
+            .Select(m => m.Id.Contains(':') ? m.Id[..m.Id.IndexOf(':')] : m.Id)
+            .ToList();
+
+        var entityTasks = documentIds
+            .Select(docId => Koan.Data.Core.Data<TEntity, string>.Get(docId, ct))
+            .ToList();
+
+        var loadedEntities = await Task.WhenAll(entityTasks);
+
         var chunks = new List<RagChunk>();
-        foreach (var match in searchResult.Matches)
+        for (var i = 0; i < searchMatches.Count; i++)
         {
-            // Extract document ID from composite chunk ID (format: "docId:chunkId")
-            var documentId = match.Id.Contains(':') ? match.Id[..match.Id.IndexOf(':')] : match.Id;
-            var entity = await Koan.Data.Core.Data<TEntity, string>.Get(documentId, ct);
+            var match = searchMatches[i];
+            var entity = loadedEntities[i];
             var text = entity is not null ? EntityAi.ExtractText(entity) : $"[Chunk {match.Id}]";
 
             chunks.Add(new RagChunk(
                 ChunkId: match.Id,
-                DocumentId: documentId,
+                DocumentId: documentIds[i],
                 Text: text,
                 Score: match.Score));
         }

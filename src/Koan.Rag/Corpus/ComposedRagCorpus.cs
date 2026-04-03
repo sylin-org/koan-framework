@@ -102,9 +102,12 @@ internal sealed class ComposedRagCorpus : IComposedRagCorpus
         var systemPrompt = "You are a knowledgeable assistant. Answer based only on the provided context. " +
                           "Cite sources by referencing [Source: document-id].";
 
-        var answer = await Koan.AI.Client.Chat(
-            $"{systemPrompt}\n\nRETRIEVED CONTEXT:\n\n{context}\n\n---\n\nQUESTION: {query}",
-            ct);
+        var composedChatOptions = new Koan.AI.Contracts.Options.ChatOptions
+        {
+            SystemPrompt = systemPrompt
+        };
+        var userPrompt = $"RETRIEVED CONTEXT:\n\n{context}\n\n---\n\nQUESTION: {query}";
+        var answer = await Koan.AI.Client.Chat(userPrompt, composedChatOptions, ct);
 
         sw.Stop();
 

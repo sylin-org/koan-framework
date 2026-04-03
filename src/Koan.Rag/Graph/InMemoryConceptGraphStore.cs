@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using System.Text.Json;
 using Koan.Rag.Abstractions;
 using Microsoft.Extensions.Logging;
@@ -6,11 +7,17 @@ using Microsoft.Extensions.Logging;
 namespace Koan.Rag.Graph;
 
 /// <summary>
-/// In-memory concept graph with periodic snapshot persistence to <c>.Koan/cache/rag/</c>.
+/// In-memory concept graph with periodic snapshot persistence to
+/// <c>.Koan/cache/rag/{partition}/concept-graph.json</c>.
+/// Partition-aware: reads the active partition from <c>EntityContext</c> at construction time.
 /// Suitable for corpora up to ~500K entities (~55MB memory).
 /// <para>
 /// Implements single-writer (ingestion pipeline) + multi-reader (retrieval pipeline)
 /// concurrency model. Reads are lock-free; writes use a lightweight lock.
+/// </para>
+/// <para>
+/// Partition is captured at DI construction time. For multi-partition operation,
+/// register stores as scoped or use a partition-keyed factory.
 /// </para>
 /// </summary>
 internal sealed class InMemoryConceptGraphStore : IConceptGraphStore
@@ -23,11 +30,11 @@ internal sealed class InMemoryConceptGraphStore : IConceptGraphStore
     private readonly ConcurrentDictionary<string, ConceptEntity> _entities = new();
     private readonly ConcurrentDictionary<string, ConceptRelationship> _relationships = new();
 
-    // Adjacency index for fast neighborhood queries
-    private readonly ConcurrentDictionary<string, HashSet<string>> _adjacency = new();
+    // Adjacency index — ImmutableHashSet enables lock-free reads
+    private readonly ConcurrentDictionary<string, ImmutableHashSet<string>> _adjacency = new();
 
-    // Document provenance: entity ID → set of source document IDs
-    private readonly ConcurrentDictionary<string, HashSet<string>> _entityDocuments = new();
+    // Document provenance: entity ID → set of source document IDs (lock-free reads)
+    private readonly ConcurrentDictionary<string, ImmutableHashSet<string>> _entityDocuments = new();
 
     private DateTimeOffset? _lastPersisted;
 
@@ -35,9 +42,10 @@ internal sealed class InMemoryConceptGraphStore : IConceptGraphStore
     {
         _logger = logger;
 
-        // Use the .Koan/ persistent storage convention
+        // Use the .Koan/ persistent storage convention, scoped to the active partition
+        var partition = Koan.Data.Core.EntityContext.Current?.Partition ?? "default";
         var basePath = Path.Combine(
-            AppContext.BaseDirectory, ".Koan", "cache", "rag");
+            AppContext.BaseDirectory, ".Koan", "cache", "rag", partition);
         Directory.CreateDirectory(basePath);
         _persistencePath = Path.Combine(basePath, "concept-graph.json");
     }
@@ -57,6 +65,14 @@ internal sealed class InMemoryConceptGraphStore : IConceptGraphStore
 
             if (snapshot is null) return;
 
+            if (snapshot.SchemaVersion != 1)
+            {
+                _logger.LogWarning(
+                    "Concept graph snapshot has unsupported schema version {Version}, skipping",
+                    snapshot.SchemaVersion);
+                return;
+            }
+
             lock (_writeLock)
             {
                 _entities.Clear();
@@ -75,7 +91,7 @@ internal sealed class InMemoryConceptGraphStore : IConceptGraphStore
                 }
 
                 foreach (var (entityId, docIds) in snapshot.EntityDocuments)
-                    _entityDocuments[entityId] = new HashSet<string>(docIds);
+                    _entityDocuments[entityId] = ImmutableHashSet.CreateRange(docIds);
             }
 
             _lastPersisted = DateTimeOffset.UtcNow;
@@ -142,15 +158,8 @@ internal sealed class InMemoryConceptGraphStore : IConceptGraphStore
             {
                 if (!visitedEntities.Add(eid)) continue;
 
-                IReadOnlyList<string> relIds;
-                lock (_writeLock)
-                {
-                    relIds = _adjacency.TryGetValue(eid, out var set)
-                        ? set.ToList()
-                        : [];
-                }
-
-                if (relIds.Count > 0)
+                // No lock needed — ImmutableHashSet is thread-safe
+                if (_adjacency.TryGetValue(eid, out var relIds))
                 {
                     foreach (var relId in relIds)
                     {
@@ -238,12 +247,17 @@ internal sealed class InMemoryConceptGraphStore : IConceptGraphStore
                 // Track document provenance
                 if (mention.Delta > 0)
                 {
-                    var docs = _entityDocuments.GetOrAdd(mention.EntityId, _ => []);
-                    docs.Add(mention.DocumentId);
+                    _entityDocuments.AddOrUpdate(
+                        mention.EntityId,
+                        _ => ImmutableHashSet.Create(mention.DocumentId),
+                        (_, existing) => existing.Add(mention.DocumentId));
                 }
-                else if (_entityDocuments.TryGetValue(mention.EntityId, out var existingDocs))
+                else
                 {
-                    existingDocs.Remove(mention.DocumentId);
+                    _entityDocuments.AddOrUpdate(
+                        mention.EntityId,
+                        _ => ImmutableHashSet<string>.Empty,
+                        (_, existing) => existing.Remove(mention.DocumentId));
                 }
             }
         }
@@ -286,14 +300,18 @@ internal sealed class InMemoryConceptGraphStore : IConceptGraphStore
 
     private void AddToAdjacency(string entityId, string relationshipId)
     {
-        var set = _adjacency.GetOrAdd(entityId, _ => []);
-        set.Add(relationshipId);
+        _adjacency.AddOrUpdate(
+            entityId,
+            _ => ImmutableHashSet.Create(relationshipId),
+            (_, existing) => existing.Add(relationshipId));
     }
 
     private void RemoveFromAdjacency(string entityId, string relationshipId)
     {
-        if (_adjacency.TryGetValue(entityId, out var set))
-            set.Remove(relationshipId);
+        _adjacency.AddOrUpdate(
+            entityId,
+            _ => ImmutableHashSet<string>.Empty,
+            (_, existing) => existing.Remove(relationshipId));
     }
 
     /// <summary>
@@ -301,6 +319,7 @@ internal sealed class InMemoryConceptGraphStore : IConceptGraphStore
     /// </summary>
     private sealed class GraphSnapshot
     {
+        public int SchemaVersion { get; init; } = 1;
         public List<ConceptEntity> Entities { get; init; } = [];
         public List<ConceptRelationship> Relationships { get; init; } = [];
         public Dictionary<string, IReadOnlyList<string>> EntityDocuments { get; init; } = new();

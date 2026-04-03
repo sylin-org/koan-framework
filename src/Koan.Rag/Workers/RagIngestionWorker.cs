@@ -26,6 +26,9 @@ internal sealed class RagIngestionWorker(
     private const double RetryBackoffMultiplier = 2.0;
     private const int BatchSize = 10;
 
+    private readonly Queue<DateTimeOffset> _recentCalls = new();
+    private const int MaxCallsPerMinute = 100;
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         logger.LogInformation(
@@ -35,6 +38,9 @@ internal sealed class RagIngestionWorker(
         // Load persisted concept graph and distillation tree on startup
         await graphStore.Load(stoppingToken);
         await treeStore.Load(stoppingToken);
+
+        // Recover stale Processing jobs (crashed before completion)
+        await RecoverStaleJobs(stoppingToken);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -83,6 +89,9 @@ internal sealed class RagIngestionWorker(
                 job.StartedAt = DateTimeOffset.UtcNow;
                 await job.Save(ct);
 
+                // Throttle outbound calls to respect rate limits
+                await WaitForRateLimit(ct);
+
                 // Dispatch to the pre-registered typed processor
                 await processorRegistry.Process(job, ct);
 
@@ -120,7 +129,12 @@ internal sealed class RagIngestionWorker(
         }
 
         if (processedCount > 0)
+        {
             await graphStore.Save(ct);
+
+            // Periodic cleanup of old completed jobs (keep last 24 hours)
+            await CleanupCompletedJobs(ct);
+        }
 
         return processedCount;
     }
@@ -151,6 +165,60 @@ internal sealed class RagIngestionWorker(
         }
 
         await job.Save(ct);
+    }
+
+    private async Task RecoverStaleJobs(CancellationToken ct)
+    {
+        try
+        {
+            var staleJobs = await RagIngestionJob.Query(
+                j => j.Status == RagIngestionStatus.Processing, ct);
+
+            foreach (var job in staleJobs)
+            {
+                job.Status = RagIngestionStatus.Pending;
+                job.StartedAt = null;
+                await job.Save(ct);
+            }
+
+            if (staleJobs.Count > 0)
+                logger.LogInformation("Recovered {Count} stale Processing jobs to Pending", staleJobs.Count);
+        }
+        catch { /* Job store may not be available yet */ }
+    }
+
+    private async Task WaitForRateLimit(CancellationToken ct)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var windowStart = now.AddMinutes(-1);
+
+        // Purge old entries
+        while (_recentCalls.Count > 0 && _recentCalls.Peek() < windowStart)
+            _recentCalls.Dequeue();
+
+        if (_recentCalls.Count >= MaxCallsPerMinute)
+        {
+            var oldestInWindow = _recentCalls.Peek();
+            var waitTime = oldestInWindow.AddMinutes(1) - now;
+            if (waitTime > TimeSpan.Zero)
+                await Task.Delay(waitTime, ct);
+        }
+
+        _recentCalls.Enqueue(now);
+    }
+
+    private static async Task CleanupCompletedJobs(CancellationToken ct)
+    {
+        try
+        {
+            var cutoff = DateTimeOffset.UtcNow.AddHours(-24);
+            var oldJobs = await RagIngestionJob.Query(
+                j => j.Status == RagIngestionStatus.Completed && j.CompletedAt < cutoff, ct);
+
+            foreach (var job in oldJobs.Take(50)) // Batch limit
+                await RagIngestionJob.Remove(job.Id, ct);
+        }
+        catch { /* Cleanup is best-effort */ }
     }
 
     private static async Task<List<RagIngestionJob>> QueryPendingJobs(

@@ -86,6 +86,12 @@ internal sealed class ContentAdapterRegistry
         string? directive,
         CancellationToken ct)
     {
+        // Validate path is absolute and doesn't contain traversal sequences
+        var fullPath = Path.GetFullPath(filePath);
+        if (!Path.IsPathFullyQualified(filePath))
+            throw new ArgumentException(
+                $"File path must be absolute and fully qualified: '{filePath}'", nameof(filePath));
+
         var fileInfo = new FileInfo(filePath);
         const long MaxFileSizeBytes = 100 * 1024 * 1024; // 100 MB
         if (fileInfo.Length > MaxFileSizeBytes)

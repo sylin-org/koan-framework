@@ -129,32 +129,38 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
             // 1. Contextual chunking with parent-child hierarchy
             var chunked = await _chunker.Chunk(text, documentTitle, metadata.Directive, ct);
 
-            // 2. Embed child chunks and store in vector index
-            var chunksCreated = 0;
-            var leafEmbeddings = new List<EmbeddingWithText>();
-            foreach (var child in chunked.ChildChunks)
+            // 2. Embed child chunks and store in vector index — parallel with bounded concurrency
+            var semaphore = new SemaphoreSlim(5); // Max 5 concurrent embed calls
+            var embedTasks = chunked.ChildChunks.Select(async child =>
             {
                 ct.ThrowIfCancellationRequested();
+                await semaphore.WaitAsync(ct);
+                try
+                {
+                    var embedding = await Koan.AI.Client.Embed(child.Text, ct);
+                    var chunkId = $"{documentId}:{child.Id}";
 
-                var embedding = await Koan.AI.Client.Embed(child.Text, ct);
-                var chunkId = $"{documentId}:{child.Id}";
+                    // Store chunk embedding with metadata linking to document and parent
+                    await Koan.Data.Vector.Vector<TEntity>.Save(
+                        chunkId,
+                        embedding,
+                        new Dictionary<string, object>
+                        {
+                            ["document_id"] = documentId,
+                            ["parent_id"] = child.ParentId ?? "",
+                            ["section"] = child.SectionTitle ?? "",
+                            ["is_child"] = true
+                        },
+                        ct);
 
-                // Store chunk embedding with metadata linking to document and parent
-                await Koan.Data.Vector.Vector<TEntity>.Save(
-                    chunkId,
-                    embedding,
-                    new Dictionary<string, object>
-                    {
-                        ["document_id"] = documentId,
-                        ["parent_id"] = child.ParentId ?? "",
-                        ["section"] = child.SectionTitle ?? "",
-                        ["is_child"] = true
-                    },
-                    ct);
+                    return new EmbeddingWithText(chunkId, embedding, child.Text);
+                }
+                finally { semaphore.Release(); }
+            }).ToList();
 
-                leafEmbeddings.Add(new EmbeddingWithText(chunkId, embedding, child.Text));
-                chunksCreated++;
-            }
+            var embedResults = await Task.WhenAll(embedTasks);
+            var leafEmbeddings = embedResults.ToList();
+            var chunksCreated = leafEmbeddings.Count;
 
             // 3. Extract entities from each parent chunk and resolve
             var entitiesExtracted = 0;

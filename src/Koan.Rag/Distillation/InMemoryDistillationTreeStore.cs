@@ -8,7 +8,11 @@ namespace Koan.Rag.Distillation;
 /// <summary>
 /// In-memory distillation tree with JSON snapshot persistence to
 /// <c>.Koan/cache/rag/{partition}/distillation-tree.json</c>.
-/// Partition-aware: reads the active partition from EntityContext.
+/// Partition-aware: reads the active partition from <c>EntityContext</c> at construction time.
+/// <para>
+/// Partition is captured at DI construction time. For multi-partition operation,
+/// register stores as scoped or use a partition-keyed factory.
+/// </para>
 /// </summary>
 internal sealed class InMemoryDistillationTreeStore : IDistillationTreeStore
 {
@@ -50,6 +54,14 @@ internal sealed class InMemoryDistillationTreeStore : IDistillationTreeStore
                 stream, JsonOptions, ct);
 
             if (snapshot is null) return;
+
+            if (snapshot.SchemaVersion != 1)
+            {
+                _logger.LogWarning(
+                    "Distillation tree snapshot has unsupported schema version {Version}, skipping",
+                    snapshot.SchemaVersion);
+                return;
+            }
 
             lock (_writeLock)
             {
@@ -184,6 +196,7 @@ internal sealed class InMemoryDistillationTreeStore : IDistillationTreeStore
 
     private sealed class TreeSnapshot
     {
+        public int SchemaVersion { get; init; } = 1;
         public List<DistillationNode> Nodes { get; init; } = [];
         public long Version { get; init; }
         public DateTimeOffset? LastBuildTime { get; init; }

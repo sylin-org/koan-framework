@@ -133,6 +133,16 @@ internal sealed class EntityResolver
             if (allEntities.Count == 0)
                 return null;
 
+            if (allEntities.Count > 10_000)
+            {
+                _logger.LogWarning(
+                    "Entity resolution: {Count} entities exceeds scan limit (10,000). " +
+                    "Consider indexing entity embeddings via Vector<ConceptEntity>.Search() for ANN.",
+                    allEntities.Count);
+                // Take a random sample to avoid degenerate behavior
+                allEntities = allEntities.OrderBy(_ => Random.Shared.Next()).Take(10_000).ToList();
+            }
+
             ConceptEntity? bestMatch = null;
             double bestSimilarity = 0;
 

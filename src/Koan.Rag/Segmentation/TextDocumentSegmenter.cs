@@ -48,6 +48,9 @@ internal sealed class TextDocumentSegmenter : IDocumentSegmenter
         string filePath,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
+        if (!Path.IsPathFullyQualified(filePath))
+            throw new ArgumentException("File path must be fully qualified", nameof(filePath));
+
         _logger.LogDebug("Segmenting large text document: {File}", filePath);
 
         using var reader = new StreamReader(filePath, Encoding.UTF8);
