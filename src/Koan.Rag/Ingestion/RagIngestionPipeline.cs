@@ -2,22 +2,42 @@ using System.Diagnostics;
 using Koan.Data.Abstractions;
 using Koan.Data.AI;
 using Koan.Rag.Abstractions;
+using Koan.Rag.Chunking;
+using Koan.Rag.Graph;
+using Koan.Rag.Infrastructure;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Koan.Rag.Ingestion;
 
 /// <summary>
-/// Orchestrates the multi-stage ingestion pipeline: modality detection,
-/// parallel extraction, entity/relationship extraction, chunking, embedding,
+/// Orchestrates the multi-stage ingestion pipeline: text extraction,
+/// contextual chunking, entity/relationship extraction, embedding,
 /// and concept graph construction.
 /// </summary>
 internal sealed class RagIngestionPipeline : IRagIngestionPipeline
 {
+    private readonly ContextualChunker _chunker;
+    private readonly EntityExtractor _entityExtractor;
+    private readonly EntityResolver _entityResolver;
+    private readonly IConceptGraphStore _graphStore;
     private readonly ILogger<RagIngestionPipeline> _logger;
+    private readonly RagOptions _options;
 
-    public RagIngestionPipeline(ILogger<RagIngestionPipeline> logger)
+    public RagIngestionPipeline(
+        ContextualChunker chunker,
+        EntityExtractor entityExtractor,
+        EntityResolver entityResolver,
+        IConceptGraphStore graphStore,
+        IOptions<RagOptions> options,
+        ILogger<RagIngestionPipeline> logger)
     {
+        _chunker = chunker;
+        _entityExtractor = entityExtractor;
+        _entityResolver = entityResolver;
+        _graphStore = graphStore;
         _logger = logger;
+        _options = options.Value;
     }
 
     public async Task<RagIngestResult> IngestFiles<TEntity>(
@@ -28,20 +48,20 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
     {
         var sw = Stopwatch.StartNew();
         var processed = 0;
-        var chunksCreated = 0;
-        var entitiesExtracted = 0;
+        var totalChunks = 0;
+        var totalEntities = 0;
         var errors = new List<RagIngestError>();
 
         for (var i = 0; i < filePaths.Count; i++)
         {
             ct.ThrowIfCancellationRequested();
-
             var filePath = filePaths[i];
+
             try
             {
                 var result = await IngestSingleFile<TEntity>(filePath, metadata, ct);
-                chunksCreated += result.ChunksCreated;
-                entitiesExtracted += result.EntitiesExtracted;
+                totalChunks += result.ChunksCreated;
+                totalEntities += result.EntitiesExtracted;
                 processed++;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
@@ -53,17 +73,20 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
             progress?.Report(new RagIngestProgress(
                 ProcessedFiles: i + 1,
                 TotalFiles: filePaths.Count,
-                ProcessedChunks: chunksCreated,
+                ProcessedChunks: totalChunks,
                 CurrentFileName: Path.GetFileName(filePath)));
         }
 
-        sw.Stop();
+        // Persist graph snapshot after batch ingestion
+        if (totalEntities > 0)
+            await _graphStore.Save(ct);
 
+        sw.Stop();
         return new RagIngestResult
         {
             FilesProcessed = processed,
-            ChunksCreated = chunksCreated,
-            EntitiesExtracted = entitiesExtracted,
+            ChunksCreated = totalChunks,
+            EntitiesExtracted = totalEntities,
             Errors = errors,
             Duration = sw.Elapsed
         };
@@ -78,71 +101,91 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
 
         try
         {
-            // Extract text content via EmbeddingMetadata convention inference
             var text = EntityAi.ExtractText(entity);
             if (string.IsNullOrWhiteSpace(text))
             {
                 _logger.LogWarning(
-                    "No embeddable content found on {EntityType} for RAG ingestion",
-                    typeof(TEntity).Name);
-
-                return new RagIngestResult
-                {
-                    FilesProcessed = 0,
-                    Duration = sw.Elapsed
-                };
+                    "No content found on {EntityType} for RAG ingestion", typeof(TEntity).Name);
+                return new RagIngestResult { Duration = sw.Elapsed };
             }
 
-            // TODO Phase 1d: Full pipeline — chunk, embed, extract entities, build graph
-            // For now: delegate to the existing embedding infrastructure
-            var embedding = await Koan.AI.Client.Embed(text, ct);
+            var documentId = entity.Id;
+            var documentTitle = ExtractTitle(entity);
 
-            // Store in vector index
-            await Koan.Data.Vector.Vector<TEntity>.Save(
-                entity,
-                new ReadOnlyMemory<float>(embedding),
-                metadata: null,
-                ct);
+            // 1. Contextual chunking with parent-child hierarchy
+            var chunked = await _chunker.Chunk(text, documentTitle, metadata.Directive, ct);
+
+            // 2. Embed child chunks and store in vector index
+            var chunksCreated = 0;
+            foreach (var child in chunked.ChildChunks)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                var embedding = await Koan.AI.Client.Embed(child.Text, ct);
+
+                // Store chunk embedding with metadata linking to document and parent
+                await Koan.Data.Vector.Vector<TEntity>.Save(
+                    $"{documentId}:{child.Id}",
+                    embedding,
+                    new Dictionary<string, object>
+                    {
+                        ["document_id"] = documentId,
+                        ["parent_id"] = child.ParentId ?? "",
+                        ["section"] = child.SectionTitle ?? "",
+                        ["is_child"] = true
+                    },
+                    ct);
+
+                chunksCreated++;
+            }
+
+            // 3. Extract entities from each parent chunk and resolve
+            var entitiesExtracted = 0;
+            if (metadata.GraphStrategy != GraphStrategy.Lazy)
+            {
+                entitiesExtracted = await ExtractAndResolveEntities(
+                    chunked.ParentChunks, documentId, documentTitle, metadata, ct);
+            }
 
             sw.Stop();
-
             return new RagIngestResult
             {
                 FilesProcessed = 1,
-                ChunksCreated = 1, // Single-chunk for now; multi-chunk in Phase 1d
-                EntitiesExtracted = 0, // Phase 2
+                ChunksCreated = chunksCreated,
+                EntitiesExtracted = entitiesExtracted,
                 Duration = sw.Elapsed
             };
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             sw.Stop();
-
             return new RagIngestResult
             {
-                FilesProcessed = 0,
                 Errors = [new RagIngestError(typeof(TEntity).Name, ex.Message, ex)],
                 Duration = sw.Elapsed
             };
         }
     }
 
-    public Task RemoveEntity<TEntity>(
+    public async Task RemoveEntity<TEntity>(
         TEntity entity,
         RagCorpusMetadata metadata,
         CancellationToken ct) where TEntity : class, IEntity<string>
     {
-        // TODO: Remove chunks, decrement entity mentions, prune graph
-        return Koan.Data.Vector.Vector<TEntity>.Delete(entity.Id, ct);
+        // Remove chunks from vector index
+        await Koan.Data.Vector.Vector<TEntity>.Delete(entity.Id, ct);
+
+        // TODO: Remove all child chunks (need chunk store to enumerate)
+        // TODO: Build removal delta for concept graph
     }
 
     public Task Rebuild<TEntity>(
         RagCorpusMetadata metadata,
         CancellationToken ct) where TEntity : class, IEntity<string>
     {
-        // TODO Phase 4: Full rebuild with content-hash diffing
         _logger.LogInformation("Rebuild requested for corpus '{Corpus}'",
             metadata.EffectiveName(typeof(TEntity)));
+        // TODO: Full rebuild — query all entities, re-ingest with content-hash diffing
         return Task.CompletedTask;
     }
 
@@ -161,10 +204,13 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
         RagCorpusMetadata metadata,
         CancellationToken ct) where TEntity : class, IEntity<string>
     {
-        // TODO Phase 4: Real stats from chunk store, graph, and telemetry
+        var graphStats = _graphStore.GetStats();
         return Task.FromResult(new RagCorpusStats
         {
-            FreshnessScore = 1.0
+            Entities = graphStats.EntityCount,
+            Relationships = graphStats.RelationshipCount,
+            FreshnessScore = 1.0,
+            LastFullReindex = graphStats.LastPersisted
         });
     }
 
@@ -172,7 +218,6 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
         RagCorpusMetadata metadata,
         CancellationToken ct) where TEntity : class, IEntity<string>
     {
-        // Ready if the vector store is available for this entity type
         return Task.FromResult(Koan.Data.Vector.Vector<TEntity>.IsAvailable);
     }
 
@@ -180,40 +225,151 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
         RagCorpusMetadata metadata,
         CancellationToken ct) where TEntity : class, IEntity<string>
     {
-        // Clear the vector index
         if (Koan.Data.Vector.Vector<TEntity>.IsAvailable)
-        {
             await Koan.Data.Vector.Vector<TEntity>.Clear(ct);
-        }
 
-        // TODO: Clear concept graph, chunk store, ingestion state
+        // Clear concept graph
+        await _graphStore.ApplyDelta(new GraphDelta
+        {
+            // Full clear via empty delta — the store handles this
+            // TODO: Add a Clear() method to IConceptGraphStore
+        }, ct);
     }
+
+    // ── Internal Pipeline Steps ─────────────────────────────────────────
 
     private async Task<(int ChunksCreated, int EntitiesExtracted)> IngestSingleFile<TEntity>(
         string filePath,
         RagCorpusMetadata metadata,
         CancellationToken ct) where TEntity : class, IEntity<string>
     {
-        // TODO Phase 1d: Full file ingestion pipeline
-        // 1. Detect modality from file extension / magic bytes
-        // 2. Parse content (text, PDF, image, audio/video)
-        // 3. Apply parallel extraction (Describe, OCR, Transcribe, Classify)
-        // 4. Extract entities and facts
-        // 5. Chunk with contextual prefixes and parent-child hierarchy
-        // 6. Multi-level embed (document, section, chunk)
-        // 7. Merge to concept graph
+        _logger.LogDebug("Ingesting file {FilePath}", filePath);
 
-        _logger.LogDebug("Ingesting file {FilePath} into corpus", filePath);
-
-        // Minimal implementation: read text, embed as single chunk
+        // Read file content
+        // TODO: Modality detection + multi-modal extraction (OCR, Describe, Transcribe)
         var text = await File.ReadAllTextAsync(filePath, ct);
         if (string.IsNullOrWhiteSpace(text))
             return (0, 0);
 
-        var embedding = await Koan.AI.Client.Embed(text, ct);
+        var documentId = Path.GetFileNameWithoutExtension(filePath);
+        var documentTitle = Path.GetFileName(filePath);
 
-        // TODO: Store chunk with proper ID and metadata
-        return (1, 0);
+        // Chunk
+        var chunked = await _chunker.Chunk(text, documentTitle, metadata.Directive, ct);
+
+        // Embed child chunks
+        var chunksCreated = 0;
+        foreach (var child in chunked.ChildChunks)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var embedding = await Koan.AI.Client.Embed(child.Text, ct);
+            // TODO: Store in chunk-specific vector collection
+            chunksCreated++;
+        }
+
+        // Extract entities
+        var entitiesExtracted = 0;
+        if (metadata.GraphStrategy != GraphStrategy.Lazy)
+        {
+            entitiesExtracted = await ExtractAndResolveEntities(
+                chunked.ParentChunks, documentId, documentTitle, metadata, ct);
+        }
+
+        return (chunksCreated, entitiesExtracted);
     }
 
+    private async Task<int> ExtractAndResolveEntities(
+        IReadOnlyList<RagContentChunk> parentChunks,
+        string documentId,
+        string? documentTitle,
+        RagCorpusMetadata metadata,
+        CancellationToken ct)
+    {
+        var totalEntities = 0;
+
+        foreach (var parent in parentChunks)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            // Extract entities from this chunk
+            var extraction = await _entityExtractor.ExtractEntities(
+                parent.Text, documentTitle, parent.SectionTitle, metadata.Directive, ct);
+
+            if (extraction.Entities.Count == 0)
+                continue;
+
+            // Resolve against existing graph
+            var resolution = await _entityResolver.Resolve(
+                extraction.Entities, documentId, ct);
+
+            // Apply delta to graph
+            await _graphStore.ApplyDelta(resolution.Delta, ct);
+            totalEntities += resolution.ResolvedEntities.Count;
+
+            // Full strategy: also extract explicit relationships
+            if (metadata.GraphStrategy == GraphStrategy.Full && resolution.ResolvedEntities.Count >= 2)
+            {
+                var entityNames = resolution.ResolvedEntities
+                    .Select(e => e.CanonicalName)
+                    .ToList();
+
+                var relationships = await _entityExtractor.ExtractRelationships(
+                    parent.Text, entityNames, metadata.Directive, ct);
+
+                if (relationships.Relationships.Count > 0)
+                {
+                    var relDelta = BuildRelationshipDelta(
+                        relationships.Relationships, resolution.ResolvedEntities, documentId);
+                    await _graphStore.ApplyDelta(relDelta, ct);
+                }
+            }
+        }
+
+        return totalEntities;
+    }
+
+    private static GraphDelta BuildRelationshipDelta(
+        IReadOnlyList<ExtractedRelationship> relationships,
+        IReadOnlyList<ConceptEntity> resolvedEntities,
+        string documentId)
+    {
+        var entityLookup = resolvedEntities.ToDictionary(
+            e => e.CanonicalName,
+            e => e.Id,
+            StringComparer.OrdinalIgnoreCase);
+
+        var addedRelationships = new List<ConceptRelationship>();
+
+        foreach (var rel in relationships)
+        {
+            if (entityLookup.TryGetValue(
+                    EntityResolver.NormalizeName(rel.From), out var fromId) &&
+                entityLookup.TryGetValue(
+                    EntityResolver.NormalizeName(rel.To), out var toId))
+            {
+                addedRelationships.Add(new ConceptRelationship
+                {
+                    Id = $"rel:{fromId}:{toId}:{rel.Label.ToLowerInvariant().Replace(' ', '-')}",
+                    FromEntityId = fromId,
+                    ToEntityId = toId,
+                    Label = rel.Label,
+                    Confidence = 1.0,
+                    SourceDocumentId = documentId
+                });
+            }
+        }
+
+        return new GraphDelta { AddedRelationships = addedRelationships };
+    }
+
+    private static string? ExtractTitle<TEntity>(TEntity entity) where TEntity : class
+    {
+        // Try common title properties by convention
+        var titleProp = typeof(TEntity).GetProperty("Title")
+            ?? typeof(TEntity).GetProperty("Name")
+            ?? typeof(TEntity).GetProperty("Subject");
+
+        return titleProp?.GetValue(entity)?.ToString();
+    }
 }

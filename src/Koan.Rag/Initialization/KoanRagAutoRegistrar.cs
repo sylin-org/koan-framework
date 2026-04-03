@@ -36,6 +36,12 @@ public sealed class KoanRagAutoRegistrar : IKoanAutoRegistrar
         services.AddSingleton<IRagService, RagService>();
         services.AddSingleton<IConceptGraphStore, Graph.InMemoryConceptGraphStore>();
 
+        // ── Pipeline Components ─────────────────────────────────────────
+        services.AddSingleton<Chunking.ContextualChunker>();
+        services.AddSingleton<Graph.EntityExtractor>();
+        services.AddSingleton<Graph.EntityResolver>();
+        services.AddSingleton<Evaluation.RagEvaluator>();
+
         // ── Configuration ───────────────────────────────────────────────
         services.AddOptions<RagOptions>()
             .BindConfiguration(Infrastructure.ConfigurationKeys.Rag)

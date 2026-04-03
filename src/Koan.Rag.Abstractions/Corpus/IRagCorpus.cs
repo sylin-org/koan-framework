@@ -91,4 +91,7 @@ public interface IRagCorpus<TEntity> : IRagCorpusBase where TEntity : class, IEn
 
     /// <summary>Remove all documents, chunks, and graph data. Dev/test only.</summary>
     Task Clear(CancellationToken ct = default);
+
+    /// <summary>Run quality evaluation against a test set.</summary>
+    Task<RagEvaluation> Evaluate(RagTestSet testSet, CancellationToken ct = default);
 }

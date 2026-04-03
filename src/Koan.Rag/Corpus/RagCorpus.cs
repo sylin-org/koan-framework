@@ -1,6 +1,8 @@
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Koan.Data.Abstractions;
 using Koan.Rag.Abstractions;
+using Koan.Rag.Evaluation;
 using Koan.Rag.Ingestion;
 using Koan.Rag.Retrieval;
 using Microsoft.Extensions.Logging;
@@ -17,17 +19,20 @@ internal sealed class RagCorpus<TEntity> : IRagCorpus<TEntity> where TEntity : c
     private readonly RagCorpusMetadata _metadata;
     private readonly IRagIngestionPipeline _ingestionPipeline;
     private readonly IRagRetrievalPipeline _retrievalPipeline;
+    private readonly RagEvaluator _evaluator;
     private readonly ILogger _logger;
 
     public RagCorpus(
         RagCorpusMetadata metadata,
         IRagIngestionPipeline ingestionPipeline,
         IRagRetrievalPipeline retrievalPipeline,
+        RagEvaluator evaluator,
         ILogger logger)
     {
         _metadata = metadata;
         _ingestionPipeline = ingestionPipeline;
         _retrievalPipeline = retrievalPipeline;
+        _evaluator = evaluator;
         _logger = logger;
     }
 
@@ -190,5 +195,39 @@ internal sealed class RagCorpus<TEntity> : IRagCorpus<TEntity> where TEntity : c
             _metadata.EffectiveName(typeof(TEntity)), typeof(TEntity).Name);
 
         await _ingestionPipeline.Clear<TEntity>(_metadata, ct);
+    }
+
+    // ── Evaluation ──────────────────────────────────────────────────────
+
+    public async Task<RagEvaluation> Evaluate(RagTestSet testSet, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(testSet);
+        var sw = Stopwatch.StartNew();
+
+        _logger.LogInformation(
+            "Running evaluation on corpus '{Corpus}' with {Cases} test cases",
+            _metadata.EffectiveName(typeof(TEntity)), testSet.Count);
+
+        var results = new List<RagTestCaseResult>();
+
+        foreach (var testCase in testSet)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var queryResult = await AskResult(testCase.Query, ct);
+            var caseResult = await _evaluator.EvaluateCase(testCase, queryResult, ct);
+            results.Add(caseResult);
+        }
+
+        sw.Stop();
+        var evaluation = _evaluator.Aggregate(results, sw.Elapsed);
+
+        _logger.LogInformation(
+            "Evaluation complete: Faithfulness={F:F2}, Relevancy={R:F2}, " +
+            "Hallucination={H:F2}, Duration={D}",
+            evaluation.Faithfulness, evaluation.AnswerRelevancy,
+            evaluation.HallucinationScore, evaluation.Duration);
+
+        return evaluation;
     }
 }

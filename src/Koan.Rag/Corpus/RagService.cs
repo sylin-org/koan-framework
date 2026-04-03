@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Koan.Data.Abstractions;
 using Koan.Rag.Abstractions;
+using Koan.Rag.Evaluation;
 using Koan.Rag.Ingestion;
 using Koan.Rag.Retrieval;
 using Microsoft.Extensions.Logging;
@@ -16,15 +17,18 @@ internal sealed class RagService : IRagService
     private readonly ConcurrentDictionary<(Type, string?), object> _corpora = new();
     private readonly IRagIngestionPipeline _ingestionPipeline;
     private readonly IRagRetrievalPipeline _retrievalPipeline;
+    private readonly RagEvaluator _evaluator;
     private readonly ILoggerFactory _loggerFactory;
 
     public RagService(
         IRagIngestionPipeline ingestionPipeline,
         IRagRetrievalPipeline retrievalPipeline,
+        RagEvaluator evaluator,
         ILoggerFactory loggerFactory)
     {
         _ingestionPipeline = ingestionPipeline;
         _retrievalPipeline = retrievalPipeline;
+        _evaluator = evaluator;
         _loggerFactory = loggerFactory;
     }
 
@@ -63,6 +67,6 @@ internal sealed class RagService : IRagService
             (metadata.Name is not null ? $"[{metadata.Name}]" : ""));
 
         return new RagCorpus<TEntity>(
-            metadata, _ingestionPipeline, _retrievalPipeline, logger);
+            metadata, _ingestionPipeline, _retrievalPipeline, _evaluator, logger);
     }
 }
