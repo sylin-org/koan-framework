@@ -52,6 +52,14 @@ public sealed class KoanRagAutoRegistrar : IKoanAutoRegistrar
         services.AddSingleton<IContentAdapter, Content.Adapters.AudioAdapter>();
         services.AddSingleton<IContentAdapter, Content.Adapters.PdfAdapter>();
 
+        // ── Distillation Tree ───────────────────────────────────────────
+        services.AddSingleton<IClusteringStrategy, Distillation.DiagonalGmmClustering>();
+        services.AddSingleton<IDistillationTreeStore, Distillation.InMemoryDistillationTreeStore>();
+        services.AddSingleton<Distillation.DistillationTreeBuilder>();
+
+        // ── Document Segmentation ───────────────────────────────────────
+        services.AddSingleton<IDocumentSegmenter, Segmentation.TextDocumentSegmenter>();
+
         // ── Configuration ───────────────────────────────────────────────
         services.AddOptions<RagOptions>()
             .BindConfiguration(Infrastructure.ConfigurationKeys.Rag)

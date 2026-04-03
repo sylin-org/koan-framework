@@ -28,5 +28,6 @@
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" Version="10.0.0" />
+    <PackageReference Include="UMAP" Version="1.0.62830" />
   </ItemGroup>
 </Project>

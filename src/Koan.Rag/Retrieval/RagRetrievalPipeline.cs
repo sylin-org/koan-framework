@@ -20,15 +20,18 @@ namespace Koan.Rag.Retrieval;
 internal sealed class RagRetrievalPipeline : IRagRetrievalPipeline
 {
     private readonly IConceptGraphStore _graphStore;
+    private readonly IDistillationTreeStore _treeStore;
     private readonly ILogger<RagRetrievalPipeline> _logger;
     private readonly RagOptions _options;
 
     public RagRetrievalPipeline(
         IConceptGraphStore graphStore,
+        IDistillationTreeStore treeStore,
         IOptions<RagOptions> options,
         ILogger<RagRetrievalPipeline> logger)
     {
         _graphStore = graphStore;
+        _treeStore = treeStore;
         _logger = logger;
         _options = options.Value;
     }

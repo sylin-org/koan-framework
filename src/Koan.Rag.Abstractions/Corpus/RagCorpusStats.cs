@@ -46,4 +46,15 @@ public sealed record RagCorpusStats
 
     /// <summary>Documents added since the last full reindex.</summary>
     public int DocumentsSinceLastReindex { get; init; }
+
+    // ── Distillation Tree ───────────────────────────────────────────
+
+    /// <summary>Total nodes in the distillation tree (all levels).</summary>
+    public int TreeNodes { get; init; }
+
+    /// <summary>Depth of the distillation tree.</summary>
+    public int TreeDepth { get; init; }
+
+    /// <summary>When the distillation tree was last built.</summary>
+    public DateTimeOffset? TreeLastBuildTime { get; init; }
 }

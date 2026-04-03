@@ -52,6 +52,22 @@ public sealed class RagOptions
     /// <summary>Whether to include citations in results.</summary>
     public bool CitationsEnabled { get; set; } = true;
 
+    /// <summary>
+    /// Cluster branching factor for the distillation tree.
+    /// Each parent node summarizes approximately this many children.
+    /// Default: 10.
+    /// </summary>
+    [Range(3, 50)]
+    public int TreeClusterFactor { get; set; } = 10;
+
+    /// <summary>
+    /// Maximum tree depth. Null = auto-computed from corpus size.
+    /// Capped at 5 regardless: summaries-of-summaries beyond level 5
+    /// degrade in information density.
+    /// </summary>
+    [Range(1, 10)]
+    public int? TreeMaxDepth { get; set; }
+
     /// <summary>Per-stage model routing overrides. Keyed by stage name.</summary>
     public RagModelRouting Models { get; set; } = new();
 }
@@ -86,4 +102,7 @@ public sealed class RagModelRouting
 
     /// <summary>Model for content description (vision).</summary>
     public string? Describe { get; set; }
+
+    /// <summary>Model for distillation tree summarization. Can be cheaper than StrategyGeneration.</summary>
+    public string? Summarize { get; set; }
 }

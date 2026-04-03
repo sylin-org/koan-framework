@@ -4,6 +4,7 @@ using Koan.Data.AI;
 using Koan.Rag.Abstractions;
 using Koan.Rag.Chunking;
 using Koan.Rag.Content;
+using Koan.Rag.Distillation;
 using Koan.Rag.Graph;
 using Koan.Rag.Infrastructure;
 using Microsoft.Extensions.Logging;
@@ -23,6 +24,8 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
     private readonly EntityExtractor _entityExtractor;
     private readonly EntityResolver _entityResolver;
     private readonly IConceptGraphStore _graphStore;
+    private readonly DistillationTreeBuilder _treeBuilder;
+    private readonly IDistillationTreeStore _treeStore;
     private readonly ILogger<RagIngestionPipeline> _logger;
     private readonly RagOptions _options;
 
@@ -32,6 +35,8 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
         EntityExtractor entityExtractor,
         EntityResolver entityResolver,
         IConceptGraphStore graphStore,
+        DistillationTreeBuilder treeBuilder,
+        IDistillationTreeStore treeStore,
         IOptions<RagOptions> options,
         ILogger<RagIngestionPipeline> logger)
     {
@@ -40,6 +45,8 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
         _entityExtractor = entityExtractor;
         _entityResolver = entityResolver;
         _graphStore = graphStore;
+        _treeBuilder = treeBuilder;
+        _treeStore = treeStore;
         _logger = logger;
         _options = options.Value;
     }
@@ -303,12 +310,16 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
         CancellationToken ct) where TEntity : class, IEntity<string>
     {
         var graphStats = _graphStore.GetStats();
+        var treeStats = _treeStore.GetStats();
         return Task.FromResult(new RagCorpusStats
         {
             Entities = graphStats.EntityCount,
             Relationships = graphStats.RelationshipCount,
             FreshnessScore = 1.0,
-            LastFullReindex = graphStats.LastPersisted
+            LastFullReindex = graphStats.LastPersisted,
+            TreeNodes = treeStats.TotalNodes,
+            TreeDepth = treeStats.TreeDepth,
+            TreeLastBuildTime = treeStats.LastBuildTime
         });
     }
 
