@@ -130,7 +130,7 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
             var chunked = await _chunker.Chunk(text, documentTitle, metadata.Directive, ct);
 
             // 2. Embed child chunks and store in vector index — parallel with bounded concurrency
-            var semaphore = new SemaphoreSlim(5); // Max 5 concurrent embed calls
+            using var semaphore = new SemaphoreSlim(5); // Max 5 concurrent embed calls
             var embedTasks = chunked.ChildChunks.Select(async child =>
             {
                 ct.ThrowIfCancellationRequested();

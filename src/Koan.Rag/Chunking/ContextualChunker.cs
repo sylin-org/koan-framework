@@ -111,7 +111,7 @@ internal sealed class ContextualChunker
         foreach (var line in lines)
         {
             // Detect headings: lines starting with # (markdown) or all-caps short lines
-            if (IsHeading(line))
+            if (TextHeuristics.IsHeading(line))
             {
                 if (currentContent.Count > 0)
                 {
@@ -134,20 +134,6 @@ internal sealed class ContextualChunker
             sections.Add(new TextSection(null, text));
 
         return sections;
-    }
-
-    private static bool IsHeading(string line)
-    {
-        var trimmed = line.TrimStart();
-        if (trimmed.StartsWith('#')) return true;
-
-        // All-caps short line (likely a heading)
-        if (trimmed.Length is > 3 and < 80 &&
-            trimmed == trimmed.ToUpperInvariant() &&
-            trimmed.Any(char.IsLetter))
-            return true;
-
-        return false;
     }
 
     // ── Parent Chunk Creation ───────────────────────────────────────────

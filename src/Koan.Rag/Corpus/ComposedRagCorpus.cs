@@ -134,9 +134,12 @@ internal sealed class ComposedRagCorpus : IComposedRagCorpus
         string query,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        // Retrieve context first, then stream generation
-        var result = await AskResult(query, ct);
-        yield return result.Answer;
+        // Composed corpus does not support true token-level streaming.
+        // Use Ask() or AskResult() instead.
+        throw new NotSupportedException(
+            "Token-level streaming is not supported for composed corpora. " +
+            "Use Ask() or AskResult() instead.");
+        yield break; // Required for IAsyncEnumerable signature
     }
 
     private static IReadOnlyList<RagChunk> NormalizeScores(IReadOnlyList<RagChunk> chunks)

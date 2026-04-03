@@ -71,7 +71,7 @@ internal sealed class TextDocumentSegmenter : IDocumentSegmenter
                 if (line is null) break;
 
                 // Track headings for structural context
-                if (IsHeading(line))
+                if (TextHeuristics.IsHeading(line))
                 {
                     lastHeading = line.TrimStart('#', ' ', '\t');
                     if (!currentHeadings.Contains(lastHeading))
@@ -115,16 +115,4 @@ internal sealed class TextDocumentSegmenter : IDocumentSegmenter
             Path.GetFileName(filePath), segmentIndex);
     }
 
-    private static bool IsHeading(string line)
-    {
-        var trimmed = line.TrimStart();
-        if (trimmed.StartsWith('#')) return true;
-
-        if (trimmed.Length is > 3 and < 80 &&
-            trimmed == trimmed.ToUpperInvariant() &&
-            trimmed.Any(char.IsLetter))
-            return true;
-
-        return false;
-    }
 }

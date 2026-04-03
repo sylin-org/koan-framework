@@ -133,7 +133,7 @@ internal sealed class RagIngestionWorker(
             await graphStore.Save(ct);
 
             // Periodic cleanup of old completed jobs (keep last 24 hours)
-            await CleanupCompletedJobs(ct);
+            await CleanupCompletedJobs(logger, ct);
         }
 
         return processedCount;
@@ -184,7 +184,11 @@ internal sealed class RagIngestionWorker(
             if (staleJobs.Count > 0)
                 logger.LogInformation("Recovered {Count} stale Processing jobs to Pending", staleJobs.Count);
         }
-        catch { /* Job store may not be available yet */ }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "Job store not available during stale job recovery");
+        }
     }
 
     private async Task WaitForRateLimit(CancellationToken ct)
@@ -207,7 +211,7 @@ internal sealed class RagIngestionWorker(
         _recentCalls.Enqueue(now);
     }
 
-    private static async Task CleanupCompletedJobs(CancellationToken ct)
+    private static async Task CleanupCompletedJobs(ILogger logger, CancellationToken ct)
     {
         try
         {
@@ -218,7 +222,11 @@ internal sealed class RagIngestionWorker(
             foreach (var job in oldJobs.Take(50)) // Batch limit
                 await RagIngestionJob.Remove(job.Id, ct);
         }
-        catch { /* Cleanup is best-effort */ }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "Job cleanup encountered an error");
+        }
     }
 
     private static async Task<List<RagIngestionJob>> QueryPendingJobs(

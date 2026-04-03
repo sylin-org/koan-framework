@@ -87,7 +87,6 @@ internal sealed class ContentAdapterRegistry
         CancellationToken ct)
     {
         // Validate path is absolute and doesn't contain traversal sequences
-        var fullPath = Path.GetFullPath(filePath);
         if (!Path.IsPathFullyQualified(filePath))
             throw new ArgumentException(
                 $"File path must be absolute and fully qualified: '{filePath}'", nameof(filePath));

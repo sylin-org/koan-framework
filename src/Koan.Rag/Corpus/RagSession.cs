@@ -15,6 +15,7 @@ internal sealed class RagSession<TEntity> : IRagSession<TEntity> where TEntity :
     private readonly RagSessionOptions _options;
     private readonly List<(string Role, string Content)> _history = [];
     private int _tokensUsed;
+    private int _turnCount;
 
     internal RagSession(
         IRagCorpus<TEntity> corpus,
@@ -30,7 +31,7 @@ internal sealed class RagSession<TEntity> : IRagSession<TEntity> where TEntity :
 
     public int TokensUsed => _tokensUsed;
     public int TokensRemaining => Math.Max(0, _options.MaxTokenBudget - _tokensUsed);
-    public int TurnCount => _history.Count(h => h.Role == "user");
+    public int TurnCount => _turnCount;
 
     public async Task<string> Ask(string query, CancellationToken ct = default)
     {
@@ -42,11 +43,12 @@ internal sealed class RagSession<TEntity> : IRagSession<TEntity> where TEntity :
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
 
-        _history.Add(("user", query));
-        _tokensUsed += EstimateTokens(query);
-
-        if (_tokensUsed > _options.MaxTokenBudget)
+        var queryTokens = EstimateTokens(query);
+        if (_tokensUsed + queryTokens > _options.MaxTokenBudget)
             await HandleBudgetExhaustion(ct);
+        _history.Add(("user", query));
+        _tokensUsed += queryTokens;
+        _turnCount++;
 
         var contextualQuery = BuildContextualQuery(query);
         var result = await _retrievalPipeline.Execute<TEntity>(
@@ -62,13 +64,15 @@ internal sealed class RagSession<TEntity> : IRagSession<TEntity> where TEntity :
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
 
+        // Check budget before mutating state
+        var queryTokens = EstimateTokens(query);
+        if (_tokensUsed + queryTokens > _options.MaxTokenBudget)
+            await HandleBudgetExhaustion(ct);
+
         // Track the question in history
         _history.Add(("user", query));
-        _tokensUsed += EstimateTokens(query);
-
-        // Handle budget exhaustion
-        if (_tokensUsed > _options.MaxTokenBudget)
-            await HandleBudgetExhaustion(ct);
+        _tokensUsed += queryTokens;
+        _turnCount++;
 
         // Build context-aware query with conversation history
         var contextualQuery = BuildContextualQuery(query);
@@ -87,6 +91,7 @@ internal sealed class RagSession<TEntity> : IRagSession<TEntity> where TEntity :
     {
         _history.Clear();
         _tokensUsed = 0;
+        _turnCount = 0;
         return ValueTask.CompletedTask;
     }
 

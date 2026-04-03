@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using Koan.Rag.Abstractions;
 using Koan.Rag.Infrastructure;
@@ -27,7 +28,7 @@ internal sealed class DistillationTreeBuilder
     private readonly string? _summarizeModel;
 
     private long _currentVersion;
-    private readonly Dictionary<string, string> _leafTextCache = new();
+    private readonly ConcurrentDictionary<string, string> _leafTextCache = new();
 
     public DistillationTreeBuilder(
         IClusteringStrategy clustering,
@@ -57,7 +58,7 @@ internal sealed class DistillationTreeBuilder
         // Cache leaf texts for Level 1 summarization (keyed by chunk ID)
         _leafTextCache.Clear();
         foreach (var leaf in leafEmbeddings)
-            _leafTextCache[leaf.Id] = leaf.Text;
+            _leafTextCache.TryAdd(leaf.Id, leaf.Text);
 
         if (leafEmbeddings.Count < 2)
         {
@@ -264,7 +265,7 @@ internal sealed class DistillationTreeBuilder
     {
         try { return await Koan.AI.Client.Embed(summary, ct); }
         catch (OperationCanceledException) { throw; }
-        catch { return null; }
+        catch (Exception) { return null; }
     }
 
     private static IReadOnlyList<string> ExtractSourceDocuments(IReadOnlyList<string> memberIds)

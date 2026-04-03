@@ -48,10 +48,10 @@ public sealed class KoanRagAutoRegistrar : IKoanAutoRegistrar
         // ── Content Adapters ────────────────────────────────────────────
         services.TryAddSingleton<Content.Strategies.StrategyGenerator>();
         services.TryAddSingleton<Content.ContentAdapterRegistry>();
-        services.TryAddSingleton<IContentAdapter, Content.Adapters.TextDocumentAdapter>();
-        services.TryAddSingleton<IContentAdapter, Content.Adapters.ImageAdapter>();
-        services.TryAddSingleton<IContentAdapter, Content.Adapters.AudioAdapter>();
-        services.TryAddSingleton<IContentAdapter, Content.Adapters.PdfAdapter>();
+        services.AddSingleton<IContentAdapter, Content.Adapters.TextDocumentAdapter>();
+        services.AddSingleton<IContentAdapter, Content.Adapters.ImageAdapter>();
+        services.AddSingleton<IContentAdapter, Content.Adapters.AudioAdapter>();
+        services.AddSingleton<IContentAdapter, Content.Adapters.PdfAdapter>();
 
         // ── Distillation Tree ───────────────────────────────────────────
         services.TryAddSingleton<IClusteringStrategy, Distillation.DiagonalGmmClustering>();
@@ -141,19 +141,6 @@ public sealed class KoanRagAutoRegistrar : IKoanAutoRegistrar
         module.AddSetting("Rag:RerankEnabled", rerankEnabled,
             source: BootSettingSource.AppSettings);
 
-        // Report distillation tree stats if available
-        var treeStore = Koan.Core.Hosting.App.AppHost.Current
-            ?.GetService(typeof(IDistillationTreeStore)) as IDistillationTreeStore;
-        if (treeStore is not null)
-        {
-            var treeStats = treeStore.GetStats();
-            module.SetNote("distillation-tree", n => n
-                .Message($"Distillation tree: {treeStats.TotalNodes} nodes, " +
-                         $"depth {treeStats.TreeDepth}, version {treeStats.CurrentVersion}" +
-                         (treeStats.LastBuildTime.HasValue
-                             ? $", last built {treeStats.LastBuildTime.Value:u}"
-                             : ", not yet built")));
-        }
     }
 
     // ── Job Processor Registration (typed, no runtime reflection) ──────
