@@ -775,6 +775,53 @@ var result = await agent.Run("How do I connect to external APIs?", ct);
 
 All values have convention defaults. Zero configuration required to use `Rag.Corpus<T>()`.
 
+### Part 15: Content Adapter Architecture — Multi-Round Interpretation
+
+**Added post-initial ADR based on implementation experience.**
+
+Pluggable content-to-text adapters with a multi-round interpretation protocol:
+
+- **Round 1 (Classification)**: Vision model detects content type using hierarchical categories (e.g., `diagram/architecture`, `table`, `chart/line`)
+- **Round 2 (Interpretation)**: Strategy-specific prompt extracts structured meaning — components, connections, data, relationships
+- **Round 3 (Enrichment)**: Optional pass extracts implicit information — constraints, assumptions, failure modes
+
+Strategy resolution hierarchy:
+1. **Pre-determined**: 8 built-in strategies for known content types with optimized prompts
+2. **Auto-generated**: Best available reasoning model generates strategy for novel content types (cached per corpus)
+3. **Corpus-cached**: Promoted from auto-generated after repeated use
+
+Abstractions: `IContentAdapter`, `ContentAdapterAttribute`, `InterpretationStrategy`, `ContentClassification`.
+Built-in adapters: Text, Image, Audio, PDF. Extensible via `[ContentAdapter(".dwg")]` attribute.
+Model routing: `RagModelRouting.StrategyGeneration` routes to best reasoning model for strategy creation.
+
+### Part 16: Hierarchical Distillation — Corpus-Wide RAPTOR Tree
+
+**Added post-initial ADR based on research into large-document processing.**
+
+Builds a RAPTOR [Sarthi et al., ICLR 2024] distillation tree from all chunks across all documents in a corpus. The tree progressively clusters and summarizes content bottom-up:
+
+- **Level 0**: All leaf chunks (already embedded during ingestion)
+- **Level 1**: Cluster summaries — semantically similar chunks grouped via UMAP + GMM (soft clustering, BIC for k selection)
+- **Level 2+**: Recursive clustering and summarization
+- **Level N**: Corpus-level thematic summaries
+
+**Cross-document clustering**: Chunks from different documents that discuss the same topic cluster together. Documents 1, 3, 54, 194 discussing HL7 are grouped regardless of document boundaries.
+
+**Collapsed tree retrieval**: All tree levels stored in the same vector index, searched simultaneously. A factoid query matches a leaf chunk; a thematic query matches a Level 2-3 summary. No routing decision needed — embedding similarity naturally selects the right granularity. RAPTOR evaluation showed 18-57% of useful retrieved nodes come from non-leaf layers.
+
+**Adaptive depth**: `min(ceil(log(chunkCount) / log(clusterFactor)), maxDepth)`. Default cluster factor: 10. Max depth: 5. Auto-computed from corpus size with configuration override.
+
+**Two build phases**:
+- Phase A (per-document): Built during ingestion, captures internal structure
+- Phase B (corpus-wide): Trigger-based (on `Rebuild()`, `ReindexRecommended`, or explicit API), captures cross-document connections
+
+**Incremental updates**: New chunks assigned to nearest existing cluster centroids, only affected clusters re-summarized. Version-stamped nodes with metadata swap for atomic tree updates.
+
+**Clustering implementation**: UMAP NuGet package (pure C#, MIT) for dimensionality reduction (768→10 dims). Diagonal GMM with BIC for k selection and soft assignment. `IClusteringStrategy` interface for algorithm swappability.
+
+Abstractions: `IDistillationTreeStore` (mirrors `IConceptGraphStore`: Load/Save/ApplyDelta/Clear/GetStats), `DistillationNode`.
+Configuration: `RagOptions.TreeClusterFactor`, `RagOptions.TreeMaxDepth`, `RagModelRouting.Summarize`.
+
 ## Implementation Phases
 
 | Phase | Scope | Depends On | Delivers |
@@ -788,9 +835,11 @@ All values have convention defaults. Zero configuration required to use `Rag.Cor
 | **Phase 7: ColPali** | Visual retrieval, multi-vector detection, layered capability activation, OCR gate bypass defense | Phase 1, multi-vector provider | Visual document understanding. |
 | **Phase 8: Full Graph Strategy** | Relationship extraction, labeled edges, Full `GraphStrategy` option | Phase 2 | Explicit relationship traversal for ontological corpora. |
 | **Phase 9: Embedding Adaptation** | `Adapt()`, synthetic training pair generation, corpus-scoped model, blue-green re-indexing | Phase 4, `AiCapability.Train` adapters | 27-44% domain retrieval improvement. |
-| **Phase 10: Advanced** | Lazy graph strategy, SQLite graph adapter, CAG for small corpora, RL trajectory training data, FLARE-style mid-generation retrieval hook | Prior phases | Future optimization and research integration. |
+| **Phase 10: Content Adapters** | `IContentAdapter`, multi-round protocol, built-in strategies, `StrategyGenerator`, `ContentAdapterRegistry` | Phase 1 | Multi-modal content understanding. |
+| **Phase 11: Distillation Tree** | `IDistillationTreeStore`, `IClusteringStrategy`, `DistillationTreeBuilder`, UMAP + diagonal GMM, per-document and corpus-wide tree construction | Phase 2 | Multi-resolution retrieval. Cross-document thematic discovery. |
+| **Phase 12: Advanced** | Lazy graph strategy, SQLite graph adapter, CAG for small corpora, RL trajectory training data, FLARE-style mid-generation retrieval hook | Prior phases | Future optimization and research integration. |
 
-Phases 1-3 are the critical path. They deliver the core value proposition: load documents, get self-associative answers. Phases 4-6 make it production-ready and measurable. Phases 7-10 are progressive enhancements.
+Phases 1-3 are the critical path. They deliver the core value proposition: load documents, get self-associative answers. Phases 4-6 make it production-ready and measurable. Phases 7-12 are progressive enhancements. Phases 10-11 are implemented as part of the initial delivery.
 
 ## Consequences
 
@@ -839,3 +888,7 @@ Phases 1-3 are the critical path. They deliver the core value proposition: load 
 - **ARCH-0070** — Attribute-Driven AI Embeddings (`[Embedding]`, `EmbeddingMetadata`, `EmbeddingWorker`)
 - **ADR-0051** — Vector Hybrid Search (`Vector<T>.Search()` with alpha weighting)
 - **AI-0018** — Chunk Size Hard Cap (1000-token ceiling, section splitting)
+
+### Research
+
+- **Technical Whitepaper**: [docs/research/koan-rag-whitepaper.md](../research/koan-rag-whitepaper.md) — Comprehensive description of the system architecture with abstraction checkpoints for non-specialist audiences, research citations, cost models, and novel contributions.
