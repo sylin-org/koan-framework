@@ -38,6 +38,23 @@ public static class AiCapability
     public const string Train = "Train";
     public const string Align = "Align";
 
+    // ── Generation (AI-0033) ──
+    public const string Imagine = "Imagine";
+    public const string Edit = "Edit";
+    public const string Render = "Render";
+
+    // ── Audio (AI-0033) ──
+    public const string Speak = "Speak";
+
+    // ── Search (AI-0033) ──
+    public const string Rerank = "Rerank";
+
+    // ── Language (AI-0033) ──
+    public const string Translate = "Translate";
+
+    // ── Safety (AI-0033) ──
+    public const string Moderate = "Moderate";
+
     // ── Evaluation ──
     public const string MetricCompute = "MetricCompute";
 }
