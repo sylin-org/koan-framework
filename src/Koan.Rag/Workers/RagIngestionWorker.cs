@@ -9,13 +9,14 @@ namespace Koan.Rag.Workers;
 
 /// <summary>
 /// Background service that processes queued RAG ingestion jobs.
-/// Follows the <c>EmbeddingWorker</c> pattern: adaptive polling,
-/// batch processing, retry with exponential backoff.
+/// Uses <see cref="RagJobProcessorRegistry"/> for typed entity loading —
+/// no runtime reflection. Processors are pre-registered by the auto-registrar.
 /// </summary>
 internal sealed class RagIngestionWorker(
     ILogger<RagIngestionWorker> logger,
     IOptions<RagOptions> options,
-    IConceptGraphStore graphStore) : BackgroundService
+    IConceptGraphStore graphStore,
+    RagJobProcessorRegistry processorRegistry) : BackgroundService
 {
     private readonly RagOptions _config = options.Value;
     private static readonly TimeSpan ActivePollInterval = TimeSpan.FromSeconds(2);
@@ -39,7 +40,6 @@ internal sealed class RagIngestionWorker(
             {
                 var processed = await ProcessBatch(stoppingToken);
 
-                // Adaptive polling: fast when work available, slow when idle
                 var delay = processed > 0 ? ActivePollInterval : IdlePollInterval;
                 await Task.Delay(delay, stoppingToken);
             }
@@ -61,7 +61,9 @@ internal sealed class RagIngestionWorker(
 
     private async Task<int> ProcessBatch(CancellationToken ct)
     {
-        // Query pending jobs
+        if (!processorRegistry.HasProcessors)
+            return 0;
+
         var pendingJobs = await QueryPendingJobs(ct);
         if (pendingJobs.Count == 0)
             return 0;
@@ -74,15 +76,13 @@ internal sealed class RagIngestionWorker(
 
             try
             {
-                // Mark as processing
                 job.Status = RagIngestionStatus.Processing;
                 job.StartedAt = DateTimeOffset.UtcNow;
                 await job.Save(ct);
 
-                // Process the job
-                await ProcessJob(job, ct);
+                // Dispatch to the pre-registered typed processor
+                await processorRegistry.Process(job, ct);
 
-                // Mark complete
                 job.Status = RagIngestionStatus.Completed;
                 job.CompletedAt = DateTimeOffset.UtcNow;
                 await job.Save(ct);
@@ -102,28 +102,10 @@ internal sealed class RagIngestionWorker(
             }
         }
 
-        // Persist graph after batch
         if (processedCount > 0)
             await graphStore.Save(ct);
 
         return processedCount;
-    }
-
-    private async Task ProcessJob(RagIngestionJob job, CancellationToken ct)
-    {
-        // Resolve the RAG service to get the ingestion pipeline
-        var ragService = Koan.Core.Hosting.App.AppHost.Current
-            ?.GetService(typeof(IRagService)) as IRagService
-            ?? throw new InvalidOperationException("IRagService not registered");
-
-        // The actual ingestion is handled by the pipeline via the corpus
-        // The worker's job is to orchestrate retry and state management
-        logger.LogDebug(
-            "Processing RAG ingestion for {EntityType}:{EntityId} (corpus: {Corpus})",
-            job.EntityType, job.EntityId, job.CorpusName ?? "default");
-
-        // TODO: Load entity by ID + type via reflection (matching EmbeddingWorker pattern),
-        // re-verify content signature, and call pipeline.IngestEntity
     }
 
     private async Task HandleJobFailure(RagIngestionJob job, string error, CancellationToken ct)
@@ -142,10 +124,9 @@ internal sealed class RagIngestionWorker(
         }
         else
         {
-            // Schedule retry with exponential backoff
             var delay = CalculateRetryDelay(job.RetryCount);
             logger.LogWarning(
-                "RAG ingestion job {JobId} failed (retry {Retry}/{Max}), will retry in {Delay}: {Error}",
+                "RAG ingestion job {JobId} failed (retry {Retry}/{Max}), next attempt in {Delay}: {Error}",
                 job.Id, job.RetryCount, job.MaxRetries, delay, error);
 
             job.Status = RagIngestionStatus.Pending;
@@ -170,7 +151,6 @@ internal sealed class RagIngestionWorker(
         }
         catch
         {
-            // If the job store isn't available yet (no data adapter configured), return empty
             return [];
         }
     }
@@ -179,6 +159,6 @@ internal sealed class RagIngestionWorker(
     {
         var seconds = InitialRetryDelay.TotalSeconds *
                       Math.Pow(RetryBackoffMultiplier, retryCount - 1);
-        return TimeSpan.FromSeconds(Math.Min(seconds, 300)); // Cap at 5 minutes
+        return TimeSpan.FromSeconds(Math.Min(seconds, 300));
     }
 }

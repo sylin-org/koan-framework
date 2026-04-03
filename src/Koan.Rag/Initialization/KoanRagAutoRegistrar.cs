@@ -64,9 +64,11 @@ public sealed class KoanRagAutoRegistrar : IKoanAutoRegistrar
                 "rag-corpus",
                 tags: ["ai", "rag", "ready"]);
 
-        // ── Entity Lifecycle Hooks ──────────────────────────────────────
+        // ── Entity Lifecycle Hooks + Worker Processors ────────────────────
         // Scan loaded assemblies for [RagCorpus]-decorated entities
         var ragTypes = DiscoverRagCorpusTypes();
+        var processorRegistry = new Workers.RagJobProcessorRegistry();
+        services.AddSingleton(processorRegistry);
 
         foreach (var entityType in ragTypes)
         {
@@ -76,7 +78,8 @@ public sealed class KoanRagAutoRegistrar : IKoanAutoRegistrar
                 if (metadata.LifecycleEnabled)
                 {
                     RegisterIngestionHooks(entityType);
-                    break; // One hook registration per entity type (serves all corpora)
+                    RegisterJobProcessor(processorRegistry, entityType);
+                    break; // One registration per entity type (serves all corpora)
                 }
             }
         }
@@ -126,6 +129,24 @@ public sealed class KoanRagAutoRegistrar : IKoanAutoRegistrar
             source: BootSettingSource.AppSettings);
         module.AddSetting("Rag:RerankEnabled", rerankEnabled,
             source: BootSettingSource.AppSettings);
+    }
+
+    // ── Job Processor Registration (typed, no runtime reflection) ──────
+
+    [RequiresUnreferencedCode("RAG processor registration uses reflection to close generics at init time.")]
+    [RequiresDynamicCode("RAG processor registration creates closed generic method at init time.")]
+    private static void RegisterJobProcessor(
+        Workers.RagJobProcessorRegistry registry,
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)]
+        Type entityType)
+    {
+        var method = typeof(Workers.RagJobProcessorRegistry)
+            .GetMethod(nameof(Workers.RagJobProcessorRegistry.Register))
+            ?.MakeGenericMethod(entityType)
+            ?? throw new InvalidOperationException(
+                $"RagJobProcessorRegistry.Register<> method not found.");
+
+        method.Invoke(registry, []);
     }
 
     // ── Hook Registration (follows Koan.Data.AI pattern exactly) ────────

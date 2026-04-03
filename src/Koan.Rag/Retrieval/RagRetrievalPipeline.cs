@@ -193,9 +193,43 @@ internal sealed class RagRetrievalPipeline : IRagRetrievalPipeline
         RagCorpusMetadata metadata,
         [EnumeratorCancellation] CancellationToken ct) where TEntity : class, IEntity<string>
     {
-        // TODO Phase 3: True streaming with Client.Stream after context retrieval
-        var result = await Execute<TEntity>(query, options, metadata, ct);
-        yield return result.Answer;
+        // Retrieve context (non-streaming), then stream the generation
+        if (!Koan.Data.Vector.Vector<TEntity>.IsAvailable)
+            yield break;
+
+        var queryEmbedding = await Koan.AI.Client.Embed(query, ct);
+        var searchResult = await Koan.Data.Vector.Vector<TEntity>.Search(
+            vector: queryEmbedding, text: query, alpha: _options.HybridAlpha,
+            topK: _options.RerankTopN, ct: ct);
+
+        if (searchResult.Matches.Count == 0)
+            yield break;
+
+        var contextParts = new List<string>();
+        foreach (var match in searchResult.Matches.Take(_options.RerankTopN))
+        {
+            var entity = await Koan.Data.Core.Data<TEntity, string>.Get(match.Id, ct);
+            if (entity is not null)
+            {
+                var text = EntityAi.ExtractText(entity);
+                if (!string.IsNullOrWhiteSpace(text))
+                    contextParts.Add(text);
+            }
+        }
+
+        if (contextParts.Count == 0)
+            yield break;
+
+        var context = string.Join("\n\n---\n\n", contextParts);
+        var systemPrompt = BuildSystemPrompt(options.Focus, metadata.Directive);
+        var userPrompt = BuildUserPrompt(query, context, options.IncludeCitations);
+        var fullPrompt = $"{systemPrompt}\n\n{userPrompt}";
+
+        // Stream generation token by token
+        await foreach (var token in Koan.AI.Client.Stream(fullPrompt, ct))
+        {
+            yield return token;
+        }
     }
 
     public async Task<TResult> Extract<TEntity, TResult>(

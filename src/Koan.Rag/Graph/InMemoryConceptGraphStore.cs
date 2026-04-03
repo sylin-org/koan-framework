@@ -237,6 +237,20 @@ internal sealed class InMemoryConceptGraphStore : IConceptGraphStore
         return Task.CompletedTask;
     }
 
+    public Task Clear(CancellationToken ct = default)
+    {
+        lock (_writeLock)
+        {
+            _entities.Clear();
+            _relationships.Clear();
+            _adjacency.Clear();
+            _entityDocuments.Clear();
+        }
+
+        _logger.LogInformation("Concept graph cleared");
+        return Task.CompletedTask;
+    }
+
     public GraphStats GetStats()
     {
         var entityCount = _entities.Count;

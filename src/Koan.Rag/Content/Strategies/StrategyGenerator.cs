@@ -36,8 +36,7 @@ internal sealed class StrategyGenerator
         ILogger<StrategyGenerator> logger)
     {
         _logger = logger;
-        // TODO: Read from Koan:Rag:Models:StrategyGeneration config
-        _strategyModel = null; // Uses default model routing — should be configured to best reasoning model
+        _strategyModel = options.Value.Models.StrategyGeneration;
     }
 
     /// <summary>

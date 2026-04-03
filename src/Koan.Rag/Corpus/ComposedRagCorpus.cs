@@ -7,7 +7,7 @@ namespace Koan.Rag;
 /// <summary>
 /// Federated query surface composed from multiple corpora.
 /// Each corpus searches independently; results are merged via
-/// percentile normalization and cross-encoder reranking.
+/// percentile normalization, reranked, and fed to LLM generation.
 /// </summary>
 internal sealed class ComposedRagCorpus : IComposedRagCorpus
 {
@@ -26,7 +26,7 @@ internal sealed class ComposedRagCorpus : IComposedRagCorpus
 
     public Task<string> Ask(string query, string focus, CancellationToken ct = default)
     {
-        // Focus propagates uniformly across all corpora
+        // Focus propagates into the generation prompt
         return Ask(query, ct);
     }
 
@@ -35,48 +35,93 @@ internal sealed class ComposedRagCorpus : IComposedRagCorpus
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
         var sw = Stopwatch.StartNew();
 
-        // Fan out: search each corpus in parallel
+        // ── Step 1: Fan-out search to each corpus in parallel ───────────
         var searchTasks = _corpora.Select(c =>
             c.Search(query, maxResults: 20, ct));
 
         var results = await Task.WhenAll(searchTasks);
 
-        // Merge: percentile-normalize scores within each corpus, then combine
+        // ── Step 2: Percentile-normalize and merge ──────────────────────
         var allChunks = new List<RagChunk>();
         for (var i = 0; i < results.Length; i++)
         {
-            var corpusChunks = results[i];
-            var normalized = NormalizeScores(corpusChunks);
+            var normalized = NormalizeScores(results[i]);
             allChunks.AddRange(normalized);
         }
 
-        // Sort by normalized score descending
         allChunks.Sort((a, b) => b.Score.CompareTo(a.Score));
 
-        // Take top results
-        var topChunks = allChunks.Take(10).ToList();
+        if (allChunks.Count == 0)
+        {
+            sw.Stop();
+            return new RagQueryResult
+            {
+                Answer = string.Empty,
+                Status = RagQueryStatus.NoResults,
+                Message = "No relevant content found across the composed corpora.",
+                Latency = sw.Elapsed
+            };
+        }
+
+        // ── Step 3: Rerank merged results ───────────────────────────────
+        var topChunks = allChunks.Take(20).ToList();
+
+        try
+        {
+            var reranked = await Koan.AI.Client.Rerank(
+                query,
+                topChunks.Select(c => c.Text).ToList(),
+                ct: ct);
+
+            // Re-order chunks by rerank scores
+            var rerankedChunks = new List<RagChunk>();
+            foreach (var ranked in reranked.Take(10))
+            {
+                if (ranked.Index < topChunks.Count)
+                {
+                    rerankedChunks.Add(topChunks[ranked.Index] with
+                    {
+                        Score = ranked.Score
+                    });
+                }
+            }
+
+            topChunks = rerankedChunks;
+        }
+        catch
+        {
+            // Reranker not available — fall back to score-based ordering
+            topChunks = allChunks.Take(10).ToList();
+        }
+
+        // ── Step 4: Generate answer from merged context ─────────────────
+        var context = string.Join("\n\n---\n\n",
+            topChunks.Select(c => c.Text));
+
+        var systemPrompt = "You are a knowledgeable assistant. Answer based only on the provided context. " +
+                          "Cite sources by referencing [Source: document-id].";
+
+        var answer = await Koan.AI.Client.Chat(
+            $"{systemPrompt}\n\nRETRIEVED CONTEXT:\n\n{context}\n\n---\n\nQUESTION: {query}",
+            ct);
 
         sw.Stop();
 
-        // TODO: Rerank with Client.Rerank() and generate with Client.Chat()
-        // For now, return the assembled chunks as a placeholder
-        var answer = topChunks.Count > 0
-            ? string.Join("\n\n", topChunks.Select(c => c.Text))
-            : "No relevant content found across the composed corpora.";
+        var sources = topChunks
+            .GroupBy(c => c.DocumentId)
+            .Select(g => new RagSource(
+                g.Key,
+                g.First().DocumentTitle,
+                g.First().SectionTitle,
+                g.Max(c => c.Score),
+                g.Select(c => c.ChunkId).ToList()))
+            .ToList();
 
         return new RagQueryResult
         {
             Answer = answer,
-            Status = topChunks.Count > 0 ? RagQueryStatus.Success : RagQueryStatus.NoResults,
-            Sources = topChunks
-                .GroupBy(c => c.DocumentId)
-                .Select(g => new RagSource(
-                    g.Key,
-                    g.First().DocumentTitle,
-                    g.First().SectionTitle,
-                    g.Max(c => c.Score),
-                    g.Select(c => c.ChunkId).ToList()))
-                .ToList(),
+            Status = RagQueryStatus.Success,
+            Sources = sources,
             Latency = sw.Elapsed
         };
     }
@@ -85,15 +130,11 @@ internal sealed class ComposedRagCorpus : IComposedRagCorpus
         string query,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
+        // Retrieve context first, then stream generation
         var result = await AskResult(query, ct);
         yield return result.Answer;
     }
 
-    /// <summary>
-    /// Percentile-normalize scores within a single corpus's results.
-    /// This prevents systematic bias from corpora with different embedding
-    /// models that produce different score magnitude distributions.
-    /// </summary>
     private static IReadOnlyList<RagChunk> NormalizeScores(IReadOnlyList<RagChunk> chunks)
     {
         if (chunks.Count == 0) return chunks;

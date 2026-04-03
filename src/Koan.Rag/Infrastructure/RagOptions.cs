@@ -43,4 +43,39 @@ public sealed class RagOptions
 
     /// <summary>Whether to include citations in results.</summary>
     public bool CitationsEnabled { get; set; } = true;
+
+    /// <summary>Per-stage model routing overrides. Keyed by stage name.</summary>
+    public RagModelRouting Models { get; set; } = new();
+}
+
+/// <summary>
+/// Per-stage model routing for the RAG pipeline.
+/// Each property is an AI source identifier (e.g., "anthropic/opus", "garden/llama-70b").
+/// Null means use the default model resolution chain.
+/// </summary>
+public sealed class RagModelRouting
+{
+    /// <summary>Model for content classification (Round 1). Can be cheaper/faster.</summary>
+    public string? Classify { get; set; }
+
+    /// <summary>Model for strategy generation. Should be the best reasoning model available.</summary>
+    public string? StrategyGeneration { get; set; }
+
+    /// <summary>Model for content interpretation (Round 2). Good vision model.</summary>
+    public string? Interpret { get; set; }
+
+    /// <summary>Model for entity/relationship extraction. Reasoning model.</summary>
+    public string? Extract { get; set; }
+
+    /// <summary>Model for embedding generation.</summary>
+    public string? Embed { get; set; }
+
+    /// <summary>Model for OCR operations.</summary>
+    public string? Ocr { get; set; }
+
+    /// <summary>Model for transcription.</summary>
+    public string? Transcribe { get; set; }
+
+    /// <summary>Model for content description (vision).</summary>
+    public string? Describe { get; set; }
 }

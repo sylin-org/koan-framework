@@ -25,6 +25,9 @@ public interface IConceptGraphStore
     /// <summary>Apply incremental changes (adds, updates, removals).</summary>
     Task ApplyDelta(GraphDelta delta, CancellationToken ct = default);
 
+    /// <summary>Remove all entities, relationships, and mention data.</summary>
+    Task Clear(CancellationToken ct = default);
+
     /// <summary>Current graph statistics.</summary>
     GraphStats GetStats();
 }
