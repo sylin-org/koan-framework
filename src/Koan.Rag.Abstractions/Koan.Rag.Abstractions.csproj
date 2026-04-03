@@ -12,7 +12,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
-    <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\Koan.AI.Contracts\Koan.AI.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>

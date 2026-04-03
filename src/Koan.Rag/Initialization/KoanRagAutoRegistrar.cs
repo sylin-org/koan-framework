@@ -3,6 +3,7 @@ using System.Reflection;
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Provenance;
+using Koan.Data.Core;
 using Koan.Rag.Abstractions;
 using Koan.Rag.Infrastructure;
 using Koan.Rag.Ingestion;
@@ -10,6 +11,7 @@ using Koan.Rag.Retrieval;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Koan.Rag.Initialization;
 
@@ -218,14 +220,51 @@ public sealed class KoanRagAutoRegistrar : IKoanAutoRegistrar
         Koan.Data.Core.Events.EntityEventContext<TEntity> ctx)
         where TEntity : class, Koan.Data.Abstractions.IEntity<string>
     {
-        // Resolve the RAG service and ingest
         var ragService = Koan.Core.Hosting.App.AppHost.Current
             ?.GetService(typeof(IRagService)) as IRagService;
 
         if (ragService is null) return;
 
-        var corpus = ragService.GetCorpus<TEntity>();
-        await corpus.Ingest(ctx.Current, ctx.CancellationToken);
+        var metadata = RagCorpusMetadata.ResolveDefault<TEntity>();
+
+        if (metadata.Async)
+        {
+            // Queue for background processing — don't block the entity save
+            var signature = Koan.Data.AI.EmbeddingMetadata.Resolve<TEntity>()
+                .ComputeSignature(ctx.Current);
+
+            var jobId = Workers.RagIngestionJob.MakeId(
+                typeof(TEntity).Name, metadata.Name, ctx.Current.Id);
+
+            var job = new Workers.RagIngestionJob
+            {
+                Id = jobId,
+                EntityId = ctx.Current.Id,
+                EntityType = typeof(TEntity).Name,
+                CorpusName = metadata.Name,
+                ContentSignature = signature,
+                Status = Abstractions.RagIngestionStatus.Pending,
+                CreatedAt = DateTimeOffset.UtcNow
+            };
+
+            try { await job.Save(ctx.CancellationToken); }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                // Job store may not be configured yet — log and continue
+                var log = Koan.Core.Hosting.App.AppHost.Current
+                    ?.GetService(typeof(Microsoft.Extensions.Logging.ILoggerFactory))
+                    as Microsoft.Extensions.Logging.ILoggerFactory;
+                log?.CreateLogger("Koan.Rag")
+                    .LogDebug(ex, "Failed to queue RAG ingestion job for {EntityId}", ctx.Current.Id);
+            }
+        }
+        else
+        {
+            // Synchronous ingestion in the save path
+            var corpus = ragService.GetCorpus<TEntity>();
+            await corpus.Ingest(ctx.Current, ctx.CancellationToken);
+        }
     }
 
     /// <summary>

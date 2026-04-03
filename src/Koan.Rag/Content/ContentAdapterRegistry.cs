@@ -86,6 +86,13 @@ internal sealed class ContentAdapterRegistry
         string? directive,
         CancellationToken ct)
     {
+        var fileInfo = new FileInfo(filePath);
+        const long MaxFileSizeBytes = 100 * 1024 * 1024; // 100 MB default
+        if (fileInfo.Length > MaxFileSizeBytes)
+            throw new InvalidOperationException(
+                $"File '{filePath}' exceeds maximum size ({fileInfo.Length / (1024 * 1024)} MB > {MaxFileSizeBytes / (1024 * 1024)} MB). " +
+                "Configure Koan:Rag:MaxFileSizeBytes for larger files.");
+
         var bytes = await File.ReadAllBytesAsync(filePath, ct);
         var modality = DetectModality(filePath);
         var documentTitle = Path.GetFileName(filePath);
@@ -122,9 +129,9 @@ internal sealed class ContentAdapterRegistry
                 };
             }
         }
-        catch
+        catch (Exception)
         {
-            // Not valid UTF-8
+            // Not valid UTF-8 — binary content without a matching adapter
         }
 
         _logger.LogWarning("Could not extract content from '{File}'", filePath);

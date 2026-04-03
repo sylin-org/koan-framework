@@ -64,20 +64,25 @@ public sealed record RagTestCase(
     IReadOnlyList<string>? ExpectedSourceIds = null);
 
 /// <summary>
-/// A set of test cases for evaluation, loadable from file or built programmatically.
+/// A set of test cases for evaluation, built programmatically or loaded via
+/// <c>RagTestSetLoader</c> in <c>Koan.Rag</c>.
 /// </summary>
-public sealed class RagTestSet : List<RagTestCase>
+public sealed class RagTestSet
 {
-    /// <summary>Load test cases from a JSON file.</summary>
-    public static async Task<RagTestSet> FromJsonFile(string filePath, CancellationToken ct = default)
-    {
-        await using var stream = File.OpenRead(filePath);
-        var cases = await System.Text.Json.JsonSerializer.DeserializeAsync<List<RagTestCase>>(
-            stream, cancellationToken: ct);
+    private readonly List<RagTestCase> _cases = [];
 
-        var testSet = new RagTestSet();
-        if (cases is not null)
-            testSet.AddRange(cases);
-        return testSet;
-    }
+    /// <summary>All test cases in this set.</summary>
+    public IReadOnlyList<RagTestCase> Cases => _cases;
+
+    /// <summary>Number of test cases.</summary>
+    public int Count => _cases.Count;
+
+    /// <summary>Add a single test case.</summary>
+    public void Add(RagTestCase testCase) => _cases.Add(testCase);
+
+    /// <summary>Add multiple test cases.</summary>
+    public void AddRange(IEnumerable<RagTestCase> testCases) => _cases.AddRange(testCases);
+
+    /// <summary>Enumerate test cases.</summary>
+    public IEnumerator<RagTestCase> GetEnumerator() => _cases.GetEnumerator();
 }

@@ -214,9 +214,24 @@ internal sealed class RagCorpus<TEntity> : IRagCorpus<TEntity> where TEntity : c
         {
             ct.ThrowIfCancellationRequested();
 
-            var queryResult = await AskResult(testCase.Query, ct);
-            var caseResult = await _evaluator.EvaluateCase(testCase, queryResult, ct);
-            results.Add(caseResult);
+            try
+            {
+                var queryResult = await AskResult(testCase.Query, ct);
+                var caseResult = await _evaluator.EvaluateCase(testCase, queryResult, ct);
+                results.Add(caseResult);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "Evaluation failed for test case: {Query}", testCase.Query);
+                results.Add(new RagTestCaseResult
+                {
+                    TestCase = testCase,
+                    GeneratedAnswer = $"[Evaluation error: {ex.Message}]",
+                    Faithfulness = 0,
+                    AnswerRelevancy = 0,
+                    HallucinationScore = 1.0
+                });
+            }
         }
 
         sw.Stop();

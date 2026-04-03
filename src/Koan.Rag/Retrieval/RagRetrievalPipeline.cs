@@ -180,7 +180,7 @@ internal sealed class RagRetrievalPipeline : IRagRetrievalPipeline
             {
                 Answer = string.Empty,
                 Status = RagQueryStatus.Error,
-                Message = $"Retrieval error: {ex.Message}",
+                Message = "An error occurred during retrieval. Check server logs for details.",
                 Latency = sw.Elapsed,
                 Trace = BuildTrace(trace, sw.Elapsed)
             };

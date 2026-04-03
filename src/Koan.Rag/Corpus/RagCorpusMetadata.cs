@@ -58,7 +58,13 @@ public sealed class RagCorpusMetadata
     public static RagCorpusMetadata? Resolve(Type entityType, string? name)
     {
         var key = (entityType, name);
-        return _cache.GetOrAdd(key, static k => ResolveFromAttribute(k.EntityType, k.Name));
+        var result = _cache.GetOrAdd(key, static k => ResolveFromAttribute(k.EntityType, k.Name));
+
+        // Defensive: prevent unbounded growth from dynamic corpus names
+        if (_cache.Count > 1000)
+            _cache.Clear(); // Reset cache — next calls will re-resolve
+
+        return result;
     }
 
     /// <summary>

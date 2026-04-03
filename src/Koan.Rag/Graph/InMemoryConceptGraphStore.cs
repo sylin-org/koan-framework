@@ -93,13 +93,19 @@ internal sealed class InMemoryConceptGraphStore : IConceptGraphStore
     {
         try
         {
+            Dictionary<string, IReadOnlyList<string>> entityDocumentsSnapshot;
+            lock (_writeLock)
+            {
+                entityDocumentsSnapshot = _entityDocuments.ToDictionary(
+                    kv => kv.Key,
+                    kv => kv.Value.ToList() as IReadOnlyList<string>);
+            }
+
             var snapshot = new GraphSnapshot
             {
                 Entities = _entities.Values.ToList(),
                 Relationships = _relationships.Values.ToList(),
-                EntityDocuments = _entityDocuments.ToDictionary(
-                    kv => kv.Key,
-                    kv => kv.Value.ToList() as IReadOnlyList<string>)
+                EntityDocuments = entityDocumentsSnapshot
             };
 
             var tempPath = _persistencePath + ".tmp";
@@ -136,7 +142,15 @@ internal sealed class InMemoryConceptGraphStore : IConceptGraphStore
             {
                 if (!visitedEntities.Add(eid)) continue;
 
-                if (_adjacency.TryGetValue(eid, out var relIds))
+                IReadOnlyList<string> relIds;
+                lock (_writeLock)
+                {
+                    relIds = _adjacency.TryGetValue(eid, out var set)
+                        ? set.ToList()
+                        : [];
+                }
+
+                if (relIds.Count > 0)
                 {
                     foreach (var relId in relIds)
                     {
@@ -249,6 +263,14 @@ internal sealed class InMemoryConceptGraphStore : IConceptGraphStore
 
         _logger.LogInformation("Concept graph cleared");
         return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<ConceptEntity>> GetAllEntities(CancellationToken ct = default)
+    {
+        lock (_writeLock)
+        {
+            return Task.FromResult<IReadOnlyList<ConceptEntity>>(_entities.Values.ToList());
+        }
     }
 
     public GraphStats GetStats()

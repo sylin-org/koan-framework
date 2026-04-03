@@ -169,6 +169,7 @@ internal abstract class ContentAdapterBase : IContentAdapter
                 FormatHint = null
             };
         }
+        catch (OperationCanceledException) { throw; }
         catch
         {
             return new ContentClassification
@@ -206,6 +207,7 @@ internal abstract class ContentAdapterBase : IContentAdapter
                 Description = $"Text content classified as {category.Trim()}"
             };
         }
+        catch (OperationCanceledException) { throw; }
         catch
         {
             return new ContentClassification
@@ -262,6 +264,7 @@ internal abstract class ContentAdapterBase : IContentAdapter
             var prompt = $"{enrichmentPrompt}\n\nContent interpretation:\n{interpretation}";
             return await Koan.AI.Client.Chat(prompt, ct);
         }
+        catch (OperationCanceledException) { throw; }
         catch
         {
             return null;

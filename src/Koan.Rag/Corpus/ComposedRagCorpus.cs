@@ -88,6 +88,7 @@ internal sealed class ComposedRagCorpus : IComposedRagCorpus
 
             topChunks = rerankedChunks;
         }
+        catch (OperationCanceledException) { throw; }
         catch
         {
             // Reranker not available — fall back to score-based ordering

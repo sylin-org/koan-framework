@@ -248,6 +248,12 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
             .All(options: null, ct: ct);
 
         var entityList = entities.ToList();
+
+        if (entityList.Count > 10_000)
+            _logger.LogWarning(
+                "Rebuild loading {Count} entities into memory. Consider batched rebuild for very large corpora.",
+                entityList.Count);
+
         _logger.LogInformation(
             "Rebuild: processing {Count} entities for corpus '{Corpus}'",
             entityList.Count, metadata.EffectiveName(typeof(TEntity)));
@@ -470,13 +476,15 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
         return new GraphDelta { AddedRelationships = addedRelationships };
     }
 
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, System.Reflection.PropertyInfo?> _titlePropertyCache = new();
+
     private static string? ExtractTitle<TEntity>(TEntity entity) where TEntity : class
     {
-        // Try common title properties by convention
-        var titleProp = typeof(TEntity).GetProperty("Title")
-            ?? typeof(TEntity).GetProperty("Name")
-            ?? typeof(TEntity).GetProperty("Subject");
+        var prop = _titlePropertyCache.GetOrAdd(typeof(TEntity), static type =>
+            type.GetProperty("Title")
+            ?? type.GetProperty("Name")
+            ?? type.GetProperty("Subject"));
 
-        return titleProp?.GetValue(entity)?.ToString();
+        return prop?.GetValue(entity)?.ToString();
     }
 }

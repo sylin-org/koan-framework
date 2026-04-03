@@ -40,7 +40,21 @@ internal sealed class RagSession<TEntity> : IRagSession<TEntity> where TEntity :
 
     public async Task<string> Ask(string query, string focus, CancellationToken ct = default)
     {
-        var result = await AskResult(query, ct);
+        ArgumentException.ThrowIfNullOrWhiteSpace(query);
+
+        _history.Add(("user", query));
+        _tokensUsed += EstimateTokens(query);
+
+        if (_tokensUsed > _options.MaxTokenBudget)
+            await HandleBudgetExhaustion(ct);
+
+        var contextualQuery = BuildContextualQuery(query);
+        var result = await _retrievalPipeline.Execute<TEntity>(
+            contextualQuery, new RagQueryOptions { Focus = focus }, _metadata, ct);
+
+        _history.Add(("assistant", result.Answer));
+        _tokensUsed += EstimateTokens(result.Answer);
+
         return result.Answer;
     }
 

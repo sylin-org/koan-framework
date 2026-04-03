@@ -19,12 +19,6 @@ public sealed record RagQueryOptions
     public RetrievalHint? Hint { get; init; }
 
     /// <summary>
-    /// Maximum number of search rounds the agent may perform.
-    /// Default: 3.
-    /// </summary>
-    public int MaxSearchRounds { get; init; } = 3;
-
-    /// <summary>
     /// Minimum confidence threshold for the answer. If the agent cannot
     /// meet this threshold, the result status is <see cref="RagQueryStatus.LowConfidence"/>.
     /// Default: 0.5.

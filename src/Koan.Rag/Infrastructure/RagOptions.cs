@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Koan.Rag.Abstractions;
 
 namespace Koan.Rag.Infrastructure;
@@ -12,33 +13,40 @@ public sealed class RagOptions
     public string ChunkStrategy { get; set; } = "SemanticWithContext";
 
     /// <summary>Token count for child chunks (precision matching).</summary>
+    [Range(50, 2000)]
     public int ChildChunkTokens { get; set; } = 300;
 
     /// <summary>Token count for parent chunks (context return).</summary>
+    [Range(200, 8000)]
     public int ParentChunkTokens { get; set; } = 1200;
 
     /// <summary>Whether to generate contextual prefixes per chunk.</summary>
     public bool ContextualPrefix { get; set; } = true;
 
     /// <summary>Hybrid search alpha (0.0 = keyword only, 1.0 = semantic only).</summary>
+    [Range(0.0, 1.0)]
     public double HybridAlpha { get; set; } = 0.6;
 
     /// <summary>Whether cross-encoder reranking is enabled.</summary>
     public bool RerankEnabled { get; set; } = true;
 
     /// <summary>Top-N results after reranking.</summary>
+    [Range(1, 100)]
     public int RerankTopN { get; set; } = 10;
 
     /// <summary>Default graph construction strategy.</summary>
     public GraphStrategy GraphStrategy { get; set; } = GraphStrategy.Lightweight;
 
     /// <summary>Cosine similarity threshold for entity resolution.</summary>
+    [Range(0.5, 1.0)]
     public double EntityResolutionThreshold { get; set; } = 0.92;
 
     /// <summary>Maximum retrieval rounds for the agent.</summary>
+    [Range(1, 20)]
     public int MaxSearchRounds { get; set; } = 3;
 
     /// <summary>Minimum confidence for answer acceptance.</summary>
+    [Range(0.0, 1.0)]
     public double MinConfidence { get; set; } = 0.5;
 
     /// <summary>Whether to include citations in results.</summary>

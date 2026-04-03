@@ -30,6 +30,9 @@ public interface IConceptGraphStore
 
     /// <summary>Current graph statistics.</summary>
     GraphStats GetStats();
+
+    /// <summary>All entities in the graph (for embedding-based resolution). Use with caution at scale.</summary>
+    Task<IReadOnlyList<ConceptEntity>> GetAllEntities(CancellationToken ct = default);
 }
 
 /// <summary>

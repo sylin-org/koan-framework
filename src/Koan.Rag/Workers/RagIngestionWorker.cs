@@ -64,7 +64,7 @@ internal sealed class RagIngestionWorker(
         if (!processorRegistry.HasProcessors)
             return 0;
 
-        var pendingJobs = await QueryPendingJobs(ct);
+        var pendingJobs = await QueryPendingJobs(logger, ct);
         if (pendingJobs.Count == 0)
             return 0;
 
@@ -83,14 +83,28 @@ internal sealed class RagIngestionWorker(
                 // Dispatch to the pre-registered typed processor
                 await processorRegistry.Process(job, ct);
 
-                job.Status = RagIngestionStatus.Completed;
-                job.CompletedAt = DateTimeOffset.UtcNow;
-                await job.Save(ct);
+                try
+                {
+                    job.Status = RagIngestionStatus.Completed;
+                    job.CompletedAt = DateTimeOffset.UtcNow;
+                    await job.Save(ct);
 
-                processedCount++;
-                logger.LogDebug(
-                    "Completed RAG ingestion job {JobId} for {EntityType}:{EntityId}",
-                    job.Id, job.EntityType, job.EntityId);
+                    processedCount++;
+                    logger.LogDebug(
+                        "Completed RAG ingestion job {JobId} for {EntityType}:{EntityId}",
+                        job.Id, job.EntityType, job.EntityId);
+                }
+                catch (Exception saveEx) when (saveEx is not OperationCanceledException)
+                {
+                    logger.LogError(saveEx,
+                        "RAG ingestion job {JobId} completed but failed to persist Completed state; resetting to Pending",
+                        job.Id);
+
+                    job.Status = RagIngestionStatus.Pending;
+                    job.StartedAt = null;
+                    job.CompletedAt = null;
+                    await job.Save(CancellationToken.None);
+                }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -136,7 +150,8 @@ internal sealed class RagIngestionWorker(
         await job.Save(ct);
     }
 
-    private static async Task<List<RagIngestionJob>> QueryPendingJobs(CancellationToken ct)
+    private static async Task<List<RagIngestionJob>> QueryPendingJobs(
+        ILogger<RagIngestionWorker> logger, CancellationToken ct)
     {
         try
         {
@@ -149,8 +164,9 @@ internal sealed class RagIngestionWorker(
                 .Take(BatchSize)
                 .ToList();
         }
-        catch
+        catch (Exception ex)
         {
+            logger.LogError(ex, "Failed to query pending RAG ingestion jobs");
             return [];
         }
     }

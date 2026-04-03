@@ -106,9 +106,11 @@ internal sealed class RagEvaluator
             var response = await Koan.AI.Client.Chat(prompt, ct);
             return ParseScore(response);
         }
-        catch
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
         {
-            return 0.5; // Neutral on failure
+            _logger.LogDebug(ex, "LLM judge call failed; defaulting to neutral score");
+            return 0.5;
         }
     }
 
@@ -136,8 +138,10 @@ internal sealed class RagEvaluator
             var response = await Koan.AI.Client.Chat(prompt, ct);
             return ParseScore(response);
         }
-        catch
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
         {
+            _logger.LogDebug(ex, "LLM judge call failed; defaulting to neutral score");
             return 0.5;
         }
     }
@@ -164,8 +168,10 @@ internal sealed class RagEvaluator
             var response = await Koan.AI.Client.Chat(prompt, ct);
             return ParseScore(response);
         }
-        catch
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
         {
+            _logger.LogDebug(ex, "LLM judge call failed; defaulting to neutral score");
             return 0.5;
         }
     }

@@ -128,20 +128,15 @@ internal sealed class EntityResolver
             var candidateEmbedding = await Koan.AI.Client.Embed(textToEmbed, ct);
 
             // Compare against existing entities with embeddings
-            // For now, use the graph store to get all entities and compare locally
             // Future: use Vector<ConceptEntity>.Search() for ANN
-            var stats = _graphStore.GetStats();
-            if (stats.EntityCount == 0)
+            var allEntities = await _graphStore.GetAllEntities(ct);
+            if (allEntities.Count == 0)
                 return null;
-
-            // Get entities in a broad neighborhood (the root entities)
-            // This is a simplified approach; production would use a dedicated entity vector index
-            var neighborhood = await _graphStore.GetNeighborhood("__root__", depth: 0, ct);
 
             ConceptEntity? bestMatch = null;
             double bestSimilarity = 0;
 
-            foreach (var entity in neighborhood.Entities)
+            foreach (var entity in allEntities)
             {
                 if (entity.Embedding is null || entity.Embedding.Length == 0)
                     continue;
