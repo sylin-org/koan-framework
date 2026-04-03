@@ -46,11 +46,14 @@ internal sealed class RagSession<TEntity> : IRagSession<TEntity> where TEntity :
         var queryTokens = EstimateTokens(query);
         if (_tokensUsed + queryTokens > _options.MaxTokenBudget)
             await HandleBudgetExhaustion(ct);
+
+        // Build context from PRIOR history before adding current question
+        var contextualQuery = BuildContextualQuery(query);
+
         _history.Add(("user", query));
         _tokensUsed += queryTokens;
         _turnCount++;
 
-        var contextualQuery = BuildContextualQuery(query);
         var result = await _retrievalPipeline.Execute<TEntity>(
             contextualQuery, new RagQueryOptions { Focus = focus }, _metadata, ct);
 
@@ -69,13 +72,13 @@ internal sealed class RagSession<TEntity> : IRagSession<TEntity> where TEntity :
         if (_tokensUsed + queryTokens > _options.MaxTokenBudget)
             await HandleBudgetExhaustion(ct);
 
+        // Build context from PRIOR history before adding current question
+        var contextualQuery = BuildContextualQuery(query);
+
         // Track the question in history
         _history.Add(("user", query));
         _tokensUsed += queryTokens;
         _turnCount++;
-
-        // Build context-aware query with conversation history
-        var contextualQuery = BuildContextualQuery(query);
 
         var result = await _retrievalPipeline.Execute<TEntity>(
             contextualQuery, new RagQueryOptions(), _metadata, ct);
@@ -100,10 +103,11 @@ internal sealed class RagSession<TEntity> : IRagSession<TEntity> where TEntity :
         if (_history.Count <= 1)
             return currentQuery;
 
-        // Include recent conversation context for the retrieval agent
+        // Include only prior user questions to prevent LLM response re-injection
         var context = string.Join("\n",
-            _history.TakeLast(6) // Last 3 turns (user + assistant pairs)
-                .Select(h => $"{h.Role}: {h.Content}"));
+            _history.Where(h => h.Role == "user")
+                .TakeLast(3) // Last 3 user questions for context
+                .Select(h => $"Previous question: {h.Content}"));
 
         return $"Conversation context:\n{context}\n\nCurrent question: {currentQuery}";
     }

@@ -130,7 +130,8 @@ internal sealed class DiagonalGmmClustering : IClusteringStrategy
             }
         }
 
-        return (bestK, bestGmm!);
+        return (bestK, bestGmm ?? throw new InvalidOperationException(
+            $"BIC selection produced no model (maxK={maxK}). This should not happen."));
     }
 
     // ── Diagonal GMM with EM ────────────────────────────────────────────

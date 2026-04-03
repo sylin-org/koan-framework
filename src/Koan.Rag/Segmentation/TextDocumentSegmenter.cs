@@ -51,6 +51,10 @@ internal sealed class TextDocumentSegmenter : IDocumentSegmenter
         if (!Path.IsPathFullyQualified(filePath))
             throw new ArgumentException("File path must be fully qualified", nameof(filePath));
 
+        // Reject UNC/network paths to prevent NTLM relay and network file access
+        if (filePath.StartsWith(@"\\") || filePath.StartsWith("//"))
+            throw new ArgumentException("Network (UNC) paths are not permitted for file ingestion", nameof(filePath));
+
         _logger.LogDebug("Segmenting large text document: {File}", filePath);
 
         using var reader = new StreamReader(filePath, Encoding.UTF8);

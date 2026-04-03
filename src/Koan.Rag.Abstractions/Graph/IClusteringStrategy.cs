@@ -22,7 +22,13 @@ public interface IClusteringStrategy
         CancellationToken ct = default);
 }
 
-/// <summary>An embedding vector paired with its source chunk/node ID.</summary>
+/// <summary>
+/// An embedding vector paired with its source chunk/node ID.
+/// <para>
+/// Note: the <c>Embedding</c> array uses reference equality in record comparisons.
+/// Do not use this type as a dictionary key or in HashSet operations.
+/// </para>
+/// </summary>
 public sealed record EmbeddingWithId(string Id, float[] Embedding);
 
 /// <summary>A cluster produced by the clustering strategy.</summary>

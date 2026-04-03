@@ -141,7 +141,7 @@ internal sealed class RagIngestionWorker(
 
     private async Task HandleJobFailure(RagIngestionJob job, string error, CancellationToken ct)
     {
-        job.Error = error;
+        job.Error = error.Length > 500 ? error[..500] + "..." : error;
         job.RetryCount++;
 
         if (job.RetryCount >= job.MaxRetries)

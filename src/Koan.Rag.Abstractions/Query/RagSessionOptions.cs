@@ -15,6 +15,8 @@ public sealed record RagSessionOptions
     /// <summary>
     /// Strategy for handling token budget exhaustion.
     /// Default: <see cref="SessionExhaustionStrategy.AutoSummarize"/>.
+    /// Note: AutoSummarize currently falls back to DropOldest behavior.
+    /// Full summarization will be implemented with agentic retrieval (Phase 3).
     /// </summary>
     public SessionExhaustionStrategy ExhaustionStrategy { get; init; } =
         SessionExhaustionStrategy.AutoSummarize;

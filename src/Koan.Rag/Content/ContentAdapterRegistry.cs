@@ -91,6 +91,10 @@ internal sealed class ContentAdapterRegistry
             throw new ArgumentException(
                 $"File path must be absolute and fully qualified: '{filePath}'", nameof(filePath));
 
+        // Reject UNC/network paths to prevent NTLM relay and network file access
+        if (filePath.StartsWith(@"\\") || filePath.StartsWith("//"))
+            throw new ArgumentException("Network (UNC) paths are not permitted for file ingestion", nameof(filePath));
+
         var fileInfo = new FileInfo(filePath);
         const long MaxFileSizeBytes = 100 * 1024 * 1024; // 100 MB
         if (fileInfo.Length > MaxFileSizeBytes)

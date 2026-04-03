@@ -87,7 +87,7 @@ internal sealed class ContextualChunker
             var sample = TruncateToTokens(text, 2000);
 
             var prompt = documentTitle is not null
-                ? $"In 2-3 sentences, summarize what the document titled \"{documentTitle}\" is about, based on this excerpt:\n\n{sample}"
+                ? $"In 2-3 sentences, summarize what the document titled \"{TextHeuristics.SanitizeForPrompt(documentTitle)}\" is about, based on this excerpt:\n\n{sample}"
                 : $"In 2-3 sentences, summarize what this document is about:\n\n{sample}";
 
             return await Koan.AI.Client.Chat(prompt, ct);

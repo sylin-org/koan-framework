@@ -17,6 +17,10 @@ public sealed record ConceptEntity
 
     /// <summary>
     /// Embedding of the entity name + description for similarity-based resolution.
+    /// <para>
+    /// Note: the <c>Embedding</c> array uses reference equality in record comparisons.
+    /// Do not use this type as a dictionary key or in HashSet operations.
+    /// </para>
     /// </summary>
     public float[]? Embedding { get; init; }
 

@@ -13,4 +13,19 @@ internal static class TextHeuristics
             return true;
         return false;
     }
+
+    /// <summary>
+    /// Sanitize a string before embedding it in an LLM prompt.
+    /// Removes characters that could break prompt structure.
+    /// </summary>
+    public static string SanitizeForPrompt(string input, int maxLength = 200)
+    {
+        if (string.IsNullOrEmpty(input)) return "";
+        var sanitized = input
+            .Replace("\"", "'")
+            .Replace("\n", " ")
+            .Replace("\r", " ")
+            .Replace("---", "—"); // Prevent delimiter breakout
+        return sanitized.Length > maxLength ? sanitized[..maxLength] : sanitized;
+    }
 }

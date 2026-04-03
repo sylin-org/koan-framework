@@ -26,11 +26,14 @@ internal sealed class ComposedRagCorpus : IComposedRagCorpus
 
     public async Task<string> Ask(string query, string focus, CancellationToken ct = default)
     {
-        var result = await AskResult($"{query}\n\n[Focus: {focus}]", ct);
+        var result = await AskResultInternal(query, focus, ct);
         return result.Answer;
     }
 
-    public async Task<RagQueryResult> AskResult(string query, CancellationToken ct = default)
+    public Task<RagQueryResult> AskResult(string query, CancellationToken ct = default)
+        => AskResultInternal(query, focus: null, ct);
+
+    private async Task<RagQueryResult> AskResultInternal(string query, string? focus, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
         var sw = Stopwatch.StartNew();
@@ -101,6 +104,8 @@ internal sealed class ComposedRagCorpus : IComposedRagCorpus
 
         var systemPrompt = "You are a knowledgeable assistant. Answer based only on the provided context. " +
                           "Cite sources by referencing [Source: document-id].";
+        if (focus is not null)
+            systemPrompt += $"\nFocus: {focus}";
 
         var composedChatOptions = new Koan.AI.Contracts.Options.ChatOptions
         {

@@ -54,8 +54,16 @@ internal sealed class RagService : IRagService
         return (IRagCorpus<TEntity>)_corpora.GetOrAdd(key, _ =>
         {
             // Try attribute-declared first, then create with provided directive
-            var metadata = RagCorpusMetadata.Resolve<TEntity>(name)
-                ?? RagCorpusMetadata.CreateDynamic(name, directive);
+            var metadata = RagCorpusMetadata.Resolve<TEntity>(name);
+            if (metadata is not null && directive != metadata.Directive)
+            {
+                var warnLogger = _loggerFactory.CreateLogger("Koan.Rag");
+                warnLogger.LogWarning(
+                    "Directive ignored for corpus '{Name}' [{Entity}]: attribute-declared directive takes precedence. " +
+                    "Use Rebuild(new RagRebuildOptions {{ Directive = \"...\" }}) to change.",
+                    name, typeof(TEntity).Name);
+            }
+            metadata ??= RagCorpusMetadata.CreateDynamic(name, directive);
 
             return CreateCorpus<TEntity>(metadata);
         });

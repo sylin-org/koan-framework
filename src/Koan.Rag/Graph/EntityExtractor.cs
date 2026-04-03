@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Koan.Rag.Abstractions;
+using Koan.Rag.Infrastructure;
 using Microsoft.Extensions.Logging;
 
 namespace Koan.Rag.Graph;
@@ -92,8 +93,8 @@ internal sealed class EntityExtractor
         string? directive)
     {
         var contextLine = documentTitle is not null
-            ? $"This chunk is from a document titled \"{documentTitle}\""
-              + (sectionTitle is not null ? $", section \"{sectionTitle}\"" : "")
+            ? $"This chunk is from a document titled \"{TextHeuristics.SanitizeForPrompt(documentTitle)}\""
+              + (sectionTitle is not null ? $", section \"{TextHeuristics.SanitizeForPrompt(sectionTitle)}\"" : "")
               + ".\n\n"
             : "";
 
