@@ -42,6 +42,14 @@ public sealed class KoanRagAutoRegistrar : IKoanAutoRegistrar
         services.AddSingleton<Graph.EntityResolver>();
         services.AddSingleton<Evaluation.RagEvaluator>();
 
+        // ── Content Adapters ────────────────────────────────────────────
+        services.AddSingleton<Content.Strategies.StrategyGenerator>();
+        services.AddSingleton<Content.ContentAdapterRegistry>();
+        services.AddSingleton<IContentAdapter, Content.Adapters.TextDocumentAdapter>();
+        services.AddSingleton<IContentAdapter, Content.Adapters.ImageAdapter>();
+        services.AddSingleton<IContentAdapter, Content.Adapters.AudioAdapter>();
+        services.AddSingleton<IContentAdapter, Content.Adapters.PdfAdapter>();
+
         // ── Configuration ───────────────────────────────────────────────
         services.AddOptions<RagOptions>()
             .BindConfiguration(Infrastructure.ConfigurationKeys.Rag)

@@ -3,6 +3,7 @@ using Koan.Data.Abstractions;
 using Koan.Data.AI;
 using Koan.Rag.Abstractions;
 using Koan.Rag.Chunking;
+using Koan.Rag.Content;
 using Koan.Rag.Graph;
 using Koan.Rag.Infrastructure;
 using Microsoft.Extensions.Logging;
@@ -17,6 +18,7 @@ namespace Koan.Rag.Ingestion;
 /// </summary>
 internal sealed class RagIngestionPipeline : IRagIngestionPipeline
 {
+    private readonly ContentAdapterRegistry _contentRegistry;
     private readonly ContextualChunker _chunker;
     private readonly EntityExtractor _entityExtractor;
     private readonly EntityResolver _entityResolver;
@@ -25,6 +27,7 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
     private readonly RagOptions _options;
 
     public RagIngestionPipeline(
+        ContentAdapterRegistry contentRegistry,
         ContextualChunker chunker,
         EntityExtractor entityExtractor,
         EntityResolver entityResolver,
@@ -32,6 +35,7 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
         IOptions<RagOptions> options,
         ILogger<RagIngestionPipeline> logger)
     {
+        _contentRegistry = contentRegistry;
         _chunker = chunker;
         _entityExtractor = entityExtractor;
         _entityResolver = entityResolver;
@@ -245,17 +249,23 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
     {
         _logger.LogDebug("Ingesting file {FilePath}", filePath);
 
-        // Read file content
-        // TODO: Modality detection + multi-modal extraction (OCR, Describe, Transcribe)
-        var text = await File.ReadAllTextAsync(filePath, ct);
-        if (string.IsNullOrWhiteSpace(text))
+        // Multi-modal content extraction via content adapter registry
+        var extractionResult = await _contentRegistry.ExtractFromFile(
+            filePath, metadata.Directive, ct);
+
+        if (string.IsNullOrWhiteSpace(extractionResult.Text))
             return (0, 0);
 
         var documentId = Path.GetFileNameWithoutExtension(filePath);
         var documentTitle = Path.GetFileName(filePath);
 
-        // Chunk
-        var chunked = await _chunker.Chunk(text, documentTitle, metadata.Directive, ct);
+        _logger.LogDebug(
+            "File '{File}' extracted via strategy '{Strategy}' ({Rounds} rounds)",
+            filePath, extractionResult.StrategyUsed, extractionResult.RoundsExecuted);
+
+        // Contextual chunking of the extracted text
+        var chunked = await _chunker.Chunk(
+            extractionResult.Text, documentTitle, metadata.Directive, ct);
 
         // Embed child chunks
         var chunksCreated = 0;
@@ -264,11 +274,11 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
             ct.ThrowIfCancellationRequested();
 
             var embedding = await Koan.AI.Client.Embed(child.Text, ct);
-            // TODO: Store in chunk-specific vector collection
+            // TODO: Store in chunk-specific vector collection with metadata
             chunksCreated++;
         }
 
-        // Extract entities
+        // Extract entities from parent chunks
         var entitiesExtracted = 0;
         if (metadata.GraphStrategy != GraphStrategy.Lazy)
         {
