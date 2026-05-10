@@ -25,20 +25,16 @@ public sealed class MilvusOptions : IAdapterOptions
     public string? Username { get; set; } = null;
     public string? Password { get; set; } = null;
 
-    // Query configuration for vector similarity search
+    // Query configuration for vector similarity search. MaxTopK is a vector-search domain
+    // concept (cost of nearest-neighbour scoring), not a row-page cap; it stays.
     public int DefaultTopK { get; set; } = 10;
     public int MaxTopK { get; set; } = 200;
 
-    // IAdapterOptions implementation - map to vector-specific properties
+    // IAdapterOptions implementation — default-only fallback aliased to DefaultTopK.
     public int DefaultPageSize
     {
         get => DefaultTopK;
         set => DefaultTopK = value;
-    }
-    public int MaxPageSize
-    {
-        get => MaxTopK;
-        set => MaxTopK = value;
     }
 
     public IAdapterReadinessConfiguration Readiness { get; set; } = new AdapterReadinessConfiguration();

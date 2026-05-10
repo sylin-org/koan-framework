@@ -22,7 +22,6 @@ internal static class Constants
             public const string Password = Section + ":Password";
             public const string AltPassword = "Koan:Data:Password";
             public const string DefaultPageSize = Section + ":DefaultPageSize";
-            public const string MaxPageSize = Section + ":MaxPageSize";
             public const string QueryTimeout = Section + ":QueryTimeoutSeconds";
             public const string DurabilityLevel = Section + ":Durability";
             public const string Hosts = Section + ":Hosts";
@@ -41,7 +40,6 @@ internal static class Constants
     {
         public const string EnsureCreatedSupported = "data:couchbase:ensureCreated";
         public const string DefaultPageSize = "data:couchbase:defaultPageSize";
-        public const string MaxPageSize = "data:couchbase:maxPageSize";
     }
 }
 

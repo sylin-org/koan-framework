@@ -34,13 +34,5 @@ internal sealed class JsonDataOptionsConfigurator : IConfigureOptions<JsonDataOp
             $"{Constants.Configuration.Section_Sources_Default}:{Constants.Configuration.Keys.DefaultPageSize}"
         });
         if (int.TryParse(dps, out var dpsVal) && dpsVal > 0) options.DefaultPageSize = dpsVal;
-        var mps = Koan.Core.Configuration.ReadFirst(_config, new[]
-        {
-            $"{Constants.Configuration.Section_Data}:{Constants.Configuration.Keys.MaxPageSize}",
-            $"{Constants.Configuration.Section_Sources_Default}:{Constants.Configuration.Keys.MaxPageSize}"
-        });
-        if (int.TryParse(mps, out var mpsVal) && mpsVal > 0) options.MaxPageSize = mpsVal;
-        if (options.DefaultPageSize > options.MaxPageSize)
-            options.DefaultPageSize = options.MaxPageSize;
     }
 }

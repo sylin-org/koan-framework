@@ -77,12 +77,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
             Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
             Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
 
-        var maxPageSize = Configuration.ReadFirstWithSource(
-            cfg,
-            defaultOptions.MaxPageSize,
-            Infrastructure.Constants.Configuration.Keys.MaxPageSize,
-            Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
-
         var namingStyle = Configuration.ReadFirstWithSource(
             cfg,
             defaultOptions.NamingStyle,
@@ -135,7 +129,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
         module.PublishConfigValue(PostgresItems.Separator, separator);
         module.PublishConfigValue(PostgresItems.EnsureCreatedSupported, ensureCreated);
         module.PublishConfigValue(PostgresItems.DefaultPageSize, defaultPageSize);
-        module.PublishConfigValue(PostgresItems.MaxPageSize, maxPageSize);
     }
 
     private static string BuildPostgresFallback(PostgresOptions defaults)

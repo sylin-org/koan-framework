@@ -29,12 +29,6 @@ internal static class MongoProvenanceItems
         ConfigurationConstants.Sources.DefaultMongoDefaultPageSize
     };
 
-    internal static readonly string[] MaxPageSizeKeys =
-    {
-        ConfigurationConstants.FullKey(ConfigurationConstants.Keys.MaxPageSize),
-        ConfigurationConstants.Sources.DefaultMongoMaxPageSize
-    };
-
     private static readonly IReadOnlyCollection<string> ConnectionConsumers = new[]
     {
         "Koan.Data.Connector.Mongo.MongoOptionsConfigurator",
@@ -81,13 +75,6 @@ internal static class MongoProvenanceItems
         "Default Page Size",
         "Default batch size used when paging Mongo queries.",
         DefaultValue: Defaults.DefaultPageSize.ToString(CultureInfo.InvariantCulture),
-        DefaultConsumers: PagingConsumers);
-
-    internal static readonly ProvenanceItem MaxPageSize = new(
-        MaxPageSizeKeys[0],
-        "Max Page Size",
-        "Maximum server-allowed page size for Mongo query batching.",
-        DefaultValue: Defaults.MaxPageSize.ToString(CultureInfo.InvariantCulture),
         DefaultConsumers: PagingConsumers);
 
     private static string BoolString(bool value) => value ? "true" : "false";

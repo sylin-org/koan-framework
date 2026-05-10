@@ -106,7 +106,9 @@ public abstract class AdapterOptionsConfigurator<TOptions> : IConfigureOptions<T
     }
 
     /// <summary>
-    /// Centralizes paging configuration with consistent key patterns
+    /// Centralizes paging configuration with consistent key patterns. Per the IAdapterOptions
+    /// docstring, page-size capping is no longer the adapter layer's concern — only the
+    /// <see cref="IAdapterOptions.DefaultPageSize"/> fallback is bound here.
     /// </summary>
     protected void ConfigurePaging(IAdapterOptions options)
     {
@@ -114,14 +116,9 @@ public abstract class AdapterOptionsConfigurator<TOptions> : IConfigureOptions<T
             Infrastructure.ConfigurationConstants.Data.Paging.DefaultPageSizeForProvider(ProviderName),
             Infrastructure.ConfigurationConstants.Data.Paging.DefaultPageSize);
 
-        options.MaxPageSize = Core.Configuration.ReadFirst(Configuration, options.MaxPageSize,
-            Infrastructure.ConfigurationConstants.Data.Paging.MaxPageSizeForProvider(ProviderName),
-            Infrastructure.ConfigurationConstants.Data.Paging.MaxPageSize);
-
         KoanLog.ConfigDebug(Logger, LogActions.PagingConfiguration, LogOutcomes.Applied,
             ("provider", ProviderName),
-            ("defaultPageSize", options.DefaultPageSize),
-            ("maxPageSize", options.MaxPageSize));
+            ("defaultPageSize", options.DefaultPageSize));
     }
 
     /// <summary>

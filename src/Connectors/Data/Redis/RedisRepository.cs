@@ -74,7 +74,7 @@ internal sealed class RedisRepository<TEntity, TKey> :
     public async Task<IReadOnlyList<TEntity>> Query(object? query, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        var pageSize = Math.Max(1, Math.Min(_options.Value.DefaultPageSize, _options.Value.MaxPageSize));
+        var pageSize = Math.Max(1, _options.Value.DefaultPageSize);
         var (items, _) = await ScanAll(page: 1, size: pageSize, ct);
         return items;
     }
@@ -83,8 +83,7 @@ internal sealed class RedisRepository<TEntity, TKey> :
     {
         ct.ThrowIfCancellationRequested();
         var page = options?.Page is int p && p > 1 ? p : 1;
-        var max = Math.Max(1, _options.Value.MaxPageSize);
-        var size = options?.PageSize is int ps && ps > 0 ? Math.Min(ps, max) : Math.Min(_options.Value.DefaultPageSize, max);
+        var size = options?.PageSize is int ps && ps > 0 ? ps : Math.Max(1, _options.Value.DefaultPageSize);
         var (items, _) = await ScanAll(page, size, ct);
         return items;
     }
@@ -92,7 +91,7 @@ internal sealed class RedisRepository<TEntity, TKey> :
     public async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        var pageSize = Math.Max(1, Math.Min(_options.Value.DefaultPageSize, _options.Value.MaxPageSize));
+        var pageSize = Math.Max(1, _options.Value.DefaultPageSize);
         var (items, _) = await ScanAll(page: 1, size: pageSize, ct);
         return items.AsQueryable().Where(predicate).ToList();
     }
@@ -101,8 +100,7 @@ internal sealed class RedisRepository<TEntity, TKey> :
     {
         ct.ThrowIfCancellationRequested();
         var page = options?.Page is int p && p > 1 ? p : 1;
-        var max = Math.Max(1, _options.Value.MaxPageSize);
-        var size = options?.PageSize is int ps && ps > 0 ? Math.Min(ps, max) : Math.Min(_options.Value.DefaultPageSize, max);
+        var size = options?.PageSize is int ps && ps > 0 ? ps : Math.Max(1, _options.Value.DefaultPageSize);
         var (items, _) = await ScanAll(page, size, ct);
         return items.AsQueryable().Where(predicate).ToList();
     }

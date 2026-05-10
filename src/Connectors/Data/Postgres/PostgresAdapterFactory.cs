@@ -63,7 +63,6 @@ public sealed class PostgresAdapterFactory : IDataAdapterFactory
         {
             ConnectionString = connectionString,
             DefaultPageSize = baseOpts.DefaultPageSize,
-            MaxPageSize = baseOpts.MaxPageSize,
             DdlPolicy = baseOpts.DdlPolicy,
             SchemaMatching = baseOpts.SchemaMatching,
             AllowProductionDdl = baseOpts.AllowProductionDdl,

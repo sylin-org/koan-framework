@@ -91,13 +91,6 @@ internal sealed class RedisOptionsConfigurator : AdapterOptionsConfigurator<Redi
             Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
             Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
 
-        options.MaxPageSize = ReadProviderConfiguration(
-            options.MaxPageSize,
-            Infrastructure.Constants.Configuration.Keys.MaxPageSize,
-            Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
-
-        if (options.DefaultPageSize > options.MaxPageSize) options.DefaultPageSize = options.MaxPageSize;
-
         Logger?.LogInformation("Final Redis Configuration");
         Logger?.LogInformation("Connection: {ConnectionString}", options.ConnectionString);
         Logger?.LogInformation("Database: {Database}", database);

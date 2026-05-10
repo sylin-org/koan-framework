@@ -77,10 +77,6 @@ internal sealed class SqlServerOptionsConfigurator : AdapterOptionsConfigurator<
             options.DefaultPageSize,
             Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
             Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
-        options.MaxPageSize = ReadProviderConfiguration(
-            options.MaxPageSize,
-            Infrastructure.Constants.Configuration.Keys.MaxPageSize,
-            Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
 
         var ddlStr = ReadProviderConfiguration(options.DdlPolicy.ToString(),
             Infrastructure.Constants.Configuration.Keys.DdlPolicy,

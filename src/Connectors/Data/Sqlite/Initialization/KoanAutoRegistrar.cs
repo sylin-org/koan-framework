@@ -72,12 +72,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
             Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
 
-        var maxPageSize = Koan.Core.Configuration.ReadFirstWithSource(
-            cfg,
-            defaultOptions.MaxPageSize,
-            Infrastructure.Constants.Configuration.Keys.MaxPageSize,
-            Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
-
         var namingStyle = Koan.Core.Configuration.ReadFirstWithSource(
             cfg,
             defaultOptions.NamingStyle,
@@ -132,7 +126,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         module.PublishConfigValue(SqliteItems.Separator, separator);
         module.PublishConfigValue(SqliteItems.EnsureCreatedSupported, ensureCreated);
         module.PublishConfigValue(SqliteItems.DefaultPageSize, defaultPageSize);
-        module.PublishConfigValue(SqliteItems.MaxPageSize, maxPageSize);
     }
 
     private static class LogActions

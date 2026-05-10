@@ -10,7 +10,6 @@ public sealed class RedisOptions : IAdapterOptions
     public string ConnectionString { get; set; } = "auto"; // DX-first: auto-detect by default
     public int Database { get; set; } = 0;
     public int DefaultPageSize { get; set; } = 1000;
-    public int MaxPageSize { get; set; } = 10_000;
 
     public IAdapterReadinessConfiguration Readiness { get; set; } = new AdapterReadinessConfiguration();
 }

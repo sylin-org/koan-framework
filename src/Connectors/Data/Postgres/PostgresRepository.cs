@@ -52,7 +52,6 @@ internal sealed class PostgresRepository<
     private readonly StorageNameResolver.Convention _conv;
     private readonly ILinqSqlDialect _dialect = new PgDialect();
     private readonly int _defaultPageSize;
-    private readonly int _maxPageSize;
     private readonly ILogger _logger;
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> _healthyCache = new(StringComparer.Ordinal);
 
@@ -81,7 +80,6 @@ internal sealed class PostgresRepository<
                       : NullLogger.Instance);
         _conv = new StorageNameResolver.Convention(options.NamingStyle, options.Separator, NameCasing.AsIs);
         _defaultPageSize = options.DefaultPageSize > 0 ? options.DefaultPageSize : 50;
-        _maxPageSize = options.MaxPageSize > 0 ? options.MaxPageSize : 200;
 
         // Log optimization strategy for diagnostics
         if (_optimizationInfo.IsOptimized)
@@ -988,11 +986,10 @@ internal sealed class PostgresRepository<
             return (0, int.MaxValue);
         }
 
-        // Pagination is active - apply defaults and limits
+        // Pagination is active - apply default fallback only. Per ADR no adapter-side cap.
         var page = options?.Page is int p && p > 0 ? p : 1;
         var sizeReq = options?.PageSize;
         var size = sizeReq is int ps && ps > 0 ? ps : _defaultPageSize;
-        if (size > _maxPageSize) size = _maxPageSize;
         var offset = (page - 1) * size;
         return (offset, size);
     }

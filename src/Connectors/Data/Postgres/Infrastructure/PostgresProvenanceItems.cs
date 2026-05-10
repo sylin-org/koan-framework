@@ -75,12 +75,5 @@ internal static class PostgresProvenanceItems
         DefaultValue: Defaults.DefaultPageSize.ToString(CultureInfo.InvariantCulture),
         DefaultConsumers: PagingConsumers);
 
-    internal static readonly ProvenanceItem MaxPageSize = new(
-        Constants.Configuration.Keys.MaxPageSize,
-        "Max Page Size",
-        "Maximum number of rows allowed per page when paging through results.",
-        DefaultValue: Defaults.MaxPageSize.ToString(CultureInfo.InvariantCulture),
-        DefaultConsumers: PagingConsumers);
-
     private static string BoolString(bool value) => value ? "true" : "false";
 }

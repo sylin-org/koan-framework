@@ -63,7 +63,6 @@ public sealed class SqlServerAdapterFactory : IDataAdapterFactory
         {
             ConnectionString = connectionString,
             DefaultPageSize = baseOpts.DefaultPageSize,
-            MaxPageSize = baseOpts.MaxPageSize,
             JsonCaseInsensitive = baseOpts.JsonCaseInsensitive,
             JsonWriteIndented = baseOpts.JsonWriteIndented,
             JsonIgnoreNullValues = baseOpts.JsonIgnoreNullValues,

@@ -39,8 +39,6 @@ public static class AdapterBootReporting
         // Standard adapter capabilities
         module.AddSetting($"{moduleName}:DefaultPageSize",
             options.DefaultPageSize.ToString(CultureInfo.InvariantCulture));
-        module.AddSetting($"{moduleName}:MaxPageSize",
-            options.MaxPageSize.ToString(CultureInfo.InvariantCulture));
 
         // Readiness configuration
         module.AddSetting($"{moduleName}:ReadinessPolicy",

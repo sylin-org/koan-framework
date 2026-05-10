@@ -364,14 +364,14 @@ internal sealed class MongoRepository<TEntity, TKey> :
         => ExecuteWithReadinessAsync(async () =>
         {
             ct.ThrowIfCancellationRequested();
-            var (defaultPageSize, maxPageSize) = _options.CurrentValue.GetPagingGuardrails();
+            var defaultPageSize = _options.CurrentValue.GetDefaultPageSize();
             var collection = await GetCollection(ct).ConfigureAwait(false);
 
             IFindFluent<TEntity, TEntity> cursor = query is Expression<Func<TEntity, bool>> predicate
                 ? FindWithPredicate(collection, predicate)
                 : collection.Find(Builders<TEntity>.Filter.Empty);
 
-            cursor = cursor.ApplyPaging(options, defaultPageSize, maxPageSize,
+            cursor = cursor.ApplyPaging(options, defaultPageSize,
                 (c, skip, take) => c.Skip(skip).Limit(take));
 
             var results = await cursor.ToListAsync(ct).ConfigureAwait(false);
@@ -387,11 +387,11 @@ internal sealed class MongoRepository<TEntity, TKey> :
             ct.ThrowIfCancellationRequested();
             using var activity = MongoTelemetry.Activity.StartActivity("mongo.query.linq");
             activity?.SetTag("entity", typeof(TEntity).FullName);
-            var (defaultPageSize, maxPageSize) = _options.CurrentValue.GetPagingGuardrails();
+            var defaultPageSize = _options.CurrentValue.GetDefaultPageSize();
             var collection = await GetCollection(ct).ConfigureAwait(false);
 
             var cursor = FindWithPredicate(collection, predicate)
-                .ApplyPaging(options, defaultPageSize, maxPageSize,
+                .ApplyPaging(options, defaultPageSize,
                     (c, skip, take) => c.Skip(skip).Limit(take));
 
             var results = await cursor.ToListAsync(ct).ConfigureAwait(false);

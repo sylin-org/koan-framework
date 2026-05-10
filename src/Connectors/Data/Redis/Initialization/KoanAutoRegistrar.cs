@@ -106,12 +106,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
             $"{Infrastructure.Constants.Configuration.Section_Data}:{Infrastructure.Constants.Configuration.Keys.DefaultPageSize}",
             $"{Infrastructure.Constants.Configuration.Section_Sources_Default}:{Infrastructure.Constants.Configuration.Keys.DefaultPageSize}");
 
-        var maxPageSize = Configuration.ReadFirstWithSource(
-            cfg,
-            defaultOptions.MaxPageSize,
-            $"{Infrastructure.Constants.Configuration.Section_Data}:{Infrastructure.Constants.Configuration.Keys.MaxPageSize}",
-            $"{Infrastructure.Constants.Configuration.Section_Sources_Default}:{Infrastructure.Constants.Configuration.Keys.MaxPageSize}");
-
         var ensureCreated = Configuration.ReadFirstWithSource(
             cfg,
             true,
@@ -148,7 +142,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
         module.PublishConfigValue(RedisItems.Database, database);
         module.PublishConfigValue(RedisItems.EnsureCreatedSupported, ensureCreated);
         module.PublishConfigValue(RedisItems.DefaultPageSize, defaultPageSize);
-        module.PublishConfigValue(RedisItems.MaxPageSize, maxPageSize);
     }
 
     private static string BuildRedisFallback(RedisOptions defaults)

@@ -62,12 +62,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
             Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
 
-        var maxPageSize = Configuration.ReadFirstWithSource(
-            cfg,
-            defaultOptions.MaxPageSize,
-            Infrastructure.Constants.Configuration.Keys.MaxPageSize,
-            Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
-
         var namingStyle = Configuration.ReadFirstWithSource(
             cfg,
             defaultOptions.NamingStyle,
@@ -115,7 +109,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         module.PublishConfigValue(SqlServerItems.Separator, separator);
         module.PublishConfigValue(SqlServerItems.EnsureCreatedSupported, ensureCreated);
         module.PublishConfigValue(SqlServerItems.DefaultPageSize, defaultPageSize);
-        module.PublishConfigValue(SqlServerItems.MaxPageSize, maxPageSize);
     }
 
     private static string BuildSqlServerFallback()

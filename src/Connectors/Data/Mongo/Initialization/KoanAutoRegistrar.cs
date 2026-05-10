@@ -144,11 +144,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             defaultOptions.DefaultPageSize,
             MongoItems.DefaultPageSizeKeys);
 
-        var maxPageSize = Configuration.ReadFirstWithSource(
-            cfg,
-            defaultOptions.MaxPageSize,
-            MongoItems.MaxPageSizeKeys);
-
         var username = Configuration.ReadFirstWithSource(
             cfg,
             "",
@@ -193,8 +188,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             sanitizeOverride: false);
 
         module.PublishConfigValue(MongoItems.DefaultPageSize, defaultPageSize);
-
-        module.PublishConfigValue(MongoItems.MaxPageSize, maxPageSize);
     }
 
     private static string ResolveConnectionStringForReporting(
