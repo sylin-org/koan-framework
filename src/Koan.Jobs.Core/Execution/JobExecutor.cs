@@ -121,6 +121,44 @@ internal sealed class JobExecutor
             return;
         }
 
+        // Cross-job WaitFor check (ADR-0017). A dependent job whose declared prerequisites
+        // haven't all cleared transitions to Blocked and re-queues with a geometric backoff.
+        // Specific-id dependencies that ended Failed/Cancelled poison the dependent.
+        var depCheck = await CheckDependencies(job, store, metadata, cancellationToken);
+        if (depCheck.Outcome != DependencyOutcome.Ready)
+        {
+            if (depCheck.Outcome == DependencyOutcome.Poisoned)
+            {
+                job.Status = JobStatus.Failed;
+                job.LastError = depCheck.Reason;
+                job.CompletedAt = DateTimeOffset.UtcNow;
+                job.Duration = job.CompletedAt - job.CreatedAt;
+                await store.Update(job, metadata, cancellationToken);
+                await _eventPublisher.PublishFailed(job, depCheck.Reason, cancellationToken);
+                activity?.SetTag("job.status", "DependencyPoisoned");
+                activity?.SetStatus(ActivityStatusCode.Error, depCheck.Reason);
+                _logger.LogWarning("Job {JobId} failed due to dependency: {Reason}.", job.Id, depCheck.Reason);
+                return;
+            }
+
+            // Blocked — re-queue with backoff. Same shape as the host-rate-gate path above.
+            var backoff = ComputeBlockedBackoff(job);
+            job.Status = JobStatus.Blocked;
+            job.QueuedAt = DateTimeOffset.UtcNow.Add(backoff);
+            job.ProgressMessage = depCheck.Reason;
+            await store.Update(job, metadata, cancellationToken);
+            activity?.SetTag("job.status", "Blocked");
+
+            _logger.LogDebug("Job {JobId} blocked: {Reason}. Re-queue in {Backoff:F0}s.",
+                job.Id, depCheck.Reason, backoff.TotalSeconds);
+
+            try { await Task.Delay(backoff, cancellationToken); }
+            catch (OperationCanceledException) { return; }
+
+            await _queue.Enqueue(item, cancellationToken);
+            return;
+        }
+
         while (attempt < maxAttempts)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -294,4 +332,86 @@ internal sealed class JobExecutor
         var executions = await store.ListExecutions(jobId, metadata, cancellationToken);
         return executions.Count;
     }
+
+    /// <summary>
+    /// Evaluates <see cref="Job.WaitForJobIds"/> and <see cref="Job.WaitForTypeNames"/> at dispatch
+    /// time. Returns <see cref="DependencyOutcome.Ready"/> only when every specific id has reached
+    /// <see cref="JobStatus.Completed"/> AND every type has at least one Completed instance.
+    /// See ADR-0017.
+    /// </summary>
+    private static async Task<DependencyCheck> CheckDependencies(
+        Job job,
+        IJobStore store,
+        JobStoreMetadata metadata,
+        CancellationToken cancellationToken)
+    {
+        // Specific-id dependencies: terminal-required, Failed/Cancelled poisons the dependent.
+        foreach (var depId in job.WaitForJobIds)
+        {
+            if (string.IsNullOrWhiteSpace(depId)) continue;
+            var dep = await store.Get(depId, metadata, cancellationToken);
+            if (dep is null)
+            {
+                // Unknown reference — treat as poisoned. Caller bug; should surface loudly.
+                return new DependencyCheck(DependencyOutcome.Poisoned,
+                    $"Dependency job {depId} not found.");
+            }
+            switch (dep.Status)
+            {
+                case JobStatus.Completed:
+                    continue;
+                case JobStatus.Failed:
+                case JobStatus.Cancelled:
+                    return new DependencyCheck(DependencyOutcome.Poisoned,
+                        $"Dependency {depId} ended {dep.Status}.");
+                default:
+                    return new DependencyCheck(DependencyOutcome.Blocked,
+                        $"Waiting on job {depId} (currently {dep.Status}).");
+            }
+        }
+
+        // Type-based dependencies: any Completed of EACH listed type satisfies.
+        foreach (var typeName in job.WaitForTypeNames)
+        {
+            if (string.IsNullOrWhiteSpace(typeName)) continue;
+            var any = await store.HasCompletedJobOfType(typeName, metadata, cancellationToken);
+            if (!any)
+            {
+                return new DependencyCheck(DependencyOutcome.Blocked,
+                    $"Waiting on first successful {ShortName(typeName)} run.");
+            }
+        }
+
+        return new DependencyCheck(DependencyOutcome.Ready, null);
+    }
+
+    /// <summary>
+    /// Geometric backoff for jobs in <see cref="JobStatus.Blocked"/>. Starts at 5s, doubles each
+    /// re-check, caps at 5 min. Re-check count is tracked via <see cref="Job.Metadata"/> so the
+    /// backoff curve survives across re-queue cycles without an extra schema field.
+    /// </summary>
+    private static TimeSpan ComputeBlockedBackoff(Job job)
+    {
+        const string CounterKey = "blocked.attempt";
+        var attempts = 0;
+        if (job.Metadata.TryGetValue(CounterKey, out var raw) && raw is not null)
+        {
+            int.TryParse(raw.ToString(), out attempts);
+        }
+        attempts++;
+        job.Metadata[CounterKey] = attempts;
+
+        var seconds = Math.Min(5d * Math.Pow(2, attempts - 1), 300d); // 5 → 10 → 20 → … cap 300
+        return TimeSpan.FromSeconds(seconds);
+    }
+
+    private static string ShortName(string fullName)
+    {
+        var i = fullName.LastIndexOf('.');
+        return i >= 0 && i < fullName.Length - 1 ? fullName[(i + 1)..] : fullName;
+    }
+
+    private enum DependencyOutcome { Ready, Blocked, Poisoned }
+
+    private readonly record struct DependencyCheck(DependencyOutcome Outcome, string? Reason);
 }

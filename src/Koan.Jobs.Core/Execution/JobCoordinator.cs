@@ -66,7 +66,9 @@ internal sealed class JobCoordinator : IJobCoordinator
             QueuedAt = DateTimeOffset.UtcNow,
             CreatedAt = DateTimeOffset.UtcNow,
             CorrelationId = correlationId,
-            Progress = 0d
+            Progress = 0d,
+            // Stable type identity for WaitFor type-based lookups (see ADR-0017).
+            TypeName = typeof(TJob).FullName ?? typeof(TJob).Name,
         };
 
         job.Context = request.Context;

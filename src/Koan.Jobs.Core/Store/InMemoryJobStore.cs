@@ -47,6 +47,22 @@ internal sealed class InMemoryJobStore(JobIndexCache index) : IJobStore
         return Task.CompletedTask;
     }
 
+    public Task<bool> HasCompletedJobOfType(string typeName, JobStoreMetadata metadata, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(typeName)) return Task.FromResult(false);
+        // Linear scan — the dictionary is small (in-memory jobs sweep periodically) and this
+        // path only fires when a job is in Blocked-with-type-deps state on each redispatch.
+        foreach (var job in _jobs.Values)
+        {
+            if (job.Status == JobStatus.Completed
+                && (job.TypeName == typeName || job.GetType().FullName == typeName))
+            {
+                return Task.FromResult(true);
+            }
+        }
+        return Task.FromResult(false);
+    }
+
     public Task<JobExecution> CreateExecution(JobExecution execution, JobStoreMetadata metadata, CancellationToken cancellationToken)
     {
         var list = _executions.GetOrAdd(execution.JobId, _ => new List<JobExecution>());
