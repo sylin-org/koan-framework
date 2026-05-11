@@ -52,4 +52,28 @@ public class Tag : Entity<Tag>
     /// "<see cref="Id"/> is the canonical form; these strings are synonyms of it."
     /// </summary>
     public List<string> ParentOf { get; set; } = new();
+
+    /// <summary>
+    /// Canonical taxonomic parent — the <see cref="Id"/> of a sibling Tag that contains this one.
+    /// Distinct from <see cref="ParentOf"/> (synonym graph). Example:
+    /// <c>Tag { Id="midlander", Parent="hyur" }</c>; <c>Tag { Id="hyur", Parent="race" }</c>.
+    /// Consumers walk the chain at projection time to grow leaf tags into their ancestor set
+    /// (e.g. catalog query "all Hyur presets" matches both <c>hyur</c> and any descendants).
+    /// </summary>
+    /// <remarks>
+    /// String-Id self-reference, not a strongly-typed link — Mongo doesn't enforce referential
+    /// integrity. Importers are expected to write parent rows before children. The walk is
+    /// depth-capped at the call site to short-circuit pathological cycles. See ADR-0018.
+    /// </remarks>
+    [Index]
+    public string? Parent { get; set; }
+
+    /// <summary>
+    /// When <see langword="true"/>, this Tag exists for grouping or hierarchy purposes only and
+    /// should be filtered out of user-facing tag projections (e.g. <c>PackageSummary.PublicTags</c>).
+    /// The walk still traverses through it; only the final rendered list excludes it. Useful for
+    /// synthetic "category root" Tags (<c>race</c>, <c>tribe</c>, <c>patch</c>) whose only role
+    /// is to be a uniform <see cref="Parent"/> pointer for their children.
+    /// </summary>
+    public bool NoRender { get; set; }
 }
