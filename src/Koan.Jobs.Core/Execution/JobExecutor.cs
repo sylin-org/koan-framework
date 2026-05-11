@@ -9,6 +9,7 @@ using Koan.Jobs.Model;
 using Koan.Jobs.Options;
 using Koan.Jobs.Progress;
 using Koan.Jobs.Queue;
+using Koan.Jobs.RateGating;
 using Koan.Jobs.Store;
 using Koan.Jobs.Support;
 using Microsoft.Extensions.Logging;
@@ -18,11 +19,15 @@ namespace Koan.Jobs.Execution;
 
 internal sealed class JobExecutor
 {
+    /// <summary>Convention key on <see cref="Job.Metadata"/> for the host-rate-gate concept.</summary>
+    internal const string HostMetadataKey = "host";
+
     private readonly IJobStoreResolver _resolver;
     private readonly JobIndexCache _index;
     private readonly IJobEventPublisher _eventPublisher;
     private readonly JobProgressBroker _progressBroker;
     private readonly IJobQueue _queue;
+    private readonly IHostRateGate _rateGate;
     private readonly JobsOptions _options;
     private readonly ILogger<JobExecutor> _logger;
 
@@ -32,6 +37,7 @@ internal sealed class JobExecutor
         IJobEventPublisher eventPublisher,
         JobProgressBroker progressBroker,
         IJobQueue queue,
+        IHostRateGate rateGate,
         IOptions<JobsOptions> options,
         ILogger<JobExecutor> logger)
     {
@@ -40,6 +46,7 @@ internal sealed class JobExecutor
         _eventPublisher = eventPublisher;
         _progressBroker = progressBroker;
         _queue = queue;
+        _rateGate = rateGate;
         _options = options.Value;
         _logger = logger;
     }
@@ -85,6 +92,34 @@ internal sealed class JobExecutor
         var descriptor = ResolveRetryPolicy(item.JobType);
         var maxAttempts = customRetryPolicy != null ? int.MaxValue : descriptor.MaxAttempts;
         var attempt = await DetermineStartingAttempt(store, metadata, job.Id, item.AuditExecutions, cancellationToken);
+
+        // Host-rate-gate check (see IHostRateGate documentation). If another job from the same host
+        // is currently gated (typically because it hit a 429), don't even attempt this one — re-queue
+        // until the gate releases. No retry budget is consumed; the worker re-picks the queued item
+        // and re-runs this check.
+        var hostTag = ResolveHostTag(job);
+        if (hostTag is not null && _rateGate.TryGetGate(hostTag, out var activeGate))
+        {
+            job.Status = JobStatus.Queued;
+            job.QueuedAt = activeGate.ReleaseAt;
+            job.ProgressMessage = $"Waiting for host '{hostTag}' rate gate: {activeGate.Reason}";
+            await store.Update(job, metadata, cancellationToken);
+            activity?.SetTag("job.status", "RateGated");
+            activity?.SetTag("job.host", hostTag);
+
+            var waitFor = activeGate.ReleaseAt - DateTimeOffset.UtcNow;
+            if (waitFor < TimeSpan.Zero) waitFor = TimeSpan.FromSeconds(1);
+
+            _logger.LogInformation(
+                "Job {JobId} deferred — host '{HostTag}' gated until {ReleaseAt} ({Reason}).",
+                job.Id, hostTag, activeGate.ReleaseAt, activeGate.Reason);
+
+            try { await Task.Delay(waitFor, cancellationToken); }
+            catch (OperationCanceledException) { return; }
+
+            await _queue.Enqueue(item, cancellationToken);
+            return;
+        }
 
         while (attempt < maxAttempts)
         {
@@ -181,9 +216,25 @@ internal sealed class JobExecutor
                 return;
             }
 
-            var delay = customRetryPolicy != null
-                ? customRetryPolicy.ComputeDelay(attempt, outcome.Error ?? new Exception(outcome.Error?.Message ?? "Unknown error"))
-                : descriptor.ComputeDelay(attempt);
+            // RateLimitedJobException → set the cross-job gate AND override the per-job retry delay
+            // with the rate-limit's Retry-After value. Other jobs targeting the same host will see
+            // the gate at dispatch start and defer without consuming their retry budgets.
+            TimeSpan delay;
+            if (outcome.Error is RateLimitedJobException rateLimited)
+            {
+                await _rateGate.GateHost(rateLimited.HostTag, rateLimited.RetryAfter, rateLimited.Message, cancellationToken);
+                delay = rateLimited.RetryAfter;
+                _logger.LogWarning(
+                    "Job {JobId} hit rate limit on host '{HostTag}'. Gating for {Duration:F0}s.",
+                    job.Id, rateLimited.HostTag, rateLimited.RetryAfter.TotalSeconds);
+            }
+            else
+            {
+                delay = customRetryPolicy != null
+                    ? customRetryPolicy.ComputeDelay(attempt, outcome.Error ?? new Exception(outcome.Error?.Message ?? "Unknown error"))
+                    : descriptor.ComputeDelay(attempt);
+            }
+
             job.Status = JobStatus.Queued;
             job.QueuedAt = DateTimeOffset.UtcNow.Add(delay);
             await store.Update(job, metadata, cancellationToken);
@@ -211,6 +262,18 @@ internal sealed class JobExecutor
     {
         var attribute = jobType.GetCustomAttribute<RetryPolicyAttribute>(inherit: true);
         return attribute != null ? RetryPolicyDescriptor.FromAttribute(attribute) : RetryPolicyDescriptor.None;
+    }
+
+    /// <summary>
+    /// Reads the host tag from <see cref="Job.Metadata"/> under the conventional key
+    /// (<see cref="HostMetadataKey"/>). Returns <see langword="null"/> when not set — jobs without
+    /// a declared host bypass the rate-gate path entirely.
+    /// </summary>
+    private static string? ResolveHostTag(Job job)
+    {
+        if (!job.Metadata.TryGetValue(HostMetadataKey, out var raw) || raw is null) return null;
+        var value = raw.ToString();
+        return string.IsNullOrWhiteSpace(value) ? null : value;
     }
 
     private static async Task<JobExecutionOutcome> InvokeRunner(JobQueueItem item, Job job, JobProgressTracker tracker, CancellationToken cancellationToken)

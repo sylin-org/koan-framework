@@ -6,6 +6,7 @@ using Koan.Jobs.Events;
 using Koan.Jobs.Options;
 using Koan.Jobs.Progress;
 using Koan.Jobs.Queue;
+using Koan.Jobs.RateGating;
 using Koan.Jobs.Store;
 using Koan.Jobs.Support;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,6 +25,7 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<EntityJobStore>();
         services.TryAddSingleton<IJobStoreResolver, JobStoreResolver>();
         services.TryAddSingleton<IJobQueue, InMemoryJobQueue>();
+        services.TryAddSingleton<IHostRateGate, InMemoryHostRateGate>();
         services.TryAddSingleton<IJobCoordinator, JobCoordinator>();
         services.TryAddSingleton<JobExecutor>();
         services.TryAddSingleton<IJobEventPublisher, JobEventPublisher>();
