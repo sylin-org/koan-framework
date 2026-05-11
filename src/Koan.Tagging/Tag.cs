@@ -33,12 +33,12 @@ namespace Koan.Tagging;
 /// </remarks>
 public class Tag : Entity<Tag>
 {
-    /// <summary>
-    /// Canonical tag identifier — the form that gets stored on entities' <see cref="TagSet"/>s.
-    /// Conventionally lowercase kebab-case (<c>"ffxiv"</c>, <c>"depth-of-field"</c>).
-    /// </summary>
-    [Index(Unique = true)]
-    public new required string Id { get; set; } = default!;
+    // Canonical tag identifier — the form that gets stored on entities' TagSets. Conventionally
+    // lowercase kebab-case ("ffxiv", "depth-of-field"). Carried on the inherited
+    // Entity<Tag>.Id property; consumers set it explicitly at construction time (e.g.
+    // `new Tag { Id = "au-ra", … }`) since the slug IS the canonical identity. We don't shadow
+    // it with `new required string Id` because Mongo's BSON class-map rejects two properties
+    // mapping to `_id` even when the override is same-type-and-name.
 
     /// <summary>Human-readable display name (e.g. <c>"Final Fantasy XIV"</c>).</summary>
     public string? DisplayName { get; set; }
