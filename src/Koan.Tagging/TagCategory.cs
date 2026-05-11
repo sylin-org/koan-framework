@@ -27,13 +27,43 @@ namespace Koan.Tagging;
 [JsonConverter(typeof(TagCategoryJsonConverter))]
 public sealed class TagCategory : IEnumerable<string>
 {
-    private readonly HashSet<string> _values = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>
+    /// The underlying tag values. Exposed as a settable <see cref="HashSet{T}"/> so MongoDB BSON
+    /// auto-mapping can round-trip the data. Consumers should mutate via the fluent
+    /// <see cref="Set(string)"/> / <see cref="Unset(string)"/> / etc. API rather than touching this
+    /// directly — the fluent methods normalise inputs (trim, case-insensitive comparison) and the
+    /// JSON converter expects this to behave like a string set.
+    /// </summary>
+    /// <remarks>
+    /// The setter accepts <see langword="null"/> and normalises to an empty set so partial
+    /// deserialisation paths don't leave the type in a broken state.
+    /// </remarks>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public HashSet<string> Values
+    {
+        get => _values;
+        set => _values = value is null
+            ? new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            : new HashSet<string>(value, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private HashSet<string> _values = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Add a tag. Empty / whitespace inputs are ignored. Returns this for chaining.</summary>
     public TagCategory Set(string tag)
     {
         if (!string.IsNullOrWhiteSpace(tag)) _values.Add(tag.Trim());
         return this;
+    }
+
+    /// <summary>
+    /// Add a tag — non-fluent, void return so MongoDB.Bson's collection-initialiser deserialiser
+    /// can populate this category from a JSON array. Consumers should prefer <see cref="Set(string)"/>
+    /// (same semantics, fluent return).
+    /// </summary>
+    public void Add(string tag)
+    {
+        if (!string.IsNullOrWhiteSpace(tag)) _values.Add(tag.Trim());
     }
 
     /// <summary>Add multiple tags. Returns this for chaining.</summary>

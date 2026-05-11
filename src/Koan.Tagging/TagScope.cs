@@ -27,7 +27,26 @@ namespace Koan.Tagging;
 [JsonConverter(typeof(TagScopeJsonConverter))]
 public sealed class TagScope
 {
-    private readonly Dictionary<string, TagCategory> _categories = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>
+    /// Categories keyed by name. Exposed as a settable <see cref="Dictionary{TKey,TValue}"/> so MongoDB
+    /// BSON auto-mapping and System.Text.Json default fallback can round-trip the data. Consumers
+    /// should access categories via the <see cref="this[string]"/> indexer rather than touching this
+    /// directly — the indexer handles case-insensitive lookup and auto-create-on-miss semantics.
+    /// </summary>
+    /// <remarks>
+    /// The setter accepts <see langword="null"/> and normalises to an empty dictionary so partial
+    /// deserialisation paths (BSON skip-during-restore, etc.) don't leave the type in a broken state.
+    /// </remarks>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public Dictionary<string, TagCategory> Categories
+    {
+        get => _categories;
+        set => _categories = value is null
+            ? new Dictionary<string, TagCategory>(StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, TagCategory>(value, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private Dictionary<string, TagCategory> _categories = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Access (auto-create on miss) the category with the given name. The returned
@@ -76,6 +95,7 @@ public sealed class TagScope
     /// Flat, de-duplicated list of every tag across every category in this scope.
     /// Computed on access (cheap; not cached).
     /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
     public IReadOnlyList<string> Flat
     {
         get
@@ -89,10 +109,8 @@ public sealed class TagScope
         }
     }
 
-    /// <summary>Live read-only view of the category dictionary, keyed by category name.</summary>
-    public IReadOnlyDictionary<string, TagCategory> Categories => _categories;
-
     /// <summary>True when this scope holds no tags in any category.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
     public bool IsEmpty
     {
         get

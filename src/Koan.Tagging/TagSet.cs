@@ -60,10 +60,12 @@ public sealed class TagSet
     }
 
     /// <summary>The public-visible side. Crosses the surface boundary when the entity is rendered.</summary>
-    public TagScope Public { get; } = new();
+    /// <remarks>Setter is for serialisation round-trip (BSON/JSON); consumers should mutate via the fluent API, not by reassigning.</remarks>
+    public TagScope Public { get; set; } = new();
 
     /// <summary>The private side. Stays inside the platform; never emitted on anonymous surfaces.</summary>
-    public TagScope Private { get; } = new();
+    /// <remarks>Setter is for serialisation round-trip (BSON/JSON); consumers should mutate via the fluent API, not by reassigning.</remarks>
+    public TagScope Private { get; set; } = new();
 
     /// <summary>
     /// Flat, de-duplicated list of every <see cref="Public"/> tag across all its categories.
