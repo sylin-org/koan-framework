@@ -1,6 +1,3 @@
-using System.Text.Json.Serialization;
-using Koan.Tagging.Json;
-
 namespace Koan.Tagging;
 
 /// <summary>
@@ -45,7 +42,6 @@ namespace Koan.Tagging;
 /// </code>
 /// </para>
 /// </remarks>
-[JsonConverter(typeof(TagSetJsonConverter))]
 public sealed class TagSet
 {
     /// <summary>Scope a <see cref="Has(string, EScope)"/> query against.</summary>

@@ -1,6 +1,3 @@
-using System.Text.Json.Serialization;
-using Koan.Tagging.Json;
-
 namespace Koan.Tagging;
 
 /// <summary>
@@ -24,12 +21,11 @@ namespace Koan.Tagging;
 /// Empty categories are stripped from output. See <see cref="TagScopeJsonConverter"/>.
 /// </para>
 /// </remarks>
-[JsonConverter(typeof(TagScopeJsonConverter))]
 public sealed class TagScope
 {
     /// <summary>
     /// Categories keyed by name. Exposed as a settable <see cref="Dictionary{TKey,TValue}"/> so MongoDB
-    /// BSON auto-mapping and System.Text.Json default fallback can round-trip the data. Consumers
+    /// BSON auto-mapping and Koan's polymorphic JSON serialisation can round-trip the data. Consumers
     /// should access categories via the <see cref="this[string]"/> indexer rather than touching this
     /// directly — the indexer handles case-insensitive lookup and auto-create-on-miss semantics.
     /// </summary>
@@ -37,7 +33,6 @@ public sealed class TagScope
     /// The setter accepts <see langword="null"/> and normalises to an empty dictionary so partial
     /// deserialisation paths (BSON skip-during-restore, etc.) don't leave the type in a broken state.
     /// </remarks>
-    [System.Text.Json.Serialization.JsonIgnore]
     public Dictionary<string, TagCategory> Categories
     {
         get => _categories;
@@ -93,9 +88,8 @@ public sealed class TagScope
 
     /// <summary>
     /// Flat, de-duplicated list of every tag across every category in this scope.
-    /// Computed on access (cheap; not cached).
+    /// Computed on access (cheap; not cached). Exposed publicly as a serialisable convenience.
     /// </summary>
-    [System.Text.Json.Serialization.JsonIgnore]
     public IReadOnlyList<string> Flat
     {
         get
@@ -110,7 +104,6 @@ public sealed class TagScope
     }
 
     /// <summary>True when this scope holds no tags in any category.</summary>
-    [System.Text.Json.Serialization.JsonIgnore]
     public bool IsEmpty
     {
         get

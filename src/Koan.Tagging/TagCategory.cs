@@ -1,6 +1,4 @@
 using System.Collections;
-using System.Text.Json.Serialization;
-using Koan.Tagging.Json;
 
 namespace Koan.Tagging;
 
@@ -20,25 +18,25 @@ namespace Koan.Tagging;
 /// the <see cref="Tag"/> entity's <see cref="Tag.ParentOf"/> registry before <c>Set</c> lands.
 /// </para>
 /// <para>
-/// JSON shape: a TagCategory serialises as a JSON array of strings (e.g. <c>["ffxiv", "sims4"]</c>),
-/// NOT as an object with a values property. See <see cref="TagCategoryJsonConverter"/>.
+/// Serialisation: under Koan's polymorphic JSON layer, all public properties serialise. A
+/// TagCategory emits its <see cref="Values"/> set as a JSON array. The <see cref="IEnumerable{T}"/>
+/// implementation is for fluent iteration in C# code and for MongoDB.Bson's collection-shaped
+/// auto-mapping; the <see cref="Add(string)"/> seam supports BSON deserialisation.
 /// </para>
 /// </remarks>
-[JsonConverter(typeof(TagCategoryJsonConverter))]
 public sealed class TagCategory : IEnumerable<string>
 {
     /// <summary>
-    /// The underlying tag values. Exposed as a settable <see cref="HashSet{T}"/> so MongoDB BSON
-    /// auto-mapping can round-trip the data. Consumers should mutate via the fluent
-    /// <see cref="Set(string)"/> / <see cref="Unset(string)"/> / etc. API rather than touching this
-    /// directly — the fluent methods normalise inputs (trim, case-insensitive comparison) and the
-    /// JSON converter expects this to behave like a string set.
+    /// The underlying tag values. Exposed as a settable <see cref="HashSet{T}"/> so Koan's
+    /// polymorphic serialiser, MongoDB BSON auto-mapping, and any other reflection-driven
+    /// serialiser can round-trip the data. Consumers should mutate via the fluent
+    /// <see cref="Set(string)"/> / <see cref="Unset(string)"/> API rather than touching this
+    /// directly.
     /// </summary>
     /// <remarks>
     /// The setter accepts <see langword="null"/> and normalises to an empty set so partial
     /// deserialisation paths don't leave the type in a broken state.
     /// </remarks>
-    [System.Text.Json.Serialization.JsonIgnore]
     public HashSet<string> Values
     {
         get => _values;
