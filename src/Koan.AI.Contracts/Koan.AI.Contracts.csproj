@@ -5,9 +5,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Description>Contracts for Koan AI: prompts, request/response shapes, and standard token accounting models.</Description>
     <PackageTags>$(CommonPackageTags);ai;contracts</PackageTags>
-    <Version>0.6.3</Version>
-    <AssemblyVersion>0.6.3</AssemblyVersion>
-    <FileVersion>0.6.3</FileVersion>
+    <Version>0.6.4</Version>
+    <AssemblyVersion>0.6.4</AssemblyVersion>
+    <FileVersion>0.6.4</FileVersion>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />

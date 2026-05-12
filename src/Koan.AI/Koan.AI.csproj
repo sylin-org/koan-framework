@@ -5,9 +5,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Description>Koan AI facade and runtime glue.</Description>
     <PackageTags>$(CommonPackageTags);ai;facade;runtime</PackageTags>
-    <Version>0.6.3</Version>
-    <AssemblyVersion>0.6.3</AssemblyVersion>
-    <FileVersion>0.6.3</FileVersion>
+    <Version>0.6.4</Version>
+    <AssemblyVersion>0.6.4</AssemblyVersion>
+    <FileVersion>0.6.4</FileVersion>
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Koan.AI.Integration.Tests" />

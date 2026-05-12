@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -6,9 +6,9 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Description>Core cache module for Koan: fluent builders, policy registry, singleflight coordination, instrumentation, and DI extensions.</Description>
     <PackageTags>$(CommonPackageTags);cache;redis;memory;policies</PackageTags>
-    <Version>0.6.3</Version>
-    <AssemblyVersion>0.6.3</AssemblyVersion>
-    <FileVersion>0.6.3</FileVersion>
+    <Version>0.6.4</Version>
+    <AssemblyVersion>0.6.4</AssemblyVersion>
+    <FileVersion>0.6.4</FileVersion>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Cache.Abstractions\Koan.Cache.Abstractions.csproj" />
