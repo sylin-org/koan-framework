@@ -20,7 +20,19 @@ public sealed class RoleAttributionOptions
 
     public sealed class ClaimKeyOptions
     {
-        public string[] Roles { get; set; } = new[] { "roles", "role", "groups", Infrastructure.RoleClaimConstants.KoanRole, Infrastructure.RoleClaimConstants.KoanRoles };
+        // Includes ClaimTypes.Role so AspNetCore-standard role claims (which Koan.Web.Auth's
+        // AuthController emits via UserInfoMapper, and which most OIDC providers issue under the
+        // `roles` scope) are picked up by attribution. Without it, providers that asserted roles
+        // would be ignored and DevFallback would inject "reader" on every authenticated request.
+        public string[] Roles { get; set; } = new[]
+        {
+            "roles",
+            "role",
+            "groups",
+            System.Security.Claims.ClaimTypes.Role,
+            Infrastructure.RoleClaimConstants.KoanRole,
+            Infrastructure.RoleClaimConstants.KoanRoles,
+        };
         public string[] Permissions { get; set; } = new[] { Infrastructure.RoleClaimConstants.KoanPermission, "permissions", "scope" };
     }
 
