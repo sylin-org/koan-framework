@@ -12,6 +12,7 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="..\Koan.Media.Abstractions\Koan.Media.Abstractions.csproj" />
+    <ProjectReference Include="..\Koan.Media.Core\Koan.Media.Core.csproj" />
     <ProjectReference Include="..\Koan.Storage\Koan.Storage.csproj" />
   </ItemGroup>
 </Project>
