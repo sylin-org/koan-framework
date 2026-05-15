@@ -1,13 +1,23 @@
-using Koan.Cache.Extensions;
+using Koan.Cache.Abstractions.Stores;
+using Koan.Cache.Adapter.Sqlite.Options;
+using Koan.Cache.Adapter.Sqlite.Stores;
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
+using Koan.Core.Modules;
 using Koan.Core.Provenance;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 
 namespace Koan.Cache.Adapter.Sqlite.Initialization;
 
+/// <summary>
+/// Reference = Intent: referencing <c>Koan.Cache.Adapter.Sqlite</c> auto-registers
+/// <see cref="SqliteCacheStore"/> as a Local-tier <c>ICacheStore</c>. With higher
+/// <c>[ProviderPriority]</c> than the in-process Memory store, SQLite becomes the
+/// default L1 when this package is referenced — providing persistence across restarts.
+/// </summary>
 public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 {
     public string ModuleName => "Koan.Cache.Adapter.Sqlite";
@@ -15,7 +25,11 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        services.AddKoanCacheAdapter("sqlite");
+        services.AddKoanOptions<SqliteCacheOptions>("Koan:Cache:Adapters:Sqlite");
+
+        services.TryAddSingleton<SqliteCacheStore>();
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<ICacheStore>(sp => sp.GetRequiredService<SqliteCacheStore>()));
     }
 
     public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
@@ -25,9 +39,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         var databasePath = Configuration.Read(cfg, "Koan:Cache:Adapters:Sqlite:DatabasePath", ".Koan/cache/cache.db");
         var sweepInterval = Configuration.Read(cfg, "Koan:Cache:Adapters:Sqlite:SweepIntervalSeconds", 60);
 
-        module.AddSetting("CacheStore.Selected", "sqlite");
-        module.AddSetting("CacheStore.Candidates", "memory, redis, sqlite, custom");
-        module.AddSetting("CacheStore.Rationale", "Reference = sqlite adapter package");
+        module.AddSetting("CacheStore", "sqlite (Local, [ProviderPriority(50)])");
         module.AddSetting("DatabasePath", databasePath);
         module.AddSetting("SweepIntervalSeconds", sweepInterval.ToString());
     }

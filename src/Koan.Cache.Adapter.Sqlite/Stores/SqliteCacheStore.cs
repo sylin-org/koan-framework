@@ -2,13 +2,20 @@ using System.Runtime.CompilerServices;
 using Koan.Cache.Abstractions.Primitives;
 using Koan.Cache.Abstractions.Stores;
 using Koan.Cache.Adapter.Sqlite.Options;
+using Koan.Data.Abstractions;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Koan.Cache.Adapter.Sqlite.Stores;
 
-internal sealed class SqliteCacheStore : ICacheStore, IDisposable
+/// <summary>
+/// Persistent local <see cref="ICacheStore"/> backed by SQLite. L1 candidate that survives
+/// process restart. Higher <c>[ProviderPriority]</c> than the in-process Memory store so
+/// referencing this adapter automatically takes precedence as the Local tier.
+/// </summary>
+[ProviderPriority(50)]
+public sealed class SqliteCacheStore : ICacheStore, IDisposable
 {
     private const string CreateTableSql = """
         CREATE TABLE IF NOT EXISTS cache_entries (
@@ -39,16 +46,18 @@ internal sealed class SqliteCacheStore : ICacheStore, IDisposable
         _connectionString = BuildConnectionString(_options.DatabasePath);
     }
 
-    public string ProviderName => "sqlite";
+    public string Name => "sqlite";
 
-    public CacheCapabilities Capabilities { get; } = new(
+    public CacheStorePlacement Placement => CacheStorePlacement.Local;
+
+    public CacheStoreCapabilities Capabilities { get; } = new(
+        SupportsTags: true,
+        SupportsSlidingTtl: false,
+        SupportsStaleWhileRevalidate: true,
         SupportsBinary: true,
-        SupportsPubSubInvalidation: false,
-        SupportsCompareExchange: false,
-        SupportsRegionScoping: false,
-        Hints: new HashSet<string>(["tags", "persistent"], StringComparer.OrdinalIgnoreCase));
+        SupportsPersistence: true);
 
-    public async ValueTask<CacheFetchResult> Fetch(CacheKey key, CacheEntryOptions options, CancellationToken ct)
+    public async ValueTask<CacheFetchResult> Fetch(CacheKey key, CacheReadOptions options, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         EnsureInitialized();
@@ -66,9 +75,7 @@ internal sealed class SqliteCacheStore : ICacheStore, IDisposable
 
         await using var reader = await command.ExecuteReaderAsync(ct);
         if (!await reader.ReadAsync(ct))
-        {
-            return CacheFetchResult.Miss(options);
-        }
+            return CacheFetchResult.Miss(new CacheEntryOptions());
 
         var now = DateTimeOffset.UtcNow;
         var absoluteExpiration = ParseDateTimeOffset(reader, 4);
@@ -77,13 +84,13 @@ internal sealed class SqliteCacheStore : ICacheStore, IDisposable
         if (staleUntil is { } finalExpiry && finalExpiry <= now)
         {
             await RemoveCore(connection, key.Value, ct);
-            return CacheFetchResult.Miss(options);
+            return CacheFetchResult.Miss(new CacheEntryOptions());
         }
 
         if (absoluteExpiration is { } abs && abs <= now)
         {
             await RemoveCore(connection, key.Value, ct);
-            return CacheFetchResult.Miss(options);
+            return CacheFetchResult.Miss(new CacheEntryOptions());
         }
 
         var contentKind = (CacheContentKind)reader.GetInt32(1);
@@ -101,26 +108,29 @@ internal sealed class SqliteCacheStore : ICacheStore, IDisposable
             _ => CacheValue.FromBytes(valueBlob, runtimeType)
         };
 
-        return CacheFetchResult.HitResult(cacheValue, options, absoluteExpiration, staleUntil);
+        // Build a minimal CacheEntryOptions from the stored row's tags for the hit result.
+        var tagsRaw = reader.IsDBNull(6) ? null : reader.GetString(6);
+        var tagSet = string.IsNullOrEmpty(tagsRaw)
+            ? new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            : new HashSet<string>(tagsRaw.Split(',', StringSplitOptions.RemoveEmptyEntries), StringComparer.OrdinalIgnoreCase);
+
+        var hitOptions = new CacheEntryOptions { Tags = tagSet };
+        return CacheFetchResult.HitResult(cacheValue, hitOptions, absoluteExpiration, staleUntil);
     }
 
-    public async ValueTask Set(CacheKey key, CacheValue value, CacheEntryOptions options, CancellationToken ct)
+    public async ValueTask Set(CacheKey key, CacheValue value, CacheWriteOptions options, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         EnsureInitialized();
 
         var now = DateTimeOffset.UtcNow;
-        var absoluteExpiration = options.CalculateAbsoluteExpiration(now);
+        var absoluteExpiration = options.AbsoluteTtl.HasValue ? now.Add(options.AbsoluteTtl.Value) : (DateTimeOffset?)null;
         var staleUntil = absoluteExpiration;
         if (options.AllowStaleFor.HasValue && absoluteExpiration.HasValue)
-        {
             staleUntil = absoluteExpiration.Value.Add(options.AllowStaleFor.Value);
-        }
 
         var valueBytes = value.ToBytes().ToArray();
-        var tagsString = options.Tags is { Count: > 0 }
-            ? string.Join(",", options.Tags)
-            : null;
+        var tagsString = options.Tags is { Count: > 0 } ? string.Join(",", options.Tags) : null;
 
         await using var connection = CreateConnection();
         await connection.OpenAsync(ct);
@@ -161,18 +171,13 @@ internal sealed class SqliteCacheStore : ICacheStore, IDisposable
         return await RemoveCore(connection, key.Value, ct);
     }
 
-    public async ValueTask Touch(CacheKey key, CacheEntryOptions options, CancellationToken ct)
+    public async ValueTask Touch(CacheKey key, TimeSpan? newAbsoluteTtl, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         EnsureInitialized();
 
         var now = DateTimeOffset.UtcNow;
-        var absoluteExpiration = options.CalculateAbsoluteExpiration(now);
-        var staleUntil = absoluteExpiration;
-        if (options.AllowStaleFor.HasValue && absoluteExpiration.HasValue)
-        {
-            staleUntil = absoluteExpiration.Value.Add(options.AllowStaleFor.Value);
-        }
+        var absoluteExpiration = newAbsoluteTtl.HasValue ? now.Add(newAbsoluteTtl.Value) : (DateTimeOffset?)null;
 
         await using var connection = CreateConnection();
         await connection.OpenAsync(ct);
@@ -189,7 +194,7 @@ internal sealed class SqliteCacheStore : ICacheStore, IDisposable
         command.Parameters.AddWithValue("@absolute_expiration_utc",
             absoluteExpiration.HasValue ? FormatDateTimeOffset(absoluteExpiration.Value) : DBNull.Value);
         command.Parameters.AddWithValue("@stale_until_utc",
-            staleUntil.HasValue ? FormatDateTimeOffset(staleUntil.Value) : DBNull.Value);
+            absoluteExpiration.HasValue ? FormatDateTimeOffset(absoluteExpiration.Value) : DBNull.Value);
 
         await command.ExecuteNonQueryAsync(ct);
     }
@@ -211,9 +216,7 @@ internal sealed class SqliteCacheStore : ICacheStore, IDisposable
 
         await using var reader = await command.ExecuteReaderAsync(ct);
         if (!await reader.ReadAsync(ct))
-        {
             return false;
-        }
 
         var now = DateTimeOffset.UtcNow;
         var absoluteExpiration = ParseDateTimeOffset(reader, 0);
@@ -232,12 +235,6 @@ internal sealed class SqliteCacheStore : ICacheStore, IDisposable
         }
 
         return true;
-    }
-
-    public ValueTask PublishInvalidation(CacheKey key, CacheEntryOptions options, CancellationToken ct)
-    {
-        // No-op: SQLite is local-only with no pub/sub support.
-        return ValueTask.CompletedTask;
     }
 
     public async IAsyncEnumerable<TaggedCacheKey> EnumerateByTag(
@@ -268,15 +265,8 @@ internal sealed class SqliteCacheStore : ICacheStore, IDisposable
             var absoluteExpiration = ParseDateTimeOffset(reader, 1);
             var staleUntil = ParseDateTimeOffset(reader, 2);
 
-            if (staleUntil is { } finalExpiry && finalExpiry <= now)
-            {
-                continue;
-            }
-
-            if (absoluteExpiration is { } abs && abs <= now)
-            {
-                continue;
-            }
+            if (staleUntil is { } finalExpiry && finalExpiry <= now) continue;
+            if (absoluteExpiration is { } abs && abs <= now) continue;
 
             yield return new TaggedCacheKey(tag, new CacheKey(entryKey), absoluteExpiration);
         }
@@ -289,17 +279,11 @@ internal sealed class SqliteCacheStore : ICacheStore, IDisposable
 
     private void EnsureInitialized()
     {
-        if (_initialized)
-        {
-            return;
-        }
+        if (_initialized) return;
 
         lock (_initLock)
         {
-            if (_initialized)
-            {
-                return;
-            }
+            if (_initialized) return;
 
             EnsureDirectoryExists(_options.DatabasePath);
 
@@ -310,7 +294,6 @@ internal sealed class SqliteCacheStore : ICacheStore, IDisposable
             command.CommandText = CreateTableSql;
             command.ExecuteNonQuery();
 
-            // Enable WAL mode for better concurrent read performance.
             using var walCommand = connection.CreateCommand();
             walCommand.CommandText = "PRAGMA journal_mode=WAL;";
             walCommand.ExecuteNonQuery();
@@ -344,9 +327,7 @@ internal sealed class SqliteCacheStore : ICacheStore, IDisposable
     {
         var directory = Path.GetDirectoryName(databasePath);
         if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory))
-        {
             Directory.CreateDirectory(directory);
-        }
     }
 
     private static string FormatDateTimeOffset(DateTimeOffset value)
@@ -354,10 +335,7 @@ internal sealed class SqliteCacheStore : ICacheStore, IDisposable
 
     private static DateTimeOffset? ParseDateTimeOffset(SqliteDataReader reader, int ordinal)
     {
-        if (reader.IsDBNull(ordinal))
-        {
-            return null;
-        }
+        if (reader.IsDBNull(ordinal)) return null;
 
         var text = reader.GetString(ordinal);
         return DateTimeOffset.TryParse(text, System.Globalization.CultureInfo.InvariantCulture,
