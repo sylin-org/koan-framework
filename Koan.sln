@@ -445,6 +445,12 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Adapter.Sqlite", "Adapter.S
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Cache.Adapter.Sqlite.Tests", "tests\Suites\Cache\Adapter.Sqlite\Koan.Cache.Adapter.Sqlite.Tests\Koan.Cache.Adapter.Sqlite.Tests.csproj", "{DA069D1D-2566-4896-B0D0-8A108BE66F6C}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Integration", "Integration", "{EC023B6D-21D9-67FF-A870-59C199368581}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Bootstrap", "Bootstrap", "{7B16C914-355C-931B-D371-F343A038ACCC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Tests.Integration.Bootstrap", "tests\Suites\Integration\Bootstrap\Koan.Tests.Integration.Bootstrap\Koan.Tests.Integration.Bootstrap.csproj", "{B3A840E1-C319-4D0C-9B4D-15ED2BC8611D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -2193,6 +2199,18 @@ Global
 		{DA069D1D-2566-4896-B0D0-8A108BE66F6C}.Release|x64.Build.0 = Release|Any CPU
 		{DA069D1D-2566-4896-B0D0-8A108BE66F6C}.Release|x86.ActiveCfg = Release|Any CPU
 		{DA069D1D-2566-4896-B0D0-8A108BE66F6C}.Release|x86.Build.0 = Release|Any CPU
+		{B3A840E1-C319-4D0C-9B4D-15ED2BC8611D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B3A840E1-C319-4D0C-9B4D-15ED2BC8611D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B3A840E1-C319-4D0C-9B4D-15ED2BC8611D}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B3A840E1-C319-4D0C-9B4D-15ED2BC8611D}.Debug|x64.Build.0 = Debug|Any CPU
+		{B3A840E1-C319-4D0C-9B4D-15ED2BC8611D}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{B3A840E1-C319-4D0C-9B4D-15ED2BC8611D}.Debug|x86.Build.0 = Debug|Any CPU
+		{B3A840E1-C319-4D0C-9B4D-15ED2BC8611D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B3A840E1-C319-4D0C-9B4D-15ED2BC8611D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B3A840E1-C319-4D0C-9B4D-15ED2BC8611D}.Release|x64.ActiveCfg = Release|Any CPU
+		{B3A840E1-C319-4D0C-9B4D-15ED2BC8611D}.Release|x64.Build.0 = Release|Any CPU
+		{B3A840E1-C319-4D0C-9B4D-15ED2BC8611D}.Release|x86.ActiveCfg = Release|Any CPU
+		{B3A840E1-C319-4D0C-9B4D-15ED2BC8611D}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -2415,6 +2433,9 @@ Global
 		{09E9E027-7A67-477D-B6CB-83CF671D1CA3} = {D9C8B947-3B18-6BC2-06C0-74E0975A559B}
 		{75F5A5F1-C547-A0A7-57EA-78A8891C782C} = {716E9AAC-EB86-4B69-DA41-68B421417ACF}
 		{DA069D1D-2566-4896-B0D0-8A108BE66F6C} = {75F5A5F1-C547-A0A7-57EA-78A8891C782C}
+		{EC023B6D-21D9-67FF-A870-59C199368581} = {FE5BEB77-E3D6-7BD8-ABAC-7889084D539C}
+		{7B16C914-355C-931B-D371-F343A038ACCC} = {EC023B6D-21D9-67FF-A870-59C199368581}
+		{B3A840E1-C319-4D0C-9B4D-15ED2BC8611D} = {7B16C914-355C-931B-D371-F343A038ACCC}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {669C5778-BFAE-4972-B427-0AFF99562045}
