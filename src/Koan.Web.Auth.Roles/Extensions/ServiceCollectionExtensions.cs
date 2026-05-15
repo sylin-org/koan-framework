@@ -18,6 +18,8 @@ public static class ServiceCollectionExtensions
     services.TryAddSingleton<IRoleAttributionService, Koan.Web.Auth.Roles.Services.DefaultRoleAttributionService>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IClaimsTransformation, KoanRoleClaimsTransformation>());
     services.TryAddEnumerable(ServiceDescriptor.Transient<IRoleMapContributor, Koan.Web.Auth.Roles.Contributors.DefaultCapabilityContributor>());
+    // Singleton: caches the parsed JSON file across requests, gated by mtime + PollInterval.
+    services.TryAddEnumerable(ServiceDescriptor.Singleton<IRoleMapContributor, Koan.Web.Auth.Roles.Contributors.RoleListContributor>());
 
     // lightweight in-memory cache for attribution; apps can replace
     services.TryAddSingleton<IRoleAttributionCache, InMemoryRoleAttributionCache>();

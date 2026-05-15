@@ -18,8 +18,6 @@ public static class Constants
             public const string AltPassword = "Koan:Data:Password";
             public const string DefaultPageSize = Constants.Section + ":DefaultPageSize";
             public const string AltDefaultPageSize = "Koan:Data:DefaultPageSize";
-            public const string MaxPageSize = Constants.Section + ":MaxPageSize";
-            public const string AltMaxPageSize = "Koan:Data:MaxPageSize";
             public const string DisableAutoDetection = Constants.Section + ":DisableAutoDetection";
             public const string EnsureCreatedSupported = nameof(EnsureCreatedSupported);
         }
@@ -28,7 +26,6 @@ public static class Constants
     public static class Bootstrap
     {
         public const string DefaultPageSize = "data.redis.defaultPageSize";
-        public const string MaxPageSize = "data.redis.maxPageSize";
         public const string EnsureCreatedSupported = "EnsureCreatedSupported";
     }
 

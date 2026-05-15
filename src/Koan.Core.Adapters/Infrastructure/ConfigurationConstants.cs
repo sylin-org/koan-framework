@@ -25,10 +25,8 @@ internal static class ConfigurationConstants
         public static class Paging
         {
             public const string DefaultPageSize = "Koan:Data:DefaultPageSize";
-            public const string MaxPageSize = "Koan:Data:MaxPageSize";
 
             public static string DefaultPageSizeForProvider(string provider) => $"Koan:Data:{provider}:DefaultPageSize";
-            public static string MaxPageSizeForProvider(string provider) => $"Koan:Data:{provider}:MaxPageSize";
         }
     }
 

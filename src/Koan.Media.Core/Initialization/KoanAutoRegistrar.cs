@@ -21,6 +21,8 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
         services.AddSingleton<IMediaOperator, ResizeOperator>();
         services.AddSingleton<IMediaOperator, RotateOperator>();
+        services.AddSingleton<IMediaOperator, CropOperator>();
+        services.AddSingleton<IMediaOperator, PadOperator>();
         services.AddSingleton<IMediaOperator, TypeConverterOperator>();
         services.AddSingleton<IMediaOperatorRegistry, MediaOperatorRegistry>();
     }

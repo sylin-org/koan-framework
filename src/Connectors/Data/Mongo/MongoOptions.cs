@@ -19,9 +19,10 @@ public sealed class MongoOptions : IAdapterOptions
     public StorageNamingStyle NamingStyle { get; set; } = StorageNamingStyle.FullNamespace;
     public string Separator { get; set; } = "."; // used when composing namespace + entity
 
-    // Paging guardrails (acceptance criteria 0044)
-    public int DefaultPageSize { get; set; } = 50; // mirrors Koan.Web default
-    public int MaxPageSize { get; set; } = 200;
+    // Default page size used when callers don't specify one. Per ADR removing
+    // adapter-layer caps: this is a fallback, not a cap. Callers may request larger sizes
+    // and the connector honours them.
+    public int DefaultPageSize { get; set; } = 50;
 
     public IAdapterReadinessConfiguration Readiness { get; set; } = new AdapterReadinessConfiguration();
 }

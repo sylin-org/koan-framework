@@ -15,7 +15,6 @@ internal static class ConfigurationConstants
         public const string Username = nameof(Username);
         public const string Password = nameof(Password);
         public const string DefaultPageSize = nameof(DefaultPageSize);
-        public const string MaxPageSize = nameof(MaxPageSize);
         public const string DisableAutoDetection = nameof(DisableAutoDetection);
     }
 
@@ -41,7 +40,6 @@ internal static class ConfigurationConstants
     {
         public const string DefaultMongoConnectionString = "Koan:Data:Sources:Default:mongo:ConnectionString";
         public const string DefaultMongoDefaultPageSize = "Koan:Data:Sources:Default:mongo:DefaultPageSize";
-        public const string DefaultMongoMaxPageSize = "Koan:Data:Sources:Default:mongo:MaxPageSize";
     }
 
     /// <summary>

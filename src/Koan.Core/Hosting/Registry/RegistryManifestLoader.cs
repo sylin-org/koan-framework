@@ -9,9 +9,20 @@ using Koan.Core.Orchestration.Abstractions;
 namespace Koan.Core.Hosting.Bootstrap;
 
 /// <summary>
-/// Runtime fallback that reflects Koan assemblies to populate the registry when source-generated manifests are missing.
-/// Ensures adapters and initializers still light up even if module initializers fail to execute.
+/// Runtime fallback that reflects loaded assemblies to populate the registry when source-generated
+/// manifests are missing. Ensures adapters and initializers still light up even when the
+/// compile-time generator didn't run (e.g. downstream consumer assemblies that pull Koan in via
+/// NuGet, where the analyzer isn't shipped). Every assembly is scanned — Koan-named or not — so a
+/// consumer can define its own <see cref="IKoanAutoRegistrar"/> and have it discovered without an
+/// explicit <c>Initialize()</c> call.
 /// </summary>
+/// <remarks>
+/// Well-known framework prefixes are skipped via <see cref="ShouldSkipAssembly"/> as a cheap
+/// fast-path; those assemblies (BCL, ASP.NET Core, System.*, etc.) are known not to carry Koan
+/// interface implementations and excluding them keeps the per-startup scan tight without changing
+/// observable behaviour. Per-type metadata access is guarded so an unloadable reference inside a
+/// scanned assembly can't bring down the host bootstrap.
+/// </remarks>
 internal static class RegistryManifestLoader
 {
     private static readonly Type InitializerInterface = typeof(IKoanInitializer);
@@ -23,10 +34,27 @@ internal static class RegistryManifestLoader
     private static readonly Type HealthContributorInterface = typeof(IHealthContributor);
     private static readonly Type DiscoveryAdapterInterface = typeof(IServiceDiscoveryAdapter);
 
+    /// <summary>
+    /// Assembly-name prefixes that obviously cannot contain Koan interface implementations.
+    /// Excluding them keeps the runtime scan tight without restricting where consumers can define
+    /// their own modules. Comparison is case-sensitive — the BCL and Microsoft frameworks use
+    /// stable PascalCase prefixes.
+    /// </summary>
+    private static readonly string[] SkipPrefixes =
+    {
+        "System.",
+        "Microsoft.",
+        "mscorlib",
+        "netstandard",
+        "WindowsBase",
+        "PresentationFramework",
+        "PresentationCore",
+    };
+
     public static void PopulateFromAssembly(Assembly assembly)
     {
         if (assembly is null) return;
-        if (!IsKoanAssembly(assembly)) return;
+        if (ShouldSkipAssembly(assembly)) return;
 
         Type[] types;
         try
@@ -39,6 +67,11 @@ internal static class RegistryManifestLoader
         {
             types = ex.Types.Where(t => t is not null)!.Cast<Type>().ToArray();
         }
+        catch
+        {
+            // Any other reflection failure on the assembly is fatal only to its scan — skip it.
+            return;
+        }
 
         if (types.Length == 0) return;
 
@@ -49,27 +82,36 @@ internal static class RegistryManifestLoader
 
         foreach (var type in types)
         {
-            if (type is null || type.IsAbstract || type.IsGenericTypeDefinition) continue;
-
-            if (InitializerInterface.IsAssignableFrom(type))
+            try
             {
-                initializers.Add(type);
-                if (AutoRegistrarInterface.IsAssignableFrom(type))
+                if (type is null || type.IsAbstract || type.IsGenericTypeDefinition) continue;
+
+                if (InitializerInterface.IsAssignableFrom(type))
                 {
-                    autoRegistrars.Add(type);
+                    initializers.Add(type);
+                    if (AutoRegistrarInterface.IsAssignableFrom(type))
+                    {
+                        autoRegistrars.Add(type);
+                    }
+                }
+
+                if (DiscoveryAdapterInterface.IsAssignableFrom(type))
+                {
+                    discoveryAdapters.Add(new KoanRegistry.ServiceDiscoveryAdapterDescriptor(type));
+                }
+
+                if (BackgroundServiceInterface.IsAssignableFrom(type))
+                {
+                    backgroundServices.Add(BuildBackgroundDescriptor(type));
                 }
             }
-
-            if (DiscoveryAdapterInterface.IsAssignableFrom(type))
+            catch
             {
-                discoveryAdapters.Add(new KoanRegistry.ServiceDiscoveryAdapterDescriptor(type));
+                // Defensive: a single type with unloadable references shouldn't kill the whole
+                // assembly's scan. The interface checks above can trip TypeLoadException /
+                // FileNotFoundException when a transitive dependency is missing — we silently
+                // skip the offending type and keep going.
             }
-
-            if (BackgroundServiceInterface.IsAssignableFrom(type))
-            {
-                backgroundServices.Add(BuildBackgroundDescriptor(type));
-            }
-
         }
 
         if (initializers.Count > 0)
@@ -126,9 +168,14 @@ internal static class RegistryManifestLoader
             isHealthContributor);
     }
 
-    private static bool IsKoanAssembly(Assembly assembly)
+    private static bool ShouldSkipAssembly(Assembly assembly)
     {
         var name = assembly.GetName().Name;
-        return !string.IsNullOrEmpty(name) && name.StartsWith("Koan.", StringComparison.Ordinal);
+        if (string.IsNullOrEmpty(name)) return true;
+        foreach (var prefix in SkipPrefixes)
+        {
+            if (name.StartsWith(prefix, StringComparison.Ordinal)) return true;
+        }
+        return false;
     }
 }

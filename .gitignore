@@ -18,6 +18,7 @@ obj/
 out/
 artifacts/
 TestResults/
+*.lscache
 
 # NuGet
 *.nupkg

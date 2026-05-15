@@ -5,8 +5,10 @@ public sealed class MediaTransformOptions
     // Global strictness for unknown params and duplicate handling
     public MediaTransformStrictness Strictness { get; set; } = MediaTransformStrictness.Relaxed;
 
-    // Fixed v1 precedence: rotate -> resize -> typeConverter (can be overridden per-entity later)
-    public IReadOnlyList<string> Precedence { get; set; } = new[] { "rotate@1", "resize@1", "typeConverter@1" };
+    // Default pipeline order: orient the bytes, then pick a region, then size it, then pad if a
+    // target aspect is asked for, then encode. Each operator self-skips when no relevant params
+    // are present, so the only cost of an idle stage is the alias-overlap check.
+    public IReadOnlyList<string> Precedence { get; set; } = new[] { "rotate@1", "crop@1", "resize@1", "pad@1", "typeConverter@1" };
 
     // Limits
     public int MaxWidth { get; set; } = 4096;

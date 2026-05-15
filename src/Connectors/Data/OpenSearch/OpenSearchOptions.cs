@@ -24,9 +24,8 @@ public sealed class OpenSearchOptions : IAdapterOptions
     public string? Password { get; set; } = null;
     public bool DisableIndexAutoCreate { get; set; } = false;
 
-    // IAdapterOptions implementation - search paging properties
+    // IAdapterOptions implementation - default page size fallback (NOT a cap)
     public int DefaultPageSize { get; set; } = 50;
-    public int MaxPageSize { get; set; } = 1000;
 
     public IAdapterReadinessConfiguration Readiness { get; set; } = new AdapterReadinessConfiguration();
 }

@@ -71,8 +71,8 @@ internal sealed class JsonRepository<TEntity, TKey> :
     {
         ct.ThrowIfCancellationRequested();
         var store = ResolveStore();
-        var pageSize = Math.Max(1, Math.Min(_options.Value.DefaultPageSize, _options.Value.MaxPageSize));
-        // Apply default paging guardrail when caller does not specify explicit options interface
+        // No options provided — apply default page size as a fallback (not a cap).
+        var pageSize = Math.Max(1, _options.Value.DefaultPageSize);
         var result = store.Values.Take(pageSize).ToList();
         return Task.FromResult((IReadOnlyList<TEntity>)result);
     }
@@ -82,8 +82,7 @@ internal sealed class JsonRepository<TEntity, TKey> :
         ct.ThrowIfCancellationRequested();
         var store = ResolveStore();
         var items = store.Values.AsQueryable();
-        var max = Math.Max(1, _options.Value.MaxPageSize);
-        var size = options?.PageSize is int ps && ps > 0 ? Math.Min(ps, max) : Math.Min(_options.Value.DefaultPageSize, max);
+        var size = options?.PageSize is int ps && ps > 0 ? ps : Math.Max(1, _options.Value.DefaultPageSize);
         var page = options?.Page is int p && p > 1 ? p : 1;
         var skip = (page - 1) * size;
         var list = items.Skip(skip).Take(size).ToList();
@@ -94,7 +93,7 @@ internal sealed class JsonRepository<TEntity, TKey> :
     {
         ct.ThrowIfCancellationRequested();
         var store = ResolveStore();
-        var pageSize = Math.Max(1, Math.Min(_options.Value.DefaultPageSize, _options.Value.MaxPageSize));
+        var pageSize = Math.Max(1, _options.Value.DefaultPageSize);
         var list = store.Values.AsQueryable().Where(predicate).Take(pageSize).ToList();
         return Task.FromResult((IReadOnlyList<TEntity>)list);
     }
@@ -104,8 +103,7 @@ internal sealed class JsonRepository<TEntity, TKey> :
         ct.ThrowIfCancellationRequested();
         var store = ResolveStore();
         var items = store.Values.AsQueryable().Where(predicate);
-        var max = Math.Max(1, _options.Value.MaxPageSize);
-        var size = options?.PageSize is int ps && ps > 0 ? Math.Min(ps, max) : Math.Min(_options.Value.DefaultPageSize, max);
+        var size = options?.PageSize is int ps && ps > 0 ? ps : Math.Max(1, _options.Value.DefaultPageSize);
         var page = options?.Page is int p && p > 1 ? p : 1;
         var skip = (page - 1) * size;
         var list = items.Skip(skip).Take(size).ToList();

@@ -5,9 +5,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Description>Entity-aware autonomous agents for Koan AI: auto-generated tools from Entity&lt;T&gt; with ReAct reasoning.</Description>
     <PackageTags>$(CommonPackageTags);ai;agents</PackageTags>
-    <Version>0.6.3</Version>
-    <AssemblyVersion>0.6.3</AssemblyVersion>
-    <FileVersion>0.6.3</FileVersion>
+    <Version>0.6.4</Version>
+    <AssemblyVersion>0.6.4</AssemblyVersion>
+    <FileVersion>0.6.4</FileVersion>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />

@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Koan.Core;
 using Koan.Core.Modules;
 using Koan.Web.Auth.Domain;
@@ -30,6 +31,11 @@ public static class ServiceCollectionExtensions
         // Default in-memory stores; apps can replace these via DI with Entity<>-backed implementations.
         services.AddSingleton<IUserStore, InMemoryUserStore>();
         services.AddSingleton<IExternalIdentityStore, InMemoryExternalIdentityStore>();
+
+        // /me projector. Default surfaces the rich shape (email, roles, claims) so SPAs can render
+        // role-gated UI on first paint without a probe round-trip. Use TryAdd so a host can swap
+        // the projection (e.g. to redact email or omit custom claims) before this call lands.
+        services.TryAddSingleton<ICurrentUserProjector, DefaultCurrentUserProjector>();
 
         // Ensure a default cookie scheme is registered so the centralized challenge/callback can sign users in.
         // External provider handlers (OIDC/OAuth2) are not registered here; flows are handled centrally by AuthController.

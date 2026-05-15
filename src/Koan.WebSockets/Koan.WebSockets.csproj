@@ -1,13 +1,13 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Description>WebSocket stream helpers for Koan realtime endpoints.</Description>
     <PackageTags>$(CommonPackageTags);websockets;streaming;realtime</PackageTags>
-    <Version>0.6.3</Version>
-    <AssemblyVersion>0.6.3</AssemblyVersion>
-    <FileVersion>0.6.3</FileVersion>
+    <Version>0.6.4</Version>
+    <AssemblyVersion>0.6.4</AssemblyVersion>
+    <FileVersion>0.6.4</FileVersion>
   </PropertyGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />

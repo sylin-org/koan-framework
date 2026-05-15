@@ -11,6 +11,7 @@ public sealed class RoleAttributionOptions
     public int MaxPermissions { get; set; } = 1024;
     public DevFallbackOptions DevFallback { get; set; } = new();
     public BootstrapOptions Bootstrap { get; set; } = new();
+    public RoleListOptions RoleList { get; set; } = new();
     // Import/seed guardrail: allow seeding in Production when true (disabled by default)
     public bool AllowSeedingInProduction { get; set; } = false;
 
@@ -20,7 +21,19 @@ public sealed class RoleAttributionOptions
 
     public sealed class ClaimKeyOptions
     {
-        public string[] Roles { get; set; } = new[] { "roles", "role", "groups", Infrastructure.RoleClaimConstants.KoanRole, Infrastructure.RoleClaimConstants.KoanRoles };
+        // Includes ClaimTypes.Role so AspNetCore-standard role claims (which Koan.Web.Auth's
+        // AuthController emits via UserInfoMapper, and which most OIDC providers issue under the
+        // `roles` scope) are picked up by attribution. Without it, providers that asserted roles
+        // would be ignored and DevFallback would inject "reader" on every authenticated request.
+        public string[] Roles { get; set; } = new[]
+        {
+            "roles",
+            "role",
+            "groups",
+            System.Security.Claims.ClaimTypes.Role,
+            Infrastructure.RoleClaimConstants.KoanRole,
+            Infrastructure.RoleClaimConstants.KoanRoles,
+        };
         public string[] Permissions { get; set; } = new[] { Infrastructure.RoleClaimConstants.KoanPermission, "permissions", "scope" };
     }
 
@@ -64,5 +77,31 @@ public sealed class RoleAttributionOptions
     {
         public string Id { get; set; } = ""; // policy name
         public string Requirement { get; set; } = ""; // e.g., role:admin or perm:*
+    }
+
+    /// <summary>
+    /// Email-keyed role list read from a JSON file at attribution time. Operations are explicit:
+    /// <c>allow</c> adds roles to the principal; <c>revoke</c> strips roles from the principal
+    /// (runs <i>after</i> claim extraction + aliases, so it overrides what the IdP asserted).
+    /// An email not present in either section is a no-op — removing from <c>allow</c> does not
+    /// revoke. Empty <see cref="FilePath"/> disables the feature (default).
+    /// </summary>
+    /// <remarks>
+    /// File shape:
+    /// <code>
+    /// {
+    ///   "allow":  { "user@example.com": ["admin", "curator"] },
+    ///   "revoke": { "ex-admin@example.com": ["admin"] }
+    /// }
+    /// </code>
+    /// Email lookup is case-insensitive and matches <see cref="System.Security.Claims.ClaimTypes.Email"/>.
+    /// </remarks>
+    public sealed class RoleListOptions
+    {
+        /// <summary>Absolute path to the JSON role list file. Empty disables the contributor.</summary>
+        public string FilePath { get; set; } = "";
+
+        /// <summary>How often the contributor may stat() the file to pick up edits. mtime-based reload.</summary>
+        public TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(30);
     }
 }

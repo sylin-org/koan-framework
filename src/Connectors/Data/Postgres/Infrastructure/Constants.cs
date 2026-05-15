@@ -16,8 +16,6 @@ public static class Constants
 
             public const string DefaultPageSize = Section + ":DefaultPageSize";
             public const string AltDefaultPageSize = AltSection + ":DefaultPageSize";
-            public const string MaxPageSize = Section + ":MaxPageSize";
-            public const string AltMaxPageSize = AltSection + ":MaxPageSize";
 
             public const string DdlPolicy = Section + ":DdlPolicy";
             public const string AltDdlPolicy = AltSection + ":DdlPolicy";

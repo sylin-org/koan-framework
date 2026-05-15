@@ -65,7 +65,6 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory
             ConnectionString = connectionString,
             Database = AdapterConnectionResolver.GetSourceSetting(config, sourceRegistry, "Mongo", source, "Database", baseOptions.Database),
             DefaultPageSize = baseOptions.DefaultPageSize,
-            MaxPageSize = baseOptions.MaxPageSize,
             Readiness = baseOptions.Readiness
         };
 

@@ -45,6 +45,14 @@ internal sealed class EntityJobStore(JobIndexCache index) : IJobStore
         index.Remove(jobId);
     }
 
+    public async Task<bool> HasCompletedJobOfType(string typeName, JobStoreMetadata metadata, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(typeName)) return false;
+        using var scope = EnterContext(metadata.Source, metadata.Partition);
+        var hits = await Job.Query(j => j.TypeName == typeName && j.Status == JobStatus.Completed, cancellationToken);
+        return hits.Count > 0;
+    }
+
     public async Task<JobExecution> CreateExecution(JobExecution execution, JobStoreMetadata metadata, CancellationToken cancellationToken)
     {
         using var scope = EnterContext(metadata.Source, metadata.Partition);
