@@ -128,6 +128,48 @@ and package boundary:
     covering the surface that survives. Extended, not replaced. New test projects sit under
     `tests/Suites/Cache/{Abstractions,Coherence.InMemory,Coherence.Messaging,Web,Performance}/`.
 
+15. **`ICacheCoherenceChannel` inherits from a generic `ICoherenceChannel<TMessage>`.** The
+    coordination contract (publish / subscribe / catch-up) is genuinely transport-agnostic and
+    payload-agnostic; only the payload (`CacheInvalidation`) is cache-specific. The generic
+    interface lives in `Koan.Cache.Abstractions.Coherence` for v1 and is documented as
+    promotable to `Koan.Core.Coherence` when a second consumer (cluster events, feature-flag
+    propagation, service-discovery hot-reload) materializes. Migration is a file move with
+    no type renames.
+
+16. **Singleflight extracts to `Koan.Core/Singleflight`.** `CacheSingleflightRegistry` is a
+    per-key semaphore primitive with zero cache-specific coupling. Other pillars
+    (AI embeddings, heavy DB queries, file ops, slow upstream calls) benefit from stampede
+    protection without depending on `Koan.Cache`. Lands in M2 alongside topology rebuild.
+
+17. **`CacheKey.For<T>(id, partition)` entity-aware constructor.** Eliminates stringly-typed
+    key construction at call sites. Mirrors the canonical key template
+    `{TypeName}:{Partition}:{Id}`. Lands in M6 with decorator hardening.
+
+18. **Boot-report policy health column.** Each `[Cacheable]` line carries a status flag —
+    `OK`, `DEGRADED` (e.g., `Layered` downgraded to `LocalOnly` because no Remote tier),
+    `BUG` (e.g., `L1Ttl > L2Ttl` configuration error). Catches misconfigurations at boot
+    instead of in production. Lands in M9.
+
+19. **OpenTelemetry `ActivitySource("Koan.Cache")` spans.** `LayeredCache.Read`/`Write` and
+    `CoherenceCoordinator` emit activity spans tagged with `cache.key`, `cache.tier`,
+    `cache.hit`, `cache.transport`. Distributed traces show the cache layer naturally in
+    any modern observability stack. Lands in M9.
+
+20. **Diagnostic trace key via `KOAN_CACHE_TRACE_KEY` environment variable.** Setting the env
+    var enables verbose logging for every operation touching that specific key — fetch,
+    set, evict, broadcast, receive. Production cache debugging without redeployment.
+    Lands in M9.
+
+21. **`IHealthCheck` for the cache pillar.** Reports L1 reachable, L2 reachable, coherence
+    channel connected. Kubernetes/Aspire readiness probes pick it up automatically via
+    `AddHealthCheck("koan-cache")`. Returns `Healthy` / `Degraded` / `Unhealthy` with
+    diagnostic data. Lands in M9.
+
+22. **Decorator ordering canon (ARCH-0076).** A separate ADR documents priority bands for
+    `IDataRepositoryDecorator` implementations: 100+ = read short-circuit (Cache),
+    50–99 = read observation (CQRS, audit-log), 0–49 = write transformation (soft-delete,
+    multi-tenancy), &lt;0 = framework reserved. Drafted alongside M10.
+
 ---
 
 ## Consequences

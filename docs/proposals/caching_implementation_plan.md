@@ -163,22 +163,21 @@ public enum CacheInvalidationKind
     EvictAll         // entire local cache (use sparingly)
 }
 
-public interface ICacheCoherenceChannel
+// Generic base — designed to be promotable to Koan.Core.Coherence
+// when a second consumer materializes (cluster events, feature-flag
+// propagation, service-discovery hot-reload).
+public interface ICoherenceChannel<TMessage> where TMessage : struct
 {
     string TransportName { get; }
     CoherenceCapabilities Capabilities { get; }
-
-    ValueTask Publish(CacheInvalidation invalidation, CancellationToken ct);
-
-    ValueTask Subscribe(
-        Func<CacheInvalidation, CancellationToken, ValueTask> onReceived,
-        CancellationToken ct);
-
-    ValueTask<string?> CatchUp(
-        string? cursor,
-        Func<CacheInvalidation, CancellationToken, ValueTask> onReceived,
-        CancellationToken ct);
+    ValueTask Publish(TMessage message, CancellationToken ct);
+    ValueTask Subscribe(Func<TMessage, CancellationToken, ValueTask> onReceived, CancellationToken ct);
+    ValueTask<string?> CatchUp(string? cursor, Func<TMessage, CancellationToken, ValueTask> onReceived, CancellationToken ct);
 }
+
+// Cache-specific specialization — adapters implement this so DI can resolve
+// IEnumerable<ICacheCoherenceChannel>.
+public interface ICacheCoherenceChannel : ICoherenceChannel<CacheInvalidation> { }
 
 public sealed record CoherenceCapabilities(
     bool SupportsCatchUp,        // can replay missed messages
@@ -878,6 +877,12 @@ Each milestone is independently shippable and tested. Order is deliberate — la
 - Modified: `Stores/MemoryCacheStore.cs` (add Placement=Local), `Stores/CacheClient.cs` (consume LayeredCache), `Stores/CacheStoreRegistry.cs` (relocated to Topology/, otherwise unchanged), `Extensions/CacheServiceCollectionExtensions.cs`, `Initialization/KoanAutoRegistrar.cs` (boot report Topology line).
 - Discarded: `Stores/LayeredCacheStore.cs` (replaced by `LayeredCache`).
 
+**Singleflight extraction (bundle item B):**
+- Move `Koan.Cache/Singleflight/CacheSingleflightRegistry.cs` → `Koan.Core/Singleflight/SingleflightRegistry.cs` + introduce `ISingleflightRegistry` interface.
+- Register via `services.AddKoanSingleflight()` in `Koan.Core`.
+- `CacheClient` consumes `ISingleflightRegistry` from DI rather than the cache-internal type.
+- Rationale: stampede protection is a generic primitive; AI embeddings, heavy DB queries, file ops, and slow upstream calls all benefit. No cache-specific coupling.
+
 **Tests** (extending existing `tests/Suites/Cache/Unit/`):
 - `LayeredCache.Read` — L1 hit, L1 miss/L2 hit (backfill verified), both miss + factory invocation.
 - `LayeredCache.Write` — both tiers receive Set; no broadcast (no channel).
@@ -978,6 +983,12 @@ Each milestone is independently shippable and tested. Order is deliberate — la
 - `Koan.Cache/Decorators/CacheRepositoryDecorator.cs` — annotate with `[ProviderPriority(N)]` to lock the cache-vs-CQRS decorator order.
 - `Koan.Cache/Decorators/CacheKeyTemplate.cs` — `{TypeName}` token added to ambient.
 - `Koan.Data.Core/EntityContext.cs` — extend `ContextState` record with `CacheBehavior`; add `WithCacheBehavior` / `NoCache` / `RefreshCache` static helpers (mirrors existing `Partition` pattern verified via canon audit).
+- **Bundle item D — `CacheKey.For<T>(id, partition)` entity-aware constructor.** Add static helpers to `Koan.Cache.Abstractions/Primitives/CacheKey.cs`:
+  ```csharp
+  public static CacheKey For<TEntity>(object id, string? partition = null);
+  public static CacheKey For(Type entityType, object id, string? partition = null);
+  ```
+  Builds canonical `{TypeName}:{Partition ?? "_"}:{Id}`. Eliminates stringly-typed key construction at call sites in tests, extensions, and `Cache.Evict<T,K>`.
 
 **Tests** (extending `tests/Suites/Cache/Unit/CacheRepositoryDecorator.Spec.cs`):
 - `Get` honours each `CacheBehavior` mode correctly.
@@ -1034,29 +1045,41 @@ Each milestone is independently shippable and tested. Order is deliberate — la
 
 ---
 
-### M9 — Boot report + diagnostics
+### M9 — Boot report + diagnostics + observability
 
-**Deliverable:** rich per-entity boot reporting; optional HTTP diagnostics endpoint.
+**Deliverable:** rich per-entity boot reporting; OpenTelemetry tracing; health check; diagnostic trace key; optional HTTP diagnostics endpoint.
 
 **Files:**
 - `Koan.Cache/Initialization/KoanAutoRegistrar.cs` — `Describe` emits:
   - `Topology: layered (L1={localName}, L2={remoteName})` or `local-only` / `remote-only` / `none`.
   - `Coherence: active (transport={name}, catch-up={bool})` or `inactive (reason)`.
   - `NodeId: {guid}` (truncated).
-  - Per `CachePolicyDescriptor`: `Policy:{TypeName}: tier={Tier}, ttl={AbsoluteTtl}, l1={L1AbsoluteTtl}, strategy={Strategy}, tags=[{Tags}], broadcast={ForceCoherenceBroadcast}`.
+  - Per `CachePolicyDescriptor`: `Policy:{TypeName}: tier={Tier}, ttl={AbsoluteTtl}, l1={L1AbsoluteTtl}, strategy={Strategy}, tags=[{Tags}], broadcast={ForceCoherenceBroadcast}` followed by status flag:
+    - **Bundle item H — health column:** `[OK]`, `[DEGRADED]` (e.g. `Layered` downgraded to `LocalOnly` because no Remote tier registered), or `[BUG]` (e.g. `L1Ttl > L2Ttl` configuration error). Catches misconfigurations at boot rather than in production.
 - `Koan.Cache/Diagnostics/CacheDiagnosticsEndpoint.cs` — `GET /diagnostics/cache` (when `EnableDiagnosticsEndpoint=true`):
-  - JSON: topology, coherence status, registered channels (incl. suppressed), live policies, hit/miss/set/remove counters, last invalidation timestamps.
+  - JSON: topology, coherence status, registered channels (incl. suppressed), live policies (with health flags from H), hit/miss/set/remove counters, last invalidation timestamps.
 - `Koan.Cache/Diagnostics/CacheInstrumentation.cs` — add metrics (extends existing):
   - `koan.cache.coherence.published`, `koan.cache.coherence.received`, `koan.cache.coherence.applied` (tagged by transport).
   - `koan.cache.tier.fetches`, `tier.hits`, `tier.misses` (tagged by tier=local|remote).
   - Histograms: `koan.cache.read.duration`, `write.duration` (tagged by hit/miss).
+  - **Bundle item I — `ActivitySource("Koan.Cache")` spans** on `LayeredCache.Read`/`Write`/`Evict` and `CoherenceCoordinator.OnReceived` / `BroadcastEvict`. Tags: `cache.key`, `cache.tier`, `cache.hit`, `cache.transport`, `cache.evict.reason`. Distributed traces show the cache layer naturally in any modern observability stack.
+- **Bundle item G — `Koan.Cache/Diagnostics/CacheTraceFilter.cs`** — reads `KOAN_CACHE_TRACE_KEY` env var at startup. When set, every operation touching that key emits a verbose log line via `KoanLog` (fetch, set, evict, broadcast, receive). Production cache debugging without redeployment.
+- **Bundle item F — `Koan.Cache/Diagnostics/CacheHealthCheck.cs`** — implements `IHealthCheck`. Reports:
+  - L1 reachable (best-effort write/read of a sentinel key).
+  - L2 reachable (same).
+  - Coherence channel(s) connected (per-channel status).
+  - Returns `Healthy` (all good), `Degraded` (L2 unreachable but L1 OK), `Unhealthy` (no usable tier). Diagnostic data attached. Registered automatically by `AddKoanCache()`; Kubernetes/Aspire readiness probes pick it up via `MapHealthChecks("/health")`.
 
 **Tests:**
 - Boot report contains all expected lines for each topology/coherence combination.
+- Boot report health column correctly flags downgrades and bugs (`L1Ttl > L2Ttl`, missing Remote).
 - Diagnostics endpoint returns JSON shape under config `Enable=true`; 404 under `Enable=false`.
 - Integration: metrics emitted under each operation type.
+- Integration: `ActivitySource` produces well-formed spans with expected tags.
+- Integration: `KOAN_CACHE_TRACE_KEY=Todo:_:abc-123` produces verbose log lines for that key only; other keys silent.
+- Integration: Health check returns `Healthy` with both tiers up; `Degraded` with L2 paused (Testcontainers); `Unhealthy` with both down.
 
-**Acceptance:** running a sample app and hitting `/diagnostics/cache` returns full state.
+**Acceptance:** running a sample app and hitting `/diagnostics/cache` returns full state; `/health` reports cache pillar status; distributed traces show cache spans; misconfigured policies are flagged at boot.
 
 ---
 
@@ -1068,6 +1091,14 @@ Each milestone is independently shippable and tested. Order is deliberate — la
 - New `docs/reference/data/cache.md` — top-down reference for the pillar (replaces any existing draft).
 - New `docs/architecture/koan-cache-module.md` — four-pillar architecture overview.
 - New `docs/decisions/ARCH-0075-koan-cache-pillar.md` — ADR (drafted alongside this plan).
+- **Bundle item C — New `docs/decisions/ARCH-0076-repository-decorator-order.md`** — priority bands for `IDataRepositoryDecorator` implementations:
+  | Priority band | Concern | Examples |
+  |---|---|---|
+  | 100+ | Read short-circuit | Cache |
+  | 50–99 | Read observation | CQRS, audit-log |
+  | 0–49 | Write transformation | Soft-delete, multi-tenancy filtering |
+  | <0 | Reserved / framework | — |
+  Establishes canon so future decorator-writers land at a clear band without reinventing.
 - Add `[Cacheable(120)]` to `samples/S2.Api/Models/Todo.cs` (or current sample-app Todo equivalent).
 - New `.claude/skills/koan-caching/SKILL.md` — pattern-recognition entry for AI assistants.
 - Update `CLAUDE.md` "Framework Utilities" section — current entries match the shipped surface.
@@ -1255,11 +1286,25 @@ Each is an integration test in CI. The pillar is shippable when all pass.
 
 ## 18. Sign-off checklist
 
-- [ ] Architect approves §3–§7 (architecture + contracts + semantics).
+- [x] Architect approves §3–§7 (architecture + contracts + semantics). ✅ Plan accepted.
+- [x] Branch `feat/koan-cache-pillar` created off `dev`. ✅
+- [x] ADR `ARCH-0075-koan-cache-pillar.md` drafted and accepted alongside this plan. ✅
+- [x] Bundle items A/B/C/D/F/G/H/I folded into milestones. ✅
 - [ ] Decision: ship `RedisStreamsCoherenceChannel` in v1, or defer? Recommend **defer** unless production hardening from day one is required.
-- [ ] Branch `feat/koan-cache-pillar` created off `dev` ✅ (done).
-- [ ] ADR `ARCH-0075-koan-cache-pillar.md` drafted alongside this plan.
-- [ ] First PR scaffolds M1 abstractions reshape.
+- [ ] First PR scaffolds M1 abstractions reshape (in progress).
+
+### Bundle items — milestone placement
+
+| Item | Description | Landing milestone | Status |
+|---|---|---|---|
+| **A** | Generic `ICoherenceChannel<TMessage>` with `ICacheCoherenceChannel` as specialization | M1 | ✅ Applied |
+| **B** | Extract `Singleflight` to `Koan.Core/Singleflight/` with `ISingleflightRegistry` | M2 | Pending |
+| **C** | ARCH-0076 repository-decorator priority bands ADR | M10 (docs) | Pending |
+| **D** | `CacheKey.For<T>(id, partition)` entity-aware constructor | M6 | Pending |
+| **F** | `IHealthCheck` for cache pillar | M9 | Pending |
+| **G** | `KOAN_CACHE_TRACE_KEY` env-var diagnostic filter | M9 | Pending |
+| **H** | Boot-report policy health column (`[OK]`/`[DEGRADED]`/`[BUG]`) | M9 | Pending |
+| **I** | `ActivitySource("Koan.Cache")` OpenTelemetry spans | M9 | Pending |
 
 ---
 
