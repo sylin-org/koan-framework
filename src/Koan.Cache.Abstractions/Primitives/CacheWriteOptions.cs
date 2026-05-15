@@ -44,7 +44,8 @@ public sealed record CacheWriteOptions(
 
     /// <summary>
     /// Compute the effective L1 TTL for this write. When <see cref="L1AbsoluteTtl"/> is set, returns
-    /// that value verbatim. Otherwise derives <c>max(30s, AbsoluteTtl / 2)</c> for defense in depth.
+    /// that value verbatim. Otherwise derives <c>min(AbsoluteTtl, max(30s, AbsoluteTtl / 2))</c>
+    /// for defense in depth: clamped to <see cref="AbsoluteTtl"/> so L1 never outlives L2.
     /// Returns null only when <see cref="AbsoluteTtl"/> is also null (no expiration).
     /// </summary>
     public TimeSpan? GetEffectiveL1Ttl()
@@ -52,8 +53,12 @@ public sealed record CacheWriteOptions(
         if (L1AbsoluteTtl.HasValue) return L1AbsoluteTtl;
         if (!AbsoluteTtl.HasValue) return null;
 
-        var half = AbsoluteTtl.Value.TotalSeconds / 2.0;
+        var absSeconds = AbsoluteTtl.Value.TotalSeconds;
+        var half = absSeconds / 2.0;
         var floor = 30.0;
-        return TimeSpan.FromSeconds(Math.Max(floor, half));
+        // Inner: max(30s, half) — defense-in-depth ceiling.
+        // Outer: min(absoluteTtl, inner) — L1 must never outlive L2.
+        var derived = Math.Min(absSeconds, Math.Max(floor, half));
+        return TimeSpan.FromSeconds(derived);
     }
 }

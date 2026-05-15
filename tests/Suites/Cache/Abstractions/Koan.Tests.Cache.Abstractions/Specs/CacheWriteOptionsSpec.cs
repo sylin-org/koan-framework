@@ -32,12 +32,14 @@ public class CacheWriteOptionsSpec
     }
 
     [Fact]
-    public void GetEffectiveL1Ttl_WhenL1NullAndAbsoluteSmall_FloorsAt30Seconds()
+    public void GetEffectiveL1Ttl_WhenL1NullAndAbsoluteSmall_ClampedToAbsolute()
     {
-        // Absolute = 20s; half = 10s; floor = 30s → result = 30s
+        // Per ARCH-0075's defense-in-depth invariant "L1 TTL = min(L2, max(30s, L2/2))":
+        // Absolute = 20s; inner = max(30s, 10s) = 30s; outer = min(20s, 30s) = 20s.
+        // L1 must never outlive L2.
         var opts = Build(absolute: TimeSpan.FromSeconds(20), l1: null);
 
-        opts.GetEffectiveL1Ttl().Should().Be(TimeSpan.FromSeconds(30));
+        opts.GetEffectiveL1Ttl().Should().Be(TimeSpan.FromSeconds(20));
     }
 
     [Fact]
