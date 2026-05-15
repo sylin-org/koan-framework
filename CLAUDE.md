@@ -26,6 +26,7 @@ Framework knowledge is provided through **Agent Skills** in `.claude/skills/` th
 | Complex relationships, N+1 queries | `koan-relationships` |
 | Performance issues, large datasets | `koan-performance` |
 | Vector database migration | `koan-vector-migration` |
+| `[Cacheable]`, L1/L2, cache coherence, TTL, `EntityContext.NoCache()` | `koan-caching` |
 | MCP server development | `koan-mcp-integration` |
 
 **Full Skills Catalog**: `.claude/skills/README.md` (descriptions, learning paths, examples)
@@ -62,11 +63,19 @@ Framework knowledge is provided through **Agent Skills** in `.claude/skills/` th
 - **PatchNormalizer** (`Koan.Web.PatchOps`) - Normalize and validate JSON Patch operations
 - **EntityController<T>** (`Koan.Web.Controllers`) - Full REST API base controller with CRUD + Query + Patch
 
-### Cache
-- **LayeredCacheStore** (`Koan.Cache`) — Auto-layered L1 (local) + L2 (remote) cache orchestration
-- **EntityCacheExtensions** (`Koan.Cache`) — `entity.Uncache()`, `EntityCache<T>.Flush(id)`, `EntityCache<T>.FlushAll()`
-- **CachePolicyAttribute** (`Koan.Cache.Abstractions`) — `[CachePolicy(Tier = CacheTier.Layered)]` with `LocalProvider`/`RemoteProvider` pinning
-- **SqliteCacheStore** (`Koan.Cache.Adapter.Sqlite`) — Persistent local cache (`.Koan/cache/cache.db`)
+### Cache (ARCH-0075 · v0.7.0)
+- **[Cacheable]** (`Koan.Cache.Abstractions.Policies`) — Entity-friendly attribute. `[Cacheable(300)]` opts an entity into transparent L1/L2 caching with sane defaults. Power users drop to `[CachePolicy]` for custom key templates / method-scoped policies
+- **LayeredCache** (`Koan.Cache.Topology`) — Composition-based L1/L2 orchestrator. Verbs: `Read`/`Write`/`Evict`/`Touch`/`EnumerateByTag`. `ApplyRemoteInvalidation` is L1-only (architectural invariant)
+- **CoherenceCoordinator** (`Koan.Cache.Coherence`) — `IHostedService` routing `ICacheCoherenceChannel` messages → `LayeredCache.ApplyRemoteInvalidation`. Origin filter prevents echo. Honors `CoherenceMode.AutoDetect`/`Required`/`Disabled`
+- **CacheKey.For<T>(id, partition)** (`Koan.Cache.Abstractions.Primitives`) — Canonical entity key builder; eliminates stringly-typed concatenation
+- **EntityCacheExtensions** (`Koan.Cache`) — `entity.Uncache()`, `EntityCache<T,K>.Flush(id)`, `.FlushAll()` for out-of-band evict from `Koan.Data.Direct` / batch jobs
+- **EntityContext.CacheBehavior** (`Koan.Data.Core`) — Per-request opt-out: `NoCache()`, `RefreshCache()`, `WithCacheBehavior(...)`. Writes always invalidate regardless
+- **Reference = Intent adapters**:
+  - `Koan.Cache.Adapter.Sqlite` — persistent L1 (priority 50, preempts Memory)
+  - `Koan.Cache.Adapter.Redis` — L2 + `RedisCoherenceChannel` (priority 100 + 100)
+  - `Koan.Cache.Coherence.Messaging` — rides `Koan.Messaging.IMessageBus` (priority 150, preempts Redis pub/sub)
+  - `Koan.Cache.Coherence.InMemory` — fallback channel for tests / single-process verification (priority `int.MinValue`)
+- **Singleflight** (`Koan.Core.Singleflight`) — Stampede-protection primitive lifted out of cache for cross-pillar reuse
 
 ### Entity Lifecycle
 - **[Timestamp]** (`Koan.Data.Abstractions`) — `[Timestamp]` set-once on creation, `[Timestamp(OnSave = true)]` set on every save
