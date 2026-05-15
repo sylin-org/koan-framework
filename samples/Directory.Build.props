@@ -1,4 +1,11 @@
 ﻿<Project>
+  <!--
+    Sample apps declare [assembly: KoanApp(...)] so the orchestration manifest generator can emit
+    an "app" service entry into the published manifest. Opt in here; see ARCH-0077.
+  -->
+  <PropertyGroup>
+    <KoanRequiresOrchestrationGenerator>true</KoanRequiresOrchestrationGenerator>
+  </PropertyGroup>
   <ItemGroup>
     <Compile Include="$(MSBuildThisFileDirectory)GlobalUsings.cs" Link="_GlobalUsings.cs" />
   </ItemGroup>

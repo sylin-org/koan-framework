@@ -46,12 +46,27 @@
     <None Include="$(MSBuildThisFileDirectory)icon.png" Pack="true" PackagePath="/" Condition="Exists('$(MSBuildThisFileDirectory)icon.png')" />
   <None Include="$(MSBuildThisFileDirectory)resources\image\0_2.jpg" Pack="true" PackagePath="/" Condition="Exists('$(MSBuildThisFileDirectory)resources\image\0_2.jpg')" />
   </ItemGroup>
-  <!-- Attach in-repo Roslyn generators to all projects for local builds -->
+  <!-- In-repo Roslyn generators attached as analyzers. See ARCH-0077 (orchestration generator
+       scope-narrowing rationale; deprecation path toward .NET Aspire). -->
   <ItemGroup>
+    <!--
+      Orchestration manifest generator (legacy ISourceGenerator). Only attach to projects that
+      actually declare [KoanService] / [KoanApp] / [assembly: AuthProviderDescriptor]. Connectors
+      and samples opt in via Directory.Build.props files in their roots; the lone non-connector
+      service that declares [KoanService] (Koan.Service.Translation) sets the property in its csproj.
+      Unrelated framework projects (Koan.Web.Auth, Koan.Core, etc.) no longer pay the analyzer
+      load cost and cannot be blocked by generator-side compile errors.
+    -->
     <ProjectReference Include="$(MSBuildThisFileDirectory)src\Koan.Orchestration.Generators\Koan.Orchestration.Generators.csproj"
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false"
-                      Condition="Exists('$(MSBuildThisFileDirectory)src\Koan.Orchestration.Generators\Koan.Orchestration.Generators.csproj') and '$(MSBuildProjectName)' != 'Koan.Orchestration.Generators' and '$(MSBuildProjectName)' != 'Koan.Core.Registry.Generators'" />
+                      Condition="Exists('$(MSBuildThisFileDirectory)src\Koan.Orchestration.Generators\Koan.Orchestration.Generators.csproj') and '$(KoanRequiresOrchestrationGenerator)' == 'true'" />
+    <!--
+      Registry generator (modern IIncrementalGenerator). Harmless on projects with no registry
+      entries — emits nothing. Still attached broadly because some downstream Koan projects do
+      rely on its output. Exclusion list keeps it from analyzing itself or the orchestration
+      generator project.
+    -->
     <ProjectReference Include="$(MSBuildThisFileDirectory)src\Koan.Core.Registry.Generators\Koan.Core.Registry.Generators.csproj"
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false"
