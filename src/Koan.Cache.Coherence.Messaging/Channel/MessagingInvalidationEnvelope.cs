@@ -1,16 +1,17 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Koan.Cache.Abstractions.Coherence;
 using Koan.Cache.Abstractions.Primitives;
 
-namespace Koan.Cache.Adapter.Redis.Coherence;
+namespace Koan.Cache.Coherence.Messaging.Channel;
 
 /// <summary>
-/// Wire-format envelope for <see cref="CacheInvalidation"/> over Redis pub/sub.
-/// The strongly-typed value type isn't directly JSON-friendly (record struct with nullable
-/// reference-type members); this DTO mirrors it for serialization.
+/// Wire DTO for <see cref="CacheInvalidation"/> over <c>Koan.Messaging</c>. The bus requires
+/// <c>T : class</c> on send/consume APIs, so the strongly-typed value type needs a
+/// reference-type envelope.
 /// </summary>
-internal sealed record RedisInvalidationEnvelope
+public sealed class MessagingInvalidationEnvelope
 {
     public string Kind { get; init; } = "";
     public string? Key { get; init; }
@@ -20,12 +21,12 @@ internal sealed record RedisInvalidationEnvelope
     public string OriginNodeId { get; init; } = "";
     public long PublishedAtUtcTicks { get; init; }
 
-    public static RedisInvalidationEnvelope FromMessage(CacheInvalidation msg)
+    public static MessagingInvalidationEnvelope FromMessage(CacheInvalidation msg)
         => new()
         {
             Kind = msg.Kind.ToString(),
             Key = msg.Key?.Value,
-            Tags = msg.Tags is { Count: > 0 } tags ? System.Linq.Enumerable.ToArray(tags) : null,
+            Tags = msg.Tags is { Count: > 0 } tags ? tags.ToArray() : null,
             Region = msg.Region,
             ScopeId = msg.ScopeId,
             OriginNodeId = msg.OriginNodeId.ToString("D"),
