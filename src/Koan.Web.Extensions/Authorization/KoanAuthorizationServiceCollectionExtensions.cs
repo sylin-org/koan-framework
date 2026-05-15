@@ -28,7 +28,11 @@ public static class KoanAuthorizationServiceCollectionExtensions
         if (developmentClaimsTransformer is not null)
         {
             services.AddHttpContextAccessor();
-            services.TryAddEnumerable(ServiceDescriptor.Singleton<IClaimsTransformation>(sp =>
+            // Singleton<TService, TImplementation>(factory) form keeps the descriptor's
+            // ImplementationType distinguishable from the service type so TryAddEnumerable can
+            // correctly dedup — the plain Singleton<TService>(factory) overload would produce
+            // ImplementationType == IClaimsTransformation, which TryAddEnumerable rejects.
+            services.TryAddEnumerable(ServiceDescriptor.Singleton<IClaimsTransformation, DelegateClaimsTransformation>(sp =>
                 new DelegateClaimsTransformation(principal =>
                 {
                     var env = sp.GetRequiredService<IHostEnvironment>();
