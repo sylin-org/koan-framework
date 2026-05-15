@@ -2,16 +2,23 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Cache.Abstractions.Primitives;
 using Koan.Cache.Abstractions.Stores;
+using Koan.Data.Abstractions;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Koan.Cache.Adapters.Memory;
 
+/// <summary>
+/// Process-local <see cref="ICacheStore"/> backed by <see cref="IMemoryCache"/>.
+/// Default L1 candidate; lower <c>[ProviderPriority]</c> than persistent stores like SQLite.
+/// </summary>
+[ProviderPriority(10)]
 internal sealed class MemoryCacheStore : ICacheStore
 {
     private readonly IMemoryCache _cache;
@@ -26,31 +33,29 @@ internal sealed class MemoryCacheStore : ICacheStore
         _logger = logger;
     }
 
-    public string ProviderName => "memory";
+    public string Name => "memory";
 
-    public CacheCapabilities Capabilities { get; } = new(
+    public CacheStorePlacement Placement => CacheStorePlacement.Local;
+
+    public CacheStoreCapabilities Capabilities { get; } = new(
+        SupportsTags: true,
+        SupportsSlidingTtl: true,
+        SupportsStaleWhileRevalidate: true,
         SupportsBinary: true,
-        SupportsPubSubInvalidation: false,
-        SupportsCompareExchange: false,
-        SupportsRegionScoping: false,
-        Hints: new HashSet<string>(new[] { "tags", "stale-while-revalidate", "singleflight" }, StringComparer.OrdinalIgnoreCase),
-        SupportsSharedAccess: false,
         SupportsPersistence: false);
 
-    public ValueTask<CacheFetchResult> Fetch(CacheKey key, CacheEntryOptions options, CancellationToken ct)
+    public ValueTask<CacheFetchResult> Fetch(CacheKey key, CacheReadOptions options, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         if (!_cache.TryGetValue(key.Value, out CacheEnvelope? envelope) || envelope is null)
-        {
-            return ValueTask.FromResult(CacheFetchResult.Miss(options));
-        }
+            return ValueTask.FromResult(CacheFetchResult.Miss(new CacheEntryOptions()));
 
         var now = DateTimeOffset.UtcNow;
         if (envelope.StaleUntil is { } finalExpiry && finalExpiry <= now)
         {
             _cache.Remove(key.Value);
             RemoveTags(key.Value, envelope.Tags);
-            return ValueTask.FromResult(CacheFetchResult.Miss(options));
+            return ValueTask.FromResult(CacheFetchResult.Miss(new CacheEntryOptions()));
         }
 
         var absoluteExpired = envelope.AbsoluteExpiration is { } abs && abs <= now;
@@ -58,13 +63,11 @@ internal sealed class MemoryCacheStore : ICacheStore
         {
             _cache.Remove(key.Value);
             RemoveTags(key.Value, envelope.Tags);
-            return ValueTask.FromResult(CacheFetchResult.Miss(options));
+            return ValueTask.FromResult(CacheFetchResult.Miss(new CacheEntryOptions()));
         }
 
         if (absoluteExpired && _options.EnableStaleWhileRevalidate && _logger.IsEnabled(LogLevel.Debug))
-        {
             _logger.LogDebug("Serving stale memory cache entry for {CacheKey}", key.Value);
-        }
 
         return ValueTask.FromResult(CacheFetchResult.HitResult(
             envelope.Value,
@@ -73,56 +76,45 @@ internal sealed class MemoryCacheStore : ICacheStore
             envelope.StaleUntil));
     }
 
-    public ValueTask Set(CacheKey key, CacheValue value, CacheEntryOptions options, CancellationToken ct)
+    public ValueTask Set(CacheKey key, CacheValue value, CacheWriteOptions options, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         var now = DateTimeOffset.UtcNow;
         var absoluteExpiration = options.AbsoluteTtl.HasValue ? now.Add(options.AbsoluteTtl.Value) : (DateTimeOffset?)null;
         var staleUntil = absoluteExpiration;
         if (options.AllowStaleFor.HasValue && absoluteExpiration.HasValue)
-        {
             staleUntil = absoluteExpiration.Value.Add(options.AllowStaleFor.Value);
-        }
 
         if (_cache.TryGetValue(key.Value, out CacheEnvelope? existing) && existing is not null)
-        {
             RemoveTags(key.Value, existing.Tags);
-        }
 
         var tagArray = options.Tags.Count == 0
-            ? []
-            : options.Tags.Where(static t => !string.IsNullOrWhiteSpace(t)).Select(static t => t.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            ? Array.Empty<string>()
+            : options.Tags
+                .Where(static t => !string.IsNullOrWhiteSpace(t))
+                .Select(static t => t.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
 
-        var envelope = new CacheEnvelope(value, options, now, absoluteExpiration, staleUntil, tagArray);
+        var storedOptions = CacheEntryOptions.FromWriteOptions(options);
+        var envelope = new CacheEnvelope(value, storedOptions, now, absoluteExpiration, staleUntil, tagArray);
 
         var entryOptions = new MemoryCacheEntryOptions();
         if (_options.EnableStaleWhileRevalidate && staleUntil.HasValue)
-        {
             entryOptions.AbsoluteExpiration = staleUntil;
-        }
         else if (absoluteExpiration.HasValue)
-        {
             entryOptions.AbsoluteExpiration = absoluteExpiration;
-        }
 
         if (options.SlidingTtl.HasValue)
-        {
             entryOptions.SlidingExpiration = options.SlidingTtl;
-        }
 
         entryOptions.Priority = CacheItemPriority.Normal;
         entryOptions.PostEvictionCallbacks.Add(new PostEvictionCallbackRegistration
         {
             EvictionCallback = (_, state, _, _) =>
             {
-                if (state is CacheEnvelope env)
-                {
-                    RemoveTags(key.Value, env.Tags);
-                }
-                else
-                {
-                    RemoveTags(key.Value, []);
-                }
+                if (state is CacheEnvelope env) RemoveTags(key.Value, env.Tags);
+                else RemoveTags(key.Value, Array.Empty<string>());
             },
             State = envelope
         });
@@ -138,31 +130,27 @@ internal sealed class MemoryCacheStore : ICacheStore
         var existed = _cache.TryGetValue(key.Value, out CacheEnvelope? envelope);
         _cache.Remove(key.Value);
         if (existed && envelope is not null)
-        {
             RemoveTags(key.Value, envelope.Tags);
-        }
 
         return ValueTask.FromResult(existed);
     }
 
-    public ValueTask Touch(CacheKey key, CacheEntryOptions options, CancellationToken ct)
+    public ValueTask Touch(CacheKey key, TimeSpan? newAbsoluteTtl, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        if (_cache.TryGetValue(key.Value, out CacheEnvelope? envelope) && envelope is not null)
-        {
-            return Set(key, envelope.Value, envelope.Options, ct);
-        }
+        if (!_cache.TryGetValue(key.Value, out CacheEnvelope? envelope) || envelope is null)
+            return ValueTask.CompletedTask;
 
-        return ValueTask.CompletedTask;
+        var refreshedOptions = envelope.Options with { AbsoluteTtl = newAbsoluteTtl };
+        var writeOpts = refreshedOptions.ToWriteOptions();
+        return Set(key, envelope.Value, writeOpts, ct);
     }
 
     public ValueTask<bool> Exists(CacheKey key, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         if (!_cache.TryGetValue(key.Value, out CacheEnvelope? envelope) || envelope is null)
-        {
             return ValueTask.FromResult(false);
-        }
 
         var now = DateTimeOffset.UtcNow;
         if (envelope.StaleUntil is { } staleUntil && staleUntil <= now)
@@ -182,18 +170,10 @@ internal sealed class MemoryCacheStore : ICacheStore
         return ValueTask.FromResult(true);
     }
 
-    public ValueTask PublishInvalidation(CacheKey key, CacheEntryOptions options, CancellationToken ct)
-    {
-        // No-op for in-memory implementation; nothing to publish.
-        return ValueTask.CompletedTask;
-    }
-
-    public async IAsyncEnumerable<TaggedCacheKey> EnumerateByTag(string tag, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    public async IAsyncEnumerable<TaggedCacheKey> EnumerateByTag(string tag, [EnumeratorCancellation] CancellationToken ct)
     {
         if (!_tagIndex.TryGetValue(tag, out var keys))
-        {
             yield break;
-        }
 
         await Task.Yield();
 
@@ -201,27 +181,20 @@ internal sealed class MemoryCacheStore : ICacheStore
         {
             ct.ThrowIfCancellationRequested();
             if (_cache.TryGetValue(kvp, out CacheEnvelope? envelope) && envelope is not null)
-            {
                 yield return new TaggedCacheKey(tag, new CacheKey(kvp), envelope.AbsoluteExpiration);
-            }
         }
     }
 
     private void IndexTags(string key, IReadOnlyList<string> tags)
     {
-        if (tags.Count == 0)
-        {
-            return;
-        }
+        if (tags.Count == 0) return;
 
         foreach (var tag in tags)
         {
             if (!_tagIndex.ContainsKey(tag) && _tagIndex.Count >= _options.TagIndexCapacity)
             {
                 if (_logger.IsEnabled(LogLevel.Debug))
-                {
                     _logger.LogDebug("Skipping tag index registration for {Tag} due to capacity.", tag);
-                }
 
                 continue;
             }
@@ -233,10 +206,7 @@ internal sealed class MemoryCacheStore : ICacheStore
 
     private void RemoveTags(string key, IReadOnlyList<string> tags)
     {
-        if (tags.Count == 0)
-        {
-            return;
-        }
+        if (tags.Count == 0) return;
 
         foreach (var tag in tags)
         {
@@ -244,9 +214,7 @@ internal sealed class MemoryCacheStore : ICacheStore
             {
                 index.TryRemove(key, out _);
                 if (index.IsEmpty)
-                {
                     _tagIndex.TryRemove(tag, out _);
-                }
             }
         }
     }

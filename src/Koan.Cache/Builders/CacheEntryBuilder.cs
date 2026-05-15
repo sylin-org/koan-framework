@@ -64,9 +64,9 @@ internal sealed class CacheEntryBuilder<T> : ICacheEntryBuilder<T>
         return this;
     }
 
-    public ICacheEntryBuilder<T> PublishInvalidation(bool value = true)
+    public ICacheEntryBuilder<T> BroadcastInvalidation(bool value = true)
     {
-        _options = _options with { ForcePublishInvalidation = value };
+        _options = _options with { ForceCoherenceBroadcast = value };
         return this;
     }
 

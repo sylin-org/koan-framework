@@ -138,19 +138,23 @@ internal sealed class CachePolicyRegistry(ILogger<CachePolicyRegistry> logger) :
             : attribute.Metadata.ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.Ordinal);
 
         return new CachePolicyDescriptor(
-            attribute.Scope,
-            attribute.KeyTemplate,
-            attribute.Strategy,
-            attribute.Consistency,
-            attribute.AbsoluteTtl,
-            attribute.SlidingTtl,
-            attribute.AllowStaleFor,
-            attribute.ForcePublishInvalidation,
-            tags,
-            attribute.Region,
-            attribute.ScopeId,
-            metadata,
-            member,
-            declaringType);
+            Scope: attribute.Scope,
+            KeyTemplate: attribute.KeyTemplate,
+            Strategy: attribute.Strategy,
+            Consistency: attribute.Consistency,
+            Tier: attribute.Tier,
+            AbsoluteTtl: attribute.AbsoluteTtl,
+            L1AbsoluteTtl: attribute.L1AbsoluteTtl,
+            SlidingTtl: attribute.SlidingTtl,
+            AllowStaleFor: attribute.AllowStaleFor,
+            Tags: tags,
+            Region: attribute.Region,
+            ScopeId: attribute.ScopeId,
+            LocalProvider: attribute.LocalProvider,
+            RemoteProvider: attribute.RemoteProvider,
+            ForceCoherenceBroadcast: attribute.ForceCoherenceBroadcast,
+            Metadata: metadata,
+            TargetMember: member,
+            DeclaringType: declaringType);
     }
 }

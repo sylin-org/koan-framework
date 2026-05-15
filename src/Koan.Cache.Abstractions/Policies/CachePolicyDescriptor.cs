@@ -30,6 +30,26 @@ public sealed record CachePolicyDescriptor(
     MemberInfo? TargetMember,
     Type? DeclaringType)
 {
+    /// <summary>
+    /// Project the developer-facing aggregate options. <see cref="ToReadOptions"/> and
+    /// <see cref="ToWriteOptions"/> are the strict tier-side variants consumed by
+    /// <c>LayeredCache</c> and <c>ICacheStore</c>.
+    /// </summary>
+    public CacheEntryOptions ToOptions()
+        => new()
+        {
+            AbsoluteTtl = AbsoluteTtl,
+            L1AbsoluteTtl = L1AbsoluteTtl,
+            SlidingTtl = SlidingTtl,
+            AllowStaleFor = AllowStaleFor,
+            Consistency = Consistency,
+            ForceCoherenceBroadcast = ForceCoherenceBroadcast,
+            Tags = new HashSet<string>(Tags, StringComparer.OrdinalIgnoreCase),
+            Region = Region,
+            ScopeId = ScopeId,
+            Metadata = new Dictionary<string, string>(Metadata, StringComparer.Ordinal),
+        };
+
     /// <summary>Project the read-side options carried by this policy.</summary>
     public CacheReadOptions ToReadOptions()
         => new(
