@@ -20,7 +20,7 @@ public static class InMemoryCoherenceServiceCollectionExtensions
         services.TryAddSingleton<InMemoryCoherenceBus>();
         services.TryAddSingleton<InMemoryCoherenceChannel>();
         services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<ICacheCoherenceChannel>(
+            ServiceDescriptor.Singleton<ICacheCoherenceChannel, InMemoryCoherenceChannel>(
                 sp => sp.GetRequiredService<InMemoryCoherenceChannel>()));
         return services;
     }

@@ -67,8 +67,13 @@ public static class CacheServiceCollectionExtensions
         services.AddMemoryCache();
         services.AddKoanOptions<MemoryCacheAdapterOptions>(CacheConstants.Configuration.Memory.Section);
         services.TryAddSingleton<MemoryCacheStore>();
+        // Two-generic overload (TService + TImplementation) keeps the descriptor's
+        // ImplementationType distinguishable from the service type, so TryAddEnumerable
+        // can correctly dedup against adapter-registered stores. The plain
+        // Singleton<ICacheStore>(factory) form sets ImplementationType = ICacheStore,
+        // which TryAddEnumerable rejects as "indistinguishable".
         services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<ICacheStore>(sp => sp.GetRequiredService<MemoryCacheStore>()));
+            ServiceDescriptor.Singleton<ICacheStore, MemoryCacheStore>(sp => sp.GetRequiredService<MemoryCacheStore>()));
 
         // Topology
         services.TryAddSingleton<CacheStoreRegistry>();

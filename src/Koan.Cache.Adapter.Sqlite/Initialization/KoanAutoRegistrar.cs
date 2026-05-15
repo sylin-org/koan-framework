@@ -29,7 +29,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
         services.TryAddSingleton<SqliteCacheStore>();
         services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<ICacheStore>(sp => sp.GetRequiredService<SqliteCacheStore>()));
+            ServiceDescriptor.Singleton<ICacheStore, SqliteCacheStore>(sp => sp.GetRequiredService<SqliteCacheStore>()));
     }
 
     public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)

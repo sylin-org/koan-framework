@@ -61,15 +61,17 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             return ConnectionMultiplexer.Connect(connectionString);
         });
 
-        // Storage: RedisCacheStore as Remote (L2) tier.
+        // Storage: RedisCacheStore as Remote (L2) tier. Two-generic overload keeps the
+        // descriptor's ImplementationType distinguishable from the service type — see the
+        // matching comment in CacheServiceCollectionExtensions.AddKoanCache.
         services.TryAddSingleton<RedisCacheStore>();
         services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<ICacheStore>(sp => sp.GetRequiredService<RedisCacheStore>()));
+            ServiceDescriptor.Singleton<ICacheStore, RedisCacheStore>(sp => sp.GetRequiredService<RedisCacheStore>()));
 
         // Coherence: RedisCoherenceChannel as ICacheCoherenceChannel.
         services.TryAddSingleton<RedisCoherenceChannel>();
         services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<ICacheCoherenceChannel>(sp => sp.GetRequiredService<RedisCoherenceChannel>()));
+            ServiceDescriptor.Singleton<ICacheCoherenceChannel, RedisCoherenceChannel>(sp => sp.GetRequiredService<RedisCoherenceChannel>()));
 
         // Service discovery for orchestration (parity with data-connector discovery).
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, Koan.Data.Connector.Redis.Discovery.RedisDiscoveryAdapter>());

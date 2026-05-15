@@ -21,7 +21,7 @@ public static class MessagingCoherenceServiceCollectionExtensions
     {
         services.TryAddSingleton<MessagingCoherenceChannel>();
         services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<ICacheCoherenceChannel>(
+            ServiceDescriptor.Singleton<ICacheCoherenceChannel, MessagingCoherenceChannel>(
                 sp => sp.GetRequiredService<MessagingCoherenceChannel>()));
 
         // Register the messaging handler — it captures AppHost.Current at invocation time
