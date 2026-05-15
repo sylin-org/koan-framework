@@ -8,6 +8,7 @@ using Koan.Cache.Abstractions;
 using Koan.Cache.Abstractions.Primitives;
 using Koan.Cache.Abstractions.Serialization;
 using Koan.Cache.Abstractions.Stores;
+using Koan.Cache.Coherence;
 using Koan.Cache.Diagnostics;
 using Koan.Cache.Options;
 using Koan.Cache.Scope;
@@ -32,6 +33,7 @@ internal sealed class CacheClient : ICacheClient
     private readonly ISingleflightRegistry _singleflight;
     private readonly ICacheScopeAccessor _scopeAccessor;
     private readonly CacheInstrumentation _instrumentation;
+    private readonly CoherenceCoordinator _coherence;
     private readonly IOptionsMonitor<CacheOptions> _options;
     private readonly ILogger<CacheClient> _logger;
     private readonly ConcurrentDictionary<Type, ICacheSerializer> _serializerCache = new();
@@ -42,6 +44,7 @@ internal sealed class CacheClient : ICacheClient
         ISingleflightRegistry singleflight,
         ICacheScopeAccessor scopeAccessor,
         CacheInstrumentation instrumentation,
+        CoherenceCoordinator coherence,
         IOptionsMonitor<CacheOptions> options,
         ILogger<CacheClient> logger)
     {
@@ -51,6 +54,7 @@ internal sealed class CacheClient : ICacheClient
             throw new InvalidOperationException("No cache serializers registered. Ensure AddKoanCache() was called.");
 
         _singleflight = singleflight ?? throw new ArgumentNullException(nameof(singleflight));
+        _coherence = coherence ?? throw new ArgumentNullException(nameof(coherence));
         _scopeAccessor = scopeAccessor;
         _instrumentation = instrumentation;
         _options = options;
@@ -119,13 +123,19 @@ internal sealed class CacheClient : ICacheClient
         await _layered.Write(key, cacheValue, normalized.ToWriteOptions(), ct).ConfigureAwait(false);
         _instrumentation.RecordSet(key.Value, LayeredProviderTag);
 
-        // M3 wires the CoherenceCoordinator to broadcast on writes; M2 leaves it inactive.
+        if (normalized.ForceCoherenceBroadcast)
+        {
+            await _coherence.BroadcastEvict(key, normalized.Region, ct).ConfigureAwait(false);
+            _instrumentation.RecordInvalidation(key.Value, LayeredProviderTag, "write-broadcast");
+        }
     }
 
     public async ValueTask<bool> Remove(CacheKey key, CancellationToken ct)
     {
         var success = await _layered.Evict(key, ct).ConfigureAwait(false);
         _instrumentation.RecordRemove(key.Value, LayeredProviderTag, success);
+        // Removes always broadcast — peers must drop their L1 entries even if the key wasn't present locally.
+        await _coherence.BroadcastEvict(key, region: null, ct).ConfigureAwait(false);
         return success;
     }
 

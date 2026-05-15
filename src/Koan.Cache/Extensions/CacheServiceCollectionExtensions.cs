@@ -6,6 +6,7 @@ using Koan.Cache.Abstractions.Serialization;
 using Koan.Cache.Abstractions.Stores;
 using Koan.Cache.Adapters;
 using Koan.Cache.Adapters.Memory;
+using Koan.Cache.Coherence;
 using Koan.Cache.Decorators;
 using Koan.Cache.Diagnostics;
 using Koan.Cache.Options;
@@ -81,6 +82,14 @@ public static class CacheServiceCollectionExtensions
             return resolver.Resolve(registry.Stores, opts);
         });
         services.TryAddSingleton<LayeredCache>();
+
+        // Coherence runtime — coordinator is always registered; activates iff a channel is
+        // present (CoherenceMode.AutoDetect) or required (CoherenceMode.Required). Channels
+        // are registered by adapter packages (Redis, Messaging, InMemory).
+        services.TryAddSingleton<NodeIdProvider>();
+        services.TryAddSingleton<CursorStore>();
+        services.TryAddSingleton<CoherenceCoordinator>();
+        services.AddHostedService(sp => sp.GetRequiredService<CoherenceCoordinator>());
 
         // Client (consumes LayeredCache; ICacheClient = ICacheReader + ICacheWriter)
         services.TryAddSingleton<CacheClient>();
