@@ -128,33 +128,5 @@ internal sealed class CachePolicyRegistry(ILogger<CachePolicyRegistry> logger) :
     }
 
     private static CachePolicyDescriptor CreateDescriptor(CachePolicyAttribute attribute, MemberInfo? member, Type? declaringType)
-    {
-        var tags = attribute.Tags is null || attribute.Tags.Length == 0
-            ? []
-            : attribute.Tags.Select(t => t.Trim()).Where(t => t.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-
-        var metadata = attribute.Metadata is null || attribute.Metadata.Count == 0
-            ? new Dictionary<string, string>()
-            : attribute.Metadata.ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.Ordinal);
-
-        return new CachePolicyDescriptor(
-            Scope: attribute.Scope,
-            KeyTemplate: attribute.KeyTemplate,
-            Strategy: attribute.Strategy,
-            Consistency: attribute.Consistency,
-            Tier: attribute.Tier,
-            AbsoluteTtl: attribute.AbsoluteTtl,
-            L1AbsoluteTtl: attribute.L1AbsoluteTtl,
-            SlidingTtl: attribute.SlidingTtl,
-            AllowStaleFor: attribute.AllowStaleFor,
-            Tags: tags,
-            Region: attribute.Region,
-            ScopeId: attribute.ScopeId,
-            LocalProvider: attribute.LocalProvider,
-            RemoteProvider: attribute.RemoteProvider,
-            ForceCoherenceBroadcast: attribute.ForceCoherenceBroadcast,
-            Metadata: metadata,
-            TargetMember: member,
-            DeclaringType: declaringType);
-    }
+        => CachePolicyMaterializer.Materialize(attribute, member, declaringType);
 }
