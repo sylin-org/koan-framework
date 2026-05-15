@@ -66,6 +66,24 @@ Critical invariant: `ICacheStore` has NO publish methods. Coherence is its own p
 | Cache-bypass via `if (skipCache) ...` branches in business code | `EntityContext.NoCache()` / `RefreshCache()` scopes — declarative, doesn't pollute call sites. |
 | L1 TTL > L2 TTL | Boot-time validator throws. The materializer enforces the invariant. |
 
+## Stale-while-revalidate is opt-in (ARCH-0078)
+
+Default reads are **fresh-or-null** — past `AbsoluteTtl` the cache returns `null`. To allow stale reads, callers must explicitly opt in via `AllowStaleFor`:
+
+```csharp
+// Per-entity opt-in
+[Cacheable(60, AllowStaleForSeconds: 10)]
+public sealed class HotKey : Entity<HotKey> { }
+
+// Per-call opt-in
+var report = await Cache.WithJson<UsageReport>(key)
+    .WithAbsoluteTtl(TimeSpan.FromMinutes(5))
+    .AllowStaleFor(TimeSpan.FromMinutes(2))   // ← explicit; otherwise strict
+    .GetOrAdd(async ct => ..., ct);
+```
+
+There are **no global SWR toggles** in adapter options or app configuration. The per-call/per-policy opt-in is the only switch. The boot report flags policies that opt in: `Policy:HotKey ... swr=10s [opt-in]`.
+
 ## Per-request opt-out
 
 ```csharp

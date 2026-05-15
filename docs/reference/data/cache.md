@@ -87,6 +87,34 @@ public sealed class HotKey : Entity<HotKey> { }
 
 `L1AbsoluteTtl > AbsoluteTtl` throws at startup with a clear diagnostic. The materializer enforces the L1 ≤ L2 invariant.
 
+### Stale-while-revalidate is opt-in (ARCH-0078)
+
+The cache contract is **fresh-or-null by default**. Reads past `AbsoluteTtl` return `null`, not a stale value — the cache's identity is "freshness through coherence," not "serve stale while we refresh."
+
+SWR is available as an **explicit, per-policy or per-call opt-in** via `AllowStaleFor`:
+
+```csharp
+// Entity-level opt-in: any Get of HotKey past its TTL but within the staleness window
+// returns the prior value instead of null.
+[Cacheable(60, AllowStaleForSeconds: 10)]
+public sealed class HotKey : Entity<HotKey> { }
+
+// Per-call opt-in: ad-hoc cache use.
+var report = await Cache.WithJson<UsageReport>("report:" + tenantId)
+    .WithAbsoluteTtl(TimeSpan.FromHours(1))
+    .AllowStaleFor(TimeSpan.FromMinutes(10))     // ← explicit SWR opt-in
+    .GetOrAdd(async ct => await BuildReportAsync(tenantId, ct), ct);
+```
+
+Callers that don't set `AllowStaleFor` never see stale data, regardless of any adapter configuration. There are no global "enable SWR" toggles — the per-call opt-in is the only switch.
+
+The boot report surfaces SWR opt-in on a per-policy basis:
+
+```
+Policy:HotKey   tier=Layered, ttl=60s, l1=30s, ..., swr=10s [opt-in] [OK]
+Policy:Todo     tier=Layered, ttl=300s, l1=150s, ..., [OK]
+```
+
 ---
 
 ## The `[CachePolicy]` attribute — power-user surface
@@ -263,8 +291,7 @@ Peer (Node B):
 
       // Memory adapter
       "Memory": {
-        "TagIndexCapacity": 2048,
-        "EnableStaleWhileRevalidate": true
+        "TagIndexCapacity": 2048
       },
 
       // Redis adapter (referenced separately)

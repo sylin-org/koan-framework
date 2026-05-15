@@ -30,8 +30,11 @@ public sealed record CacheEntryOptions
     /// <summary>Per-call override for singleflight gate wait. Null = use <c>CacheOptions.DefaultSingleflightTimeout</c>.</summary>
     public TimeSpan? SingleflightTimeout { get; init; }
 
-    /// <summary>Consistency guarantees expected from the store when serving reads.</summary>
-    public CacheConsistencyMode Consistency { get; init; } = CacheConsistencyMode.StaleWhileRevalidate;
+    /// <summary>
+    /// Consistency guarantees expected from the store when serving reads. Per ARCH-0078, default
+    /// is <see cref="CacheConsistencyMode.Strict"/> — SWR is opted in by setting <see cref="AllowStaleFor"/>.
+    /// </summary>
+    public CacheConsistencyMode Consistency { get; init; } = CacheConsistencyMode.Strict;
 
     /// <summary>Whether writes should broadcast a coherence invalidation. Default <c>true</c>.</summary>
     public bool ForceCoherenceBroadcast { get; init; } = true;

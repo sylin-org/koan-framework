@@ -92,8 +92,11 @@ public sealed class RedisCacheStore : ICacheStore
             return CacheFetchResult.Miss(new CacheEntryOptions());
         }
 
+        // Per ARCH-0078: read-side AllowStaleFor is the master signal. Past the absolute TTL,
+        // the caller must have explicitly opted into staleness for this read or the store
+        // treats it as Miss.
         var absoluteExpired = absoluteExpiration is { } abs && abs <= now;
-        if (absoluteExpired && !_options.EnableStaleWhileRevalidate)
+        if (absoluteExpired && options.AllowStaleFor is null)
         {
             await Evict(redisKey, envelope.Options.Tags).ConfigureAwait(false);
             return CacheFetchResult.Miss(new CacheEntryOptions());
@@ -175,13 +178,9 @@ public sealed class RedisCacheStore : ICacheStore
                 ? new DateTimeOffset(envelope.StaleUntilUtcTicks.Value, TimeSpan.Zero)
                 : (DateTimeOffset?)null;
 
+            // Per ARCH-0078: Exists reports storage presence (entry within staleness ceiling).
+            // Whether a Fetch surfaces a stale value is the reader's per-call opt-in.
             if (staleUntil is { } finalExpiry && finalExpiry <= now)
-            {
-                await Evict(redisKey, envelope.Options.Tags).ConfigureAwait(false);
-                return false;
-            }
-
-            if (!_options.EnableStaleWhileRevalidate && absoluteExpiration is { } absolute && absolute <= now)
             {
                 await Evict(redisKey, envelope.Options.Tags).ConfigureAwait(false);
                 return false;

@@ -175,6 +175,11 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             $"broadcast={(policy.ForceCoherenceBroadcast ? "yes" : "no")}",
         };
 
+        // Per ARCH-0078: surface SWR opt-in in the boot report so ops can see at a glance which
+        // policies deviate from the default "fresh or null" contract.
+        if (policy.AllowStaleFor is { } stale && stale > TimeSpan.Zero)
+            parts.Add($"swr={Fmt(stale)} [opt-in]");
+
         var health = ComputeHealth(policy, topology, coordinator);
         return $"{string.Join(", ", parts)} [{health}]";
     }

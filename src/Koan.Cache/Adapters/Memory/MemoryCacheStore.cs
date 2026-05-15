@@ -51,6 +51,7 @@ internal sealed class MemoryCacheStore : ICacheStore
             return ValueTask.FromResult(CacheFetchResult.Miss(new CacheEntryOptions()));
 
         var now = DateTimeOffset.UtcNow;
+        // staleUntil is the storage-level eviction ceiling — past this, the entry is gone for everyone.
         if (envelope.StaleUntil is { } finalExpiry && finalExpiry <= now)
         {
             _cache.Remove(key.Value);
@@ -58,16 +59,18 @@ internal sealed class MemoryCacheStore : ICacheStore
             return ValueTask.FromResult(CacheFetchResult.Miss(new CacheEntryOptions()));
         }
 
+        // Per ARCH-0078: read-side AllowStaleFor is the master signal. Past the absolute TTL, the
+        // caller must have explicitly opted into staleness for this read or the store treats it as Miss.
         var absoluteExpired = envelope.AbsoluteExpiration is { } abs && abs <= now;
-        if (absoluteExpired && !_options.EnableStaleWhileRevalidate)
+        if (absoluteExpired && options.AllowStaleFor is null)
         {
             _cache.Remove(key.Value);
             RemoveTags(key.Value, envelope.Tags);
             return ValueTask.FromResult(CacheFetchResult.Miss(new CacheEntryOptions()));
         }
 
-        if (absoluteExpired && _options.EnableStaleWhileRevalidate && _logger.IsEnabled(LogLevel.Debug))
-            _logger.LogDebug("Serving stale memory cache entry for {CacheKey}", key.Value);
+        if (absoluteExpired && _logger.IsEnabled(LogLevel.Debug))
+            _logger.LogDebug("Serving stale memory cache entry for {CacheKey} (caller opted-in via AllowStaleFor)", key.Value);
 
         return ValueTask.FromResult(CacheFetchResult.HitResult(
             envelope.Value,
@@ -99,8 +102,11 @@ internal sealed class MemoryCacheStore : ICacheStore
         var storedOptions = CacheEntryOptions.FromWriteOptions(options);
         var envelope = new CacheEnvelope(value, storedOptions, now, absoluteExpiration, staleUntil, tagArray);
 
+        // IMemoryCache must hold the entry until the staleness ceiling expires; otherwise opted-in
+        // readers can't see stale values even when the contract allows them. Per ARCH-0078, the
+        // staleUntil is set at write time iff the writer specified AllowStaleFor.
         var entryOptions = new MemoryCacheEntryOptions();
-        if (_options.EnableStaleWhileRevalidate && staleUntil.HasValue)
+        if (staleUntil.HasValue)
             entryOptions.AbsoluteExpiration = staleUntil;
         else if (absoluteExpiration.HasValue)
             entryOptions.AbsoluteExpiration = absoluteExpiration;
@@ -153,14 +159,10 @@ internal sealed class MemoryCacheStore : ICacheStore
             return ValueTask.FromResult(false);
 
         var now = DateTimeOffset.UtcNow;
+        // Per ARCH-0078: Exists reports storage presence (entry within staleness ceiling).
+        // Whether a specific Fetch surfaces a stale value is the reader's per-call opt-in, not
+        // a storage-level decision.
         if (envelope.StaleUntil is { } staleUntil && staleUntil <= now)
-        {
-            _cache.Remove(key.Value);
-            RemoveTags(key.Value, envelope.Tags);
-            return ValueTask.FromResult(false);
-        }
-
-        if (envelope.AbsoluteExpiration is { } absolute && absolute <= now && !_options.EnableStaleWhileRevalidate)
         {
             _cache.Remove(key.Value);
             RemoveTags(key.Value, envelope.Tags);

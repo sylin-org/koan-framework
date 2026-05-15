@@ -87,7 +87,10 @@ public sealed class SqliteCacheStore : ICacheStore, IDisposable
             return CacheFetchResult.Miss(new CacheEntryOptions());
         }
 
-        if (absoluteExpiration is { } abs && abs <= now)
+        // Per ARCH-0078: read-side AllowStaleFor is the master signal. Past the absolute TTL,
+        // the caller must have explicitly opted into staleness for this read or the store
+        // treats it as Miss.
+        if (absoluteExpiration is { } abs && abs <= now && options.AllowStaleFor is null)
         {
             await RemoveCore(connection, key.Value, ct);
             return CacheFetchResult.Miss(new CacheEntryOptions());
@@ -222,13 +225,9 @@ public sealed class SqliteCacheStore : ICacheStore, IDisposable
         var absoluteExpiration = ParseDateTimeOffset(reader, 0);
         var staleUntil = ParseDateTimeOffset(reader, 1);
 
+        // Per ARCH-0078: Exists reports storage presence (entry within staleness ceiling).
+        // Whether a Fetch surfaces a stale value is the reader's per-call opt-in.
         if (staleUntil is { } finalExpiry && finalExpiry <= now)
-        {
-            await RemoveCore(connection, key.Value, ct);
-            return false;
-        }
-
-        if (absoluteExpiration is { } abs && abs <= now)
         {
             await RemoveCore(connection, key.Value, ct);
             return false;

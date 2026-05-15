@@ -63,8 +63,9 @@ Framework knowledge is provided through **Agent Skills** in `.claude/skills/` th
 - **PatchNormalizer** (`Koan.Web.PatchOps`) - Normalize and validate JSON Patch operations
 - **EntityController<T>** (`Koan.Web.Controllers`) - Full REST API base controller with CRUD + Query + Patch
 
-### Cache (ARCH-0075 · v0.7.0)
+### Cache (ARCH-0075 + ARCH-0078 · v0.7.0)
 - **[Cacheable]** (`Koan.Cache.Abstractions.Policies`) — Entity-friendly attribute. `[Cacheable(300)]` opts an entity into transparent L1/L2 caching with sane defaults. Power users drop to `[CachePolicy]` for custom key templates / method-scoped policies
+- **Fresh-or-null read contract (ARCH-0078)** — Default reads return `null` past `AbsoluteTtl`. **SWR is opt-in only** via `[Cacheable(AllowStaleForSeconds = N)]` or `.AllowStaleFor(TimeSpan)` on the fluent builder. No global adapter toggles — the per-call/per-policy opt-in is the only switch.
 - **LayeredCache** (`Koan.Cache.Topology`) — Composition-based L1/L2 orchestrator. Verbs: `Read`/`Write`/`Evict`/`Touch`/`EnumerateByTag`. `ApplyRemoteInvalidation` is L1-only (architectural invariant)
 - **CoherenceCoordinator** (`Koan.Cache.Coherence`) — `IHostedService` routing `ICacheCoherenceChannel` messages → `LayeredCache.ApplyRemoteInvalidation`. Origin filter prevents echo. Honors `CoherenceMode.AutoDetect`/`Required`/`Disabled`
 - **CacheKey.For<T>(id, partition)** (`Koan.Cache.Abstractions.Primitives`) — Canonical entity key builder; eliminates stringly-typed concatenation

@@ -21,6 +21,4 @@ public sealed class RedisCacheAdapterOptions
 
     [Range(0, int.MaxValue)]
     public int TagIndexCapacity { get; set; } = 8192;
-
-    public bool EnableStaleWhileRevalidate { get; set; } = true;
 }

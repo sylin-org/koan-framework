@@ -69,9 +69,11 @@ internal sealed class CacheClient : ICacheClient
 
     public ICacheEntryBuilder<T> CreateEntry<T>(CacheKey key)
     {
+        // Per ARCH-0078: default consistency is Strict. Callers opt into SWR via .AllowStaleFor(...)
+        // on the builder, or via [Cacheable(AllowStaleForSeconds = N)] at the entity level.
         var options = new CacheEntryOptions
         {
-            Consistency = CacheConsistencyMode.StaleWhileRevalidate,
+            Consistency = CacheConsistencyMode.Strict,
             SingleflightTimeout = _options.CurrentValue.DefaultSingleflightTimeout
         };
 

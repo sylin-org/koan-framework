@@ -25,7 +25,6 @@ public static class CacheConstants
         {
             public const string Section = "Cache:Memory";
             public const string TagIndexCapacity = "Cache:Memory:TagIndexCapacity";
-            public const string EnableStaleWhileRevalidate = "Cache:Memory:EnableStaleWhileRevalidate";
         }
     }
 
