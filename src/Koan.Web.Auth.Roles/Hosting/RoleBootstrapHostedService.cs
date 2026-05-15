@@ -43,7 +43,8 @@ internal sealed class RoleBootstrapHostedService(
                 }
             }
 
-            // 2) Admin bootstrap gates (FirstUser/ClaimMatch) are enforced at attribution time; nothing to do here.
+            // Admin bootstrap (FirstUser/ClaimMatch) is now an IKoanAuthEventContributor
+            // (Contributors.AdminBootstrapContributor) running at sign-in. See WEB-0065.
         }
         catch (Exception ex)
         {

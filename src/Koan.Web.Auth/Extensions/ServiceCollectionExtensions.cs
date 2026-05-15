@@ -1,4 +1,6 @@
 using System;
+using System.Reflection;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -8,7 +10,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Koan.Core;
 using Koan.Core.Modules;
+using Koan.Web.Auth.Contributors;
 using Koan.Web.Auth.Domain;
+using Koan.Web.Auth.Hosting;
 using Koan.Web.Auth.Infrastructure;
 using Koan.Web.Auth.Options;
 using Koan.Web.Auth.Providers;
@@ -21,6 +25,7 @@ public static class ServiceCollectionExtensions
     {
         // Bind from configuration by section path at runtime (no IConfiguration required here)
         services.AddKoanOptions<AuthOptions>(AuthOptions.SectionPath);
+        services.AddKoanOptions<AuthLifecycleOptions>(AuthLifecycleOptions.SectionPath);
 
         services.AddHttpClient();
 
@@ -36,6 +41,14 @@ public static class ServiceCollectionExtensions
         // role-gated UI on first paint without a probe round-trip. Use TryAdd so a host can swap
         // the projection (e.g. to redact email or omit custom claims) before this call lands.
         services.TryAddSingleton<ICurrentUserProjector, DefaultCurrentUserProjector>();
+
+        // Event-contributor pipeline (WEB-0065). Scan loaded assemblies for IKoanAuthEventContributor
+        // implementations and register them as scoped (so they can depend on per-request services such
+        // as DB sessions). AuthEventDispatcher composes the list in Priority order. Apps add a
+        // contributor by simply implementing the interface — no DI registration call required.
+        DiscoverAndRegisterAuthEventContributors(services);
+        services.TryAddScoped<AuthEventDispatcher>();
+        services.AddHostedService<AuthBootstrapHostedService>();
 
         // Ensure a default cookie scheme is registered so the centralized challenge/callback can sign users in.
         // External provider handlers (OIDC/OAuth2) are not registered here; flows are handled centrally by AuthController.
@@ -56,7 +69,6 @@ public static class ServiceCollectionExtensions
                 o.Cookie.Name = ".AspNetCore.Koan.cookie";
                 o.SlidingExpiration = true;
 
-                // Avoid HTML redirects for XHR/API callers (send proper 401/403)
                 o.Events = new CookieAuthenticationEvents
                 {
                     OnRedirectToLogin = ctx =>
@@ -86,10 +98,85 @@ public static class ServiceCollectionExtensions
                         }
                         ctx.Response.Redirect(ctx.RedirectUri);
                         return Task.CompletedTask;
+                    },
+                    // OnSigningIn / OnSigningOut: framework owns these slots. They dispatch through
+                    // AuthEventDispatcher to every registered IKoanAuthEventContributor in Priority
+                    // order. Applications that previously assigned o.Events.OnSigningIn directly must
+                    // migrate that logic into a contributor (see WEB-0065 ADR). Overwriting these via
+                    // a later PostConfigure will break the lifecycle pipeline.
+                    OnSigningIn = async ctx =>
+                    {
+                        var principal = ctx.Principal;
+                        if (principal?.Identity is not ClaimsIdentity identity) return;
+
+                        var dispatcher = ctx.HttpContext.RequestServices.GetService<AuthEventDispatcher>();
+                        if (dispatcher is null) return;
+
+                        var provider = ResolveProviderFromPath(ctx.HttpContext.Request.Path.Value);
+                        var signInCtx = new AuthSignInContext
+                        {
+                            Provider = provider,
+                            Identity = identity,
+                            Services = ctx.HttpContext.RequestServices,
+                            HttpContext = ctx.HttpContext,
+                        };
+                        await dispatcher.DispatchSignIn(signInCtx, ctx.HttpContext.RequestAborted);
+
+                        if (signInCtx.RejectReason is not null)
+                        {
+                            // Outer middleware can read the rejection marker from HttpContext.Items to
+                            // translate it into a redirect or distinct response.
+                            ctx.HttpContext.Items[AuthLifecycleMarkers.SignInRejected] = signInCtx.RejectReason;
+                            ctx.Principal = new ClaimsPrincipal(new ClaimsIdentity());
+                        }
+                    },
+                    OnSigningOut = async ctx =>
+                    {
+                        var dispatcher = ctx.HttpContext.RequestServices.GetService<AuthEventDispatcher>();
+                        if (dispatcher is null) return;
+                        var userId = ctx.HttpContext.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                            ?? ctx.HttpContext.User?.FindFirst("sub")?.Value;
+                        var signOutCtx = new AuthSignOutContext(userId, ctx.HttpContext.RequestServices, ctx.HttpContext);
+                        await dispatcher.DispatchSignOut(signOutCtx, ctx.HttpContext.RequestAborted);
                     }
                 };
             });
         return services;
+    }
+
+    /// <summary>
+    /// Scan loaded assemblies for non-abstract <see cref="IKoanAuthEventContributor"/> types and
+    /// register each as a scoped service. Follows the same scan-tolerant pattern used elsewhere in
+    /// Koan (skips assemblies that fail <see cref="Assembly.GetTypes"/>, swallows individual type
+    /// failures). Idempotent: <see cref="ServiceCollectionDescriptorExtensions.TryAddEnumerable(IServiceCollection, ServiceDescriptor)"/>
+    /// ensures the same concrete type is not registered twice.
+    /// </summary>
+    private static void DiscoverAndRegisterAuthEventContributors(IServiceCollection services)
+    {
+        var contract = typeof(IKoanAuthEventContributor);
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            Type[] types;
+            try { types = assembly.GetTypes(); }
+            catch (ReflectionTypeLoadException ex) { types = ex.Types.Where(t => t is not null).Select(t => t!).ToArray(); }
+            catch { continue; }
+
+            foreach (var type in types)
+            {
+                if (type.IsAbstract || type.IsInterface) continue;
+                if (!contract.IsAssignableFrom(type)) continue;
+                services.TryAddEnumerable(ServiceDescriptor.Scoped(contract, type));
+            }
+        }
+    }
+
+    private static string? ResolveProviderFromPath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return null;
+        // Koan's OAuth callback route is /auth/{provider}/callback. Other sign-in paths (cookie refresh,
+        // programmatic SignInAsync) may not match — provider is null there, which is fine.
+        var match = AuthLifecycleConstants.CallbackPathRegex.Match(path);
+        return match.Success ? match.Groups[1].Value : null;
     }
 
     // Minimal copy of the WantsJson heuristic (kept internal to avoid API surfacing)

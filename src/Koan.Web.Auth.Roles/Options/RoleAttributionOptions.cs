@@ -1,41 +1,45 @@
 namespace Koan.Web.Auth.Roles.Options;
 
+/// <summary>
+/// Configuration for the role-management surface in <c>Koan.Web.Auth.Roles</c>. After WEB-0065
+/// (auth event contributor pipeline), this options shape is purely about <i>data seeding and
+/// normalization</i> for the role admin surface — it no longer drives per-request role attribution.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Bound at <c>Koan:Web:Auth:Roles</c>. Apps that previously configured per-request attribution
+/// options (claim keys, dev fallback, max caps, role-list path, bootstrap mode) should migrate:
+/// </para>
+/// <list type="bullet">
+/// <item>Role-list allow/revoke file → <c>Koan:Web:Auth:Lifecycle:RoleListFile</c> in <c>Koan.Web.Auth</c></item>
+/// <item>FirstUser / ClaimMatch admin bootstrap → <c>Koan:Web:Auth:Lifecycle:AdminBootstrap</c> in <c>Koan.Web.Auth</c></item>
+/// <item>Claim keys / dev fallback / caps: removed; replaced by application-defined contributors</item>
+/// </list>
+/// </remarks>
 public sealed class RoleAttributionOptions
 {
     public const string SectionPath = "Koan:Web:Auth:Roles";
 
-    public ClaimKeyOptions ClaimKeys { get; set; } = new();
-    public AliasOptions Aliases { get; set; } = new();
-    public bool EmitPermissionClaims { get; set; } = true;
-    public int MaxRoles { get; set; } = 256;
-    public int MaxPermissions { get; set; } = 1024;
-    public DevFallbackOptions DevFallback { get; set; } = new();
-    public BootstrapOptions Bootstrap { get; set; } = new();
-    public RoleListOptions RoleList { get; set; } = new();
-    // Import/seed guardrail: allow seeding in Production when true (disabled by default)
+    /// <summary>
+    /// Production guardrail for the seeding hosted service. When <see langword="false"/>
+    /// (default), the seeder refuses to populate empty role/alias/policy-binding stores in
+    /// Production environments. Set <see langword="true"/> in deliberately-seeded environments
+    /// or use a deployment-time admin import call instead.
+    /// </summary>
     public bool AllowSeedingInProduction { get; set; } = false;
 
-    // Optional seed/template content read from configuration for import/export flows
-    public List<RoleSeed> Roles { get; set; } = new();
-    public List<RolePolicyBindingSeed> PolicyBindings { get; set; } = new();
+    /// <summary>
+    /// Alias map used by <see cref="Services.DefaultRoleConfigSnapshotProvider"/> as the initial
+    /// in-memory snapshot before the DB-backed alias store is consulted. Also seeded into
+    /// <c>RoleAlias</c> entities on first run.
+    /// </summary>
+    public AliasOptions Aliases { get; set; } = new();
 
-    public sealed class ClaimKeyOptions
-    {
-        // Includes ClaimTypes.Role so AspNetCore-standard role claims (which Koan.Web.Auth's
-        // AuthController emits via UserInfoMapper, and which most OIDC providers issue under the
-        // `roles` scope) are picked up by attribution. Without it, providers that asserted roles
-        // would be ignored and DevFallback would inject "reader" on every authenticated request.
-        public string[] Roles { get; set; } = new[]
-        {
-            "roles",
-            "role",
-            "groups",
-            System.Security.Claims.ClaimTypes.Role,
-            Infrastructure.RoleClaimConstants.KoanRole,
-            Infrastructure.RoleClaimConstants.KoanRoles,
-        };
-        public string[] Permissions { get; set; } = new[] { Infrastructure.RoleClaimConstants.KoanPermission, "permissions", "scope" };
-    }
+    /// <summary>Role catalog seeded into the DB on first run.</summary>
+    public List<RoleSeed> Roles { get; set; } = new();
+
+    /// <summary>Policy bindings (e.g. <c>auth.roles.admin</c> → <c>role:admin</c>) seeded on first run.</summary>
+    public List<RolePolicyBindingSeed> PolicyBindings { get; set; } = new();
 
     public sealed class AliasOptions
     {
@@ -50,22 +54,6 @@ public sealed class RoleAttributionOptions
         };
     }
 
-    public sealed class DevFallbackOptions
-    {
-        public bool Enabled { get; set; } = true;
-        public string Role { get; set; } = "reader";
-    }
-
-    public sealed class BootstrapOptions
-    {
-        // Modes: None | FirstUser | ClaimMatch
-        public string Mode { get; set; } = "None";
-        // ClaimMatch helpers
-        public string[] AdminEmails { get; set; } = [];
-        public string ClaimType { get; set; } = System.Security.Claims.ClaimTypes.Email;
-        public string[] ClaimValues { get; set; } = [];
-    }
-
     public sealed class RoleSeed
     {
         public string Id { get; set; } = "";
@@ -77,31 +65,5 @@ public sealed class RoleAttributionOptions
     {
         public string Id { get; set; } = ""; // policy name
         public string Requirement { get; set; } = ""; // e.g., role:admin or perm:*
-    }
-
-    /// <summary>
-    /// Email-keyed role list read from a JSON file at attribution time. Operations are explicit:
-    /// <c>allow</c> adds roles to the principal; <c>revoke</c> strips roles from the principal
-    /// (runs <i>after</i> claim extraction + aliases, so it overrides what the IdP asserted).
-    /// An email not present in either section is a no-op — removing from <c>allow</c> does not
-    /// revoke. Empty <see cref="FilePath"/> disables the feature (default).
-    /// </summary>
-    /// <remarks>
-    /// File shape:
-    /// <code>
-    /// {
-    ///   "allow":  { "user@example.com": ["admin", "curator"] },
-    ///   "revoke": { "ex-admin@example.com": ["admin"] }
-    /// }
-    /// </code>
-    /// Email lookup is case-insensitive and matches <see cref="System.Security.Claims.ClaimTypes.Email"/>.
-    /// </remarks>
-    public sealed class RoleListOptions
-    {
-        /// <summary>Absolute path to the JSON role list file. Empty disables the contributor.</summary>
-        public string FilePath { get; set; } = "";
-
-        /// <summary>How often the contributor may stat() the file to pick up edits. mtime-based reload.</summary>
-        public TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(30);
     }
 }

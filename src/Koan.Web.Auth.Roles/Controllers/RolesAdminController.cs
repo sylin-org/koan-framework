@@ -18,11 +18,10 @@ public sealed class RolesAdminController : ControllerBase
     private readonly IRolePolicyBindingStore _bindings;
     private readonly IOptionsMonitor<RoleAttributionOptions> _options;
     private readonly IHostEnvironment _env;
-    private readonly IRoleAttributionCache _cache;
     private readonly IRoleConfigSnapshotProvider _snapshotProvider;
 
-    public RolesAdminController(IRoleStore roles, IRoleAliasStore aliases, IRolePolicyBindingStore bindings, IOptionsMonitor<RoleAttributionOptions> options, IHostEnvironment env, IRoleAttributionCache cache, IRoleConfigSnapshotProvider snapshotProvider)
-    { _roles = roles; _aliases = aliases; _bindings = bindings; _options = options; _env = env; _cache = cache; _snapshotProvider = snapshotProvider; }
+    public RolesAdminController(IRoleStore roles, IRoleAliasStore aliases, IRolePolicyBindingStore bindings, IOptionsMonitor<RoleAttributionOptions> options, IHostEnvironment env, IRoleConfigSnapshotProvider snapshotProvider)
+    { _roles = roles; _aliases = aliases; _bindings = bindings; _options = options; _env = env; _snapshotProvider = snapshotProvider; }
 
     // Roles
     [HttpGet]
@@ -92,12 +91,7 @@ public sealed class RolesAdminController : ControllerBase
                     {
                         Roles = new
                         {
-                            ClaimKeys = opt.ClaimKeys,
                             Aliases = opt.Aliases,
-                            EmitPermissionClaims = opt.EmitPermissionClaims,
-                            MaxRoles = opt.MaxRoles,
-                            MaxPermissions = opt.MaxPermissions,
-                            DevFallback = opt.DevFallback,
                             Roles = roles.Select(r => new RoleAttributionOptions.RoleSeed { Id = r.Id, Display = r.Display, Description = r.Description }).ToArray(),
                             PolicyBindings = bindings.Select(b => new RoleAttributionOptions.RolePolicyBindingSeed { Id = b.Id, Requirement = b.Requirement }).ToArray()
                         }
@@ -190,8 +184,7 @@ public sealed class RolesAdminController : ControllerBase
         foreach (var k in toDeleteBindings)
             await _bindings.Delete(k, ct);
 
-    await _snapshotProvider.Reload(ct);
-    _cache.Clear(); // invalidate attribution cache
+        await _snapshotProvider.Reload(ct);
         return Ok(new { applied = true, diff });
     }
 
@@ -199,7 +192,6 @@ public sealed class RolesAdminController : ControllerBase
     public async Task<IActionResult> Reload(CancellationToken ct)
     {
         await _snapshotProvider.Reload(ct);
-        _cache.Clear();
         return NoContent();
     }
 

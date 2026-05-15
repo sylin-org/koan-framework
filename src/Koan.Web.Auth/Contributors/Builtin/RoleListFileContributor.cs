@@ -3,33 +3,40 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Koan.Web.Auth.Roles.Contracts;
-using Koan.Web.Auth.Roles.Options;
+using Koan.Web.Auth.Options;
 
-namespace Koan.Web.Auth.Roles.Contributors;
+namespace Koan.Web.Auth.Contributors.Builtin;
 
 /// <summary>
-/// Applies an email-keyed role list to the principal: <c>allow</c> entries add roles,
-/// <c>revoke</c> entries strip roles. Allow and revoke are explicit, separate operations —
-/// removing an email from <c>allow</c> does NOT revoke (you must add to <c>revoke</c> to do that).
+/// Built-in <see cref="IKoanAuthEventContributor"/> that applies an email-keyed allow/revoke role
+/// list (loaded from a JSON file on disk) to the principal during sign-in. Replaces the previous
+/// per-request <c>RoleListContributor</c> in the Roles module — semantics are unchanged for the
+/// file shape; what changed is the trigger (sign-in event rather than every claims transformation).
 /// </summary>
 /// <remarks>
-/// File shape:
-/// <code>
-/// {
-///   "allow":  { "user@example.com": ["admin", "curator"] },
-///   "revoke": { "ex-admin@example.com": ["admin"] }
-/// }
-/// </code>
-/// Singleton; safe under concurrent attribution. Caches the parsed file keyed on mtime + size,
-/// re-stats at most every <see cref="RoleAttributionOptions.RoleListOptions.PollInterval"/>.
-/// Missing file, parse errors, and missing claims are soft failures — the pipeline continues.
+/// <para>
+/// <b>Priority</b> is positive (50) so it runs AFTER application contributors that read
+/// authoritative role state from a data store (e.g. a per-user <c>Roles</c> field). This makes
+/// <c>revoke</c> work as documented — it can strip a role that an upstream contributor stamped.
+/// </para>
+/// <para>
+/// Empty <c>FilePath</c> disables the contributor (default). Missing file, parse errors, and
+/// missing email claims are soft failures — they log a warning and contribute nothing.
+/// </para>
+/// <para>
+/// Singleton-like caching: the parsed file is cached by mtime + size, re-stat'd at the configured
+/// poll interval at most. Multiple concurrent sign-ins share a single parse.
+/// </para>
 /// </remarks>
-public sealed class RoleListContributor : IRoleMapContributor
+public sealed class RoleListFileContributor : IKoanAuthEventContributor
 {
-    private readonly IOptionsMonitor<RoleAttributionOptions> _options;
-    private readonly ILogger<RoleListContributor> _logger;
+    public int Priority => 50;
 
+    private readonly IOptionsMonitor<AuthLifecycleOptions> _options;
+    private readonly ILogger<RoleListFileContributor> _logger;
+
+    // mtime-based cache shared across requests. Lock-guarded to keep the I/O path single-flight
+    // while the in-flight check itself remains cheap.
     private readonly object _gate = new();
     private string _cachedPath = "";
     private long _cachedSize = -1;
@@ -37,24 +44,27 @@ public sealed class RoleListContributor : IRoleMapContributor
     private DateTime _lastStatUtc = DateTime.MinValue;
     private RoleListFile _file = RoleListFile.Empty;
 
-    public RoleListContributor(IOptionsMonitor<RoleAttributionOptions> options, ILogger<RoleListContributor> logger)
+    public RoleListFileContributor(IOptionsMonitor<AuthLifecycleOptions> options, ILogger<RoleListFileContributor> logger)
     {
         _options = options;
         _logger = logger;
     }
 
-    public Task Contribute(ClaimsPrincipal principal, ISet<string> roles, ISet<string> permissions, RoleAttributionContext? ctx, CancellationToken ct)
+    public Task OnSignIn(AuthSignInContext ctx, CancellationToken ct)
     {
+        var cfg = _options.CurrentValue.RoleListFile;
+        var path = cfg?.FilePath;
+        if (string.IsNullOrWhiteSpace(path)) return Task.CompletedTask;
+
         try
         {
-            var cfg = _options.CurrentValue.RoleList;
-            var path = cfg?.FilePath;
-            if (string.IsNullOrWhiteSpace(path)) return Task.CompletedTask;
-
             var file = GetFile(path, cfg!.PollInterval);
             if (file.Allow.Count == 0 && file.Revoke.Count == 0) return Task.CompletedTask;
 
-            foreach (var c in principal.FindAll(ClaimTypes.Email))
+            // Email is the lookup key. We read it from the identity being signed in — this is the
+            // post-mapping identity, so it reflects whatever upstream contributors stamped, plus
+            // the email claim that the OAuth provider asserted.
+            foreach (var c in ctx.Identity.FindAll(ClaimTypes.Email))
             {
                 var email = c.Value;
                 if (string.IsNullOrWhiteSpace(email)) continue;
@@ -63,21 +73,31 @@ public sealed class RoleListContributor : IRoleMapContributor
                 {
                     foreach (var role in grants)
                     {
-                        if (!string.IsNullOrWhiteSpace(role)) roles.Add(role);
+                        if (string.IsNullOrWhiteSpace(role)) continue;
+                        if (!ctx.Identity.HasClaim(ClaimTypes.Role, role))
+                            ctx.Identity.AddClaim(new Claim(ClaimTypes.Role, role));
                     }
                 }
                 if (file.Revoke.TryGetValue(email, out var revokes) && revokes is not null)
                 {
                     foreach (var role in revokes)
                     {
-                        if (!string.IsNullOrWhiteSpace(role)) roles.Remove(role);
+                        if (string.IsNullOrWhiteSpace(role)) continue;
+                        foreach (var match in ctx.Identity.FindAll(ClaimTypes.Role).Where(rc => string.Equals(rc.Value, role, StringComparison.OrdinalIgnoreCase)).ToArray())
+                            ctx.Identity.TryRemoveClaim(match);
                     }
                 }
             }
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Koan.Web.Auth.Roles: role list contributor failed; continuing without mutation");
+            _logger.LogWarning(ex,
+                "Koan.Web.Auth: RoleListFileContributor failed for {UserId} with path {Path}; continuing pipeline",
+                ctx.UserId, path);
         }
         return Task.CompletedTask;
     }
@@ -101,7 +121,9 @@ public sealed class RoleListContributor : IRoleMapContributor
             {
                 if (pathChanged || _cachedSize != -1)
                 {
-                    _logger.LogWarning("Koan.Web.Auth.Roles: role list file not found at {Path}; grants disabled until file appears", path);
+                    _logger.LogWarning(
+                        "Koan.Web.Auth: role list file not found at {Path}; allow/revoke disabled until file appears",
+                        path);
                 }
                 _cachedPath = path;
                 _cachedSize = -1;
@@ -125,12 +147,14 @@ public sealed class RoleListContributor : IRoleMapContributor
                 _cachedSize = size;
                 _cachedMtimeUtc = mtime;
                 _logger.LogInformation(
-                    "Koan.Web.Auth.Roles: role list loaded from {Path} (allow={Allow}, revoke={Revoke})",
+                    "Koan.Web.Auth: role list loaded from {Path} (allow={Allow}, revoke={Revoke})",
                     path, _file.Allow.Count, _file.Revoke.Count);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Koan.Web.Auth.Roles: failed to parse role list at {Path}; keeping previous file (allow={Allow}, revoke={Revoke})", path, _file.Allow.Count, _file.Revoke.Count);
+                _logger.LogWarning(ex,
+                    "Koan.Web.Auth: failed to parse role list at {Path}; keeping previous file (allow={Allow}, revoke={Revoke})",
+                    path, _file.Allow.Count, _file.Revoke.Count);
             }
             return _file;
         }
