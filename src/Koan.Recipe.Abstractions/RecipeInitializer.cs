@@ -19,7 +19,10 @@ internal sealed class RecipeInitializer : IKoanInitializer
             catch { /* ignore */ }
         }
 
-        // Defer application until a ServiceProvider exists: we need IConfiguration/IHostEnvironment
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanInitializer>(sp => new RecipeApplier()));
+        // Defer application until a ServiceProvider exists: we need IConfiguration/IHostEnvironment.
+        // Uses Singleton<TService, TImplementation>(factory) form so TryAddEnumerable can correctly
+        // dedup the descriptor — the plain Singleton<TService>(factory) overload produces
+        // ImplementationType == ServiceType, which TryAddEnumerable rejects as indistinguishable.
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanInitializer, RecipeApplier>(sp => new RecipeApplier()));
     }
 }
