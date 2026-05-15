@@ -106,6 +106,13 @@ public static class CacheServiceCollectionExtensions
 
         services.AddHostedService<CachePolicyBootstrapper>();
 
+        // Health check — registered against the standard ASP.NET Core IHealthCheck registry.
+        // Kubernetes / Aspire readiness probes pick it up automatically.
+        services.AddHealthChecks().AddCheck<CacheHealthCheck>(
+            name: "koan-cache",
+            failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Unhealthy,
+            tags: new[] { "cache", "koan" });
+
         return services;
     }
 
