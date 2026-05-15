@@ -9,6 +9,7 @@ using Koan.Cache.Abstractions.Primitives;
 using Koan.Cache.Abstractions.Stores;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Instructions;
+using Koan.Data.Core;
 using Koan.Data.Core.Schema;
 using Microsoft.Extensions.Logging;
 
@@ -79,7 +80,9 @@ internal sealed class CachedRepository<TEntity, TKey> :
 
     public async Task<TEntity?> Get(TKey id, CancellationToken ct = default)
     {
-        if (_entityPolicy.Strategy is CacheStrategy.NoCache or CacheStrategy.SetOnly or CacheStrategy.Invalidate)
+        var effectiveStrategy = ResolveEffectiveStrategy();
+
+        if (effectiveStrategy is CacheStrategy.NoCache or CacheStrategy.SetOnly or CacheStrategy.Invalidate)
         {
             return await _inner.Get(id, ct);
         }
@@ -90,7 +93,7 @@ internal sealed class CachedRepository<TEntity, TKey> :
         }
 
         var options = _entityPolicy.ToOptions();
-        switch (_entityPolicy.Strategy)
+        switch (effectiveStrategy)
         {
             case CacheStrategy.GetOrSet:
                 return await _cacheClient.GetOrAddAsync<TEntity>(key, async innerCt =>
@@ -113,6 +116,23 @@ internal sealed class CachedRepository<TEntity, TKey> :
             default:
                 return await _inner.Get(id, ct);
         }
+    }
+
+    /// <summary>
+    /// Resolve the effective read-side strategy by combining the policy's declared Strategy
+    /// with any per-request <c>EntityContext.CacheBehavior</c> override. Writes (Upsert/Delete)
+    /// always invalidate and are unaffected by this.
+    /// </summary>
+    private CacheStrategy ResolveEffectiveStrategy()
+    {
+        var behavior = EntityContext.Current?.CacheBehavior;
+        return behavior switch
+        {
+            CacheBehavior.Bypass => CacheStrategy.NoCache,
+            CacheBehavior.Refresh => CacheStrategy.SetOnly,
+            CacheBehavior.ReadOnly => CacheStrategy.GetOnly,
+            _ => _entityPolicy.Strategy
+        };
     }
 
     public Task<IReadOnlyList<TEntity?>> GetMany(IEnumerable<TKey> ids, CancellationToken ct = default)
@@ -373,10 +393,17 @@ internal sealed class CachedRepository<TEntity, TKey> :
 
     private bool TryBuildEntityKey(TEntity? entity, object? id, out CacheKey key)
     {
+        // Ambient context for the key template. {Partition} and {Source} are pulled from
+        // EntityContext so the same Id under different partitions / data sources produces
+        // distinct keys (correctness — without this, multi-partition deployments collide).
+        var ctx = EntityContext.Current;
         var ambient = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
         {
             ["Id"] = id,
-            ["Key"] = id
+            ["Key"] = id,
+            ["TypeName"] = _entityName,
+            ["Partition"] = string.IsNullOrWhiteSpace(ctx?.Partition) ? "_" : ctx.Partition,
+            ["Source"] = string.IsNullOrWhiteSpace(ctx?.Source) ? "_" : ctx.Source,
         };
 
         if (entity is not null)

@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Koan.Cache.Abstractions.Policies;
 using Koan.Core.Hosting.App;
 using Koan.Data.Core.Transactions;
 using Microsoft.Extensions.DependencyInjection;
@@ -35,6 +36,12 @@ public static class EntityContext
         public string? Transaction { get; init; }
 
         /// <summary>
+        /// Per-request cache behavior override. Read-side only — writes always invalidate.
+        /// Null = honor the policy's declared strategy.
+        /// </summary>
+        public CacheBehavior? CacheBehavior { get; init; }
+
+        /// <summary>
         /// Transaction coordinator instance for deferred execution.
         /// Used by entity and vector operations to participate in transactions.
         /// </summary>
@@ -47,12 +54,14 @@ public static class EntityContext
         /// <param name="adapter">Adapter override (e.g., "sqlite")</param>
         /// <param name="partition">Storage partition suffix (e.g., "archive")</param>
         /// <param name="transaction">Transaction name for coordination (e.g., "save-batch")</param>
+        /// <param name="cacheBehavior">Per-request cache behavior override.</param>
         /// <exception cref="InvalidOperationException">Thrown when both source and adapter are specified</exception>
         public ContextState(
             string? source = null,
             string? adapter = null,
             string? partition = null,
-            string? transaction = null)
+            string? transaction = null,
+            CacheBehavior? cacheBehavior = null)
         {
             // Critical constraint: source and adapter are mutually exclusive
             if (!string.IsNullOrWhiteSpace(source) && !string.IsNullOrWhiteSpace(adapter))
@@ -63,6 +72,7 @@ public static class EntityContext
             Adapter = adapter;
             Partition = partition;
             Transaction = transaction;
+            CacheBehavior = cacheBehavior;
         }
 
         internal void ValidatePartitionName()
@@ -110,6 +120,7 @@ public static class EntityContext
         string? adapter = null,
         string? partition = null,
         string? transaction = null,
+        CacheBehavior? cacheBehavior = null,
         bool preserveTransaction = true)
     {
         var prev = _current.Value;
@@ -128,8 +139,9 @@ public static class EntityContext
         var effectiveTransaction = preserveTransaction
             ? transaction ?? prev?.Transaction
             : transaction;
+        var effectiveCacheBehavior = cacheBehavior ?? prev?.CacheBehavior;
 
-        var newContext = new ContextState(effectiveSource, effectiveAdapter, effectivePartition, effectiveTransaction);
+        var newContext = new ContextState(effectiveSource, effectiveAdapter, effectivePartition, effectiveTransaction, effectiveCacheBehavior);
         // Note: Partition name validation is deferred to adapters, which format partition identifiers
         // (e.g., SQLite may normalize GUID "019a..." to an adapter-specific value)
         // newContext.ValidatePartitionName();
@@ -167,6 +179,23 @@ public static class EntityContext
     /// Convenience method to set only partition routing.
     /// </summary>
     public static IDisposable Partition(string partition) => With(partition: partition);
+
+    /// <summary>
+    /// Push a cache behavior override onto the AsyncLocal stack for the duration of the scope.
+    /// Read-side only — writes (Upsert/Delete) always invalidate regardless of override.
+    /// </summary>
+    public static IDisposable WithCacheBehavior(CacheBehavior behavior) => With(cacheBehavior: behavior);
+
+    /// <summary>
+    /// Push <see cref="CacheBehavior.Bypass"/>: skip cache reads, hit the DB, do not populate.
+    /// Writes within the scope still invalidate cache.
+    /// </summary>
+    public static IDisposable NoCache() => WithCacheBehavior(CacheBehavior.Bypass);
+
+    /// <summary>
+    /// Push <see cref="CacheBehavior.Refresh"/>: skip cache reads, hit the DB, repopulate from fresh value.
+    /// </summary>
+    public static IDisposable RefreshCache() => WithCacheBehavior(CacheBehavior.Refresh);
 
     /// <summary>
     /// Start a named transaction. Operations will be tracked and committed/rolled back atomically.
