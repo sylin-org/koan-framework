@@ -1,10 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
 using Koan.Cache.Abstractions.Primitives;
 using Koan.Cache.Abstractions.Stores;
-using Koan.Cache.Extensions;
+using Koan.Core;
 using Koan.Testing.Integration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -13,23 +14,29 @@ namespace Koan.Tests.Cache.CrossEngine.Specs;
 
 /// <summary>
 /// Abstraction-proof scenarios: every behavior in this class is part of the
-/// <see cref="ICacheClient"/> contract — adapter-independent. Subclasses bind a specific
-/// engine via <see cref="ConfigureAdapter"/>; xUnit runs the inherited <c>[Fact]</c> methods
-/// against each subclass's engine. If both subclasses pass the same scenarios with identical
-/// observable behavior, the abstraction holds.
+/// <see cref="ICacheClient"/> contract — adapter-independent. Subclasses select an engine
+/// via <see cref="LocalProvider"/> (configuration only — no service-collection wiring);
+/// xUnit runs the inherited <c>[Fact]</c> methods against each subclass's engine. If both
+/// subclasses pass the same scenarios with identical observable behavior, the abstraction
+/// holds AND <b>Reference = Intent</b> works: the only thing that changes between subclasses
+/// is one config value.
 /// </summary>
 /// <remarks>
 /// <para>
-/// What this proves: the cache pillar's surface (<c>ICacheClient.CreateEntry&lt;T&gt;(key)</c>,
-/// terminal verbs <c>Get</c>/<c>Set</c>/<c>Remove</c>/<c>Exists</c>/<c>Touch</c>, TTL
-/// semantics, key isolation) is honored identically by the Memory and Sqlite stores.
-/// Adapter-specific extras (persistence across host restart, on-disk file shape) belong in
-/// adapter-specific specs — those tests would fail meaningfully on the wrong engine, so
-/// they're NOT part of this canon.
+/// <b>Koan-canonical wiring:</b> the spec calls <c>services.AddKoan()</c> (reflective
+/// discovery) — never <c>AddKoanCache()</c> or <c>new SomeAutoRegistrar().Initialize(...)</c>.
+/// The test project references both <c>Koan.Cache</c> (Memory default) AND
+/// <c>Koan.Cache.Adapter.Sqlite</c>; both adapters' <c>KoanAutoRegistrar</c>s are picked up
+/// by reflection. <c>Koan:Cache:LocalProvider</c> tells the topology resolver which one wins.
 /// </para>
 /// <para>
-/// What this does NOT prove: distributed coherence (cross-node invalidation), L2 fallback
-/// semantics, or anything requiring a real Redis. Those need their own multi-host harness.
+/// What this proves: the cache pillar's surface (<c>ICacheClient.CreateEntry&lt;T&gt;(key)</c>,
+/// terminal verbs, TTL semantics, key isolation) is honored identically by the Memory and
+/// SQLite stores AND the package-reference-driven discovery picks them up correctly.
+/// </para>
+/// <para>
+/// What this does NOT prove: distributed coherence, L2 fallback semantics, Redis. Those
+/// need their own multi-host harness.
 /// </para>
 /// </remarks>
 public abstract class CrossEngineCacheBehaviorSpecBase : IAsyncDisposable
@@ -37,31 +44,43 @@ public abstract class CrossEngineCacheBehaviorSpecBase : IAsyncDisposable
     private IntegrationHost? _host;
 
     /// <summary>
-    /// Subclass wires its engine here. Called inside <c>KoanIntegrationHost.Configure().ConfigureServices(...)</c>;
-    /// the universal cache infrastructure (<c>AddKoanCache</c>, serializers, topology) is added
-    /// before this runs.
+    /// Engine name as <c>ICacheStore.Name</c> exposes it. Used as the value of
+    /// <c>Koan:Cache:LocalProvider</c> — the ONLY thing that differs between subclasses.
     /// </summary>
-    protected abstract void ConfigureAdapter(IServiceCollection services);
+    protected abstract string LocalProvider { get; }
 
     /// <summary>
-    /// Human-readable engine name surfaced in assertion messages. Helps disambiguate
-    /// "which subclass failed" in test output.
+    /// Subclasses may publish additional configuration their engine needs (e.g., SQLite needs
+    /// a database path). Returns an enumerable of (key, value) pairs added to the configuration
+    /// builder via <c>WithSetting</c>. Default is empty — pure-default engines (Memory) need
+    /// nothing.
     /// </summary>
-    protected abstract string EngineName { get; }
+    protected virtual IEnumerable<(string Key, string Value)> ExtraSettings()
+        => Array.Empty<(string, string)>();
 
-    /// <summary>
-    /// Build the host once per test method (xUnit constructs the subclass once per <c>[Fact]</c>).
-    /// </summary>
     private async ValueTask<ICacheClient> BuildClient(CancellationToken ct)
     {
-        _host = await KoanIntegrationHost.Configure()
-            .ConfigureServices(services =>
-            {
-                services.AddLogging();
-                services.AddKoanCache();
-                ConfigureAdapter(services);
-            })
+        var builder = KoanIntegrationHost.Configure()
+            .WithSetting("Koan:Cache:LocalProvider", LocalProvider);
+
+        foreach (var (key, value) in ExtraSettings())
+            builder = builder.WithSetting(key, value);
+
+        _host = await builder
+            // Reference = Intent: AddKoan() does reflective auto-registrar discovery across
+            // every referenced Koan.* assembly. No AddKoanCache, no manual registrar init.
+            .ConfigureServices(services => services.AddKoan())
             .StartAsync(ct);
+
+        // Sanity (public API only): the adapter's auto-registrar must have fired — i.e.,
+        // Reference = Intent worked, the store is present in the registry. Without this, a
+        // future refactor that breaks adapter discovery would silently degrade both subclasses
+        // to whatever the default is, and the behavioral tests would still pass.
+        var registry = _host.Services.GetRequiredService<ICacheStoreRegistry>();
+        registry.FindByName(LocalProvider).Should().NotBeNull(
+            $"adapter '{LocalProvider}' must be discovered via Reference = Intent. Either the package " +
+            $"reference is missing from the test csproj or the adapter's KoanAutoRegistrar isn't firing.");
+
         return _host.Services.GetRequiredService<ICacheClient>();
     }
 
@@ -81,7 +100,7 @@ public abstract class CrossEngineCacheBehaviorSpecBase : IAsyncDisposable
         await client.CreateEntry<string>(key).WithAbsoluteTtl(TimeSpan.FromMinutes(5)).Set("hello", ct);
         var value = await client.CreateEntry<string>(key).Get(ct);
 
-        value.Should().Be("hello", $"{EngineName}: Set then Get must return the written value");
+        value.Should().Be("hello", $"{LocalProvider}: Set then Get must return the written value");
     }
 
     [Fact]
@@ -93,7 +112,7 @@ public abstract class CrossEngineCacheBehaviorSpecBase : IAsyncDisposable
 
         var value = await client.CreateEntry<string>(key).Get(ct);
 
-        value.Should().BeNull($"{EngineName}: Get on a never-set key must return null (the abstraction's miss signal)");
+        value.Should().BeNull($"{LocalProvider}: Get on a never-set key must return null (the abstraction's miss signal)");
     }
 
     [Fact]
@@ -104,15 +123,15 @@ public abstract class CrossEngineCacheBehaviorSpecBase : IAsyncDisposable
         var key = new CacheKey($"exists-{Guid.NewGuid():N}");
 
         (await client.CreateEntry<string>(key).Exists(ct))
-            .Should().BeFalse($"{EngineName}: a never-set key must not Exist");
+            .Should().BeFalse($"{LocalProvider}: a never-set key must not Exist");
 
         await client.CreateEntry<string>(key).WithAbsoluteTtl(TimeSpan.FromMinutes(5)).Set("v", ct);
         (await client.CreateEntry<string>(key).Exists(ct))
-            .Should().BeTrue($"{EngineName}: after Set, Exists must return true");
+            .Should().BeTrue($"{LocalProvider}: after Set, Exists must return true");
 
         await client.CreateEntry<string>(key).Remove(ct);
         (await client.CreateEntry<string>(key).Exists(ct))
-            .Should().BeFalse($"{EngineName}: after Remove, Exists must return false");
+            .Should().BeFalse($"{LocalProvider}: after Remove, Exists must return false");
     }
 
     [Fact]
@@ -126,7 +145,7 @@ public abstract class CrossEngineCacheBehaviorSpecBase : IAsyncDisposable
         await client.CreateEntry<string>(key).WithAbsoluteTtl(TimeSpan.FromMinutes(5)).Set("second", ct);
         var value = await client.CreateEntry<string>(key).Get(ct);
 
-        value.Should().Be("second", $"{EngineName}: a second Set against the same key must overwrite");
+        value.Should().Be("second", $"{LocalProvider}: a second Set against the same key must overwrite");
     }
 
     [Fact]
@@ -140,11 +159,11 @@ public abstract class CrossEngineCacheBehaviorSpecBase : IAsyncDisposable
         await client.CreateEntry<string>(keyA).WithAbsoluteTtl(TimeSpan.FromMinutes(5)).Set("alpha", ct);
         await client.CreateEntry<string>(keyB).WithAbsoluteTtl(TimeSpan.FromMinutes(5)).Set("bravo", ct);
 
-        (await client.CreateEntry<string>(keyA).Get(ct)).Should().Be("alpha", $"{EngineName}: key isolation broke (A returned not-alpha)");
-        (await client.CreateEntry<string>(keyB).Get(ct)).Should().Be("bravo", $"{EngineName}: key isolation broke (B returned not-bravo)");
+        (await client.CreateEntry<string>(keyA).Get(ct)).Should().Be("alpha", $"{LocalProvider}: key isolation broke (A returned not-alpha)");
+        (await client.CreateEntry<string>(keyB).Get(ct)).Should().Be("bravo", $"{LocalProvider}: key isolation broke (B returned not-bravo)");
 
         await client.CreateEntry<string>(keyA).Remove(ct);
-        (await client.CreateEntry<string>(keyB).Get(ct)).Should().Be("bravo", $"{EngineName}: removing A must not affect B");
+        (await client.CreateEntry<string>(keyB).Get(ct)).Should().Be("bravo", $"{LocalProvider}: removing A must not affect B");
     }
 
     [Fact]
@@ -157,7 +176,7 @@ public abstract class CrossEngineCacheBehaviorSpecBase : IAsyncDisposable
         // Must not throw — the abstraction treats Remove as idempotent.
         await client.CreateEntry<string>(key).Remove(ct);
         (await client.CreateEntry<string>(key).Exists(ct))
-            .Should().BeFalse($"{EngineName}: Remove on a missing key must remain a no-op");
+            .Should().BeFalse($"{LocalProvider}: Remove on a missing key must remain a no-op");
     }
 
     [Fact]
@@ -171,7 +190,7 @@ public abstract class CrossEngineCacheBehaviorSpecBase : IAsyncDisposable
         await client.CreateEntry<SamplePayload>(key).WithAbsoluteTtl(TimeSpan.FromMinutes(5)).Set(payload, ct);
         var roundTrip = await client.CreateEntry<SamplePayload>(key).Get(ct);
 
-        roundTrip.Should().NotBeNull($"{EngineName}: complex-value round-trip lost the entry");
+        roundTrip.Should().NotBeNull($"{LocalProvider}: complex-value round-trip lost the entry");
         roundTrip!.Id.Should().Be(42);
         roundTrip.Name.Should().Be("Hitchhiker");
         roundTrip.Tags.Should().BeEquivalentTo(new[] { "alpha", "beta" });

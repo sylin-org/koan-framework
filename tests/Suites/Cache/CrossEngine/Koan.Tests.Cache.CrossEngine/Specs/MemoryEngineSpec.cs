@@ -1,20 +1,16 @@
-using Microsoft.Extensions.DependencyInjection;
-
 namespace Koan.Tests.Cache.CrossEngine.Specs;
 
 /// <summary>
-/// Runs <see cref="CrossEngineCacheBehaviorSpecBase"/> against the default Memory store.
-/// No adapter wiring needed — <c>AddKoanCache()</c> registers <c>MemoryCacheStore</c> as
-/// the default L1.
+/// Runs <see cref="CrossEngineCacheBehaviorSpecBase"/> against the Memory store.
 /// </summary>
+/// <remarks>
+/// No extra settings — the Memory store is bundled with <c>Koan.Cache</c> and registers
+/// itself via <c>MemoryAutoRegistrar</c>. <c>Koan:Cache:LocalProvider=memory</c> tells the
+/// topology resolver to pick it even though the higher-priority SQLite adapter is also
+/// referenced by this project (Reference = Intent: both are discovered; configuration
+/// chooses).
+/// </remarks>
 public sealed class MemoryEngineSpec : CrossEngineCacheBehaviorSpecBase
 {
-    protected override string EngineName => "Memory";
-
-    protected override void ConfigureAdapter(IServiceCollection services)
-    {
-        // Intentionally empty — AddKoanCache (called in the base) already registers
-        // MemoryCacheStore. This subclass exists to assert the universal abstraction works
-        // with the framework's default engine.
-    }
+    protected override string LocalProvider => "memory";
 }

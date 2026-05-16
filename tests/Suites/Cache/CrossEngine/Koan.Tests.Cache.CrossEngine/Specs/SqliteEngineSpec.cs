@@ -1,19 +1,18 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
-using Koan.Cache.Adapter.Sqlite.Initialization;
-using Koan.Testing.Integration;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Tests.Cache.CrossEngine.Specs;
 
 /// <summary>
-/// Runs <see cref="CrossEngineCacheBehaviorSpecBase"/> against the SQLite-backed L1 store.
-/// SQLite's adapter has higher priority than Memory, so the topology resolver picks it.
+/// Runs <see cref="CrossEngineCacheBehaviorSpecBase"/> against the SQLite-backed store.
 /// </summary>
 /// <remarks>
-/// Uses a unique temp database file per test method (xUnit constructs the subclass fresh per
-/// <c>[Fact]</c>). Cleanup runs in <c>DisposeAsync</c> via <c>IAsyncDisposable</c> on the base
-/// class, plus a best-effort file delete here.
+/// The SQLite adapter is referenced as a NuGet-style package reference in this project's
+/// csproj — <c>services.AddKoan()</c> picks it up via reflective auto-registrar discovery.
+/// Only configuration distinguishes this spec from <see cref="MemoryEngineSpec"/>: the
+/// <c>LocalProvider</c> pin and the database path. No service-collection wiring, no manual
+/// <c>Initialize(...)</c>. This is the Reference = Intent contract under test.
 /// </remarks>
 public sealed class SqliteEngineSpec : CrossEngineCacheBehaviorSpecBase, IDisposable
 {
@@ -21,23 +20,13 @@ public sealed class SqliteEngineSpec : CrossEngineCacheBehaviorSpecBase, IDispos
         Path.GetTempPath(),
         $"koan-cache-crossengine-{Guid.NewGuid():N}.db");
 
-    protected override string EngineName => "Sqlite";
+    protected override string LocalProvider => "sqlite";
 
-    protected override void ConfigureAdapter(IServiceCollection services)
+    protected override IEnumerable<(string Key, string Value)> ExtraSettings()
     {
-        // The Sqlite adapter reads its database path from configuration. We can't reach the
-        // KoanIntegrationHost.Configure().WithSetting builder from here (it's already been
-        // resolved by the time the base class calls us), so configure via DI directly. The
-        // adapter's options binding will pick this up.
-        services.Configure<Koan.Cache.Adapter.Sqlite.Options.SqliteCacheOptions>(o =>
-        {
-            o.DatabasePath = _databasePath;
-            // Keep the sweeper idle in tests — deterministic lifecycle.
-            o.SweepIntervalSeconds = 3600;
-        });
-
-        // Manual registrar invocation (mirrors SqliteCachePersistenceSpec's pattern).
-        new KoanAutoRegistrar().Initialize(services);
+        yield return ("Koan:Cache:Adapters:Sqlite:DatabasePath", _databasePath);
+        // Keep the sweeper idle in tests — deterministic lifecycle.
+        yield return ("Koan:Cache:Adapters:Sqlite:SweepIntervalSeconds", "3600");
     }
 
     public void Dispose()
