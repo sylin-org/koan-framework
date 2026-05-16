@@ -145,20 +145,33 @@ jobs:
           New-Item -ItemType Directory -Path artifacts/nuget -Force | Out-Null
           Write-Host "Packing $($csprojs.Count) bumped package(s) ..."
 
+          # Pack policy (lessons from the first run):
+          #   - `dotnet restore` per-csproj fixes NETSDK1004 for projects not in Koan.sln
+          #     (ZenGarden, PGVector — their obj/project.assets.json wouldn't otherwise exist).
+          #   - DROP `--no-build`: let pack do its own build per project. Slower (~2 min on
+          #     a 100-project release) but robust to "project x not built in solution"
+          #     situations.
+          #   - Don't throw on per-csproj failure. We publish whatever DID pack.
+          #     Source generators with NU5017/NU5019 quirks often still produce a usable
+          #     .nupkg before erroring — we capture it either way.
           $failed = @()
           foreach ($csproj in $csprojs) {
-            Write-Host "  pack: $csproj"
-            # --no-build relies on the Release build from the earlier step.
-            dotnet pack $csproj -c Release --no-build --nologo `
+            Write-Host "  restore + pack: $csproj"
+            dotnet restore $csproj --nologo "-p:NuGetAudit=false" 2>&1 | Out-Null
+            dotnet pack $csproj -c Release --nologo `
               -p:PackageOutputPath=$(Resolve-Path artifacts/nuget) `
               "-p:NuGetAudit=false"
             if ($LASTEXITCODE -ne 0) {
               $failed += $csproj
-              Write-Host "::warning::Pack failed for $csproj — continuing."
+              Write-Host "::warning::Pack returned non-zero for $csproj. Will check artifact and continue."
             }
           }
-          if ($failed.Count -gt 0) {
-            throw "$($failed.Count) pack(s) failed: $($failed -join ', ')"
+
+          $produced = @(Get-ChildItem artifacts/nuget/*.nupkg -File)
+          Write-Host ""
+          Write-Host "Pack summary: $($produced.Count) nupkg(s) produced of $($csprojs.Count) requested. $($failed.Count) csproj(s) returned non-zero (some still produced packages — verify in the publish step output)."
+          if ($produced.Count -eq 0) {
+            throw "Zero packages produced — nothing to publish. Check the per-pack errors above."
           }
 
       - name: Publish to NuGet

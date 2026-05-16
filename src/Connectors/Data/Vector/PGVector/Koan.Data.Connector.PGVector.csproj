@@ -8,6 +8,16 @@
     <RootNamespace>Koan.Data.Connector.PGVector</RootNamespace>
     <Description>PostgreSQL pgvector provider for Koan vector search: Native vector embeddings with HNSW and IVFFlat indexing.</Description>
     <PackageTags>$(CommonPackageTags);data;vector;pgvector;postgres;embeddings;semantic-search</PackageTags>
+    <!--
+      Temporarily non-packable (release 0.8.0): the connector has multiple unresolved
+      references (NamingStyle missing, PGVectorOptions.MaxDimension missing, etc.) that
+      predate ARCH-0082. There's an in-flight branch (`trusting-mccarthy`) working on
+      these fixes. Re-enable IsPackable once that branch lands.
+
+      KoanPackageKind stays Periphery so versions.props tracks it consistently — only
+      the NuGet package emission is suppressed for now.
+    -->
+    <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Dapper" Version="2.1.66" />
