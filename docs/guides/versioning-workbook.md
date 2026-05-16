@@ -31,13 +31,16 @@ This is what 95% of releases look like for the standard `dev → main` workflow:
    ↳ The release-on-main workflow runs:
        a. Builds Koan.sln (refuses to release if broken)
        b. Runs Update-Versions.ps1 -AutoBumpKernel
+          → writes versions.props AND artifacts/bumped-packages.txt
+            (the exact csprojs whose versions moved)
        c. If versions.props changed:
             - commits "chore(release): bump versions [skip release]"
             - tags release/v<kernel-version>
             - pushes both
-       d. If KOAN_NUGET_PUBLISH=true AND NUGET_API_KEY is set:
-            - dotnet pack Koan.sln
-            - dotnet nuget push *.nupkg
+       d. Packs ONLY the bumped packages (not the whole solution — kernel
+          lockstep means all 14 kernel packages; periphery means only the
+          folders with new commits since the last tag).
+       e. Pushes those .nupkg + .snupkg to nuget.org (requires NUGET_API_KEY).
 
 4. Delete dev locally + on origin, branch new dev from main.
 
@@ -50,19 +53,15 @@ There is no step 4.5 "remember to update versions." There's no step 6 "tag the r
 
 **Opting out of a specific release:** include `[skip release]` in the merge commit subject. The workflow short-circuits at the job-level conditional.
 
-### Enabling NuGet auto-publish (optional)
+### NuGet auto-publish: one-time setup
 
-Off by default. To turn it on:
+NuGet publish is **always-on** for merges to main. The only thing you need:
 
-1. **Repository variable** (Settings → Secrets and variables → Actions → Variables):
-   - Name: `KOAN_NUGET_PUBLISH`
-   - Value: `true`
-
-2. **Repository secret** (Settings → Secrets and variables → Actions → Secrets):
+- **Repository secret** (Settings → Secrets and variables → Actions → Secrets):
    - Name: `NUGET_API_KEY`
    - Value: your nuget.org API key
 
-The workflow only publishes when BOTH are set. Missing either → packages get computed and tagged on main, but nothing is pushed to nuget.org.
+If the secret is missing or rotated, the workflow still tags + commits versions.props but skips the NuGet push with a `::warning::`. The release isn't lost — you can manually push the (locally regenerated) artifacts later.
 
 ### What the workflow guarantees
 

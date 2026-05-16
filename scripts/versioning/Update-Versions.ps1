@@ -216,9 +216,21 @@ function Get-CsprojProjectName {
 function Get-IsPackable {
     param([string]$FullPath)
     $content = Get-Content $FullPath -Raw
-    # Treat missing <IsPackable> as packable (SDK default for library projects).
+    # Csproj-level opt-out wins outright.
     if ($content -match '<IsPackable>\s*false\s*</IsPackable>') { return $false }
-    # Skip projects that explicitly opt out via IsPackable=false anywhere.
+    # Walk upward checking every Directory.Build.props — IsPackable=false in any
+    # parent (samples/, src/Services/, tests/) cascades to descendants.
+    $repoRootStr = $RepoRoot.ToString()
+    $dir = Split-Path $FullPath -Parent
+    while ($dir -and $dir.Length -ge $repoRootStr.Length) {
+        $props = Join-Path $dir 'Directory.Build.props'
+        if (Test-Path $props) {
+            if ((Get-Content $props -Raw) -match '<IsPackable>\s*false\s*</IsPackable>') { return $false }
+        }
+        $parent = Split-Path $dir -Parent
+        if ($parent -eq $dir) { break }
+        $dir = $parent
+    }
     return $true
 }
 
@@ -372,8 +384,38 @@ if (-not (Test-Path $outputDir)) {
 Set-Content -Path $VersionsPropsPath -Value $sb.ToString() -NoNewline -Encoding UTF8
 
 Write-Host "Wrote $VersionsPropsPath" -ForegroundColor Green
+
+# ── Emit bumped-packages manifest (consumed by release-on-main.yml) ──────────
+# Single source of truth for "which packages should the workflow pack + push."
+# Kernel bumps imply ALL kernel packages move (lockstep); periphery bumps are
+# per-package. Format: one csproj path (repo-relative) per line.
+$bumpedCsprojs = New-Object System.Collections.Generic.List[string]
+if ($EffectiveKernelBump) {
+    foreach ($manifestPath in $KernelPaths) {
+        [void]$bumpedCsprojs.Add($manifestPath)
+    }
+}
+foreach ($entry in $PeripheryReport | Where-Object { $_.Bump -ne 'none' }) {
+    [void]$bumpedCsprojs.Add($entry.RelPath)
+}
+
+$bumpedManifestPath = Join-Path $RepoRoot 'artifacts/bumped-packages.txt'
+$artifactsDir = Split-Path $bumpedManifestPath -Parent
+if (-not (Test-Path $artifactsDir)) {
+    New-Item -ItemType Directory -Path $artifactsDir -Force | Out-Null
+}
+if ($bumpedCsprojs.Count -gt 0) {
+    Set-Content -Path $bumpedManifestPath -Value ($bumpedCsprojs -join "`n") -NoNewline -Encoding UTF8
+    Write-Host "Wrote $bumpedManifestPath ($($bumpedCsprojs.Count) packages to pack)" -ForegroundColor Green
+} else {
+    # Workflow checks file presence to decide whether to pack — write an empty file so it's unambiguous.
+    Set-Content -Path $bumpedManifestPath -Value '' -NoNewline -Encoding UTF8
+    Write-Host "Wrote $bumpedManifestPath (empty — nothing to pack)" -ForegroundColor Gray
+}
+
 Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Cyan
-Write-Host "  1. git diff build/versions.props    # review the version delta"
-Write-Host "  2. dotnet build Koan.sln            # confirm builds resolve cleanly"
-Write-Host "  3. git commit + scripts/versioning/New-Release.ps1 -Version $NewKernelVersion"
+Write-Host "  1. git diff build/versions.props          # review the version delta"
+Write-Host "  2. dotnet build Koan.sln                  # confirm builds resolve cleanly"
+Write-Host "  3. cat artifacts/bumped-packages.txt      # see what would be packed/pushed"
+Write-Host "  4. git commit + scripts/versioning/New-Release.ps1 -Version $NewKernelVersion"
