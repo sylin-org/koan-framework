@@ -205,7 +205,7 @@ public sealed class ZenGardenClient : IZenGardenClient
         return new CapabilitySubscriptionHandle(this, registration.Id);
     }
 
-    public async Task<IReadOnlyList<ZenGardenToolSnapshot>> CatalogAsync(
+    public async Task<IReadOnlyList<ZenGardenToolSnapshot>> Catalog(
         ZenGardenSubscription subscription,
         CancellationToken cancellationToken = default)
     {
@@ -243,7 +243,7 @@ public sealed class ZenGardenClient : IZenGardenClient
         return filtered;
     }
 
-    public async ValueTask<ZenGardenCapabilityWish> WishAsync(
+    public async ValueTask<ZenGardenCapabilityWish> Wish(
         string offering,
         IReadOnlyList<string> capabilities,
         ZenGardenCapabilityWishOptions? options = null,
@@ -447,7 +447,7 @@ public sealed class ZenGardenClient : IZenGardenClient
     {
         try
         {
-            // When the subscription has capability requirements, CatalogAsync filters
+            // When the subscription has capability requirements, Catalog filters
             // out tools that don't satisfy them — leaving nothing to emit when
             // capabilities are unsatisfied. Strip requirements so we get the full
             // tool list, then classify each tool locally below.
@@ -455,7 +455,7 @@ public sealed class ZenGardenClient : IZenGardenClient
                 ? registration.Subscription with { Requires = Array.Empty<ZenGardenCapabilityRequirement>() }
                 : registration.Subscription;
 
-            var tools = await CatalogAsync(catalogSubscription, ct);
+            var tools = await Catalog(catalogSubscription, ct);
             foreach (var snapshot in tools)
             {
                 if (ct.IsCancellationRequested)
@@ -1032,7 +1032,7 @@ public sealed class ZenGardenClient : IZenGardenClient
             return current;
         }
 
-        var scoped = await CatalogAsync(new ZenGardenSubscription
+        var scoped = await Catalog(new ZenGardenSubscription
         {
             ToolType = Models.ZenGardenToolType.Offering,
             ToolFqid = toolFqid
@@ -1043,7 +1043,7 @@ public sealed class ZenGardenClient : IZenGardenClient
             return scoped[0];
         }
 
-        var broad = await CatalogAsync(new ZenGardenSubscription
+        var broad = await Catalog(new ZenGardenSubscription
         {
             ToolType = Models.ZenGardenToolType.Offering
         }, ct).ConfigureAwait(false);
@@ -1593,7 +1593,7 @@ public sealed class ZenGardenClient : IZenGardenClient
         {
             try
             {
-                var persisted = await _rosterStore.LoadAsync(ct).ConfigureAwait(false);
+                var persisted = await _rosterStore.Load(ct).ConfigureAwait(false);
                 var now = DateTimeOffset.UtcNow;
                 foreach (var stone in persisted)
                 {
@@ -1783,7 +1783,7 @@ public sealed class ZenGardenClient : IZenGardenClient
         IReadOnlyList<CachedMossStone> persisted;
         try
         {
-            persisted = await _rosterStore.LoadAsync(ct).ConfigureAwait(false);
+            persisted = await _rosterStore.Load(ct).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -1875,7 +1875,7 @@ public sealed class ZenGardenClient : IZenGardenClient
         {
             try
             {
-                await _rosterStore.PersistAsync(snapshot).ConfigureAwait(false);
+                await _rosterStore.Persist(snapshot).ConfigureAwait(false);
             }
             catch (Exception ex)
             {

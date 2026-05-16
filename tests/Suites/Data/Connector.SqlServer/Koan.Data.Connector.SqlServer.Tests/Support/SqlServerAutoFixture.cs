@@ -85,8 +85,7 @@ public sealed class SqlServerAutoFixture : IRelationalTestFixture<Specs.Count.Sq
                 new KeyValuePair<string,string?>("Koan:Data:Sources:Default:Adapter", "sqlserver"),
                 new KeyValuePair<string,string?>("Koan:Data:Sources:Default:ConnectionString", ConnectionString),
                 new KeyValuePair<string,string?>("Koan:Environment", "Test"),
-                new KeyValuePair<string,string?>(Infrastructure.Constants.Configuration.Keys.DefaultPageSize, "5"),
-                new KeyValuePair<string,string?>(Infrastructure.Constants.Configuration.Keys.MaxPageSize, "50")
+                new KeyValuePair<string,string?>(Infrastructure.Constants.Configuration.Keys.DefaultPageSize, "5")
             })
             .Build();
 
