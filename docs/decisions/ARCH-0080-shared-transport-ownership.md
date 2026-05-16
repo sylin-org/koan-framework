@@ -112,10 +112,10 @@ For **future transports** (RabbitMQ, Postgres, etc.): the pattern is documented 
 - RabbitMQ and Postgres ownership assignments are listed in the table as **forward declarations** — they're consistent with the pattern but not implemented in this branch.
 - The `IHttpClientFactory` row in the table records existing state (Microsoft.Extensions.Http owns it). This is informational; no Koan code changes required.
 
-### Residual concern: the data connector's eager-connect
+### Residual concern: the data connector's eager-connect — RESOLVED
 
-After this ADR's implementation, the pillar boot smokes STILL need an `abortConnect=false` setting on the canonical `Koan:Data:Redis:ConnectionString` key. The reason is upstream of ARCH-0080: `Koan.Data.Connector.Redis`'s `RegisterConnectionMultiplexer` factory calls `ConnectionMultiplexer.Connect()` eagerly, which throws when Redis is unreachable. ARCH-0080 makes the cache adapter consume rather than register — it doesn't change the data connector's factory.
+> **Resolution (2026-05-16):** `Koan.Data.Connector.Redis`'s factory now parses the connection string into `ConfigurationOptions` and sets `AbortOnConnectFail = false` whenever the user hasn't pinned it explicitly. The multiplexer constructs in disconnected state instead of throwing at host build, and the pillar boot smokes dropped the `abortConnect=false,connectTimeout=100,syncTimeout=100` suffix — they now just point at `localhost:0` to keep test runs offline. Connection failures continue to surface through health contributors and adapter retries, which is the correct surface for a transport problem.
 
-A follow-up branch should make the data connector's factory tolerant by default (return a non-connected multiplexer that the rest of the host can hold safely; report the connection failure through health probes instead of throwing at construction). At that point the `abortConnect=false` workaround disappears from the test specs. Until then, the spec remarks document it.
+Original concern (preserved for context): the data connector's `RegisterConnectionMultiplexer` factory called `ConnectionMultiplexer.Connect()` eagerly, which threw when Redis was unreachable. ARCH-0080 made the cache adapter consume rather than register the multiplexer, but it didn't change the factory's eagerness — the boot smokes had to embed `abortConnect=false` on the canonical config key to construct the multiplexer in non-connected state.
 
-This is a real concern but it lives in `Koan.Data.Connector.Redis`, not the cache pillar. Captured here so the next branch picks it up explicitly.
+Pattern for future transports (RabbitMQ, Postgres, ...): the canonical owner's connection-factory should NEVER throw at host build time. Transport unavailability is a runtime concern (health checks, adapter retries), not a startup-fatal one.

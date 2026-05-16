@@ -63,12 +63,27 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
 
             var logger = sp.GetService<ILogger<KoanAutoRegistrar>>();
             logger?.LogDebug("Attempting Redis connection to: {ConnectionString}", cs);
+
+            // ARCH-0080 follow-up: parse to ConfigurationOptions and force tolerant defaults
+            // when the user hasn't pinned them. The factory must NEVER throw at host-build time —
+            // a missing/unreachable Redis is a runtime concern (health contributors, retry logic
+            // in adapters), not a startup-fatal one. Pre-fix callers had to embed
+            // `abortConnect=false` in every connection string to avoid eager Connect() throws;
+            // now the factory defaults that for them.
+            var options = ConfigurationOptions.Parse(cs);
+            if (!cs.Contains("abortConnect", StringComparison.OrdinalIgnoreCase))
+            {
+                options.AbortOnConnectFail = false;
+            }
+
             try
             {
-                return ConnectionMultiplexer.Connect(cs);
+                return ConnectionMultiplexer.Connect(options);
             }
             catch (RedisConnectionException ex)
             {
+                // With AbortOnConnectFail=false this branch should be unreachable on transport
+                // failure; preserved for genuinely malformed config (auth rejection, etc.).
                 logger?.LogError(ex, "Redis connection failed: {Message}", ex.Message);
                 throw new InvalidOperationException($"Redis is not available. Connection string: {cs}. " +
                     "Ensure Redis is running or use the Aspire AppHost for managed Redis.", ex);

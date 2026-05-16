@@ -41,8 +41,8 @@ public sealed class MessagingCorePillarBootstrapSpec
     public async Task AddKoan_resolves_IMessageProxy_through_real_bootstrap()
     {
         await using var host = await KoanIntegrationHost.Configure()
-            // ARCH-0080 canonical key — see DataCorePillarBootstrapSpec remarks.
-            .WithSetting("Koan:Data:Redis:ConnectionString", "localhost:0,abortConnect=false,connectTimeout=100,syncTimeout=100")
+            // Offline-only — see DataCorePillarBootstrapSpec remarks.
+            .WithSetting("Koan:Data:Redis:ConnectionString", "localhost:0")
             .ConfigureServices(services => services.AddKoan())
             .StartAsync();
 

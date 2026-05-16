@@ -16,14 +16,11 @@ namespace Koan.Tests.Integration.Bootstrap.Specs;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Residual cross-pillar config:</b> after ARCH-0080 the cache adapter no longer registers
-/// <c>IConnectionMultiplexer</c>, but <c>Koan.Data.Connector.Redis</c> (the canonical owner)
-/// still does — and its factory eagerly calls <c>ConnectionMultiplexer.Connect()</c> which
-/// throws if Redis isn't reachable. This spec supplies <c>abortConnect=false</c> on the
-/// canonical key (per ARCH-0080) so the multiplexer is constructed in non-connected state.
-/// The CoherenceCoordinator-tolerance fix then handles the downstream Subscribe failure
-/// gracefully. A follow-up branch will make the data connector's factory tolerant on its
-/// own — at which point this workaround disappears.
+/// Points at <c>localhost:0</c> (invalid port) so the spec stays offline and never
+/// reaches a real Redis on the dev box. The connector's <c>IConnectionMultiplexer</c>
+/// factory is tolerant by default (ARCH-0080 follow-up) — it constructs in disconnected
+/// state without throwing, and the CoherenceCoordinator handles the downstream Subscribe
+/// failure gracefully.
 /// </para>
 /// </remarks>
 public sealed class DataCorePillarBootstrapSpec
@@ -41,8 +38,8 @@ public sealed class DataCorePillarBootstrapSpec
         await using var host = await KoanIntegrationHost.Configure()
             .WithSetting("Koan:Data:Sources:Default:Adapter", "inmemory")
             .WithSetting("Koan:Environment", "Test")
-            // ARCH-0080 canonical key — see remarks on the class.
-            .WithSetting("Koan:Data:Redis:ConnectionString", "localhost:0,abortConnect=false,connectTimeout=100,syncTimeout=100")
+            // Offline-only — invalid port keeps the multiplexer from reaching real Redis.
+            .WithSetting("Koan:Data:Redis:ConnectionString", "localhost:0")
             .ConfigureServices(services => services.AddKoan())
             .StartAsync();
 

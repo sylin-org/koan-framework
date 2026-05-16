@@ -138,12 +138,13 @@ public sealed class KoanCacheControlTestServerSpec
         var bypassTask = client.SendAsync(bypassRequest);
         var defaultTask = client.SendAsync(defaultRequest);
 
-        await Task.WhenAll(bypassTask, defaultTask);
+        var bypassResponse = await bypassTask;
+        var defaultResponse = await defaultTask;
 
-        bypassTask.Result.Headers.GetValues("X-Observed-Behavior").Should().ContainSingle()
+        bypassResponse.Headers.GetValues("X-Observed-Behavior").Should().ContainSingle()
             .Which.Should().Be(CacheBehavior.Bypass.ToString());
 
-        defaultTask.Result.Headers.GetValues("X-Observed-Behavior").Should().ContainSingle()
+        defaultResponse.Headers.GetValues("X-Observed-Behavior").Should().ContainSingle()
             .Which.Should().Be("default");
     }
 }

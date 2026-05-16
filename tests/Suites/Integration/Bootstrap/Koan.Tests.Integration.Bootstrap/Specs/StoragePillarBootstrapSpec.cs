@@ -48,8 +48,8 @@ public sealed class StoragePillarBootstrapSpec : IDisposable
             .WithSetting("Koan:Storage:DefaultProfile", "local")
             .WithSetting("Koan:Storage:Profiles:local:Provider", "local")
             .WithSetting("Koan:Storage:Profiles:local:Container", _tempRoot)
-            // ARCH-0080 canonical key — see DataCorePillarBootstrapSpec remarks.
-            .WithSetting("Koan:Data:Redis:ConnectionString", "localhost:0,abortConnect=false,connectTimeout=100,syncTimeout=100")
+            // Offline-only — see DataCorePillarBootstrapSpec remarks.
+            .WithSetting("Koan:Data:Redis:ConnectionString", "localhost:0")
             .ConfigureServices(services => services.AddKoan())
             .StartAsync();
 
