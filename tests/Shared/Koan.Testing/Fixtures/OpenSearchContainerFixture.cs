@@ -10,8 +10,13 @@ using DotNet.Testcontainers.Containers;
 using Koan.Testing.Contracts;
 using Koan.Testing.Extensions;
 
-namespace Koan.Data.Connector.OpenSearch.Tests.Support;
+namespace Koan.Testing.Fixtures;
 
+/// <summary>
+/// Shared OpenSearch container fixture (per ARCH-0079). Mirrors the
+/// <see cref="RedisContainerFixture"/> pattern: env-var override → local TCP ping →
+/// Testcontainers Docker daemon → Docker CLI fallback.
+/// </summary>
 public sealed class OpenSearchContainerFixture : IAsyncDisposable, IInitializableFixture
 {
     private const string DefaultEndpoint = "http://localhost:9200";
@@ -227,21 +232,8 @@ public sealed class OpenSearchContainerFixture : IAsyncDisposable, IInitializabl
         var target = container ?? _container;
         if (target is not null)
         {
-            try
-            {
-                await target.StopAsync().ConfigureAwait(false);
-            }
-            catch
-            {
-            }
-
-            try
-            {
-                await target.DisposeAsync().ConfigureAwait(false);
-            }
-            catch
-            {
-            }
+            try { await target.StopAsync().ConfigureAwait(false); } catch { }
+            try { await target.DisposeAsync().ConfigureAwait(false); } catch { }
         }
 
         if (ReferenceEquals(target, _container))
@@ -329,13 +321,7 @@ public sealed class OpenSearchContainerFixture : IAsyncDisposable, IInitializabl
         {
             if (process is { HasExited: false })
             {
-                try
-                {
-                    process.Kill(entireProcessTree: true);
-                }
-                catch
-                {
-                }
+                try { process.Kill(entireProcessTree: true); } catch { }
             }
 
             return (false, "", "Cancelled", -1);
@@ -381,17 +367,9 @@ public sealed class OpenSearchContainerFixture : IAsyncDisposable, IInitializabl
             return;
         }
 
-        try
-        {
-            await RunDockerCommand($"rm -f {_cliContainerId}", CancellationToken.None).ConfigureAwait(false);
-        }
-        catch
-        {
-        }
-        finally
-        {
-            _cliContainerId = null;
-        }
+        try { await RunDockerCommand($"rm -f {_cliContainerId}", CancellationToken.None).ConfigureAwait(false); }
+        catch { }
+        finally { _cliContainerId = null; }
     }
 
     private static int ParseDockerPortOutput(string output)

@@ -9,6 +9,7 @@ using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Core;
 using Koan.Testing;
 using Koan.Testing.Contracts;
+using Koan.Testing.Fixtures;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;

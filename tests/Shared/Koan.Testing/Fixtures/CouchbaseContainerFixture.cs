@@ -12,8 +12,13 @@ using DotNet.Testcontainers.Containers;
 using Koan.Testing.Contracts;
 using Koan.Testing.Extensions;
 
-namespace Koan.Data.Connector.Couchbase.Tests.Support;
+namespace Koan.Testing.Fixtures;
 
+/// <summary>
+/// Shared Couchbase container fixture (per ARCH-0079). Boots a Couchbase Community node,
+/// initializes the cluster (data + n1ql + index services), creates a default bucket, and
+/// waits for readiness. Mirrors the <see cref="RedisContainerFixture"/> resilience pattern.
+/// </summary>
 public sealed class CouchbaseContainerFixture : IAsyncDisposable, IInitializableFixture
 {
     private const string DefaultBucket = "koan";
@@ -329,21 +334,8 @@ public sealed class CouchbaseContainerFixture : IAsyncDisposable, IInitializable
         var target = container ?? _container;
         if (target is not null)
         {
-            try
-            {
-                await target.StopAsync().ConfigureAwait(false);
-            }
-            catch
-            {
-            }
-
-            try
-            {
-                await target.DisposeAsync().ConfigureAwait(false);
-            }
-            catch
-            {
-            }
+            try { await target.StopAsync().ConfigureAwait(false); } catch { }
+            try { await target.DisposeAsync().ConfigureAwait(false); } catch { }
         }
 
         if (ReferenceEquals(target, _container))
@@ -386,8 +378,6 @@ public sealed class CouchbaseContainerFixture : IAsyncDisposable, IInitializable
         }
 
         var kvPort = ParseDockerPortOutput(portResult.stdout);
-
-        // Also get the REST port
         var (restPortOk, restPortStdout, _, _) = await RunDockerCommand($"port {containerName} {CouchbaseRestPort}/tcp", context.Cancellation).ConfigureAwait(false);
         var restPort = restPortOk ? ParseDockerPortOutput(restPortStdout) : 0;
 
@@ -438,13 +428,7 @@ public sealed class CouchbaseContainerFixture : IAsyncDisposable, IInitializable
         {
             if (process is { HasExited: false })
             {
-                try
-                {
-                    process.Kill(entireProcessTree: true);
-                }
-                catch
-                {
-                }
+                try { process.Kill(entireProcessTree: true); } catch { }
             }
 
             return (false, "", "Cancelled", -1);
@@ -490,17 +474,9 @@ public sealed class CouchbaseContainerFixture : IAsyncDisposable, IInitializable
             return;
         }
 
-        try
-        {
-            await RunDockerCommand($"rm -f {_cliContainerId}", CancellationToken.None).ConfigureAwait(false);
-        }
-        catch
-        {
-        }
-        finally
-        {
-            _cliContainerId = null;
-        }
+        try { await RunDockerCommand($"rm -f {_cliContainerId}", CancellationToken.None).ConfigureAwait(false); }
+        catch { }
+        finally { _cliContainerId = null; }
     }
 
     private static int ParseDockerPortOutput(string output)
