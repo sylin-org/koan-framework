@@ -1,14 +1,12 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
 using Koan.Cache.Abstractions.Primitives;
 using Koan.Cache.Abstractions.Stores;
 using Koan.Cache.Extensions;
-using Microsoft.Extensions.Configuration;
+using Koan.Testing.Integration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Xunit;
@@ -57,7 +55,7 @@ public sealed class SqliteCachePersistenceSpec : IDisposable
         // ── Lifetime 1: write the entry, then dispose the whole DI graph including SQLite. ─
         await using (var node = await BuildNode(_databasePath, ct))
         {
-            var client = node.Provider.GetRequiredService<ICacheClient>();
+            var client = node.Services.GetRequiredService<ICacheClient>();
             await client.CreateEntry<string>(key)
                 .WithAbsoluteTtl(TimeSpan.FromMinutes(10))
                 .Set("payload", ct);
@@ -73,7 +71,7 @@ public sealed class SqliteCachePersistenceSpec : IDisposable
         // is real and not just "Memory L1 retained somehow".
         await using (var node = await BuildNode(_databasePath, ct))
         {
-            var client = node.Provider.GetRequiredService<ICacheClient>();
+            var client = node.Services.GetRequiredService<ICacheClient>();
             var afterRehydration = await client.CreateEntry<string>(key).Get(ct);
             afterRehydration.Should().Be("payload");
         }
@@ -88,7 +86,7 @@ public sealed class SqliteCachePersistenceSpec : IDisposable
         var ct = CancellationToken.None;
 
         await using var node = await BuildNode(_databasePath, ct);
-        var client = node.Provider.GetRequiredService<ICacheClient>();
+        var client = node.Services.GetRequiredService<ICacheClient>();
 
         await client.CreateEntry<string>(new CacheKey("disk-canary"))
             .WithAbsoluteTtl(TimeSpan.FromMinutes(5))
@@ -98,56 +96,21 @@ public sealed class SqliteCachePersistenceSpec : IDisposable
         new FileInfo(_databasePath).Length.Should().BeGreaterThan(0, "the database should contain pages");
     }
 
-    private static async Task<TestNode> BuildNode(string databasePath, CancellationToken ct)
-    {
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
+    /// <summary>
+    /// Rides <see cref="KoanIntegrationHost"/> (the ARCH-0079 canon helper). Manual adapter
+    /// activation is intentional — this spec exercises Sqlite adapter behavior in isolation;
+    /// reflective discovery is covered by <c>CachePillarBootstrapSpec</c>.
+    /// </summary>
+    private static Task<IntegrationHost> BuildNode(string databasePath, CancellationToken ct)
+        => KoanIntegrationHost.Configure()
+            .WithSetting("Koan:Cache:Adapters:Sqlite:DatabasePath", databasePath)
+            // Disable the background sweeper for tests — keeps the lifecycle deterministic.
+            .WithSetting("Koan:Cache:Adapters:Sqlite:SweepIntervalSeconds", "3600")
+            .ConfigureServices(services =>
             {
-                ["Koan:Cache:Adapters:Sqlite:DatabasePath"] = databasePath,
-                // Disable the background sweeper for tests — keeps the lifecycle deterministic.
-                ["Koan:Cache:Adapters:Sqlite:SweepIntervalSeconds"] = "3600"
+                services.AddLogging();
+                services.AddKoanCache();
+                new Koan.Cache.Adapter.Sqlite.Initialization.KoanAutoRegistrar().Initialize(services);
             })
-            .Build();
-
-        var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(configuration);
-        services.AddLogging();
-        services.AddKoanCache(configuration);
-
-        // Reference = Intent: manually invoke the Sqlite adapter's auto-registrar (we're
-        // not running full Koan bootstrap in tests).
-        new Koan.Cache.Adapter.Sqlite.Initialization.KoanAutoRegistrar().Initialize(services);
-
-        var provider = services.BuildServiceProvider();
-        var hosted = provider.GetServices<IHostedService>().ToArray();
-        foreach (var service in hosted)
-        {
-            await service.StartAsync(ct);
-        }
-
-        return new TestNode(provider, hosted);
-    }
-
-    private sealed class TestNode : IAsyncDisposable
-    {
-        private readonly ServiceProvider _provider;
-        private readonly IHostedService[] _hosted;
-
-        public TestNode(ServiceProvider provider, IHostedService[] hosted)
-        {
-            _provider = provider;
-            _hosted = hosted;
-        }
-
-        public IServiceProvider Provider => _provider;
-
-        public async ValueTask DisposeAsync()
-        {
-            foreach (var service in _hosted.Reverse())
-            {
-                try { await service.StopAsync(CancellationToken.None); } catch { /* teardown */ }
-            }
-            await _provider.DisposeAsync();
-        }
-    }
+            .StartAsync(ct);
 }

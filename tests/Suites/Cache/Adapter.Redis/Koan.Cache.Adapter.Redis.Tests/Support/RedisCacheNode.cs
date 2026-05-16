@@ -1,13 +1,10 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Cache.Abstractions;
 using Koan.Cache.Extensions;
-using Microsoft.Extensions.Configuration;
+using Koan.Testing.Integration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 
 namespace Koan.Cache.Adapter.Redis.Tests.Support;
 
@@ -18,21 +15,28 @@ namespace Koan.Cache.Adapter.Redis.Tests.Support;
 /// <c>CoherenceCoordinator</c>) so the node actually subscribes to the channel.
 /// </summary>
 /// <remarks>
+/// <para>
+/// Rides <see cref="KoanIntegrationHost"/> (the ARCH-0079 canon helper) for host wiring.
+/// Bootstrap is explicit (<c>AddKoanCache</c> + manual <c>KoanAutoRegistrar.Initialize</c>)
+/// rather than reflective <c>AddKoan()</c> — this spec exercises cache adapter behavior
+/// in isolation; the cross-pillar reflective discovery path is covered separately by
+/// <c>CachePillarBootstrapSpec</c>.
+/// </para>
+/// <para>
 /// Tests build two nodes pointed at the same Redis container + channel name to simulate a
 /// real multi-instance cluster sharing one L2 and one coherence transport.
+/// </para>
 /// </remarks>
 internal sealed class RedisCacheNode : IAsyncDisposable
 {
-    private readonly ServiceProvider _provider;
-    private readonly IHostedService[] _hostedServices;
+    private readonly IntegrationHost _host;
 
-    private RedisCacheNode(ServiceProvider provider, IHostedService[] hostedServices)
+    private RedisCacheNode(IntegrationHost host)
     {
-        _provider = provider;
-        _hostedServices = hostedServices;
+        _host = host;
     }
 
-    public IServiceProvider Provider => _provider;
+    public IServiceProvider Provider => _host.Services;
 
     public static async Task<RedisCacheNode> Start(
         string connectionString,
@@ -41,58 +45,25 @@ internal sealed class RedisCacheNode : IAsyncDisposable
         string channelName,
         CancellationToken ct)
     {
-        var settings = new Dictionary<string, string?>
-        {
-            [CacheConstants.Configuration.Redis.Configuration] = connectionString,
-            [CacheConstants.Configuration.Redis.KeyPrefix] = keyPrefix,
-            [CacheConstants.Configuration.Redis.TagPrefix] = tagPrefix,
-            [CacheConstants.Configuration.Redis.ChannelName] = channelName
-        };
+        var host = await KoanIntegrationHost.Configure()
+            .WithSetting(CacheConstants.Configuration.Redis.Configuration, connectionString)
+            .WithSetting(CacheConstants.Configuration.Redis.KeyPrefix, keyPrefix)
+            .WithSetting(CacheConstants.Configuration.Redis.TagPrefix, tagPrefix)
+            .WithSetting(CacheConstants.Configuration.Redis.ChannelName, channelName)
+            .ConfigureServices(services =>
+            {
+                services.AddLogging();
+                // Pillar core — Memory L1 + topology + coordinator + client + policies + health.
+                services.AddKoanCache();
+                // Manual adapter activation — this spec tests adapter behavior, not the
+                // reflective discovery path (which is covered by CachePillarBootstrapSpec).
+                new Koan.Cache.Adapter.Redis.Initialization.KoanAutoRegistrar().Initialize(services);
+            })
+            .StartAsync(ct)
+            .ConfigureAwait(false);
 
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(settings)
-            .Build();
-
-        var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(configuration);
-        services.AddLogging();
-
-        // Pillar core — Memory L1 + topology + coordinator + client + policies + health.
-        services.AddKoanCache(configuration);
-
-        // Reference = Intent: invoke the Redis adapter's auto-registrar manually because we're
-        // not running through full Koan host bootstrap in tests. This is the same code path the
-        // bootstrapper would execute.
-        new Koan.Cache.Adapter.Redis.Initialization.KoanAutoRegistrar().Initialize(services);
-
-        var provider = services.BuildServiceProvider();
-
-        // Start hosted services — most importantly CoherenceCoordinator, which subscribes to
-        // the Redis pub/sub channel. Without this, the node is deaf to peer invalidations.
-        var hosted = provider.GetServices<IHostedService>().ToArray();
-        foreach (var service in hosted)
-        {
-            await service.StartAsync(ct).ConfigureAwait(false);
-        }
-
-        return new RedisCacheNode(provider, hosted);
+        return new RedisCacheNode(host);
     }
 
-    public async ValueTask DisposeAsync()
-    {
-        // Stop hosted services in reverse order; swallow exceptions during teardown.
-        foreach (var service in _hostedServices.Reverse())
-        {
-            try
-            {
-                await service.StopAsync(CancellationToken.None).ConfigureAwait(false);
-            }
-            catch
-            {
-                // ignored — teardown is best-effort
-            }
-        }
-
-        await _provider.DisposeAsync().ConfigureAwait(false);
-    }
+    public ValueTask DisposeAsync() => _host.DisposeAsync();
 }
