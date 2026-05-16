@@ -61,10 +61,11 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Restore + build the solution
+      - name: Restore + build the solution (Release)
         shell: pwsh
         run: |
-          dotnet build Koan.sln --nologo "-p:NuGetAudit=false"
+          # -c Release so the subsequent dotnet pack --no-build can use these outputs.
+          dotnet build Koan.sln -c Release --nologo "-p:NuGetAudit=false"
           if ($LASTEXITCODE -ne 0) { throw "Build failed — refusing to release a broken main." }
 
       - name: Compute new versions
@@ -122,13 +123,11 @@ jobs:
         if: |
           steps.compute.outputs.has-changes == 'true' &&
           steps.tag-check.outputs.skip == 'false' &&
-          vars.KOAN_NUGET_PUBLISH == 'true' &&
-          env.NUGET_API_KEY != ''
-        env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+          vars.KOAN_NUGET_PUBLISH == 'true'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path artifacts/nuget -Force | Out-Null
+          # --no-build relies on the Release build from the earlier step.
           dotnet pack Koan.sln -c Release --no-build --nologo `
             -p:PackageOutputPath=$(Resolve-Path artifacts/nuget) `
             "-p:NuGetAudit=false"
@@ -138,13 +137,20 @@ jobs:
         if: |
           steps.compute.outputs.has-changes == 'true' &&
           steps.tag-check.outputs.skip == 'false' &&
-          vars.KOAN_NUGET_PUBLISH == 'true' &&
-          env.NUGET_API_KEY != ''
+          vars.KOAN_NUGET_PUBLISH == 'true'
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         shell: pwsh
         run: |
-          $packages = Get-ChildItem artifacts/nuget/*.nupkg -File
+          # Guard inside the step (step-level env isn't reliably in scope for `if:`).
+          if ([string]::IsNullOrEmpty($env:NUGET_API_KEY)) {
+            Write-Host "::warning::vars.KOAN_NUGET_PUBLISH=true but secrets.NUGET_API_KEY is empty."
+            Write-Host "::warning::Tag was created and main was updated, but no packages will be pushed."
+            Write-Host "::warning::Add the NUGET_API_KEY secret to enable publish."
+            exit 0
+          }
+
+          $packages = @(Get-ChildItem artifacts/nuget/*.nupkg -File)
           Write-Host "Publishing $($packages.Count) package(s) to nuget.org ..."
           $failed = @()
           foreach ($pkg in $packages) {

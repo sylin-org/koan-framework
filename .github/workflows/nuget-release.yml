@@ -1,134 +1,21 @@
-name: nuget-release
+name: disabled-nuget-release
+
+# Superseded by .github/workflows/release-on-main.yml (ARCH-0082).
+# Previously: NBGV-driven pack-and-push on push of v* tags. Replaced because
+# the new system computes per-package versions from build/versions.props
+# (kernel lockstep + periphery independent) rather than NBGV's single-version-
+# everywhere model, and the release-on-main workflow handles both tagging and
+# publishing in one place.
+#
+# The old helper scripts under .github/scripts/ (find-packable-csproj.ps1,
+# find-changed-csproj.ps1, pack-meta.ps1) are not used by release-on-main.yml
+# but are kept in-tree because they may be useful for ad-hoc operations.
 
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
 
-concurrency:
-  group: publish-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  pack-and-push-all:
-    runs-on: windows-latest
-    permissions:
-      contents: write
-    env:
-      NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+  noop:
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          fetch-tags: true
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "10.0.x"
-
-      - name: Install nuget.exe
-        uses: nuget/setup-nuget@v2
-
-      - name: Generate icon.png (256x256) from resources/image/0_2.jpg
-        shell: pwsh
-        run: |
-          $srcPath = Join-Path $pwd 'resources/image/0_2.jpg'
-          if (Test-Path $srcPath) {
-            Add-Type -AssemblyName System.Drawing
-            $size = 256
-            $src = [System.Drawing.Image]::FromFile($srcPath)
-            try {
-              $bmp = New-Object System.Drawing.Bitmap($size, $size, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
-              $gfx = [System.Drawing.Graphics]::FromImage($bmp)
-              try {
-                $gfx.Clear([System.Drawing.Color]::Transparent)
-                $gfx.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
-                $gfx.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
-                $gfx.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
-                $ratioW = $size / $src.Width
-                $ratioH = $size / $src.Height
-                $ratio = [Math]::Min($ratioW, $ratioH)
-                $newW = [int]([Math]::Round($src.Width * $ratio))
-                $newH = [int]([Math]::Round($src.Height * $ratio))
-                $x = [int](($size - $newW) / 2)
-                $y = [int](($size - $newH) / 2)
-                $rect = New-Object System.Drawing.Rectangle($x, $y, $newW, $newH)
-                $gfx.DrawImage($src, $rect)
-              } finally { $gfx.Dispose() }
-              $outPath = Join-Path $pwd 'icon.png'
-              $bmp.Save($outPath, [System.Drawing.Imaging.ImageFormat]::Png)
-              Write-Host "icon.png generated at $outPath"
-            } finally { $bmp.Dispose(); $src.Dispose() }
-          } else {
-            Write-Host "No resources/image/0_2.jpg found; skipping icon generation."
-          }
-
-      - name: Restore
-        shell: pwsh
-        run: |
-          $list = & pwsh -NoProfile -ExecutionPolicy Bypass -File ./.github/scripts/find-packable-csproj.ps1
-          foreach ($p in $list) {
-            Write-Host "Restoring $p" -ForegroundColor Cyan
-            dotnet restore "$p"
-          }
-
-      - name: Compute version
-        id: nbgv
-        shell: pwsh
-        run: |
-          dotnet tool update --global nbgv || dotnet tool install --global nbgv
-          $nbgv = (Get-Command nbgv -ErrorAction SilentlyContinue)?.Source
-          if (-not $nbgv) { $nbgv = Join-Path $env:USERPROFILE ".dotnet/tools/nbgv.exe" }
-          if (-not (Test-Path $nbgv)) { throw "nbgv tool not found on PATH or at $nbgv" }
-          $nugetVersion = & $nbgv get-version -v NuGetPackageVersion
-          $simple = & $nbgv get-version -v SimpleVersion
-          echo "NUGETVERSION=$nugetVersion" >> $env:GITHUB_OUTPUT
-          echo "SIMPLEVERSION=$simple" >> $env:GITHUB_OUTPUT
-
-      - name: Pack all src projects (stable)
-        shell: pwsh
-        run: |
-          $list = & pwsh -NoProfile -ExecutionPolicy Bypass -File ./.github/scripts/find-packable-csproj.ps1
-          if (-not $list) { Write-Warning "No packable projects found by find-packable-csproj.ps1" }
-          New-Item -ItemType Directory -Path artifacts -Force | Out-Null
-          foreach ($p in $list) {
-            Write-Host "Packing $p" -ForegroundColor Cyan
-            dotnet pack "$p" -c Release -o artifacts -p:PublicRelease=true
-          }
-
-      - name: Pack meta packages
-        shell: pwsh
-        run: pwsh ./.github/scripts/pack-meta.ps1 -Version "${{ steps.nbgv.outputs.SIMPLEVERSION }}" -OutDir artifacts
-
-      - name: Verify NUGET_API_KEY present
-        shell: pwsh
-        run: |
-          if (-not $env:NUGET_API_KEY) { throw "NUGET_API_KEY is empty or not provided" }
-          Write-Host "NUGET_API_KEY supplied (length: $($env:NUGET_API_KEY.Length))"
-
-      - name: Push all to nuget.org
-        shell: pwsh
-        env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
-        run: |
-          $source = "https://api.nuget.org/v3/index.json"
-          Write-Host "Listing nupkg candidates under artifacts and repo root:" -ForegroundColor Yellow
-          Get-ChildItem -Path artifacts -Filter *.nupkg -Recurse -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.FullName }
-          Get-ChildItem -Path . -Filter *.nupkg -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.FullName }
-          $pkgs = Get-ChildItem -Recurse -Filter *.nupkg | Where-Object { $_.FullName -notlike "*.symbols.nupkg" }
-          foreach ($p in $pkgs) {
-            Write-Host "Pushing $($p.FullName)" -ForegroundColor Cyan
-            dotnet nuget push "$($p.FullName)" --api-key "$env:NUGET_API_KEY" --source $source --skip-duplicate
-          }
-          $snupkgs = Get-ChildItem -Recurse -Filter *.snupkg -ErrorAction SilentlyContinue
-          if ($snupkgs) {
-            foreach ($s in $snupkgs) {
-              Write-Host "Pushing symbols $($s.FullName)" -ForegroundColor Cyan
-              dotnet nuget push "$($s.FullName)" --api-key "$env:NUGET_API_KEY" --source $source --skip-duplicate
-            }
-          } else {
-            Write-Host "No .snupkg files found; skipping symbol push." -ForegroundColor Yellow
-          }
+      - run: echo "This workflow is disabled. See release-on-main.yml + ARCH-0082."
