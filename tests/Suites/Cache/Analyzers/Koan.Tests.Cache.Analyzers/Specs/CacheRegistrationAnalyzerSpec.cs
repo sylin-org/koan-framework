@@ -145,6 +145,50 @@ public sealed class CacheRegistrationAnalyzerSpec
     }
 
     [Fact]
+    public async Task Singleton_instance_overload_does_not_fire()
+    {
+        // The single-generic INSTANCE overload Singleton<T>(T instance) is runtime-safe — the
+        // descriptor's GetImplementationType() returns instance.GetType() (concrete), not the
+        // service type. Only the factory overload produces the indistinguishable shape. The
+        // analyzer must not over-fire on the instance form.
+        const string source = """
+            using System;
+            using System.Collections.Generic;
+            using System.Threading;
+            using System.Threading.Tasks;
+            using Koan.Cache.Abstractions.Stores;
+            using Koan.Cache.Abstractions.Primitives;
+            using Microsoft.Extensions.DependencyInjection;
+            using Microsoft.Extensions.DependencyInjection.Extensions;
+
+            internal sealed class InstanceStore : ICacheStore
+            {
+                public string Name => "instance";
+                public CacheStorePlacement Placement => default;
+                public CacheStoreCapabilities Capabilities => default;
+                public ValueTask<CacheFetchResult> Fetch(CacheKey k, CacheReadOptions o, CancellationToken ct) => default;
+                public ValueTask Set(CacheKey k, CacheValue v, CacheWriteOptions o, CancellationToken ct) => default;
+                public ValueTask<bool> Remove(CacheKey k, CancellationToken ct) => default;
+                public ValueTask<bool> Exists(CacheKey k, CancellationToken ct) => default;
+                public ValueTask Touch(CacheKey k, TimeSpan? ttl, CancellationToken ct) => default;
+                public IAsyncEnumerable<TaggedCacheKey> EnumerateByTag(string tag, CancellationToken ct) => null!;
+            }
+
+            public static class InstanceRegistration
+            {
+                public static void Register(IServiceCollection services)
+                {
+                    services.TryAddEnumerable(ServiceDescriptor.Singleton<ICacheStore>(new InstanceStore()));
+                }
+            }
+            """;
+
+        var diagnostics = await RunAnalyzer(source);
+
+        diagnostics.Should().NotContain(d => d.Id == CacheRegistrationAnalyzer.DiagnosticId);
+    }
+
+    [Fact]
     public async Task TryAddEnumerable_against_foreign_interface_does_not_fire()
     {
         // The analyzer only cares about framework-managed interfaces. Anything else compiles silently.

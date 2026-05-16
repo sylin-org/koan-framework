@@ -97,13 +97,26 @@ public sealed class CacheRegistrationAnalyzer : DiagnosticAnalyzer
         if (singletonGeneric.TypeArgumentList.Arguments.Count != 1) return;
 
         // Resolve to confirm it's ServiceDescriptor.Singleton<TService>(factory) — the
-        // single-generic factory overload specifically.
+        // single-generic FACTORY overload specifically. The instance overload
+        // Singleton<TService>(TService instance) is runtime-safe because the descriptor's
+        // GetImplementationType() returns instance.GetType() (the concrete type), not the
+        // service type — so TryAddEnumerable's indistinguishable check doesn't reject it.
+        // Only the factory overload produces ImplementationFactory whose generic argument
+        // is the service type, triggering the indistinguishable rejection.
         var singletonSymbol = context.SemanticModel.GetSymbolInfo(descriptorCall).Symbol as IMethodSymbol;
         if (singletonSymbol is null) return;
         if (singletonSymbol.Name != "Singleton") return;
         if (singletonSymbol.ContainingType?.ToDisplayString() != "Microsoft.Extensions.DependencyInjection.ServiceDescriptor")
             return;
         if (singletonSymbol.TypeParameters.Length != 1) return;
+
+        // Narrow to the factory overload by inspecting the single parameter's type.
+        // Factory parameter type is `System.Func<System.IServiceProvider, TService>`.
+        if (singletonSymbol.Parameters.Length != 1) return;
+        var paramType = singletonSymbol.Parameters[0].Type;
+        if (paramType is not INamedTypeSymbol namedParam) return;
+        if (!namedParam.OriginalDefinition.ToDisplayString().StartsWith("System.Func<", System.StringComparison.Ordinal))
+            return;
 
         // Check the generic argument against the canon list.
         var typeArgSymbol = context.SemanticModel.GetSymbolInfo(singletonGeneric.TypeArgumentList.Arguments[0]).Symbol;

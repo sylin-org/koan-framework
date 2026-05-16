@@ -112,3 +112,20 @@ Rolling the analyzer into every cache adapter happens iteratively. Adding it to 
 - The analyzer is **narrow by design**: cache interfaces only, in this branch. Adding the data pillar's interfaces (`IDataAdapterFactory`, etc.) is a follow-up when those interfaces stabilize their typed-helper story.
 - The diagnostic ID `KOAN0001` claims the first slot in the framework's diagnostic namespace. Future analyzers should consecutively number (`KOAN0002`, etc.) and live alongside or adjacent to this one.
 - Synthetic-violation test lives in the analyzer project rather than a separate test project — keeps the analyzer self-contained for the v1 ship.
+
+## Refinement (2026-05-16): factory-overload-only detection
+
+A codebase survey across `src/` for the bare single-generic pattern returned exactly **one** match — and on inspection it was the instance form, not the factory form:
+
+```csharp
+// src/Koan.Canon.Domain/Runtime/CanonRuntimeServiceCollectionExtensions.cs:26
+services.TryAddEnumerable(ServiceDescriptor.Singleton<ICanonRuntimeConfigurator>(new DelegateCanonRuntimeConfigurator(configure)));
+```
+
+This is **runtime-safe**. The instance overload `Singleton<TService>(TService instance)` stores `ImplementationInstance`, and `GetImplementationType()` returns `instance.GetType()` (the concrete type) — not the service type. `TryAddEnumerable`'s "indistinguishable" rejection (which compares against the service type) does not fire. Only the **factory** overload `Singleton<TService>(Func<IServiceProvider, TService> factory)` produces the bug shape, because `GetImplementationType()` then extracts `typeof(TService)` from the factory's generic argument.
+
+The analyzer was refined to flag the factory overload specifically (inspect the parameter's type-display for `System.Func<...>`). The instance overload is no longer flagged. A negative-case spec was added to lock the boundary.
+
+### Implication for the data/messaging rollout
+
+The same survey across `src/` found **zero** factory-form occurrences outside the cache pillar (which already migrated to typed helpers). Rolling KOAN0001 to data/messaging interfaces today would add no enforcement targets — the bug surface in those pillars is empty. The forward declaration stands: when those pillars accumulate factory-style multi-provider registration and a typed-helper story emerges, append to `KnownInterfaces` and add the helper. Until then, KOAN0001 stays cache-scoped.
