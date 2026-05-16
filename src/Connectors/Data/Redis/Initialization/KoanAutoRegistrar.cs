@@ -62,7 +62,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
             }
 
             var logger = sp.GetService<ILogger<KoanAutoRegistrar>>();
-            logger?.LogDebug("Attempting Redis connection to: {ConnectionString}", cs);
+            logger?.LogDebug("Attempting Redis connection to: {ConnectionString}", RedactCredentials(cs));
 
             // ARCH-0080 follow-up: parse to ConfigurationOptions and force tolerant defaults
             // when the user hasn't pinned them. The factory must NEVER throw at host-build time —
@@ -88,14 +88,19 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
                 // boots silently into a permanently disconnected state. Surface that as a
                 // Warning so deployments don't go undetected until first request. Users who
                 // pinned abortConnect explicitly know what they signed up for.
-                if (abortConnectImplicitlyDefaulted && !mux.IsConnected)
+                //
+                // Skipped when ANY endpoint targets port 0 — that's "deliberately unreachable"
+                // sentinel test code uses (per the pillar boot smokes) and the noise would
+                // train reviewers to ignore real production occurrences.
+                if (abortConnectImplicitlyDefaulted && !mux.IsConnected && !IsDeliberatelyUnreachable(options))
                 {
                     logger?.LogWarning(
+                        new EventId(1, "RedisDisconnectedBoot"),
                         "Redis multiplexer constructed but NOT connected to {ConnectionString}. " +
                         "AbortOnConnectFail defaulted to false (tolerant) — the host will boot, but cache/coherence " +
                         "operations will fail until Redis becomes reachable. Pin abortConnect=true in the connection " +
                         "string to fail fast on misconfig.",
-                        cs);
+                        RedactCredentials(cs));
                 }
 
                 return mux;
@@ -106,7 +111,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
                 // failure; preserved for genuinely malformed config (auth rejection, etc.) and
                 // for callers who pinned abortConnect=true.
                 logger?.LogError(ex, "Redis connection failed: {Message}", ex.Message);
-                throw new InvalidOperationException($"Redis is not available. Connection string: {cs}. " +
+                throw new InvalidOperationException($"Redis is not available. Connection string: {RedactCredentials(cs)}. " +
                     "Ensure Redis is running or use the Aspire AppHost for managed Redis.", ex);
             }
             catch (Exception ex) when (ex is ArgumentException or FormatException)
@@ -115,12 +120,51 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
                 // unreachable). Wrap with the same helpful guidance the connect branch uses.
                 logger?.LogError(ex, "Redis connection string is malformed: {Message}", ex.Message);
                 throw new InvalidOperationException(
-                    $"Redis connection string is malformed and could not be parsed: {cs}. " +
+                    $"Redis connection string is malformed and could not be parsed: {RedactCredentials(cs)}. " +
                     "Expected StackExchange.Redis configuration syntax (e.g., 'localhost:6379' or " +
                     "'host1:6379,host2:6379,abortConnect=false'). See https://stackexchange.github.io/StackExchange.Redis/Configuration.",
                     ex);
             }
         });
+    }
+
+    /// <summary>
+    /// Replaces <c>password=...</c> and <c>user=...</c> segments in a Redis connection string
+    /// with <c>***</c> so credentials don't leak into logs or thrown exception messages.
+    /// </summary>
+    /// <remarks>
+    /// The StackExchange.Redis connection-string syntax is comma-separated key=value pairs after
+    /// the endpoint list. Match is case-insensitive (the parser is). Pure string work — no
+    /// allocations beyond the result.
+    /// </remarks>
+    internal static string RedactCredentials(string connectionString)
+    {
+        if (string.IsNullOrEmpty(connectionString)) return connectionString;
+        // Anchored to comma/start so we don't match a substring that happens to contain "password".
+        return System.Text.RegularExpressions.Regex.Replace(
+            connectionString,
+            @"(?<=^|,)\s*(password|user)\s*=\s*[^,]*",
+            "$1=***",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+    }
+
+    /// <summary>
+    /// Returns true when ANY parsed endpoint targets port 0 — the sentinel pillar boot smokes
+    /// use to indicate "deliberately unreachable Redis." Skipping the disconnect warning for
+    /// this case keeps test runs quiet while preserving the warning for real production typos.
+    /// </summary>
+    private static bool IsDeliberatelyUnreachable(ConfigurationOptions options)
+    {
+        foreach (var ep in options.EndPoints)
+        {
+            // EndPoint can be DnsEndPoint or IPEndPoint; both expose Port.
+            switch (ep)
+            {
+                case System.Net.DnsEndPoint dns when dns.Port == 0: return true;
+                case System.Net.IPEndPoint ip when ip.Port == 0: return true;
+            }
+        }
+        return false;
     }
 
     public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)

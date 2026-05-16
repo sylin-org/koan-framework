@@ -235,6 +235,30 @@ public sealed class CacheRegistrationAnalyzerSpec
     }
 
     /// <summary>
+    /// Every helper-name value in <see cref="CacheRegistrationAnalyzer.KnownInterfaces"/> must
+    /// resolve to a public static method on <see cref="Koan.Cache.Abstractions.Extensions.CacheRegistrationExtensions"/>.
+    /// A typo in the helper name (e.g., "AddCachStore") would produce a misleading diagnostic
+    /// hint pointing adapter authors at a non-existent method — the FQN test alone wouldn't catch
+    /// it because that test only validates the interface side of the pair.
+    /// </summary>
+    [Fact]
+    public void Every_KnownInterfaces_helper_name_resolves_to_a_public_static_method()
+    {
+        var extensionsType = typeof(Koan.Cache.Abstractions.Extensions.CacheRegistrationExtensions);
+        var helperMethods = extensionsType
+            .GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
+            .Select(m => m.Name)
+            .ToHashSet();
+
+        foreach (var (fqn, helperName) in CacheRegistrationAnalyzer.KnownInterfaces)
+        {
+            helperMethods.Should().Contain(
+                helperName,
+                $"helper '{helperName}' (mapped from FQN '{fqn}') in CacheRegistrationAnalyzer.KnownInterfaces must exist as a public static method on {extensionsType.FullName} — otherwise the analyzer's diagnostic hint points at a non-existent method");
+        }
+    }
+
+    /// <summary>
     /// Parse the source, build a compilation with the necessary references, run
     /// <see cref="CacheRegistrationAnalyzer"/>, and return the analyzer's diagnostics.
     /// Compiler-side diagnostics (CS-prefixed) are filtered out — the analyzer's behavior is
