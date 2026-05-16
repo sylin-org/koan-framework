@@ -30,6 +30,7 @@ The voice is imperative. Commands are concrete. Explanations sit alongside what 
 |---|---|
 | [versioning.md](versioning.md) | Bumping package versions, the kernel/periphery split, computing what changes on each merge |
 | [nuget-publishing.md](nuget-publishing.md) | How packages reach nuget.org, what the release-on-main workflow does, recovery when it fails |
+| [adding-a-connector.md](adding-a-connector.md) | Scaffolding a new connector (data store, vector store, AI provider, broker, storage) from csproj to integration tests |
 
 ---
 
