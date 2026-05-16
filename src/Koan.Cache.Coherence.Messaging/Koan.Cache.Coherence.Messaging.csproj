@@ -15,5 +15,9 @@
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
     <ProjectReference Include="..\Koan.Messaging.Core\Koan.Messaging.Core.csproj" />
+    <!-- Analyzer-only reference (KOAN0001): flags bare TryAddEnumerable on cache interfaces. -->
+    <ProjectReference Include="..\Koan.Cache.Analyzers\Koan.Cache.Analyzers.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
   </ItemGroup>
 </Project>
