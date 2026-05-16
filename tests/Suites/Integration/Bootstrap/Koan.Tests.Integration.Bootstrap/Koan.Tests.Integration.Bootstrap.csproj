@@ -37,5 +37,29 @@
 
     <!-- Messaging pillar (MessagingCorePillarBootstrapSpec) — in-process provider -->
     <ProjectReference Include="..\..\..\..\..\src\Koan.Messaging.Core\Koan.Messaging.Core.csproj" />
+
+    <!-- Auth pillar (AuthPillarBootstrapSpec) -->
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Web.Auth\Koan.Web.Auth.csproj" />
+
+    <!-- AI pillar (AiPillarBootstrapSpec) -->
+    <ProjectReference Include="..\..\..\..\..\src\Koan.AI\Koan.AI.csproj" />
+
+    <!-- Web pillar (WebPillarBootstrapSpec) -->
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Web\Koan.Web.csproj" />
+
+    <!-- Mcp pillar (McpPillarBootstrapSpec) -->
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Mcp\Koan.Mcp.csproj" />
+
+    <!-- Media pillar (MediaPillarBootstrapSpec) -->
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Media.Core\Koan.Media.Core.csproj" />
+
+    <!-- Jobs pillar (JobsPillarBootstrapSpec) -->
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Jobs.Core\Koan.Jobs.Core.csproj" />
+
+    <!-- Rag pillar (RagPillarBootstrapSpec) -->
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Rag\Koan.Rag.csproj" />
+
+    <!-- Canon pillar (CanonPillarBootstrapSpec) — Canon Web registrar is the only entry point -->
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Canon.Web\Koan.Canon.Web.csproj" />
   </ItemGroup>
 </Project>
