@@ -17,7 +17,9 @@ internal static class CachePolicyMaterializer
     public const string TypeNameTagToken = "{TypeName}";
 
     /// <summary>Floor for derived L1 TTL — caps worst-case staleness when coherence is silent.</summary>
-    public static readonly TimeSpan L1TtlFloor = TimeSpan.FromSeconds(30);
+    /// <remarks>Re-exposes <see cref="Abstractions.Policies.CacheL1TtlPolicy.DefaultFloor"/> at this
+    /// type's surface so existing call sites keep compiling; the rule itself lives in the policy.</remarks>
+    public static readonly TimeSpan L1TtlFloor = Abstractions.Policies.CacheL1TtlPolicy.DefaultFloor;
 
     public static CachePolicyDescriptor Materialize(CachePolicyAttribute attribute, MemberInfo? member, Type? declaringType)
     {
@@ -78,21 +80,13 @@ internal static class CachePolicyMaterializer
     }
 
     /// <summary>
-    /// Compute the effective L1 TTL. Explicit override wins. When unset AND <paramref name="absoluteTtl"/>
-    /// has a value, derive <c>min(L2, max(30s, L2/2))</c> — defense-in-depth default clamped to L2
-    /// so the <c>L1Ttl ≤ L2Ttl</c> invariant holds even for short L2 TTLs. Returns null when both
-    /// are null.
+    /// Compute the effective L1 TTL. Delegates to
+    /// <see cref="Abstractions.Policies.CacheL1TtlPolicy.Derive(TimeSpan?, TimeSpan?)"/> — the
+    /// single source of truth shared with the per-write path so the rule can't drift between
+    /// call sites.
     /// </summary>
     public static TimeSpan? ResolveL1Ttl(TimeSpan? absoluteTtl, TimeSpan? l1Override)
-    {
-        if (l1Override.HasValue) return l1Override;
-        if (!absoluteTtl.HasValue) return null;
-
-        var l2Seconds = absoluteTtl.Value.TotalSeconds;
-        var derived = Math.Max(L1TtlFloor.TotalSeconds, l2Seconds / 2.0);
-        var clamped = Math.Min(derived, l2Seconds);
-        return TimeSpan.FromSeconds(clamped);
-    }
+        => Abstractions.Policies.CacheL1TtlPolicy.Derive(absoluteTtl, l1Override);
 
     private static void ValidateTtl(string typeName, TimeSpan? absoluteTtl, TimeSpan? l1Ttl)
     {
