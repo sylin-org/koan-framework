@@ -16,8 +16,19 @@
   <!-- SourceLink/Repo metadata -->
   <PublishRepositoryUrl>true</PublishRepositoryUrl>
   <EmbedUntrackedSources>true</EmbedUntrackedSources>
-  <!-- NuGet package IDs: publish under Sylin.Koan.* while keeping code namespaces as Koan.* -->
-  <PackageId Condition="'$(IsPackable)' == 'true' and '$(PackageId)' == ''">Sylin.$(AssemblyName)</PackageId>
+  <!--
+    NuGet package IDs: publish under Sylin.Koan.* while keeping code namespaces as Koan.*
+
+    Condition: apply UNLESS the csproj has IsPackable=false. SDK defaults leave IsPackable
+    unset for class libraries (still packable), and that case must still get the prefix —
+    the previous `IsPackable == 'true'` condition silently failed for those projects and
+    they ended up published as `Koan.*` instead of `Sylin.Koan.*`.
+
+    Source: MSBuildProjectName (the bare csproj filename without extension). Using
+    $(AssemblyName) here would produce "Sylin." literally — AssemblyName isn't resolved
+    yet at props-evaluation time. MSBuildProjectName is always defined.
+  -->
+  <PackageId Condition="'$(IsPackable)' != 'false' and '$(PackageId)' == ''">Sylin.$(MSBuildProjectName)</PackageId>
   <!-- Common NuGet package metadata -->
   <Authors>Sylin Labs</Authors>
   <Company>Sylin Labs</Company>

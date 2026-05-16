@@ -4,6 +4,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <Description>Core orchestration logic for the Koan CLI: app discovery, manifest assembly, compose generation, and provider election. Shared with the CLI front-end (Koan.Orchestration.Cli) and consumable by tooling that builds on the same primitives.</Description>
+    <PackageTags>$(CommonPackageTags);orchestration;cli;compose;docker;podman</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

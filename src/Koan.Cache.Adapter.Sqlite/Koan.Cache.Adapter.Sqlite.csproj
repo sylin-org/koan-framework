@@ -7,6 +7,8 @@
     <LangVersion>latest</LangVersion>
     <AssemblyName>Koan.Cache.Adapter.Sqlite</AssemblyName>
     <RootNamespace>Koan.Cache.Adapter.Sqlite</RootNamespace>
+    <Description>SQLite-backed persistent L1 cache store for Koan.Cache. Provides on-disk cache persistence with tag indexing and TTL eviction. Preempts the default Memory store by ProviderPriority.</Description>
+    <PackageTags>$(CommonPackageTags);cache;adapter;sqlite;l1;persistent</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

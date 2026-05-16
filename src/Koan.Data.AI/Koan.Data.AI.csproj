@@ -7,6 +7,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
+    <Description>Entity-aware AI operations for Koan: EntityAi.Embed/Chat/Ocr, [Embedding] convention defaults, [MediaAnalysis] auto-processing pipeline, and cross-modal search via the MediaAnalysisEmbeddingBridge.</Description>
+    <PackageTags>$(CommonPackageTags);ai;embedding;rag;media-analysis;entity</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

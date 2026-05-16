@@ -150,9 +150,13 @@ jobs:
             exit 0
           }
 
+          # Publish .nupkg files. dotnet nuget push does NOT auto-publish .snupkg
+          # symbol packages alongside — they need an explicit second pass.
           $packages = @(Get-ChildItem artifacts/nuget/*.nupkg -File)
-          Write-Host "Publishing $($packages.Count) package(s) to nuget.org ..."
+          $symbols  = @(Get-ChildItem artifacts/nuget/*.snupkg -File)
+          Write-Host "Publishing $($packages.Count) package(s) + $($symbols.Count) symbol(s) to nuget.org ..."
           $failed = @()
+
           foreach ($pkg in $packages) {
             Write-Host "  -> $($pkg.Name)"
             dotnet nuget push $pkg.FullName `
@@ -164,8 +168,21 @@ jobs:
               Write-Host "::warning::Failed to publish $($pkg.Name) — continuing with remaining packages."
             }
           }
+
+          foreach ($sym in $symbols) {
+            Write-Host "  -> $($sym.Name) (symbols)"
+            dotnet nuget push $sym.FullName `
+              --source https://api.nuget.org/v3/index.json `
+              --api-key $env:NUGET_API_KEY `
+              --skip-duplicate
+            if ($LASTEXITCODE -ne 0) {
+              # Symbol push failure isn't fatal — main package is up; symbols can be re-pushed later.
+              Write-Host "::warning::Failed to publish symbols $($sym.Name) — main package is published; symbols can be retried."
+            }
+          }
+
           if ($failed.Count -gt 0) {
-            throw "$($failed.Count) package(s) failed to publish: $($failed -join ', ')"
+            throw "$($failed.Count) main package(s) failed to publish: $($failed -join ', ')"
           }
 
       - name: Summary

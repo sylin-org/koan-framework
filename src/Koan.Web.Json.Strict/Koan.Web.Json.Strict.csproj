@@ -6,6 +6,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Description>Strict JSON serialization configuration for Koan.Web — opt-in stricter defaults (no implicit type coercion, exact property names) for APIs that need contract-precise payloads.</Description>
+    <PackageTags>$(CommonPackageTags);web;json;serialization;strict</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

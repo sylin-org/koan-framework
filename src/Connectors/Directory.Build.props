@@ -1,4 +1,9 @@
 <Project>
+  <!-- Import root Directory.Build.props for common metadata (Sylin.* PackageId prefix,
+       CommonPackageTags, Authors, etc.). Without this, MSBuild only imports the nearest
+       Directory.Build.props and child files shadow the parent entirely. -->
+  <Import Project="..\..\Directory.Build.props" />
+
   <!--
     Every connector under this folder declares orchestration metadata on its adapter factory
     (typically [KoanService(...)] — see ARCH-0049). The web-auth connectors additionally publish

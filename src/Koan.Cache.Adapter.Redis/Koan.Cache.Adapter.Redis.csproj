@@ -6,6 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Koan.Cache.Adapter.Redis</AssemblyName>
     <RootNamespace>Koan.Cache.Adapter.Redis</RootNamespace>
+    <Description>Redis-backed L2 cache store for Koan.Cache. Provides distributed cache storage and Redis pub/sub coherence channel via Koan.Data.Connector.Redis's shared IConnectionMultiplexer (ARCH-0080).</Description>
+    <PackageTags>$(CommonPackageTags);cache;adapter;redis;l2;coherence</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Cache\Koan.Cache.csproj" />
