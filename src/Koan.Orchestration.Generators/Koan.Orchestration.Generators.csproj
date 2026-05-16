@@ -40,6 +40,9 @@
     <KoanPackageKind>Periphery</KoanPackageKind>
     <!-- Mark this assembly as an analyzer for consumers -->
     <IsRoslynComponent>true</IsRoslynComponent>
-    <NoWarn>$(NoWarn);RS2007;RS1035;RS1042</NoWarn>
+    <!-- See Koan.Cache.Analyzers.csproj for the rationale on these symbol/pack settings. -->
+    <IncludeSymbols>false</IncludeSymbols>
+    <IncludeSource>false</IncludeSource>
+    <NoWarn>$(NoWarn);RS2007;RS1035;RS1042;NU5017;NU5019;NU5128</NoWarn>
   </PropertyGroup>
 </Project>
