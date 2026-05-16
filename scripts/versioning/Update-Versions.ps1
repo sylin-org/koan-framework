@@ -27,11 +27,20 @@
 .PARAMETER BumpKernel
     Force a kernel-wide bump: major | minor | patch.
     Omit to keep the current kernel version unchanged.
+    Mutually exclusive with -AutoBumpKernel.
 
 .PARAMETER Reason
     Human-readable rationale for a kernel bump (recorded in the script's
     output and intended to be referenced from the commit message).
     Required when -BumpKernel is specified.
+
+.PARAMETER AutoBumpKernel
+    Detect kernel bump magnitude automatically from conventional commits
+    in kernel-manifest folders since the reference tag. Same rules as
+    periphery: feat! -> major, feat -> minor, anything else -> patch,
+    no commits -> no bump. This is the CI default — for hand-driven
+    bumps (ADR-level decisions) prefer -BumpKernel + -Reason for the
+    audit trail.
 
 .PARAMETER SinceTag
     Override the "last release" reference. Defaults to the most recent
@@ -50,15 +59,24 @@
 
 .EXAMPLE
     pwsh scripts/versioning/Update-Versions.ps1 -BumpKernel minor -Reason "ARCH-0083 contract change"
-    # Bump kernel one minor step, also pick up periphery changes
+    # Bump kernel one minor step (ADR-driven), also pick up periphery changes
+
+.EXAMPLE
+    pwsh scripts/versioning/Update-Versions.ps1 -AutoBumpKernel
+    # CI mode: detect kernel bump from commits, no manual reason required
 #>
 
-[CmdletBinding()]
+[CmdletBinding(DefaultParameterSetName='Manual')]
 param(
+    [Parameter(ParameterSetName='Manual')]
     [ValidateSet('major', 'minor', 'patch')]
     [string]$BumpKernel,
 
+    [Parameter(ParameterSetName='Manual')]
     [string]$Reason,
+
+    [Parameter(ParameterSetName='Auto')]
+    [switch]$AutoBumpKernel,
 
     [string]$SinceTag,
 
@@ -226,12 +244,38 @@ Write-Host ""
 
 # ── Compute kernel version ────────────────────────────────────────────────────
 $NewKernelVersion = $CurrentKernelVersion
+$EffectiveKernelBump = $null    # records what actually happened for downstream report
+
 if ($BumpKernel) {
+    $EffectiveKernelBump = $BumpKernel
     $NewKernelVersion = Get-NextVersion -Current $CurrentKernelVersion -Bump $BumpKernel
     Write-Host "Kernel bump: $CurrentKernelVersion -> $NewKernelVersion ($BumpKernel)" -ForegroundColor Green
     Write-Host "  Reason: $Reason" -ForegroundColor Green
-} else {
-    Write-Host "Kernel: held at $CurrentKernelVersion (no -BumpKernel)" -ForegroundColor Gray
+}
+elseif ($AutoBumpKernel) {
+    if (-not $ReferenceCommit) {
+        Write-Host "Kernel: held at $CurrentKernelVersion (-AutoBumpKernel needs a reference tag; bootstrap mode)" -ForegroundColor Gray
+    } else {
+        # Collect commits touching ANY kernel-manifest folder.
+        $kernelCommits = @()
+        foreach ($manifestPath in $KernelPaths) {
+            $folderPath = (Split-Path $manifestPath -Parent) -replace '\\', '/'
+            $kernelCommits += @(Get-CommitsForPath -Path $folderPath)
+        }
+        # Deduplicate by subject (a single commit touching N kernel folders shows N times).
+        $kernelCommits = @($kernelCommits | Sort-Object -Unique)
+        $detected = Get-BumpMagnitudeFromCommits -CommitSubjects $kernelCommits
+        if ($detected) {
+            $EffectiveKernelBump = $detected
+            $NewKernelVersion = Get-NextVersion -Current $CurrentKernelVersion -Bump $detected
+            Write-Host "Kernel auto-bump: $CurrentKernelVersion -> $NewKernelVersion ($detected, detected from kernel-folder commits)" -ForegroundColor Green
+        } else {
+            Write-Host "Kernel: held at $CurrentKernelVersion (no commits in kernel folders since $ReferenceLabel)" -ForegroundColor Gray
+        }
+    }
+}
+else {
+    Write-Host "Kernel: held at $CurrentKernelVersion (no -BumpKernel / -AutoBumpKernel)" -ForegroundColor Gray
 }
 Write-Host ""
 
@@ -303,6 +347,8 @@ $sb = [System.Text.StringBuilder]::new()
 [void]$sb.AppendLine("    Reference   : $ReferenceLabel")
 if ($BumpKernel) {
     [void]$sb.AppendLine("    Kernel bump : $BumpKernel ($Reason)")
+} elseif ($EffectiveKernelBump) {
+    [void]$sb.AppendLine("    Kernel bump : $EffectiveKernelBump (auto-detected from kernel-folder commits)")
 }
 [void]$sb.AppendLine('  -->')
 [void]$sb.AppendLine('  <PropertyGroup>')
