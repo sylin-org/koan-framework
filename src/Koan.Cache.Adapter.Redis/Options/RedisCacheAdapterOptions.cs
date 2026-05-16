@@ -6,11 +6,16 @@ namespace Koan.Cache.Adapter.Redis.Options;
 /// Storage-side options for the Redis cache adapter. Coherence pub/sub settings live in
 /// <see cref="RedisCoherenceChannelOptions"/> and are consumed by <c>RedisCoherenceChannel</c>.
 /// </summary>
+/// <remarks>
+/// <para>
+/// <b>No <c>Configuration</c> property:</b> per ARCH-0080, the connection string is owned by
+/// <c>Koan.Data.Connector.Redis</c> (read from <c>Koan:Data:Redis:ConnectionString</c>). This
+/// adapter consumes <c>IConnectionMultiplexer</c> via DI and only exposes cache-specific
+/// knobs (key/tag prefixes, optional Redis database selector, tag-index capacity).
+/// </para>
+/// </remarks>
 public sealed class RedisCacheAdapterOptions
 {
-    [Required]
-    public string Configuration { get; set; } = "localhost:6379";
-
     public string? InstanceName { get; set; }
 
     public string KeyPrefix { get; set; } = "cache:";

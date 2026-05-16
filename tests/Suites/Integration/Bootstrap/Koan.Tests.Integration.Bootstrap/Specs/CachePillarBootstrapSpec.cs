@@ -130,27 +130,23 @@ public sealed class CachePillarBootstrapSpec
     /// to get a started <see cref="IntegrationHost"/>.
     /// </summary>
     /// <remarks>
-    /// <b>Cross-pillar workaround:</b> referencing <c>Koan.Cache.Adapter.Redis</c> also pulls
-    /// <c>Koan.Data.Connector.Redis</c> in transitively. Both register
-    /// <c>IConnectionMultiplexer</c> at boot — the data connector via <c>AddSingleton</c>
-    /// (forced), the cache adapter via <c>TryAddSingleton</c> (skipped if present). The data
-    /// connector's registration therefore wins, and it reads its connection string from
-    /// <c>Koan:Data:Redis:ConnectionString</c> — NOT from <c>Cache:Redis:Configuration</c>.
-    /// Apps using both pillars MUST set both keys to the same value, or the cache silently
-    /// connects to the wrong Redis. ARCH-0080 (pending) will codify the shared-transport
-    /// ownership pattern that makes this workaround unnecessary.
+    /// Per ARCH-0080, <c>IConnectionMultiplexer</c> is owned by <c>Koan.Data.Connector.Redis</c>
+    /// and reads from the canonical <c>Koan:Data:Redis:ConnectionString</c> key. The cache
+    /// adapter consumes the multiplexer via DI and only owns cache-specific options
+    /// (key/tag prefixes, channel name).
     /// </remarks>
     private static KoanIntegrationHost.Builder BuildBootstrapHost(string redisConnectionString, string sqliteDbPath, Guid executionId)
     {
         var token = executionId.ToString("N");
         return KoanIntegrationHost.Configure()
-            .WithSetting(CacheConstants.Configuration.Redis.Configuration, redisConnectionString)
+            // ARCH-0080: data connector owns IConnectionMultiplexer; this is the canonical key.
+            .WithSetting("Koan:Data:Redis:ConnectionString", redisConnectionString)
+            .WithSetting("Koan:Data:Redis:DisableAutoDetection", "true")
+            // Cache-adapter-owned options (prefixes + channel name).
             .WithSetting(CacheConstants.Configuration.Redis.KeyPrefix, $"boot:{token}:")
             .WithSetting(CacheConstants.Configuration.Redis.TagPrefix, $"boot:tag:{token}:")
             .WithSetting(CacheConstants.Configuration.Redis.ChannelName, $"boot-cache-{token}")
-            .WithSetting("Koan:Data:Redis:ConnectionString", redisConnectionString)
-            .WithSetting("Koan:Data:Redis:DisableAutoDetection", "true")
-            .WithSetting("ConnectionStrings:Redis", redisConnectionString)
+            // SQLite adapter config.
             .WithSetting("Koan:Cache:Adapters:Sqlite:DatabasePath", sqliteDbPath)
             .WithSetting("Koan:Cache:Adapters:Sqlite:SweepIntervalSeconds", "3600")
             .ConfigureServices(services => services.AddKoan());

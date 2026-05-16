@@ -294,12 +294,20 @@ Peer (Node B):
         "TagIndexCapacity": 2048
       },
 
-      // Redis adapter (referenced separately)
+      // Redis adapter (referenced separately).
+      // Note: connection string is owned by Koan.Data.Connector.Redis per ARCH-0080;
+      // set it via Koan:Data:Redis:ConnectionString (or ConnectionStrings:Redis).
       "Redis": {
-        "Configuration": "localhost:6379",
         "KeyPrefix": "cache:",
         "TagPrefix": "cache:tag:",
         "ChannelName": "koan-cache"
+      }
+    },
+
+    // Owned by Koan.Data.Connector.Redis (ARCH-0080 canonical key).
+    "Data": {
+      "Redis": {
+        "ConnectionString": "localhost:6379"
       }
     }
   }

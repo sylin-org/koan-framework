@@ -46,7 +46,11 @@ internal sealed class RedisCacheNode : IAsyncDisposable
         CancellationToken ct)
     {
         var host = await KoanIntegrationHost.Configure()
-            .WithSetting(CacheConstants.Configuration.Redis.Configuration, connectionString)
+            // Per ARCH-0080: IConnectionMultiplexer is owned by Koan.Data.Connector.Redis;
+            // configure its canonical key. The cache adapter consumes the multiplexer via DI.
+            .WithSetting("Koan:Data:Redis:ConnectionString", connectionString)
+            .WithSetting("Koan:Data:Redis:DisableAutoDetection", "true")
+            // Cache-specific knobs the cache adapter still owns.
             .WithSetting(CacheConstants.Configuration.Redis.KeyPrefix, keyPrefix)
             .WithSetting(CacheConstants.Configuration.Redis.TagPrefix, tagPrefix)
             .WithSetting(CacheConstants.Configuration.Redis.ChannelName, channelName)
@@ -55,8 +59,12 @@ internal sealed class RedisCacheNode : IAsyncDisposable
                 services.AddLogging();
                 // Pillar core — Memory L1 + topology + coordinator + client + policies + health.
                 services.AddKoanCache();
-                // Manual adapter activation — this spec tests adapter behavior, not the
-                // reflective discovery path (which is covered by CachePillarBootstrapSpec).
+                // ARCH-0080 ownership: the data connector owns IConnectionMultiplexer.
+                new Koan.Data.Connector.Redis.Initialization.KoanAutoRegistrar().Initialize(services);
+                // The cache adapter consumes the multiplexer + registers RedisCacheStore +
+                // RedisCoherenceChannel. Manual activation here mirrors what reflective
+                // discovery does under AddKoan(); the reflective path is covered by
+                // CachePillarBootstrapSpec.
                 new Koan.Cache.Adapter.Redis.Initialization.KoanAutoRegistrar().Initialize(services);
             })
             .StartAsync(ct)

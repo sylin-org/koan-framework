@@ -16,13 +16,14 @@ namespace Koan.Tests.Integration.Bootstrap.Specs;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Cross-pillar coupling note:</b> the bootstrap test project transitively references
-/// Redis adapters via the cache pillar smoke. This spec sets <c>abortConnect=false</c> on
-/// the Redis connection string so the <c>IConnectionMultiplexer</c> factory doesn't throw at
-/// construction time. The <c>CoherenceCoordinator</c> degrade-on-subscribe-failure fix
-/// (commit on this branch) then handles the post-construction Subscribe timeout gracefully —
-/// the host comes up even though no Redis is running. ARCH-0080 will eliminate this workaround
-/// by making the cache adapter consume rather than re-register the multiplexer.
+/// <b>Residual cross-pillar config:</b> after ARCH-0080 the cache adapter no longer registers
+/// <c>IConnectionMultiplexer</c>, but <c>Koan.Data.Connector.Redis</c> (the canonical owner)
+/// still does — and its factory eagerly calls <c>ConnectionMultiplexer.Connect()</c> which
+/// throws if Redis isn't reachable. This spec supplies <c>abortConnect=false</c> on the
+/// canonical key (per ARCH-0080) so the multiplexer is constructed in non-connected state.
+/// The CoherenceCoordinator-tolerance fix then handles the downstream Subscribe failure
+/// gracefully. A follow-up branch will make the data connector's factory tolerant on its
+/// own — at which point this workaround disappears.
 /// </para>
 /// </remarks>
 public sealed class DataCorePillarBootstrapSpec
@@ -40,7 +41,7 @@ public sealed class DataCorePillarBootstrapSpec
         await using var host = await KoanIntegrationHost.Configure()
             .WithSetting("Koan:Data:Sources:Default:Adapter", "inmemory")
             .WithSetting("Koan:Environment", "Test")
-            // Cross-pillar workaround — see remarks on the class.
+            // ARCH-0080 canonical key — see remarks on the class.
             .WithSetting("Koan:Data:Redis:ConnectionString", "localhost:0,abortConnect=false,connectTimeout=100,syncTimeout=100")
             .ConfigureServices(services => services.AddKoan())
             .StartAsync();

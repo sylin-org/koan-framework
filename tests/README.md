@@ -112,7 +112,7 @@ All integration tests build their host through `Koan.Testing.Integration.KoanInt
 
 ```csharp
 await using var host = await KoanIntegrationHost.Configure()
-    .WithSetting("Cache:Redis:Configuration", redis.ConnectionString)
+    .WithSetting("Koan:Data:Redis:ConnectionString", redis.ConnectionString)  // ARCH-0080 canonical key
     .ConfigureServices(services => services.AddKoan())          // Reference = Intent
     .StartAsync(ct);
 

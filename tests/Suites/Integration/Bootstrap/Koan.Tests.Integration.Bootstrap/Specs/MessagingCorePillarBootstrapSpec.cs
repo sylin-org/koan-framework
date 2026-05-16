@@ -24,7 +24,8 @@ namespace Koan.Tests.Integration.Bootstrap.Specs;
 /// <c>Koan.Messaging.Connector.RabbitMq</c> adapter suite.
 /// </para>
 /// <para>
-/// See <see cref="DataCorePillarBootstrapSpec"/> for the cross-pillar Redis workaround note.
+/// See <see cref="DataCorePillarBootstrapSpec"/> for the residual cross-pillar Redis config
+/// note — the data connector's eager-connect is a separate concern from ARCH-0080.
 /// </para>
 /// </remarks>
 public sealed class MessagingCorePillarBootstrapSpec
@@ -40,7 +41,7 @@ public sealed class MessagingCorePillarBootstrapSpec
     public async Task AddKoan_resolves_IMessageProxy_through_real_bootstrap()
     {
         await using var host = await KoanIntegrationHost.Configure()
-            // Cross-pillar workaround — see DataCorePillarBootstrapSpec remarks.
+            // ARCH-0080 canonical key — see DataCorePillarBootstrapSpec remarks.
             .WithSetting("Koan:Data:Redis:ConnectionString", "localhost:0,abortConnect=false,connectTimeout=100,syncTimeout=100")
             .ConfigureServices(services => services.AddKoan())
             .StartAsync();

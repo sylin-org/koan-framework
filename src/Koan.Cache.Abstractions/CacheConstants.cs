@@ -14,7 +14,9 @@ public static class CacheConstants
         public static class Redis
         {
             public const string Section = "Cache:Redis";
-            public const string Configuration = "Cache:Redis:Configuration";
+            // Connection-string config key removed in ARCH-0080. IConnectionMultiplexer is
+            // owned by Koan.Data.Connector.Redis, which reads "Koan:Data:Redis:ConnectionString"
+            // as the single canonical source of truth.
             public const string Channel = "Cache:Redis:Channel";
             public const string ChannelName = "Cache:Redis:ChannelName";
             public const string KeyPrefix = "Cache:Redis:KeyPrefix";
