@@ -1,13 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <KoanPackageKind>Periphery</KoanPackageKind>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <Description>Human-in-the-loop review queues for Koan AI: approve, reject, edit, and label AI outputs to close the feedback loop.</Description>
     <PackageTags>$(CommonPackageTags);ai;review;hitl;feedback</PackageTags>
-    <Version>0.6.4</Version>
-    <AssemblyVersion>0.6.4</AssemblyVersion>
-    <FileVersion>0.6.4</FileVersion>
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Koan.AI.Review.Tests" />

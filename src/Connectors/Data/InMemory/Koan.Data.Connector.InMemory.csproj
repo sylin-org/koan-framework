@@ -13,13 +13,11 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.0" />
   </ItemGroup>
   <PropertyGroup>
+    <KoanPackageKind>Periphery</KoanPackageKind>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Description>In-memory data provider for Koan: thread-safe repository for testing, development, and ephemeral storage scenarios.</Description>
     <PackageTags>$(CommonPackageTags);data;inmemory;testing;repository</PackageTags>
-    <Version>0.1.0</Version>
-    <AssemblyVersion>0.1.0</AssemblyVersion>
-    <FileVersion>0.1.0</FileVersion>
   </PropertyGroup>
 </Project>

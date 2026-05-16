@@ -1,12 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+
+    <KoanPackageKind>Periphery</KoanPackageKind>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Description>Core service mesh and discovery implementation for Koan ServiceMesh. Provides UDP multicast-based service discovery, routing, and execution.</Description>
     <PackageTags>$(CommonPackageTags);services;discovery;mesh;orchestration</PackageTags>
-    <Version>0.1.0</Version>
   </PropertyGroup>
 
   <ItemGroup>

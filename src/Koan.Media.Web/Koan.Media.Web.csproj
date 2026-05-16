@@ -1,13 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <KoanPackageKind>Periphery</KoanPackageKind>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <Description>Web layer for Koan Media: upload endpoints, variant routing, and storage-backed streaming helpers for media entities.</Description>
     <PackageTags>$(CommonPackageTags);media;web;storage;upload;variants</PackageTags>
-    <Version>0.6.4</Version>
-    <AssemblyVersion>0.6.4</AssemblyVersion>
-    <FileVersion>0.6.4</FileVersion>
   </PropertyGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />

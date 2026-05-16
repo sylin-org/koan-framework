@@ -1,14 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <KoanPackageKind>Periphery</KoanPackageKind>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Description>Koan RAG module: entity-native corpora, agentic retrieval, emergent concept graphs, contextual chunking.</Description>
     <PackageTags>$(CommonPackageTags);ai;rag;corpus;retrieval;knowledge-graph</PackageTags>
-    <Version>0.6.4</Version>
-    <AssemblyVersion>0.6.4</AssemblyVersion>
-    <FileVersion>0.6.4</FileVersion>
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Koan.Rag.Tests" />
