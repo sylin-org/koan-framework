@@ -37,6 +37,7 @@ Framework knowledge is provided through **Agent Skills** in `.claude/skills/` th
 - **Entity-First Development**: `Todo.Get(id)`, `todo.Save()` patterns with automatic GUID v7 generation
 - **Multi-Provider Transparency**: Same entity code works across SQL, NoSQL, Vector, JSON stores
 - **Self-Reporting Infrastructure**: Services describe their capabilities in structured boot reports
+- **Integration Tests as Canon (ARCH-0079)**: Every adapter, connector, coherence channel, and pillar core ships at least one integration spec that goes through real `AddKoan()` reflective discovery using `KoanIntegrationHost`. Unit tests with fakes are insufficient — they structurally cannot reveal composition or shared-resource bugs. See [tests/README.md](tests/README.md#integration-tests-are-canon-arch-0079) for the canon pattern.
 
 ### Critical Anti-Patterns to Detect
 

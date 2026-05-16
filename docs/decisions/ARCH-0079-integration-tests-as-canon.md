@@ -10,17 +10,18 @@
 
 ## Context
 
-The cache pillar work landed on `feat/koan-cache-pillar` shipped with a real integration-test surface (M4 cornerstone, SQLite persistence round-trip, middleware TestServer, full-DI boot smoke). Across that work, three latent **systemic production bugs** were caught — none of them by the 162 pre-existing unit specs:
+The cache pillar work landed on `feat/koan-cache-pillar` shipped with a real integration-test surface (M4 cornerstone, SQLite persistence round-trip, middleware TestServer, full-DI boot smoke). Across that work, **four latent systemic production bugs** were caught — none of them by the 162 pre-existing unit specs:
 
 | Bug | Surfaced by | Pillars affected | Severity |
 |---|---|---|---|
 | `TryAddEnumerable<TService>(factory)` indistinguishable-descriptor throw | SQLite integration test | Cache (5 sites), Recipe (2 latent), Web.Extensions (1 latent) | Would crash `AddKoanCache + any adapter` at boot |
 | `CacheWriteOptions.GetEffectiveL1Ttl` not clamped to `AbsoluteTtl` | Redis SWR integration test | Cache | L1 outlives L2 for any L2 TTL < 60s |
 | Cross-pillar `IConnectionMultiplexer` registration race | Bootstrap smoke | Data.Connector.Redis + Cache.Adapter.Redis | Silent fallback to localhost:6379 when both adapters referenced with mismatched config keys |
+| `StartupProbeService` treats one adapter's unavailability as fatal to the entire host | Attempt to write per-pillar boot smokes in a project that transitively references the Redis adapter | Any Koan app referencing any infra adapter | App fails to start ALL pillars when ONE transitively-referenced infra adapter is unavailable, even if no pillar actually uses it |
 
 Each bug was structurally invisible to unit tests because units hand-roll their DI graphs and skip the production bootstrap path. Each bug required exactly **one** integration test to surface.
 
-This is not anecdotal. It is a **category claim** with three data points across one branch: integration tests reveal bug classes that unit tests cannot.
+This is not anecdotal. It is a **category claim** with four data points across one branch: integration tests reveal bug classes that unit tests cannot.
 
 ### Forces
 
@@ -123,8 +124,10 @@ Acceptance: all four cache integration suites + the bootstrap smoke compile and 
    - Write boot-smoke specs for the remaining pillar cores beyond Cache (~12 hr).
    - Update docs: `tests/README.md` + `koan-caching` skill + CLAUDE.md (~1 hr).
 
-2. **Follow-up branch (`arch/0080-shared-transport-ownership`)**:
-   - Codify the shared-transport pattern; refactor Redis multiplexer ownership; cache adapter becomes consumer; remove the workaround comment from `CachePillarBootstrapSpec`.
+2. **Follow-up branches**:
+   - `arch/0080-shared-transport-ownership` — codify the shared-transport pattern; refactor Redis multiplexer ownership; cache adapter becomes consumer; remove the workaround comment from `CachePillarBootstrapSpec`.
+   - `fix/startup-probe-degrade-not-throw` — `StartupProbeService` should mark probes failed (degraded health) rather than abort host startup. Currently any infra adapter that's transitively referenced but unavailable kills the host even when no pillar uses it. Surfaced while attempting per-pillar boot smokes.
+   - Per-pillar bootstrap test projects (`Koan.Tests.Integration.Bootstrap.Data`, `.Storage`, `.Messaging`, etc.) — required because the cross-project coupling otherwise forces every pillar smoke to satisfy every transitively-referenced adapter's runtime requirements.
 
 3. **Tracked backlog (next 2 release cycles)**:
    - Testcontainers integration tests for the remaining ~20 containerizable adapters.
