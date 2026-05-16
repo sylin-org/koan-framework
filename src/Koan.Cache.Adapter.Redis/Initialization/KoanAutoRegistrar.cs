@@ -1,15 +1,13 @@
 using Koan.Cache.Abstractions;
-using Koan.Cache.Abstractions.Coherence;
-using Koan.Cache.Abstractions.Stores;
 using Koan.Cache.Adapter.Redis.Coherence;
 using Koan.Cache.Adapter.Redis.Options;
 using Koan.Cache.Adapter.Redis.Stores;
+using Koan.Cache.Abstractions.Extensions;
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 
 namespace Koan.Cache.Adapter.Redis.Initialization;
@@ -64,17 +62,10 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // owner, per ARCH-0080). This adapter does not duplicate that registration; it just
         // injects the multiplexer into RedisCacheStore and RedisCoherenceChannel via DI.
 
-        // Storage: RedisCacheStore as Remote (L2) tier. Two-generic overload keeps the
-        // descriptor's ImplementationType distinguishable from the service type — see the
-        // matching comment in CacheServiceCollectionExtensions.AddKoanCache.
-        services.TryAddSingleton<RedisCacheStore>();
-        services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<ICacheStore, RedisCacheStore>(sp => sp.GetRequiredService<RedisCacheStore>()));
-
-        // Coherence: RedisCoherenceChannel as ICacheCoherenceChannel.
-        services.TryAddSingleton<RedisCoherenceChannel>();
-        services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<ICacheCoherenceChannel, RedisCoherenceChannel>(sp => sp.GetRequiredService<RedisCoherenceChannel>()));
+        // Typed registration helpers hide the descriptor shape so the indistinguishable-
+        // descriptor bug class can't return through this adapter.
+        services.AddCacheStore<RedisCacheStore>();
+        services.AddCoherenceChannel<RedisCoherenceChannel>();
     }
 
     public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)

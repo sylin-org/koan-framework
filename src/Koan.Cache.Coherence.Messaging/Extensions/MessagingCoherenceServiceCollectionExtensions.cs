@@ -1,10 +1,9 @@
 using System.Threading.Tasks;
-using Koan.Cache.Abstractions.Coherence;
 using Koan.Cache.Coherence.Messaging.Channel;
+using Koan.Cache.Abstractions.Extensions;
 using Koan.Core.Hosting.App;
 using Koan.Messaging;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Koan.Cache.Coherence.Messaging.Extensions;
 
@@ -14,15 +13,12 @@ namespace Koan.Cache.Coherence.Messaging.Extensions;
 public static class MessagingCoherenceServiceCollectionExtensions
 {
     /// <summary>
-    /// Register <see cref="MessagingCoherenceChannel"/> as an <see cref="ICacheCoherenceChannel"/>
+    /// Register <see cref="MessagingCoherenceChannel"/> as an <c>ICacheCoherenceChannel</c>
     /// and wire up the messaging handler that routes incoming envelopes to it.
     /// </summary>
     public static IServiceCollection AddKoanCacheMessagingCoherence(this IServiceCollection services)
     {
-        services.TryAddSingleton<MessagingCoherenceChannel>();
-        services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<ICacheCoherenceChannel, MessagingCoherenceChannel>(
-                sp => sp.GetRequiredService<MessagingCoherenceChannel>()));
+        services.AddCoherenceChannel<MessagingCoherenceChannel>();
 
         // Register the messaging handler — it captures AppHost.Current at invocation time
         // to resolve the channel singleton. This sidesteps the chicken-and-egg of needing

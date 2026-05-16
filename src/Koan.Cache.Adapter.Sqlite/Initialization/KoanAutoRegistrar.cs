@@ -1,13 +1,12 @@
-using Koan.Cache.Abstractions.Stores;
 using Koan.Cache.Adapter.Sqlite.Options;
 using Koan.Cache.Adapter.Sqlite.Stores;
+using Koan.Cache.Abstractions.Extensions;
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Core.Provenance;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 
 namespace Koan.Cache.Adapter.Sqlite.Initialization;
@@ -26,10 +25,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     public void Initialize(IServiceCollection services)
     {
         services.AddKoanOptions<SqliteCacheOptions>("Koan:Cache:Adapters:Sqlite");
-
-        services.TryAddSingleton<SqliteCacheStore>();
-        services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<ICacheStore, SqliteCacheStore>(sp => sp.GetRequiredService<SqliteCacheStore>()));
+        services.AddCacheStore<SqliteCacheStore>();
     }
 
     public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)

@@ -1,6 +1,7 @@
 using System;
 using Koan.Cache.Abstractions;
 using Koan.Cache.Abstractions.Adapters;
+using Koan.Cache.Abstractions.Extensions;
 using Koan.Cache.Abstractions.Policies;
 using Koan.Cache.Abstractions.Serialization;
 using Koan.Cache.Abstractions.Stores;
@@ -63,17 +64,11 @@ public static class CacheServiceCollectionExtensions
         services.TryAddEnumerable(ServiceDescriptor.Singleton<ICacheSerializer, BinaryCacheSerializer>());
 
         // Default built-in L1 store: Memory. Adapters add their own stores via
-        // TryAddEnumerable(ServiceDescriptor.Singleton<ICacheStore>, sp => ...).
+        // CacheRegistrationExtensions.AddCacheStore<T>() (canonical per the typed-helper
+        // pattern that prevents the indistinguishable-descriptor bug from recurring).
         services.AddMemoryCache();
         services.AddKoanOptions<MemoryCacheAdapterOptions>(CacheConstants.Configuration.Memory.Section);
-        services.TryAddSingleton<MemoryCacheStore>();
-        // Two-generic overload (TService + TImplementation) keeps the descriptor's
-        // ImplementationType distinguishable from the service type, so TryAddEnumerable
-        // can correctly dedup against adapter-registered stores. The plain
-        // Singleton<ICacheStore>(factory) form sets ImplementationType = ICacheStore,
-        // which TryAddEnumerable rejects as "indistinguishable".
-        services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<ICacheStore, MemoryCacheStore>(sp => sp.GetRequiredService<MemoryCacheStore>()));
+        services.AddCacheStore<MemoryCacheStore>();
 
         // Topology
         services.TryAddSingleton<CacheStoreRegistry>();

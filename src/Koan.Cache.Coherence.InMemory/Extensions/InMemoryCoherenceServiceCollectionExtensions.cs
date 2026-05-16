@@ -1,5 +1,5 @@
-using Koan.Cache.Abstractions.Coherence;
 using Koan.Cache.Coherence.InMemory.Channel;
+using Koan.Cache.Abstractions.Extensions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -18,10 +18,7 @@ public static class InMemoryCoherenceServiceCollectionExtensions
     public static IServiceCollection AddKoanCacheInMemoryCoherence(this IServiceCollection services)
     {
         services.TryAddSingleton<InMemoryCoherenceBus>();
-        services.TryAddSingleton<InMemoryCoherenceChannel>();
-        services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<ICacheCoherenceChannel, InMemoryCoherenceChannel>(
-                sp => sp.GetRequiredService<InMemoryCoherenceChannel>()));
+        services.AddCoherenceChannel<InMemoryCoherenceChannel>();
         return services;
     }
 }
