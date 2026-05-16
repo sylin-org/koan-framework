@@ -215,6 +215,26 @@ public sealed class CacheRegistrationAnalyzerSpec
     }
 
     /// <summary>
+    /// Every FQN in <see cref="CacheRegistrationAnalyzer.KnownInterfaces"/> must resolve to a real
+    /// type in <c>Koan.Cache.Abstractions</c>. Without this guard a silent typo would disable
+    /// detection for that interface — every positive spec would still pass (because the spec uses
+    /// the actual interface, which already happens to match the FQN). This is the only test that
+    /// catches "the FQN in the analyzer doesn't match what the abstractions assembly exposes."
+    /// </summary>
+    [Fact]
+    public void Every_KnownInterfaces_entry_resolves_to_a_real_type()
+    {
+        var abstractionsAssembly = typeof(Koan.Cache.Abstractions.Stores.ICacheStore).Assembly;
+
+        foreach (var (fqn, helperName) in CacheRegistrationAnalyzer.KnownInterfaces)
+        {
+            var type = abstractionsAssembly.GetType(fqn, throwOnError: false);
+            type.Should().NotBeNull($"FQN '{fqn}' (mapped to helper '{helperName}') in CacheRegistrationAnalyzer.KnownInterfaces must resolve to a real type in {abstractionsAssembly.GetName().Name}");
+            type!.IsInterface.Should().BeTrue($"FQN '{fqn}' must point at an interface (the analyzer logic assumes interface types)");
+        }
+    }
+
+    /// <summary>
     /// Parse the source, build a compilation with the necessary references, run
     /// <see cref="CacheRegistrationAnalyzer"/>, and return the analyzer's diagnostics.
     /// Compiler-side diagnostics (CS-prefixed) are filtered out — the analyzer's behavior is

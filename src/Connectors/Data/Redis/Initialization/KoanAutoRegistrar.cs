@@ -70,23 +70,55 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
             // in adapters), not a startup-fatal one. Pre-fix callers had to embed
             // `abortConnect=false` in every connection string to avoid eager Connect() throws;
             // now the factory defaults that for them.
-            var options = ConfigurationOptions.Parse(cs);
-            if (!cs.Contains("abortConnect", StringComparison.OrdinalIgnoreCase))
-            {
-                options.AbortOnConnectFail = false;
-            }
-
+            //
+            // Parse + Connect are wrapped in the same try so a malformed connection string
+            // doesn't slip past as a bare ArgumentException/FormatException.
+            var abortConnectImplicitlyDefaulted = !cs.Contains("abortConnect", StringComparison.OrdinalIgnoreCase);
             try
             {
-                return ConnectionMultiplexer.Connect(options);
+                var options = ConfigurationOptions.Parse(cs);
+                if (abortConnectImplicitlyDefaulted)
+                {
+                    options.AbortOnConnectFail = false;
+                }
+
+                var mux = ConnectionMultiplexer.Connect(options);
+
+                // DX guard: with implicit AbortOnConnectFail=false, a typo'd connection string
+                // boots silently into a permanently disconnected state. Surface that as a
+                // Warning so deployments don't go undetected until first request. Users who
+                // pinned abortConnect explicitly know what they signed up for.
+                if (abortConnectImplicitlyDefaulted && !mux.IsConnected)
+                {
+                    logger?.LogWarning(
+                        "Redis multiplexer constructed but NOT connected to {ConnectionString}. " +
+                        "AbortOnConnectFail defaulted to false (tolerant) — the host will boot, but cache/coherence " +
+                        "operations will fail until Redis becomes reachable. Pin abortConnect=true in the connection " +
+                        "string to fail fast on misconfig.",
+                        cs);
+                }
+
+                return mux;
             }
             catch (RedisConnectionException ex)
             {
                 // With AbortOnConnectFail=false this branch should be unreachable on transport
-                // failure; preserved for genuinely malformed config (auth rejection, etc.).
+                // failure; preserved for genuinely malformed config (auth rejection, etc.) and
+                // for callers who pinned abortConnect=true.
                 logger?.LogError(ex, "Redis connection failed: {Message}", ex.Message);
                 throw new InvalidOperationException($"Redis is not available. Connection string: {cs}. " +
                     "Ensure Redis is running or use the Aspire AppHost for managed Redis.", ex);
+            }
+            catch (Exception ex) when (ex is ArgumentException or FormatException)
+            {
+                // Parse-time failure: the connection string itself is malformed (not just
+                // unreachable). Wrap with the same helpful guidance the connect branch uses.
+                logger?.LogError(ex, "Redis connection string is malformed: {Message}", ex.Message);
+                throw new InvalidOperationException(
+                    $"Redis connection string is malformed and could not be parsed: {cs}. " +
+                    "Expected StackExchange.Redis configuration syntax (e.g., 'localhost:6379' or " +
+                    "'host1:6379,host2:6379,abortConnect=false'). See https://stackexchange.github.io/StackExchange.Redis/Configuration.",
+                    ex);
             }
         });
     }

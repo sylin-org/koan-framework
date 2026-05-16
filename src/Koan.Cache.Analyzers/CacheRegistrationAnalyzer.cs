@@ -57,7 +57,12 @@ public sealed class CacheRegistrationAnalyzer : DiagnosticAnalyzer
     /// Map from fully-qualified service interface → the typed helper that should be used.
     /// Adding a new pillar interface to the canon: append a new pair here.
     /// </summary>
-    private static readonly IReadOnlyDictionary<string, string> KnownInterfaces =
+    /// <remarks>
+    /// Exposed as <c>internal</c> so tests can reflectively verify each FQN resolves to a real
+    /// type in the abstractions assembly — silent typo here would disable detection without
+    /// failing any positive spec.
+    /// </remarks>
+    internal static readonly IReadOnlyDictionary<string, string> KnownInterfaces =
         new Dictionary<string, string>
         {
             ["Koan.Cache.Abstractions.Stores.ICacheStore"] = "AddCacheStore",
