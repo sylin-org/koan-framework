@@ -17,7 +17,7 @@ The cache pillar work landed on `feat/koan-cache-pillar` shipped with a real int
 | `TryAddEnumerable<TService>(factory)` indistinguishable-descriptor throw | SQLite integration test | Cache (5 sites), Recipe (2 latent), Web.Extensions (1 latent) | Would crash `AddKoanCache + any adapter` at boot |
 | `CacheWriteOptions.GetEffectiveL1Ttl` not clamped to `AbsoluteTtl` | Redis SWR integration test | Cache | L1 outlives L2 for any L2 TTL < 60s |
 | Cross-pillar `IConnectionMultiplexer` registration race | Bootstrap smoke | Data.Connector.Redis + Cache.Adapter.Redis | Silent fallback to localhost:6379 when both adapters referenced with mismatched config keys |
-| `StartupProbeService` treats one adapter's unavailability as fatal to the entire host | Attempt to write per-pillar boot smokes in a project that transitively references the Redis adapter | Any Koan app referencing any infra adapter | App fails to start ALL pillars when ONE transitively-referenced infra adapter is unavailable, even if no pillar actually uses it |
+| `CoherenceCoordinator.StartAsync` propagated `ICacheCoherenceChannel.Subscribe` failures, aborting host startup | Attempt to write per-pillar boot smokes in a project that transitively references the Redis cache adapter without Redis running | Any Koan app referencing `Koan.Cache.Adapter.Redis` without Redis available at startup | App fails to start when the coherence channel can't reach its transport, even if no pillar actually uses the cache. Fixed by wrapping `Subscribe` in per-channel try-catch with degrade-or-fail semantics keyed off `CoherenceMode`. |
 
 Each bug was structurally invisible to unit tests because units hand-roll their DI graphs and skip the production bootstrap path. Each bug required exactly **one** integration test to surface.
 
@@ -125,9 +125,9 @@ Acceptance: all four cache integration suites + the bootstrap smoke compile and 
    - Update docs: `tests/README.md` + `koan-caching` skill + CLAUDE.md (~1 hr).
 
 2. **Follow-up branches**:
-   - `arch/0080-shared-transport-ownership` — codify the shared-transport pattern; refactor Redis multiplexer ownership; cache adapter becomes consumer; remove the workaround comment from `CachePillarBootstrapSpec`.
-   - `fix/startup-probe-degrade-not-throw` — `StartupProbeService` should mark probes failed (degraded health) rather than abort host startup. Currently any infra adapter that's transitively referenced but unavailable kills the host even when no pillar uses it. Surfaced while attempting per-pillar boot smokes.
-   - Per-pillar bootstrap test projects (`Koan.Tests.Integration.Bootstrap.Data`, `.Storage`, `.Messaging`, etc.) — required because the cross-project coupling otherwise forces every pillar smoke to satisfy every transitively-referenced adapter's runtime requirements.
+   - `arch/0080-shared-transport-ownership` — codify the shared-transport pattern; refactor Redis multiplexer ownership; cache adapter becomes consumer; remove the `abortConnect=false` workaround from the pillar boot smokes.
+   - **`fix/coherence-tolerate-channel-subscribe-failures` — landed on this branch.** `CoherenceCoordinator.StartAsync` now wraps each channel's `Subscribe` in per-channel try-catch and applies degrade-or-fail semantics by `CoherenceMode` (AutoDetect → partial coherence acceptable; Required → any failure throws). Unblocks per-pillar boot smokes when Redis isn't running, eliminates "Redis-down kills host" as a failure mode.
+   - Per-pillar bootstrap test projects (when adapter test scopes grow large enough to justify them) — for now the single bootstrap project hosts the cache, Data.Core, Storage, and Messaging pillar smokes side-by-side using the `abortConnect=false` workaround.
 
 3. **Tracked backlog (next 2 release cycles)**:
    - Testcontainers integration tests for the remaining ~20 containerizable adapters.

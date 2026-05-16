@@ -110,10 +110,26 @@ internal sealed class CoherenceCoordinator : IHostedService, IAsyncDisposable
         using var startupCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         startupCts.CancelAfter(TimeSpan.FromMilliseconds(opts.CoherenceStartupTimeoutMs));
 
+        var subscribed = 0;
+        var subscribeFailures = new List<(ICacheCoherenceChannel Channel, Exception Error)>();
+
         foreach (var channel in _channels)
         {
-            await channel.Subscribe(OnReceived, startupCts.Token).ConfigureAwait(false);
-            _logger.LogInformation("Koan.Cache coherence: subscribed to {Transport}.", channel.TransportName);
+            try
+            {
+                await channel.Subscribe(OnReceived, startupCts.Token).ConfigureAwait(false);
+                _logger.LogInformation("Koan.Cache coherence: subscribed to {Transport}.", channel.TransportName);
+                subscribed++;
+            }
+            catch (Exception ex)
+            {
+                subscribeFailures.Add((channel, ex));
+                _logger.LogWarning(ex,
+                    "Koan.Cache coherence: failed to subscribe to {Transport}; channel will be inactive until next restart.",
+                    channel.TransportName);
+                // Skip CatchUp for failed channels — there's nothing to catch up against.
+                continue;
+            }
 
             if (channel.Capabilities.SupportsCatchUp)
             {
@@ -130,7 +146,31 @@ internal sealed class CoherenceCoordinator : IHostedService, IAsyncDisposable
             }
         }
 
-        _active = true;
+        // CoherenceMode.Required is a strict contract: every registered channel must subscribe.
+        // Any failure means the application's coherence guarantees can't be honored; fail boot.
+        // AutoDetect is permissive: degrade gracefully if some/all channels can't reach their
+        // transport. The host stays alive; broadcasts are no-ops until a restart with reachable
+        // infra. This is the right default per ARCH-0079 (a downed Redis cache shouldn't kill
+        // an app whose other pillars are healthy).
+        if (opts.CoherenceMode == CoherenceMode.Required && subscribeFailures.Count > 0)
+        {
+            var first = subscribeFailures[0];
+            throw new InvalidOperationException(
+                $"CacheOptions.CoherenceMode = Required, but {subscribeFailures.Count} of {_channels.Count} coherence channel(s) " +
+                $"failed to subscribe. First failure: {first.Channel.TransportName} — {first.Error.Message}. " +
+                $"Set CoherenceMode to AutoDetect (default) to allow graceful degradation, " +
+                $"or fix the transport(s) before restarting.",
+                first.Error);
+        }
+
+        _active = subscribed > 0;
+
+        if (subscribeFailures.Count > 0)
+        {
+            _logger.LogWarning(
+                "Koan.Cache coherence: started in degraded mode — {Subscribed} of {Total} channel(s) subscribed; {Failed} failed.",
+                subscribed, _channels.Count, subscribeFailures.Count);
+        }
     }
 
     public Task StopAsync(CancellationToken ct)
