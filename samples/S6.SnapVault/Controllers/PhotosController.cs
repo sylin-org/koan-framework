@@ -212,7 +212,7 @@ public class PhotosController : EntityController<PhotoAsset>
                 }
 
                 // Use semantic search service (returns List<PhotoAsset>)
-                var searchResults = await _processingService.SemanticSearchAsync(
+                var searchResults = await _processingService.SemanticSearch(
                     query: searchQuery,
                     eventId: null,
                     alpha: searchAlpha,
@@ -355,7 +355,7 @@ public class PhotosController : EntityController<PhotoAsset>
                 queuedCount++;
 
                 // Notify clients that file is queued
-                await _hubContext.Clients.Group($"job:{job.Id}").SendAsync("PhotoQueued", new PhotoProgressEvent
+                await _hubContext.Clients.Group($"job:{job.Id}").Send("PhotoQueued", new PhotoProgressEvent
                 {
                     JobId = job.Id,
                     PhotoId = "", // Not yet created
@@ -401,7 +401,7 @@ public class PhotosController : EntityController<PhotoAsset>
         }
 
         // Use service for semantic search with user-controlled alpha (with built-in fallback)
-        var photos = await _processingService.SemanticSearchAsync(
+        var photos = await _processingService.SemanticSearch(
             query: request.Query,
             eventId: request.EventId,
             alpha: request.Alpha,
@@ -514,7 +514,7 @@ public class PhotosController : EntityController<PhotoAsset>
         {
             try
             {
-                await _processingService.GenerateAIMetadataAsync(photo, CancellationToken.None);
+                await _processingService.GenerateAIMetadata(photo, CancellationToken.None);
                 _logger.LogInformation("Successfully regenerated AI metadata for photo {PhotoId}", id);
             }
             catch (Exception ex)
@@ -539,7 +539,7 @@ public class PhotosController : EntityController<PhotoAsset>
     {
         try
         {
-            var photo = await _processingService.RegenerateAIAnalysisAsync(id, request?.AnalysisStyleId, ct);
+            var photo = await _processingService.RegenerateAIAnalysis(id, request?.AnalysisStyleId, ct);
             return Ok(photo);
         }
         catch (InvalidOperationException ex)

@@ -32,7 +32,7 @@ public interface IKoanAdapter : IHealthContributor
     /// <summary>
     /// Bootstrap data for initial discovery and logging integration
     /// </summary>
-    Task<IReadOnlyDictionary<string, object?>?> GetBootstrapMetadataAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyDictionary<string, object?>?> GetBootstrapMetadata(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Initialize the adapter with configuration and dependencies

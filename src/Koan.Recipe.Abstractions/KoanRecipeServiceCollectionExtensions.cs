@@ -6,7 +6,7 @@ namespace Koan.Recipe.Abstractions;
 
 public static class KoanRecipeServiceCollectionExtensions
 {
-    private const string ConfigRoot = "Koan:Recipes";
+    private const string ConfigRoot = Infrastructure.ConfigurationConstants.Section;
 
     public static IServiceCollection AddRecipe<T>(this IServiceCollection services)
         where T : class, IKoanRecipe
@@ -31,8 +31,10 @@ public static class KoanRecipeServiceCollectionExtensions
 
     internal static void ApplyActiveRecipes(IServiceCollection services)
     {
-        // Bind options if IConfiguration is present
+        // Bind options if IConfiguration is present.
         services.AddOptions<KoanRecipeOptions>();
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanInitializer>(sp => new RecipeInitializer()));
+        // Uses Singleton<TService, TImplementation>(factory) form so TryAddEnumerable can correctly
+        // dedup the descriptor. See RecipeInitializer.cs for the same idiom and rationale.
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanInitializer, RecipeInitializer>(sp => new RecipeInitializer()));
     }
 }

@@ -118,7 +118,7 @@ public class CanonEntitiesController<TModel> : EntityController<TModel>
         if (query.TryGetValue("views", out var viewsValue) && !StringValues.IsNullOrEmpty(viewsValue))
         {
             var views = viewsValue
-        .SelectMany(static value => (value ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        .SelectMany(static value => (value ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
             if (views.Length > 0)
@@ -138,7 +138,7 @@ public class CanonEntitiesController<TModel> : EntityController<TModel>
 
             if (rawKey.StartsWith("tag.", StringComparison.OrdinalIgnoreCase))
             {
-                var key = rawKey.Length > 4 ? rawKey[4..] : string.Empty;
+                var key = rawKey.Length > 4 ? rawKey[4..] : "";
                 if (string.IsNullOrWhiteSpace(key))
                 {
                     continue;
@@ -159,7 +159,7 @@ public class CanonEntitiesController<TModel> : EntityController<TModel>
                 if (parts.Length == 2 && !string.IsNullOrEmpty(parts[0]))
                 {
                     var tagKey = parts[0];
-                    var tagValue = parts[1] ?? string.Empty;
+                    var tagValue = parts[1] ?? "";
                     options = options.WithTag(tagKey, tagValue);
                 }
             }
@@ -175,7 +175,7 @@ public class CanonEntitiesController<TModel> : EntityController<TModel>
 
             if (headerKey.StartsWith("X-Canon-Tag-", StringComparison.OrdinalIgnoreCase))
             {
-                var key = headerKey.Length > 12 ? headerKey[12..] : string.Empty;
+                var key = headerKey.Length > 12 ? headerKey[12..] : "";
                 if (string.IsNullOrWhiteSpace(key))
                 {
                     continue;
@@ -194,7 +194,7 @@ public class CanonEntitiesController<TModel> : EntityController<TModel>
 
     private bool TryGetHeaderOrQueryValue(string headerName, string queryName, [NotNullWhen(true)] out string? value)
     {
-        value = string.Empty;
+        value = "";
         var context = HttpContext;
         if (context?.Request is not { } request)
         {
@@ -218,7 +218,7 @@ public class CanonEntitiesController<TModel> : EntityController<TModel>
 
     private bool TryGetCorrelationId([NotNullWhen(true)] out string? correlationId)
     {
-        correlationId = string.Empty;
+        correlationId = "";
         var context = HttpContext;
         if (context?.Request is not { } request)
         {
@@ -261,7 +261,7 @@ public class CanonEntitiesController<TModel> : EntityController<TModel>
     {
         if (StringValues.IsNullOrEmpty(source))
         {
-            value = string.Empty;
+            value = "";
             return false;
         }
 
@@ -272,7 +272,7 @@ public class CanonEntitiesController<TModel> : EntityController<TModel>
     private static CanonizationOptions AddTagOption(CanonizationOptions options, string key, string? value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
-        return options.WithTag(key, value ?? string.Empty);
+        return options.WithTag(key, value ?? "");
     }
 
     public sealed record CanonizationResponse<T>(

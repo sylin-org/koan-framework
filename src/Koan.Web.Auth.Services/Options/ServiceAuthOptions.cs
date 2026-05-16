@@ -16,8 +16,8 @@ public sealed class ServiceAuthOptions
 
     // Authentication
     public string TokenEndpoint { get; init; } = "/.testoauth/token";
-    public string ClientId { get; set; } = string.Empty; // Auto-generated if empty
-    public string ClientSecret { get; set; } = string.Empty; // Auto-generated in dev
+    public string ClientId { get; set; } = ""; // Auto-generated if empty
+    public string ClientSecret { get; set; } = ""; // Auto-generated in dev
     public string[] DefaultScopes { get; set; } = new[] { "koan:service" };
 
     // Security

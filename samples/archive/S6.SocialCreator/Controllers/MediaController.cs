@@ -30,8 +30,8 @@ public sealed class MediaController : Koan.Media.Web.Controllers.MediaContentCon
     [HttpGet("{id:guid}/{*filename}")]
     public async Task<IActionResult> GetById(Guid id, string? filename, CancellationToken ct)
     {
-        var srcExt = System.IO.Path.GetExtension(filename ?? string.Empty);
-        var key = id.ToString("N") + (string.IsNullOrWhiteSpace(srcExt) ? string.Empty : srcExt.ToLowerInvariant());
+        var srcExt = System.IO.Path.GetExtension(filename ?? "");
+        var key = id.ToString("N") + (string.IsNullOrWhiteSpace(srcExt) ? "" : srcExt.ToLowerInvariant());
         var stat = await StorageEntity<ProfileMedia>.Head(key, ct);
         if (stat is null)
         {
@@ -54,13 +54,13 @@ public sealed class MediaController : Koan.Media.Web.Controllers.MediaContentCon
 
         // Canonical signature
         (string hash, string json) = SignatureUtility.BuildSignature(key, stat, ops);
-        var flairName = string.IsNullOrWhiteSpace(filename) ? (id.ToString("N") + (string.IsNullOrWhiteSpace(srcExt) ? string.Empty : srcExt)) : filename!;
+        var flairName = string.IsNullOrWhiteSpace(filename) ? (id.ToString("N") + (string.IsNullOrWhiteSpace(srcExt) ? "" : srcExt)) : filename!;
 
         // Variant storage path
         var variantKey = $"variants/{key}/{hash}/{flairName}";
 
         // Short-circuit: if exists, redirect to canonical id path which is the storage key
-        var exists = await _storage.ExistsAsync("", "media", variantKey, ct);
+        var exists = await _storage.Exists("", "media", variantKey, ct);
         if (exists)
         {
             Response.Headers[HttpHeaderNames.XMediaVariant] = hash;
@@ -71,7 +71,7 @@ public sealed class MediaController : Koan.Media.Web.Controllers.MediaContentCon
         // Create variant on-the-fly
         await using var srcFile = await StorageEntity<ProfileMedia>.OpenRead(key, ct);
         await using var src = new MemoryStream();
-        await srcFile.CopyToAsync(src, ct);
+        await srcFile.CopyTo(src, ct);
         src.Position = 0;
 
         // Execute pipeline serially
@@ -109,7 +109,7 @@ public sealed class MediaController : Koan.Media.Web.Controllers.MediaContentCon
         }
 
         // Persist
-        await _storage.PutAsync("", "media", variantKey, current, contentType, ct);
+        await _storage.Put("", "media", variantKey, current, contentType, ct);
 
         Response.Headers[HttpHeaderNames.XMediaVariant] = hash;
         var redirect = Url.ActionLink(action: nameof(Get), controller: null, values: new { key = variantKey }, protocol: Request.Scheme, host: Request.Host.ToString());

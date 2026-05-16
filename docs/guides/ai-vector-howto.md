@@ -2,13 +2,19 @@
 type: GUIDE
 domain: ai
 title: "AI & Vector Search How-To"
-audience: [developers, architects]
+audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2025-10-03
+last_updated: 2025-11-09
 framework_version: v0.6.3
 validation:
-  status: tested
-  scope: S5.Recs, samples/ai-demos
+  date_last_tested: 2025-11-09
+  status: verified
+  scope: all-examples-tested
+related_guides:
+  - entity-capabilities-howto.md
+  - patch-capabilities-howto.md
+  - canon-capabilities-howto.md
+  - mcp-http-sse-howto.md
 ---
 
 # Koan AI & Vector Search – End-to-End How-To
@@ -18,6 +24,12 @@ This guide walks through everything Koan offers for AI-powered semantic search, 
 - **S5.Recs** – Media recommendation engine with hybrid search and personalized vectors
 - **AI demos** – Sample applications showing embedding patterns and caching strategies
 - **Production patterns** – Real-world optimization and monitoring approaches
+
+**Related Guides:**
+- [Entity Capabilities](entity-capabilities-howto.md) – Core entity patterns for data access
+- [PATCH Operations](patch-capabilities-howto.md) – Partial update patterns for entities
+- [Canon Entities](canon-capabilities-howto.md) – Multi-source aggregation and conflict resolution
+- [MCP over HTTP+SSE](mcp-http-sse-howto.md) – Expose entities to AI agents
 
 ---
 
@@ -899,5 +911,11 @@ await foreach (var batch in vectorRepo.ExportAllAsync(batchSize: 100, ct))
 5. Add personalization for returning users (section 5)
 
 Explore the S5.Recs sample to see production patterns in action. The combination of semantic search, hybrid matching, and personalization creates powerful recommendation experiences that understand both explicit queries and implicit user preferences.
+
+**Related Guides:**
+- [Entity Capabilities](entity-capabilities-howto.md) – Learn core entity patterns for data access and CRUD operations
+- [PATCH Operations](patch-capabilities-howto.md) – Apply partial updates to entities across providers
+- [Canon Entities](canon-capabilities-howto.md) – Aggregate data from multiple sources with conflict resolution
+- [MCP over HTTP+SSE](mcp-http-sse-howto.md) – Expose your AI-powered entities to remote AI agents
 
 When in doubt, stick to the capability-first patterns above. They keep your code provider-agnostic and ready for model upgrades without breaking changes.

@@ -31,7 +31,7 @@ public sealed class AggregationPolicyAttribute : Attribute
     /// <summary>
     /// Gets or sets the ordered collection of authoritative source keys for <see cref="AggregationPolicyKind.SourceOfTruth"/> policies.
     /// </summary>
-    public string[] Sources { get; set; } = Array.Empty<string>();
+    public string[] Sources { get; set; } = [];
 
     /// <summary>
     /// Gets or sets the fallback policy used until an authoritative source contributes.
@@ -55,7 +55,7 @@ public sealed class AggregationPolicyAttribute : Attribute
 
         if (Sources.Length == 0)
         {
-            return Array.Empty<string>();
+            return [];
         }
 
         return Sources

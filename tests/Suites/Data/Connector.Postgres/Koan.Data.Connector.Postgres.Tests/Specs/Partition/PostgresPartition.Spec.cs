@@ -21,7 +21,7 @@ public sealed class PostgresPartitionSpec
         await TestPipeline.For<PostgresPartitionSpec>(_output, nameof(Partition_scopes_isolate_entities))
             .RequireDocker()
             .UsingPostgresContainer(database: databaseName)
-            .Using<PostgresConnectorFixture>("fixture", static ctx => PostgresConnectorFixture.CreateAsync(ctx))
+            .Using<PostgresConnectorFixture>("fixture", static ctx => PostgresConnectorFixture.Create(ctx))
             .Arrange(static async ctx =>
             {
                 var fixture = ctx.GetRequiredItem<PostgresConnectorFixture>("fixture");
@@ -38,13 +38,13 @@ public sealed class PostgresPartitionSpec
 
                 await using (fixture.LeasePartition(partitionA))
                 {
-                    await TenantRecord.UpsertAsync(new TenantRecord { Name = "A1" });
-                    await TenantRecord.UpsertAsync(new TenantRecord { Name = "A2" });
+                    await TenantRecord.Upsert(new TenantRecord { Name = "A1" });
+                    await TenantRecord.Upsert(new TenantRecord { Name = "A2" });
                 }
 
                 await using (fixture.LeasePartition(partitionB))
                 {
-                    await TenantRecord.UpsertAsync(new TenantRecord { Name = "B1" });
+                    await TenantRecord.Upsert(new TenantRecord { Name = "B1" });
                 }
 
                 var defaultScope = await TenantRecord.All();
@@ -70,11 +70,11 @@ public sealed class PostgresPartitionSpec
                 var partitionBAfterDelete = await TenantRecord.All(partitionB);
                 partitionBAfterDelete.Should().HaveCount(1);
             })
-            .RunAsync();
+            .Run();
     }
 
     private sealed class TenantRecord : Entity<TenantRecord>
     {
-        public string Name { get; set; } = string.Empty;
+        public string Name { get; set; } = "";
     }
 }

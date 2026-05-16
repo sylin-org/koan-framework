@@ -24,91 +24,91 @@ internal static class BackupProvenanceItems
     };
 
     internal static readonly ProvenanceItem DefaultStorageProfile = new(
-        "Koan:Backup:DefaultStorageProfile",
+        ConfigurationConstants.Keys.DefaultStorageProfile,
         "Default Storage Profile",
         "Storage profile used when an entity policy does not override the target.",
         DefaultValue: DefaultStorageProfileDefault(),
         DefaultConsumers: OptionConsumers);
 
     internal static readonly ProvenanceItem DefaultBatchSize = new(
-        "Koan:Backup:DefaultBatchSize",
+        ConfigurationConstants.Keys.DefaultBatchSize,
         "Default Batch Size",
         "Number of records processed per batch when creating backups.",
         DefaultValue: Defaults.DefaultBatchSize.ToString(CultureInfo.InvariantCulture),
         DefaultConsumers: OptionConsumers);
 
     internal static readonly ProvenanceItem WarmupEntitiesOnStartup = new(
-        "Koan:Backup:WarmupEntitiesOnStartup",
+        ConfigurationConstants.Keys.WarmupEntitiesOnStartup,
         "Warmup Entities On Startup",
         "Warms up entity metadata so backup discovery has cached models on process start.",
         DefaultValue: BoolString(Defaults.WarmupEntitiesOnStartup),
         DefaultConsumers: MaintenanceConsumers);
 
     internal static readonly ProvenanceItem EnableBackgroundMaintenance = new(
-        "Koan:Backup:EnableBackgroundMaintenance",
+        ConfigurationConstants.Keys.EnableBackgroundMaintenance,
         "Enable Background Maintenance",
         "Enables automatic cleanup and validation background tasks for backups.",
         DefaultValue: BoolString(Defaults.EnableBackgroundMaintenance),
         DefaultConsumers: MaintenanceConsumers);
 
     internal static readonly ProvenanceItem MaintenanceInterval = new(
-        "Koan:Backup:MaintenanceInterval",
+        ConfigurationConstants.Keys.MaintenanceInterval,
         "Maintenance Interval",
         "Refresh interval for background maintenance tasks (ISO 8601 duration).",
         DefaultValue: Defaults.MaintenanceInterval.ToString("c", CultureInfo.InvariantCulture),
         DefaultConsumers: MaintenanceConsumers);
 
     internal static readonly ProvenanceItem MaxConcurrency = new(
-        "Koan:Backup:MaxConcurrency",
+        ConfigurationConstants.Keys.MaxConcurrency,
         "Max Concurrency",
         "Maximum number of backup operations allowed to run in parallel.",
         DefaultValue: Defaults.MaxConcurrency.ToString(CultureInfo.InvariantCulture),
         DefaultConsumers: OptionConsumers);
 
     internal static readonly ProvenanceItem AutoValidateBackups = new(
-        "Koan:Backup:AutoValidateBackups",
+        ConfigurationConstants.Keys.AutoValidateBackups,
         "Auto-Validate Backups",
         "Automatically verifies backup integrity after completion.",
         DefaultValue: BoolString(Defaults.AutoValidateBackups),
         DefaultConsumers: MaintenanceConsumers);
 
     internal static readonly ProvenanceItem CompressionLevel = new(
-        "Koan:Backup:CompressionLevel",
+        ConfigurationConstants.Keys.CompressionLevel,
         "Compression Level",
         "ZIP compression level applied to backup archives.",
         DefaultValue: Defaults.CompressionLevel.ToString(),
         DefaultConsumers: OptionConsumers);
 
     internal static readonly ProvenanceItem KeepDaily = new(
-        "Koan:Backup:Retention:KeepDaily",
+        ConfigurationConstants.Retention.KeepDaily,
         "Retention: Keep Daily",
         "Number of daily backups retained before cleanup.",
         DefaultValue: RetentionDefaults.KeepDaily.ToString(CultureInfo.InvariantCulture),
         DefaultConsumers: MaintenanceConsumers);
 
     internal static readonly ProvenanceItem KeepWeekly = new(
-        "Koan:Backup:Retention:KeepWeekly",
+        ConfigurationConstants.Retention.KeepWeekly,
         "Retention: Keep Weekly",
         "Number of weekly backups retained before cleanup.",
         DefaultValue: RetentionDefaults.KeepWeekly.ToString(CultureInfo.InvariantCulture),
         DefaultConsumers: MaintenanceConsumers);
 
     internal static readonly ProvenanceItem KeepMonthly = new(
-        "Koan:Backup:Retention:KeepMonthly",
+        ConfigurationConstants.Retention.KeepMonthly,
         "Retention: Keep Monthly",
         "Number of monthly backups retained before cleanup.",
         DefaultValue: RetentionDefaults.KeepMonthly.ToString(CultureInfo.InvariantCulture),
         DefaultConsumers: MaintenanceConsumers);
 
     internal static readonly ProvenanceItem KeepYearly = new(
-        "Koan:Backup:Retention:KeepYearly",
+        ConfigurationConstants.Retention.KeepYearly,
         "Retention: Keep Yearly",
         "Number of yearly backups retained before cleanup.",
         DefaultValue: RetentionDefaults.KeepYearly.ToString(CultureInfo.InvariantCulture),
         DefaultConsumers: MaintenanceConsumers);
 
     internal static readonly ProvenanceItem ExcludeFromCleanup = new(
-        "Koan:Backup:Retention:ExcludeFromCleanup",
+        ConfigurationConstants.Retention.ExcludeFromCleanup,
         "Retention: Exclude From Cleanup",
         "Comma separated list of backup names that are never removed by retention policies.",
         DefaultValue: FormatList(RetentionDefaults.ExcludeFromCleanup),
@@ -132,7 +132,7 @@ internal static class BackupProvenanceItems
         var buffer = new List<string>(items.Count);
         foreach (var item in items)
         {
-            var candidate = (item ?? string.Empty).Trim();
+            var candidate = (item ?? "").Trim();
             if (candidate.Length > 0)
             {
                 buffer.Add(candidate);

@@ -55,7 +55,7 @@ public class PhotoSetsController : ControllerBase
                             "[PhotoSets] Session {SessionId} not found, creating new",
                             request.SessionId);
 
-                        session = await _service.CreateSessionAsync(request.Definition, ct);
+                        session = await _service.CreateSession(request.Definition, ct);
                     }
                     else
                     {
@@ -66,7 +66,7 @@ public class PhotoSetsController : ControllerBase
             else if (request.Definition != null)
             {
                 // Create new session
-                session = await _service.CreateSessionAsync(request.Definition, ct);
+                session = await _service.CreateSession(request.Definition, ct);
             }
             else
             {
@@ -74,7 +74,7 @@ public class PhotoSetsController : ControllerBase
             }
 
             // Execute query on-demand for this range
-            var photoAssets = await _service.ExecuteQueryAsync(session, request.StartIndex, request.Count, ct);
+            var photoAssets = await _service.ExecuteQuery(session, request.StartIndex, request.Count, ct);
 
             // Convert to metadata
             var photos = photoAssets.Select(p => new PhotoMetadata

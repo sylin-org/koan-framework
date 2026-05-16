@@ -33,7 +33,7 @@ public static class EndpointRouteBuilderExtensions
             var inventory = KoanAutoRegistrar.GetCachedInventory();
 
             // If not cached, build it now
-            inventory ??= await discoveryService.BuildInventoryAsync();
+            inventory ??= await discoveryService.BuildInventory();
 
             return Results.Ok(new
             {
@@ -70,7 +70,7 @@ public static class EndpointRouteBuilderExtensions
         group.MapGet("/inventory/health", async (IEntityDiscoveryService discoveryService) =>
         {
             var inventory = KoanAutoRegistrar.GetCachedInventory()
-                ?? await discoveryService.BuildInventoryAsync();
+                ?? await discoveryService.BuildInventory();
 
             if (inventory.IsHealthy)
             {
@@ -103,7 +103,7 @@ public static class EndpointRouteBuilderExtensions
         // POST /backup/inventory/refresh - Force inventory rebuild
         group.MapPost("/inventory/refresh", async (IEntityDiscoveryService discoveryService) =>
         {
-            var inventory = await discoveryService.BuildInventoryAsync();
+            var inventory = await discoveryService.BuildInventory();
 
             return Results.Ok(new
             {

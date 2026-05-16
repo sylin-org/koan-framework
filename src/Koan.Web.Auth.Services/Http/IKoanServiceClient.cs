@@ -4,7 +4,7 @@ public interface IKoanServiceClient
 {
     Task<T?> GetAsync<T>(string serviceId, string endpoint, CancellationToken ct = default) where T : class;
     Task<T?> PostAsync<T>(string serviceId, string endpoint, object? data = null, CancellationToken ct = default) where T : class;
-    Task<HttpResponseMessage> SendAsync(string serviceId, HttpRequestMessage request, CancellationToken ct = default);
+    Task<HttpResponseMessage> Send(string serviceId, HttpRequestMessage request, CancellationToken ct = default);
 }
 
 public interface IKoanServiceClient<TService> : IKoanServiceClient where TService : class

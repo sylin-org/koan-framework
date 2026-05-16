@@ -29,7 +29,7 @@ public class ServiceInstance
     /// <summary>
     /// Capabilities provided by this service (e.g., ["translate", "detect-language"]).
     /// </summary>
-    public string[] Capabilities { get; set; } = Array.Empty<string>();
+    public string[] Capabilities { get; set; } = [];
 
     /// <summary>
     /// Last time heartbeat was received from this instance.

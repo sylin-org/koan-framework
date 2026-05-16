@@ -23,7 +23,7 @@ public abstract class BaseOrchestrationEvaluator : IKoanOrchestrationEvaluator
     public abstract string ServiceName { get; }
     public abstract int StartupPriority { get; }
 
-    public virtual async Task<OrchestrationDecision> EvaluateAsync(IConfiguration configuration, OrchestrationContext context)
+    public virtual async Task<OrchestrationDecision> Evaluate(IConfiguration configuration, OrchestrationContext context)
     {
         Logger?.LogDebug("[{ServiceName}] Starting orchestration evaluation", ServiceName);
 
@@ -74,7 +74,7 @@ public abstract class BaseOrchestrationEvaluator : IKoanOrchestrationEvaluator
                 return new OrchestrationDecision
                 {
                     Action = OrchestrationAction.ProvisionContainer,
-                    DependencyDescriptor = await CreateDependencyDescriptorAsync(configuration, context),
+                    DependencyDescriptor = await CreateDependencyDescriptor(configuration, context),
                     Reason = "Always provision mode enabled"
                 };
 
@@ -129,7 +129,7 @@ public abstract class BaseOrchestrationEvaluator : IKoanOrchestrationEvaluator
                 return new OrchestrationDecision
                 {
                     Action = OrchestrationAction.ProvisionContainer,
-                    DependencyDescriptor = await CreateDependencyDescriptorAsync(configuration, context),
+                    DependencyDescriptor = await CreateDependencyDescriptor(configuration, context),
                     Reason = "Host service available but credentials don't match"
                 };
             }
@@ -140,7 +140,7 @@ public abstract class BaseOrchestrationEvaluator : IKoanOrchestrationEvaluator
             return new OrchestrationDecision
             {
                 Action = OrchestrationAction.ProvisionContainer,
-                DependencyDescriptor = await CreateDependencyDescriptorAsync(configuration, context),
+                DependencyDescriptor = await CreateDependencyDescriptor(configuration, context),
                 Reason = "No suitable host service detected"
             };
         }
@@ -226,7 +226,7 @@ public abstract class BaseOrchestrationEvaluator : IKoanOrchestrationEvaluator
 
     protected virtual OrchestrationOptions GetOrchestrationOptions(IConfiguration configuration)
     {
-        var section = configuration.GetSection("Koan:Orchestration");
+        var section = configuration.GetSection(Infrastructure.Constants.Configuration.Orchestration.Section);
         var options = new OrchestrationOptions();
 
         // Get global mode
@@ -262,7 +262,7 @@ public abstract class BaseOrchestrationEvaluator : IKoanOrchestrationEvaluator
     protected abstract bool HasExplicitConfiguration(IConfiguration configuration);
     protected abstract int GetDefaultPort();
     protected abstract Task<bool> ValidateHostCredentials(IConfiguration configuration, HostDetectionResult hostResult);
-    protected abstract Task<DependencyDescriptor> CreateDependencyDescriptorAsync(IConfiguration configuration, OrchestrationContext context);
+    protected abstract Task<DependencyDescriptor> CreateDependencyDescriptor(IConfiguration configuration, OrchestrationContext context);
     protected abstract string[] GetAdditionalHostCandidates(IConfiguration configuration);
 }
 

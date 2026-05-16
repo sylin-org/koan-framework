@@ -4,9 +4,9 @@ namespace Koan.Admin.Services;
 
 public interface IKoanAdminLaunchKitService
 {
-    Task<KoanAdminLaunchKitMetadata> GetMetadataAsync(CancellationToken cancellationToken = default);
+    Task<KoanAdminLaunchKitMetadata> GetMetadata(CancellationToken cancellationToken = default);
 
-    Task<KoanAdminLaunchKitArchive> GenerateArchiveAsync(
+    Task<KoanAdminLaunchKitArchive> GenerateArchive(
         KoanAdminLaunchKitRequest request,
         CancellationToken cancellationToken = default);
 }

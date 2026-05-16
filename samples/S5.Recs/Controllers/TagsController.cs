@@ -27,9 +27,9 @@ public class TagsController : ControllerBase
         IEnumerable<TagStatDoc> q = list;
         if (!showCensored)
         {
-            var opt = tagOptions?.Value?.CensorTags ?? Array.Empty<string>();
+            var opt = tagOptions?.Value?.CensorTags ?? [];
             var doc = await S5.Recs.Models.CensorTagsDoc.Get("recs:censor-tags", ct);
-            var dyn = doc?.Tags?.ToArray() ?? Array.Empty<string>();
+            var dyn = doc?.Tags?.ToArray() ?? [];
             var censor = opt.Concat(dyn).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
             q = list.Where(t => !IsCensored(t.Tag, censor));
         }

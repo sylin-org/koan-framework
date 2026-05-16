@@ -14,7 +14,7 @@ public interface IAdapterInitializationOrder
 
 public interface IAdapterInitializationRetryPolicy
 {
-    Task ExecuteAsync(Func<CancellationToken, Task> action, CancellationToken ct);
+    Task Execute(Func<CancellationToken, Task> action, CancellationToken ct);
 }
 
 public interface IRetryPolicyProvider
@@ -35,7 +35,7 @@ internal sealed class DefaultAdapterInitializationRetryPolicy : IAdapterInitiali
         _adapterType = adapterType;
     }
 
-    public async Task ExecuteAsync(Func<CancellationToken, Task> action, CancellationToken ct)
+    public async Task Execute(Func<CancellationToken, Task> action, CancellationToken ct)
     {
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         if (_timeout > TimeSpan.Zero)
@@ -159,7 +159,7 @@ internal sealed class AdapterInitializationService : IHostedService
         try
         {
             _logger.LogDebug("Initializing adapter {Adapter}", adapterType);
-            await policy.ExecuteAsync(ct => initializer.InitializeAsync(ct), cancellationToken);
+            await policy.Execute(ct => initializer.InitializeAsync(ct), cancellationToken);
             _logger.LogDebug("Adapter {Adapter} initialized", adapterType);
         }
         catch (Exception ex)

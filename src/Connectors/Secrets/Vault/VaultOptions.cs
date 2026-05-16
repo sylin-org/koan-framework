@@ -4,7 +4,7 @@ public sealed class VaultOptions
 {
     public bool Enabled { get; set; } = false;
     public Uri? Address { get; set; }
-    public string Token { get; set; } = string.Empty;
+    public string Token { get; set; } = "";
     public string? Namespace { get; set; }
     public string Mount { get; set; } = "secret"; // KV engine mount
     public bool UseKvV2 { get; set; } = true;

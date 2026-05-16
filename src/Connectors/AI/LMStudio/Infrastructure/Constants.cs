@@ -3,6 +3,7 @@ namespace Koan.AI.Connector.LMStudio.Infrastructure;
 internal static class Constants
 {
     public const string Section = "Koan:Ai:Provider:LMStudio";
+    public const string ShortSection = "Koan:Ai:LMStudio";
 
     public static class Configuration
     {
@@ -10,9 +11,17 @@ internal static class Constants
 
         public static class Keys
         {
-            public const string ConnectionString = "Koan:Ai:Provider:LMStudio:ConnectionString";
+            public const string ConnectionString = Section + ":ConnectionString";
             public const string AltConnectionString = "Koan:Ai:ConnectionString";
-            public const string ApiKey = "Koan:Ai:Provider:LMStudio:ApiKey";
+            public const string ApiKey = Section + ":ApiKey";
+            public const string BaseUrl = Section + ":BaseUrl";
+            public const string AltBaseUrl = ShortSection + ":BaseUrl";
+            public const string DefaultModel = Section + ":DefaultModel";
+            public const string AltDefaultModel = ShortSection + ":DefaultModel";
+            public const string AutoDiscoveryEnabled = Section + ":AutoDiscoveryEnabled";
+            public const string AltAutoDiscoveryEnabled = ShortSection + ":AutoDiscoveryEnabled";
+            public const string Weight = Section + ":Weight";
+            public const string Labels = Section + ":Labels";
         }
     }
 

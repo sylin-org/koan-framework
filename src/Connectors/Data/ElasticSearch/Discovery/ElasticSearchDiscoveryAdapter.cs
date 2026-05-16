@@ -62,9 +62,9 @@ internal sealed class ElasticSearchDiscoveryAdapter : ServiceDiscoveryAdapterBas
         // Check ElasticSearch-specific configuration paths
         return _configuration.GetConnectionString("ElasticSearch") ??
                _configuration.GetConnectionString("Elasticsearch") ??
-               _configuration["Koan:Data:ElasticSearch:ConnectionString"] ??
-               _configuration["Koan:Data:ElasticSearch:Endpoint"] ??
-               _configuration["Koan:Data:ConnectionString"];
+               _configuration[Infrastructure.Constants.Configuration.Keys.ConnectionString] ??
+               _configuration[Infrastructure.Constants.Configuration.Keys.Endpoint] ??
+               _configuration[Infrastructure.Constants.Configuration.Keys.AltConnectionString];
     }
 
     /// <summary>ElasticSearch-specific environment variable handling</summary>

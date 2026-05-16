@@ -37,6 +37,7 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<Configuration.IDataConnectionResolver, Configuration.DefaultDataConnectionResolver>();
         // Provide a default storage name resolver so naming works even without adapter-specific registration (e.g., JSON adapter)
         services.TryAddSingleton<Koan.Data.Abstractions.Naming.IStorageNameResolver, Koan.Data.Abstractions.Naming.DefaultStorageNameResolver>();
+        // Note: Partition context provided by EntityContext (static, no DI needed) - see DATA-0077
         services.AddKoanOptions<Options.DirectOptions>(Infrastructure.Constants.Configuration.Direct.Section);
         // Vector defaults now live in Koan.Data.Vector; apps should call AddKoanDataVector() to enable vector features.
         services.AddKoanOptions<DataRuntimeOptions>();
@@ -61,6 +62,9 @@ public static class ServiceCollectionExtensions
         // Relationship metadata scanning (ParentAttribute, etc.)
         services.TryAddSingleton<Koan.Data.Core.Relationships.IRelationshipMetadata, Koan.Data.Core.Relationships.RelationshipMetadataService>();
         Koan.Data.Core.Model.EntityMetadataProvider.RelationshipMetadataAccessor = sp => sp.GetRequiredService<Koan.Data.Core.Relationships.IRelationshipMetadata>();
+
+        // Auto-register transaction support (AI-0020) - "Reference = Intent" pattern
+        Transactions.TransactionServiceCollectionExtensions.AddKoanTransactions(services);
     }
 
     // One-liner startup: builds provider, runs discovery, starts runtime (greenfield)
@@ -100,7 +104,7 @@ public static class ServiceCollectionExtensions
         {
             var secretsType = Type.GetType("Koan.Secrets.Core.Configuration.SecretResolvingConfigurationExtensions, Koan.Secrets.Core", throwOnError: false, ignoreCase: false);
             var method = secretsType?.GetMethod(methodName, BindingFlags.Public | BindingFlags.Static);
-            method?.Invoke(null, args ?? Array.Empty<object?>());
+            method?.Invoke(null, args ?? []);
         }
         catch { /* optional */ }
     }

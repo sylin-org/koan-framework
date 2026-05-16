@@ -48,107 +48,107 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     public QueryCapabilities Capabilities => _caps;
     public WriteCapabilities Writes => _writeCaps;
 
-    private Task EnsureSchemaAsync(CancellationToken ct) => _schemaGuard.EnsureHealthyAsync(ct);
+    private Task EnsureSchema(CancellationToken ct) => _schemaGuard.EnsureHealthy(ct);
 
-    private async Task GuardAsync(CancellationToken ct)
+    private async Task Guard(CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        await EnsureSchemaAsync(ct);
+        await EnsureSchema(ct);
     }
 
-    public async Task<TEntity?> GetAsync(TKey id, CancellationToken ct = default)
+    public async Task<TEntity?> Get(TKey id, CancellationToken ct = default)
     {
-        await GuardAsync(ct);
-        return await _inner.GetAsync(id, ct);
+        await Guard(ct);
+        return await _inner.Get(id, ct);
     }
-    public async Task<IReadOnlyList<TEntity?>> GetManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity?>> GetMany(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
-        await GuardAsync(ct);
-        return await _inner.GetManyAsync(ids, ct);
+        await Guard(ct);
+        return await _inner.GetMany(ids, ct);
     }
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(object? query, CancellationToken ct = default)
     {
-        await GuardAsync(ct);
-        return await _inner.QueryAsync(query, ct);
+        await Guard(ct);
+        return await _inner.Query(query, ct);
     }
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(object? query, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
     {
-        await GuardAsync(ct);
+        await Guard(ct);
         if (_inner is IDataRepositoryWithOptions<TEntity, TKey> with)
-            return await with.QueryAsync(query, options, ct);
+            return await with.Query(query, options, ct);
         // Fallback: ignore options and use base method; adapters will apply guardrails
-        return await _inner.QueryAsync(query, ct);
+        return await _inner.Query(query, ct);
     }
-    public async Task<CountResult> CountAsync(CountRequest<TEntity> request, CancellationToken ct = default)
+    public async Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
     {
-        await GuardAsync(ct);
-        return await _inner.CountAsync(request, ct);
+        await Guard(ct);
+        return await _inner.Count(request, ct);
     }
 
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
     {
-        await GuardAsync(ct);
+        await Guard(ct);
         if (_inner is ILinqQueryRepository<TEntity, TKey> linq)
-            return await linq.QueryAsync(predicate, ct);
+            return await linq.Query(predicate, ct);
         throw new NotSupportedException("LINQ queries are not supported by this repository.");
     }
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
     {
-        await GuardAsync(ct);
+        await Guard(ct);
         if (_inner is ILinqQueryRepositoryWithOptions<TEntity, TKey> linq)
-            return await linq.QueryAsync(predicate, options, ct);
+            return await linq.Query(predicate, options, ct);
         if (_inner is ILinqQueryRepository<TEntity, TKey> linqb)
-            return await linqb.QueryAsync(predicate, ct);
+            return await linqb.Query(predicate, ct);
         throw new NotSupportedException("LINQ queries are not supported by this repository.");
     }
 
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(string query, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(string query, CancellationToken ct = default)
     {
-        await GuardAsync(ct);
+        await Guard(ct);
         if (_inner is IStringQueryRepository<TEntity, TKey> raw)
-            return await raw.QueryAsync(query, ct);
+            return await raw.Query(query, ct);
         throw new NotSupportedException("String queries are not supported by this repository.");
     }
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(string query, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(string query, DataQueryOptions? options, CancellationToken ct = default)
     {
-        await GuardAsync(ct);
+        await Guard(ct);
         if (_inner is IStringQueryRepositoryWithOptions<TEntity, TKey> raw)
-            return await raw.QueryAsync(query, options, ct);
+            return await raw.Query(query, options, ct);
         if (_inner is IStringQueryRepository<TEntity, TKey> rawb)
-            return await rawb.QueryAsync(query, ct);
+            return await rawb.Query(query, ct);
         throw new NotSupportedException("String queries are not supported by this repository.");
     }
 
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(string query, object? parameters, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(string query, object? parameters, CancellationToken ct = default)
     {
-        await GuardAsync(ct);
+        await Guard(ct);
         if (_inner is IStringQueryRepositoryWithOptions<TEntity, TKey> rawp)
-            return await rawp.QueryAsync(query, parameters, null, ct);
+            return await rawp.Query(query, parameters, null, ct);
         throw new NotSupportedException("Parameterized string queries are not supported by this repository.");
     }
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(string query, object? parameters, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(string query, object? parameters, DataQueryOptions? options, CancellationToken ct = default)
     {
-        await GuardAsync(ct);
+        await Guard(ct);
         if (_inner is IStringQueryRepositoryWithOptions<TEntity, TKey> rawp)
-            return await rawp.QueryAsync(query, parameters, options, ct);
+            return await rawp.Query(query, parameters, options, ct);
         throw new NotSupportedException("Parameterized string queries with options are not supported by this repository.");
     }
 
-    public async Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)
+    public async Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
     {
-        await GuardAsync(ct);
+        await Guard(ct);
         await _manager.EnsureIdAsync<TEntity, TKey>(model, ct);
 
         // Auto-update [Timestamp] field if present
         if (_timestampBag.HasTimestamp)
             _timestampBag.UpdateTimestamp(model);
 
-        return await _inner.UpsertAsync(model, ct);
+        return await _inner.Upsert(model, ct);
     }
 
-    public async Task<int> UpsertManyAsync(IEnumerable<TEntity> models, CancellationToken ct = default)
+    public async Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default)
     {
-        await GuardAsync(ct);
+        await Guard(ct);
         // Materialize to avoid double enumeration creating fresh instances (e.g., LINQ Select)
         var list = models as IList<TEntity> ?? models.ToList();
         foreach (var m in list)
@@ -160,23 +160,23 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
             if (_timestampBag.HasTimestamp)
                 _timestampBag.UpdateTimestamp(m);
         }
-        return await _inner.UpsertManyAsync(list, ct);
+        return await _inner.UpsertMany(list, ct);
     }
 
-    public async Task<bool> DeleteAsync(TKey id, CancellationToken ct = default)
+    public async Task<bool> Delete(TKey id, CancellationToken ct = default)
     {
-        await GuardAsync(ct);
-        return await _inner.DeleteAsync(id, ct);
+        await Guard(ct);
+        return await _inner.Delete(id, ct);
     }
-    public async Task<int> DeleteManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    public async Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
-        await GuardAsync(ct);
-        return await _inner.DeleteManyAsync(ids, ct);
+        await Guard(ct);
+        return await _inner.DeleteMany(ids, ct);
     }
 
-    public async Task<int> DeleteAllAsync(CancellationToken ct = default)
+    public async Task<int> DeleteAll(CancellationToken ct = default)
     {
-        await GuardAsync(ct);
+        await Guard(ct);
         // Prefer adapter fast-path when available
         if (_inner is IInstructionExecutor<TEntity> exec)
         {
@@ -184,15 +184,15 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
             catch (NotSupportedException) { /* fall back */ }
         }
         // Fallback: enumerate ids then delete
-        var all = await _inner.QueryAsync(null, ct);
+        var all = await _inner.Query(null, ct);
         var ids = all.Select(e => e.Id);
-        return await _inner.DeleteManyAsync(ids, ct);
+        return await _inner.DeleteMany(ids, ct);
     }
 
-    public async Task<long> RemoveAllAsync(RemoveStrategy strategy, CancellationToken ct = default)
+    public async Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default)
     {
-        await GuardAsync(ct);
-        return await _inner.RemoveAllAsync(strategy, ct);
+        await Guard(ct);
+        return await _inner.RemoveAll(strategy, ct);
     }
 
     public IBatchSet<TEntity, TKey> CreateBatch() => new BatchFacade(this);
@@ -200,7 +200,7 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     /// <inheritdoc/>
     public async Task<TResult> ExecuteAsync<TResult>(Instruction instruction, CancellationToken ct = default)
     {
-        await GuardAsync(ct);
+        await Guard(ct);
         if (_inner is IInstructionExecutor<TEntity> exec)
         {
             return await exec.ExecuteAsync<TResult>(instruction, ct);
@@ -208,11 +208,11 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         throw new NotSupportedException($"Repository for {typeof(TEntity).Name} does not support instruction '{instruction.Name}'.");
     }
 
-    public Task EnsureHealthyAsync(CancellationToken ct)
+    public Task EnsureHealthy(CancellationToken ct)
     {
         if (_inner is ISchemaHealthContributor<TEntity, TKey> contributor)
         {
-            return contributor.EnsureHealthyAsync(ct);
+            return contributor.EnsureHealthy(ct);
         }
         return Task.CompletedTask;
     }
@@ -246,9 +246,9 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         public IBatchSet<TEntity, TKey> Clear() { _adds.Clear(); _updates.Clear(); _deletes.Clear(); _mutations.Clear(); return this; }
 
         /// <inheritdoc />
-        public async Task<BatchResult> SaveAsync(BatchOptions? options = null, CancellationToken ct = default)
+        public async Task<BatchResult> Save(BatchOptions? options = null, CancellationToken ct = default)
         {
-            await _outer.GuardAsync(ct);
+            await _outer.Guard(ct);
             foreach (var e in _adds)
             {
                 ct.ThrowIfCancellationRequested();
@@ -265,7 +265,7 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
                 foreach (var (id, mutate) in _mutations)
                 {
                     ct.ThrowIfCancellationRequested();
-                    var current = await _outer._inner.GetAsync(id, ct);
+                    var current = await _outer._inner.Get(id, ct);
                     if (current is not null)
                     {
                         mutate(current);
@@ -280,7 +280,7 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
             foreach (var e in _adds) native.Add(e);
             foreach (var e in _updates) native.Update(e);
             foreach (var id in _deletes) native.Delete(id);
-            return await native.SaveAsync(options, ct);
+            return await native.Save(options, ct);
         }
     }
 }

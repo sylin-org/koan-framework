@@ -78,7 +78,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
     public Task<bool> IsReadyAsync(CancellationToken ct = default)
         => Task.FromResult(_stateManager.IsReady);
 
-    public async Task WaitForReadinessAsync(TimeSpan? timeout = null, CancellationToken ct = default)
+    public async Task WaitForReadiness(TimeSpan? timeout = null, CancellationToken ct = default)
     {
         if (_stateManager.IsReady)
         {
@@ -99,7 +99,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
 
         try
         {
-            await _stateManager.WaitAsync(effectiveTimeout, ct);
+            await _stateManager.Wait(effectiveTimeout, ct);
         }
         catch (TimeoutException ex)
         {
@@ -131,7 +131,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
         return ("KoanUser", password);
     }
 
-    private async Task<bool> IsClusterInitializedAsync(string baseUrl, string username, string password, CancellationToken ct)
+    private async Task<bool> IsClusterInitialized(string baseUrl, string username, string password, CancellationToken ct)
     {
         try
         {
@@ -166,7 +166,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
         }
     }
 
-    private async Task InitializeClusterAsync(string baseUrl, string username, string password, CancellationToken ct)
+    private async Task InitializeCluster(string baseUrl, string username, string password, CancellationToken ct)
     {
         _logger?.LogDebug("Initializing Couchbase cluster at {BaseUrl} with user {Username}", baseUrl, username);
 
@@ -207,7 +207,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
         _logger?.LogInformation("Couchbase cluster initialized successfully");
     }
 
-    private async Task<bool> WaitForCouchbaseAndCheckInitializationAsync(string baseUrl, string username, string password, string bucketName, CancellationToken ct)
+    private async Task<bool> WaitForCouchbaseAndCheckInitialization(string baseUrl, string username, string password, string bucketName, CancellationToken ct)
     {
         const int maxRetries = 12; // Wait up to 60 seconds (5s * 12)
         const int delayMs = 5000;
@@ -225,20 +225,20 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
                     _logger?.LogDebug("Couchbase web console is ready");
 
                     // Check if cluster is already initialized
-                    if (await IsClusterInitializedAsync(baseUrl, username, password, ct))
+                    if (await IsClusterInitialized(baseUrl, username, password, ct))
                     {
                         _logger?.LogDebug("Couchbase cluster is already initialized");
                         return true;
                     }
 
                     // Initialize cluster
-                    await InitializeClusterAsync(baseUrl, username, password, ct);
+                    await InitializeCluster(baseUrl, username, password, ct);
 
                     // Ensure bucket exists
-                    await EnsureBucketExistsAsync(baseUrl, username, password, bucketName, ct);
+                    await EnsureBucketExists(baseUrl, username, password, bucketName, ct);
 
                     // Wait for N1QL service to become query-ready
-                    await WaitForN1QLServiceReadinessAsync(baseUrl, username, password, ct);
+                    await WaitForN1QLServiceReadiness(baseUrl, username, password, ct);
 
                     return true;
                 }
@@ -259,7 +259,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
         return false;
     }
 
-    private async Task EnsureBucketExistsAsync(string baseUrl, string username, string password, string bucketName, CancellationToken ct)
+    private async Task EnsureBucketExists(string baseUrl, string username, string password, string bucketName, CancellationToken ct)
     {
         try
         {
@@ -334,17 +334,17 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
         }
     }
 
-    public async ValueTask<CouchbaseCollectionContext> GetCollectionContextAsync(string collectionName, CancellationToken ct)
+    public async ValueTask<CouchbaseCollectionContext> GetCollectionContext(string collectionName, CancellationToken ct)
     {
         var options = _options.CurrentValue;
-        var cluster = await EnsureClusterAsync(options, ct);
-        var bucket = await EnsureBucketAsync(cluster, options, ct);
+        var cluster = await EnsureCluster(options, ct);
+        var bucket = await EnsureBucket(cluster, options, ct);
         var scopeName = string.IsNullOrWhiteSpace(options.Scope) ? "_default" : options.Scope!;
-        var scope = await GetScopeAsync(bucket, scopeName);
+        var scope = await GetScope(bucket, scopeName);
         var finalCollection = string.IsNullOrWhiteSpace(collectionName)
             ? (!string.IsNullOrWhiteSpace(options.Collection) ? options.Collection! : "_default")
             : collectionName;
-        var collection = await GetCollectionAsync(scope, scopeName, finalCollection);
+        var collection = await GetCollection(scope, scopeName, finalCollection);
         if (_stateManager.State == AdapterReadinessState.Initializing)
         {
             _stateManager.TransitionTo(AdapterReadinessState.Ready);
@@ -352,7 +352,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
         return new CouchbaseCollectionContext(cluster, bucket, scope, collection, bucket.Name, scopeName, finalCollection);
     }
 
-    private async ValueTask<ICluster> EnsureClusterAsync(CouchbaseOptions options, CancellationToken ct)
+    private async ValueTask<ICluster> EnsureCluster(CouchbaseOptions options, CancellationToken ct)
     {
         if (_cluster is not null)
         {
@@ -387,7 +387,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
                 }
 
                 // Wait for Couchbase to be ready and check if cluster needs initialization
-                if (!await WaitForCouchbaseAndCheckInitializationAsync(baseUrl, username, password, options.Bucket, ct))
+                if (!await WaitForCouchbaseAndCheckInitialization(baseUrl, username, password, options.Bucket, ct))
                 {
                     _logger?.LogDebug("Couchbase cluster initialization was not needed or failed gracefully");
                 }
@@ -414,7 +414,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
         return _cluster!;
     }
 
-    private async ValueTask<IBucket> EnsureBucketAsync(ICluster cluster, CouchbaseOptions options, CancellationToken ct)
+    private async ValueTask<IBucket> EnsureBucket(ICluster cluster, CouchbaseOptions options, CancellationToken ct)
     {
         if (_bucket is not null && string.Equals(_bucketName, options.Bucket, StringComparison.OrdinalIgnoreCase))
         {
@@ -469,7 +469,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
         return _bucket!;
     }
 
-    private async ValueTask<IScope> GetScopeAsync(IBucket bucket, string scopeName)
+    private async ValueTask<IScope> GetScope(IBucket bucket, string scopeName)
     {
         if (_scopes.TryGetValue(scopeName, out var cached))
         {
@@ -490,7 +490,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
         return scope;
     }
 
-    private async ValueTask<ICouchbaseCollection> GetCollectionAsync(IScope scope, string scopeName, string collectionName)
+    private async ValueTask<ICouchbaseCollection> GetCollection(IScope scope, string scopeName, string collectionName)
     {
         var key = $"{scopeName}:{collectionName}";
         if (_collections.TryGetValue(key, out var cached))
@@ -514,7 +514,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
                 _logger?.LogDebug(ex, "Collection {CollectionName} not found, attempting to create it", collectionName);
 
                 // Try to create the collection if it doesn't exist
-                await EnsureCollectionExistsAsync(scope, scopeName, collectionName);
+                await EnsureCollectionExists(scope, scopeName, collectionName);
 
                 // Now try to get it again
                 collection = await scope.CollectionAsync(collectionName);
@@ -525,7 +525,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
         return collection;
     }
 
-    private async Task EnsureCollectionExistsAsync(IScope scope, string scopeName, string collectionName)
+    private async Task EnsureCollectionExists(IScope scope, string scopeName, string collectionName)
     {
         try
         {
@@ -569,7 +569,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
         return ex.Context?.Message?.Contains("already exists", StringComparison.OrdinalIgnoreCase) == true;
     }
 
-    private async Task WaitForN1QLServiceReadinessAsync(string baseUrl, string username, string password, CancellationToken ct)
+    private async Task WaitForN1QLServiceReadiness(string baseUrl, string username, string password, CancellationToken ct)
     {
         const int maxRetries = 10; // Wait up to 30 seconds (3s * 10)
         const int delayMs = 3000;
@@ -626,8 +626,8 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
         try
         {
             var options = _options.CurrentValue;
-            var collectionName = options.Collection ?? string.Empty;
-            await GetCollectionContextAsync(collectionName, ct);
+            var collectionName = options.Collection ?? "";
+            await GetCollectionContext(collectionName, ct);
 
             if (_stateManager.State == AdapterReadinessState.Degraded)
             {

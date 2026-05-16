@@ -1,5 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Koan.Canon.Domain.Model;
+using Koan.Data.Abstractions.Annotations;
+using TimestampAttribute = Koan.Data.Abstractions.Annotations.TimestampAttribute;
 
 namespace S8.Canon.Domain;
 
@@ -12,7 +14,7 @@ public class Customer : CanonEntity<Customer>
     /// <summary>
     /// Customer's email address (required, normalized to lowercase).
     /// </summary>
-    public string Email { get; set; } = string.Empty;
+    public string Email { get; set; } = "";
 
     /// <summary>
     /// Customer's phone number (optional, normalized to E.164 format).
@@ -22,18 +24,18 @@ public class Customer : CanonEntity<Customer>
     /// <summary>
     /// Customer's first name.
     /// </summary>
-    public string FirstName { get; set; } = string.Empty;
+    public string FirstName { get; set; } = "";
 
     /// <summary>
     /// Customer's last name.
     /// </summary>
-    public string LastName { get; set; } = string.Empty;
+    public string LastName { get; set; } = "";
 
     /// <summary>
     /// Computed display name (enriched during canonization).
     /// Format: "FirstName LastName" or email prefix if names missing.
     /// </summary>
-    public string DisplayName { get; set; } = string.Empty;
+    public string DisplayName { get; set; } = "";
 
     /// <summary>
     /// Computed account tier based on customer attributes (enriched during canonization).
@@ -59,6 +61,6 @@ public class Customer : CanonEntity<Customer>
     /// <summary>
     /// Date when customer record was last updated.
     /// </summary>
-    [Timestamp]
+    [Timestamp(OnSave = true)]
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

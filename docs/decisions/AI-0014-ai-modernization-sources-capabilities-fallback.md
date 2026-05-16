@@ -3,28 +3,32 @@
 Status: Approved
 **Amendment:** 2025-10-01 - Terminology Correction (See Below)
 
+> Updated by AI-0019: Routing responsibilities once assigned to `IAiRouter` now flow through `AiRoutingEngine` and Microsoft.Extensions.AI pipeline clients. The source/member architecture described here still applies and is implemented by the new routing engine.
+
 ---
 
 ## 🔴 TERMINOLOGY AMENDMENT (2025-10-01)
 
 **This ADR's original terminology has been corrected to match framework standards:**
 
-| Original Term (This Doc) | Correct Term | Definition |
-|-------------------------|--------------|------------|
-| "Source" | **Member** | Individual endpoint (e.g., `ollama::host`) |
-| "Group" | **Source** | Collection of members (e.g., `ollama`) |
-| "ollama-auto-host" | **ollama::host** | Member naming pattern |
-| "ollama-auto" group | **ollama** source | Source naming pattern |
+| Original Term (This Doc) | Correct Term      | Definition                                 |
+| ------------------------ | ----------------- | ------------------------------------------ |
+| "Source"                 | **Member**        | Individual endpoint (e.g., `ollama::host`) |
+| "Group"                  | **Source**        | Collection of members (e.g., `ollama`)     |
+| "ollama-auto-host"       | **ollama::host**  | Member naming pattern                      |
+| "ollama-auto" group      | **ollama** source | Source naming pattern                      |
 
 **Canonical Reference:** See [AI-SOURCE-MEMBER-ARCHITECTURE.md](../AI-SOURCE-MEMBER-ARCHITECTURE.md) for complete model.
 
 **Key Changes:**
+
 - **Source = Collection** with policy and multiple members
 - **Member = Endpoint** with URL and priority
 - **Default source = provider name** (e.g., "ollama" for Ollama adapter)
 - **Naming: `source::member`** pattern (e.g., "ollama::host", "enterprise::ollama-1")
 
 **Reading This Document:**
+
 - When you see "source" below, think "member" (endpoint)
 - When you see "group" below, think "source" (collection)
 - When you see "ollama-auto-host", think "ollama::host"
@@ -95,11 +99,13 @@ Adopt **Source Abstraction with Property-Based Grouping and Capability Mapping**
 ### Minimal Configurations
 
 #### Level 0: Zero Config (Auto-Discovery)
+
 ```json
 {}
 ```
 
 **Behavior:**
+
 - Discovers Ollama at localhost:11434, host.docker.internal:11434, linked services
 - Introspects installed models
 - Maps models to capabilities using preferred model lists
@@ -108,6 +114,7 @@ Adopt **Source Abstraction with Property-Based Grouping and Capability Mapping**
 - Sets highest-priority source as default
 
 **Boot Report:**
+
 ```
 ┌─ Koan FRAMEWORK v0.2.18 ─────────────────
 │ AI Sources (3 auto-discovered)
@@ -129,6 +136,7 @@ Adopt **Source Abstraction with Property-Based Grouping and Capability Mapping**
 ```
 
 #### Level 1: Simple Override
+
 ```json
 {
   "Koan": {
@@ -142,11 +150,13 @@ Adopt **Source Abstraction with Property-Based Grouping and Capability Mapping**
 ```
 
 **Behavior:**
+
 - Auto-discovery still occurs
 - Uses specified model for all capabilities in discovered sources
 - Backward compatible with existing configurations
 
 #### Level 2: Capability-Specific Models
+
 ```json
 {
   "Koan": {
@@ -164,6 +174,7 @@ Adopt **Source Abstraction with Property-Based Grouping and Capability Mapping**
 ```
 
 **Behavior:**
+
 - Auto-discovery creates "Default" source with these capability mappings
 - Different models for different capabilities
 - Capability-specific options (temperature, max tokens)
@@ -172,6 +183,7 @@ Adopt **Source Abstraction with Property-Based Grouping and Capability Mapping**
 ### Advanced Configurations
 
 #### Level 3: Explicit Sources with Groups
+
 ```json
 {
   "Koan": {
@@ -240,6 +252,7 @@ Adopt **Source Abstraction with Property-Based Grouping and Capability Mapping**
 ```
 
 **Behavior:**
+
 - Chat/Embedding use `production-ollama` group (fallback policy)
 - Vision uses `openai-premium` source
 - Automatic failover within `production-ollama` group
@@ -255,6 +268,7 @@ Adopt **Source Abstraction with Property-Based Grouping and Capability Mapping**
 ### Behavior by Provider
 
 #### Ollama (Supports Auto-Download)
+
 - Models configured in capabilities are checked during discovery
 - Missing models flagged in boot report with download size
 - **On first request**: Model automatically downloaded, request blocks until complete
@@ -262,6 +276,7 @@ Adopt **Source Abstraction with Property-Based Grouping and Capability Mapping**
 - Subsequent requests use cached model
 
 #### OpenAI, Anthropic, Azure (Managed Services)
+
 - No model provisioning needed (cloud-managed)
 - Invalid model names fail immediately with helpful error
 
@@ -272,17 +287,17 @@ Adopt **Source Abstraction with Property-Based Grouping and Capability Mapping**
   "Koan": {
     "Ai": {
       "ModelProvisioning": {
-        "Enabled": true,                    // Default: true in Development, false in Production
-        "TimeoutSeconds": 600,              // Max wait time for download (10 minutes)
-        "BlockRequests": true,              // Default: true (wait for download)
-        "DownloadOnBoot": false,            // Default: false (download on first use)
-        "AllowInProduction": false          // Default: false (safety guard)
+        "Enabled": true, // Default: true in Development, false in Production
+        "TimeoutSeconds": 600, // Max wait time for download (10 minutes)
+        "BlockRequests": true, // Default: true (wait for download)
+        "DownloadOnBoot": false, // Default: false (download on first use)
+        "AllowInProduction": false // Default: false (safety guard)
       },
       "Ollama": {
         "Capabilities": {
           "Chat": {
             "Model": "llama3.2",
-            "AutoDownload": true            // Per-model override (default: inherits from global)
+            "AutoDownload": true // Per-model override (default: inherits from global)
           }
         }
       }
@@ -319,6 +334,7 @@ Adopt **Source Abstraction with Property-Based Grouping and Capability Mapping**
 #### First Request with Missing Model
 
 **Option A: Block and Wait (Default)**
+
 ```csharp
 var response = await Ai.Chat("Hello");  // Model missing
 
@@ -332,12 +348,13 @@ var response = await Ai.Chat("Hello");  // Model missing
 ```
 
 **Option B: Fail Fast with Retry Guidance**
+
 ```json
 {
   "Koan": {
     "Ai": {
       "ModelProvisioning": {
-        "BlockRequests": false  // Don't block, fail immediately
+        "BlockRequests": false // Don't block, fail immediately
       }
     }
   }
@@ -357,6 +374,7 @@ catch (ModelProvisioningException ex) {
 ```
 
 #### Subsequent Requests
+
 ```csharp
 var response = await Ai.Chat("Hello");  // Instant - model cached
 ```
@@ -364,6 +382,7 @@ var response = await Ai.Chat("Hello");  // Instant - model cached
 ### Safety Guards
 
 #### Production Protection
+
 ```csharp
 // In production, auto-download disabled by default
 if (KoanEnv.IsProduction && !KoanEnv.AllowMagicInProduction) {
@@ -378,6 +397,7 @@ if (KoanEnv.IsProduction && !KoanEnv.AllowMagicInProduction) {
 ```
 
 #### Timeout Handling
+
 ```csharp
 try {
     await DownloadModelAsync(modelName, timeout: TimeSpan.FromSeconds(600));
@@ -396,7 +416,7 @@ catch (TimeoutException) {
   "Koan": {
     "Ai": {
       "ModelProvisioning": {
-        "DownloadOnBoot": true  // Download during startup instead of first use
+        "DownloadOnBoot": true // Download during startup instead of first use
       }
     }
   }
@@ -404,6 +424,7 @@ catch (TimeoutException) {
 ```
 
 **Behavior:**
+
 - During `OllamaDiscoveryService.StartAsync()`, trigger downloads for all missing models
 - Boot completes when all models ready
 - Startup time increases, but first request is fast
@@ -506,8 +527,8 @@ public class OllamaAdapter : IAiAdapter {
 **Failure Modes:** Calls cancel if the client token is cancelled while queued; requests still surface HTTP errors from Ollama when executed.  
 **Policy:** `Koan:Ai:Provider:Ollama:MaxConcurrentRequests` (or `Koan:Ai:Ollama:MaxConcurrentRequests`) limits in-flight calls per adapter instance; defaults to `3`. Set to `0` to disable throttling.
 
-- **Edge: cancellation while waiting** — limiter releases immediately; caller observes the original cancellation token.  
-- **Edge: streaming enumerators** — semaphore slot is held for the entire stream lifespan to avoid interleaving server responses.  
+- **Edge: cancellation while waiting** — limiter releases immediately; caller observes the original cancellation token.
+- **Edge: streaming enumerators** — semaphore slot is held for the entire stream lifespan to avoid interleaving server responses.
 - **Edge: embedding batches** — batching inside a single request reuses one slot; parallel embedding calls still queue.
 
 This guard keeps local Ollama instances from timing out under burst load while preserving deterministic throughput. Telemetry logs a debug entry if waits exceed one second, aiding diagnosis of contention hot spots.
@@ -515,6 +536,7 @@ This guard keeps local Ollama instances from timing out under burst load while p
 ## Developer API
 
 ### Capability-First Static Methods
+
 ```csharp
 public static class Ai {
     // Simple usage
@@ -540,6 +562,7 @@ public static class Ai {
 ```
 
 ### Options Records
+
 ```csharp
 public record AiOptionsBase {
     public string? Source { get; init; }      // Source or group name
@@ -568,6 +591,7 @@ public record AiVisionOptions : AiOptionsBase {
 ```
 
 ### Context-Based Overrides
+
 ```csharp
 // Default behavior (uses routing configuration)
 var response = await Ai.Chat("Hello");
@@ -597,11 +621,13 @@ using (Ai.Context(source: "ollama-primary", model: "llama3.2:70b")) {
 ### Scenario 1: Developer First Run (Zero Config)
 
 **Setup:**
+
 - Fresh project
 - Add `<PackageReference Include="Koan.AI.Connector.Ollama" />`
 - Ollama running on localhost with llama3.2 and nomic-embed-text installed
 
 **Code:**
+
 ```csharp
 var response = await Ai.Chat("What is quantum computing?");
 var embeddings = await Ai.Embed("Document text");
@@ -617,11 +643,13 @@ var embeddings = await Ai.Embed("Document text");
 ### Scenario 2: Containerized App with Host Ollama
 
 **Setup:**
+
 - App running in Docker container
 - Ollama on host machine (http://host.docker.internal:11434)
 - Ollama has llama3.2, llava, nomic-embed-text
 
 **Code:**
+
 ```csharp
 var chat = await Ai.Chat("Analyze this data");
 var vision = await Ai.Understand(imageBytes, "Describe this chart");
@@ -636,11 +664,13 @@ var vision = await Ai.Understand(imageBytes, "Describe this chart");
 ### Scenario 3: Multi-Source Fallback
 
 **Setup:**
+
 - Ollama on host (http://host.docker.internal:11434)
 - Ollama on linked service (http://ollama:11434)
 - Both discovered automatically
 
 **Code:**
+
 ```csharp
 var response = await Ai.Chat("Hello");
 // Host Ollama crashes mid-operation
@@ -658,6 +688,7 @@ var response = await Ai.Chat("Hello");
 ### Scenario 4: Hybrid Local/Cloud Strategy
 
 **Configuration:**
+
 ```json
 {
   "Koan": {
@@ -691,6 +722,7 @@ var response = await Ai.Chat("Hello");
 ```
 
 **Code:**
+
 ```csharp
 var chat = await Ai.Chat("Summarize this");           // Uses local
 var embeddings = await Ai.Embed("Document text");     // Uses local
@@ -706,6 +738,7 @@ var vision = await Ai.Understand(image, "Describe");  // Uses cloud
 ### Scenario 5: Multi-Tenant Isolation
 
 **Configuration:**
+
 ```json
 {
   "Koan": {
@@ -731,6 +764,7 @@ var vision = await Ai.Understand(image, "Describe");  // Uses cloud
 ```
 
 **Code:**
+
 ```csharp
 public class TenantService {
     public async Task<string> ProcessQuery(string tenantId, string query) {
@@ -752,6 +786,7 @@ public class TenantService {
 ### Scenario 6: Testing Different Models
 
 **Code:**
+
 ```csharp
 var prompt = "Explain quantum computing";
 var models = new[] { "llama3.2:3b", "llama3.2:8b", "llama3.2:70b" };
@@ -776,10 +811,12 @@ foreach (var model in models) {
 ### Scenario 7: Model Auto-Provisioning (Zero Manual Setup)
 
 **Setup:**
+
 - Fresh Ollama installation (no models installed)
 - Configuration specifies models not yet downloaded
 
 **Configuration:**
+
 ```json
 {
   "Koan": {
@@ -800,6 +837,7 @@ foreach (var model in models) {
 ```
 
 **Code:**
+
 ```csharp
 // First request with missing model
 Console.WriteLine("Sending first chat request...");
@@ -810,6 +848,7 @@ Console.WriteLine($"Response: {response}");
 **Expected Outcome:**
 
 **Boot Report:**
+
 ```
 ┌─ Koan FRAMEWORK v0.2.18 ─────────────────
 │ AI Sources (1 auto-discovered)
@@ -824,6 +863,7 @@ Console.WriteLine($"Response: {response}");
 ```
 
 **First Request Logs:**
+
 ```
 [INFO] Model 'llama3.2' not found, downloading... (4.7GB)
 [INFO] Downloading llama3.2: 5.0% (240MB/4.7GB) - ETA 8m 30s
@@ -843,12 +883,13 @@ Console.WriteLine($"Response: {response}");
 ✅ Developer sees clear progress indication
 
 **Alternative: Fail Fast Mode**
+
 ```json
 {
   "Koan": {
     "Ai": {
       "ModelProvisioning": {
-        "BlockRequests": false  // Fail instead of blocking
+        "BlockRequests": false // Fail instead of blocking
       }
     }
   }
@@ -856,6 +897,7 @@ Console.WriteLine($"Response: {response}");
 ```
 
 **First Request:**
+
 ```csharp
 try {
     var response = await Ai.Chat("Hello");
@@ -875,9 +917,11 @@ catch (ModelProvisioningException ex) {
 ## Implementation Phases
 
 ### Phase 1: Source Abstraction Foundation (Week 1-2)
+
 **Goal:** Basic source registry and configuration parsing
 
 **Tasks:**
+
 1. Create `AiSourceDefinition` record with Group and Priority properties
 2. Create `AiSourceRegistry` with discovery from `Koan:Ai:Sources` configuration
 3. Implement backward-compatible parsing of `Koan:Ai:Ollama` simple config
@@ -885,6 +929,7 @@ catch (ModelProvisioningException ex) {
 5. Update `OllamaDiscoveryService` to create sources with auto-discovery naming
 
 **Tests:**
+
 - [ ] Zero config creates implicit "Default" source
 - [ ] Simple `Koan:Ai:Ollama:DefaultModel` creates source with single model for all capabilities
 - [ ] Capability-specific `Koan:Ai:Ollama:Capabilities` config parsed correctly
@@ -893,6 +938,7 @@ catch (ModelProvisioningException ex) {
 - [ ] Boot report shows all discovered sources
 
 **Acceptance Criteria:**
+
 ```csharp
 // This must work with zero config:
 var registry = services.GetRequiredService<AiSourceRegistry>();
@@ -902,9 +948,11 @@ Assert.Equal("ollama", defaultSource.Provider);
 ```
 
 ### Phase 2: Capability-First API (Week 2-3)
+
 **Goal:** New developer-facing API with options pattern
 
 **Tasks:**
+
 1. Create options records: `AiChatOptions`, `AiEmbedOptions`, `AiVisionOptions`
 2. Implement `Ai.Chat()`, `Ai.Embed()`, `Ai.Understand()` methods
 3. Implement `Ai.Stream()` for streaming responses
@@ -913,6 +961,7 @@ Assert.Equal("ollama", defaultSource.Provider);
 6. Update adapter resolution to check context before routing config
 
 **Tests:**
+
 - [ ] Simple `Ai.Chat("message")` works with default source
 - [ ] Options-based `Ai.Chat(new AiChatOptions { Message = "..." })` works
 - [ ] Context override: `using (Ai.Context(source: "x")) { ... }` routes correctly
@@ -921,6 +970,7 @@ Assert.Equal("ollama", defaultSource.Provider);
 - [ ] Context stack cleaned up after dispose
 
 **Acceptance Criteria:**
+
 ```csharp
 // Simple usage
 var response = await Ai.Chat("Hello");
@@ -934,9 +984,11 @@ using (Ai.Context(source: "test-source")) {
 ```
 
 ### Phase 3: Multi-Source Discovery + Model Provisioning (Week 3-4)
+
 **Goal:** Discover multiple Ollama instances, create fallback group, and enable model auto-provisioning
 
 **Tasks:**
+
 1. Enhance `OllamaDiscoveryService` to check host, localhost, linked services
 2. Create `ollama-auto-host`, `ollama-auto-linked`, `ollama-auto-container` sources
 3. Implement model introspection via `/api/tags`
@@ -949,6 +1001,7 @@ using (Ai.Context(source: "test-source")) {
 10. Enhanced boot report showing all discovered sources, groups, and missing models
 
 **Tests:**
+
 - [ ] Containerized: discovers host Ollama first
 - [ ] Containerized: discovers linked Ollama service
 - [ ] Containerized: discovers container localhost Ollama
@@ -966,6 +1019,7 @@ using (Ai.Context(source: "test-source")) {
 - [ ] **Production guard: auto-download disabled by default**
 
 **Acceptance Criteria:**
+
 ```csharp
 // When containerized with host and linked Ollama:
 var registry = services.GetRequiredService<AiSourceRegistry>();
@@ -1000,9 +1054,11 @@ Assert.True(sw.ElapsedMilliseconds < 1000);  // No download delay
 ```
 
 ### Phase 4: Fallback Groups and Circuit Breaker (Week 4-5)
+
 **Goal:** Automatic failover with health monitoring
 
 **Tasks:**
+
 1. Implement `IGroupPolicy` interface with `Fallback`, `RoundRobin` policies
 2. Create `CircuitBreakerState` per source
 3. Implement `ResilientAiAdapter` wrapper that tries sources in priority order
@@ -1012,6 +1068,7 @@ Assert.True(sw.ElapsedMilliseconds < 1000);  // No download delay
 7. Log failover events and recovery
 
 **Tests:**
+
 - [ ] Fallback policy tries sources in priority order
 - [ ] Circuit opens after configured failure threshold
 - [ ] Requests route to next source when circuit open
@@ -1022,6 +1079,7 @@ Assert.True(sw.ElapsedMilliseconds < 1000);  // No download delay
 - [ ] Health check respects timeout configuration
 
 **Acceptance Criteria:**
+
 ```csharp
 // Simulate primary source failure
 MockAdapter.Setup(a => a.ChatAsync(...)).Throws<HttpRequestException>();
@@ -1043,9 +1101,11 @@ Assert.Equal(SourceHealthState.Healthy, health.State);
 ```
 
 ### Phase 5: Enhanced Boot Reporting (Week 5)
+
 **Goal:** Comprehensive visibility into AI configuration
 
 **Tasks:**
+
 1. Extend boot report to show sources with capabilities
 2. Show group membership and policies
 3. Display health status and fallback chains
@@ -1054,6 +1114,7 @@ Assert.Equal(SourceHealthState.Healthy, health.State);
 6. Implement structured logging for failover events
 
 **Tests:**
+
 - [ ] Boot report shows all sources
 - [ ] Boot report shows groups with members
 - [ ] Boot report indicates default source
@@ -1062,6 +1123,7 @@ Assert.Equal(SourceHealthState.Healthy, health.State);
 - [ ] Failover events logged with source names
 
 **Acceptance Criteria:**
+
 ```
 Boot report must include:
 ✓ Environment (containerized or not)
@@ -1074,9 +1136,11 @@ Boot report must include:
 ```
 
 ### Phase 6: OpenAI and Anthropic Connectors (Week 6-7)
+
 **Goal:** Validate multi-provider architecture
 
 **Tasks:**
+
 1. Implement `OpenAIAdapterFactory` following source pattern
 2. Implement `OpenAIAdapter` with Chat, Embedding, Vision capabilities
 3. Implement `AnthropicAdapterFactory`
@@ -1086,6 +1150,7 @@ Boot report must include:
 7. Update samples to demonstrate multi-provider scenarios
 
 **Tests:**
+
 - [ ] OpenAI adapter registers and resolves via factory
 - [ ] OpenAI auto-discovery creates source from `OPENAI_API_KEY`
 - [ ] Anthropic adapter works with Claude models
@@ -1093,6 +1158,7 @@ Boot report must include:
 - [ ] Capability routing: local for chat, cloud for vision
 
 **Acceptance Criteria:**
+
 ```csharp
 // With OPENAI_API_KEY environment variable:
 var registry = services.GetRequiredService<AiSourceRegistry>();
@@ -1106,9 +1172,11 @@ using (Ai.Context(source: "openai-auto-default")) {
 ```
 
 ### Phase 7: Sample Updates and Documentation (Week 7-8)
+
 **Goal:** Update samples to showcase new features
 
 **Tasks:**
+
 1. Update S5.Recs to use new API
 2. Update S12.MedTrials to demonstrate fallback groups
 3. Update S13.DocMind to show hybrid local/cloud routing
@@ -1118,11 +1186,13 @@ using (Ai.Context(source: "openai-auto-default")) {
 7. Update API documentation
 
 **Tests:**
+
 - [ ] All samples build and run
 - [ ] Samples demonstrate different configuration levels
 - [ ] Migration guide examples work as documented
 
 **Acceptance Criteria:**
+
 ```
 Updated samples:
 ✓ S5.Recs: Uses Ai.Embed() for vector search
@@ -1135,6 +1205,7 @@ Updated samples:
 ## Testing Strategy
 
 ### Unit Tests
+
 - Source registry configuration parsing
 - Group policy behavior (Fallback, RoundRobin)
 - Circuit breaker state transitions
@@ -1142,12 +1213,14 @@ Updated samples:
 - Adapter resolution priority chain
 
 ### Integration Tests
+
 - Auto-discovery with mock Ollama endpoints
 - Multi-source fallback behavior
 - Health monitoring and recovery
 - End-to-end chat/embed/vision operations
 
 ### Manual Testing Scenarios
+
 1. Zero-config first run experience
 2. Containerized app with host Ollama
 3. Host Ollama crash and recovery
@@ -1182,16 +1255,19 @@ Updated samples:
 ### Migration Path
 
 **Existing Code:**
+
 ```csharp
 var response = await Ai.PromptAsync("Hello");
 ```
 
 **New Code (backward compatible):**
+
 ```csharp
 var response = await Ai.Chat("Hello");  // Simpler API
 ```
 
 **Configuration Migration:**
+
 ```json
 // Old (still works)
 {
@@ -1224,6 +1300,7 @@ var response = await Ai.Chat("Hello");  // Simpler API
 ## Follow-Ups
 
 ### Immediate (Part of This ADR)
+
 - [x] Source abstraction with group properties
 - [x] Capability-first API design
 - [x] Multi-source auto-discovery
@@ -1232,6 +1309,7 @@ var response = await Ai.Chat("Hello");  // Simpler API
 - [x] Model auto-provisioning with progress tracking
 
 ### Future Enhancements (Separate ADRs)
+
 - [ ] Cost tracking per source/capability
 - [ ] Latency-based routing
 - [ ] Request caching layer

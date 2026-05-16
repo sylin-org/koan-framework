@@ -58,7 +58,7 @@ public sealed class CanonModelsController : ControllerBase
             descriptor.ModelType.FullName ?? descriptor.ModelType.Name,
             descriptor.IsValueObject,
             metadata?.HasSteps ?? false,
-            metadata?.Phases ?? Array.Empty<CanonPipelinePhase>(),
+            metadata?.Phases ?? [],
             aggregationMetadata.AggregationKeyNames,
             metadata?.AggregationPolicies ?? aggregationMetadata.PolicyByName,
             metadata?.AggregationPolicyDetails ?? aggregationMetadata.PolicyDescriptorsByName,

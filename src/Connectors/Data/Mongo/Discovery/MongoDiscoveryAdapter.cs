@@ -51,8 +51,8 @@ internal sealed class MongoDiscoveryAdapter : ServiceDiscoveryAdapterBase
     {
         // Check MongoDB-specific configuration paths
         return _configuration.GetConnectionString("MongoDB") ??
-               _configuration["Koan:Data:Mongo:ConnectionString"] ??
-               _configuration["Koan:Data:ConnectionString"];
+               _configuration[Infrastructure.ConfigurationConstants.FullKey(Infrastructure.ConfigurationConstants.Keys.ConnectionString)] ??
+               _configuration[Infrastructure.ConfigurationConstants.DataFallback.ConnectionString];
     }
 
     /// <summary>MongoDB-specific environment variable handling</summary>
@@ -68,34 +68,65 @@ internal sealed class MongoDiscoveryAdapter : ServiceDiscoveryAdapterBase
                        .Select(url => new DiscoveryCandidate(url.Trim(), "environment-mongo-urls", 0));
     }
 
-    /// <summary>MongoDB-specific connection string parameter application</summary>
+    /// <summary>MongoDB-specific connection string parameter application.
+    /// Uses string manipulation rather than System.Uri to support replica set
+    /// connection strings with comma-separated hosts.</summary>
     protected override string ApplyConnectionParameters(string baseUrl, IDictionary<string, object> parameters)
     {
         try
         {
-            var uri = new Uri(baseUrl);
-            var auth = "";
-            var database = "";
+            // Format: mongodb[+srv]://[existing-auth@]hosts[/db][?options]
+            var schemeEnd = baseUrl.IndexOf("://", StringComparison.Ordinal);
+            if (schemeEnd < 0) return baseUrl;
 
-            // Apply MongoDB-specific authentication parameters
+            var scheme = baseUrl[..(schemeEnd + 3)];
+            var rest = baseUrl[(schemeEnd + 3)..];
+
+            // Detect existing auth (@ must appear before any / or ?)
+            var atIndex = rest.IndexOf('@');
+            var slashIndex = rest.IndexOf('/');
+            if (atIndex >= 0 && (slashIndex < 0 || atIndex < slashIndex))
+            {
+                rest = rest[(atIndex + 1)..];
+            }
+
+            // Split hosts from path+query
+            string hosts;
+            string trailing = "";
+            var pathStart = rest.IndexOf('/');
+            if (pathStart >= 0)
+            {
+                hosts = rest[..pathStart];
+                trailing = rest[pathStart..];
+            }
+            else
+            {
+                var queryStart = rest.IndexOf('?');
+                hosts = queryStart >= 0 ? rest[..queryStart] : rest;
+                trailing = queryStart >= 0 ? rest[queryStart..] : "";
+            }
+
+            var auth = "";
             if (parameters.TryGetValue("username", out var username) &&
                 parameters.TryGetValue("password", out var password))
             {
                 auth = $"{username}:{password}@";
             }
 
-            // Apply MongoDB-specific database parameter
             if (parameters.TryGetValue("database", out var db))
             {
-                database = $"/{db}";
+                // Replace existing path with requested database, preserve query
+                var qIdx = trailing.IndexOf('?');
+                var query = qIdx >= 0 ? trailing[qIdx..] : "";
+                trailing = $"/{db}{query}";
             }
 
-            return $"{uri.Scheme}://{auth}{uri.Host}:{uri.Port}{database}";
+            return $"{scheme}{auth}{hosts}{trailing}";
         }
         catch (Exception ex)
         {
             _logger.LogDebug("Failed to apply MongoDB parameters to {BaseUrl}: {Error}", baseUrl, ex.Message);
-            return baseUrl; // Return original URL if parameter application fails
+            return baseUrl;
         }
     }
 

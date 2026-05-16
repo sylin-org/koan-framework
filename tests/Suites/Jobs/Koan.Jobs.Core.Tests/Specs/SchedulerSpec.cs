@@ -19,8 +19,8 @@ public class SchedulerSpec : IClassFixture<JobsCoreTestPipelineFixture>
     var job = _fixture.CreateTestJob();
 
     // Act
-    await scheduler.ScheduleAsync(job);
-    var scheduled = await scheduler.GetScheduledJobsAsync();
+    await scheduler.Schedule(job);
+    var scheduled = await scheduler.GetScheduledJobs();
 
     // Assert
     scheduled.Should().Contain(j => j.Id == job.Id);

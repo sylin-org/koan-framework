@@ -2,7 +2,7 @@
 id: DATA-0079
 slug: data-0079-entity-transfer-helpers
 domain: DATA
-status: Proposed
+status: Accepted
 date: 2025-10-02
 ---
 
@@ -10,7 +10,8 @@ date: 2025-10-02
 
 Date: 2025-10-02
 
-Status: Proposed
+Status: Accepted
+**Implementation**: `CopyTransferBuilder`, `MoveTransferBuilder`, `MirrorTransferBuilder` in `src/Koan.Data.Core/Transfers/`
 
 ## Context
 

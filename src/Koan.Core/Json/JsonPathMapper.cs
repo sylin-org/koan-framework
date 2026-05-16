@@ -35,12 +35,12 @@ public static class JsonPathMapper
                 var arr = (JArray)token;
                 for (int i = 0; i < arr.Count; i++)
                 {
-                    var path = (prefix ?? string.Empty) + "[" + i + "]";
+                    var path = (prefix ?? "") + "[" + i + "]";
                     Recurse(arr[i], path, dict);
                 }
                 break;
             default:
-                dict[prefix ?? string.Empty] = ((JValue)token).DeepClone();
+                dict[prefix ?? ""] = ((JValue)token).DeepClone();
                 break;
         }
     }

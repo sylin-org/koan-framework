@@ -13,7 +13,7 @@ namespace Koan.Samples.Meridian.Services;
 
 public interface IPipelineProcessor
 {
-    Task ProcessAsync(ProcessingJob job, CancellationToken ct);
+    Task Process(ProcessingJob job, CancellationToken ct);
 }
 
 public sealed class PipelineProcessor : IPipelineProcessor
@@ -65,7 +65,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
         _logger = logger;
     }
 
-    public async Task ProcessAsync(ProcessingJob job, CancellationToken ct)
+    public async Task Process(ProcessingJob job, CancellationToken ct)
     {
         var pipeline = await DocumentPipeline.Get(job.PipelineId, ct)
             ?? throw new InvalidOperationException($"Pipeline {job.PipelineId} not found.");
@@ -76,18 +76,18 @@ public sealed class PipelineProcessor : IPipelineProcessor
         pipeline.AttachDocuments(job.DocumentIds);
         pipeline.Status = PipelineStatus.Processing;
         pipeline.UpdatedAt = DateTime.UtcNow;
-        await pipeline.Save(ct);
+        await pipeline.Save(ct).ConfigureAwait(false);
 
         // STEP 1: Create virtual document from Authoritative Notes (if present)
         string? virtualDocumentId = null;
         if (!string.IsNullOrWhiteSpace(pipeline.AuthoritativeNotes))
         {
-            virtualDocumentId = await CreateVirtualDocumentFromNotesAsync(pipeline, ct);
+            virtualDocumentId = await CreateVirtualDocumentFromNotes(pipeline, ct);
             if (!string.IsNullOrWhiteSpace(virtualDocumentId))
             {
                 pipeline.AttachDocument(virtualDocumentId);
                 pipeline.UpdatedAt = DateTime.UtcNow;
-                await pipeline.Save(ct);
+                await pipeline.Save(ct).ConfigureAwait(false);
             }
             _logger.LogInformation(
                 "Created virtual document {VirtualDocId} from Authoritative Notes for pipeline {PipelineId}",
@@ -111,7 +111,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
                 job.ProcessedDocuments = processedCount;
                 job.LastDocumentId = documentId;
                 job.HeartbeatAt = DateTime.UtcNow;
-                await job.Save(ct);
+                await job.Save(ct).ConfigureAwait(false);
                 continue;
             }
 
@@ -119,7 +119,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
             var previousStatus = document.Status;
 
             var extractStarted = DateTime.UtcNow;
-            var extraction = await _textExtractor.ExtractAsync(document, ct);
+            var extraction = await _textExtractor.Extract(document, ct);
             var extractFinished = DateTime.UtcNow;
 
             var newHash = TextExtractor.ComputeTextHash(extraction.Text);
@@ -134,7 +134,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
 
             await document.Save(ct);
 
-            await _runLog.AppendAsync(new RunLog
+            await _runLog.Append(new RunLog
             {
                 PipelineId = pipeline.Id,
                 Stage = "extract",
@@ -157,7 +157,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
                 document.UpdatedAt = extractFinished;
                 await document.Save(ct);
 
-                await _runLog.AppendAsync(new RunLog
+                await _runLog.Append(new RunLog
                 {
                     PipelineId = pipeline.Id,
                     Stage = "refresh",
@@ -176,12 +176,12 @@ public sealed class PipelineProcessor : IPipelineProcessor
                 job.ProcessedDocuments = processedCount;
                 job.LastDocumentId = document.Id;
                 job.HeartbeatAt = DateTime.UtcNow;
-                await job.Save(ct);
+                await job.Save(ct).ConfigureAwait(false);
                 continue;
             }
 
             var classifyStarted = DateTime.UtcNow;
-            var classification = await _classifier.ClassifyAsync(document, ct);
+            var classification = await _classifier.Classify(document, ct);
             var classifyFinished = DateTime.UtcNow;
 
             document.SourceType = classification.TypeId;
@@ -205,7 +205,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
                 ["reason"] = classification.Reason
             };
 
-            await _runLog.AppendAsync(new RunLog
+            await _runLog.Append(new RunLog
             {
                 PipelineId = pipeline.Id,
                 Stage = "classify",
@@ -236,7 +236,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
                 job.ProcessedDocuments = processedCount;
                 job.LastDocumentId = document.Id;
                 job.HeartbeatAt = DateTime.UtcNow;
-                await job.Save(ct);
+                await job.Save(ct).ConfigureAwait(false);
                 continue; // Skip to next document
             }
 
@@ -251,10 +251,10 @@ public sealed class PipelineProcessor : IPipelineProcessor
             job.ProcessedDocuments = processedCount;
             job.LastDocumentId = document.Id;
             job.HeartbeatAt = DateTime.UtcNow;
-            await job.Save(ct);
+            await job.Save(ct).ConfigureAwait(false);
         }
 
-        await _indexer.IndexAsync(pipeline.Id, passages, ct);
+        await _indexer.Index(pipeline.Id, passages, ct);
 
         foreach (var docId in job.DocumentIds)
         {
@@ -272,8 +272,8 @@ public sealed class PipelineProcessor : IPipelineProcessor
             }
         }
 
-        var allPassages = await pipeline.LoadPassagesAsync(ct);
-        var existingFields = (await ExtractedField.Query(e => e.PipelineId == pipeline.Id, ct))
+        var allPassages = await pipeline.LoadPassages(ct);
+        var existingFields = (await ExtractedField.Query(e => e.PipelineId == pipeline.Id, ct).ConfigureAwait(false))
             .Where(field => string.Equals(field.PipelineId, pipeline.Id, StringComparison.Ordinal))
             .Select(field =>
             {
@@ -281,7 +281,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
                 return field;
             })
             .ToList();
-        var plan = await _refreshPlanner.PlanAsync(pipeline, changedDocuments, existingFields, ct);
+        var plan = await _refreshPlanner.Plan(pipeline, changedDocuments, existingFields, ct).ConfigureAwait(false);
 
         var planTimestamp = DateTime.UtcNow;
         var planMetadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -297,7 +297,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
             planMetadata["reasonCount"] = plan.Reasons.Count.ToString(CultureInfo.InvariantCulture);
         }
 
-        await _runLog.AppendAsync(new RunLog
+        await _runLog.Append(new RunLog
         {
             PipelineId = pipeline.Id,
             Stage = "refresh-plan",
@@ -307,7 +307,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
             FinishedAt = DateTime.UtcNow,
             Status = plan.Mode,
             Metadata = planMetadata
-        }, ct);
+        }, ct).ConfigureAwait(false);
 
         HashSet<string>? fieldFilter = null;
         if (!plan.RequiresFullExtraction && plan.FieldsToExtract.Count > 0)
@@ -320,21 +320,21 @@ public sealed class PipelineProcessor : IPipelineProcessor
         var freshExtractions = new List<ExtractedField>();
         if (plan.RequiresFullExtraction || (fieldFilter?.Count ?? 0) > 0)
         {
-            var analysisType = await AnalysisType.Get(pipeline.AnalysisTypeId, ct)
+            var analysisType = await AnalysisType.Get(pipeline.AnalysisTypeId, ct).ConfigureAwait(false)
                 ?? throw new InvalidOperationException($"AnalysisType '{pipeline.AnalysisTypeId}' not found for pipeline {pipeline.Id}.");
 
             // STAGE 1: Build complete fact catalog from org profile + analysis type
-            var factCatalog = await _catalogBuilder.BuildAsync(pipeline, analysisType, ct);
+            var factCatalog = await _catalogBuilder.Build(pipeline, analysisType, ct).ConfigureAwait(false);
 
             // STAGE 2: Semantic categorization of facts into contextual batches (cached)
-            var categorizationMap = await _categorizer.CategorizeAsync(factCatalog, analysisType, ct);
+            var categorizationMap = await _categorizer.Categorize(factCatalog, analysisType, ct).ConfigureAwait(false);
 
             // STAGE 3: Targeted extraction per batch per document
             var allExtractedFields = new List<ExtractedField>();
 
             foreach (var docId in pipeline.DocumentIds.Distinct(StringComparer.Ordinal))
             {
-                var document = await SourceDocument.Get(docId, ct);
+                var document = await SourceDocument.Get(docId, ct).ConfigureAwait(false);
                 if (document is null)
                 {
                     _logger.LogWarning("Unable to load document {DocumentId} for fact extraction", docId);
@@ -342,7 +342,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
                 }
 
                 // STAGE 2.5: Document style classification (cached if already classified)
-                await _styleClassifier.ClassifyAsync(document, ct);
+                await _styleClassifier.Classify(document, ct).ConfigureAwait(false);
 
                 foreach (var batch in categorizationMap.Batches)
                 {
@@ -368,8 +368,8 @@ public sealed class PipelineProcessor : IPipelineProcessor
                         batchToExtract = filteredBatch;
                     }
 
-                    var batchFields = await _extractor.ExtractBatchAsync(
-                        document, batchToExtract, factCatalog, pipeline.Id, ct);
+                    var batchFields = await _extractor.ExtractBatch(
+                        document, batchToExtract, factCatalog, pipeline.Id, ct).ConfigureAwait(false);
                     allExtractedFields.AddRange(batchFields);
                 }
             }
@@ -403,8 +403,8 @@ public sealed class PipelineProcessor : IPipelineProcessor
                         batchToExtract = filteredBatch;
                     }
 
-                    var notesBatchFields = await _extractor.ExtractBatchFromNotesAsync(
-                        pipeline.AuthoritativeNotes, batchToExtract, factCatalog, pipeline.Id, ct);
+                    var notesBatchFields = await _extractor.ExtractBatchFromNotes(
+                        pipeline.AuthoritativeNotes, batchToExtract, factCatalog, pipeline.Id, ct).ConfigureAwait(false);
                     allExtractedFields.AddRange(notesBatchFields);
                 }
             }
@@ -429,7 +429,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
             }
 
             extraction.UpdatedAt = DateTime.UtcNow;
-            var saved = await extraction.Save(ct);
+            var saved = await extraction.Save(ct).ConfigureAwait(false);
             existingByField[extraction.FieldPath] = saved;
             savedExtractions.Add(saved);
         }
@@ -470,7 +470,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
             if (existingFields.Count > 0)
             {
                 mergeCandidates = existingFields.ToList();
-                await _runLog.AppendAsync(new RunLog
+                await _runLog.Append(new RunLog
                 {
                     PipelineId = pipeline.Id,
                     Stage = "refresh-fallback",
@@ -483,7 +483,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
                         ["reason"] = "no-new-extractions",
                         ["preservedFields"] = existingFields.Count.ToString(CultureInfo.InvariantCulture)
                     }
-                }, ct);
+                }, ct).ConfigureAwait(false);
             }
             else
             {
@@ -493,22 +493,22 @@ public sealed class PipelineProcessor : IPipelineProcessor
             }
         }
 
-        await _merger.MergeAsync(pipeline, mergeCandidates, ct);
+        await _merger.Merge(pipeline, mergeCandidates, ct);
 
         // Update all documents with the extraction version to detect stale extractions on reuse
         if (!string.IsNullOrWhiteSpace(pipeline.AnalysisTypeId))
         {
-            var analysisType = await AnalysisType.Get(pipeline.AnalysisTypeId, ct);
+            var analysisType = await AnalysisType.Get(pipeline.AnalysisTypeId, ct).ConfigureAwait(false);
             if (analysisType != null)
             {
                 foreach (var docId in pipeline.DocumentIds.Distinct(StringComparer.Ordinal))
                 {
-                    var document = await SourceDocument.Get(docId, ct);
+                    var document = await SourceDocument.Get(docId, ct).ConfigureAwait(false);
                     if (document != null && !document.IsVirtual)
                     {
                         document.LastExtractedAnalysisTypeVersion = analysisType.Version;
                         document.UpdatedAt = DateTime.UtcNow;
-                        await document.Save(ct);
+                        await document.Save(ct).ConfigureAwait(false);
                     }
                 }
 
@@ -522,7 +522,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
         pipeline.Status = PipelineStatus.Completed;
         pipeline.CompletedAt = completedAt;
         pipeline.UpdatedAt = completedAt;
-        await pipeline.Save(ct);
+        await pipeline.Save(ct).ConfigureAwait(false);
 
         // Move completed job to archive partition to preserve history and prevent reprocessing
         job.Status = JobStatus.Completed;
@@ -531,10 +531,10 @@ public sealed class PipelineProcessor : IPipelineProcessor
         job.ProcessedDocuments = job.TotalDocuments;
 
         _logger.LogInformation("Archiving completed job {JobId} to completed-jobs partition", job.Id);
-        await job.Save("completed-jobs", ct);
+        await job.Save("completed-jobs", ct).ConfigureAwait(false);
 
         // Remove from active jobs collection to prevent TryClaimAnyAsync from finding it
-        await job.Delete(ct);
+        await job.Delete(ct).ConfigureAwait(false);
         _logger.LogInformation("Job {JobId} archived and removed from active queue", job.Id);
     }
 
@@ -542,11 +542,11 @@ public sealed class PipelineProcessor : IPipelineProcessor
     /// Create a virtual document from Authoritative Notes to enable extraction via standard pipeline.
     /// Virtual documents have precedence=1 (highest priority) to override all other sources.
     /// </summary>
-    private async Task<string> CreateVirtualDocumentFromNotesAsync(
+    private async Task<string> CreateVirtualDocumentFromNotes(
         DocumentPipeline pipeline,
         CancellationToken ct)
     {
-        var notesContent = pipeline.AuthoritativeNotes ?? string.Empty;
+        var notesContent = pipeline.AuthoritativeNotes ?? "";
         var notesHash = TextExtractor.ComputeTextHash(notesContent);
 
         // Check for existing virtual document attached to this pipeline
@@ -569,7 +569,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
                 existingVirtual.ExtractedAt = DateTime.UtcNow;
                 await existingVirtual.Save(ct);
 
-                await _runLog.AppendAsync(new RunLog
+                await _runLog.Append(new RunLog
                 {
                     PipelineId = pipeline.Id,
                     Stage = "virtual-document-update",
@@ -617,9 +617,9 @@ public sealed class PipelineProcessor : IPipelineProcessor
             UpdatedAt = DateTime.UtcNow
         };
 
-        var saved = await virtualDoc.Save(ct);
+        var saved = await virtualDoc.Save(ct).ConfigureAwait(false);
 
-        await _runLog.AppendAsync(new RunLog
+        await _runLog.Append(new RunLog
         {
             PipelineId = pipeline.Id,
             Stage = "virtual-document",

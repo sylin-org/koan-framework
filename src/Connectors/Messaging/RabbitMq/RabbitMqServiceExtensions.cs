@@ -53,11 +53,11 @@ public class KoanAutoRegistrar : IKoanAutoRegistrar
             }
 
             // Discover RabbitMQ service
-            var discoveryTask = serviceDiscovery.DiscoverServiceAsync("rabbitmq", discoveryOptions);
+            var discoveryTask = serviceDiscovery.DiscoverService("rabbitmq", discoveryOptions);
             var result = discoveryTask.GetAwaiter().GetResult();
 
             var method = $"orchestration-{result.DiscoveryMethod}";
-            var endpoint = Koan.Core.Redaction.DeIdentify(result.ServiceUrl ?? string.Empty);
+            var endpoint = Koan.Core.Redaction.DeIdentify(result.ServiceUrl ?? "");
             module.AddSetting("Discovery.Method", method);
             module.AddSetting("Discovery.Endpoint", endpoint);
             module.AddSetting("Discovery.Healthy", result.IsHealthy.ToString());

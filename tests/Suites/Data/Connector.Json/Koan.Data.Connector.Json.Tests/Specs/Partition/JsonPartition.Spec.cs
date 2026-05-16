@@ -19,7 +19,7 @@ public sealed class JsonPartitionSpec
     public async Task Partition_scopes_isolate_entities()
     {
         await TestPipeline.For<JsonPartitionSpec>(_output, nameof(Partition_scopes_isolate_entities))
-            .Using<JsonConnectorFixture>("fixture", static ctx => JsonConnectorFixture.CreateAsync(ctx))
+            .Using<JsonConnectorFixture>("fixture", static ctx => JsonConnectorFixture.Create(ctx))
             .Arrange(static async ctx =>
             {
                 var fixture = ctx.GetRequiredItem<JsonConnectorFixture>("fixture");
@@ -36,13 +36,13 @@ public sealed class JsonPartitionSpec
 
                 await using (fixture.LeasePartition(partitionA))
                 {
-                    await TenantRecord.UpsertAsync(new TenantRecord { Name = "A1" });
-                    await TenantRecord.UpsertAsync(new TenantRecord { Name = "A2" });
+                    await TenantRecord.Upsert(new TenantRecord { Name = "A1" });
+                    await TenantRecord.Upsert(new TenantRecord { Name = "A2" });
                 }
 
                 await using (fixture.LeasePartition(partitionB))
                 {
-                    await TenantRecord.UpsertAsync(new TenantRecord { Name = "B1" });
+                    await TenantRecord.Upsert(new TenantRecord { Name = "B1" });
                 }
 
                 var defaultScope = await TenantRecord.All();
@@ -70,15 +70,15 @@ public sealed class JsonPartitionSpec
 
                 var jsonFiles = Directory.Exists(fixture.RootPath)
                     ? Directory.EnumerateFiles(fixture.RootPath, "*.json", SearchOption.AllDirectories).ToArray()
-                    : Array.Empty<string>();
+                    : [];
 
                 jsonFiles.Should().NotBeEmpty("each partition should materialize its own json store");
             })
-            .RunAsync();
+            .Run();
     }
 
     private sealed class TenantRecord : Entity<TenantRecord>
     {
-        public string Name { get; set; } = string.Empty;
+        public string Name { get; set; } = "";
     }
 }

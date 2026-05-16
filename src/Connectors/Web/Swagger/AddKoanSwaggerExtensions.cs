@@ -3,12 +3,13 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Microsoft.OpenApi.Models;
 using Koan.Core;
 using Koan.Core.Extensions;
 using Koan.Core.Modules;
 using Koan.Web.Connector.Swagger.Infrastructure;
-using Swashbuckle.AspNetCore.Swagger;
+using Koan.Web.OpenApi.Options;
+using Swashbuckle.AspNetCore.SwaggerUI;
+using Microsoft.AspNetCore.OpenApi;
 
 namespace Koan.Web.Connector.Swagger;
 
@@ -16,40 +17,12 @@ public static class AddKoanSwaggerExtensions
 {
     public static IServiceCollection AddKoanSwagger(this IServiceCollection services, IConfiguration? config = null)
     {
-        // Idempotency: if Swagger services are already registered, skip to avoid duplicate docs/config actions
-        if (services.Any(d => d.ServiceType == typeof(ISwaggerProvider)))
-        {
-            return services;
-        }
-        if (config is null)
-        {
-            // Delay resolve until app builds; rely on DI at UseKoanSwagger time if needed.
-            // For Add phase, prefer having config passed in; otherwise, we skip config-dependent parts.
-        }
         // Bind typed options (lazy binding if config is not provided now)
         try { services.AddKoanOptions<KoanWebSwaggerOptions>(Infrastructure.Constants.Configuration.Section); } catch { }
+
         services.AddEndpointsApiExplorer();
-        services.AddSwaggerGen(c =>
-        {
-            c.SwaggerDoc("v1", new OpenApiInfo { Title = "Koan API", Version = "v1" });
-            var opts = config is not null ? GetOptions(config) : new KoanWebSwaggerOptions();
-            if (opts.IncludeXmlComments)
-            {
-                foreach (var xml in GetXmlDocFiles())
-                {
-                    try { c.IncludeXmlComments(xml, includeControllerXmlComments: true); } catch { }
-                }
-            }
-            // Document pagination semantics for EntityController endpoints
-            c.OperationFilter<PaginationOperationFilter>();
-            // Document common headers
-            c.OperationFilter<KoanHeadersOperationFilter>();
-            // If transformers assembly is present, include an operation filter to advertise alternate media types
-            if (Type.GetType("Koan.Web.Transformers.EnableEntityTransformersAttribute, Koan.Web.Transformers") is not null)
-            {
-                c.OperationFilter<TransformerMediaTypesOperationFilter>();
-            }
-        });
+        services.AddOpenApi();
+
         return services;
     }
 
@@ -78,19 +51,12 @@ public static class AddKoanSwaggerExtensions
 
         if (!enabled) return app; // off in non-dev unless explicitly enabled via env or magic flag
 
-        // Ensure services were registered; if not, skip to avoid runtime 500s
-        var provider = app.Services.GetService<ISwaggerProvider>();
-        if (provider is null)
-        {
-            app.Logger.LogWarning("Koan.Web.Connector.Swagger: Swagger services not found. Did you call services.AddKoanSwagger()? Skipping UI middleware.");
-            return app;
-        }
+        app.MapOpenApi("openapi/{documentName}.json");
 
-        app.UseSwagger();
         app.UseSwaggerUI(ui =>
         {
             ui.RoutePrefix = opts.RoutePrefix;
-            ui.SwaggerEndpoint("/swagger/v1/swagger.json", "Koan API v1");
+            ui.SwaggerEndpoint($"/openapi/{KoanOpenApiOptions.DefaultDocumentName}.json", "Koan API v1");
         });
 
         // Optionally protect UI outside Development
@@ -120,12 +86,5 @@ public static class AddKoanSwaggerExtensions
         return o;
     }
 
-    private static IEnumerable<string> GetXmlDocFiles()
-    {
-        var baseDir = AppContext.BaseDirectory;
-        foreach (var file in Directory.EnumerateFiles(baseDir, "*.xml", SearchOption.TopDirectoryOnly))
-            yield return file;
-    }
 }
 
-// Lives in Swagger assembly and uses reflection to talk to Transformers without a direct reference

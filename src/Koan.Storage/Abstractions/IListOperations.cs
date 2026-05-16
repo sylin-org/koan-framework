@@ -9,7 +9,7 @@ public interface IListOperations
     /// <param name="prefix">Optional prefix to filter objects (e.g., "backups/")</param>
     /// <param name="ct">Cancellation token</param>
     /// <returns>Enumerable of object information</returns>
-    IAsyncEnumerable<StorageObjectInfo> ListObjectsAsync(string container, string? prefix = null, CancellationToken ct = default);
+    IAsyncEnumerable<StorageObjectInfo> ListObjects(string container, string? prefix = null, CancellationToken ct = default);
 }
 
 /// <summary>

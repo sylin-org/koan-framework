@@ -34,7 +34,7 @@ internal sealed class RoleBootstrapHostedService(
                     if (opt.PolicyBindings.Count > 0)
                         await bindings.UpsertMany(opt.PolicyBindings.Select(p => new SeedBindingDto(p.Id, p.Requirement)), cancellationToken);
 
-                    await snapshot.ReloadAsync(cancellationToken);
+                    await snapshot.Reload(cancellationToken);
                     logger.LogInformation("Koan.Web.Auth.Roles: initial seed applied from configuration template.");
                 }
                 else
@@ -43,7 +43,8 @@ internal sealed class RoleBootstrapHostedService(
                 }
             }
 
-            // 2) Admin bootstrap gates (FirstUser/ClaimMatch) are enforced at attribution time; nothing to do here.
+            // Admin bootstrap (FirstUser/ClaimMatch) is now an IKoanAuthEventContributor
+            // (Contributors.AdminBootstrapContributor) running at sign-in. See WEB-0065.
         }
         catch (Exception ex)
         {

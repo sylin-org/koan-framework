@@ -17,8 +17,8 @@ namespace Koan.Samples.Meridian.Services;
 
 public interface IDocumentIngestionService
 {
-    Task<DocumentIngestionResult> IngestAsync(string pipelineId, IFormFileCollection files, bool forceReprocess, string? typeHint, CancellationToken ct);
-    Task<DocumentIngestionResult> IngestAsync(string pipelineId, IFormFile file, bool forceReprocess, string? typeHint, CancellationToken ct);
+    Task<DocumentIngestionResult> Ingest(string pipelineId, IFormFileCollection files, bool forceReprocess, string? typeHint, CancellationToken ct);
+    Task<DocumentIngestionResult> Ingest(string pipelineId, IFormFile file, bool forceReprocess, string? typeHint, CancellationToken ct);
 }
 
 public sealed record DocumentIngestionResult(
@@ -44,7 +44,7 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
         _logger = logger;
     }
 
-    public async Task<DocumentIngestionResult> IngestAsync(string pipelineId, IFormFileCollection files, bool forceReprocess, string? typeHint, CancellationToken ct)
+    public async Task<DocumentIngestionResult> Ingest(string pipelineId, IFormFileCollection files, bool forceReprocess, string? typeHint, CancellationToken ct)
     {
         if (files is null || files.Count == 0)
         {
@@ -54,7 +54,7 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
         var pipeline = await DocumentPipeline.Get(pipelineId, ct)
             ?? throw new InvalidOperationException($"Pipeline {pipelineId} not found.");
 
-        var existingDocuments = await pipeline.LoadDocumentsAsync(ct);
+        var existingDocuments = await pipeline.LoadDocuments(ct).ConfigureAwait(false);
         var documentsByHash = existingDocuments
             .Where(doc => !string.IsNullOrWhiteSpace(doc.ContentHash))
             .ToDictionary(doc => doc.ContentHash!, doc => doc, StringComparer.OrdinalIgnoreCase);
@@ -77,9 +77,9 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
 
             _logger.LogInformation("Processing file upload: {FileName}, Size: {Size} bytes", file.FileName, file.Length);
 
-            await _validator.ValidateAsync(file, ct);
+            await _validator.Validate(file, ct).ConfigureAwait(false);
 
-            var buffered = await BufferAndHashAsync(file, ct);
+            var buffered = await BufferAndHash(file, ct).ConfigureAwait(false);
             await using var contentStream = buffered.Content;
             var hash = buffered.Hash;
 
@@ -111,7 +111,7 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
                 // Check if extraction schema has changed since last extraction, or if never extracted
                 if (!requiresReprocess && !string.IsNullOrWhiteSpace(pipeline.AnalysisTypeId))
                 {
-                    var analysisType = await AnalysisType.Get(pipeline.AnalysisTypeId!, ct);
+                    var analysisType = await AnalysisType.Get(pipeline.AnalysisTypeId!, ct).ConfigureAwait(false);
                     if (analysisType != null)
                     {
                         // Reprocess if never extracted OR if analysis type version has changed
@@ -137,12 +137,12 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
                     ApplyManualClassification(existingByHash, typeHint, "Upload hint");
                     existingByHash.Status = DocumentProcessingStatus.Pending;
                     existingByHash.UpdatedAt = DateTime.UtcNow;
-                    var updated = await existingByHash.Save(ct);
+                    var updated = await existingByHash.Save(ct).ConfigureAwait(false);
                     documentsByHash[hash] = updated;
                     ReplaceDocument(existingDocuments, updated);
                     existingByHash = updated;
 
-                    await AppendClassificationAuditAsync(pipeline, existingByHash, "manual-hint", ct);
+                    await AppendClassificationAudit(pipeline, existingByHash, "manual-hint", ct).ConfigureAwait(false);
                 }
 
                 if (requiresReprocess)
@@ -154,7 +154,7 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
                         existingByHash.ContentHash = hash;
                     }
 
-                    var refreshed = await existingByHash.Save(ct);
+                    var refreshed = await existingByHash.Save(ct).ConfigureAwait(false);
                     documentsByHash[hash] = refreshed;
                     ReplaceDocument(existingDocuments, refreshed);
                     newDocuments.Add(refreshed);
@@ -171,7 +171,7 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
             }
 
             contentStream.Position = 0;
-            var storageKey = await _storage.StoreAsync(contentStream, file.FileName, file.ContentType, ct);
+            var storageKey = await _storage.Store(contentStream, file.FileName, file.ContentType, ct).ConfigureAwait(false);
 
             var document = new SourceDocument
             {
@@ -191,7 +191,7 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
                 ApplyManualClassification(document, typeHint, "Upload hint");
             }
 
-            var saved = await document.Save(ct);
+            var saved = await document.Save(ct).ConfigureAwait(false);
 
             // Track for rollback in case pipeline.Save fails
             storedDocuments.Add((saved, storageKey));
@@ -206,7 +206,7 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
 
             if (!string.IsNullOrWhiteSpace(typeHint))
             {
-                await AppendClassificationAuditAsync(pipeline, saved, "manual-hint", ct);
+                await AppendClassificationAudit(pipeline, saved, "manual-hint", ct).ConfigureAwait(false);
             }
             }
 
@@ -218,14 +218,14 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
             if (attachmentsAdded)
             {
                 pipeline.UpdatedAt = DateTime.UtcNow;
-                await pipeline.Save(ct);
+                await pipeline.Save(ct).ConfigureAwait(false);
                 _logger.LogInformation("Pipeline {PipelineId} now has {Count} attached documents: {DocumentIds}",
                     pipeline.Id, pipeline.DocumentIds.Count, string.Join(", ", pipeline.DocumentIds));
             }
 
             if (reuseTelemetryCandidates.Count > 0)
             {
-                await EmitDocumentReuseTelemetryAsync(pipeline, reuseTelemetryCandidates, ct);
+                await EmitDocumentReuseTelemetry(pipeline, reuseTelemetryCandidates, ct).ConfigureAwait(false);
             }
 
             _logger.LogInformation(
@@ -249,7 +249,7 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
                 try
                 {
                     // Delete from blob storage
-                    await _storage.DeleteAsync(storageKey, ct);
+                    await _storage.Delete(storageKey, ct).ConfigureAwait(false);
                     _logger.LogDebug("Rolled back storage for document {DocumentId}, key {StorageKey}",
                         doc.Id, storageKey);
                 }
@@ -268,14 +268,14 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
         }
     }
 
-    public async Task<DocumentIngestionResult> IngestAsync(string pipelineId, IFormFile file, bool forceReprocess, string? typeHint, CancellationToken ct)
+    public async Task<DocumentIngestionResult> Ingest(string pipelineId, IFormFile file, bool forceReprocess, string? typeHint, CancellationToken ct)
     {
         if (file is null)
         {
             throw new ArgumentNullException(nameof(file));
         }
 
-        return await IngestAsync(pipelineId, new FormFileCollection { file }, forceReprocess, typeHint, ct);
+        return await Ingest(pipelineId, new FormFileCollection { file }, forceReprocess, typeHint, ct).ConfigureAwait(false);
     }
 
     private static void ApplyManualClassification(SourceDocument document, string typeId, string reason)
@@ -288,11 +288,11 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
         document.ClassificationReason = reason;
     }
 
-    private async Task AppendClassificationAuditAsync(DocumentPipeline pipeline, SourceDocument document, string mode, CancellationToken ct)
+    private async Task AppendClassificationAudit(DocumentPipeline pipeline, SourceDocument document, string mode, CancellationToken ct)
     {
-        await _runLog.AppendAsync(new RunLog
+        await _runLog.Append(new RunLog
         {
-            PipelineId = pipeline.Id ?? string.Empty,
+            PipelineId = pipeline.Id ?? "",
             Stage = "classify",
             DocumentId = document.Id,
             Status = mode,
@@ -302,13 +302,13 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
             {
                 ["typeId"] = document.ClassifiedTypeId ?? document.SourceType,
                 ["method"] = document.ClassificationMethod.ToString(),
-                ["reason"] = document.ClassificationReason ?? string.Empty,
+                ["reason"] = document.ClassificationReason ?? "",
                 ["confidence"] = document.ClassificationConfidence.ToString("0.00", CultureInfo.InvariantCulture)
             }
-        }, ct);
+        }, ct).ConfigureAwait(false);
     }
 
-    private static async Task<(string Hash, MemoryStream Content)> BufferAndHashAsync(IFormFile file, CancellationToken ct)
+    private static async Task<(string Hash, MemoryStream Content)> BufferAndHash(IFormFile file, CancellationToken ct)
     {
         using var hasher = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         var buffer = ArrayPool<byte>.Shared.Rent(128 * 1024);
@@ -319,10 +319,10 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
         try
         {
             int read;
-            while ((read = await source.ReadAsync(buffer.AsMemory(0, buffer.Length), ct)) > 0)
+            while ((read = await source.ReadAsync(buffer.AsMemory(0, buffer.Length), ct).ConfigureAwait(false)) > 0)
             {
                 hasher.AppendData(buffer, 0, read);
-                await memory.WriteAsync(buffer.AsMemory(0, read), ct);
+                await memory.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
             }
         }
         finally
@@ -346,7 +346,7 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
         }
     }
 
-    private async Task EmitDocumentReuseTelemetryAsync(DocumentPipeline pipeline, IReadOnlyList<SourceDocument> reusedDocuments, CancellationToken ct)
+    private async Task EmitDocumentReuseTelemetry(DocumentPipeline pipeline, IReadOnlyList<SourceDocument> reusedDocuments, CancellationToken ct)
     {
         var distinctDocuments = reusedDocuments
             .Where(doc => !string.IsNullOrWhiteSpace(doc.Id))
@@ -355,7 +355,7 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
 
         foreach (var document in distinctDocuments)
         {
-            var pipelinesUsingDocument = await DocumentPipeline.Query(p => p.DocumentIds.Contains(document.Id!), ct);
+            var pipelinesUsingDocument = await DocumentPipeline.Query(p => p.DocumentIds.Contains(document.Id!), ct).ConfigureAwait(false);
             var pipelineIds = pipelinesUsingDocument
                 .Select(p => p.Id)
                 .Where(id => !string.IsNullOrWhiteSpace(id))
@@ -374,7 +374,7 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
             var metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
                 ["pipelineCount"] = pipelineIds.Count.ToString(CultureInfo.InvariantCulture),
-                ["ingestingPipeline"] = pipeline.Id ?? string.Empty
+                ["ingestingPipeline"] = pipeline.Id ?? ""
             };
 
             if (sharedWith.Count > 0)
@@ -389,16 +389,16 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
 
             var timestamp = DateTime.UtcNow;
 
-            await _runLog.AppendAsync(new RunLog
+            await _runLog.Append(new RunLog
             {
-                PipelineId = pipeline.Id ?? string.Empty,
+                PipelineId = pipeline.Id ?? "",
                 Stage = "document-reuse",
                 DocumentId = document.Id,
                 StartedAt = timestamp,
                 FinishedAt = timestamp,
                 Status = "shared",
                 Metadata = metadata
-            }, ct);
+            }, ct).ConfigureAwait(false);
         }
     }
 }

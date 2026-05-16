@@ -1,420 +1,332 @@
-﻿---
+---
 type: ARCHITECTURE
 domain: framework
 title: "Koan Cache Module Architecture"
 audience: [architects, developers, ai-agents]
-status: draft
-last_updated: 2025-10-06
-framework_version: v0.6.3
+status: accepted
+last_updated: 2026-05-15
+framework_version: v0.7.0
 validation:
-  status: not-yet-tested
+  status: accepted
   scope: docs/architecture/koan-cache-module.md
+  evidence: ARCH-0075, implementation milestones M1–M9 shipped
 ---
 
-> **Contract**
->
-> - **Inputs:** Koan data adapter model, Entity<T> conventions, existing Koan.Core abstractions (KoanEnv, Auto-Registrar, Configuration helpers), and customer scenarios needing low-latency state reuse.
-> - **Outputs:** A cohesive module design (`Koan.Cache`) delivering cache client APIs, adapter expansion points, and developer ergonomics aligned with reference=intent.
-> - **Failure modes:** Divergent cache APIs across modules, providers that cannot enforce TTL/serialization guarantees, or data adapters that cannot advertise caching capabilities.
-> - **Success criteria:** Applications select cache backends declaratively, reuse cached state via terse fluent helpers, and the abstract data layer can consume caching without leaking provider implementation.
+# Koan.Cache — Module Architecture
 
-## Edge Cases To Plan For
+**Status:** initial release · v0.7.0
+**ADR:** [ARCH-0075](../decisions/ARCH-0075-koan-cache-pillar.md) · [ARCH-0076](../decisions/ARCH-0076-repository-decorator-order.md)
+**Reference doc:** [cache.md](../reference/data/cache.md)
+**Implementation plan:** [caching_implementation_plan.md](../proposals/caching_implementation_plan.md)
 
-1. Large object payloads (files, vectors) where providers may impose size limits or require streaming.
-2. Concurrent writers attempting to mutate the same cache key, especially when providers support atomic operations differently.
-3. Eviction or expiration lapses causing stale reads in critical workflows (Canon pipelines, auth tokens).
-4. Multi-region deployments where latency-sensitive caches need geo-awareness or read replicas.
-5. Provider capability mismatches (e.g., Redis supports pub/sub invalidation, in-memory does not) that must surface predictably to callers.
+The cache pillar is built around **four orthogonal concerns**: Storage, Coherence, Topology, Policy. Each has its own contract and package boundary. The composition lives in `Koan.Cache`; the rest are pluggable.
 
-## Why Koan.Cache
+---
 
-- Koan currently focuses on persistence, messaging, and orchestration. Caching is handled ad-hoc via ASP.NET `IMemoryCache`, Redis clients, or bespoke wrappers—none align with Koan's reference=intent ethos.
-- Canon pipelines, task schedulers, and EntityController-heavy APIs frequently need shared state snapshots, throttling counters, or expensive query memoization.
-- A dedicated module keeps the developer ergonomics consistent: declarative selection of providers, simple defaults, and automation through Auto-Registrar metadata.
+## The four pillars
 
-## Module Stack Overview
+```mermaid
+flowchart TB
+    subgraph User["User code"]
+        E[("Entity&lt;Todo&gt;<br/>[Cacheable(300)]")]
+    end
 
-| Layer                     | Responsibility                                                                         | Key Types                                                                               |
-| ------------------------- | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `Koan.Cache.Abstractions` | Contracts shared by adapters and consumers.                                            | `ICacheStore`, `CacheItemDescriptor`, `CacheCapabilities`, `ICacheSerializer`           |
-| `Koan.Cache`              | Default implementation with DI registrations, static gateway helpers, instrumentation. | `CacheClient`, `Cache`, `CachePipeline`, serializers                                    |
-| `Koan.Cache.Adapters.*`   | Provider-specific bridges implemented using Koan data connectors.                      | `Koan.Cache.Adapter.Redis`, `Koan.Cache.Adapter.Memory`, `Koan.Cache.Adapter.Couchbase` |
-| `Koan.Cache.Testing`      | Fakes and harnesses for unit testing.                                                  | `InMemoryCacheHarness`, `CacheProbe`                                                    |
+    subgraph Policy["Policy (Koan.Cache + Koan.Cache.Abstractions)"]
+        PR[CachePolicyRegistry]
+        CR[CachedRepository&lt;T,K&gt;]
+        MAT[CachePolicyMaterializer]
+    end
 
-The adapters layer reuses Koan data connectors for connection management, metrics, and capability discovery—developers can swap cache providers by adjusting module references and configuration.
+    subgraph Topology["Topology (Koan.Cache)"]
+        LC[LayeredCache]
+        CO[CoherenceCoordinator]
+        CTR[CacheTopologyResolver]
+        CCB[CoherenceCoalescingBuffer]
+    end
 
-## Developer Experience Flow
+    subgraph Storage["Storage (Koan.Cache.Abstractions + adapters)"]
+        L1[(L1: Memory / SQLite)]
+        L2[(L2: Redis / Memory-Remote)]
+    end
 
-1. Add the `Koan.Cache` reference (and optionally `Koan.Cache.Adapter.Redis`).
-2. Update the module's `KoanAutoRegistrar` to advertise caching intent—no manual service wiring.
-3. Configure the cache provider via Koan configuration (environment variables, JSON) aligned with data adapter patterns.
-4. Inject `ICacheClient` or use the static `Cache` facade for one-liners.
-5. Observe metrics via the standard Koan telemetry pipeline (OpenTelemetry conventions).
+    subgraph Coherence["Coherence (Koan.Cache.Abstractions + adapters)"]
+        CH1[(RedisCoherenceChannel — pub/sub)]
+        CH2[(MessagingCoherenceChannel — IMessageBus)]
+        CH3[(InMemoryCoherenceChannel — fallback)]
+    end
 
-### Auto-Registrar Snippet
-
-```csharp
-using Koan.Core;
-using Koan.Cache;
-using Microsoft.Extensions.DependencyInjection;
-
-public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
-{
-    public string ModuleName => "S8.Content";
-    public string? ModuleVersion => typeof(KoanAutoRegistrar).Assembly.GetName().Version?.ToString();
-
-    public void Initialize(IServiceCollection services)
-    {
-        services.AddKoanCache(); // registers CacheClient, serializers, metrics
-        services.AddKoanCacheAdapter("redis"); // resolves Koan.Data.Connector.Redis connection info
-    }
-
-    public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
-    {
-        report.AddModule(ModuleName, ModuleVersion)
-              .AddCapability("cache", cfg["Cache:Provider"] ?? "redis");
-    }
-}
+    E -->|"Entity static call"| CR
+    PR --> CR
+    MAT -.->|"materializes attribute"| PR
+    CR --> LC
+    LC --> L1
+    LC --> L2
+    LC -.->|"BroadcastEvict"| CO
+    CO -.->|"per-key debounce"| CCB
+    CCB -.-> CH1
+    CCB -.-> CH2
+    CCB -.-> CH3
+    CH1 -.->|"received invalidation"| CO
+    CH2 -.->|"received invalidation"| CO
+    CH3 -.->|"received invalidation"| CO
+    CO -.->|"ApplyRemoteInvalidation<br/>(L1 only)"| LC
+    CTR --> LC
 ```
 
-This mirrors the existing AddKoan bootstrap style—no bespoke wiring. The adapter registration inspects known Koan data connectors and loads matching cache providers.
+### Boundaries
 
-## Cache Facade & Fluent API
+| Pillar | Owns | Does NOT know about |
+|---|---|---|
+| **Storage** | K/V verbs on bytes | Coherence, topology, policy |
+| **Coherence** | Cross-node invalidation broadcast | Specific stores, policy |
+| **Topology** | L1/L2 wiring, read/write orchestration, applying remote invalidations | Specific transports |
+| **Policy** | Per-entity/per-method declarative intent | Wire transports or store types |
 
-To keep call sites terse yet expressive, `Koan.Cache` exposes a static `Cache` helper backed by the scoped `CacheClient`. Each call resolves the provider based on configuration and key scoping rules.
+Each pillar is unit-testable in isolation. The four pillars meet exactly in `Koan.Cache`.
 
-```csharp
-using Koan.Cache;
-using Koan.Data;
+---
 
-public class TodoProjectionService
-{
-    public async Task<IReadOnlyList<Todo>> GetOpenTodosAsync(CancellationToken ct)
-    {
-        return await Cache.WithJson("todo:open:v1")
-            .For(TimeSpan.FromMinutes(1))
-            .GetOrAddAsync(async innerCt => await Todo.Query("Completed == false", innerCt), ct);
-    }
-}
-```
+## Storage — `ICacheStore`
 
-### Fluent Helpers
-
-| Helper                         | Purpose                                                                       |
-| ------------------------------ | ----------------------------------------------------------------------------- |
-| `Cache.WithJson(key)`          | JSON-serializes complex objects using configured serializer.                  |
-| `Cache.WithBinary(key)`        | Stores raw bytes or streams for files.                                        |
-| `Cache.WithString(key)`        | Optimized path for UTF-8 text content.                                        |
-| `Cache.WithRecord<TItem>(key)` | Strongly typed upsert/merge using custom serializers.                         |
-| `.For(TimeSpan ttl)`           | Sets relative expiration.                                                     |
-| `.Tag(params string[] tags)`   | Adds cache tags for selective invalidation.                                   |
-| `.AllowStaleUntil(TimeSpan)`   | Enables "stale-while-revalidate" behaviors when provider supports it.         |
-| `.PublishInvalidation()`       | Forces adapters supporting pub/sub to emit invalidation messages.             |
-| `.Exists(ct)`                  | Lightweight probe that returns `true` when the key is currently cached.       |
-| `Cache.Exists(key)`            | Global probe without building an entry instance; returns a `ValueTask<bool>`. |
-
-The fluent builder returns a `CacheEntry<T>` that supports `GetAsync`, `GetOrAddAsync`, `SetAsync`, `RemoveAsync`, `TouchAsync`, and the new `Exists` probe. All methods accept `CancellationToken` to stay aligned with Koan data calls.
-
-### Tag and Policy Control Helpers
-
-- `Cache.Tags("todo", "user:123").Flush()` removes distinct keys associated with the provided tags (no `Async` suffix on the fluent method, yet it still returns a `ValueTask<long>`).
-- `Cache.Tags("todo").Count()` and `.Any()` surface quick diagnostics for how many entries remain under a tag group.
-- `Entity<TEntity, TKey>.Cache` bridges cache policies straight to entity code. `await Todo.Cache.Flush(ct)` gathers tags from `[CachePolicy]` declarations, merges any additional explicit tags supplied by the caller, and issues a tag flush via the cache client. `Count(...)` and `Any(...)` follow the same contract.
-
-Helpers intentionally avoid the `Async` suffix even though they are asynchronous under the hood, matching DX feedback while preserving `ValueTask` signatures for efficient awaiting.
-
-### Static Helper Under the Hood
-
-- The static `Cache` type is a thin proxy that resolves `ICacheClient` via scoped services.
-- Consumers preferring DI can inject `ICacheClient` or `ICacheWriter` directly, gaining the same fluent API without static helper.
-- Koan CLI tooling can auto-generate strongly typed cache key wrappers based on configuration (future work).
-
-## Core API Implementation Blueprint
-
-| Component                   | Location                          | Description                                                                                              | Dependencies                                      |
-| --------------------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| `Koan.Cache.Abstractions`   | `/src/Koan.Cache.Abstractions/`   | Contracts, capability descriptors, policy metadata, marker interfaces.                                   | `Koan.Core` (logging, options)                    |
-| `Koan.Cache`                | `/src/Koan.Cache/`                | Implements fluent API, DI bootstrap, singleflight coordinator, serializers, telemetry, policy evaluator. | `Koan.Cache.Abstractions`, `Koan.Core.Telemetry`  |
-| `Koan.Cache.Adapter.Memory` | `/src/Koan.Cache.Adapter.Memory/` | `ICacheStore` implementation over `IMemoryCache`.                                                        | `Microsoft.Extensions.Caching.Memory`             |
-| `Koan.Cache.Adapter.Redis`  | `/src/Koan.Cache.Adapter.Redis/`  | `ICacheStore` backed by `IDistributedCache` (StackExchange.Redis).                                       | `Microsoft.Extensions.Caching.StackExchangeRedis` |
-| `Koan.Cache.Testing`        | `/tests/Koan.Cache.Testing/`      | Harness, fake stores, assertion helpers.                                                                 | xUnit, `Koan.Cache`                               |
-
-### Core Types To Ship
-
-- `ICacheClient`, `ICacheReader`, `ICacheWriter`: thin abstractions swallowing `CacheEntryBuilder<T>`. `ICacheClient` exposes `Store` (for capability introspection) and `CreateEntry(key, contentType)` factory methods.
-- `CacheEntryBuilder<T>`: manages options (TTL, tags, stale policy, singleflight). Internally composes `CacheEntryOptions` record and emits to `ICacheStore` via `CacheEnvelope`.
-- `CachePolicyAttribute`: see **Policy Attributes & Metadata**.
-- `CacheScope`: disposable ambient scope storing prefixes/tenant hints; consumed by builders and interceptors.
-- `CacheInstrumentation`: helper emitting metrics/logs, reused by adapters to avoid duplicate code.
-- `CacheSingleflightRegistry`: keyed by `CacheKey`, manages async locks to dedupe concurrent fetches. Lives in `Koan.Cache` and is injected into stores that opt-in.
-- `CacheConsistencyMode` enum + `CacheConsistencyOptions` allowing passthrough-on-failure, stale-while-revalidate, or strict modes.
-
-### Public Surface Goals
-
-- All async, cancellation-first signatures (`ValueTask` where practical).
-- No provider-specific metadata leaks; everything flows through `CacheCapabilities` and `CacheEntryOptions`.
-- Fluent API remains allocation-light by reusing builders via pooled objects (optional optimization after MVP).
-
-## Adapter Construction Details
-
-### In-Memory Adapter
-
-- Register via `services.AddKoanCacheAdapter("memory")`. Under the hood:
-  - Ensure `services.AddMemoryCache()` is present (throw guided exception otherwise).
-  - Wrap `IMemoryCache` to implement `ICacheStore`.
-  - Capabilities: `SupportsBinary = true`, `SupportsPubSubInvalidation = false`, `SupportsCompareExchange = true` (via `MemoryCacheEntryExtensions.SetPostEvictionCallback` + `lock`), `SupportsRegionScoping = true`.
-  - Implement tagging using `ConcurrentDictionary<string, HashSet<string>>` guarded by `ReaderWriterLockSlim`, with periodic garbage collection triggered by eviction callbacks.
-  - Persist stale metadata inside `MemoryCache` entry using `CacheEnvelope.Metadata` (lazy delegate for stale fallback runtime check).
-
-### Redis Adapter
-
-- Register via `services.AddKoanCacheAdapter("redis")`. Responsibilities:
-  - Consume `RedisCacheOptions` sourced from `Configuration.Read(cfg, "Cache:Redis:Configuration", ...)`.
-  - Reuse `IDistributedCache` for base operations; supplement with `IConnectionMultiplexer` (optional) for advanced commands (Lua scripts, pub/sub, distributed locks).
-  - Capabilities: `SupportsBinary = true`, `SupportsPubSubInvalidation = true`, `SupportsCompareExchange = true` (Lua-based CAS), `SupportsRegionScoping = true`.
-  - Tagging: maintain Redis Set per tag (key `tag::<tag>::members`). TTL mirrors entry TTL via `EXPIRE`. When provider lacks set support, degrade to prefix scan fallback flagged in `CacheCapabilities.Hints`.
-  - Publish invalidation via `SUBSCRIBE`/`PUBLISH` to channel `Cache:Redis:Channel` defaulting to `koan-cache`. Consumers register once per app instance.
-  - Singleflight: Acquire lock key `sf::<cacheKey>` with `SET key value NX PX <timeout>` before executing value factory. Fallback: if lock unavailable, await pub/sub invalidation or short delay before stale read.
-    - Compare-and-exchange support is part of the MVP: use Lua (or `StringSet` with `When`) to enforce atomic swaps, and cover hot-path contention with integration tests before release.
-
-### Testing Plan
-
-- Memory adapter: deterministic unit tests verifying TTL, tagging, stale policy, singleflight concurrency using `Parallel.ForEachAsync` harness.
-- Redis adapter: integration harness leveraging existing Koan container scripts (`scripts/module-inventory.ps1` already starts Redis for tests). Validate CAS, tag enumeration, invalidation fan-out.
-- Provide `ICacheStore` contract tests to ensure any future adapters demonstrate parity via trait-based xUnit suite.
-
-## Framework Integration Hooks
-
-We insert caching through existing Koan touchpoints—no ad-hoc duplication.
-
-| Pipeline                                   | Hook Type                      | Location             | Behavior                                                                                                                                                      |
-| ------------------------------------------ | ------------------------------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Entity static methods (`Entity<T>`)        | `EntityQueryInterceptor` (new) | `Koan.Data.Core`     | Wraps `All`, `Query`, `Get`, `FirstPage` to consult cache when `[CachePolicy]` present. Uses metadata from `CachePolicyRegistry` constructed at startup.      |
-| Entity instance methods (`Save`, `Delete`) | `EntityLifecycleEvents`        | `Koan.Data.Core`     | On `AfterSave`/`AfterDelete`, evict keys derived from policy (key template, tags).                                                                            |
-| `EntityController<T>`                      | `CachePolicyFilter`            | `Koan.Web`           | MVC filter inspects controller or action `[CachePolicy]` annotations. For GET actions, returns cached response if available; for mutations, invalidates tags. |
-| Data commands (instruction execution)      | `IDataInstructionInterceptor`  | `Koan.Data.Core`     | Exposes extension point for lower-level caching (e.g., raw queries) so adapters can short-circuit repeated instructions.                                      |
-| Canon pipelines                            | `CachePipeline` (new)          | `Koan.Canon.Core`    | Provides scoped cache for enrichment steps, automatically respecting policy tags defined on source entities.                                                  |
-| Background jobs / Koan. Orchestration      | `TaskEnvelope` metadata        | `Koan.Orchestration` | Allows job payloads to declare temporary cache usage and rely on distributed invalidation for multi-instance coordination.                                    |
-
-### Policy Registry and Discovery
-
-- `CachePolicyAttribute` attaches to entities, controllers, or methods. During `AddKoanCache()` we scan assemblies listed in auto-registrar manifest (same approach as existing capability registration).
-- Discovered policies create entries inside `CachePolicyRegistry` keyed by `Type`/`MemberInfo`. This registry exposes:
-  - `CacheKeyTemplate`: e.g., `"todo:{Id}"` or `"todo:list:{Completed}"`.
-  - `CacheScope`: `Entity`, `Controller`, `Query`, `Response`.
-  - `CacheStrategy`: `GetOrSet`, `SetOnly`, `InvalidateOnly`, etc.
-  - `Consistency`: `Strict`, `StaleWhileRevalidate`, `PassthroughOnFailure`.
-
-### Policy Attributes & Metadata
+Pure K/V on bytes. Adapters implement this interface and self-register via their `KoanAutoRegistrar`.
 
 ```csharp
-[AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, Inherited = true, AllowMultiple = true)]
-public sealed class CachePolicyAttribute : Attribute
-{
-     public CachePolicyAttribute(CacheScope scope, string keyTemplate)
-          => (Scope, KeyTemplate) = (scope, keyTemplate);
-
-     public CacheScope Scope { get; }
-     public string KeyTemplate { get; }
-     public string[] Tags { get; init; } = Array.Empty<string>();
-     public CacheStrategy Strategy { get; init; } = CacheStrategy.GetOrSet;
-     public CacheConsistencyMode Consistency { get; init; } = CacheConsistencyMode.StaleWhileRevalidate;
-     public TimeSpan? AbsoluteTtl { get; init; }
-     public TimeSpan? SlidingTtl { get; init; }
-     public bool ForcePublishInvalidation { get; init; }
-}
-```
-
-- `CacheScope` enumeration examples: `Entity`, `EntityQuery`, `ControllerAction`, `ControllerResponse`, `PipelineStep`.
-- `CacheStrategy` enumeration examples: `SetOnly`, `GetOnly`, `GetOrSet`, `Invalidate`, `NoCache` (explicit opt-out overriding parent policies).
-- When applied to `Entity<T>`, the policy can declare `KeyTemplate = "todo:{Id}"` plus tags like `"todo"`, `"tenant:{TenantId}"`.
-- When applied to controllers, we optionally include `KeyTemplate = "api/{Route}/{UserId}"`; tokens resolved via `CacheKeyInterpolation` dictionary (similar to `EntityRouteDefinition`).
-
-Configuration-bound policies hydrate from strongly typed options (`CacheOptions`, `CachePolicyOptions`) and merge into the registry. Precedence is deterministic: global defaults feed attribute metadata, and explicit configuration overrides win when conflicts arise. Diagnostics emit the reconciled view so operators can confirm which source supplied each policy value.
-
-### Insertion Mechanics
-
-- `Entity<T>`: extend existing `EntityPipeline` to check `CachePolicyRegistry.TryGetQueryPolicy(typeof(T))`. If present, wrap provider call in `Cache.WithRecord<T>(resolvedKey)` before hitting data store. Use Koan's singleflight to avoid duplicate fetches. Save/delete hooks call `Cache.RemoveAsync` and `Cache.WithJson(...).Tag(...)` invalidation helpers.
-- `EntityController<T>`: register MVC filter (`CachePolicyFilter`) at `AddKoanCache()` time. Filter queries `CachePolicyRegistry` for controller/action; if `Strategy == GetOrSet`, attempt retrieval before invoking action; otherwise set/invalidate post-execution. Filter ensures idempotency by keying on `HttpContext.RequestAborted` as cancellation token.
-- `Data:InstructionExecution`: create `CacheInstructionInterceptor` implementing new `IDataInstructionInterceptor` contract. Interceptor examines instruction metadata, maps to cache key template (if `CachePolicyAttribute` is annotated on the instruction handler), and performs caching accordingly. Prevent duplication by routing through `CacheClient` rather than reimplementing per module.
-- `Canon`: when `CachePolicyAttribute` indicates pipeline usage, `CachePipeline` obtains scope from canonical entity type and attaches to `CanonContext.Properties`. Steps access via `CachePipeline.Current` (pattern mirrors `KoanEnv`).
-
-### Mutation Invalidation Patterns
-
-| Surface               | Operation(s)                         | Eviction behaviour                                                                                                     |
-| --------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| `Entity<T>` instances | `Save()` (create/update), `Delete()` | `EntityLifecycleEvents.AfterSave/AfterDelete` resolve the policy key template, remove the concrete key, and flush tags |
-| `EntityController<T>` | `POST/PUT/PATCH/DELETE` actions      | `CachePolicyFilter` translates route data into cache keys/tags and evicts immediately after the action completes       |
-| Instruction handlers  | Custom upserts/deletes               | `CacheInstructionInterceptor` consumes handler metadata, invokes `Cache.RemoveAsync`, and optionally clears tag sets   |
-
-Upserts piggyback on `Entity<T>.Save()`, so the same lifecycle hook covers both create and update paths without extra wiring. Tag-based policies ensure related list queries or projections fall out of cache alongside the primary key entry. Future adapters must exercise mutation tests to verify that compare-and-exchange flows still trigger the eviction pipeline when writes succeed.
-
-## Koan DX Enhancements & Opportunities
-
-- **Auto key interpolation**: Provide `CacheKeyTemplateParser` that supports tokens like `{Id}` or `{User.Claims["tenant"]}`. Entities and controllers supply token material via `ICacheKeyContextProvider` interface (optional). Prevents repeated string interpolation code.
-- **Declarative invalidation sets**: `[CachePolicy(Tags = new[]{"todo"}, Strategy = CacheStrategy.Invalidate)]` on mutation actions ensures consistent invalidation logic across commands.
-- **Rate limiting synergy**: integrate with existing `RateLimitAttribute` by sharing the same cache adapter (Redis), avoiding multiple connection pools.
-- **Diagnostics integration**: hook into the shared Koan diagnostics pipeline (no bespoke endpoint). `CacheOptions.EnableDiagnosticsEndpoint` gates registration so the existing diagnostics UI/lens lists policies, capability matrices, and hit/miss counters.
-- **CLI support**: extend Koan CLI to emit baseline cache config and scaffold policy attributes for entities—it already scans entity metadata; we reuse that pipeline to avoid duplication.
-- **Recipe integration**: update recipe templates (`Koan.Recipe.Abstractions`) so new services automatically call `services.AddKoanCache()` when `Cache:Provider` exists in environment manifest.
-
-## Implementation & Delivery Plan (Detailed)
-
-1. **Contracts & Options**
-
-   - Create `Koan.Cache.Abstractions` with interfaces, enums, `CachePolicyAttribute`, `CacheCapabilities`, `CacheEntryOptions`.
-   - Add unit tests verifying attribute defaults and options merge behavior.
-
-2. **Core Module**
-
-   - Implement `CacheClient`, `CacheEntryBuilder<T>`, `CacheScope`, `CachePolicyRegistry`, `CacheSingleflightRegistry`.
-   - Wire DI via `AddKoanCache()` extension; register health checks, instrumentation, MVC filter provider.
-   - Provide configuration binding classes (`CacheOptions`, `RedisCacheOptionsExtended`, `MemoryCacheAdapterOptions`).
-
-3. **Adapters**
-
-   - Memory adapter: implement `MemoryCacheStore`, hooking eviction callbacks to propagate tag cleanup. Document limitations (single-instance only).
-   - Redis adapter: implement `RedisCacheStore`, bundling configurable channel name, script cache for CAS, optional cluster mode support.
-   - Both adapters satisfy common test suite defined in `Koan.Cache.Tests`.
-
-4. **Pipeline Hooks**
-
-   - Extend `Koan.Data.Core` with `EntityQueryInterceptor` and `CacheInstructionInterceptor` referencing `ICacheClient` via DI.
-   - Add MVC filter factory to `Koan.Web` for `CachePolicyFilter`.
-   - Provide `CachePipeline` helper in `Koan.Canon.Core` enabling canonical operations to opt-in without direct adapter knowledge.
-
-5. **Samples & Docs**
-
-   - Update `S2.Api` (API sample) to demonstrate `[CachePolicy(CacheScope.ControllerAction, "api/todos/{RouteValues[id]}")]` for GET endpoints.
-   - Update `S8.Canon` to cache canonicalization snapshots between processing steps.
-   - Author `docs/decisions/ARCH-00XX-koan-cache-module.md` capturing final contract.
-
-6. **Validation & DX Feedback**
-   - Run docs lint + unit/integration test suites.
-   - Provide developer preview instructions via `docs/guides/cache-policies-howto.md` (future deliverable).
-
-## Downstream Module Adoption Targets
-
-The caching module should light up multiple Koan pillars. The table below highlights the first wave we plan to integrate, mapped to their insertion hooks.
-
-| Module                                          | Primary Gains                                                                                                            | Entry Point                                                   |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
-| `Koan.Data.Core`                                | Entity snapshot reuse, query memoization, paging metadata caching.                                                       | `EntityQueryInterceptor`, entity lifecycle events.            |
-| `Koan.Canon.Core`                               | Canonicalization intermediate caching, dedupe of enrichment fetches, multi-instance coordination via Redis invalidation. | `CachePipeline` scope, Canon step helpers.                    |
-| `Koan.Web` (`EntityController<T>`, MVC filters) | Response caching for GET, rate-limit counters, ETag generation using shared adapters.                                    | `CachePolicyFilter`, action-level `[CachePolicy]`.            |
-| `Koan.Messaging.Core`                           | Message dedupe, outbox/inbox replay state, consumer cursor caching to reduce provider round-trips.                       | Messaging envelope interceptors and `InboxProcessor`.         |
-| `Koan.Orchestration` (Aspire, CLI)              | Cache environment manifests, provisioned resource descriptors, capability snapshots for dashboards.                      | Auto-registrar boot metadata, orchestration manifest loaders. |
-| `Koan.AI`                                       | Cache model catalogs, token price tables, safety configs, grounding context payloads.                                    | AI engine selection pipeline, prompt augmentation helpers.    |
-| `Koan.Storage`                                  | Cache signed URLs, variant lookup tables, policy manifests to avoid repeated storage calls.                              | Storage profile resolution and `StorageRouter`.               |
-| `Koan.Media.Core`                               | Cache transformation recipes, variant manifests, CDN origin metadata with tag-based invalidation.                        | Media pipeline orchestrators.                                 |
-| `Koan.Recipe.Abstractions`                      | Speed up template scaffolding by caching generated manifests and detection results.                                      | Recipe execution context + CLI integrations.                  |
-| `Koan.Diagnostics` / `Koan.Logging`             | Persist boot reports, capability inventories, health summaries for quick UI rendering.                                   | Diagnostics snapshot collectors.                              |
-
-Each adoption target consumes the centralized `CachePolicyRegistry` and `Cache` fluent helpers to avoid duplicating caching logic per module.
-
-## Migration & Adoption Plan
-
-## Adapter & Capability Model
-
-`Koan.Cache.Abstractions` surfaces capabilities so higher layers know what features are safe to use.
-
-```csharp
-public sealed record CacheCapabilities(
-    bool SupportsBinary,
-    bool SupportsPubSubInvalidation,
-    bool SupportsCompareExchange,
-    bool SupportsRegionScoping,
-    IReadOnlySet<string> Hints);
-
 public interface ICacheStore
 {
-    string ProviderName { get; }
-    CacheCapabilities Capabilities { get; }
-    ValueTask CacheAsync(CacheItemDescriptor descriptor, CancellationToken ct);
-    ValueTask<CacheResult> FetchAsync(CacheItemDescriptor descriptor, CancellationToken ct);
-    ValueTask<bool> RemoveAsync(CacheKey key, CancellationToken ct);
-    IAsyncEnumerable<TaggedCacheKey> EnumerateByTagAsync(string tag, CancellationToken ct);
+    string Name { get; }                                    // unique store identifier
+    CacheStorePlacement Placement { get; }                  // Local | Remote
+    CacheStoreCapabilities Capabilities { get; }            // SupportsTags / SupportsSlidingTtl / ...
+
+    ValueTask<CacheFetchResult> Fetch(CacheKey key, CacheReadOptions options, CancellationToken ct);
+    ValueTask Set(CacheKey key, CacheValue value, CacheWriteOptions options, CancellationToken ct);
+    ValueTask<bool> Remove(CacheKey key, CancellationToken ct);
+    ValueTask<bool> Exists(CacheKey key, CancellationToken ct);
+    ValueTask Touch(CacheKey key, TimeSpan? newAbsoluteTtl, CancellationToken ct);
+    IAsyncEnumerable<TaggedCacheKey> EnumerateByTag(string tag, CancellationToken ct);
 }
 ```
 
-Adapters implement `ICacheStore` by leaning on Koan data connectors:
+**Critical:** `ICacheStore` does NOT declare any pub/sub or broadcast methods. Storage is storage. The pillar architecturally cannot conflate the two.
 
-- **Redis:** Uses `Koan.Data.Connector.Redis` for connection pooling, metrics, capability detection.
-- **InMemory:** Lightweight, single-node implementation for development and tests (`Koan.Cache.Adapter.Memory`).
-- **Couchbase/Hazelcast:** Reuse existing Koan connectors to provide distributed caching and region scoping.
+| Adapter | Placement | Priority | Notes |
+|---|---|---|---|
+| `MemoryCacheStore` (built-in) | Local | 10 | Always available, no reference needed |
+| `SqliteCacheStore` | Local | 50 | Persists across restart; preempts Memory |
+| `RedisCacheStore` | Remote | 100 | Shared across nodes |
 
-Capabilities allow higher layers to branch without unsafe assumptions:
+---
+
+## Coherence — `ICacheCoherenceChannel`
+
+Transport-agnostic cross-node coordination. Specialization of a generic `ICoherenceChannel<TMessage>` (designed to lift to `Koan.Core.Coherence` when a second non-cache consumer materializes).
 
 ```csharp
-var cache = Cache.Client;
-if (cache.Store.Capabilities.SupportsPubSubInvalidation)
+public interface ICoherenceChannel<TMessage> where TMessage : struct
 {
-    await Cache.WithJson("profile:" + userId)
-        .PublishInvalidation()
-        .SetAsync(profileSnapshot, ct);
+    string TransportName { get; }
+    CoherenceCapabilities Capabilities { get; }
+    ValueTask Publish(TMessage message, CancellationToken ct);
+    ValueTask Subscribe(Func<TMessage, CancellationToken, ValueTask> onReceived, CancellationToken ct);
+    ValueTask<string?> CatchUp(string? cursor, Func<TMessage, CancellationToken, ValueTask> onReceived, CancellationToken ct);
 }
-else
-{
-    await Cache.WithJson("profile:" + userId)
-        .SetAsync(profileSnapshot, ct);
-    await BackgroundRefresh.EnqueueAsync(userId, ct);
-}
+
+public interface ICacheCoherenceChannel : ICoherenceChannel<CacheInvalidation> { }
 ```
 
-## Serialization Strategy
+`CacheInvalidation` is a `readonly record struct` carrying `Kind` (EvictKey/EvictByTag/EvictAll), `Key`, `Tags`, `Region`, `ScopeId`, `OriginNodeId`, `PublishedAtUtc`.
 
-- Default serializer: Koan's `Koan.Core.Serialization.Json` for JSON payloads (camelCase, ISO-8601 dates).
-- Binary payloads accept `ReadOnlyMemory<byte>` or `Stream` and skip serialization.
-- Developers can register additional serializers by tagging implementations of `ICacheSerializer` with content-type metadata.
-- Cache metadata (TTL, tags, region) is stored alongside each entry in a provider-agnostic envelope to ensure consistent invalidation semantics.
+| Channel | Priority | Capabilities | Notes |
+|---|---|---|---|
+| `RedisCoherenceChannel` | 100 | BestEffort | Pub/sub, no catch-up |
+| `MessagingCoherenceChannel` | 150 | BestEffort | Rides `Koan.Messaging.IMessageBus`; preempts Redis when both registered |
+| `InMemoryCoherenceChannel` | `int.MinValue` | BestEffort | In-process bus; primary use is tests |
 
-## Integration With Koan Data Layer
+Priority rationale: `Koan.Messaging` outranks Redis pub/sub because users with an existing message bus shouldn't need to stand up Redis just for cache invalidation. Explicit pin via `Koan:Cache:CoherenceTransport` overrides.
 
-- The cache module sits parallel to `Koan.Data.Core`, but adapters map onto the same provider registration system. A provider can support both data persistence and caching (e.g., Redis) or only one.
-- Entity methods can opt-in to caching via opt-in policies:
+### Consistency model
+
+**Writer write-through, peer evict, always broadcast `EvictKey`.** The broadcast is never `SetWithValue` — values in flight can be overtaken by reality, so peers always re-fetch from L2 or DB. DB is the single serialization point for cross-node races.
+
+```
+Node A: todo.Save()
+  ├─ DB commits
+  ├─ L1 (A) + L2 (shared) write-through
+  └─ Channel.Publish(EvictKey, origin=A)
+
+Node B: receives EvictKey
+  ├─ Coordinator filters origin
+  └─ LayeredCache.ApplyRemoteInvalidation evicts L1 only
+```
+
+Coherence is **best-effort**. Defense in depth: L1 TTL is capped to `min(L2, max(30s, L2/2))` at policy materialization — worst-case staleness is bounded even when broadcasts are silent.
+
+---
+
+## Topology — `LayeredCache` + `CoherenceCoordinator`
+
+Composition over inheritance. `LayeredCache` does NOT implement `ICacheStore` — it's a focused orchestrator with explicit verbs.
 
 ```csharp
-public static class TodoCache
+internal sealed class LayeredCache
 {
-    public static ValueTask<Todo?> GetCachedAsync(Ulid id, CancellationToken ct)
-        => Cache.WithRecord<Todo>($"todo:{id}")
-            .For(TimeSpan.FromMinutes(5))
-            .GetOrAddAsync(_ => Todo.Get(id, ct), ct);
+    public ValueTask<CacheFetchResult> Read(CacheKey key, CacheReadOptions options, CancellationToken ct);
+    public ValueTask Write(CacheKey key, CacheValue value, CacheWriteOptions options, CancellationToken ct);
+    public ValueTask<bool> Evict(CacheKey key, CancellationToken ct);
+    public ValueTask Touch(CacheKey key, TimeSpan? newAbsoluteTtl, CancellationToken ct);
+    public IAsyncEnumerable<TaggedCacheKey> EnumerateByTag(string tag, CancellationToken ct);
+
+    // Internal — only the coordinator calls this
+    internal ValueTask ApplyRemoteInvalidation(CacheInvalidation msg, CancellationToken ct);
 }
 ```
 
-- Canon pipelines can request scoped caches from `CachePipeline` to stash enrichment intermediate results.
-- Data adapters can advertise cache preferences through configuration: `Data:Providers:Primary -> postgres`, `Cache:Provider -> redis`.
+**`ApplyRemoteInvalidation` touches L1 only, never L2, never republishes.** The shared remote tier was already evicted by the originating writer; re-evicting it would be wasted work and republishing would create feedback loops. The method is `internal` with a distinct name so contributors can't accidentally reuse generic `Evict`.
 
-## Operational Guardrails
+### `CacheTopologyResolver`
 
-- Metrics: `Koan.Cache` emits OpenTelemetry metrics (`koan.cache.hits`, `koan.cache.misses`, `koan.cache.latency`).
-- Logging: structured logs include key prefixes only (never full keys) to avoid leaking secrets.
-- Health checks: `AddKoanCache()` registers a health contributor that tests provider connectivity.
-- Resilience: Circuit breakers wrap provider calls; backpressure triggers degrade gracefully to passthrough (skip cache) when providers fail.
+Picks one L1 and one L2 at startup:
 
-## Files, Streams, and Embeddings
+1. Config pin (`CacheOptions.LocalProvider` / `RemoteProvider` matched against `ICacheStore.Name`)
+2. Highest `[ProviderPriority]` among stores with matching `Placement`
+3. First store with matching `Placement`
+4. Null (single-tier or empty deployment)
 
-- `Cache.WithBinary(key)` streams via `PipeReader`/`PipeWriter` for efficient file caching.
-- For vector embeddings, use `Cache.WithRecord<VectorSnapshot>(key)` with adapters guaranteeing byte-order preservation.
-- Large file caching leverages chunked storage when provider supports it (Redis module for `CACHE.MSET` or object storage feeds paired with metadata keys).
+### `CoherenceCoordinator` — `IHostedService`
 
-## Migration & Adoption Plan
+- Generates a per-process `NodeId` (Guid) at construction
+- Subscribes to every registered `ICacheCoherenceChannel` at `StartAsync`
+- Calls `CatchUp` on channels declaring `SupportsCatchUp = true`
+- Routes received messages to `LayeredCache.ApplyRemoteInvalidation` after origin filter
+- Honours `CoherenceMode`: `AutoDetect` (default, active iff ≥1 channel) / `Required` (fail at boot if no channel + Remote tier) / `Disabled`
+- Optional `CoherenceCoalescingBuffer` for per-key debounce (default off via `CoherenceCoalescingMs = 0`)
 
-1. Ship `Koan.Cache` as an opt-in module alongside adapters for Redis and in-memory.
-2. Update reference samples (`S2.Api`, `S8.Canon`) to use `Cache` helpers for rate limiting, session state, and Canon pipeline memoization.
-3. Extend `Koan.CoreOnly.slnf` to include the cache module once implementation lands.
-4. Document policy precedence and diagnostics visibility in the architecture docs and `CachePolicyRegistry` implementation notes.
-5. Land Redis CAS integration tests covering compare-and-exchange contention paths.
-6. Fold cache telemetry into the shared diagnostics surface, controlled via `CacheOptions.EnableDiagnosticsEndpoint`.
-7. Long-term: unify rate-limiting, distributed locking, and task coordination atop cache providers.
+---
 
-## Next Steps
+## Policy — `[Cacheable]` and `[CachePolicy]`
 
-1. Prototype `ICacheStore` contracts and register them in `Koan.Core` previews.
-2. Implement adapter discovery that reuses Koan data provider registration metadata.
-3. Wire policy merge precedence into `CachePolicyRegistry`, ensuring diagnostics can surface the final configuration source map.
-4. Land Redis CAS integration tests that exercise Lua-based compare-and-exchange paths under contention.
-5. Fold cache telemetry into the shared diagnostics module and document enablement via `CacheOptions`.
-6. Extend docs with deployment guidance (e.g., Redis cluster sizing, in-memory fallback for tests).
-7. Track CLI scaffolding as a follow-up item post-MVP (deferred).
+`CacheableAttribute` is a thin subclass of `CachePolicyAttribute` with entity-friendly defaults:
+
+```csharp
+public class CacheableAttribute : CachePolicyAttribute
+{
+    public CacheableAttribute(int ttlSeconds = 300)
+        : base(CacheScope.Entity, "{TypeName}:{Partition}:{Id}")
+    {
+        if (ttlSeconds > 0) AbsoluteTtl = TimeSpan.FromSeconds(ttlSeconds);
+        Tier     = CacheTier.Layered;
+        Strategy = CacheStrategy.GetOrSet;
+        Tags     = new[] { "{TypeName}" };
+    }
+
+    public int L1TtlSeconds         { init => L1AbsoluteTtl = TimeSpan.FromSeconds(value); }
+    public int SlidingTtlSeconds    { init => SlidingTtl    = TimeSpan.FromSeconds(value); }
+    public int AllowStaleForSeconds { init => AllowStaleFor = TimeSpan.FromSeconds(value); }
+}
+```
+
+The integer-second sister setters sidestep the C# attribute-syntax limitation that `TimeSpan` literals aren't constant expressions.
+
+### `CachePolicyMaterializer`
+
+Materializes attributes into runtime `CachePolicyDescriptor`s at boot. Resolves the `{TypeName}` tag sentinel to `declaringType.Name`, derives the L1 TTL, and validates `L1 ≤ L2`:
+
+```csharp
+public static TimeSpan? ResolveL1Ttl(TimeSpan? absoluteTtl, TimeSpan? l1Override)
+{
+    if (l1Override.HasValue) return l1Override;
+    if (!absoluteTtl.HasValue) return null;
+
+    var l2 = absoluteTtl.Value.TotalSeconds;
+    var derived = Math.Max(30, l2 / 2.0);
+    var clamped = Math.Min(derived, l2);             // clamp to L2 for short L2 TTLs
+    return TimeSpan.FromSeconds(clamped);
+}
+```
+
+### `CachedRepository<T,K>` — the decorator
+
+Wraps `IDataRepository<T,K>` when a policy exists for `typeof(T)`. Reads consult `EntityContext.Current.CacheBehavior` (per-request override); writes always invalidate (broadcast included) regardless of override.
+
+Key building (`TryBuildEntityKey`) seeds the template with `{TypeName}`, `{Partition}`, `{Source}` from ambient `EntityContext` — partition isolation works without extra plumbing.
+
+---
+
+## Package layout
+
+```
+src/
+  Koan.Cache.Abstractions/        Contracts only — referenced by every adapter
+    Stores/                        ICacheStore, CacheStorePlacement, CacheStoreCapabilities
+    Coherence/                     ICoherenceChannel<T>, ICacheCoherenceChannel, CacheInvalidation, CoherenceCapabilities, CoherenceMode
+    Policies/                      CachePolicyAttribute, CacheableAttribute, CachePolicyDescriptor, ICachePolicyRegistry, CacheBehavior
+    Primitives/                    CacheKey, CacheValue, CacheReadOptions, CacheWriteOptions, ...
+    Serialization/                 ICacheSerializer
+
+  Koan.Cache/                      Orchestration + built-in Memory L1
+    Topology/                      LayeredCache, CacheStoreRegistry, CacheTopologyResolver, CacheTopology
+    Coherence/                     CoherenceCoordinator, NodeIdProvider, CoherenceCoalescingBuffer, CursorStore
+    Stores/                        CacheClient, MemoryCacheStore
+    Decorators/                    CachedRepository<T,K>, CacheRepositoryDecorator [ProviderPriority(100)]
+    Policies/                      CachePolicyRegistry, CachePolicyMaterializer, CachePolicyBootstrapper
+    Diagnostics/                   CacheInstrumentation, CacheHealthCheck, CacheTraceFilter
+    Initialization/                KoanAutoRegistrar (rich boot report)
+
+  Koan.Cache.Adapter.Sqlite/       Persistent L1 (priority 50)
+  Koan.Cache.Adapter.Redis/        L2 + RedisCoherenceChannel (priority 100)
+  Koan.Cache.Coherence.InMemory/   In-process channel (priority int.MinValue)
+  Koan.Cache.Coherence.Messaging/  IMessageBus channel (priority 150)
+```
+
+---
+
+## Cross-cutting
+
+### `Koan.Core.Singleflight` (extracted M2)
+
+The per-key semaphore primitive that prevents cache stampedes. Lifted out of `Koan.Cache` so other pillars can use it without taking a cache dependency. Used today by `CacheClient.GetOrAddAsync`; equally applicable to AI embedding computations, heavy DB queries, file ops.
+
+### `EntityContext.CacheBehavior` (M6, in `Koan.Data.Core`)
+
+AsyncLocal ambient mirroring the existing `Partition`/`Source`/`Adapter` fields. Pushed via `EntityContext.WithCacheBehavior(...)`, `NoCache()`, `RefreshCache()`. Inherits through nested `With()` calls; child overrides parent.
+
+### `[ProviderPriority]` decorator order (ARCH-0076)
+
+Bands:
+- **100+** read short-circuit (Cache at 100)
+- **50–99** read observation (CQRS at 50)
+- **0–49** write transformation (soft-delete, multi-tenancy)
+- **<0** framework reserved
+
+---
+
+## Observability
+
+| Surface | Where |
+|---|---|
+| Boot report (Topology, Coherence, NodeId, per-policy with health flag) | `KoanAutoRegistrar.Describe` |
+| Health check (`IHealthCheck`) | `CacheHealthCheck`, registered automatically as `"koan-cache"` |
+| OpenTelemetry meters | `Meter("Koan.Cache")` |
+| OpenTelemetry tracing | `ActivitySource("Koan.Cache")` |
+| Per-key prod debug | `KOAN_CACHE_TRACE_KEY` env var → verbose log lines for matching key only |
+
+Metrics list and span tag list in [cache.md §production hardening](../reference/data/cache.md#production-hardening).
+
+---
+
+## What's deferred
+
+| Item | Why deferred |
+|---|---|
+| `RedisStreamsCoherenceChannel` (catch-up via Redis Streams) | Pub/sub + L1 TTL ceiling is sufficient for typical deployments. Add when first production user reports staleness after network blip. |
+| Query-result caching | Predicate invalidation semantics are an unsolved problem; entity-keyed caching covers the high-value cases. |
+| Bespoke cache migrations (`InMemoryRoleAttributionCache`, `RagCorpusMetadata._cache`, etc.) | Each is its own PR. M11 pilots `InMemoryMediaTransformCache`. |
+| HTTP `/diagnostics/cache` endpoint | Boot report + health check + metrics cover the common needs. Add when an ops team asks. |
+
+---
+
+## See also
+
+- [cache.md](../reference/data/cache.md) — five-minute integration + reference
+- [ARCH-0075](../decisions/ARCH-0075-koan-cache-pillar.md) — pillar architecture (Accepted)
+- [ARCH-0076](../decisions/ARCH-0076-repository-decorator-order.md) — decorator priority canon (Accepted)
+- [implementation plan](../proposals/caching_implementation_plan.md) — milestone history

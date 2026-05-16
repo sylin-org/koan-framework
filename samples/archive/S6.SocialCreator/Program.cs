@@ -11,7 +11,7 @@ var app = builder.Build();
 app.MapControllers();
 
 // Static files and default files are enabled by Koan.Web
-app.Run();
+app.RunAsync();
 
 // Expose Program for WebApplicationFactory in integration tests
 public partial class Program { }

@@ -8,7 +8,7 @@ namespace Koan.Samples.Meridian.Services;
 
 public interface IAiAssistAuditor
 {
-    Task RecordAsync(
+    Task Record(
         string entityType,
         string? suggestedName,
         string requestSummary,
@@ -27,7 +27,7 @@ public sealed class AiAssistAuditor : IAiAssistAuditor
         _logger = logger;
     }
 
-    public async Task RecordAsync(
+    public async Task Record(
         string entityType,
         string? suggestedName,
         string requestSummary,
@@ -60,7 +60,7 @@ public sealed class AiAssistAuditor : IAiAssistAuditor
 
     private static string SafeTrim(string value, int maxLength)
     {
-        var trimmed = (value ?? string.Empty).Trim();
+        var trimmed = (value ?? "").Trim();
         if (trimmed.Length <= maxLength)
         {
             return trimmed;

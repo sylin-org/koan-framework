@@ -24,7 +24,7 @@ public static class AggregateExtensions
     public static Task<TEntity> Upsert<TEntity, TKey>(this TEntity model, CancellationToken ct = default)
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
-        => Model.Entity<TEntity, TKey>.UpsertAsync(model, ct);
+        => Model.Entity<TEntity, TKey>.Upsert(model, ct);
 
     // Alias: model.Save() -> Upsert (generic key)
     /// <summary>
@@ -43,7 +43,7 @@ public static class AggregateExtensions
     public static Task<TEntity> Upsert<TEntity, TKey>(this TEntity model, string partition, CancellationToken ct = default)
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
-        => Model.Entity<TEntity, TKey>.UpsertAsync(model, partition, ct);
+        => Model.Entity<TEntity, TKey>.Upsert(model, partition, ct);
 
     // Alias: model.Save("partition") -> Upsert("partition") (generic key)
     /// <summary>
@@ -60,7 +60,7 @@ public static class AggregateExtensions
     /// </summary>
     public static Task<TEntity> Upsert<TEntity>(this TEntity model, CancellationToken ct = default)
         where TEntity : class, IEntity<string>
-        => Model.Entity<TEntity, string>.UpsertAsync(model, ct);
+        => Model.Entity<TEntity, string>.Upsert(model, ct);
 
     // Alias: model.Save() -> Upsert (string key convenience)
     /// <summary>
@@ -76,7 +76,7 @@ public static class AggregateExtensions
     /// </summary>
     public static Task<TEntity> Upsert<TEntity>(this TEntity model, string partition, CancellationToken ct = default)
         where TEntity : class, IEntity<string>
-        => Model.Entity<TEntity, string>.UpsertAsync(model, partition, ct);
+        => Model.Entity<TEntity, string>.Upsert(model, partition, ct);
 
     // Alias: model.Save("partition") -> Upsert("partition") (string key)
     /// <summary>
@@ -93,7 +93,7 @@ public static class AggregateExtensions
     public static async Task<TKey> UpsertId<TEntity, TKey>(this TEntity model, CancellationToken ct = default)
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
-        => (await Model.Entity<TEntity, TKey>.UpsertAsync(model, ct)).Id;
+        => (await Model.Entity<TEntity, TKey>.Upsert(model, ct)).Id;
 
     // Convenience for string key: UpsertId()
     /// <summary>
@@ -113,8 +113,8 @@ public static class AggregateExtensions
         var (aggType, keyType) = ResolveAggregateContract(model.GetType());
         var data = DataService();
         var getRepo = typeof(IDataService).GetMethod(nameof(IDataService.GetRepository))!;
-        var repo = getRepo.MakeGenericMethod(aggType, keyType).Invoke(data, System.Array.Empty<object>())!;
-        var upsert = repo.GetType().GetMethod("UpsertAsync")!;
+        var repo = getRepo.MakeGenericMethod(aggType, keyType).Invoke(data, Array.Empty<object>())!;
+        var upsert = repo.GetType().GetMethod("Upsert")!;
         var task = (Task)upsert.Invoke(repo, new object[] { model, ct })!;
         await task;
         var resultProp = task.GetType().GetProperty("Result");
@@ -133,8 +133,8 @@ public static class AggregateExtensions
         var id = AggregateMetadata.GetIdValue(model) ?? throw new System.InvalidOperationException("Model has no identifier");
         var data = DataService();
         var getRepo = typeof(IDataService).GetMethod(nameof(IDataService.GetRepository))!;
-        var repo = getRepo.MakeGenericMethod(aggType, keyType).Invoke(data, System.Array.Empty<object>())!;
-        var del = repo.GetType().GetMethod("DeleteAsync")!;
+        var repo = getRepo.MakeGenericMethod(aggType, keyType).Invoke(data, Array.Empty<object>())!;
+        var del = repo.GetType().GetMethod("Delete")!;
         var task = (Task)del.Invoke(repo, new object[] { id, ct })!;
         await task;
         var resultProp = task.GetType().GetProperty("Result");
@@ -210,7 +210,7 @@ public static class AggregateExtensions
     public static Task<int> Remove<TEntity, TKey>(this IEnumerable<TEntity> models, CancellationToken ct = default)
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
-        => Data<TEntity, TKey>.DeleteManyAsync(models.Select(m => m.Id), ct);
+        => Data<TEntity, TKey>.DeleteMany(models.Select(m => m.Id), ct);
 
     // String-key convenience delegates to generic
     /// <summary>
@@ -218,7 +218,7 @@ public static class AggregateExtensions
     /// </summary>
     public static Task<int> Remove<TEntity>(this IEnumerable<TEntity> models, CancellationToken ct = default)
         where TEntity : class, IEntity<string>
-        => Data<TEntity, string>.DeleteManyAsync(models.Select(m => m.Id), ct);
+        => Data<TEntity, string>.DeleteMany(models.Select(m => m.Id), ct);
 
     // Replace all contents with provided models
     /// <summary>
@@ -233,9 +233,9 @@ public static class AggregateExtensions
         if (existing.Count > 0)
         {
             var ids = existing.Select(e => e.Id);
-            await Data<TEntity, TKey>.DeleteManyAsync(ids, ct);
+            await Data<TEntity, TKey>.DeleteMany(ids, ct);
         }
-        return await Data<TEntity, TKey>.UpsertManyAsync(models, ct);
+        return await Data<TEntity, TKey>.UpsertMany(models, ct);
     }
 
     // String-key convenience delegates to generic

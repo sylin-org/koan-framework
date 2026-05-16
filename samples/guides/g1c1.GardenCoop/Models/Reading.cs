@@ -19,7 +19,7 @@ public class Reading : Entity<Reading>  // inheriting from Entity<Reading> gives
     public string? SensorSerial { get; set; }
 
     [Parent(typeof(Sensor))]
-    public string SensorId { get; set; } = string.Empty;  // this will be set to the serial after lookup
+    public string SensorId { get; set; } = "";  // this will be set to the serial after lookup
 
     [Parent(typeof(Plot))]
     public string? PlotId { get; set; }  // gets copied from sensor binding, might be null if sensor not bound yet
@@ -60,7 +60,7 @@ public class Reading : Entity<Reading>  // inheriting from Entity<Reading> gives
                 if (!string.IsNullOrWhiteSpace(reading.SensorSerial))
                 {
                     // find or create the sensor - one call does it all
-                    var sensor = await Sensor.EnsureAsync(reading.SensorSerial, ct);
+                    var sensor = await Sensor.Ensure(reading.SensorSerial, ct);
 
                     // update sensor's last seen and capabilities
                     sensor.LastSeenAt = reading.SampledAt;

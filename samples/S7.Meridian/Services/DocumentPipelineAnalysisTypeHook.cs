@@ -18,15 +18,15 @@ public sealed class DocumentPipelineAnalysisTypeHook : IModelHook<DocumentPipeli
 
     public int Order => 0;
 
-    public Task OnAfterDeleteAsync(HookContext<DocumentPipeline> ctx, DocumentPipeline model) => Task.CompletedTask;
-    public Task OnAfterFetchAsync(HookContext<DocumentPipeline> ctx, DocumentPipeline? model) => Task.CompletedTask;
-    public Task OnAfterPatchAsync(HookContext<DocumentPipeline> ctx, DocumentPipeline model) => Task.CompletedTask;
-    public Task OnAfterSaveAsync(HookContext<DocumentPipeline> ctx, DocumentPipeline model) => Task.CompletedTask;
-    public Task OnBeforeDeleteAsync(HookContext<DocumentPipeline> ctx, DocumentPipeline model) => Task.CompletedTask;
-    public Task OnBeforeFetchAsync(HookContext<DocumentPipeline> ctx, string id) => Task.CompletedTask;
-    public Task OnBeforePatchAsync(HookContext<DocumentPipeline> ctx, string id, object patch) => Task.CompletedTask;
+    public Task OnAfterDelete(HookContext<DocumentPipeline> ctx, DocumentPipeline model) => Task.CompletedTask;
+    public Task OnAfterFetch(HookContext<DocumentPipeline> ctx, DocumentPipeline? model) => Task.CompletedTask;
+    public Task OnAfterPatch(HookContext<DocumentPipeline> ctx, DocumentPipeline model) => Task.CompletedTask;
+    public Task OnAfterSave(HookContext<DocumentPipeline> ctx, DocumentPipeline model) => Task.CompletedTask;
+    public Task OnBeforeDelete(HookContext<DocumentPipeline> ctx, DocumentPipeline model) => Task.CompletedTask;
+    public Task OnBeforeFetch(HookContext<DocumentPipeline> ctx, string id) => Task.CompletedTask;
+    public Task OnBeforePatch(HookContext<DocumentPipeline> ctx, string id, object patch) => Task.CompletedTask;
 
-    public async Task OnBeforeSaveAsync(HookContext<DocumentPipeline> ctx, DocumentPipeline model)
+    public async Task OnBeforeSave(HookContext<DocumentPipeline> ctx, DocumentPipeline model)
     {
         var ct = ctx.Ct;
         var previous = !string.IsNullOrWhiteSpace(model.Id)
@@ -51,7 +51,7 @@ public sealed class DocumentPipelineAnalysisTypeHook : IModelHook<DocumentPipeli
                               previous.AnalysisTypeVersion != analysisType.Version;
 
         model.AnalysisTypeVersion = analysisType.Version;
-        model.AnalysisInstructions = (analysisType.Instructions ?? string.Empty).Trim();
+        model.AnalysisInstructions = (analysisType.Instructions ?? "").Trim();
         model.AnalysisTags = analysisType.Tags is { Count: > 0 }
             ? new List<string>(analysisType.Tags)
             : new List<string>();

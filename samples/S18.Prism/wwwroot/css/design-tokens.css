@@ -1,0 +1,64 @@
+/* Prism — Design Tokens
+   Personal Knowledge Intelligence
+   Dark theme optimized for reading */
+
+:root {
+    /* Surface — warm dark (not pure black) */
+    --surface-canvas: #0D1117;
+    --surface-primary: #161B22;
+    --surface-secondary: #1C2128;
+    --surface-hover: #242A33;
+    --surface-active: #2D333B;
+    --surface-border: #30363D;
+
+    /* Text */
+    --text-primary: #E6EDF3;
+    --text-secondary: #8B949E;
+    --text-tertiary: #848D97;
+    --text-link: #58A6FF;
+
+    /* Accent — Prism spectrum (knowledge tool identity) */
+    --accent-primary: #7C6EF6;     /* Purple — primary action */
+    --accent-search: #58A6FF;      /* Blue — search/find */
+    --accent-success: #3FB950;     /* Green — approved/ingested */
+    --accent-warning: #D29922;     /* Amber — pending review */
+    --accent-danger: #F85149;      /* Red — rejected/error */
+    --accent-brief: #A371F7;       /* Violet — research briefs */
+    --accent-source: #79C0FF;      /* Light blue — sources */
+
+    /* Spacing (8px grid) */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-8: 32px;
+    --space-10: 40px;
+    --space-12: 48px;
+
+    /* Typography */
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    --font-size-xs: 0.75rem;
+    --font-size-sm: 0.875rem;
+    --font-size-base: 1rem;
+    --font-size-lg: 1.125rem;
+    --font-size-xl: 1.25rem;
+    --font-size-2xl: 1.5rem;
+
+    /* Radius */
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+    --radius-xl: 12px;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+
+    /* Transitions */
+    --transition-fast: 150ms ease;
+    --transition-normal: 250ms ease;
+}

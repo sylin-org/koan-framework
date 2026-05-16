@@ -30,7 +30,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddSingleton<IConfigureOptions<MilvusOptions>, MilvusOptionsConfigurator>();
 
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<INamingDefaultsProvider, MilvusNamingDefaultsProvider>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, MilvusHealthContributor>());
 
         // Register Milvus discovery adapter (maintains "Reference = Intent")

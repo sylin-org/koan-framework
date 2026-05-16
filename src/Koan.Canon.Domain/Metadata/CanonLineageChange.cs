@@ -31,7 +31,7 @@ public sealed class CanonLineageChange
     /// <summary>
     /// Identifier related to the change (parent/child/replacement).
     /// </summary>
-    public string RelatedId { get; set; } = string.Empty;
+    public string RelatedId { get; set; } = "";
 
     /// <summary>
     /// Timestamp of the change.

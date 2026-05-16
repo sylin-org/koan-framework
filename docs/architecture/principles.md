@@ -3,11 +3,11 @@ type: ARCHITECTURE
 domain: framework
 title: "Koan Framework Architecture Principles"
 audience: [architects, developers, ai-agents]
-last_updated: 2025-01-17
-framework_version: v0.2.18+
+last_updated: 2026-03-23
+framework_version: v0.6.3
 status: current
 validation:
-    date_last_tested: 2025-01-17
+    date_last_tested: 2026-03-23
     status: verified
     scope: docs/architecture/principles.md
 ---
@@ -16,8 +16,8 @@ validation:
 
 **Document Type**: ARCHITECTURE
 **Target Audience**: Architects, Senior Developers
-**Last Updated**: 2025-01-17
-**Framework Version**: v0.2.18+
+**Last Updated**: 2026-03-23
+**Framework Version**: v0.6.3
 
 ---
 
@@ -148,7 +148,7 @@ public class CustomController : ControllerBase
 public class DataAutoRegistrar : IKoanAutoRegistrar
 {
     public string ModuleName => "Koan.Data";
-    public string? ModuleVersion => "v0.2.18";
+    public string? ModuleVersion => "v0.6.3";
 
     public void Initialize(IServiceCollection services)
     {
@@ -465,5 +465,5 @@ Emphasize BootReport observability and self-documenting systems as enterprise-gr
 - [Provider Transparency Showcase](../guides/data-modeling.md) - Multi-provider examples
 - [Auto-Registration Patterns](../reference/core/index.md) - Implementation details
 
-**Last Validation**: 2025-01-17 by Framework Specialist
-**Framework Version Tested**: v0.2.18+
+**Last Validation**: 2026-03-25 by Framework Specialist
+**Framework Version Tested**: v0.6.3

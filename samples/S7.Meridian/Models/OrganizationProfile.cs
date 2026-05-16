@@ -15,7 +15,7 @@ namespace Koan.Samples.Meridian.Models;
 public sealed class OrganizationProfile : Entity<OrganizationProfile>
 {
     /// <summary>User-friendly label (e.g., "Geisinger Healthcare").</summary>
-    public string Name { get; set; } = string.Empty;
+    public string Name { get; set; } = "";
 
     /// <summary>Only one profile can be active at a time.</summary>
     public bool Active { get; set; }
@@ -74,7 +74,7 @@ public sealed class OrganizationProfile : Entity<OrganizationProfile>
     }
 
     /// <summary>Gets the currently active OrganizationProfile, if any.</summary>
-    public static async Task<OrganizationProfile?> GetActiveAsync(CancellationToken ct = default)
+    public static async Task<OrganizationProfile?> GetActive(CancellationToken ct = default)
     {
         var profiles = await Query(p => p.Active, ct);
         return profiles.FirstOrDefault();
@@ -84,7 +84,7 @@ public sealed class OrganizationProfile : Entity<OrganizationProfile>
     /// Activates this profile and deactivates all others.
     /// Ensures only one profile is active at a time.
     /// </summary>
-    public async Task ActivateAsync(CancellationToken ct = default)
+    public async Task Activate(CancellationToken ct = default)
     {
         // Deactivate all other profiles
         var allProfiles = await All(ct);
@@ -102,7 +102,7 @@ public sealed class OrganizationProfile : Entity<OrganizationProfile>
     }
 
     /// <summary>Deactivates this profile.</summary>
-    public async Task DeactivateAsync(CancellationToken ct = default)
+    public async Task Deactivate(CancellationToken ct = default)
     {
         Active = false;
         UpdatedAt = DateTime.UtcNow;

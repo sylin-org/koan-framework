@@ -4,7 +4,7 @@ domain: architecture
 title: "Koan-Aspire Integration: Orchestration-Aware Architecture"
 audience: [architects, developers]
 status: draft
-last_updated: 2025-10-09
+last_updated: 2026-03-25
 framework_version: v0.6.3
 validation:
   status: not-yet-tested

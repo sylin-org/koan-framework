@@ -23,7 +23,7 @@ public sealed class UploadController : ControllerBase
         // Use a GUID-based key for collision-free addressing and to enable ID-first routes
         var id = Guid.NewGuid();
         var ext = System.IO.Path.GetExtension(file.FileName);
-        var key = id.ToString("N") + (string.IsNullOrWhiteSpace(ext) ? string.Empty : ext.ToLowerInvariant());
+        var key = id.ToString("N") + (string.IsNullOrWhiteSpace(ext) ? "" : ext.ToLowerInvariant());
 
         // Store the bytes under the GUID key; keep original filename in Name for clients/UI
         var obj = await ProfileMedia.Onboard(key, ms, file.ContentType, ct);

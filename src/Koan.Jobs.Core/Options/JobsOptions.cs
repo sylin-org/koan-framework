@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Koan.Jobs.Archival;
 using Koan.Jobs.Model;
 
 namespace Koan.Jobs.Options;
@@ -11,6 +12,7 @@ public sealed class JobsOptions
     public bool AuditByDefault { get; set; }
     public bool PublishEvents { get; set; } = true;
     public InMemoryStoreOptions InMemory { get; } = new();
+    public JobArchivalPolicy Archival { get; } = new();
     public JsonSerializerOptions SerializerOptions { get; } = new(JsonSerializerDefaults.Web);
 }
 

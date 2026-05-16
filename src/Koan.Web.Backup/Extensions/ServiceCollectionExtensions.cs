@@ -143,7 +143,7 @@ public class BackupOperationCleanupService : Microsoft.Extensions.Hosting.Backgr
                 if (stoppingToken.IsCancellationRequested)
                     break;
 
-                await _operationTracker.CleanupCompletedOperationsAsync(_maxOperationAge);
+                await _operationTracker.CleanupCompletedOperations(_maxOperationAge);
             }
             catch (TaskCanceledException)
             {

@@ -31,15 +31,15 @@ public class RabbitMqProvider : IMessagingProvider
     public string Name => "RabbitMQ";
     public int Priority => 100; // High priority - preferred provider
 
-    public async Task<bool> CanConnectAsync(CancellationToken cancellationToken = default)
+    public async Task<bool> CanConnect(CancellationToken cancellationToken = default)
     {
         try
         {
             // Use orchestration-aware service discovery
-            var connectionString = await GetOrchestrationAwareConnectionStringAsync(cancellationToken);
+            var connectionString = await GetOrchestrationAwareConnectionString(cancellationToken);
 
             _logger?.LogDebug("[RabbitMQ] Trying orchestration-aware connection: {ConnectionString}", MaskConnectionString(connectionString));
-            if (await TryConnectAsync(connectionString, cancellationToken))
+            if (await TryConnect(connectionString, cancellationToken))
             {
                 _workingConnectionString = connectionString;
                 _logger?.LogDebug("[RabbitMQ] Connection successful: {ConnectionString}", MaskConnectionString(connectionString));
@@ -58,7 +58,7 @@ public class RabbitMqProvider : IMessagingProvider
         }
     }
 
-    public async Task<IMessageBus> CreateBusAsync(CancellationToken cancellationToken = default)
+    public async Task<IMessageBus> CreateBus(CancellationToken cancellationToken = default)
     {
         if (_workingConnectionString == null)
         {
@@ -68,7 +68,7 @@ public class RabbitMqProvider : IMessagingProvider
         return await Task.FromResult<IMessageBus>(new RabbitMqBus(_workingConnectionString, _logger));
     }
 
-    private async Task<string> GetOrchestrationAwareConnectionStringAsync(CancellationToken cancellationToken = default)
+    private async Task<string> GetOrchestrationAwareConnectionString(CancellationToken cancellationToken = default)
     {
         try
         {
@@ -89,7 +89,7 @@ public class RabbitMqProvider : IMessagingProvider
             }
 
             // Discover RabbitMQ service
-            var result = await serviceDiscovery.DiscoverServiceAsync("rabbitmq", discoveryOptions, cancellationToken);
+            var result = await serviceDiscovery.DiscoverService("rabbitmq", discoveryOptions, cancellationToken);
 
             _logger?.LogDebug("[RabbitMQ] Orchestration-aware discovery result: {Method} -> {ConnectionString}",
                 result.DiscoveryMethod, MaskConnectionString(result.ServiceUrl));
@@ -123,7 +123,7 @@ public class RabbitMqProvider : IMessagingProvider
         return candidates.ToArray();
     }
 
-    private async Task<bool> TryConnectAsync(string connectionString, CancellationToken cancellationToken)
+    private async Task<bool> TryConnect(string connectionString, CancellationToken cancellationToken)
     {
         try
         {
@@ -181,7 +181,7 @@ internal class RabbitMqBus : IMessageBus
 
     public async Task SendAsync<T>(T message, CancellationToken cancellationToken = default) where T : class
     {
-        await EnsureConnectionAsync(cancellationToken);
+        await EnsureConnection(cancellationToken);
 
         await using var channel = await _connection!.CreateChannelAsync();
         var queueName = GetQueueName<T>();
@@ -215,7 +215,7 @@ internal class RabbitMqBus : IMessageBus
 
     public async Task<IMessageConsumer> CreateConsumerAsync<T>(Func<T, Task> handler, CancellationToken cancellationToken = default) where T : class
     {
-        await EnsureConnectionAsync(cancellationToken);
+        await EnsureConnection(cancellationToken);
 
         var queueName = GetQueueName<T>();
         var consumer = new RabbitMqConsumer(_connection!, queueName, handler, _logger);
@@ -229,11 +229,11 @@ internal class RabbitMqBus : IMessageBus
         return consumer;
     }
 
-    public async Task<bool> IsHealthyAsync(CancellationToken cancellationToken = default)
+    public async Task<bool> IsHealthy(CancellationToken cancellationToken = default)
     {
         try
         {
-            await EnsureConnectionAsync(cancellationToken);
+            await EnsureConnection(cancellationToken);
             return _connection?.IsOpen == true;
         }
         catch
@@ -242,7 +242,7 @@ internal class RabbitMqBus : IMessageBus
         }
     }
 
-    private async Task EnsureConnectionAsync(CancellationToken cancellationToken = default)
+    private async Task EnsureConnection(CancellationToken cancellationToken = default)
     {
         if (_connection?.IsOpen == true)
             return;
@@ -308,7 +308,7 @@ internal class RabbitMqConsumer : IMessageConsumer
         _consumer = new AsyncEventingBasicConsumer(_channel);
         _consumer.ReceivedAsync += async (sender, args) =>
         {
-            await HandleMessageAsync(sender, args);
+            await HandleMessage(sender, args);
         };
 
         await _channel.BasicConsumeAsync(_queueName, autoAck: false, consumer: _consumer, cancellationToken: cancellationToken);
@@ -316,7 +316,7 @@ internal class RabbitMqConsumer : IMessageConsumer
         _logger?.LogDebug("RabbitMQ consumer started for queue {QueueName}", _queueName);
     }
 
-    private async Task HandleMessageAsync(object? sender, BasicDeliverEventArgs args)
+    private async Task HandleMessage(object? sender, BasicDeliverEventArgs args)
     {
         try
         {
@@ -348,7 +348,7 @@ internal class RabbitMqConsumer : IMessageConsumer
         }
     }
 
-    public async Task PauseAsync()
+    public async Task Pause()
     {
         if (_channel != null && _consumer != null)
         {
@@ -360,14 +360,14 @@ internal class RabbitMqConsumer : IMessageConsumer
         }
     }
 
-    public async Task ResumeAsync()
+    public async Task Resume()
     {
         if (_channel != null)
         {
             _consumer = new AsyncEventingBasicConsumer(_channel);
             _consumer.ReceivedAsync += async (sender, args) =>
             {
-                await HandleMessageAsync(sender, args);
+                await HandleMessage(sender, args);
             };
             await _channel.BasicConsumeAsync(_queueName, autoAck: false, consumer: _consumer);
         }

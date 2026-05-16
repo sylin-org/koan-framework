@@ -19,12 +19,12 @@ public sealed record KoanAdminStatusResponse(
 {
     public static KoanAdminStatusResponse Disabled()
         => new(KoanEnv.CurrentSnapshot, new KoanAdminFeatureSnapshot(false, false, false, false, false, false, false,
-            new KoanAdminRouteMap(Koan.Admin.Infrastructure.KoanAdminDefaults.Prefix, string.Empty, string.Empty),
+            new KoanAdminRouteMap(Koan.Admin.Infrastructure.KoanAdminDefaults.Prefix, "", ""),
             Koan.Admin.Infrastructure.KoanAdminDefaults.Prefix, KoanEnv.IsDevelopment),
             KoanAdminRuntimeSurface.Empty,
-            new KoanAdminManifestSummary(DateTimeOffset.UtcNow, Array.Empty<KoanAdminModuleSummary>(), HealthStatus.Unknown, 0),
+            new KoanAdminManifestSummary(DateTimeOffset.UtcNow, [], HealthStatus.Unknown, 0),
             KoanAdminHealthDocument.Empty,
-            Array.Empty<KoanAdminModuleSurface>(),
+            [],
             KoanAdminConfigurationSummary.Empty,
-            Array.Empty<KoanAdminStartupNote>());
+            []);
 }

@@ -43,7 +43,7 @@ public class {parameters.ClassName} : BaseKoanAdapter
     {{
     }}
 
-    protected override async Task InitializeAdapterAsync(CancellationToken cancellationToken = default)
+    protected override async Task InitializeAdapter(CancellationToken cancellationToken = default)
     {{
         var connectionString = GetConnectionString();
         if (string.IsNullOrEmpty(connectionString))
@@ -60,7 +60,7 @@ public class {parameters.ClassName} : BaseKoanAdapter
         Logger.LogInformation(""[{{AdapterId}}] {parameters.DisplayName} connection established"", AdapterId);
     }}
 
-    protected override async Task<IReadOnlyDictionary<string, object?>?> CheckAdapterHealthAsync(CancellationToken cancellationToken = default)
+    protected override async Task<IReadOnlyDictionary<string, object?>?> CheckAdapterHealth(CancellationToken cancellationToken = default)
     {{
         try
         {{
@@ -83,8 +83,8 @@ public class {parameters.ClassName} : BaseKoanAdapter
             // Example:
             // try
             // {{
-            //     healthData[""queues_count""] = await GetQueueCountAsync(cancellationToken);
-            //     healthData[""active_connections""] = await GetActiveConnectionsAsync(cancellationToken);
+            //     healthData[""queues_count""] = await GetQueueCount(cancellationToken);
+            //     healthData[""active_connections""] = await GetActiveConnections(cancellationToken);
             // }}
             // catch (Exception ex)
             // {{
@@ -104,7 +104,7 @@ public class {parameters.ClassName} : BaseKoanAdapter
         }}
     }}
 
-    protected override Task<IReadOnlyDictionary<string, object?>?> GetAdapterBootstrapMetadataAsync(CancellationToken cancellationToken = default)
+    protected override Task<IReadOnlyDictionary<string, object?>?> GetAdapterBootstrapMetadata(CancellationToken cancellationToken = default)
     {{
         var metadata = new Dictionary<string, object?>
         {{

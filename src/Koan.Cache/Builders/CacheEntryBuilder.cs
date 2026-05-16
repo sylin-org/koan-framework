@@ -64,9 +64,9 @@ internal sealed class CacheEntryBuilder<T> : ICacheEntryBuilder<T>
         return this;
     }
 
-    public ICacheEntryBuilder<T> PublishInvalidation(bool value = true)
+    public ICacheEntryBuilder<T> BroadcastInvalidation(bool value = true)
     {
-        _options = _options with { ForcePublishInvalidation = value };
+        _options = _options with { ForceCoherenceBroadcast = value };
         return this;
     }
 
@@ -76,21 +76,21 @@ internal sealed class CacheEntryBuilder<T> : ICacheEntryBuilder<T>
         return this;
     }
 
-    public ValueTask<T?> GetAsync(CancellationToken ct)
+    public ValueTask<T?> Get(CancellationToken ct)
         => _client.GetAsync<T>(Key, _options, ct);
 
-    public ValueTask<T?> GetOrAddAsync(Func<CancellationToken, ValueTask<T?>> valueFactory, CancellationToken ct)
+    public ValueTask<T?> GetOrAdd(Func<CancellationToken, ValueTask<T?>> valueFactory, CancellationToken ct)
         => _client.GetOrAddAsync(Key, valueFactory, _options, ct);
 
-    public ValueTask SetAsync(T value, CancellationToken ct)
+    public ValueTask Set(T value, CancellationToken ct)
         => _client.SetAsync(Key, value, _options, ct);
 
-    public async ValueTask RemoveAsync(CancellationToken ct)
-        => await _client.RemoveAsync(Key, ct);
+    public async ValueTask Remove(CancellationToken ct)
+        => await _client.Remove(Key, ct);
 
-    public ValueTask TouchAsync(CancellationToken ct)
-        => _client.TouchAsync(Key, _options, ct);
+    public ValueTask Touch(CancellationToken ct)
+        => _client.Touch(Key, _options, ct);
 
     public ValueTask<bool> Exists(CancellationToken ct)
-        => _client.ExistsAsync(Key, _options, ct);
+        => _client.Exists(Key, _options, ct);
 }

@@ -106,7 +106,7 @@ public class CollectionsController : ControllerBase
             if (collection == null)
                 return NotFound(new { Error = $"Collection '{id}' not found" });
 
-            var photos = await collection.GetPhotosAsync(ct);
+            var photos = await collection.GetPhotos(ct);
 
             // Apply pagination if requested
             if (skip.HasValue)

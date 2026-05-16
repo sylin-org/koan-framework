@@ -15,5 +15,5 @@ public class CreateMealPlanRequest
     public string? UserId { get; set; }
     public DateTime StartDate { get; set; }
     public DateTime EndDate { get; set; }
-    public PlannedMeal[] Meals { get; set; } = Array.Empty<PlannedMeal>();
+    public PlannedMeal[] Meals { get; set; } = [];
 }

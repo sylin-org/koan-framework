@@ -14,11 +14,8 @@ public static class Constants
             public const string ConnectionStringsSqlite = "ConnectionStrings:Sqlite";
             public const string ConnectionStringsDefault = "ConnectionStrings:Default";
 
-            // Paging guardrails (ADR-0044)
             public const string DefaultPageSize = Section + ":DefaultPageSize";
             public const string AltDefaultPageSize = AltSection + ":DefaultPageSize";
-            public const string MaxPageSize = Section + ":MaxPageSize";
-            public const string AltMaxPageSize = AltSection + ":MaxPageSize";
 
             // Naming and connection metadata
             public const string NamingStyle = Section + ":NamingStyle";
@@ -32,6 +29,13 @@ public static class Constants
             public const string AltDdlPolicy = AltSection + ":DdlPolicy";
             public const string SchemaMatchingMode = Section + ":SchemaMatchingMode"; // Relaxed | Strict
             public const string AltSchemaMatchingMode = AltSection + ":SchemaMatchingMode";
+
+            public const string DisableAutoDetection = Section + ":DisableAutoDetection";
+        }
+
+        public static class DataFallback
+        {
+            public const string ConnectionString = "Koan:Data:ConnectionString";
         }
     }
 
@@ -39,7 +43,6 @@ public static class Constants
     {
         public const string EnsureCreatedSupported = "EnsureCreatedSupported";
         public const string DefaultPageSize = "DefaultPageSize";
-        public const string MaxPageSize = "MaxPageSize";
     }
 }
 

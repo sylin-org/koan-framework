@@ -7,5 +7,6 @@ public sealed class KoanWebSwaggerOptions
     public bool IncludeXmlComments { get; set; } = true;
     public bool RequireAuthOutsideDevelopment { get; set; } = true;
     public bool DocumentHeaders { get; set; } = true;
+    public string? DocumentDisplayName { get; set; }
 }
 

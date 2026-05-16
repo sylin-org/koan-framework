@@ -1,0 +1,30 @@
+<Project>
+  <!--
+    ARCH-0082: resolve the package <Version> after the csproj has declared its
+    KoanPackageKind. Importing versions.props HERE (not in Directory.Build.props)
+    is critical — .props imports run BEFORE the csproj body, so $(KoanPackageKind)
+    would be empty and the conditional PropertyGroups in versions.props would
+    silently no-op. .targets imports run after the csproj body, so the kind is
+    set by then.
+
+    See docs/guides/versioning-workbook.md.
+  -->
+  <Import Project="$(MSBuildThisFileDirectory)build/versions.props"
+          Condition="Exists('$(MSBuildThisFileDirectory)build/versions.props')" />
+
+  <PropertyGroup Condition="'$(KoanPackageKind)' == 'Kernel' and '$(KoanKernelVersion)' != ''">
+    <Version>$(KoanKernelVersion)</Version>
+    <AssemblyVersion>$(KoanKernelVersion)</AssemblyVersion>
+    <FileVersion>$(KoanKernelVersion)</FileVersion>
+  </PropertyGroup>
+
+  <!--
+    For periphery packages, the per-package PropertyGroup in versions.props
+    (conditioned on MSBuildProjectName) sets <Version> directly. Mirror it onto
+    AssemblyVersion/FileVersion here so all three stay in sync.
+  -->
+  <PropertyGroup Condition="'$(KoanPackageKind)' == 'Periphery' and '$(Version)' != ''">
+    <AssemblyVersion Condition="'$(AssemblyVersion)' == ''">$(Version)</AssemblyVersion>
+    <FileVersion Condition="'$(FileVersion)' == ''">$(Version)</FileVersion>
+  </PropertyGroup>
+</Project>

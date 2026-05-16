@@ -128,7 +128,7 @@ internal static class CacheAdapterResolver
         var context = DependencyContext.Default;
         if (context is null)
         {
-            return Array.Empty<AssemblyName>();
+            return [];
         }
 
         var assemblies = new HashSet<AssemblyName>(AssemblyNameComparer.Instance);
@@ -160,6 +160,6 @@ internal static class CacheAdapterResolver
             => string.Equals(x?.FullName, y?.FullName, StringComparison.OrdinalIgnoreCase);
 
         public int GetHashCode(AssemblyName obj)
-            => StringComparer.OrdinalIgnoreCase.GetHashCode(obj.FullName ?? obj.Name ?? string.Empty);
+            => StringComparer.OrdinalIgnoreCase.GetHashCode(obj.FullName ?? obj.Name ?? "");
     }
 }

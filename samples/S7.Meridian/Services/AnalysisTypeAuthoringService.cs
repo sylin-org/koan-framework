@@ -16,7 +16,7 @@ namespace Koan.Samples.Meridian.Services;
 
 public interface IAnalysisTypeAuthoringService
 {
-    Task<AnalysisTypeAiSuggestResponse> SuggestAsync(AnalysisTypeAiSuggestRequest request, CancellationToken ct);
+    Task<AnalysisTypeAiSuggestResponse> Suggest(AnalysisTypeAiSuggestRequest request, CancellationToken ct);
 }
 
 public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
@@ -50,7 +50,7 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
         _logger = logger;
     }
 
-    public async Task<AnalysisTypeAiSuggestResponse> SuggestAsync(AnalysisTypeAiSuggestRequest request, CancellationToken ct)
+    public async Task<AnalysisTypeAiSuggestResponse> Suggest(AnalysisTypeAiSuggestRequest request, CancellationToken ct)
     {
         if (request is null)
         {
@@ -65,9 +65,8 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
         var prompt = BuildPrompt(request);
         // Model selection removed from request; use options default or fallback
         var model = _options.Extraction.Model ?? "granite3.3:8b";
-        var chatOptions = new AiChatOptions
+        var chatOptions = new ChatOptions
         {
-            Message = prompt,
             Model = model,
             Temperature = 0.1,
             MaxTokens = 4000
@@ -76,7 +75,7 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
         string rawResponse;
         try
         {
-            rawResponse = await Ai.Chat(chatOptions, ct);
+            rawResponse = await Client.Chat(prompt, chatOptions, ct).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -112,14 +111,14 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
             ["prompt"] = request.Prompt.Truncate(120)
         };
 
-        await _auditor.RecordAsync(
+        await _auditor.Record(
             "AnalysisType",
             draft.Name,
             requestSummary,
             responseSummary,
             chatOptions.Model,
             metadata,
-            ct);
+            ct).ConfigureAwait(false);
 
         return new AnalysisTypeAiSuggestResponse
         {
@@ -190,7 +189,7 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
     {
         try
         {
-            var cleaned = rawResponse?.Trim() ?? string.Empty;
+            var cleaned = rawResponse?.Trim() ?? "";
 
             // Strip markdown code fences if present
             if (cleaned.StartsWith("```"))
@@ -252,10 +251,10 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
 
             var draft = new AnalysisTypeDraft
             {
-                Name = json["name"]?.Value<string>()?.Trim() ?? string.Empty,
-                Description = json["description"]?.Value<string>()?.Trim() ?? string.Empty,
-                Instructions = json["instructions"]?.Value<string>()?.Trim() ?? string.Empty,
-                OutputTemplate = FieldPathCanonicalizer.CanonicalizeTemplatePlaceholders(json["outputTemplate"]?.Value<string>()?.Trim() ?? string.Empty),
+                Name = json["name"]?.Value<string>()?.Trim() ?? "",
+                Description = json["description"]?.Value<string>()?.Trim() ?? "",
+                Instructions = json["instructions"]?.Value<string>()?.Trim() ?? "",
+                OutputTemplate = FieldPathCanonicalizer.CanonicalizeTemplatePlaceholders(json["outputTemplate"]?.Value<string>()?.Trim() ?? ""),
                 JsonSchema = schemaJson,
                 Tags = ExtractArray(json["tags"]),
                 Descriptors = ExtractArray(json["descriptors"])
@@ -289,9 +288,9 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
         {
             Name = name,
             Description = description,
-            Instructions = string.Empty,
-            OutputTemplate = string.Empty,
-            JsonSchema = string.Empty,
+            Instructions = "",
+            OutputTemplate = "",
+            JsonSchema = "",
             Tags = new List<string>(),
             Descriptors = new List<string>()
         };
@@ -366,7 +365,7 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
         draft.Instructions = draft.Instructions.Truncate(5000);
         draft.OutputTemplate = draft.OutputTemplate.Truncate(10000);
         draft.OutputTemplate = FieldPathCanonicalizer.CanonicalizeTemplatePlaceholders(draft.OutputTemplate);
-        draft.JsonSchema = draft.JsonSchema?.Truncate(16000) ?? string.Empty;
+        draft.JsonSchema = draft.JsonSchema?.Truncate(16000) ?? "";
         draft.JsonSchema = FieldPathCanonicalizer.CanonicalizeJsonSchema(draft.JsonSchema);
         draft.Tags = draft.Tags
                 .Where(value => !string.IsNullOrWhiteSpace(value))
@@ -410,7 +409,7 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
 
     private static bool DraftMeetsQuality(AnalysisTypeDraft draft, out string failureReason)
     {
-        failureReason = string.Empty;
+        failureReason = "";
 
         if (draft is null)
         {

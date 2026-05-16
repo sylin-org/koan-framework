@@ -19,7 +19,7 @@ public interface IBandCacheService
     /// <param name="userId">User ID for personalization (null for anonymous)</param>
     /// <param name="ct">Cancellation token</param>
     /// <returns>List of recommendations and degraded flag</returns>
-    Task<(IReadOnlyList<Recommendation> items, bool degraded)> GetPageAsync(
+    Task<(IReadOnlyList<Recommendation> items, bool degraded)> GetPage(
         RecsQuery query,
         int offset,
         int limit,

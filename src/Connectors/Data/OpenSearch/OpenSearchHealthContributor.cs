@@ -15,7 +15,7 @@ public sealed class OpenSearchHealthContributor(
     public string Name => "data:opensearch";
     public bool IsCritical => true;
 
-    public async Task<HealthReport> CheckAsync(CancellationToken ct = default)
+    public async Task<HealthReport> Check(CancellationToken ct = default)
     {
         try
         {

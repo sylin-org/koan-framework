@@ -19,7 +19,7 @@ namespace Koan.Samples.Meridian.Services;
 
 public interface IDocumentMerger
 {
-    Task<Deliverable> MergeAsync(DocumentPipeline pipeline, IReadOnlyList<ExtractedField> extractions, CancellationToken ct);
+    Task<Deliverable> Merge(DocumentPipeline pipeline, IReadOnlyList<ExtractedField> extractions, CancellationToken ct);
 }
 
 public sealed class DocumentMerger : IDocumentMerger
@@ -67,7 +67,7 @@ public sealed class DocumentMerger : IDocumentMerger
         _logger = logger;
     }
 
-    public async Task<Deliverable> MergeAsync(DocumentPipeline pipeline, IReadOnlyList<ExtractedField> extractions, CancellationToken ct)
+    public async Task<Deliverable> Merge(DocumentPipeline pipeline, IReadOnlyList<ExtractedField> extractions, CancellationToken ct)
     {
         if (extractions.Count == 0)
         {
@@ -92,7 +92,7 @@ public sealed class DocumentMerger : IDocumentMerger
         var sourceCache = new Dictionary<string, SourceDocument?>(StringComparer.OrdinalIgnoreCase);
         var passageCache = new Dictionary<string, Passage?>(StringComparer.OrdinalIgnoreCase);
 
-        var priorDeliverables = (await Deliverable.Query(d => d.PipelineId == pipeline.Id, ct)).ToList();
+        var priorDeliverables = (await Deliverable.Query(d => d.PipelineId == pipeline.Id, ct).ConfigureAwait(false)).ToListAsync();
         var nextVersion = priorDeliverables.Count + 1;
 
         foreach (var group in groups)
@@ -106,7 +106,7 @@ public sealed class DocumentMerger : IDocumentMerger
             totalConflicts += Math.Max(0, candidates.Count - 1);
 
             var descriptor = ResolvePolicy(group.Key);
-            var mergeResult = await ApplyPolicyAsync(group.Key, candidates, descriptor, sourceCache, ct);
+            var mergeResult = await ApplyPolicy(group.Key, candidates, descriptor, sourceCache, ct).ConfigureAwait(false);
 
             autoResolved += mergeResult.Rejected.Count;
 
@@ -125,7 +125,7 @@ public sealed class DocumentMerger : IDocumentMerger
                 PreserveApprovalsIfEquivalent(accepted, candidates, mergeResult.ValueToken);
             }
 
-            var savedAccepted = await accepted.Save(ct);
+            var savedAccepted = await accepted.Save(ct).ConfigureAwait(false);
             acceptedFields.Add(savedAccepted);
 
             var rejectedIds = new List<string>();
@@ -138,7 +138,7 @@ public sealed class DocumentMerger : IDocumentMerger
 
                 rejected.MergeStrategy = mergeResult.Strategy;
                 rejected.UpdatedAt = now;
-                var savedRejected = await rejected.Save(ct);
+                var savedRejected = await rejected.Save(ct).ConfigureAwait(false);
                 if (!string.IsNullOrWhiteSpace(savedRejected.Id))
                 {
                     rejectedIds.Add(savedRejected.Id);
@@ -157,28 +157,28 @@ public sealed class DocumentMerger : IDocumentMerger
                 PipelineId = pipeline.Id,
                 FieldPath = group.Key,
                 Strategy = mergeResult.Strategy,
-                Explanation = mergeResult.Explanation ?? string.Empty,
-                AcceptedExtractionId = savedAccepted.Id ?? string.Empty,
+                Explanation = mergeResult.Explanation ?? "",
+                AcceptedExtractionId = savedAccepted.Id ?? "",
                 RejectedExtractionIds = rejectedIds,
                 SupportingExtractionIds = supportingIds,
                 CollectionProvenance = mergeResult.CollectionProvenance ?? new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase),
                 RuleConfigJson = SerializePolicyDescriptor(descriptor),
                 TransformApplied = descriptor.Transform
             };
-            await decision.Save(ct);
+            await decision.Save(ct).ConfigureAwait(false);
 
             var templateKey = FieldPathCanonicalizer.ToTemplateKey(group.Key);
             var hasCanonicalContent = HasSubstantiveValue(mergeResult.ValueToken);
             var formattedValue = hasCanonicalContent
                 ? FormatValueForTemplate(mergeResult.ValueToken)
-                : string.Empty;
+                : "";
 
             _logger.LogDebug("Field {FieldPath} → {TemplateKey}: hasContent={HasContent}, tokenType={TokenType}, formatted={FormattedValue}",
                 group.Key, templateKey, hasCanonicalContent, mergeResult.ValueToken?.Type, formattedValue);
 
             if (_options.Merge.EnableCitations && hasCanonicalContent && !string.IsNullOrWhiteSpace(formattedValue))
             {
-                var footnote = await BuildFootnoteAsync(savedAccepted, mergeResult.ValueToken, footnotes.Count + 1, sourceCache, passageCache, ct);
+                var footnote = await BuildFootnote(savedAccepted, mergeResult.ValueToken, footnotes.Count + 1, sourceCache, passageCache, ct).ConfigureAwait(false);
                 if (footnote is { } info)
                 {
                     footnotes.Add(info);
@@ -196,7 +196,7 @@ public sealed class DocumentMerger : IDocumentMerger
                 _logger.LogDebug("Canonical field {TemplateKey} populated: value={Value}, formatted={Formatted}",
                     templateKey, clonedValue.ToString(Formatting.None), formattedValue);
 
-                var evidenceToken = await BuildEvidenceTokenAsync(savedAccepted, sourceCache, passageCache, ct);
+                var evidenceToken = await BuildEvidenceToken(savedAccepted, sourceCache, passageCache, ct).ConfigureAwait(false);
                 if (evidenceToken is not null && HasSubstantiveValue(evidenceToken))
                 {
                     evidence[templateKey] = evidenceToken;
@@ -225,7 +225,7 @@ public sealed class DocumentMerger : IDocumentMerger
                 FieldPath = group.Key,
                 Strategy = mergeResult.Strategy,
                 Explanation = mergeResult.Explanation,
-                AcceptedExtractionId = savedAccepted.Id ?? string.Empty,
+                AcceptedExtractionId = savedAccepted.Id ?? "",
                 RejectedExtractionIds = rejectedIds,
                 SupportingExtractionIds = supportingIds,
                 CollectionProvenance = mergeResult.CollectionProvenance ?? new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase)
@@ -237,7 +237,7 @@ public sealed class DocumentMerger : IDocumentMerger
                 {
                     ["strategy"] = mergeResult.Strategy,
                     ["candidateCount"] = candidates.Count.ToString(CultureInfo.InvariantCulture),
-                    ["acceptedExtractionId"] = savedAccepted.Id ?? string.Empty,
+                    ["acceptedExtractionId"] = savedAccepted.Id ?? "",
                     ["supportingCount"] = supportingIds.Count.ToString(CultureInfo.InvariantCulture)
                 };
 
@@ -246,7 +246,7 @@ public sealed class DocumentMerger : IDocumentMerger
                     metadata["explanation"] = mergeResult.Explanation!;
                 }
 
-                await _runLog.AppendAsync(new RunLog
+                await _runLog.Append(new RunLog
                 {
                     PipelineId = pipeline.Id,
                     Stage = "merge",
@@ -255,7 +255,7 @@ public sealed class DocumentMerger : IDocumentMerger
                     FinishedAt = DateTime.UtcNow,
                     Status = "success",
                     Metadata = metadata
-                }, ct);
+                }, ct).ConfigureAwait(false);
             }
         }
 
@@ -313,12 +313,12 @@ public sealed class DocumentMerger : IDocumentMerger
         string? pdfKey = null;
         try
         {
-            var pdfBytes = await _pdfRenderer.RenderAsync(markdown, ct);
+            var pdfBytes = await _pdfRenderer.Render(markdown, ct).ConfigureAwait(false);
             if (pdfBytes.Length > 0)
             {
                 await using var pdfStream = new MemoryStream(pdfBytes, writable: false);
                 var fileName = $"{pipeline.Id}-{now:yyyyMMddHHmmss}.pdf";
-                pdfKey = await _deliverableStorage.StoreAsync(pdfStream, fileName, "application/pdf", ct);
+                pdfKey = await _deliverableStorage.Store(pdfStream, fileName, "application/pdf", ct).ConfigureAwait(false);
             }
         }
         catch (Exception ex)
@@ -343,12 +343,12 @@ public sealed class DocumentMerger : IDocumentMerger
             Version = nextVersion,
             CreatedAt = now
         };
-        var savedDeliverable = await deliverable.Save(ct);
+        var savedDeliverable = await deliverable.Save(ct).ConfigureAwait(false);
 
         pipeline.DeliverableId = savedDeliverable.Id;
         pipeline.Status = PipelineStatus.Completed;
         pipeline.CompletedAt = now;
-        await pipeline.Save(ct);
+        await pipeline.Save(ct).ConfigureAwait(false);
 
         var snapshot = new PipelineQualitySnapshot
         {
@@ -366,9 +366,9 @@ public sealed class DocumentMerger : IDocumentMerger
             MergeP95 = pipeline.Quality.MergeP95,
             CreatedAt = now
         };
-        await snapshot.Save(ct);
+        await snapshot.Save(ct).ConfigureAwait(false);
 
-        await _runLog.AppendAsync(new RunLog
+        await _runLog.Append(new RunLog
         {
             PipelineId = pipeline.Id,
             Stage = "quality",
@@ -386,9 +386,9 @@ public sealed class DocumentMerger : IDocumentMerger
                 ["manualReview"] = pipeline.Quality.ManualReviewNeeded.ToString(CultureInfo.InvariantCulture),
                 ["sourceDocumentCount"] = sourceDocumentIds.Count.ToString(CultureInfo.InvariantCulture)
             }
-        }, ct);
+        }, ct).ConfigureAwait(false);
 
-        await _runLog.AppendAsync(new RunLog
+        await _runLog.Append(new RunLog
         {
             PipelineId = pipeline.Id,
             Stage = "render",
@@ -402,7 +402,7 @@ public sealed class DocumentMerger : IDocumentMerger
                 ["deliverableVersion"] = nextVersion.ToString(CultureInfo.InvariantCulture),
                 ["templateHash"] = templateHash
             }
-        }, ct);
+        }, ct).ConfigureAwait(false);
 
         _logger.LogInformation("Merged {FieldCount} fields for pipeline {PipelineId}.", acceptedFields.Count, pipeline.Id);
         return savedDeliverable;
@@ -446,7 +446,7 @@ public sealed class DocumentMerger : IDocumentMerger
         };
     }
 
-    private async Task<FieldMergeResult> ApplyPolicyAsync(
+    private async Task<FieldMergeResult> ApplyPolicy(
         string fieldPath,
         List<ExtractedField> candidates,
         MergePolicyDescriptor descriptor,
@@ -501,7 +501,7 @@ public sealed class DocumentMerger : IDocumentMerger
 
         FieldMergeResult result = descriptor.Strategy switch
         {
-            MergeStrategyType.SourcePrecedence => await ApplySourcePrecedenceAsync(candidates, descriptor, sourceCache, ct),
+            MergeStrategyType.SourcePrecedence => await ApplySourcePrecedence(candidates, descriptor, sourceCache, ct),
             MergeStrategyType.Latest => ApplyLatest(candidates, descriptor),
             MergeStrategyType.Consensus => ApplyConsensus(candidates, descriptor),
             MergeStrategyType.Collection => ApplyCollection(candidates, descriptor),
@@ -513,7 +513,7 @@ public sealed class DocumentMerger : IDocumentMerger
         return result with { ValueToken = transformed };
     }
 
-    private async Task<FieldMergeResult> ApplySourcePrecedenceAsync(
+    private async Task<FieldMergeResult> ApplySourcePrecedence(
         List<ExtractedField> candidates,
         MergePolicyDescriptor descriptor,
         Dictionary<string, SourceDocument?> sourceCache,
@@ -524,7 +524,7 @@ public sealed class DocumentMerger : IDocumentMerger
         var ranked = new List<(ExtractedField Field, int Priority, string SourceType)>();
         foreach (var candidate in candidates)
         {
-            var doc = await GetSourceDocumentAsync(candidate.SourceDocumentId, sourceCache, ct);
+            var doc = await GetSourceDocument(candidate.SourceDocumentId, sourceCache, ct);
             var sourceType = doc?.SourceType ?? MeridianConstants.SourceTypes.Unspecified;
             var priority = precedence.FindIndex(type => string.Equals(type, sourceType, StringComparison.OrdinalIgnoreCase));
             if (priority < 0)
@@ -647,7 +647,7 @@ public sealed class DocumentMerger : IDocumentMerger
 
                 var contributor = !string.IsNullOrWhiteSpace(candidate.SourceDocumentId)
                     ? candidate.SourceDocumentId!
-                    : candidate.Id ?? string.Empty;
+                    : candidate.Id ?? "";
 
                 if (!string.IsNullOrWhiteSpace(contributor) &&
                     !supporters.Any(existing => existing.Equals(contributor, StringComparison.OrdinalIgnoreCase)))
@@ -665,7 +665,7 @@ public sealed class DocumentMerger : IDocumentMerger
                     arrays.Skip(1)
                         .Aggregate(
                             new HashSet<string>(
-                                arrays.FirstOrDefault()?.Select(item => item.ToString(Formatting.None)) ?? Array.Empty<string>(),
+                                arrays.FirstOrDefault()?.Select(item => item.ToString(Formatting.None)) ?? [],
                                 StringComparer.OrdinalIgnoreCase),
                             (set, array) =>
                             {
@@ -745,7 +745,7 @@ public sealed class DocumentMerger : IDocumentMerger
         }
     }
 
-    private async Task<Footnote?> BuildFootnoteAsync(
+    private async Task<Footnote?> BuildFootnote(
         ExtractedField accepted,
     JToken? valueToken,
         int index,
@@ -770,8 +770,8 @@ public sealed class DocumentMerger : IDocumentMerger
         var section = evidence.Section ?? GetMetadataValue(evidence, "section");
         var page = evidence.Page ?? TryParseNullableInt(GetMetadataValue(evidence, "page"));
 
-        var source = await GetSourceDocumentAsync(sourceId, sourceCache, ct);
-        var passage = await GetPassageAsync(passageId, passageCache, ct);
+        var source = await GetSourceDocument(sourceId, sourceCache, ct).ConfigureAwait(false);
+        var passage = await GetPassage(passageId, passageCache, ct).ConfigureAwait(false);
 
         var builder = new StringBuilder();
         builder.Append(source?.OriginalFileName ?? "Source");
@@ -826,7 +826,7 @@ public sealed class DocumentMerger : IDocumentMerger
         return new Footnote(index, builder.ToString());
     }
 
-    private async Task<JObject?> BuildEvidenceTokenAsync(
+    private async Task<JObject?> BuildEvidenceToken(
         ExtractedField accepted,
         Dictionary<string, SourceDocument?> sourceCache,
         Dictionary<string, Passage?> passageCache,
@@ -849,18 +849,18 @@ public sealed class DocumentMerger : IDocumentMerger
         var section = evidence.Section ?? GetMetadataValue(evidence, "section");
         var page = evidence.Page ?? TryParseNullableInt(GetMetadataValue(evidence, "page"));
 
-        var source = await GetSourceDocumentAsync(sourceId, sourceCache, ct);
-        var passage = await GetPassageAsync(passageId, passageCache, ct);
+        var source = await GetSourceDocument(sourceId, sourceCache, ct).ConfigureAwait(false);
+        var passage = await GetPassage(passageId, passageCache, ct).ConfigureAwait(false);
 
         var textualEvidence = !string.IsNullOrWhiteSpace(evidence.OriginalText)
             ? evidence.OriginalText
-            : GetMetadataValue(evidence, "factSummary") ?? string.Empty;
+            : GetMetadataValue(evidence, "factSummary") ?? "";
 
         var token = new JObject
         {
-            ["sourceDocumentId"] = sourceId ?? string.Empty,
-            ["sourceFileName"] = source?.OriginalFileName ?? string.Empty,
-            ["passageId"] = passageId ?? string.Empty,
+            ["sourceDocumentId"] = sourceId ?? "",
+            ["sourceFileName"] = source?.OriginalFileName ?? "",
+            ["passageId"] = passageId ?? "",
             ["page"] = page,
             ["section"] = section,
             ["text"] = textualEvidence,
@@ -1007,17 +1007,17 @@ public sealed class DocumentMerger : IDocumentMerger
     {
         if (token is null || token.Type is JTokenType.Null or JTokenType.Undefined)
         {
-            return string.Empty;
+            return "";
         }
 
         return token.Type switch
         {
-            JTokenType.String => token.Value<string>() ?? string.Empty,
+            JTokenType.String => token.Value<string>() ?? "",
             JTokenType.Float or JTokenType.Integer => ((double)token).ToString("G", CultureInfo.InvariantCulture),
             JTokenType.Boolean => token.Value<bool>() ? "true" : "false",
             JTokenType.Date => token.Value<DateTime>().ToString("O", CultureInfo.InvariantCulture),
             JTokenType.Array => string.Join(", ", token.Values<JToken?>().Select(FormatValueForTemplate).Where(value => !string.IsNullOrWhiteSpace(value))),
-            JTokenType.Null or JTokenType.Undefined => string.Empty,
+            JTokenType.Null or JTokenType.Undefined => "",
             _ => token.ToString()
         };
     }
@@ -1151,7 +1151,7 @@ public sealed class DocumentMerger : IDocumentMerger
         return null;
     }
 
-    private static async Task<SourceDocument?> GetSourceDocumentAsync(string? id, Dictionary<string, SourceDocument?> cache, CancellationToken ct)
+    private static async Task<SourceDocument?> GetSourceDocument(string? id, Dictionary<string, SourceDocument?> cache, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(id))
         {
@@ -1168,7 +1168,7 @@ public sealed class DocumentMerger : IDocumentMerger
         return loaded;
     }
 
-    private static async Task<Passage?> GetPassageAsync(string? id, Dictionary<string, Passage?> cache, CancellationToken ct)
+    private static async Task<Passage?> GetPassage(string? id, Dictionary<string, Passage?> cache, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(id))
         {

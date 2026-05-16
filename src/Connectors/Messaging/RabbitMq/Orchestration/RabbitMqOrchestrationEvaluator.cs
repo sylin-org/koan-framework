@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using Koan.Core;
 using Koan.Core.Orchestration;
+using Koan.Messaging.Connector.RabbitMq.Infrastructure;
 
 namespace Koan.Messaging.Connector.RabbitMq.Orchestration;
 
@@ -34,8 +35,8 @@ public class RabbitMqOrchestrationEvaluator : BaseOrchestrationEvaluator
     {
         // Check for explicit RabbitMQ connection configuration
         var explicitConnectionString = Configuration.ReadFirst(configuration, "",
-            "Koan:Messaging:RabbitMQ:ConnectionString",
-            "Koan:Messaging:ConnectionString",
+            ConfigurationConstants.Keys.ConnectionString,
+            ConfigurationConstants.Fallbacks.ConnectionString,
             "ConnectionStrings:rabbitmq",
             "ConnectionStrings:RabbitMQ",
             "ConnectionStrings:Messaging");
@@ -84,18 +85,18 @@ public class RabbitMqOrchestrationEvaluator : BaseOrchestrationEvaluator
 
             // Get configured credentials
             var username = Configuration.ReadFirst(configuration, "guest",
-                "Koan:Messaging:RabbitMQ:Username",
-                "Koan:Messaging:Username");
+                ConfigurationConstants.Keys.Username,
+                ConfigurationConstants.Fallbacks.Username);
 
             var password = Configuration.ReadFirst(configuration, "guest",
-                "Koan:Messaging:RabbitMQ:Password",
-                "Koan:Messaging:Password");
+                ConfigurationConstants.Keys.Password,
+                ConfigurationConstants.Fallbacks.Password);
 
             // Build connection string for validation
             var connectionString = BuildRabbitMqConnectionString(hostResult.HostEndpoint!, username, password);
 
             // Try to connect with the configured credentials
-            var isValid = await TryRabbitMqConnectionAsync(connectionString);
+            var isValid = await TryRabbitMqConnection(connectionString);
 
             Logger?.LogDebug("[RabbitMQ] Credential validation result: {IsValid}", isValid);
             return isValid;
@@ -107,16 +108,16 @@ public class RabbitMqOrchestrationEvaluator : BaseOrchestrationEvaluator
         }
     }
 
-    protected override async Task<DependencyDescriptor> CreateDependencyDescriptorAsync(IConfiguration configuration, OrchestrationContext context)
+    protected override async Task<DependencyDescriptor> CreateDependencyDescriptor(IConfiguration configuration, OrchestrationContext context)
     {
         // Get configuration values
         var username = Configuration.ReadFirst(configuration, "guest",
-            "Koan:Messaging:RabbitMQ:Username",
-            "Koan:Messaging:Username");
+            ConfigurationConstants.Keys.Username,
+            ConfigurationConstants.Fallbacks.Username);
 
         var password = Configuration.ReadFirst(configuration, "guest",
-            "Koan:Messaging:RabbitMQ:Password",
-            "Koan:Messaging:Password");
+            ConfigurationConstants.Keys.Password,
+            ConfigurationConstants.Fallbacks.Password);
 
         // Create environment variables for the container
         var environment = new Dictionary<string, string>(context.EnvironmentVariables)
@@ -174,7 +175,7 @@ public class RabbitMqOrchestrationEvaluator : BaseOrchestrationEvaluator
         }
     }
 
-    private static async Task<bool> TryRabbitMqConnectionAsync(string connectionString)
+    private static async Task<bool> TryRabbitMqConnection(string connectionString)
     {
         try
         {

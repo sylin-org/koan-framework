@@ -35,7 +35,7 @@ internal sealed class CqrsRouting : ICqrsRouting
 
     private object ResolveRepository(Type entityType, Type keyType, string role)
     {
-        var profileName = GetProfileNameFor(entityType) ?? string.Empty;
+        var profileName = GetProfileNameFor(entityType) ?? "";
         var cacheKey = (entityType, keyType, profileName, role);
         if (_cache.TryGetValue(cacheKey, out var cached)) return cached;
 

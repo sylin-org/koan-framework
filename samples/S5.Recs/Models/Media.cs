@@ -17,7 +17,10 @@ namespace S5.Recs.Models;
         nameof(Synonyms), nameof(Synopsis), nameof(Genres), nameof(Tags)
     },
     Async = true,
-    RateLimitPerMinute = 60
+    RateLimitPerMinute = 60,
+    MaxTokens = 8191,  // text-embedding-3-large limit
+    Version = 1,
+    WarnOnTruncation = true  // Warn in dev if synopsis + tags exceed limit
 )]
 public sealed class Media : Entity<Media>
 {
@@ -35,10 +38,10 @@ public sealed class Media : Entity<Media>
     public string? TitleEnglish { get; set; }
     public string? TitleRomaji { get; set; }
     public string? TitleNative { get; set; }
-    public string[] Synonyms { get; set; } = Array.Empty<string>();
+    public string[] Synonyms { get; set; } = [];
 
-    public string[] Genres { get; set; } = Array.Empty<string>();
-    public string[] Tags { get; set; } = Array.Empty<string>();
+    public string[] Genres { get; set; } = [];
+    public string[] Tags { get; set; } = [];
 
     // Media-specific metrics (null for non-applicable types)
     public int? Episodes { get; set; }     // For series/episodic content

@@ -14,7 +14,7 @@ public sealed class ComposeExporter : IArtifactExporter
     public ExporterCapabilities Capabilities => new(false, true, false);
     public bool Supports(string format) => string.Equals(format, "compose", StringComparison.OrdinalIgnoreCase);
 
-    public async Task GenerateAsync(Plan plan, Profile profile, string outPath, CancellationToken ct = default)
+    public async Task Generate(Plan plan, Profile profile, string outPath, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(plan);
         if (string.IsNullOrWhiteSpace(outPath)) throw new ArgumentException("Output path required", nameof(outPath));
@@ -199,7 +199,7 @@ public sealed class ComposeExporter : IArtifactExporter
         // Fallback heuristics when no attribute-driven mapping matched
         if (!added)
         {
-            var img = (svc.Image ?? string.Empty).ToLowerInvariant();
+            var img = (svc.Image ?? "").ToLowerInvariant();
             if ((img.Contains("postgres") || img.Contains("postgresql")) && !HasTarget("/var/lib/postgresql/data"))
                 AddForTarget("/var/lib/postgresql/data");
             else if (img.Contains("mongo") && !HasTarget("/data/db"))
@@ -295,7 +295,7 @@ public sealed class ComposeExporter : IArtifactExporter
             yaml.Append(pad).AppendLine("  healthcheck:");
             // Try curl first; if not installed, fall back to wget; finally try bash /dev/tcp to probe the port
             var hp = ParseHostPortFromUrl(svc.Health.HttpEndpoint);
-            var tcpProbe = hp is null ? string.Empty : $" || bash -lc 'exec 3<>/dev/tcp/{hp.Value.host}/{hp.Value.port}'";
+            var tcpProbe = hp is null ? "" : $" || bash -lc 'exec 3<>/dev/tcp/{hp.Value.host}/{hp.Value.port}'";
             var test = $"(curl -fsS {svc.Health.HttpEndpoint} || wget -q -O- {svc.Health.HttpEndpoint}{tcpProbe}) >/dev/null 2>&1 || exit 1";
             yaml.Append(pad).Append("    test: [\"CMD-SHELL\", \"").Append(EscapeJson(test)).AppendLine("\"]");
             if (svc.Health.Interval is not null)

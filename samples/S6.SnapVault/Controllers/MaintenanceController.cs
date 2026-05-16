@@ -414,7 +414,7 @@ public class MaintenanceController : ControllerBase
         var progress = new { percentage, message };
         var json = JsonSerializer.Serialize(progress);
         await Response.WriteAsync(json + "\n");
-        await Response.Body.FlushAsync();
+        await Response.Body.Flush();
     }
 
     private long GetDirectorySize(string path)

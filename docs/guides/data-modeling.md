@@ -4,12 +4,17 @@ domain: data
 title: "Data Modeling Playbook"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2025-09-28
-framework_version: v0.6.2
+last_updated: 2025-11-09
+framework_version: v0.6.3
 validation:
-  date_last_tested: 2025-09-28
+  date_last_tested: 2025-11-09
   status: verified
-  scope: docs/guides/data-modeling.md
+  scope: all-examples-tested
+related_guides:
+  - entity-capabilities-howto.md
+  - canon-capabilities-howto.md
+  - ai-vector-howto.md
+  - performance.md
 ---
 
 # Data Modeling Playbook

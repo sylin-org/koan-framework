@@ -21,7 +21,7 @@ public sealed class VisitPlanningService : IVisitPlanningService
         _logger = logger;
     }
 
-    public async Task<VisitPlanningResult> PlanAsync(VisitPlanningRequest request, CancellationToken ct)
+    public async Task<VisitPlanningResult> Plan(VisitPlanningRequest request, CancellationToken ct)
     {
         if (request is null) throw new ArgumentNullException(nameof(request));
         if (string.IsNullOrWhiteSpace(request.TrialSiteId))
@@ -57,7 +57,7 @@ public sealed class VisitPlanningService : IVisitPlanningService
         var visitList = query.ToList();
         if (visitList.Count == 0)
         {
-            return new VisitPlanningResult(Array.Empty<VisitAdjustment>(), true, "No visits found for the supplied criteria.", null, Array.Empty<VisitDiagnostic>());
+            return new VisitPlanningResult([], true, "No visits found for the supplied criteria.", null, []);
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -138,8 +138,8 @@ public sealed class VisitPlanningService : IVisitPlanningService
         }
 
         var ai = Ai.TryResolve();
-        var narrative = string.Empty;
-        var model = string.Empty;
+        var narrative = "";
+        var model = "";
         var degraded = false;
 
         if (ai is not null)
@@ -147,7 +147,7 @@ public sealed class VisitPlanningService : IVisitPlanningService
             try
             {
                 var prompt = BuildPlannerPrompt(visitList, adjustments, request, maxPerDay);
-                var response = await ai.PromptAsync(new AiChatRequest
+                var response = await ai.Prompt(new AiChatRequest
                 {
                     Model = string.IsNullOrWhiteSpace(request.Model) ? null : request.Model,
                     Messages =
@@ -161,7 +161,7 @@ public sealed class VisitPlanningService : IVisitPlanningService
                 if (!string.IsNullOrWhiteSpace(response.Text))
                 {
                     narrative = response.Text.Trim();
-                    model = response.Model ?? request.Model ?? string.Empty;
+                    model = response.Model ?? request.Model ?? "";
                 }
                 else
                 {

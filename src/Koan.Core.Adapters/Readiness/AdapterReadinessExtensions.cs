@@ -34,7 +34,7 @@ public static class AdapterReadinessExtensions
                 break;
             case ReadinessPolicy.Hold:
                 var timeout = (adapter as IAdapterReadinessConfiguration)?.Timeout;
-                await readiness.WaitForReadinessAsync(timeout, ct);
+                await readiness.WaitForReadiness(timeout, ct);
                 break;
             case ReadinessPolicy.Degrade:
                 break;
@@ -84,7 +84,7 @@ public static class AdapterReadinessExtensions
                 break;
             case ReadinessPolicy.Hold:
                 var timeout = (adapter as IAdapterReadinessConfiguration)?.Timeout;
-                await readiness.WaitForReadinessAsync(timeout, ct);
+                await readiness.WaitForReadiness(timeout, ct);
                 break;
             case ReadinessPolicy.Degrade:
                 break;
@@ -116,7 +116,7 @@ public static class AdapterReadinessExtensions
                 try
                 {
                     // Execute EnsureCreated instruction using reflection
-                    var executeMethod = executorType.GetMethod("ExecuteAsync")?.MakeGenericMethod(typeof(bool));
+                    var executeMethod = executorType.GetMethod("Execute")?.MakeGenericMethod(typeof(bool));
                     if (executeMethod != null)
                     {
                         var instruction = new Instruction(DataInstructions.EnsureCreated);
@@ -149,7 +149,7 @@ public static class AdapterReadinessExtensions
     /// </summary>
     private static bool IsSchemaRelatedFailure(Exception ex)
     {
-        var message = ex.Message?.ToLowerInvariant() ?? string.Empty;
+        var message = ex.Message?.ToLowerInvariant() ?? "";
 
         // Common schema-related failure patterns across providers
         return message.Contains("keyspace not found") ||           // Couchbase
@@ -163,7 +163,7 @@ public static class AdapterReadinessExtensions
                (ex.GetType().Name.Contains("Schema") && message.Contains("not found"));
     }
 
-    public static async Task WithReadinessAsync(this object adapter, Func<Task> operation, CancellationToken ct = default)
+    public static async Task WithReadiness(this object adapter, Func<Task> operation, CancellationToken ct = default)
     {
         await adapter.WithReadinessAsync(async () =>
         {

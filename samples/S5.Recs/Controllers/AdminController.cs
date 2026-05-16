@@ -25,7 +25,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
                 return BadRequest(new { error = "MediaType is required. Please specify a media type or 'all' to import all types." });
             }
 
-            var id = seeder.StartAsync(req.Source, req.MediaType, req.Limit, req.Overwrite, HttpContext.RequestAborted).GetAwaiter().GetResult();
+            var id = seeder.Start(req.Source, req.MediaType, req.Limit, req.Overwrite, HttpContext.RequestAborted).GetAwaiter().GetResult();
             return Ok(new { jobId = id });
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("import is already in progress"))
@@ -53,7 +53,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
     [HttpPost("tags/censor/add")]
     public async Task<IActionResult> AddCensorTags([FromBody] CensorTagsRequest req, CancellationToken ct)
     {
-        var src = req?.Text ?? string.Empty;
+        var src = req?.Text ?? "";
         var parts = src
             .Replace("\r", "\n")
             .Split(new[] { '\n', ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
@@ -74,11 +74,11 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
     public async Task<IActionResult> ClearCensorTags(CancellationToken ct)
     {
         var doc = await Models.CensorTagsDoc.Get("recs:censor-tags", ct);
-        if (doc is null) return Ok(new { count = 0, tags = Array.Empty<string>() });
+        if (doc is null) return Ok(new { count = 0, tags = Array.Empty<object>() });
         doc.Tags = new List<string>();
         doc.UpdatedAt = DateTimeOffset.UtcNow;
         await Models.CensorTagsDoc.UpsertMany(new[] { doc }, ct);
-        return Ok(new { count = 0, tags = Array.Empty<string>() });
+        return Ok(new { count = 0, tags = Array.Empty<object>() });
     }
 
     public record RemoveCensorTagRequest(string? Tag);
@@ -86,7 +86,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
     [HttpPost("tags/censor/remove")]
     public async Task<IActionResult> RemoveCensorTag([FromBody] RemoveCensorTagRequest req, CancellationToken ct)
     {
-        var tag = (req?.Tag ?? string.Empty).Trim();
+        var tag = (req?.Tag ?? "").Trim();
         if (string.IsNullOrWhiteSpace(tag)) return BadRequest(new { error = "tag is required" });
         var doc = await Models.CensorTagsDoc.Get("recs:censor-tags", ct) ?? new Models.CensorTagsDoc { Id = "recs:censor-tags", Tags = new List<string>() };
         if (doc.Tags is null) doc.Tags = new List<string>();
@@ -125,21 +125,21 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
             UpdatedAt = DateTimeOffset.UtcNow
         };
         Models.SettingsDoc.UpsertMany(new[] { doc }, HttpContext.RequestAborted).GetAwaiter().GetResult();
-        provider.InvalidateAsync(HttpContext.RequestAborted).GetAwaiter().GetResult();
+        provider.Invalidate(HttpContext.RequestAborted).GetAwaiter().GetResult();
         return Ok(new { preferTagsWeight = ptw, maxPreferredTags = mpt, diversityWeight = dw, censoredTagsPenaltyWeight = ctpw });
     }
 
     [HttpGet("seed/status/{jobId}")]
     public IActionResult GetStatus([FromRoute] string jobId)
     {
-        var status = seeder.GetStatusAsync(jobId, HttpContext.RequestAborted).GetAwaiter().GetResult();
+        var status = seeder.GetStatus(jobId, HttpContext.RequestAborted).GetAwaiter().GetResult();
         return Ok(status);
     }
 
     [HttpGet("stats")]
     public IActionResult GetStats()
     {
-        var (media, contentPieces, vectors) = seeder.GetStatsAsync(HttpContext.RequestAborted).GetAwaiter().GetResult();
+        var (media, contentPieces, vectors) = seeder.GetStats(HttpContext.RequestAborted).GetAwaiter().GetResult();
         return Ok(new { media, contentPieces, vectors });
     }
 
@@ -152,14 +152,14 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
     [HttpPost("tags/rebuild")] // on-demand tag import/catalog rebuild
     public async Task<IActionResult> RebuildTags([FromServices] S5.Recs.Services.ISeedService seeder, CancellationToken ct)
     {
-        var n = await seeder.RebuildTagCatalogAsync(ct);
+        var n = await seeder.RebuildTagCatalog(ct);
         return Ok(new { updated = n });
     }
 
     [HttpPost("genres/rebuild")] // on-demand genre catalog rebuild
     public async Task<IActionResult> RebuildGenres([FromServices] S5.Recs.Services.ISeedService seeder, CancellationToken ct)
     {
-        var n = await seeder.RebuildGenreCatalogAsync(ct);
+        var n = await seeder.RebuildGenreCatalog(ct);
         return Ok(new { updated = n });
     }
 
@@ -236,9 +236,9 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
         var totalTagStatDocs = allTagStats.Count();
 
         // Apply the same filtering logic as /api/tags
-        var opt = tagOptions?.Value?.CensorTags ?? Array.Empty<string>();
+        var opt = tagOptions?.Value?.CensorTags ?? [];
         var doc = await Models.CensorTagsDoc.Get("recs:censor-tags", ct);
-        var dyn = doc?.Tags?.ToArray() ?? Array.Empty<string>();
+        var dyn = doc?.Tags?.ToArray() ?? [];
         var censor = opt.Concat(dyn).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
 
         var filteredTags = allTagStats.Where(t => !IsCensoredTag(t.Tag, censor)).ToList();
@@ -333,7 +333,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
     [HttpPost("tags/preemptive-filter/test")] // Test if a specific tag would be preemptively filtered
     public IActionResult TestPreemptiveFilter([FromBody] TestPreemptiveFilterRequest req)
     {
-        var tag = req?.Tag?.Trim() ?? string.Empty;
+        var tag = req?.Tag?.Trim() ?? "";
         if (string.IsNullOrWhiteSpace(tag))
         {
             return BadRequest(new { error = "tag is required" });
@@ -368,7 +368,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
         _logger.LogInformation("------------- Starting vector-only upsert for {Count} items (limit {Limit})",
             items.Count, req.Limit?.ToString() ?? "none (all)");
 
-        var id = await seeder.StartVectorUpsertAsync(items, HttpContext.RequestAborted);
+        var id = await seeder.StartVectorUpsert(items, HttpContext.RequestAborted);
         return Ok(new { jobId = id, count = items.Count, limit = req.Limit });
     }
 
@@ -382,7 +382,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
         var ct = HttpContext.RequestAborted;
         while (!ct.IsCancellationRequested)
         {
-            var status = await seeder.GetStatusAsync(jobId, ct);
+            var status = await seeder.GetStatus(jobId, ct);
             await HttpContext.Response.WriteAsync($"data: {Newtonsoft.Json.JsonConvert.SerializeObject(status)}\n\n", ct);
             await HttpContext.Response.Body.FlushAsync(ct);
             await Task.Delay(1000, ct);
@@ -394,7 +394,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
     [HttpGet("cache/list")]
     public async Task<IActionResult> ListCaches([FromServices] Services.IRawCacheService cache, CancellationToken ct)
     {
-        var manifests = await cache.ListCachesAsync(ct);
+        var manifests = await cache.ListCaches(ct);
         return Ok(new { count = manifests.Count, caches = manifests });
     }
 
@@ -412,7 +412,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
         // If no source/mediaType specified, iterate through ALL unique combinations
         if (string.IsNullOrWhiteSpace(req.Source) || string.IsNullOrWhiteSpace(req.MediaType))
         {
-            var allManifests = await cache.ListCachesAsync(ct);
+            var allManifests = await cache.ListCaches(ct);
             var uniqueCombinations = allManifests
                 .Select(m => new { m.Source, m.MediaType })
                 .Distinct()
@@ -523,7 +523,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
         if (!string.IsNullOrWhiteSpace(specificJobId))
         {
             // Process single specific job
-            var manifest = await cache.GetManifestAsync(source, mediaType, specificJobId, ct);
+            var manifest = await cache.GetManifest(source, mediaType, specificJobId, ct);
             if (manifest == null)
             {
                 _logger.LogWarning("Cache not found: {Source}/{MediaType}/{JobId}", source, mediaType, specificJobId);
@@ -534,7 +534,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
         else
         {
             // Process ALL jobs for this source/mediaType in chronological order (oldest first)
-            var allManifests = await cache.ListCachesAsync(ct);
+            var allManifests = await cache.ListCaches(ct);
             jobsToProcess = allManifests
                 .Where(m => m.Source.Equals(source, StringComparison.OrdinalIgnoreCase) &&
                            m.MediaType.Equals(mediaType, StringComparison.OrdinalIgnoreCase))
@@ -561,9 +561,9 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
             _logger.LogInformation("Rebuild: processing job {JobId} (fetched {FetchedAt:u})",
                 job.JobId, job.FetchedAt);
 
-            await foreach (var (pageNum, rawJson) in cache.ReadPagesAsync(job.Source, job.MediaType, job.JobId, CancellationToken.None))
+            await foreach (var (pageNum, rawJson) in cache.ReadPages(job.Source, job.MediaType, job.JobId, CancellationToken.None))
             {
-                var parsedMedia = await parser.ParsePageAsync(rawJson, mediaTypeEntity, CancellationToken.None);
+                var parsedMedia = await parser.ParsePage(rawJson, mediaTypeEntity, CancellationToken.None);
 
                 if (parsedMedia.Count > 0)
                 {
@@ -592,7 +592,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
     [HttpPost("flush/cache")]
     public async Task<IActionResult> FlushCache([FromServices] Services.IRawCacheService cache, CancellationToken ct)
     {
-        var count = await cache.FlushAllAsync(ct);
+        var count = await cache.FlushAll(ct);
         return Ok(new { flushed = "cache", count });
     }
 
@@ -663,6 +663,275 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
     {
         var stats = await EmbedJobExtensions.GetStats<Models.Media>(ct);
         return Ok(stats);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Embedding Telemetry & Management Endpoints (ADR AI-0020 Phase 5)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Get real-time embedding performance metrics for the last 24 hours.
+    /// Shows latency, cost, token usage, and queue health.
+    /// </summary>
+    [HttpGet("embeddings/metrics")]
+    public IActionResult GetEmbeddingMetrics(
+        [FromQuery] string? period = "1h",
+        [FromServices] Koan.Data.AI.Telemetry.EmbeddingTelemetry? telemetry = null)
+    {
+        if (telemetry == null)
+        {
+            return Ok(new {
+                available = false,
+                message = "EmbeddingTelemetry not registered. Add services.AddSingleton<EmbeddingTelemetry>() to enable metrics."
+            });
+        }
+
+        // Parse period (1h, 6h, 24h)
+        var timeSpan = period?.ToLowerInvariant() switch
+        {
+            "1h" => TimeSpan.FromHours(1),
+            "6h" => TimeSpan.FromHours(6),
+            "24h" => TimeSpan.FromHours(24),
+            _ => TimeSpan.FromHours(1)
+        };
+
+        var stats = telemetry.CalculateStats(timeSpan);
+
+        // Get latest queue metrics
+        var queueMetrics = telemetry.GetQueueMetrics(DateTime.UtcNow.Subtract(timeSpan)).LastOrDefault();
+
+        return Ok(new
+        {
+            period = period,
+            totalEmbeddings = stats.TotalEmbeddings,
+            successRate = stats.TotalEmbeddings > 0
+                ? Math.Round(stats.SuccessfulEmbeddings / (double)stats.TotalEmbeddings * 100, 2)
+                : 0,
+            performance = new
+            {
+                avgLatencyMs = Math.Round(stats.AvgLatencyMs, 2),
+                p50LatencyMs = Math.Round(stats.P50LatencyMs, 2),
+                p95LatencyMs = Math.Round(stats.P95LatencyMs, 2),
+                p99LatencyMs = Math.Round(stats.P99LatencyMs, 2)
+            },
+            cost = new
+            {
+                totalCost = Math.Round(stats.TotalCost, 4),
+                totalTokens = stats.TotalTokens,
+                avgCostPerEmbedding = stats.TotalEmbeddings > 0
+                    ? Math.Round(stats.TotalCost / stats.TotalEmbeddings, 6)
+                    : 0
+            },
+            queue = queueMetrics != null ? new
+            {
+                pending = queueMetrics.PendingCount,
+                failed = queueMetrics.FailedCount,
+                oldestAgeMinutes = Math.Round(queueMetrics.OldestAgeSeconds / 60.0, 2)
+            } : null
+        });
+    }
+
+    /// <summary>
+    /// Get detailed embedding metrics time-series data for charting/analysis.
+    /// </summary>
+    [HttpGet("embeddings/metrics/detailed")]
+    public IActionResult GetDetailedEmbeddingMetrics(
+        [FromQuery] string? since = null,
+        [FromServices] Koan.Data.AI.Telemetry.EmbeddingTelemetry? telemetry = null)
+    {
+        if (telemetry == null)
+        {
+            return Ok(new { available = false });
+        }
+
+        DateTime? sinceDt = null;
+        if (!string.IsNullOrEmpty(since) && DateTime.TryParse(since, out var parsed))
+        {
+            sinceDt = parsed;
+        }
+
+        var embeddingMetrics = telemetry.GetEmbeddingMetrics(sinceDt).ToList();
+        var queueMetrics = telemetry.GetQueueMetrics(sinceDt).ToList();
+
+        return Ok(new
+        {
+            embeddings = embeddingMetrics.Select(m => new
+            {
+                timestamp = m.Timestamp,
+                entityType = m.EntityType,
+                model = m.Model,
+                provider = m.Provider,
+                source = m.Source,
+                latencyMs = Math.Round(m.LatencyMs, 2),
+                tokens = m.Tokens,
+                cost = Math.Round(m.EstimatedCost, 6),
+                success = m.Success,
+                error = m.ErrorMessage
+            }),
+            queue = queueMetrics.Select(q => new
+            {
+                timestamp = q.Timestamp,
+                pending = q.PendingCount,
+                failed = q.FailedCount,
+                oldestAgeSeconds = Math.Round(q.OldestAgeSeconds, 2)
+            })
+        });
+    }
+
+    public record MigrateEmbeddingsRequest(
+        string TargetModel,
+        string? TargetSource = null,
+        string? TargetProvider = null,
+        int BatchSize = 50,
+        bool Parallel = false);
+
+    /// <summary>
+    /// Migrate all Media embeddings to a new model/provider.
+    /// Example: Migrate from Ollama to OpenAI, or upgrade from ada-002 to text-embedding-3-large.
+    /// This is a long-running operation - use GET /admin/embeddings/metrics to monitor progress.
+    /// </summary>
+    [HttpPost("embeddings/migrate")]
+    public async Task<IActionResult> MigrateEmbeddings(
+        [FromBody] MigrateEmbeddingsRequest request,
+        CancellationToken ct)
+    {
+        try
+        {
+            _logger.LogInformation(
+                "Starting embedding migration: model={Model}, source={Source}, provider={Provider}",
+                request.TargetModel, request.TargetSource, request.TargetProvider);
+
+            var result = await Koan.Data.AI.Migration.EmbeddingMigrator.ReEmbedAll<Models.Media>(
+                targetModel: request.TargetModel,
+                targetSource: request.TargetSource,
+                targetProvider: request.TargetProvider,
+                batchSize: request.BatchSize,
+                parallel: request.Parallel,
+                logger: _logger,
+                ct: ct);
+
+            return Ok(new
+            {
+                success = result.Success,
+                totalEntities = result.TotalEntities,
+                successful = result.SuccessfulEntities,
+                failed = result.FailedEntities,
+                duration = result.Duration,
+                successRate = Math.Round(result.SuccessRate, 2),
+                errorMessage = result.ErrorMessage
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Embedding migration failed");
+            return StatusCode(500, new { error = "Migration failed", details = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Export all Media embeddings to a JSON file for backup or analysis.
+    /// File will be saved to the configured output path.
+    /// </summary>
+    [HttpPost("embeddings/export-backup")]
+    public async Task<IActionResult> ExportEmbeddingsBackup(
+        [FromQuery] string? outputPath = null,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            outputPath ??= Path.Combine(
+                Directory.GetCurrentDirectory(),
+                $"embeddings-backup-{DateTime.UtcNow:yyyy-MM-dd-HHmmss}.json");
+
+            _logger.LogInformation("Exporting embeddings to {Path}", outputPath);
+
+            await Koan.Data.AI.Migration.EmbeddingMigrator.ExportEmbeddings<Models.Media>(
+                outputPath: outputPath,
+                logger: _logger);
+
+            return Ok(new
+            {
+                success = true,
+                outputPath = outputPath,
+                message = "Embeddings exported successfully"
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Embedding export failed");
+            return StatusCode(500, new { error = "Export failed", details = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Clean up orphaned embedding states (states for entities that no longer exist).
+    /// Run this periodically to maintain database hygiene.
+    /// </summary>
+    [HttpPost("embeddings/cleanup-orphaned")]
+    public async Task<IActionResult> CleanupOrphanedEmbeddings(CancellationToken ct)
+    {
+        try
+        {
+            _logger.LogInformation("Cleaning up orphaned embedding states");
+
+            var removed = await Koan.Data.AI.Migration.EmbeddingMigrator.CleanupOrphanedStates<Models.Media>(
+                logger: _logger);
+
+            return Ok(new
+            {
+                success = true,
+                removed = removed,
+                message = $"Cleaned up {removed} orphaned embedding state(s)"
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Cleanup failed");
+            return StatusCode(500, new { error = "Cleanup failed", details = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Compare embedding model costs to help with migration decisions.
+    /// </summary>
+    [HttpGet("embeddings/model-costs")]
+    public IActionResult GetModelCosts()
+    {
+        var models = new[]
+        {
+            "text-embedding-3-small",
+            "text-embedding-3-large",
+            "text-embedding-ada-002"
+        };
+
+        var costs = models
+            .Select(model => new
+            {
+                model = model,
+                costPerMillion = Koan.Data.AI.Telemetry.EmbeddingCostEstimator.GetModelCostPerMillion(model),
+                provider = "openai"
+            })
+            .Where(m => m.costPerMillion.HasValue)
+            .Select(m => new
+            {
+                m.model,
+                m.provider,
+                costPerMillion = m.costPerMillion!.Value,
+                // Example cost for 100K entities with 2000 tokens each (200M tokens)
+                exampleCost100k = Math.Round((200_000_000 / 1_000_000.0) * (double)m.costPerMillion.Value, 2)
+            })
+            .ToList();
+
+        return Ok(new
+        {
+            models = costs,
+            note = "Example costs are for 100K entities with ~2000 tokens each (200M tokens total)",
+            localModels = new
+            {
+                ollama = "Free (local inference)",
+                lmStudio = "Free (local inference)"
+            }
+        });
     }
 
     [HttpPost("cache/embeddings/export")]
@@ -778,7 +1047,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
                 Overwrite: request.Overwrite
             );
 
-            var jobIds = await orchestrator.QueueImportAsync(
+            var jobIds = await orchestrator.QueueImport(
                 request.Source,
                 mediaTypeIds,
                 options,
@@ -844,7 +1113,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
                 }
             }
 
-            var progress = await orchestrator.GetProgressAsync(jobIds, ct);
+            var progress = await orchestrator.GetProgress(jobIds, ct);
 
             return Ok(progress);
         }

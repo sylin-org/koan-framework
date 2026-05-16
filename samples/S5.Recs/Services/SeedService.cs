@@ -42,11 +42,11 @@ internal sealed class SeedService : ISeedService
         _sp = sp;
         _logger = logger;
         // Discover providers via DI
-        var provs = (IEnumerable<IMediaProvider>?)_sp.GetService(typeof(IEnumerable<IMediaProvider>)) ?? Array.Empty<IMediaProvider>();
+        var provs = (IEnumerable<IMediaProvider>?)_sp.GetService(typeof(IEnumerable<IMediaProvider>)) ?? [];
         _providers = provs.ToDictionary(p => p.Code, StringComparer.OrdinalIgnoreCase);
     }
 
-    public async Task<string> StartAsync(string source, int? limit, bool overwrite, CancellationToken ct)
+    public async Task<string> Start(string source, int? limit, bool overwrite, CancellationToken ct)
     {
         // Import all supported media types for comprehensive coverage
         var mediaTypes = await MediaType.All(ct);
@@ -64,7 +64,7 @@ internal sealed class SeedService : ISeedService
         {
             try
             {
-                var typeJobId = await StartAsync(source, mediaType.Name, limit, overwrite, null, ct);
+                var typeJobId = await Start(source, mediaType.Name, limit, overwrite, null, ct);
                 _logger?.LogInformation("Completed import for MediaType '{MediaType}' as part of job {JobId}",
                     mediaType.Name, jobId);
             }
@@ -78,7 +78,7 @@ internal sealed class SeedService : ISeedService
         return jobId;
     }
 
-    public async Task<string> StartAsync(string source, int? limit, bool overwrite, string? embeddingModel, CancellationToken ct)
+    public async Task<string> Start(string source, int? limit, bool overwrite, string? embeddingModel, CancellationToken ct)
     {
         // Import all supported media types for comprehensive coverage
         var mediaTypes = await MediaType.All(ct);
@@ -96,7 +96,7 @@ internal sealed class SeedService : ISeedService
         {
             try
             {
-                var typeJobId = await StartAsync(source, mediaType.Name, limit, overwrite, embeddingModel, ct);
+                var typeJobId = await Start(source, mediaType.Name, limit, overwrite, embeddingModel, ct);
                 _logger?.LogInformation("Completed import for MediaType '{MediaType}' as part of job {JobId}",
                     mediaType.Name, jobId);
             }
@@ -110,10 +110,10 @@ internal sealed class SeedService : ISeedService
         return jobId;
     }
 
-    public Task<string> StartAsync(string source, string mediaTypeName, int? limit, bool overwrite, CancellationToken ct)
-        => StartAsync(source, mediaTypeName, limit, overwrite, null, ct);
+    public Task<string> Start(string source, string mediaTypeName, int? limit, bool overwrite, CancellationToken ct)
+        => Start(source, mediaTypeName, limit, overwrite, null, ct);
 
-    public Task<string> StartAsync(string source, string mediaTypeName, int? limit, bool overwrite, string? embeddingModel, CancellationToken ct)
+    public Task<string> Start(string source, string mediaTypeName, int? limit, bool overwrite, string? embeddingModel, CancellationToken ct)
     {
         // Prevent concurrent imports to avoid service saturation
         lock (_importLock)
@@ -183,16 +183,16 @@ internal sealed class SeedService : ISeedService
                     _logger?.LogInformation("Seeding job {JobId}: Starting import for media type '{MediaType}' with limit {Limit}",
                         jobId, mediaType.Name, limitPerType);
 
-                    await foreach (var batch in FetchStreamFromProviderAsync(source, mediaType, limitPerType, internalToken))
+                    await foreach (var batch in FetchStreamFromProvider(source, mediaType, limitPerType, internalToken))
                     {
                         totalFetched += batch.Count;
                         _progress[jobId] = (totalFetched, totalFetched, totalEmbedded, totalImported, false, null);
 
                         // Process this batch immediately
-                        var batchImported = await ImportDataAsync(batch, internalToken);
+                        var batchImported = await ImportData(batch, internalToken);
                         totalImported += batchImported;
 
-                        var batchEmbedded = await EmbedAndIndexAsync(batch, embeddingModel, internalToken);
+                        var batchEmbedded = await EmbedAndIndex(batch, embeddingModel, internalToken);
                         totalEmbedded += batchEmbedded;
 
                         // Keep data for catalog building
@@ -212,8 +212,8 @@ internal sealed class SeedService : ISeedService
                     jobId, totalFetched, totalImported, totalEmbedded);
 
                 // Build catalogs once docs are imported
-                try { await CatalogTagsAsync(allData, internalToken); } catch (Exception ex) { _logger?.LogWarning(ex, "Tag cataloging failed: {Message}", ex.Message); }
-                try { await CatalogGenresAsync(allData, internalToken); } catch (Exception ex) { _logger?.LogWarning(ex, "Genre cataloging failed: {Message}", ex.Message); }
+                try { await CatalogTags(allData, internalToken); } catch (Exception ex) { _logger?.LogWarning(ex, "Tag cataloging failed: {Message}", ex.Message); }
+                try { await CatalogGenres(allData, internalToken); } catch (Exception ex) { _logger?.LogWarning(ex, "Genre cataloging failed: {Message}", ex.Message); }
 
                 // Auto-rebuild full tag catalog after large imports to ensure accurate counts across ALL media
                 if (totalImported >= 100) // Rebuild if significant number of items imported
@@ -221,7 +221,7 @@ internal sealed class SeedService : ISeedService
                     _logger?.LogInformation("Auto-rebuilding full tag catalog after importing {Count} items", totalImported);
                     try
                     {
-                        var catalogRebuildCount = await RebuildTagCatalogAsync(internalToken);
+                        var catalogRebuildCount = await RebuildTagCatalog(internalToken);
                         _logger?.LogInformation("Full tag catalog rebuilt with {TagCount} tags", catalogRebuildCount);
                     }
                     catch (Exception ex)
@@ -263,10 +263,10 @@ internal sealed class SeedService : ISeedService
         return Task.FromResult(jobId);
     }
 
-    public Task<string> StartVectorUpsertAsync(IEnumerable<Media> items, CancellationToken ct)
-        => StartVectorUpsertAsync(items, null, ct);
+    public Task<string> StartVectorUpsert(IEnumerable<Media> items, CancellationToken ct)
+        => StartVectorUpsert(items, null, ct);
 
-    public Task<string> StartVectorUpsertAsync(IEnumerable<Media> items, string? embeddingModel, CancellationToken ct)
+    public Task<string> StartVectorUpsert(IEnumerable<Media> items, string? embeddingModel, CancellationToken ct)
     {
         var mediaItems = items.ToList();
 
@@ -281,7 +281,7 @@ internal sealed class SeedService : ISeedService
             try
             {
                 // Use CancellationToken.None for long-running background job (don't cancel when HTTP request completes)
-                var embedded = await UpsertVectorsAsync(mediaItems, embeddingModel, CancellationToken.None);
+                var embedded = await UpsertVectors(mediaItems, embeddingModel, CancellationToken.None);
                 _progress[jobId] = (count, count, embedded, 0, true, null);
                 _logger?.LogInformation("Vector-only job {JobId}: embedded and indexed {Embedded} vectors", jobId, embedded);
                 await File.WriteAllTextAsync(Path.Combine(_cacheDir, "manifest-vectors.json"),
@@ -297,14 +297,14 @@ internal sealed class SeedService : ISeedService
         return Task.FromResult(jobId);
     }
 
-    public Task<object> GetStatusAsync(string jobId, CancellationToken ct)
+    public Task<object> GetStatus(string jobId, CancellationToken ct)
     {
         var p = _progress.TryGetValue(jobId, out var prog) ? prog : (Fetched: 0, Normalized: 0, Embedded: 0, Imported: 0, Completed: false, Error: null);
         var state = p.Completed ? (p.Error is null ? "completed" : "failed") : "running";
         return Task.FromResult<object>(new { jobId, state, error = p.Error, progress = new { fetched = p.Fetched, normalized = p.Normalized, embedded = p.Embedded, imported = p.Imported } });
     }
 
-    public async Task<(int media, int contentPieces, int vectors)> GetStatsAsync(CancellationToken ct)
+    public async Task<(int media, int contentPieces, int vectors)> GetStats(CancellationToken ct)
     {
         var dataSvc = (IDataService?)_sp.GetService(typeof(IDataService));
         if (dataSvc is null) { _logger?.LogWarning("Stats: IDataService unavailable"); return (0, 0, 0); }
@@ -317,7 +317,7 @@ internal sealed class SeedService : ISeedService
             using (EntityContext.Partition(null!))
             {
                 var repo = dataSvc.GetRepository<Media, string>();
-                var result = await repo.CountAsync(new CountRequest<Media>(), ct);
+                var result = await repo.Count(new CountRequest<Media>(), ct);
                 mediaCount = (int)result.Value;
             }
         }
@@ -344,7 +344,7 @@ internal sealed class SeedService : ISeedService
         return (mediaCount, mediaCount, vectorCount);
     }
 
-    public async Task<int> RebuildTagCatalogAsync(CancellationToken ct)
+    public async Task<int> RebuildTagCatalog(CancellationToken ct)
     {
         try
         {
@@ -391,7 +391,7 @@ internal sealed class SeedService : ISeedService
             // Auto-add flagged tags to censor list
             if (flaggedTags.Count > 0)
             {
-                await AutoCensorTagsAsync(flaggedTags.Distinct().ToList(), ct);
+                await AutoCensorTags(flaggedTags.Distinct().ToList(), ct);
                 _logger?.LogInformation("Preemptive filter auto-censored {Count} unique tags during catalog rebuild", flaggedTags.Distinct().Count());
             }
 
@@ -408,7 +408,7 @@ internal sealed class SeedService : ISeedService
         }
     }
 
-    public async Task<int> RebuildGenreCatalogAsync(CancellationToken ct)
+    public async Task<int> RebuildGenreCatalog(CancellationToken ct)
     {
         try
         {
@@ -442,28 +442,28 @@ internal sealed class SeedService : ISeedService
         return mediaTypes.ToList();
     }
 
-    private async Task<List<Media>> FetchFromProviderAsync(string source, MediaType mediaType, int limit, CancellationToken ct)
+    private async Task<List<Media>> FetchFromProvider(string source, MediaType mediaType, int limit, CancellationToken ct)
     {
         if (_providers.TryGetValue(source, out var provider))
         {
             _logger?.LogInformation("Using provider {Code} ({Name}) to fetch {MediaType} items.", provider.Code, provider.Name, mediaType.Name);
-            return await provider.FetchAsync(mediaType, limit, ct);
+            return await provider.Fetch(mediaType, limit, ct);
         }
 
         _logger?.LogWarning("Unknown provider '{Source}'. Falling back to 'local' if available.", source);
         if (_providers.TryGetValue("local", out var local))
         {
-            return await local.FetchAsync(mediaType, limit, ct);
+            return await local.Fetch(mediaType, limit, ct);
         }
         return new List<Media>();
     }
 
-    private async IAsyncEnumerable<List<Media>> FetchStreamFromProviderAsync(string source, MediaType mediaType, int limit, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    private async IAsyncEnumerable<List<Media>> FetchStreamFromProvider(string source, MediaType mediaType, int limit, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
         if (_providers.TryGetValue(source, out var provider))
         {
             _logger?.LogInformation("Using provider {Code} ({Name}) to stream {MediaType} items.", provider.Code, provider.Name, mediaType.Name);
-            await foreach (var batch in provider.FetchStreamAsync(mediaType, limit, ct))
+            await foreach (var batch in provider.FetchStream(mediaType, limit, ct))
             {
                 yield return batch;
             }
@@ -473,14 +473,14 @@ internal sealed class SeedService : ISeedService
         _logger?.LogWarning("Unknown provider '{Source}'. Falling back to 'local' if available.", source);
         if (_providers.TryGetValue("local", out var local))
         {
-            await foreach (var batch in local.FetchStreamAsync(mediaType, limit, ct))
+            await foreach (var batch in local.FetchStream(mediaType, limit, ct))
             {
                 yield return batch;
             }
         }
     }
 
-    private async Task<int> ImportDataAsync(List<Media> items, CancellationToken ct)
+    private async Task<int> ImportData(List<Media> items, CancellationToken ct)
     {
         try
         {
@@ -567,7 +567,7 @@ internal sealed class SeedService : ISeedService
         }
     }
 
-    private async Task CatalogTagsAsync(List<Media> items, CancellationToken ct)
+    private async Task CatalogTags(List<Media> items, CancellationToken ct)
     {
         var extractedTags = ExtractTags(items);
 
@@ -589,7 +589,7 @@ internal sealed class SeedService : ISeedService
 
         if (flaggedTags.Count > 0)
         {
-            await AutoCensorTagsAsync(flaggedTags, ct);
+            await AutoCensorTags(flaggedTags, ct);
             _logger?.LogInformation("Preemptive filter auto-censored {Count} tags during import", flaggedTags.Count);
         }
 
@@ -602,7 +602,7 @@ internal sealed class SeedService : ISeedService
         _logger?.LogInformation("Tag catalog updated with {Count} tags ({Censored} preemptively filtered)", counts.Count, flaggedTags.Count);
     }
 
-    private async Task AutoCensorTagsAsync(List<string> tags, CancellationToken ct)
+    private async Task AutoCensorTags(List<string> tags, CancellationToken ct)
     {
         try
         {
@@ -632,7 +632,7 @@ internal sealed class SeedService : ISeedService
         }
     }
 
-    private async Task CatalogGenresAsync(List<Media> items, CancellationToken ct)
+    private async Task CatalogGenres(List<Media> items, CancellationToken ct)
     {
         var counts = CountGenres(ExtractGenres(items));
         var docs = BuildGenreDocs(counts).ToList();
@@ -643,11 +643,11 @@ internal sealed class SeedService : ISeedService
         _logger?.LogInformation("Genre catalog updated with {Count} genres", counts.Count);
     }
 
-    private async Task<int> EmbedAndIndexAsync(List<Media> items, string? embeddingModel, CancellationToken ct)
+    private async Task<int> EmbedAndIndex(List<Media> items, string? embeddingModel, CancellationToken ct)
     {
         try
         {
-            var ai = Ai.TryResolve();
+            var ai = Client.TryResolve();
             var dataSvc = (IDataService?)_sp.GetService(typeof(IDataService));
             if (ai is null || dataSvc is null) { _logger?.LogWarning("Embedding and vector index skipped: AI or data service unavailable"); return 0; }
             if (!Vector<Media>.IsAvailable)
@@ -656,7 +656,7 @@ internal sealed class SeedService : ISeedService
                 return 0;
             }
 
-            var total = await RunVectorPipelineAsync(items, embeddingModel, ct);
+            var total = await RunVectorPipeline(items, embeddingModel, ct);
             //_logger?.LogInformation("Vector pipeline stored {Stored} embeddings for recommendation content", total);
             return total;
         }
@@ -666,11 +666,11 @@ internal sealed class SeedService : ISeedService
         }
     }
 
-    private async Task<int> UpsertVectorsAsync(List<Media> docs, string? embeddingModel, CancellationToken ct)
+    private async Task<int> UpsertVectors(List<Media> docs, string? embeddingModel, CancellationToken ct)
     {
         try
         {
-            var ai = Ai.TryResolve();
+            var ai = Client.TryResolve();
             var dataSvc = (IDataService?)_sp.GetService(typeof(IDataService));
             if (ai is null || dataSvc is null) { _logger?.LogWarning("Embedding and vector index skipped: AI or data service unavailable"); return 0; }
             if (!Vector<Media>.IsAvailable)
@@ -679,7 +679,7 @@ internal sealed class SeedService : ISeedService
                 return 0;
             }
 
-            var total = await RunVectorPipelineAsync(docs, embeddingModel, ct);
+            var total = await RunVectorPipeline(docs, embeddingModel, ct);
             //_logger?.LogInformation("Vector pipeline stored {Stored} embeddings for admin rebuild", total);
             return total;
         }
@@ -689,7 +689,7 @@ internal sealed class SeedService : ISeedService
         }
     }
 
-    private async Task<int> RunVectorPipelineAsync(IEnumerable<Media> items, string? model, CancellationToken ct)
+    private async Task<int> RunVectorPipeline(IEnumerable<Media> items, string? model, CancellationToken ct)
     {
         var stored = 0;
         var failures = 0;
@@ -699,7 +699,7 @@ internal sealed class SeedService : ISeedService
         _logger?.LogDebug("Vector pipeline starting: {Count} items, model={Model}", itemsList.Count, modelId);
 
         // Build lookup: contentHash -> Media
-        var metadata = EmbeddingMetadata.Get<Media>();
+        var metadata = EmbeddingMetadata.Resolve<Media>();
         var mediaByHash = new Dictionary<string, Media>();
         foreach (var media in itemsList)
         {
@@ -767,7 +767,7 @@ internal sealed class SeedService : ISeedService
                         .Tap(env => _logger?.LogWarning("Vector pipeline: tokenization failed for media {Id}: {Error}", env.Entity.Id, env.Error?.Message ?? "unknown"))
                         .Tap(_ => Interlocked.Increment(ref failures))
                         .Trace(env => $"Vector pipeline failed for media {env.Entity.Id}: {env.Error?.Message ?? "unknown"}")))
-                .ExecuteAsync(ct);
+                .Execute(ct);
         }
 
         if (failures > 0)

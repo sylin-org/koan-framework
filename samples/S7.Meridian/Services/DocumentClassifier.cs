@@ -17,7 +17,7 @@ namespace Koan.Samples.Meridian.Services;
 
 public interface IDocumentClassifier
 {
-    Task<ClassificationResult> ClassifyAsync(SourceDocument document, CancellationToken ct);
+    Task<ClassificationResult> Classify(SourceDocument document, CancellationToken ct);
 }
 
 public readonly record struct ClassificationResult(string TypeId, double Confidence, ClassificationMethod Method, int Version, string Reason);
@@ -45,7 +45,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
         _logger = logger;
     }
 
-    public async Task<ClassificationResult> ClassifyAsync(SourceDocument document, CancellationToken ct)
+    public async Task<ClassificationResult> Classify(SourceDocument document, CancellationToken ct)
     {
         if (document is null)
         {
@@ -73,7 +73,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
             return new ClassificationResult(manualTypeId, confidence, ClassificationMethod.Manual, version, reason);
         }
 
-        var text = document.ExtractedText ?? string.Empty;
+        var text = document.ExtractedText ?? "";
 
         // Stage 1: Heuristic
         var heuristic = EvaluateHeuristics(document, text, types);
@@ -85,7 +85,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
         }
 
         // Stage 2: Vector similarity
-        var vector = await EvaluateVectorSimilarityAsync(document, text, types, ct);
+        var vector = await EvaluateVectorSimilarity(document, text, types, ct);
         if (vector.HasValue && vector.Value.Confidence >= _options.Classification.VectorConfidenceThreshold)
         {
             _logger.LogDebug("Document {DocumentId} classified via vector similarity as {TypeId} ({Confidence:P0}). Reason: {Reason}",
@@ -94,7 +94,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
         }
 
         // Stage 3: LLM fallback
-        var llm = await EvaluateLlmAsync(document, text, types, ct);
+        var llm = await EvaluateLlm(document, text, types, ct);
         if (llm.HasValue)
         {
             _logger.LogDebug("Document {DocumentId} classified via LLM as {TypeId} ({Confidence:P0}). Reason: {Reason}",
@@ -190,7 +190,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
         return best;
     }
 
-    private async Task<ClassificationResult?> EvaluateVectorSimilarityAsync(
+    private async Task<ClassificationResult?> EvaluateVectorSimilarity(
         SourceDocument document,
         string text,
         IReadOnlyList<SourceType> types,
@@ -211,7 +211,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
         float[] documentEmbedding;
         try
         {
-            documentEmbedding = await Ai.Embed(preview, ct);
+            documentEmbedding = await Client.Embed(preview, ct);
         }
         catch (Exception ex)
         {
@@ -224,7 +224,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
 
         foreach (var type in types)
         {
-            var embedding = await GetTypeEmbeddingAsync(type, ct);
+            var embedding = await GetTypeEmbedding(type, ct);
             if (embedding is null || embedding.Length == 0)
             {
                 continue;
@@ -246,7 +246,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
         return new ClassificationResult(bestType.Id, bestSimilarity, ClassificationMethod.Vector, bestType.Version, $"Cosine similarity {bestSimilarity:P0} against type embedding");
     }
 
-    private async Task<ClassificationResult?> EvaluateLlmAsync(
+    private async Task<ClassificationResult?> EvaluateLlm(
         SourceDocument document,
         string text,
         IReadOnlyList<SourceType> types,
@@ -268,9 +268,9 @@ public sealed class DocumentClassifier : IDocumentClassifier
         promptBuilder.AppendLine().AppendLine("Document preview:").AppendLine(preview);
         promptBuilder.AppendLine().AppendLine("Respond ONLY in JSON with fields typeId, confidence (0.0-1.0), and reasoning.");
 
-        var chatOptions = new AiChatOptions
+        var message = promptBuilder.ToString();
+        var chatOptions = new ChatOptions
         {
-            Message = promptBuilder.ToString(),
             Temperature = 0.1,
             MaxTokens = 400,
             Model = _options.Classification.LlmModel ?? _options.Extraction.Model ?? "granite3.3:8b"
@@ -278,7 +278,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
 
         try
         {
-            var response = await Ai.Chat(chatOptions, ct);
+            var response = await Client.Chat(message, chatOptions, ct);
 
             // Check for empty response
             if (string.IsNullOrWhiteSpace(response))
@@ -349,7 +349,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
     {
         if (string.IsNullOrWhiteSpace(content))
         {
-            return string.Empty;
+            return "";
         }
 
         return content.ToLowerInvariant();
@@ -359,7 +359,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
     {
         if (string.IsNullOrWhiteSpace(fileName))
         {
-            return string.Empty;
+            return "";
         }
 
         var lowered = fileName.ToLowerInvariant();
@@ -373,7 +373,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
     {
         if (string.IsNullOrWhiteSpace(phrase))
         {
-            return string.Empty;
+            return "";
         }
 
         var tokens = phrase
@@ -449,7 +449,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
             type.ExpectedPageCountMax);
     }
 
-    private async Task<float[]?> GetTypeEmbeddingAsync(SourceType type, CancellationToken ct)
+    private async Task<float[]?> GetTypeEmbedding(SourceType type, CancellationToken ct)
     {
         if (type.TypeEmbedding is { Length: > 0 } embedding && type.TypeEmbeddingVersion == type.Version)
         {
@@ -471,7 +471,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
                 builder.Append(" Signal phrases: ").Append(string.Join(", ", type.SignalPhrases));
             }
 
-            var newEmbedding = await Ai.Embed(builder.ToString(), ct);
+            var newEmbedding = await Client.Embed(builder.ToString(), ct);
             type.TypeEmbedding = newEmbedding;
             type.TypeEmbeddingVersion = type.Version;
             type.TypeEmbeddingComputedAt = DateTime.UtcNow;

@@ -1,0 +1,28 @@
+# Koan kernel package manifest
+#
+# Authoritative list of packages that version in lockstep (Tier 1, per ARCH-0082).
+# Paths are relative to the repo root, one per line. Lines starting with '#' are comments.
+#
+# Adding to / removing from this list is an ADR-level decision — it changes the
+# framework contract surface. Don't edit casually; if a new abstractions package
+# stabilizes and should join the kernel, write an ADR and reference it here.
+#
+# Kept in sync with: docs/decisions/ARCH-0082-versioning-strategy.md
+#
+# Read by: scripts/versioning/Update-Versions.ps1, scripts/versioning/Show-VersionStatus.ps1
+# Written by: humans only.
+
+src/Koan.Core/Koan.Core.csproj
+src/Koan.Core.Adapters/Koan.Core.Adapters.csproj
+src/Koan.Core.Registry.Generators/Koan.Core.Registry.Generators.csproj
+src/Koan.Cache.Abstractions/Koan.Cache.Abstractions.csproj
+src/Koan.Data.Abstractions/Koan.Data.Abstractions.csproj
+src/Koan.Data.Vector.Abstractions/Koan.Data.Vector.Abstractions.csproj
+src/Koan.Media.Abstractions/Koan.Media.Abstractions.csproj
+src/Koan.Orchestration.Abstractions/Koan.Orchestration.Abstractions.csproj
+src/Koan.Rag.Abstractions/Koan.Rag.Abstractions.csproj
+src/Koan.Recipe.Abstractions/Koan.Recipe.Abstractions.csproj
+src/Koan.Secrets.Abstractions/Koan.Secrets.Abstractions.csproj
+src/Koan.ServiceMesh.Abstractions/Koan.ServiceMesh.Abstractions.csproj
+src/Koan.AI.Contracts/Koan.AI.Contracts.csproj
+src/Koan.AI.Contracts.Shared/Koan.AI.Contracts.Shared.csproj

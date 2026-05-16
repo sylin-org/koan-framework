@@ -46,7 +46,7 @@ public class ImportWorker : BackgroundService
 
                 if (job != null)
                 {
-                    await ProcessJobAsync(job, stoppingToken);
+                    await ProcessJob(job, stoppingToken);
                 }
                 else
                 {
@@ -64,7 +64,7 @@ public class ImportWorker : BackgroundService
         _logger.LogInformation("ImportWorker stopped");
     }
 
-    private async Task ProcessJobAsync(ImportJob job, CancellationToken ct)
+    private async Task ProcessJob(ImportJob job, CancellationToken ct)
     {
         try
         {
@@ -100,7 +100,7 @@ public class ImportWorker : BackgroundService
             int totalFetched = 0;
 
             // Stream from provider
-            await foreach (var batch in provider.FetchStreamAsync(
+            await foreach (var batch in provider.FetchStream(
                 mediaType,
                 job.Limit ?? int.MaxValue,
                 ct))

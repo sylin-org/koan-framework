@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.Net;
+using System.Security.Cryptography;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -5,9 +9,9 @@ using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Vector.Abstractions;
-using System.Net;
+using Koan.Data.Vector.Abstractions.Configuration;
+using Koan.Data.Vector.Abstractions.Schema;
 using Newtonsoft.Json;
-using System.Security.Cryptography;
 using Newtonsoft.Json.Linq;
 
 namespace Koan.Data.Vector.Connector.Weaviate;
@@ -20,10 +24,11 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
     private readonly WeaviateOptions _options;
     private readonly IServiceProvider _sp;
     private readonly ILogger<WeaviateVectorRepository<TEntity, TKey>>? _logger;
+    private readonly VectorSchemaDescriptor _schemaDescriptor;
     private volatile bool _schemaEnsured;
     private volatile int _discoveredDimension = -1; // -1 means not discovered yet
 
-    public VectorCapabilities Capabilities => VectorCapabilities.Knn | VectorCapabilities.Filters | VectorCapabilities.BulkUpsert | VectorCapabilities.BulkDelete | VectorCapabilities.Hybrid;
+    public VectorCapabilities Capabilities => VectorCapabilities.Knn | VectorCapabilities.Filters | VectorCapabilities.BulkUpsert | VectorCapabilities.BulkDelete | VectorCapabilities.Hybrid | VectorCapabilities.NativeContinuation | VectorCapabilities.DynamicCollections;
 
     public WeaviateVectorRepository(IHttpClientFactory httpFactory, IOptions<WeaviateOptions> options, IServiceProvider sp)
     {
@@ -31,6 +36,8 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         _options = options.Value;
         _sp = sp;
         _logger = (ILogger<WeaviateVectorRepository<TEntity, TKey>>?)sp.GetService(typeof(ILogger<WeaviateVectorRepository<TEntity, TKey>>));
+        var registry = (VectorSchemaRegistry?)sp.GetService(typeof(VectorSchemaRegistry));
+        _schemaDescriptor = registry?.Get<TEntity, TKey>() ?? VectorSchemaDescriptor.CreateFallback(typeof(TEntity));
         _http.BaseAddress = new Uri(_options.Endpoint);
         if (_http.Timeout == default)
             _http.Timeout = TimeSpan.FromSeconds(Math.Max(1, _options.DefaultTimeoutSeconds));
@@ -40,31 +47,22 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
     {
         get
         {
-            // Vector repository must use "weaviate" provider naming, not the entity's default DATA provider
-            var providers = _sp.GetServices<Koan.Data.Abstractions.Naming.INamingDefaultsProvider>();
-            var weaviateProvider = providers.FirstOrDefault(p => string.Equals(p.Provider, "weaviate", StringComparison.OrdinalIgnoreCase));
-            if (weaviateProvider == null)
-            {
-                // Fallback to simple type name if no naming provider found
-                return typeof(TEntity).Name;
-            }
-            var diResolver = _sp.GetRequiredService<Koan.Data.Abstractions.Naming.IStorageNameResolver>();
-            var convention = weaviateProvider.GetConvention(_sp);
-            var overrideFn = weaviateProvider.GetAdapterOverride(_sp);
-            return Koan.Data.Abstractions.Naming.StorageNameSelector.ResolveName(null, diResolver, typeof(TEntity), convention, overrideFn);
+            // DATA-0086: Use vector-specific naming registry (VectorStorageNameRegistry)
+            // Automatically handles partitions via EntityContext and WeaviateAdapterFactory's INamingProvider
+            return VectorStorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
         }
     }
 
-    private async Task EnsureSchemaAsync(CancellationToken ct)
+    private async Task EnsureSchema(CancellationToken ct)
     {
         if (_schemaEnsured) return;
 
         // For backward compatibility, use configured dimension if no dimension discovered yet
         var effectiveDimension = _discoveredDimension > 0 ? _discoveredDimension : _options.Dimension;
-        await EnsureSchemaAsync(effectiveDimension, ct);
+        await EnsureSchema(effectiveDimension, ct);
     }
 
-    private async Task EnsureSchemaAsync(int dimension, CancellationToken ct)
+    private async Task EnsureSchema(int dimension, CancellationToken ct)
     {
         if (_schemaEnsured) return;
         using var _ = WeaviateTelemetry.Activity.StartActivity("vector.index.ensureCreated");
@@ -78,38 +76,16 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
             _schemaEnsured = true; return;
         }
         // Create class with manual vectors
-        var properties = new List<object>
-        {
-            new { name = "docId", dataType = new[] { "text" } },
-            new
-            {
-                name = "searchText",
-                dataType = new[] { "text" },
-                indexSearchable = true,      // Enable BM25 indexing
-                tokenization = "word"
-            }
-        };
-
-        // Add filterable properties for common recommendation system use cases
-        // These enable filter push-down at the vector database layer
-        properties.Add(new { name = "genres", dataType = new[] { "text[]" } });
-        properties.Add(new { name = "tags", dataType = new[] { "text[]" } });
-        properties.Add(new { name = "rating", dataType = new[] { "number" } });
-        properties.Add(new { name = "year", dataType = new[] { "int" } });
-        properties.Add(new { name = "episodes", dataType = new[] { "int" } });
-        properties.Add(new { name = "mediaTypeId", dataType = new[] { "text" } });
-        properties.Add(new { name = "popularity", dataType = new[] { "number" } });
-
         var body = new
         {
             @class = cls,
             vectorizer = "none",
             vectorIndexConfig = new { distance = _options.Metric },
-            properties = properties.ToArray()
+            properties = BuildSchemaProperties()
         };
         var bodyJson = JsonConvert.SerializeObject(body, Formatting.Indented);
         _logger?.LogDebug("Weaviate: POST /v1/schema/classes for class {Class}. Schema body: {Body}", cls, bodyJson);
-    var create = await _http.PostAsync("/v1/schema/classes", new StringContent(bodyJson, System.Text.Encoding.UTF8, "application/json"), ct);
+        var create = await _http.PostAsync("/v1/schema/classes", new StringContent(bodyJson, System.Text.Encoding.UTF8, "application/json"), ct);
         var createResponse = await create.Content.ReadAsStringAsync(ct);
         _logger?.LogDebug("Weaviate: schema creation response ({Status}): {Response}", (int)create.StatusCode, createResponse);
         if (!create.IsSuccessStatusCode)
@@ -135,11 +111,11 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         }
 
         // Wait for schema to be fully available
-        await WaitForSchemaReadyAsync(cls, ct);
+        await WaitForSchemaReady(cls, ct);
         _schemaEnsured = true;
     }
 
-    private async Task WaitForSchemaReadyAsync(string className, CancellationToken ct)
+    private async Task WaitForSchemaReady(string className, CancellationToken ct)
     {
         const int maxAttempts = 10;
         const int delayMs = 50;
@@ -186,7 +162,7 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
     }
 
     // Upsert single vector using /v1/objects
-    public async Task UpsertAsync(TKey id, float[] embedding, object? metadata = null, CancellationToken ct = default)
+    public async Task Upsert(TKey id, float[] embedding, object? metadata = null, CancellationToken ct = default)
     {
         using var _ = WeaviateTelemetry.Activity.StartActivity("vector.upsert");
 
@@ -204,7 +180,7 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
             _schemaEnsured = false;
         }
 
-        await EnsureSchemaAsync(ct);
+        await EnsureSchema(ct);
         ValidateEmbedding(embedding);
         // Weaviate requires UUID ids; derive a deterministic UUID from the entity id (namespaced by class) for stable mapping
         var uuid = DeterministicGuidFromString(ClassName, id!.ToString()!);
@@ -249,7 +225,7 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         if (postBody.Contains("non-existing index", StringComparison.OrdinalIgnoreCase))
         {
             _logger?.LogDebug("Weaviate: schema not ready, retrying POST after schema wait");
-            await WaitForSchemaReadyAsync(ClassName, ct);
+            await WaitForSchemaReady(ClassName, ct);
             // Retry the POST once more
             var retryPost = await _http.PostAsync("/v1/objects", new StringContent(postObjJson, System.Text.Encoding.UTF8, "application/json"), ct);
             if (retryPost.IsSuccessStatusCode)
@@ -282,18 +258,18 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         throw new InvalidOperationException($"Weaviate upsert failed: {(int)postResp.StatusCode} {postResp.ReasonPhrase} {postBody}");
     }
 
-    public async Task<int> UpsertManyAsync(IEnumerable<(TKey Id, float[] Embedding, object? Metadata)> items, CancellationToken ct = default)
+    public async Task<int> UpsertMany(IEnumerable<(TKey Id, float[] Embedding, object? Metadata)> items, CancellationToken ct = default)
     {
         var count = 0;
         foreach (var (id, emb, meta) in items)
         {
-            await UpsertAsync(id, emb, meta, ct);
+            await Upsert(id, emb, meta, ct);
             count++;
         }
         return count;
     }
 
-    public async Task<bool> DeleteAsync(TKey id, CancellationToken ct = default)
+    public async Task<bool> Delete(TKey id, CancellationToken ct = default)
     {
         using var _ = WeaviateTelemetry.Activity.StartActivity("vector.delete");
         var uuid = DeterministicGuidFromString(ClassName, id!.ToString()!);
@@ -301,21 +277,21 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         return resp.IsSuccessStatusCode;
     }
 
-    public async Task<int> DeleteManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    public async Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
         var count = 0;
         foreach (var id in ids)
         {
-            if (await DeleteAsync(id, ct)) count++;
+            if (await Delete(id, ct)) count++;
         }
         return count;
     }
 
-    public async Task<float[]?> GetEmbeddingAsync(TKey id, CancellationToken ct = default)
+    public async Task<float[]?> GetEmbedding(TKey id, CancellationToken ct = default)
     {
         using var _ = WeaviateTelemetry.Activity.StartActivity("vector.getEmbedding");
 
-        await EnsureSchemaAsync(ct);
+        await EnsureSchema(ct);
 
         var uuid = DeterministicGuidFromString(ClassName, id!.ToString()!);
 
@@ -362,11 +338,11 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         return null;
     }
 
-    public async Task<Dictionary<TKey, float[]>> GetEmbeddingsAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    public async Task<Dictionary<TKey, float[]>> GetEmbeddings(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
         using var _ = WeaviateTelemetry.Activity.StartActivity("vector.getEmbeddings");
 
-        await EnsureSchemaAsync(ct);
+        await EnsureSchema(ct);
 
         var result = new Dictionary<TKey, float[]>();
         var idsList = ids.ToList();
@@ -434,7 +410,7 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         return result;
     }
 
-    public async Task<VectorQueryResult<TKey>> SearchAsync(VectorQueryOptions options, CancellationToken ct = default)
+    public async Task<VectorQueryResult<TKey>> Search(VectorQueryOptions options, CancellationToken ct = default)
     {
         using var _ = WeaviateTelemetry.Activity.StartActivity("vector.search");
 
@@ -445,7 +421,7 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
             _logger?.LogDebug("Weaviate: discovered embedding dimension {Dimension} from query vector", _discoveredDimension);
         }
 
-        await EnsureSchemaAsync(ct);
+        await EnsureSchema(ct);
         ValidateEmbedding(options.Query);
         var topK = options.TopK ?? _options.DefaultTopK;
         if (topK > _options.MaxTopK) topK = _options.MaxTopK;
@@ -474,27 +450,43 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
             searchClause = $"nearVector: {{ vector: [{vectorStr}] }}";
         }
 
+        // Add cursor-based pagination support (native continuation)
+        var afterClause = !string.IsNullOrWhiteSpace(options.ContinuationToken)
+            ? $", after: \"{options.ContinuationToken}\""
+            : "";
+
+        if (!string.IsNullOrWhiteSpace(options.ContinuationToken))
+        {
+            _logger?.LogDebug("Weaviate: resuming search with cursor: {Cursor}", options.ContinuationToken);
+        }
+
         var args = string.IsNullOrEmpty(whereClause)
-            ? $"({searchClause}, limit: {topK})"
-            : $"({searchClause}, limit: {topK}, where: {whereClause})";
+            ? $"({searchClause}, limit: {topK}{afterClause})"
+            : $"({searchClause}, limit: {topK}, where: {whereClause}{afterClause})";
         var gql = new
         {
             // Request docId alongside _additional so we can map back to original ids
             query = $"query {{ Get {{ {ClassName} {args} {{ docId _additional {{ id distance }} }} }} }}"
         };
-    var req = new StringContent(JsonConvert.SerializeObject(gql), System.Text.Encoding.UTF8, "application/json");
-    var resp = await _http.PostAsync("/v1/graphql", req, ct);
+        var req = new StringContent(JsonConvert.SerializeObject(gql), System.Text.Encoding.UTF8, "application/json");
+        var resp = await _http.PostAsync("/v1/graphql", req, ct);
         if (!resp.IsSuccessStatusCode)
         {
             var body = await resp.Content.ReadAsStringAsync(ct);
             throw new InvalidOperationException($"Weaviate search failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {body}");
         }
         var json = await resp.Content.ReadAsStringAsync(ct);
-        var matches = ParseGraphQlIds(json);
-        return new VectorQueryResult<TKey>(matches, ContinuationToken: null);
+        var (matches, nextCursor) = ParseGraphQlIdsWithCursor(json, topK);
+
+        _logger?.LogInformation(
+            "Weaviate search completed: {MatchCount} matches, nextCursor: {HasCursor}",
+            matches.Count,
+            nextCursor != null ? "present" : "null");
+
+        return new VectorQueryResult<TKey>(matches, ContinuationToken: nextCursor);
     }
 
-    public async Task FlushAsync(CancellationToken ct = default)
+    public async Task Flush(CancellationToken ct = default)
     {
         using var _ = WeaviateTelemetry.Activity.StartActivity("vector.flush");
         var cls = ClassName;
@@ -516,18 +508,18 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         _schemaEnsured = false;
 
         // Recreate the schema
-        await EnsureSchemaAsync(ct);
+        await EnsureSchema(ct);
 
         _logger?.LogInformation("Weaviate: flushed all vectors for class {Class}", cls);
     }
 
-    public async IAsyncEnumerable<VectorExportBatch<TKey>> ExportAllAsync(
+    public async IAsyncEnumerable<VectorExportBatch<TKey>> ExportAll(
         int? batchSize = null,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
         using var _ = WeaviateTelemetry.Activity.StartActivity("vector.export");
 
-        await EnsureSchemaAsync(ct);
+        await EnsureSchema(ct);
 
         var limit = batchSize ?? 100; // Weaviate cursor default
         var totalExported = 0;
@@ -621,6 +613,92 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
 
     // Translator helpers moved to WeaviateFilterTranslator
 
+    private object[] BuildSchemaProperties()
+    {
+        var properties = new List<object>
+        {
+            new { name = "docId", dataType = new[] { "text" } }
+        };
+
+        if (_schemaDescriptor.Properties.Count == 0)
+        {
+            properties.Add(new
+            {
+                name = "searchText",
+                dataType = new[] { "text" },
+                indexSearchable = true,
+                tokenization = "word"
+            });
+
+            return properties.ToArray();
+        }
+
+        foreach (var property in _schemaDescriptor.Properties)
+        {
+            if (string.Equals(property.Name, "docId", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var payload = CreateWeaviateProperty(property);
+            if (payload is not null)
+            {
+                properties.Add(payload);
+            }
+        }
+
+        return properties.ToArray();
+    }
+
+    private static object? CreateWeaviateProperty(VectorSchemaProperty property)
+    {
+        var dataType = property.Type switch
+        {
+            VectorSchemaPropertyType.Text => "text",
+            VectorSchemaPropertyType.TextArray => "text[]",
+            VectorSchemaPropertyType.Int => "int",
+            VectorSchemaPropertyType.Long => "number",
+            VectorSchemaPropertyType.Number => "number",
+            VectorSchemaPropertyType.Boolean => "boolean",
+            VectorSchemaPropertyType.DateTime => "date",
+            _ => null
+        };
+
+        if (dataType is null)
+        {
+            return null;
+        }
+
+        var payload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["name"] = property.Name,
+            ["dataType"] = new[] { dataType }
+        };
+
+        if (!string.IsNullOrWhiteSpace(property.Description))
+        {
+            payload["description"] = property.Description;
+        }
+
+        if (property.Type == VectorSchemaPropertyType.Text && property.IsSearchable)
+        {
+            payload["indexSearchable"] = true;
+            payload["tokenization"] = "word";
+        }
+
+        if (property.IsFilterable)
+        {
+            payload["indexInverted"] = true;
+        }
+
+        if (property.IsSortable)
+        {
+            payload["sortable"] = true;
+        }
+
+        return payload;
+    }
+
     private void ValidateEmbedding(float[] embedding)
     {
         // Use discovered dimension if available, otherwise fall back to configured dimension
@@ -639,11 +717,11 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         switch (instruction.Name)
         {
             case VectorInstructions.IndexEnsureCreated:
-                await EnsureSchemaAsync(ct);
+                await EnsureSchema(ct);
                 return (TResult)(object)true;
             case VectorInstructions.IndexStats:
                 {
-                    await EnsureSchemaAsync(ct);
+                    await EnsureSchema(ct);
                     var cls = ClassName;
                     var gql = new { query = $"query {{ Aggregate {{ {cls} {{ meta {{ count }} }} }} }}" };
                     var req = new StringContent(JsonConvert.SerializeObject(gql), System.Text.Encoding.UTF8, "application/json");
@@ -667,7 +745,7 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
                     if (!allow) throw new NotSupportedException("Destructive clear requires Options.AllowDestructive=true.");
 
                     // Delegate to FlushAsync which implements the actual clear logic
-                    await FlushAsync(ct);
+                    await Flush(ct);
                     return (TResult)(object)true;
                 }
             default:
@@ -714,6 +792,47 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
             }
         }
         return list;
+    }
+
+    private static (IReadOnlyList<VectorMatch<TKey>> Matches, string? NextCursor) ParseGraphQlIdsWithCursor(string json, int requestedLimit)
+    {
+        var root = JToken.Parse(json);
+        var list = new List<VectorMatch<TKey>>();
+        string? lastUuid = null;
+
+        var get = root["data"]?["Get"] as JObject;
+        if (get is null) return (list, null);
+
+        foreach (var prop in get.Properties())
+        {
+            if (prop.Value is not JArray arr) continue;
+            foreach (var itemTok in arr)
+            {
+                var item = itemTok as JObject;
+                if (item is null) continue;
+                var add = item["_additional"] as JObject;
+                var idStr = item["docId"]?.Value<string>() ?? add?["id"]?.Value<string>();
+                var distance = add?["distance"]?.Value<double?>() ?? 0.0;
+                var uuid = add?["id"]?.Value<string>();
+
+                if (idStr is null) continue;
+
+                TKey id = (TKey)Convert.ChangeType(idStr, typeof(TKey));
+                var score = 1.0 - distance;
+                list.Add(new VectorMatch<TKey>(id, score, null));
+
+                if (uuid != null)
+                {
+                    lastUuid = uuid;
+                }
+            }
+        }
+
+        // If we got a full page of results, there might be more (return cursor)
+        // If we got fewer results than requested, we've reached the end (return null)
+        var nextCursor = list.Count == requestedLimit ? lastUuid : null;
+
+        return (list, nextCursor);
     }
 
     // Deterministic UUID (v5-like) from class namespace + id using SHA-1

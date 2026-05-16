@@ -15,27 +15,27 @@ public interface IBackupService
     /// <summary>
     /// Backs up all discovered entity types
     /// </summary>
-    Task<BackupManifest> BackupAllEntitiesAsync(string backupName, GlobalBackupOptions? options = null, CancellationToken ct = default);
+    Task<BackupManifest> BackupAllEntities(string backupName, GlobalBackupOptions? options = null, CancellationToken ct = default);
 
     /// <summary>
     /// Backs up selected entities based on filter
     /// </summary>
-    Task<BackupManifest> BackupSelectedAsync(string backupName, Func<EntityTypeInfo, bool> filter, GlobalBackupOptions? options = null, CancellationToken ct = default);
+    Task<BackupManifest> BackupSelected(string backupName, Func<EntityTypeInfo, bool> filter, GlobalBackupOptions? options = null, CancellationToken ct = default);
 
     /// <summary>
     /// Backs up entities from specific providers
     /// </summary>
-    Task<BackupManifest> BackupByProviderAsync(string backupName, string[] providers, GlobalBackupOptions? options = null, CancellationToken ct = default);
+    Task<BackupManifest> BackupByProvider(string backupName, string[] providers, GlobalBackupOptions? options = null, CancellationToken ct = default);
 
     /// <summary>
     /// Gets backup progress for monitoring
     /// </summary>
-    Task<BackupProgress> GetBackupProgressAsync(string backupId, CancellationToken ct = default);
+    Task<BackupProgress> GetBackupProgress(string backupId, CancellationToken ct = default);
 
     /// <summary>
     /// Cancels an ongoing backup operation
     /// </summary>
-    Task CancelBackupAsync(string backupId, CancellationToken ct = default);
+    Task CancelBackup(string backupId, CancellationToken ct = default);
 }
 
 public class BackupProgress

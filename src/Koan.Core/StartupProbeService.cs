@@ -23,7 +23,7 @@ internal sealed class StartupProbeService : Microsoft.Extensions.Hosting.IHosted
                 {
                     try
                     {
-                        var report = await c.CheckAsync(cancellationToken);
+                        var report = await c.Check(cancellationToken);
                         _log?.LogDebug("StartupProbe: {Name} -> {State} ({Msg})", c.Name, report.State, report.Description);
                         var status = report.State switch
                         {
@@ -39,7 +39,7 @@ internal sealed class StartupProbeService : Microsoft.Extensions.Hosting.IHosted
                             foreach (var kv in report.Data)
                             {
                                 if (kv.Value is null) continue;
-                                dict[kv.Key] = kv.Value?.ToString() ?? string.Empty;
+                                dict[kv.Key] = kv.Value?.ToString() ?? "";
                             }
                             facts = dict;
                         }

@@ -24,7 +24,7 @@ public sealed class CanonRuntimeFlowSpec
                 ctx.SetItem("runtime", runtime);
                 ctx.SetItem("persistence", persistence);
             })
-            .Act(ctx => ExecuteCanonizationAsync(ctx, CanonStageBehavior.Immediate, "integration"))
+            .Act(ctx => ExecuteCanonization(ctx, CanonStageBehavior.Immediate, "integration"))
             .Assert(ctx =>
             {
                 var result = ctx.GetRequiredItem<CanonizationResult<ContactCanon>>("result");
@@ -45,7 +45,7 @@ public sealed class CanonRuntimeFlowSpec
                 index.Should().NotBeNull();
                 index!.CanonicalId.Should().Be(result.Canonical.Id);
             })
-            .RunAsync();
+            .Run();
 
     [Fact]
     public Task Stage_only_requests_create_stage_entries_without_persisting_canonical()
@@ -60,7 +60,7 @@ public sealed class CanonRuntimeFlowSpec
                 ctx.SetItem("runtime", runtime);
                 ctx.SetItem("persistence", persistence);
             })
-            .Act(ctx => ExecuteCanonizationAsync(ctx, CanonStageBehavior.StageOnly, "queue"))
+            .Act(ctx => ExecuteCanonization(ctx, CanonStageBehavior.StageOnly, "queue"))
             .Assert(ctx =>
             {
                 var result = ctx.GetRequiredItem<CanonizationResult<ContactCanon>>("result");
@@ -71,7 +71,7 @@ public sealed class CanonRuntimeFlowSpec
                 persistence.StageRecords.Should().HaveCount(1);
                 persistence.CanonicalEntries.Should().BeEmpty();
             })
-            .RunAsync();
+            .Run();
 
     [Fact]
     public Task Stage_only_requests_forward_tags_to_stage_metadata()
@@ -89,7 +89,7 @@ public sealed class CanonRuntimeFlowSpec
             .Act(ctx =>
             {
                 var overrideOptions = CanonizationOptions.Default.WithTag("tenant", "acme");
-                return ExecuteCanonizationAsync(ctx, CanonStageBehavior.StageOnly, "tagged", overrideOptions);
+                return ExecuteCanonization(ctx, CanonStageBehavior.StageOnly, "tagged", overrideOptions);
             })
             .Assert(ctx =>
             {
@@ -115,7 +115,7 @@ public sealed class CanonRuntimeFlowSpec
                 behavior.Should().Be(CanonStageBehavior.StageOnly.ToString());
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 
     [Fact]
     public Task Replay_returns_canonization_records_in_phase_order()
@@ -129,8 +129,8 @@ public sealed class CanonRuntimeFlowSpec
             })
             .Act(async ctx =>
             {
-                await ExecuteCanonizationAsync(ctx, CanonStageBehavior.Immediate, "replay-1").ConfigureAwait(false);
-                await ExecuteCanonizationAsync(ctx, CanonStageBehavior.Immediate, "replay-2").ConfigureAwait(false);
+                await ExecuteCanonization(ctx, CanonStageBehavior.Immediate, "replay-1").ConfigureAwait(false);
+                await ExecuteCanonization(ctx, CanonStageBehavior.Immediate, "replay-2").ConfigureAwait(false);
             })
             .Assert(async ctx =>
             {
@@ -147,7 +147,7 @@ public sealed class CanonRuntimeFlowSpec
                 var phases = records.Select(r => r.Event!.Phase).ToList();
                 phases.Should().OnlyContain(phase => Enum.IsDefined(typeof(CanonPipelinePhase), phase));
             })
-            .RunAsync();
+            .Run();
 
     private static void ConfigureServices(TestContext ctx, IServiceCollection services)
     {
@@ -174,7 +174,7 @@ public sealed class CanonRuntimeFlowSpec
         });
     }
 
-    private static async ValueTask ExecuteCanonizationAsync(TestContext ctx, CanonStageBehavior behavior, string origin, CanonizationOptions? overrideOptions = null)
+    private static async ValueTask ExecuteCanonization(TestContext ctx, CanonStageBehavior behavior, string origin, CanonizationOptions? overrideOptions = null)
     {
         var runtime = ctx.GetRequiredItem<ICanonRuntime>("runtime");
         var email = $"{origin}-{ctx.ExecutionId:N}@example.com";
@@ -278,7 +278,7 @@ public sealed class CanonRuntimeFlowSpec
             return Task.FromResult(stage);
         }
 
-        public Task<CanonIndex?> GetIndexAsync(string entityType, string key, CancellationToken cancellationToken)
+        public Task<CanonIndex?> GetIndex(string entityType, string key, CancellationToken cancellationToken)
         {
             lock (_gate)
             {
@@ -287,7 +287,7 @@ public sealed class CanonRuntimeFlowSpec
             }
         }
 
-        public Task UpsertIndexAsync(CanonIndex index, CancellationToken cancellationToken)
+        public Task UpsertIndex(CanonIndex index, CancellationToken cancellationToken)
         {
             if (index is null)
             {
@@ -308,7 +308,7 @@ public sealed class CanonRuntimeFlowSpec
 
     private sealed class NoopAuditSink : ICanonAuditSink
     {
-        public Task WriteAsync(IReadOnlyList<CanonAuditEntry> entries, CancellationToken cancellationToken)
+        public Task Write(IReadOnlyList<CanonAuditEntry> entries, CancellationToken cancellationToken)
             => Task.CompletedTask;
     }
 
@@ -316,7 +316,7 @@ public sealed class CanonRuntimeFlowSpec
     private sealed class ContactCanon : CanonEntity<ContactCanon>
     {
         [AggregationKey]
-        public string Email { get; set; } = string.Empty;
+        public string Email { get; set; } = "";
 
         [AggregationKey]
         public string? PhoneNumber { get; set; }

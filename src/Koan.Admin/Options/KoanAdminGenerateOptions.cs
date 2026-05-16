@@ -10,7 +10,7 @@ public sealed class KoanAdminGenerateOptions
     [Required]
     public string[] ComposeProfiles { get; set; } = DefaultComposeProfiles;
 
-    public string[] OpenApiClients { get; set; } = Array.Empty<string>();
+    public string[] OpenApiClients { get; set; } = [];
 
     public bool IncludeAppSettings { get; set; } = true;
 

@@ -26,6 +26,7 @@ Framework knowledge is provided through **Agent Skills** in `.claude/skills/` th
 | Complex relationships, N+1 queries | `koan-relationships` |
 | Performance issues, large datasets | `koan-performance` |
 | Vector database migration | `koan-vector-migration` |
+| `[Cacheable]`, L1/L2, cache coherence, TTL, `EntityContext.NoCache()` | `koan-caching` |
 | MCP server development | `koan-mcp-integration` |
 
 **Full Skills Catalog**: `.claude/skills/README.md` (descriptions, learning paths, examples)
@@ -36,6 +37,7 @@ Framework knowledge is provided through **Agent Skills** in `.claude/skills/` th
 - **Entity-First Development**: `Todo.Get(id)`, `todo.Save()` patterns with automatic GUID v7 generation
 - **Multi-Provider Transparency**: Same entity code works across SQL, NoSQL, Vector, JSON stores
 - **Self-Reporting Infrastructure**: Services describe their capabilities in structured boot reports
+- **Integration Tests as Canon (ARCH-0079)**: Every adapter, connector, coherence channel, and pillar core ships at least one integration spec that goes through real `AddKoan()` reflective discovery using `KoanIntegrationHost`. Unit tests with fakes are insufficient — they structurally cannot reveal composition or shared-resource bugs. See [tests/README.md](tests/README.md#integration-tests-are-canon-arch-0079) for the canon pattern.
 
 ### Critical Anti-Patterns to Detect
 
@@ -61,6 +63,30 @@ Framework knowledge is provided through **Agent Skills** in `.claude/skills/` th
 - **EntityQueryParser** (`Koan.Web.Queries`) - Parse filter, sort, pagination, field selection from query strings
 - **PatchNormalizer** (`Koan.Web.PatchOps`) - Normalize and validate JSON Patch operations
 - **EntityController<T>** (`Koan.Web.Controllers`) - Full REST API base controller with CRUD + Query + Patch
+
+### Cache (ARCH-0075 + ARCH-0078 · v0.7.0)
+- **[Cacheable]** (`Koan.Cache.Abstractions.Policies`) — Entity-friendly attribute. `[Cacheable(300)]` opts an entity into transparent L1/L2 caching with sane defaults. Power users drop to `[CachePolicy]` for custom key templates / method-scoped policies
+- **Fresh-or-null read contract (ARCH-0078)** — Default reads return `null` past `AbsoluteTtl`. **SWR is opt-in only** via `[Cacheable(AllowStaleForSeconds = N)]` or `.AllowStaleFor(TimeSpan)` on the fluent builder. No global adapter toggles — the per-call/per-policy opt-in is the only switch.
+- **LayeredCache** (`Koan.Cache.Topology`) — Composition-based L1/L2 orchestrator. Verbs: `Read`/`Write`/`Evict`/`Touch`/`EnumerateByTag`. `ApplyRemoteInvalidation` is L1-only (architectural invariant)
+- **CoherenceCoordinator** (`Koan.Cache.Coherence`) — `IHostedService` routing `ICacheCoherenceChannel` messages → `LayeredCache.ApplyRemoteInvalidation`. Origin filter prevents echo. Honors `CoherenceMode.AutoDetect`/`Required`/`Disabled`
+- **CacheKey.For<T>(id, partition)** (`Koan.Cache.Abstractions.Primitives`) — Canonical entity key builder; eliminates stringly-typed concatenation
+- **EntityCacheExtensions** (`Koan.Cache`) — `entity.Uncache()`, `EntityCache<T,K>.Flush(id)`, `.FlushAll()` for out-of-band evict from `Koan.Data.Direct` / batch jobs
+- **EntityContext.CacheBehavior** (`Koan.Data.Core`) — Per-request opt-out: `NoCache()`, `RefreshCache()`, `WithCacheBehavior(...)`. Writes always invalidate regardless
+- **Reference = Intent adapters**:
+  - `Koan.Cache.Adapter.Sqlite` — persistent L1 (priority 50, preempts Memory)
+  - `Koan.Cache.Adapter.Redis` — L2 + `RedisCoherenceChannel` (priority 100 + 100)
+  - `Koan.Cache.Coherence.Messaging` — rides `Koan.Messaging.IMessageBus` (priority 150, preempts Redis pub/sub)
+  - `Koan.Cache.Coherence.InMemory` — fallback channel for tests / single-process verification (priority `int.MinValue`)
+- **Singleflight** (`Koan.Core.Singleflight`) — Stampede-protection primitive lifted out of cache for cross-pillar reuse
+
+### Entity Lifecycle
+- **[Timestamp]** (`Koan.Data.Abstractions`) — `[Timestamp]` set-once on creation, `[Timestamp(OnSave = true)]` set on every save
+- **Entity Transfer** (`Koan.Data.Core`) — `Entity<T>.Copy()`, `.Move()`, `.Mirror()` fluent builders for cross-context transfers
+
+### AI — Entity-Aware Operations
+- **EntityAi** (`Koan.Data.AI`) — `EntityAi.Embed(entity)`, `.Chat(msg, entity)`, `.Ocr(entity)` with convention inference
+- **[MediaAnalysis]** (`Koan.Data.AI`) — `[MediaAnalysis(Analysis = Describe | Ocr)]` auto-processes media on upload
+- **MediaAnalysisEmbeddingBridge** (`Koan.Data.AI`) — Cross-modal search: analysis results feed into `[Embedding]` text
 
 ### Common Patterns
 - **Guard Clauses** (`Koan.Core.Utilities.Guard`) - `Must.NotBeNull()`, `Be.Positive()`, `NotBe.Default()`

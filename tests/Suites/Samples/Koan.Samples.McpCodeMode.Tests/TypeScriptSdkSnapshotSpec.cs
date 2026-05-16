@@ -16,9 +16,9 @@ public class TypeScriptSdkSnapshotSpec : IClassFixture<TestPipelineFixture>
 
     private static string Sanitize(string raw)
     {
-        if (string.IsNullOrWhiteSpace(raw)) return string.Empty;
+        if (string.IsNullOrWhiteSpace(raw)) return "";
         // Normalize line endings + strip footer line if present
-        var cleaned = raw.Replace("\r", string.Empty);
+        var cleaned = raw.Replace("\r", "");
         var lines = cleaned.Split('\n');
         if (lines.Length > 0 && lines[^1].TrimStart().StartsWith("// integrity-sha256:"))
         {
@@ -46,7 +46,7 @@ public class TypeScriptSdkSnapshotSpec : IClassFixture<TestPipelineFixture>
         var baselinePath = Path.Combine(snapshotDir, "koan-code-mode.d.ts.baseline");
         if (!File.Exists(baselinePath))
         {
-            File.WriteAllText(baselinePath, generated, Encoding.UTF8);
+            File.WriteAllTextAsync(baselinePath, generated, Encoding.UTF8);
             return; // First-run initialization; treat as pass.
         }
         var baselineRaw = File.ReadAllText(baselinePath, Encoding.UTF8);
@@ -55,7 +55,7 @@ public class TypeScriptSdkSnapshotSpec : IClassFixture<TestPipelineFixture>
         if (IsPlaceholder(baseline))
         {
             // Upgrade placeholder with actual generated snapshot silently
-            File.WriteAllText(baselinePath, generated, Encoding.UTF8);
+            File.WriteAllTextAsync(baselinePath, generated, Encoding.UTF8);
             return; // Do not fail; baseline established.
         }
 
@@ -76,8 +76,8 @@ public class TypeScriptSdkSnapshotSpec : IClassFixture<TestPipelineFixture>
         var sb = new StringBuilder();
         for (int i = 0; i < max; i++)
         {
-            var e = i < expLines.Length ? expLines[i] : string.Empty;
-            var a = i < actLines.Length ? actLines[i] : string.Empty;
+            var e = i < expLines.Length ? expLines[i] : "";
+            var a = i < actLines.Length ? actLines[i] : "";
             if (!string.Equals(e, a, StringComparison.Ordinal))
             {
                 sb.AppendLine($"@@ line {i + 1} @@");

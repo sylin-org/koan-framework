@@ -10,9 +10,9 @@ namespace Koan.Samples.Meridian.Infrastructure;
 
 internal static class PipelineSnapshotMapper
 {
-    public static async Task<IReadOnlyList<JobSnapshot>> LoadJobSnapshotsAsync(string pipelineId, CancellationToken ct)
+    public static async Task<IReadOnlyList<JobSnapshot>> LoadJobSnapshots(string pipelineId, CancellationToken ct)
     {
-        var jobs = await ProcessingJob.Query(job => job.PipelineId == pipelineId, ct);
+        var jobs = await ProcessingJob.Query(job => job.PipelineId == pipelineId, ct).ConfigureAwait(false);
 
         return jobs
             .OrderByDescending(job => job.CreatedAt)
@@ -21,9 +21,9 @@ internal static class PipelineSnapshotMapper
             .ToArray();
     }
 
-    public static async Task<IReadOnlyList<RunLogSnapshot>> LoadRunLogSnapshotsAsync(string pipelineId, CancellationToken ct)
+    public static async Task<IReadOnlyList<RunLogSnapshot>> LoadRunLogSnapshots(string pipelineId, CancellationToken ct)
     {
-        var logs = await RunLog.Query(log => log.PipelineId == pipelineId, ct);
+        var logs = await RunLog.Query(log => log.PipelineId == pipelineId, ct).ConfigureAwait(false);
 
         return logs
             .OrderByDescending(log => log.StartedAt)
@@ -35,7 +35,7 @@ internal static class PipelineSnapshotMapper
     private static JobSnapshot MapJob(ProcessingJob job)
         => new()
         {
-            Id = job.Id ?? string.Empty,
+            Id = job.Id ?? "",
             Status = job.Status.ToString(),
             ProgressPercent = job.ProgressPercent,
             TotalDocuments = job.TotalDocuments,
@@ -50,7 +50,7 @@ internal static class PipelineSnapshotMapper
     private static RunLogSnapshot MapRunLog(RunLog log)
         => new()
         {
-            Id = log.Id ?? string.Empty,
+            Id = log.Id ?? "",
             Stage = log.Stage,
             Status = log.Status,
             DocumentId = log.DocumentId,

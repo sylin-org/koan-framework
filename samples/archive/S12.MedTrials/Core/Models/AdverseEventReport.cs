@@ -14,18 +14,18 @@ namespace S12.MedTrials.Models;
 public sealed class AdverseEventReport : Entity<AdverseEventReport>
 {
     [Parent(typeof(TrialSite))]
-    public string TrialSiteId { get; set; } = string.Empty;
+    public string TrialSiteId { get; set; } = "";
 
     [Parent(typeof(ParticipantVisit))]
     public string? ParticipantVisitId { get; set; }
 
-    public string ParticipantId { get; set; } = string.Empty;
+    public string ParticipantId { get; set; } = "";
     public AdverseEventSeverity Severity { get; set; } = AdverseEventSeverity.Moderate;
-    public string Description { get; set; } = string.Empty;
+    public string Description { get; set; } = "";
     public DateOnly OnsetDate { get; set; } = DateOnly.FromDateTime(DateTime.UtcNow);
     public AdverseEventStatus Status { get; set; } = AdverseEventStatus.Open;
-    public string[] SourceDocuments { get; set; } = Array.Empty<string>();
-    public string[] Tags { get; set; } = Array.Empty<string>();
+    public string[] SourceDocuments { get; set; } = [];
+    public string[] Tags { get; set; } = [];
     public string? VectorId { get; set; }
     public DateTimeOffset ReportedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;

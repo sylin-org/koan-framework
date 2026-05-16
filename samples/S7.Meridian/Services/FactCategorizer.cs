@@ -18,7 +18,7 @@ namespace Koan.Samples.Meridian.Services;
 
 public interface IFactCategorizer
 {
-    Task<FactCategorizationMap> CategorizeAsync(
+    Task<FactCategorizationMap> Categorize(
         FactCatalog catalog,
         AnalysisType analysisType,
         CancellationToken ct);
@@ -40,14 +40,14 @@ public sealed class FactCategorizer : IFactCategorizer
         _logger = logger;
     }
 
-    public async Task<FactCategorizationMap> CategorizeAsync(
+    public async Task<FactCategorizationMap> Categorize(
         FactCatalog catalog,
         AnalysisType analysisType,
         CancellationToken ct)
     {
         // Check cache first
         var catalogHash = FactCategorizationMap.ComputeCatalogHash(catalog);
-        var cached = await FactCategorizationMap.GetByCatalogHashAsync(catalogHash, ct);
+        var cached = await FactCategorizationMap.GetByCatalogHash(catalogHash, ct);
 
         if (cached != null)
         {
@@ -63,9 +63,8 @@ public sealed class FactCategorizer : IFactCategorizer
         var prompt = BuildCategorizationPrompt(catalog, analysisType);
 
         // Call LLM
-        var chatOptions = new AiChatOptions
+        var chatOptions = new ChatOptions
         {
-            Message = prompt,
             Model = _options.Facts.ExtractionModel,
             Temperature = 0.3, // Lower temperature for consistent categorization
             MaxTokens = 0,
@@ -75,7 +74,7 @@ public sealed class FactCategorizer : IFactCategorizer
         string raw;
         try
         {
-            raw = await Ai.Chat(chatOptions, ct);
+            raw = await Client.Chat(prompt, chatOptions, ct);
             _logger.LogDebug("LLM categorization response length: {Length} characters", raw.Length);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -95,7 +94,7 @@ public sealed class FactCategorizer : IFactCategorizer
         }
 
         // Save to cache
-        var map = await FactCategorizationMap.SaveWithHashAsync(catalogHash, batches, ct);
+        var map = await FactCategorizationMap.SaveWithHash(catalogHash, batches, ct);
 
         _logger.LogInformation("Generated {BatchCount} semantic batches for {FactCount} facts (hash: {Hash})",
             batches.Count, catalog.Facts.Count, catalogHash[..12]);
@@ -174,7 +173,7 @@ public sealed class FactCategorizer : IFactCategorizer
     {
         try
         {
-            var cleaned = JsonFence.Replace(rawResponse, string.Empty).Trim();
+            var cleaned = JsonFence.Replace(rawResponse, "").Trim();
             var json = JObject.Parse(cleaned);
 
             var batchesToken = json["batches"];
@@ -189,9 +188,9 @@ public sealed class FactCategorizer : IFactCategorizer
 
             foreach (var token in array.OfType<JObject>())
             {
-                var batchId = token.Value<string>("batchId")?.Trim() ?? string.Empty;
-                var categoryName = token.Value<string>("categoryName")?.Trim() ?? string.Empty;
-                var categoryDescription = token.Value<string>("categoryDescription")?.Trim() ?? string.Empty;
+                var batchId = token.Value<string>("batchId")?.Trim() ?? "";
+                var categoryName = token.Value<string>("categoryName")?.Trim() ?? "";
+                var categoryDescription = token.Value<string>("categoryDescription")?.Trim() ?? "";
                 var fieldPathsToken = token["fieldPaths"];
 
                 if (string.IsNullOrWhiteSpace(batchId) || string.IsNullOrWhiteSpace(categoryName))

@@ -516,26 +516,14 @@ public static class StreamTransformExtensions
         return await Task.FromResult(new TransformResult(source, "image/jpeg"));
     }
 
-    /// <summary>
-    /// Store transformed stream as new MediaEntity
-    /// Automatically disposes stream after upload
-    /// NOTE: Users should call MediaEntity.Upload() or Onboard() directly with the transformed stream
-    /// Example: var entity = await PhotoAsset.Upload(transformedStream, "photo.jpg", "image/jpeg");
-    /// </summary>
-    /// <remarks>
-    /// This is a placeholder for future enhancement.
-    /// Cannot call static methods on generic type parameters without reflection.
-    /// For now, use: var bytes = await stream.ToBytes(); then MediaEntity.Upload()
-    /// </remarks>
-    [Obsolete("Use MediaEntity<T>.Upload() or Onboard() directly with transformed stream", false)]
-    public static Task<string> StoreAs<TEntity>(this Stream source, CancellationToken ct = default)
-        where TEntity : MediaEntity<TEntity>, new()
-    {
-        throw new NotImplementedException(
-            "Use MediaEntity<T>.Upload() or Onboard() directly. " +
-            "Example: var entity = await PhotoAsset.Upload(transformedStream, \"photo.jpg\", \"image/jpeg\");"
-        );
-    }
+    // The earlier `StoreAs<TEntity>(this Stream, ...)` placeholder was deleted: its intent —
+    // content-addressable upload + dedup keyed by the bytes themselves — is now provided as a
+    // first-class CRTP-friendly method directly on the entity, where calling the same-class
+    // static `Upload(...)` is legal:
+    //
+    //     var entity = await PhotoAsset.Store(bytes, name: "photo.jpg", contentType: "image/jpeg");
+    //
+    // See `Koan.Media.Abstractions.Model.MediaEntity{TEntity}.Store(byte[], ...)`.
 
     /// <summary>
     /// Get transformed stream as byte array (for in-memory processing)

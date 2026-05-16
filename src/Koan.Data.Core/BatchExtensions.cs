@@ -10,5 +10,5 @@ public static class BatchExtensions
         CancellationToken ct = default)
     where TEntity : class, IEntity<TKey>
         where TKey : notnull
-        => batch.SaveAsync(options, ct);
+        => batch.Save(options, ct);
 }

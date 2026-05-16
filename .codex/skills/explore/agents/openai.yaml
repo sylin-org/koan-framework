@@ -1,0 +1,4 @@
+interface:
+  display_name: "Explore"
+  short_description: "Structured pre-implementation exploration workflow"
+  default_prompt: "Follow the seven-step exploration checklist before writing production code."

@@ -21,7 +21,7 @@ public sealed class ShoppingList : Entity<ShoppingList>
     /// <summary>Status: active, purchased, archived</summary>
     public string Status { get; set; } = "active";
 
-    public ShoppingItem[] Items { get; set; } = Array.Empty<ShoppingItem>();
+    public ShoppingItem[] Items { get; set; } = [];
 
     public decimal EstimatedTotal { get; set; }
     public DateTime? PurchasedAt { get; set; }
@@ -43,5 +43,5 @@ public class ShoppingItem
     public decimal EstimatedPrice { get; set; }
 
     /// <summary>Which recipes need this ingredient</summary>
-    public string[] NeededForRecipes { get; set; } = Array.Empty<string>();
+    public string[] NeededForRecipes { get; set; } = [];
 }

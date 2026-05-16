@@ -21,7 +21,7 @@ public sealed class PostgresInstructionsSpec
         await TestPipeline.For<PostgresInstructionsSpec>(_output, nameof(Instruction_clear_returns_deleted_count))
             .RequireDocker()
             .UsingPostgresContainer(database: databaseName)
-            .Using<PostgresConnectorFixture>("fixture", static ctx => PostgresConnectorFixture.CreateAsync(ctx))
+            .Using<PostgresConnectorFixture>("fixture", static ctx => PostgresConnectorFixture.Create(ctx))
             .Arrange(static async ctx =>
             {
                 var fixture = ctx.GetRequiredItem<PostgresConnectorFixture>("fixture");
@@ -35,7 +35,7 @@ public sealed class PostgresInstructionsSpec
                 var partition = fixture.EnsurePartition(ctx);
                 await using var lease = fixture.LeasePartition(partition);
 
-                await InstructionProbe.UpsertAsync(new InstructionProbe { Name = "item" });
+                await InstructionProbe.Upsert(new InstructionProbe { Name = "item" });
                 var before = await InstructionProbe.Count.Exact();
                 before.Should().Be(1);
 
@@ -45,7 +45,7 @@ public sealed class PostgresInstructionsSpec
                 var after = await InstructionProbe.Count.Exact();
                 after.Should().Be(0);
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
@@ -56,7 +56,7 @@ public sealed class PostgresInstructionsSpec
         await TestPipeline.For<PostgresInstructionsSpec>(_output, nameof(Instruction_ensure_created_is_idempotent))
             .RequireDocker()
             .UsingPostgresContainer(database: databaseName)
-            .Using<PostgresConnectorFixture>("fixture", static ctx => PostgresConnectorFixture.CreateAsync(ctx))
+            .Using<PostgresConnectorFixture>("fixture", static ctx => PostgresConnectorFixture.Create(ctx))
             .Arrange(static async ctx =>
             {
                 var fixture = ctx.GetRequiredItem<PostgresConnectorFixture>("fixture");
@@ -73,11 +73,11 @@ public sealed class PostgresInstructionsSpec
                 var second = await fixture.Data.Execute<InstructionProbe, string, bool>(new Instruction(DataInstructions.EnsureCreated));
                 second.Should().BeTrue();
             })
-            .RunAsync();
+            .Run();
     }
 
     private sealed class InstructionProbe : Entity<InstructionProbe>
     {
-        public string Name { get; set; } = string.Empty;
+        public string Name { get; set; } = "";
     }
 }

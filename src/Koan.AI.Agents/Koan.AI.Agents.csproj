@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <KoanPackageKind>Periphery</KoanPackageKind>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Description>Entity-aware autonomous agents for Koan AI: auto-generated tools from Entity&lt;T&gt; with ReAct reasoning.</Description>
+    <PackageTags>$(CommonPackageTags);ai;agents</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <ProjectReference Include="..\Koan.AI.Contracts\Koan.AI.Contracts.csproj" />
+    <ProjectReference Include="..\Koan.AI.Contracts.Shared\Koan.AI.Contracts.Shared.csproj" />
+    <ProjectReference Include="..\Koan.AI.Orchestration\Koan.AI.Orchestration.csproj" />
+    <ProjectReference Include="..\Koan.AI\Koan.AI.csproj" />
+    <ProjectReference Include="..\Koan.Data.Vector\Koan.Data.Vector.csproj" />
+  </ItemGroup>
+</Project>

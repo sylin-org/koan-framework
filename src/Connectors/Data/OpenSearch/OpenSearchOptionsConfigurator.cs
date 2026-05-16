@@ -51,17 +51,17 @@ internal sealed class OpenSearchOptionsConfigurator : AdapterOptionsConfigurator
 
         // Read OpenSearch-specific configuration
         var endpoint = ReadProviderConfiguration(options.Endpoint,
-            "Koan:Data:OpenSearch:Endpoint",
-            "Koan:Data:OpenSearch:BaseUrl");
+            Infrastructure.Constants.Configuration.Keys.Endpoint,
+            Infrastructure.Constants.Configuration.Keys.BaseUrl);
 
         var apiKey = ReadProviderConfiguration(options.ApiKey ?? "",
-            "Koan:Data:OpenSearch:ApiKey");
+            Infrastructure.Constants.Configuration.Keys.ApiKey);
 
         var username = ReadProviderConfiguration(options.Username ?? "",
-            "Koan:Data:OpenSearch:Username");
+            Infrastructure.Constants.Configuration.Keys.Username);
 
         var password = ReadProviderConfiguration(options.Password ?? "",
-            "Koan:Data:OpenSearch:Password");
+            Infrastructure.Constants.Configuration.Keys.Password);
 
         var explicitConnectionString = ReadProviderConfiguration("",
             Infrastructure.Constants.Configuration.Keys.ConnectionString,
@@ -99,35 +99,35 @@ internal sealed class OpenSearchOptionsConfigurator : AdapterOptionsConfigurator
         // Configure OpenSearch-specific options
         options.IndexPrefix = ReadProviderConfiguration(
             options.IndexPrefix ?? "koan",
-            "Koan:Data:OpenSearch:IndexPrefix");
+            Infrastructure.Constants.Configuration.Keys.IndexPrefix);
         options.IndexName = ReadProviderConfiguration(
             options.IndexName ?? "",
-            "Koan:Data:OpenSearch:IndexName");
+            Infrastructure.Constants.Configuration.Keys.IndexName);
         options.VectorField = ReadProviderConfiguration(
             options.VectorField,
-            "Koan:Data:OpenSearch:VectorField");
+            Infrastructure.Constants.Configuration.Keys.VectorField);
         options.MetadataField = ReadProviderConfiguration(
             options.MetadataField,
-            "Koan:Data:OpenSearch:MetadataField");
+            Infrastructure.Constants.Configuration.Keys.MetadataField);
         options.IdField = ReadProviderConfiguration(
             options.IdField,
-            "Koan:Data:OpenSearch:IdField");
+            Infrastructure.Constants.Configuration.Keys.IdField);
         options.SimilarityMetric = ReadProviderConfiguration(
             options.SimilarityMetric,
-            "Koan:Data:OpenSearch:SimilarityMetric");
+            Infrastructure.Constants.Configuration.Keys.SimilarityMetric);
         options.RefreshMode = ReadProviderConfiguration(
             options.RefreshMode,
-            "Koan:Data:OpenSearch:RefreshMode");
+            Infrastructure.Constants.Configuration.Keys.RefreshMode);
         options.DefaultTimeoutSeconds = ReadProviderConfiguration(
             options.DefaultTimeoutSeconds,
-            "Koan:Data:OpenSearch:TimeoutSeconds");
+            Infrastructure.Constants.Configuration.Keys.TimeoutSeconds);
 
-        if (int.TryParse(ReadProviderConfiguration("", "Koan:Data:OpenSearch:Dimension"), out var dimension))
+        if (int.TryParse(ReadProviderConfiguration("", Infrastructure.Constants.Configuration.Keys.Dimension), out var dimension))
             options.Dimension = dimension;
 
         options.DisableIndexAutoCreate = ReadProviderConfiguration(
             options.DisableIndexAutoCreate,
-            "Koan:Data:OpenSearch:DisableIndexAutoCreate");
+            Infrastructure.Constants.Configuration.Keys.DisableIndexAutoCreate);
 
         Logger?.LogInformation("Final OpenSearch Configuration");
         Logger?.LogInformation("Connection: {ConnectionString}", options.ConnectionString);
@@ -160,7 +160,7 @@ internal sealed class OpenSearchOptionsConfigurator : AdapterOptionsConfigurator
             };
 
             // Use autonomous discovery coordinator
-            var discoveryTask = _discoveryCoordinator.DiscoverServiceAsync("opensearch", context);
+            var discoveryTask = _discoveryCoordinator.DiscoverService("opensearch", context);
             var result = discoveryTask.GetAwaiter().GetResult();
 
             if (result.IsSuccessful)
@@ -183,7 +183,7 @@ internal sealed class OpenSearchOptionsConfigurator : AdapterOptionsConfigurator
 
     private bool IsAutoDetectionDisabled()
     {
-        return Koan.Core.Configuration.Read(Configuration, "Koan:Data:OpenSearch:DisableAutoDetection", false);
+        return Koan.Core.Configuration.Read(Configuration, Infrastructure.Constants.Configuration.Keys.DisableAutoDetection, false);
     }
 }
 

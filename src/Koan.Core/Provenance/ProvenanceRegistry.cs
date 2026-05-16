@@ -14,7 +14,7 @@ namespace Koan.Core.Provenance
     private readonly object _gate = new();
     private readonly Dictionary<string, PillarState> _pillars = new(StringComparer.OrdinalIgnoreCase);
     private long _sequence;
-    private ProvenanceSnapshot _snapshot = new(0, Guid.CreateVersion7(), DateTimeOffset.UtcNow, Array.Empty<ProvenancePillar>());
+    private ProvenanceSnapshot _snapshot = new(0, Guid.CreateVersion7(), DateTimeOffset.UtcNow, []);
 
     private ProvenanceRegistry()
     {

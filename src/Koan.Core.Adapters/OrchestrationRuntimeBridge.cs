@@ -72,8 +72,8 @@ public static class OrchestrationRuntimeBridge
         {
             var orchestrationConfig = new Dictionary<string, string?>
             {
-                [$"Koan:Services:{adapterId}:OrchestrationMode"] = "managed",
-                [$"Koan:Services:{adapterId}:ServiceKind"] = orchestrationContext.ServiceKind.ToString()
+                [Infrastructure.ConfigurationConstants.Services.OrchestrationMode(adapterId)] = "managed",
+                [Infrastructure.ConfigurationConstants.Services.ServiceKind(adapterId)] = orchestrationContext.ServiceKind.ToString()
             };
 
             bridgedConfig.AddInMemoryCollection(orchestrationConfig);
@@ -94,7 +94,7 @@ public static class OrchestrationRuntimeBridge
     /// <summary>
     /// Initialize adapter with orchestration context if supported
     /// </summary>
-    public static async Task<bool> TryInitializeWithOrchestrationAsync(
+    public static async Task<bool> TryInitializeWithOrchestration(
         IKoanAdapter adapter,
         UnifiedServiceMetadata orchestrationContext,
         ILogger logger,

@@ -8,12 +8,12 @@ public sealed class CanonExternalId
     /// <summary>
     /// Identifier scheme (e.g., crm, sap, device).
     /// </summary>
-    public string Scheme { get; set; } = string.Empty;
+    public string Scheme { get; set; } = "";
 
     /// <summary>
     /// Identifier value.
     /// </summary>
-    public string Value { get; set; } = string.Empty;
+    public string Value { get; set; } = "";
 
     /// <summary>
     /// Optional source attribution key.

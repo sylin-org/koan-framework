@@ -11,31 +11,31 @@ public interface IEntityHookPipeline<TEntity>
 {
     HookContext<TEntity> CreateContext(EntityRequestContext requestContext);
 
-    Task<AuthorizeDecision> AuthorizeAsync(HookContext<TEntity> context, AuthorizeRequest request);
+    Task<AuthorizeDecision> Authorize(HookContext<TEntity> context, AuthorizeRequest request);
 
-    Task<bool> BuildOptionsAsync(HookContext<TEntity> context, QueryOptions options);
+    Task<bool> BuildOptions(HookContext<TEntity> context, QueryOptions options);
 
-    Task<bool> BeforeCollectionAsync(HookContext<TEntity> context, QueryOptions options);
+    Task<bool> BeforeCollection(HookContext<TEntity> context, QueryOptions options);
 
-    Task<bool> AfterCollectionAsync(HookContext<TEntity> context, List<TEntity> items);
+    Task<bool> AfterCollection(HookContext<TEntity> context, List<TEntity> items);
 
-    Task<bool> BeforeModelFetchAsync(HookContext<TEntity> context, string id);
+    Task<bool> BeforeModelFetch(HookContext<TEntity> context, string id);
 
-    Task<bool> AfterModelFetchAsync(HookContext<TEntity> context, TEntity? model);
+    Task<bool> AfterModelFetch(HookContext<TEntity> context, TEntity? model);
 
-    Task<bool> BeforeSaveAsync(HookContext<TEntity> context, TEntity model);
+    Task<bool> BeforeSave(HookContext<TEntity> context, TEntity model);
 
-    Task<bool> AfterSaveAsync(HookContext<TEntity> context, TEntity model);
+    Task<bool> AfterSave(HookContext<TEntity> context, TEntity model);
 
-    Task<bool> BeforeDeleteAsync(HookContext<TEntity> context, TEntity model);
+    Task<bool> BeforeDelete(HookContext<TEntity> context, TEntity model);
 
-    Task<bool> AfterDeleteAsync(HookContext<TEntity> context, TEntity model);
+    Task<bool> AfterDelete(HookContext<TEntity> context, TEntity model);
 
-    Task<bool> BeforePatchAsync(HookContext<TEntity> context, string id, object patch);
+    Task<bool> BeforePatch(HookContext<TEntity> context, string id, object patch);
 
-    Task<bool> AfterPatchAsync(HookContext<TEntity> context, TEntity model);
+    Task<bool> AfterPatch(HookContext<TEntity> context, TEntity model);
 
-    Task<(bool replaced, object payload)> EmitCollectionAsync(HookContext<TEntity> context, object payload);
+    Task<(bool replaced, object payload)> EmitCollection(HookContext<TEntity> context, object payload);
 
-    Task<(bool replaced, object payload)> EmitModelAsync(HookContext<TEntity> context, object payload);
+    Task<(bool replaced, object payload)> EmitModel(HookContext<TEntity> context, object payload);
 }

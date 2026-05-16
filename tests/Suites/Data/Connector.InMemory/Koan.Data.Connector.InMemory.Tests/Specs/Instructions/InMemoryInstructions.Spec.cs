@@ -20,7 +20,7 @@ public sealed class InMemoryInstructionsSpec
     public async Task Instruction_clear_returns_deleted_count()
     {
         await TestPipeline.For<InMemoryInstructionsSpec>(_output, nameof(Instruction_clear_returns_deleted_count))
-            .Using<InMemoryConnectorFixture>("fixture", static ctx => InMemoryConnectorFixture.CreateAsync(ctx))
+            .Using<InMemoryConnectorFixture>("fixture", static ctx => InMemoryConnectorFixture.Create(ctx))
             .Arrange(static async ctx =>
             {
                 var fixture = ctx.GetRequiredItem<InMemoryConnectorFixture>("fixture");
@@ -35,7 +35,7 @@ public sealed class InMemoryInstructionsSpec
 
                 await using var lease = fixture.LeasePartition(partition);
 
-                await InstructionProbe.UpsertAsync(new InstructionProbe { Name = "item" });
+                await InstructionProbe.Upsert(new InstructionProbe { Name = "item" });
 
                 var before = await InstructionProbe.Count.Exact();
                 before.Should().Be(1);
@@ -49,14 +49,14 @@ public sealed class InMemoryInstructionsSpec
                 var remaining = await InstructionProbe.All(partition);
                 remaining.Should().BeEmpty();
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
     public async Task Instruction_ensure_created_is_idempotent()
     {
         await TestPipeline.For<InMemoryInstructionsSpec>(_output, nameof(Instruction_ensure_created_is_idempotent))
-            .Using<InMemoryConnectorFixture>("fixture", static ctx => InMemoryConnectorFixture.CreateAsync(ctx))
+            .Using<InMemoryConnectorFixture>("fixture", static ctx => InMemoryConnectorFixture.Create(ctx))
             .Arrange(static async ctx =>
             {
                 var fixture = ctx.GetRequiredItem<InMemoryConnectorFixture>("fixture");
@@ -73,11 +73,11 @@ public sealed class InMemoryInstructionsSpec
                 var second = await fixture.Data.Execute<InstructionProbe, string, bool>(new Instruction(DataInstructions.EnsureCreated));
                 second.Should().BeTrue();
             })
-            .RunAsync();
+            .Run();
     }
 
     private sealed class InstructionProbe : Entity<InstructionProbe>
     {
-        public string Name { get; set; } = string.Empty;
+        public string Name { get; set; } = "";
     }
 }

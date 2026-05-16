@@ -18,7 +18,7 @@ public sealed class JsonCapabilitiesSpec
     public async Task Repository_reports_linq_capability_and_no_native_bulk_writes()
     {
         await TestPipeline.For<JsonCapabilitiesSpec>(_output, nameof(Repository_reports_linq_capability_and_no_native_bulk_writes))
-            .Using<JsonConnectorFixture>("fixture", static ctx => JsonConnectorFixture.CreateAsync(ctx))
+            .Using<JsonConnectorFixture>("fixture", static ctx => JsonConnectorFixture.Create(ctx))
             .Arrange(static async ctx =>
             {
                 var fixture = ctx.GetRequiredItem<JsonConnectorFixture>("fixture");
@@ -40,15 +40,15 @@ public sealed class JsonCapabilitiesSpec
                 var writeCaps = repository.Should().BeAssignableTo<IWriteCapabilities>().Subject;
                 writeCaps.Writes.Should().Be(WriteCapabilities.None);
 
-                await CapabilityProbe.UpsertAsync(new CapabilityProbe { Name = "cap" });
+                await CapabilityProbe.Upsert(new CapabilityProbe { Name = "cap" });
                 var all = await CapabilityProbe.All();
                 all.Should().ContainSingle(p => p.Name == "cap");
             })
-            .RunAsync();
+            .Run();
     }
 
     private sealed class CapabilityProbe : Entity<CapabilityProbe>
     {
-        public string Name { get; set; } = string.Empty;
+        public string Name { get; set; } = "";
     }
 }

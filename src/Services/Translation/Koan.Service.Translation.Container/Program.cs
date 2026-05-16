@@ -45,4 +45,4 @@ app.MapGet("/.well-known/koan-service", () => Results.Ok(new
     }
 }));
 
-app.Run();
+app.RunAsync();

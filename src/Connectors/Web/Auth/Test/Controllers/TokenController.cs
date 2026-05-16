@@ -28,7 +28,7 @@ public sealed class TokenController(IOptionsSnapshot<TestProviderOptions> opts, 
         // Handle authorization code flow (existing logic)
         if (!string.Equals(req.grant_type, "authorization_code", StringComparison.OrdinalIgnoreCase)) return BadRequest(new { error = "unsupported_grant_type" });
         if (string.IsNullOrWhiteSpace(req.code) || string.IsNullOrWhiteSpace(req.redirect_uri) || string.IsNullOrWhiteSpace(req.client_id)) return BadRequest(new { error = "invalid_request" });
-        if (!string.Equals(req.client_id, o.ClientId, StringComparison.Ordinal) || !string.Equals(req.client_secret ?? string.Empty, o.ClientSecret, StringComparison.Ordinal)) return Unauthorized();
+        if (!string.Equals(req.client_id, o.ClientId, StringComparison.Ordinal) || !string.Equals(req.client_secret ?? "", o.ClientSecret, StringComparison.Ordinal)) return Unauthorized();
 
         if (!store.TryRedeemCode(req.code, out var profile, out var challenge, out var envx)) { logger.LogDebug("TestProvider token: invalid_grant for code {Code}", req.code); return BadRequest(new { error = "invalid_grant" }); }
         // Enforce PKCE S256 when a challenge is present
@@ -107,7 +107,7 @@ public sealed class TokenController(IOptionsSnapshot<TestProviderOptions> opts, 
     private string[] ParseScopes(string? scope)
     {
         if (string.IsNullOrWhiteSpace(scope))
-            return Array.Empty<string>();
+            return [];
 
         return scope.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }

@@ -24,10 +24,13 @@
     <!-- Storage -->
     <ProjectReference Include="..\..\src\Koan.Storage\Koan.Storage.csproj" />
     <ProjectReference Include="..\..\src\Connectors\Storage\Local\Koan.Storage.Connector.Local.csproj" />
+    <ProjectReference Include="..\..\src\Connectors\Storage\S3\Koan.Storage.Connector.S3.csproj" />
 
     <!-- AI -->
     <ProjectReference Include="..\..\src\Koan.AI\Koan.AI.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.AI\Koan.Data.AI.csproj" />
     <ProjectReference Include="..\..\src\Connectors\AI\Ollama\Koan.AI.Connector.Ollama.csproj" />
+    <ProjectReference Include="..\..\src\Koan.ZenGarden\Koan.ZenGarden.csproj" />
 
     <!-- Vector Search -->
     <ProjectReference Include="..\..\src\Koan.Data.Vector\Koan.Data.Vector.csproj" />
@@ -37,7 +40,7 @@
 
   <ItemGroup>
     <!-- Image Processing Library -->
-    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
     <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.4" />
 
     <!-- EXIF Metadata -->

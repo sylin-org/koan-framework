@@ -18,7 +18,7 @@ public class EmbeddingCacheTests
         var cache = new EmbeddingCache(NullLogger<EmbeddingCache>.Instance);
 
         // Ensure a clean slate
-        await cache.FlushAsync(Ct);
+        await cache.Flush(Ct);
 
         var content = "Meridian cache test";
         var hash = EmbeddingCache.ComputeContentHash(content);
@@ -26,19 +26,19 @@ public class EmbeddingCacheTests
         const string modelId = "granite3.3:8b";
         const string entityType = nameof(Passage);
 
-        await cache.SetAsync(hash, modelId, embedding, entityType, Ct);
+        await cache.Set(hash, modelId, embedding, entityType, Ct);
 
-        var cached = await cache.GetAsync(hash, modelId, entityType, Ct);
+        var cached = await cache.Get(hash, modelId, entityType, Ct);
         cached.Should().NotBeNull();
         cached!.Embedding.Should().BeEquivalentTo(embedding);
 
-        var stats = await cache.GetStatsAsync(Ct);
+        var stats = await cache.GetStats(Ct);
         stats.TotalEntries.Should().BeGreaterThan(0);
 
-        var deleted = await cache.FlushAsync(Ct);
+        var deleted = await cache.Flush(Ct);
         deleted.Should().BeGreaterThan(0);
 
-        var after = await cache.GetAsync(hash, modelId, entityType, Ct);
+        var after = await cache.Get(hash, modelId, entityType, Ct);
         after.Should().BeNull();
     }
 }

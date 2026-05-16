@@ -26,7 +26,7 @@ public sealed class WeaviateConnectorSpec
         await TestPipeline.For<WeaviateConnectorSpec>(_output, nameof(Vector_crud_and_search_roundtrip))
             .RequireDocker()
             .UsingWeaviateContainer()
-            .Using<WeaviateConnectorFixture>("fixture", static ctx => WeaviateConnectorFixture.CreateAsync(ctx))
+            .Using<WeaviateConnectorFixture>("fixture", static ctx => WeaviateConnectorFixture.Create(ctx))
             .Arrange(static async ctx =>
             {
                 var fixture = ctx.GetRequiredItem<WeaviateConnectorFixture>("fixture");
@@ -35,7 +35,7 @@ public sealed class WeaviateConnectorSpec
                 fixture.BindHost();
                 (await VectorNote.All()).Should().BeEmpty("reset should leave no persisted documents");
 
-                var emptySearch = await VectorData<VectorNote>.SearchAsync(new VectorQueryOptions(new[] { 0f, 0f, 0f }, TopK: 3));
+                var emptySearch = await VectorData<VectorNote>.Search(new VectorQueryOptions(new[] { 0f, 0f, 0f }, TopK: 3));
                 emptySearch.Matches.Should().BeEmpty("reset should remove residual vectors");
             })
             .Assert(async ctx =>
@@ -66,7 +66,7 @@ public sealed class WeaviateConnectorSpec
                 alpha.Title = "Graph embeddings updated";
                 await VectorData<VectorNote>.SaveWithVector(alpha, new[] { 0.97f, 0.02f, 0.01f }, Metadata(alpha));
 
-                var vectorOnly = await VectorData<VectorNote>.SearchAsync(new VectorQueryOptions(new[] { 1.0f, 0.0f, 0.0f }, TopK: 3));
+                var vectorOnly = await VectorData<VectorNote>.Search(new VectorQueryOptions(new[] { 1.0f, 0.0f, 0.0f }, TopK: 3));
                 vectorOnly.Matches.Should().HaveCount(3);
                 vectorOnly.ContinuationToken.Should().BeNull();
 
@@ -81,7 +81,7 @@ public sealed class WeaviateConnectorSpec
                     .index;
                 betaVectorOnlyRank.Should().BeGreaterThan(0, "vector-only scoring should not favor the text match");
 
-                var hybrid = await VectorData<VectorNote>.SearchAsync(new VectorQueryOptions(
+                var hybrid = await VectorData<VectorNote>.Search(new VectorQueryOptions(
                     Query: new[] { 0.5f, 0.4f, 0.1f },
                     TopK: 3,
                     SearchText: "adapter",
@@ -98,7 +98,7 @@ public sealed class WeaviateConnectorSpec
                 betaHybridRank.Should().BeLessThanOrEqualTo(betaVectorOnlyRank, "keyword weighting should not demote the text-matching note");
                 betaHybridMatch.Score.Should().BeGreaterThan(betaVectorOnlyMatch.Score, "hybrid scoring should boost the text match compared to pure vector results");
 
-                var textOnly = await VectorData<VectorNote>.SearchAsync(new VectorQueryOptions(
+                var textOnly = await VectorData<VectorNote>.Search(new VectorQueryOptions(
                     Query: new[] { 0f, 0f, 0f },
                     TopK: 1,
                     SearchText: "weaviate adapters",
@@ -106,7 +106,7 @@ public sealed class WeaviateConnectorSpec
                 textOnly.Matches.Should().ContainSingle("text-only search should use persisted metadata");
                 textOnly.Matches[0].Id.Should().Be(beta.Id);
             })
-            .RunAsync();
+            .Run();
 
         static IReadOnlyDictionary<string, object> Metadata(VectorNote note)
             => new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
@@ -119,5 +119,5 @@ public sealed class WeaviateConnectorSpec
 
 internal sealed class VectorNote : Entity<VectorNote>
 {
-    public string Title { get; set; } = string.Empty;
+    public string Title { get; set; } = "";
 }

@@ -12,7 +12,7 @@ public sealed class TransferResult<TKey>
     public int DeletedCount { get; init; }
     public TimeSpan Duration { get; init; }
     public IReadOnlyList<TransferConflict<TKey>> Conflicts { get; init; } = Array.Empty<TransferConflict<TKey>>();
-    public IReadOnlyList<TransferAuditBatch> Audit { get; init; } = Array.Empty<TransferAuditBatch>();
-    public IReadOnlyList<string> Warnings { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<TransferAuditBatch> Audit { get; init; } = [];
+    public IReadOnlyList<string> Warnings { get; init; } = [];
     public bool HasConflicts => Conflicts.Count > 0;
 }

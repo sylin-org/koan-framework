@@ -18,20 +18,22 @@ namespace Koan.Data.AI.Tests;
 public class Phase2_QueryExtensionsTests
 {
     [Fact]
-    public void EntityWithoutEmbeddingAttribute_ThrowsInvalidOperationException()
+    public void EntityWithoutEmbeddingAttribute_ReturnsConventionInferredMetadata()
     {
-        // Arrange & Act
-        Action act = () => EmbeddingMetadata.Get<NonEmbeddableEntity>();
+        // Arrange & Act — Resolve() never returns null (AI-0021 convention defaults)
+        var metadata = EmbeddingMetadata.Resolve<NonEmbeddableEntity>();
 
-        // Assert
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*has no [Embedding] attribute*")
-            .WithMessage("*Add [Embedding] to enable*");
+        // Assert — convention-inferred: AllStrings policy, lifecycle disabled
+        metadata.Should().NotBeNull();
+        metadata.Policy.Should().Be(Koan.Data.AI.Attributes.EmbeddingPolicy.AllStrings);
+        metadata.LifecycleEnabled.Should().BeFalse("no [Embedding] attribute = no auto-embed-on-save");
+        metadata.HasAttribute.Should().BeFalse();
+        metadata.Properties.Should().Contain("Name");
     }
 }
 
 /// <summary>
-/// Test entity WITHOUT [Embedding] attribute to validate error handling
+/// Test entity WITHOUT [Embedding] attribute — used to verify convention-inferred metadata
 /// </summary>
 public class NonEmbeddableEntity : Koan.Data.Core.Model.Entity<NonEmbeddableEntity>
 {

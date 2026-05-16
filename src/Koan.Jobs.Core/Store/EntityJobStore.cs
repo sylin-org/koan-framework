@@ -8,64 +8,66 @@ using Koan.Jobs.Support;
 
 namespace Koan.Jobs.Store;
 
-internal sealed class EntityJobStore : IJobStore
+internal sealed class EntityJobStore(JobIndexCache index) : IJobStore
 {
-    private readonly JobIndexCache _index;
 
-    public EntityJobStore(JobIndexCache index)
-    {
-        _index = index;
-    }
-
-    public async Task<Job> CreateAsync(Job job, JobStoreMetadata metadata, CancellationToken cancellationToken)
+    public async Task<Job> Create(Job job, JobStoreMetadata metadata, CancellationToken cancellationToken)
     {
         using var scope = EnterContext(metadata.Source, metadata.Partition);
         await job.Save(cancellationToken);
-        _index.Set(new JobIndexEntry(job.Id, JobStorageMode.Entity, metadata.Source, metadata.Partition, metadata.Audit, job.GetType()));
+        index.Set(new JobIndexEntry(job.Id, JobStorageMode.Entity, metadata.Source, metadata.Partition, metadata.Audit, job.GetType()));
         return job;
     }
 
-    public async Task<Job?> GetAsync(string jobId, JobStoreMetadata metadata, CancellationToken cancellationToken)
+    public async Task<Job?> Get(string jobId, JobStoreMetadata metadata, CancellationToken cancellationToken)
     {
         using var scope = EnterContext(metadata.Source, metadata.Partition);
         var job = await Job.Get(jobId, cancellationToken);
         if (job != null)
         {
-            _index.Set(new JobIndexEntry(job.Id, JobStorageMode.Entity, metadata.Source, metadata.Partition, metadata.Audit, job.GetType()));
+            index.Set(new JobIndexEntry(job.Id, JobStorageMode.Entity, metadata.Source, metadata.Partition, metadata.Audit, job.GetType()));
         }
         return job;
     }
 
-    public async Task<Job> UpdateAsync(Job job, JobStoreMetadata metadata, CancellationToken cancellationToken)
+    public async Task<Job> Update(Job job, JobStoreMetadata metadata, CancellationToken cancellationToken)
     {
         using var scope = EnterContext(metadata.Source, metadata.Partition);
         await job.Save(cancellationToken);
-        _index.Set(new JobIndexEntry(job.Id, JobStorageMode.Entity, metadata.Source, metadata.Partition, metadata.Audit, job.GetType()));
+        index.Set(new JobIndexEntry(job.Id, JobStorageMode.Entity, metadata.Source, metadata.Partition, metadata.Audit, job.GetType()));
         return job;
     }
 
-    public async Task RemoveAsync(string jobId, JobStoreMetadata metadata, CancellationToken cancellationToken)
+    public async Task Remove(string jobId, JobStoreMetadata metadata, CancellationToken cancellationToken)
     {
         using var scope = EnterContext(metadata.Source, metadata.Partition);
         await Job.Remove(jobId, cancellationToken);
-        _index.Remove(jobId);
+        index.Remove(jobId);
     }
 
-    public async Task<JobExecution> CreateExecutionAsync(JobExecution execution, JobStoreMetadata metadata, CancellationToken cancellationToken)
+    public async Task<bool> HasCompletedJobOfType(string typeName, JobStoreMetadata metadata, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(typeName)) return false;
+        using var scope = EnterContext(metadata.Source, metadata.Partition);
+        var hits = await Job.Query(j => j.TypeName == typeName && j.Status == JobStatus.Completed, cancellationToken);
+        return hits.Count > 0;
+    }
+
+    public async Task<JobExecution> CreateExecution(JobExecution execution, JobStoreMetadata metadata, CancellationToken cancellationToken)
     {
         using var scope = EnterContext(metadata.Source, metadata.Partition);
         await execution.Save(cancellationToken);
         return execution;
     }
 
-    public async Task<JobExecution> UpdateExecutionAsync(JobExecution execution, JobStoreMetadata metadata, CancellationToken cancellationToken)
+    public async Task<JobExecution> UpdateExecution(JobExecution execution, JobStoreMetadata metadata, CancellationToken cancellationToken)
     {
         using var scope = EnterContext(metadata.Source, metadata.Partition);
         await execution.Save(cancellationToken);
         return execution;
     }
 
-    public async Task<IReadOnlyList<JobExecution>> ListExecutionsAsync(string jobId, JobStoreMetadata metadata, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<JobExecution>> ListExecutions(string jobId, JobStoreMetadata metadata, CancellationToken cancellationToken)
     {
         using var scope = EnterContext(metadata.Source, metadata.Partition);
         var executions = await JobExecution.Query(e => e.JobId == jobId, cancellationToken);

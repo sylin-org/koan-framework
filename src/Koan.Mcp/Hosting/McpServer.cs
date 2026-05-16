@@ -48,12 +48,12 @@ public sealed class McpServer
         return new McpRpcHandler(_registry, _executor, _services, _serverOptions, handlerLogger);
     }
 
-    public Task RunAsync(McpRpcHandler handler, Stream input, Stream output, CancellationToken cancellationToken)
+    public Task Run(McpRpcHandler handler, Stream input, Stream output, CancellationToken cancellationToken)
     {
         if (handler is null) throw new ArgumentNullException(nameof(handler));
         if (input is null) throw new ArgumentNullException(nameof(input));
         if (output is null) throw new ArgumentNullException(nameof(output));
 
-        return _dispatcher.RunAsync(handler, input, output, cancellationToken);
+        return _dispatcher.Run(handler, input, output, cancellationToken);
     }
 }

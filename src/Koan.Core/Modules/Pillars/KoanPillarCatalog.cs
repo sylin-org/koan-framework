@@ -272,7 +272,7 @@ public static class KoanPillarCatalog
         {
             if (string.IsNullOrWhiteSpace(value))
             {
-                return string.Empty;
+                return "";
             }
 
             var trimmed = value.Trim();

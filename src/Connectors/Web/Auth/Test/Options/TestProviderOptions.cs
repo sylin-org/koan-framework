@@ -8,7 +8,7 @@ public sealed class TestProviderOptions
     public string ClientId { get; init; } = "test-client";
     public string ClientSecret { get; init; } = "test-secret";
     public bool ExposeInDiscoveryOutsideDevelopment { get; init; } = false;
-    public string[] AllowedRedirectUris { get; init; } = Array.Empty<string>();
+    public string[] AllowedRedirectUris { get; init; } = [];
 
     // Caps and DX knobs
     public int MaxRoles { get; init; } = 256; // align with Koan.Web.Auth.Roles default
@@ -22,7 +22,7 @@ public sealed class TestProviderOptions
 
     // JWT Token Configuration
     public bool UseJwtTokens { get; set; } = false;
-    public string JwtSigningKey { get; init; } = string.Empty; // Base64 encoded key; auto-generated if empty
+    public string JwtSigningKey { get; init; } = ""; // Base64 encoded key; auto-generated if empty
     public string JwtAlgorithm { get; init; } = "HS256";
     public string JwtIssuer { get; set; } = "koan-test-provider";
     public string JwtAudience { get; set; } = "koan-test-client";
@@ -31,6 +31,6 @@ public sealed class TestProviderOptions
     // Client Credentials Support
     public bool EnableClientCredentials { get; set; } = false;
     public Dictionary<string, ClientCredentialsClient> RegisteredClients { get; init; } = new();
-    public string[] AllowedScopes { get; set; } = Array.Empty<string>();
+    public string[] AllowedScopes { get; set; } = [];
 }
 

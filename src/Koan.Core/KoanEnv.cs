@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Koan.Core.Hosting.App;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Logging;
 using Koan.Core.Provenance;
@@ -31,12 +32,14 @@ public static class KoanEnv
                 ("processStart", snap.ProcessStart.ToString("o")),
                 ("orchestrationMode", snap.OrchestrationMode.ToString()),
                 ("sessionId", snap.SessionId),
-                ("assemblies", KoanAssemblies.Length));
+                ("assemblies", KoanAssemblies.Length),
+                ("application", snap.Identity.Name),
+                ("applicationCode", snap.Identity.Code));
             return;
         }
 
         // Fallback to console output if no logger available
-        Console.WriteLine("[K:SNAP] env.snapshot environment={0} isDevelopment={1} isProduction={2} isStaging={3} inContainer={4} isCi={5} allowMagicInProduction={6} processStart={7:o} orchestrationMode={8} sessionId={9} assemblies={10}",
+        Console.WriteLine("[K:SNAP] env.snapshot environment={0} isDevelopment={1} isProduction={2} isStaging={3} inContainer={4} isCi={5} allowMagicInProduction={6} processStart={7:o} orchestrationMode={8} sessionId={9} assemblies={10} application={11} applicationCode={12}",
             snap.EnvironmentName,
             snap.IsDevelopment,
             snap.IsProduction,
@@ -47,7 +50,9 @@ public static class KoanEnv
             snap.ProcessStart,
             snap.OrchestrationMode,
             snap.SessionId,
-            KoanAssemblies.Length);
+            KoanAssemblies.Length,
+            snap.Identity.Name,
+            snap.Identity.Code);
     }
 
     private static readonly object _gate = new();
@@ -159,7 +164,7 @@ public static class KoanEnv
                 Infrastructure.Constants.Configuration.Env.DotnetEnvironment,
                 Infrastructure.Constants.Configuration.Env.AspNetCoreEnvironment
             )
-            ?? string.Empty;
+            ?? "";
         bool isDev = env?.IsDevelopment() ?? string.Equals(envName, "Development", StringComparison.OrdinalIgnoreCase);
         bool isProd = env?.IsProduction() ?? string.Equals(envName, "Production", StringComparison.OrdinalIgnoreCase);
         bool isStg = env?.IsStaging() ?? string.Equals(envName, "Staging", StringComparison.OrdinalIgnoreCase);
@@ -191,7 +196,9 @@ public static class KoanEnv
         var sessionId = Configuration.Read<string?>(cfg, Infrastructure.Constants.Configuration.Env.KoanSessionId, null) ??
                        Guid.NewGuid().ToString("N")[..8];
 
-        return new SnapshotData(envName, isDev, isProd, isStg, inContainer, isCi, magic, DateTimeOffset.UtcNow, orchestrationMode, sessionId);
+        var identity = ApplicationIdentityDefaults.Resolve(cfg, env);
+
+        return new SnapshotData(envName, isDev, isProd, isStg, inContainer, isCi, magic, DateTimeOffset.UtcNow, orchestrationMode, sessionId, identity);
     }
 
     private static SnapshotData Current => _initialized && _snap is not null ? _snap : ComputeSnapshot(null, null);
@@ -207,7 +214,8 @@ public static class KoanEnv
         Current.ProcessStart,
         Current.OrchestrationMode,
         Current.SessionId,
-        AssemblyCache.Instance.GetKoanAssemblies().Length);
+        AssemblyCache.Instance.GetKoanAssemblies().Length,
+        Current.Identity);
 
     public static string EnvironmentName => CurrentSnapshot.EnvironmentName;
     public static bool IsDevelopment => CurrentSnapshot.IsDevelopment;
@@ -232,7 +240,8 @@ public static class KoanEnv
         bool AllowMagicInProduction,
         DateTimeOffset ProcessStart,
         OrchestrationMode OrchestrationMode,
-        string SessionId);
+        string SessionId,
+        ApplicationIdentitySnapshot Identity);
 }
 
 public readonly record struct KoanEnvironmentSnapshot(
@@ -246,7 +255,8 @@ public readonly record struct KoanEnvironmentSnapshot(
     DateTimeOffset ProcessStart,
     OrchestrationMode OrchestrationMode,
     string SessionId,
-    int AssemblyCount)
+    int AssemblyCount,
+    ApplicationIdentitySnapshot Application)
 {
     public TimeSpan Uptime => DateTimeOffset.UtcNow - ProcessStart;
 }

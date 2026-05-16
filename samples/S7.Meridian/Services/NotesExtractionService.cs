@@ -20,7 +20,7 @@ public interface INotesExtractionService
     /// Extract field values from free-text Authoritative Notes using AI interpretation
     /// with fuzzy field name matching.
     /// </summary>
-    Task<List<ExtractedField>> ExtractFromNotesAsync(
+    Task<List<ExtractedField>> ExtractFromNotes(
         DocumentPipeline pipeline,
         string virtualDocumentId,
         CancellationToken ct);
@@ -52,7 +52,7 @@ public sealed class NotesExtractionService : INotesExtractionService
         _options = options;
     }
 
-    public async Task<List<ExtractedField>> ExtractFromNotesAsync(
+    public async Task<List<ExtractedField>> ExtractFromNotes(
         DocumentPipeline pipeline,
         string virtualDocumentId,
         CancellationToken ct)
@@ -87,15 +87,14 @@ public sealed class NotesExtractionService : INotesExtractionService
 
         try
         {
-            var chatOptions = new AiChatOptions
+            var chatOptions = new ChatOptions
             {
-                Message = prompt,
                 Model = _options.Extraction.Model ?? "granite3.3:8b",
                 Temperature = 0.1, // Low temperature for deterministic extraction
                 MaxTokens = 2000
             };
 
-            var response = await Ai.Chat(chatOptions, ct);
+            var response = await Client.Chat(prompt, chatOptions, ct);
 
             if (string.IsNullOrWhiteSpace(response))
             {
@@ -112,7 +111,7 @@ public sealed class NotesExtractionService : INotesExtractionService
 
             var extractionTime = DateTime.UtcNow - extractionStarted;
 
-            await _runLog.AppendAsync(new RunLog
+            await _runLog.Append(new RunLog
             {
                 PipelineId = pipeline.Id,
                 Stage = "notes-extraction",
@@ -140,7 +139,7 @@ public sealed class NotesExtractionService : INotesExtractionService
                 "Failed to extract from Authoritative Notes for pipeline {PipelineId}",
                 pipeline.Id);
 
-            await _runLog.AppendAsync(new RunLog
+            await _runLog.Append(new RunLog
             {
                 PipelineId = pipeline.Id,
                 Stage = "notes-extraction",

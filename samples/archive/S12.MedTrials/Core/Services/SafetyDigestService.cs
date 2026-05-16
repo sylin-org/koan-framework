@@ -21,7 +21,7 @@ public sealed class SafetyDigestService : ISafetyDigestService
         _logger = logger;
     }
 
-    public async Task<SafetySummaryResult> SummariseAsync(SafetySummaryRequest request, CancellationToken ct)
+    public async Task<SafetySummaryResult> Summarise(SafetySummaryRequest request, CancellationToken ct)
     {
         if (request is null) throw new ArgumentNullException(nameof(request));
 
@@ -50,13 +50,13 @@ public sealed class SafetyDigestService : ISafetyDigestService
         var eventList = events.Take(max).ToList();
         if (eventList.Count == 0)
         {
-            return new SafetySummaryResult($"No adverse events recorded in the last {lookback} days.", false, null, Array.Empty<string>(), eventList);
+            return new SafetySummaryResult($"No adverse events recorded in the last {lookback} days.", false, null, [], eventList);
         }
 
         var warnings = new List<string>();
         var ai = Ai.TryResolve();
         var degraded = false;
-        var model = string.Empty;
+        var model = "";
         string summary;
 
         if (ai is not null)
@@ -64,7 +64,7 @@ public sealed class SafetyDigestService : ISafetyDigestService
             try
             {
                 var prompt = BuildSafetyPrompt(eventList, request, lookback);
-                var response = await ai.PromptAsync(new AiChatRequest
+                var response = await ai.Prompt(new AiChatRequest
                 {
                     Model = string.IsNullOrWhiteSpace(request.Model) ? null : request.Model,
                     Messages =
@@ -78,7 +78,7 @@ public sealed class SafetyDigestService : ISafetyDigestService
                 if (!string.IsNullOrWhiteSpace(response.Text))
                 {
                     summary = response.Text.Trim();
-                    model = response.Model ?? request.Model ?? string.Empty;
+                    model = response.Model ?? request.Model ?? "";
                 }
                 else
                 {

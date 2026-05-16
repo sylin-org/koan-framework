@@ -79,7 +79,7 @@ public sealed class ResponseTranslator
             case ContentResult contentResult:
                 obj["statusCode"] = contentResult.StatusCode ?? 200;
                 obj["contentType"] = contentResult.ContentType ?? "text/plain";
-                obj["content"] = contentResult.Content ?? string.Empty;
+                obj["content"] = contentResult.Content ?? "";
                 break;
             case UnauthorizedResult:
                 obj["statusCode"] = 401; break;
@@ -89,28 +89,28 @@ public sealed class ResponseTranslator
                 obj["statusCode"] = statusCodeResult.StatusCode; break;
             case RedirectResult redirectResult:
                 obj["statusCode"] = redirectResult.Permanent ? 301 : 302;
-                obj["location"] = redirectResult.Url ?? string.Empty;
+                obj["location"] = redirectResult.Url ?? "";
                 obj["permanent"] = redirectResult.Permanent; break;
             case RedirectToRouteResult routeResult:
                 obj["statusCode"] = routeResult.Permanent ? 301 : 302;
-                obj["routeName"] = routeResult.RouteName ?? string.Empty;
+                obj["routeName"] = routeResult.RouteName ?? "";
                 if (routeResult.RouteValues is not null) obj["routeValues"] = SerializeObject(routeResult.RouteValues);
                 break;
             case ChallengeResult challengeResult:
                 obj["statusCode"] = 401;
-                obj["schemes"] = JArray.FromObject(challengeResult.AuthenticationSchemes ?? Array.Empty<string>());
+                obj["schemes"] = JArray.FromObject(challengeResult.AuthenticationSchemes ?? []);
                 if (challengeResult.Properties is not null) obj["properties"] = SerializeObject(challengeResult.Properties);
                 break;
             case ForbidResult forbidResult:
                 obj["statusCode"] = 403;
-                obj["schemes"] = JArray.FromObject(forbidResult.AuthenticationSchemes ?? Array.Empty<string>());
+                obj["schemes"] = JArray.FromObject(forbidResult.AuthenticationSchemes ?? []);
                 if (forbidResult.Properties is not null) obj["properties"] = SerializeObject(forbidResult.Properties);
                 break;
             default:
                 if (actionResult is FileResult fileResult)
                 {
                     obj["statusCode"] = 200;
-                    obj["contentType"] = fileResult.ContentType ?? string.Empty;
+                    obj["contentType"] = fileResult.ContentType ?? "";
                     if (!string.IsNullOrEmpty(fileResult.FileDownloadName)) obj["fileName"] = fileResult.FileDownloadName;
                 }
                 break;

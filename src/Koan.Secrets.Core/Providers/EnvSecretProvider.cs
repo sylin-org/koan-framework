@@ -4,7 +4,7 @@ namespace Koan.Secrets.Core.Providers;
 
 public sealed class EnvSecretProvider : ISecretProvider
 {
-    public Task<SecretValue> GetAsync(SecretId id, CancellationToken ct = default)
+    public Task<SecretValue> Get(SecretId id, CancellationToken ct = default)
     {
         // Convention: SCOPE__NAME or SCOPE_NAME (uppercased, non-alnum to underscore)
         var key = ($"{id.Scope}__{id.Name}").Replace('-', '_').Replace('/', '_').ToUpperInvariant();

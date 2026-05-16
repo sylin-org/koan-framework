@@ -27,19 +27,19 @@ public static class Data<TEntity, TKey>
     public static IWriteCapabilities WriteCaps
         => Repo as IWriteCapabilities ?? new WriteCapsImpl(WriteCapabilities.None);
 
-    private static async Task<CountOutcome> CountInternalAsync(object? query, CountStrategy strategy, DataQueryOptions? options, CancellationToken ct)
+    private static async Task<CountOutcome> CountInternal(object? query, CountStrategy strategy, DataQueryOptions? options, CancellationToken ct)
     {
         var repo = Repo;
         var request = BuildCountRequest(query, strategy, options);
 
         try
         {
-            var result = await repo.CountAsync(request, ct);
+            var result = await repo.Count(request, ct);
             return new CountOutcome(result.Value, result.IsEstimate);
         }
         catch (NotSupportedException)
         {
-            var fallbackItems = await LoadItemsForFallbackAsync(repo, request, ct);
+            var fallbackItems = await LoadItemsForFallback(repo, request, ct);
             return new CountOutcome(fallbackItems.Count, false);
         }
     }
@@ -54,30 +54,30 @@ public static class Data<TEntity, TKey>
             ProviderQuery = query is string || query is Expression<Func<TEntity, bool>> ? null : query
         };
 
-    private static async Task<IReadOnlyList<TEntity>> LoadItemsForFallbackAsync(IDataRepository<TEntity, TKey> repo, CountRequest<TEntity> request, CancellationToken ct)
+    private static async Task<IReadOnlyList<TEntity>> LoadItemsForFallback(IDataRepository<TEntity, TKey> repo, CountRequest<TEntity> request, CancellationToken ct)
     {
         var payload = request.ProviderQuery ?? (object?)request.RawQuery ?? request.Predicate;
         var options = request.Options;
 
         if (repo is IDataRepositoryWithOptions<TEntity, TKey> repoWithOptions && options is not null)
         {
-            return await repoWithOptions.QueryAsync(payload, options, ct);
+            return await repoWithOptions.Query(payload, options, ct);
         }
 
         if (request.Predicate is not null && repo is ILinqQueryRepository<TEntity, TKey> linq)
         {
-            return await linq.QueryAsync(request.Predicate, ct);
+            return await linq.Query(request.Predicate, ct);
         }
 
         if (request.RawQuery is not null && repo is IStringQueryRepository<TEntity, TKey> str)
         {
-            return await str.QueryAsync(request.RawQuery, ct);
+            return await str.Query(request.RawQuery, ct);
         }
 
-        return await repo.QueryAsync(payload, ct);
+        return await repo.Query(payload, ct);
     }
-    public static Task<TEntity?> GetAsync(TKey id, CancellationToken ct = default) => Repo.GetAsync(id, ct);
-    public static Task<IReadOnlyList<TEntity?>> GetManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default) => Repo.GetManyAsync(ids, ct);
+    public static Task<TEntity?> Get(TKey id, CancellationToken ct = default) => Repo.Get(id, ct);
+    public static Task<IReadOnlyList<TEntity?>> GetMany(IEnumerable<TKey> ids, CancellationToken ct = default) => Repo.GetMany(ids, ct);
 
     // Full scan - no pagination applied unless explicitly requested by user
     public static Task<IReadOnlyList<TEntity>> All(CancellationToken ct = default)
@@ -129,12 +129,12 @@ public static class Data<TEntity, TKey>
 
         if (!hasPagination && absoluteMaxRecords.HasValue)
         {
-            var outcome = await CountInternalAsync(query, countStrategy, providedOptions, ct);
+            var outcome = await CountInternal(query, countStrategy, providedOptions, ct);
             if (outcome.Count > absoluteMaxRecords.Value)
             {
                 return new QueryResult<TEntity>
                 {
-                    Items = Array.Empty<TEntity>(),
+                    Items = [],
                     TotalCount = outcome.Count,
                     Page = 1,
                     PageSize = 0,
@@ -149,7 +149,7 @@ public static class Data<TEntity, TKey>
 
         if (hasPagination && repo is IPagedRepository<TEntity, TKey> pagedRepo)
         {
-            var repoResult = await pagedRepo.QueryPageAsync(query, normalizedOptions, ct);
+            var repoResult = await pagedRepo.QueryPage(query, normalizedOptions, ct);
             return new QueryResult<TEntity>
             {
                 Items = repoResult.Items,
@@ -167,18 +167,18 @@ public static class Data<TEntity, TKey>
 
         if (repo is IDataRepositoryWithOptions<TEntity, TKey> repoWithOptions)
         {
-            items = await repoWithOptions.QueryAsync(query, normalizedOptions, ct);
+            items = await repoWithOptions.Query(query, normalizedOptions, ct);
             repositoryHandledPagination = hasPagination;
         }
         else
         {
-            items = await repo.QueryAsync(query, ct);
+            items = await repo.Query(query, ct);
         }
 
         CountOutcome? countOutcome = precomputedCount;
         if (!countOutcome.HasValue && (hasPagination || absoluteMaxRecords.HasValue))
         {
-            countOutcome = await CountInternalAsync(query, countStrategy, providedOptions, ct);
+            countOutcome = await CountInternal(query, countStrategy, providedOptions, ct);
         }
 
         var totalCount = countOutcome?.Count ?? items.Count;
@@ -190,7 +190,7 @@ public static class Data<TEntity, TKey>
             {
                 return new QueryResult<TEntity>
                 {
-                    Items = Array.Empty<TEntity>(),
+                    Items = [],
                     TotalCount = totalCount,
                     Page = 1,
                     PageSize = 0,
@@ -249,68 +249,80 @@ public static class Data<TEntity, TKey>
         var result = await QueryWithCount(query, options, ct);
         return result.Items;
     }
-    public static Task<long> CountAsync(CancellationToken ct = default)
-        => CountAsync((object?)null, CountStrategy.Exact, null, ct);
+    public static Task<long> Count(CancellationToken ct = default)
+        => Count((object?)null, CountStrategy.Exact, null, ct);
 
-    public static Task<long> CountAsync(object? query, CountStrategy strategy = CountStrategy.Exact, CancellationToken ct = default)
-        => CountAsync(query, strategy, null, ct);
+    public static Task<long> Count(object? query, CountStrategy strategy = CountStrategy.Exact, CancellationToken ct = default)
+        => Count(query, strategy, null, ct);
 
-    public static Task<long> CountAsync(Expression<Func<TEntity, bool>> predicate, CountStrategy strategy = CountStrategy.Optimized, CancellationToken ct = default)
-        => CountAsync((object?)predicate ?? throw new ArgumentNullException(nameof(predicate)), strategy, null, ct);
+    public static Task<long> Count(Expression<Func<TEntity, bool>> predicate, CountStrategy strategy = CountStrategy.Optimized, CancellationToken ct = default)
+        => Count((object?)predicate ?? throw new ArgumentNullException(nameof(predicate)), strategy, null, ct);
 
-    public static Task<long> CountAsync(string query, CountStrategy strategy = CountStrategy.Optimized, CancellationToken ct = default)
-        => CountAsync((object?)query ?? throw new ArgumentNullException(nameof(query)), strategy, null, ct);
+    public static Task<long> Count(string query, CountStrategy strategy = CountStrategy.Optimized, CancellationToken ct = default)
+        => Count((object?)query ?? throw new ArgumentNullException(nameof(query)), strategy, null, ct);
 
-    public static Task<long> CountAsync(DataQueryOptions options, CancellationToken ct = default)
-        => CountAsync((object?)null, options?.CountStrategy ?? CountStrategy.Exact, options, ct);
+    public static Task<long> Count(DataQueryOptions options, CancellationToken ct = default)
+        => Count((object?)null, options?.CountStrategy ?? CountStrategy.Exact, options, ct);
 
-    public static Task<long> CountAsync(Expression<Func<TEntity, bool>> predicate, DataQueryOptions options, CancellationToken ct = default)
-        => CountAsync((object?)predicate ?? throw new ArgumentNullException(nameof(predicate)), options?.CountStrategy ?? CountStrategy.Optimized, options, ct);
+    public static Task<long> Count(Expression<Func<TEntity, bool>> predicate, DataQueryOptions options, CancellationToken ct = default)
+        => Count((object?)predicate ?? throw new ArgumentNullException(nameof(predicate)), options?.CountStrategy ?? CountStrategy.Optimized, options, ct);
 
-    public static Task<long> CountAsync(string query, DataQueryOptions options, CancellationToken ct = default)
-        => CountAsync((object?)query ?? throw new ArgumentNullException(nameof(query)), options?.CountStrategy ?? CountStrategy.Optimized, options, ct);
+    public static Task<long> Count(string query, DataQueryOptions options, CancellationToken ct = default)
+        => Count((object?)query ?? throw new ArgumentNullException(nameof(query)), options?.CountStrategy ?? CountStrategy.Optimized, options, ct);
 
-    public static async Task<long> CountAsync(object? query, CountStrategy strategy, DataQueryOptions? options, CancellationToken ct)
+    public static async Task<long> Count(object? query, CountStrategy strategy, DataQueryOptions? options, CancellationToken ct)
     {
-        var outcome = await CountInternalAsync(query, strategy, options, ct);
+        var outcome = await CountInternal(query, strategy, options, ct);
         return outcome.Count;
     }
 
-    public static Task<long> CountAsync(Expression<Func<TEntity, bool>> predicate, string partition, CountStrategy strategy = CountStrategy.Optimized, CancellationToken ct = default)
+    public static Task<long> Count(Expression<Func<TEntity, bool>> predicate, string partition, CountStrategy strategy = CountStrategy.Optimized, CancellationToken ct = default)
     {
         using var _ = WithPartition(partition);
-        return CountAsync((object?)predicate ?? throw new ArgumentNullException(nameof(predicate)), strategy, null, ct);
+        return Count((object?)predicate ?? throw new ArgumentNullException(nameof(predicate)), strategy, null, ct);
     }
 
-    public static Task<long> CountAsync(string query, string partition, CountStrategy strategy = CountStrategy.Optimized, CancellationToken ct = default)
+    public static Task<long> Count(string query, string partition, CountStrategy strategy = CountStrategy.Optimized, CancellationToken ct = default)
     {
         using var _ = WithPartition(partition);
-        return CountAsync((object?)query ?? throw new ArgumentNullException(nameof(query)), strategy, null, ct);
+        return Count((object?)query ?? throw new ArgumentNullException(nameof(query)), strategy, null, ct);
     }
 
-    public static Task<bool> DeleteAsync(TKey id, CancellationToken ct = default) => Repo.DeleteAsync(id, ct);
-    public static Task<int> DeleteManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default) => Repo.DeleteManyAsync(ids, ct);
-    public static Task<int> DeleteAllAsync(CancellationToken ct = default) => Repo.DeleteAllAsync(ct);
-    public static Task<bool> DeleteAsync(TKey id, DataQueryOptions? options, CancellationToken ct = default)
-        => string.IsNullOrWhiteSpace(options?.Partition) ? Repo.DeleteAsync(id, ct) : DeleteAsync(id, options!.Partition!, ct);
+    public static Task<bool> Delete(TKey id, CancellationToken ct = default)
+    {
+        // Check if in transaction - defer execution if so
+        var context = EntityContext.Current;
+        if (context?.TransactionCoordinator != null)
+        {
+            context.TransactionCoordinator.TrackDelete<TEntity, TKey>(id, context);
+            return Task.FromResult(true);  // Return immediately - actual execution deferred
+        }
 
-    public static Task<int> DeleteManyAsync(IEnumerable<TKey> ids, DataQueryOptions? options, CancellationToken ct = default)
-        => string.IsNullOrWhiteSpace(options?.Partition) ? Repo.DeleteManyAsync(ids, ct) : DeleteManyAsync(ids, options!.Partition!, ct);
+        // Not in transaction - execute immediately
+        return Repo.Delete(id, ct);
+    }
+    public static Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default) => Repo.DeleteMany(ids, ct);
+    public static Task<int> DeleteAll(CancellationToken ct = default) => Repo.DeleteAll(ct);
+    public static Task<bool> Delete(TKey id, DataQueryOptions? options, CancellationToken ct = default)
+        => string.IsNullOrWhiteSpace(options?.Partition) ? Repo.Delete(id, ct) : Delete(id, options!.Partition!, ct);
 
-    public static Task<int> DeleteAllAsync(DataQueryOptions? options, CancellationToken ct = default)
-        => string.IsNullOrWhiteSpace(options?.Partition) ? Repo.DeleteAllAsync(ct) : DeleteAllAsync(options!.Partition!, ct);
+    public static Task<int> DeleteMany(IEnumerable<TKey> ids, DataQueryOptions? options, CancellationToken ct = default)
+        => string.IsNullOrWhiteSpace(options?.Partition) ? Repo.DeleteMany(ids, ct) : DeleteMany(ids, options!.Partition!, ct);
 
-    public static Task<long> RemoveAllAsync(RemoveStrategy strategy, CancellationToken ct = default)
-        => Repo.RemoveAllAsync(strategy, ct);
+    public static Task<int> DeleteAll(DataQueryOptions? options, CancellationToken ct = default)
+        => string.IsNullOrWhiteSpace(options?.Partition) ? Repo.DeleteAll(ct) : DeleteAll(options!.Partition!, ct);
 
-    public static Task<long> RemoveAllAsync(RemoveStrategy strategy, string partition, CancellationToken ct = default)
-    { using var _ = WithPartition(partition); return Repo.RemoveAllAsync(strategy, ct); }
+    public static Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default)
+        => Repo.RemoveAll(strategy, ct);
+
+    public static Task<long> RemoveAll(RemoveStrategy strategy, string partition, CancellationToken ct = default)
+    { using var _ = WithPartition(partition); return Repo.RemoveAll(strategy, ct); }
 
     /// <summary>
     /// Applies a patch to an entity by id using a transport-agnostic PatchRequest.
     /// Tries adapter instruction execution (data.patch), else performs read-modify-upsert locally.
     /// </summary>
-    public static async Task<TEntity?> PatchAsync(
+    public static async Task<TEntity?> Patch(
         Koan.Data.Abstractions.Instructions.PatchRequest<TKey, TEntity> request,
         MergePatchNullPolicy? mergeNulls = null,
         PartialJsonNullPolicy? partialNulls = null,
@@ -327,20 +339,20 @@ public static class Data<TEntity, TKey>
             catch (NotSupportedException) { /* fall back */ }
         }
 
-        var current = await repo.GetAsync(request.Id, ct);
+        var current = await repo.Get(request.Id, ct);
         if (current is null) return null;
         var m = mergeNulls ?? MergePatchNullPolicy.SetDefault;
         var p = partialNulls ?? PartialJsonNullPolicy.SetNull;
         var applicator = Koan.Data.Core.Patch.PatchApplicators.Create<TEntity, TKey>(request.Kind, request.Payload!, m, p);
         applicator.Apply(current);
-        return await repo.UpsertAsync(current, ct);
+        return await repo.Upsert(current, ct);
     }
 
     /// <summary>
     /// Applies canonical patch operations to an entity by id.
     /// Attempts adapter execution (data.patch) with the payload; otherwise read-modify-upsert.
     /// </summary>
-    public static async Task<TEntity?> PatchAsync(
+    public static async Task<TEntity?> Patch(
         Koan.Data.Abstractions.Instructions.PatchPayload<TKey> payload,
         CancellationToken ct = default)
     {
@@ -355,21 +367,38 @@ public static class Data<TEntity, TKey>
             catch (NotSupportedException) { /* fallback */ }
         }
 
-        var current = await repo.GetAsync(payload.Id, ct);
+        var current = await repo.Get(payload.Id, ct);
         if (current is null) return null;
         Koan.Data.Core.Patch.PatchOpsExecutor.Apply<TEntity, TKey>(current, payload);
-        return await repo.UpsertAsync(current, ct);
+        return await repo.Upsert(current, ct);
     }
 
-    public static Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default) => Repo.UpsertAsync(model, ct);
-    public static Task<int> UpsertManyAsync(IEnumerable<TEntity> models, CancellationToken ct = default) => Repo.UpsertManyAsync(models, ct);
+    public static async Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
+    {
+        // Check if in transaction - defer execution if so
+        var context = EntityContext.Current;
+        if (context?.TransactionCoordinator != null)
+        {
+            var manager = Koan.Core.Hosting.App.AppHost.Current?.GetService<IAggregateIdentityManager>()
+                ?? throw new InvalidOperationException("Aggregate identity manager not registered. Ensure services.AddKoanDataCore() is configured correctly.");
+
+            await manager.EnsureIdAsync<TEntity, TKey>(model, ct);
+
+            context.TransactionCoordinator.TrackSave<TEntity, TKey>(model, context);
+            return model;  // Return immediately - actual execution deferred
+        }
+
+        // Not in transaction - execute immediately
+        return await Repo.Upsert(model, ct);
+    }
+    public static Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default) => Repo.UpsertMany(models, ct);
     public static IBatchSet<TEntity, TKey> Batch() => Repo.CreateBatch();
 
     // Streaming helpers (IAsyncEnumerable), stable iteration using options page loops
     public static async IAsyncEnumerable<TEntity> AllStream(int? batchSize = null, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
         // Internal streaming operation - no pagination constraints should apply
-        var all = await Repo.QueryAsync(null, ct);
+        var all = await Repo.Query(null, ct);
         foreach (var item in all) yield return item;
     }
 
@@ -383,7 +412,7 @@ public static class Data<TEntity, TKey>
             {
                 ct.ThrowIfCancellationRequested();
                 var opts = new DataQueryOptions(page, size);
-                var batch = await srepoOpts.QueryAsync(query, opts, ct);
+                var batch = await srepoOpts.Query(query, opts, ct);
                 if (batch.Count == 0) yield break;
                 foreach (var item in batch) yield return item;
                 if (batch.Count < size) yield break;
@@ -392,7 +421,7 @@ public static class Data<TEntity, TKey>
         }
         else if (Repo is IStringQueryRepository<TEntity, TKey> srepo)
         {
-            var all = await srepo.QueryAsync(query, ct);
+            var all = await srepo.Query(query, ct);
             foreach (var item in all) yield return item;
         }
         else
@@ -406,9 +435,9 @@ public static class Data<TEntity, TKey>
     {
         if (size <= 0) throw new System.ArgumentOutOfRangeException(nameof(size));
         if (Repo is IDataRepositoryWithOptions<TEntity, TKey> repoOpts)
-            return await repoOpts.QueryAsync(null, new DataQueryOptions(1, size), ct);
+            return await repoOpts.Query(null, new DataQueryOptions(1, size), ct);
         // Fallback: materialize and take
-        var all = await Repo.QueryAsync(null, ct);
+        var all = await Repo.Query(null, ct);
         return all.Take(size).ToList();
     }
 
@@ -417,9 +446,9 @@ public static class Data<TEntity, TKey>
         if (page <= 0) throw new System.ArgumentOutOfRangeException(nameof(page));
         if (size <= 0) throw new System.ArgumentOutOfRangeException(nameof(size));
         if (Repo is IDataRepositoryWithOptions<TEntity, TKey> repoOpts)
-            return await repoOpts.QueryAsync(null, new DataQueryOptions(page, size), ct);
+            return await repoOpts.Query(null, new DataQueryOptions(page, size), ct);
         // Fallback: materialize and page in-memory
-        var all = await Repo.QueryAsync(null, ct);
+        var all = await Repo.Query(null, ct);
         return all.Skip((page - 1) * size).Take(size).ToList();
     }
 
@@ -427,56 +456,80 @@ public static class Data<TEntity, TKey>
     public static IDisposable WithPartition(string? partition) =>
         string.IsNullOrEmpty(partition) ? NoOpDisposable.Instance : EntityContext.Partition(partition);
 
-    public static Task<TEntity?> GetAsync(TKey id, string partition, CancellationToken ct = default)
-    { using var _ = WithPartition(partition); return Repo.GetAsync(id, ct); }
+    public static Task<TEntity?> Get(TKey id, string partition, CancellationToken ct = default)
+    { using var _ = WithPartition(partition); return Repo.Get(id, ct); }
 
-    public static Task<IReadOnlyList<TEntity?>> GetManyAsync(IEnumerable<TKey> ids, string partition, CancellationToken ct = default)
-    { using var _ = WithPartition(partition); return Repo.GetManyAsync(ids, ct); }
+    public static Task<IReadOnlyList<TEntity?>> GetMany(IEnumerable<TKey> ids, string partition, CancellationToken ct = default)
+    { using var _ = WithPartition(partition); return Repo.GetMany(ids, ct); }
 
     public static Task<IReadOnlyList<TEntity>> All(string partition, CancellationToken ct = default)
-    { using var _ = WithPartition(partition); return Repo.QueryAsync(null, ct); }
+    { using var _ = WithPartition(partition); return Repo.Query(null, ct); }
     public static Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, string partition, CancellationToken ct = default)
     {
-        using var _ = WithPartition(partition); return (Repo as ILinqQueryRepository<TEntity, TKey>)?.QueryAsync(predicate, ct)
+        using var _ = WithPartition(partition); return (Repo as ILinqQueryRepository<TEntity, TKey>)?.Query(predicate, ct)
                                            ?? throw new System.NotSupportedException("LINQ queries are not supported by this repository.");
     }
 
     public static Task<IReadOnlyList<TEntity>> Query(string query, string partition, CancellationToken ct = default)
     {
-        using var _ = WithPartition(partition); return (Repo as IStringQueryRepository<TEntity, TKey>)?.QueryAsync(query, ct)
+        using var _ = WithPartition(partition); return (Repo as IStringQueryRepository<TEntity, TKey>)?.Query(query, ct)
                                            ?? throw new System.NotSupportedException("String queries are not supported by this repository.");
     }
 
-    public static Task<TEntity> UpsertAsync(TEntity model, string partition, CancellationToken ct = default)
-    { using var _ = WithPartition(partition); return Repo.UpsertAsync(model, ct); }
+    public static Task<TEntity> Upsert(TEntity model, string partition, CancellationToken ct = default)
+    {
+        // Check if in transaction - defer execution if so
+        var context = EntityContext.Current;
+        if (context?.TransactionCoordinator != null)
+        {
+            // For partitioned operations, pass partition to tracked operation
+            context.TransactionCoordinator.TrackSave<TEntity, TKey>(model, context with { Partition = partition });
+            return Task.FromResult(model);
+        }
 
-    public static Task<bool> DeleteAsync(TKey id, string partition, CancellationToken ct = default)
-    { using var _ = WithPartition(partition); return Repo.DeleteAsync(id, ct); }
+        using var _ = WithPartition(partition);
+        return Repo.Upsert(model, ct);
+    }
 
-    public static Task<int> UpsertManyAsync(IEnumerable<TEntity> models, string partition, CancellationToken ct = default)
-    { using var _ = WithPartition(partition); return Repo.UpsertManyAsync(models, ct); }
+    public static Task<bool> Delete(TKey id, string partition, CancellationToken ct = default)
+    {
+        // Check if in transaction - defer execution if so
+        var context = EntityContext.Current;
+        if (context?.TransactionCoordinator != null)
+        {
+            // For partitioned operations, pass partition to tracked operation
+            context.TransactionCoordinator.TrackDelete<TEntity, TKey>(id, context with { Partition = partition });
+            return Task.FromResult(true);
+        }
 
-    public static Task<int> DeleteManyAsync(IEnumerable<TKey> ids, string partition, CancellationToken ct = default)
-    { using var _ = WithPartition(partition); return Repo.DeleteManyAsync(ids, ct); }
+        using var _ = WithPartition(partition);
+        return Repo.Delete(id, ct);
+    }
 
-    public static Task<int> DeleteAllAsync(string partition, CancellationToken ct = default)
-    { using var _ = WithPartition(partition); return Repo.DeleteAllAsync(ct); }
+    public static Task<int> UpsertMany(IEnumerable<TEntity> models, string partition, CancellationToken ct = default)
+    { using var _ = WithPartition(partition); return Repo.UpsertMany(models, ct); }
+
+    public static Task<int> DeleteMany(IEnumerable<TKey> ids, string partition, CancellationToken ct = default)
+    { using var _ = WithPartition(partition); return Repo.DeleteMany(ids, ct); }
+
+    public static Task<int> DeleteAll(string partition, CancellationToken ct = default)
+    { using var _ = WithPartition(partition); return Repo.DeleteAll(ct); }
 
     public static async Task<int> Delete(Expression<Func<TEntity, bool>> predicate, string partition, CancellationToken ct = default)
     {
         using var _ = WithPartition(partition);
         if (Repo is ILinqQueryRepository<TEntity, TKey> linq)
         {
-            var items = await linq.QueryAsync(predicate, ct);
+            var items = await linq.Query(predicate, ct);
             var ids = items.Select(e => e.Id);
-            return await Repo.DeleteManyAsync(ids, ct);
+            return await Repo.DeleteMany(ids, ct);
         }
         else
         {
-            var all = await Repo.QueryAsync(null, ct);
+            var all = await Repo.Query(null, ct);
             var filtered = all.AsQueryable().Where(predicate).ToList();
             var ids = filtered.Select(e => e.Id);
-            return await Repo.DeleteManyAsync(ids, ct);
+            return await Repo.DeleteMany(ids, ct);
         }
     }
 
@@ -541,8 +594,8 @@ public static class Data<TEntity, TKey>
         if (string.Equals(fromPartition, toPartition, StringComparison.Ordinal)) return 0;
         using var _from = WithPartition(fromPartition);
         var source = predicate is null
-            ? await Repo.QueryAsync(null, ct)
-            : await (Repo as ILinqQueryRepository<TEntity, TKey>)!.QueryAsync(predicate, ct);
+            ? await Repo.Query(null, ct)
+            : await (Repo as ILinqQueryRepository<TEntity, TKey>)!.Query(predicate, ct);
         if (source.Count == 0) return 0;
         var total = 0;
         foreach (var chunk in source.Chunk(Math.Max(1, batchSize)))
@@ -550,7 +603,7 @@ public static class Data<TEntity, TKey>
             ct.ThrowIfCancellationRequested();
             var items = map is null ? chunk : chunk.Select(map).ToArray();
             using var _to = WithPartition(toPartition);
-            total += await Repo.UpsertManyAsync(items, ct);
+            total += await Repo.UpsertMany(items, ct);
         }
         return total;
     }
@@ -566,8 +619,8 @@ public static class Data<TEntity, TKey>
         if (string.Equals(fromPartition, toPartition, StringComparison.Ordinal)) return 0;
         using var _from = WithPartition(fromPartition);
         var source = predicate is null
-            ? await Repo.QueryAsync(null, ct)
-            : await (Repo as ILinqQueryRepository<TEntity, TKey>)!.QueryAsync(predicate, ct);
+            ? await Repo.Query(null, ct)
+            : await (Repo as ILinqQueryRepository<TEntity, TKey>)!.Query(predicate, ct);
         if (source.Count == 0) return 0;
         var total = 0;
         foreach (var chunk in source.Chunk(Math.Max(1, batchSize)))
@@ -576,11 +629,11 @@ public static class Data<TEntity, TKey>
             var items = map is null ? chunk : chunk.Select(map).ToArray();
             // Upsert into target partition
             using var _to = WithPartition(toPartition);
-            total += await Repo.UpsertManyAsync(items, ct);
+            total += await Repo.UpsertMany(items, ct);
             // Delete the moved ids from source partition
             using var _back = WithPartition(fromPartition);
             var ids = items.Select(e => e.Id);
-            await Repo.DeleteManyAsync(ids, ct);
+            await Repo.DeleteMany(ids, ct);
         }
         return total;
     }
@@ -596,7 +649,7 @@ public static class Data<TEntity, TKey>
         foreach (var chunk in items.Chunk(Math.Max(1, batchSize)))
         {
             using var _ = WithPartition(targetPartition);
-            total += await Repo.UpsertManyAsync(chunk, ct);
+            total += await Repo.UpsertMany(chunk, ct);
         }
         return total;
     }

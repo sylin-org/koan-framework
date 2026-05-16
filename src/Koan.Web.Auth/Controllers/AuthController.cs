@@ -33,7 +33,7 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
         // Use Secure only when the request is HTTPS to support HTTP in dev/container scenarios
         var secure = HttpContext.Request.IsHttps;
         Response.Cookies.Append("Koan.auth.state", state, new CookieOptions { HttpOnly = true, Secure = secure, IsEssential = true, SameSite = SameSiteMode.Lax, Path = "/", Expires = DateTimeOffset.UtcNow.AddMinutes(5) });
-        var allowed = authOptions.Value.ReturnUrl.AllowList ?? Array.Empty<string>();
+        var allowed = authOptions.Value.ReturnUrl.AllowList ?? [];
         var def = authOptions.Value.ReturnUrl.DefaultPath ?? "/";
         var ru = SanitizeReturnUrl(returnUrl, allowed, def);
         Response.Cookies.Append("Koan.auth.return", ru, new CookieOptions { HttpOnly = true, Secure = secure, IsEssential = true, SameSite = SameSiteMode.Lax, Path = "/", Expires = DateTimeOffset.UtcNow.AddMinutes(5) });
@@ -44,10 +44,10 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
         if (type == AuthConstants.Protocols.OAuth2)
         {
             // Build authorize URL
-            var authz = cfg.AuthorizationEndpoint ?? string.Empty;
+            var authz = cfg.AuthorizationEndpoint ?? "";
             if (string.IsNullOrWhiteSpace(authz)) return Problem(detail: "AuthorizationEndpoint not configured.", statusCode: 500);
-            var clientId = cfg.ClientId ?? string.Empty;
-            var scope = cfg.Scopes != null && cfg.Scopes.Length > 0 ? string.Join(' ', cfg.Scopes) : string.Empty;
+            var clientId = cfg.ClientId ?? "";
+            var scope = cfg.Scopes != null && cfg.Scopes.Length > 0 ? string.Join(' ', cfg.Scopes) : "";
             // Browser-facing redirect must use the externally visible host/port
             var redirectUri = BuildAbsoluteBrowser(callback);
             logger.LogDebug("Auth challenge: provider={Provider} callback={Callback} redirectUri={RedirectUri}", provider, callback, redirectUri);
@@ -58,9 +58,9 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
         }
 
         // Minimal OIDC redirect (use authorize at authority)
-        var authority = cfg.Authority ?? string.Empty;
+        var authority = cfg.Authority ?? "";
         if (string.IsNullOrWhiteSpace(authority)) return Problem(detail: "Authority not configured.", statusCode: 500);
-        var client = cfg.ClientId ?? string.Empty;
+        var client = cfg.ClientId ?? "";
         var scopeOidc = cfg.Scopes != null && cfg.Scopes.Length > 0 ? string.Join(' ', cfg.Scopes) : "openid profile email";
         var cb = BuildAbsoluteBrowser(callback);
         logger.LogDebug("OIDC challenge: provider={Provider} callback={Callback} redirectUri={RedirectUri}", provider, callback, cb);
@@ -86,13 +86,13 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
         if (string.IsNullOrWhiteSpace(code)) return Problem(detail: "Missing code.", statusCode: 400);
 
     string? sub = null; string? name = null; string? picture = null; string claimsJson = "{}";
-    string[] mappedRoles = Array.Empty<string>();
-    string[] mappedPerms = Array.Empty<string>();
+    string[] mappedRoles = [];
+    string[] mappedPerms = [];
     List<KeyValuePair<string, string>> mappedExtras = new();
         if (type == AuthConstants.Protocols.OAuth2)
         {
             // Exchange code for token
-            var tokenEndpoint = cfg.TokenEndpoint ?? string.Empty;
+            var tokenEndpoint = cfg.TokenEndpoint ?? "";
             if (string.IsNullOrWhiteSpace(tokenEndpoint)) return Problem(detail: "TokenEndpoint not configured.", statusCode: 500);
             // Ensure absolute URL for server-side call (inside container, prefer ASPNETCORE_URLS base)
             tokenEndpoint = BuildAbsoluteServer(tokenEndpoint);
@@ -104,7 +104,7 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
                 ["grant_type"] = "authorization_code",
                 ["code"] = code!,
                 ["redirect_uri"] = redirectUri,
-                ["client_id"] = cfg.ClientId ?? string.Empty,
+                ["client_id"] = cfg.ClientId ?? "",
             };
             if (!string.IsNullOrWhiteSpace(cfg.ClientSecret)) form["client_secret"] = cfg.ClientSecret!;
             var httpClient = http.CreateClient();
@@ -124,7 +124,7 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
             if (string.IsNullOrWhiteSpace(accessToken)) return Problem(detail: "Token response missing access_token.", statusCode: 502);
 
             // Fetch user info
-            var userInfo = cfg.UserInfoEndpoint ?? string.Empty;
+            var userInfo = cfg.UserInfoEndpoint ?? "";
             if (string.IsNullOrWhiteSpace(userInfo)) return Problem(detail: "UserInfoEndpoint not configured.", statusCode: 500);
             // Ensure absolute URL for server-side call
             userInfo = BuildAbsoluteServer(userInfo);
@@ -184,9 +184,9 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
         // Persist external identity link (best-effort)
         try
         {
-            var userId = claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value ?? sub ?? string.Empty;
-            var keyHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(sub ?? string.Empty)));
-            await identities.LinkAsync(new ExternalIdentity
+            var userId = claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value ?? sub ?? "";
+            var keyHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(sub ?? "")));
+            await identities.Link(new ExternalIdentity
             {
                 UserId = userId,
                 Provider = provider,
@@ -208,8 +208,8 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
         // Sign out of cookie auth
         await HttpContext.SignOutAsync(AuthenticationExtensions.CookieScheme);
     // Best-effort: also clear the local dev TestProvider cookie to avoid silent re-login loops
-    try { Response.Cookies.Append(Infrastructure.AuthConstants.Dev.TestProviderCookieUser, string.Empty, new CookieOptions { Expires = DateTimeOffset.UnixEpoch, Path = "/", SameSite = SameSiteMode.Lax, HttpOnly = false, Secure = Request.IsHttps }); } catch { /* ignore */ }
-        var allowed = authOptions.Value.ReturnUrl.AllowList ?? Array.Empty<string>();
+    try { Response.Cookies.Append(Infrastructure.AuthConstants.Dev.TestProviderCookieUser, "", new CookieOptions { Expires = DateTimeOffset.UnixEpoch, Path = "/", SameSite = SameSiteMode.Lax, HttpOnly = false, Secure = Request.IsHttps }); } catch { /* ignore */ }
+        var allowed = authOptions.Value.ReturnUrl.AllowList ?? [];
         var def = authOptions.Value.ReturnUrl.DefaultPath ?? "/";
         var ru = SanitizeReturnUrl(returnUrl, allowed, def);
         return LocalRedirect(ru);

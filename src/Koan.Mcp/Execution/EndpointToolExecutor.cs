@@ -32,7 +32,7 @@ public sealed class EndpointToolExecutor
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task<McpToolExecutionResult> ExecuteAsync(string toolName, JObject? arguments, CancellationToken cancellationToken)
+    public async Task<McpToolExecutionResult> Execute(string toolName, JObject? arguments, CancellationToken cancellationToken)
     {
         if (!_registry.TryGetTool(toolName, out var registration, out var tool))
         {
@@ -57,7 +57,7 @@ public sealed class EndpointToolExecutor
         try
         {
             var translation = _requestTranslator.Translate(provider, registration, tool, arguments, cancellationToken);
-            var endpointResult = await InvokeServiceAsync(service, translation);
+            var endpointResult = await InvokeService(service, translation);
             return _responseTranslator.Translate(registration, tool, endpointResult);
         }
         catch (JsonException ex)
@@ -86,7 +86,7 @@ public sealed class EndpointToolExecutor
         }
     }
 
-    private static async Task<EntityEndpointResult> InvokeServiceAsync(object service, RequestTranslation translation)
+    private static async Task<EntityEndpointResult> InvokeService(object service, RequestTranslation translation)
     {
         if (service is null) throw new ArgumentNullException(nameof(service));
         if (translation is null) throw new ArgumentNullException(nameof(translation));

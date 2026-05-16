@@ -10,7 +10,7 @@ public interface IAdapterReadiness
 
     Task<bool> IsReadyAsync(CancellationToken ct = default);
 
-    Task WaitForReadinessAsync(TimeSpan? timeout = null, CancellationToken ct = default);
+    Task WaitForReadiness(TimeSpan? timeout = null, CancellationToken ct = default);
 
     event EventHandler<ReadinessStateChangedEventArgs>? ReadinessStateChanged;
 

@@ -185,8 +185,8 @@ internal static class CouchbaseLinqQueryTranslator
 
         private static object? ToLikePattern(object? value, string? prefix = null, string? suffix = null)
         {
-            var str = Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty;
-            return string.Concat(prefix ?? string.Empty, str, suffix ?? string.Empty);
+            var str = Convert.ToString(value, CultureInfo.InvariantCulture) ?? "";
+            return string.Concat(prefix ?? "", str, suffix ?? "");
         }
 
         private string TranslateConstant(ConstantExpression expression)
@@ -247,7 +247,7 @@ internal static class CouchbaseLinqQueryTranslator
                 }
             }
 
-            field = string.Empty;
+            field = "";
             return false;
         }
 

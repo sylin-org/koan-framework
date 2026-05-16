@@ -29,7 +29,7 @@ public sealed class CanonStageSpec
                 stage.Transitions.Should().Contain(t => t.Status == CanonStageStatus.Pending);
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 
     [Fact]
     public Task Processing_and_completion_transitions_are_recorded()
@@ -48,7 +48,7 @@ public sealed class CanonStageSpec
                 stage.Transitions.Should().Contain(t => t.Status == CanonStageStatus.Completed);
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 
     [Fact]
     public Task Park_and_fail_track_errors()
@@ -69,7 +69,7 @@ public sealed class CanonStageSpec
                 stage.Transitions.Last().Status.Should().Be(CanonStageStatus.Failed);
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 
     [Fact]
     public Task Reset_to_pending_clears_error_state()
@@ -87,7 +87,7 @@ public sealed class CanonStageSpec
                 stage.Transitions.Should().Contain(t => t.Status == CanonStageStatus.Pending && t != stage.Transitions.First());
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 
     private sealed class TestCanonModel : CanonEntity<TestCanonModel>
     {

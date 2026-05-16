@@ -107,7 +107,7 @@ internal class KoanServiceMesh : IKoanServiceMesh, IDisposable
         }
     }
 
-    public async Task AnnounceAsync(CancellationToken ct = default)
+    public async Task Announce(CancellationToken ct = default)
     {
         if (_orchestratorSender == null)
         {
@@ -139,7 +139,7 @@ internal class KoanServiceMesh : IKoanServiceMesh, IDisposable
             _instanceId);
     }
 
-    public async Task DiscoverAsync(CancellationToken ct = default)
+    public async Task Discover(CancellationToken ct = default)
     {
         if (_orchestratorSender == null)
         {
@@ -162,7 +162,7 @@ internal class KoanServiceMesh : IKoanServiceMesh, IDisposable
         _logger.LogInformation("Koan:services:mesh broadcast discovery request");
     }
 
-    public async Task MaintainAsync(CancellationToken ct = default)
+    public async Task Maintain(CancellationToken ct = default)
     {
         if (_orchestratorReceiver == null)
         {
@@ -182,7 +182,7 @@ internal class KoanServiceMesh : IKoanServiceMesh, IDisposable
                     var result = await _orchestratorReceiver.ReceiveAsync(ct);
                     var json = Encoding.UTF8.GetString(result.Buffer);
 
-                    await ProcessMessageAsync(json, ct);
+                    await ProcessMessage(json, ct);
                 }
                 catch (OperationCanceledException)
                 {
@@ -217,7 +217,7 @@ internal class KoanServiceMesh : IKoanServiceMesh, IDisposable
         _logger.LogInformation("Koan:services:mesh maintenance stopped");
     }
 
-    private async Task ProcessMessageAsync(string json, CancellationToken ct)
+    private async Task ProcessMessage(string json, CancellationToken ct)
     {
         try
         {
@@ -237,7 +237,7 @@ internal class KoanServiceMesh : IKoanServiceMesh, IDisposable
 
                 case "discovery":
                     // Respond to discovery requests with our announcement
-                    await AnnounceAsync(ct);
+                    await Announce(ct);
                     break;
             }
         }
@@ -382,7 +382,7 @@ internal class KoanServiceMesh : IKoanServiceMesh, IDisposable
     public IReadOnlyList<ServiceInstance> GetAllInstances(string serviceId)
     {
         if (!_services.TryGetValue(serviceId, out var instances))
-            return Array.Empty<ServiceInstance>();
+            return [];
 
         return instances.Values.ToArray();
     }
@@ -428,7 +428,7 @@ internal class ServiceAnnouncement
     public string ServiceId { get; set; } = "";
     public string HttpEndpoint { get; set; } = "";
     public string? ServiceChannelEndpoint { get; set; }
-    public string[] Capabilities { get; set; } = Array.Empty<string>();
+    public string[] Capabilities { get; set; } = [];
     public DateTime Timestamp { get; set; }
 }
 

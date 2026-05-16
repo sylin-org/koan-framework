@@ -1,6 +1,7 @@
 using Koan.Media.Abstractions.Model;
 using Koan.Storage.Infrastructure;
 using Koan.Data.Vector.Abstractions;
+using Koan.Data.AI.Attributes;
 
 namespace S6.SnapVault.Models;
 
@@ -8,6 +9,12 @@ namespace S6.SnapVault.Models;
 /// Full-resolution photo asset with complete metadata (stored in cold tier for cost optimization)
 /// </summary>
 [StorageBinding(Profile = "cold", Container = "photos")]
+[Embedding(
+    Policy = EmbeddingPolicy.AllStrings,
+    Async = true,
+    MaxTokens = 8191,
+    Version = 2,
+    Exclude = ["EventId", "InferredStyleId"])]
 public class PhotoAsset : MediaEntity<PhotoAsset>
 {
     // Event relationship
@@ -56,6 +63,10 @@ public class PhotoAsset : MediaEntity<PhotoAsset>
 
     // Processing
     public ProcessingStatus ProcessingStatus { get; set; } = ProcessingStatus.Pending;
+
+    // Embedding text extraction handled by framework via [Embedding(Policy=AllStrings)].
+    // All public string properties (excluding Id, EventId, InferredStyleId) are included by convention.
+    // AiAnalysis, AutoTags, DetectedObjects contribute via their string representations.
 }
 
 public class GpsCoordinates

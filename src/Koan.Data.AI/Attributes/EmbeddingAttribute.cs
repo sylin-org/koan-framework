@@ -51,4 +51,50 @@ public class EmbeddingAttribute : Attribute
     /// Only applies when Async = true.
     /// </summary>
     public int RateLimitPerMinute { get; set; } = 0;
+
+    /// <summary>
+    /// AI source or group name for routing embeddings to specific providers.
+    /// Flows through Client.Scope(all: ...) to route to appropriate AI service.
+    /// Examples: "ollama-primary", "openai-prod", "azure-embeddings"
+    /// If null, uses default routing.
+    /// </summary>
+    public string? Source { get; set; }
+
+    /// <summary>
+    /// Maximum tokens allowed for embedding text (provider-specific limit).
+    /// Examples: 8191 for text-embedding-3-large, 512 for all-MiniLM-L6-v2.
+    /// If exceeded, text is intelligently truncated with optional warning.
+    /// If 0, no truncation is applied (default).
+    /// </summary>
+    public int MaxTokens { get; set; } = 0;
+
+    /// <summary>
+    /// Maximum depth for nested object traversal when using EmbeddingPolicy.FullJson.
+    /// Prevents infinite recursion in circular references.
+    /// Default: 3 levels deep.
+    /// </summary>
+    public int MaxDepth { get; set; } = 3;
+
+    /// <summary>
+    /// Properties to exclude from embedding (complements [EmbeddingIgnore]).
+    /// Useful for runtime exclusions without modifying entity class.
+    /// Example: new[] { "InternalId", "Metadata" }
+    /// </summary>
+    public string[]? Exclude { get; set; }
+
+    /// <summary>
+    /// Emit warning in development when embedding text is truncated due to MaxTokens limit.
+    /// Helps developers identify when important content is being cut off.
+    /// Only applies when MaxTokens > 0.
+    /// Default: true.
+    /// </summary>
+    public bool WarnOnTruncation { get; set; } = true;
+
+    /// <summary>
+    /// Schema version for this embedding configuration.
+    /// Increment when changing Template, Properties, Policy, or content structure.
+    /// Forces re-embedding of all entities when version changes.
+    /// Default: 1.
+    /// </summary>
+    public int Version { get; set; } = 1;
 }

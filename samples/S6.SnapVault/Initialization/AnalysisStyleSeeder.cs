@@ -9,7 +9,7 @@ namespace S6.SnapVault.Initialization;
 /// </summary>
 public static class AnalysisStyleSeeder
 {
-    public static async Task SeedDefaultStylesAsync(ILogger logger)
+    public static async Task SeedDefaultStyles(ILogger logger)
     {
         // Check if styles already seeded
         //var existingStyles = await AnalysisStyle.All();

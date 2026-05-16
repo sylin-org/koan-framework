@@ -18,11 +18,11 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     public void Initialize(IServiceCollection services, IConfiguration cfg, IHostEnvironment env)
     {
         // Options: Koan:Scheduling
-        services.AddKoanOptions<SchedulingOptions>(cfg, "Koan:Scheduling")
+        services.AddKoanOptions<SchedulingOptions>(cfg, ConfigurationConstants.Section)
             .PostConfigure(opts =>
             {
                 // Dev default enabled, Prod default disabled unless explicitly enabled
-                if (!env.IsDevelopment() && !cfg.GetSection("Koan:Scheduling").Exists())
+                if (!env.IsDevelopment() && !cfg.GetSection(ConfigurationConstants.Section).Exists())
                 {
                     opts.Enabled = false;
                 }
@@ -35,15 +35,15 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     // Required by IKoanInitializer; minimal registration without bespoke discovery.
     public void Initialize(IServiceCollection services)
     {
-        services.AddKoanOptions<SchedulingOptions>("Koan:Scheduling");
+        services.AddKoanOptions<SchedulingOptions>(ConfigurationConstants.Section);
         services.AddHostedService<SchedulingOrchestrator>();
     }
 
     public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         module.Describe(ModuleVersion);
-        var enabledOption = Configuration.ReadWithSource<bool?>(cfg, "Koan:Scheduling:Enabled", null);
-        var schedulingSectionExists = cfg.GetSection("Koan:Scheduling").Exists();
+        var enabledOption = Configuration.ReadWithSource<bool?>(cfg, ConfigurationConstants.FullKey(ConfigurationConstants.Keys.Enabled), null);
+        var schedulingSectionExists = cfg.GetSection(ConfigurationConstants.Section).Exists();
         var effectiveEnabled = enabledOption.UsedDefault
             ? (env.IsDevelopment() || schedulingSectionExists)
             : enabledOption.Value ?? true;
@@ -59,7 +59,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             sourceKey: enabledOption.ResolvedKey,
             usedDefault: enabledOption.UsedDefault);
 
-        var readinessOption = Configuration.ReadWithSource(cfg, "Koan:Scheduling:ReadinessGate", true);
+        var readinessOption = Configuration.ReadWithSource(cfg, ConfigurationConstants.FullKey(ConfigurationConstants.Keys.ReadinessGate), true);
         module.AddSetting(
             SchedulingProvenanceItems.ReadinessGate,
             FromConfigurationValue(readinessOption),

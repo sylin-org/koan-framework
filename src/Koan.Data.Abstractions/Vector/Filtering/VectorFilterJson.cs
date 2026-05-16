@@ -31,7 +31,7 @@ public static class VectorFilterJson
             var opToken = obj["operator"];
             if (opToken is not null)
             {
-                var opStr = (opToken.Type == JTokenType.String ? opToken.Value<string>() : opToken.ToString()) ?? string.Empty;
+                var opStr = (opToken.Type == JTokenType.String ? opToken.Value<string>() : opToken.ToString()) ?? "";
                 if (string.Equals(opStr, "And", StringComparison.OrdinalIgnoreCase) || string.Equals(opStr, "Or", StringComparison.OrdinalIgnoreCase))
                 {
                     var opsEl = obj["operands"] as JArray;
@@ -89,7 +89,7 @@ public static class VectorFilterJson
         return $"{{ \"path\": {path}, \"operator\": \"{op}\", {field}: {lit} }}";
     }
 
-    private static string Escape(string? s) => (s ?? string.Empty).Replace("\\", "\\\\").Replace("\"", "\\\"");
+    private static string Escape(string? s) => (s ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"");
 
     private static (object? value, bool ok) ReadValue(JToken value)
     {
@@ -118,7 +118,7 @@ public static class VectorFilterJson
     {
         if (!el.TryGetValue("path", out var p)) return null;
         if (p.Type == JTokenType.String) return new[] { p.Value<string>()! };
-        if (p.Type == JTokenType.Array) return p.Values<string>().Select(x => x ?? string.Empty).ToArray();
+        if (p.Type == JTokenType.Array) return p.Values<string>().Select(x => x ?? "").ToArray();
         return null;
     }
 

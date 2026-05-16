@@ -5,6 +5,6 @@ namespace Koan.Web.Hooks;
 /// </summary>
 public interface IEmitHook<TEntity> : IOrderedHook
 {
-    Task<EmitDecision> OnEmitCollectionAsync(HookContext<TEntity> ctx, object payload);
-    Task<EmitDecision> OnEmitModelAsync(HookContext<TEntity> ctx, object payload);
+    Task<EmitDecision> OnEmitCollection(HookContext<TEntity> ctx, object payload);
+    Task<EmitDecision> OnEmitModel(HookContext<TEntity> ctx, object payload);
 }

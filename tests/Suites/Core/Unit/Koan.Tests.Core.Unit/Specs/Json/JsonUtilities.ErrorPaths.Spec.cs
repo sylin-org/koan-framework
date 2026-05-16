@@ -25,7 +25,7 @@ public sealed class JsonUtilitiesErrorPathsSpec
                 act.Should().Throw<JsonReaderException>();
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
@@ -38,7 +38,7 @@ public sealed class JsonUtilitiesErrorPathsSpec
                 act.Should().Throw<JsonSerializationException>();
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
@@ -52,7 +52,7 @@ public sealed class JsonUtilitiesErrorPathsSpec
                 value.Should().BeNull();
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
@@ -65,6 +65,6 @@ public sealed class JsonUtilitiesErrorPathsSpec
                 act.Should().Throw<JsonReaderException>();
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
     }
 }

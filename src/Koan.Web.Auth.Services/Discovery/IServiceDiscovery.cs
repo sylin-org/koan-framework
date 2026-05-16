@@ -2,9 +2,9 @@ namespace Koan.Web.Auth.Services.Discovery;
 
 public interface IServiceDiscovery
 {
-    Task<ServiceEndpoint> ResolveServiceAsync(string serviceId, CancellationToken ct = default);
-    Task<ServiceEndpoint[]> DiscoverServicesAsync(CancellationToken ct = default);
-    Task RegisterServiceAsync(ServiceRegistration registration, CancellationToken ct = default);
+    Task<ServiceEndpoint> ResolveService(string serviceId, CancellationToken ct = default);
+    Task<ServiceEndpoint[]> DiscoverServices(CancellationToken ct = default);
+    Task RegisterService(ServiceRegistration registration, CancellationToken ct = default);
 }
 
 public record ServiceEndpoint(string ServiceId, Uri BaseUrl, string[] SupportedScopes);

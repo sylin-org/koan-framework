@@ -51,7 +51,7 @@ public sealed class CanonRuntimeBuilderSpec
 
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 
     [Fact]
     public Task SetRecordCapacity_rejects_non_positive_values()
@@ -63,7 +63,7 @@ public sealed class CanonRuntimeBuilderSpec
                 act.Should().Throw<ArgumentOutOfRangeException>();
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 
     [Fact]
     public Task Build_produces_runtime_with_configured_defaults()
@@ -109,13 +109,13 @@ public sealed class CanonRuntimeBuilderSpec
                 stage.Payload!.Key.Should().Be("alpha");
                 stage.Metadata.Should().ContainKey("runtime:stage-behavior").WhoseValue.Should().Be(CanonStageBehavior.StageOnly.ToString());
             })
-            .RunAsync();
+            .Run();
 
     private sealed class TestCanon : CanonEntity<TestCanon>
     {
         [AggregationKey]
         [AggregationPolicy(AggregationPolicyKind.SourceOfTruth, Source = "crm")]
-        public string Key { get; set; } = string.Empty;
+        public string Key { get; set; } = "";
     }
 
     private sealed class TestPersistence : ICanonPersistence
@@ -152,16 +152,16 @@ public sealed class CanonRuntimeBuilderSpec
             return Task.FromResult(stage);
         }
 
-        public Task<CanonIndex?> GetIndexAsync(string entityType, string key, CancellationToken cancellationToken)
+        public Task<CanonIndex?> GetIndex(string entityType, string key, CancellationToken cancellationToken)
             => Task.FromResult<CanonIndex?>(null);
 
-        public Task UpsertIndexAsync(CanonIndex index, CancellationToken cancellationToken)
+        public Task UpsertIndex(CanonIndex index, CancellationToken cancellationToken)
             => Task.CompletedTask;
     }
 
     private sealed class NoopAuditSink : ICanonAuditSink
     {
-        public Task WriteAsync(IReadOnlyList<CanonAuditEntry> entries, CancellationToken cancellationToken)
+        public Task Write(IReadOnlyList<CanonAuditEntry> entries, CancellationToken cancellationToken)
             => Task.CompletedTask;
     }
 }

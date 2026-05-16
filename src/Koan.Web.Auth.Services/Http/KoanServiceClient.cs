@@ -33,7 +33,7 @@ public sealed class KoanServiceClient : IKoanServiceClient
     public async Task<T?> GetAsync<T>(string serviceId, string endpoint, CancellationToken ct = default) where T : class
     {
         var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
-        var response = await SendAsync(serviceId, request, ct);
+        var response = await Send(serviceId, request, ct);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -56,7 +56,7 @@ public sealed class KoanServiceClient : IKoanServiceClient
             request.Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
         }
 
-        var response = await SendAsync(serviceId, request, ct);
+        var response = await Send(serviceId, request, ct);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -69,20 +69,20 @@ public sealed class KoanServiceClient : IKoanServiceClient
         return JsonSerializer.Deserialize<T>(responseJson, JsonOptions);
     }
 
-    public async Task<HttpResponseMessage> SendAsync(string serviceId, HttpRequestMessage request, CancellationToken ct = default)
+    public async Task<HttpResponseMessage> Send(string serviceId, HttpRequestMessage request, CancellationToken ct = default)
     {
         _logger.LogDebug("Sending {Method} request to {ServiceId}{Endpoint}",
             request.Method, serviceId, request.RequestUri?.ToString());
 
         // Resolve service endpoint
-        var endpoint = await _discovery.ResolveServiceAsync(serviceId, ct);
+        var endpoint = await _discovery.ResolveService(serviceId, ct);
 
         // Build absolute URL
         var absoluteUri = new Uri(endpoint.BaseUrl, request.RequestUri?.ToString() ?? "/");
         request.RequestUri = absoluteUri;
 
         // Get authentication token
-        var token = await _authenticator.GetServiceTokenAsync(serviceId, scopes: null, ct);
+        var token = await _authenticator.GetServiceToken(serviceId, scopes: null, ct);
 
         // Add authorization header
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);

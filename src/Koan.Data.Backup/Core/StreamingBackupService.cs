@@ -47,7 +47,7 @@ public class StreamingBackupService : IBackupService
             Id = Guid.CreateVersion7().ToString(),
             Name = backupName,
             Description = options.Description ?? $"Backup of {typeof(TEntity).Name}",
-            Labels = options.Tags ?? Array.Empty<string>(),
+            Labels = options.Tags ?? [],
             CreatedAt = DateTimeOffset.UtcNow,
             Status = BackupStatus.InProgress,
             Version = "1.0"
@@ -66,7 +66,7 @@ public class StreamingBackupService : IBackupService
             _activeBackups[manifest.Id] = progress;
 
             // Create backup archive
-            var (archiveStream, descriptor) = await _storageService.CreateBackupArchiveAsync(
+            var (archiveStream, descriptor) = await _storageService.CreateBackupArchive(
                 backupName,
                 manifest.CreatedAt,
                 ct);
@@ -109,18 +109,18 @@ public class StreamingBackupService : IBackupService
             manifest.Verification.OverallChecksum = _storageService.ComputeOverallChecksum(manifest.Entities);
 
             // Store manifest and verification
-            await _storageService.StoreManifestAsync(archive, manifest, ct);
-            await _storageService.StoreVerificationAsync(archive, manifest, ct);
+            await _storageService.StoreManifest(archive, manifest, ct);
+            await _storageService.StoreVerification(archive, manifest, ct);
 
             // Upload to storage
             archive.Dispose(); // Close the archive
-            var storageObject = await _storageService.UploadBackupArchiveAsync(
+            var storageObject = await _storageService.UploadBackupArchive(
                 archiveStream,
                 descriptor,
                 options.StorageProfile,
                 ct);
 
-            manifest.Verification.ArchiveContentHash = storageObject.ContentHash ?? string.Empty;
+            manifest.Verification.ArchiveContentHash = storageObject.ContentHash ?? "";
             manifest.Verification.ArchiveSizeBytes = storageObject.Size;
             // Update final progress
             progress.Status = BackupStatus.Completed;
@@ -152,7 +152,7 @@ public class StreamingBackupService : IBackupService
         }
     }
 
-    public async Task<BackupManifest> BackupAllEntitiesAsync(
+    public async Task<BackupManifest> BackupAllEntities(
         string backupName,
         GlobalBackupOptions? options = null,
         CancellationToken ct = default)
@@ -163,10 +163,10 @@ public class StreamingBackupService : IBackupService
         _logger.LogInformation("Starting backup of all entities to {BackupName}", backupName);
 
         // Ensure all entities are discovered and warmed up
-        await _discoveryService.WarmupAllEntitiesAsync(ct);
+        await _discoveryService.WarmupAllEntities(ct);
 
         // Build backup inventory to get policies
-        var inventory = await _discoveryService.BuildInventoryAsync(ct);
+        var inventory = await _discoveryService.BuildInventory(ct);
 
         // Filter to only included entities (respecting backup policy)
         var allEntities = _discoveryService.GetDiscoveredEntities()
@@ -188,7 +188,7 @@ public class StreamingBackupService : IBackupService
             Id = Guid.CreateVersion7().ToString(),
             Name = backupName,
             Description = options.Description ?? $"Backup of {allEntities.Count} entity types",
-            Labels = options.Tags ?? Array.Empty<string>(),
+            Labels = options.Tags ?? [],
             CreatedAt = DateTimeOffset.UtcNow,
             Status = BackupStatus.InProgress,
             Version = "1.0"
@@ -215,7 +215,7 @@ public class StreamingBackupService : IBackupService
             _activeBackups[manifest.Id] = progress;
 
             // Create backup archive
-            var (archiveStream, descriptor) = await _storageService.CreateBackupArchiveAsync(
+            var (archiveStream, descriptor) = await _storageService.CreateBackupArchive(
                 backupName,
                 manifest.CreatedAt,
                 ct);
@@ -272,18 +272,18 @@ public class StreamingBackupService : IBackupService
             }
 
             // Store manifest and verification
-            await _storageService.StoreManifestAsync(archive, manifest, ct);
-            await _storageService.StoreVerificationAsync(archive, manifest, ct);
+            await _storageService.StoreManifest(archive, manifest, ct);
+            await _storageService.StoreVerification(archive, manifest, ct);
 
             // Upload to storage
             archive.Dispose(); // Close the archive
-            var storageObject = await _storageService.UploadBackupArchiveAsync(
+            var storageObject = await _storageService.UploadBackupArchive(
                 archiveStream,
                 descriptor,
                 options.StorageProfile,
                 ct);
 
-            manifest.Verification.ArchiveContentHash = storageObject.ContentHash ?? string.Empty;
+            manifest.Verification.ArchiveContentHash = storageObject.ContentHash ?? "";
             manifest.Verification.ArchiveSizeBytes = storageObject.Size;
             // Update final progress
             progress.Status = BackupStatus.Completed;
@@ -317,37 +317,37 @@ public class StreamingBackupService : IBackupService
         }
     }
 
-    public async Task<BackupManifest> BackupSelectedAsync(
+    public async Task<BackupManifest> BackupSelected(
         string backupName,
         Func<EntityTypeInfo, bool> filter,
         GlobalBackupOptions? options = null,
         CancellationToken ct = default)
     {
-        await _discoveryService.WarmupAllEntitiesAsync(ct);
+        await _discoveryService.WarmupAllEntities(ct);
         var allEntities = _discoveryService.GetDiscoveredEntities().Where(filter).ToList();
 
         var modifiedOptions = options ?? new GlobalBackupOptions();
         modifiedOptions.IncludeEntityTypes = allEntities.Select(e => e.EntityType.Name).ToArray();
 
-        return await BackupAllEntitiesAsync(backupName, modifiedOptions, ct);
+        return await BackupAllEntities(backupName, modifiedOptions, ct);
     }
 
-    public async Task<BackupManifest> BackupByProviderAsync(
+    public async Task<BackupManifest> BackupByProvider(
         string backupName,
         string[] providers,
         GlobalBackupOptions? options = null,
         CancellationToken ct = default)
     {
-        return await BackupSelectedAsync(backupName, entity => providers.Contains(entity.Provider), options, ct);
+        return await BackupSelected(backupName, entity => providers.Contains(entity.Provider), options, ct);
     }
 
-    public Task<BackupProgress> GetBackupProgressAsync(string backupId, CancellationToken ct = default)
+    public Task<BackupProgress> GetBackupProgress(string backupId, CancellationToken ct = default)
     {
         _activeBackups.TryGetValue(backupId, out var progress);
         return Task.FromResult(progress ?? new BackupProgress { BackupId = backupId, Status = BackupStatus.Completed });
     }
 
-    public Task CancelBackupAsync(string backupId, CancellationToken ct = default)
+    public Task CancelBackup(string backupId, CancellationToken ct = default)
     {
         if (_activeBackups.TryGetValue(backupId, out var progress))
         {

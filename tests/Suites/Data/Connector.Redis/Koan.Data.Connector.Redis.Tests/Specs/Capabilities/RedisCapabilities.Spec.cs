@@ -20,7 +20,7 @@ public sealed class RedisCapabilitiesSpec
         await TestPipeline.For<RedisCapabilitiesSpec>(_output, nameof(Repository_reports_linq_and_fast_remove_capabilities))
             .RequireDocker()
             .UsingRedisContainer()
-            .Using<RedisConnectorFixture>("fixture", static ctx => RedisConnectorFixture.CreateAsync(ctx))
+            .Using<RedisConnectorFixture>("fixture", static ctx => RedisConnectorFixture.Create(ctx))
             .Arrange(static async ctx =>
             {
                 var fixture = ctx.GetRequiredItem<RedisConnectorFixture>("fixture");
@@ -42,15 +42,15 @@ public sealed class RedisCapabilitiesSpec
                 var writeCaps = repository.Should().BeAssignableTo<IWriteCapabilities>().Subject;
                 writeCaps.Writes.Should().Be(WriteCapabilities.FastRemove);
 
-                await CapabilityProbe.UpsertAsync(new CapabilityProbe { Name = "cap" });
+                await CapabilityProbe.Upsert(new CapabilityProbe { Name = "cap" });
                 var all = await CapabilityProbe.All();
                 all.Should().ContainSingle(p => p.Name == "cap");
             })
-            .RunAsync();
+            .Run();
     }
 
     private sealed class CapabilityProbe : Entity<CapabilityProbe>
     {
-        public string Name { get; set; } = string.Empty;
+        public string Name { get; set; } = "";
     }
 }

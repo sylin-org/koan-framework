@@ -13,39 +13,24 @@ using Microsoft.Extensions.Options;
 
 namespace Koan.Admin.Services;
 
-internal sealed class KoanAdminLaunchKitService : IKoanAdminLaunchKitService
+internal sealed class KoanAdminLaunchKitService(
+    IKoanAdminManifestService manifestService,
+    IOptionsMonitor<KoanAdminOptions> options,
+    IHostEnvironment environment,
+    IKoanAdminRouteProvider routes,
+    ILogger<KoanAdminLaunchKitService> logger) : IKoanAdminLaunchKitService
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         WriteIndented = true
     };
 
-    private readonly IKoanAdminManifestService _manifestService;
-    private readonly IOptionsMonitor<KoanAdminOptions> _options;
-    private readonly IHostEnvironment _environment;
-    private readonly IKoanAdminRouteProvider _routes;
-    private readonly ILogger<KoanAdminLaunchKitService> _logger;
-
-    public KoanAdminLaunchKitService(
-        IKoanAdminManifestService manifestService,
-        IOptionsMonitor<KoanAdminOptions> options,
-        IHostEnvironment environment,
-        IKoanAdminRouteProvider routes,
-        ILogger<KoanAdminLaunchKitService> logger)
+    public Task<KoanAdminLaunchKitMetadata> GetMetadata(CancellationToken cancellationToken = default)
     {
-        _manifestService = manifestService;
-        _options = options;
-        _environment = environment;
-        _routes = routes;
-        _logger = logger;
-    }
-
-    public Task<KoanAdminLaunchKitMetadata> GetMetadataAsync(CancellationToken cancellationToken = default)
-    {
-        var generate = _options.CurrentValue.Generate ?? new KoanAdminGenerateOptions();
+        var generate = options.CurrentValue.Generate ?? new KoanAdminGenerateOptions();
         var profiles = NormalizeProfiles(generate.ComposeProfiles);
         var defaultProfile = profiles.Length > 0 ? profiles[0] : "Default";
-        var openApiTemplates = generate.OpenApiClients?.Where(s => !string.IsNullOrWhiteSpace(s)).Select(NormalizeClient).Distinct(StringComparer.OrdinalIgnoreCase).ToArray() ?? Array.Empty<string>();
+        var openApiTemplates = generate.OpenApiClients?.Where(s => !string.IsNullOrWhiteSpace(s)).Select(NormalizeClient).Distinct(StringComparer.OrdinalIgnoreCase).ToArray() ?? [];
 
         var metadata = new KoanAdminLaunchKitMetadata(
             defaultProfile,
@@ -58,18 +43,18 @@ internal sealed class KoanAdminLaunchKitService : IKoanAdminLaunchKitService
             generate.IncludeReadme
         );
 
-        _logger.LogDebug("LaunchKit metadata requested. Profiles: {Profiles}; OpenAPI: {Clients}", profiles, openApiTemplates);
+        logger.LogDebug("LaunchKit metadata requested. Profiles: {Profiles}; OpenAPI: {Clients}", profiles, openApiTemplates);
 
         return Task.FromResult(metadata);
     }
 
-    public async Task<KoanAdminLaunchKitArchive> GenerateArchiveAsync(
+    public async Task<KoanAdminLaunchKitArchive> GenerateArchive(
         KoanAdminLaunchKitRequest request,
         CancellationToken cancellationToken = default)
     {
         request ??= new KoanAdminLaunchKitRequest(null, null, null, null, null, null, null);
-        var options = _options.CurrentValue;
-        var generate = options.Generate ?? new KoanAdminGenerateOptions();
+        var opts = options.CurrentValue;
+        var generate = opts.Generate ?? new KoanAdminGenerateOptions();
         var profiles = NormalizeProfiles(generate.ComposeProfiles);
         var profile = ResolveProfile(request.Profile, profiles);
 
@@ -81,8 +66,8 @@ internal sealed class KoanAdminLaunchKitService : IKoanAdminLaunchKitService
         var openApiClients = ResolveOpenApiClients(request.OpenApiClients, generate.OpenApiClients);
 
         var generatedAt = DateTimeOffset.UtcNow;
-        var manifest = await _manifestService.BuildAsync(cancellationToken);
-        var routes = _routes.Current;
+        var manifest = await manifestService.Build(cancellationToken);
+        var routeMap = routes.Current;
 
         var files = new List<FileBuffer>();
 
@@ -112,16 +97,16 @@ internal sealed class KoanAdminLaunchKitService : IKoanAdminLaunchKitService
 
         if (includeReadme)
         {
-            var readme = BuildReadme(manifest, profile, generatedAt, routes);
+            var readme = BuildReadme(manifest, profile, generatedAt, routeMap);
             files.Add(new FileBuffer("README.md", "text/markdown", Encoding.UTF8.GetBytes(readme)));
         }
 
-        var metadata = BuildMetadata(manifest, profile, generatedAt, routes, includeAppSettings, includeCompose, includeAspire, includeManifest, openApiClients);
+        var metadata = BuildMetadata(manifest, profile, generatedAt, routeMap, includeAppSettings, includeCompose, includeAspire, includeManifest, openApiClients);
         files.Add(new FileBuffer("metadata/launchkit.json", "application/json", metadata));
 
         foreach (var client in openApiClients)
         {
-            var content = BuildOpenApiInstructions(client, profile, routes);
+            var content = BuildOpenApiInstructions(client, profile, routeMap);
             files.Add(new FileBuffer($"openapi/{client}/README.md", "text/markdown", Encoding.UTF8.GetBytes(content)));
         }
 
@@ -129,7 +114,7 @@ internal sealed class KoanAdminLaunchKitService : IKoanAdminLaunchKitService
         var archiveContent = CreateArchive(files);
         var archiveName = $"koan-launchkit-{profile.ToLowerInvariant()}-{generatedAt:yyyyMMddHHmmss}.zip";
 
-        _logger.LogInformation("Generated LaunchKit bundle {Archive} with {FileCount} files for profile {Profile}", archiveName, files.Count, profile);
+        logger.LogInformation("Generated LaunchKit bundle {Archive} with {FileCount} files for profile {Profile}", archiveName, files.Count, profile);
 
         return new KoanAdminLaunchKitArchive(archiveName, "application/zip", bundle, archiveContent);
     }
@@ -188,7 +173,7 @@ internal sealed class KoanAdminLaunchKitService : IKoanAdminLaunchKitService
 
     private static string[] ResolveOpenApiClients(IReadOnlyList<string>? requested, string[]? configured)
     {
-        IEnumerable<string> source = Array.Empty<string>();
+        IEnumerable<string> source = [];
 
         if (requested is not null && requested.Count > 0)
         {
@@ -266,7 +251,7 @@ internal sealed class KoanAdminLaunchKitService : IKoanAdminLaunchKitService
         {
             schema = "https://koan.dev/schemas/launchkit/appsettings.json",
             generatedAtUtc = generatedAt,
-            environment = _environment.EnvironmentName,
+            environment = environment.EnvironmentName,
             profile,
             modules
         };
@@ -337,7 +322,7 @@ internal sealed class KoanAdminLaunchKitService : IKoanAdminLaunchKitService
         {
             profile,
             generatedAtUtc = generatedAt,
-            environment = _environment.EnvironmentName,
+            environment = environment.EnvironmentName,
             configuration = new
             {
                 includeAppSettings,

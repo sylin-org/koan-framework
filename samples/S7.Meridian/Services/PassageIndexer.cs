@@ -8,106 +8,97 @@ namespace Koan.Samples.Meridian.Services;
 
 public interface IPassageIndexer
 {
-    Task IndexAsync(string pipelineId, List<Passage> passages, CancellationToken ct);
+    Task Index(string pipelineId, List<Passage> passages, CancellationToken ct);
 }
 
 public sealed class PassageIndexer : IPassageIndexer
 {
     private readonly ILogger<PassageIndexer> _logger;
     private readonly IPipelineAlertService _alerts;
-    private readonly IEmbeddingCache _cache;
-    private const string EmbeddingModel = "granite3.3:8b";
 
     public PassageIndexer(
         ILogger<PassageIndexer> logger,
-        IPipelineAlertService alerts,
-        IEmbeddingCache cache)
+        IPipelineAlertService alerts)
     {
         _logger = logger;
         _alerts = alerts;
-        _cache = cache;
     }
 
-    public async Task IndexAsync(string pipelineId, List<Passage> passages, CancellationToken ct)
+    public async Task Index(string pipelineId, List<Passage> passages, CancellationToken ct)
     {
         if (passages.Count == 0)
         {
             return;
         }
 
-        if (!VectorWorkflow<Passage>.IsAvailable(MeridianConstants.VectorProfile))
+        // Check vector availability using new Vector<T> API
+        if (!Vector<Passage>.IsAvailable)
         {
-            _logger.LogWarning("Vector workflow {Profile} unavailable; skipping indexing.", MeridianConstants.VectorProfile);
-            await _alerts.PublishWarning(pipelineId, "vector-unavailable", $"Vector profile '{MeridianConstants.VectorProfile}' unavailable; retrieval falls back to lexical search.", ct);
+            _logger.LogWarning("Vector storage unavailable; skipping indexing.");
+            await _alerts.PublishWarning(
+                pipelineId,
+                "vector-unavailable",
+                "Vector storage unavailable; retrieval falls back to lexical search.",
+                ct);
             return;
         }
 
-        await VectorWorkflow<Passage>.EnsureCreated(MeridianConstants.VectorProfile, ct);
+        await Vector<Passage>.EnsureCreated(ct);
 
-        var hits = 0;
-        var misses = 0;
-        var payload = new List<(Passage Entity, float[] Embedding, object? Metadata)>();
+        var successCount = 0;
+        var failureCount = 0;
 
+        // Process passages with transaction coordination for atomic entity + vector saves
+        // [Embedding] attribute handles:
+        // - Content hash calculation for change detection
+        // - Cache lookup via EmbeddingState<Passage>
+        // - Embedding generation if content changed
+        // - Vector upsert coordination
         foreach (var passage in passages)
         {
-            // Check cache
-            var contentHash = EmbeddingCache.ComputeContentHash(passage.Text);
-            var cached = await _cache.GetAsync(contentHash, EmbeddingModel, nameof(Passage), ct);
+            using var tx = EntityContext.Transaction($"passage-{passage.Id}");
 
-            float[] embedding;
-            if (cached != null)
+            try
             {
-                hits++;
-                _logger.LogDebug("Embedding cache HIT for passage {PassageId}", passage.Id);
-                embedding = cached.Embedding;
-            }
-            else
-            {
-                misses++;
-                _logger.LogDebug("Embedding cache MISS for passage {PassageId}", passage.Id);
-                embedding = await Koan.AI.Ai.Embed(passage.Text, ct);
-                await _cache.SetAsync(contentHash, EmbeddingModel, embedding, nameof(Passage), ct);
-            }
+                passage.IndexedAt = DateTime.UtcNow;
 
-            payload.Add((passage, embedding, BuildMetadata(passage)));
-            passage.IndexedAt = DateTime.UtcNow;
-            await passage.Save(ct);
+                // Save triggers [Embedding] attribute lifecycle:
+                // 1. Computes content hash from Text property
+                // 2. Checks EmbeddingState<Passage> for existing hash
+                // 3. Generates embedding if content changed
+                // 4. Queues vector upsert for commit
+                await passage.Save(ct);
+
+                // Atomic commit: Both entity + vector, or neither
+                await EntityContext.Commit(ct);
+
+                successCount++;
+                _logger.LogDebug("Indexed passage {PassageId} (transactional)", passage.Id);
+            }
+            catch (Exception ex)
+            {
+                failureCount++;
+
+                // Rollback discards both entity and vector operations
+                await EntityContext.Rollback(ct);
+
+                _logger.LogError(ex, "Failed to index passage {PassageId}, transaction rolled back", passage.Id);
+            }
         }
 
-        _logger.LogInformation("Embedding cache: {Hits} hits, {Misses} misses ({Total} total)",
-            hits, misses, passages.Count);
+        _logger.LogInformation(
+            "Passage indexing complete: {Success} succeeded, {Failed} failed ({Total} total)",
+            successCount,
+            failureCount,
+            passages.Count);
 
-        if (payload.Count > 0)
+        if (failureCount > 0)
         {
-            _logger.LogDebug("Attempting to upsert {Count} passages to Weaviate (profile: {Profile})",
-                payload.Count, MeridianConstants.VectorProfile);
-
-            var result = await VectorWorkflow<Passage>.SaveMany(payload, MeridianConstants.VectorProfile, ct);
-
-            _logger.LogInformation("Weaviate SaveMany result: Documents={Docs}, Vectors={Vecs}, Payload={PayloadCount}",
-                result.Documents, result.Vectors, payload.Count);
-
-            if (result.Documents == 0)
-            {
-                _logger.LogWarning("Weaviate returned 0 documents! Expected {Expected}, got {Actual}. Vectors={Vecs}",
-                    payload.Count, result.Documents, result.Vectors);
-            }
-            else if (result.Documents < payload.Count)
-            {
-                _logger.LogWarning("Partial Weaviate upsert: {Actual}/{Expected} documents saved",
-                    result.Documents, payload.Count);
-            }
-
-            _logger.LogInformation("Upserted {Count} passages into vector profile {Profile}.", result.Documents, MeridianConstants.VectorProfile);
+            await _alerts.PublishWarning(
+                pipelineId,
+                "indexing-partial-failure",
+                $"{failureCount}/{passages.Count} passages failed to index",
+                ct);
         }
     }
-
-    private static Dictionary<string, object?> BuildMetadata(Passage passage)
-        => new()
-        {
-            ["docId"] = passage.Id, // Required for VectorWorkflow to map Weaviate results back to entity IDs
-            ["sourceDocumentId"] = passage.SourceDocumentId,
-            ["sequenceNumber"] = passage.SequenceNumber,
-            ["section"] = passage.Section
-        };
 }

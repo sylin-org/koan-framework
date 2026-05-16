@@ -21,7 +21,7 @@ internal sealed class WeaviateClient
         _http.Timeout = TimeSpan.FromSeconds(Math.Max(1, _options.DefaultTimeoutSeconds));
     }
 
-    public async Task<(bool Ok, string? Version)> PingAsync(CancellationToken ct)
+    public async Task<(bool Ok, string? Version)> Ping(CancellationToken ct)
     {
         try
         {

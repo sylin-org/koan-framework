@@ -53,7 +53,7 @@ public class BackupController : ControllerBase
                 request.Name, request.IncludeEntityTypes?.Length ?? 0);
 
             // Start tracking the operation
-            var operationId = await _operationTracker.StartBackupOperationAsync(request.Name, ct);
+            var operationId = await _operationTracker.StartBackupOperation(request.Name, ct);
 
             // Start the backup operation asynchronously
             _ = Task.Run(async () =>
@@ -62,23 +62,23 @@ public class BackupController : ControllerBase
                 {
                     var options = MapToGlobalBackupOptions(request);
 
-                    await _operationTracker.UpdateBackupProgressAsync(operationId, new BackupProgressInfo
+                    await _operationTracker.UpdateBackupProgress(operationId, new BackupProgressInfo
                     {
                         CurrentStage = "Initializing",
                         PercentComplete = 0
                     });
 
-                    var result = await _backupService.BackupAllEntitiesAsync(request.Name, options, ct);
-                    await _operationTracker.CompleteBackupOperationAsync(operationId, result);
+                    var result = await _backupService.BackupAllEntities(request.Name, options, ct);
+                    await _operationTracker.CompleteBackupOperation(operationId, result);
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Global backup operation {OperationId} failed", operationId);
-                    await _operationTracker.FailOperationAsync(operationId, ex.Message);
+                    await _operationTracker.FailOperation(operationId, ex.Message);
                 }
             }, ct);
 
-            var response = await _operationTracker.GetBackupOperationAsync(operationId);
+            var response = await _operationTracker.GetBackupOperation(operationId);
             return Accepted(response);
         }
         catch (Exception ex)
@@ -106,7 +106,7 @@ public class BackupController : ControllerBase
         {
             _logger.LogInformation("Starting selective backup '{BackupName}'", request.Name);
 
-            var operationId = await _operationTracker.StartBackupOperationAsync(request.Name, ct);
+            var operationId = await _operationTracker.StartBackupOperation(request.Name, ct);
 
             _ = Task.Run(async () =>
             {
@@ -114,7 +114,7 @@ public class BackupController : ControllerBase
                 {
                     var options = MapToGlobalBackupOptions(request);
 
-                    await _operationTracker.UpdateBackupProgressAsync(operationId, new BackupProgressInfo
+                    await _operationTracker.UpdateBackupProgress(operationId, new BackupProgressInfo
                     {
                         CurrentStage = "Discovering entities",
                         PercentComplete = 5
@@ -144,17 +144,17 @@ public class BackupController : ControllerBase
                         return true;
                     };
 
-                    var result = await _backupService.BackupSelectedAsync(request.Name, filter, options, ct);
-                    await _operationTracker.CompleteBackupOperationAsync(operationId, result);
+                    var result = await _backupService.BackupSelected(request.Name, filter, options, ct);
+                    await _operationTracker.CompleteBackupOperation(operationId, result);
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Selective backup operation {OperationId} failed", operationId);
-                    await _operationTracker.FailOperationAsync(operationId, ex.Message);
+                    await _operationTracker.FailOperation(operationId, ex.Message);
                 }
             }, ct);
 
-            var response = await _operationTracker.GetBackupOperationAsync(operationId);
+            var response = await _operationTracker.GetBackupOperation(operationId);
             return Accepted(response);
         }
         catch (Exception ex)
@@ -175,7 +175,7 @@ public class BackupController : ControllerBase
     public async Task<ActionResult<BackupOperationResponse>> GetBackupOperation(
         [Required] string operationId)
     {
-        var operation = await _operationTracker.GetBackupOperationAsync(operationId);
+        var operation = await _operationTracker.GetBackupOperation(operationId);
 
         if (operation == null)
         {
@@ -197,7 +197,7 @@ public class BackupController : ControllerBase
     public async Task<ActionResult<BackupOperationResponse>> CancelBackupOperation(
         [Required] string operationId)
     {
-        var operation = await _operationTracker.GetBackupOperationAsync(operationId);
+        var operation = await _operationTracker.GetBackupOperation(operationId);
 
         if (operation == null)
         {
@@ -209,9 +209,9 @@ public class BackupController : ControllerBase
             return BadRequest(new { error = "Operation cannot be cancelled", status = operation.Status.ToString() });
         }
 
-        await _operationTracker.CancelOperationAsync(operationId);
+        await _operationTracker.CancelOperation(operationId);
 
-        var updatedOperation = await _operationTracker.GetBackupOperationAsync(operationId);
+        var updatedOperation = await _operationTracker.GetBackupOperation(operationId);
         return Ok(updatedOperation);
     }
 
@@ -247,7 +247,7 @@ public class BackupController : ControllerBase
                 SearchTerm = search
             };
 
-            var catalog = await _backupDiscoveryService.QueryBackupsAsync(query, ct);
+            var catalog = await _backupDiscoveryService.QueryBackups(query, ct);
 
             var response = new BackupCatalogResponse
             {
@@ -282,7 +282,7 @@ public class BackupController : ControllerBase
     {
         try
         {
-            var backup = await _backupDiscoveryService.GetBackupAsync(backupId, ct);
+            var backup = await _backupDiscoveryService.GetBackup(backupId, ct);
 
             if (backup == null)
             {
@@ -314,7 +314,7 @@ public class BackupController : ControllerBase
     {
         try
         {
-            var result = await _backupDiscoveryService.ValidateBackupAsync(backupId, ct);
+            var result = await _backupDiscoveryService.ValidateBackup(backupId, ct);
             return Ok(result);
         }
         catch (Exception ex)
@@ -334,20 +334,20 @@ public class BackupController : ControllerBase
     {
         try
         {
-            var activeOperations = await _operationTracker.GetActiveOperationsAsync();
+            var activeOperations = await _operationTracker.GetActiveOperations();
             var activeBackups = 0;
             var activeRestores = 0;
 
             foreach (var operationId in activeOperations)
             {
-                var backupOp = await _operationTracker.GetBackupOperationAsync(operationId);
+                var backupOp = await _operationTracker.GetBackupOperation(operationId);
                 if (backupOp != null)
                 {
                     activeBackups++;
                     continue;
                 }
 
-                var restoreOp = await _operationTracker.GetRestoreOperationAsync(operationId);
+                var restoreOp = await _operationTracker.GetRestoreOperation(operationId);
                 if (restoreOp != null)
                 {
                     activeRestores++;
@@ -394,7 +394,7 @@ public class BackupController : ControllerBase
             Description = request.Description,
             Tags = request.Tags,
             Partition = request.Partition,
-            StorageProfile = request.StorageProfile ?? string.Empty,
+            StorageProfile = request.StorageProfile ?? "",
             CompressionLevel = request.CompressionLevel,
             VerificationEnabled = request.VerificationEnabled,
             BatchSize = request.BatchSize,

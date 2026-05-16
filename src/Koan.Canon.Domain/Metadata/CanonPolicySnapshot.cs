@@ -8,12 +8,12 @@ public sealed class CanonPolicySnapshot
     /// <summary>
     /// Policy identifier.
     /// </summary>
-    public string Policy { get; set; } = string.Empty;
+    public string Policy { get; set; } = "";
 
     /// <summary>
     /// Selected outcome or transformer.
     /// </summary>
-    public string Outcome { get; set; } = string.Empty;
+    public string Outcome { get; set; } = "";
 
     /// <summary>
     /// Policy version, if applicable.

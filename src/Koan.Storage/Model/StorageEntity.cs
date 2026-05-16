@@ -15,7 +15,7 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
     where TEntity : class, IStorageObject
 {
     // IStorageObject properties (minimal baseline, derived types may add more fields)
-    public string Key { get; set; } = string.Empty;
+    public string Key { get; set; } = "";
     public string? Name { get; set; }
     public string? ContentType { get; set; }
     public long Size { get; set; }
@@ -31,8 +31,8 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
     {
         var t = typeof(TEntity);
         var attr = t.GetCustomAttributes(typeof(StorageBindingAttribute), inherit: false).OfType<StorageBindingAttribute>().FirstOrDefault();
-        var profile = attr?.Profile ?? string.Empty;
-        var container = overrideContainer ?? attr?.Container ?? string.Empty;
+        var profile = attr?.Profile ?? "";
+        var container = overrideContainer ?? attr?.Container ?? "";
         return (profile, container);
     }
 
@@ -96,25 +96,25 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
     public async Task<Stream> OpenRead(CancellationToken ct = default)
     {
         var (profile, container) = InstanceBinding();
-        return await Storage().ReadAsync(profile, container, Key, ct);
+        return await Storage().Read(profile, container, Key, ct);
     }
 
     public async Task<(Stream Stream, long? Length)> OpenReadRange(long? from = null, long? to = null, CancellationToken ct = default)
     {
         var (profile, container) = InstanceBinding();
-        return await Storage().ReadRangeAsync(profile, container, Key, from, to, ct);
+        return await Storage().ReadRange(profile, container, Key, from, to, ct);
     }
 
     public async Task<ObjectStat?> Head(CancellationToken ct = default)
     {
         var (profile, container) = InstanceBinding();
-        return await Storage().HeadAsync(profile, container, Key, ct);
+        return await Storage().Head(profile, container, Key, ct);
     }
 
     public async Task<bool> Delete(CancellationToken ct = default)
     {
         var (profile, container) = InstanceBinding();
-        return await Storage().DeleteAsync(profile, container, Key, ct);
+        return await Storage().Delete(profile, container, Key, ct);
     }
 
     public async Task<TTarget> CopyTo<TTarget>(CancellationToken ct = default)
@@ -125,7 +125,7 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
             ? ("", "")
             : InstanceBinding();
         var (targetProfile, targetContainer) = ResolveBindingFor<TTarget>();
-        var obj = await Storage().TransferToProfileAsync(sourceProfile, sourceContainer, Key, targetProfile, targetContainer, deleteSource: false, ct);
+        var obj = await Storage().TransferToProfile(sourceProfile, sourceContainer, Key, targetProfile, targetContainer, deleteSource: false, ct);
         return To<TTarget>(obj);
     }
 
@@ -136,7 +136,7 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
             ? ("", "")
             : InstanceBinding();
         var (targetProfile, targetContainer) = ResolveBindingFor<TTarget>();
-        var obj = await Storage().TransferToProfileAsync(sourceProfile, sourceContainer, Key, targetProfile, targetContainer, deleteSource: true, ct);
+        var obj = await Storage().TransferToProfile(sourceProfile, sourceContainer, Key, targetProfile, targetContainer, deleteSource: true, ct);
         return To<TTarget>(obj);
     }
 
@@ -144,8 +144,8 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
     {
         var t = typeof(T);
         var attr = t.GetCustomAttributes(typeof(StorageBindingAttribute), inherit: false).OfType<StorageBindingAttribute>().FirstOrDefault();
-        var profile = attr?.Profile ?? string.Empty;
-        var container = attr?.Container ?? string.Empty;
+        var profile = attr?.Profile ?? "";
+        var container = attr?.Container ?? "";
         return (profile, container);
     }
 
@@ -160,19 +160,43 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
     public static Task<Stream> OpenRead(string key, CancellationToken ct = default)
     {
         var (profile, container) = ResolveBinding();
-        return Storage().ReadAsync(profile, container, key, ct);
+        return Storage().Read(profile, container, key, ct);
     }
 
     public static Task<(Stream Stream, long? Length)> OpenReadRange(string key, long? from = null, long? to = null, CancellationToken ct = default)
     {
         var (profile, container) = ResolveBinding();
-        return Storage().ReadRangeAsync(profile, container, key, from, to, ct);
+        return Storage().ReadRange(profile, container, key, from, to, ct);
     }
 
-    public static Task<ObjectStat?> Head(string key, CancellationToken ct = default)
+    public static async Task<ObjectStat?> Head(string key, CancellationToken ct = default)
     {
+        // Defensive guard: a null/empty key is a not-found, not an exception. Callers like
+        // MediaContentController's [HttpGet("{**key}")] can receive empty segments from clients;
+        // pushing them to the storage provider (which throws on null) would surface as 500s
+        // rather than the natural 404.
+        if (string.IsNullOrWhiteSpace(key)) return null;
+
         var (profile, container) = ResolveBinding();
-        return Storage().HeadAsync(profile, container, key, ct);
+        var stat = await Storage().Head(profile, container, key, ct);
+        if (stat is null) return null;
+
+        // Provider ContentType reliability varies: S3/Azure persist it via service metadata;
+        // the local-filesystem provider doesn't carry a sidecar today and returns null. When
+        // the provider can't supply ContentType, fall back to the persisted entity row — that's
+        // the value the caller passed to Upload/Put, and it's authoritative regardless of how
+        // the storage backend chose to (not) record it. The query is keyed on Key (typically
+        // indexed) and only runs when the fast path is empty; providers that DO persist mime
+        // skip this entirely.
+        if (string.IsNullOrWhiteSpace(stat.ContentType))
+        {
+            var entity = (await Query(e => ((IStorageObject)e).Key == key, ct)).FirstOrDefault();
+            if (entity is IStorageObject so && !string.IsNullOrWhiteSpace(so.ContentType))
+            {
+                stat = stat with { ContentType = so.ContentType };
+            }
+        }
+        return stat;
     }
 
     // Map from StorageObject to TEntity (shallow copy of storage metadata)

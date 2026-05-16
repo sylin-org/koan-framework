@@ -9,6 +9,8 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Annotations;
+using TimestampAttribute = Koan.Data.Abstractions.Annotations.TimestampAttribute;
 
 namespace Koan.Data.Core.Transfers;
 
@@ -42,9 +44,9 @@ public sealed class MirrorTransferBuilder<TEntity, TKey> : EntityTransferBuilder
         {
             case MirrorMode.Push:
             {
-                var items = await FetchEntitiesAsync(FromContext, cancellationToken);
+                var items = await FetchEntities(FromContext, cancellationToken);
                 readCount = items.Count;
-                var pushProgress = await UpsertBatchesAsync(
+                var pushProgress = await UpsertBatches(
                     items,
                     FromContext,
                     ToContext,
@@ -61,9 +63,9 @@ public sealed class MirrorTransferBuilder<TEntity, TKey> : EntityTransferBuilder
             }
             case MirrorMode.Pull:
             {
-                var items = await FetchEntitiesAsync(ToContext, cancellationToken);
+                var items = await FetchEntities(ToContext, cancellationToken);
                 readCount = items.Count;
-                var pullProgress = await UpsertBatchesAsync(
+                var pullProgress = await UpsertBatches(
                     items,
                     ToContext,
                     FromContext,
@@ -80,8 +82,8 @@ public sealed class MirrorTransferBuilder<TEntity, TKey> : EntityTransferBuilder
             }
             case MirrorMode.Bidirectional:
             {
-                var sourceItems = await FetchEntitiesAsync(FromContext, cancellationToken);
-                var targetItems = await FetchEntitiesAsync(ToContext, cancellationToken);
+                var sourceItems = await FetchEntities(FromContext, cancellationToken);
+                var targetItems = await FetchEntities(ToContext, cancellationToken);
                 readCount = sourceItems.Count + targetItems.Count;
 
                 var timestampProperty = ResolveTimestampProperty();
@@ -137,7 +139,7 @@ public sealed class MirrorTransferBuilder<TEntity, TKey> : EntityTransferBuilder
                 }
 
                 copied = 0;
-                var destProgress = await UpsertBatchesAsync(
+                var destProgress = await UpsertBatches(
                     copyToDestination,
                     FromContext,
                     ToContext,
@@ -151,7 +153,7 @@ public sealed class MirrorTransferBuilder<TEntity, TKey> : EntityTransferBuilder
                 batchCounter = destProgress.BatchCounter;
                 totalProcessed = destProgress.TotalProcessed;
 
-                var sourceProgress = await UpsertBatchesAsync(
+                var sourceProgress = await UpsertBatches(
                     copyToSource,
                     ToContext,
                     FromContext,

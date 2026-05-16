@@ -25,13 +25,13 @@ public interface IMessagingProvider
     /// Checks if this provider can establish a connection in the current environment.
     /// Used during auto-selection to find the first working provider.
     /// </summary>
-    Task<bool> CanConnectAsync(CancellationToken cancellationToken = default);
+    Task<bool> CanConnect(CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Creates and initializes a message bus instance.
     /// Called only after CanConnectAsync returns true.
     /// </summary>
-    Task<IMessageBus> CreateBusAsync(CancellationToken cancellationToken = default);
+    Task<IMessageBus> CreateBus(CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -53,7 +53,7 @@ public interface IMessageBus
     /// <summary>
     /// Checks if the bus connection is healthy.
     /// </summary>
-    Task<bool> IsHealthyAsync(CancellationToken cancellationToken = default);
+    Task<bool> IsHealthy(CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -79,10 +79,10 @@ public interface IMessageConsumer : IAsyncDisposable
     /// <summary>
     /// Pauses message consumption.
     /// </summary>
-    Task PauseAsync();
+    Task Pause();
     
     /// <summary>
     /// Resumes message consumption.
     /// </summary>
-    Task ResumeAsync();
+    Task Resume();
 }

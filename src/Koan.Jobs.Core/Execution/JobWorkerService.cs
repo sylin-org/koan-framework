@@ -27,16 +27,16 @@ internal sealed class JobWorkerService : KoanBackgroundServiceBase
     public override string Name => "Koan.Jobs.Worker";
     public override bool IsCritical => true;
 
-    public override Task ExecuteCoreAsync(CancellationToken cancellationToken)
-        => RunAsync(cancellationToken);
+    public override Task ExecuteCore(CancellationToken cancellationToken)
+        => Run(cancellationToken);
 
-    private async Task RunAsync(CancellationToken cancellationToken)
+    private async Task Run(CancellationToken cancellationToken)
     {
-        await foreach (var item in _queue.ReadAllAsync(cancellationToken))
+        await foreach (var item in _queue.ReadAll(cancellationToken))
         {
             try
             {
-                await _executor.ExecuteAsync(item, cancellationToken);
+                await _executor.Execute(item, cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {

@@ -5,12 +5,12 @@ namespace Koan.Web.Hooks;
 /// </summary>
 public interface IModelHook<TEntity> : IOrderedHook
 {
-    Task OnBeforeFetchAsync(HookContext<TEntity> ctx, string id);
-    Task OnAfterFetchAsync(HookContext<TEntity> ctx, TEntity? model);
-    Task OnBeforeSaveAsync(HookContext<TEntity> ctx, TEntity model);
-    Task OnAfterSaveAsync(HookContext<TEntity> ctx, TEntity model);
-    Task OnBeforeDeleteAsync(HookContext<TEntity> ctx, TEntity model);
-    Task OnAfterDeleteAsync(HookContext<TEntity> ctx, TEntity model);
-    Task OnBeforePatchAsync(HookContext<TEntity> ctx, string id, object patch);
-    Task OnAfterPatchAsync(HookContext<TEntity> ctx, TEntity model);
+    Task OnBeforeFetch(HookContext<TEntity> ctx, string id);
+    Task OnAfterFetch(HookContext<TEntity> ctx, TEntity? model);
+    Task OnBeforeSave(HookContext<TEntity> ctx, TEntity model);
+    Task OnAfterSave(HookContext<TEntity> ctx, TEntity model);
+    Task OnBeforeDelete(HookContext<TEntity> ctx, TEntity model);
+    Task OnAfterDelete(HookContext<TEntity> ctx, TEntity model);
+    Task OnBeforePatch(HookContext<TEntity> ctx, string id, object patch);
+    Task OnAfterPatch(HookContext<TEntity> ctx, TEntity model);
 }

@@ -61,24 +61,24 @@ internal sealed class EntityInputTransformFormatter : InputFormatter
         }
         else entityType = modelType;
 
-        var contentType = http.Request.ContentType ?? string.Empty;
+        var contentType = http.Request.ContentType ?? "";
         var selection = _registry.ResolveForInput(entityType, contentType);
         if (selection is null)
         {
-            return await InputFormatterResult.NoValueAsync();
+            return InputFormatterResult.NoValue();
         }
 
         // Don't dispose the request body; the framework owns it
         var body = http.Request.Body;
         if (isMany)
         {
-            var entities = await selection.Invoker.ParseManyAsync(body, contentType, http);
-            return await InputFormatterResult.SuccessAsync(entities);
+            var entities = await selection.Invoker.ParseMany(body, contentType, http);
+            return InputFormatterResult.Success(entities);
         }
         else
         {
-            var entity = await selection.Invoker.ParseAsync(body, contentType, http);
-            return await InputFormatterResult.SuccessAsync(entity);
+            var entity = await selection.Invoker.Parse(body, contentType, http);
+            return InputFormatterResult.Success(entity);
         }
     }
 }

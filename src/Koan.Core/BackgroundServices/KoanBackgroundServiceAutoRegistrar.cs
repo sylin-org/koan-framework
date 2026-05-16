@@ -1,10 +1,9 @@
-using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Koan.Core.Hosting.Bootstrap;
+using Koan.Core.Hosting.Registry;
 
 namespace Koan.Core.BackgroundServices;
 
@@ -19,7 +18,7 @@ public class KoanBackgroundServiceAutoRegistrar : IKoanAutoRegistrar
     public void Initialize(IServiceCollection services)
     {
         // Register core background service infrastructure
-        services.Configure<KoanBackgroundServiceOptions>(options => 
+        services.Configure<KoanBackgroundServiceOptions>(options =>
         {
             // Set defaults
             options.Enabled = true;
@@ -34,8 +33,8 @@ public class KoanBackgroundServiceAutoRegistrar : IKoanAutoRegistrar
         // Register service registry
         services.TryAddSingleton<IServiceRegistry, ServiceRegistry>();
 
-        // Discover and register all background services
-        var discoveredServices = DiscoverBackgroundServices();
+        // Discover and register all background services using generated descriptors
+        var discoveredServices = KoanRegistry.GetBackgroundServices();
 
         foreach (var serviceInfo in discoveredServices)
         {
@@ -52,64 +51,42 @@ public class KoanBackgroundServiceAutoRegistrar : IKoanAutoRegistrar
 
     public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        var discoveredServices = DiscoverBackgroundServices();
-        var enabledCount = discoveredServices.Count(s => ShouldRegisterService(s));
-        var totalCount = discoveredServices.Count();
+        var discoveredServices = KoanRegistry.GetBackgroundServices();
+        var enabledCount = discoveredServices.Count(service => ShouldRegisterService(service));
+        var totalCount = discoveredServices.Length;
 
         module.Describe(ModuleVersion);
         module.AddNote($"TotalServices: {totalCount}, EnabledServices: {enabledCount}");
-        var serviceTypes = discoveredServices.GroupBy(s => s.ServiceType switch
-        {
-            var t when typeof(IKoanStartupService).IsAssignableFrom(t) => "Startup",
-            var t when typeof(IKoanPeriodicService).IsAssignableFrom(t) => "Periodic",
-            var t when typeof(IKoanPokableService).IsAssignableFrom(t) => "Pokable",
-            _ => "Standard"
-        }).ToDictionary(g => g.Key, g => g.Count());
+
+        var serviceTypes = discoveredServices
+            .GroupBy(s => s.IsStartup ? "Startup" : s.IsPeriodic ? "Periodic" : s.IsPokable ? "Pokable" : "Standard")
+            .ToDictionary(g => g.Key, g => g.Count());
+
         foreach (var kvp in serviceTypes)
-            module.AddNote($"{kvp.Key}: {kvp.Value}");
-    }
-
-    private IEnumerable<BackgroundServiceInfo> DiscoverBackgroundServices()
-    {
-        // Use cached assemblies instead of bespoke AppDomain scanning
-        var assemblies = AssemblyCache.Instance.GetAllAssemblies()
-            .Where(a => !a.IsDynamic && !IsSystemAssembly(a))
-            .ToArray();
-
-        return assemblies
-            .SelectMany(a => GetTypesFromAssembly(a))
-            .Where(t => typeof(IKoanBackgroundService).IsAssignableFrom(t) && 
-                       !t.IsInterface && 
-                       !t.IsAbstract && 
-                       t.IsClass)
-            .Select(t => new BackgroundServiceInfo
-            {
-                ServiceType = t,
-                Attribute = t.GetCustomAttribute<KoanBackgroundServiceAttribute>(),
-                IsPeriodicService = typeof(IKoanPeriodicService).IsAssignableFrom(t),
-                IsStartupService = typeof(IKoanStartupService).IsAssignableFrom(t),
-                IsPokableService = typeof(IKoanPokableService).IsAssignableFrom(t)
-            })
-            .Where(info => info.Attribute?.Enabled ?? true);
-    }
-
-    private bool ShouldRegisterService(BackgroundServiceInfo serviceInfo)
-    {
-        var attr = serviceInfo.Attribute;
-        if (attr == null) return true;
-
-            return KoanEnv.EnvironmentName switch
         {
-            "Development" => attr.RunInDevelopment,
-            "Production" => attr.RunInProduction,
-            "Testing" => attr.RunInTesting,
+            module.AddNote($"{kvp.Key}: {kvp.Value}");
+        }
+    }
+
+    private bool ShouldRegisterService(KoanRegistry.BackgroundServiceDescriptor serviceInfo)
+    {
+        if (!serviceInfo.Enabled)
+        {
+            return false;
+        }
+
+        return KoanEnv.EnvironmentName switch
+        {
+            "Development" => serviceInfo.RunInDevelopment,
+            "Production" => serviceInfo.RunInProduction,
+            "Testing" => serviceInfo.RunInTesting,
             _ => true
         };
     }
 
-    private void RegisterBackgroundService(IServiceCollection services, BackgroundServiceInfo serviceInfo)
+    private void RegisterBackgroundService(IServiceCollection services, KoanRegistry.BackgroundServiceDescriptor serviceInfo)
     {
-        var lifetime = serviceInfo.Attribute?.Lifetime ?? ServiceLifetime.Singleton;
+        var lifetime = serviceInfo.Lifetime;
 
         // Register the service itself
         services.Add(ServiceDescriptor.Describe(
@@ -124,7 +101,7 @@ public class KoanBackgroundServiceAutoRegistrar : IKoanAutoRegistrar
             lifetime));
 
         // Register specific interfaces if implemented
-        if (serviceInfo.IsPokableService)
+        if (serviceInfo.IsPokable)
         {
             services.Add(ServiceDescriptor.Describe(
                 typeof(IKoanPokableService),
@@ -132,7 +109,7 @@ public class KoanBackgroundServiceAutoRegistrar : IKoanAutoRegistrar
                 lifetime));
         }
 
-        if (serviceInfo.IsPeriodicService)
+        if (serviceInfo.IsPeriodic)
         {
             services.Add(ServiceDescriptor.Describe(
                 typeof(IKoanPeriodicService),
@@ -140,7 +117,7 @@ public class KoanBackgroundServiceAutoRegistrar : IKoanAutoRegistrar
                 lifetime));
         }
 
-        if (serviceInfo.IsStartupService)
+        if (serviceInfo.IsStartup)
         {
             services.Add(ServiceDescriptor.Describe(
                 typeof(IKoanStartupService),
@@ -149,48 +126,12 @@ public class KoanBackgroundServiceAutoRegistrar : IKoanAutoRegistrar
         }
 
         // Register as health contributor if applicable
-        if (typeof(IHealthContributor).IsAssignableFrom(serviceInfo.ServiceType))
+        if (serviceInfo.ImplementsHealthContributor)
         {
             services.Add(ServiceDescriptor.Describe(
                 typeof(IHealthContributor),
                 provider => (IHealthContributor)provider.GetRequiredService(serviceInfo.ServiceType),
                 lifetime));
         }
-    }
-
-    private static bool IsSystemAssembly(Assembly assembly)
-    {
-        var name = assembly.FullName ?? "";
-        return name.StartsWith("System.") ||
-               name.StartsWith("Microsoft.") ||
-               name.StartsWith("netstandard") ||
-               name.StartsWith("mscorlib");
-    }
-
-    private static Type[] GetTypesFromAssembly(Assembly assembly)
-    {
-        try
-        {
-            return assembly.GetTypes();
-        }
-        catch (ReflectionTypeLoadException ex)
-        {
-            // Return only the types that loaded successfully
-            return ex.Types.Where(t => t != null).ToArray()!;
-        }
-        catch
-        {
-            // If we can't load types from this assembly, skip it
-            return Array.Empty<Type>();
-        }
-    }
-
-    private record BackgroundServiceInfo
-    {
-        public Type ServiceType { get; init; } = null!;
-        public KoanBackgroundServiceAttribute? Attribute { get; init; }
-        public bool IsPeriodicService { get; init; }
-        public bool IsStartupService { get; init; }
-        public bool IsPokableService { get; init; }
     }
 }

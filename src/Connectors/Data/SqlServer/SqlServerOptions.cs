@@ -12,7 +12,6 @@ public sealed class SqlServerOptions : IAdapterOptions
     public StorageNamingStyle NamingStyle { get; set; } = StorageNamingStyle.FullNamespace;
     public string Separator { get; set; } = ".";
     public int DefaultPageSize { get; set; } = 50;
-    public int MaxPageSize { get; set; } = 200;
     // Object materialization/serialization
     public bool JsonCaseInsensitive { get; set; } = true;
     public bool JsonWriteIndented { get; set; } = false;

@@ -31,13 +31,13 @@ public sealed class MongoOutboxStore : IOutboxStore
         c.Indexes.CreateMany(new[] { idx1, idx2, idx3 });
     }
 
-    public async Task AppendAsync(OutboxEntry entry, CancellationToken ct = default)
+    public async Task Append(OutboxEntry entry, CancellationToken ct = default)
     {
         var rec = ToRecord(entry);
         await _col.InsertOneAsync(rec, cancellationToken: ct);
     }
 
-    public async Task<IReadOnlyList<OutboxEntry>> DequeueAsync(int max = 100, CancellationToken ct = default)
+    public async Task<IReadOnlyList<OutboxEntry>> Dequeue(int max = 100, CancellationToken ct = default)
     {
         var now = DateTimeOffset.UtcNow;
         var leaseId = Guid.CreateVersion7().ToString("n");
@@ -77,7 +77,7 @@ public sealed class MongoOutboxStore : IOutboxStore
         return leased;
     }
 
-    public async Task MarkProcessedAsync(string id, CancellationToken ct = default)
+    public async Task MarkProcessed(string id, CancellationToken ct = default)
     {
         await _col.UpdateOneAsync(
             Builders<MongoOutboxRecord>.Filter.Eq(x => x.Id, id),

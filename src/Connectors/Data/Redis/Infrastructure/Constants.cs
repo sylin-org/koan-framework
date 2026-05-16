@@ -2,16 +2,23 @@ namespace Koan.Data.Connector.Redis.Infrastructure;
 
 public static class Constants
 {
+    public const string Section = "Koan:Data:Redis";
+
     public static class Configuration
     {
-        public const string Section_Data = "Koan:Data:Redis";
+        public const string Section_Data = Constants.Section;
         public const string Section_Sources_Default = "Koan:Data:Sources:Default:redis";
+        public const string AltConnectionString = "Koan:Data:ConnectionString";
         public static class Keys
         {
-            public const string ConnectionString = nameof(ConnectionString);
-            public const string Database = nameof(Database);
-            public const string DefaultPageSize = nameof(DefaultPageSize);
-            public const string MaxPageSize = nameof(MaxPageSize);
+            public const string ConnectionString = Constants.Section + ":ConnectionString";
+            public const string Database = Constants.Section + ":Database";
+            public const string AltDatabase = "Koan:Data:Database";
+            public const string Password = Constants.Section + ":Password";
+            public const string AltPassword = "Koan:Data:Password";
+            public const string DefaultPageSize = Constants.Section + ":DefaultPageSize";
+            public const string AltDefaultPageSize = "Koan:Data:DefaultPageSize";
+            public const string DisableAutoDetection = Constants.Section + ":DisableAutoDetection";
             public const string EnsureCreatedSupported = nameof(EnsureCreatedSupported);
         }
     }
@@ -19,7 +26,6 @@ public static class Constants
     public static class Bootstrap
     {
         public const string DefaultPageSize = "data.redis.defaultPageSize";
-        public const string MaxPageSize = "data.redis.maxPageSize";
         public const string EnsureCreatedSupported = "EnsureCreatedSupported";
     }
 

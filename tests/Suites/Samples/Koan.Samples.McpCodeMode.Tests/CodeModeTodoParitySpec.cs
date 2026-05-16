@@ -18,11 +18,11 @@ public class CodeModeTodoParitySpec : IClassFixture<TestPipelineFixture>
     private record RpcRequest(string Jsonrpc, string Method, object? @Params, string Id);
     private record RpcResponse<T>(string Jsonrpc, T? Result, object? Error, string Id);
 
-    private async Task<JToken> CallToolAsync(string toolName, object arguments)
+    private async Task<JToken> CallTool(string toolName, object arguments)
     {
         var jsonString = JsonConvert.SerializeObject(arguments, JsonOpts);
         var json = JObject.Parse(jsonString);
-        var resultObj = await _fx.InvokeRpcAsync("tools/call", Guid.NewGuid().ToString("n"), toolName, json);
+        var resultObj = await _fx.InvokeRpc("tools/call", Guid.NewGuid().ToString("n"), toolName, json);
         var normalized = JsonConvert.SerializeObject(resultObj, JsonOpts);
         return JToken.Parse(normalized);
     }
@@ -36,7 +36,7 @@ public class CodeModeTodoParitySpec : IClassFixture<TestPipelineFixture>
     // Entity SDK methods are synchronous (they block on async internally), so we invoke them directly without await.
     var code = @"function run() { const t = SDK.Entities.Todo.upsert({ title: 'from-code', completed: false }); const fetched = SDK.Entities.Todo.getById(t.id); const title = fetched.title || fetched.Title; const completed = fetched.completed || fetched.Completed; SDK.Out.answer(JSON.stringify({ id: fetched.id || fetched.Id, title, completed })); }";
 
-        var result = await CallToolAsync("koan.code.execute", new { code, entryFunction = (string?)null, correlationId = "test-parity-1" });
+        var result = await CallTool("koan.code.execute", new { code, entryFunction = (string?)null, correlationId = "test-parity-1" });
         result.Type.Should().Be(JTokenType.Object);
         var textProp = result["text"];
         string? text = textProp?.Type switch
@@ -53,7 +53,7 @@ public class CodeModeTodoParitySpec : IClassFixture<TestPipelineFixture>
 
         // Act: fetch same entity via REST controller (EntityController<Todo>)
         var http = _fx.CreateClient();
-    var restEntityStr = await http.GetStringAsync($"/api/todos/{id}");
+    var restEntityStr = await http.GetString($"/api/todos/{id}");
     var restEntity = JToken.Parse(restEntityStr);
 
         // Assert parity
@@ -66,12 +66,12 @@ public class CodeModeTodoParitySpec : IClassFixture<TestPipelineFixture>
     {
         // Insert via code
     var code = @"function run() { SDK.Entities.Todo.upsert({ title: 'list-check', completed: true }); SDK.Out.answer(JSON.stringify({ ok: true })); }";
-    await CallToolAsync("koan.code.execute", new { code, correlationId = "test-list-1" });
+    await CallTool("koan.code.execute", new { code, correlationId = "test-list-1" });
 
         // Query via code for collection
     // collection() returns a paging object with an 'items' array; assert inserted entity present.
     var listCode = @"function run() { const col = SDK.Entities.Todo.collection(); SDK.Out.answer(JSON.stringify(col)); }";
-    var listResult = await CallToolAsync("koan.code.execute", new { code = listCode, correlationId = "test-list-2" });
+    var listResult = await CallTool("koan.code.execute", new { code = listCode, correlationId = "test-list-2" });
     var listTextProp = listResult["text"];
     string? listText = listTextProp?.Type switch
     {
@@ -93,7 +93,7 @@ public class CodeModeTodoParitySpec : IClassFixture<TestPipelineFixture>
     public async Task CodeMode_GetById_Missing()
     {
         var code = @"function run() { try { const fetched = SDK.Entities.Todo.getById('does-not-exist-12345'); if (!fetched) { SDK.Out.answer(JSON.stringify({ mode: 'null' })); } else { SDK.Out.answer(JSON.stringify({ mode: 'object', hasId: !!(fetched.id || fetched.Id) })); } } catch (e) { SDK.Out.answer(JSON.stringify({ mode: 'error', error: '' + e })); } }";
-        var result = await CallToolAsync("koan.code.execute", new { code, correlationId = "test-missing-1" });
+        var result = await CallTool("koan.code.execute", new { code, correlationId = "test-missing-1" });
         var textProp = result["text"];        
         string? text = textProp?.Type switch
         {
@@ -121,7 +121,7 @@ public class CodeModeTodoParitySpec : IClassFixture<TestPipelineFixture>
         var bogusArgs = new { code = "function run(){}", correlationId = "invalid-tool-1" };
         var jsonString = JsonConvert.SerializeObject(bogusArgs, JsonOpts);
         var json = JObject.Parse(jsonString);
-        var resultObj = await _fx.InvokeRpcAsync("tools/call", Guid.NewGuid().ToString("n"), "koan.code.execute.nope", json);
+        var resultObj = await _fx.InvokeRpc("tools/call", Guid.NewGuid().ToString("n"), "koan.code.execute.nope", json);
         var normalized = JsonConvert.SerializeObject(resultObj, JsonOpts);
         var token = JToken.Parse(normalized);
         // Expect an error surface; depending on RPC layer this may appear under 'error' or absence of 'text'.

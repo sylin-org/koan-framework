@@ -24,16 +24,16 @@ builder.Services.AddTransient<BenchmarkService>();
 var app = builder.Build();
 
 // Apply SQLite performance optimizations at startup
-await InitializeSqlitePerformanceAsync(app.Logger);
+await InitializeSqlitePerformance(app.Logger);
 
 // Koan.Web startup filter auto-wires static files, controller routing, and Swagger
 
 // Map SignalR hub
 app.MapHub<S14.AdapterBench.Hubs.BenchmarkHub>("/hubs/benchmark");
 
-app.Run();
+app.RunAsync();
 
-static async Task InitializeSqlitePerformanceAsync(ILogger logger)
+static async Task InitializeSqlitePerformance(ILogger logger)
 {
     try
     {

@@ -16,7 +16,7 @@ public static class OutboxConfig
     /// </summary>
     public static OptionsBuilder<TOptions> BindOutboxOptions<TOptions>(this IServiceCollection services, string adapterName)
         where TOptions : class
-        => services.AddKoanOptions<TOptions>($"Koan:Cqrs:Outbox:{adapterName}");
+        => services.AddKoanOptions<TOptions>(Infrastructure.Constants.Configuration.Outbox.ForAdapter(adapterName));
 
     /// <summary>
     /// Resolve a connection string using Koan conventions.
@@ -26,7 +26,7 @@ public static class OutboxConfig
     {
         if (!string.IsNullOrWhiteSpace(inline)) return inline!;
         var n = string.IsNullOrWhiteSpace(name) ? defaultName : name!;
-        var fromDataSources = cfg[$"Koan:Data:Sources:{n}:{provider}:ConnectionString"];
+        var fromDataSources = cfg[Infrastructure.Constants.Configuration.DataSources.ConnectionString(n, provider)];
         if (!string.IsNullOrWhiteSpace(fromDataSources)) return fromDataSources!;
         var fromConn = cfg.GetConnectionString(n);
         if (!string.IsNullOrWhiteSpace(fromConn)) return fromConn!;

@@ -7,7 +7,7 @@ public sealed class ConfigurationSecretProvider(IConfiguration configuration) : 
 {
     private readonly IConfiguration _cfg = configuration;
 
-    public Task<SecretValue> GetAsync(SecretId id, CancellationToken ct = default)
+    public Task<SecretValue> Get(SecretId id, CancellationToken ct = default)
     {
         // Map to Secrets:<scope>:<name> path
         var val = _cfg[$"Secrets:{id.Scope}:{id.Name}"];

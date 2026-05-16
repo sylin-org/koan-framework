@@ -94,15 +94,15 @@ namespace Koan.Messaging
             if (intercepted is IQueuedMessage queuedMessage)
             {
                 // Route to specific queue
-                await SendToQueueAsync(proxy, queuedMessage.QueueName, queuedMessage.Payload, cancellationToken);
+                await SendToQueue(proxy, queuedMessage.QueueName, queuedMessage.Payload, cancellationToken);
             }
             else
             {
                 // Default behavior: type-based routing
                 var concreteType = intercepted.GetType();
-                var sendAsyncMethod = proxy.GetType().GetMethod("SendAsync");
+                var sendAsyncMethod = proxy.GetType().GetMethod("Send");
                 if (sendAsyncMethod == null)
-                    throw new InvalidOperationException($"SendAsync method not found for type {concreteType.Name}");
+                    throw new InvalidOperationException($"Send method not found for type {concreteType.Name}");
                 var genericSendAsync = sendAsyncMethod.MakeGenericMethod(concreteType);
                 await (Task)genericSendAsync!.Invoke(proxy, new object[] { intercepted, cancellationToken })!;
             }
@@ -111,7 +111,7 @@ namespace Koan.Messaging
         /// <summary>
         /// Sends a message to a specific queue using the provider's queue-specific routing.
         /// </summary>
-        private static async Task SendToQueueAsync(object proxy, string queueName, object payload, CancellationToken cancellationToken)
+        private static async Task SendToQueue(object proxy, string queueName, object payload, CancellationToken cancellationToken)
         {
             // Try to find SendToQueueAsync method on the provider
             var sendToQueueMethod = proxy.GetType().GetMethod("SendToQueueAsync");
@@ -126,7 +126,7 @@ namespace Koan.Messaging
             {
                 // Fallback to regular SendAsync (for providers that don't support queue routing yet)
                 var concreteType = payload.GetType();
-                var sendAsyncMethod = proxy.GetType().GetMethod("SendAsync");
+                var sendAsyncMethod = proxy.GetType().GetMethod("Send");
                 if (sendAsyncMethod == null)
                     throw new InvalidOperationException($"Neither SendToQueueAsync nor SendAsync method found on provider {proxy.GetType().Name}");
                 var genericSendAsync = sendAsyncMethod.MakeGenericMethod(concreteType);
@@ -214,7 +214,7 @@ namespace Koan.Messaging
         /// Creates message consumers for all registered handlers.
         /// Called during Phase 3 of the messaging lifecycle.
         /// </summary>
-        public async Task CreateConsumersAsync(IMessageBus bus, CancellationToken cancellationToken = default)
+        public async Task CreateConsumers(IMessageBus bus, CancellationToken cancellationToken = default)
         {
             foreach (var (messageType, handler) in _handlers)
             {

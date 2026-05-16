@@ -4,6 +4,8 @@ using Koan.Core.Hosting.Runtime;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Connector.Json;
 using Koan.Data.Connector.Sqlite;
+using Koan.Data.Core.Transactions;
+using Koan.Data.Vector;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -16,12 +18,14 @@ internal sealed class DataCoreRuntimeFixture : IAsyncDisposable
     private readonly ServiceProvider _provider;
     private readonly string _rootPath;
     private readonly string? _sqlitePath;
+    private readonly FakeVectorService _vectorService;
 
-    private DataCoreRuntimeFixture(ServiceProvider provider, string rootPath, string? sqlitePath)
+    private DataCoreRuntimeFixture(ServiceProvider provider, string rootPath, string? sqlitePath, FakeVectorService vectorService)
     {
         _provider = provider;
         _rootPath = rootPath;
         _sqlitePath = sqlitePath;
+        _vectorService = vectorService;
     }
 
     public IServiceProvider Services => _provider;
@@ -30,7 +34,9 @@ internal sealed class DataCoreRuntimeFixture : IAsyncDisposable
 
     public string? SqlitePath => _sqlitePath;
 
-    public static ValueTask<DataCoreRuntimeFixture> CreateAsync(TestContext ctx, bool includeSqlite = false)
+    public FakeVectorService VectorService => _vectorService;
+
+    public static ValueTask<DataCoreRuntimeFixture> Create(TestContext ctx, bool includeSqlite = false)
     {
         if (ctx is null)
         {
@@ -60,14 +66,20 @@ internal sealed class DataCoreRuntimeFixture : IAsyncDisposable
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddSingleton<IHostApplicationLifetime, NoopHostApplicationLifetime>();
+        services.AddSingleton<IHostEnvironment, FakeHostEnvironment>();
         services.AddSingleton<IConfiguration>(configuration);
         services.AddKoan();
         services.AddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
         services.AddJsonAdapter(o => o.DirectoryPath = root);
+        services.AddKoanTransactions();
         if (includeSqlite)
         {
             services.AddSqliteAdapter(o => o.ConnectionString = $"Data Source={sqlitePath}");
         }
+
+        // Register fake vector service for testing
+        var vectorService = new FakeVectorService();
+        services.AddSingleton<IVectorService>(vectorService);
 
         var provider = services.BuildServiceProvider(new ServiceProviderOptions
         {
@@ -90,7 +102,7 @@ internal sealed class DataCoreRuntimeFixture : IAsyncDisposable
         runtime?.Discover();
         runtime?.Start();
 
-        return ValueTask.FromResult(new DataCoreRuntimeFixture(provider, root, sqlitePath));
+        return ValueTask.FromResult(new DataCoreRuntimeFixture(provider, root, sqlitePath, vectorService));
     }
 
     public EntityPartitionLease UsePartition(string? name = null)
@@ -161,6 +173,14 @@ internal sealed class DataCoreRuntimeFixture : IAsyncDisposable
         public void StopApplication()
         {
         }
+    }
+
+    private sealed class FakeHostEnvironment : IHostEnvironment
+    {
+        public string EnvironmentName { get; set; } = "Test";
+        public string ApplicationName { get; set; } = "Koan.Tests.Data.Core";
+        public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
+        public Microsoft.Extensions.FileProviders.IFileProvider ContentRootFileProvider { get; set; } = new Microsoft.Extensions.FileProviders.NullFileProvider();
     }
 
     internal readonly struct EntityPartitionLease : IAsyncDisposable, IDisposable

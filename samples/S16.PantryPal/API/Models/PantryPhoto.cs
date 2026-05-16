@@ -49,7 +49,7 @@ public sealed class PantryPhoto : Entity<PantryPhoto>
     // AI Results
     // ==========================================
 
-    public PantryDetection[] Detections { get; set; } = Array.Empty<PantryDetection>();
+    public PantryDetection[] Detections { get; set; } = [];
     public int DetectionCount { get; set; }
     public int ProcessingTimeMs { get; set; }
     public VisionMetrics? Metrics { get; set; }
@@ -81,7 +81,7 @@ public class PantryDetection
     // ==========================================
 
     /// <summary>AI-provided alternatives for user selection</summary>
-    public DetectionCandidate[] Candidates { get; set; } = Array.Empty<DetectionCandidate>();
+    public DetectionCandidate[] Candidates { get; set; } = [];
 
     /// <summary>User's selected candidate or top AI suggestion</summary>
     public string SelectedCandidateId { get; set; } = "";

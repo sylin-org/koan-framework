@@ -31,7 +31,7 @@ public abstract class EntityAuditController<TEntity> : ControllerBase
     [HttpPost("{id}/audit/snapshot")]
     public virtual async Task<IActionResult> Snapshot([FromRoute] string id, CancellationToken ct)
     {
-        var current = await Data<TEntity, string>.GetAsync(id, ct);
+        var current = await Data<TEntity, string>.Get(id, ct);
         if (current is null) return NotFound();
         var nextVersion = await GetNextVersion(id, ct);
         var snapshotId = ComposeSnapshotId(id, nextVersion);
@@ -39,7 +39,7 @@ public abstract class EntityAuditController<TEntity> : ControllerBase
         var clone = System.Text.Json.JsonSerializer.Deserialize<TEntity>(json)!;
         SetEntityId(clone, snapshotId);
         using var _ = Data<TEntity, string>.WithPartition(AuditSet);
-        await Data<TEntity, string>.UpsertAsync(clone, ct);
+        await Data<TEntity, string>.Upsert(clone, ct);
         return NoContent();
     }
 
@@ -61,7 +61,7 @@ public abstract class EntityAuditController<TEntity> : ControllerBase
         using var _ = Data<TEntity, string>.WithPartition(AuditSet);
         var all = await Data<TEntity, string>.All(ct);
         var prefix = id + "#v";
-        var items = all.Where(e => (e.Id ?? string.Empty).StartsWith(prefix, StringComparison.Ordinal)).ToList();
+        var items = all.Where(e => (e.Id ?? "").StartsWith(prefix, StringComparison.Ordinal)).ToList();
         return Ok(items);
     }
 
@@ -87,17 +87,17 @@ public abstract class EntityAuditController<TEntity> : ControllerBase
         if (body is null) return BadRequest(new { error = "body is required" });
         var snapshotId = ComposeSnapshotId(id, body.Version);
         using var _ = Data<TEntity, string>.WithPartition(AuditSet);
-        var snapshot = await Data<TEntity, string>.GetAsync(snapshotId, ct);
+        var snapshot = await Data<TEntity, string>.Get(snapshotId, ct);
         if (snapshot is null) return NotFound();
         SetEntityId(snapshot, id);
         if (!string.IsNullOrWhiteSpace(body.TargetSet))
         {
             using var _t = Data<TEntity, string>.WithPartition(body.TargetSet);
-            await Data<TEntity, string>.UpsertAsync(snapshot, ct);
+            await Data<TEntity, string>.Upsert(snapshot, ct);
         }
         else
         {
-            await Data<TEntity, string>.UpsertAsync(snapshot, ct);
+            await Data<TEntity, string>.Upsert(snapshot, ct);
         }
         return NoContent();
     }
@@ -118,7 +118,7 @@ public abstract class EntityAuditController<TEntity> : ControllerBase
         var max = 0;
         foreach (var item in all)
         {
-            var curId = item.Id ?? string.Empty;
+            var curId = item.Id ?? "";
             if (!curId.StartsWith(prefix, StringComparison.Ordinal)) continue;
             var tail = curId.AsSpan(prefix.Length);
             if (int.TryParse(tail, out var v) && v > max) max = v;

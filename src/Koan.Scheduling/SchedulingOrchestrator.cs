@@ -35,7 +35,7 @@ internal sealed class SchedulingOrchestrator : KoanFluentServiceBase
         _env = env;
     }
 
-    public override async Task ExecuteCoreAsync(CancellationToken stoppingToken)
+    public override async Task ExecuteCore(CancellationToken stoppingToken)
     {
         await Task.Yield();
         var opts = _options.CurrentValue;
@@ -60,7 +60,7 @@ internal sealed class SchedulingOrchestrator : KoanFluentServiceBase
         // Start
         var startup = _runners.Where(r => r.OnStartup).ToList();
         foreach (var r in startup)
-            _ = r.RunOnceAsync(stoppingToken);
+            _ = r.RunOnce(stoppingToken);
 
         // Loop for fixed-delay; cron reserved for Phase 2
         while (!stoppingToken.IsCancellationRequested)
@@ -68,7 +68,7 @@ internal sealed class SchedulingOrchestrator : KoanFluentServiceBase
             var now = DateTimeOffset.UtcNow;
             var due = _runners.Where(r => r.NextRunUtc is not null && r.NextRunUtc <= now).ToList();
             foreach (var r in due)
-                _ = r.RunOnceAsync(stoppingToken);
+                _ = r.RunOnce(stoppingToken);
 
             await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
         }
@@ -84,7 +84,7 @@ internal sealed class SchedulingOrchestrator : KoanFluentServiceBase
         var runner = _runners.FirstOrDefault(r => r.Id == taskId);
         if (runner != null)
         {
-            _ = runner.RunOnceAsync(cancellationToken);
+            _ = runner.RunOnce(cancellationToken);
             Logger.LogInformation("Task {TaskId} triggered successfully", taskId);
         }
         else
@@ -175,7 +175,7 @@ internal sealed class SchedulingOrchestrator : KoanFluentServiceBase
             NextRunUtc = fixedDelay is null ? null : DateTimeOffset.UtcNow + fixedDelay;
         }
 
-        public async Task RunOnceAsync(CancellationToken ct)
+        public async Task RunOnce(CancellationToken ct)
         {
             if (!await _gate.WaitAsync(0, ct)) return; // max 1 schedule trigger at a time
             try
@@ -188,12 +188,12 @@ internal sealed class SchedulingOrchestrator : KoanFluentServiceBase
                 health.Push($"scheduling:task:{Id}", Koan.Core.Observability.Health.HealthStatus.Healthy, message: "running", ttl: TimeSpan.FromSeconds(30), facts: Facts("running"));
                 try
                 {
-                    await task.RunAsync(runCt);
+                    await task.Run(runCt);
                     Interlocked.Increment(ref _success);
                     _lastError = null;
                     health.Push($"scheduling:task:{Id}", Koan.Core.Observability.Health.HealthStatus.Healthy, message: "ok", ttl: TimeSpan.FromMinutes(5), facts: Facts("ok"));
                     
-                    _ = orchestrator.EmitEventAsync(Koan.Core.Events.KoanServiceEvents.Scheduling.TaskExecuted, new TaskExecutedEventArgs
+                    _ = orchestrator.EmitEvent(Koan.Core.Events.KoanServiceEvents.Scheduling.TaskExecuted, new TaskExecutedEventArgs
                     {
                         TaskId = Id,
                         ExecutedAt = DateTimeOffset.UtcNow,
@@ -206,7 +206,7 @@ internal sealed class SchedulingOrchestrator : KoanFluentServiceBase
                     _lastError = "timeout";
                     health.Push($"scheduling:task:{Id}", Koan.Core.Observability.Health.HealthStatus.Unhealthy, message: "timeout", ttl: TimeSpan.FromMinutes(5), facts: Facts("timeout"));
                     
-                    _ = orchestrator.EmitEventAsync(Koan.Core.Events.KoanServiceEvents.Scheduling.TaskTimeout, new TaskTimeoutEventArgs
+                    _ = orchestrator.EmitEvent(Koan.Core.Events.KoanServiceEvents.Scheduling.TaskTimeout, new TaskTimeoutEventArgs
                     {
                         TaskId = Id,
                         TimeoutAt = DateTimeOffset.UtcNow,
@@ -219,7 +219,7 @@ internal sealed class SchedulingOrchestrator : KoanFluentServiceBase
                     _lastError = ex.GetType().Name;
                     health.Push($"scheduling:task:{Id}", Koan.Core.Observability.Health.HealthStatus.Unhealthy, message: ex.Message, ttl: TimeSpan.FromMinutes(5), facts: Facts("error"));
                     
-                    _ = orchestrator.EmitEventAsync(Koan.Core.Events.KoanServiceEvents.Scheduling.TaskFailed, new TaskFailedEventArgs
+                    _ = orchestrator.EmitEvent(Koan.Core.Events.KoanServiceEvents.Scheduling.TaskFailed, new TaskFailedEventArgs
                     {
                         TaskId = Id,
                         Error = ex.Message,

@@ -33,11 +33,11 @@ public abstract class BaseKoanAdapter : IKoanAdapter
     // IHealthContributor implementation
     public virtual bool IsCritical => true;
 
-    public async Task<HealthReport> CheckAsync(CancellationToken ct = default)
+    public async Task<HealthReport> Check(CancellationToken ct = default)
     {
         try
         {
-            var metadata = await CheckAdapterHealthAsync(ct);
+            var metadata = await CheckAdapterHealth(ct);
             var state = metadata?.ContainsKey("status") == true && metadata["status"]?.ToString() == "unhealthy"
                 ? HealthState.Unhealthy
                 : HealthState.Healthy;
@@ -51,15 +51,15 @@ public abstract class BaseKoanAdapter : IKoanAdapter
         }
     }
 
-    async Task<IReadOnlyDictionary<string, object?>?> IKoanAdapter.GetBootstrapMetadataAsync(CancellationToken cancellationToken)
+    async Task<IReadOnlyDictionary<string, object?>?> IKoanAdapter.GetBootstrapMetadata(CancellationToken cancellationToken)
     {
-        return await GetAdapterBootstrapMetadataAsync(cancellationToken);
+        return await GetAdapterBootstrapMetadata(cancellationToken);
     }
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         Logger.LogDebug("[{AdapterId}] Initializing adapter", AdapterId);
-        await InitializeAdapterAsync(cancellationToken);
+        await InitializeAdapter(cancellationToken);
         Logger.LogInformation("[{AdapterId}] Adapter initialized successfully", AdapterId);
     }
 
@@ -78,14 +78,14 @@ public abstract class BaseKoanAdapter : IKoanAdapter
     }
 
     // Template methods for derived classes
-    protected abstract Task InitializeAdapterAsync(CancellationToken cancellationToken = default);
-    protected abstract Task<IReadOnlyDictionary<string, object?>?> CheckAdapterHealthAsync(CancellationToken cancellationToken = default);
-    protected abstract Task<IReadOnlyDictionary<string, object?>?> GetAdapterBootstrapMetadataAsync(CancellationToken cancellationToken = default);
+    protected abstract Task InitializeAdapter(CancellationToken cancellationToken = default);
+    protected abstract Task<IReadOnlyDictionary<string, object?>?> CheckAdapterHealth(CancellationToken cancellationToken = default);
+    protected abstract Task<IReadOnlyDictionary<string, object?>?> GetAdapterBootstrapMetadata(CancellationToken cancellationToken = default);
 
     // Configuration helpers
     protected TOptions GetOptions<TOptions>() where TOptions : class, new()
     {
-        var sectionName = $"Koan:Services:{AdapterId}";
+        var sectionName = Infrastructure.ConfigurationConstants.Services.ForAdapter(AdapterId);
         var section = Configuration.GetSection(sectionName);
 
         var options = section.Get<TOptions>();
@@ -94,9 +94,9 @@ public abstract class BaseKoanAdapter : IKoanAdapter
             // Try legacy patterns for backward compatibility
             var legacySections = new[]
             {
-                $"Koan:AI:{AdapterId}",
-                $"Koan:Data:{AdapterId}",
-                $"Koan:Cache:{AdapterId}",
+                Infrastructure.ConfigurationConstants.Ai.ForAdapter(AdapterId),
+                Infrastructure.ConfigurationConstants.Data.ForProvider(AdapterId),
+                Infrastructure.ConfigurationConstants.Cache.ForAdapter(AdapterId),
                 AdapterId
             };
 
@@ -121,7 +121,7 @@ public abstract class BaseKoanAdapter : IKoanAdapter
             return connectionString;
 
         // Try service-specific configuration
-        var serviceSection = $"Koan:Services:{AdapterId}:ConnectionString";
+        var serviceSection = Infrastructure.ConfigurationConstants.Services.ConnectionString(AdapterId);
         connectionString = Configuration[serviceSection];
         if (!string.IsNullOrEmpty(connectionString))
             return connectionString;
@@ -129,9 +129,9 @@ public abstract class BaseKoanAdapter : IKoanAdapter
         // Try legacy patterns
         var legacyPatterns = new[]
         {
-            $"Koan:AI:{AdapterId}:BaseUrl",
-            $"Koan:Data:{AdapterId}:ConnectionString",
-            $"Koan:Cache:{AdapterId}:ConnectionString",
+            Infrastructure.ConfigurationConstants.Ai.BaseUrl(AdapterId),
+            Infrastructure.ConfigurationConstants.Data.ForProvider(AdapterId) + ":ConnectionString",
+            Infrastructure.ConfigurationConstants.Cache.ConnectionString(AdapterId),
             $"{AdapterId}:ConnectionString"
         };
 
@@ -147,7 +147,7 @@ public abstract class BaseKoanAdapter : IKoanAdapter
 
     protected bool IsEnabled()
     {
-        var enabledSection = $"Koan:Services:{AdapterId}:Enabled";
+        var enabledSection = Infrastructure.ConfigurationConstants.Services.Enabled(AdapterId);
         if (Configuration[enabledSection] != null)
         {
             return Configuration.GetValue<bool>(enabledSection, true);
@@ -156,9 +156,9 @@ public abstract class BaseKoanAdapter : IKoanAdapter
         // Check legacy patterns
         var legacyPatterns = new[]
         {
-            $"Koan:AI:{AdapterId}:Enabled",
-            $"Koan:Data:{AdapterId}:Enabled",
-            $"Koan:Cache:{AdapterId}:Enabled",
+            Infrastructure.ConfigurationConstants.Ai.Enabled(AdapterId),
+            Infrastructure.ConfigurationConstants.Data.ForProvider(AdapterId) + ":Enabled",
+            Infrastructure.ConfigurationConstants.Cache.Enabled(AdapterId),
             $"{AdapterId}:Enabled"
         };
 

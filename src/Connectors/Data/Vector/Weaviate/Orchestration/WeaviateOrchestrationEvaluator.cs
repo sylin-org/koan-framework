@@ -27,9 +27,9 @@ public class WeaviateOrchestrationEvaluator : BaseOrchestrationEvaluator
 
     protected override bool IsServiceEnabled(IConfiguration configuration)
     {
-        // Weaviate is typically enabled when vector data adapters reference it or when explicitly configured
-        // Conservative approach - only enable if explicitly configured
-        return HasExplicitConfiguration(configuration);
+        // Weaviate is enabled when package is referenced (Reference = Intent principle)
+        // The orchestration evaluator will determine whether to provision or use external based on configuration
+        return true;
     }
 
     protected override bool HasExplicitConfiguration(IConfiguration configuration)
@@ -103,7 +103,7 @@ public class WeaviateOrchestrationEvaluator : BaseOrchestrationEvaluator
         }
     }
 
-    protected override async Task<DependencyDescriptor> CreateDependencyDescriptorAsync(IConfiguration configuration, OrchestrationContext context)
+    protected override async Task<DependencyDescriptor> CreateDependencyDescriptor(IConfiguration configuration, OrchestrationContext context)
     {
         // Create environment variables for the container
         var environment = new Dictionary<string, string>(context.EnvironmentVariables)
@@ -112,7 +112,9 @@ public class WeaviateOrchestrationEvaluator : BaseOrchestrationEvaluator
             ["QUERY_DEFAULTS_LIMIT"] = "25",
             ["DEFAULT_VECTORIZER_MODULE"] = "none",
             ["ENABLE_MODULES"] = "text2vec-openai,text2vec-cohere,text2vec-huggingface,ref2vec-centroid,generative-openai,qna-openai",
-            ["CLUSTER_HOSTNAME"] = "node1"
+            ["CLUSTER_HOSTNAME"] = "node1",
+            ["PERSISTENCE_DATA_PATH"] = "/var/lib/weaviate",
+            ["AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED"] = "true"
         };
 
         // Check for additional configuration from WeaviateOptions
@@ -130,7 +132,7 @@ public class WeaviateOrchestrationEvaluator : BaseOrchestrationEvaluator
             Environment = environment,
             Volumes = new List<string>
             {
-                $"koan-weaviate-{context.SessionId}:/var/lib/weaviate"
+                ".koan/data/weaviate:/var/lib/weaviate"
             }
         });
     }

@@ -28,5 +28,5 @@ if (KoanEnv.IsDevelopment)
 app.UseAuthorization();
 app.MapControllers();
 
-app.Run();
+app.RunAsync();
 public partial class Program { }

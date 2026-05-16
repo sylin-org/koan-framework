@@ -11,17 +11,17 @@ public sealed class CanonAuditEntry
     /// <summary>
     /// Gets or sets the canonical identifier.
     /// </summary>
-    public string CanonicalId { get; set; } = string.Empty;
+    public string CanonicalId { get; set; } = "";
 
     /// <summary>
     /// Gets or sets the canonical model CLR type.
     /// </summary>
-    public string EntityType { get; set; } = string.Empty;
+    public string EntityType { get; set; } = "";
 
     /// <summary>
     /// Gets or sets the property name affected by the change.
     /// </summary>
-    public string Property { get; set; } = string.Empty;
+    public string Property { get; set; } = "";
 
     /// <summary>
     /// Gets or sets the previous value (string representation).
@@ -36,7 +36,7 @@ public sealed class CanonAuditEntry
     /// <summary>
     /// Gets or sets the policy applied to compute the value.
     /// </summary>
-    public string Policy { get; set; } = string.Empty;
+    public string Policy { get; set; } = "";
 
     /// <summary>
     /// Gets or sets the source key that contributed the update.

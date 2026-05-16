@@ -252,6 +252,6 @@ public sealed class CanonModelAggregationMetadata
             throw new InvalidOperationException($"Canonical entity '{modelType.Name}' property '{property.Name}' declares {attribute.Kind} policy and cannot override the fallback behavior.");
         }
 
-        return new AggregationPolicyDescriptor(attribute.Kind, Array.Empty<string>(), AggregationPolicyKind.Latest);
+        return new AggregationPolicyDescriptor(attribute.Kind, [], AggregationPolicyKind.Latest);
     }
 }

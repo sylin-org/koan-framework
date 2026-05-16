@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -9,6 +11,7 @@ using Koan.Core.Adapters.Configuration;
 using Koan.Core.Logging;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
+using Koan.ZenGarden.Core;
 using MongoItems = Koan.Data.Connector.Mongo.Infrastructure.MongoProvenanceItems;
 
 namespace Koan.Data.Connector.Mongo;
@@ -20,6 +23,7 @@ namespace Koan.Data.Connector.Mongo;
 internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<MongoOptions>
 {
     private readonly IServiceDiscoveryCoordinator? _discoveryCoordinator;
+    private readonly IZenGardenInitializationProvider? _zenGardenInitializationProvider;
 
     protected override string ProviderName => "Mongo";
 
@@ -27,10 +31,12 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
         IConfiguration config,
         ILogger<MongoOptionsConfigurator>? logger,
         IOptions<AdaptersReadinessOptions> readinessOptions,
-        IServiceDiscoveryCoordinator? discoveryCoordinator = null)
+        IServiceDiscoveryCoordinator? discoveryCoordinator = null,
+        IZenGardenInitializationProvider? zenGardenInitializationProvider = null)
         : base(config, logger, readinessOptions)
     {
         _discoveryCoordinator = discoveryCoordinator;
+        _zenGardenInitializationProvider = zenGardenInitializationProvider;
     }
 
     protected override void ConfigureProviderSpecific(MongoOptions options)
@@ -45,43 +51,64 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
 
         // MongoDB-specific configuration
         var databaseName = ReadProviderConfiguration(options.Database,
-            "Koan:Data:Mongo:Database",
-            "Koan:Data:Database",
+            Infrastructure.ConfigurationConstants.FullKey(Infrastructure.ConfigurationConstants.Keys.Database),
+            Infrastructure.ConfigurationConstants.DataFallback.Database,
             "ConnectionStrings:Database");
 
         var username = ReadProviderConfiguration("",
-            "Koan:Data:Mongo:Username",
-            "Koan:Data:Username");
+            Infrastructure.ConfigurationConstants.FullKey(Infrastructure.ConfigurationConstants.Keys.Username),
+            Infrastructure.ConfigurationConstants.DataFallback.Username);
 
         var password = ReadProviderConfiguration("",
-            "Koan:Data:Mongo:Password",
-            "Koan:Data:Password");
+            Infrastructure.ConfigurationConstants.FullKey(Infrastructure.ConfigurationConstants.Keys.Password),
+            Infrastructure.ConfigurationConstants.DataFallback.Password);
 
-        var explicitConnectionString = ReadProviderConfiguration(
-            string.Empty,
+        var configuredConnectionString = ReadProviderConfiguration(
+            "",
             MongoItems.ConnectionStringKeys);
 
-        if (!string.IsNullOrWhiteSpace(explicitConnectionString))
+        var requestedConnection = !string.IsNullOrWhiteSpace(configuredConnectionString)
+            ? configuredConnectionString
+            : options.ConnectionString;
+
+        if (ZenGardenConnectionIntent.TryParse(requestedConnection, out var zenGardenIntent))
         {
-            KoanLog.ConfigInfo(Logger, LogActions.Config, "connection-explicit", ("source", "configuration"));
-            options.ConnectionString = explicitConnectionString;
+            if (TryResolveZenGardenConnection(zenGardenIntent!, databaseName, username, password, out var resolved))
+            {
+                options.ConnectionString = resolved;
+                KoanLog.ConfigInfo(Logger, LogActions.ZenGarden, "intent-resolved", ("intent", requestedConnection));
+            }
+            else
+            {
+                options.ConnectionString = ResolveAutonomousConnection(databaseName, username, password);
+                KoanLog.ConfigWarning(Logger, LogActions.ZenGarden, "intent-fallback-autonomous", ("intent", requestedConnection));
+            }
         }
-        else if (string.Equals(options.ConnectionString?.Trim(), "auto", StringComparison.OrdinalIgnoreCase) ||
-                 string.IsNullOrWhiteSpace(options.ConnectionString))
+        else if (IsAutoConnection(requestedConnection))
         {
-            KoanLog.ConfigInfo(Logger, LogActions.Discovery, "auto-mode",
-                ("database", databaseName ?? "(none)"));
-            options.ConnectionString = ResolveAutonomousConnection(databaseName, username, password);
+            var defaultIntent = BuildDefaultZenGardenIntent();
+            if (TryResolveZenGardenConnection(defaultIntent, databaseName, username, password, out var resolved))
+            {
+                options.ConnectionString = resolved;
+                KoanLog.ConfigInfo(Logger, LogActions.ZenGarden, "auto-resolved", ("offering", defaultIntent.ToOfferingSelector()));
+            }
+            else
+            {
+                KoanLog.ConfigInfo(Logger, LogActions.Discovery, "auto-mode",
+                    ("database", databaseName ?? "(none)"));
+                options.ConnectionString = ResolveAutonomousConnection(databaseName, username, password);
+            }
         }
         else
         {
+            options.ConnectionString = requestedConnection ?? "";
             KoanLog.ConfigInfo(Logger, LogActions.Config, "connection-preconfigured");
         }
 
         options.Database = ReadProviderConfiguration(options.Database,
             MongoItems.DatabaseKeys)
             ?? options.Database
-            ?? string.Empty;
+            ?? "";
 
         KoanLog.ConfigInfo(Logger, LogActions.Config, LogOutcomeValues.Final,
             ("connection", options.ConnectionString ?? "(null)"),
@@ -130,7 +157,7 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
                 ("user", username ?? "(none)"));
 
             // Use autonomous discovery coordinator
-            var discoveryTask = _discoveryCoordinator.DiscoverServiceAsync("mongo", context);
+            var discoveryTask = _discoveryCoordinator.DiscoverService("mongo", context);
             var result = discoveryTask.GetAwaiter().GetResult();
 
             if (result.IsSuccessful)
@@ -161,7 +188,263 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
 
     private bool IsAutoDetectionDisabled()
     {
-        return Koan.Core.Configuration.Read(Configuration, "Koan:Data:Mongo:DisableAutoDetection", false);
+        return Koan.Core.Configuration.Read(Configuration, Infrastructure.ConfigurationConstants.FullKey(Infrastructure.ConfigurationConstants.Keys.DisableAutoDetection), false);
+    }
+
+    private ZenGardenConnectionIntent BuildDefaultZenGardenIntent()
+    {
+        var configuredOffering = ReadProviderConfiguration(
+            "",
+            Infrastructure.ConfigurationConstants.ZenGarden.Offering);
+
+        if (string.IsNullOrWhiteSpace(configuredOffering) &&
+            _zenGardenInitializationProvider?.TryGetDefaultOffering("mongo", out var mappedOffering) == true)
+        {
+            configuredOffering = mappedOffering;
+        }
+
+        if (string.IsNullOrWhiteSpace(configuredOffering))
+        {
+            configuredOffering = "mongodb";
+        }
+
+        var configuredInstance = ReadProviderConfiguration(
+            "",
+            Infrastructure.ConfigurationConstants.ZenGarden.Instance);
+
+        return ZenGardenConnectionIntent.ForOffering(
+            configuredOffering,
+            configuredInstance,
+            ReadZenGardenCapabilities());
+    }
+
+    private IReadOnlyList<string> ReadZenGardenCapabilities()
+    {
+        var sectionValues = Configuration
+            .GetSection(Infrastructure.ConfigurationConstants.ZenGarden.Capabilities)
+            .Get<string[]>() ?? [];
+
+        var singleValue = ReadProviderConfiguration(
+            "",
+            Infrastructure.ConfigurationConstants.ZenGarden.Capability);
+
+        var parsed = new List<string>();
+        foreach (var raw in sectionValues)
+        {
+            AppendCapabilities(raw, parsed);
+        }
+
+        AppendCapabilities(singleValue, parsed);
+
+        return new ReadOnlyCollection<string>(parsed
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(x => x.ToLowerInvariant())
+            .ToArray());
+    }
+
+    private static void AppendCapabilities(string? raw, ICollection<string> output)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return;
+        }
+
+        foreach (var token in raw.Split([',', '|'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (!string.IsNullOrWhiteSpace(token))
+            {
+                output.Add(token.Trim());
+            }
+        }
+    }
+
+    private bool TryResolveZenGardenConnection(
+        ZenGardenConnectionIntent intent,
+        string? databaseName,
+        string? username,
+        string? password,
+        out string connectionString)
+    {
+        connectionString = "";
+        if (_zenGardenInitializationProvider is null)
+        {
+            KoanLog.ConfigDebug(Logger, LogActions.ZenGarden, "provider-missing");
+            return false;
+        }
+
+        try
+        {
+            var resolved = _zenGardenInitializationProvider
+                .Resolve(intent)
+                .GetAwaiter()
+                .GetResult();
+
+            if (resolved is null)
+            {
+                KoanLog.ConfigDebug(Logger, LogActions.ZenGarden, "offering-not-ready",
+                    ("offering", intent.ToOfferingSelector()));
+                return false;
+            }
+
+            if (!TryBuildMongoConnectionString(
+                    resolved,
+                    databaseName,
+                    username,
+                    password,
+                    out connectionString))
+            {
+                KoanLog.ConfigWarning(Logger, LogActions.ZenGarden, "missing-endpoint",
+                    ("offering", resolved.ToolFqid));
+                return false;
+            }
+
+            KoanLog.ConfigInfo(Logger, LogActions.ZenGarden, "resolved",
+                ("offering", resolved.ToolFqid),
+                ("connection", connectionString));
+            return true;
+        }
+        catch (Exception ex)
+        {
+            KoanLog.ConfigWarning(Logger, LogActions.ZenGarden, "exception",
+                ("offering", intent.ToOfferingSelector()),
+                ("reason", ex.Message));
+            KoanLog.ConfigDebug(Logger, LogActions.ZenGarden, "exception-detail", ("exception", ex.ToString()));
+            return false;
+        }
+    }
+
+    private static bool TryBuildMongoConnectionString(
+        ZenGardenOfferingResolution resolved,
+        string? databaseName,
+        string? username,
+        string? password,
+        out string connectionString)
+    {
+        connectionString = "";
+
+        // Primary path: native MongoDB connection string (supports replica sets with comma-separated hosts).
+        // Uses GetConnectionString (prefix match) instead of GetUri (Uri.TryCreate) because
+        // System.Uri rejects multi-host MongoDB connection strings as invalid RFC 3986 URIs.
+        var mongoConnectionString = resolved.GetConnectionString("mongodb", "mongodb+srv");
+        if (!string.IsNullOrWhiteSpace(mongoConnectionString) &&
+            mongoConnectionString.StartsWith("mongodb", StringComparison.OrdinalIgnoreCase))
+        {
+            connectionString = MergeMongoOverrides(mongoConnectionString, databaseName, username, password);
+            return true;
+        }
+
+        var genericUri = resolved.GetUri("http", "https", "tcp", "udp");
+        if (!string.IsNullOrWhiteSpace(genericUri) &&
+            Uri.TryCreate(genericUri, UriKind.Absolute, out var parsedGeneric) &&
+            !string.IsNullOrWhiteSpace(parsedGeneric.Host))
+        {
+            var port = parsedGeneric.IsDefaultPort || parsedGeneric.Port <= 0
+                ? resolved.Port ?? 27017
+                : parsedGeneric.Port;
+            connectionString = BuildMongoConnectionString(parsedGeneric.Host, port, databaseName, username, password);
+            return true;
+        }
+
+        var host = !string.IsNullOrWhiteSpace(resolved.Hostname)
+            ? resolved.Hostname
+            : resolved.Ip;
+        if (string.IsNullOrWhiteSpace(host))
+        {
+            return false;
+        }
+
+        connectionString = BuildMongoConnectionString(host, resolved.Port ?? 27017, databaseName, username, password);
+        return true;
+    }
+
+    /// <summary>
+    /// Applies database, username, and password overrides to a MongoDB connection string
+    /// using string manipulation. Handles both single-host and replica-set (multi-host)
+    /// connection strings without routing through System.Uri or UriBuilder.
+    /// </summary>
+    private static string MergeMongoOverrides(
+        string connectionString,
+        string? databaseName,
+        string? username,
+        string? password)
+    {
+        // Format: mongodb[+srv]://[user:pass@]hosts[/database][?options]
+        var schemeEnd = connectionString.IndexOf("://", StringComparison.Ordinal);
+        if (schemeEnd < 0) return connectionString;
+
+        var scheme = connectionString[..(schemeEnd + 3)]; // e.g. "mongodb://"
+        var rest = connectionString[(schemeEnd + 3)..];    // everything after "://"
+
+        // Split existing auth from host portion
+        string existingAuth = "";
+        var atIndex = rest.IndexOf('@');
+        var slashIndex = rest.IndexOf('/');
+        var questionIndex = rest.IndexOf('?');
+
+        // '@' must appear before any '/' or '?' to be auth (not part of query params)
+        if (atIndex >= 0 && (slashIndex < 0 || atIndex < slashIndex) && (questionIndex < 0 || atIndex < questionIndex))
+        {
+            existingAuth = rest[..atIndex];
+            rest = rest[(atIndex + 1)..];
+        }
+
+        // Split hosts from path+query
+        string hosts;
+        string pathAndQuery;
+        var pathStart = rest.IndexOf('/');
+        if (pathStart >= 0)
+        {
+            hosts = rest[..pathStart];
+            pathAndQuery = rest[pathStart..]; // includes leading '/'
+        }
+        else
+        {
+            var queryStart = rest.IndexOf('?');
+            if (queryStart >= 0)
+            {
+                hosts = rest[..queryStart];
+                pathAndQuery = rest[queryStart..];
+            }
+            else
+            {
+                hosts = rest;
+                pathAndQuery = "";
+            }
+        }
+
+        // Apply auth override (only if not already present)
+        var auth = !string.IsNullOrWhiteSpace(existingAuth)
+            ? existingAuth + "@"
+            : !string.IsNullOrWhiteSpace(username)
+                ? $"{username}:{password ?? ""}@"
+                : "";
+
+        // Apply database override (only if not already present in path)
+        if (!string.IsNullOrWhiteSpace(databaseName))
+        {
+            // Extract existing path portion (before any '?')
+            var existingPath = pathAndQuery;
+            var existingQuery = "";
+            var qIdx = pathAndQuery.IndexOf('?');
+            if (qIdx >= 0)
+            {
+                existingPath = pathAndQuery[..qIdx];
+                existingQuery = pathAndQuery[qIdx..];
+            }
+
+            if (string.IsNullOrWhiteSpace(existingPath.Trim('/')))
+            {
+                pathAndQuery = "/" + databaseName.Trim() + existingQuery;
+            }
+        }
+
+        return (scheme + auth + hosts + pathAndQuery).TrimEnd('/');
+    }
+
+    private static bool IsAutoConnection(string? connectionString)
+    {
+        return string.IsNullOrWhiteSpace(connectionString)
+            || string.Equals(connectionString.Trim(), "auto", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string BuildMongoConnectionString(string hostname, int port, string? database, string? username, string? password)
@@ -175,6 +458,7 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
         public const string Config = "mongo.config";
         public const string Discovery = "mongo.discovery";
         public const string DiscoveryRequest = "mongo.discovery.request";
+        public const string ZenGarden = "mongo.zengarden";
     }
 
     private static class LogOutcomeValues

@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <KoanPackageKind>Periphery</KoanPackageKind>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Description>Koan RAG module: entity-native corpora, agentic retrieval, emergent concept graphs, contextual chunking.</Description>
+    <PackageTags>$(CommonPackageTags);ai;rag;corpus;retrieval;knowledge-graph</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Koan.Rag.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Rag.Abstractions\Koan.Rag.Abstractions.csproj" />
+    <ProjectReference Include="..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
+    <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <ProjectReference Include="..\Koan.Data.Vector\Koan.Data.Vector.csproj" />
+    <ProjectReference Include="..\Koan.Data.AI\Koan.Data.AI.csproj" />
+    <ProjectReference Include="..\Koan.AI.Contracts\Koan.AI.Contracts.csproj" />
+    <ProjectReference Include="..\Koan.AI\Koan.AI.csproj" />
+    <ProjectReference Include="..\Koan.AI.Orchestration\Koan.AI.Orchestration.csproj" />
+    <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" Version="10.0.0" />
+    <PackageReference Include="UMAP" Version="1.0.62830" />
+  </ItemGroup>
+</Project>

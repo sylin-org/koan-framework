@@ -1,7 +1,8 @@
 using System;
-using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Koan.Web.Sse;
+using Koan.Web.Sse.Formatting;
 
 namespace Koan.Mcp.Hosting;
 
@@ -45,11 +46,14 @@ public readonly record struct ServerSentEvent(string Event, JToken Payload)
 
     public string ToWireFormat()
     {
-        var builder = new StringBuilder();
-        builder.Append("event: ").Append(Event).Append('\n');
+        var envelope = ToEnvelope();
+        return SseFormatter.ToWireFormat(envelope);
+    }
+
+    public SseEnvelope ToEnvelope()
+    {
         var json = Payload?.ToString(Formatting.None) ?? "null";
-        builder.Append("data: ").Append(json).Append("\n\n");
-        return builder.ToString();
+        return new SseEnvelope(Event, json);
     }
 }
 

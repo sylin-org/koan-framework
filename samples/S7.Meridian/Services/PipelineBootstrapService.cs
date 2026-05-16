@@ -20,7 +20,7 @@ public interface IPipelineBootstrapService
     /// <summary>
     /// Creates a pipeline from uploaded files containing analysis-config.json and documents.
     /// </summary>
-    Task<CreatePipelineResponse> CreateFromFilesAsync(
+    Task<CreatePipelineResponse> CreateFromFiles(
         IFormFileCollection files,
         CancellationToken ct = default
     );
@@ -47,7 +47,7 @@ public class PipelineBootstrapService : IPipelineBootstrapService
         _logger = logger;
     }
 
-    public async Task<CreatePipelineResponse> CreateFromFilesAsync(
+    public async Task<CreatePipelineResponse> CreateFromFiles(
         IFormFileCollection files,
         CancellationToken ct = default)
     {
@@ -79,10 +79,10 @@ public class PipelineBootstrapService : IPipelineBootstrapService
         }
 
         // 2. Validate configuration
-        await ValidateConfigAsync(config, ct);
+        await ValidateConfig(config, ct);
 
         // 3. Resolve or create analysis type
-        var (analysisType, isCustom) = await ResolveAnalysisTypeAsync(config.Analysis, ct);
+        var (analysisType, isCustom) = await ResolveAnalysisType(config.Analysis, ct);
 
         // 4. Create pipeline
         var pipeline = new DocumentPipeline
@@ -122,7 +122,7 @@ public class PipelineBootstrapService : IPipelineBootstrapService
 
         foreach (var file in documentFiles)
         {
-            var result = await ProcessDocumentAsync(
+            var result = await ProcessDocument(
                 pipeline,
                 file,
                 config.Manifest,
@@ -178,7 +178,7 @@ public class PipelineBootstrapService : IPipelineBootstrapService
         };
     }
 
-    private async Task ValidateConfigAsync(AnalysisConfig config, CancellationToken ct)
+    private async Task ValidateConfig(AnalysisConfig config, CancellationToken ct)
     {
         // Validate pipeline config
         if (string.IsNullOrWhiteSpace(config.Pipeline.Name))
@@ -196,7 +196,7 @@ public class PipelineBootstrapService : IPipelineBootstrapService
         // Validate analysis type code if specified
         if (!string.IsNullOrWhiteSpace(config.Analysis.Type))
         {
-            var availableCodes = await _typeCodeResolver.GetAvailableAnalysisCodesAsync(ct);
+            var availableCodes = await _typeCodeResolver.GetAvailableAnalysisCodes(ct);
             if (!availableCodes.Contains(config.Analysis.Type, StringComparer.OrdinalIgnoreCase))
             {
                 throw new InvalidOperationException(
@@ -208,7 +208,7 @@ public class PipelineBootstrapService : IPipelineBootstrapService
         // Validate manifest source type codes
         if (config.Manifest.Count > 0)
         {
-            var availableSourceCodes = await _typeCodeResolver.GetAvailableSourceCodesAsync(ct);
+            var availableSourceCodes = await _typeCodeResolver.GetAvailableSourceCodes(ct);
             foreach (var entry in config.Manifest)
             {
                 if (!availableSourceCodes.Contains(entry.Value.Type, StringComparer.OrdinalIgnoreCase))
@@ -221,17 +221,17 @@ public class PipelineBootstrapService : IPipelineBootstrapService
         }
     }
 
-    private async Task<(AnalysisType Type, bool IsCustom)> ResolveAnalysisTypeAsync(
+    private async Task<(AnalysisType Type, bool IsCustom)> ResolveAnalysisType(
         AnalysisDefinition definition,
         CancellationToken ct)
     {
         // Seeded type
         if (!string.IsNullOrWhiteSpace(definition.Type))
         {
-            var type = await _typeCodeResolver.ResolveAnalysisTypeAsync(definition.Type, ct);
+            var type = await _typeCodeResolver.ResolveAnalysisType(definition.Type, ct);
             if (type == null)
             {
-                var availableCodes = await _typeCodeResolver.GetAvailableAnalysisCodesAsync(ct);
+                var availableCodes = await _typeCodeResolver.GetAvailableAnalysisCodes(ct);
                 throw new InvalidOperationException(
                     $"Analysis type '{definition.Type}' not found. " +
                     $"Available codes: {string.Join(", ", availableCodes)}");
@@ -260,7 +260,7 @@ public class PipelineBootstrapService : IPipelineBootstrapService
         return (customType, true);
     }
 
-    private async Task<DocumentCreationResult> ProcessDocumentAsync(
+    private async Task<DocumentCreationResult> ProcessDocument(
         DocumentPipeline pipeline,
         IFormFile file,
         Dictionary<string, ManifestEntry> manifest,
@@ -276,7 +276,7 @@ public class PipelineBootstrapService : IPipelineBootstrapService
             file.FileName, inManifest, manifestEntry?.Type ?? "null");
 
         // Store the document once. Ingestion service handles attachment and dedupe.
-            var ingestionResult = await _ingestionService.IngestAsync(pipeline.Id, file, forceReprocess: false, typeHint: null, ct);
+            var ingestionResult = await _ingestionService.Ingest(pipeline.Id, file, forceReprocess: false, typeHint: null, ct);
         var storedDocument = ingestionResult.NewDocuments.FirstOrDefault()
             ?? ingestionResult.ReusedDocuments.FirstOrDefault();
 
@@ -291,10 +291,10 @@ public class PipelineBootstrapService : IPipelineBootstrapService
 
         if (inManifest && manifestEntry != null)
         {
-            sourceType = await _typeCodeResolver.ResolveSourceTypeAsync(manifestEntry.Type, ct);
+            sourceType = await _typeCodeResolver.ResolveSourceType(manifestEntry.Type, ct);
             if (sourceType == null)
             {
-                var availableCodes = await _typeCodeResolver.GetAvailableSourceCodesAsync(ct);
+                var availableCodes = await _typeCodeResolver.GetAvailableSourceCodes(ct);
                 throw new InvalidOperationException(
                     $"Source type '{manifestEntry.Type}' specified in manifest for '{file.FileName}' not found. " +
                     $"Available codes: {string.Join(", ", availableCodes)}");

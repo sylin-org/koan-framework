@@ -58,7 +58,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     private EntityRequestContextBuilder ContextBuilder => HttpContext.RequestServices.GetRequiredService<EntityRequestContextBuilder>();
 
     protected virtual string GetDisplay(TEntity e)
-        => e?.ToString() ?? string.Empty;
+        => e?.ToString() ?? "";
 
     private EntityRequestContext CreateRequestContext(QueryOptions options, CancellationToken ct)
         => ContextBuilder.Build(options, ct, HttpContext, HttpContext?.User);
@@ -252,7 +252,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             QueryParameters = ToQueryDictionary(query)
         };
 
-        var result = await EndpointService.GetCollectionAsync(request);
+        var result = await EndpointService.GetCollection(request);
         ApplyResponseMetadata(result);
 
         if (result.IsShortCircuited)
@@ -302,7 +302,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             Accept = HttpContext.Request.Headers["Accept"].ToString()
         };
 
-        var result = await EndpointService.QueryAsync(request);
+        var result = await EndpointService.Query(request);
         ApplyResponseMetadata(result);
         if (result.IsShortCircuited)
         {
@@ -322,7 +322,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             Context = context,
             Accept = HttpContext.Request.Headers["Accept"].ToString()
         };
-        var result = await EndpointService.GetNewAsync(request);
+        var result = await EndpointService.GetNew(request);
         ApplyResponseMetadata(result);
         if (result.IsShortCircuited) return ResolveShortCircuit(result);
         return PrepareResponse(result.Payload ?? result.Model);
@@ -343,7 +343,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             With = GetRelationshipParameter(query),
             Accept = HttpContext.Request.Headers["Accept"].ToString()
         };
-        var result = await EndpointService.GetByIdAsync(request);
+        var result = await EndpointService.GetById(request);
         ApplyResponseMetadata(result);
         if (result.IsShortCircuited) return ResolveShortCircuit(result);
         return PrepareResponse(result.Payload ?? result.Model);
@@ -364,7 +364,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             Set = query.TryGetValue("set", out var setVal) ? setVal.ToString() : null,
             Accept = HttpContext.Request.Headers["Accept"].ToString()
         };
-        var result = await EndpointService.UpsertAsync(request);
+        var result = await EndpointService.Upsert(request);
         ApplyResponseMetadata(result);
         if (result.IsShortCircuited) return ResolveShortCircuit(result);
         return PrepareResponse(result.Payload ?? result.Model);
@@ -385,7 +385,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             Models = list,
             Set = query.TryGetValue("set", out var setVal) ? setVal.ToString() : null
         };
-        var result = await EndpointService.UpsertManyAsync(request);
+        var result = await EndpointService.UpsertMany(request);
         ApplyResponseMetadata(result);
         if (result.IsShortCircuited) return ResolveShortCircuit(result);
         return PrepareResponse(result.Payload);
@@ -405,7 +405,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             Set = query.TryGetValue("set", out var setVal) ? setVal.ToString() : null,
             Accept = HttpContext.Request.Headers["Accept"].ToString()
         };
-        var result = await EndpointService.DeleteAsync(request);
+        var result = await EndpointService.Delete(request);
         ApplyResponseMetadata(result);
         if (result.IsShortCircuited) return ResolveShortCircuit(result);
         return PrepareResponse(result.Payload ?? result.Model);
@@ -425,7 +425,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             Ids = list,
             Set = query.TryGetValue("set", out var setVal) ? setVal.ToString() : null
         };
-        var result = await EndpointService.DeleteManyAsync(request);
+        var result = await EndpointService.DeleteMany(request);
         ApplyResponseMetadata(result);
         if (result.IsShortCircuited) return ResolveShortCircuit(result);
         return PrepareResponse(result.Payload);
@@ -445,7 +445,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             Query = q!,
             Set = query.TryGetValue("set", out var setVal) ? setVal.ToString() : null
         };
-        var result = await EndpointService.DeleteByQueryAsync(request);
+        var result = await EndpointService.DeleteByQuery(request);
         ApplyResponseMetadata(result);
         if (result.IsShortCircuited) return ResolveShortCircuit(result);
         return PrepareResponse(result.Payload);
@@ -463,7 +463,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             Context = context,
             Set = query.TryGetValue("set", out var setVal) ? setVal.ToString() : null
         };
-        var result = await EndpointService.DeleteAllAsync(request);
+        var result = await EndpointService.DeleteAll(request);
         ApplyResponseMetadata(result);
         if (result.IsShortCircuited) return ResolveShortCircuit(result);
         return PrepareResponse(result.Payload);
@@ -509,7 +509,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             payload = payload with { Options = optsOverride };
         }
 
-        var updated = await Koan.Data.Core.Data<TEntity, TKey>.PatchAsync(payload, ct);
+        var updated = await Koan.Data.Core.Data<TEntity, TKey>.Patch(payload, ct);
         if (updated is null) return NotFound();
 
         var request = new EntityGetByIdRequest<TKey>
@@ -519,7 +519,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             Set = set,
             Accept = HttpContext.Request.Headers["Accept"].ToString()
         };
-        var result = await EndpointService.GetByIdAsync(request);
+        var result = await EndpointService.GetById(request);
         ApplyResponseMetadata(result);
         if (result.IsShortCircuited) return ResolveShortCircuit(result);
         return PrepareResponse(result.Payload ?? result.Model);

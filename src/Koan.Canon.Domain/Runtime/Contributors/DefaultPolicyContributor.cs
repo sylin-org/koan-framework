@@ -33,7 +33,7 @@ internal sealed class DefaultPolicyContributor<TModel> : ICanonPipelineContribut
     public CanonPipelinePhase Phase => CanonPipelinePhase.Policy;
 
     /// <inheritdoc />
-    public ValueTask<CanonizationEvent?> ExecuteAsync(CanonPipelineContext<TModel> context, CancellationToken cancellationToken)
+    public ValueTask<CanonizationEvent?> Execute(CanonPipelineContext<TModel> context, CancellationToken cancellationToken)
     {
         if (context is null)
         {
@@ -198,7 +198,7 @@ internal sealed class DefaultPolicyContributor<TModel> : ICanonPipelineContribut
     private static PolicyEvaluationResult EvaluateLatest(object? incomingValue, object? existingValue, CanonPropertyFootprint? footprint, DateTimeOffset now, string arrivalToken, string? sourceKey)
     {
         var previousTimestamp = footprint?.ArrivedAt ?? DateTimeOffset.MinValue;
-        var previousToken = footprint?.ArrivalToken ?? string.Empty;
+        var previousToken = footprint?.ArrivalToken ?? "";
 
         if (incomingValue is null && existingValue is null)
         {
@@ -331,7 +331,7 @@ internal sealed class DefaultPolicyContributor<TModel> : ICanonPipelineContribut
                 evidence["arrivalToken"] = footprint.ArrivalToken;
             }
 
-            return new PolicyEvaluationResult(value, "existing", footprint?.SourceKey, footprint?.ArrivalToken ?? string.Empty, footprint?.ArrivedAt ?? DateTimeOffset.MinValue, evidence);
+            return new PolicyEvaluationResult(value, "existing", footprint?.SourceKey, footprint?.ArrivalToken ?? "", footprint?.ArrivedAt ?? DateTimeOffset.MinValue, evidence);
         }
     }
 }

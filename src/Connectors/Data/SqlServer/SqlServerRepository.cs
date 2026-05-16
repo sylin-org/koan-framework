@@ -51,7 +51,6 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
     private readonly StorageNameResolver.Convention _conv;
     private readonly ILinqSqlDialect _dialect = new MsSqlDialect();
     private readonly int _defaultPageSize;
-    private readonly int _maxPageSize;
     private readonly ILogger _logger;
     private readonly JsonSerializerSettings _json;
     private static readonly CamelCaseNamingStrategy CamelCase = new();
@@ -73,7 +72,6 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
                       : NullLogger.Instance);
         _conv = new StorageNameResolver.Convention(options.NamingStyle, options.Separator, NameCasing.AsIs);
         _defaultPageSize = options.DefaultPageSize > 0 ? options.DefaultPageSize : 50;
-        _maxPageSize = options.MaxPageSize > 0 ? options.MaxPageSize : 200;
         _json = new JsonSerializerSettings
         {
             ContractResolver = new Newtonsoft.Json.Serialization.DefaultContractResolver
@@ -145,7 +143,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         var cacheKey = BuildCacheKey(conn, table);
         try
         {
-            EnsureOrchestratedAsync(conn, cacheKey, CancellationToken.None).GetAwaiter().GetResult();
+            EnsureOrchestrated(conn, cacheKey, CancellationToken.None).GetAwaiter().GetResult();
         }
         catch
         {
@@ -153,14 +151,14 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         }
     }
 
-    private Task EnsureOrchestratedAsync(SqlConnection conn, string cacheKey, CancellationToken ct)
+    private Task EnsureOrchestrated(SqlConnection conn, string cacheKey, CancellationToken ct)
     {
         if (_healthyCache.TryGetValue(cacheKey, out var healthy) && healthy)
         {
             return Task.CompletedTask;
         }
 
-        return Singleflight.RunAsync(cacheKey, async runCt =>
+        return Singleflight.Run(cacheKey, async runCt =>
         {
             if (_healthyCache.TryGetValue(cacheKey, out var cached) && cached)
             {
@@ -196,7 +194,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         }, ct);
     }
 
-    public async Task EnsureHealthyAsync(CancellationToken ct)
+    public async Task EnsureHealthy(CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         await using var conn = new SqlConnection(_options.ConnectionString);
@@ -204,7 +202,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         var cacheKey = BuildCacheKey(conn, TableName);
         try
         {
-            await EnsureOrchestratedAsync(conn, cacheKey, ct);
+            await EnsureOrchestrated(conn, cacheKey, ct);
         }
         catch (Exception ex)
         {
@@ -244,7 +242,7 @@ BEGIN
         [Json] NVARCHAR(MAX) NOT NULL
     );
 END";
-        cmd.ExecuteNonQuery();
+        cmd.ExecuteNonQueryAsync();
 
         var projections = ProjectionResolver.Get(typeof(TEntity));
         foreach (var p in projections)
@@ -270,7 +268,7 @@ END";
         {
             using var add = conn.CreateCommand();
             add.CommandText = $"ALTER TABLE [dbo].[{TableName}] ADD [{column}] AS JSON_VALUE([Json], '{jsonPath}')";
-            add.ExecuteNonQuery();
+            add.ExecuteNonQueryAsync();
         }
         catch { }
     }
@@ -282,7 +280,7 @@ END";
             using var idx = conn.CreateCommand();
             idx.CommandText = $@"IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_{TableName}_{column}' AND object_id = OBJECT_ID(N'[dbo].[{TableName}]'))
 CREATE INDEX [IX_{TableName}_{column}] ON [dbo].[{TableName}] ([{column}]);";
-            idx.ExecuteNonQuery();
+            idx.ExecuteNonQueryAsync();
         }
         catch { }
     }
@@ -292,7 +290,7 @@ CREATE INDEX [IX_{TableName}_{column}] ON [dbo].[{TableName}] ([{column}]);";
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT 1 FROM sys.tables WHERE name = @n AND SCHEMA_NAME(schema_id) = 'dbo'";
         cmd.Parameters.Add(new SqlParameter("@n", TableName));
-        try { var o = cmd.ExecuteScalar(); return o != null; } catch { return false; }
+        try { var o = cmd.ExecuteScalarAsync(); return o != null; } catch { return false; }
     }
 
     private bool ColumnExists(SqlConnection conn, string column)
@@ -304,7 +302,7 @@ JOIN sys.schemas s ON t.schema_id = s.schema_id
 WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         cmd.Parameters.Add(new SqlParameter("@t", TableName));
         cmd.Parameters.Add(new SqlParameter("@c", column));
-        try { var o = cmd.ExecuteScalar(); return o != null; } catch { return false; }
+        try { var o = cmd.ExecuteScalarAsync(); return o != null; } catch { return false; }
     }
 
     private TEntity FromRow((string Id, string Json) row)
@@ -316,7 +314,7 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         return (id, json);
     }
 
-    public async Task<TEntity?> GetAsync(TKey id, CancellationToken ct = default)
+    public async Task<TEntity?> Get(TKey id, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = SqlServerTelemetry.Activity.StartActivity("mssql.get");
@@ -326,7 +324,7 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         return row == default ? null : FromRow(row);
     }
 
-    public async Task<IReadOnlyList<TEntity?>> GetManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity?>> GetMany(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = SqlServerTelemetry.Activity.StartActivity("mssql.get.many");
@@ -335,7 +333,7 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
         if (idList.Count == 0)
         {
-            return Array.Empty<TEntity?>();
+            return [];
         }
 
         await using var conn = Open();
@@ -359,7 +357,7 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         return results;
     }
 
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(object? query, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query:all");
@@ -370,7 +368,7 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         return rows.Select(FromRow).ToList();
     }
 
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(object? query, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query:all+opts");
@@ -382,7 +380,7 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         return rows.Select(FromRow).ToList();
     }
 
-    public async Task<CountResult> CountAsync(CountRequest<TEntity> request, CancellationToken ct = default)
+    public async Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = SqlServerTelemetry.Activity.StartActivity("mssql.count");
@@ -422,11 +420,11 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
             {
                 var (whereSql, parameters) = translator.Translate(request.Predicate);
                 whereSql = RewriteWhereForProjection(whereSql);
-                return await CountWhereAsync(whereSql, parameters);
+                return await CountWhere(whereSql, parameters);
             }
             catch (NotSupportedException)
             {
-                var all = await QueryAsync((object?)null, ct);
+                var all = await Query((object?)null, ct);
                 var count = (long)all.AsQueryable().Count(request.Predicate);
                 return CountResult.Exact(count);
             }
@@ -444,7 +442,7 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         return CountResult.Exact(totalCount);
     }
 
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query:linq");
@@ -463,12 +461,12 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         }
         catch (NotSupportedException)
         {
-            var all = await QueryAsync((object?)null, ct);
+            var all = await Query((object?)null, ct);
             return all.AsQueryable().Where(predicate).ToList();
         }
     }
 
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query:linq+opts");
@@ -488,12 +486,12 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         }
         catch (NotSupportedException)
         {
-            var all = await QueryAsync((object?)null, options, ct);
+            var all = await Query((object?)null, options, ct);
             return all.AsQueryable().Where(predicate).ToList();
         }
     }
 
-    private async Task<CountResult> CountWhereAsync(string whereSql, IReadOnlyList<object?> parameters)
+    private async Task<CountResult> CountWhere(string whereSql, IReadOnlyList<object?> parameters)
     {
         await using var conn = Open();
         var sql = $"SELECT COUNT(1) FROM [dbo].[{TableName}] WHERE {whereSql}";
@@ -503,7 +501,7 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         return CountResult.Exact(count);
     }
 
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(string sql, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(string sql, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query:string");
@@ -523,7 +521,7 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         }
     }
 
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(string sql, object? parameters, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(string sql, object? parameters, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query:string:param");
@@ -543,7 +541,7 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         }
     }
 
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(string sql, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(string sql, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query:string+opts");
@@ -564,7 +562,7 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         }
     }
 
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(string sql, object? parameters, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(string sql, object? parameters, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query:string:param+opts");
@@ -586,13 +584,13 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
     }
 
 
-    public async Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)
-    { await UpsertManyAsync(new[] { model }, ct); return model; }
+    public async Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
+    { await UpsertMany(new[] { model }, ct); return model; }
 
-    public async Task<bool> DeleteAsync(TKey id, CancellationToken ct = default)
-        => await DeleteManyAsync(new[] { id }, ct).ContinueWith(t => t.Result > 0, ct);
+    public async Task<bool> Delete(TKey id, CancellationToken ct = default)
+        => await DeleteMany(new[] { id }, ct).ContinueWith(t => t.Result > 0, ct);
 
-    public async Task<int> UpsertManyAsync(IEnumerable<TEntity> models, CancellationToken ct = default)
+    public async Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default)
     {
         await using var conn = Open();
         await using var tx = conn.BeginTransaction();
@@ -612,20 +610,20 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         return count;
     }
 
-    public async Task<int> DeleteManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    public async Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
         await using var conn = Open();
         var idArr = ids.Select(i => i!.ToString()!).ToArray();
         return await conn.ExecuteAsync($"DELETE FROM [dbo].[{TableName}] WHERE [Id] IN @Ids", new { Ids = idArr });
     }
 
-    public async Task<int> DeleteAllAsync(CancellationToken ct = default)
+    public async Task<int> DeleteAll(CancellationToken ct = default)
     {
         await using var conn = Open();
         return await conn.ExecuteAsync($"DELETE FROM [dbo].[{TableName}]");
     }
 
-    public async Task<long> RemoveAllAsync(RemoveStrategy strategy, CancellationToken ct = default)
+    public async Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default)
     {
         await using var conn = Open();
 
@@ -651,7 +649,7 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
 
         // Safe path: DELETE (fires hooks if registered)
         var countRequest = new CountRequest<TEntity>();
-        var countResult = await CountAsync(countRequest, ct);
+        var countResult = await Count(countRequest, ct);
         await conn.ExecuteAsync($"DELETE FROM [dbo].[{TableName}]", ct);
         return countResult.Value;
     }
@@ -671,11 +669,11 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         public IBatchSet<TEntity, TKey> Delete(TKey id) { _deletes.Add(id); return this; }
         public IBatchSet<TEntity, TKey> Clear() { _adds.Clear(); _updates.Clear(); _deletes.Clear(); _mutations.Clear(); return this; }
 
-        public async Task<BatchResult> SaveAsync(BatchOptions? options = null, CancellationToken ct = default)
+        public async Task<BatchResult> Save(BatchOptions? options = null, CancellationToken ct = default)
         {
             foreach (var (id, mutate) in _mutations)
             {
-                var current = await repo.GetAsync(id, ct);
+                var current = await repo.Get(id, ct);
                 if (current is not null) { mutate(current); _updates.Add(current); }
             }
             var upserts = _adds.Concat(_updates);
@@ -683,8 +681,8 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
             var requireAtomic = options?.RequireAtomic == true;
             if (!requireAtomic)
             {
-                if (upserts.Any()) await repo.UpsertManyAsync(upserts, ct);
-                var deleted = 0; if (_deletes.Any()) deleted = await repo.DeleteManyAsync(_deletes, ct);
+                if (upserts.Any()) await repo.UpsertMany(upserts, ct);
+                var deleted = 0; if (_deletes.Any()) deleted = await repo.DeleteMany(_deletes, ct);
                 return new BatchResult(added, updated, deleted);
             }
 
@@ -748,7 +746,7 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
                     var feats = new MsSqlStoreFeatures();
                     // Decide based on attribute > options precedence handled by orchestrator
                     var key = $"{conn.DataSource}/{conn.Database}::{TableName}";
-                    await Singleflight.RunAsync(key, async kct =>
+                    await Singleflight.Run(key, async kct =>
                     {
                         await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, kct);
                         _healthyCache[key] = true;
@@ -869,10 +867,19 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
 
     private (int offset, int limit) ComputeSkipTake(DataQueryOptions? options)
     {
+        // Check if pagination is active
+        var hasPagination = options?.HasPagination ?? false;
+
+        if (!hasPagination)
+        {
+            // No pagination - return full result set without applying default page size
+            return (0, int.MaxValue);
+        }
+
+        // Pagination is active - apply default fallback only. Per ADR no adapter-side cap.
         var page = options?.Page is int p && p > 0 ? p : 1;
         var sizeReq = options?.PageSize;
         var size = sizeReq is int ps && ps > 0 ? ps : _defaultPageSize;
-        if (size > _maxPageSize) size = _maxPageSize;
         var offset = (page - 1) * size;
         return (offset, size);
     }

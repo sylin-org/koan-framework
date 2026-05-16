@@ -12,18 +12,10 @@ namespace Koan.Data.Backup.Services;
 /// Reports healthy status when all entities have backup coverage (either included or excluded with reason).
 /// Reports degraded status when entities lack backup coverage.
 /// </remarks>
-public class BackupInventoryHealthCheck : IHealthCheck
+public class BackupInventoryHealthCheck(
+    IEntityDiscoveryService discoveryService,
+    ILogger<BackupInventoryHealthCheck> logger) : IHealthCheck
 {
-    private readonly IEntityDiscoveryService _discoveryService;
-    private readonly ILogger<BackupInventoryHealthCheck> _logger;
-
-    public BackupInventoryHealthCheck(
-        IEntityDiscoveryService discoveryService,
-        ILogger<BackupInventoryHealthCheck> logger)
-    {
-        _discoveryService = discoveryService;
-        _logger = logger;
-    }
 
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
@@ -37,8 +29,8 @@ public class BackupInventoryHealthCheck : IHealthCheck
             // If not cached, build it now
             if (inventory == null)
             {
-                _logger.LogDebug("Backup inventory not cached, building now...");
-                inventory = await _discoveryService.BuildInventoryAsync(cancellationToken);
+                logger.LogDebug("Backup inventory not cached, building now...");
+                inventory = await discoveryService.BuildInventory(cancellationToken);
             }
 
             var data = new Dictionary<string, object>
@@ -67,7 +59,7 @@ public class BackupInventoryHealthCheck : IHealthCheck
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Backup inventory health check failed");
+            logger.LogError(ex, "Backup inventory health check failed");
 
             return HealthCheckResult.Unhealthy(
                 "Failed to build backup inventory",

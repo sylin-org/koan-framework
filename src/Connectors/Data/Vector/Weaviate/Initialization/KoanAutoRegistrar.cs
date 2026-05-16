@@ -17,6 +17,7 @@ using Koan.Data.Abstractions.Naming;
 using Koan.Data.Vector.Abstractions;
 using Koan.Data.Vector.Connector.Weaviate.Discovery;
 using Koan.Data.Vector.Connector.Weaviate.Orchestration;
+using Koan.ZenGarden.Core;
 using WeaviateItems = Koan.Data.Vector.Connector.Weaviate.Infrastructure.WeaviateProvenanceItems;
 using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
 
@@ -33,7 +34,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
         services.AddSingleton<IConfigureOptions<WeaviateOptions>, WeaviateOptionsConfigurator>();
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
-        services.TryAddEnumerable(new ServiceDescriptor(typeof(INamingDefaultsProvider), typeof(WeaviateNamingDefaultsProvider), ServiceLifetime.Singleton));
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, WeaviateHealthContributor>());
 
         // Register orchestration evaluator for dependency management
@@ -42,6 +42,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // Register Weaviate discovery adapter (maintains "Reference = Intent")
         // Adding Koan.Data.Vector.Connector.Weaviate automatically enables Weaviate discovery capabilities
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, WeaviateDiscoveryAdapter>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IZenGardenOfferingBinding, WeaviateZenGardenOfferingBinding>());
 
         services.AddSingleton<IVectorAdapterFactory, WeaviateVectorAdapterFactory>();
         services.AddHttpClient("weaviate");
@@ -175,12 +176,11 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         if (Uri.TryCreate(endpoint, UriKind.Absolute, out var uri))
         {
             var scheme = string.IsNullOrWhiteSpace(uri.Scheme) ? "http" : uri.Scheme;
-            var portSegment = uri.IsDefaultPort ? string.Empty : $":{uri.Port}";
+            var portSegment = uri.IsDefaultPort ? "" : $":{uri.Port}";
             return $"{scheme}://{uri.Host}{portSegment}";
         }
 
         return endpoint;
     }
 }
-
 

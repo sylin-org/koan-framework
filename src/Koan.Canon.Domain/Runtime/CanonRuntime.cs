@@ -90,8 +90,8 @@ public sealed class CanonRuntime : ICanonRuntime
                 Detail = $"stage:{stage.Id}"
             };
 
-            await NotifyBeforePhaseAsync(CanonPipelinePhase.Intake, context, observers, cancellationToken);
-            await NotifyAfterPhaseAsync(CanonPipelinePhase.Intake, context, stageEvent, observers, cancellationToken);
+            await NotifyBeforePhase(CanonPipelinePhase.Intake, context, observers, cancellationToken);
+            await NotifyAfterPhase(CanonPipelinePhase.Intake, context, stageEvent, observers, cancellationToken);
 
             AppendRecord(context, stageEvent, CanonizationOutcome.Parked);
             return new CanonizationResult<T>(entity, CanonizationOutcome.Parked, metadata.Clone(), new[] { stageEvent }, reprojectionTriggered: false, distributionSkipped: true);
@@ -102,7 +102,7 @@ public sealed class CanonRuntime : ICanonRuntime
             entity.Metadata = metadata.Clone();
             var canonical = await _persistence.PersistCanonicalAsync(entity, cancellationToken);
             var resultMetadata = canonical.Metadata.Clone();
-            return new CanonizationResult<T>(canonical, CanonizationOutcome.Canonized, resultMetadata, Array.Empty<CanonizationEvent>(), effectiveOptions.ForceRebuild, effectiveOptions.SkipDistribution);
+            return new CanonizationResult<T>(canonical, CanonizationOutcome.Canonized, resultMetadata, [], effectiveOptions.ForceRebuild, effectiveOptions.SkipDistribution);
         }
 
         var events = new List<CanonizationEvent>(descriptor.Phases.Count);
@@ -115,12 +115,12 @@ public sealed class CanonRuntime : ICanonRuntime
                 cancellationToken.ThrowIfCancellationRequested();
                 currentPhase = phase;
 
-                await NotifyBeforePhaseAsync(phase, context, observers, cancellationToken);
+                await NotifyBeforePhase(phase, context, observers, cancellationToken);
 
                 CanonizationEvent? overrideEvent = null;
                 foreach (var contributor in descriptor.GetContributors(phase))
                 {
-                    var evt = await contributor.ExecuteAsync(context, cancellationToken);
+                    var evt = await contributor.Execute(context, cancellationToken);
                     if (evt is not null)
                     {
                         overrideEvent = evt;
@@ -130,7 +130,7 @@ public sealed class CanonRuntime : ICanonRuntime
                 var phaseEvent = NormalizeEvent(overrideEvent, phase, context);
                 events.Add(phaseEvent);
 
-                await NotifyAfterPhaseAsync(phase, context, phaseEvent, observers, cancellationToken);
+                await NotifyAfterPhase(phase, context, phaseEvent, observers, cancellationToken);
                 AppendRecord(context, phaseEvent, CanonizationOutcome.Canonized);
             }
 
@@ -152,7 +152,7 @@ public sealed class CanonRuntime : ICanonRuntime
         catch (Exception ex)
         {
             var phase = currentPhase ?? CanonPipelinePhase.Intake;
-            await NotifyErrorAsync(phase, context, ex, observers, cancellationToken);
+            await NotifyError(phase, context, ex, observers, cancellationToken);
             var errorEvent = BuildErrorEvent(phase, context, ex);
             AppendRecord(context, errorEvent, CanonizationOutcome.Failed);
             throw;
@@ -180,7 +180,7 @@ public sealed class CanonRuntime : ICanonRuntime
             entry.ArrivalToken ??= context.Entity.Id;
         }
 
-        await _auditSink.WriteAsync(entries, cancellationToken);
+        await _auditSink.Write(entries, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -386,16 +386,16 @@ public sealed class CanonRuntime : ICanonRuntime
         }
     }
 
-    private static Task NotifyBeforePhaseAsync(CanonPipelinePhase phase, ICanonPipelineContext context, IReadOnlyList<ICanonPipelineObserver> observers, CancellationToken cancellationToken)
-        => NotifyObserversAsync(observers, observer => observer.BeforePhaseAsync(phase, context, cancellationToken));
+    private static Task NotifyBeforePhase(CanonPipelinePhase phase, ICanonPipelineContext context, IReadOnlyList<ICanonPipelineObserver> observers, CancellationToken cancellationToken)
+        => NotifyObservers(observers, observer => observer.BeforePhase(phase, context, cancellationToken));
 
-    private static Task NotifyAfterPhaseAsync(CanonPipelinePhase phase, ICanonPipelineContext context, CanonizationEvent @event, IReadOnlyList<ICanonPipelineObserver> observers, CancellationToken cancellationToken)
-        => NotifyObserversAsync(observers, observer => observer.AfterPhaseAsync(phase, context, @event, cancellationToken));
+    private static Task NotifyAfterPhase(CanonPipelinePhase phase, ICanonPipelineContext context, CanonizationEvent @event, IReadOnlyList<ICanonPipelineObserver> observers, CancellationToken cancellationToken)
+        => NotifyObservers(observers, observer => observer.AfterPhase(phase, context, @event, cancellationToken));
 
-    private static Task NotifyErrorAsync(CanonPipelinePhase phase, ICanonPipelineContext context, Exception exception, IReadOnlyList<ICanonPipelineObserver> observers, CancellationToken cancellationToken)
-        => NotifyObserversAsync(observers, observer => observer.OnErrorAsync(phase, context, exception, cancellationToken));
+    private static Task NotifyError(CanonPipelinePhase phase, ICanonPipelineContext context, Exception exception, IReadOnlyList<ICanonPipelineObserver> observers, CancellationToken cancellationToken)
+        => NotifyObservers(observers, observer => observer.OnError(phase, context, exception, cancellationToken));
 
-    private static async Task NotifyObserversAsync(IReadOnlyList<ICanonPipelineObserver> observers, Func<ICanonPipelineObserver, ValueTask> callback)
+    private static async Task NotifyObservers(IReadOnlyList<ICanonPipelineObserver> observers, Func<ICanonPipelineObserver, ValueTask> callback)
     {
         for (var i = 0; i < observers.Count; i++)
         {

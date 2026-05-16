@@ -108,11 +108,13 @@ Recent additions to SnapVault showcase sophisticated AI integration:
 - **Accessibility**: ARIA labels, keyboard navigation, focus management
 - **Progressive Enhancement**: Works without AI, degrades gracefully
 
-### Infrastructure (Docker Compose)
+### Infrastructure (Zen Garden)
 
-- **MongoDB**: Photo metadata, events, relationships
-- **Weaviate**: Vector similarity search
-- **Ollama**: Local AI (no external API dependencies)
+- **MongoDB**: Photo metadata, events, relationships *(discovered via Zen Garden)*
+- **Weaviate**: Vector similarity search *(discovered via Zen Garden)*
+- **Ollama**: Local AI, no external API dependencies *(discovered via Zen Garden)*
+
+All infrastructure is resolved at runtime through Zen Garden service discovery from a host Moss instance. SnapVault runs as a single standalone container with no bundled services.
 
 ---
 
@@ -744,57 +746,44 @@ public async Task<ActionResult<BulkDeleteResponse>> BulkDelete([FromBody] BulkDe
 
 ```bash
 # Automatically:
-# 1. Checks for Docker
+# 1. Checks for Docker Desktop
 # 2. Builds container image
-# 3. Starts dependencies (MongoDB, Weaviate, Ollama)
-# 4. Runs the application
-# 5. Opens browser to http://localhost:5086
+# 3. Runs SnapVault as a single container
+# 4. Opens browser to http://localhost:5086
 ./start.bat
 ```
 
-### Docker Compose Configuration
+### Container Configuration
 
-**File**: `docker-compose.yml`
+SnapVault runs as a standalone container — no Docker Compose, no bundled services. All infrastructure (MongoDB, Weaviate, Ollama) is discovered at runtime via Zen Garden.
 
-```yaml
-services:
-  mongodb:
-    image: mongo:latest
-    ports: ["27017:27017"]
-    volumes: ["mongodb-data:/data/db"]
-
-  weaviate:
-    image: semitechnologies/weaviate:latest
-    ports: ["8080:8080"]
-    environment:
-      PERSISTENCE_DATA_PATH: "/var/lib/weaviate"
-
-  ollama:
-    image: ollama/ollama:latest
-    ports: ["11434:11434"]
-    volumes: ["ollama-data:/root/.ollama"]
-```
-
-### Environment Variables
-
-**File**: `.env` (not committed, created by start.bat)
+**File**: `docker-run.env`
 
 ```bash
-# Data Provider
-KOAN_DATA_PROVIDER=mongodb
-KOAN_MONGODB_CONNECTION=mongodb://localhost:27017
+ASPNETCORE_ENVIRONMENT=Development
+ASPNETCORE_URLS=http://+:5086
 
-# Vector Provider
-KOAN_VECTOR_PROVIDER=weaviate
-KOAN_WEAVIATE_ENDPOINT=http://localhost:8080
+# Zen Garden - service discovery via host Moss
+Koan__ZenGarden__RequireHostMossWhenContainerized=true
+Koan__ZenGarden__ContainerHost=host.docker.internal
+Koan__ZenGarden__ContainerHostPort=7185
+KOAN_ZENGARDEN_CACHE_PATH=/app/cache/zen-garden
+```
 
-# AI Provider
-KOAN_AI_PROVIDER=ollama
-KOAN_OLLAMA_ENDPOINT=http://localhost:11434
+### Volume Mounts
 
-# Storage
-KOAN_STORAGE_PROVIDER=localfile
-KOAN_STORAGE_BASEPATH=./.Koan/storage
+| Host | Container | Purpose |
+|------|-----------|---------|
+| `.Koan/Data` | `/app/data` | Persistent application data |
+| `.Koan/cache` | `/app/cache` | Zen Garden stone roster, AI caches |
+| `.Koan/storage` | `/app/storage` | Photo storage tiers (hot/warm/cold) |
+
+### Container Lifecycle
+
+```bash
+docker logs -f koan-s6-snapvault    # Stream logs
+docker stop koan-s6-snapvault       # Stop
+docker restart koan-s6-snapvault    # Restart
 ```
 
 ### Production Considerations

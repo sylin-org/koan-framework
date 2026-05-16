@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "koan-context": {
+      "transport": {
+        "type": "sse",
+        "url": "http://localhost:27500/mcp/sse"
+      },
+      "name": "Koan Context",
+      "description": "Semantic code search and project management"
+    }
+  }
+}

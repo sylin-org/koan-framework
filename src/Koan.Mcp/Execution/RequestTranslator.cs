@@ -41,45 +41,45 @@ public sealed class RequestTranslator
         return tool.Operation switch
         {
             EntityEndpointOperationKind.Collection => new RequestTranslation(
-                nameof(IEntityEndpointService<object, object>.GetCollectionAsync),
+                nameof(IEntityEndpointService<object, object>.GetCollection),
                 BuildCollectionRequest(context, args)),
             EntityEndpointOperationKind.Query => new RequestTranslation(
-                nameof(IEntityEndpointService<object, object>.QueryAsync),
+                nameof(IEntityEndpointService<object, object>.Query),
                 BuildQueryRequest(context, args)),
             EntityEndpointOperationKind.GetNew => new RequestTranslation(
-                nameof(IEntityEndpointService<object, object>.GetNewAsync),
+                nameof(IEntityEndpointService<object, object>.GetNew),
                 new EntityGetNewRequest
                 {
                     Context = context,
                     Accept = ReadString(args, "accept")
                 }),
             EntityEndpointOperationKind.GetById => new RequestTranslation(
-                nameof(IEntityEndpointService<object, object>.GetByIdAsync),
+                nameof(IEntityEndpointService<object, object>.GetById),
                 BuildGetByIdRequest(registration, context, args)),
             EntityEndpointOperationKind.Upsert => new RequestTranslation(
-                nameof(IEntityEndpointService<object, object>.UpsertAsync),
+                nameof(IEntityEndpointService<object, object>.Upsert),
                 BuildUpsertRequest(registration, context, args)),
             EntityEndpointOperationKind.UpsertMany => new RequestTranslation(
-                nameof(IEntityEndpointService<object, object>.UpsertManyAsync),
+                nameof(IEntityEndpointService<object, object>.UpsertMany),
                 BuildUpsertManyRequest(registration, context, args)),
             EntityEndpointOperationKind.Delete => new RequestTranslation(
-                nameof(IEntityEndpointService<object, object>.DeleteAsync),
+                nameof(IEntityEndpointService<object, object>.Delete),
                 BuildDeleteRequest(registration, context, args)),
             EntityEndpointOperationKind.DeleteMany => new RequestTranslation(
-                nameof(IEntityEndpointService<object, object>.DeleteManyAsync),
+                nameof(IEntityEndpointService<object, object>.DeleteMany),
                 BuildDeleteManyRequest(registration, context, args)),
             EntityEndpointOperationKind.DeleteByQuery => new RequestTranslation(
-                nameof(IEntityEndpointService<object, object>.DeleteByQueryAsync),
+                nameof(IEntityEndpointService<object, object>.DeleteByQuery),
                 BuildDeleteByQueryRequest(context, args)),
             EntityEndpointOperationKind.DeleteAll => new RequestTranslation(
-                nameof(IEntityEndpointService<object, object>.DeleteAllAsync),
+                nameof(IEntityEndpointService<object, object>.DeleteAll),
                 new EntityDeleteAllRequest
                 {
                     Context = context,
                     Set = ReadString(args, "set")
                 }),
             EntityEndpointOperationKind.Patch => new RequestTranslation(
-                nameof(IEntityEndpointService<object, object>.PatchAsync),
+                nameof(IEntityEndpointService<object, object>.Patch),
                 BuildPatchRequest(registration, context, args)),
             _ => throw new JsonException($"Operation '{tool.Operation}' is not supported.")
         };
@@ -242,7 +242,7 @@ public sealed class RequestTranslator
             {
                 var val = kv.Value;
                 if (val.Type == JTokenType.String)
-                    options.Extras[kv.Name] = val.Value<string>() ?? string.Empty;
+                    options.Extras[kv.Name] = val.Value<string>() ?? "";
                 else if (val.Type != JTokenType.Null)
                     options.Extras[kv.Name] = val.ToString(Newtonsoft.Json.Formatting.None);
             }
@@ -316,7 +316,7 @@ public sealed class RequestTranslator
 
     private static object ConvertValue(JToken node, Type targetType)
     {
-        if (targetType == typeof(string)) return node.Type == JTokenType.String ? (node.Value<string>() ?? string.Empty) : node.ToString();
+        if (targetType == typeof(string)) return node.Type == JTokenType.String ? (node.Value<string>() ?? "") : node.ToString();
 
         if (targetType.IsEnum)
         {

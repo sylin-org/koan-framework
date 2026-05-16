@@ -13,13 +13,13 @@ public sealed class Role : Entity<Role>, IKoanAuthRole
 public sealed class RoleAlias : Entity<RoleAlias>, IKoanAuthRoleAlias
 {
     // Id = alias key
-    public string TargetRole { get; set; } = string.Empty;
+    public string TargetRole { get; set; } = "";
     public byte[]? RowVersion { get; set; }
 }
 
 public sealed class RolePolicyBinding : Entity<RolePolicyBinding>, IKoanAuthRolePolicyBinding
 {
     // Id = policy name
-    public string Requirement { get; set; } = string.Empty;
+    public string Requirement { get; set; } = "";
     public byte[]? RowVersion { get; set; }
 }

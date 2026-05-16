@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Koan.AI.Contracts.Adapters;
 using Koan.AI.Connector.LMStudio.Discovery;
 using Koan.AI.Connector.LMStudio.Infrastructure;
 using Koan.AI.Connector.LMStudio.Options;
@@ -32,9 +33,8 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddKoanOptions<LMStudioOptions>(Constants.Section);
         services.AddSingleton<IConfigureOptions<LMStudioOptions>, LMStudioOptionsConfigurator>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, LMStudioDiscoveryAdapter>());
-
-        services.AddHostedService<LMStudioDiscoveryService>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanOrchestrationEvaluator, LMStudioOrchestrationEvaluator>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IAiAdapterContributor, LMStudioAdapterContributor>());
     }
 
     public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
@@ -55,18 +55,18 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         var baseUrl = KoanConfiguration.ReadFirstWithSource(
                 cfg,
                 defaults.BaseUrl,
-                Constants.Section + ":BaseUrl",
-                "Koan:Ai:LMStudio:BaseUrl");
+                Constants.Configuration.Keys.BaseUrl,
+                Constants.Configuration.Keys.AltBaseUrl);
 
         var defaultModel = KoanConfiguration.ReadFirstWithSource(
                 cfg,
                 defaults.DefaultModel ?? "none",
-                Constants.Section + ":DefaultModel",
-                "Koan:Ai:LMStudio:DefaultModel");
+                Constants.Configuration.Keys.DefaultModel,
+                Constants.Configuration.Keys.AltDefaultModel);
 
         var apiKey = KoanConfiguration.ReadFirstWithSource(
                 cfg,
-                defaults.ApiKey ?? string.Empty,
+                defaults.ApiKey ?? "",
                 Constants.Configuration.Keys.ApiKey,
                 Constants.Discovery.EnvKey);
 

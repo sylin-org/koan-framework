@@ -19,7 +19,7 @@ public sealed class JobsController : ControllerBase
         // If not found, check completed-jobs partition
         if (job == null)
         {
-            job = await Data<ProcessingJob, string>.GetAsync(jobId, "completed-jobs", ct);
+            job = await Data<ProcessingJob, string>.Get(jobId, "completed-jobs", ct);
         }
         
         if (job == null || !string.Equals(job.PipelineId, pipelineId, StringComparison.Ordinal))
@@ -33,7 +33,7 @@ public sealed class JobsController : ControllerBase
     [HttpPost("{jobId}/cancel")]
     public async Task<ActionResult<ProcessingJob>> Cancel(string pipelineId, string jobId, CancellationToken ct)
     {
-        var (job, cancelled) = await ProcessingJob.TryCancelPendingAsync(jobId, ct);
+        var (job, cancelled) = await ProcessingJob.TryCancelPending(jobId, ct);
         if (job is null || !string.Equals(job.PipelineId, pipelineId, StringComparison.Ordinal))
         {
             return NotFound();

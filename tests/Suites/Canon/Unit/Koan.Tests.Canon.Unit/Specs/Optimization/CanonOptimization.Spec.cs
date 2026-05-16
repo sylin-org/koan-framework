@@ -27,7 +27,7 @@ public sealed class CanonOptimizationSpec
 
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 
     [Fact]
     public Task Development_preset_remains_cautious()
@@ -44,7 +44,7 @@ public sealed class CanonOptimizationSpec
 
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 
     [Fact]
     public Task Adaptive_batch_processor_adjusts_within_bounds()
@@ -66,7 +66,7 @@ public sealed class CanonOptimizationSpec
                 var decreased = await processor.GetOptimalBatchSize().ConfigureAwait(false);
                 decreased.Should().BeInRange(100, options.Performance.MaxBatchSize);
             })
-            .RunAsync();
+            .Run();
 
     [Fact]
     public Task Performance_monitor_records_and_reports()
@@ -89,7 +89,7 @@ public sealed class CanonOptimizationSpec
 
                 await Task.Delay(TimeSpan.FromMilliseconds(120), ctx.Cancellation).ConfigureAwait(false);
             })
-            .RunAsync();
+            .Run();
 
     [Fact]
     public Task Service_registration_registers_core_components()
@@ -120,7 +120,7 @@ public sealed class CanonOptimizationSpec
 
                 return;
             })
-            .RunAsync();
+            .Run();
 
     [Fact]
     public Task Production_registration_applies_preset()
@@ -142,7 +142,7 @@ public sealed class CanonOptimizationSpec
 
                 return;
             })
-            .RunAsync();
+            .Run();
 
     [Fact]
     public Task Development_registration_uses_conservative_defaults()
@@ -164,5 +164,5 @@ public sealed class CanonOptimizationSpec
 
                 return;
             })
-            .RunAsync();
+            .Run();
 }

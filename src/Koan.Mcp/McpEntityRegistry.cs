@@ -245,7 +245,7 @@ public sealed class McpEntityRegistry
     {
         if (options.EntityOverrides.Count == 0) return null;
 
-        if (options.EntityOverrides.TryGetValue(entityType.FullName ?? string.Empty, out var entityOverride))
+        if (options.EntityOverrides.TryGetValue(entityType.FullName ?? "", out var entityOverride))
         {
             return entityOverride;
         }
@@ -282,7 +282,7 @@ public sealed class McpEntityRegistry
             SchemaOverride = entityOverride.SchemaOverride ?? attribute.SchemaOverride,
             ToolPrefix = attribute.ToolPrefix,
             RequireAuthentication = entityOverride.RequireAuthentication ?? attribute.RequireAuthentication,
-            RequiredScopes = scopes.Length == 0 ? Array.Empty<string>() : scopes.ToArray()
+            RequiredScopes = scopes.Length == 0 ? [] : scopes.ToArray()
         };
 
         merged.EnableStdio = entityOverride.EnableStdio ?? attribute.EnableStdio;
@@ -315,7 +315,7 @@ public sealed class McpEntityRegistry
     {
         if (set.Count == 0) return false;
 
-        return set.Contains(entityType.FullName ?? string.Empty)
+        return set.Contains(entityType.FullName ?? "")
             || set.Contains(entityType.Name)
             || (!string.IsNullOrWhiteSpace(displayName) && set.Contains(displayName));
     }

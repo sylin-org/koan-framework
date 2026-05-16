@@ -14,7 +14,7 @@ internal sealed class MongoHealthContributor(IOptions<MongoOptions> options) : I
     public string Name => "data:mongo";
     public bool IsCritical => true;
 
-    public async Task<HealthReport> CheckAsync(CancellationToken ct = default)
+    public async Task<HealthReport> Check(CancellationToken ct = default)
     {
         try
         {

@@ -11,7 +11,7 @@ internal static class DataCoreProvenanceItems
     };
 
     internal static readonly ProvenanceItem EnsureSchemaOnStart = new(
-        "Koan:Data:Runtime:EnsureSchemaOnStart",
+        ConfigurationConstants.Runtime.EnsureSchemaOnStart,
         "Ensure Schema On Start",
         "Creates missing schema objects during startup to keep entity stores aligned.",
         DefaultConsumers: SchemaLifecycleConsumers);

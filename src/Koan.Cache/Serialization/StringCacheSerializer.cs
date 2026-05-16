@@ -15,9 +15,9 @@ public sealed class StringCacheSerializer : ICacheSerializer
         => type == typeof(string);
 
     public ValueTask<CacheValue> SerializeAsync<T>(T value, CacheEntryOptions options, CancellationToken ct)
-        => SerializeAsync(value!, typeof(T), options, ct);
+        => Serialize(value!, typeof(T), options, ct);
 
-    public ValueTask<CacheValue> SerializeAsync(object value, Type runtimeType, CacheEntryOptions options, CancellationToken ct)
+    public ValueTask<CacheValue> Serialize(object value, Type runtimeType, CacheEntryOptions options, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         if (value is not string str)
@@ -40,6 +40,6 @@ public sealed class StringCacheSerializer : ICacheSerializer
         return ValueTask.FromResult((T?)(object?)text);
     }
 
-    public ValueTask<object?> DeserializeAsync(CacheValue value, Type returnType, CancellationToken ct)
+    public ValueTask<object?> Deserialize(CacheValue value, Type returnType, CancellationToken ct)
         => DeserializeAsync<object?>(value, ct);
 }

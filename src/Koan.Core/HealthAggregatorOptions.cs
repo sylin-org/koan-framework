@@ -1,6 +1,6 @@
 namespace Koan.Core;
 
-/// Options for the Health Aggregator. Bind from configuration path: "Koan:Health:Aggregator".
+/// Options for the Health Aggregator. Bind from configuration path: <see cref="Infrastructure.ConfigurationConstants.Health.AggregatorSection"/>.
 public sealed class HealthAggregatorOptions
 {
     public bool Enabled { get; set; } = true;

@@ -303,7 +303,7 @@ public sealed class KoanAdminAutoRegistrar : IKoanAutoRegistrar
         }
 
         var displayValues = resolved
-            .Select(v => (v.Value ?? string.Empty).Trim())
+            .Select(v => (v.Value ?? "").Trim())
             .Where(v => !string.IsNullOrEmpty(v))
             .ToArray();
 
@@ -319,7 +319,7 @@ public sealed class KoanAdminAutoRegistrar : IKoanAutoRegistrar
     private static string FormatList(IReadOnlyCollection<string> items)
     {
         if (items is null || items.Count == 0) return "(none)";
-        var trimmed = items.Select(i => (i ?? string.Empty).Trim()).Where(i => i.Length > 0).ToArray();
+        var trimmed = items.Select(i => (i ?? "").Trim()).Where(i => i.Length > 0).ToArray();
         return trimmed.Length == 0 ? "(none)" : string.Join(", ", trimmed);
     }
 

@@ -11,7 +11,7 @@ public sealed class ProcessingJob : Entity<ProcessingJob>
 {
     private static readonly TimeSpan HeartbeatGracePeriod = TimeSpan.FromMinutes(5);
 
-    public string PipelineId { get; set; } = string.Empty;
+    public string PipelineId { get; set; } = "";
     public JobStatus Status { get; set; } = JobStatus.Pending;
     public int RetryCount { get; set; } = 0;
     public int Version { get; set; } = 1; // For optimistic concurrency control
@@ -53,20 +53,20 @@ public sealed class ProcessingJob : Entity<ProcessingJob>
 
     public int ProgressPercent => (int)Math.Round(Progress * 100, MidpointRounding.AwayFromZero);
 
-    public static async Task<ProcessingJob?> FindPendingAsync(string pipelineId, CancellationToken ct)
+    public static async Task<ProcessingJob?> FindPending(string pipelineId, CancellationToken ct)
     {
         var pending = await Query(j =>
             j.PipelineId == pipelineId &&
-            j.Status == JobStatus.Pending, ct);
+            j.Status == JobStatus.Pending, ct).ConfigureAwait(false);
 
         return pending
             .OrderByDescending(j => j.CreatedAt)
             .FirstOrDefault();
     }
 
-    public static async Task<(ProcessingJob? Job, bool Cancelled)> TryCancelPendingAsync(string jobId, CancellationToken ct)
+    public static async Task<(ProcessingJob? Job, bool Cancelled)> TryCancelPending(string jobId, CancellationToken ct)
     {
-        var job = await Get(jobId, ct);
+        var job = await Get(jobId, ct).ConfigureAwait(false);
         if (job is null)
         {
             return (null, false);
@@ -90,12 +90,12 @@ public sealed class ProcessingJob : Entity<ProcessingJob>
         job.HeartbeatAt = now;
         job.WorkerId = null;
         job.LastError ??= "Cancelled";
-        await job.Save(ct);
+        await job.Save(ct).ConfigureAwait(false);
 
         return (job, true);
     }
 
-    public static async Task<ProcessingJob?> TryClaimAsync(string pipelineId, string workerId, CancellationToken ct)
+    public static async Task<ProcessingJob?> TryClaim(string pipelineId, string workerId, CancellationToken ct)
     {
         var now = DateTime.UtcNow;
         var staleCutoff = now - HeartbeatGracePeriod;
@@ -121,11 +121,11 @@ public sealed class ProcessingJob : Entity<ProcessingJob>
         job.ProcessedDocuments = 0;
         job.LastDocumentId = null;
         job.LastError = null;
-        await job.Save(ct);
+        await job.Save(ct).ConfigureAwait(false);
         return job;
     }
 
-    public static async Task<ProcessingJob?> TryClaimAnyAsync(string workerId, CancellationToken ct)
+    public static async Task<ProcessingJob?> TryClaimAny(string workerId, CancellationToken ct)
     {
         var now = DateTime.UtcNow;
         var staleCutoff = now - HeartbeatGracePeriod;
@@ -154,7 +154,7 @@ public sealed class ProcessingJob : Entity<ProcessingJob>
         return job;
     }
 
-    public static async Task SignalHeartbeatAsync(string jobId, CancellationToken ct)
+    public static async Task SignalHeartbeat(string jobId, CancellationToken ct)
     {
         var job = await Get(jobId, ct);
         if (job is null)
@@ -163,7 +163,7 @@ public sealed class ProcessingJob : Entity<ProcessingJob>
         }
 
         job.HeartbeatAt = DateTime.UtcNow;
-        await job.Save(ct);
+        await job.Save(ct).ConfigureAwait(false);
     }
 
     public bool MergeDocuments(IEnumerable<string> documentIds)

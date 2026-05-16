@@ -92,7 +92,7 @@ public sealed class CanonProjectionFlowSpec
 
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 
     private static void ConfigureServices(TestContext ctx, IServiceCollection services)
     {
@@ -282,7 +282,7 @@ public sealed class CanonProjectionFlowSpec
             return Task.FromResult(stage);
         }
 
-        public Task<CanonIndex?> GetIndexAsync(string entityType, string key, CancellationToken cancellationToken)
+        public Task<CanonIndex?> GetIndex(string entityType, string key, CancellationToken cancellationToken)
         {
             lock (_gate)
             {
@@ -291,7 +291,7 @@ public sealed class CanonProjectionFlowSpec
             }
         }
 
-        public Task UpsertIndexAsync(CanonIndex index, CancellationToken cancellationToken)
+        public Task UpsertIndex(CanonIndex index, CancellationToken cancellationToken)
         {
             if (index is null)
             {
@@ -373,29 +373,29 @@ public sealed class CanonProjectionFlowSpec
                 => new()
                 {
                     Id = customer.Id,
-                    DisplayName = customer.DisplayName ?? string.Empty,
+                    DisplayName = customer.DisplayName ?? "",
                     Metadata = customer.Metadata.Clone()
                 };
         }
 
         internal sealed class CanonicalProjection
         {
-            public string ReferenceId { get; init; } = string.Empty;
-            public string ViewName { get; init; } = string.Empty;
-            public string DisplayName { get; init; } = string.Empty;
+            public string ReferenceId { get; init; } = "";
+            public string ViewName { get; init; } = "";
+            public string DisplayName { get; init; } = "";
             public CanonMetadata Metadata { get; init; } = new();
         }
 
         internal sealed class LineageProjection
         {
-            public string ReferenceId { get; init; } = string.Empty;
-            public string ViewName { get; init; } = string.Empty;
+            public string ReferenceId { get; init; } = "";
+            public string ViewName { get; init; } = "";
             public Dictionary<string, string?> Sources { get; init; } = new(StringComparer.OrdinalIgnoreCase);
         }
 
         internal sealed class PolicyProjection
         {
-            public string ReferenceId { get; init; } = string.Empty;
+            public string ReferenceId { get; init; } = "";
             public Dictionary<string, string?> Policies { get; init; } = new(StringComparer.OrdinalIgnoreCase);
             public Dictionary<string, CanonPropertyFootprint> PropertyFootprints { get; init; } = new(StringComparer.OrdinalIgnoreCase);
         }
@@ -403,7 +403,7 @@ public sealed class CanonProjectionFlowSpec
 
     private sealed class NoopAuditSink : ICanonAuditSink
     {
-        public Task WriteAsync(IReadOnlyList<CanonAuditEntry> entries, CancellationToken cancellationToken)
+        public Task Write(IReadOnlyList<CanonAuditEntry> entries, CancellationToken cancellationToken)
             => Task.CompletedTask;
     }
 
@@ -411,11 +411,11 @@ public sealed class CanonProjectionFlowSpec
     private sealed class CustomerCanon : CanonEntity<CustomerCanon>
     {
         [AggregationKey]
-        public string Email { get; set; } = string.Empty;
+        public string Email { get; set; } = "";
 
         [AggregationKey]
         [AggregationPolicy(AggregationPolicyKind.SourceOfTruth, Source = "crm", Sources = new[] { "erp" })]
-        public string Dummy { get; set; } = string.Empty;
+        public string Dummy { get; set; } = "";
 
         public string? DisplayName { get; set; }
     }

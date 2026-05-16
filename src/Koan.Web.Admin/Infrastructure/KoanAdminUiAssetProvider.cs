@@ -17,8 +17,8 @@ internal static class KoanAdminUiAssetProvider
         Console.WriteLine($"[DEBUG] TryGetAsset: normalized='{normalized}'");
         if (normalized is null)
         {
-            content = string.Empty;
-            contentType = string.Empty;
+            content = "";
+            contentType = "";
             return false;
         }
 
@@ -34,8 +34,8 @@ internal static class KoanAdminUiAssetProvider
         Console.WriteLine($"[DEBUG] TryGetAsset: stream is {(stream == null ? "null" : "not null")}");
         if (stream is null)
         {
-            content = string.Empty;
-            contentType = string.Empty;
+            content = "";
+            contentType = "";
             return false;
         }
 

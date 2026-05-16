@@ -48,11 +48,11 @@ public sealed class SecretResolvingConfigurationSource(IServiceProvider? service
             value = _base[key];
             if (value is { Length: > 0 } && value.Contains("${secret://", StringComparison.Ordinal))
             {
-                value = _resolver.ResolveAsync(value).GetAwaiter().GetResult();
+                value = _resolver.Resolve(value).GetAwaiter().GetResult();
             }
             else if (value is { Length: > 0 } && (value.StartsWith("secret://", StringComparison.Ordinal) || value.StartsWith("secret+", StringComparison.Ordinal)))
             {
-                var sv = _resolver.GetAsync(SecretId.Parse(value!)).GetAwaiter().GetResult();
+                var sv = _resolver.Get(SecretId.Parse(value!)).GetAwaiter().GetResult();
                 value = sv.AsString();
             }
             return ok;
@@ -61,7 +61,7 @@ public sealed class SecretResolvingConfigurationSource(IServiceProvider? service
         public void Set(string key, string? value) => _base[key] = value;
         public IChangeToken GetReloadToken() => _reload;
         public void Load() { }
-        public IEnumerable<string> GetChildKeys(IEnumerable<string> earlierKeys, string? parentPath) => _base.GetSection(parentPath ?? string.Empty).GetChildren().Select(c => c.Key);
+        public IEnumerable<string> GetChildKeys(IEnumerable<string> earlierKeys, string? parentPath) => _base.GetSection(parentPath ?? "").GetChildren().Select(c => c.Key);
 
         public void UpgradeResolverFrom(IServiceProvider sp)
         {

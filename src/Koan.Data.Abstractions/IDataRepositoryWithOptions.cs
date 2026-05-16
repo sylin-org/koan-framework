@@ -4,5 +4,5 @@ public interface IDataRepositoryWithOptions<TEntity, TKey> : IDataRepository<TEn
     where TEntity : IEntity<TKey>
     where TKey : notnull
 {
-    Task<IReadOnlyList<TEntity>> QueryAsync(object? query, DataQueryOptions? options, CancellationToken ct = default);
+    Task<IReadOnlyList<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default);
 }

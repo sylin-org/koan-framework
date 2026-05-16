@@ -1,7 +1,7 @@
 ﻿using Koan.Data.Core.Model;
 using Koan.Data.Core.Transfers;
 using Koan.Tests.Data.Core.Support;
-using System.ComponentModel.DataAnnotations;
+using Koan.Data.Abstractions.Annotations;
 
 namespace Koan.Tests.Data.Core.Specs.Transfers;
 
@@ -34,11 +34,11 @@ public sealed class EntityTransferDslSpec
     public async Task Copy_ToPartition_CopiesFilteredEntities()
     {
         await TestPipeline.For<EntityTransferDslSpec>(_output, nameof(Copy_ToPartition_CopiesFilteredEntities))
-            .Using<DataCoreRuntimeFixture>("runtime", static ctx => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static ctx => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                return ResetAsync(runtime);
+                return Reset(runtime);
             })
             .Assert(async ctx =>
             {
@@ -78,18 +78,18 @@ public sealed class EntityTransferDslSpec
                     items.Should().HaveCount(2);
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
     public async Task Copy_QueryShaper_AppliesFilter()
     {
         await TestPipeline.For<EntityTransferDslSpec>(_output, nameof(Copy_QueryShaper_AppliesFilter))
-            .Using<DataCoreRuntimeFixture>("runtime", static ctx => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static ctx => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                return ResetAsync(runtime);
+                return Reset(runtime);
             })
             .Assert(async ctx =>
             {
@@ -111,18 +111,18 @@ public sealed class EntityTransferDslSpec
                     items.Should().ContainSingle(t => t.Title == "keep");
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
     public async Task Move_DefaultStrategy_RemovesFromSource()
     {
         await TestPipeline.For<EntityTransferDslSpec>(_output, nameof(Move_DefaultStrategy_RemovesFromSource))
-            .Using<DataCoreRuntimeFixture>("runtime", static ctx => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static ctx => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                return ResetAsync(runtime);
+                return Reset(runtime);
             })
             .Assert(async ctx =>
             {
@@ -156,18 +156,18 @@ public sealed class EntityTransferDslSpec
                     (await TransferTodo.All()).Should().HaveCount(3);
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
     public async Task Move_BatchedStrategy_RespectsBatching()
     {
         await TestPipeline.For<EntityTransferDslSpec>(_output, nameof(Move_BatchedStrategy_RespectsBatching))
-            .Using<DataCoreRuntimeFixture>("runtime", static ctx => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static ctx => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                return ResetAsync(runtime);
+                return Reset(runtime);
             })
             .Assert(async ctx =>
             {
@@ -197,18 +197,18 @@ public sealed class EntityTransferDslSpec
                     (await TransferTodo.All()).Should().BeEmpty();
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
     public async Task Move_SyncedStrategy_RemovesAsItGoes()
     {
         await TestPipeline.For<EntityTransferDslSpec>(_output, nameof(Move_SyncedStrategy_RemovesAsItGoes))
-            .Using<DataCoreRuntimeFixture>("runtime", static ctx => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static ctx => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                return ResetAsync(runtime);
+                return Reset(runtime);
             })
             .Assert(async ctx =>
             {
@@ -238,18 +238,18 @@ public sealed class EntityTransferDslSpec
                     (await TransferTodo.All()).Should().BeEmpty();
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
     public async Task Mirror_Push_SynchronizesToTarget()
     {
         await TestPipeline.For<EntityTransferDslSpec>(_output, nameof(Mirror_Push_SynchronizesToTarget))
-            .Using<DataCoreRuntimeFixture>("runtime", static ctx => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static ctx => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                return ResetAsync(runtime);
+                return Reset(runtime);
             })
             .Assert(async ctx =>
             {
@@ -272,18 +272,18 @@ public sealed class EntityTransferDslSpec
                     (await TransferTodo.All()).Should().ContainSingle(x => x.Title == "primary");
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
     public async Task Mirror_Pull_SynchronizesBackToDefault()
     {
         await TestPipeline.For<EntityTransferDslSpec>(_output, nameof(Mirror_Pull_SynchronizesBackToDefault))
-            .Using<DataCoreRuntimeFixture>("runtime", static ctx => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static ctx => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                return ResetAsync(runtime);
+                return Reset(runtime);
             })
             .Assert(async ctx =>
             {
@@ -304,18 +304,18 @@ public sealed class EntityTransferDslSpec
                 var all = await TransferTodo.All();
                 all.Should().ContainSingle(x => x.Title == "remote");
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
     public async Task Mirror_Bidirectional_UsesTimestampForResolution()
     {
         await TestPipeline.For<EntityTransferDslSpec>(_output, nameof(Mirror_Bidirectional_UsesTimestampForResolution))
-            .Using<DataCoreRuntimeFixture>("runtime", static ctx => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static ctx => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                return ResetAsync(runtime);
+                return Reset(runtime);
             })
             .Assert(async ctx =>
             {
@@ -347,18 +347,18 @@ public sealed class EntityTransferDslSpec
                     target!.Title.Should().Be("v2");
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
     public async Task Mirror_Bidirectional_WithoutTimestamp_ReportsConflicts()
     {
         await TestPipeline.For<EntityTransferDslSpec>(_output, nameof(Mirror_Bidirectional_WithoutTimestamp_ReportsConflicts))
-            .Using<DataCoreRuntimeFixture>("runtime", static ctx => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static ctx => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                return ResetAsync(runtime);
+                return Reset(runtime);
             })
             .Assert(async ctx =>
             {
@@ -384,18 +384,18 @@ public sealed class EntityTransferDslSpec
                 defaultNote.Should().NotBeNull();
                 defaultNote!.Content.Should().Be("default");
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
     public async Task To_WithSourceAndAdapter_ShouldThrow()
     {
         await TestPipeline.For<EntityTransferDslSpec>(_output, nameof(To_WithSourceAndAdapter_ShouldThrow))
-            .Using<DataCoreRuntimeFixture>("runtime", static ctx => DataCoreRuntimeFixture.CreateAsync(ctx))
+            .Using<DataCoreRuntimeFixture>("runtime", static ctx => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                return ResetAsync(runtime);
+                return Reset(runtime);
             })
             .Assert(_ =>
             {
@@ -403,10 +403,10 @@ public sealed class EntityTransferDslSpec
                 act.Should().Throw<InvalidOperationException>();
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
     }
 
-    private static async ValueTask ResetAsync(DataCoreRuntimeFixture runtime)
+    private static async ValueTask Reset(DataCoreRuntimeFixture runtime)
     {
     runtime.ResetEntityCaches();
 
@@ -423,15 +423,15 @@ public sealed class EntityTransferDslSpec
 
     private sealed class TransferTodo : Entity<TransferTodo>
     {
-        public string Title { get; set; } = string.Empty;
+        public string Title { get; set; } = "";
         public bool Active { get; set; }
 
-        [Timestamp]
+        [Timestamp(OnSave = true)]
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     }
 
     private sealed class BasicNote : Entity<BasicNote>
     {
-        public string Content { get; set; } = string.Empty;
+        public string Content { get; set; } = "";
     }
 }

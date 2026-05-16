@@ -40,7 +40,7 @@ internal sealed class HealthAnnouncements : IHealthAnnouncer, IHealthAnnouncemen
         foreach (var kv in data)
         {
             if (kv.Value is null) continue;
-            dict[kv.Key] = kv.Value.ToString() ?? string.Empty;
+            dict[kv.Key] = kv.Value.ToString() ?? "";
         }
         return dict;
     }

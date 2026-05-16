@@ -10,7 +10,7 @@ public static class Singleflight
 {
     private static readonly ConcurrentDictionary<string, Lazy<Task>> _inflight = new(StringComparer.Ordinal);
 
-    public static async Task RunAsync(string key, Func<CancellationToken, Task> work, CancellationToken ct = default)
+    public static async Task Run(string key, Func<CancellationToken, Task> work, CancellationToken ct = default)
     {
         if (key == null) throw new ArgumentNullException(nameof(key));
         if (work == null) throw new ArgumentNullException(nameof(work));
@@ -35,7 +35,7 @@ public static class Singleflight
         if (work == null) throw new ArgumentNullException(nameof(work));
 
         var tcs = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
-        _ = RunAsync(key, async kct =>
+        _ = Run(key, async kct =>
         {
             try
             {

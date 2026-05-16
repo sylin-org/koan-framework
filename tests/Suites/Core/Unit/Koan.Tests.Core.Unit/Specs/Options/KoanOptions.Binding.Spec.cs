@@ -55,7 +55,7 @@ public sealed class KoanOptionsBindingSpec
                 opts.Threshold.Should().Be(42);
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
@@ -74,7 +74,7 @@ public sealed class KoanOptionsBindingSpec
                 opts.Threshold.Should().Be(11);
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
@@ -96,7 +96,7 @@ public sealed class KoanOptionsBindingSpec
                 act.Should().Throw<OptionsValidationException>();
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
@@ -138,7 +138,7 @@ public sealed class KoanOptionsBindingSpec
                 opts.Threshold.Should().Be(13);
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
@@ -158,6 +158,6 @@ public sealed class KoanOptionsBindingSpec
                 act.Should().Throw<OptionsValidationException>();
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
     }
 }

@@ -19,7 +19,7 @@ var app = builder.Build();
 // Enable Swagger UI per policy: Dev by default; in non-dev only when Koan__Web__Swagger__Enabled=true
 app.UseKoanSwagger();
 
-app.Run();
+app.RunAsync();
 
 namespace S8.Canon
 {

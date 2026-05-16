@@ -48,7 +48,7 @@ public sealed class WeaviateContainerFixture : IAsyncDisposable, IInitializableF
 
         context.Diagnostics.Info("weaviate.fixture.initialize", new { dockerKey = DockerFixtureKey });
 
-        if (TryGetExplicitEndpoint(out var explicitEndpoint) && await CanPingAsync(explicitEndpoint!, context.Cancellation).ConfigureAwait(false))
+        if (TryGetExplicitEndpoint(out var explicitEndpoint) && await CanPing(explicitEndpoint!, context.Cancellation).ConfigureAwait(false))
         {
             Endpoint = explicitEndpoint;
             IsAvailable = true;
@@ -56,7 +56,7 @@ public sealed class WeaviateContainerFixture : IAsyncDisposable, IInitializableF
             return;
         }
 
-        if (await CanPingAsync(DefaultEndpoint, context.Cancellation).ConfigureAwait(false))
+        if (await CanPing(DefaultEndpoint, context.Cancellation).ConfigureAwait(false))
         {
             Endpoint = DefaultEndpoint;
             IsAvailable = true;
@@ -84,7 +84,7 @@ public sealed class WeaviateContainerFixture : IAsyncDisposable, IInitializableF
             .WithPortBinding(WeaviateHttpPort, assignRandomHostPort: true)
             .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(WeaviateHttpPort))
             .WithEnvironment("DEFAULT_VECTORIZER_MODULE", "none")
-            .WithEnvironment("ENABLE_MODULES", string.Empty)
+            .WithEnvironment("ENABLE_MODULES", "")
             .WithEnvironment("PERSISTENCE_DATA_PATH", "/var/lib/weaviate")
             .WithEnvironment("AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED", "true")
             .WithEnvironment("AUTHORIZATION_ADMINLIST_ENABLED", "false")
@@ -111,7 +111,7 @@ public sealed class WeaviateContainerFixture : IAsyncDisposable, IInitializableF
             var mappedPort = container.GetMappedPublicPort(WeaviateHttpPort);
             var connection = $"http://localhost:{mappedPort}";
 
-            if (!await WaitForReadyAsync(connection, context.Cancellation).ConfigureAwait(false))
+            if (!await WaitForReady(connection, context.Cancellation).ConfigureAwait(false))
             {
                 throw new InvalidOperationException("Unable to confirm Weaviate readiness.");
             }
@@ -126,9 +126,9 @@ public sealed class WeaviateContainerFixture : IAsyncDisposable, IInitializableF
         {
             var missingMessage = mmex?.Message ?? ex.Message;
             context.Diagnostics.Warn("weaviate.fixture.testcontainers.missingmethod", new { message = missingMessage });
-            await DisposeContainerSilentlyAsync(container).ConfigureAwait(false);
+            await DisposeContainerSilently(container).ConfigureAwait(false);
 
-            var (ok, connection, failureReason) = await TryStartWithDockerCliAsync(context).ConfigureAwait(false);
+            var (ok, connection, failureReason) = await TryStartWithDockerCli(context).ConfigureAwait(false);
             if (ok && connection is not null)
             {
                 Endpoint = connection;
@@ -144,7 +144,7 @@ public sealed class WeaviateContainerFixture : IAsyncDisposable, IInitializableF
         {
             UnavailableReason = $"Failed to start Weaviate container: {ex.GetType().Name}: {ex.Message}";
             context.Diagnostics.Error("weaviate.fixture.container.failed", new { message = ex.Message }, ex);
-            await DisposeContainerSilentlyAsync(container).ConfigureAwait(false);
+            await DisposeContainerSilently(container).ConfigureAwait(false);
             return;
         }
     }
@@ -169,7 +169,7 @@ public sealed class WeaviateContainerFixture : IAsyncDisposable, IInitializableF
 
     public async ValueTask DisposeAsync()
     {
-        await DisposeContainerSilentlyAsync().ConfigureAwait(false);
+        await DisposeContainerSilently().ConfigureAwait(false);
     }
 
     private static bool TryGetExplicitEndpoint(out string? endpoint)
@@ -191,7 +191,7 @@ public sealed class WeaviateContainerFixture : IAsyncDisposable, IInitializableF
         return !string.IsNullOrWhiteSpace(endpoint);
     }
 
-    private static async Task<bool> CanPingAsync(string endpoint, CancellationToken cancellation = default)
+    private static async Task<bool> CanPing(string endpoint, CancellationToken cancellation = default)
     {
         try
         {
@@ -212,11 +212,11 @@ public sealed class WeaviateContainerFixture : IAsyncDisposable, IInitializableF
         }
     }
 
-    private static async Task<bool> WaitForReadyAsync(string endpoint, CancellationToken cancellation)
+    private static async Task<bool> WaitForReady(string endpoint, CancellationToken cancellation)
     {
         for (var attempt = 0; attempt < 40; attempt++)
         {
-            if (await CanPingAsync(endpoint, cancellation).ConfigureAwait(false))
+            if (await CanPing(endpoint, cancellation).ConfigureAwait(false))
             {
                 return true;
             }
@@ -234,7 +234,7 @@ public sealed class WeaviateContainerFixture : IAsyncDisposable, IInitializableF
         return false;
     }
 
-    private async ValueTask DisposeContainerSilentlyAsync(TestcontainersContainer? container = null)
+    private async ValueTask DisposeContainerSilently(TestcontainersContainer? container = null)
     {
         var target = container ?? _container;
         if (target is not null)
@@ -261,14 +261,14 @@ public sealed class WeaviateContainerFixture : IAsyncDisposable, IInitializableF
             _container = null;
         }
 
-        await StopCliContainerAsync().ConfigureAwait(false);
+        await StopCliContainer().ConfigureAwait(false);
     }
 
-    private async Task<(bool ok, string? endpoint, string? failureReason)> TryStartWithDockerCliAsync(TestContext context)
+    private async Task<(bool ok, string? endpoint, string? failureReason)> TryStartWithDockerCli(TestContext context)
     {
         var containerName = $"koan-weaviate-{Guid.NewGuid():N}";
         var runArgs = $"run --rm -d --name {containerName} -p 127.0.0.1::{WeaviateHttpPort} --env DEFAULT_VECTORIZER_MODULE=none --env ENABLE_MODULES= --env PERSISTENCE_DATA_PATH=/var/lib/weaviate --env AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED=true --env AUTHORIZATION_ADMINLIST_ENABLED=false --env CLUSTER_HOSTNAME=node1 --env QUERY_DEFAULTS_LIMIT=25 --env ENABLE_TELEMETRY=false --env LOG_LEVEL=info {ImageName}";
-        var (runOk, runStdout, runStderr, runExitCode) = await RunDockerCommandAsync(runArgs, context.Cancellation).ConfigureAwait(false);
+        var (runOk, runStdout, runStderr, runExitCode) = await RunDockerCommand(runArgs, context.Cancellation).ConfigureAwait(false);
 
         if (!runOk)
         {
@@ -278,10 +278,10 @@ public sealed class WeaviateContainerFixture : IAsyncDisposable, IInitializableF
 
         _cliContainerId = containerName;
 
-        (bool ok, string stdout, string stderr, int exitCode) portResult = (false, string.Empty, string.Empty, 0);
+        (bool ok, string stdout, string stderr, int exitCode) portResult = (false, "", "", 0);
         for (var attempt = 0; attempt < 5 && !portResult.ok; attempt++)
         {
-            portResult = await RunDockerCommandAsync($"port {containerName} {WeaviateHttpPort}/tcp", context.Cancellation).ConfigureAwait(false);
+            portResult = await RunDockerCommand($"port {containerName} {WeaviateHttpPort}/tcp", context.Cancellation).ConfigureAwait(false);
             if (!portResult.ok || string.IsNullOrWhiteSpace(portResult.stdout))
             {
                 await Task.Delay(200, context.Cancellation).ConfigureAwait(false);
@@ -291,7 +291,7 @@ public sealed class WeaviateContainerFixture : IAsyncDisposable, IInitializableF
         if (!portResult.ok || string.IsNullOrWhiteSpace(portResult.stdout))
         {
             context.Diagnostics.Warn("weaviate.fixture.dockercli.port.failed", new { exitCode = portResult.exitCode, stdout = Truncate(portResult.stdout), stderr = Truncate(portResult.stderr) });
-            await StopCliContainerAsync().ConfigureAwait(false);
+            await StopCliContainer().ConfigureAwait(false);
             return (false, null, "Failed to determine published Weaviate port from docker CLI");
         }
 
@@ -299,16 +299,16 @@ public sealed class WeaviateContainerFixture : IAsyncDisposable, IInitializableF
         if (hostPort == 0)
         {
             context.Diagnostics.Warn("weaviate.fixture.dockercli.port.parse", new { stdout = Truncate(portResult.stdout) });
-            await StopCliContainerAsync().ConfigureAwait(false);
+            await StopCliContainer().ConfigureAwait(false);
             return (false, null, "Unable to parse published Weaviate port from docker CLI output");
         }
 
         var connection = $"http://127.0.0.1:{hostPort}";
-        if (!await WaitForReadyAsync(connection, context.Cancellation).ConfigureAwait(false))
+        if (!await WaitForReady(connection, context.Cancellation).ConfigureAwait(false))
         {
             context.Diagnostics.Warn("weaviate.fixture.dockercli.connect.timeout", new { port = hostPort });
-            await DumpDockerLogsAsync(containerName, context.Cancellation, context).ConfigureAwait(false);
-            await StopCliContainerAsync().ConfigureAwait(false);
+            await DumpDockerLogs(containerName, context.Cancellation, context).ConfigureAwait(false);
+            await StopCliContainer().ConfigureAwait(false);
             return (false, null, $"Weaviate container did not respond on localhost:{hostPort} within timeout");
         }
 
@@ -319,7 +319,7 @@ public sealed class WeaviateContainerFixture : IAsyncDisposable, IInitializableF
         return (true, connection, null);
     }
 
-    private async Task<(bool ok, string stdout, string stderr, int exitCode)> RunDockerCommandAsync(string arguments, CancellationToken cancellation)
+    private async Task<(bool ok, string stdout, string stderr, int exitCode)> RunDockerCommand(string arguments, CancellationToken cancellation)
     {
         var psi = CreateDockerProcessStartInfo(arguments);
         Process? process = null;
@@ -329,7 +329,7 @@ public sealed class WeaviateContainerFixture : IAsyncDisposable, IInitializableF
             process = Process.Start(psi);
             if (process is null)
             {
-                return (false, string.Empty, "Failed to start docker process", -1);
+                return (false, "", "Failed to start docker process", -1);
             }
 
             var stdoutTask = process.StandardOutput.ReadToEndAsync();
@@ -351,11 +351,11 @@ public sealed class WeaviateContainerFixture : IAsyncDisposable, IInitializableF
                 }
             }
 
-            return (false, string.Empty, "Cancelled", -1);
+            return (false, "", "Cancelled", -1);
         }
         catch (Exception ex)
         {
-            return (false, string.Empty, ex.Message, -1);
+            return (false, "", ex.Message, -1);
         }
         finally
         {
@@ -387,7 +387,7 @@ public sealed class WeaviateContainerFixture : IAsyncDisposable, IInitializableF
     private static bool IsLocalNamedPipe(string endpoint)
         => endpoint.StartsWith("npipe://", StringComparison.OrdinalIgnoreCase);
 
-    private async Task StopCliContainerAsync()
+    private async Task StopCliContainer()
     {
         if (string.IsNullOrWhiteSpace(_cliContainerId))
         {
@@ -396,7 +396,7 @@ public sealed class WeaviateContainerFixture : IAsyncDisposable, IInitializableF
 
         try
         {
-            await RunDockerCommandAsync($"stop {_cliContainerId}", CancellationToken.None).ConfigureAwait(false);
+            await RunDockerCommand($"stop {_cliContainerId}", CancellationToken.None).ConfigureAwait(false);
         }
         catch
         {
@@ -407,11 +407,11 @@ public sealed class WeaviateContainerFixture : IAsyncDisposable, IInitializableF
         }
     }
 
-    private async Task DumpDockerLogsAsync(string containerName, CancellationToken cancellation, TestContext context)
+    private async Task DumpDockerLogs(string containerName, CancellationToken cancellation, TestContext context)
     {
         try
         {
-            var (ok, stdout, stderr, exitCode) = await RunDockerCommandAsync($"logs {containerName}", cancellation).ConfigureAwait(false);
+            var (ok, stdout, stderr, exitCode) = await RunDockerCommand($"logs {containerName}", cancellation).ConfigureAwait(false);
             context.Diagnostics.Debug("weaviate.fixture.dockercli.logs", new { ok, exitCode, stdout = Truncate(stdout), stderr = Truncate(stderr) });
         }
         catch

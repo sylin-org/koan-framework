@@ -25,7 +25,7 @@ public class TypeScriptSdkIdempotencySpec : IClassFixture<TestPipelineFixture>
         var initialInfo = new FileInfo(path);
         var initialWriteTime = initialInfo.LastWriteTimeUtc;
         var initialText = File.ReadAllText(path);
-        var initialFooter = initialText.Replace("\r", string.Empty).Split('\n').Reverse().First(l => !string.IsNullOrWhiteSpace(l));
+        var initialFooter = initialText.Replace("\r", "").Split('\n').Reverse().First(l => !string.IsNullOrWhiteSpace(l));
         initialFooter.Should().StartWith("// integrity-sha256:");
 
         // Trigger another pipeline run which should invoke generator (fixture already bootstraps environment).
@@ -38,7 +38,7 @@ public class TypeScriptSdkIdempotencySpec : IClassFixture<TestPipelineFixture>
         var secondInfo = new FileInfo(path);
         var secondWriteTime = secondInfo.LastWriteTimeUtc;
         var secondText = File.ReadAllText(path);
-        var secondFooter = secondText.Replace("\r", string.Empty).Split('\n').Reverse().First(l => !string.IsNullOrWhiteSpace(l));
+        var secondFooter = secondText.Replace("\r", "").Split('\n').Reverse().First(l => !string.IsNullOrWhiteSpace(l));
 
         // Idempotency contract: hash footers identical and (ideally) the file wasn't rewritten.
         secondFooter.Should().Be(initialFooter, "hash footer should remain identical for unchanged content");

@@ -57,7 +57,7 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
 
         context.Diagnostics.Info("postgres.fixture.initialize", new { dockerKey = DockerFixtureKey, database = Database });
 
-        if (TryGetExplicitConnectionString(out var explicitConnection) && await CanOpenAsync(explicitConnection!, context.Cancellation).ConfigureAwait(false))
+        if (TryGetExplicitConnectionString(out var explicitConnection) && await CanOpen(explicitConnection!, context.Cancellation).ConfigureAwait(false))
         {
             ConnectionString = Normalize(explicitConnection!);
             IsAvailable = true;
@@ -65,7 +65,7 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
             return;
         }
 
-        if (await TryDetectLocalAsync(context.Cancellation).ConfigureAwait(false) is string localConnection)
+        if (await TryDetectLocal(context.Cancellation).ConfigureAwait(false) is string localConnection)
         {
             ConnectionString = Normalize(localConnection);
             IsAvailable = true;
@@ -127,7 +127,7 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
                 KeepAlive = 0
             }.ConnectionString;
 
-            if (!await CanOpenAsync(connection, context.Cancellation).ConfigureAwait(false))
+            if (!await CanOpen(connection, context.Cancellation).ConfigureAwait(false))
             {
                 throw new InvalidOperationException("Unable to open connection to Postgres container.");
             }
@@ -142,9 +142,9 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
         {
             var missingMessage = mmex?.Message ?? ex.Message;
             context.Diagnostics.Warn("postgres.fixture.testcontainers.missingmethod", new { message = missingMessage });
-            await DisposeContainerSilentlyAsync(container).ConfigureAwait(false);
+            await DisposeContainerSilently(container).ConfigureAwait(false);
 
-            var (ok, connection, failureReason) = await TryStartWithDockerCliAsync(context, password).ConfigureAwait(false);
+            var (ok, connection, failureReason) = await TryStartWithDockerCli(context, password).ConfigureAwait(false);
             if (ok && connection is not null)
             {
                 ConnectionString = connection;
@@ -160,7 +160,7 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
         {
             UnavailableReason = $"Failed to start Postgres container: {ex.GetType().Name}: {ex.Message}";
             context.Diagnostics.Error("postgres.fixture.container.failed", new { message = ex.Message }, ex);
-            await DisposeContainerSilentlyAsync(container).ConfigureAwait(false);
+            await DisposeContainerSilently(container).ConfigureAwait(false);
             return;
         }
     }
@@ -183,7 +183,7 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
 
     public async ValueTask DisposeAsync()
     {
-        await DisposeContainerSilentlyAsync().ConfigureAwait(false);
+        await DisposeContainerSilently().ConfigureAwait(false);
     }
 
     private static bool TryGetExplicitConnectionString(out string? connectionString)
@@ -209,7 +209,7 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
         return builder.ConnectionString;
     }
 
-    private static async Task<bool> CanOpenAsync(string connectionString, CancellationToken cancellation)
+    private static async Task<bool> CanOpen(string connectionString, CancellationToken cancellation)
     {
         try
         {
@@ -230,7 +230,7 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
         var port = Environment.GetEnvironmentVariable("PGPORT");
         var database = Environment.GetEnvironmentVariable("PGDATABASE") ?? DefaultDatabase;
         var user = Environment.GetEnvironmentVariable("PGUSER") ?? DefaultUsername;
-        var password = Environment.GetEnvironmentVariable("PGPASSWORD") ?? string.Empty;
+        var password = Environment.GetEnvironmentVariable("PGPASSWORD") ?? "";
 
         if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(user))
         {
@@ -251,17 +251,17 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
         return builder.ConnectionString;
     }
 
-    private static async Task<string?> TryDetectLocalAsync(CancellationToken cancellation)
+    private static async Task<string?> TryDetectLocal(CancellationToken cancellation)
     {
         var envCandidate = BuildFromPgEnv();
-        if (!string.IsNullOrWhiteSpace(envCandidate) && await CanOpenAsync(envCandidate!, cancellation).ConfigureAwait(false))
+        if (!string.IsNullOrWhiteSpace(envCandidate) && await CanOpen(envCandidate!, cancellation).ConfigureAwait(false))
         {
             return envCandidate;
         }
 
         var ports = new[] { 5432, 5433, 5434 };
         var host = "localhost";
-        if (!await AnyPortReachableAsync(host, ports, cancellation).ConfigureAwait(false))
+        if (!await AnyPortReachable(host, ports, cancellation).ConfigureAwait(false))
         {
             return null;
         }
@@ -284,7 +284,7 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
         {
             Environment.GetEnvironmentVariable("PGPASSWORD"),
             DefaultPassword,
-            string.Empty
+            ""
         };
 
         foreach (var port in ports)
@@ -311,7 +311,7 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
                         }
 
                         var candidate = builder.ConnectionString;
-                        if (await CanOpenAsync(candidate, cancellation).ConfigureAwait(false))
+                        if (await CanOpen(candidate, cancellation).ConfigureAwait(false))
                         {
                             return candidate;
                         }
@@ -323,11 +323,11 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
         return null;
     }
 
-    private static async Task<bool> AnyPortReachableAsync(string host, IEnumerable<int> ports, CancellationToken cancellation)
+    private static async Task<bool> AnyPortReachable(string host, IEnumerable<int> ports, CancellationToken cancellation)
     {
         foreach (var port in ports)
         {
-            if (await CanTcpConnectAsync(host, port, cancellation).ConfigureAwait(false))
+            if (await CanTcpConnect(host, port, cancellation).ConfigureAwait(false))
             {
                 return true;
             }
@@ -336,7 +336,7 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
         return false;
     }
 
-    private static async Task<bool> CanTcpConnectAsync(string host, int port, CancellationToken cancellation, int timeoutMs = 250)
+    private static async Task<bool> CanTcpConnect(string host, int port, CancellationToken cancellation, int timeoutMs = 250)
     {
         try
         {
@@ -352,7 +352,7 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
         }
     }
 
-    private async ValueTask DisposeContainerSilentlyAsync(TestcontainersContainer? container = null)
+    private async ValueTask DisposeContainerSilently(TestcontainersContainer? container = null)
     {
         var target = container ?? _container;
         if (target is not null)
@@ -381,14 +381,14 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
             _container = null;
         }
 
-        await StopCliContainerAsync().ConfigureAwait(false);
+        await StopCliContainer().ConfigureAwait(false);
     }
 
-    private async Task<(bool ok, string? connectionString, string? failureReason)> TryStartWithDockerCliAsync(TestContext context, string password)
+    private async Task<(bool ok, string? connectionString, string? failureReason)> TryStartWithDockerCli(TestContext context, string password)
     {
         var containerName = $"koan-postgres-{Guid.NewGuid():N}";
         var runArgs = $"run --rm -d --name {containerName} -e POSTGRES_PASSWORD={password} -e POSTGRES_USER={DefaultUsername} -e POSTGRES_DB={Database} -p 127.0.0.1::{DefaultPort} postgres:16-alpine";
-        var (runOk, runStdout, runStderr, runExitCode) = await RunDockerCommandAsync(runArgs, context.Cancellation).ConfigureAwait(false);
+        var (runOk, runStdout, runStderr, runExitCode) = await RunDockerCommand(runArgs, context.Cancellation).ConfigureAwait(false);
 
         if (!runOk)
         {
@@ -399,13 +399,13 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
         _cliContainerId = containerName;
 
         var portOk = false;
-        string portStdout = string.Empty;
-        string portStderr = string.Empty;
+        string portStdout = "";
+        string portStderr = "";
         var portExitCode = 0;
 
         for (var attempt = 0; attempt < 5 && !portOk; attempt++)
         {
-            (portOk, portStdout, portStderr, portExitCode) = await RunDockerCommandAsync($"port {containerName} {DefaultPort}/tcp", context.Cancellation).ConfigureAwait(false);
+            (portOk, portStdout, portStderr, portExitCode) = await RunDockerCommand($"port {containerName} {DefaultPort}/tcp", context.Cancellation).ConfigureAwait(false);
             if (portOk && !string.IsNullOrWhiteSpace(portStdout))
             {
                 break;
@@ -426,7 +426,7 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
         if (!portOk || string.IsNullOrWhiteSpace(portStdout))
         {
             context.Diagnostics.Warn("postgres.fixture.dockercli.port.failed", new { exitCode = portExitCode, stdout = Truncate(portStdout), stderr = Truncate(portStderr) });
-            await StopCliContainerAsync().ConfigureAwait(false);
+            await StopCliContainer().ConfigureAwait(false);
             return (false, null, "Failed to determine published Postgres port from docker CLI");
         }
 
@@ -434,7 +434,7 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
         if (hostPort == 0)
         {
             context.Diagnostics.Warn("postgres.fixture.dockercli.port.parse", new { stdout = Truncate(portStdout) });
-            await StopCliContainerAsync().ConfigureAwait(false);
+            await StopCliContainer().ConfigureAwait(false);
             return (false, null, "Unable to parse published Postgres port from docker CLI output");
         }
 
@@ -452,7 +452,7 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
         var opened = false;
         for (var attempt = 0; attempt < 60 && !context.Cancellation.IsCancellationRequested; attempt++)
         {
-            if (await CanOpenAsync(connection, context.Cancellation).ConfigureAwait(false))
+            if (await CanOpen(connection, context.Cancellation).ConfigureAwait(false))
             {
                 opened = true;
                 break;
@@ -471,8 +471,8 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
         if (!opened)
         {
             context.Diagnostics.Warn("postgres.fixture.dockercli.connect.timeout", new { port = hostPort });
-            await DumpDockerLogsAsync(containerName, context.Cancellation, context).ConfigureAwait(false);
-            await StopCliContainerAsync().ConfigureAwait(false);
+            await DumpDockerLogs(containerName, context.Cancellation, context).ConfigureAwait(false);
+            await StopCliContainer().ConfigureAwait(false);
             return (false, null, $"Postgres container did not accept connections on localhost:{hostPort} within timeout");
         }
 
@@ -484,7 +484,7 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
         return (true, normalized, null);
     }
 
-    private async Task<(bool ok, string stdout, string stderr, int exitCode)> RunDockerCommandAsync(string arguments, CancellationToken cancellation)
+    private async Task<(bool ok, string stdout, string stderr, int exitCode)> RunDockerCommand(string arguments, CancellationToken cancellation)
     {
         var psi = CreateDockerProcessStartInfo(arguments);
         Process? process = null;
@@ -494,7 +494,7 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
             process = Process.Start(psi);
             if (process is null)
             {
-                return (false, string.Empty, "Failed to start docker process", -1);
+                return (false, "", "Failed to start docker process", -1);
             }
 
             var stdoutTask = process.StandardOutput.ReadToEndAsync();
@@ -517,11 +517,11 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
                 }
             }
 
-            return (false, string.Empty, "Cancelled", -1);
+            return (false, "", "Cancelled", -1);
         }
         catch (Exception ex)
         {
-            return (false, string.Empty, ex.Message, -1);
+            return (false, "", ex.Message, -1);
         }
         finally
         {
@@ -600,13 +600,13 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
     {
         if (string.IsNullOrEmpty(value))
         {
-            return string.Empty;
+            return "";
         }
 
         return value.Length <= max ? value : value[..max] + "…";
     }
 
-    private async Task DumpDockerLogsAsync(string containerName, CancellationToken cancellation, TestContext context)
+    private async Task DumpDockerLogs(string containerName, CancellationToken cancellation, TestContext context)
     {
         if (string.IsNullOrWhiteSpace(containerName))
         {
@@ -615,7 +615,7 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
 
         try
         {
-            var (ok, stdout, stderr, exitCode) = await RunDockerCommandAsync($"logs {containerName}", cancellation).ConfigureAwait(false);
+            var (ok, stdout, stderr, exitCode) = await RunDockerCommand($"logs {containerName}", cancellation).ConfigureAwait(false);
             if (!ok)
             {
                 context.Diagnostics.Debug("postgres.fixture.dockercli.logs.failed", new { exitCode, stderr = Truncate(stderr), stdout = Truncate(stdout) });
@@ -630,7 +630,7 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
         }
     }
 
-    private async ValueTask StopCliContainerAsync()
+    private async ValueTask StopCliContainer()
     {
         if (string.IsNullOrWhiteSpace(_cliContainerId))
         {
@@ -639,7 +639,7 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
 
         try
         {
-            await RunDockerCommandAsync($"rm -f {_cliContainerId}", CancellationToken.None).ConfigureAwait(false);
+            await RunDockerCommand($"rm -f {_cliContainerId}", CancellationToken.None).ConfigureAwait(false);
         }
         catch
         {

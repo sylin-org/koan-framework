@@ -9,10 +9,10 @@ internal static class WeaviateFilterTranslator
     public static string TranslateWhereClause(object? filter)
     {
         if (!VectorFilterJson.TryParse(filter, out var ast) || ast is null)
-            return string.Empty;
+            return "";
 
         var gql = Translate(ast);
-        return gql ?? string.Empty;
+        return gql ?? "";
     }
 
     public static string? Translate(VectorFilter filter)
@@ -72,6 +72,6 @@ internal static class WeaviateFilterTranslator
     }
 
     private static string EscapeGraphQl(string? value)
-        => (value ?? string.Empty).Replace("\\", "\\\\").Replace("\"", "\\\"");
+        => (value ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"");
 }
 

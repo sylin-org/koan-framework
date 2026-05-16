@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <KoanPackageKind>Periphery</KoanPackageKind>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Description>HuggingFace Hub connector for Koan AI: search, metadata, and download via adapter capabilities.</Description>
+    <PackageTags>$(CommonPackageTags);ai;connector;huggingface</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\..\..\Koan.AI.Models\Koan.AI.Models.csproj" />
+    <ProjectReference Include="..\..\..\Koan.AI.Contracts\Koan.AI.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\Koan.AI.Contracts.Shared\Koan.AI.Contracts.Shared.csproj" />
+  </ItemGroup>
+</Project>

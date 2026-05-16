@@ -15,7 +15,7 @@ public sealed class MilvusHealthContributor(
     public string Name => "data:milvus";
     public bool IsCritical => true;
 
-    public async Task<HealthReport> CheckAsync(CancellationToken ct = default)
+    public async Task<HealthReport> Check(CancellationToken ct = default)
     {
         try
         {

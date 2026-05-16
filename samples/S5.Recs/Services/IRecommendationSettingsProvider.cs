@@ -3,5 +3,5 @@
 public interface IRecommendationSettingsProvider
 {
     (double PreferTagsWeight, int MaxPreferredTags, double DiversityWeight, double CensoredTagsPenaltyWeight) GetEffective();
-    Task InvalidateAsync(CancellationToken ct = default);
+    Task Invalidate(CancellationToken ct = default);
 }

@@ -5,7 +5,7 @@ namespace Koan.Samples.Meridian.Contracts;
 
 public sealed class SourceTypeAiSuggestRequest
 {
-    public string SeedText { get; set; } = string.Empty;
+    public string SeedText { get; set; } = "";
     public string? DocumentName { get; set; }
         = null;
     public string? AdditionalContext { get; set; }
@@ -24,8 +24,8 @@ public sealed class SourceTypeAiSuggestResponse
 
 public sealed class SourceTypeDraft
 {
-    public string Name { get; set; } = string.Empty;
-    public string Description { get; set; } = string.Empty;
+    public string Name { get; set; } = "";
+    public string Description { get; set; } = "";
     public List<string> Tags { get; set; } = new();
     public List<string> DescriptorHints { get; set; } = new();
     public List<string> SignalPhrases { get; set; } = new();
@@ -36,15 +36,15 @@ public sealed class SourceTypeDraft
     public int? ExpectedPageCountMax { get; set; }
         = null;
     public Dictionary<string, string> FieldQueries { get; set; } = new(StringComparer.OrdinalIgnoreCase);
-    public string Instructions { get; set; } = string.Empty;
-    public string OutputTemplate { get; set; } = string.Empty;
+    public string Instructions { get; set; } = "";
+    public string OutputTemplate { get; set; } = "";
 }
 
 public sealed class AnalysisTypeAiSuggestRequest
 {
     // Single free-form prompt describing the desired analysis type.
     // Example: "An Enterprise Architecture Review, containing fields like the ServiceNow ID, the architect responsible for it, and recommendation status."
-    public string Prompt { get; set; } = string.Empty;
+    public string Prompt { get; set; } = "";
 }
 
 public sealed class AnalysisTypeAiSuggestResponse
@@ -55,11 +55,11 @@ public sealed class AnalysisTypeAiSuggestResponse
 
 public sealed class AnalysisTypeDraft
 {
-    public string Name { get; set; } = string.Empty;
-    public string Description { get; set; } = string.Empty;
+    public string Name { get; set; } = "";
+    public string Description { get; set; } = "";
     public List<string> Tags { get; set; } = new();
     public List<string> Descriptors { get; set; } = new();
-    public string Instructions { get; set; } = string.Empty;
-    public string OutputTemplate { get; set; } = string.Empty;
-    public string JsonSchema { get; set; } = string.Empty;
+    public string Instructions { get; set; } = "";
+    public string OutputTemplate { get; set; } = "";
+    public string JsonSchema { get; set; } = "";
 }

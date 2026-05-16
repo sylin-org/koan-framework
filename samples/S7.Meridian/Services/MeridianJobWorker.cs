@@ -27,7 +27,7 @@ public sealed class MeridianJobWorker : BackgroundService
         {
             try
             {
-                var job = await ProcessingJob.TryClaimAnyAsync(workerId, stoppingToken);
+                var job = await ProcessingJob.TryClaimAny(workerId, stoppingToken);
                 if (job is null)
                 {
                     await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
@@ -39,7 +39,7 @@ public sealed class MeridianJobWorker : BackgroundService
 
                 try
                 {
-                    await _processor.ProcessAsync(job, stoppingToken);
+                    await _processor.Process(job, stoppingToken);
                     _logger.LogInformation("Completed job {JobId} for pipeline {PipelineId}.", job.Id, job.PipelineId);
                 }
                 catch (Exception ex) when (!stoppingToken.IsCancellationRequested)

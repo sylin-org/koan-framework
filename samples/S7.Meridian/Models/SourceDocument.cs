@@ -5,13 +5,13 @@ namespace Koan.Samples.Meridian.Models;
 
 public sealed class SourceDocument : Entity<SourceDocument>
 {
-    public string OriginalFileName { get; set; } = string.Empty;
-    public string StorageKey { get; set; } = string.Empty;
+    public string OriginalFileName { get; set; } = "";
+    public string StorageKey { get; set; } = "";
     public string? MediaType { get; set; }
         = null;
     public long Size { get; set; }
         = 0;
-    public string ContentHash { get; set; } = string.Empty;
+    public string ContentHash { get; set; } = "";
 
     /// <summary>
     /// Indicates if this is a virtual document (created from Authoritative Notes)
@@ -32,7 +32,7 @@ public sealed class SourceDocument : Entity<SourceDocument>
     public string SourceType { get; set; } = MeridianConstants.SourceTypes.Unspecified;
 
     /// <summary>Raw text extracted from the document for downstream processing.</summary>
-    public string ExtractedText { get; set; } = string.Empty;
+    public string ExtractedText { get; set; } = "";
 
     /// <summary>Identifier of the classified type (mirrors SourceType for compatibility).</summary>
     public string? ClassifiedTypeId { get; set; }
@@ -93,7 +93,7 @@ public sealed class SourceDocument : Entity<SourceDocument>
     public int? LastExtractedAnalysisTypeVersion { get; set; }
         = null;
 
-    public string TextHash { get; set; } = string.Empty;
+    public string TextHash { get; set; } = "";
     public int PageCount { get; set; }
         = 0;
 

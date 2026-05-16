@@ -1,50 +1,69 @@
+using System.Collections.Concurrent;
+using System.Linq;
+
 namespace Koan.Data.AI;
 
 /// <summary>
-/// Global registry of entity types with [Embedding] attribute.
-/// Populated during startup by EmbeddingAutoRegistrar.
+/// Global registry of entity types tagged with <see cref="Attributes.EmbeddingAttribute"/>.
+/// Populated via source-generated module initializers; remains additive for runtime extensibility.
 /// </summary>
-internal static class EmbeddingRegistry
+public static partial class EmbeddingRegistry
 {
-    private static readonly List<Type> _registeredTypes = new();
-    private static readonly object _lock = new();
+    private static readonly ConcurrentDictionary<Type, byte> _registeredTypes = new(TypeEqualityComparer.Instance);
 
     /// <summary>
-    /// Registers entity types with [Embedding] attribute.
-    /// Called once during startup by KoanAutoRegistrar.
+    /// Registers entity types with <c>[Embedding]</c> attribute.
+    /// Source generators call this during module initialization; runtime callers can extend as needed.
     /// </summary>
     public static void RegisterTypes(IEnumerable<Type> types)
     {
-        lock (_lock)
+        if (types is null) return;
+
+        foreach (var type in types)
         {
-            _registeredTypes.AddRange(types);
+            if (type is null) continue;
+            _registeredTypes.TryAdd(type, 0);
         }
     }
 
     /// <summary>
-    /// Gets all registered entity types with [Embedding] attribute.
+    /// Gets all registered entity types with <c>[Embedding]</c> attribute.
     /// </summary>
     public static IReadOnlyList<Type> GetRegisteredTypes()
     {
-        lock (_lock)
+        if (_registeredTypes.IsEmpty)
         {
-            return _registeredTypes.ToList();
+            return [];
         }
+
+        return _registeredTypes.Keys.ToArray();
     }
 
     /// <summary>
-    /// Gets entity types that use async embedding (for background worker).
+    /// Gets entity types that opt into async embedding (used by background worker orchestration).
     /// </summary>
     public static IEnumerable<Type> AsyncEntityTypes
     {
         get
         {
-            lock (_lock)
+            if (_registeredTypes.IsEmpty)
             {
-                return _registeredTypes
-                    .Where(t => EmbeddingMetadata.Get(t).Async)
-                    .ToList();
+                return [];
             }
+
+            var snapshot = _registeredTypes.Keys.ToArray();
+            return snapshot
+                .Where(t => EmbeddingMetadata.Resolve(t).Async)
+                .ToArray();
         }
+    }
+
+    internal static void ResetForTesting() => _registeredTypes.Clear();
+
+    private sealed class TypeEqualityComparer : IEqualityComparer<Type>
+    {
+        public static TypeEqualityComparer Instance { get; } = new();
+        public bool Equals(Type? x, Type? y) => x == y;
+        public int GetHashCode(Type obj) => obj.GetHashCode();
     }
 }

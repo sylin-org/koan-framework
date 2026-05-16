@@ -16,4 +16,4 @@ var app = builder.Build();
 
 app.UseKoanSwagger();
 
-app.Run();
+app.RunAsync();

@@ -16,20 +16,20 @@ public class IngestionFlowTests
     private sealed class FakePhotoStorage : IPhotoStorage
     {
         private readonly Dictionary<string, byte[]> _store = new();
-        public Task<string> StoreAsync(Stream content, string originalFileName, string? contentType, CancellationToken ct = default)
+        public Task<string> Store(Stream content, string originalFileName, string? contentType, CancellationToken ct = default)
         {
             using var ms = new MemoryStream();
-            content.CopyTo(ms);
+            content.CopyToAsync(ms);
             var key = $"photos/{Guid.NewGuid()}{Path.GetExtension(originalFileName)}";
             _store[key] = ms.ToArray();
             return Task.FromResult(key);
         }
-        public Task<Stream> OpenReadAsync(string key, CancellationToken ct = default)
+        public Task<Stream> OpenRead(string key, CancellationToken ct = default)
             => Task.FromResult<Stream>(new MemoryStream(_store[key]));
     }
     private sealed class FakeVision : IPantryVisionService
     {
-        public Task<VisionProcessingResult> ProcessPhotoAsync(string photoId, Stream image, VisionProcessingOptions options, CancellationToken ct = default)
+        public Task<VisionProcessingResult> ProcessPhoto(string photoId, Stream image, VisionProcessingOptions options, CancellationToken ct = default)
         {
             return Task.FromResult(new VisionProcessingResult
             {
@@ -47,7 +47,7 @@ public class IngestionFlowTests
             });
         }
 
-        public Task LearnFromCorrectionAsync(string originalName, string correctedName, string? correctedQuantity, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task LearnFromCorrection(string originalName, string correctedName, string? correctedQuantity, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private sealed class FakeParser : IPantryInputParser

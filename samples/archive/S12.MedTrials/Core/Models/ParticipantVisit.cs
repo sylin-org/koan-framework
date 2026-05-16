@@ -13,9 +13,9 @@ namespace S12.MedTrials.Models;
 public sealed class ParticipantVisit : Entity<ParticipantVisit>
 {
     [Parent(typeof(TrialSite))]
-    public string TrialSiteId { get; set; } = string.Empty;
+    public string TrialSiteId { get; set; } = "";
 
-    public string ParticipantId { get; set; } = string.Empty;
+    public string ParticipantId { get; set; } = "";
     public VisitType VisitType { get; set; } = VisitType.Baseline;
     public DateTimeOffset ScheduledAt { get; set; } = DateTimeOffset.UtcNow;
     public VisitStatus Status { get; set; } = VisitStatus.Scheduled;
@@ -23,6 +23,6 @@ public sealed class ParticipantVisit : Entity<ParticipantVisit>
     public string? WindowLabel { get; set; }
     public List<VisitAdjustment> ProposedAdjustments { get; set; } = new();
     public List<VisitDiagnostic> Diagnostics { get; set; } = new();
-    public string[] Tags { get; set; } = Array.Empty<string>();
+    public string[] Tags { get; set; } = [];
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

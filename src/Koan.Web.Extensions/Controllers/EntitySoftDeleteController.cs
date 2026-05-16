@@ -40,7 +40,7 @@ public abstract class EntitySoftDeleteController<TEntity, TKey> : ControllerBase
         var items = await Data<TEntity, TKey>.Page(page <= 0 ? 1 : page, size <= 0 ? KoanWebConstants.Defaults.DefaultPageSize : Math.Min(size, KoanWebConstants.Defaults.MaxPageSize), ct);
         try
         {
-            var total = await Data<TEntity, TKey>.CountAsync(ct);
+            var total = await Data<TEntity, TKey>.Count(ct);
             var totalPages = size > 0 ? (int)Math.Ceiling((double)total / size) : 0;
             Response.Headers["X-Total-Count"] = total.ToString();
             Response.Headers["X-Page"] = (page <= 0 ? 1 : page).ToString();
@@ -71,12 +71,12 @@ public abstract class EntitySoftDeleteController<TEntity, TKey> : ControllerBase
     {
         var from = string.IsNullOrWhiteSpace(options?.FromSet) ? null : options!.FromSet;
         TEntity? model;
-        if (!string.IsNullOrWhiteSpace(from)) { using var _ = Data<TEntity, TKey>.WithPartition(from); model = await Data<TEntity, TKey>.GetAsync(id!, ct); }
-        else { model = await Data<TEntity, TKey>.GetAsync(id!, ct); }
+        if (!string.IsNullOrWhiteSpace(from)) { using var _ = Data<TEntity, TKey>.WithPartition(from); model = await Data<TEntity, TKey>.Get(id!, ct); }
+        else { model = await Data<TEntity, TKey>.Get(id!, ct); }
         if (model is null) return NotFound();
-        using (var _to = Data<TEntity, TKey>.WithPartition(DeletedSet)) { await Data<TEntity, TKey>.UpsertAsync(model, ct); }
-        if (!string.IsNullOrWhiteSpace(from)) { using var _ = Data<TEntity, TKey>.WithPartition(from); await Data<TEntity, TKey>.DeleteAsync(id!, ct); }
-        else { await Data<TEntity, TKey>.DeleteAsync(id!, ct); }
+        using (var _to = Data<TEntity, TKey>.WithPartition(DeletedSet)) { await Data<TEntity, TKey>.Upsert(model, ct); }
+        if (!string.IsNullOrWhiteSpace(from)) { using var _ = Data<TEntity, TKey>.WithPartition(from); await Data<TEntity, TKey>.Delete(id!, ct); }
+        else { await Data<TEntity, TKey>.Delete(id!, ct); }
         return NoContent();
     }
 
@@ -97,7 +97,7 @@ public abstract class EntitySoftDeleteController<TEntity, TKey> : ControllerBase
     [HttpPost("soft-delete")]
     public virtual async Task<IActionResult> SoftDeleteMany([FromBody] BulkOperation<TKey> op, CancellationToken ct)
     {
-        var ids = op?.Ids ?? Array.Empty<TKey>();
+        var ids = op?.Ids ?? [];
         var filter = op?.Filter;
         var from = (op?.Options as SoftDeleteOptions)?.FromSet;
 
@@ -112,16 +112,16 @@ public abstract class EntitySoftDeleteController<TEntity, TKey> : ControllerBase
                 var found = new List<TEntity>();
                 foreach (var id in ids)
                 {
-                    var item = await Data<TEntity, TKey>.GetAsync(id, ct);
+                    var item = await Data<TEntity, TKey>.Get(id, ct);
                     if (item is not null) found.Add(item);
                 }
                 if (found.Count > 0)
                 {
                     using (var _to = Data<TEntity, TKey>.WithPartition(DeletedSet))
                     {
-                        await Data<TEntity, TKey>.UpsertManyAsync(found, ct);
+                        await Data<TEntity, TKey>.UpsertMany(found, ct);
                     }
-                    await Data<TEntity, TKey>.DeleteManyAsync(ids, ct);
+                    await Data<TEntity, TKey>.DeleteMany(ids, ct);
                 }
             }
             return NoContent();
@@ -150,9 +150,9 @@ public abstract class EntitySoftDeleteController<TEntity, TKey> : ControllerBase
                     {
                         using (var _to = Data<TEntity, TKey>.WithPartition(DeletedSet))
                         {
-                            await Data<TEntity, TKey>.UpsertManyAsync(list, ct);
+                            await Data<TEntity, TKey>.UpsertMany(list, ct);
                         }
-                        await Data<TEntity, TKey>.DeleteManyAsync(list.Select(x => x.Id), ct);
+                        await Data<TEntity, TKey>.DeleteMany(list.Select(x => x.Id), ct);
                     }
                     return NoContent();
                 }
@@ -183,12 +183,12 @@ public abstract class EntitySoftDeleteController<TEntity, TKey> : ControllerBase
     {
         var target = string.IsNullOrWhiteSpace(options?.TargetSet) ? null : options!.TargetSet;
         using var _from = Data<TEntity, TKey>.WithPartition(DeletedSet);
-        var model = await Data<TEntity, TKey>.GetAsync(id!, ct);
+        var model = await Data<TEntity, TKey>.Get(id!, ct);
         if (model is null) return NotFound();
-        if (!string.IsNullOrWhiteSpace(target)) { using var _t = Data<TEntity, TKey>.WithPartition(target); await Data<TEntity, TKey>.UpsertAsync(model, ct); }
-        else { await Data<TEntity, TKey>.UpsertAsync(model, ct); }
+        if (!string.IsNullOrWhiteSpace(target)) { using var _t = Data<TEntity, TKey>.WithPartition(target); await Data<TEntity, TKey>.Upsert(model, ct); }
+        else { await Data<TEntity, TKey>.Upsert(model, ct); }
         using var _del = Data<TEntity, TKey>.WithPartition(DeletedSet);
-        await Data<TEntity, TKey>.DeleteAsync(id!, ct);
+        await Data<TEntity, TKey>.Delete(id!, ct);
         return NoContent();
     }
 
@@ -209,7 +209,7 @@ public abstract class EntitySoftDeleteController<TEntity, TKey> : ControllerBase
     [HttpPost("soft-delete/restore")]
     public virtual async Task<IActionResult> RestoreMany([FromBody] BulkOperation<TKey> op, CancellationToken ct)
     {
-        var ids = op?.Ids ?? Array.Empty<TKey>();
+        var ids = op?.Ids ?? [];
         var target = (op?.Options as RestoreOptions)?.TargetSet;
         if (ids.Count == 0) return BadRequest(new { error = "ids are required for bulk restore" });
         _ = await Data<TEntity, TKey>.MovePartition(DeletedSet, string.IsNullOrWhiteSpace(target) ? "" : target!, e => ids.Contains(e.Id), null, 500, ct);

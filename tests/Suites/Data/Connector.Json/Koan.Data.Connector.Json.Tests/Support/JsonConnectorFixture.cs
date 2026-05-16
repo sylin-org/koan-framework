@@ -40,7 +40,7 @@ internal sealed class JsonConnectorFixture : IAsyncDisposable
 
     public string RootPath => _rootPath;
 
-    public static ValueTask<JsonConnectorFixture> CreateAsync(TestContext ctx)
+    public static ValueTask<JsonConnectorFixture> Create(TestContext ctx)
     {
         ArgumentNullException.ThrowIfNull(ctx);
 
@@ -138,7 +138,7 @@ internal sealed class JsonConnectorFixture : IAsyncDisposable
     {
         try
         {
-            await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+            await asyncDisposable.Dispose().ConfigureAwait(false);
         }
         finally
         {

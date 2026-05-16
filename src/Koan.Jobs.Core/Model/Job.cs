@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Koan.Data.Abstractions.Annotations;
+using TimestampAttribute = Koan.Data.Abstractions.Annotations.TimestampAttribute;
 using Koan.Data.Core.Model;
 
 namespace Koan.Jobs.Model;
@@ -22,7 +23,17 @@ public abstract partial class Job : Entity<Job>
 
     [Required]
     [MaxLength(200)]
-    public string Name { get; set; } = string.Empty;
+    public string Name { get; set; } = "";
+
+    /// <summary>
+    /// Stable type identifier — <see cref="Type.FullName"/> of the concrete <c>Job&lt;,,&gt;</c>
+    /// subtype. Set by <see cref="Execution.JobCoordinator"/> at creation time and persisted so
+    /// type-based dependency lookups (<see cref="WaitForTypeNames"/>) work consistently across
+    /// in-memory and Entity-backed storage modes. See ADR-0017.
+    /// </summary>
+    [Index]
+    [MaxLength(500)]
+    public string? TypeName { get; set; }
 
     [MaxLength(500)]
     public string? Description { get; set; }
@@ -56,6 +67,26 @@ public abstract partial class Job : Entity<Job>
     [Column(TypeName = "jsonb")]
     public Dictionary<string, object?> Metadata { get; set; } = new();
 
-    [Timestamp]
+    /// <summary>
+    /// Specific job ids this job won't start until each reaches a terminal state
+    /// (<see cref="JobStatus.Completed"/>, <see cref="JobStatus.Failed"/>, or
+    /// <see cref="JobStatus.Cancelled"/>). A dependency ending in <see cref="JobStatus.Failed"/>
+    /// or <see cref="JobStatus.Cancelled"/> poisons this job — it transitions to
+    /// <see cref="JobStatus.Failed"/> with <see cref="LastError"/> set to the dependency
+    /// reference. Populated via <see cref="Execution.JobRunBuilder{TJob,TContext,TResult}.WaitFor(string[])"/>.
+    /// See ADR-0017.
+    /// </summary>
+    public List<string> WaitForJobIds { get; set; } = new();
+
+    /// <summary>
+    /// Type names (<see cref="Type.FullName"/>) of jobs whose Completed-status existence
+    /// gates this one. The check is "at least one Completed job of EACH listed type exists"
+    /// — a single successful run satisfies the type-based dependency permanently for this
+    /// job. Populated via <see cref="Execution.JobRunBuilder{TJob,TContext,TResult}.WaitFor(System.Type[])"/>.
+    /// See ADR-0017.
+    /// </summary>
+    public List<string> WaitForTypeNames { get; set; } = new();
+
+    [Timestamp(OnSave = true)]
     public DateTimeOffset LastModified { get; set; }
 }

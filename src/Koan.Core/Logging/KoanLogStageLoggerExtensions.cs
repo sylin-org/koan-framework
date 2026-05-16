@@ -119,7 +119,7 @@ public static class KoanLogStageLoggerExtensions
             DateTime dt => dt.ToString("o"),
             DateTimeOffset dto => dto.ToString("o"),
             TimeSpan ts => ts.ToString(),
-            _ => value?.ToString() ?? string.Empty
+            _ => value?.ToString() ?? ""
         };
     }
 }

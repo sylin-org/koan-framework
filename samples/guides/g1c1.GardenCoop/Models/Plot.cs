@@ -9,12 +9,12 @@ namespace g1c1.GardenCoop.Models;
 public class Plot : Entity<Plot>
 {
     [Required]
-    public string Name { get; set; } = string.Empty;
+    public string Name { get; set; } = "";
 
     // nullable MemberId = plots can exist without stewards assigned yet
     [Parent(typeof(Member))]  // tried this attribute - it wires up the relationship for me
     public string? MemberId { get; set; }
 
     // field notes stay with the bed, not the person - makes sense for perennial info
-    public string Notes { get; set; } = string.Empty;
+    public string Notes { get; set; } = "";
 }

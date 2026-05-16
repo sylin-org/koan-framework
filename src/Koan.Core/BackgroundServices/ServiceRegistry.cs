@@ -5,23 +5,17 @@ namespace Koan.Core.BackgroundServices;
 /// <summary>
 /// Default implementation of service registry
 /// </summary>
-public class ServiceRegistry : IServiceRegistry
+public class ServiceRegistry(IServiceProvider serviceProvider) : IServiceRegistry
 {
-    private readonly IServiceProvider _serviceProvider;
     private readonly Dictionary<string, IKoanBackgroundService> _servicesByName = new();
     private readonly Dictionary<Type, IKoanBackgroundService> _servicesByType = new();
-
-    public ServiceRegistry(IServiceProvider serviceProvider)
-    {
-        _serviceProvider = serviceProvider;
-    }
 
     public T GetService<T>() where T : class, IKoanBackgroundService
     {
         if (_servicesByType.TryGetValue(typeof(T), out var cached))
             return (T)cached;
 
-        var service = _serviceProvider.GetRequiredService<T>();
+        var service = serviceProvider.GetRequiredService<T>();
         RegisterService(service);
         return service;
     }

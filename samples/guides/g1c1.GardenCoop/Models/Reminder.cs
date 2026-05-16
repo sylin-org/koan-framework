@@ -16,14 +16,14 @@ public enum ReminderStatus
 public class Reminder : Entity<Reminder>
 {
     [Parent(typeof(Plot))]
-    public string PlotId { get; set; } = string.Empty;
+    public string PlotId { get; set; } = "";
 
     [Parent(typeof(Member))]
     public string? MemberId { get; set; }  // who should we nudge?
 
     public ReminderStatus Status { get; set; } = ReminderStatus.Idle;
 
-    public string Notes { get; set; } = string.Empty;
+    public string Notes { get; set; } = "";
 
     public static async Task<Reminder?> ActiveForPlot(string plotId, CancellationToken ct = default)
     {
@@ -32,7 +32,7 @@ public class Reminder : Entity<Reminder>
         return reminders.FirstOrDefault();
     }
 
-    public Task<Reminder> ActivateAsync(string notes, CancellationToken ct = default)
+    public Task<Reminder> Activate(string notes, CancellationToken ct = default)
     {
         // turn on the reminder
         Status = ReminderStatus.Active;
@@ -40,7 +40,7 @@ public class Reminder : Entity<Reminder>
         return this.Save(ct);
     }
 
-    public Task<Reminder> AcknowledgeAsync(string notes, CancellationToken ct = default)
+    public Task<Reminder> Acknowledge(string notes, CancellationToken ct = default)
     {
         // mark it done
         Status = ReminderStatus.Acknowledged;

@@ -35,7 +35,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
             Infrastructure.Constants.Configuration.Keys.Section,
             configuratorLifetime: ServiceLifetime.Singleton);
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
-        services.TryAddEnumerable(new ServiceDescriptor(typeof(INamingDefaultsProvider), typeof(PostgresNamingDefaultsProvider), ServiceLifetime.Singleton));
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, PostgresHealthContributor>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IConfigureOptions<RelationalMaterializationOptions>, PostgresRelationalMaterializationOptionsConfigurator>());
 
@@ -77,12 +76,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
             defaultOptions.DefaultPageSize,
             Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
             Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
-
-        var maxPageSize = Configuration.ReadFirstWithSource(
-            cfg,
-            defaultOptions.MaxPageSize,
-            Infrastructure.Constants.Configuration.Keys.MaxPageSize,
-            Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
 
         var namingStyle = Configuration.ReadFirstWithSource(
             cfg,
@@ -136,7 +129,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
         module.PublishConfigValue(PostgresItems.Separator, separator);
         module.PublishConfigValue(PostgresItems.EnsureCreatedSupported, ensureCreated);
         module.PublishConfigValue(PostgresItems.DefaultPageSize, defaultPageSize);
-        module.PublishConfigValue(PostgresItems.MaxPageSize, maxPageSize);
     }
 
     private static string BuildPostgresFallback(PostgresOptions defaults)

@@ -39,7 +39,7 @@ public class PantryIngestionController(
 
         // Persist photo through storage abstraction
         await using var uploadStream = photo.OpenReadStream();
-        var storageKey = await photoStorage.StoreAsync(uploadStream, photo.FileName, photo.ContentType, ct);
+        var storageKey = await photoStorage.Store(uploadStream, photo.FileName, photo.ContentType, ct);
 
         var photoRecord = new PantryPhoto
         {
@@ -50,7 +50,7 @@ public class PantryIngestionController(
         };
         await photoRecord.Save();
 
-        using var imageStream = await photoStorage.OpenReadAsync(storageKey, ct);
+        using var imageStream = await photoStorage.OpenRead(storageKey, ct);
 
         // Thumbnails intentionally omitted (noise for MVP). A future enhancement could plug an image pipeline here.
         var options = new VisionProcessingOptions
@@ -60,13 +60,13 @@ public class PantryIngestionController(
             UserId = userId
         };
 
-        var result = await visionService.ProcessPhotoAsync(photoRecord.Id, imageStream, options, ct);
+        var result = await visionService.ProcessPhoto(photoRecord.Id, imageStream, options, ct);
 
         // Idempotency / duplicate avoidance (basic): remove detections that already became pantry items for same photo
         if (result.Detections is { Length: >0 })
         {
             var existingItems = await PantryItem.Query(p => p.SourcePhotoId == photoRecord.Id, ct);
-            var existingNames = existingItems.Select(i => (i.Name ?? string.Empty).Trim().ToLowerInvariant()).ToHashSet();
+            var existingNames = existingItems.Select(i => (i.Name ?? "").Trim().ToLowerInvariant()).ToHashSet();
             foreach (var d in result.Detections)
             {
                 // Use top candidate as canonical name for duplicate detection
@@ -98,12 +98,12 @@ public class PantryIngestionController(
     {
         try
         {
-            var confirmed = await confirmationService.ConfirmDetectionsAsync(photoId, request.Confirmations, visionService, inputParser, ct);
+            var confirmed = await confirmationService.ConfirmDetections(photoId, request.Confirmations, visionService, inputParser, ct);
 
             // Shelf-life inference (post-confirm) for items missing ExpiresAt
             foreach (var item in confirmed)
             {
-                if (item.ExpiresAt == null && _opts.DefaultShelfLifeDaysByCategory.TryGetValue((item.Category ?? string.Empty).ToLowerInvariant(), out var days) && days > 0)
+                if (item.ExpiresAt == null && _opts.DefaultShelfLifeDaysByCategory.TryGetValue((item.Category ?? "").ToLowerInvariant(), out var days) && days > 0)
                 {
                     item.ExpiresAt = DateTime.UtcNow.AddDays(days);
                     await item.Save();

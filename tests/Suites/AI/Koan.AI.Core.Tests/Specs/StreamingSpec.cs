@@ -20,7 +20,7 @@ public class StreamingSpec : IClassFixture<AICoreTestPipelineFixture>
 
         // Act
         var results = new List<string>();
-        await foreach (var chunk in client.StreamCompletionAsync(prompt))
+        await foreach (var chunk in client.StreamCompletion(prompt))
         {
             results.Add(chunk);
         }

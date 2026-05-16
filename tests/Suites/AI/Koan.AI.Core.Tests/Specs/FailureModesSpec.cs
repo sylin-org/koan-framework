@@ -19,7 +19,7 @@ public class FailureModesSpec : IClassFixture<AICoreTestPipelineFixture>
     var prompt = "Cause error";
 
     // Act
-    Func<Task> act = async () => await client.CompleteAsync(prompt, forceError: true);
+    Func<Task> act = async () => await client.Complete(prompt, forceError: true);
 
     // Assert
     await act.Should().ThrowAsync<Exception>().WithMessage("*error*");

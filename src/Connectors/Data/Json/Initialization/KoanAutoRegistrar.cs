@@ -41,12 +41,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             $"{Constants.Configuration.Section_Data}:{Constants.Configuration.Keys.DefaultPageSize}",
             $"{Constants.Configuration.Section_Sources_Default}:{Constants.Configuration.Keys.DefaultPageSize}");
 
-        var maxPageSize = Configuration.ReadFirstWithSource(
-            cfg,
-            defaultOptions.MaxPageSize,
-            $"{Constants.Configuration.Section_Data}:{Constants.Configuration.Keys.MaxPageSize}",
-            $"{Constants.Configuration.Section_Sources_Default}:{Constants.Configuration.Keys.MaxPageSize}");
-
         module.AddSetting(
             Constants.Bootstrap.DirectoryPath,
             directory.Value,
@@ -67,16 +61,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 "Koan.Data.Connector.Json.JsonAdapterFactory"
             },
             sourceKey: defaultPageSize.ResolvedKey);
-
-        module.AddSetting(
-            Constants.Bootstrap.MaxPageSize,
-            maxPageSize.Value.ToString(),
-            source: maxPageSize.Source,
-            consumers: new[]
-            {
-                "Koan.Data.Connector.Json.JsonAdapterFactory"
-            },
-            sourceKey: maxPageSize.ResolvedKey);
     }
 }
 

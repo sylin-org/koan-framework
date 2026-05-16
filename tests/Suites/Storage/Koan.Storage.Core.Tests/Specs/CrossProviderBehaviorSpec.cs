@@ -20,9 +20,9 @@ public class CrossProviderBehaviorSpec : IClassFixture<StorageCoreTestPipelineFi
     var file = _fixture.CreateTestFile();
 
     // Act
-    await src.UploadAsync(file);
-    await dst.CopyFromAsync(src, file.Path);
-    var exists = await dst.ExistsAsync(file.Path);
+    await src.Upload(file);
+    await dst.CopyFrom(src, file.Path);
+    var exists = await dst.Exists(file.Path);
 
     // Assert
     exists.Should().BeTrue();

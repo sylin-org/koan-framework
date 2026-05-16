@@ -44,7 +44,7 @@ public sealed class McpRpcHandler
     }
 
     [JsonRpcMethod("tools/list")]
-    public Task<ToolsListResponse> ListToolsAsync(CancellationToken cancellationToken)
+    public Task<ToolsListResponse> ListTools(CancellationToken cancellationToken)
     {
         var exposureMode = ResolveExposureMode();
         var toolsList = new List<ToolDescriptor>();
@@ -82,7 +82,7 @@ public sealed class McpRpcHandler
     }
 
     [JsonRpcMethod("tools/call")]
-    public async Task<ToolsCallResult> CallToolAsync(ToolsCallParams parameters, CancellationToken cancellationToken)
+    public async Task<ToolsCallResult> CallTool(ToolsCallParams parameters, CancellationToken cancellationToken)
     {
         if (parameters is null) throw new ArgumentNullException(nameof(parameters));
         _logger.LogDebug("MCP tools/call for {Tool} invoked.", parameters.Name);
@@ -90,7 +90,7 @@ public sealed class McpRpcHandler
         // Handle code execution tool
         if (parameters.Name == "koan.code.execute")
         {
-            return await ExecuteCodeAsync(parameters.Arguments, cancellationToken);
+            return await ExecuteCode(parameters.Arguments, cancellationToken);
         }
         // Handle code validation tool
         if (parameters.Name == "koan.code.validate")
@@ -99,12 +99,12 @@ public sealed class McpRpcHandler
         }
 
         // Handle traditional entity tools
-        var result = await _executor.ExecuteAsync(parameters.Name, parameters.Arguments, cancellationToken);
+        var result = await _executor.Execute(parameters.Name, parameters.Arguments, cancellationToken);
         return ToolsCallResult.FromExecution(parameters.Name, result);
     }
 
     [JsonRpcMethod("ping")]
-    public Task<string> PingAsync() => Task.FromResult("pong");
+    public Task<string> Ping() => Task.FromResult("pong");
 
     private McpExposureMode ResolveExposureMode()
     {
@@ -246,7 +246,7 @@ public sealed class McpRpcHandler
                 Result = new JObject { ["valid"] = false, ["error"] = "Missing required 'code' parameter" }
             };
         }
-        var code = codeNode?.Value<string>() ?? string.Empty;
+        var code = codeNode?.Value<string>() ?? "";
         if (jint.ValidateSyntax(code, out var error))
         {
             return new ToolsCallResult
@@ -262,7 +262,7 @@ public sealed class McpRpcHandler
         };
     }
 
-    private async Task<ToolsCallResult> ExecuteCodeAsync(JObject? arguments, CancellationToken cancellationToken)
+    private async Task<ToolsCallResult> ExecuteCode(JObject? arguments, CancellationToken cancellationToken)
     {
         if (_codeExecutor == null)
         {
@@ -305,7 +305,7 @@ public sealed class McpRpcHandler
             var request = BuildExecutionRequest(arguments!, code);
 
             // Execute code via unified executor (bindings are created internally in implementation; we keep existing for side-effects if needed in future)
-            var result = await _codeExecutor.ExecuteAsync(request, cancellationToken);
+            var result = await _codeExecutor.Execute(request, cancellationToken);
 
             if (result.Success)
             {
@@ -389,7 +389,7 @@ public sealed class McpRpcHandler
     public sealed class ToolsListResponse
     {
         [JsonPropertyName("tools")]
-        public IReadOnlyList<ToolDescriptor> Tools { get; init; } = Array.Empty<ToolDescriptor>();
+        public IReadOnlyList<ToolDescriptor> Tools { get; init; } = [];
 
         [JsonPropertyName("next")]
         public object? Next { get; init; }

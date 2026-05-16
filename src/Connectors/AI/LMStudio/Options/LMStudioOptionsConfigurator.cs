@@ -41,20 +41,20 @@ internal sealed class LMStudioOptionsConfigurator : AdapterOptionsConfigurator<L
     {
         KoanLog.ConfigInfo(Logger, LogActions.Config, LocalLogOutcomes.Start);
 
-        var explicitConnection = ReadProviderConfiguration(string.Empty,
+        var explicitConnection = ReadProviderConfiguration("",
             Constants.Configuration.Keys.ConnectionString,
             Constants.Configuration.Keys.AltConnectionString,
             "ConnectionStrings:LMStudio");
 
         var configuredBaseUrl = ReadProviderConfiguration(options.BaseUrl,
-            "Koan:Ai:Provider:LMStudio:BaseUrl",
-            "Koan:Ai:LMStudio:BaseUrl");
+            Constants.Configuration.Keys.BaseUrl,
+            Constants.Configuration.Keys.AltBaseUrl);
 
-        var defaultModel = ReadProviderConfiguration(options.DefaultModel ?? string.Empty,
-            "Koan:Ai:Provider:LMStudio:DefaultModel",
-            "Koan:Ai:LMStudio:DefaultModel");
+        var defaultModel = ReadProviderConfiguration(options.DefaultModel ?? "",
+            Constants.Configuration.Keys.DefaultModel,
+            Constants.Configuration.Keys.AltDefaultModel);
 
-        var configuredApiKey = ReadProviderConfiguration(options.ApiKey ?? string.Empty,
+        var configuredApiKey = ReadProviderConfiguration(options.ApiKey ?? "",
             Constants.Configuration.Keys.ApiKey,
             Constants.Discovery.EnvKey);
 
@@ -90,15 +90,15 @@ internal sealed class LMStudioOptionsConfigurator : AdapterOptionsConfigurator<L
         }
 
         options.AutoDiscoveryEnabled = ReadProviderConfiguration(options.AutoDiscoveryEnabled,
-            "Koan:Ai:Provider:LMStudio:AutoDiscoveryEnabled",
-            "Koan:Ai:LMStudio:AutoDiscoveryEnabled");
+            Constants.Configuration.Keys.AutoDiscoveryEnabled,
+            Constants.Configuration.Keys.AltAutoDiscoveryEnabled);
 
-        if (int.TryParse(ReadProviderConfiguration(string.Empty, "Koan:Ai:Provider:LMStudio:Weight"), out var weight))
+        if (int.TryParse(ReadProviderConfiguration("", Constants.Configuration.Keys.Weight), out var weight))
         {
             options.Weight = weight;
         }
 
-        var labelsSection = Configuration.GetSection("Koan:Ai:Provider:LMStudio:Labels");
+        var labelsSection = Configuration.GetSection(Constants.Configuration.Keys.Labels);
         if (labelsSection.Exists())
         {
             options.Labels = new Dictionary<string, string>();
@@ -142,8 +142,8 @@ internal sealed class LMStudioOptionsConfigurator : AdapterOptionsConfigurator<L
                 HealthCheckTimeout = TimeSpan.FromMilliseconds(750),
                 Parameters = new Dictionary<string, object>
                 {
-                    ["requiredModel"] = defaultModel ?? string.Empty,
-                    ["apiKey"] = options.ApiKey ?? string.Empty
+                    ["requiredModel"] = defaultModel ?? "",
+                    ["apiKey"] = options.ApiKey ?? ""
                 }
             };
 
@@ -151,7 +151,7 @@ internal sealed class LMStudioOptionsConfigurator : AdapterOptionsConfigurator<L
                 ("mode", context.OrchestrationMode.ToString()),
                 ("requiredModel", defaultModel ?? "(none)"));
 
-            var result = _discoveryCoordinator.DiscoverServiceAsync(Constants.Adapter.Type, context)
+            var result = _discoveryCoordinator.DiscoverService(Constants.Adapter.Type, context)
                 .GetAwaiter().GetResult();
 
             if (result.IsSuccessful)

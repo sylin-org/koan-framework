@@ -75,9 +75,9 @@ internal sealed class MilvusDiscoveryAdapter : ServiceDiscoveryAdapterBase
     {
         // Check Milvus-specific configuration paths
         return _configuration.GetConnectionString("Milvus") ??
-               _configuration["Koan:Data:Milvus:ConnectionString"] ??
-               _configuration["Koan:Data:Milvus:Endpoint"] ??
-               _configuration["Koan:Data:ConnectionString"];
+               _configuration[Infrastructure.Constants.Configuration.Keys.ConnectionString] ??
+               _configuration[Infrastructure.Constants.Configuration.Keys.Endpoint] ??
+               _configuration[Infrastructure.Constants.Configuration.Keys.AltConnectionString];
     }
 
     /// <summary>Milvus-specific environment variable handling</summary>

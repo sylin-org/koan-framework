@@ -18,7 +18,7 @@ internal sealed class RawCacheService : IRawCacheService
         Directory.CreateDirectory(_cacheRoot);
     }
 
-    public async Task WritePageAsync(string source, string mediaType, string jobId, int pageNum, string rawJson, CancellationToken ct = default)
+    public async Task WritePage(string source, string mediaType, string jobId, int pageNum, string rawJson, CancellationToken ct = default)
     {
         var jobDir = GetJobDirectory(source, mediaType, jobId);
         Directory.CreateDirectory(jobDir);
@@ -30,7 +30,7 @@ internal sealed class RawCacheService : IRawCacheService
             source, mediaType, jobId, pageNum);
     }
 
-    public async IAsyncEnumerable<(int PageNum, string RawJson)> ReadPagesAsync(
+    public async IAsyncEnumerable<(int PageNum, string RawJson)> ReadPages(
         string source,
         string mediaType,
         string jobId,
@@ -67,7 +67,7 @@ internal sealed class RawCacheService : IRawCacheService
         }
     }
 
-    public async Task<List<CacheManifest>> ListCachesAsync(CancellationToken ct = default)
+    public async Task<List<CacheManifest>> ListCaches(CancellationToken ct = default)
     {
         var manifests = new List<CacheManifest>();
 
@@ -110,7 +110,7 @@ internal sealed class RawCacheService : IRawCacheService
         return manifests.OrderByDescending(m => m.FetchedAt).ToList();
     }
 
-    public async Task<CacheManifest?> GetManifestAsync(string source, string mediaType, string jobId, CancellationToken ct = default)
+    public async Task<CacheManifest?> GetManifest(string source, string mediaType, string jobId, CancellationToken ct = default)
     {
         var manifestFile = Path.Combine(GetJobDirectory(source, mediaType, jobId), "manifest.json");
 
@@ -129,9 +129,9 @@ internal sealed class RawCacheService : IRawCacheService
         }
     }
 
-    public async Task<CacheManifest?> GetLatestManifestAsync(string source, string mediaType, CancellationToken ct = default)
+    public async Task<CacheManifest?> GetLatestManifest(string source, string mediaType, CancellationToken ct = default)
     {
-        var allManifests = await ListCachesAsync(ct);
+        var allManifests = await ListCaches(ct);
         return allManifests
             .Where(m => m.Source.Equals(source, StringComparison.OrdinalIgnoreCase) &&
                        m.MediaType.Equals(mediaType, StringComparison.OrdinalIgnoreCase))
@@ -139,7 +139,7 @@ internal sealed class RawCacheService : IRawCacheService
             .FirstOrDefault();
     }
 
-    public async Task WriteManifestAsync(string source, string mediaType, string jobId, CacheManifest manifest, CancellationToken ct = default)
+    public async Task WriteManifest(string source, string mediaType, string jobId, CacheManifest manifest, CancellationToken ct = default)
     {
         var jobDir = GetJobDirectory(source, mediaType, jobId);
         Directory.CreateDirectory(jobDir);
@@ -152,7 +152,7 @@ internal sealed class RawCacheService : IRawCacheService
             source, mediaType, jobId, manifest.TotalItems, manifest.TotalPages);
     }
 
-    public Task<int> FlushAllAsync(CancellationToken ct = default)
+    public Task<int> FlushAll(CancellationToken ct = default)
     {
         if (!Directory.Exists(_cacheRoot))
             return Task.FromResult(0);
@@ -168,7 +168,7 @@ internal sealed class RawCacheService : IRawCacheService
         return Task.FromResult(count);
     }
 
-    public Task<int> FlushAsync(string? source = null, string? mediaType = null, CancellationToken ct = default)
+    public Task<int> Flush(string? source = null, string? mediaType = null, CancellationToken ct = default)
     {
         if (!Directory.Exists(_cacheRoot))
             return Task.FromResult(0);
@@ -205,7 +205,7 @@ internal sealed class RawCacheService : IRawCacheService
         else
         {
             // Flush all
-            return FlushAllAsync(ct);
+            return FlushAll(ct);
         }
 
         return Task.FromResult(count);

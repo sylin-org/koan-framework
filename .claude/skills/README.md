@@ -27,7 +27,7 @@ Agent Skills are filesystem-based capability packages that:
 |-------|-------------|-------------|
 | **koan-data-modeling** | Aggregate boundaries, relationships, lifecycle hooks, value objects | Designing domain models, complex entities, business logic encapsulation |
 | **koan-api-building** | EntityController<T>, custom routes, payload transformers, auth policies | Building REST APIs, custom endpoints, authentication, API design |
-| **koan-ai-integration** | Chat endpoints, embeddings, RAG workflows, vector search | Integrating AI features, semantic search, chat interfaces, embeddings |
+| **koan-ai-integration** | Chat endpoints, embeddings, RAG, vector search, category routing, entity-aware AI, media analysis | Integrating AI features, semantic search, chat interfaces, embeddings |
 
 ### Tier 3: Developer Journey Skills (Progressive Complexity)
 
@@ -126,7 +126,7 @@ Skills act as **intelligent indexes** into the full documentation, loading exact
 ## Framework Version
 
 **Aligned with:** Koan Framework v0.6.3
-**Last Updated:** 2025-11-03
+**Last Updated:** 2026-03-23
 
 ## Migration Notes
 

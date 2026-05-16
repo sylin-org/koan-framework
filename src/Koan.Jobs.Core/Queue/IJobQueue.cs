@@ -6,6 +6,6 @@ namespace Koan.Jobs.Queue;
 
 internal interface IJobQueue
 {
-    ValueTask EnqueueAsync(JobQueueItem item, CancellationToken cancellationToken);
-    IAsyncEnumerable<JobQueueItem> ReadAllAsync(CancellationToken cancellationToken);
+    ValueTask Enqueue(JobQueueItem item, CancellationToken cancellationToken);
+    IAsyncEnumerable<JobQueueItem> ReadAll(CancellationToken cancellationToken);
 }

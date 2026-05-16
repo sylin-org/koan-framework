@@ -1,6 +1,6 @@
 ﻿using System;
-using System.ComponentModel.DataAnnotations;
 using System.Linq;
+using Koan.Data.Abstractions.Annotations;
 using System.Threading.Tasks;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
@@ -25,7 +25,7 @@ public sealed class PostgresCrudSpec
         await TestPipeline.For<PostgresCrudSpec>(_output, nameof(Upsert_query_count_and_remove_flow))
             .RequireDocker()
             .UsingPostgresContainer(database: databaseName)
-            .Using<PostgresConnectorFixture>("fixture", static ctx => PostgresConnectorFixture.CreateAsync(ctx))
+            .Using<PostgresConnectorFixture>("fixture", static ctx => PostgresConnectorFixture.Create(ctx))
             .Arrange(static async ctx =>
             {
                 var fixture = ctx.GetRequiredItem<PostgresConnectorFixture>("fixture");
@@ -41,7 +41,7 @@ public sealed class PostgresCrudSpec
 
                 await using var lease = fixture.LeasePartition(partition);
 
-                var saved = await Person.UpsertAsync(new Person { Name = "Ada", Age = 34 });
+                var saved = await Person.Upsert(new Person { Name = "Ada", Age = 34 });
                 saved.Id.Should().NotBeNullOrWhiteSpace();
                 var originalTimestamp = saved.LastUpdated;
 
@@ -61,14 +61,14 @@ public sealed class PostgresCrudSpec
                 var updated = filtered.First(f => f.Name == "Bob");
                 updated.Name = "Bobby";
                 updated.Age = 43;
-                await Person.UpsertAsync(updated);
+                await Person.Upsert(updated);
 
                 var fetched = await Person.Get(updated.Id);
                 fetched.Should().NotBeNull();
                 fetched!.Name.Should().Be("Bobby");
                 fetched.LastUpdated.Should().BeOnOrAfter(originalTimestamp);
 
-                var count = await Data<Person, string>.CountAsync(p => p.Age >= 40, partition);
+                var count = await Data<Person, string>.Count(p => p.Age >= 40, partition);
                 count.Should().Be(3);
 
                 var page = await Person.Page(1, 2);
@@ -85,14 +85,14 @@ public sealed class PostgresCrudSpec
                 remaining.Should().HaveCount(1);
                 remaining[0].Name.Should().Be("Grace");
             })
-            .RunAsync();
+            .Run();
     }
 
     private sealed class Person : Entity<Person>
     {
-        public string Name { get; set; } = string.Empty;
+        public string Name { get; set; } = "";
         public int Age { get; set; }
-        [Timestamp]
+        [Timestamp(OnSave = true)]
         public DateTimeOffset LastUpdated { get; set; }
     }
 }

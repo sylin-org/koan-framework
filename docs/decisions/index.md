@@ -8,6 +8,23 @@ This index aggregates accepted and proposed decision records. Each ADR is:
 
 Refer to `toc.yml` for categorized navigation. Use the template (`AAAA-0000`) for new ADRs.
 
+## AI Lifecycle Expansion (AI-0022 – AI-0030)
+
+Vision and capability expansion for Koan.AI: model catalog, compute fabric, prompt primitive, chain composition, media analysis, training, evaluation, and review queues.
+
+| ID | Title | Status | Depends On |
+|----|-------|--------|------------|
+| AI-0022 | [Unified AI Lifecycle — Vision](AI-0022-unified-ai-lifecycle-vision.md) | Proposed | — |
+| AI-0023 | [Model Catalog and Lifecycle](AI-0023-model-catalog-and-lifecycle.md) | Proposed | AI-0022 |
+| AI-0024 | [Compute Fabric](AI-0024-compute-fabric.md) | Proposed | AI-0023 |
+| AI-0025 | [Prompt Primitive](AI-0025-prompt-primitive.md) | Proposed | AI-0022 |
+| AI-0026 | [Chain Composition](AI-0026-chain-composition.md) | Proposed | AI-0025 |
+| AI-0027 | [Media Analysis Attribute](AI-0027-media-analysis-attribute.md) | Proposed | AI-0023, MEDIA-0001 |
+| AI-0028 | [Training and Dataset](AI-0028-training-and-dataset.md) | Proposed | AI-0023, AI-0024 |
+| AI-0029 | [Eval and Gates](AI-0029-eval-and-gates.md) | Proposed | AI-0023, AI-0028 |
+| AI-0030 | [Review Queues](AI-0030-review-queues.md) | Proposed | AI-0028 |
+| AI-0031 | [Entity-Aware Agents](AI-0031-entity-aware-agents.md) | Proposed | AI-0026, AI-0014 |
+
 ## Recent Archival / Streamlining Decisions
 
 | ID | Title | Intent |

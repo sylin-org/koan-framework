@@ -19,7 +19,6 @@ public static class PostgresRegistration
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, PostgresHealthContributor>());
         services.AddSingleton<IDataAdapterFactory, PostgresAdapterFactory>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Koan.Data.Core.Configuration.IDataProviderConnectionFactory, PostgresConnectionFactory>());
-        services.TryAddEnumerable(new ServiceDescriptor(typeof(INamingDefaultsProvider), typeof(PostgresNamingDefaultsProvider), ServiceLifetime.Singleton));
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
         services.AddRelationalOrchestration();
         return services;

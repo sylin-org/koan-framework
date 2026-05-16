@@ -91,8 +91,8 @@ internal sealed class CouchbaseDiscoveryAdapter : ServiceDiscoveryAdapterBase
     {
         // Check Couchbase-specific configuration paths
         return _configuration.GetConnectionString("Couchbase") ??
-               _configuration["Koan:Data:Couchbase:ConnectionString"] ??
-               _configuration["Koan:Data:ConnectionString"];
+               _configuration[Infrastructure.Constants.Configuration.Keys.ConnectionString] ??
+               _configuration[Infrastructure.Constants.Configuration.Keys.AltConnectionString];
     }
 
     /// <summary>Couchbase-specific environment variable handling</summary>
@@ -119,7 +119,7 @@ internal sealed class CouchbaseDiscoveryAdapter : ServiceDiscoveryAdapterBase
     {
         try
         {
-            var trimmed = value?.Trim() ?? string.Empty;
+            var trimmed = value?.Trim() ?? "";
             if (string.IsNullOrEmpty(trimmed)) return "couchbase://localhost";
 
             // If already properly formatted, return as-is

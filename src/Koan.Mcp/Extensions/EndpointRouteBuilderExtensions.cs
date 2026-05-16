@@ -55,13 +55,13 @@ public static class EndpointRouteBuilderExtensions
             group.RequireAuthorization();
         }
 
-        group.MapGet("sse", context => transport.AcceptStreamAsync(context))
+        group.MapGet("sse", context => transport.AcceptStream(context))
             .WithName("KoanMcpSseStream")
             .WithMetadata(new ProducesResponseTypeAttribute(typeof(void), StatusCodes.Status200OK, "text/event-stream"));
 
         group.MapPost("rpc", async context =>
         {
-            var result = await transport.SubmitRequestAsync(context);
+            var result = await transport.SubmitRequest(context);
             await result.ExecuteAsync(context);
         })
             .WithName("KoanMcpRpcSubmit")
@@ -71,7 +71,7 @@ public static class EndpointRouteBuilderExtensions
         {
             group.MapGet("capabilities", async context =>
             {
-                var document = await capabilityReporter.GetCapabilitiesAsync(context.RequestAborted);
+                var document = await capabilityReporter.GetCapabilities(context.RequestAborted);
                 await context.Response.WriteAsJsonAsync(document, cancellationToken: context.RequestAborted);
             })
             .WithName("KoanMcpCapabilities")

@@ -21,12 +21,12 @@ public readonly struct CacheTagSet
     public ValueTask<long> Flush(CancellationToken ct = default)
         => _tags.Length == 0
             ? ValueTask.FromResult(0L)
-            : _client.FlushTagsAsync(_tags, ct);
+            : _client.FlushTags(_tags, ct);
 
     public ValueTask<long> Count(CancellationToken ct = default)
         => _tags.Length == 0
             ? ValueTask.FromResult(0L)
-            : _client.CountTagsAsync(_tags, ct);
+            : _client.CountTags(_tags, ct);
 
     public async ValueTask<bool> Any(CancellationToken ct = default)
     {
@@ -35,7 +35,7 @@ public readonly struct CacheTagSet
             return false;
         }
 
-        var count = await _client.CountTagsAsync(_tags, ct);
+        var count = await _client.CountTags(_tags, ct);
         return count > 0;
     }
 
@@ -43,7 +43,7 @@ public readonly struct CacheTagSet
     {
         if (tags is null)
         {
-            return Array.Empty<string>();
+            return [];
         }
 
         var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -57,6 +57,6 @@ public readonly struct CacheTagSet
             set.Add(tag.Trim());
         }
 
-        return set.Count == 0 ? Array.Empty<string>() : set.ToArray();
+        return set.Count == 0 ? [] : set.ToArray();
     }
 }

@@ -45,7 +45,7 @@ internal sealed class WeaviateConnectorFixture : IAsyncDisposable
 
     public string Endpoint { get; }
 
-    public static ValueTask<WeaviateConnectorFixture> CreateAsync(TestContext ctx)
+    public static ValueTask<WeaviateConnectorFixture> Create(TestContext ctx)
     {
         ArgumentNullException.ThrowIfNull(ctx);
 
@@ -115,7 +115,7 @@ internal sealed class WeaviateConnectorFixture : IAsyncDisposable
             return;
         }
 
-        var response = await _adminHttp.DeleteAsync($"/v1/schema/{Uri.EscapeDataString(className)}").ConfigureAwait(false);
+        var response = await _adminHttp.Delete($"/v1/schema/{Uri.EscapeDataString(className)}").ConfigureAwait(false);
         if (response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.NotFound)
         {
             return;
@@ -143,7 +143,7 @@ internal sealed class WeaviateConnectorFixture : IAsyncDisposable
         {
             try
             {
-                await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+                await asyncDisposable.Dispose().ConfigureAwait(false);
                 return;
             }
             catch

@@ -6,7 +6,7 @@ EXPOSE 5090
 # Create data directory for SQLite
 RUN mkdir -p /app/data && chmod 755 /app/data
 
-FROM mcr.microsoft.com/dotnet/sdk:10.0.100-rc.1 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0.100 AS build
 WORKDIR /src
 
 # Copy project files first for better layer caching

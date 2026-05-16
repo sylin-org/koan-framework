@@ -9,7 +9,7 @@ public sealed class AppEnvDefaultsAttribute : Attribute
 {
     public AppEnvDefaultsAttribute(params string[] pairs)
     {
-        Pairs = pairs ?? Array.Empty<string>();
+        Pairs = pairs ?? [];
     }
 
     public string[] Pairs { get; }

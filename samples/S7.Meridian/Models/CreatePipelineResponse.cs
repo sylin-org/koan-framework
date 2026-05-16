@@ -8,22 +8,22 @@ namespace Koan.Samples.Meridian.Models;
 public class CreatePipelineResponse
 {
     /// <summary>ID of the created pipeline.</summary>
-    public string PipelineId { get; set; } = string.Empty;
+    public string PipelineId { get; set; } = "";
 
     /// <summary>Name of the created pipeline.</summary>
-    public string PipelineName { get; set; } = string.Empty;
+    public string PipelineName { get; set; } = "";
 
     /// <summary>Analysis type code (e.g., "EAR", "VDD") or empty if custom.</summary>
     public string? AnalysisType { get; set; }
 
     /// <summary>Analysis type name (seeded or custom).</summary>
-    public string AnalysisTypeName { get; set; } = string.Empty;
+    public string AnalysisTypeName { get; set; } = "";
 
     /// <summary>Whether this uses a custom (ephemeral) analysis type.</summary>
     public bool IsCustomAnalysis { get; set; }
 
     /// <summary>ID of the processing job created for document analysis.</summary>
-    public string JobId { get; set; } = string.Empty;
+    public string JobId { get; set; } = "";
 
     /// <summary>Current job status (typically "Pending" on creation).</summary>
     public string Status { get; set; } = "Pending";
@@ -41,19 +41,19 @@ public class CreatePipelineResponse
 public class DocumentCreationResult
 {
     /// <summary>ID of the created document entity.</summary>
-    public string DocumentId { get; set; } = string.Empty;
+    public string DocumentId { get; set; } = "";
 
     /// <summary>Original filename from upload.</summary>
-    public string FileName { get; set; } = string.Empty;
+    public string FileName { get; set; } = "";
 
     /// <summary>Assigned source type code (e.g., "MEET", "INV").</summary>
-    public string SourceType { get; set; } = string.Empty;
+    public string SourceType { get; set; } = "";
 
     /// <summary>Source type name for display.</summary>
-    public string SourceTypeName { get; set; } = string.Empty;
+    public string SourceTypeName { get; set; } = "";
 
     /// <summary>Classification method used (Manual) or the placeholder "Deferred" until background processing completes.</summary>
-    public string Method { get; set; } = string.Empty;
+    public string Method { get; set; } = "";
 
     /// <summary>Classification confidence (0.0-1.0).</summary>
     public double Confidence { get; set; }

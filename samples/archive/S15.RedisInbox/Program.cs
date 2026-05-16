@@ -13,7 +13,7 @@ var app = builder.Build();
 
 app.UseKoanSwagger();
 
-app.Run();
+app.RunAsync();
 
 namespace S15.RedisInbox
 {

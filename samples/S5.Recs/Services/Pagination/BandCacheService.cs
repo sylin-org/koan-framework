@@ -42,7 +42,7 @@ internal sealed class BandCacheService : IBandCacheService
         _logger = logger;
     }
 
-    public async Task<(IReadOnlyList<Recommendation> items, bool degraded)> GetPageAsync(
+    public async Task<(IReadOnlyList<Recommendation> items, bool degraded)> GetPage(
         RecsQuery query,
         int offset,
         int limit,
@@ -59,10 +59,10 @@ internal sealed class BandCacheService : IBandCacheService
             _logger?.LogDebug("Cache miss for {CacheKey}, initializing", cacheKey);
             lock (_statsLock) { _cacheMisses++; }
 
-            cache = await InitializeCacheAsync(query, userId, limit, ct);
+            cache = await InitializeCache(query, userId, limit, ct);
             if (cache == null || cache.Count == 0)
             {
-                return (Array.Empty<Recommendation>(), true);
+                return ([], true);
             }
 
             cache.QueryHash = queryHash;
@@ -97,13 +97,13 @@ internal sealed class BandCacheService : IBandCacheService
         if (cache.ShouldPrefetchLower(offset, limit))
         {
             _logger?.LogDebug("Triggering lower bound prefetch at offset {Offset}", offset);
-            _ = Task.Run(async () => await PrefetchLowerBandAsync(cache, query, userId, cacheKey, ct));
+            _ = Task.Run(async () => await PrefetchLowerBand(cache, query, userId, cacheKey, ct));
         }
 
         if (cache.ShouldPrefetchUpper(offset))
         {
             _logger?.LogDebug("Triggering upper bound prefetch at offset {Offset}", offset);
-            _ = Task.Run(async () => await PrefetchUpperBandAsync(cache, query, userId, cacheKey, ct));
+            _ = Task.Run(async () => await PrefetchUpperBand(cache, query, userId, cacheKey, ct));
         }
 
         // Return the requested page
@@ -115,7 +115,7 @@ internal sealed class BandCacheService : IBandCacheService
         return (page, false);
     }
 
-    private async Task<SlidingWindowCache?> InitializeCacheAsync(
+    private async Task<SlidingWindowCache?> InitializeCache(
         RecsQuery query,
         string? userId,
         int pageSize,
@@ -142,7 +142,7 @@ internal sealed class BandCacheService : IBandCacheService
             ExcludeIds = null
         };
 
-        var (initialResults, degraded) = await _recsService.QueryAsync(initialQuery, userId, ct);
+        var (initialResults, degraded) = await _recsService.Query(initialQuery, userId, ct);
 
         if (degraded)
         {
@@ -175,7 +175,7 @@ internal sealed class BandCacheService : IBandCacheService
                 _logger?.LogDebug("Fetching band [{Upper:F2}, {Lower:F2}] (attempt {Attempt}, collected {Count}/{Target})",
                     upperBound, lowerBound, attempts + 1, allItems.Count, targetSize);
 
-                var bandItems = await FetchScoreBandAsync(
+                var bandItems = await FetchScoreBand(
                     query,
                     userId,
                     lowerBound,
@@ -249,7 +249,7 @@ internal sealed class BandCacheService : IBandCacheService
             var upperBound = cache.LowerScoreBound;
             var lowerBound = upperBound - bandWidth;
 
-            var bandItems = await FetchScoreBandAsync(
+            var bandItems = await FetchScoreBand(
                 query,
                 userId,
                 lowerBound,
@@ -267,7 +267,7 @@ internal sealed class BandCacheService : IBandCacheService
         }
     }
 
-    private async Task PrefetchLowerBandAsync(
+    private async Task PrefetchLowerBand(
         SlidingWindowCache cache,
         RecsQuery query,
         string? userId,
@@ -289,7 +289,7 @@ internal sealed class BandCacheService : IBandCacheService
             _logger?.LogDebug("Background prefetch: fetching lower band [{Upper:F2}, {Lower:F2}]",
                 upperBound, lowerBound);
 
-            var bandItems = await FetchScoreBandAsync(
+            var bandItems = await FetchScoreBand(
                 query,
                 userId,
                 lowerBound,
@@ -327,7 +327,7 @@ internal sealed class BandCacheService : IBandCacheService
         }
     }
 
-    private async Task PrefetchUpperBandAsync(
+    private async Task PrefetchUpperBand(
         SlidingWindowCache cache,
         RecsQuery query,
         string? userId,
@@ -349,7 +349,7 @@ internal sealed class BandCacheService : IBandCacheService
             _logger?.LogDebug("Background prefetch: fetching upper band [{Upper:F2}, {Lower:F2}]",
                 upperBound, lowerBound);
 
-            var bandItems = await FetchScoreBandAsync(
+            var bandItems = await FetchScoreBand(
                 query,
                 userId,
                 lowerBound,
@@ -387,7 +387,7 @@ internal sealed class BandCacheService : IBandCacheService
         }
     }
 
-    private async Task<List<Recommendation>> FetchScoreBandAsync(
+    private async Task<List<Recommendation>> FetchScoreBand(
         RecsQuery query,
         string? userId,
         double scoreMin,
@@ -409,7 +409,7 @@ internal sealed class BandCacheService : IBandCacheService
         };
 
         // Fetch from RecsService (this applies vector search + personalization)
-        var (results, degraded) = await _recsService.QueryAsync(bandQuery, userId, ct);
+        var (results, degraded) = await _recsService.Query(bandQuery, userId, ct);
 
         if (degraded)
         {

@@ -33,7 +33,7 @@ internal sealed class GraphQlExecutor : IGraphQlExecutor
     public async Task<string> GetSdl(CancellationToken ct)
     {
         var executor = await _executors.GetRequestExecutorAsync();
-        return executor.Schema?.ToString() ?? string.Empty;
+        return executor.Schema?.ToString() ?? "";
     }
 }
 

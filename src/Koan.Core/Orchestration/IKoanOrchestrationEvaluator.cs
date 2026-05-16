@@ -25,7 +25,7 @@ public interface IKoanOrchestrationEvaluator
     /// <param name="configuration">Application configuration</param>
     /// <param name="context">Current orchestration context</param>
     /// <returns>Orchestration decision with action and dependency details</returns>
-    Task<OrchestrationDecision> EvaluateAsync(IConfiguration configuration, OrchestrationContext context);
+    Task<OrchestrationDecision> Evaluate(IConfiguration configuration, OrchestrationContext context);
 }
 
 /// <summary>

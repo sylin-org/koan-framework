@@ -18,7 +18,7 @@ public class ImportOrchestrator : IImportOrchestrator
         _logger = logger;
     }
 
-    public async Task<List<string>> QueueImportAsync(
+    public async Task<List<string>> QueueImport(
         string source,
         string[] mediaTypeIds,
         ImportOptions options,
@@ -93,7 +93,7 @@ public class ImportOrchestrator : IImportOrchestrator
         return jobIds;
     }
 
-    public async Task<ImportProgressResponse> GetProgressAsync(
+    public async Task<ImportProgressResponse> GetProgress(
         string[] jobIds,
         CancellationToken ct)
     {

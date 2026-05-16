@@ -51,7 +51,7 @@ public sealed class RedisContainerFixture : IAsyncDisposable, IInitializableFixt
             return;
         }
 
-        if (await CanTcpConnectAsync(IPAddress.Loopback, RedisPort, context.Cancellation).ConfigureAwait(false))
+        if (await CanTcpConnect(IPAddress.Loopback, RedisPort, context.Cancellation).ConfigureAwait(false))
         {
             ConnectionString = $"127.0.0.1:{RedisPort}";
             IsAvailable = true;
@@ -108,9 +108,9 @@ public sealed class RedisContainerFixture : IAsyncDisposable, IInitializableFixt
         {
             var missingMessage = mmex?.Message ?? ex.Message;
             context.Diagnostics.Warn("redis.fixture.testcontainers.missingmethod", new { message = missingMessage });
-            await DisposeContainerSilentlyAsync(container).ConfigureAwait(false);
+            await DisposeContainerSilently(container).ConfigureAwait(false);
 
-            var (ok, failureReason) = await TryStartWithDockerCliAsync(context).ConfigureAwait(false);
+            var (ok, failureReason) = await TryStartWithDockerCli(context).ConfigureAwait(false);
             if (ok)
             {
                 return;
@@ -123,7 +123,7 @@ public sealed class RedisContainerFixture : IAsyncDisposable, IInitializableFixt
         {
             UnavailableReason = $"Failed to start Redis container: {ex.GetType().Name}: {ex.Message}";
             context.Diagnostics.Error("redis.fixture.container.failed", new { message = ex.Message }, ex);
-            await DisposeContainerSilentlyAsync(container).ConfigureAwait(false);
+            await DisposeContainerSilently(container).ConfigureAwait(false);
             return;
         }
     }
@@ -146,7 +146,7 @@ public sealed class RedisContainerFixture : IAsyncDisposable, IInitializableFixt
 
     public async ValueTask DisposeAsync()
     {
-        await DisposeContainerSilentlyAsync().ConfigureAwait(false);
+        await DisposeContainerSilently().ConfigureAwait(false);
     }
 
     private static bool TryGetExplicitConnectionString(out string? connectionString)
@@ -162,17 +162,17 @@ public sealed class RedisContainerFixture : IAsyncDisposable, IInitializableFixt
         return !string.IsNullOrWhiteSpace(connectionString);
     }
 
-    private static Task<bool> CanTcpConnectAsync(string host, int port, CancellationToken cancellation, int timeoutMs = 250)
+    private static Task<bool> CanTcpConnect(string host, int port, CancellationToken cancellation, int timeoutMs = 250)
     {
         if (IPAddress.TryParse(host, out var ip))
         {
-            return CanTcpConnectAsync(ip, port, cancellation, timeoutMs);
+            return CanTcpConnect(ip, port, cancellation, timeoutMs);
         }
 
-        return CanTcpConnectByLookupAsync(host, port, cancellation, timeoutMs);
+        return CanTcpConnectByLookup(host, port, cancellation, timeoutMs);
     }
 
-    private static async Task<bool> CanTcpConnectByLookupAsync(string host, int port, CancellationToken cancellation, int timeoutMs)
+    private static async Task<bool> CanTcpConnectByLookup(string host, int port, CancellationToken cancellation, int timeoutMs)
     {
         try
         {
@@ -181,7 +181,7 @@ public sealed class RedisContainerFixture : IAsyncDisposable, IInitializableFixt
             foreach (var address in addresses)
             {
                 if (address.AddressFamily == AddressFamily.InterNetwork
-                    && await CanTcpConnectAsync(address, port, cancellation, timeoutMs).ConfigureAwait(false))
+                    && await CanTcpConnect(address, port, cancellation, timeoutMs).ConfigureAwait(false))
                 {
                     return true;
                 }
@@ -190,7 +190,7 @@ public sealed class RedisContainerFixture : IAsyncDisposable, IInitializableFixt
             foreach (var address in addresses)
             {
                 if (address.AddressFamily == AddressFamily.InterNetworkV6
-                    && await CanTcpConnectAsync(address, port, cancellation, timeoutMs).ConfigureAwait(false))
+                    && await CanTcpConnect(address, port, cancellation, timeoutMs).ConfigureAwait(false))
                 {
                     return true;
                 }
@@ -204,7 +204,7 @@ public sealed class RedisContainerFixture : IAsyncDisposable, IInitializableFixt
         return false;
     }
 
-    private static async Task<bool> CanTcpConnectAsync(IPAddress address, int port, CancellationToken cancellation, int timeoutMs = 250)
+    private static async Task<bool> CanTcpConnect(IPAddress address, int port, CancellationToken cancellation, int timeoutMs = 250)
     {
         try
         {
@@ -219,7 +219,7 @@ public sealed class RedisContainerFixture : IAsyncDisposable, IInitializableFixt
         }
     }
 
-    private async ValueTask DisposeContainerSilentlyAsync(TestcontainersContainer? container = null)
+    private async ValueTask DisposeContainerSilently(TestcontainersContainer? container = null)
     {
         var target = container ?? _container;
         if (target is not null)
@@ -248,14 +248,14 @@ public sealed class RedisContainerFixture : IAsyncDisposable, IInitializableFixt
             _container = null;
         }
 
-        await StopCliContainerAsync().ConfigureAwait(false);
+        await StopCliContainer().ConfigureAwait(false);
     }
 
-    private async Task<(bool ok, string? failureReason)> TryStartWithDockerCliAsync(TestContext context)
+    private async Task<(bool ok, string? failureReason)> TryStartWithDockerCli(TestContext context)
     {
         var containerName = $"koan-redis-{Guid.NewGuid():N}";
         var runArgs = $"run --rm -d --name {containerName} -p 127.0.0.1::6379 redis:7-alpine";
-        var (runOk, runStdout, runStderr, runExitCode) = await RunDockerCommandAsync(runArgs, context.Cancellation).ConfigureAwait(false);
+        var (runOk, runStdout, runStderr, runExitCode) = await RunDockerCommand(runArgs, context.Cancellation).ConfigureAwait(false);
 
         if (!runOk)
         {
@@ -266,13 +266,13 @@ public sealed class RedisContainerFixture : IAsyncDisposable, IInitializableFixt
         _cliContainerId = containerName;
 
         var portOk = false;
-        string portStdout = string.Empty;
-        string portStderr = string.Empty;
+        string portStdout = "";
+        string portStderr = "";
         var portExitCode = 0;
 
         for (var attempt = 0; attempt < 5 && !portOk; attempt++)
         {
-            (portOk, portStdout, portStderr, portExitCode) = await RunDockerCommandAsync($"port {containerName} 6379/tcp", context.Cancellation).ConfigureAwait(false);
+            (portOk, portStdout, portStderr, portExitCode) = await RunDockerCommand($"port {containerName} 6379/tcp", context.Cancellation).ConfigureAwait(false);
             if (portOk && !string.IsNullOrWhiteSpace(portStdout))
             {
                 break;
@@ -293,7 +293,7 @@ public sealed class RedisContainerFixture : IAsyncDisposable, IInitializableFixt
         if (!portOk || string.IsNullOrWhiteSpace(portStdout))
         {
             context.Diagnostics.Warn("redis.fixture.dockercli.port.failed", new { exitCode = portExitCode, stdout = Truncate(portStdout), stderr = Truncate(portStderr) });
-            await StopCliContainerAsync().ConfigureAwait(false);
+            await StopCliContainer().ConfigureAwait(false);
             return (false, "Failed to determine published Redis port from docker CLI");
         }
 
@@ -301,15 +301,15 @@ public sealed class RedisContainerFixture : IAsyncDisposable, IInitializableFixt
         if (hostPort == 0)
         {
             context.Diagnostics.Warn("redis.fixture.dockercli.port.parse", new { stdout = Truncate(portStdout) });
-            await StopCliContainerAsync().ConfigureAwait(false);
+            await StopCliContainer().ConfigureAwait(false);
             return (false, "Unable to parse published Redis port from docker CLI output");
         }
 
         var connected = false;
         for (var attempt = 0; attempt < 60 && !context.Cancellation.IsCancellationRequested; attempt++)
         {
-            if (await CanTcpConnectAsync(IPAddress.Loopback, hostPort, context.Cancellation, 250).ConfigureAwait(false)
-                || await CanTcpConnectAsync(IPAddress.IPv6Loopback, hostPort, context.Cancellation, 250).ConfigureAwait(false))
+            if (await CanTcpConnect(IPAddress.Loopback, hostPort, context.Cancellation, 250).ConfigureAwait(false)
+                || await CanTcpConnect(IPAddress.IPv6Loopback, hostPort, context.Cancellation, 250).ConfigureAwait(false))
             {
                 connected = true;
                 break;
@@ -328,8 +328,8 @@ public sealed class RedisContainerFixture : IAsyncDisposable, IInitializableFixt
         if (!connected)
         {
             context.Diagnostics.Warn("redis.fixture.dockercli.connect.timeout", new { port = hostPort });
-            await DumpDockerLogsAsync(containerName, context.Cancellation, context).ConfigureAwait(false);
-            await StopCliContainerAsync().ConfigureAwait(false);
+            await DumpDockerLogs(containerName, context.Cancellation, context).ConfigureAwait(false);
+            await StopCliContainer().ConfigureAwait(false);
             return (false, $"Redis container did not accept TCP connections on localhost:{hostPort} within timeout");
         }
 
@@ -340,7 +340,7 @@ public sealed class RedisContainerFixture : IAsyncDisposable, IInitializableFixt
         return (true, null);
     }
 
-    private async Task<(bool ok, string stdout, string stderr, int exitCode)> RunDockerCommandAsync(string arguments, CancellationToken cancellation)
+    private async Task<(bool ok, string stdout, string stderr, int exitCode)> RunDockerCommand(string arguments, CancellationToken cancellation)
     {
         var psi = CreateDockerProcessStartInfo(arguments);
         Process? process = null;
@@ -350,7 +350,7 @@ public sealed class RedisContainerFixture : IAsyncDisposable, IInitializableFixt
             process = Process.Start(psi);
             if (process is null)
             {
-                return (false, string.Empty, "Failed to start docker process", -1);
+                return (false, "", "Failed to start docker process", -1);
             }
 
             var stdoutTask = process.StandardOutput.ReadToEndAsync();
@@ -373,11 +373,11 @@ public sealed class RedisContainerFixture : IAsyncDisposable, IInitializableFixt
                 }
             }
 
-            return (false, string.Empty, "Cancelled", -1);
+            return (false, "", "Cancelled", -1);
         }
         catch (Exception ex)
         {
-            return (false, string.Empty, ex.Message, -1);
+            return (false, "", ex.Message, -1);
         }
         finally
         {
@@ -427,7 +427,7 @@ public sealed class RedisContainerFixture : IAsyncDisposable, IInitializableFixt
         return endpoint;
     }
 
-    private async Task DumpDockerLogsAsync(string containerName, CancellationToken cancellation, TestContext context)
+    private async Task DumpDockerLogs(string containerName, CancellationToken cancellation, TestContext context)
     {
         if (string.IsNullOrWhiteSpace(containerName))
         {
@@ -436,7 +436,7 @@ public sealed class RedisContainerFixture : IAsyncDisposable, IInitializableFixt
 
         try
         {
-            var (ok, stdout, stderr, exitCode) = await RunDockerCommandAsync($"logs {containerName}", cancellation).ConfigureAwait(false);
+            var (ok, stdout, stderr, exitCode) = await RunDockerCommand($"logs {containerName}", cancellation).ConfigureAwait(false);
             if (!ok)
             {
                 context.Diagnostics.Debug("redis.fixture.dockercli.logs.failed", new { exitCode, stderr = Truncate(stderr), stdout = Truncate(stdout) });
@@ -483,13 +483,13 @@ public sealed class RedisContainerFixture : IAsyncDisposable, IInitializableFixt
     {
         if (string.IsNullOrEmpty(value))
         {
-            return string.Empty;
+            return "";
         }
 
         return value.Length <= max ? value : value[..max] + "…";
     }
 
-    private async ValueTask StopCliContainerAsync()
+    private async ValueTask StopCliContainer()
     {
         if (string.IsNullOrWhiteSpace(_cliContainerId))
         {
@@ -498,7 +498,7 @@ public sealed class RedisContainerFixture : IAsyncDisposable, IInitializableFixt
 
         try
         {
-            await RunDockerCommandAsync($"rm -f {_cliContainerId}", CancellationToken.None).ConfigureAwait(false);
+            await RunDockerCommand($"rm -f {_cliContainerId}", CancellationToken.None).ConfigureAwait(false);
         }
         catch
         {

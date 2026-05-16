@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Koan.AI.Contracts;
 using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Models;
 using Koan.AI.Contracts.Routing;
+using Koan.Web.Sse.Mvc;
 
 namespace Koan.AI.Web.Controllers;
 
@@ -13,9 +15,9 @@ namespace Koan.AI.Web.Controllers;
 [Route(Constants.Routes.Base)]
 public sealed class AiController : ControllerBase
 {
-    private readonly IAi _ai;
+    private readonly IAiPipeline _ai;
     private readonly IAiAdapterRegistry _registry;
-    public AiController(IAi ai, IAiAdapterRegistry registry)
+    public AiController(IAiPipeline ai, IAiAdapterRegistry registry)
     { _ai = ai; _registry = registry; }
 
     [HttpGet(Constants.Routes.Health)]
@@ -38,7 +40,7 @@ public sealed class AiController : ControllerBase
         {
             try
             {
-                var list = await a.ListModelsAsync(ct);
+                var list = await a.ListModels(ct);
                 results.AddRange(list);
             }
             catch { /* ignore unavailable adapter */ }
@@ -47,62 +49,85 @@ public sealed class AiController : ControllerBase
     }
 
     [HttpGet(Constants.Routes.Capabilities)]
-    public async Task<IActionResult> Capabilities(CancellationToken ct)
+    public IActionResult Capabilities()
     {
-        var caps = new List<AiCapabilities>();
-        foreach (var a in _registry.All)
+        var caps = _registry.All.Select(a => new
         {
-            try { caps.Add(await a.GetCapabilitiesAsync(ct)); }
-            catch { /* ignore unavailable adapter */ }
-        }
+            a.Id,
+            a.Type,
+            Chat = a is IChatAdapter,
+            Embed = a is IEmbedAdapter,
+            Ocr = a is IOcrAdapter,
+            ModelManagement = a.ModelManager is not null
+        });
         return Ok(caps);
+    }
+
+    [HttpPost(Constants.Routes.Ocr)]
+    public async Task<IActionResult> Ocr(IFormFile file, CancellationToken ct)
+    {
+        if (file is null || file.Length == 0)
+            return BadRequest(new { message = "Image file is required." });
+
+        using var ms = new System.IO.MemoryStream();
+        await file.CopyToAsync(ms, ct);
+        var imageBytes = ms.ToArray();
+
+        var text = await Client.Ocr(imageBytes, new Contracts.Options.OcrOptions
+        {
+            MimeType = file.ContentType
+        }, ct);
+
+        return Ok(new { text });
     }
 
     [HttpPost(Constants.Routes.AdapterModelInstall)]
     public Task<IActionResult> InstallModel(string adapterId, [FromBody] AiModelOperationRequest request, CancellationToken ct)
-        => ExecuteModelOperationAsync(adapterId, request, static (manager, payload, token) => manager.EnsureInstalledAsync(payload, token), ct);
+        => ExecuteModelOperation(adapterId, request, static (manager, payload, token) => manager.EnsureInstalled(payload, token), ct);
 
     [HttpPost(Constants.Routes.AdapterModelRefresh)]
     public Task<IActionResult> RefreshModel(string adapterId, [FromBody] AiModelOperationRequest request, CancellationToken ct)
-        => ExecuteModelOperationAsync(adapterId, request, static (manager, payload, token) => manager.RefreshAsync(payload, token), ct);
+        => ExecuteModelOperation(adapterId, request, static (manager, payload, token) => manager.Refresh(payload, token), ct);
 
     [HttpPost(Constants.Routes.AdapterModelFlush)]
     public Task<IActionResult> FlushModel(string adapterId, [FromBody] AiModelOperationRequest request, CancellationToken ct)
-        => ExecuteModelOperationAsync(adapterId, request, static (manager, payload, token) => manager.FlushAsync(payload, token), ct);
+        => ExecuteModelOperation(adapterId, request, static (manager, payload, token) => manager.Flush(payload, token), ct);
 
     [HttpPost(Constants.Routes.Chat)]
     public async Task<ActionResult<AiChatResponse>> Chat([FromBody] AiChatRequest request, CancellationToken ct)
     {
-        var res = await _ai.PromptAsync(request, ct);
+        var res = await _ai.Prompt(request, ct);
         return Ok(res);
     }
 
     [HttpPost(Constants.Routes.ChatStream)]
-    public async Task Stream([FromBody] AiChatRequest request, CancellationToken ct)
+    public IActionResult ChatStream([FromBody] AiChatRequest request, CancellationToken ct)
+        => SseActionResult.StreamText(StreamDeltas(request, ct));
+
+    private async IAsyncEnumerable<string> StreamDeltas(
+        AiChatRequest request,
+        [EnumeratorCancellation] CancellationToken ct)
     {
-        Response.StatusCode = 200;
-        Response.ContentType = "text/event-stream";
-        Response.Headers.CacheControl = "no-cache";
-        Response.Headers.Pragma = "no-cache";
-        Response.Headers.Connection = "keep-alive";
-        Response.Headers["X-Accel-Buffering"] = "no"; // nginx
-        await foreach (var chunk in _ai.StreamAsync(request, ct))
+        await foreach (var chunk in _ai.Stream(request, ct))
         {
-            var payload = chunk.DeltaText ?? string.Empty;
-            if (payload.Length == 0) continue;
-            await Response.WriteAsync($"data: {payload}\n\n", ct);
-            await Response.Body.FlushAsync(ct);
+            var payload = chunk.DeltaText;
+            if (string.IsNullOrEmpty(payload))
+            {
+                continue;
+            }
+
+            yield return payload;
         }
     }
 
     [HttpPost(Constants.Routes.Embeddings)]
     public async Task<ActionResult<AiEmbeddingsResponse>> Embeddings([FromBody] AiEmbeddingsRequest request, CancellationToken ct)
     {
-        var res = await _ai.EmbedAsync(request, ct);
+        var res = await _ai.Embed(request, ct);
         return Ok(res);
     }
 
-    private async Task<IActionResult> ExecuteModelOperationAsync(
+    private async Task<IActionResult> ExecuteModelOperation(
         string adapterId,
         AiModelOperationRequest request,
         Func<IAiModelManager, AiModelOperationRequest, CancellationToken, Task<AiModelOperationResult>> operation,

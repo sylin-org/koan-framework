@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using Koan.Data.Core.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -11,7 +12,7 @@ namespace Koan.Data.Core;
 /// Registry for data sources discovered from configuration or registered programmatically.
 ///
 /// Sources are named configurations that define adapter, connection string, and adapter-specific settings.
-/// Discovered from "Koan:Data:Sources:{name}" configuration sections.
+/// Discovered from "<see cref="ConfigurationConstants.Sources.Section"/>:{name}" configuration sections.
 ///
 /// Example configuration:
 /// {
@@ -47,14 +48,14 @@ public sealed class DataSourceRegistry
         IReadOnlyDictionary<string, string> Settings);
 
     /// <summary>
-    /// Auto-discover sources from IConfiguration at "Koan:Data:Sources:{name}".
+    /// Auto-discover sources from IConfiguration at "<see cref="ConfigurationConstants.Sources.Section"/>:{name}".
     /// Always ensures "Default" source exists (even if empty).
     /// </summary>
     /// <param name="config">Configuration to scan for sources</param>
     /// <param name="logger">Optional logger for diagnostics</param>
     public void DiscoverFromConfiguration(IConfiguration config, ILogger? logger = null)
     {
-        var sourcesSection = config.GetSection("Koan:Data:Sources");
+        var sourcesSection = config.GetSection(ConfigurationConstants.Sources.Section);
 
         foreach (var sourceConfig in sourcesSection.GetChildren())
         {

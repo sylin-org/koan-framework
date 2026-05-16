@@ -22,7 +22,7 @@ public sealed class AdverseEventReportsController : EntityController<AdverseEven
     [HttpPost("summarise")]
     public async Task<ActionResult<SafetySummaryResult>> Summarise([FromBody] SafetySummaryRequest request, CancellationToken ct)
     {
-        var result = await _safety.SummariseAsync(request, ct);
+        var result = await _safety.Summarise(request, ct);
         return Ok(result);
     }
 }

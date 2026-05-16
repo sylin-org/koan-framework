@@ -8,7 +8,7 @@ namespace Koan.Samples.Meridian.Services;
 
 public interface IOcrClient
 {
-    Task<OcrExtractionResult?> ExtractAsync(Stream pdfStream, CancellationToken ct);
+    Task<OcrExtractionResult?> Extract(Stream pdfStream, CancellationToken ct);
 }
 
 public sealed record OcrExtractionResult(string Text, double Confidence, int PageCount);
@@ -26,7 +26,7 @@ public sealed class TesseractOcrClient : IOcrClient
         _logger = logger;
     }
 
-    public async Task<OcrExtractionResult?> ExtractAsync(Stream pdfStream, CancellationToken ct)
+    public async Task<OcrExtractionResult?> Extract(Stream pdfStream, CancellationToken ct)
     {
         var ocrOptions = _options.Extraction.Ocr;
         if (!ocrOptions.Enabled)

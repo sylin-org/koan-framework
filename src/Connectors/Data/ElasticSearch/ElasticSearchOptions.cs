@@ -24,20 +24,17 @@ public sealed class ElasticSearchOptions : IAdapterOptions
     public string? Password { get; set; } = null;
     public bool DisableIndexAutoCreate { get; set; } = false;
 
-    // Query configuration for vector similarity search
+    // Query configuration for vector similarity search. MaxTopK is a vector-search domain
+    // concept (cost of nearest-neighbour scoring), not a row-page cap; it stays.
     public int DefaultTopK { get; set; } = 10;
     public int MaxTopK { get; set; } = 200;
 
-    // IAdapterOptions implementation - map to vector-specific properties
+    // IAdapterOptions implementation — default-only fallback. Aliased to DefaultTopK because
+    // a "page" of vector results IS a top-K query for this adapter family.
     public int DefaultPageSize
     {
         get => DefaultTopK;
         set => DefaultTopK = value;
-    }
-    public int MaxPageSize
-    {
-        get => MaxTopK;
-        set => MaxTopK = value;
     }
 
     public IAdapterReadinessConfiguration Readiness { get; set; } = new AdapterReadinessConfiguration();

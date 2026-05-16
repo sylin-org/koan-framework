@@ -8,10 +8,12 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging;
 using Koan.Core.Hosting.Bootstrap;
+using Koan.Core.Hosting.Registry;
 using Koan.Core.Logging;
-using Koan.Core.Observability;
 using Koan.Core;
 using Koan.Core.Provenance;
+using Koan.Core.Observability;
+using Koan.Core.Observability.Health;
 
 namespace Koan.Core.Hosting.Runtime;
 
@@ -50,17 +52,38 @@ internal sealed class AppRuntime : IAppRuntime
             var snapshot = KoanEnv.CurrentSnapshot;
             var runtimeVersion = ResolveRuntimeVersion(modulePairs);
 
+            HealthSnapshot? healthSnapshot = null;
+            try
+            {
+                var healthAggregator = _sp.GetService<IHealthAggregator>();
+                healthSnapshot = healthAggregator?.GetSnapshot();
+            }
+            catch
+            {
+                // intentionally best-effort
+            }
+
             var hostDescription = DescribeHost();
-            var headerBlock = KoanConsoleBlocks.BuildBootstrapHeaderBlock(snapshot, hostDescription, modulePairs, runtimeVersion);
-            var inventoryBlock = KoanConsoleBlocks.BuildInventoryBlock(snapshot, modulePairs);
+            var startupBlock = KoanConsoleBlocks.BuildStartupOverviewBlock(
+                snapshot,
+                hostDescription,
+                modulePairs,
+                runtimeVersion,
+                AppBootstrapper.RegistrySummary,
+                healthSnapshot);
+
+            KoanStartupTimeline.Mark(KoanStartupStage.ConfigReady);
+            var timeline = KoanStartupTimeline.GetSummary();
 
             if (_logger is not null)
             {
-                _logger.LogInformation("{Block}", headerBlock);
-                _logger.LogInformation("{Block}", inventoryBlock);
-            }
+                if (timeline.HasValues)
+                {
+                    _logger.LogInformation("[K:PHASE] {Timeline}", KoanConsoleBlocks.FormatStartupPhases(timeline));
+                }
 
-            KoanStartupTimeline.Mark(KoanStartupStage.ConfigReady);
+                _logger.LogInformation("{Block}", startupBlock);
+            }
 
             var show = !KoanEnv.IsProduction;
             var obs = _sp.GetService<Microsoft.Extensions.Options.IOptions<Koan.Core.Observability.ObservabilityOptions>>();
@@ -71,8 +94,11 @@ internal sealed class AppRuntime : IAppRuntime
             {
                 try
                 {
-                    Console.Write(headerBlock);
-                    Console.Write(inventoryBlock);
+                    if (timeline.HasValues)
+                    {
+                        Console.WriteLine($"[K:PHASE] {KoanConsoleBlocks.FormatStartupPhases(timeline)}");
+                    }
+                    Console.Write(startupBlock);
                 }
                 catch
                 {
@@ -89,29 +115,21 @@ internal sealed class AppRuntime : IAppRuntime
 
         var env = _sp.GetService<IHostEnvironment>();
 
-        // Find and invoke all KoanAutoRegistrars to collect their reports
-        // Use cached assemblies instead of bespoke AppDomain scanning
-        var assemblies = AssemblyCache.Instance.GetAllAssemblies();
-        foreach (var asm in assemblies)
+        foreach (var registrarType in KoanRegistry.GetAutoRegistrarTypes())
         {
-            Type[] types;
-            try { types = asm.GetTypes(); }
-            catch { continue; }
-
-            foreach (var t in types)
+            try
             {
-                if (t.IsAbstract || !typeof(IKoanAutoRegistrar).IsAssignableFrom(t)) continue;
-                try
-                {
-                    if (Activator.CreateInstance(t) is IKoanAutoRegistrar registrar)
-                    {
-                        var hostEnv = env ?? new DefaultHostEnvironment();
-                        var module = registry.GetOrCreateModule(string.Empty, registrar.ModuleName);
-                        module.Describe(registrar.ModuleVersion);
-                        registrar.Describe(module, cfg, hostEnv);
-                    }
-                }
-                catch { /* best-effort */ }
+                if (registrarType.IsAbstract) continue;
+                if (Activator.CreateInstance(registrarType) is not IKoanAutoRegistrar registrar) continue;
+
+                var hostEnv = env ?? new DefaultHostEnvironment();
+                var module = registry.GetOrCreateModule("", registrar.ModuleName);
+                module.Describe(registrar.ModuleVersion);
+                registrar.Describe(module, cfg, hostEnv);
+            }
+            catch
+            {
+                // best-effort only; provenance should never block host start
             }
         }
     }

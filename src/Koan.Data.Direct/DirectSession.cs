@@ -54,7 +54,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
         {
             return await execTask;
         }
-        await using var ctx = await OpenAsync(ct);
+        await using var ctx = await Open(ct);
         await using var cmd = CreateCommand(ctx.Connection, sql, ToDictionary(parameters), ctx.Transaction);
         cmd.CommandTimeout = (int)_timeout.TotalSeconds;
         return await cmd.ExecuteNonQueryAsync(ct);
@@ -66,7 +66,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
         {
             return await execTask;
         }
-        await using var ctx = await OpenAsync(ct);
+        await using var ctx = await Open(ct);
         await using var cmd = CreateCommand(ctx.Connection, sql, ToDictionary(parameters), ctx.Transaction);
         cmd.CommandTimeout = (int)_timeout.TotalSeconds;
         var res = await cmd.ExecuteScalarAsync(ct);
@@ -102,7 +102,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
                 }
             }
         }
-        await using var ctx = await OpenAsync(ct);
+        await using var ctx = await Open(ct);
         await using var cmd = CreateCommand(ctx.Connection, sql, ToDictionary(parameters), ctx.Transaction);
         cmd.CommandTimeout = (int)_timeout.TotalSeconds;
         using var reader = await cmd.ExecuteReaderAsync(ct);
@@ -140,7 +140,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
             .OrderBy(a => a.GetName().Name?.StartsWith("Koan.") == true ? 0 : 1)
             .SelectMany(a =>
             {
-                try { return a.GetTypes(); } catch { return Array.Empty<Type>(); }
+                try { return a.GetTypes(); } catch { return []; }
             })
             .FirstOrDefault(t => string.Equals(t.FullName, token, StringComparison.OrdinalIgnoreCase) || string.Equals(t.Name, token, StringComparison.Ordinal));
         return entityType is not null;
@@ -162,7 +162,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
         return false;
     }
 
-    private async Task<ConnCtx> OpenAsync(CancellationToken ct)
+    private async Task<ConnCtx> Open(CancellationToken ct)
     {
         var (provider, connStr) = Resolve();
         var conn = CreateConnection(_sp, provider, connStr);
@@ -203,7 +203,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
             if (!string.IsNullOrWhiteSpace(byResolver))
                 return (providerHint, byResolver!);
 
-            var named = _cfg[$"ConnectionStrings:{value}"] ?? _cfg[$"Koan:Data:Sources:{value}:ConnectionString"];
+            var named = _cfg[$"ConnectionStrings:{value}"] ?? _cfg[Infrastructure.ConfigurationConstants.Keys.SourceConnectionString(value)];
             if (!string.IsNullOrWhiteSpace(named))
                 return (providerHint, named!);
 
@@ -219,7 +219,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
             }
 
             // Fallback: Try config-based resolution for backward compatibility
-            var byCfg = _cfg[$"ConnectionStrings:{_source}"] ?? _cfg[$"Koan:Data:Sources:{_source}:ConnectionString"];
+            var byCfg = _cfg[$"ConnectionStrings:{_source}"] ?? _cfg[Infrastructure.ConfigurationConstants.Keys.SourceConnectionString(_source)];
             if (!string.IsNullOrWhiteSpace(byCfg))
                 return (_source, byCfg!);
 
@@ -235,7 +235,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
                 return (_adapter, byResolver!);
 
             // Try adapter-specific config path
-            var adapterCfg = _cfg[$"Koan:Data:{_adapter}:ConnectionString"];
+            var adapterCfg = _cfg[Infrastructure.ConfigurationConstants.Keys.AdapterConnectionString(_adapter)];
             if (!string.IsNullOrWhiteSpace(adapterCfg))
                 return (_adapter, adapterCfg!);
 

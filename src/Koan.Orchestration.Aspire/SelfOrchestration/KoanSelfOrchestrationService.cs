@@ -30,14 +30,14 @@ public class KoanSelfOrchestrationService : IHostedService
         {
             // Clean up containers from crashed app instances (primary crash recovery mechanism)
             _logger.LogDebug("Cleaning up containers from crashed app instances...");
-            await _containerManager.CleanupAppInstanceContainersAsync(cancellationToken);
+            await _containerManager.CleanupAppInstanceContainers(cancellationToken);
 
             // Clean up any orphaned containers from other apps (fallback cleanup)
             _logger.LogDebug("Cleaning up orphaned containers from previous sessions...");
-            await _containerManager.CleanupOrphanedKoanContainersAsync(cancellationToken);
+            await _containerManager.CleanupOrphanedKoanContainers(cancellationToken);
 
             // Start the dependencies
-            await _orchestrator.StartDependenciesAsync(cancellationToken);
+            await _orchestrator.StartDependencies(cancellationToken);
             _logger.LogInformation("Self-orchestration service started successfully");
         }
         catch (Exception ex)
@@ -53,7 +53,7 @@ public class KoanSelfOrchestrationService : IHostedService
 
         try
         {
-            await _orchestrator.StopDependenciesAsync(cancellationToken);
+            await _orchestrator.StopDependencies(cancellationToken);
             _logger.LogInformation("Self-orchestration service stopped successfully");
         }
         catch (Exception ex)

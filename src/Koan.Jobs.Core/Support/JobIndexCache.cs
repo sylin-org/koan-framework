@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using Koan.Jobs.Model;
 
 namespace Koan.Jobs.Support;
@@ -14,6 +16,8 @@ internal sealed class JobIndexCache
     public bool TryGet(string jobId, [NotNullWhen(true)] out JobIndexEntry? entry) => _entries.TryGetValue(jobId, out entry);
 
     public void Remove(string jobId) => _entries.TryRemove(jobId, out _);
+
+    internal IReadOnlyCollection<JobIndexEntry> GetAll() => _entries.Values.ToArray();
 }
 
 /// <summary>

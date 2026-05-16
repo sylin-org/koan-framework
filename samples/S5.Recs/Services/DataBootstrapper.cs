@@ -19,21 +19,21 @@ public class DataBootstrapper
     /// <summary>
     /// Seeds MediaType and MediaFormat reference data if not already present.
     /// </summary>
-    public async Task SeedReferenceDataAsync(CancellationToken ct = default)
+    public async Task SeedReferenceData(CancellationToken ct = default)
     {
-        Console.Error.WriteLine("[DEBUG] DataBootstrapper.SeedReferenceDataAsync() called");
-        _logger?.LogInformation("[DEBUG] DataBootstrapper.SeedReferenceDataAsync() called");
-        await SeedMediaTypesAsync(ct);
-        await SeedMediaFormatsAsync(ct);
-        Console.Error.WriteLine("[DEBUG] DataBootstrapper.SeedReferenceDataAsync() completed");
-        _logger?.LogInformation("[DEBUG] DataBootstrapper.SeedReferenceDataAsync() completed");
+        Console.Error.WriteLine("[DEBUG] DataBootstrapper.SeedReferenceData() called");
+        _logger?.LogInformation("[DEBUG] DataBootstrapper.SeedReferenceData() called");
+        await SeedMediaTypes(ct);
+        await SeedMediaFormats(ct);
+        Console.Error.WriteLine("[DEBUG] DataBootstrapper.SeedReferenceData() completed");
+        _logger?.LogInformation("[DEBUG] DataBootstrapper.SeedReferenceData() completed");
     }
 
-    private async Task SeedMediaTypesAsync(CancellationToken ct)
+    private async Task SeedMediaTypes(CancellationToken ct)
     {
         var threadId = Thread.CurrentThread.ManagedThreadId;
-        Console.Error.WriteLine($"[DEBUG] SeedMediaTypesAsync() called on thread {threadId} at {DateTime.UtcNow:HH:mm:ss.fff}");
-        _logger?.LogInformation("[DEBUG] SeedMediaTypesAsync() called");
+        Console.Error.WriteLine($"[DEBUG] SeedMediaTypes() called on thread {threadId} at {DateTime.UtcNow:HH:mm:ss.fff}");
+        _logger?.LogInformation("[DEBUG] SeedMediaTypes() called");
         var existing = await MediaType.All(ct);
         Console.Error.WriteLine($"[DEBUG] Thread {threadId}: Found {existing.Count} existing MediaTypes: {string.Join(", ", existing.Select(mt => $"'{mt.Name}'"))}");
         _logger?.LogInformation("[DEBUG] Found {Count} existing MediaTypes: {Names}",
@@ -90,7 +90,7 @@ public class DataBootstrapper
         _logger?.LogInformation("Seeded {Count} MediaTypes", mediaTypes.Length);
     }
 
-    private async Task SeedMediaFormatsAsync(CancellationToken ct)
+    private async Task SeedMediaFormats(CancellationToken ct)
     {
         var existing = await MediaFormat.All(ct);
         if (existing.Any())

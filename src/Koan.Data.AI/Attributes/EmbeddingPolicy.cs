@@ -21,5 +21,13 @@ public enum EmbeddingPolicy
     /// Automatically include all public readable properties (advanced).
     /// Use [EmbeddingIgnore] to exclude specific properties.
     /// </summary>
-    AllPublic
+    AllPublic,
+
+    /// <summary>
+    /// Serialize entire entity to JSON for embedding.
+    /// Supports complex nested objects and collections.
+    /// Respects MaxDepth to prevent infinite recursion.
+    /// Use Exclude or [EmbeddingIgnore] to filter sensitive properties.
+    /// </summary>
+    FullJson
 }

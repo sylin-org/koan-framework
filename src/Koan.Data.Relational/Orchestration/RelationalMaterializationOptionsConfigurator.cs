@@ -9,7 +9,7 @@ internal sealed class RelationalMaterializationOptionsConfigurator(IConfiguratio
     public void Configure(RelationalMaterializationOptions options)
     {
         // Bind loosely from multiple potential keys; default values already set above.
-        var section = cfg.GetSection("Koan:Data:Relational:Materialization");
+        var section = cfg.GetSection(Infrastructure.ConfigurationConstants.Keys.Materialization);
         section.Bind(options);
         // Sensible default: when policy != None, fail on mismatch by default.
         if (options.Materialization != RelationalMaterializationPolicy.None && !options.FailOnMismatch)

@@ -5,5 +5,5 @@ namespace Koan.Web.Hooks;
 /// </summary>
 public interface IRequestOptionsHook<TEntity> : IOrderedHook
 {
-    Task OnBuildingOptionsAsync(HookContext<TEntity> ctx, QueryOptions opts);
+    Task OnBuildingOptions(HookContext<TEntity> ctx, QueryOptions opts);
 }

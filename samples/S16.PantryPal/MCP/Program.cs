@@ -19,4 +19,4 @@ app.MapGet("/healthz", () => Results.Ok(new { status = "ok", service = "mcp-host
 // Map MCP HTTP/SSE endpoints based on configured route (Koan__Mcp__HttpSseRoute)
 app.MapKoanMcpEndpoints();
 
-app.Run();
+app.RunAsync();

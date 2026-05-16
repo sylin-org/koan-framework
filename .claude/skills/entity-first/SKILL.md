@@ -95,8 +95,12 @@ var todos = Enumerable.Range(0, 1000)
     .ToList();
 await todos.Save();
 
-// Batch operations - add/update/delete in one transaction
-await Todo.Batch()
+// Batch operations — returns IBatchSet<Todo, Guid>, committed with SaveAsync()
+// Atomicity: relational providers wrap all operations in a transaction;
+//            document providers (Mongo) execute sequentially (no distributed tx by default).
+// Size guidance: keep batches under ~1 000 items to stay within provider and memory limits.
+IBatchSet<Todo, Guid> batch = Todo.Batch();
+await batch
     .Add(new Todo { Title = "New task" })
     .Update(existingId, todo => todo.Completed = true)
     .Delete(oldId)
@@ -143,6 +147,14 @@ await foreach (var reading in Reading.QueryStream(
 ```
 
 **When to Stream:** Large datasets (>10k records), background jobs, ETL pipelines
+
+## Timestamp Auto-Update
+
+Entities can declare `[Timestamp]` properties for automatic time tracking:
+- `[Timestamp]` — set once (creation time)
+- `[Timestamp(OnSave = true)]` — refreshed on every save
+
+Works with batch operations (`UpsertMany`) — all entities in the batch receive the current timestamp.
 
 ## Anti-Patterns to Avoid
 

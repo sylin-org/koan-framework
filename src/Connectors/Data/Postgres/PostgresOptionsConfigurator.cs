@@ -51,17 +51,17 @@ internal sealed class PostgresOptionsConfigurator : AdapterOptionsConfigurator<P
 
         // PostgreSQL-specific configuration
         var databaseName = ReadProviderConfiguration(options.SearchPath ?? "public",
-            "Koan:Data:Postgres:Database",
-            "Koan:Data:Database",
+            Infrastructure.Constants.Configuration.Keys.Database,
+            Infrastructure.Constants.Configuration.DataFallback.Database,
             "ConnectionStrings:Database");
 
         var username = ReadProviderConfiguration("postgres",
-            "Koan:Data:Postgres:Username",
-            "Koan:Data:Username");
+            Infrastructure.Constants.Configuration.Keys.Username,
+            Infrastructure.Constants.Configuration.DataFallback.Username);
 
         var password = ReadProviderConfiguration("postgres",
-            "Koan:Data:Postgres:Password",
-            "Koan:Data:Password");
+            Infrastructure.Constants.Configuration.Keys.Password,
+            Infrastructure.Constants.Configuration.DataFallback.Password);
 
         var explicitConnectionString = ReadProviderConfiguration("",
             Infrastructure.Constants.Configuration.Keys.ConnectionString,
@@ -90,10 +90,6 @@ internal sealed class PostgresOptionsConfigurator : AdapterOptionsConfigurator<P
             options.DefaultPageSize,
             Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
             Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
-        options.MaxPageSize = ReadProviderConfiguration(
-            options.MaxPageSize,
-            Infrastructure.Constants.Configuration.Keys.MaxPageSize,
-            Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
 
         var ddlStr = ReadProviderConfiguration(options.DdlPolicy.ToString(),
             Infrastructure.Constants.Configuration.Keys.DdlPolicy,
@@ -155,7 +151,7 @@ internal sealed class PostgresOptionsConfigurator : AdapterOptionsConfigurator<P
                 context.Parameters["password"] = password;
 
             // Use autonomous discovery coordinator
-            var discoveryTask = _discoveryCoordinator.DiscoverServiceAsync("postgres", context);
+            var discoveryTask = _discoveryCoordinator.DiscoverService("postgres", context);
             var result = discoveryTask.GetAwaiter().GetResult();
 
             if (result.IsSuccessful)
@@ -178,7 +174,7 @@ internal sealed class PostgresOptionsConfigurator : AdapterOptionsConfigurator<P
 
     private bool IsAutoDetectionDisabled()
     {
-        return Koan.Core.Configuration.Read(Configuration, "Koan:Data:Postgres:DisableAutoDetection", false);
+        return Koan.Core.Configuration.Read(Configuration, Infrastructure.Constants.Configuration.Keys.DisableAutoDetection, false);
     }
 
     private static string BuildPostgresConnectionString(string hostname, int port, string? database, string? username, string? password)

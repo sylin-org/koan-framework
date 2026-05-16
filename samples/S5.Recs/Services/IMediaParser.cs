@@ -20,5 +20,5 @@ public interface IMediaParser
     /// <param name="mediaType">Target media type</param>
     /// <param name="ct">Cancellation token</param>
     /// <returns>List of parsed Media objects</returns>
-    Task<List<Media>> ParsePageAsync(string rawJson, MediaType mediaType, CancellationToken ct = default);
+    Task<List<Media>> ParsePage(string rawJson, MediaType mediaType, CancellationToken ct = default);
 }

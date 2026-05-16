@@ -53,7 +53,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         var defaultProfile = Core.Configuration.ReadWithSource(
             cfg,
             $"{StorageConstants.Constants.Configuration.Section}:{StorageConstants.Constants.Configuration.Keys.DefaultProfile}",
-            string.Empty);
+            "");
 
         module.AddSetting(
             StorageItems.DefaultProfile,

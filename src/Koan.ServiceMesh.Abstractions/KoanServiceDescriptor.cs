@@ -91,7 +91,7 @@ public class KoanServiceDescriptor
     /// <summary>
     /// Service capabilities (auto-detected or explicit).
     /// </summary>
-    public string[] Capabilities { get; set; } = Array.Empty<string>();
+    public string[] Capabilities { get; set; } = [];
 
     /// <summary>
     /// Container image for Docker deployment.

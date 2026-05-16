@@ -17,7 +17,7 @@ public sealed class InMemoryBatchSpec
     public async Task Batch_operations_apply_atomically()
     {
         await TestPipeline.For<InMemoryBatchSpec>(_output, nameof(Batch_operations_apply_atomically))
-            .Using<InMemoryConnectorFixture>("fixture", static ctx => InMemoryConnectorFixture.CreateAsync(ctx))
+            .Using<InMemoryConnectorFixture>("fixture", static ctx => InMemoryConnectorFixture.Create(ctx))
             .Arrange(static async ctx =>
             {
                 var fixture = ctx.GetRequiredItem<InMemoryConnectorFixture>("fixture");
@@ -31,15 +31,15 @@ public sealed class InMemoryBatchSpec
 
                 await using var lease = fixture.LeasePartition(partition);
 
-                var toUpdate = await InventoryItem.UpsertAsync(new InventoryItem { Name = "Widget", Quantity = 5 });
-                var toDelete = await InventoryItem.UpsertAsync(new InventoryItem { Name = "Spare", Quantity = 2 });
+                var toUpdate = await InventoryItem.Upsert(new InventoryItem { Name = "Widget", Quantity = 5 });
+                var toDelete = await InventoryItem.Upsert(new InventoryItem { Name = "Spare", Quantity = 2 });
 
                 var batch = InventoryItem.Batch();
                 batch.Add(new InventoryItem { Name = "New", Quantity = 7 });
                 batch.Update(toUpdate.Id, item => item.Quantity = 11);
                 batch.Delete(toDelete.Id);
 
-                var result = await batch.SaveAsync();
+                var result = await batch.Save();
                 result.Added.Should().Be(1);
                 result.Updated.Should().Be(1);
                 result.Deleted.Should().Be(1);
@@ -49,12 +49,12 @@ public sealed class InMemoryBatchSpec
                 remaining.Should().ContainSingle(item => item.Name == "Widget" && item.Quantity == 11);
                 remaining.Should().ContainSingle(item => item.Name == "New" && item.Quantity == 7);
             })
-            .RunAsync();
+            .Run();
     }
 
     private sealed class InventoryItem : Entity<InventoryItem>
     {
-        public string Name { get; set; } = string.Empty;
+        public string Name { get; set; } = "";
         public int Quantity { get; set; }
     }
 }

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Linq;
-using System.ComponentModel.DataAnnotations;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
 using Koan.Data.Connector.InMemory.Tests.Support;
@@ -21,7 +21,7 @@ public sealed class InMemoryCrudSpec
     public async Task Upsert_query_count_and_remove_flow()
     {
         await TestPipeline.For<InMemoryCrudSpec>(_output, nameof(Upsert_query_count_and_remove_flow))
-            .Using<InMemoryConnectorFixture>("fixture", static ctx => InMemoryConnectorFixture.CreateAsync(ctx))
+            .Using<InMemoryConnectorFixture>("fixture", static ctx => InMemoryConnectorFixture.Create(ctx))
             .Arrange(static async ctx =>
             {
                 var fixture = ctx.GetRequiredItem<InMemoryConnectorFixture>("fixture");
@@ -35,7 +35,7 @@ public sealed class InMemoryCrudSpec
 
                 await using var lease = fixture.LeasePartition(partition);
 
-                var saved = await Person.UpsertAsync(new Person { Name = "Ada", Age = 34 });
+                var saved = await Person.Upsert(new Person { Name = "Ada", Age = 34 });
                 var originalTimestamp = saved.LastUpdated;
                 saved.Id.Should().NotBeNullOrWhiteSpace();
 
@@ -53,7 +53,7 @@ public sealed class InMemoryCrudSpec
 
                 var updated = filtered.First();
                 updated.Name = "Bobby";
-                await Person.UpsertAsync(updated);
+                await Person.Upsert(updated);
 
                 var fetched = await Person.Get(updated.Id);
                 fetched!.Name.Should().Be("Bobby");
@@ -68,14 +68,14 @@ public sealed class InMemoryCrudSpec
                 var remaining = await Person.All(partition);
                 remaining.Should().HaveCount(2);
             })
-            .RunAsync();
+            .Run();
     }
 
     private sealed class Person : Entity<Person>
     {
-        public string Name { get; set; } = string.Empty;
+        public string Name { get; set; } = "";
         public int Age { get; set; }
-        [Timestamp]
+        [Timestamp(OnSave = true)]
         public DateTimeOffset LastUpdated { get; set; }
     }
 }

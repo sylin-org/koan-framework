@@ -10,23 +10,15 @@ using System.Threading.Tasks;
 
 namespace Koan.Data.Backup.Core;
 
-public class EntityDiscoveryService : IEntityDiscoveryService
+public class EntityDiscoveryService(IServiceProvider serviceProvider, ILogger<EntityDiscoveryService> logger) : IEntityDiscoveryService
 {
-    private readonly IServiceProvider _serviceProvider;
-    private readonly ILogger<EntityDiscoveryService> _logger;
     private readonly ConcurrentDictionary<string, EntityDiscoveryResult> _discoveryCache = new();
     private EntityDiscoveryResult? _currentDiscovery;
 
-    public EntityDiscoveryService(IServiceProvider serviceProvider, ILogger<EntityDiscoveryService> logger)
-    {
-        _serviceProvider = serviceProvider;
-        _logger = logger;
-    }
-
-    public Task<EntityDiscoveryResult> DiscoverAllEntitiesAsync(CancellationToken ct = default)
+    public Task<EntityDiscoveryResult> DiscoverAllEntities(CancellationToken ct = default)
     {
         var stopwatch = Stopwatch.StartNew();
-        _logger.LogInformation("Starting entity discovery...");
+        logger.LogInformation("Starting entity discovery...");
 
         var result = new EntityDiscoveryResult
         {
@@ -72,20 +64,20 @@ public class EntityDiscoveryService : IEntityDiscoveryService
                             };
 
                             entityTypes.Add(entityInfo);
-                            _logger.LogDebug("Discovered entity: {EntityType} with key {KeyType} from {Assembly}",
+                            logger.LogDebug("Discovered entity: {EntityType} with key {KeyType} from {Assembly}",
                                 type.Name, keyType.Name, assembly.GetName().Name);
                         }
                     }
                 }
                 catch (ReflectionTypeLoadException ex)
                 {
-                    _logger.LogWarning("Could not load types from assembly {Assembly}: {Error}",
+                    logger.LogWarning("Could not load types from assembly {Assembly}: {Error}",
                         assembly.FullName, ex.Message);
                     result.Errors.Add($"Assembly {assembly.GetName().Name}: {ex.Message}");
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Error processing assembly {Assembly}", assembly.FullName);
+                    logger.LogWarning(ex, "Error processing assembly {Assembly}", assembly.FullName);
                     result.Errors.Add($"Assembly {assembly.GetName().Name}: {ex.Message}");
                 }
             }
@@ -94,7 +86,7 @@ public class EntityDiscoveryService : IEntityDiscoveryService
             result.TotalTypesExamined = totalTypesExamined;
             result.DiscoveryDuration = stopwatch.Elapsed;
 
-            _logger.LogInformation("Entity discovery completed. Found {EntityCount} entities from {AssemblyCount} assemblies in {Duration}ms",
+            logger.LogInformation("Entity discovery completed. Found {EntityCount} entities from {AssemblyCount} assemblies in {Duration}ms",
                 entityTypes.Count, assemblies.Count, stopwatch.ElapsedMilliseconds);
 
             // Cache the result
@@ -106,7 +98,7 @@ public class EntityDiscoveryService : IEntityDiscoveryService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Entity discovery failed");
+            logger.LogError(ex, "Entity discovery failed");
             result.Errors.Add($"Discovery failed: {ex.Message}");
             result.DiscoveryDuration = stopwatch.Elapsed;
         }
@@ -114,12 +106,12 @@ public class EntityDiscoveryService : IEntityDiscoveryService
         return Task.FromResult(result);
     }
 
-    public async Task WarmupAllEntitiesAsync(CancellationToken ct = default)
+    public async Task WarmupAllEntities(CancellationToken ct = default)
     {
-        var discovered = _currentDiscovery ?? await DiscoverAllEntitiesAsync(ct);
+        var discovered = _currentDiscovery ?? await DiscoverAllEntities(ct);
         var stopwatch = Stopwatch.StartNew();
 
-        _logger.LogInformation("Warming up {Count} discovered entities...", discovered.Entities.Count);
+        logger.LogInformation("Warming up {Count} discovered entities...", discovered.Entities.Count);
 
         var warmedUp = 0;
         var failed = 0;
@@ -130,22 +122,22 @@ public class EntityDiscoveryService : IEntityDiscoveryService
             {
                 ct.ThrowIfCancellationRequested();
 
-                AggregateConfigsExtensions.PreRegisterEntityByReflection(entity.EntityType, entity.KeyType, _serviceProvider);
+                AggregateConfigsExtensions.PreRegisterEntityByReflection(entity.EntityType, entity.KeyType, serviceProvider);
                 warmedUp++;
 
                 if (warmedUp % 10 == 0)
                 {
-                    _logger.LogDebug("Warmed up {Count}/{Total} entities...", warmedUp, discovered.Entities.Count);
+                    logger.LogDebug("Warmed up {Count}/{Total} entities...", warmedUp, discovered.Entities.Count);
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to warm up entity {EntityType}", entity.EntityType.Name);
+                logger.LogWarning(ex, "Failed to warm up entity {EntityType}", entity.EntityType.Name);
                 failed++;
             }
         }
 
-        _logger.LogInformation("Entity warmup completed. Warmed up {WarmedUp} entities, {Failed} failures in {Duration}ms",
+        logger.LogInformation("Entity warmup completed. Warmed up {WarmedUp} entities, {Failed} failures in {Duration}ms",
             warmedUp, failed, stopwatch.ElapsedMilliseconds);
     }
 
@@ -159,12 +151,12 @@ public class EntityDiscoveryService : IEntityDiscoveryService
         return AggregateConfigsExtensions.GetAllRegisteredEntities();
     }
 
-    public async Task RefreshDiscoveryAsync(CancellationToken ct = default)
+    public async Task RefreshDiscovery(CancellationToken ct = default)
     {
-        _logger.LogInformation("Refreshing entity discovery cache...");
+        logger.LogInformation("Refreshing entity discovery cache...");
         _discoveryCache.Clear();
         _currentDiscovery = null;
-        await DiscoverAllEntitiesAsync(ct);
+        await DiscoverAllEntities(ct);
     }
 
     public EntityDiscoveryResult GetDiscoveryStats()
@@ -239,10 +231,10 @@ public class EntityDiscoveryService : IEntityDiscoveryService
         return Convert.ToHexString(System.Text.Encoding.UTF8.GetBytes(combined)).ToLowerInvariant();
     }
 
-    public Task<BackupInventory> BuildInventoryAsync(CancellationToken ct = default)
+    public Task<BackupInventory> BuildInventory(CancellationToken ct = default)
     {
         var stopwatch = Stopwatch.StartNew();
-        _logger.LogInformation("Building backup inventory...");
+        logger.LogInformation("Building backup inventory...");
 
         var inventory = new BackupInventory
         {
@@ -254,7 +246,7 @@ public class EntityDiscoveryService : IEntityDiscoveryService
             // Get all discovered or registered entities
             var entityTypes = GetDiscoveredEntities().ToList();
 
-            _logger.LogDebug("Processing {Count} entity types for backup inventory", entityTypes.Count);
+            logger.LogDebug("Processing {Count} entity types for backup inventory", entityTypes.Count);
 
             // Group entities by assembly for efficient scope resolution
             var entitiesByAssembly = entityTypes
@@ -280,7 +272,7 @@ public class EntityDiscoveryService : IEntityDiscoveryService
                     if (policy.IsIncluded)
                     {
                         inventory.IncludedEntities.Add(policy);
-                        _logger.LogDebug("Entity {EntityName} included in backup: encrypt={Encrypt}, schema={IncludeSchema} (via {Source})",
+                        logger.LogDebug("Entity {EntityName} included in backup: encrypt={Encrypt}, schema={IncludeSchema} (via {Source})",
                             policy.EntityName, policy.Encrypt, policy.IncludeSchema, policy.Source);
                     }
                     else if (policy.IsExcluded)
@@ -288,7 +280,7 @@ public class EntityDiscoveryService : IEntityDiscoveryService
                         inventory.ExcludedEntities.Add(policy);
                         if (!string.IsNullOrWhiteSpace(policy.Reason))
                         {
-                            _logger.LogDebug("Entity {EntityName} excluded from backup: {Reason}",
+                            logger.LogDebug("Entity {EntityName} excluded from backup: {Reason}",
                                 policy.EntityName, policy.Reason);
                         }
                         else
@@ -302,12 +294,12 @@ public class EntityDiscoveryService : IEntityDiscoveryService
                         var scopeMode = assemblyScope?.Mode.ToString() ?? "None";
                         var warning = $"Entity {policy.EntityName} has no backup coverage (assembly scope: {scopeMode})";
                         inventory.Warnings.Add(warning);
-                        _logger.LogWarning(warning);
+                        logger.LogWarning(warning);
                     }
                 }
             }
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "Backup inventory built in {Duration}ms: {Included} included, {Excluded} excluded, {Warnings} warnings",
                 stopwatch.ElapsedMilliseconds,
                 inventory.TotalIncludedEntities,
@@ -318,7 +310,7 @@ public class EntityDiscoveryService : IEntityDiscoveryService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to build backup inventory");
+            logger.LogError(ex, "Failed to build backup inventory");
             inventory.Warnings.Add($"Inventory build failed: {ex.Message}");
             return Task.FromResult(inventory);
         }

@@ -20,6 +20,7 @@ using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Connector.Mongo.Discovery;
 using Koan.Data.Connector.Mongo.Orchestration;
+using Koan.ZenGarden.Core;
 using MongoItems = Koan.Data.Connector.Mongo.Infrastructure.MongoProvenanceItems;
 using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
 
@@ -54,7 +55,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IAsyncAdapterInitializer, MongoClientProvider>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IAdapterReadiness, MongoClientProvider>());
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
-        services.TryAddEnumerable(new ServiceDescriptor(typeof(INamingDefaultsProvider), typeof(MongoNamingDefaultsProvider), ServiceLifetime.Singleton));
         services.AddSingleton<IDataAdapterFactory, MongoAdapterFactory>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, MongoHealthContributor>());
 
@@ -64,6 +64,10 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // NEW: Register MongoDB discovery adapter (maintains "Reference = Intent")
         // Adding Koan.Data.Connector.Mongo automatically enables MongoDB discovery capabilities
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, MongoDiscoveryAdapter>());
+
+        // Optional Zen Garden binding metadata (used only when Koan.ZenGarden is referenced).
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IZenGardenOfferingBinding, MongoZenGardenOfferingBinding>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IZenGardenOfferingBinding, MongoDbZenGardenOfferingBinding>());
     }
 
     private static void ConfigureMongoStaticState()
@@ -140,22 +144,17 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             defaultOptions.DefaultPageSize,
             MongoItems.DefaultPageSizeKeys);
 
-        var maxPageSize = Configuration.ReadFirstWithSource(
-            cfg,
-            defaultOptions.MaxPageSize,
-            MongoItems.MaxPageSizeKeys);
-
         var username = Configuration.ReadFirstWithSource(
             cfg,
-            string.Empty,
-            "Koan:Data:Mongo:Username",
-            "Koan:Data:Username");
+            "",
+            Infrastructure.ConfigurationConstants.FullKey(Infrastructure.ConfigurationConstants.Keys.Username),
+            Infrastructure.ConfigurationConstants.DataFallback.Username);
 
         var password = Configuration.ReadFirstWithSource(
             cfg,
-            string.Empty,
-            "Koan:Data:Mongo:Password",
-            "Koan:Data:Password");
+            "",
+            Infrastructure.ConfigurationConstants.FullKey(Infrastructure.ConfigurationConstants.Keys.Password),
+            Infrastructure.ConfigurationConstants.DataFallback.Password);
 
         var effectiveConnectionString = ResolveConnectionStringForReporting(
             cfg,
@@ -189,8 +188,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             sanitizeOverride: false);
 
         module.PublishConfigValue(MongoItems.DefaultPageSize, defaultPageSize);
-
-        module.PublishConfigValue(MongoItems.MaxPageSize, maxPageSize);
     }
 
     private static string ResolveConnectionStringForReporting(
@@ -238,7 +235,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 Parameters = parameters.Count > 0 ? parameters : null
             };
 
-            var result = adapter.DiscoverAsync(context).GetAwaiter().GetResult();
+            var result = adapter.Discover(context).GetAwaiter().GetResult();
             if (result.IsSuccessful && !string.IsNullOrWhiteSpace(result.ServiceUrl))
             {
                 return result.ServiceUrl!;

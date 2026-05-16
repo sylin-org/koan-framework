@@ -77,10 +77,6 @@ internal sealed class SqlServerOptionsConfigurator : AdapterOptionsConfigurator<
             options.DefaultPageSize,
             Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
             Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
-        options.MaxPageSize = ReadProviderConfiguration(
-            options.MaxPageSize,
-            Infrastructure.Constants.Configuration.Keys.MaxPageSize,
-            Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
 
         var ddlStr = ReadProviderConfiguration(options.DdlPolicy.ToString(),
             Infrastructure.Constants.Configuration.Keys.DdlPolicy,
@@ -146,7 +142,7 @@ internal sealed class SqlServerOptionsConfigurator : AdapterOptionsConfigurator<
             context.Parameters["password"] = "Your_password123";
 
             // Use autonomous discovery coordinator
-            var discoveryTask = _discoveryCoordinator.DiscoverServiceAsync("mssql", context);
+            var discoveryTask = _discoveryCoordinator.DiscoverService("mssql", context);
             var result = discoveryTask.GetAwaiter().GetResult();
 
             if (result.IsSuccessful)
@@ -169,7 +165,7 @@ internal sealed class SqlServerOptionsConfigurator : AdapterOptionsConfigurator<
 
     private bool IsAutoDetectionDisabled()
     {
-        return Koan.Core.Configuration.Read(Configuration, "Koan:Data:SqlServer:DisableAutoDetection", false);
+        return Koan.Core.Configuration.Read(Configuration, Infrastructure.Constants.Configuration.Keys.DisableAutoDetection, false);
     }
 
     private static string BuildSqlServerConnectionString(string hostname, int port)

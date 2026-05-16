@@ -1,0 +1,55 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>S18.Prism</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Koan Framework - Core -->
+    <ProjectReference Include="..\..\src\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web.Extensions\Koan.Web.Extensions.csproj" />
+
+    <!-- Data Provider -->
+    <ProjectReference Include="..\..\src\Connectors\Data\Mongo\Koan.Data.Connector.Mongo.csproj" />
+
+    <!-- Media Processing -->
+    <ProjectReference Include="..\..\src\Koan.Media.Core\Koan.Media.Core.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Media.Abstractions\Koan.Media.Abstractions.csproj" />
+
+    <!-- Storage -->
+    <ProjectReference Include="..\..\src\Koan.Storage\Koan.Storage.csproj" />
+    <ProjectReference Include="..\..\src\Connectors\Storage\Local\Koan.Storage.Connector.Local.csproj" />
+    <ProjectReference Include="..\..\src\Connectors\Storage\S3\Koan.Storage.Connector.S3.csproj" />
+
+    <!-- AI (expanded) -->
+    <ProjectReference Include="..\..\src\Koan.AI\Koan.AI.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.AI\Koan.Data.AI.csproj" />
+    <ProjectReference Include="..\..\src\Connectors\AI\Ollama\Koan.AI.Connector.Ollama.csproj" />
+    <ProjectReference Include="..\..\src\Koan.ZenGarden\Koan.ZenGarden.csproj" />
+    <ProjectReference Include="..\..\src\Koan.AI.Models\Koan.AI.Models.csproj" />
+    <ProjectReference Include="..\..\src\Koan.AI.Prompt\Koan.AI.Prompt.csproj" />
+    <ProjectReference Include="..\..\src\Koan.AI.Orchestration\Koan.AI.Orchestration.csproj" />
+    <ProjectReference Include="..\..\src\Koan.AI.Eval\Koan.AI.Eval.csproj" />
+    <ProjectReference Include="..\..\src\Koan.AI.Review\Koan.AI.Review.csproj" />
+    <ProjectReference Include="..\..\src\Koan.AI.Agents\Koan.AI.Agents.csproj" />
+    <ProjectReference Include="..\..\src\Koan.AI.Compute\Koan.AI.Compute.csproj" />
+    <ProjectReference Include="..\..\src\Koan.AI.Training\Koan.AI.Training.csproj" />
+    <ProjectReference Include="..\..\src\Koan.AI.Contracts.Shared\Koan.AI.Contracts.Shared.csproj" />
+
+    <!-- Vector Search -->
+    <ProjectReference Include="..\..\src\Koan.Data.Vector\Koan.Data.Vector.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.Vector.Abstractions\Koan.Data.Vector.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\Connectors\Data\Vector\Weaviate\Koan.Data.Vector.Connector.Weaviate.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- SignalR for Real-Time Updates -->
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="9.0.0" />
+  </ItemGroup>
+
+</Project>

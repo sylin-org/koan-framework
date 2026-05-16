@@ -23,6 +23,8 @@ namespace Koan.Data.Connector.Mongo;
     LocalScheme = "mongodb", LocalHost = "localhost", LocalPort = 27017, LocalPattern = "mongodb://{host}:{port}")]
 public sealed class MongoAdapterFactory : IDataAdapterFactory
 {
+    public string Provider => "mongo";
+
     public bool CanHandle(string provider) => string.Equals(provider, "mongo", StringComparison.OrdinalIgnoreCase) || string.Equals(provider, "mongodb", StringComparison.OrdinalIgnoreCase);
 
     public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(
@@ -63,7 +65,6 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory
             ConnectionString = connectionString,
             Database = AdapterConnectionResolver.GetSourceSetting(config, sourceRegistry, "Mongo", source, "Database", baseOptions.Database),
             DefaultPageSize = baseOptions.DefaultPageSize,
-            MaxPageSize = baseOptions.MaxPageSize,
             Readiness = baseOptions.Readiness
         };
 
@@ -74,6 +75,36 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory
         var clientProvider = new MongoClientProvider(optionsMonitor, logger);
 
         return new MongoRepository<TEntity, TKey>(clientProvider, optionsMonitor, resolver, sp);
+    }
+
+    // INamingProvider implementation
+    public string RepositorySeparator => "#";
+
+    public string GetStorageName(Type entityType, IServiceProvider services)
+    {
+        var opts = services.GetRequiredService<IOptions<MongoOptions>>().Value;
+
+        // Check adapter-level override FIRST (MongoOptions.CollectionName)
+        if (opts.CollectionName != null)
+        {
+            var overrideName = opts.CollectionName(entityType);
+            if (!string.IsNullOrWhiteSpace(overrideName))
+                return overrideName;
+        }
+
+        // Fall back to convention
+        var convention = new StorageNameResolver.Convention(
+            opts.NamingStyle,
+            opts.Separator ?? ".",
+            NameCasing.AsIs);
+
+        return StorageNameResolver.Resolve(entityType, convention);
+    }
+
+    public string GetConcretePartition(string partition)
+    {
+        // MongoDB: Pass-through (accepts most UTF-8 strings)
+        return partition;
     }
 }
 

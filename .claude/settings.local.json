@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "mcp__ide__getDiagnostics",
-      "Skill(ai-integration)"
+      "Skill(ai-integration)",
+      "Skill(mcp-integration)"
     ],
     "deny": [],
     "ask": []

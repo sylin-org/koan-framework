@@ -19,7 +19,7 @@ public class SqlServerCountTests : IClassFixture<Support.SqlServerAutoFixture>
     public async Task EntityCount_DefaultsToOptimized()
     {
         using var partition = BeginPartition("count-default");
-        var (available, repo) = await PrepareAsync();
+        var (available, repo) = await Prepare();
         if (!available) return;
 
     await new CountTestEntity { Name = "Test1" }.Save();
@@ -34,7 +34,7 @@ public class SqlServerCountTests : IClassFixture<Support.SqlServerAutoFixture>
     public async Task EntityCount_Exact_ForcesFullScan()
     {
         using var partition = BeginPartition("count-exact");
-        var (available, repo) = await PrepareAsync();
+        var (available, repo) = await Prepare();
         if (!available) return;
 
     await new CountTestEntity { Name = "Test1" }.Save();
@@ -50,7 +50,7 @@ public class SqlServerCountTests : IClassFixture<Support.SqlServerAutoFixture>
     public async Task EntityCount_Fast_UsesPartitionStats()
     {
         using var partition = BeginPartition("count-fast");
-        var (available, repo) = await PrepareAsync();
+        var (available, repo) = await Prepare();
         if (!available) return;
 
         foreach (var i in Enumerable.Range(0, 10))
@@ -67,18 +67,18 @@ public class SqlServerCountTests : IClassFixture<Support.SqlServerAutoFixture>
     public async Task EntityCount_Where_WorksWithStrategies()
     {
         using var partition = BeginPartition("count-where");
-        var (available, repo) = await PrepareAsync();
+        var (available, repo) = await Prepare();
         if (!available) return;
 
     await new CountTestEntity { Name = "Match1", Status = "Active" }.Save();
     await new CountTestEntity { Name = "Match2", Status = "Active" }.Save();
     await new CountTestEntity { Name = "NoMatch", Status = "Inactive" }.Save();
 
-    var all = await repo.QueryAsync(null, default);
+    var all = await repo.Query(null, default);
     all.Should().HaveCount(3);
     all.Count(x => x.Status == "Active").Should().Be(2);
 
-        var repoCheck = await repo.CountAsync(new CountRequest<CountTestEntity>
+        var repoCheck = await repo.Count(new CountRequest<CountTestEntity>
         {
             Predicate = x => x.Status == "Active",
             Options = new DataQueryOptions { CountStrategy = CountStrategy.Exact }
@@ -96,12 +96,12 @@ public class SqlServerCountTests : IClassFixture<Support.SqlServerAutoFixture>
     public async Task ExactCount_SetsIsEstimateFalse()
     {
         using var partition = BeginPartition("count-isest-exact");
-        var (available, repo) = await PrepareAsync();
+        var (available, repo) = await Prepare();
         if (!available) return;
 
     await new CountTestEntity { Name = "Test" }.Save();
 
-        var result = await repo.CountAsync(new CountRequest<CountTestEntity>
+        var result = await repo.Count(new CountRequest<CountTestEntity>
         {
             Options = new DataQueryOptions { CountStrategy = CountStrategy.Exact }
         });
@@ -114,7 +114,7 @@ public class SqlServerCountTests : IClassFixture<Support.SqlServerAutoFixture>
     public async Task FastCount_SetsIsEstimateTrue()
     {
         using var partition = BeginPartition("count-isest-fast");
-        var (available, repo) = await PrepareAsync();
+        var (available, repo) = await Prepare();
         if (!available) return;
 
         foreach (var i in Enumerable.Range(0, 5))
@@ -122,7 +122,7 @@ public class SqlServerCountTests : IClassFixture<Support.SqlServerAutoFixture>
             await new CountTestEntity { Name = $"Item{i}" }.Save();
         }
 
-        var result = await repo.CountAsync(new CountRequest<CountTestEntity>
+        var result = await repo.Count(new CountRequest<CountTestEntity>
         {
             Options = new DataQueryOptions { CountStrategy = CountStrategy.Fast }
         });
@@ -135,7 +135,7 @@ public class SqlServerCountTests : IClassFixture<Support.SqlServerAutoFixture>
     public async Task CountStrategy_Exact_PerformsFullScan()
     {
         using var partition = BeginPartition("count-strategy-exact");
-        var (available, repo) = await PrepareAsync();
+        var (available, repo) = await Prepare();
         if (!available) return;
 
         var expected = 7;
@@ -144,7 +144,7 @@ public class SqlServerCountTests : IClassFixture<Support.SqlServerAutoFixture>
             await new CountTestEntity { Name = $"Item{i}" }.Save();
         }
 
-        var result = await repo.CountAsync(new CountRequest<CountTestEntity>
+        var result = await repo.Count(new CountRequest<CountTestEntity>
         {
             Options = new DataQueryOptions { CountStrategy = CountStrategy.Exact }
         });
@@ -157,7 +157,7 @@ public class SqlServerCountTests : IClassFixture<Support.SqlServerAutoFixture>
     public async Task CountStrategy_Fast_UsesPartitionStats()
     {
         using var partition = BeginPartition("count-strategy-fast");
-        var (available, repo) = await PrepareAsync();
+        var (available, repo) = await Prepare();
         if (!available) return;
 
         foreach (var i in Enumerable.Range(0, 10))
@@ -165,7 +165,7 @@ public class SqlServerCountTests : IClassFixture<Support.SqlServerAutoFixture>
             await new CountTestEntity { Name = $"Item{i}" }.Save();
         }
 
-        var result = await repo.CountAsync(new CountRequest<CountTestEntity>
+        var result = await repo.Count(new CountRequest<CountTestEntity>
         {
             Options = new DataQueryOptions { CountStrategy = CountStrategy.Fast }
         });
@@ -178,7 +178,7 @@ public class SqlServerCountTests : IClassFixture<Support.SqlServerAutoFixture>
     public async Task SqlServer_FastCount_UsesDmDbPartitionStats()
     {
         using var partition = BeginPartition("count-dmdb");
-        var (available, repo) = await PrepareAsync();
+        var (available, repo) = await Prepare();
         if (!available) return;
 
         foreach (var i in Enumerable.Range(0, 20))
@@ -186,7 +186,7 @@ public class SqlServerCountTests : IClassFixture<Support.SqlServerAutoFixture>
             await new CountTestEntity { Name = $"Item{i}", Value = i }.Save();
         }
 
-        var result = await repo.CountAsync(new CountRequest<CountTestEntity>
+        var result = await repo.Count(new CountRequest<CountTestEntity>
         {
             Options = new DataQueryOptions { CountStrategy = CountStrategy.Fast }
         });
@@ -199,13 +199,13 @@ public class SqlServerCountTests : IClassFixture<Support.SqlServerAutoFixture>
     public async Task FastCount_WithPredicate_FallbacksToExact()
     {
         using var partition = BeginPartition("count-fallback");
-        var (available, repo) = await PrepareAsync();
+        var (available, repo) = await Prepare();
         if (!available) return;
 
     await new CountTestEntity { Name = "Match", Status = "Active" }.Save();
     await new CountTestEntity { Name = "NoMatch", Status = "Inactive" }.Save();
 
-        var result = await repo.CountAsync(new CountRequest<CountTestEntity>
+        var result = await repo.Count(new CountRequest<CountTestEntity>
         {
             Predicate = x => x.Status == "Active",
             Options = new DataQueryOptions { CountStrategy = CountStrategy.Fast }
@@ -219,12 +219,12 @@ public class SqlServerCountTests : IClassFixture<Support.SqlServerAutoFixture>
     public async Task Count_ReturnsLongType()
     {
         using var partition = BeginPartition("count-long");
-        var (available, repo) = await PrepareAsync();
+        var (available, repo) = await Prepare();
         if (!available) return;
 
     await new CountTestEntity { Name = "Test" }.Save();
 
-        var result = await repo.CountAsync(new CountRequest<CountTestEntity>());
+        var result = await repo.Count(new CountRequest<CountTestEntity>());
 
         result.Value.Should().Be(1L);
     }
@@ -233,10 +233,10 @@ public class SqlServerCountTests : IClassFixture<Support.SqlServerAutoFixture>
     public async Task Count_EmptyTable_ReturnsZero()
     {
         using var partition = BeginPartition("count-empty");
-        var (available, repo) = await PrepareAsync();
+        var (available, repo) = await Prepare();
         if (!available) return;
 
-        var exactResult = await repo.CountAsync(new CountRequest<CountTestEntity>
+        var exactResult = await repo.Count(new CountRequest<CountTestEntity>
         {
             Options = new DataQueryOptions { CountStrategy = CountStrategy.Exact }
         });
@@ -248,14 +248,14 @@ public class SqlServerCountTests : IClassFixture<Support.SqlServerAutoFixture>
     public async Task Count_RawQuery_WorksCorrectly()
     {
         using var partition = BeginPartition("count-raw");
-        var (available, repo) = await PrepareAsync();
+        var (available, repo) = await Prepare();
         if (!available) return;
 
     await new CountTestEntity { Name = "Alpha", Value = 10 }.Save();
     await new CountTestEntity { Name = "Beta", Value = 20 }.Save();
     await new CountTestEntity { Name = "Gamma", Value = 30 }.Save();
 
-        var result = await repo.CountAsync(new CountRequest<CountTestEntity>
+        var result = await repo.Count(new CountRequest<CountTestEntity>
         {
             RawQuery = "[Value] > 15"
         });
@@ -263,7 +263,7 @@ public class SqlServerCountTests : IClassFixture<Support.SqlServerAutoFixture>
         result.Value.Should().Be(2);
     }
 
-    private async Task<(bool Available, IDataRepository<CountTestEntity, string> Repo)> PrepareAsync()
+    private async Task<(bool Available, IDataRepository<CountTestEntity, string> Repo)> Prepare()
     {
         if (_fx.SkipTests)
         {
@@ -292,8 +292,8 @@ public class SqlServerCountTests : IClassFixture<Support.SqlServerAutoFixture>
 
     public class CountTestEntity : Entity<CountTestEntity>
     {
-        public string Name { get; set; } = string.Empty;
+        public string Name { get; set; } = "";
         public int Value { get; set; }
-        public string Status { get; set; } = string.Empty;
+        public string Status { get; set; } = "";
     }
 }

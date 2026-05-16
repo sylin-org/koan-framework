@@ -71,4 +71,27 @@ public readonly record struct CacheKey
         key = new CacheKey(value.Trim());
         return true;
     }
+
+    /// <summary>
+    /// Build the canonical entity cache key <c>"{TypeName}:{Partition}:{Id}"</c> used by
+    /// <c>[Cacheable]</c>. Eliminates stringly-typed construction at out-of-band evict sites.
+    /// Null/whitespace partition is rendered as the <c>"_"</c> sentinel.
+    /// </summary>
+    public static CacheKey For<TEntity>(object id, string? partition = null)
+        => For(typeof(TEntity), id, partition);
+
+    /// <summary>
+    /// Build the canonical entity cache key for <paramref name="entityType"/>. Non-generic form.
+    /// </summary>
+    public static CacheKey For(Type entityType, object id, string? partition = null)
+    {
+        if (entityType is null) throw new ArgumentNullException(nameof(entityType));
+        if (id is null) throw new ArgumentNullException(nameof(id));
+
+        var typeName = entityType.Name;
+        var partitionToken = string.IsNullOrWhiteSpace(partition) ? "_" : partition.Trim();
+        var idToken = id.ToString() ?? throw new ArgumentException("Id.ToString() returned null.", nameof(id));
+
+        return new CacheKey($"{typeName}:{partitionToken}:{idToken}");
+    }
 }

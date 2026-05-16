@@ -34,13 +34,13 @@ public sealed class DocumentsController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<List<SourceDocument>>> GetDocuments(string pipelineId, CancellationToken ct)
     {
-        var pipeline = await DocumentPipeline.Get(pipelineId, ct);
+        var pipeline = await DocumentPipeline.Get(pipelineId, ct).ConfigureAwait(false);
         if (pipeline is null)
         {
             return NotFound();
         }
 
-        var documents = await pipeline.LoadDocumentsAsync(ct);
+        var documents = await pipeline.LoadDocuments(ct).ConfigureAwait(false);
         return Ok(documents);
     }
 
@@ -77,7 +77,7 @@ public sealed class DocumentsController : ControllerBase
             return BadRequest("At least one file is required.");
         }
 
-    var result = await _ingestion.IngestAsync(pipelineId, collected, force, typeHint, ct);
+    var result = await _ingestion.Ingest(pipelineId, collected, force, typeHint, ct).ConfigureAwait(false);
         var newIds = result.NewDocuments
             .Select(d => d.Id)
             .Where(id => !string.IsNullOrWhiteSpace(id))
@@ -98,7 +98,7 @@ public sealed class DocumentsController : ControllerBase
 
             var reuseResponse = new DocumentIngestionResponse
             {
-                DocumentId = reusedIds.FirstOrDefault() ?? string.Empty,
+                DocumentId = reusedIds.FirstOrDefault() ?? "",
                 DocumentIds = reusedIds,
                 ReusedDocumentIds = reusedIds,
                 Status = "Uploaded"
@@ -114,7 +114,7 @@ public sealed class DocumentsController : ControllerBase
 
         var response = new DocumentIngestionResponse
         {
-            DocumentId = newIds.FirstOrDefault() ?? string.Empty,
+            DocumentId = newIds.FirstOrDefault() ?? "",
             DocumentIds = newIds,
             ReusedDocumentIds = reusedIds,
             JobId = null, // No auto-processing
@@ -138,7 +138,7 @@ public sealed class DocumentsController : ControllerBase
             return BadRequest("TypeId is required.");
         }
 
-        var pipeline = await DocumentPipeline.Get(pipelineId, ct);
+        var pipeline = await DocumentPipeline.Get(pipelineId, ct).ConfigureAwait(false);
         if (pipeline is null)
         {
             return NotFound();
@@ -149,7 +149,7 @@ public sealed class DocumentsController : ControllerBase
             return NotFound();
         }
 
-        var document = await SourceDocument.Get(documentId, ct);
+        var document = await SourceDocument.Get(documentId, ct).ConfigureAwait(false);
         if (document is null)
         {
             return NotFound();
@@ -169,11 +169,11 @@ public sealed class DocumentsController : ControllerBase
         document.Status = DocumentProcessingStatus.Pending;
         document.UpdatedAt = DateTime.UtcNow;
 
-        var saved = await document.Save(ct);
+        var saved = await document.Save(ct).ConfigureAwait(false);
 
-        await _runLog.AppendAsync(new RunLog
+        await _runLog.Append(new RunLog
         {
-            PipelineId = pipeline.Id ?? string.Empty,
+            PipelineId = pipeline.Id ?? "",
             Stage = "classify-override",
             DocumentId = saved.Id,
             StartedAt = DateTime.UtcNow,
@@ -185,11 +185,11 @@ public sealed class DocumentsController : ControllerBase
                 ["previousMethod"] = previousMethod.ToString(),
                 ["newType"] = saved.SourceType,
                 ["confidence"] = saved.ClassificationConfidence.ToString("0.00", CultureInfo.InvariantCulture),
-                ["reason"] = saved.ClassificationReason ?? string.Empty
+                ["reason"] = saved.ClassificationReason ?? ""
             }
-        }, ct);
+        }, ct).ConfigureAwait(false);
 
-        var job = await _jobs.ScheduleAsync(pipeline.Id!, new[] { saved.Id! }, ct);
+        var job = await _jobs.Schedule(pipeline.Id!, new[] { saved.Id! }, ct).ConfigureAwait(false);
 
         var response = new DocumentTypeOverrideResponse
         {
@@ -206,16 +206,16 @@ public sealed class DocumentsController : ControllerBase
 
 public sealed class DocumentIngestionResponse
 {
-    public string DocumentId { get; set; } = string.Empty;
+    public string DocumentId { get; set; } = "";
     public List<string> DocumentIds { get; set; } = new();
     public List<string> ReusedDocumentIds { get; set; } = new();
-    public string JobId { get; set; } = string.Empty;
-    public string Status { get; set; } = string.Empty;
+    public string JobId { get; set; } = "";
+    public string Status { get; set; } = "";
 }
 
 public sealed class DocumentTypeOverrideRequest
 {
-    public string TypeId { get; set; } = string.Empty;
+    public string TypeId { get; set; } = "";
     public double? Confidence { get; set; }
         = null;
     public int? TypeVersion { get; set; }
@@ -226,9 +226,9 @@ public sealed class DocumentTypeOverrideRequest
 
 public sealed class DocumentTypeOverrideResponse
 {
-    public string PipelineId { get; set; } = string.Empty;
-    public string DocumentId { get; set; } = string.Empty;
-    public string TypeId { get; set; } = string.Empty;
-    public string JobId { get; set; } = string.Empty;
-    public string Status { get; set; } = string.Empty;
+    public string PipelineId { get; set; } = "";
+    public string DocumentId { get; set; } = "";
+    public string TypeId { get; set; } = "";
+    public string JobId { get; set; } = "";
+    public string Status { get; set; } = "";
 }

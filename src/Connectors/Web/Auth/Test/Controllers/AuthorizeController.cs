@@ -25,7 +25,7 @@ public sealed class AuthorizeController(IOptionsSnapshot<TestProviderOptions> op
     var forceLogin = !string.IsNullOrWhiteSpace(prompt) && (string.Equals(prompt, "login", StringComparison.OrdinalIgnoreCase) || string.Equals(prompt, "select_account", StringComparison.OrdinalIgnoreCase));
     if (forceLogin)
     {
-      try { Response.Cookies.Append(Constants.CookieUser, string.Empty, new CookieOptions { Expires = DateTimeOffset.UnixEpoch, Path = "/", SameSite = SameSiteMode.Lax, HttpOnly = false, Secure = Request.IsHttps }); } catch { /* ignore */ }
+      try { Response.Cookies.Append(Constants.CookieUser, "", new CookieOptions { Expires = DateTimeOffset.UnixEpoch, Path = "/", SameSite = SameSiteMode.Lax, HttpOnly = false, Secure = Request.IsHttps }); } catch { /* ignore */ }
     }
 
     // Render simple HTML form when no user cookie or when forced via prompt.
@@ -95,7 +95,7 @@ public sealed class AuthorizeController(IOptionsSnapshot<TestProviderOptions> op
     }
 
     // At this point redirect is validated; proceed to issue code and construct safe redirect
-    var decoded = Uri.UnescapeDataString(userCookie ?? string.Empty);
+    var decoded = Uri.UnescapeDataString(userCookie ?? "");
     var parts = decoded.Split('|');
     var profile = new UserProfile(parts.ElementAtOrDefault(0) ?? "dev", parts.ElementAtOrDefault(1) ?? "dev@example.com", null);
     var (roles, perms, extraClaims) = ParseExtras(o);
@@ -105,7 +105,7 @@ public sealed class AuthorizeController(IOptionsSnapshot<TestProviderOptions> op
     var newQuery = existingQuery.ToDictionary(kvp => kvp.Key, kvp => (string?)kvp.Value.ToString());
     newQuery["code"] = code;
     if (!string.IsNullOrWhiteSpace(state)) newQuery["state"] = state;
-    uri.Query = QueryHelpers.AddQueryString(string.Empty, newQuery).TrimStart('?');
+    uri.Query = QueryHelpers.AddQueryString("", newQuery).TrimStart('?');
     logger.LogDebug("TestProvider authorize: redirecting with authorization code (details omitted) for client_id '{ClientId}'", client_id);
     return Redirect(uri.ToString());
     }

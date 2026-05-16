@@ -26,7 +26,7 @@ public sealed class CanonizationResult<T>
         Canonical = canonical ?? throw new ArgumentNullException(nameof(canonical));
         Metadata = metadata ?? throw new ArgumentNullException(nameof(metadata));
         Outcome = outcome;
-        _events = events ?? Array.Empty<CanonizationEvent>();
+        _events = events ?? [];
         ReprojectionTriggered = reprojectionTriggered;
         DistributionSkipped = distributionSkipped;
     }

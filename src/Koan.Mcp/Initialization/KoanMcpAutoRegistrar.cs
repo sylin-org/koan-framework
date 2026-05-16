@@ -30,8 +30,8 @@ public sealed class KoanMcpAutoRegistrar : IKoanAutoRegistrar
         if (configuration is null) throw new ArgumentNullException(nameof(configuration));
 
         module.Describe(ModuleVersion);
-        var section = configuration.GetSection("Koan:Mcp");
-        var enableStdio = Configuration.ReadWithSource(configuration, "Koan:Mcp:EnableStdioTransport", true);
+        var section = configuration.GetSection(ConfigurationConstants.Section);
+        var enableStdio = Configuration.ReadWithSource(configuration, ConfigurationConstants.FullKey(ConfigurationConstants.Keys.EnableStdioTransport), true);
         module.AddSetting(
             McpProvenanceItems.EnableStdioTransport,
             FromConfigurationValue(enableStdio),
@@ -39,7 +39,7 @@ public sealed class KoanMcpAutoRegistrar : IKoanAutoRegistrar
             sourceKey: enableStdio.ResolvedKey,
             usedDefault: enableStdio.UsedDefault);
 
-        var enableHttpSse = Configuration.ReadWithSource(configuration, "Koan:Mcp:EnableHttpSseTransport", false);
+        var enableHttpSse = Configuration.ReadWithSource(configuration, ConfigurationConstants.FullKey(ConfigurationConstants.Keys.EnableHttpSseTransport), false);
         module.AddSetting(
             McpProvenanceItems.EnableHttpSseTransport,
             FromConfigurationValue(enableHttpSse),
@@ -47,7 +47,7 @@ public sealed class KoanMcpAutoRegistrar : IKoanAutoRegistrar
             sourceKey: enableHttpSse.ResolvedKey,
             usedDefault: enableHttpSse.UsedDefault);
 
-        var requireAuth = Configuration.ReadWithSource<bool?>(configuration, "Koan:Mcp:RequireAuthentication", null);
+        var requireAuth = Configuration.ReadWithSource<bool?>(configuration, ConfigurationConstants.FullKey(ConfigurationConstants.Keys.RequireAuthentication), null);
         if (!requireAuth.UsedDefault)
         {
             module.AddSetting(
@@ -58,7 +58,7 @@ public sealed class KoanMcpAutoRegistrar : IKoanAutoRegistrar
                 usedDefault: requireAuth.UsedDefault);
         }
 
-        var route = Configuration.ReadWithSource(configuration, "Koan:Mcp:HttpSseRoute", string.Empty);
+        var route = Configuration.ReadWithSource(configuration, ConfigurationConstants.FullKey(ConfigurationConstants.Keys.HttpSseRoute), "");
         if (!string.IsNullOrWhiteSpace(route.Value))
         {
             module.AddSetting(
@@ -69,7 +69,7 @@ public sealed class KoanMcpAutoRegistrar : IKoanAutoRegistrar
                 usedDefault: route.UsedDefault);
         }
 
-        var publishCapabilities = Configuration.ReadWithSource(configuration, "Koan:Mcp:PublishCapabilityEndpoint", true);
+        var publishCapabilities = Configuration.ReadWithSource(configuration, ConfigurationConstants.FullKey(ConfigurationConstants.Keys.PublishCapabilityEndpoint), true);
         module.AddSetting(
             McpProvenanceItems.PublishCapabilityEndpoint,
             FromConfigurationValue(publishCapabilities),
@@ -77,7 +77,7 @@ public sealed class KoanMcpAutoRegistrar : IKoanAutoRegistrar
             sourceKey: publishCapabilities.ResolvedKey,
             usedDefault: publishCapabilities.UsedDefault);
 
-        var allowed = ReadStringArray(configuration, "Koan:Mcp:AllowedEntities");
+        var allowed = ReadStringArray(configuration, ConfigurationConstants.FullKey(ConfigurationConstants.Keys.AllowedEntities));
         module.AddSetting(
             McpProvenanceItems.AllowedEntities,
             FromBootSource(allowed.Source, allowed.UsedDefault),
@@ -85,7 +85,7 @@ public sealed class KoanMcpAutoRegistrar : IKoanAutoRegistrar
             sourceKey: allowed.SourceKey,
             usedDefault: allowed.UsedDefault);
 
-        var denied = ReadStringArray(configuration, "Koan:Mcp:DeniedEntities");
+        var denied = ReadStringArray(configuration, ConfigurationConstants.FullKey(ConfigurationConstants.Keys.DeniedEntities));
         module.AddSetting(
             McpProvenanceItems.DeniedEntities,
             FromBootSource(denied.Source, denied.UsedDefault),
@@ -93,7 +93,7 @@ public sealed class KoanMcpAutoRegistrar : IKoanAutoRegistrar
             sourceKey: denied.SourceKey,
             usedDefault: denied.UsedDefault);
 
-        var exposure = Configuration.ReadWithSource(configuration, "Koan:Mcp:Exposure", "Auto");
+        var exposure = Configuration.ReadWithSource(configuration, ConfigurationConstants.FullKey(ConfigurationConstants.Keys.Exposure), "Auto");
         module.AddSetting(
             McpProvenanceItems.ExposureMode,
             FromConfigurationValue(exposure),
@@ -101,7 +101,7 @@ public sealed class KoanMcpAutoRegistrar : IKoanAutoRegistrar
             sourceKey: exposure.ResolvedKey,
             usedDefault: exposure.UsedDefault);
 
-        var codeEnabled = Configuration.ReadWithSource(configuration, "Koan:Mcp:CodeMode:Enabled", true);
+        var codeEnabled = Configuration.ReadWithSource(configuration, $"{ConfigurationConstants.CodeMode.Section}:{ConfigurationConstants.CodeMode.Keys.Enabled}", true);
         module.AddSetting(
             McpProvenanceItems.CodeModeEnabled,
             FromConfigurationValue(codeEnabled),
@@ -111,7 +111,7 @@ public sealed class KoanMcpAutoRegistrar : IKoanAutoRegistrar
 
         if (codeEnabled.Value)
         {
-            var runtime = Configuration.ReadWithSource(configuration, "Koan:Mcp:CodeMode:Runtime", "Jint");
+            var runtime = Configuration.ReadWithSource(configuration, $"{ConfigurationConstants.CodeMode.Section}:{ConfigurationConstants.CodeMode.Keys.Runtime}", "Jint");
             module.AddSetting(
                 McpProvenanceItems.CodeModeRuntime,
                 FromConfigurationValue(runtime),
@@ -119,7 +119,7 @@ public sealed class KoanMcpAutoRegistrar : IKoanAutoRegistrar
                 sourceKey: runtime.ResolvedKey,
                 usedDefault: runtime.UsedDefault);
 
-            var cpuMs = Configuration.ReadWithSource(configuration, "Koan:Mcp:CodeMode:Sandbox:CpuMilliseconds", 2000);
+            var cpuMs = Configuration.ReadWithSource(configuration, $"{ConfigurationConstants.CodeMode.Sandbox.Section}:{ConfigurationConstants.CodeMode.Sandbox.Keys.CpuMilliseconds}", 2000);
             module.AddSetting(
                 McpProvenanceItems.SandboxCpuMs,
                 FromConfigurationValue(cpuMs),
@@ -127,7 +127,7 @@ public sealed class KoanMcpAutoRegistrar : IKoanAutoRegistrar
                 sourceKey: cpuMs.ResolvedKey,
                 usedDefault: cpuMs.UsedDefault);
 
-            var memoryMb = Configuration.ReadWithSource(configuration, "Koan:Mcp:CodeMode:Sandbox:MemoryMegabytes", 64);
+            var memoryMb = Configuration.ReadWithSource(configuration, $"{ConfigurationConstants.CodeMode.Sandbox.Section}:{ConfigurationConstants.CodeMode.Sandbox.Keys.MemoryMegabytes}", 64);
             module.AddSetting(
                 McpProvenanceItems.SandboxMemoryMb,
                 FromConfigurationValue(memoryMb),
@@ -135,7 +135,7 @@ public sealed class KoanMcpAutoRegistrar : IKoanAutoRegistrar
                 sourceKey: memoryMb.ResolvedKey,
                 usedDefault: memoryMb.UsedDefault);
 
-            var maxRecursion = Configuration.ReadWithSource(configuration, "Koan:Mcp:CodeMode:Sandbox:MaxRecursionDepth", 100);
+            var maxRecursion = Configuration.ReadWithSource(configuration, $"{ConfigurationConstants.CodeMode.Sandbox.Section}:{ConfigurationConstants.CodeMode.Sandbox.Keys.MaxRecursionDepth}", 100);
             module.AddSetting(
                 McpProvenanceItems.SandboxMaxRecursion,
                 FromConfigurationValue(maxRecursion),
@@ -177,7 +177,7 @@ public sealed class KoanMcpAutoRegistrar : IKoanAutoRegistrar
         }
 
         var values = resolved
-            .Select(v => (v.Value ?? string.Empty).Trim())
+            .Select(v => (v.Value ?? "").Trim())
             .Where(v => v.Length > 0)
             .ToArray();
 

@@ -32,7 +32,7 @@ public sealed class TestHostFixture : IAsyncLifetime
         await Task.CompletedTask;
     }
 
-    public Task DisposeAsync()
+    public async Task DisposeAsync()
     {
         return Task.CompletedTask; // keep host for test run duration
     }

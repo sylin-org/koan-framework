@@ -122,7 +122,7 @@ public sealed class CanonPipelineBuilder<TModel>
 
         public CanonPipelinePhase Phase { get; }
 
-        public ValueTask<CanonizationEvent?> ExecuteAsync(CanonPipelineContext<TModel> context, CancellationToken cancellationToken)
+        public ValueTask<CanonizationEvent?> Execute(CanonPipelineContext<TModel> context, CancellationToken cancellationToken)
             => _delegate(context, cancellationToken);
     }
 }

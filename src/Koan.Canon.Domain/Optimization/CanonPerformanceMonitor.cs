@@ -33,7 +33,7 @@ public sealed class CanonPerformanceMonitor : IAsyncDisposable
         }
 
         _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        _ = Task.Run(() => RunLoopAsync(_cts.Token), CancellationToken.None);
+        _ = Task.Run(() => RunLoop(_cts.Token), CancellationToken.None);
         _logger.LogInformation("[canon-monitor] started with {Interval} interval", _reportingInterval);
     }
 
@@ -61,7 +61,7 @@ public sealed class CanonPerformanceMonitor : IAsyncDisposable
         await Task.CompletedTask;
     }
 
-    private async Task RunLoopAsync(CancellationToken cancellationToken)
+    private async Task RunLoop(CancellationToken cancellationToken)
     {
         while (!cancellationToken.IsCancellationRequested)
         {

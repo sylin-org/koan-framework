@@ -14,7 +14,7 @@ public interface ICodeExecutor
     /// Execute provided source code and return structured result.
     /// Implementations must enforce CPU/memory/recursion/time budgets and never allow ambient CLR access.
     /// </summary>
-    Task<CodeExecutionResult> ExecuteAsync(CodeExecutionRequest request, CancellationToken ct = default);
+    Task<CodeExecutionResult> Execute(CodeExecutionRequest request, CancellationToken ct = default);
 }
 
 public sealed record CodeExecutionRequest(
@@ -52,14 +52,14 @@ public sealed record CodeExecutionError(string Type, string Message, string? Sta
 /// </summary>
 public sealed class NotImplementedCodeExecutor : ICodeExecutor
 {
-    public Task<CodeExecutionResult> ExecuteAsync(CodeExecutionRequest request, CancellationToken ct = default)
+    public Task<CodeExecutionResult> Execute(CodeExecutionRequest request, CancellationToken ct = default)
     {
         var now = DateTime.UtcNow;
         return Task.FromResult(new CodeExecutionResult(
             Success: false,
             Result: null,
             TextResponse: null,
-            Logs: Array.Empty<string>(),
+            Logs: [],
             Diagnostics: new CodeExecutionDiagnostics(0, 0, 0, request.Source?.Length ?? 0, now, now),
             Error: new CodeExecutionError("CodeModeUnavailable", "Code execution runtime not yet configured.", null)
         ));

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Koan.Core;
+using Koan.Orchestration.Aspire.Infrastructure;
 
 namespace Koan.Orchestration.Aspire.SelfOrchestration;
 
@@ -29,9 +30,9 @@ public class SelfOrchestrationConfigurationProvider : ConfigurationProvider, ICo
         Data["AI:Weaviate:Endpoint"] = "http://localhost:8080";
 
         // Additional configuration for self-orchestration
-        Data["Koan:Orchestration:Mode"] = "SelfOrchestrating";
-        Data["Koan:Orchestration:SessionId"] = sessionId;
-        Data["Koan:Orchestration:ConnectionTimeout"] = "30";
+        Data[ConfigurationConstants.Keys.Mode] = "SelfOrchestrating";
+        Data[ConfigurationConstants.Keys.SessionId] = sessionId;
+        Data[ConfigurationConstants.Keys.ConnectionTimeout] = "30";
     }
 }
 
@@ -61,9 +62,9 @@ public class DockerComposeConfigurationProvider : ConfigurationProvider, IConfig
         Data["AI:Weaviate:Endpoint"] = "http://weaviate:8080";
 
         // Additional configuration for Docker Compose networking
-        Data["Koan:Orchestration:Mode"] = "DockerCompose";
-        Data["Koan:Orchestration:SessionId"] = sessionId;
-        Data["Koan:Orchestration:NetworkMode"] = "container";
+        Data[ConfigurationConstants.Keys.Mode] = "DockerCompose";
+        Data[ConfigurationConstants.Keys.SessionId] = sessionId;
+        Data[ConfigurationConstants.Keys.NetworkMode] = "container";
     }
 }
 
@@ -94,10 +95,10 @@ public class KubernetesConfigurationProvider : ConfigurationProvider, IConfigura
         Data["AI:Weaviate:Endpoint"] = $"http://weaviate.{k8sNamespace}.svc.cluster.local:8080";
 
         // Additional configuration for Kubernetes networking
-        Data["Koan:Orchestration:Mode"] = "Kubernetes";
-        Data["Koan:Orchestration:SessionId"] = sessionId;
-        Data["Koan:Orchestration:NetworkMode"] = "kubernetes";
-        Data["Koan:Orchestration:Namespace"] = k8sNamespace;
+        Data[ConfigurationConstants.Keys.Mode] = "Kubernetes";
+        Data[ConfigurationConstants.Keys.SessionId] = sessionId;
+        Data[ConfigurationConstants.Keys.NetworkMode] = "kubernetes";
+        Data[ConfigurationConstants.Keys.Namespace] = k8sNamespace;
     }
 }
 

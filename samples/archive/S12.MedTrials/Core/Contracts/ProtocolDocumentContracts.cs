@@ -6,12 +6,12 @@ namespace S12.MedTrials.Contracts;
 
 public sealed class ProtocolDocumentIngestionRequest
 {
-    public string Title { get; set; } = string.Empty;
+    public string Title { get; set; } = "";
     public string DocumentType { get; set; } = "Protocol";
-    public string Content { get; set; } = string.Empty;
+    public string Content { get; set; } = "";
     public string? TrialSiteId { get; set; }
     public string? Version { get; set; }
-    public string[] Tags { get; set; } = Array.Empty<string>();
+    public string[] Tags { get; set; } = [];
     public DateTimeOffset? EffectiveDate { get; set; }
     public string? SourceUrl { get; set; }
 }
@@ -26,7 +26,7 @@ public sealed record ProtocolDocumentIngestionResult(
 
 public sealed class ProtocolDocumentQueryRequest
 {
-    public string Query { get; set; } = string.Empty;
+    public string Query { get; set; } = "";
     public string? TrialSiteId { get; set; }
     public int TopK { get; set; } = 5;
     public bool IncludeContent { get; set; }

@@ -48,7 +48,7 @@ internal sealed class RecommendationSettingsProvider(IServiceProvider sp, ILogge
         }
     }
 
-    public Task InvalidateAsync(CancellationToken ct = default)
+    public Task Invalidate(CancellationToken ct = default)
     {
         _cache = null;
         return Task.CompletedTask;

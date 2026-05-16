@@ -76,7 +76,7 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
         }
     }
 
-    protected async Task<List<TEntity>> FetchEntitiesAsync(TransferContextOptions? context, CancellationToken cancellationToken)
+    protected async Task<List<TEntity>> FetchEntities(TransferContextOptions? context, CancellationToken cancellationToken)
     {
         using var scope = context?.Apply();
 
@@ -116,7 +116,7 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
         return list;
     }
 
-    protected async Task<(int Copied, int BatchCounter, int TotalProcessed)> UpsertBatchesAsync(
+    protected async Task<(int Copied, int BatchCounter, int TotalProcessed)> UpsertBatches(
         IList<TEntity> items,
         TransferContextOptions? origin,
         TransferContextOptions? destination,
@@ -139,7 +139,7 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
             cancellationToken.ThrowIfCancellationRequested();
             var materialized = chunk.ToList();
             using var scope = destination?.Apply();
-            await Data<TEntity, TKey>.UpsertManyAsync(materialized, cancellationToken);
+            await Data<TEntity, TKey>.UpsertMany(materialized, cancellationToken);
 
             copied += materialized.Count;
             totalProcessed += materialized.Count;

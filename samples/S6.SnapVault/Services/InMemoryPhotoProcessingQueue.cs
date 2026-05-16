@@ -51,7 +51,7 @@ public class InMemoryPhotoProcessingQueue : IPhotoProcessingQueue
         }
     }
 
-    public async Task WaitForItemsAsync(CancellationToken ct)
+    public async Task WaitForItems(CancellationToken ct)
     {
         await _signal.WaitAsync(ct);
     }

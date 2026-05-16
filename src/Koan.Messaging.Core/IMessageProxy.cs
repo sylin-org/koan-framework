@@ -64,13 +64,13 @@ internal class AdaptiveMessageProxy : IMessageProxy
     /// Transitions from buffering to live mode.
     /// Called by the lifecycle service when messaging provider is ready.
     /// </summary>
-    internal async Task GoLiveAsync(IMessageBus bus, CancellationToken cancellationToken = default)
+    internal async Task GoLive(IMessageBus bus, CancellationToken cancellationToken = default)
     {
         if (_isLive)
             throw new InvalidOperationException("Already live");
         
         // Flush all buffered messages to the live bus
-        var flushedCount = await _buffer.FlushToAsync(bus, cancellationToken);
+        var flushedCount = await _buffer.FlushTo(bus, cancellationToken);
         
         // Switch to live mode
         _liveBus = bus;

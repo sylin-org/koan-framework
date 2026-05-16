@@ -32,7 +32,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             Infrastructure.Constants.Configuration.Keys.Section,
             configuratorLifetime: ServiceLifetime.Singleton);
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
-        services.TryAddEnumerable(new ServiceDescriptor(typeof(INamingDefaultsProvider), typeof(SqliteNamingDefaultsProvider), ServiceLifetime.Singleton));
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, SqliteHealthContributor>());
 
         // Register SQLite discovery adapter (maintains "Reference = Intent")
@@ -72,12 +71,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             defaultOptions.DefaultPageSize,
             Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
             Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
-
-        var maxPageSize = Koan.Core.Configuration.ReadFirstWithSource(
-            cfg,
-            defaultOptions.MaxPageSize,
-            Infrastructure.Constants.Configuration.Keys.MaxPageSize,
-            Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
 
         var namingStyle = Koan.Core.Configuration.ReadFirstWithSource(
             cfg,
@@ -133,7 +126,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         module.PublishConfigValue(SqliteItems.Separator, separator);
         module.PublishConfigValue(SqliteItems.EnsureCreatedSupported, ensureCreated);
         module.PublishConfigValue(SqliteItems.DefaultPageSize, defaultPageSize);
-        module.PublishConfigValue(SqliteItems.MaxPageSize, maxPageSize);
     }
 
     private static class LogActions

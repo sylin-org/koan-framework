@@ -33,7 +33,7 @@ public class Sensor : Entity<Sensor, string>
     public string Serial => Id;
 
     // Pi's friendly name - defaults to its serial until someone changes it
-    public string DisplayName { get; set; } = string.Empty;
+    public string DisplayName { get; set; } = "";
 
     [Parent(typeof(Plot))]
     public string? PlotId { get; set; }  // nullable = sensor might not be assigned to a plot yet
@@ -42,10 +42,10 @@ public class Sensor : Entity<Sensor, string>
 
     public DateTimeOffset? LastSeenAt { get; set; }  // track when we last heard from this Pi
 
-    public static async Task<Sensor> EnsureAsync(string serial, CancellationToken ct = default)
+    public static async Task<Sensor> Ensure(string serial, CancellationToken ct = default)
     {
         // "ensure" = get it if exists, create if doesn't
-        var normalized = (serial ?? string.Empty).Trim();
+        var normalized = (serial ?? "").Trim();
         if (string.IsNullOrEmpty(normalized))
         {
             throw new ValidationException("Sensor serial is required.");

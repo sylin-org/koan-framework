@@ -2,19 +2,23 @@
 setlocal
 
 set "SCRIPT_DIR=%~dp0"
-pushd "%SCRIPT_DIR%"
+pushd "%SCRIPT_DIR%" >nul
 
 set "DOTNET_ENVIRONMENT=Development"
 set "ASPNETCORE_ENVIRONMENT=Development"
 
-set "DOTNET_CMD=dotnet run --project ""g1c1.GardenCoop.csproj"""
-if "%~1"=="" (
-    rem no additional arguments
-) else (
-    set "DOTNET_CMD=%DOTNET_CMD% -- %*"
-)
+set "CMD=dotnet run --project ""g1c1.GardenCoop.csproj"""
+if "%~1"=="" goto run
 
-start "" cmd /c "%DOTNET_CMD%"
+:collect
+if "%~1"=="" goto run
+set "CMD=%CMD% %~1"
+shift
+goto collect
 
-popd
+:run
+start "" cmd /c "%CMD%"
+
+popd >nul
 endlocal
+exit /b 0

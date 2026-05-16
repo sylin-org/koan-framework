@@ -81,11 +81,6 @@ internal sealed class SqliteOptionsConfigurator : AdapterOptionsConfigurator<Sql
             Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
             Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
 
-        options.MaxPageSize = ReadProviderConfiguration(
-            options.MaxPageSize,
-            Infrastructure.Constants.Configuration.Keys.MaxPageSize,
-            Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
-
         var ddlStr = ReadProviderConfiguration(options.DdlPolicy.ToString(),
             Infrastructure.Constants.Configuration.Keys.DdlPolicy,
             Infrastructure.Constants.Configuration.Keys.AltDdlPolicy);
@@ -114,14 +109,14 @@ internal sealed class SqliteOptionsConfigurator : AdapterOptionsConfigurator<Sql
             {
                 KoanLog.ConfigInfo(logger, LogActions.Discovery, "disabled",
                     ("reason", "config"));
-                return BuildSqliteConnectionString("Data/Koan.sqlite");
+                return BuildSqliteConnectionString(".koan/data/Koan.sqlite");
             }
 
             if (_discoveryCoordinator == null)
             {
                 KoanLog.ConfigWarning(logger, LogActions.Discovery, LogOutcomeValues.Fallback,
                     ("reason", "no-coordinator"));
-                return BuildSqliteConnectionString("Data/Koan.sqlite");
+                return BuildSqliteConnectionString(".koan/data/Koan.sqlite");
             }
 
             // Create discovery context with SQLite-specific parameters
@@ -133,7 +128,7 @@ internal sealed class SqliteOptionsConfigurator : AdapterOptionsConfigurator<Sql
             };
 
             // Use autonomous discovery coordinator
-            var discoveryTask = _discoveryCoordinator.DiscoverServiceAsync("sqlite", context);
+            var discoveryTask = _discoveryCoordinator.DiscoverService("sqlite", context);
             var result = discoveryTask.GetAwaiter().GetResult();
 
             if (result.IsSuccessful)
@@ -146,20 +141,20 @@ internal sealed class SqliteOptionsConfigurator : AdapterOptionsConfigurator<Sql
             {
                 KoanLog.ConfigWarning(logger, LogActions.Discovery, LogOutcomeValues.Fallback,
                     ("reason", "no-candidate"));
-                return BuildSqliteConnectionString("Data/Koan.sqlite");
+                return BuildSqliteConnectionString(".koan/data/Koan.sqlite");
             }
         }
         catch (Exception ex)
         {
             KoanLog.ConfigError(logger, LogActions.Discovery, "exception",
                 ("error", ex.Message));
-            return BuildSqliteConnectionString("Data/Koan.sqlite");
+            return BuildSqliteConnectionString(".koan/data/Koan.sqlite");
         }
     }
 
     private bool IsAutoDetectionDisabled()
     {
-        return Koan.Core.Configuration.Read(Configuration, "Koan:Data:Sqlite:DisableAutoDetection", false);
+        return Koan.Core.Configuration.Read(Configuration, Infrastructure.Constants.Configuration.Keys.DisableAutoDetection, false);
     }
 
     private static string BuildSqliteConnectionString(string filePath)

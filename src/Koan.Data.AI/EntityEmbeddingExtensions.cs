@@ -6,23 +6,17 @@ using Koan.Data.Vector;
 namespace Koan.Data.AI;
 
 /// <summary>
-/// Extension methods for semantic search on entities with [Embedding] attribute.
-/// Part of ARCH-0070: Attribute-Driven AI Embeddings (Phase 2).
+/// Extension methods for semantic search on entities.
+/// Convention-first: works without [Embedding] attribute for on-demand operations.
+/// [Embedding] attribute gates auto-embed-on-save, not on-demand search.
 /// </summary>
 public static class EntityEmbeddingExtensions
 {
     /// <summary>
-    /// Performs semantic search across entities with [Embedding] attribute.
+    /// Performs semantic search across entities.
     /// Generates embedding for query text and finds most similar entities.
+    /// Works by convention — no [Embedding] attribute required for on-demand use.
     /// </summary>
-    /// <typeparam name="TEntity">Entity type with [Embedding] attribute</typeparam>
-    /// <param name="query">Natural language search query</param>
-    /// <param name="limit">Maximum number of results (default: 10)</param>
-    /// <param name="threshold">Minimum similarity score 0-1 (default: 0.0)</param>
-    /// <param name="partition">Optional partition to search within</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>List of entities ordered by relevance</returns>
-    /// <exception cref="InvalidOperationException">If entity type lacks [Embedding] attribute</exception>
     public static async Task<List<TEntity>> SemanticSearch<TEntity>(
         string query,
         int limit = 10,
@@ -31,18 +25,16 @@ public static class EntityEmbeddingExtensions
         CancellationToken ct = default)
         where TEntity : class, IEntity<string>, new()
     {
-        // Verify entity has [Embedding] attribute
-        var metadata = EmbeddingMetadata.Get<TEntity>();
-        if (metadata == null)
-        {
-            throw new InvalidOperationException(
-                $"Type {typeof(TEntity).Name} does not have [Embedding] attribute. " +
-                "Add [Embedding] to enable semantic search.");
-        }
+        var metadata = EmbeddingMetadata.Resolve<TEntity>();
 
-        // Generate embedding for query text
-        // TODO: Use metadata.Model when Ai.Embed supports model parameter
-        var queryEmbedding = await Ai.Embed(query, ct);
+        // Generate embedding for query text with source routing
+        float[] queryEmbedding;
+        using (metadata.Source != null || metadata.Model != null
+            ? Client.Scope(all: metadata.Source)
+            : null)
+        {
+            queryEmbedding = await Client.Embed(query, ct);
+        }
 
         // Search for similar vectors
         var vectorResults = await Vector<TEntity>.Search(
@@ -51,12 +43,11 @@ public static class EntityEmbeddingExtensions
             ct: ct);
 
         // Load full entities from search results
-        // Vector IDs are the entity IDs directly
         var entities = new List<TEntity>();
         foreach (var match in vectorResults.Matches)
         {
             if (match.Score < threshold)
-                continue; // Skip results below threshold
+                continue;
 
             var entity = await LoadEntity<TEntity>(match.Id, partition, ct);
             if (entity != null)
@@ -70,17 +61,8 @@ public static class EntityEmbeddingExtensions
 
     /// <summary>
     /// Finds entities similar to the current entity based on embedding similarity.
-    /// Generates embedding from entity content and searches for similar vectors.
+    /// Works by convention — no [Embedding] attribute required for on-demand use.
     /// </summary>
-    /// <typeparam name="TEntity">Entity type with [Embedding] attribute</typeparam>
-    /// <param name="entity">Source entity to find similar items for</param>
-    /// <param name="limit">Maximum number of results (default: 10)</param>
-    /// <param name="threshold">Minimum similarity score 0-1 (default: 0.7)</param>
-    /// <param name="includeSource">Include source entity in results (default: false)</param>
-    /// <param name="partition">Optional partition to search within</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>List of similar entities ordered by relevance</returns>
-    /// <exception cref="InvalidOperationException">If entity type lacks [Embedding] attribute</exception>
     public static async Task<List<TEntity>> FindSimilar<TEntity>(
         this TEntity entity,
         int limit = 10,
@@ -90,19 +72,17 @@ public static class EntityEmbeddingExtensions
         CancellationToken ct = default)
         where TEntity : class, IEntity<string>, new()
     {
-        // Verify entity has [Embedding] attribute
-        var metadata = EmbeddingMetadata.Get<TEntity>();
-        if (metadata == null)
-        {
-            throw new InvalidOperationException(
-                $"Type {typeof(TEntity).Name} does not have [Embedding] attribute. " +
-                "Add [Embedding] to enable FindSimilar.");
-        }
+        var metadata = EmbeddingMetadata.Resolve<TEntity>();
 
-        // Generate embedding from entity content
+        // Generate embedding from entity content with source routing
         var text = metadata.BuildEmbeddingText(entity);
-        // TODO: Use metadata.Model when Ai.Embed supports model parameter
-        var queryEmbedding = await Ai.Embed(text, ct);
+        float[] queryEmbedding;
+        using (metadata.Source != null || metadata.Model != null
+            ? Client.Scope(all: metadata.Source)
+            : null)
+        {
+            queryEmbedding = await Client.Embed(text, ct);
+        }
 
         // Search for similar vectors (fetch +1 to account for filtering source)
         var searchLimit = includeSource ? limit : limit + 1;
@@ -116,11 +96,11 @@ public static class EntityEmbeddingExtensions
         foreach (var match in vectorResults.Matches)
         {
             if (match.Score < threshold)
-                continue; // Skip results below threshold
+                continue;
 
             if (!includeSource && match.Id == entity.Id)
             {
-                continue; // Skip source entity
+                continue;
             }
 
             var similarEntity = await LoadEntity<TEntity>(match.Id, partition, ct);
@@ -130,7 +110,7 @@ public static class EntityEmbeddingExtensions
 
                 if (entities.Count >= limit)
                 {
-                    break; // Reached desired limit
+                    break;
                 }
             }
         }
@@ -138,25 +118,21 @@ public static class EntityEmbeddingExtensions
         return entities;
     }
 
-    /// <summary>
-    /// Helper method to load entity by ID, handling partition context.
-    /// </summary>
     private static async Task<TEntity?> LoadEntity<TEntity>(
         string entityId,
         string? partition,
         CancellationToken ct)
         where TEntity : class, IEntity<string>, new()
     {
-        // Vector search returns entity IDs directly
         if (string.IsNullOrEmpty(partition))
         {
-            return await Data<TEntity, string>.GetAsync(entityId, ct);
+            return await Data<TEntity, string>.Get(entityId, ct);
         }
         else
         {
             using (EntityContext.Partition(partition))
             {
-                return await Data<TEntity, string>.GetAsync(entityId, ct);
+                return await Data<TEntity, string>.Get(entityId, ct);
             }
         }
     }

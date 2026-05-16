@@ -38,7 +38,7 @@ public sealed class PipelineBuilder<TEntity> : IPipelineStageBuilder<TEntity, Pi
     /// <summary>
     /// Executes the pipeline and drains the source stream.
     /// </summary>
-    public async Task ExecuteAsync(CancellationToken cancellationToken = default)
+    public async Task Execute(CancellationToken cancellationToken = default)
     {
         await foreach (var entity in _source.WithCancellation(cancellationToken))
         {

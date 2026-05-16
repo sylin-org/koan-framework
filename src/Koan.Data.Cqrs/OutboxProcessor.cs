@@ -37,7 +37,7 @@ internal sealed class OutboxProcessor : KoanFluentServiceBase
         _routing = serviceProvider.GetRequiredService<ICqrsRouting>(); 
     }
 
-    public override async Task ExecuteCoreAsync(CancellationToken stoppingToken)
+    public override async Task ExecuteCore(CancellationToken stoppingToken)
     {
         Logger.LogInformation("OutboxProcessor started - processing CQRS outbox entries");
         
@@ -45,7 +45,7 @@ internal sealed class OutboxProcessor : KoanFluentServiceBase
         {
             try
             {
-                var batch = await _outbox.DequeueAsync(100, stoppingToken);
+                var batch = await _outbox.Dequeue(100, stoppingToken);
                 if (batch.Count == 0)
                 {
                     await Task.Delay(TimeSpan.FromMilliseconds(500), stoppingToken);
@@ -59,8 +59,8 @@ internal sealed class OutboxProcessor : KoanFluentServiceBase
                 {
                     try
                     {
-                        await ApplyProjectionAsync(entry, stoppingToken);
-                        await _outbox.MarkProcessedAsync(entry.Id, stoppingToken);
+                        await ApplyProjection(entry, stoppingToken);
+                        await _outbox.MarkProcessed(entry.Id, stoppingToken);
                         processedCount++;
                     }
                     catch (Exception ex)
@@ -68,7 +68,7 @@ internal sealed class OutboxProcessor : KoanFluentServiceBase
                         Logger.LogError(ex, "Failed processing outbox entry {Id} {Type} {Op}", entry.Id, entry.EntityType, entry.Operation);
                         failedCount++;
                         
-                        await EmitEventAsync(Koan.Core.Events.KoanServiceEvents.Outbox.Failed, new OutboxFailedEventArgs
+                        await EmitEvent(Koan.Core.Events.KoanServiceEvents.Outbox.Failed, new OutboxFailedEventArgs
                         {
                             EntryId = entry.Id,
                             EntityType = entry.EntityType,
@@ -84,7 +84,7 @@ internal sealed class OutboxProcessor : KoanFluentServiceBase
                 
                 if (processedCount > 0)
                 {
-                    await EmitEventAsync(Koan.Core.Events.KoanServiceEvents.Outbox.Processed, new OutboxProcessedEventArgs
+                    await EmitEvent(Koan.Core.Events.KoanServiceEvents.Outbox.Processed, new OutboxProcessedEventArgs
                     {
                         ProcessedCount = processedCount,
                         FailedCount = failedCount,
@@ -101,7 +101,7 @@ internal sealed class OutboxProcessor : KoanFluentServiceBase
             {
                 Logger.LogError(ex, "OutboxProcessor loop error");
                 
-                await EmitEventAsync(Koan.Core.Events.KoanServiceEvents.Outbox.Failed, new OutboxFailedEventArgs
+                await EmitEvent(Koan.Core.Events.KoanServiceEvents.Outbox.Failed, new OutboxFailedEventArgs
                 {
                     EntryId = "",
                     EntityType = "System",
@@ -123,15 +123,15 @@ internal sealed class OutboxProcessor : KoanFluentServiceBase
     {
         Logger.LogInformation("Manual outbox batch processing requested with batch size: {BatchSize}", batchSize ?? 100);
         
-        var batch = await _outbox.DequeueAsync(batchSize ?? 100, cancellationToken);
+        var batch = await _outbox.Dequeue(batchSize ?? 100, cancellationToken);
         var processedCount = 0;
         
         foreach (var entry in batch)
         {
             try
             {
-                await ApplyProjectionAsync(entry, cancellationToken);
-                await _outbox.MarkProcessedAsync(entry.Id, cancellationToken);
+                await ApplyProjection(entry, cancellationToken);
+                await _outbox.MarkProcessed(entry.Id, cancellationToken);
                 processedCount++;
             }
             catch (Exception ex)
@@ -143,7 +143,7 @@ internal sealed class OutboxProcessor : KoanFluentServiceBase
         Logger.LogInformation("Manual batch processing completed: {ProcessedCount}/{TotalCount}", processedCount, batch.Count);
     }
 
-    private async Task ApplyProjectionAsync(OutboxEntry entry, CancellationToken ct)
+    private async Task ApplyProjection(OutboxEntry entry, CancellationToken ct)
     {
         // Minimal 1:1 mirror: same entity type assembly-qualified
         var entityType = Type.GetType(entry.EntityType, throwOnError: false);
@@ -172,14 +172,14 @@ internal sealed class OutboxProcessor : KoanFluentServiceBase
         {
             var model = JsonConvert.DeserializeObject(entry.PayloadJson, entityType);
             if (model is null) return;
-            var upsertAsync = repo.GetType().GetMethod("UpsertAsync");
+            var upsertAsync = repo.GetType().GetMethod("Upsert");
             await (Task)upsertAsync!.Invoke(repo, new object?[] { model, ct })!;
             return;
         }
         if (string.Equals(entry.Operation, "Delete", StringComparison.OrdinalIgnoreCase))
         {
             var id = ConvertId(entry.EntityId, keyType);
-            var deleteAsync = repo.GetType().GetMethod("DeleteAsync");
+            var deleteAsync = repo.GetType().GetMethod("Delete");
             await (Task)deleteAsync!.Invoke(repo, new object?[] { id, ct })!;
             return;
         }

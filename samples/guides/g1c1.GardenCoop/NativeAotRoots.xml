@@ -1,0 +1,9 @@
+﻿<linker>
+  <assembly fullname="g1c1.GardenCoop">
+    <type fullname="g1c1.GardenCoop.Controllers.*" preserve="all" />
+    <type fullname="g1c1.GardenCoop.Models.*" preserve="all" />
+    <type fullname="g1c1.GardenCoop.Automation.GardenAutomation" preserve="all" />
+  </assembly>
+  <assembly fullname="Koan.Web.Admin" preserve="all" />
+  <assembly fullname="Koan.Web.Auth.Services" preserve="all" />
+</linker>

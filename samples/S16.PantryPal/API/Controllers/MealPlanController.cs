@@ -17,14 +17,14 @@ public class MealsController(IMealPlanningService service) : ControllerBase
     [HttpPost("suggest")]
     public async Task<IActionResult> SuggestRecipes([FromBody] SuggestRecipesRequest request, CancellationToken ct = default)
     {
-        var scored = await service.SuggestRecipesAsync(request, ct);
+        var scored = await service.SuggestRecipes(request, ct);
         return Ok(scored);
     }
 
     [HttpPost("plan")]
     public async Task<IActionResult> CreateMealPlan([FromBody] CreateMealPlanRequest request, CancellationToken ct = default)
     {
-        var plan = await service.CreateMealPlanAsync(request, ct);
+        var plan = await service.CreateMealPlan(request, ct);
         return Ok(new { planId = plan.Id, plan });
     }
 
@@ -33,7 +33,7 @@ public class MealsController(IMealPlanningService service) : ControllerBase
     {
         try
         {
-            var result = await service.GenerateShoppingListAsync(planId, ct);
+            var result = await service.GenerateShoppingList(planId, ct);
             return Ok(new { listId = result.List.Id, items = result.Items });
         }
         catch (InvalidOperationException ex)

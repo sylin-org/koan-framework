@@ -64,14 +64,14 @@ namespace Koan.Data.Core.Model
 
         // Static conveniences forward to the data facade without exposing its namespace in domain types
         public static Task<TEntity?> Get(TKey id, CancellationToken ct = default)
-            => EntityEventExecutor<TEntity, TKey>.ExecuteLoadAsync(token => Data<TEntity, TKey>.GetAsync(id, token), ct);
+            => EntityEventExecutor<TEntity, TKey>.ExecuteLoad(token => Data<TEntity, TKey>.Get(id, token), ct);
         public static Task<IReadOnlyList<TEntity?>> Get(IEnumerable<TKey> ids, CancellationToken ct = default)
-            => EntityEventExecutor<TEntity, TKey>.ExecuteLoadManyAsync(token => Data<TEntity, TKey>.GetManyAsync(ids, token), ct);
+            => EntityEventExecutor<TEntity, TKey>.ExecuteLoadMany(token => Data<TEntity, TKey>.GetMany(ids, token), ct);
         // Partition-aware variants
         public static Task<TEntity?> Get(TKey id, string partition, CancellationToken ct = default)
-            => EntityEventExecutor<TEntity, TKey>.ExecuteLoadAsync(token => Data<TEntity, TKey>.GetAsync(id, partition, token), ct);
+            => EntityEventExecutor<TEntity, TKey>.ExecuteLoad(token => Data<TEntity, TKey>.Get(id, partition, token), ct);
         public static Task<IReadOnlyList<TEntity?>> Get(IEnumerable<TKey> ids, string partition, CancellationToken ct = default)
-            => EntityEventExecutor<TEntity, TKey>.ExecuteLoadManyAsync(token => Data<TEntity, TKey>.GetManyAsync(ids, partition, token), ct);
+            => EntityEventExecutor<TEntity, TKey>.ExecuteLoadMany(token => Data<TEntity, TKey>.GetMany(ids, partition, token), ct);
 
         public static Task<IReadOnlyList<TEntity>> All(CancellationToken ct = default)
             => Data<TEntity, TKey>.All(ct);
@@ -129,31 +129,31 @@ namespace Koan.Data.Core.Model
         {
             // Default: await Entity.Count → Optimized strategy
             public System.Runtime.CompilerServices.TaskAwaiter<long> GetAwaiter()
-                => Data<TEntity, TKey>.CountAsync((object?)null, CountStrategy.Optimized, default).GetAwaiter();
+                => Data<TEntity, TKey>.Count((object?)null, CountStrategy.Optimized, default).GetAwaiter();
 
             public Task<long> Exact(CancellationToken ct = default)
-                => Data<TEntity, TKey>.CountAsync(ct);
+                => Data<TEntity, TKey>.Count(ct);
 
             public Task<long> Fast(CancellationToken ct = default)
-                => Data<TEntity, TKey>.CountAsync((object?)null, CountStrategy.Fast, ct);
+                => Data<TEntity, TKey>.Count((object?)null, CountStrategy.Fast, ct);
 
             public Task<long> Optimized(CancellationToken ct = default)
-                => Data<TEntity, TKey>.CountAsync((object?)null, CountStrategy.Optimized, ct);
+                => Data<TEntity, TKey>.Count((object?)null, CountStrategy.Optimized, ct);
 
             public Task<long> Where(Expression<Func<TEntity, bool>> predicate, CountStrategy strategy = CountStrategy.Optimized, CancellationToken ct = default)
-                => Data<TEntity, TKey>.CountAsync(predicate, strategy, ct);
+                => Data<TEntity, TKey>.Count(predicate, strategy, ct);
 
             public Task<long> Where(Expression<Func<TEntity, bool>> predicate, DataQueryOptions options, CancellationToken ct = default)
-                => Data<TEntity, TKey>.CountAsync(predicate, options, ct);
+                => Data<TEntity, TKey>.Count(predicate, options, ct);
 
             public Task<long> Query(string query, CountStrategy strategy = CountStrategy.Optimized, CancellationToken ct = default)
-                => Data<TEntity, TKey>.CountAsync(query, strategy, ct);
+                => Data<TEntity, TKey>.Count(query, strategy, ct);
 
             public Task<long> Query(string query, DataQueryOptions options, CancellationToken ct = default)
-                => Data<TEntity, TKey>.CountAsync(query, options, ct);
+                => Data<TEntity, TKey>.Count(query, options, ct);
 
             public Task<long> Partition(string partition, CountStrategy strategy = CountStrategy.Exact, CancellationToken ct = default)
-                => Data<TEntity, TKey>.CountAsync(partition, strategy, ct);
+                => Data<TEntity, TKey>.Count(partition, strategy, ct);
         }
         public static IBatchSet<TEntity, TKey> Batch() => Data<TEntity, TKey>.Batch();
 
@@ -184,26 +184,26 @@ namespace Koan.Data.Core.Model
         public static MirrorTransferBuilder<TEntity, TKey> Mirror(Func<IQueryable<TEntity>, IQueryable<TEntity>> query, MirrorMode mode = MirrorMode.Push)
             => new(mode, null, query ?? throw new ArgumentNullException(nameof(query)));
 
-        public static Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)
+        public static Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
         {
             if (model is null) throw new ArgumentNullException(nameof(model));
 
-            return EntityEventExecutor<TEntity, TKey>.ExecuteUpsertAsync(
+            return EntityEventExecutor<TEntity, TKey>.ExecuteUpsert(
                 model,
-                (entity, token) => Data<TEntity, TKey>.UpsertAsync(entity, token),
-                token => LoadPriorSnapshotAsync(model, token),
+                (entity, token) => Data<TEntity, TKey>.Upsert(entity, token),
+                token => LoadPriorSnapshot(model, token),
                 ct);
         }
 
-        public static Task<TEntity> UpsertAsync(TEntity model, string partition, CancellationToken ct = default)
+        public static Task<TEntity> Upsert(TEntity model, string partition, CancellationToken ct = default)
         {
             if (model is null) throw new ArgumentNullException(nameof(model));
             if (string.IsNullOrWhiteSpace(partition)) throw new ArgumentException("Partition must be provided.", nameof(partition));
 
-            return EntityEventExecutor<TEntity, TKey>.ExecuteUpsertAsync(
+            return EntityEventExecutor<TEntity, TKey>.ExecuteUpsert(
                 model,
-                (entity, token) => Data<TEntity, TKey>.UpsertAsync(entity, partition, token),
-                token => LoadPriorSnapshotAsync(model, token, partition),
+                (entity, token) => Data<TEntity, TKey>.Upsert(entity, partition, token),
+                token => LoadPriorSnapshot(model, token, partition),
                 ct);
         }
 
@@ -212,10 +212,10 @@ namespace Koan.Data.Core.Model
             if (models is null) throw new ArgumentNullException(nameof(models));
 
             var list = models as IReadOnlyList<TEntity> ?? models.ToList();
-            return await EntityEventExecutor<TEntity, TKey>.ExecuteUpsertManyAsync(
+            return await EntityEventExecutor<TEntity, TKey>.ExecuteUpsertMany(
                     list,
-                    (payload, token) => Data<TEntity, TKey>.UpsertManyAsync(payload, token),
-                    (entity, token) => LoadPriorSnapshotAsync(entity, token),
+                    (payload, token) => Data<TEntity, TKey>.UpsertMany(payload, token),
+                    (entity, token) => LoadPriorSnapshot(entity, token),
                     ct)
                 ;
         }
@@ -226,20 +226,20 @@ namespace Koan.Data.Core.Model
             if (string.IsNullOrWhiteSpace(partition)) throw new ArgumentException("Partition must be provided.", nameof(partition));
 
             var list = models as IReadOnlyList<TEntity> ?? models.ToList();
-            return await EntityEventExecutor<TEntity, TKey>.ExecuteUpsertManyAsync(
+            return await EntityEventExecutor<TEntity, TKey>.ExecuteUpsertMany(
                 list,
-                (payload, token) => Data<TEntity, TKey>.UpsertManyAsync(payload, partition, token),
-                (entity, token) => LoadPriorSnapshotAsync(entity, token, partition),
+                (payload, token) => Data<TEntity, TKey>.UpsertMany(payload, partition, token),
+                (entity, token) => LoadPriorSnapshot(entity, token, partition),
                 ct)
             ;
         }
 
         // Removal helpers
         public static Task<bool> Remove(TKey id, CancellationToken ct = default)
-            => EntityEventExecutor<TEntity, TKey>.ExecuteRemoveAsync(
+            => EntityEventExecutor<TEntity, TKey>.ExecuteRemove(
                 id,
-                token => Data<TEntity, TKey>.GetAsync(id, token),
-                (entity, token) => Data<TEntity, TKey>.DeleteAsync(entity.Id, token),
+                token => Data<TEntity, TKey>.Get(id, token),
+                (entity, token) => Data<TEntity, TKey>.Delete(entity.Id, token),
                 ct);
 
         public static Task<bool> Remove(TKey id, DataQueryOptions? options, CancellationToken ct = default)
@@ -259,18 +259,18 @@ namespace Koan.Data.Core.Model
             var list = ids as IReadOnlyList<TKey> ?? ids.ToList();
             if (!EntityEventRegistry<TEntity, TKey>.HasRemovePipeline)
             {
-                return await Data<TEntity, TKey>.DeleteManyAsync(list, ct);
+                return await Data<TEntity, TKey>.DeleteMany(list, ct);
             }
 
-            var entities = await LoadEntitiesAsync(list, null, ct);
+            var entities = await LoadEntities(list, null, ct);
             if (entities.Count == 0)
             {
                 return 0;
             }
 
-            return await EntityEventExecutor<TEntity, TKey>.ExecuteRemoveManyAsync(
+            return await EntityEventExecutor<TEntity, TKey>.ExecuteRemoveMany(
                     entities,
-                    (payload, token) => Data<TEntity, TKey>.DeleteManyAsync(ExtractKeys(payload), token),
+                    (payload, token) => Data<TEntity, TKey>.DeleteMany(ExtractKeys(payload), token),
                     ct)
                 ;
         }
@@ -290,10 +290,10 @@ namespace Koan.Data.Core.Model
         {
             if (string.IsNullOrWhiteSpace(partition)) throw new ArgumentException("Partition must be provided.", nameof(partition));
 
-            return EntityEventExecutor<TEntity, TKey>.ExecuteRemoveAsync(
+            return EntityEventExecutor<TEntity, TKey>.ExecuteRemove(
                 id,
-                token => Data<TEntity, TKey>.GetAsync(id, partition, token),
-                (entity, token) => Data<TEntity, TKey>.DeleteAsync(entity.Id, partition, token),
+                token => Data<TEntity, TKey>.Get(id, partition, token),
+                (entity, token) => Data<TEntity, TKey>.Delete(entity.Id, partition, token),
                 ct);
         }
 
@@ -305,23 +305,23 @@ namespace Koan.Data.Core.Model
             var list = ids as IReadOnlyList<TKey> ?? ids.ToList();
             if (!EntityEventRegistry<TEntity, TKey>.HasRemovePipeline)
             {
-                return await Data<TEntity, TKey>.DeleteManyAsync(list, partition, ct);
+                return await Data<TEntity, TKey>.DeleteMany(list, partition, ct);
             }
 
-            var entities = await LoadEntitiesAsync(list, partition, ct);
+            var entities = await LoadEntities(list, partition, ct);
             if (entities.Count == 0)
             {
                 return 0;
             }
 
-            return await EntityEventExecutor<TEntity, TKey>.ExecuteRemoveManyAsync(
+            return await EntityEventExecutor<TEntity, TKey>.ExecuteRemoveMany(
                     entities,
-                    (payload, token) => Data<TEntity, TKey>.DeleteManyAsync(ExtractKeys(payload), partition, token),
+                    (payload, token) => Data<TEntity, TKey>.DeleteMany(ExtractKeys(payload), partition, token),
                     ct)
                 ;
         }
 
-        private static ValueTask<TEntity?> LoadPriorSnapshotAsync(TEntity entity, CancellationToken cancellationToken, string? partition = null)
+        private static ValueTask<TEntity?> LoadPriorSnapshot(TEntity entity, CancellationToken cancellationToken, string? partition = null)
         {
             if (entity is null) throw new ArgumentNullException(nameof(entity));
 
@@ -332,18 +332,18 @@ namespace Koan.Data.Core.Model
             }
 
             return partition is null
-                ? new ValueTask<TEntity?>(Data<TEntity, TKey>.GetAsync(key, cancellationToken))
-                : new ValueTask<TEntity?>(Data<TEntity, TKey>.GetAsync(key, partition, cancellationToken));
+                ? new ValueTask<TEntity?>(Data<TEntity, TKey>.Get(key, cancellationToken))
+                : new ValueTask<TEntity?>(Data<TEntity, TKey>.Get(key, partition, cancellationToken));
         }
 
-        private static async Task<IReadOnlyList<TEntity>> LoadEntitiesAsync(IReadOnlyList<TKey> ids, string? partition, CancellationToken cancellationToken)
+        private static async Task<IReadOnlyList<TEntity>> LoadEntities(IReadOnlyList<TKey> ids, string? partition, CancellationToken cancellationToken)
         {
             var results = new List<TEntity>(ids.Count);
             foreach (var id in ids)
             {
                 var entity = partition is null
-                    ? await Data<TEntity, TKey>.GetAsync(id, cancellationToken)
-                    : await Data<TEntity, TKey>.GetAsync(id, partition, cancellationToken);
+                    ? await Data<TEntity, TKey>.Get(id, cancellationToken)
+                    : await Data<TEntity, TKey>.Get(id, partition, cancellationToken);
 
                 if (entity != null)
                 {
@@ -367,7 +367,7 @@ namespace Koan.Data.Core.Model
             var items = await Data<TEntity, TKey>.Query(query, ct);
             if (!EntityEventRegistry<TEntity, TKey>.HasRemovePipeline)
             {
-                return await Data<TEntity, TKey>.DeleteManyAsync(items.Select(e => e.Id), ct);
+                return await Data<TEntity, TKey>.DeleteMany(items.Select(e => e.Id), ct);
             }
 
             if (items.Count == 0)
@@ -375,9 +375,9 @@ namespace Koan.Data.Core.Model
                 return 0;
             }
 
-            return await EntityEventExecutor<TEntity, TKey>.ExecuteRemoveManyAsync(
+            return await EntityEventExecutor<TEntity, TKey>.ExecuteRemoveMany(
                     items,
-                    (payload, token) => Data<TEntity, TKey>.DeleteManyAsync(ExtractKeys(payload), token),
+                    (payload, token) => Data<TEntity, TKey>.DeleteMany(ExtractKeys(payload), token),
                     ct)
                 ;
         }
@@ -387,7 +387,7 @@ namespace Koan.Data.Core.Model
             var items = await Data<TEntity, TKey>.Query(query, partition, ct);
             if (!EntityEventRegistry<TEntity, TKey>.HasRemovePipeline)
             {
-                return await Data<TEntity, TKey>.DeleteManyAsync(items.Select(e => e.Id), partition, ct);
+                return await Data<TEntity, TKey>.DeleteMany(items.Select(e => e.Id), partition, ct);
             }
 
             if (items.Count == 0)
@@ -395,9 +395,9 @@ namespace Koan.Data.Core.Model
                 return 0;
             }
 
-            return await EntityEventExecutor<TEntity, TKey>.ExecuteRemoveManyAsync(
+            return await EntityEventExecutor<TEntity, TKey>.ExecuteRemoveMany(
                     items,
-                    (payload, token) => Data<TEntity, TKey>.DeleteManyAsync(ExtractKeys(payload), partition, token),
+                    (payload, token) => Data<TEntity, TKey>.DeleteMany(ExtractKeys(payload), partition, token),
                     ct)
                 ;
         }
@@ -420,7 +420,7 @@ namespace Koan.Data.Core.Model
         /// <param name="ct">Cancellation token</param>
         /// <returns>Number of entities removed, or -1 if unknown (TRUNCATE doesn't report count)</returns>
         public static Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default)
-            => Data<TEntity, TKey>.RemoveAllAsync(strategy, ct);
+            => Data<TEntity, TKey>.RemoveAll(strategy, ct);
 
         /// <summary>
         /// Removes all entities in the specified partition using the given strategy.
@@ -430,7 +430,7 @@ namespace Koan.Data.Core.Model
         /// <param name="ct">Cancellation token</param>
         /// <returns>Number of entities removed, or -1 if unknown</returns>
         public static Task<long> RemoveAll(RemoveStrategy strategy, string partition, CancellationToken ct = default)
-            => Data<TEntity, TKey>.RemoveAllAsync(strategy, partition, ct);
+            => Data<TEntity, TKey>.RemoveAll(strategy, partition, ct);
 
         // --- Patch convenience statics (DX sugar, normalize to canonical PatchOps) ---
         // Null → null semantics (application/json partial JSON)
@@ -473,7 +473,7 @@ namespace Koan.Data.Core.Model
                 nulls ?? Koan.Data.Abstractions.Instructions.PartialJsonNullPolicy.SetNull,
                 Koan.Data.Abstractions.Instructions.ArrayBehavior.Replace);
             var payload = new Koan.Data.Abstractions.Instructions.PatchPayload<TKey>(id, null, null, "partial-json", ops, options);
-            return Data<TEntity, TKey>.PatchAsync(payload, ct);
+            return Data<TEntity, TKey>.Patch(payload, ct);
         }
 
         // Null → default semantics (application/merge-patch+json)
@@ -515,7 +515,7 @@ namespace Koan.Data.Core.Model
                 Koan.Data.Abstractions.Instructions.PartialJsonNullPolicy.SetNull,
                 Koan.Data.Abstractions.Instructions.ArrayBehavior.Replace);
             var payload = new Koan.Data.Abstractions.Instructions.PatchPayload<TKey>(id, null, null, "merge-patch", ops, options);
-            return Data<TEntity, TKey>.PatchAsync(payload, ct);
+            return Data<TEntity, TKey>.Patch(payload, ct);
         }
 
         /// <summary>
@@ -572,7 +572,7 @@ namespace Koan.Data.Core.Model
 
             if (parentId == null) return null;
 
-            return await Data<TParent, TKey>.GetAsync(parentId, ct);
+            return await Data<TParent, TKey>.Get(parentId, ct);
         }
 
         /// <summary>
@@ -585,7 +585,7 @@ namespace Koan.Data.Core.Model
             var parentId = GetPropertyValue<TKey>(propertyName);
             if (parentId == null) return null;
 
-            return await Data<TParent, TKey>.GetAsync(parentId, ct);
+            return await Data<TParent, TKey>.Get(parentId, ct);
         }
 
         /// <summary>
@@ -744,7 +744,7 @@ namespace Koan.Data.Core.Model
         {
             // Use reflection to call Data<TParent, TKey>.GetAsync
             var dataType = typeof(Data<,>).MakeGenericType(parentType, typeof(TKey));
-            var method = dataType.GetMethod("GetAsync", new[] { typeof(TKey), typeof(CancellationToken) });
+            var method = dataType.GetMethod("Get", new[] { typeof(TKey), typeof(CancellationToken) });
 
             if (method == null) return null;
 

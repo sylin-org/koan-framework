@@ -330,4 +330,69 @@ public class ConnectionStringParserTests
         Assert.Contains("Pooling", result.Parameters.Keys);
         Assert.Equal("true", result.Parameters["Pooling"]);
     }
+
+    [Fact]
+    public void Parse_MongoDbReplicaSet_ParsesMultiHostWithQueryParams()
+    {
+        var connectionString =
+            "mongodb://stone-shadowed-swamp.local:27017,stone-golden-summit.local:27017,stone-topaz-butte.local:27017,stone-limpid-dune.local:27017/?replicaSet=zen-garden";
+
+        var result = ConnectionStringParser.Parse(connectionString, "mongodb");
+
+        Assert.Equal(
+            "stone-shadowed-swamp.local:27017,stone-golden-summit.local:27017,stone-topaz-butte.local:27017,stone-limpid-dune.local:27017",
+            result.Host);
+        Assert.Equal(0, result.Port); // port is embedded in host string for multi-host
+        Assert.Null(result.Database);
+        Assert.Null(result.Username);
+        Assert.Contains("replicaSet", result.Parameters.Keys);
+        Assert.Equal("zen-garden", result.Parameters["replicaSet"]);
+    }
+
+    [Fact]
+    public void Parse_MongoDbReplicaSet_WithAuthAndDatabase()
+    {
+        var connectionString =
+            "mongodb://admin:secret@host1:27017,host2:27017,host3:27017/mydb?replicaSet=rs0";
+
+        var result = ConnectionStringParser.Parse(connectionString, "mongodb");
+
+        Assert.Equal("host1:27017,host2:27017,host3:27017", result.Host);
+        Assert.Equal(0, result.Port);
+        Assert.Equal("mydb", result.Database);
+        Assert.Equal("admin", result.Username);
+        Assert.Equal("secret", result.Password);
+        Assert.Equal("rs0", result.Parameters["replicaSet"]);
+    }
+
+    [Fact]
+    public void Build_MongoDbReplicaSet_PreservesMultiHost()
+    {
+        var components = new ConnectionStringComponents(
+            Host: "host1:27017,host2:27017,host3:27017",
+            Port: 0,
+            Database: "mydb",
+            Username: "user",
+            Password: "pass",
+            Parameters: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["replicaSet"] = "rs0"
+            });
+
+        var result = ConnectionStringParser.Build(components, "mongodb");
+
+        Assert.Equal("mongodb://user:pass@host1:27017,host2:27017,host3:27017/mydb?replicaSet=rs0", result);
+    }
+
+    [Fact]
+    public void ParseAndBuild_RoundTrip_MongoDbReplicaSet()
+    {
+        var original =
+            "mongodb://admin:pass@host1:27017,host2:27017/testdb?replicaSet=zen-garden";
+
+        var components = ConnectionStringParser.Parse(original, "mongodb");
+        var rebuilt = ConnectionStringParser.Build(components, "mongodb");
+
+        Assert.Equal(original, rebuilt);
+    }
 }

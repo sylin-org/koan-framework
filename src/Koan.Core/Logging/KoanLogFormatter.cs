@@ -21,7 +21,7 @@ public class KoanLogFormatter : ConsoleFormatter
 
     public override void Write<TState>(in LogEntry<TState> logEntry, IExternalScopeProvider? scopeProvider, TextWriter textWriter)
     {
-        var message = logEntry.Formatter?.Invoke(logEntry.State, logEntry.Exception) ?? string.Empty;
+        var message = logEntry.Formatter?.Invoke(logEntry.State, logEntry.Exception) ?? "";
         
         // Try to find registered context first (preferred approach)
         var registeredContext = _contextRegistry?.FindContext(message, logEntry.Category);

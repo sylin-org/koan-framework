@@ -25,7 +25,7 @@ public sealed record CanonPipelineMetadata
         ModelType = modelType ?? throw new ArgumentNullException(nameof(modelType));
         Phases = phases ?? throw new ArgumentNullException(nameof(phases));
         HasSteps = hasSteps;
-        AggregationKeys = aggregationKeys is null ? Array.Empty<string>() : aggregationKeys.ToArray();
+        AggregationKeys = aggregationKeys is null ? [] : aggregationKeys.ToArray();
         AggregationPolicies = aggregationPolicies is null
             ? new Dictionary<string, Annotations.AggregationPolicyKind>(StringComparer.OrdinalIgnoreCase)
             : new Dictionary<string, Annotations.AggregationPolicyKind>(aggregationPolicies, StringComparer.OrdinalIgnoreCase);

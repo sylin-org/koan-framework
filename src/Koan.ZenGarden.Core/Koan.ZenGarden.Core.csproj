@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <KoanPackageKind>Periphery</KoanPackageKind>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Description>Initialization and connection-intent contracts for Koan Zen Garden integrations.</Description>
+    <PackageTags>$(CommonPackageTags);zen-garden;contracts;initialization;connection-intent</PackageTags>
+  </PropertyGroup>
+</Project>

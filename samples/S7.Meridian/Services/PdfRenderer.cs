@@ -16,7 +16,7 @@ namespace Koan.Samples.Meridian.Services;
 
 public interface IPdfRenderer
 {
-    Task<byte[]> RenderAsync(string markdown, CancellationToken ct = default);
+    Task<byte[]> Render(string markdown, CancellationToken ct = default);
 }
 
 public sealed class PandocPdfRenderer : IPdfRenderer
@@ -42,23 +42,23 @@ public sealed class PandocPdfRenderer : IPdfRenderer
         _logger = logger;
     }
 
-    public async Task<byte[]> RenderAsync(string markdown, CancellationToken ct = default)
+    public async Task<byte[]> Render(string markdown, CancellationToken ct = default)
     {
         var pandoc = _options.Rendering.Pandoc;
         if (!pandoc.Enabled)
         {
-            return Array.Empty<byte>();
+            return [];
         }
 
         if (string.IsNullOrWhiteSpace(markdown))
         {
-            return Array.Empty<byte>();
+            return [];
         }
 
         var sanitized = pandoc.SanitizeLatex ? SanitizeMarkdown(markdown) : markdown;
         if (string.IsNullOrWhiteSpace(sanitized))
         {
-            return Array.Empty<byte>();
+            return [];
         }
 
         try
@@ -77,7 +77,7 @@ public sealed class PandocPdfRenderer : IPdfRenderer
                     response.StatusCode,
                     endpoint,
                     error);
-                return Array.Empty<byte>();
+                return [];
             }
 
             var payload = await response.Content
@@ -87,7 +87,7 @@ public sealed class PandocPdfRenderer : IPdfRenderer
             if (payload?.PdfBase64 is null)
             {
                 _logger.LogWarning("Pandoc renderer response missing PDF payload.");
-                return Array.Empty<byte>();
+                return [];
             }
 
             return Convert.FromBase64String(payload.PdfBase64);
@@ -99,7 +99,7 @@ public sealed class PandocPdfRenderer : IPdfRenderer
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Pandoc renderer failed to convert markdown to PDF.");
-            return Array.Empty<byte>();
+            return [];
         }
     }
 
@@ -109,7 +109,7 @@ public sealed class PandocPdfRenderer : IPdfRenderer
         var builder = new StringBuilder();
         string? line;
 
-        while ((line = reader.ReadLine()) != null)
+        while ((line = reader.ReadLineAsync()) != null)
         {
             if (BlockedLatexTokens.Any(token => line.Contains(token, StringComparison.OrdinalIgnoreCase)))
             {

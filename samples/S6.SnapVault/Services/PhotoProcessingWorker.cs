@@ -29,12 +29,12 @@ public class PhotoProcessingWorker : BackgroundService
             try
             {
                 // Wait for items to be available
-                await _queue.WaitForItemsAsync(stoppingToken);
+                await _queue.WaitForItems(stoppingToken);
 
                 // Process all available items (but not blocking - process one at a time)
                 while (_queue.TryDequeue(out var queuedUpload))
                 {
-                    await ProcessQueuedPhotoAsync(queuedUpload, stoppingToken);
+                    await ProcessQueuedPhoto(queuedUpload, stoppingToken);
                 }
             }
             catch (OperationCanceledException)
@@ -53,7 +53,7 @@ public class PhotoProcessingWorker : BackgroundService
         _logger.LogInformation("Photo processing worker stopped");
     }
 
-    private async Task ProcessQueuedPhotoAsync(QueuedPhotoUpload queuedUpload, CancellationToken stoppingToken)
+    private async Task ProcessQueuedPhoto(QueuedPhotoUpload queuedUpload, CancellationToken stoppingToken)
     {
         _logger.LogInformation("Processing queued photo: {FileName} for job {JobId}",
             queuedUpload.FileName, queuedUpload.JobId);
@@ -75,7 +75,7 @@ public class PhotoProcessingWorker : BackgroundService
 
             // Process the upload (this will handle thumbnails, EXIF, and background AI)
             // Use CancellationToken.None to ensure processing completes even if service is stopping
-            await processingService.ProcessUploadAsync(
+            await processingService.ProcessUpload(
                 queuedUpload.EventId,
                 formFile,
                 queuedUpload.JobId,
@@ -119,8 +119,8 @@ internal class FormFileWrapper : IFormFile
 
     public Stream OpenReadStream() => _stream;
 
-    public void CopyTo(Stream target) => _stream.CopyTo(target);
+    public void CopyTo(Stream target) => _stream.CopyToAsync(target);
 
-    public Task CopyToAsync(Stream target, CancellationToken cancellationToken = default)
+    public Task CopyTo(Stream target, CancellationToken cancellationToken = default)
         => _stream.CopyToAsync(target, cancellationToken);
 }

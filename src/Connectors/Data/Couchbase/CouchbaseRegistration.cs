@@ -19,7 +19,6 @@ public static class CouchbaseRegistration
         }
 
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, CouchbaseHealthContributor>());
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<Koan.Data.Abstractions.Naming.INamingDefaultsProvider, CouchbaseNamingDefaultsProvider>());
         services.AddSingleton<CouchbaseClusterProvider>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IAsyncAdapterInitializer, CouchbaseClusterProvider>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IAdapterReadiness, CouchbaseClusterProvider>());

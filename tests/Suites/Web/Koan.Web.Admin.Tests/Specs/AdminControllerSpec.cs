@@ -14,7 +14,7 @@ public class AdminControllerSpec : IClassFixture<WebAdminTestPipelineFixture>
     [Fact(DisplayName = "Admin: Entities controller returns expected models")]
     public async Task EntitiesController_ReturnsExpectedModels()
     {
-    var response = await _fixture.HttpGetAsync("/admin/entities");
+    var response = await _fixture.HttpGet("/admin/entities");
     response.Should().NotBeNull();
     response.StatusCode.Should().Be(200);
     var json = await response.Content.ReadAsStringAsync();
@@ -24,7 +24,7 @@ public class AdminControllerSpec : IClassFixture<WebAdminTestPipelineFixture>
     [Fact(DisplayName = "Admin: Models controller returns expected schema")]
     public async Task ModelsController_ReturnsExpectedSchema()
     {
-    var response = await _fixture.HttpGetAsync("/admin/models");
+    var response = await _fixture.HttpGet("/admin/models");
     response.Should().NotBeNull();
     response.StatusCode.Should().Be(200);
     var json = await response.Content.ReadAsStringAsync();

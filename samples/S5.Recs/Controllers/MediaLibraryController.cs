@@ -75,7 +75,7 @@ public class MediaLibraryController : ControllerBase
         {
             try
             {
-                await _recsService.RebuildUserPrefVectorAsync(userId, CancellationToken.None);
+                await _recsService.RebuildUserPrefVector(userId, CancellationToken.None);
             }
             catch
             {
@@ -97,7 +97,7 @@ public class MediaLibraryController : ControllerBase
         {
             try
             {
-                await _recsService.RebuildUserPrefVectorAsync(userId, CancellationToken.None);
+                await _recsService.RebuildUserPrefVector(userId, CancellationToken.None);
             }
             catch
             {

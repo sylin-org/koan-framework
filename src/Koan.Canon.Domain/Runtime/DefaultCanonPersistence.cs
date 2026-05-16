@@ -19,12 +19,12 @@ internal sealed class DefaultCanonPersistence : ICanonPersistence
         where TModel : CanonEntity<TModel>, new()
         => stage.Save(cancellationToken);
 
-    public async Task<CanonIndex?> GetIndexAsync(string entityType, string key, CancellationToken cancellationToken)
+    public async Task<CanonIndex?> GetIndex(string entityType, string key, CancellationToken cancellationToken)
     {
         var matches = await CanonIndex.Query(index => index.EntityType == entityType && index.Key == key, cancellationToken);
         return matches.FirstOrDefault();
     }
 
-    public Task UpsertIndexAsync(CanonIndex index, CancellationToken cancellationToken)
-        => CanonIndex.UpsertAsync(index, cancellationToken);
+    public Task UpsertIndex(CanonIndex index, CancellationToken cancellationToken)
+        => CanonIndex.Upsert(index, cancellationToken);
 }

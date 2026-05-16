@@ -19,8 +19,8 @@ public class RetryBackoffSpec : IClassFixture<JobsCoreTestPipelineFixture>
     var scheduler = _fixture.GetScheduler();
 
     // Act
-    await scheduler.ScheduleAsync(job);
-    var attempts = await scheduler.GetJobAttemptsAsync(job.Id);
+    await scheduler.Schedule(job);
+    var attempts = await scheduler.GetJobAttempts(job.Id);
 
     // Assert
     attempts.Should().BeGreaterThan(1);

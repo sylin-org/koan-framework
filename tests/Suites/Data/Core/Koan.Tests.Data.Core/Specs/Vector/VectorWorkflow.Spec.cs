@@ -74,7 +74,7 @@ public sealed class VectorWorkflowSpec
                     AppHost.Current = previous;
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
@@ -122,7 +122,7 @@ public sealed class VectorWorkflowSpec
                     AppHost.Current = previous;
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
@@ -169,7 +169,7 @@ public sealed class VectorWorkflowSpec
                     AppHost.Current = previous;
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     private static class Constants
@@ -203,37 +203,37 @@ public sealed class VectorWorkflowSpec
         public TestEntity? LastUpsert { get; private set; }
     public IReadOnlyList<TestEntity>? LastUpsertMany { get; private set; }
 
-        public Task<TestEntity?> GetAsync(string id, CancellationToken ct = default) => Task.FromResult<TestEntity?>(null);
+        public Task<TestEntity?> Get(string id, CancellationToken ct = default) => Task.FromResult<TestEntity?>(null);
 
-        public Task<IReadOnlyList<TestEntity?>> GetManyAsync(IEnumerable<string> ids, CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<TestEntity?>>(Array.Empty<TestEntity?>());
+        public Task<IReadOnlyList<TestEntity?>> GetMany(IEnumerable<string> ids, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<TestEntity?>>([]);
 
-        public Task<IReadOnlyList<TestEntity>> QueryAsync(object? query, CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<TestEntity>>(Array.Empty<TestEntity>());
+        public Task<IReadOnlyList<TestEntity>> Query(object? query, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<TestEntity>>([]);
 
-        public Task<CountResult> CountAsync(CountRequest<TestEntity> request, CancellationToken ct = default)
+        public Task<CountResult> Count(CountRequest<TestEntity> request, CancellationToken ct = default)
             => Task.FromResult(new CountResult(0, false));
 
-        public Task<TestEntity> UpsertAsync(TestEntity model, CancellationToken ct = default)
+        public Task<TestEntity> Upsert(TestEntity model, CancellationToken ct = default)
         {
             LastUpsert = model;
             return Task.FromResult(model);
         }
 
-        public Task<bool> DeleteAsync(string id, CancellationToken ct = default) => Task.FromResult(true);
+        public Task<bool> Delete(string id, CancellationToken ct = default) => Task.FromResult(true);
 
-        public Task<int> UpsertManyAsync(IEnumerable<TestEntity> models, CancellationToken ct = default)
+        public Task<int> UpsertMany(IEnumerable<TestEntity> models, CancellationToken ct = default)
         {
             var list = models as IList<TestEntity> ?? models.ToList();
             LastUpsertMany = list.ToList();
             return Task.FromResult(list.Count);
         }
 
-        public Task<int> DeleteManyAsync(IEnumerable<string> ids, CancellationToken ct = default) => Task.FromResult(0);
+        public Task<int> DeleteMany(IEnumerable<string> ids, CancellationToken ct = default) => Task.FromResult(0);
 
-        public Task<int> DeleteAllAsync(CancellationToken ct = default) => Task.FromResult(0);
+        public Task<int> DeleteAll(CancellationToken ct = default) => Task.FromResult(0);
 
-        public Task<long> RemoveAllAsync(RemoveStrategy strategy, CancellationToken ct = default) => Task.FromResult(0L);
+        public Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default) => Task.FromResult(0L);
 
         public IBatchSet<TestEntity, string> CreateBatch() => throw new NotSupportedException();
     }
@@ -260,37 +260,37 @@ public sealed class VectorWorkflowSpec
         public List<(string Id, float[] Embedding, object? Metadata)> Upserts { get; } = new();
         public VectorQueryOptions? LastQuery { get; private set; }
 
-        public Task UpsertAsync(string id, float[] embedding, object? metadata = null, CancellationToken ct = default)
+        public Task Upsert(string id, float[] embedding, object? metadata = null, CancellationToken ct = default)
         {
             Upserts.Add((id, embedding, metadata));
             return Task.CompletedTask;
         }
 
-        public Task<int> UpsertManyAsync(IEnumerable<(string Id, float[] Embedding, object? Metadata)> items, CancellationToken ct = default)
+        public Task<int> UpsertMany(IEnumerable<(string Id, float[] Embedding, object? Metadata)> items, CancellationToken ct = default)
         {
             var list = items as IList<(string Id, float[] Embedding, object? Metadata)> ?? items.ToList();
             Upserts.AddRange(list);
             return Task.FromResult(list.Count);
         }
 
-        public Task<bool> DeleteAsync(string id, CancellationToken ct = default) => Task.FromResult(true);
+        public Task<bool> Delete(string id, CancellationToken ct = default) => Task.FromResult(true);
 
-        public Task<int> DeleteManyAsync(IEnumerable<string> ids, CancellationToken ct = default) => Task.FromResult(0);
+        public Task<int> DeleteMany(IEnumerable<string> ids, CancellationToken ct = default) => Task.FromResult(0);
 
-        public Task<VectorQueryResult<string>> SearchAsync(VectorQueryOptions options, CancellationToken ct = default)
+        public Task<VectorQueryResult<string>> Search(VectorQueryOptions options, CancellationToken ct = default)
         {
             LastQuery = options;
             return Task.FromResult(new VectorQueryResult<string>(Array.Empty<VectorMatch<string>>(), null));
         }
 
-        public Task VectorEnsureCreatedAsync(CancellationToken ct = default) => Task.CompletedTask;
+        public Task VectorEnsureCreated(CancellationToken ct = default) => Task.CompletedTask;
     }
 
     private sealed class TestEntity : Entity<TestEntity, string>
     {
         [Identifier]
-        public override string Id { get; set; } = string.Empty;
+        public override string Id { get; set; } = "";
 
-        public string Name { get; set; } = string.Empty;
+        public string Name { get; set; } = "";
     }
 }

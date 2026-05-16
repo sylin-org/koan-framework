@@ -70,8 +70,8 @@ public abstract class AdapterOptionsConfigurator<TOptions> : IConfigureOptions<T
 
         // Policy configuration with enum parsing
         var policyStr = Core.Configuration.ReadFirst(Configuration, config.Policy.ToString(),
-            $"Koan:Data:{ProviderName}:Readiness:Policy",
-            "Koan:Data:Readiness:Policy");
+            Infrastructure.ConfigurationConstants.Data.Readiness.PolicyForProvider(ProviderName),
+            Infrastructure.ConfigurationConstants.Data.Readiness.Policy);
 
         if (Enum.TryParse<ReadinessPolicy>(policyStr, out var policy))
         {
@@ -81,8 +81,8 @@ public abstract class AdapterOptionsConfigurator<TOptions> : IConfigureOptions<T
         // Timeout configuration with TimeSpan conversion
         var timeoutSecondsStr = Core.Configuration.ReadFirst(Configuration,
             ((int)config.Timeout.TotalSeconds).ToString(),
-            $"Koan:Data:{ProviderName}:Readiness:Timeout",
-            "Koan:Data:Readiness:Timeout");
+            Infrastructure.ConfigurationConstants.Data.Readiness.TimeoutForProvider(ProviderName),
+            Infrastructure.ConfigurationConstants.Data.Readiness.Timeout);
 
         if (int.TryParse(timeoutSecondsStr, out var timeoutSeconds) && timeoutSeconds > 0)
         {
@@ -95,7 +95,7 @@ public abstract class AdapterOptionsConfigurator<TOptions> : IConfigureOptions<T
 
         // Gating configuration
         config.EnableReadinessGating = Core.Configuration.Read(Configuration,
-            $"Koan:Data:{ProviderName}:Readiness:EnableReadinessGating",
+            Infrastructure.ConfigurationConstants.Data.Readiness.EnableReadinessGatingForProvider(ProviderName),
             config.EnableReadinessGating);
 
         KoanLog.ConfigDebug(Logger, LogActions.ReadinessConfiguration, LogOutcomes.Applied,
@@ -106,22 +106,19 @@ public abstract class AdapterOptionsConfigurator<TOptions> : IConfigureOptions<T
     }
 
     /// <summary>
-    /// Centralizes paging configuration with consistent key patterns
+    /// Centralizes paging configuration with consistent key patterns. Per the IAdapterOptions
+    /// docstring, page-size capping is no longer the adapter layer's concern — only the
+    /// <see cref="IAdapterOptions.DefaultPageSize"/> fallback is bound here.
     /// </summary>
     protected void ConfigurePaging(IAdapterOptions options)
     {
         options.DefaultPageSize = Core.Configuration.ReadFirst(Configuration, options.DefaultPageSize,
-            $"Koan:Data:{ProviderName}:DefaultPageSize",
-            "Koan:Data:DefaultPageSize");
-
-        options.MaxPageSize = Core.Configuration.ReadFirst(Configuration, options.MaxPageSize,
-            $"Koan:Data:{ProviderName}:MaxPageSize",
-            "Koan:Data:MaxPageSize");
+            Infrastructure.ConfigurationConstants.Data.Paging.DefaultPageSizeForProvider(ProviderName),
+            Infrastructure.ConfigurationConstants.Data.Paging.DefaultPageSize);
 
         KoanLog.ConfigDebug(Logger, LogActions.PagingConfiguration, LogOutcomes.Applied,
             ("provider", ProviderName),
-            ("defaultPageSize", options.DefaultPageSize),
-            ("maxPageSize", options.MaxPageSize));
+            ("defaultPageSize", options.DefaultPageSize));
     }
 
     /// <summary>
@@ -140,7 +137,7 @@ public abstract class AdapterOptionsConfigurator<TOptions> : IConfigureOptions<T
         {
             var defaultString = defaultValue as string;
             var result = Core.Configuration.ReadFirst(Configuration, providerKeys) ?? defaultString;
-            return (T)(object)(result ?? string.Empty);
+            return (T)(object)(result ?? "");
         }
         else if (typeof(T) == typeof(int))
         {
@@ -155,7 +152,7 @@ public abstract class AdapterOptionsConfigurator<TOptions> : IConfigureOptions<T
         else
         {
             // Fallback - try to read as string and convert
-            var stringResult = Core.Configuration.ReadFirst(Configuration, defaultValue?.ToString() ?? string.Empty, providerKeys);
+            var stringResult = Core.Configuration.ReadFirst(Configuration, defaultValue?.ToString() ?? "", providerKeys);
             try
             {
                 return (T)Convert.ChangeType(stringResult, typeof(T));

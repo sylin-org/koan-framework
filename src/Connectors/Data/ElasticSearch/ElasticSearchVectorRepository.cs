@@ -13,6 +13,7 @@ using Newtonsoft.Json.Linq;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Vector.Abstractions;
+using Koan.Data.Vector.Abstractions.Configuration;
 
 namespace Koan.Data.Connector.ElasticSearch;
 
@@ -48,7 +49,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
         VectorCapabilities.BulkUpsert |
         VectorCapabilities.BulkDelete;
 
-    public async Task VectorEnsureCreatedAsync(CancellationToken ct = default)
+    public async Task VectorEnsureCreated(CancellationToken ct = default)
     {
         var dimension = _discoveredDimension > 0 ? _discoveredDimension : _options.Dimension ?? -1;
         if (dimension <= 0)
@@ -56,10 +57,10 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
             throw new InvalidOperationException("Elasticsearch vector dimension is unknown. Configure Koan:Data:ElasticSearch:Dimension or upsert a vector to allow discovery.");
         }
 
-        await EnsureIndexAsync(dimension, ct);
+        await EnsureIndex(dimension, ct);
     }
 
-    public async Task UpsertAsync(TKey id, float[] embedding, object? metadata = null, CancellationToken ct = default)
+    public async Task Upsert(TKey id, float[] embedding, object? metadata = null, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(embedding);
         if (embedding.Length == 0)
@@ -70,7 +71,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
         using var _ = ElasticSearchTelemetry.Activity.StartActivity("vector.upsert");
 
         var dimension = EnsureDimension(embedding.Length);
-        await EnsureIndexAsync(dimension, ct);
+        await EnsureIndex(dimension, ct);
 
         var document = BuildDocument(id, embedding, metadata);
         var payload = document.ToString(Formatting.None);
@@ -85,7 +86,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
         }
     }
 
-    public async Task<int> UpsertManyAsync(IEnumerable<(TKey Id, float[] Embedding, object? Metadata)> items, CancellationToken ct = default)
+    public async Task<int> UpsertMany(IEnumerable<(TKey Id, float[] Embedding, object? Metadata)> items, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(items);
 
@@ -98,7 +99,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
         }
 
         var dimension = EnsureDimension(list[0].Embedding.Length);
-        await EnsureIndexAsync(dimension, ct);
+        await EnsureIndex(dimension, ct);
 
         var sb = new StringBuilder();
         foreach (var item in list)
@@ -142,11 +143,11 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
         return list.Count;
     }
 
-    public async Task<bool> DeleteAsync(TKey id, CancellationToken ct = default)
+    public async Task<bool> Delete(TKey id, CancellationToken ct = default)
     {
         using var _ = ElasticSearchTelemetry.Activity.StartActivity("vector.delete");
 
-        await EnsureIndexInitializedAsync(ct);
+        await EnsureIndexInitialized(ct);
 
         var docId = NormalizeId(id);
         var url = $"/{Uri.EscapeDataString(IndexName)}/_doc/{Uri.EscapeDataString(docId)}?refresh={_options.RefreshMode}";
@@ -166,12 +167,12 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
         return true;
     }
 
-    public async Task<int> DeleteManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    public async Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(ids);
         using var _ = ElasticSearchTelemetry.Activity.StartActivity("vector.bulkDelete");
 
-        await EnsureIndexInitializedAsync(ct);
+        await EnsureIndexInitialized(ct);
 
         var list = ids.ToList();
         if (list.Count == 0)
@@ -213,7 +214,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
         return list.Count;
     }
 
-    public async Task<VectorQueryResult<TKey>> SearchAsync(VectorQueryOptions options, CancellationToken ct = default)
+    public async Task<VectorQueryResult<TKey>> Search(VectorQueryOptions options, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(options);
         if (options.Query is null || options.Query.Length == 0)
@@ -224,7 +225,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
         using var _ = ElasticSearchTelemetry.Activity.StartActivity("vector.search");
 
         var dimension = EnsureDimension(options.Query.Length);
-        await EnsureIndexAsync(dimension, ct);
+        await EnsureIndex(dimension, ct);
 
         var topK = Math.Max(1, options.TopK ?? 10);
         var request = BuildSearchRequest(options, topK);
@@ -272,7 +273,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
         return new VectorQueryResult<TKey>(matches, ContinuationToken: null, totalKind);
     }
 
-    public async IAsyncEnumerable<VectorExportBatch<TKey>> ExportAllAsync(
+    public async IAsyncEnumerable<VectorExportBatch<TKey>> ExportAll(
         int? batchSize = null,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
@@ -389,20 +390,20 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
 
         if (string.Equals(instruction.Name, DataInstructions.EnsureCreated, StringComparison.OrdinalIgnoreCase))
         {
-            await VectorEnsureCreatedAsync(ct);
+            await VectorEnsureCreated(ct);
             return default!;
         }
 
         if (string.Equals(instruction.Name, DataInstructions.Clear, StringComparison.OrdinalIgnoreCase))
         {
-            await ClearAsync(ct);
+            await Clear(ct);
             return default!;
         }
 
         if (string.Equals(instruction.Name, VectorInstructions.IndexStats, StringComparison.OrdinalIgnoreCase))
         {
             // For stats, don't require dimension - just check if index exists
-            var count = await GetCountAsync(ct);
+            var count = await GetCount(ct);
             if (typeof(TResult) == typeof(int))
                 return (TResult)(object)count;
             object result = new { count };
@@ -447,9 +448,9 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
         return request;
     }
 
-    private async Task ClearAsync(CancellationToken ct)
+    private async Task Clear(CancellationToken ct)
     {
-        await EnsureIndexInitializedAsync(ct);
+        await EnsureIndexInitialized(ct);
         var url = $"/{Uri.EscapeDataString(IndexName)}/_delete_by_query?refresh={_options.RefreshMode}";
         var payload = new JObject
         {
@@ -467,7 +468,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
         }
     }
 
-    private async Task<int> GetCountAsync(CancellationToken ct)
+    private async Task<int> GetCount(CancellationToken ct)
     {
         // Check if index exists first - don't require dimension for stats
         var indexExistsUrl = $"/{Uri.EscapeDataString(IndexName)}";
@@ -493,7 +494,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
         return count;
     }
 
-    private async Task EnsureIndexInitializedAsync(CancellationToken ct)
+    private async Task EnsureIndexInitialized(CancellationToken ct)
     {
         if (_indexEnsured)
         {
@@ -503,11 +504,11 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
         var dimension = _options.Dimension ?? _discoveredDimension;
         if (dimension > 0)
         {
-            await EnsureIndexAsync(dimension, ct);
+            await EnsureIndex(dimension, ct);
         }
     }
 
-    private async Task EnsureIndexAsync(int dimension, CancellationToken ct)
+    private async Task EnsureIndex(int dimension, CancellationToken ct)
     {
         if (_indexEnsured)
         {
@@ -575,7 +576,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
                 return _options.IndexName!;
             }
 
-            var baseName = Koan.Data.Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_services);
+            var baseName = VectorStorageNameRegistry.GetOrCompute<TEntity, TKey>(_services);
             baseName = baseName.Replace('#', '-').Replace('.', '-').ToLowerInvariant();
             if (!string.IsNullOrEmpty(_options.IndexPrefix))
             {
@@ -605,7 +606,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
         }
         else if (!string.IsNullOrEmpty(_options.Username))
         {
-            var token = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_options.Username}:{_options.Password ?? string.Empty}"));
+            var token = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_options.Username}:{_options.Password ?? ""}"));
             _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", token);
         }
     }

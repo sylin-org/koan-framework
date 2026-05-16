@@ -1,6 +1,8 @@
-
+using System;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Naming;
 using Koan.Data.Vector.Abstractions;
 using Koan.Orchestration;
 using Koan.Orchestration.Attributes;
@@ -29,6 +31,8 @@ namespace Koan.Data.Connector.OpenSearch;
     LocalScheme = "http", LocalHost = "localhost", LocalPort = 9200, LocalPattern = "http://{host}:{port}")]
 public sealed class OpenSearchVectorAdapterFactory : IVectorAdapterFactory
 {
+    public string Provider => "opensearch";
+
     public bool CanHandle(string provider)
         => string.Equals(provider, "opensearch", StringComparison.OrdinalIgnoreCase) ||
            string.Equals(provider, "elastic", StringComparison.OrdinalIgnoreCase);
@@ -42,6 +46,31 @@ public sealed class OpenSearchVectorAdapterFactory : IVectorAdapterFactory
         var options = (IOptions<OpenSearchOptions>?)sp.GetService(typeof(IOptions<OpenSearchOptions>))
             ?? throw new InvalidOperationException("OpenSearchOptions not configured; bind Koan:Data:OpenSearch.");
         return new OpenSearchVectorRepository<TEntity, TKey>(httpFactory, options, sp);
+    }
+
+    // INamingProvider implementation
+    public string RepositorySeparator => "-";  // OpenSearch uses hyphens in index names
+
+    public string GetStorageName(Type entityType, IServiceProvider services)
+    {
+        var opts = services.GetService<IOptions<OpenSearchOptions>>()?.Value;
+        var separator = opts?.IndexPrefix is not null ? "-" : "_";
+        var convention = new StorageNameResolver.Convention(
+            StorageNamingStyle.EntityType,
+            separator,
+            NameCasing.Lower);
+
+        return StorageNameResolver.Resolve(entityType, convention);
+    }
+
+    public string GetConcretePartition(string partition)
+    {
+        // OpenSearch: Lowercase and sanitize for index names
+        if (Guid.TryParse(partition, out var guid))
+            return guid.ToString("N");  // Lowercase, no hyphens
+
+        // Named partitions: lowercase
+        return partition.ToLowerInvariant();
     }
 }
 

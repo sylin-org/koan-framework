@@ -12,7 +12,7 @@ public sealed class HealthEndpointDefaultsAttribute : Attribute
     /// <param name="httpPath">Relative HTTP path (e.g., "/healthz" or "/v1/.well-known/ready").</param>
     public HealthEndpointDefaultsAttribute(string httpPath)
     {
-        HttpPath = httpPath ?? string.Empty;
+        HttpPath = httpPath ?? "";
     }
 
     /// <summary>Relative HTTP path (e.g., "/healthz").</summary>

@@ -21,7 +21,7 @@ public interface IServiceDiscoveryAdapter
     /// Autonomous discovery - adapter reads its own KoanServiceAttribute,
     /// tries discovery strategies, validates health, and decides what to use.
     /// </summary>
-    Task<AdapterDiscoveryResult> DiscoverAsync(
+    Task<AdapterDiscoveryResult> Discover(
         DiscoveryContext context,
         CancellationToken cancellationToken = default);
 }

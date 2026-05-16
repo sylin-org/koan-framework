@@ -8,10 +8,10 @@ public interface IEntityTransformer<TEntity, TShape>
     IReadOnlyList<string> AcceptContentTypes { get; }
 
     // Output transformation
-    Task<object> TransformAsync(TEntity model, HttpContext httpContext);
-    Task<object> TransformManyAsync(IEnumerable<TEntity> models, HttpContext httpContext);
+    Task<object> Transform(TEntity model, HttpContext httpContext);
+    Task<object> TransformMany(IEnumerable<TEntity> models, HttpContext httpContext);
 
     // Input transformation (POST/PUT): parse request payload to TEntity or list of TEntity
-    Task<TEntity> ParseAsync(Stream body, string contentType, HttpContext httpContext);
-    Task<IReadOnlyList<TEntity>> ParseManyAsync(Stream body, string contentType, HttpContext httpContext);
+    Task<TEntity> Parse(Stream body, string contentType, HttpContext httpContext);
+    Task<IReadOnlyList<TEntity>> ParseMany(Stream body, string contentType, HttpContext httpContext);
 }

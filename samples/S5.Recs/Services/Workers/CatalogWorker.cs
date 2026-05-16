@@ -38,8 +38,8 @@ public class CatalogWorker : BackgroundService
 
                 if (newMedia.Any())
                 {
-                    await CatalogTagsAsync(newMedia, stoppingToken);
-                    await CatalogGenresAsync(newMedia, stoppingToken);
+                    await CatalogTags(newMedia, stoppingToken);
+                    await CatalogGenres(newMedia, stoppingToken);
 
                     _logger.LogInformation(
                         "Cataloged {Count} newly vectorized media items",
@@ -61,12 +61,12 @@ public class CatalogWorker : BackgroundService
         _logger.LogInformation("CatalogWorker stopped");
     }
 
-    private async Task CatalogTagsAsync(List<Media> items, CancellationToken ct)
+    private async Task CatalogTags(List<Media> items, CancellationToken ct)
     {
         // Extract tags from media items (tags + genres combined)
         var allTags = items
-            .SelectMany(m => m.Tags ?? Array.Empty<string>())
-            .Concat(items.SelectMany(m => m.Genres ?? Array.Empty<string>()))
+            .SelectMany(m => m.Tags ?? [])
+            .Concat(items.SelectMany(m => m.Genres ?? []))
             .Where(tag => !string.IsNullOrWhiteSpace(tag))
             .ToList();
 
@@ -98,11 +98,11 @@ public class CatalogWorker : BackgroundService
         }
     }
 
-    private async Task CatalogGenresAsync(List<Media> items, CancellationToken ct)
+    private async Task CatalogGenres(List<Media> items, CancellationToken ct)
     {
         // Extract genres from media items
         var allGenres = items
-            .SelectMany(m => m.Genres ?? Array.Empty<string>())
+            .SelectMany(m => m.Genres ?? [])
             .Where(g => !string.IsNullOrWhiteSpace(g))
             .ToList();
 

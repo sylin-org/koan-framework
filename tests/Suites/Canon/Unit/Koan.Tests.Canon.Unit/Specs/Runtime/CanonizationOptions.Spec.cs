@@ -54,7 +54,7 @@ public sealed class CanonizationOptionsSpec
 
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 
     [Fact]
     public Task WithTag_and_Copy_create_detached_instances()
@@ -75,7 +75,7 @@ public sealed class CanonizationOptionsSpec
 
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 
     [Fact]
     public Task WithRequestedViews_normalizes_inputs()
@@ -85,10 +85,10 @@ public sealed class CanonizationOptionsSpec
                 var withViews = CanonizationOptions.Default.WithRequestedViews("canonical", "lineage");
                 withViews.RequestedViews.Should().BeEquivalentTo(new[] { "canonical", "lineage" });
 
-                var cleared = withViews.WithRequestedViews(Array.Empty<string>());
+                var cleared = withViews.WithRequestedViews([]);
                 cleared.RequestedViews.Should().BeEmpty();
 
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 }

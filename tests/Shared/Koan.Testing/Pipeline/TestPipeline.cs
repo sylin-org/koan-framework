@@ -95,7 +95,7 @@ public sealed class TestPipeline
         return this;
     }
 
-    public async Task RunAsync()
+    public async Task Run()
     {
         var diagnostics = new TestDiagnostics(_output, _suite, _scenario);
         using var scope = diagnostics.BeginScope("pipeline", new { suite = _suite, scenario = _scenario });
@@ -152,6 +152,6 @@ public sealed class TestPipeline
             _inner = inner;
         }
 
-        public override ValueTask DisposeAsync() => DisposeCoreAsync(() => _inner.DisposeAsync());
+        public override ValueTask DisposeAsync() => DisposeCore(() => _inner.DisposeAsync());
     }
 }

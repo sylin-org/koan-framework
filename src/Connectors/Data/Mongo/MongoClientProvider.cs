@@ -50,7 +50,7 @@ internal sealed class MongoClientProvider : IAdapterReadiness, IAsyncAdapterInit
 
     public Task<bool> IsReadyAsync(CancellationToken ct = default) => Task.FromResult(_stateManager.IsReady);
 
-    public async Task WaitForReadinessAsync(TimeSpan? timeout = null, CancellationToken ct = default)
+    public async Task WaitForReadiness(TimeSpan? timeout = null, CancellationToken ct = default)
     {
         if (_stateManager.IsReady)
         {
@@ -71,7 +71,7 @@ internal sealed class MongoClientProvider : IAdapterReadiness, IAsyncAdapterInit
 
         try
         {
-            await _stateManager.WaitAsync(effective, ct);
+            await _stateManager.Wait(effective, ct);
         }
         catch (TimeoutException ex)
         {
@@ -101,7 +101,7 @@ internal sealed class MongoClientProvider : IAdapterReadiness, IAsyncAdapterInit
         try
         {
             var options = _options.CurrentValue;
-            await EnsureDatabaseAsync(options, ct);
+            await EnsureDatabase(options, ct);
             _stateManager.TransitionTo(AdapterReadinessState.Ready);
         }
         catch (Exception ex)
@@ -112,13 +112,13 @@ internal sealed class MongoClientProvider : IAdapterReadiness, IAsyncAdapterInit
         }
     }
 
-    public async Task<IMongoDatabase> GetDatabaseAsync(CancellationToken ct)
+    public async Task<IMongoDatabase> GetDatabase(CancellationToken ct)
     {
         var options = _options.CurrentValue;
-        return await EnsureDatabaseAsync(options, ct);
+        return await EnsureDatabase(options, ct);
     }
 
-    private async Task<IMongoDatabase> EnsureDatabaseAsync(MongoOptions options, CancellationToken ct)
+    private async Task<IMongoDatabase> EnsureDatabase(MongoOptions options, CancellationToken ct)
     {
         if (_database is not null && string.Equals(_databaseName, options.Database, StringComparison.Ordinal))
         {

@@ -59,14 +59,10 @@ public sealed class CouchbaseOptions : IAdapterOptions
     public string Separator { get; set; } = ".";
 
     /// <summary>
-    /// Default server-side page size guardrail applied when DataQueryOptions are not specified.
+    /// Default server-side page size used when DataQueryOptions don't specify one. NOT a cap —
+    /// callers may request larger sizes and the connector honours them.
     /// </summary>
     public int DefaultPageSize { get; set; } = 50;
-
-    /// <summary>
-    /// Maximum server-side page size.
-    /// </summary>
-    public int MaxPageSize { get; set; } = 200;
 
     /// <summary>
     /// Optional timeout for N1QL queries.

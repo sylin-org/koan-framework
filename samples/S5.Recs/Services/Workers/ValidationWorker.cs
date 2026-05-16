@@ -40,7 +40,7 @@ public class ValidationWorker : BackgroundService
 
                 if (batch.Any())
                 {
-                    await ProcessBatchAsync(batch, stoppingToken);
+                    await ProcessBatch(batch, stoppingToken);
                 }
                 else
                 {
@@ -58,7 +58,7 @@ public class ValidationWorker : BackgroundService
         _logger.LogInformation("ValidationWorker stopped");
     }
 
-    private async Task ProcessBatchAsync(List<Media> batch, CancellationToken ct)
+    private async Task ProcessBatch(List<Media> batch, CancellationToken ct)
     {
         foreach (var media in batch)
         {

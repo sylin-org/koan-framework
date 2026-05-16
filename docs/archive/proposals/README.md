@@ -24,7 +24,7 @@
 | [Implementation roadmap](implementation-roadmap.md)                                         | **Superseded**        | Schedule replaced by the phased delivery in `DX-0039`; use as a planning template.               |
 | [Relationship response format v2](relationship-response-format-v2.md)                       | **Archived**          | Concepts folded into the Koan entity transformers described in `WEB-0035`.                       |
 | [Koan MCP HTTP/SSE transport](koan-mcp-http-sse-transport.md)                               | **Partially adopted** | Transport primitives now governed by `AI-0012` and `AI-0013`; revisit gaps during MCP hardening. |
-| [Adapter infrastructure centralization](PROPOSAL_Adapter_Infrastructure_Centralization.md)  | **Needs ADR**         | Core ideas live in the new orchestration stack; capture remaining deltas in a follow-up OPS ADR. |
+| [Adapter infrastructure centralization](PROPOSAL_Adapter_Infrastructure_Centralization.md)  | **Superseded**        | Superseded by `ARCH-0044`, `ARCH-0045`, `ARCH-0047`.                                            |
 | [Provider readiness system](PROPOSAL_Provider_Readiness_System.md)                          | **Superseded**        | Mechanism replaced by the readiness matrix in `ARCH-0044`.                                       |
 | [Service adapter realignment](service-adapter-realignment.md)                               | **Superseded**        | Decisions folded into `ARCH-0045` and `ARCH-0047`; keep only for citation.                       |
 | [Koan Aspire analysis set](koan-aspire-architecture-review.md)                              | **Archived**          | Outcomes ratified in `ARCH-0055`; retain for historical appendices.                              |
@@ -32,8 +32,8 @@
 | [Koan Aspire technical specification](koan-aspire-technical-specification.md)               | **Archived**          | Specifics superseded by the approved integration doc `ARCH-0055`.                                |
 | [Koan MCP integration](koan-mcp-integration.md)                                             | **Archived**          | Superseded by the MCP ADR set (`AI-0012` / `AI-0013`).                                           |
 | [Pagination attribute system](pagination-attribute-system.md)                               | **Superseded**        | Pagination semantics now defined in `DATA-0061`; attribute concept dropped.                      |
-| [Entity endpoint service extraction](entity-endpoint-service-extraction.md)                 | **Pending triage**    | Consider folding into a DX ADR once controller surface stabilises.                               |
-| [Backup/restore comprehensive specification](backup-restore-comprehensive-specification.md) | **Pending triage**    | Needs alignment with `Koan.Data.Backup` deliverables; schedule follow-up ADR.                    |
+| [Entity endpoint service extraction](entity-endpoint-service-extraction.md)                 | **Implemented**       | `EntityEndpointService` exists in `Koan.Web`.                                                    |
+| [Backup/restore comprehensive specification](backup-restore-comprehensive-specification.md) | **Partially implemented** | `Koan.Data.Backup` + `Koan.Web.Backup` exist; remaining items tracked via `ARCH-0074`.       |
 | [Entity ID storage optimisation](entity-id-storage-optimization.md)                         | **Archived**          | ID policy governed by `ARCH-0052`; revisit only if new providers demand changes.                 |
 | [Entity ID optimisation (appendix)](entity-id-optimization/)                                | **Reference only**    | Contains exploratory notebooks and diagrams; no direct implementation plan.                      |
 | [S10 DevPortal comprehensive proposal](s10-devportal-comprehensive-proposal.md)             | **Archived**          | Superseded by `/samples/S10.DevPortal` implementation guide.                                     |
@@ -51,6 +51,6 @@
 
 ## Next actions
 
-- Draft an OPS ADR distilling remaining orchestration notes from `PROPOSAL_Adapter_Infrastructure_Centralization.md`.
-- Confirm whether `entity-endpoint-service-extraction.md` still reflects planned controller refactors; either promote into a DX ADR or retire it.
-- Align the backup/restore specification with the current `Koan.Data.Backup` implementation and document gaps in a new ADR.
+- ~~Draft an OPS ADR distilling remaining orchestration notes from `PROPOSAL_Adapter_Infrastructure_Centralization.md`.~~ Superseded by `ARCH-0044`, `ARCH-0045`, `ARCH-0047`.
+- ~~Confirm whether `entity-endpoint-service-extraction.md` still reflects planned controller refactors.~~ Implemented — `EntityEndpointService` exists in `Koan.Web`.
+- ~~Align the backup/restore specification with the current `Koan.Data.Backup` implementation.~~ Partially implemented; remaining gaps tracked via `ARCH-0074`.

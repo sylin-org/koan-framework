@@ -72,6 +72,12 @@ builder.Services.AddHostedService<S5.Recs.Services.Workers.ValidationWorker>();
 //builder.Services.AddHostedService<S5.Recs.Services.Workers.VectorizationWorker>();
 builder.Services.AddHostedService<S5.Recs.Services.Workers.CatalogWorker>();
 
+// ═══════════════════════════════════════════════════════════════════════════
+// ADR AI-0020: Embedding Telemetry & Monitoring (Phase 4 & 5)
+// ═══════════════════════════════════════════════════════════════════════════
+builder.Services.AddSingleton<Koan.Data.AI.Telemetry.EmbeddingTelemetry>();
+builder.Services.AddHostedService<S5.Recs.Services.EmbeddingMonitoringService>();
+
 // Couchbase adapter is auto-registered by its module via Koan.Core discovery
 
 var app = builder.Build();
@@ -87,7 +93,7 @@ app.UseKoanWebBackupDevelopment();
 
 // TestProvider endpoints are auto-mapped by its auto-registrar in Development.
 
-app.Run();
+app.RunAsync();
 
 namespace S5.Recs
 {

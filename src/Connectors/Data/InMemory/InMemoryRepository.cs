@@ -53,13 +53,13 @@ internal sealed class InMemoryRepository<TEntity, TKey> :
 
     // ==================== Read Operations ====================
 
-    public Task<TEntity?> GetAsync(TKey id, CancellationToken ct = default)
+    public Task<TEntity?> Get(TKey id, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         return Task.FromResult(Store.TryGetValue(id, out var value) ? value : null);
     }
 
-    public Task<IReadOnlyList<TEntity?>> GetManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    public Task<IReadOnlyList<TEntity?>> GetMany(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
@@ -73,14 +73,14 @@ internal sealed class InMemoryRepository<TEntity, TKey> :
         return Task.FromResult((IReadOnlyList<TEntity?>)results);
     }
 
-    public Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default)
+    public Task<IReadOnlyList<TEntity>> Query(object? query, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var result = Store.Values.ToList();
         return Task.FromResult((IReadOnlyList<TEntity>)result);
     }
 
-    public Task<IReadOnlyList<TEntity>> QueryAsync(object? query, DataQueryOptions? options, CancellationToken ct = default)
+    public Task<IReadOnlyList<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var items = Store.Values.AsQueryable();
@@ -97,7 +97,7 @@ internal sealed class InMemoryRepository<TEntity, TKey> :
 
     // ==================== LINQ Query Operations ====================
 
-    public Task<CountResult> CountAsync(CountRequest<TEntity> request, CancellationToken ct = default)
+    public Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
 
@@ -116,14 +116,14 @@ internal sealed class InMemoryRepository<TEntity, TKey> :
         return Task.FromResult(new CountResult(total, false));
     }
 
-    public Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
+    public Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var result = Store.Values.AsQueryable().Where(predicate).ToList();
         return Task.FromResult((IReadOnlyList<TEntity>)result);
     }
 
-    public Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
+    public Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var items = Store.Values.AsQueryable().Where(predicate);
@@ -133,14 +133,14 @@ internal sealed class InMemoryRepository<TEntity, TKey> :
 
     // ==================== Write Operations ====================
 
-    public Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)
+    public Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         Store[model.Id] = model;
         return Task.FromResult(model);
     }
 
-    public Task<int> UpsertManyAsync(IEnumerable<TEntity> models, CancellationToken ct = default)
+    public Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var count = 0;
@@ -153,13 +153,13 @@ internal sealed class InMemoryRepository<TEntity, TKey> :
         return Task.FromResult(count);
     }
 
-    public Task<bool> DeleteAsync(TKey id, CancellationToken ct = default)
+    public Task<bool> Delete(TKey id, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         return Task.FromResult(Store.TryRemove(id, out _));
     }
 
-    public Task<int> DeleteManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    public Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var count = 0;
@@ -172,7 +172,7 @@ internal sealed class InMemoryRepository<TEntity, TKey> :
         return Task.FromResult(count);
     }
 
-    public Task<int> DeleteAllAsync(CancellationToken ct = default)
+    public Task<int> DeleteAll(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var count = Store.Count;
@@ -180,7 +180,7 @@ internal sealed class InMemoryRepository<TEntity, TKey> :
         return Task.FromResult(count);
     }
 
-    public Task<long> RemoveAllAsync(RemoveStrategy strategy, CancellationToken ct = default)
+    public Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var count = Store.Count;
@@ -210,7 +210,7 @@ internal sealed class InMemoryRepository<TEntity, TKey> :
         public IBatchSet<TEntity, TKey> Update(TKey id, Action<TEntity> mutate) { _mutations.Add((id, mutate)); return this; }
         public IBatchSet<TEntity, TKey> Clear() { _adds.Clear(); _updates.Clear(); _deletes.Clear(); _mutations.Clear(); return this; }
 
-        public Task<BatchResult> SaveAsync(BatchOptions? options = null, CancellationToken ct = default)
+        public Task<BatchResult> Save(BatchOptions? options = null, CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
 

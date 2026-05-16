@@ -35,7 +35,7 @@ public sealed class JsonUtilitiesCanonicalizationSpec
                 parsed.Should().BeNull();
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
@@ -54,7 +54,7 @@ public sealed class JsonUtilitiesCanonicalizationSpec
                 ((int)merged["obj"]!["y"]!).Should().Be(3);
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
@@ -68,7 +68,7 @@ public sealed class JsonUtilitiesCanonicalizationSpec
                 arr.Select(v => (int)v).Should().Equal(1, 2);
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
@@ -82,7 +82,7 @@ public sealed class JsonUtilitiesCanonicalizationSpec
                 arr.Select(v => (int)v).Should().Equal(1, 2, 9);
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
@@ -104,7 +104,7 @@ public sealed class JsonUtilitiesCanonicalizationSpec
                     .Should().Be(token.ToString(Newtonsoft.Json.Formatting.None));
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
@@ -122,7 +122,7 @@ public sealed class JsonUtilitiesCanonicalizationSpec
                 canon.Should().MatchRegex("^\\{\\\"a\\\":1,\\\"b\\\":2,\\\"c\\\":\\{\\\"x\\\":1,\\\"y\\\":2},\\\"arr\\\":\\[");
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
@@ -145,6 +145,6 @@ public sealed class JsonUtilitiesCanonicalizationSpec
                 ((int)arr[1]!["extra"]!).Should().Be(1);
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
     }
 }

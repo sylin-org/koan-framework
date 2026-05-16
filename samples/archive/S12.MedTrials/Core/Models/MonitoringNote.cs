@@ -12,15 +12,15 @@ namespace S12.MedTrials.Models;
 public sealed class MonitoringNote : Entity<MonitoringNote>
 {
     [Parent(typeof(TrialSite))]
-    public string TrialSiteId { get; set; } = string.Empty;
+    public string TrialSiteId { get; set; } = "";
 
     [Parent(typeof(ParticipantVisit))]
     public string? ParticipantVisitId { get; set; }
 
     public string NoteType { get; set; } = "General";
-    public string Summary { get; set; } = string.Empty;
+    public string Summary { get; set; } = "";
     public bool FollowUpRequired { get; set; }
-    public string EnteredBy { get; set; } = string.Empty;
+    public string EnteredBy { get; set; } = "";
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
-    public string[] Tags { get; set; } = Array.Empty<string>();
+    public string[] Tags { get; set; } = [];
 }

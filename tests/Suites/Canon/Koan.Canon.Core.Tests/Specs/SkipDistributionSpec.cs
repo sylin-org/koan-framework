@@ -19,7 +19,7 @@ public class SkipDistributionSpec : IClassFixture<CanonCoreTestPipelineFixture>
     var entity = _fixture.CreateTestEntity();
 
     // Act
-    await distributor.DistributeAsync(entity, skip: true);
+    await distributor.Distribute(entity, skip: true);
     var distributed = distributor.GetDistributedEntities();
 
     // Assert

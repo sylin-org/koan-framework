@@ -31,8 +31,8 @@ public sealed class OrchestrationAwareConnectionResolver : IOrchestrationAwareCo
         if (_configuration != null)
         {
             var explicitConnectionString = Configuration.ReadFirst(_configuration, "",
-                $"Koan:Data:{hints.ServiceName ?? serviceName}:ConnectionString",
-                $"Koan:Data:ConnectionString",
+                Infrastructure.ConfigurationConstants.Data.ConnectionString(hints.ServiceName ?? serviceName),
+                Infrastructure.ConfigurationConstants.Data.DefaultConnectionString,
                 $"ConnectionStrings:{serviceName}");
             if (!string.IsNullOrWhiteSpace(explicitConnectionString))
             {

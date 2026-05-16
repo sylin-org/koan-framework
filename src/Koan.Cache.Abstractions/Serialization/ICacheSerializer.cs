@@ -13,9 +13,9 @@ public interface ICacheSerializer
 
     ValueTask<CacheValue> SerializeAsync<T>(T value, CacheEntryOptions options, CancellationToken ct);
 
-    ValueTask<CacheValue> SerializeAsync(object value, Type runtimeType, CacheEntryOptions options, CancellationToken ct);
+    ValueTask<CacheValue> Serialize(object value, Type runtimeType, CacheEntryOptions options, CancellationToken ct);
 
     ValueTask<T?> DeserializeAsync<T>(CacheValue value, CancellationToken ct);
 
-    ValueTask<object?> DeserializeAsync(CacheValue value, Type returnType, CancellationToken ct);
+    ValueTask<object?> Deserialize(CacheValue value, Type returnType, CancellationToken ct);
 }

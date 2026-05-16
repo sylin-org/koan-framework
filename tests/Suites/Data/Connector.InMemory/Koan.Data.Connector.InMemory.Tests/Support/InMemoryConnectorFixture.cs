@@ -33,7 +33,7 @@ internal sealed class InMemoryConnectorFixture : IAsyncDisposable
 
     public IConfiguration Configuration => _configuration;
 
-    public static ValueTask<InMemoryConnectorFixture> CreateAsync(TestContext ctx)
+    public static ValueTask<InMemoryConnectorFixture> Create(TestContext ctx)
     {
         if (ctx is null)
         {
@@ -133,7 +133,7 @@ internal sealed class InMemoryConnectorFixture : IAsyncDisposable
     {
         try
         {
-            await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+            await asyncDisposable.Dispose().ConfigureAwait(false);
         }
         catch
         {

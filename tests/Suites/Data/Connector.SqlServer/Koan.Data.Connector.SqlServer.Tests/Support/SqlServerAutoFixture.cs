@@ -18,7 +18,7 @@ public sealed class SqlServerAutoFixture : IRelationalTestFixture<Specs.Count.Sq
     private TestcontainersContainer? _container;
     private string? _localDbName;
 
-    public string ConnectionString { get; private set; } = string.Empty;
+    public string ConnectionString { get; private set; } = "";
     public IServiceProvider ServiceProvider { get; private set; } = default!;
     public IDataService Data { get; private set; } = default!;
     public bool SkipTests { get; private set; }
@@ -37,7 +37,7 @@ public sealed class SqlServerAutoFixture : IRelationalTestFixture<Specs.Count.Sq
         {
             if (OperatingSystem.IsWindows())
             {
-                if (await TryUseLocalDbAsync())
+                if (await TryUseLocalDb())
                 {
                     // LocalDB ready
                 }
@@ -48,7 +48,7 @@ public sealed class SqlServerAutoFixture : IRelationalTestFixture<Specs.Count.Sq
                 try
                 {
                     Environment.SetEnvironmentVariable("TESTCONTAINERS_RYUK_DISABLED", "true");
-                    var probe = await DockerEnvironment.ProbeAsync();
+                    var probe = await DockerEnvironment.Probe();
                     if (!probe.Available)
                     {
                         SkipTests = true;
@@ -85,8 +85,7 @@ public sealed class SqlServerAutoFixture : IRelationalTestFixture<Specs.Count.Sq
                 new KeyValuePair<string,string?>("Koan:Data:Sources:Default:Adapter", "sqlserver"),
                 new KeyValuePair<string,string?>("Koan:Data:Sources:Default:ConnectionString", ConnectionString),
                 new KeyValuePair<string,string?>("Koan:Environment", "Test"),
-                new KeyValuePair<string,string?>(Infrastructure.Constants.Configuration.Keys.DefaultPageSize, "5"),
-                new KeyValuePair<string,string?>(Infrastructure.Constants.Configuration.Keys.MaxPageSize, "50")
+                new KeyValuePair<string,string?>(Infrastructure.Constants.Configuration.Keys.DefaultPageSize, "5")
             })
             .Build();
 
@@ -156,7 +155,7 @@ public sealed class SqlServerAutoFixture : IRelationalTestFixture<Specs.Count.Sq
     {
     }
 
-    private async Task<bool> TryUseLocalDbAsync()
+    private async Task<bool> TryUseLocalDb()
     {
         try
         {

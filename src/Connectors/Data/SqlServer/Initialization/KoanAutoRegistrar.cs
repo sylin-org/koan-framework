@@ -29,7 +29,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddKoanOptions<SqlServerOptions>(Infrastructure.Constants.Configuration.Keys.Section);
         services.AddSingleton<IConfigureOptions<SqlServerOptions>, SqlServerOptionsConfigurator>();
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
-        services.TryAddEnumerable(new ServiceDescriptor(typeof(INamingDefaultsProvider), typeof(SqlServerNamingDefaultsProvider), ServiceLifetime.Singleton));
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, SqlServerHealthContributor>());
 
         // Register SQL Server discovery adapter (maintains "Reference = Intent")
@@ -62,12 +61,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             defaultOptions.DefaultPageSize,
             Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
             Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
-
-        var maxPageSize = Configuration.ReadFirstWithSource(
-            cfg,
-            defaultOptions.MaxPageSize,
-            Infrastructure.Constants.Configuration.Keys.MaxPageSize,
-            Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
 
         var namingStyle = Configuration.ReadFirstWithSource(
             cfg,
@@ -116,7 +109,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         module.PublishConfigValue(SqlServerItems.Separator, separator);
         module.PublishConfigValue(SqlServerItems.EnsureCreatedSupported, ensureCreated);
         module.PublishConfigValue(SqlServerItems.DefaultPageSize, defaultPageSize);
-        module.PublishConfigValue(SqlServerItems.MaxPageSize, maxPageSize);
     }
 
     private static string BuildSqlServerFallback()

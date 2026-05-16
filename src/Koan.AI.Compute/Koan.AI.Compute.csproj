@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <KoanPackageKind>Periphery</KoanPackageKind>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Description>Hardware-agnostic compute fabric for Koan AI: discover GPUs, route workloads, delegate to network compute.</Description>
+    <PackageTags>$(CommonPackageTags);ai;compute;gpu;fabric</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\Koan.AI.Contracts.Shared\Koan.AI.Contracts.Shared.csproj" />
+  </ItemGroup>
+</Project>

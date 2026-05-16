@@ -215,7 +215,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         }
         catch
         {
-            return Array.Empty<Type>();
+            return [];
         }
     }
 
@@ -294,7 +294,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         for (var i = 0; i < parts.Length; i++)
         {
             var p = parts[i];
-            parts[i] = char.ToUpperInvariant(p[0]) + (p.Length > 1 ? p.Substring(1) : string.Empty);
+            parts[i] = char.ToUpperInvariant(p[0]) + (p.Length > 1 ? p.Substring(1) : "");
         }
         return string.Join(' ', parts);
     }

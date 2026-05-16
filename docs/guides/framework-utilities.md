@@ -1,3 +1,22 @@
+---
+type: GUIDE
+domain: core
+title: "Framework Utilities Guide"
+audience: [developers, architects, ai-agents]
+status: current
+last_updated: 2026-03-26
+framework_version: v0.6.3
+validation:
+  date_last_tested: 2026-03-26
+  status: verified
+  scope: all-examples-tested
+related_guides:
+  - entity-capabilities-howto.md
+  - data-modeling.md
+  - building-apis.md
+  - performance.md
+---
+
 # Framework Utilities Guide
 
 **Purpose**: Centralized catalog of reusable utilities, helpers, and patterns within Koan Framework.
@@ -14,6 +33,7 @@
 - [Web API Utilities](#web-api-utilities)
 - [Data Access Helpers](#data-access-helpers)
 - [Common Patterns](#common-patterns)
+- [Provenance & Boot Reporting](#provenance--boot-reporting)
 
 ---
 
@@ -166,6 +186,85 @@ internal sealed class PostgresDiscoveryAdapter : ServiceDiscoveryAdapterBase
 ---
 
 ## Configuration & Options
+
+### Configuration.ReadWithSource\<T\>
+
+**Location**: `src/Koan.Core/Configuration.cs`
+**Pattern**: Static helper method
+**ADR**: [ARCH-0068](../decisions/ARCH-0068-refactoring-strategy-static-vs-di.md)
+
+**Purpose**: Read a configuration value **with source attribution** — returns not just the value but
+where it came from (appsettings, environment variable, LaunchKit, etc.). This is the preferred
+method inside `IKoanAutoRegistrar.Describe()` to report settings with their origin.
+
+#### Return type: `ConfigurationValue<T>`
+
+```csharp
+public readonly record struct ConfigurationValue<T>(
+    T Value,                // The resolved value
+    BootSettingSource Source,  // Where the value came from
+    string? ResolvedKey,    // The config key that matched
+    bool UsedDefault        // true when no config was found and default was returned
+);
+```
+
+#### `BootSettingSource` enum
+
+| Value | Meaning |
+|-------|---------|
+| `Unknown` | Source could not be determined |
+| `Auto` | Resolved by the framework automatically |
+| `AppSettings` | From `appsettings.json` / `appsettings.{env}.json` |
+| `Environment` | From an environment variable |
+| `LaunchKit` | From LaunchKit service provisioning |
+| `Custom` | Explicitly set in code |
+
+#### Available Methods
+
+```csharp
+// Read with source attribution (preferred in Describe())
+public static ConfigurationValue<T> ReadWithSource<T>(
+    IConfiguration? cfg,
+    string key,
+    T defaultValue)
+
+// Convenience overload — checks multiple keys in order (first match wins)
+public static ConfigurationValue<T> ReadWithSource<T>(
+    IConfiguration? cfg,
+    T defaultValue,
+    params string[] keys)
+
+// Read without source (use when you only need the value)
+public static T Read<T>(IConfiguration? cfg, string key, T defaultValue)
+public static T Read<T>(IConfiguration? cfg, T defaultValue, params string[] keys)
+```
+
+#### Usage Example
+
+```csharp
+public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
+{
+    module.Describe(ModuleVersion, "Postgres connector");
+
+    // Read with source tracking — reports the value AND where it came from
+    var host = Configuration.ReadWithSource(cfg, "localhost", "Koan:Data:Postgres:Host", "POSTGRES_HOST");
+    var db   = Configuration.ReadWithSource(cfg, "default",   "Koan:Data:Postgres:Database");
+
+    module.SetSetting("host",     b => b.Value(host.Value).Source(host.Source.ToString()));
+    module.SetSetting("database", b => b.Value(db.Value).Source(db.Source.ToString()));
+
+    if (db.UsedDefault)
+        module.SetStatus("degraded", "Database name not configured — using default");
+}
+```
+
+#### When to Use
+- Inside `IKoanAutoRegistrar.Describe()` to show where settings came from in the boot report
+- Connector auto-registrars reporting their resolved configuration
+- Any diagnostic context where traceability of config values matters
+- Use plain `Configuration.Read<T>()` when you only need the resolved value
+
+---
 
 ### OptionsExtensions
 
@@ -440,42 +539,65 @@ public class MongoRepository<T>
 
 ---
 
-### Provenance Helpers
+### Provenance & Boot Reporting
 
-**Location**: `src/Koan.Core/Hosting/Bootstrap/ProvenanceModuleExtensions.cs`
-**Pattern**: Extension methods for boot report contributions
-**Status**: ⚠️ Planned for refactoring (see [REFACTORING-LEDGER.md](../refactoring/REFACTORING-LEDGER.md) P1.01)
+**Location**: `src/Koan.Core/Provenance/ProvenanceModuleWriter.cs` and
+`src/Koan.Core/Hosting/Bootstrap/ProvenanceModuleExtensions.cs`
+**Pattern**: Fluent writer + extension methods
+**Used in**: `IKoanAutoRegistrar.Describe(ProvenanceModuleWriter module, ...)`
 
-#### Current Pattern (To Be Refactored)
+`ProvenanceModuleWriter` is the object passed to `Describe()` for every `IKoanAutoRegistrar`. Use it
+to contribute structured metadata to the framework boot report.
+
+#### Full API
 
 ```csharp
-// Duplicated across 53 KoanAutoRegistrar files
-private static void Publish(ProvenanceModuleWriter writer, string key, object value)
+// Fluent core methods (on ProvenanceModuleWriter directly)
+module.Describe(string? version, string? description)      // Set version + description
+module.SetStatus(string status, string? detail = null)     // "ok" | "degraded" | "error"
+module.ClearStatus()                                        // Reset to default
+module.SetSetting(string key, Action<ProvenanceSettingBuilder> configure)  // Structured setting
+module.RemoveSetting(string key)
+module.SetNote(string key, Action<ProvenanceNoteBuilder> configure)        // Structured note
+module.RemoveNote(string key)
+module.SetTool(string name, Action<ProvenanceToolBuilder> configure)       // Registered tool/endpoint
+module.RemoveTool(string name)
+
+// Extension methods (ProvenanceModuleExtensions)
+module.AddNote(string message)                             // Quick plain-text note
+module.AddTool(string name, string route,
+    string? description = null, string? capability = null) // Quick tool registration
+```
+
+#### Usage Pattern
+
+```csharp
+public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
 {
-    writer.Add(new ProvenanceItem { Key = key, Value = value });
+    // 1. Identify the module
+    module.Describe(ModuleVersion, "My application services");
+
+    // 2. Add plain notes (quick and simple)
+    module.AddNote($"Environment: {env.EnvironmentName}");
+    module.AddNote("Services: TodoService, EmailService");
+
+    // 3. Add structured settings (show value + source)
+    var connStr = Configuration.ReadWithSource(cfg, "", "Koan:Data:Default:ConnectionString");
+    module.SetSetting("connection", b => b.Value("[redacted]").Source(connStr.Source.ToString()));
+
+    // 4. Signal degraded state if optional config is absent
+    if (!cfg.GetSection("Email:Smtp").Exists())
+        module.SetStatus("degraded", "Email not configured — notifications disabled");
+
+    // 5. Register tools/endpoints for ZenGarden discovery
+    module.AddTool("health", "/health", "Health check endpoint");
 }
 ```
 
-#### Future Pattern (After P1.01)
-
-```csharp
-// Centralized static extension
-using Koan.Core.Provenance;
-
-writer.Publish("adapter-name", "Postgres");
-writer.Publish("version", "1.0.0");
-writer.PublishMultiple(new Dictionary<string, object>
-{
-    ["host"] = options.Host,
-    ["port"] = options.Port,
-    ["database"] = options.Database
-});
-```
-
 #### When to Use
-- KoanAutoRegistrar boot reporting
-- Diagnostic information contribution
-- Service registration metadata
+- In every `IKoanAutoRegistrar.Describe()` implementation
+- Connector auto-registrars reporting resolved configuration
+- Any module that wants to appear in the Koan boot report or ZenGarden topology
 
 ---
 
@@ -491,6 +613,8 @@ Before creating new helper methods, check if these already exist:
 4. **Patch Normalization** → Use `PatchNormalizer`
 5. **Guard Clauses** → Use `Must`, `Be`, `NotBe` guards
 6. **Discovery Logic** → Inherit from `ServiceDiscoveryAdapterBase`
+7. **Config reading with source** → Use `Configuration.ReadWithSource<T>()`
+8. **Boot report writing** → Use `ProvenanceModuleWriter` methods (not custom `Publish()` helpers)
 
 ### ❌ Don't Inject Services for Pure Functions
 
@@ -553,6 +677,6 @@ Refer to [REFACTORING-LEDGER.md](../refactoring/REFACTORING-LEDGER.md) for plann
 
 ---
 
-**Last Updated**: 2025-11-03
+**Last Updated**: 2026-03-26
 **Maintained By**: Koan Framework Core Team
 **Related**: [ARCH-0068](../decisions/ARCH-0068-refactoring-strategy-static-vs-di.md), [Refactoring Ledger](../refactoring/REFACTORING-LEDGER.md)

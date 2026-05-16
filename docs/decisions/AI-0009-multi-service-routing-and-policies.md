@@ -1,8 +1,10 @@
 # AI-0009 - Multi-service routing, load balancing, and policies
 
-Status: Proposed
+Status: Superseded (see AI-0019)
 Date: 2025-08-19
 Owners: Koan AI
+
+> Superseded by AI-0019 (Koan AI ME.AI zero-config pipeline). This record remains for historical context; `AiRoutingEngine` and Microsoft.Extensions.AI pipeline abstractions replaced the router concepts described here.
 
 ## Context
 

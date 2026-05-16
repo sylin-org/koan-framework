@@ -62,9 +62,9 @@ internal sealed class OpenSearchDiscoveryAdapter : ServiceDiscoveryAdapterBase
         // Check OpenSearch-specific configuration paths
         return _configuration.GetConnectionString("OpenSearch") ??
                _configuration.GetConnectionString("Opensearch") ??
-               _configuration["Koan:Data:OpenSearch:ConnectionString"] ??
-               _configuration["Koan:Data:OpenSearch:Endpoint"] ??
-               _configuration["Koan:Data:ConnectionString"];
+               _configuration[Infrastructure.Constants.Configuration.Keys.ConnectionString] ??
+               _configuration[Infrastructure.Constants.Configuration.Keys.Endpoint] ??
+               _configuration[Infrastructure.Constants.Configuration.Keys.AltConnectionString];
     }
 
     /// <summary>OpenSearch-specific environment variable handling</summary>

@@ -11,15 +11,15 @@ public sealed class DeliverableTypeCanonicalizationHook : IModelHook<Deliverable
 {
     public int Order => 0;
 
-    public Task OnAfterDeleteAsync(HookContext<DeliverableType> ctx, DeliverableType model) => Task.CompletedTask;
-    public Task OnAfterFetchAsync(HookContext<DeliverableType> ctx, DeliverableType? model) => Task.CompletedTask;
-    public Task OnAfterPatchAsync(HookContext<DeliverableType> ctx, DeliverableType model) => Task.CompletedTask;
-    public Task OnAfterSaveAsync(HookContext<DeliverableType> ctx, DeliverableType model) => Task.CompletedTask;
-    public Task OnBeforeDeleteAsync(HookContext<DeliverableType> ctx, DeliverableType model) => Task.CompletedTask;
-    public Task OnBeforeFetchAsync(HookContext<DeliverableType> ctx, string id) => Task.CompletedTask;
-    public Task OnBeforePatchAsync(HookContext<DeliverableType> ctx, string id, object patch) => Task.CompletedTask;
+    public Task OnAfterDelete(HookContext<DeliverableType> ctx, DeliverableType model) => Task.CompletedTask;
+    public Task OnAfterFetch(HookContext<DeliverableType> ctx, DeliverableType? model) => Task.CompletedTask;
+    public Task OnAfterPatch(HookContext<DeliverableType> ctx, DeliverableType model) => Task.CompletedTask;
+    public Task OnAfterSave(HookContext<DeliverableType> ctx, DeliverableType model) => Task.CompletedTask;
+    public Task OnBeforeDelete(HookContext<DeliverableType> ctx, DeliverableType model) => Task.CompletedTask;
+    public Task OnBeforeFetch(HookContext<DeliverableType> ctx, string id) => Task.CompletedTask;
+    public Task OnBeforePatch(HookContext<DeliverableType> ctx, string id, object patch) => Task.CompletedTask;
 
-    public Task OnBeforeSaveAsync(HookContext<DeliverableType> ctx, DeliverableType model)
+    public Task OnBeforeSave(HookContext<DeliverableType> ctx, DeliverableType model)
     {
         model.TemplateMd = FieldPathCanonicalizer.CanonicalizeTemplatePlaceholders(model.TemplateMd);
         model.JsonSchema = FieldPathCanonicalizer.CanonicalizeJsonSchema(model.JsonSchema);

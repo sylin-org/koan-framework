@@ -1,16 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <KoanPackageKind>Periphery</KoanPackageKind>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <Description>Swagger/OpenAPI integration for Koan Web: idempotent registration, config-driven enablement, and friendly defaults.</Description>
     <PackageTags>$(CommonPackageTags);swagger;openapi;ui;documentation</PackageTags>
-    <Version>0.6.3</Version>
-    <AssemblyVersion>0.6.3</AssemblyVersion>
-    <FileVersion>0.6.3</FileVersion>
+    <InterceptorsNamespaces>$(InterceptorsNamespaces);Microsoft.AspNetCore.OpenApi.Generated</InterceptorsNamespaces>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+  <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="6.6.2" />
+    <ProjectReference Include="..\..\..\Koan.Web.OpenApi\Koan.Web.OpenApi.csproj" />
     <ProjectReference Include="..\..\..\Koan.Web\Koan.Web.csproj" />
   </ItemGroup>
 </Project>

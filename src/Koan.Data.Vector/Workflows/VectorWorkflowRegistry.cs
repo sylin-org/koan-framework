@@ -294,12 +294,40 @@ internal sealed class VectorWorkflowRegistry : IVectorWorkflowRegistry, VectorWo
             System.ArgumentNullException.ThrowIfNull(embedding);
 
             var repo = EnsureRepository();
-            await Data<TEntity, string>.UpsertAsync(entity, ct);
-            var payload = MergeMetadata(metadata);
-            await repo.UpsertAsync(entity.Id, embedding, payload, ct);
-            LogOperation("save",
-                ("documents", (object?)1),
-                ("vectors", (object?)1));
+            bool entitySaved = false;
+
+            try
+            {
+                await Data<TEntity, string>.Upsert(entity, ct);
+                entitySaved = true;
+
+                var payload = MergeMetadata(metadata);
+                await repo.Upsert(entity.Id, embedding, payload, ct);
+
+                LogOperation("save",
+                    ("documents", (object?)1),
+                    ("vectors", (object?)1));
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                if (entitySaved)
+                {
+                    // Entity saved, vector failed - critical inconsistency
+                    throw new VectorCoordinationException(
+                        $"Vector save failed after entity was persisted. " +
+                        $"Entity {entity.Id} exists in database but has no vector representation. " +
+                        $"Use background re-embedding to recover.",
+                        entity.Id,
+                        entitySaved: true,
+                        vectorSaved: false,
+                        ex);
+                }
+                else
+                {
+                    // Entity save failed - clean failure, nothing persisted
+                    throw;
+                }
+            }
         }
 
         public async Task<VectorWorkflowSaveManyResult> SaveMany(
@@ -316,13 +344,13 @@ internal sealed class VectorWorkflowRegistry : IVectorWorkflowRegistry, VectorWo
 
             var repo = EnsureRepository();
             var entities = materialized.Select(x => x.Entity).ToList();
-            var docsAffected = await Data<TEntity, string>.UpsertManyAsync(entities, ct);
+            var docsAffected = await Data<TEntity, string>.UpsertMany(entities, ct);
 
             var vectorItems = materialized
                 .Select(x => (x.Entity.Id, x.Embedding, MergeMetadata(x.Metadata)))
                 .ToList();
 
-            var vectorsAffected = await repo.UpsertManyAsync(vectorItems, ct);
+            var vectorsAffected = await repo.UpsertMany(vectorItems, ct);
             LogOperation("save-many",
                 ("documents", (object?)docsAffected),
                 ("vectors", (object?)vectorsAffected));
@@ -333,8 +361,8 @@ internal sealed class VectorWorkflowRegistry : IVectorWorkflowRegistry, VectorWo
         {
             System.ArgumentException.ThrowIfNullOrWhiteSpace(id);
             var repo = EnsureRepository();
-            var removed = await Data<TEntity, string>.DeleteAsync(id, ct);
-            var result = await repo.DeleteAsync(id, ct);
+            var removed = await Data<TEntity, string>.Delete(id, ct);
+            var result = await repo.Delete(id, ct);
             LogOperation("delete",
                 ("documents", (object?)(removed ? 1 : 0)),
                 ("vectors", (object?)(result ? 1 : 0)));
@@ -351,8 +379,8 @@ internal sealed class VectorWorkflowRegistry : IVectorWorkflowRegistry, VectorWo
                 return 0;
             }
 
-            var docs = await Data<TEntity, string>.DeleteManyAsync(materialized, ct);
-            var result = await repo.DeleteManyAsync(materialized, ct);
+            var docs = await Data<TEntity, string>.DeleteMany(materialized, ct);
+            var result = await repo.DeleteMany(materialized, ct);
             LogOperation("delete-many",
                 ("documents", (object?)docs),
                 ("vectors", (object?)result));
@@ -362,7 +390,7 @@ internal sealed class VectorWorkflowRegistry : IVectorWorkflowRegistry, VectorWo
         public async Task EnsureCreated(CancellationToken ct = default)
         {
             var repo = EnsureRepository();
-            await repo.VectorEnsureCreatedAsync(ct);
+            await repo.VectorEnsureCreated(ct);
             LogOperation("ensure-created");
         }
 
@@ -371,7 +399,7 @@ internal sealed class VectorWorkflowRegistry : IVectorWorkflowRegistry, VectorWo
             System.ArgumentNullException.ThrowIfNull(options);
             var repo = EnsureRepository();
             var normalized = NormalizeOptions(options);
-            var result = await repo.SearchAsync(normalized, ct);
+            var result = await repo.Search(normalized, ct);
             LogOperation("query",
                 ("topK", (object?)(normalized.TopK ?? DefaultTopK)),
                 ("alpha", (object?)(normalized.Alpha ?? DefaultAlpha)),

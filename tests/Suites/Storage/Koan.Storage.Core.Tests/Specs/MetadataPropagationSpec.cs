@@ -20,8 +20,8 @@ public class MetadataPropagationSpec : IClassFixture<StorageCoreTestPipelineFixt
     file.Metadata["x-test"] = "abc";
 
     // Act
-    await storage.UploadAsync(file);
-    var info = await storage.GetFileInfoAsync(file.Path);
+    await storage.Upload(file);
+    var info = await storage.GetFileInfo(file.Path);
 
     // Assert
     info.Metadata["x-test"].Should().Be("abc");

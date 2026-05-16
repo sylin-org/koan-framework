@@ -8,6 +8,8 @@ using RabbitMQ.Client.Events;
 
 using Koan.Service.Inbox.Connector.Redis.Options;
 
+using InboxConstants = Koan.Service.Inbox.Connector.Redis.Infrastructure.Constants;
+
 namespace Koan.Service.Inbox.Connector.Redis.Hosting;
 
 internal sealed class RedisInboxAnnouncementService : BackgroundService
@@ -56,9 +58,9 @@ internal sealed class RedisInboxAnnouncementService : BackgroundService
             var exchange = ResolveExchange();
             await _channel.ExchangeDeclareAsync(exchange, type: "topic", durable: true, autoDelete: false, arguments: null, cancellationToken: stoppingToken);
 
-            var queue = (await _channel.QueueDeclareAsync(queue: string.Empty, durable: false, exclusive: true, autoDelete: true, arguments: null, cancellationToken: stoppingToken)).QueueName;
-            var busCode = _configuration["Koan:Messaging:DefaultBus"] ?? "rabbit";
-            var group = _configuration["Koan:Messaging:DefaultGroup"] ?? "workers";
+            var queue = (await _channel.QueueDeclareAsync(queue: "", durable: false, exclusive: true, autoDelete: true, arguments: null, cancellationToken: stoppingToken)).QueueName;
+            var busCode = _configuration[InboxConstants.Messaging.DefaultBus] ?? "rabbit";
+            var group = _configuration[InboxConstants.Messaging.DefaultGroup] ?? "workers";
             var routingKey = $"Koan.discovery.ping.{busCode}.{group}";
 
             await _channel.QueueBindAsync(queue, exchange, routingKey, cancellationToken: stoppingToken);
@@ -141,19 +143,19 @@ internal sealed class RedisInboxAnnouncementService : BackgroundService
 
     private string? ResolveRabbitConnectionString()
     {
-        return _configuration["Koan:Messaging:Buses:default:ConnectionString"]
-            ?? _configuration["Koan:Messaging:Buses:rabbit:ConnectionString"]
+        return _configuration[InboxConstants.Messaging.BusDefaultConnectionString]
+            ?? _configuration[InboxConstants.Messaging.BusRabbitConnectionString]
             ?? _configuration["ConnectionStrings:RabbitMq"];
     }
 
     private string ResolveExchange()
-        => _configuration["Koan:Messaging:Buses:default:RabbitMq:Exchange"]
-            ?? _configuration["Koan:Messaging:Buses:rabbit:RabbitMq:Exchange"]
+        => _configuration[InboxConstants.Messaging.BusDefaultRabbitMqExchange]
+            ?? _configuration[InboxConstants.Messaging.BusRabbitRabbitMqExchange]
             ?? "Koan";
 
     private string ResolveEndpoint()
     {
-        var explicitEndpoint = _configuration["Koan:Messaging:Inbox:Endpoint"];
+        var explicitEndpoint = _configuration[InboxConstants.Messaging.InboxEndpoint];
         if (!string.IsNullOrWhiteSpace(explicitEndpoint)) return explicitEndpoint!;
 
         var host = Environment.GetEnvironmentVariable("HOSTNAME") ?? "localhost";

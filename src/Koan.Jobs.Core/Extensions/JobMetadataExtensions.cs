@@ -41,4 +41,24 @@ public static class JobMetadataExtensions
         job.Metadata[key] = value;
         return job;
     }
+
+    /// <summary>
+    /// Tag the job with the host platform it targets (e.g. <c>"nexusmods"</c>, <c>"ko-fi"</c>).
+    /// Read by the <see cref="Execution.JobExecutor"/> at dispatch time to consult the
+    /// <see cref="RateGating.IHostRateGate"/>: if the host is currently gated (typically because
+    /// another job from the same host hit a 429), this job defers until the gate releases — without
+    /// consuming its retry budget.
+    /// </summary>
+    public static Job WithHost(this Job job, string hostTag)
+    {
+        if (!string.IsNullOrWhiteSpace(hostTag))
+        {
+            job.Metadata[Execution.JobExecutor.HostMetadataKey] = hostTag;
+        }
+        return job;
+    }
+
+    /// <summary>Read the host tag previously set via <see cref="WithHost"/>, or <see langword="null"/>.</summary>
+    public static string? GetHost(this Job job)
+        => job.Metadata.TryGetValue(Execution.JobExecutor.HostMetadataKey, out var raw) ? raw?.ToString() : null;
 }

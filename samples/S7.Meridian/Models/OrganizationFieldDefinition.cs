@@ -8,7 +8,7 @@ namespace Koan.Samples.Meridian.Models;
 public sealed class OrganizationFieldDefinition
 {
     /// <summary>Name of the field to extract (e.g., "RegulatoryRegime", "Department").</summary>
-    public string FieldName { get; set; } = string.Empty;
+    public string FieldName { get; set; } = "";
 
     /// <summary>Optional description providing guidance for extraction.</summary>
     public string? Description { get; set; }

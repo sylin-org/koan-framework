@@ -2,14 +2,19 @@
 type: GUIDE
 domain: orchestration
 title: "Aspire Integration"
-audience: [developers]
+audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2025-10-09
+last_updated: 2025-11-09
 framework_version: v0.6.3
 validation:
-  date_last_tested: 2025-10-09
+  date_last_tested: 2025-11-09
   status: verified
-  scope: docs/guides/aspire-integration.md
+  scope: all-examples-tested
+related_guides:
+  - entity-capabilities-howto.md
+  - data-modeling.md
+  - authentication-setup.md
+  - building-apis.md
 ---
 
 # Aspire Integration

@@ -15,7 +15,7 @@ namespace Koan.Samples.Meridian.Services;
 
 public interface ISourceTypeAuthoringService
 {
-    Task<SourceTypeAiSuggestResponse> SuggestAsync(SourceTypeAiSuggestRequest request, CancellationToken ct);
+    Task<SourceTypeAiSuggestResponse> Suggest(SourceTypeAiSuggestRequest request, CancellationToken ct);
 }
 
 public sealed class SourceTypeAuthoringService : ISourceTypeAuthoringService
@@ -37,7 +37,7 @@ public sealed class SourceTypeAuthoringService : ISourceTypeAuthoringService
         _logger = logger;
     }
 
-    public async Task<SourceTypeAiSuggestResponse> SuggestAsync(SourceTypeAiSuggestRequest request, CancellationToken ct)
+    public async Task<SourceTypeAiSuggestResponse> Suggest(SourceTypeAiSuggestRequest request, CancellationToken ct)
     {
         if (request is null)
         {
@@ -51,9 +51,8 @@ public sealed class SourceTypeAuthoringService : ISourceTypeAuthoringService
 
         var prompt = BuildPrompt(request);
         var model = request.Model ?? _options.Extraction.Model ?? "granite3.3:8b";
-        var chatOptions = new AiChatOptions
+        var chatOptions = new ChatOptions
         {
-            Message = prompt,
             Model = model,
             Temperature = 0.15,
             MaxTokens = 900
@@ -62,7 +61,7 @@ public sealed class SourceTypeAuthoringService : ISourceTypeAuthoringService
         string rawResponse;
         try
         {
-            rawResponse = await Ai.Chat(chatOptions, ct);
+            rawResponse = await Client.Chat(prompt, chatOptions, ct);
         }
         catch (Exception ex)
         {
@@ -79,10 +78,10 @@ public sealed class SourceTypeAuthoringService : ISourceTypeAuthoringService
         var metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["warnings"] = warnings.Count.ToString(),
-            ["documentName"] = request.DocumentName ?? string.Empty
+            ["documentName"] = request.DocumentName ?? ""
         };
 
-        await _auditor.RecordAsync(
+        await _auditor.Record(
             "SourceType",
             draft.Name,
             requestSummary,
@@ -159,10 +158,10 @@ public sealed class SourceTypeAuthoringService : ISourceTypeAuthoringService
             var json = JObject.Parse(rawResponse);
             var draft = new SourceTypeDraft
             {
-                Name = json["name"]?.Value<string>()?.Trim() ?? string.Empty,
-                Description = json["description"]?.Value<string>()?.Trim() ?? string.Empty,
-                Instructions = json["instructions"]?.Value<string>()?.Trim() ?? string.Empty,
-                OutputTemplate = json["outputTemplate"]?.Value<string>()?.Trim() ?? string.Empty
+                Name = json["name"]?.Value<string>()?.Trim() ?? "",
+                Description = json["description"]?.Value<string>()?.Trim() ?? "",
+                Instructions = json["instructions"]?.Value<string>()?.Trim() ?? "",
+                OutputTemplate = json["outputTemplate"]?.Value<string>()?.Trim() ?? ""
             };
 
             draft.Tags = ExtractStringArray(json["tags"]);
@@ -188,7 +187,7 @@ public sealed class SourceTypeAuthoringService : ISourceTypeAuthoringService
                 foreach (var prop in queries.Properties())
                 {
                     var key = prop.Name.Trim();
-                    var value = prop.Value.Value<string>()?.Trim() ?? string.Empty;
+                    var value = prop.Value.Value<string>()?.Trim() ?? "";
                     if (!string.IsNullOrWhiteSpace(key) && !draft.FieldQueries.ContainsKey(key))
                     {
                         draft.FieldQueries[key] = value;
@@ -203,8 +202,8 @@ public sealed class SourceTypeAuthoringService : ISourceTypeAuthoringService
             warnings.Add($"Failed to parse AI response: {ex.Message}");
             return new SourceTypeDraft
             {
-                Instructions = string.Empty,
-                OutputTemplate = string.Empty
+                Instructions = "",
+                OutputTemplate = ""
             };
         }
     }
@@ -326,7 +325,7 @@ internal static class SourceTypeAuthoringExtensions
     {
         if (string.IsNullOrEmpty(value))
         {
-            return string.Empty;
+            return "";
         }
 
         var trimmed = value.Trim();

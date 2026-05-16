@@ -5,7 +5,7 @@ namespace Koan.Samples.Meridian.Models;
 
 public sealed class DeliverableType : Entity<DeliverableType>
 {
-    public string Name { get; set; } = string.Empty;
+    public string Name { get; set; } = "";
     public string? Description { get; set; }
         = null;
 
@@ -31,7 +31,7 @@ public sealed class DeliverableType : Entity<DeliverableType>
 
 public sealed class SourceTypeMapping
 {
-    public string SourceTypeId { get; set; } = string.Empty;
+    public string SourceTypeId { get; set; } = "";
     public Dictionary<string, string> FieldMappings { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }
 

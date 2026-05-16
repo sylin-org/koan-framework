@@ -24,7 +24,7 @@ public abstract partial class Entity<TEntity, TKey>
         }
 
         public ValueTask<long> Flush(CancellationToken ct = default)
-            => FlushInternal(Array.Empty<string>(), ct);
+            => FlushInternal([], ct);
 
         public ValueTask<long> Flush(IEnumerable<string> tags, CancellationToken ct = default)
             => FlushInternal(tags, ct);
@@ -33,7 +33,7 @@ public abstract partial class Entity<TEntity, TKey>
             => FlushInternal(new[] { tag }, ct);
 
         public ValueTask<long> Count(CancellationToken ct = default)
-            => CountInternal(Array.Empty<string>(), ct);
+            => CountInternal([], ct);
 
         public ValueTask<long> Count(IEnumerable<string> tags, CancellationToken ct = default)
             => CountInternal(tags, ct);
@@ -42,7 +42,7 @@ public abstract partial class Entity<TEntity, TKey>
             => CountInternal(new[] { tag }, ct);
 
         public async ValueTask<bool> Any(CancellationToken ct = default)
-            => await CountInternal(Array.Empty<string>(), ct) > 0;
+            => await CountInternal([], ct) > 0;
 
         public async ValueTask<bool> Any(IEnumerable<string> tags, CancellationToken ct = default)
             => await CountInternal(tags, ct) > 0;
@@ -56,7 +56,7 @@ public abstract partial class Entity<TEntity, TKey>
                 return ValueTask.FromResult(0L);
             }
 
-            return client.FlushTagsAsync(resolved, ct);
+            return client.FlushTags(resolved, ct);
         }
 
         private static ValueTask<long> CountInternal(IEnumerable<string>? tags, CancellationToken ct)
@@ -68,7 +68,7 @@ public abstract partial class Entity<TEntity, TKey>
                 return ValueTask.FromResult(0L);
             }
 
-            return client.CountTagsAsync(resolved, ct);
+            return client.CountTags(resolved, ct);
         }
 
         private static ICacheClient ResolveClient()
@@ -123,7 +123,7 @@ public abstract partial class Entity<TEntity, TKey>
                 }
             }
 
-            return set.Count == 0 ? Array.Empty<string>() : set.ToArray();
+            return set.Count == 0 ? [] : set.ToArray();
         }
 
         private static bool IsConcrete(string? tag)

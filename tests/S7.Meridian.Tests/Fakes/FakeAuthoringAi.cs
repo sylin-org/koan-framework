@@ -16,11 +16,11 @@ namespace S7.Meridian.Tests.Fakes;
 /// Deterministic AI stub for authoring endpoints so tests do not require external LLMs.
 /// Generates stable JSON payloads that satisfy SourceType and AnalysisType authoring contracts.
 /// </summary>
-internal sealed class FakeAuthoringAi : IAi
+internal sealed class FakeAuthoringAi : IAiPipeline
 {
-    public Task<AiChatResponse> PromptAsync(AiChatRequest request, CancellationToken ct = default)
+    public Task<AiChatResponse> Prompt(AiChatRequest request, CancellationToken ct = default)
     {
-        var prompt = request.Messages.LastOrDefault()?.Content ?? string.Empty;
+        var prompt = request.Messages.LastOrDefault()?.Content ?? "";
         var text = prompt.Contains("\"fieldQueries\"", StringComparison.OrdinalIgnoreCase)
             ? BuildSourceTypeDraft()
             : BuildAnalysisTypeDraft();
@@ -33,9 +33,9 @@ internal sealed class FakeAuthoringAi : IAi
         });
     }
 
-    public async IAsyncEnumerable<AiChatChunk> StreamAsync(AiChatRequest request, [EnumeratorCancellation] CancellationToken ct = default)
+    public async IAsyncEnumerable<AiChatChunk> Stream(AiChatRequest request, [EnumeratorCancellation] CancellationToken ct = default)
     {
-        var response = await PromptAsync(request, ct).ConfigureAwait(false);
+        var response = await Prompt(request, ct).ConfigureAwait(false);
         yield return new AiChatChunk
         {
             DeltaText = response.Text,
@@ -44,7 +44,7 @@ internal sealed class FakeAuthoringAi : IAi
         };
     }
 
-    public Task<AiEmbeddingsResponse> EmbedAsync(AiEmbeddingsRequest request, CancellationToken ct = default)
+    public Task<AiEmbeddingsResponse> Embed(AiEmbeddingsRequest request, CancellationToken ct = default)
     {
         var vectors = request.Input.Select(ComputeVector).ToList();
         return Task.FromResult(new AiEmbeddingsResponse
@@ -55,9 +55,9 @@ internal sealed class FakeAuthoringAi : IAi
         });
     }
 
-    public async Task<string> PromptAsync(string message, string? model = null, AiPromptOptions? opts = null, CancellationToken ct = default)
+    public async Task<string> Prompt(string message, string? model = null, AiPromptOptions? opts = null, CancellationToken ct = default)
     {
-        var response = await PromptAsync(new AiChatRequest
+        var response = await Prompt(new AiChatRequest
         {
             Model = model,
             Options = opts,
@@ -67,7 +67,7 @@ internal sealed class FakeAuthoringAi : IAi
         return response.Text;
     }
 
-    public async IAsyncEnumerable<AiChatChunk> StreamAsync(string message, string? model = null, AiPromptOptions? opts = null, [EnumeratorCancellation] CancellationToken ct = default)
+    public async IAsyncEnumerable<AiChatChunk> Stream(string message, string? model = null, AiPromptOptions? opts = null, [EnumeratorCancellation] CancellationToken ct = default)
     {
         var request = new AiChatRequest
         {
@@ -76,7 +76,7 @@ internal sealed class FakeAuthoringAi : IAi
             Messages = new List<AiMessage> { new("user", message) }
         };
 
-        await foreach (var chunk in StreamAsync(request, ct))
+        await foreach (var chunk in Stream(request, ct))
         {
             yield return chunk;
         }

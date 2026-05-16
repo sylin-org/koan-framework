@@ -59,7 +59,7 @@ public class Collection : Entity<Collection>
     /// </summary>
     /// <param name="ct">Cancellation token</param>
     /// <returns>List of photos in this collection (in order)</returns>
-    public async Task<List<PhotoAsset>> GetPhotosAsync(CancellationToken ct = default)
+    public async Task<List<PhotoAsset>> GetPhotos(CancellationToken ct = default)
     {
         if (PhotoIds.Count == 0) return new List<PhotoAsset>();
 

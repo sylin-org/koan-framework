@@ -36,7 +36,7 @@ internal sealed class DefaultAggregationContributor<TModel> : ICanonPipelineCont
     public CanonPipelinePhase Phase => CanonPipelinePhase.Aggregation;
 
     /// <inheritdoc />
-    public async ValueTask<CanonizationEvent?> ExecuteAsync(CanonPipelineContext<TModel> context, CancellationToken cancellationToken)
+    public async ValueTask<CanonizationEvent?> Execute(CanonPipelineContext<TModel> context, CancellationToken cancellationToken)
     {
         if (context is null)
         {
@@ -47,9 +47,9 @@ internal sealed class DefaultAggregationContributor<TModel> : ICanonPipelineCont
         context.SetItem(ArrivalTokenContextKey, arrivalToken);
 
         var aggregationKey = BuildAggregationKey(context.Entity);
-        var indexLookup = await LoadIndexesAsync(context, aggregationKey, cancellationToken);
+        var indexLookup = await LoadIndexes(context, aggregationKey, cancellationToken);
 
-        var canonicalId = await EnsureCanonicalIdAsync(context, indexLookup, cancellationToken);
+        var canonicalId = await EnsureCanonicalId(context, indexLookup, cancellationToken);
         var attributes = BuildIndexAttributes(context, arrivalToken);
 
         foreach (var entry in indexLookup)
@@ -62,13 +62,13 @@ internal sealed class DefaultAggregationContributor<TModel> : ICanonPipelineCont
             };
 
             index.Update(canonicalId, context.Metadata.Origin, attributes);
-            await context.Persistence.UpsertIndexAsync(index, cancellationToken);
+            await context.Persistence.UpsertIndex(index, cancellationToken);
         }
 
         return null;
     }
 
-    private async Task<string> EnsureCanonicalIdAsync(
+    private async Task<string> EnsureCanonicalId(
         CanonPipelineContext<TModel> context,
         IReadOnlyDictionary<string, CanonIndex?> indexLookup,
         CancellationToken cancellationToken)
@@ -96,7 +96,7 @@ internal sealed class DefaultAggregationContributor<TModel> : ICanonPipelineCont
         }
 
         context.Metadata.AssignCanonicalId(canonicalId);
-        await AttachExistingSnapshotAsync(context, canonicalId, cancellationToken);
+        await AttachExistingSnapshot(context, canonicalId, cancellationToken);
 
         if (candidateIds.Count > 1)
         {
@@ -132,7 +132,7 @@ internal sealed class DefaultAggregationContributor<TModel> : ICanonPipelineCont
         return canonicalId;
     }
 
-    private async Task AttachExistingSnapshotAsync(CanonPipelineContext<TModel> context, string canonicalId, CancellationToken cancellationToken)
+    private async Task AttachExistingSnapshot(CanonPipelineContext<TModel> context, string canonicalId, CancellationToken cancellationToken)
     {
         if (context.TryGetItem(ExistingEntityContextKey, out TModel? cachedEntity) && cachedEntity is not null)
         {
@@ -217,7 +217,7 @@ internal sealed class DefaultAggregationContributor<TModel> : ICanonPipelineCont
         return attributes;
     }
 
-    private async ValueTask<IReadOnlyDictionary<string, CanonIndex?>> LoadIndexesAsync(
+    private async ValueTask<IReadOnlyDictionary<string, CanonIndex?>> LoadIndexes(
         CanonPipelineContext<TModel> context,
         AggregationKey aggregationKey,
         CancellationToken cancellationToken)
@@ -226,13 +226,13 @@ internal sealed class DefaultAggregationContributor<TModel> : ICanonPipelineCont
 
         foreach (var token in aggregationKey.Tokens)
         {
-            var index = await context.Persistence.GetIndexAsync(_entityType, token, cancellationToken);
+            var index = await context.Persistence.GetIndex(_entityType, token, cancellationToken);
             lookup[token] = index;
         }
 
         if (!string.IsNullOrWhiteSpace(aggregationKey.CompositeKey) && !lookup.ContainsKey(aggregationKey.CompositeKey!))
         {
-            var composite = await context.Persistence.GetIndexAsync(_entityType, aggregationKey.CompositeKey!, cancellationToken);
+            var composite = await context.Persistence.GetIndex(_entityType, aggregationKey.CompositeKey!, cancellationToken);
             lookup[aggregationKey.CompositeKey!] = composite;
         }
 

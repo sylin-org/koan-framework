@@ -26,7 +26,7 @@ public static class ProvenanceModuleExtensions
         {
             builder
                 .Label(key)
-                .Description(string.Empty)
+                .Description("")
                 .Value(value)
                 .State(state)
                 .Source(MapSource(source), sourceKey);
@@ -38,7 +38,7 @@ public static class ProvenanceModuleExtensions
 
             if (isSecret)
             {
-                builder.Secret(input => Koan.Core.Redaction.DeIdentify(input ?? string.Empty));
+                builder.Secret(input => Koan.Core.Redaction.DeIdentify(input ?? ""));
             }
         });
     }
@@ -86,7 +86,7 @@ public static class ProvenanceModuleExtensions
 
             if (isSecret)
             {
-                builder.Secret(input => Koan.Core.Redaction.DeIdentify(input ?? string.Empty));
+                builder.Secret(input => Koan.Core.Redaction.DeIdentify(input ?? ""));
             }
         });
     }
@@ -97,7 +97,7 @@ public static class ProvenanceModuleExtensions
         var key = $"note-{Guid.CreateVersion7():n}";
         module.SetNote(key, builder =>
         {
-            builder.Message(message ?? string.Empty)
+            builder.Message(message ?? "")
                 .Kind(ProvenanceNoteKind.Info);
         });
     }

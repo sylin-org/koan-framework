@@ -6,7 +6,6 @@ using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Provenance;
 using Koan.Web.Connector.Swagger.Infrastructure;
-using Swashbuckle.AspNetCore.Swagger;
 using SwaggerItems = Koan.Web.Connector.Swagger.Infrastructure.SwaggerProvenanceItems;
 using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
 using Koan.Web;
@@ -20,11 +19,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        // Guard to prevent duplicate Swagger registration if the app already called AddKoanSwagger()
-        if (!services.Any(d => d.ServiceType == typeof(ISwaggerProvider)))
-        {
-            services.AddKoanSwagger();
-        }
+        services.AddKoanSwagger();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Microsoft.AspNetCore.Hosting.IStartupFilter, Hosting.KoanSwaggerStartupFilter>());
     }
 
@@ -52,6 +47,11 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             $"{Constants.Configuration.Section}:{Constants.Configuration.Keys.IncludeXmlComments}",
             true);
 
+        var documentDisplayName = Koan.Core.Configuration.ReadWithSource(
+            cfg,
+            $"{Constants.Configuration.Section}:{Constants.Configuration.Keys.DocumentDisplayName}",
+            null as string);
+
         var magic = Koan.Core.Configuration.ReadWithSource(
             cfg,
             Core.Infrastructure.Constants.Configuration.Koan.AllowMagicInProduction,
@@ -72,6 +72,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         module.PublishConfigValue(SwaggerItems.RoutePrefix, routePrefix);
         module.PublishConfigValue(SwaggerItems.RequireAuthOutsideDevelopment, requireAuth);
         module.PublishConfigValue(SwaggerItems.IncludeXmlComments, includeXmlComments);
+        module.PublishConfigValue(SwaggerItems.DocumentDisplayName, documentDisplayName);
 
         // Report full Swagger URL for immediate discoverability
         if (enabledEffective)

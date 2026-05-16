@@ -11,7 +11,7 @@ public class PantryInsightsController(IPantryInsightsService insights) : Control
     [HttpGet("stats")]
     public async Task<IActionResult> GetStats(CancellationToken ct = default)
     {
-        var stats = await insights.GetStatsAsync(ct);
+        var stats = await insights.GetStats(ct);
         return Ok(stats);
     }
 }

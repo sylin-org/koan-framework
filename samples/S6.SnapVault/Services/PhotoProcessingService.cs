@@ -7,6 +7,7 @@ using S6.SnapVault.Hubs;
 using S6.SnapVault.Services.AI;
 using Koan.Media.Core.Extensions;
 using Koan.AI;
+using Koan.AI.Contracts.Options;
 using Koan.Data.Core;
 using Koan.Data.Vector;
 using System.Text.RegularExpressions;
@@ -34,7 +35,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
         _promptFactory = promptFactory;
     }
 
-    public async Task<PhotoAsset> ProcessUploadAsync(string? eventId, IFormFile file, string jobId, CancellationToken ct = default)
+    public async Task<PhotoAsset> ProcessUpload(string? eventId, IFormFile file, string jobId, CancellationToken ct = default)
     {
         _logger.LogInformation("Processing upload: {FileName} for event {EventId} (job: {JobId})", file.FileName, eventId ?? "auto", jobId);
 
@@ -48,11 +49,11 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
         };
 
         // Helper method for emitting progress events
-        async Task EmitProgressAsync(string photoId, string status, string stage, string? error = null)
+        async Task EmitProgress(string photoId, string status, string stage, string? error = null)
         {
             try
             {
-                await _hubContext.Clients.Group($"job:{jobId}").SendAsync("PhotoProgress", new PhotoProgressEvent
+                await _hubContext.Clients.Group($"job:{jobId}").Send("PhotoProgress", new PhotoProgressEvent
                 {
                     JobId = jobId,
                     PhotoId = photoId,
@@ -70,7 +71,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
 
         try
         {
-            await EmitProgressAsync("", "processing", "upload");
+            await EmitProgress("", "processing", "upload");
 
             // Open source stream
             using var sourceStream = file.OpenReadStream();
@@ -78,26 +79,26 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             // Extract dimensions before transformations
             using (var dimensionCheck = new MemoryStream())
             {
-                await sourceStream.CopyToAsync(dimensionCheck, ct);
+                await sourceStream.CopyTo(dimensionCheck, ct);
                 dimensionCheck.Position = 0;
                 sourceStream.Position = 0;
 
-                var info = await Image.IdentifyAsync(dimensionCheck, ct);
+                var info = await Image.Identify(dimensionCheck, ct);
                 photo.Width = info.Width;
                 photo.Height = info.Height;
             }
 
-            await EmitProgressAsync("", "processing", "exif");
+            await EmitProgress("", "processing", "exif");
 
             // Extract EXIF metadata (including capture date)
-            await ExtractExifMetadataAsync(photo, sourceStream, ct);
+            await ExtractExifMetadata(photo, sourceStream, ct);
             sourceStream.Position = 0;
 
             // If no eventId provided, auto-create or get daily event based on capture date
             if (string.IsNullOrEmpty(eventId))
             {
                 var eventDate = photo.CapturedAt ?? photo.UploadedAt;
-                var dailyEvent = await GetOrCreateDailyEventAsync(eventDate, ct);
+                var dailyEvent = await GetOrCreateDailyEvent(eventDate, ct);
                 photo.EventId = dailyEvent.Id;
                 _logger.LogInformation("Auto-assigned photo to daily event: {EventName}", dailyEvent.Name);
             }
@@ -109,7 +110,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             photo.ContentType = fullResEntity.ContentType;
             photo.Size = fullResEntity.Size;
 
-            await EmitProgressAsync(photo.Id, "processing", "thumbnails");
+            await EmitProgress(photo.Id, "processing", "thumbnails");
 
             // Use DX-0047 fluent API to create derivatives
             // Branch 1: Gallery view (1200px max)
@@ -151,37 +152,37 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
 
             photo.RetinaThumbnailMediaId = retinaEntity.Id;
 
-            await galleryResult.DisposeAsync();
+            await galleryResult.Dispose();
 
             // Save photo entity (without AI metadata yet)
             await photo.Save(ct);
 
             // Update job progress
-            await UpdateJobProgressAsync(jobId, ct);
+            await UpdateJobProgress(jobId, ct);
 
             // Update event photo count
-            await UpdateEventPhotoCountAsync(photo.EventId, ct);
+            await UpdateEventPhotoCount(photo.EventId, ct);
 
             _logger.LogInformation(
                 "Photo processed: {PhotoId} ({Width}x{Height}) -> Gallery: {GalleryId}, Retina: {RetinaId}, Masonry: {MasonryId}, Thumbnail: {ThumbId}",
                 photo.Id, photo.Width, photo.Height, photo.GalleryMediaId, photo.RetinaThumbnailMediaId, photo.MasonryThumbnailMediaId, photo.ThumbnailMediaId);
 
-            await EmitProgressAsync(photo.Id, "processing", "ai-description");
+            await EmitProgress(photo.Id, "processing", "ai-description");
 
             // Generate AI metadata asynchronously (with SignalR updates)
             _ = Task.Run(async () =>
             {
                 try
                 {
-                    await GenerateAIMetadataAsync(photo, CancellationToken.None);
+                    await GenerateAIMetadata(photo, CancellationToken.None);
 
                     // Emit completion event after AI processing
-                    await EmitProgressAsync(photo.Id, "completed", "completed");
+                    await EmitProgress(photo.Id, "completed", "completed");
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Failed to generate AI metadata for photo {PhotoId}", photo.Id);
-                    await EmitProgressAsync(photo.Id, "failed", "ai-description", ex.Message);
+                    await EmitProgress(photo.Id, "failed", "ai-description", ex.Message);
                 }
             }, CancellationToken.None);
 
@@ -189,7 +190,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             await photo.Save(ct);
 
             // Emit progress for basic processing complete (AI still running in background)
-            await EmitProgressAsync(photo.Id, "processing", "completed");
+            await EmitProgress(photo.Id, "processing", "completed");
 
             return photo;
         }
@@ -198,7 +199,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             _logger.LogError(ex, "Failed to process photo {FileName}", file.FileName);
             photo.ProcessingStatus = ProcessingStatus.Failed;
 
-            await EmitProgressAsync(photo.Id ?? "", "failed", "upload", ex.Message);
+            await EmitProgress(photo.Id ?? "", "failed", "upload", ex.Message);
 
             // Update job with error
             try
@@ -219,61 +220,62 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
         }
     }
 
-    public async Task<PhotoAsset> GenerateAIMetadataAsync(PhotoAsset photo, CancellationToken ct = default)
+    public async Task<PhotoAsset> GenerateAIMetadata(PhotoAsset photo, CancellationToken ct = default)
     {
+        // Transaction coordination: Ensures atomic commits across entity + vector operations
+        // [Embedding] attribute handles embedding generation and vectorization automatically via lifecycle hooks
+        using var tx = EntityContext.Transaction($"ai-metadata-{photo.Id}");
+
         try
         {
             _logger.LogInformation("Generating AI metadata for photo {PhotoId}", photo.Id);
 
             // Generate detailed description using vision AI
-            await GenerateDetailedDescriptionAsync(photo, null, ct);
+            await GenerateDetailedDescription(photo, null, ct);
 
-            // Build embedding text from available metadata (including detailed description)
-            var embeddingText = BuildEmbeddingText(photo);
-
-            // Generate embedding using Koan AI (S5.Recs pattern)
-            var embedding = await Koan.AI.Ai.Embed(embeddingText, ct);
-
-            // Prepare vector metadata for hybrid search
-            var vectorMetadata = new Dictionary<string, object>
-            {
-                ["originalFileName"] = photo.OriginalFileName,
-                ["eventId"] = photo.EventId,
-                ["searchText"] = embeddingText // Required for hybrid search
-            };
-
-            // Save with vector using framework pattern (S5.Recs line 740)
-            await VectorData<PhotoAsset>.SaveWithVector(photo, embedding, vectorMetadata, ct);
-
+            // [Embedding] attribute automatically:
+            // 1. Calls photo.ToEmbeddingText() to build search text
+            // 2. Generates embedding via Client.Embed()
+            // 3. Stores entity + vector atomically via VectorData<T>.SaveWithVector()
             photo.ProcessingStatus = ProcessingStatus.Completed;
-            _logger.LogInformation("AI metadata generated for photo {PhotoId}", photo.Id);
+            await photo.Save(ct);
+
+            // Commit atomically (both entity + vector, or neither)
+            await EntityContext.Commit(ct);
+
+            _logger.LogInformation("AI metadata generated for photo {PhotoId} (attribute-driven, transactional)", photo.Id);
 
             return photo;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to generate AI metadata for photo {PhotoId}", photo.Id);
+            _logger.LogError(ex, "Failed to generate AI metadata for photo {PhotoId}, rolling back transaction", photo.Id);
+
+            // Rollback discards both entity + vector operations
+            await EntityContext.Rollback(ct);
+
+            // Save failed status (outside transaction)
             photo.ProcessingStatus = ProcessingStatus.Failed;
             await photo.Save(ct);
+
             throw;
         }
     }
 
-    public async Task<List<PhotoAsset>> SemanticSearchAsync(string query, string? eventId = null, double alpha = 0.5, int topK = 20, CancellationToken ct = default)
+    public async Task<List<PhotoAsset>> SemanticSearch(string query, string? eventId = null, double alpha = 0.5, int topK = 20, CancellationToken ct = default)
     {
         try
         {
             _logger.LogInformation("Semantic search: query='{Query}' alpha={Alpha} eventId={EventId} topK={TopK}", query, alpha, eventId, topK);
 
-            // Generate query embedding
-            var queryVector = await Koan.AI.Ai.Embed(query, ct);
-
-            // Check if vector search is available
             if (!Vector<PhotoAsset>.IsAvailable)
             {
                 _logger.LogWarning("Vector search unavailable, falling back to keyword search");
                 return await FallbackKeywordSearch(query, eventId, topK, ct);
             }
+
+            // Generate query embedding once vector search support is confirmed
+            var queryVector = await Koan.AI.Client.Embed(query, ct);
 
             // Perform hybrid vector search with user-controlled alpha (S5.Recs pattern - line 140)
             var vectorResults = await Vector<PhotoAsset>.Search(
@@ -311,21 +313,29 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
 
     private async Task<List<PhotoAsset>> FallbackKeywordSearch(string query, string? eventId, int topK, CancellationToken ct)
     {
+        var normalizedQuery = query?.Trim();
+        if (string.IsNullOrEmpty(normalizedQuery))
+        {
+            return new List<PhotoAsset>();
+        }
+
+        var queryLower = normalizedQuery.ToLower();
+
         var photos = await PhotoAsset.Query(p =>
             (string.IsNullOrEmpty(eventId) || p.EventId == eventId) &&
-            (p.OriginalFileName.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-             p.AutoTags.Any(t => t.Contains(query, StringComparison.OrdinalIgnoreCase)) ||
-             p.MoodDescription.Contains(query, StringComparison.OrdinalIgnoreCase)), ct);
+            ((p.OriginalFileName != null && p.OriginalFileName.ToLower().Contains(queryLower)) ||
+             (p.AutoTags != null && p.AutoTags.Any(t => t != null && t.ToLower().Contains(queryLower))) ||
+             (p.MoodDescription != null && p.MoodDescription.ToLower().Contains(queryLower))), ct);
 
         return photos.Take(topK).ToList();
     }
 
-    private async Task ExtractExifMetadataAsync(PhotoAsset photo, Stream stream, CancellationToken ct)
+    private async Task ExtractExifMetadata(PhotoAsset photo, Stream stream, CancellationToken ct)
     {
         try
         {
             stream.Position = 0;
-            using var image = await Image.LoadAsync(stream, ct);
+            using var image = await Image.Load(stream, ct);
 
             var exif = image.Metadata.ExifProfile;
             if (exif == null) return;
@@ -395,40 +405,11 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
         return degrees + (minutes / 60.0) + (seconds / 3600.0);
     }
 
-    private static string BuildEmbeddingText(PhotoAsset photo)
-    {
-        var parts = new List<string>();
-
-        // Structured AI analysis first (best semantic content)
-        if (photo.AiAnalysis != null)
-        {
-            parts.Add(photo.AiAnalysis.ToEmbeddingText());
-        }
-
-        // Fallback to legacy fields if no structured analysis
-        if (!string.IsNullOrEmpty(photo.OriginalFileName))
-            parts.Add($"Filename: {photo.OriginalFileName}");
-
-        if (photo.AutoTags.Any())
-            parts.Add($"Tags: {string.Join(", ", photo.AutoTags)}");
-
-        if (!string.IsNullOrEmpty(photo.MoodDescription))
-            parts.Add($"Mood: {photo.MoodDescription}");
-
-        if (!string.IsNullOrEmpty(photo.CameraModel))
-            parts.Add($"Camera: {photo.CameraModel}");
-
-        if (photo.Location != null)
-            parts.Add($"Location: {photo.Location.Latitude}, {photo.Location.Longitude}");
-
-        return string.Join("\n", parts);
-    }
-
     private static async Task<(int width, int height)> GetStreamDimensions(Stream stream, CancellationToken ct)
     {
         var originalPosition = stream.Position;
         stream.Position = 0;
-        var info = await Image.IdentifyAsync(stream, ct);
+        var info = await Image.Identify(stream, ct);
         stream.Position = originalPosition;
         return (info.Width, info.Height);
     }
@@ -597,14 +578,14 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
     /// Generate structured AI analysis for a photo using vision model
     /// Uses factory pattern for prompt assembly with entity-based style customization
     /// </summary>
-    private async Task GenerateDetailedDescriptionAsync(PhotoAsset photo, string? analysisStyleId = null, CancellationToken ct = default)
+    private async Task GenerateDetailedDescription(PhotoAsset photo, string? analysisStyleId = null, CancellationToken ct = default)
     {
         try
         {
             var stopwatch = Stopwatch.StartNew();
 
             // Resolve analysis style entity (requested → last used → null=default)
-            var styleEntity = await ResolveAnalysisStyleAsync(analysisStyleId, photo, ct);
+            var styleEntity = await ResolveAnalysisStyle(analysisStyleId, photo, ct);
             var effectiveStyleName = styleEntity?.Name ?? "default";
 
             _logger.LogInformation(
@@ -645,7 +626,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             else if (styleEntity.IsSmartStyle)
             {
                 // Smart mode: classify first, then render for detected style
-                var detectedStyle = await ClassifyImageStyleAsync(photo, imageBytes, ct);
+                var detectedStyle = await ClassifyImageStyle(photo, imageBytes, ct);
                 prompt = _promptFactory.RenderPromptFor(detectedStyle);
                 effectiveStyleName = $"smart→{detectedStyle.Name}";
             }
@@ -658,16 +639,12 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             // Apply variable substitution
             prompt = _promptFactory.SubstituteVariables(prompt, context);
 
-            // Use vision model
-            var visionOptions = new Koan.AI.Contracts.Options.AiVisionOptions
+            // Use vision pipeline API (AI-0021 category pattern)
+            var response = await Client.Chat(prompt, new ChatOptions
             {
-                ImageBytes = imageBytes,
-                Prompt = prompt,
-                Model = "qwen2.5vl",
-                Temperature = 0.7
-            };
-
-            var response = await Koan.AI.Ai.Understand(visionOptions, ct);
+                Image = imageBytes,
+                ImageMimeType = "image/jpeg"
+            }, ct);
 
             // Parse JSON with robust error handling
             var analysis = ParseAiResponse(response);
@@ -703,7 +680,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
     /// <summary>
     /// Resolve the analysis style entity to use based on priority: explicit request → last used → null (default)
     /// </summary>
-    private async Task<AnalysisStyle?> ResolveAnalysisStyleAsync(string? requestedId, PhotoAsset photo, CancellationToken ct)
+    private async Task<AnalysisStyle?> ResolveAnalysisStyle(string? requestedId, PhotoAsset photo, CancellationToken ct)
     {
         // Priority 1: Explicit request
         if (!string.IsNullOrEmpty(requestedId))
@@ -737,7 +714,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
     /// Classify image style for smart mode using two-stage analysis
     /// Caches result in PhotoAsset.InferredStyleId to avoid repeated classification
     /// </summary>
-    private async Task<AnalysisStyle> ClassifyImageStyleAsync(PhotoAsset photo, byte[] imageBytes, CancellationToken ct)
+    private async Task<AnalysisStyle> ClassifyImageStyle(PhotoAsset photo, byte[] imageBytes, CancellationToken ct)
     {
         // Check cache first
         if (!string.IsNullOrEmpty(photo.InferredStyleId))
@@ -767,16 +744,12 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
         _logger.LogDebug("Classifying image style for photo {PhotoId}...", photo.Id);
         var classificationStart = Stopwatch.StartNew();
 
-        // Call AI for classification
-        var classificationOptions = new Koan.AI.Contracts.Options.AiVisionOptions
+        // Use vision pipeline API for classification (AI-0021 category pattern)
+        var classificationResponse = await Client.Chat(classificationPrompt, new ChatOptions
         {
-            ImageBytes = imageBytes,
-            Prompt = classificationPrompt,
-            Model = "qwen2.5vl",
-            Temperature = 0.3 // Lower temperature for more consistent classification
-        };
-
-        var classificationResponse = await Koan.AI.Ai.Understand(classificationOptions, ct);
+            Image = imageBytes,
+            ImageMimeType = "image/jpeg"
+        }, ct);
         classificationStart.Stop();
 
         // Parse classification result (should be style name like "portrait" or "landscape")
@@ -811,7 +784,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
     /// Get or create a daily event for the given date
     /// Event name format: "October 1, 2025"
     /// </summary>
-    private async Task<Event> GetOrCreateDailyEventAsync(DateTime date, CancellationToken ct)
+    private async Task<Event> GetOrCreateDailyEvent(DateTime date, CancellationToken ct)
     {
         // Normalize to date only (UTC)
         var normalizedDate = date.Date;
@@ -819,10 +792,15 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
         // Generate event name in format: "October 1, 2025"
         var eventName = normalizedDate.ToString("MMMM d, yyyy");
 
-        // Check if event already exists for this date
+        // Check if event already exists for this date.
+        // Note: use an inclusive/exclusive UTC day range instead of `e.EventDate.Date == normalizedDate`
+        // to avoid Mongo translator emitting `$dateTrunc` (unsupported on older Mongo servers).
+        var dayStart = normalizedDate;
+        var dayEndExclusive = dayStart.AddDays(1);
         var existingEvents = await Event.Query(e =>
             e.Type == EventType.DailyAuto &&
-            e.EventDate.Date == normalizedDate,
+            e.EventDate >= dayStart &&
+            e.EventDate < dayEndExclusive,
             ct);
 
         if (existingEvents.Any())
@@ -851,7 +829,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
     /// <summary>
     /// Update job progress by incrementing processed photo count
     /// </summary>
-    private async Task UpdateJobProgressAsync(string jobId, CancellationToken ct)
+    private async Task UpdateJobProgress(string jobId, CancellationToken ct)
     {
         try
         {
@@ -869,7 +847,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
                     job.CompletedAt = DateTime.UtcNow;
 
                     // Emit job completion event
-                    await _hubContext.Clients.Group($"job:{jobId}").SendAsync("JobCompleted", new JobCompletionEvent
+                    await _hubContext.Clients.Group($"job:{jobId}").Send("JobCompleted", new JobCompletionEvent
                     {
                         JobId = jobId,
                         Status = job.Status == ProcessingStatus.Completed ? "completed" : "partial-success",
@@ -892,7 +870,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
     /// <summary>
     /// Update event photo count and status
     /// </summary>
-    private async Task UpdateEventPhotoCountAsync(string eventId, CancellationToken ct)
+    private async Task UpdateEventPhotoCount(string eventId, CancellationToken ct)
     {
         try
         {
@@ -915,7 +893,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
     /// Regenerate AI analysis for a photo while preserving locked facts
     /// "Reroll with holds" mechanic - locked facts are buffered and reapplied after regeneration
     /// </summary>
-    public async Task<PhotoAsset> RegenerateAIAnalysisAsync(string photoId, string? analysisStyle = null, CancellationToken ct = default)
+    public async Task<PhotoAsset> RegenerateAIAnalysis(string photoId, string? analysisStyle = null, CancellationToken ct = default)
     {
         _logger.LogInformation("Regenerating AI analysis for photo {PhotoId}", photoId);
 
@@ -925,89 +903,98 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             throw new InvalidOperationException($"Photo {photoId} not found");
         }
 
-        // 1. Buffer locked content before regeneration
-        // Buffer locked summary
-        string? lockedSummary = null;
-        bool summaryWasLocked = false;
+        // Transaction coordination: Ensures atomic commits across entity + vector operations
+        using var tx = EntityContext.Transaction($"ai-regen-{photoId}");
 
-        if (photo.AiAnalysis?.SummaryLocked == true)
+        try
         {
-            lockedSummary = photo.AiAnalysis.Summary;
-            summaryWasLocked = true;
-            _logger.LogDebug("Buffered locked summary: {Summary}", lockedSummary);
-        }
+            // 1. Buffer locked content before regeneration
+            // Buffer locked summary
+            string? lockedSummary = null;
+            bool summaryWasLocked = false;
 
-        // Buffer locked facts (all fact keys are lowercase, so we can use direct dictionary access)
-        var lockedFacts = new Dictionary<string, string>();
-
-        if (photo.AiAnalysis?.LockedFactKeys != null)
-        {
-            foreach (var factKey in photo.AiAnalysis.LockedFactKeys)
+            if (photo.AiAnalysis?.SummaryLocked == true)
             {
-                if (photo.AiAnalysis.Facts.TryGetValue(factKey, out var value))
+                lockedSummary = photo.AiAnalysis.Summary;
+                summaryWasLocked = true;
+                _logger.LogDebug("Buffered locked summary: {Summary}", lockedSummary);
+            }
+
+            // Buffer locked facts (all fact keys are lowercase, so we can use direct dictionary access)
+            var lockedFacts = new Dictionary<string, string>();
+
+            if (photo.AiAnalysis?.LockedFactKeys != null)
+            {
+                foreach (var factKey in photo.AiAnalysis.LockedFactKeys)
                 {
-                    lockedFacts[factKey] = value;
-                    _logger.LogDebug("Buffered locked fact: {FactKey} = {FactValue}", factKey, value);
+                    if (photo.AiAnalysis.Facts.TryGetValue(factKey, out var value))
+                    {
+                        lockedFacts[factKey] = value;
+                        _logger.LogDebug("Buffered locked fact: {FactKey} = {FactValue}", factKey, value);
+                    }
                 }
             }
-        }
 
-        // 2. Regenerate AI analysis (this will replace photo.AiAnalysis)
-        await GenerateDetailedDescriptionAsync(photo, analysisStyle, ct);
+            // 2. Regenerate AI analysis (this will replace photo.AiAnalysis)
+            await GenerateDetailedDescription(photo, analysisStyle, ct);
 
-        // 3. Restore locked content (add them back if missing, overwrite if present)
-        if (photo.AiAnalysis != null)
-        {
-            // Restore locked summary
-            if (summaryWasLocked && lockedSummary != null)
+            // 3. Restore locked content (add them back if missing, overwrite if present)
+            if (photo.AiAnalysis != null)
             {
-                photo.AiAnalysis.Summary = lockedSummary;
-                photo.AiAnalysis.SummaryLocked = true;
-                _logger.LogDebug("Restored locked summary");
-            }
-
-            // Restore locked facts
-            if (lockedFacts.Count > 0)
-            {
-                foreach (var (factKey, value) in lockedFacts)
+                // Restore locked summary
+                if (summaryWasLocked && lockedSummary != null)
                 {
-                    // Add or overwrite the fact with the locked value
-                    photo.AiAnalysis.Facts[factKey] = value;
-                    _logger.LogDebug("Restored locked fact: {FactKey} = {FactValue}", factKey, value);
+                    photo.AiAnalysis.Summary = lockedSummary;
+                    photo.AiAnalysis.SummaryLocked = true;
+                    _logger.LogDebug("Restored locked summary");
                 }
 
-                // Restore locked keys set
-                photo.AiAnalysis.LockedFactKeys = new HashSet<string>(lockedFacts.Keys);
+                // Restore locked facts
+                if (lockedFacts.Count > 0)
+                {
+                    foreach (var (factKey, value) in lockedFacts)
+                    {
+                        // Add or overwrite the fact with the locked value
+                        photo.AiAnalysis.Facts[factKey] = value;
+                        _logger.LogDebug("Restored locked fact: {FactKey} = {FactValue}", factKey, value);
+                    }
+
+                    // Restore locked keys set
+                    photo.AiAnalysis.LockedFactKeys = new HashSet<string>(lockedFacts.Keys);
+                }
             }
+
+            // 4. Save with automatic re-embedding (attribute-driven)
+            // [Embedding] attribute detects content change and regenerates embedding automatically
+            await photo.Save(ct);
+
+            // Commit atomically (both entity + vector, or neither)
+            await EntityContext.Commit(ct);
+
+            var lockedItems = new List<string>();
+            if (summaryWasLocked) lockedItems.Add("summary");
+            if (lockedFacts.Count > 0) lockedItems.Add($"{lockedFacts.Count} facts");
+
+            if (lockedItems.Count > 0)
+            {
+                _logger.LogInformation("AI analysis regenerated for photo {PhotoId} with locked {Items} preserved (transactional)",
+                    photoId, string.Join(" and ", lockedItems));
+            }
+            else
+            {
+                _logger.LogInformation("AI analysis regenerated for photo {PhotoId} (transactional)", photoId);
+            }
+
+            return photo;
         }
-
-        // 4. Regenerate embedding with the merged facts
-        var embeddingText = BuildEmbeddingText(photo);
-        var embedding = await Koan.AI.Ai.Embed(embeddingText, ct);
-
-        var vectorMetadata = new Dictionary<string, object>
+        catch (Exception ex)
         {
-            ["originalFileName"] = photo.OriginalFileName,
-            ["eventId"] = photo.EventId,
-            ["searchText"] = embeddingText
-        };
+            _logger.LogError(ex, "Failed to regenerate AI analysis for photo {PhotoId}, rolling back transaction", photoId);
 
-    await VectorData<PhotoAsset>.SaveWithVector(photo, embedding, vectorMetadata, ct);
+            // Rollback discards both entity + vector operations
+            await EntityContext.Rollback(ct);
 
-        var lockedItems = new List<string>();
-        if (summaryWasLocked) lockedItems.Add("summary");
-        if (lockedFacts.Count > 0) lockedItems.Add($"{lockedFacts.Count} facts");
-
-        if (lockedItems.Count > 0)
-        {
-            _logger.LogInformation("AI analysis regenerated for photo {PhotoId} with locked {Items} preserved",
-                photoId, string.Join(" and ", lockedItems));
+            throw;
         }
-        else
-        {
-            _logger.LogInformation("AI analysis regenerated for photo {PhotoId}", photoId);
-        }
-
-        return photo;
     }
 }

@@ -22,7 +22,7 @@ var app = builder.Build();
 app.MapKoanMcpEndpoints();
 app.MapControllers();
 
-app.Run();
+app.RunAsync();
 
 namespace Koan.Mcp.TestHost
 {

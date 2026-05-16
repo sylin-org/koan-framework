@@ -17,20 +17,16 @@ public sealed class WeaviateOptions : IAdapterOptions
     public int Dimension { get; set; } = 384; // typical small model; must match embeddings
     public string Metric { get; set; } = "cosine"; // cosine|dot|l2
 
-    // Guardrails
+    // Vector-search domain knobs (NOT row-page caps). MaxTopK stays — it's a real cost
+    // bound for nearest-neighbour scoring.
     public int DefaultTopK { get; set; } = 10;
     public int MaxTopK { get; set; } = 200;
 
-    // IAdapterOptions implementation - map to vector-specific properties
+    // IAdapterOptions implementation — default-only fallback aliased to DefaultTopK.
     public int DefaultPageSize
     {
         get => DefaultTopK;
         set => DefaultTopK = value;
-    }
-    public int MaxPageSize
-    {
-        get => MaxTopK;
-        set => MaxTopK = value;
     }
 
     // Timeout seconds for search

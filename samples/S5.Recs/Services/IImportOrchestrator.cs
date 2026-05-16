@@ -16,7 +16,7 @@ public interface IImportOrchestrator
     /// <param name="options">Import options (limit, overwrite)</param>
     /// <param name="ct">Cancellation token</param>
     /// <returns>List of created job IDs</returns>
-    Task<List<string>> QueueImportAsync(
+    Task<List<string>> QueueImport(
         string source,
         string[] mediaTypeIds,
         ImportOptions options,
@@ -29,7 +29,7 @@ public interface IImportOrchestrator
     /// <param name="jobIds">Job IDs to query</param>
     /// <param name="ct">Cancellation token</param>
     /// <returns>Progress information for each job</returns>
-    Task<ImportProgressResponse> GetProgressAsync(
+    Task<ImportProgressResponse> GetProgress(
         string[] jobIds,
         CancellationToken ct);
 }

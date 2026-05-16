@@ -24,68 +24,68 @@ internal sealed class CqrsRepositoryDecorator<TEntity, TKey> : IDataRepository<T
     public QueryCapabilities Capabilities => (_inner as IQueryCapabilities)?.Capabilities ?? QueryCapabilities.None;
     public WriteCapabilities Writes => (_inner as IWriteCapabilities)?.Writes ?? WriteCapabilities.None;
 
-    public Task<TEntity?> GetAsync(TKey id, CancellationToken ct = default)
+    public Task<TEntity?> Get(TKey id, CancellationToken ct = default)
     {
         var repo = _routing.GetReadRepository<TEntity, TKey>();
-        return repo.GetAsync(id, ct);
+        return repo.Get(id, ct);
     }
 
-    public Task<IReadOnlyList<TEntity?>> GetManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    public Task<IReadOnlyList<TEntity?>> GetMany(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
         var repo = _routing.GetReadRepository<TEntity, TKey>();
-        return repo.GetManyAsync(ids, ct);
+        return repo.GetMany(ids, ct);
     }
 
-    public Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default)
+    public Task<IReadOnlyList<TEntity>> Query(object? query, CancellationToken ct = default)
     {
         var repo = _routing.GetReadRepository<TEntity, TKey>();
-        return repo.QueryAsync(query, ct);
+        return repo.Query(query, ct);
     }
 
-    public Task<CountResult> CountAsync(CountRequest<TEntity> request, CancellationToken ct = default)
+    public Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
     {
         var repo = _routing.GetReadRepository<TEntity, TKey>();
-        return repo.CountAsync(request, ct);
+        return repo.Count(request, ct);
     }
-    public Task<IReadOnlyList<TEntity>> QueryAsync(System.Linq.Expressions.Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-    => (_routing.GetReadRepository<TEntity, TKey>() as ILinqQueryRepository<TEntity, TKey>)?.QueryAsync(predicate, ct) ?? Task.FromResult<IReadOnlyList<TEntity>>(Array.Empty<TEntity>());
+    public Task<IReadOnlyList<TEntity>> Query(System.Linq.Expressions.Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
+    => (_routing.GetReadRepository<TEntity, TKey>() as ILinqQueryRepository<TEntity, TKey>)?.Query(predicate, ct) ?? Task.FromResult<IReadOnlyList<TEntity>>([]);
 
-    public async Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)
+    public async Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        var result = await _routing.GetWriteRepository<TEntity, TKey>().UpsertAsync(model, ct);
+        var result = await _routing.GetWriteRepository<TEntity, TKey>().Upsert(model, ct);
         await RecordOutbox("Upsert", result, ct);
         return result;
     }
 
-    public async Task<bool> DeleteAsync(TKey id, CancellationToken ct = default)
+    public async Task<bool> Delete(TKey id, CancellationToken ct = default)
     {
-        var ok = await _routing.GetWriteRepository<TEntity, TKey>().DeleteAsync(id, ct);
+        var ok = await _routing.GetWriteRepository<TEntity, TKey>().Delete(id, ct);
         if (ok) await RecordOutbox("Delete", default, ct, id);
         return ok;
     }
 
-    public async Task<int> UpsertManyAsync(IEnumerable<TEntity> models, CancellationToken ct = default)
+    public async Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        var count = await _routing.GetWriteRepository<TEntity, TKey>().UpsertManyAsync(models, ct);
+        var count = await _routing.GetWriteRepository<TEntity, TKey>().UpsertMany(models, ct);
         await RecordOutboxMany("Upsert", models, ct);
         return count;
     }
 
-    public Task<int> DeleteManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
-    => _routing.GetWriteRepository<TEntity, TKey>().DeleteManyAsync(ids, ct);
+    public Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
+    => _routing.GetWriteRepository<TEntity, TKey>().DeleteMany(ids, ct);
 
-    public async Task<int> DeleteAllAsync(CancellationToken ct = default)
+    public async Task<int> DeleteAll(CancellationToken ct = default)
     {
-        var n = await _routing.GetWriteRepository<TEntity, TKey>().DeleteAllAsync(ct);
+        var n = await _routing.GetWriteRepository<TEntity, TKey>().DeleteAll(ct);
         // Optional: outbox could record a summary event; we'll skip event flood for delete-all.
         return n;
     }
 
-    public async Task<long> RemoveAllAsync(RemoveStrategy strategy, CancellationToken ct = default)
+    public async Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default)
     {
-        var n = await _routing.GetWriteRepository<TEntity, TKey>().RemoveAllAsync(strategy, ct);
+        var n = await _routing.GetWriteRepository<TEntity, TKey>().RemoveAll(strategy, ct);
         // Optional: outbox could record a summary event; we'll skip event flood for remove-all.
         return n;
     }
@@ -95,10 +95,10 @@ internal sealed class CqrsRepositoryDecorator<TEntity, TKey> : IDataRepository<T
     private async Task RecordOutbox(string op, TEntity? model, CancellationToken ct, TKey? id = default)
     {
         if (_outbox is null) return;
-        var entityId = id is not null ? id!.ToString()! : model is not null ? model.Id?.ToString() ?? string.Empty : string.Empty;
+        var entityId = id is not null ? id!.ToString()! : model is not null ? model.Id?.ToString() ?? "" : "";
     var payload = model is not null ? JsonConvert.SerializeObject(model) : "{}";
         var entry = new OutboxEntry(Guid.CreateVersion7().ToString("n"), DateTimeOffset.UtcNow, typeof(TEntity).AssemblyQualifiedName!, op, entityId, payload);
-        await _outbox.AppendAsync(entry, ct);
+        await _outbox.Append(entry, ct);
     }
 
     private async Task RecordOutboxMany(string op, IEnumerable<TEntity> models, CancellationToken ct)

@@ -44,7 +44,7 @@ internal sealed class RedisConnectorFixture : IAsyncDisposable
 
     public int Database => _database;
 
-    public static async ValueTask<RedisConnectorFixture> CreateAsync(TestContext ctx)
+    public static async ValueTask<RedisConnectorFixture> Create(TestContext ctx)
     {
         ArgumentNullException.ThrowIfNull(ctx);
 
@@ -151,7 +151,7 @@ internal sealed class RedisConnectorFixture : IAsyncDisposable
     {
         try
         {
-            await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+            await asyncDisposable.Dispose().ConfigureAwait(false);
         }
         catch
         {

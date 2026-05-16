@@ -21,7 +21,7 @@ public sealed class JobCoordinatorTests
     [Fact]
     public async Task ScheduleAsync_ReusesPendingJobAndMergesDocuments()
     {
-        await using var host = await UseInMemoryHostAsync();
+        await using var host = await UseInMemoryHost();
         using var partition = EntityContext.Partition($"job-coordinator-{Guid.NewGuid():N}");
         var coordinator = new JobCoordinator(NullLogger<JobCoordinator>.Instance);
         var ct = CancellationToken.None;
@@ -29,8 +29,8 @@ public sealed class JobCoordinatorTests
         var pipeline = new DocumentPipeline { Name = "reuse-pipeline" };
         await pipeline.Save(ct);
 
-        var initial = await coordinator.ScheduleAsync(pipeline.Id, new[] { "doc-1" }, ct);
-        var reused = await coordinator.ScheduleAsync(pipeline.Id, new[] { "doc-1", "doc-2" }, ct);
+        var initial = await coordinator.Schedule(pipeline.Id, new[] { "doc-1" }, ct);
+        var reused = await coordinator.Schedule(pipeline.Id, new[] { "doc-1", "doc-2" }, ct);
 
         Assert.Equal(initial.Id, reused.Id);
         Assert.Equal(2, reused.DocumentIds.Count);
@@ -47,7 +47,7 @@ public sealed class JobCoordinatorTests
     [Fact]
     public async Task TryCancelPendingAsync_CancelsPendingJob()
     {
-        await using var host = await UseInMemoryHostAsync();
+        await using var host = await UseInMemoryHost();
         using var partition = EntityContext.Partition($"job-cancel-{Guid.NewGuid():N}");
         var ct = CancellationToken.None;
 
@@ -63,7 +63,7 @@ public sealed class JobCoordinatorTests
         };
         await job.Save(ct);
 
-        var (updated, cancelled) = await ProcessingJob.TryCancelPendingAsync(job.Id, ct);
+        var (updated, cancelled) = await ProcessingJob.TryCancelPending(job.Id, ct);
 
         Assert.True(cancelled);
         Assert.NotNull(updated);
@@ -77,7 +77,7 @@ public sealed class JobCoordinatorTests
     [Fact]
     public async Task TryCancelPendingAsync_CancelsStaleProcessingJob()
     {
-        await using var host = await UseInMemoryHostAsync();
+        await using var host = await UseInMemoryHost();
         using var partition = EntityContext.Partition($"job-cancel-stale-{Guid.NewGuid():N}");
         var ct = CancellationToken.None;
 
@@ -97,7 +97,7 @@ public sealed class JobCoordinatorTests
 
         await job.Save(ct);
 
-        var (updated, cancelled) = await ProcessingJob.TryCancelPendingAsync(job.Id, ct);
+        var (updated, cancelled) = await ProcessingJob.TryCancelPending(job.Id, ct);
 
         Assert.True(cancelled);
         Assert.NotNull(updated);
@@ -112,7 +112,7 @@ public sealed class JobCoordinatorTests
     [Fact]
     public async Task TryCancelPendingAsync_DeniesActiveProcessingJob()
     {
-        await using var host = await UseInMemoryHostAsync();
+        await using var host = await UseInMemoryHost();
         using var partition = EntityContext.Partition($"job-cancel-active-{Guid.NewGuid():N}");
         var ct = CancellationToken.None;
 
@@ -132,7 +132,7 @@ public sealed class JobCoordinatorTests
 
         await job.Save(ct);
 
-        var (updated, cancelled) = await ProcessingJob.TryCancelPendingAsync(job.Id, ct);
+        var (updated, cancelled) = await ProcessingJob.TryCancelPending(job.Id, ct);
 
         Assert.False(cancelled);
         Assert.NotNull(updated);
@@ -146,7 +146,7 @@ public sealed class JobCoordinatorTests
 
 internal static class JobCoordinatorTestHost
 {
-    public static async Task<IAsyncDisposable> UseInMemoryHostAsync()
+    public static async Task<IAsyncDisposable> UseInMemoryHost()
     {
         var previousHost = AppHost.Current;
 
@@ -200,8 +200,8 @@ internal static class JobCoordinatorTestHost
                 AppHost.Current = _previous;
             }
 
-            await _scope.DisposeAsync().ConfigureAwait(false);
-            await _provider.DisposeAsync().ConfigureAwait(false);
+            await _scope.Dispose().ConfigureAwait(false);
+            await _provider.Dispose().ConfigureAwait(false);
         }
     }
 }

@@ -46,13 +46,13 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetPipelineGraph(string pipelineId, CancellationToken ct = default)
     {
-        var pipeline = await DocumentPipeline.Get(pipelineId, ct);
+        var pipeline = await DocumentPipeline.Get(pipelineId, ct).ConfigureAwait(false);
         if (pipeline is null)
         {
             return NotFound();
         }
 
-        var documents = await pipeline.LoadDocumentsAsync(ct);
+        var documents = await pipeline.LoadDocuments(ct).ConfigureAwait(false);
 
         _logger.LogInformation(
             "GetPipelineGraph for {PipelineId}: Pipeline.DocumentIds={PipelineDocIds}, LoadedDocuments={LoadedCount}, LoadedIds=[{LoadedIds}], LoadedStatuses=[{Statuses}]",
@@ -62,32 +62,32 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
             string.Join(", ", documents.Select(d => d.Id)),
             string.Join(", ", documents.Select(d => $"{d.Id}:{d.Status}")));
 
-        var deliverable = await GetLatestDeliverableAsync(pipeline, ct);
+        var deliverable = await GetLatestDeliverable(pipeline, ct).ConfigureAwait(false);
 
         JToken? canonical = null;
         if (deliverable is not null)
         {
-            var canonicalJson = await _renderer.RenderJsonAsync(deliverable, ct);
+            var canonicalJson = await _renderer.RenderJson(deliverable, ct).ConfigureAwait(false);
             canonical = TryParseCanonical(canonicalJson);
         }
 
-        var analysisTypeName = string.Empty;
+        var analysisTypeName = "";
         if (!string.IsNullOrWhiteSpace(pipeline.AnalysisTypeId))
         {
-            var analysisType = await AnalysisType.Get(pipeline.AnalysisTypeId, ct);
-            analysisTypeName = analysisType?.Name ?? string.Empty;
+            var analysisType = await AnalysisType.Get(pipeline.AnalysisTypeId, ct).ConfigureAwait(false);
+            analysisTypeName = analysisType?.Name ?? "";
         }
 
         var pipelineKey = pipeline.Id ?? pipelineId;
 
-        var jobSnapshots = await PipelineSnapshotMapper.LoadJobSnapshotsAsync(pipelineKey, ct);
-        var runSnapshots = await PipelineSnapshotMapper.LoadRunLogSnapshotsAsync(pipelineKey, ct);
+        var jobSnapshots = await PipelineSnapshotMapper.LoadJobSnapshots(pipelineKey, ct).ConfigureAwait(false);
+        var runSnapshots = await PipelineSnapshotMapper.LoadRunLogSnapshots(pipelineKey, ct).ConfigureAwait(false);
 
         var graph = new PipelineGraph
         {
             Pipeline = new PipelineSummary
             {
-                Id = pipeline.Id ?? string.Empty,
+                Id = pipeline.Id ?? "",
                 Name = pipeline.Name,
                 Description = pipeline.Description,
                 DeliverableTypeId = pipeline.DeliverableTypeId,
@@ -106,7 +106,7 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
             Documents = documents
                 .Select(doc => new DocumentSummary
                 {
-                    Id = doc.Id ?? string.Empty,
+                    Id = doc.Id ?? "",
                     OriginalFileName = doc.OriginalFileName,
                     SourceType = doc.SourceType,
                     ClassifiedTypeId = doc.ClassifiedTypeId,
@@ -124,7 +124,7 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
                 ? null
                 : new DeliverableSnapshot
                 {
-                    Id = deliverable.Id ?? string.Empty,
+                    Id = deliverable.Id ?? "",
                     DeliverableTypeId = deliverable.DeliverableTypeId,
                     DeliverableTypeVersion = deliverable.DeliverableTypeVersion,
                     DataHash = deliverable.DataHash,
@@ -167,7 +167,7 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
     {
         try
         {
-            var response = await _bootstrapService.CreateFromFilesAsync(files, ct);
+            var response = await _bootstrapService.CreateFromFiles(files, ct);
             return Created($"/api/pipelines/{response.PipelineId}", response);
         }
         catch (InvalidOperationException ex)
@@ -194,13 +194,13 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
             return BadRequest("AnalysisTypeId is required.");
         }
 
-        var pipeline = await DocumentPipeline.Get(pipelineId, ct);
+        var pipeline = await DocumentPipeline.Get(pipelineId, ct).ConfigureAwait(false);
         if (pipeline is null)
         {
             return NotFound();
         }
 
-        var analysisType = await AnalysisType.Get(request.AnalysisTypeId, ct);
+        var analysisType = await AnalysisType.Get(request.AnalysisTypeId, ct).ConfigureAwait(false);
         if (analysisType is null)
         {
             return NotFound();
@@ -213,11 +213,11 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
         pipeline.Status = PipelineStatus.Pending;
         pipeline.UpdatedAt = DateTime.UtcNow;
 
-        await pipeline.Save(ct);
+        await pipeline.Save(ct).ConfigureAwait(false);
 
-        await _runLog.AppendAsync(new RunLog
+        await _runLog.Append(new RunLog
         {
-            PipelineId = pipeline.Id ?? string.Empty,
+            PipelineId = pipeline.Id ?? "",
             Stage = "analysis-override",
             StartedAt = DateTime.UtcNow,
             FinishedAt = DateTime.UtcNow,
@@ -228,15 +228,15 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
                 ["previousVersion"] = previousVersion.ToString(CultureInfo.InvariantCulture),
                 ["newAnalysisType"] = pipeline.AnalysisTypeId,
                 ["newVersion"] = pipeline.AnalysisTypeVersion.ToString(CultureInfo.InvariantCulture),
-                ["overrideReason"] = request.Reason ?? string.Empty
+                ["overrideReason"] = request.Reason ?? ""
             }
-        }, ct);
+        }, ct).ConfigureAwait(false);
 
         var documents = pipeline.DocumentIds.Where(id => !string.IsNullOrWhiteSpace(id)).ToList();
         ProcessingJob? job = null;
         if (documents.Count > 0)
         {
-            job = await _jobs.ScheduleAsync(pipeline.Id!, documents, ct);
+            job = await _jobs.Schedule(pipeline.Id!, documents, ct).ConfigureAwait(false);
         }
 
         var response = new AnalysisTypeOverrideResponse
@@ -251,14 +251,14 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
         return Accepted(response);
     }
 
-    private static async Task<Deliverable?> GetLatestDeliverableAsync(DocumentPipeline pipeline, CancellationToken ct)
+    private static async Task<Deliverable?> GetLatestDeliverable(DocumentPipeline pipeline, CancellationToken ct)
     {
-        var pipelineId = pipeline.Id ?? string.Empty;
+        var pipelineId = pipeline.Id ?? "";
         Console.WriteLine($"[Meridian] Deliverable lookup start pipeline={pipelineId} directId={pipeline.DeliverableId ?? "<null>"}");
 
         if (!string.IsNullOrWhiteSpace(pipeline.DeliverableId))
         {
-            var direct = await Deliverable.Get(pipeline.DeliverableId, ct);
+            var direct = await Deliverable.Get(pipeline.DeliverableId, ct).ConfigureAwait(false);
             Console.WriteLine($"[Meridian] Deliverable direct get pipeline={pipelineId} found={(direct is not null)} id={pipeline.DeliverableId}");
             if (direct is not null)
             {
@@ -271,13 +271,13 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
         // Mongo pushes GUID-string comparisons down as native UUIDs, so equality on string fields
         // may miss matches once SmartStringGuidSerializer converts values during persistence.
         // Materialize locally when the provider returns nothing; data volume here is tiny (per-pipeline snapshots).
-        var deliverables = await Deliverable.Query(d => d.PipelineId == pipelineId, ct);
+        var deliverables = await Deliverable.Query(d => d.PipelineId == pipelineId, ct).ConfigureAwait(false);
 
         Console.WriteLine($"[Meridian] Deliverable query results pipeline={pipelineId} count={deliverables.Count}");
 
         if (deliverables.Count == 0)
         {
-            var allDeliverables = await Deliverable.All(ct);
+            var allDeliverables = await Deliverable.All(ct).ConfigureAwait(false);
             Console.WriteLine($"[Meridian] Deliverable fallback: pipeline={pipelineId} deliverableId={pipeline.DeliverableId} allCount={allDeliverables.Count}");
             deliverables = allDeliverables
                 .Where(d => string.Equals(d.PipelineId, pipelineId, StringComparison.Ordinal))
@@ -335,18 +335,18 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
 
 public sealed class AnalysisTypeOverrideRequest
 {
-    public string AnalysisTypeId { get; set; } = string.Empty;
+    public string AnalysisTypeId { get; set; } = "";
     public string? Reason { get; set; }
         = null;
 }
 
 public sealed class AnalysisTypeOverrideResponse
 {
-    public string PipelineId { get; set; } = string.Empty;
-    public string AnalysisTypeId { get; set; } = string.Empty;
+    public string PipelineId { get; set; } = "";
+    public string AnalysisTypeId { get; set; } = "";
     public int AnalysisTypeVersion { get; set; }
         = 1;
     public string? JobId { get; set; }
         = null;
-    public string Status { get; set; } = string.Empty;
+    public string Status { get; set; } = "";
 }

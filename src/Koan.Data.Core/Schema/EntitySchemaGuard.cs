@@ -43,7 +43,7 @@ internal sealed class EntitySchemaGuard<TEntity, TKey>
     /// <summary>
     /// Ensures the entity's backing store is healthy for the current dataset.
     /// </summary>
-    public async Task EnsureHealthyAsync(CancellationToken ct)
+    public async Task EnsureHealthy(CancellationToken ct)
     {
         var contributor = GetContributor();
         if (contributor is null)
@@ -72,7 +72,7 @@ internal sealed class EntitySchemaGuard<TEntity, TKey>
             }
         }
 
-        await Singleflight.RunAsync(storageKey, async token =>
+        await Singleflight.Run(storageKey, async token =>
         {
             if (_states.TryGetValue(storageKey, out var hot) && hot.IsProvisioned)
             {
@@ -81,7 +81,7 @@ internal sealed class EntitySchemaGuard<TEntity, TKey>
 
             try
             {
-                await contributor.EnsureHealthyAsync(token);
+                await contributor.EnsureHealthy(token);
                 _states[storageKey] = new ProvisionState(true, DateTime.UtcNow, null);
                 KoanLog.DataDebug(_logger, LogActions.SchemaEnsure, "healthy",
                     ("entity", typeof(TEntity).FullName ?? typeof(TEntity).Name),

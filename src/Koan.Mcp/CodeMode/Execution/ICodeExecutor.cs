@@ -17,7 +17,7 @@ public interface ICodeExecutor
     /// <param name="bindings">SDK bindings exposed to the code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Execution result with output, logs, and metrics</returns>
-    Task<ExecutionResult> ExecuteAsync(
+    Task<ExecutionResult> Execute(
         string code,
         Sdk.KoanSdkBindings bindings,
         CancellationToken cancellationToken);

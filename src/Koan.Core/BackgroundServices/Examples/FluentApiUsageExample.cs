@@ -32,7 +32,7 @@ public class ExampleController : ControllerBase
     await KoanServices.Do<TranslationService>("translate", new TranslationOptions(fileId, "auto", targetLanguage))
             .WithPriority(10)
             .WithTimeout(TimeSpan.FromMinutes(30))
-            .ExecuteAsync();
+            .Execute();
 
         return Ok(new { FileId = fileId, Message = "File uploaded and translation started" });
     }
@@ -44,7 +44,7 @@ public class ExampleController : ControllerBase
     public async Task<IActionResult> TriggerCleanup()
     {
     await KoanServices.Do<DataCleanupService>("check-queue")
-            .ExecuteAsync();
+            .Execute();
 
         return Ok(new { Message = "Data cleanup triggered" });
     }
@@ -61,7 +61,7 @@ public class ExampleController : ControllerBase
             if (serviceName.Equals("translation", StringComparison.OrdinalIgnoreCase))
             {
                 var status = await KoanServices.Query<TranslationService>()
-                    .GetStatusAsync();
+                    .GetStatus();
 
                 return Ok(status);
             }
@@ -84,7 +84,7 @@ public class WorkflowOrchestrator : KoanFluentServiceBase
     public WorkflowOrchestrator(ILogger<WorkflowOrchestrator> logger, Microsoft.Extensions.Configuration.IConfiguration configuration)
         : base(logger, configuration) { }
 
-    public override async Task ExecuteCoreAsync(CancellationToken cancellationToken)
+    public override async Task ExecuteCore(CancellationToken cancellationToken)
     {
     Logger.LogInformation("Workflow orchestrator starting...");
 
@@ -101,7 +101,7 @@ public class WorkflowOrchestrator : KoanFluentServiceBase
                 
                 // Chain to other services
                 await KoanServices.Do<DataCleanupService>("check-queue")
-                    .ExecuteAsync();
+                    .Execute();
             })
             .On("TranslationFailed").Do<TranslationErrorArgs>(async args =>
             {
@@ -110,7 +110,7 @@ public class WorkflowOrchestrator : KoanFluentServiceBase
                 // Handle failures
                 await HandleTranslationFailure(args);
             })
-            .SubscribeAsync();
+            .Subscribe();
 
         // Keep orchestrator running
         await Task.Delay(Timeout.Infinite, cancellationToken);
@@ -135,7 +135,7 @@ public class AdvancedPeriodicService : KoanPokablePeriodicServiceBase
     public AdvancedPeriodicService(ILogger<AdvancedPeriodicService> logger, Microsoft.Extensions.Configuration.IConfiguration configuration)
         : base(logger, configuration) { }
 
-    protected override async Task ExecutePeriodicAsync(CancellationToken cancellationToken)
+    protected override async Task ExecutePeriodic(CancellationToken cancellationToken)
     {
     Logger.LogInformation("Advanced periodic service executing...");
         

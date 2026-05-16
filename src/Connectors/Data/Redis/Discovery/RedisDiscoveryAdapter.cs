@@ -32,7 +32,7 @@ public sealed class RedisDiscoveryAdapter : ServiceDiscoveryAdapterBase
             options.ConnectTimeout = (int)context.HealthCheckTimeout.TotalMilliseconds;
             options.SyncTimeout = (int)context.HealthCheckTimeout.TotalMilliseconds;
 
-            using var muxer = ConnectionMultiplexer.Connect(options);
+            using var muxer = await ConnectionMultiplexer.ConnectAsync(options);
             var database = muxer.GetDatabase();
             await database.PingAsync();
 
@@ -53,8 +53,8 @@ public sealed class RedisDiscoveryAdapter : ServiceDiscoveryAdapterBase
         return _configuration.GetConnectionString("Redis") ??
                _configuration[Infrastructure.Constants.Discovery.EnvRedisUrl] ??
                _configuration[Infrastructure.Constants.Discovery.EnvRedisConnectionString] ??
-               _configuration["Koan:Data:Redis:ConnectionString"] ??
-               _configuration["Koan:Data:ConnectionString"];
+               _configuration[Infrastructure.Constants.Configuration.Keys.ConnectionString] ??
+               _configuration[Infrastructure.Constants.Configuration.AltConnectionString];
     }
 
     /// <summary>Redis-specific environment variable handling</summary>

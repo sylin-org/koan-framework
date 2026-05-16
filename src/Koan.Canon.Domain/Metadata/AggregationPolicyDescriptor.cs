@@ -20,7 +20,7 @@ public sealed class AggregationPolicyDescriptor
         Kind = kind;
         AuthoritativeSources = authoritativeSources?.Count > 0
             ? authoritativeSources.ToArray()
-            : Array.Empty<string>();
+            : [];
         Fallback = fallback;
 
         if (AuthoritativeSources.Count > 0)

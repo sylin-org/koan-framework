@@ -13,7 +13,7 @@ namespace Koan.Canon.Domain.Audit;
 public sealed class DefaultCanonAuditSink : ICanonAuditSink
 {
     /// <inheritdoc />
-    public async Task WriteAsync(IReadOnlyList<CanonAuditEntry> entries, CancellationToken cancellationToken)
+    public async Task Write(IReadOnlyList<CanonAuditEntry> entries, CancellationToken cancellationToken)
     {
         if (entries is null)
         {

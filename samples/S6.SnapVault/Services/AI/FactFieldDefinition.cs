@@ -7,7 +7,7 @@ namespace S6.SnapVault.Services.AI;
 public class FactFieldDefinition
 {
     public string Key { get; init; } = "";
-    public string[] ExampleValues { get; init; } = Array.Empty<string>();
+    public string[] ExampleValues { get; init; } = [];
     public bool IsAlwaysMandatory { get; init; } = false;
 
     /// <summary>

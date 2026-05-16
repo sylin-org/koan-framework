@@ -1,10 +1,15 @@
-﻿using System;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Cache.Abstractions.Primitives;
 
 namespace Koan.Cache.Abstractions.Stores;
 
+/// <summary>
+/// Fluent builder for cache entries. Terminal verbs (<see cref="Get"/>, <see cref="Set"/>,
+/// <see cref="Remove"/>, <see cref="Touch"/>, <see cref="Exists"/>, <see cref="GetOrAdd"/>)
+/// execute the operation; configuration verbs return the builder for chaining.
+/// </summary>
 public interface ICacheEntryBuilder<T>
 {
     CacheKey Key { get; }
@@ -23,19 +28,23 @@ public interface ICacheEntryBuilder<T>
 
     ICacheEntryBuilder<T> WithContentKind(CacheContentKind kind);
 
-    ICacheEntryBuilder<T> PublishInvalidation(bool value = true);
+    /// <summary>
+    /// Toggle coherence broadcast on writes through this builder. Default is on
+    /// (writes broadcast invalidations to peer nodes when a coherence channel is registered).
+    /// </summary>
+    ICacheEntryBuilder<T> BroadcastInvalidation(bool value = true);
 
     ICacheEntryBuilder<T> WithConsistency(CacheConsistencyMode mode);
 
-    ValueTask<T?> GetAsync(CancellationToken ct);
+    ValueTask<T?> Get(CancellationToken ct);
 
-    ValueTask<T?> GetOrAddAsync(Func<CancellationToken, ValueTask<T?>> valueFactory, CancellationToken ct);
+    ValueTask<T?> GetOrAdd(Func<CancellationToken, ValueTask<T?>> valueFactory, CancellationToken ct);
 
-    ValueTask SetAsync(T value, CancellationToken ct);
+    ValueTask Set(T value, CancellationToken ct);
 
-    ValueTask RemoveAsync(CancellationToken ct);
+    ValueTask Remove(CancellationToken ct);
 
-    ValueTask TouchAsync(CancellationToken ct);
+    ValueTask Touch(CancellationToken ct);
 
     ValueTask<bool> Exists(CancellationToken ct);
 }

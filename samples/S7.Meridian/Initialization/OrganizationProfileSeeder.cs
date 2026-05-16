@@ -36,7 +36,7 @@ public class OrganizationProfileSeeder : IKoanInitializer
                         // Ensure only one profile is active: if this is marked active, deactivate others first
                         if (seedProfile.Active)
                         {
-                            await DeactivateAllProfilesAsync();
+                            await DeactivateAllProfiles();
                         }
 
                         await seedProfile.Save(CancellationToken.None);
@@ -65,7 +65,7 @@ public class OrganizationProfileSeeder : IKoanInitializer
 
                             if (shouldActivate)
                             {
-                                await existing.ActivateAsync(CancellationToken.None);
+                                await existing.Activate(CancellationToken.None);
                                 activatedCount++;
                                 Console.WriteLine($"[Meridian] Updated and activated OrganizationProfile: {existing.Name}");
                             }
@@ -81,7 +81,7 @@ public class OrganizationProfileSeeder : IKoanInitializer
                 }
 
                 // Ensure at least one profile is active
-                await EnsureAtLeastOneActiveAsync();
+                await EnsureAtLeastOneActive();
 
                 if (seededCount > 0 || updatedCount > 0)
                 {
@@ -95,7 +95,7 @@ public class OrganizationProfileSeeder : IKoanInitializer
         });
     }
 
-    private static async Task DeactivateAllProfilesAsync()
+    private static async Task DeactivateAllProfiles()
     {
         var allProfiles = await OrganizationProfile.All(CancellationToken.None);
         foreach (var profile in allProfiles.Where(p => p.Active))
@@ -106,9 +106,9 @@ public class OrganizationProfileSeeder : IKoanInitializer
         }
     }
 
-    private static async Task EnsureAtLeastOneActiveAsync()
+    private static async Task EnsureAtLeastOneActive()
     {
-        var activeProfile = await OrganizationProfile.GetActiveAsync(CancellationToken.None);
+        var activeProfile = await OrganizationProfile.GetActive(CancellationToken.None);
         if (activeProfile == null)
         {
             // No active profile, activate the first one
@@ -116,7 +116,7 @@ public class OrganizationProfileSeeder : IKoanInitializer
             var firstProfile = allProfiles.FirstOrDefault();
             if (firstProfile != null)
             {
-                await firstProfile.ActivateAsync(CancellationToken.None);
+                await firstProfile.Activate(CancellationToken.None);
                 Console.WriteLine($"[Meridian] Auto-activated first OrganizationProfile: {firstProfile.Name}");
             }
         }

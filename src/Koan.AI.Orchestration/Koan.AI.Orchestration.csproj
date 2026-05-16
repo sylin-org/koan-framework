@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <KoanPackageKind>Periphery</KoanPackageKind>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Description>Typed, immutable chain composition for Koan AI: RAG, branching, structured output, and streaming.</Description>
+    <PackageTags>$(CommonPackageTags);ai;orchestration;chain;rag</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Koan.AI.Integration.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <ProjectReference Include="..\Koan.AI.Contracts\Koan.AI.Contracts.csproj" />
+    <ProjectReference Include="..\Koan.AI.Contracts.Shared\Koan.AI.Contracts.Shared.csproj" />
+    <ProjectReference Include="..\Koan.AI.Prompt\Koan.AI.Prompt.csproj" />
+    <ProjectReference Include="..\Koan.AI\Koan.AI.csproj" />
+    <ProjectReference Include="..\Koan.Data.Vector\Koan.Data.Vector.csproj" />
+  </ItemGroup>
+</Project>

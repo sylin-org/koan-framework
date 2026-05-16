@@ -4,6 +4,22 @@
   items:
     - name: AAAA-0000 ADR authoring template
       href: AAAA-0000-template.md
+- name: ADR Series
+  items:
+  - name: ADR-0050 Data access semantics - streaming and paging APIs
+      href: ADR-0050-data-access-pagination-and-streaming.md
+  - name: ADR-0051 Vector hybrid search integration
+      href: ADR-0051-vector-hybrid-search.md
+  - name: ADR-0052 Adaptive sliding window vector pagination
+      href: ADR-0052-adaptive-sliding-window-vector-pagination.md
+  - name: ADR-0053 Vector search native continuation with adapter push-down
+      href: ADR-0053-vector-search-native-continuation.md
+  - name: ADR-0054 Entity-backed search profile management (superseded)
+      href: ADR-0054-entity-backed-search-profile-management.md
+    - name: ADR-0055 Tag-centric semantic search rebuild
+      href: ADR-0055-tag-centric-semantic-search.md
+    - name: ADR-0056 Koan.Context maintenance and reconciliation surface
+      href: ADR-0056-koan-context-maintenance-and-reconciliation.md
 - name: AI (AI)
   items:
     - name: AI-0001 AI baseline
@@ -44,6 +60,10 @@
       href: AI-0016-lm-studio-adapter.md
     - name: AI-0017 Fact-catalog-first extraction for Meridian
       href: AI-0017-fact-catalog-extraction.md
+    - name: AI-0018 Chunk size hard cap enforcement
+      href: AI-0018-chunk-size-hard-cap.md
+    - name: AI-0019 Koan.AI zero-config integration on Microsoft.Extensions.AI
+      href: AI-0019-koan-ai-meai-zero-config.md
 - name: Architecture (ARCH)
   items:
     - name: ARCH-0001 Rename generic parameter to TEntity
@@ -110,6 +130,30 @@
       href: ARCH-0063-docs-ia-realignment-and-retrieval-improvements.md
     - name: ARCH-0065 AddKoan bootstrap lives in Koan.Core
       href: ARCH-0065-addkoan-bootstrap-rehome.md
+    - name: ARCH-0066 Boot report hub and Moss TXT record completeness
+      href: ARCH-0066-boot-report-hub-and-moss-txt-record-completeness.md
+    - name: ARCH-0067 Service organizational structure
+      href: ARCH-0067-service-organizational-structure.md
+    - name: ARCH-0068 Refactoring strategy — static vs DI
+      href: ARCH-0068-refactoring-strategy-static-vs-di.md
+    - name: ARCH-0069 S5 Recs partition-based import pipeline
+      href: ARCH-0069-s5-recs-partition-based-import-pipeline.md
+    - name: ARCH-0070 Attribute-driven AI embeddings
+      href: ARCH-0070-attribute-driven-ai-embeddings.md
+    - name: ARCH-0071 Partition context provider
+      href: ARCH-0071-partition-context-provider.md
+    - name: ARCH-0072 Drop Async method name suffix
+      href: ARCH-0072-drop-async-method-suffix.md
+    - name: ARCH-0073 Code modernization sweep
+      href: ARCH-0073-code-modernization-sweep.md
+    - name: ARCH-0074 Framework gap analysis and incremental plan
+      href: ARCH-0074-framework-gap-analysis-and-incremental-plan.md
+- name: Core (CORE)
+  items:
+    - name: CORE-0072 Source-generated registries
+      href: CORE-0072-source-generated-registries.md
+    - name: CORE-0090 Application self-description baseline
+      href: CORE-0090-application-self-description.md
 - name: Data (DATA)
   items:
     - name: DATA-0002 Query capabilities flag
@@ -204,6 +248,12 @@
       href: DATA-0084-vector-workflows-and-profiles.md
     - name: DATA-0085 Isolate vector workflows into Koan.Data.Vector
       href: DATA-0085-vector-module-split.md
+    - name: DATA-0087 Koan.Context chunk relative path alignment
+      href: DATA-0087-koan-context-chunk-relative-path-alignment.md
+    - name: DATA-0088 Adapter auto-configuration resolver pipeline
+      href: DATA-0088-adapter-auto-configuration-resolver-pipeline.md
+    - name: DATA-0089 Zen Garden connection intent minimum URI shape
+      href: DATA-0089-zengarden-connection-intent-minimum-uri-shape.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface
@@ -242,6 +292,8 @@
       href: WEB-0062-koan-admin-pillar-visualization.md
     - name: WEB-0063 Koan Admin Dashboard roadmap
       href: WEB-0063-admin-dashboard-roadmap.md
+    - name: WEB-0064 Koan.Context monitoring remediation
+      href: WEB-0064-koan-context-monitoring-remediation.md
 - name: Flow (FLOW)
   items:
     - name: FLOW-0070 Flow commands bus
@@ -356,6 +408,10 @@
       href: DX-0042-narrative-samples-simple-entity-names.md
     - name: DX-0043 Connector naming for external integrations
       href: DX-0043-connector-naming-for-external-integrations.md
+- name: Jobs (JOBS)
+  items:
+    - name: JOBS-0001 Jobs pillar — entity-first task management
+      href: JOBS-0001-jobs-pillar-entity-first-task-management.md
 - name: Security (DEC)
   items:
     - name: DEC-0053 Service-to-service authentication

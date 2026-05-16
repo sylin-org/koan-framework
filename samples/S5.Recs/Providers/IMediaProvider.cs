@@ -18,8 +18,8 @@ public interface IMediaProvider
     MediaType[] SupportedTypes { get; }
 
     /// <summary>Fetch media items of the specified type, SFW-only, up to the specified limit.</summary>
-    Task<List<Media>> FetchAsync(MediaType mediaType, int limit, CancellationToken ct);
+    Task<List<Media>> Fetch(MediaType mediaType, int limit, CancellationToken ct);
 
     /// <summary>Stream media items of the specified type in batches, enabling real-time processing.</summary>
-    IAsyncEnumerable<List<Media>> FetchStreamAsync(MediaType mediaType, int limit, CancellationToken ct);
+    IAsyncEnumerable<List<Media>> FetchStream(MediaType mediaType, int limit, CancellationToken ct);
 }

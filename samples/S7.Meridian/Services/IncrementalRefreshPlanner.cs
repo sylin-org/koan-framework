@@ -11,7 +11,7 @@ namespace Koan.Samples.Meridian.Services;
 
 public interface IIncrementalRefreshPlanner
 {
-    Task<IncrementalRefreshPlan> PlanAsync(
+    Task<IncrementalRefreshPlan> Plan(
         DocumentPipeline pipeline,
         IReadOnlyCollection<string> changedDocumentIds,
         IReadOnlyCollection<ExtractedField> existingFields,
@@ -59,7 +59,7 @@ public sealed class IncrementalRefreshPlan
             fieldsToPreserve: preserved,
             mode: "noop",
             reasons: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
-            changedDocuments: Array.Empty<string>());
+            changedDocuments: []);
     }
 
     public static IncrementalRefreshPlan Targeted(
@@ -79,7 +79,7 @@ public sealed class IncrementalRefreshPlanner : IIncrementalRefreshPlanner
         _logger = logger;
     }
 
-    public Task<IncrementalRefreshPlan> PlanAsync(
+    public Task<IncrementalRefreshPlan> Plan(
         DocumentPipeline pipeline,
         IReadOnlyCollection<string> changedDocumentIds,
         IReadOnlyCollection<ExtractedField> existingFields,

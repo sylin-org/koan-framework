@@ -29,7 +29,7 @@ internal sealed class KoanAdminManifestService : IKoanAdminManifestService
         _healthAggregator = healthAggregator;
     }
 
-    public Task<KoanAdminManifest> BuildAsync(CancellationToken cancellationToken = default)
+    public Task<KoanAdminManifest> Build(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -54,7 +54,7 @@ internal sealed class KoanAdminManifestService : IKoanAdminManifestService
         return Task.FromResult(manifest);
     }
 
-    public Task<KoanAdminHealthDocument> GetHealthAsync(CancellationToken cancellationToken = default)
+    public Task<KoanAdminHealthDocument> GetHealth(CancellationToken cancellationToken = default)
         => Task.FromResult(BuildHealth());
 
     private KoanAdminHealthDocument BuildHealth()
@@ -116,12 +116,12 @@ internal sealed class KoanAdminManifestService : IKoanAdminManifestService
             .Select(setting => new KoanAdminModuleSetting(
                 setting.Key,
                 string.IsNullOrWhiteSpace(setting.Label) ? setting.Key : setting.Label,
-                setting.Description ?? string.Empty,
-                setting.Value ?? string.Empty,
+                setting.Description ?? "",
+                setting.Value ?? "",
                 setting.IsSecret,
                 ConvertSource(setting.Source),
-                setting.SourceKey ?? string.Empty,
-                setting.Consumers.Count == 0 ? Array.Empty<string>() : setting.Consumers.ToArray()))
+                setting.SourceKey ?? "",
+                setting.Consumers.Count == 0 ? [] : setting.Consumers.ToArray()))
             .ToList();
 
         var notes = module.Notes

@@ -5,6 +5,6 @@ namespace Koan.Web.Hooks;
 /// </summary>
 public interface ICollectionHook<TEntity> : IOrderedHook
 {
-    Task OnBeforeFetchAsync(HookContext<TEntity> ctx, QueryOptions opts);
-    Task OnAfterFetchAsync(HookContext<TEntity> ctx, List<TEntity> items);
+    Task OnBeforeFetch(HookContext<TEntity> ctx, QueryOptions opts);
+    Task OnAfterFetch(HookContext<TEntity> ctx, List<TEntity> items);
 }

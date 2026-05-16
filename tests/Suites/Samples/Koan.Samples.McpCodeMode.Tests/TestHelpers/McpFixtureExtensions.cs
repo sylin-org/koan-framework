@@ -5,7 +5,7 @@ namespace Koan.Samples.McpCodeMode.Tests;
 
 internal static class McpFixtureExtensions
 {
-    public static async Task<object?> InvokeRpcAsync(this Koan.Testing.KoanTestPipelineFixtureBase fixture, string method, string id, string? toolName = null, JObject? arguments = null, CancellationToken ct = default)
+    public static async Task<object?> InvokeRpc(this Koan.Testing.KoanTestPipelineFixtureBase fixture, string method, string id, string? toolName = null, JObject? arguments = null, CancellationToken ct = default)
     {
         // Access protected Services via reflection since extension method lacks subclass access
     const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public;
@@ -18,13 +18,13 @@ internal static class McpFixtureExtensions
         var handler = server.CreateHandler();
         if (method == "tools/list")
         {
-            return await handler.ListToolsAsync(ct);
+            return await handler.ListTools(ct);
         }
         if (method == "tools/call")
         {
             if (string.IsNullOrWhiteSpace(toolName)) throw new ArgumentException("toolName required for tools/call");
             var callParams = new Koan.Mcp.Hosting.McpRpcHandler.ToolsCallParams { Name = toolName, Arguments = arguments };
-            var callResult = await handler.CallToolAsync(callParams, ct);
+            var callResult = await handler.CallTool(callParams, ct);
             if (callResult.Success && callResult.Result is not null)
             {
                 return callResult.Result; // flattened success payload

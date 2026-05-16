@@ -25,4 +25,4 @@ app.UseStaticFiles();
 // Map API controllers
 app.MapControllers();
 
-app.Run();
+app.RunAsync();

@@ -41,8 +41,16 @@ provides an opinionated, parallel-friendly structure for every suite.
       Unit/
         Koan.Tests.AI.Unit/
     Cache/
-      Unit/
-        Koan.Tests.Cache.Unit/
+      Abstractions/                # Unit (primitives, contracts)
+      Topology/                    # Unit (resolver, layered orchestration)
+      Coherence.InMemory/          # Unit + cornerstone
+      Coherence.Messaging/         # Unit
+      Web/                         # Unit + middleware TestServer
+      Adapter.Redis/               # Integration (Testcontainers)
+      Adapter.Sqlite/              # Integration (temp file)
+    Integration/
+      Bootstrap/                   # Boot-smoke: full AddKoan() reflective discovery
+        Koan.Tests.Integration.Bootstrap/
 ```
 
 ## Adding a Suite
@@ -82,15 +90,77 @@ dotnet test tests/Suites/Data/Core/Koan.Tests.Data.Core/Koan.Tests.Data.Core.csp
   honors `DOCKER_HOST` overrides, CLI contexts, and named pipe/socket fallbacks.
 - `Fixtures/DockerDaemonFixture` caches probe results, disables Ryuk for Testcontainers-powered suites,
   and exposes availability metadata so specs can decide whether to skip or fall back without duplicating logic.
-- `Fixtures/RedisContainerFixture` builds on the Docker probe to provision a disposable Redis instance via
-  Testcontainers or reuse local/explicit endpoints when available.
-- `Fixtures/PostgresContainerFixture` provides a Postgres connection string by preferring explicit/local instances and
-  falling back to a disposable Testcontainers-hosted database when Docker is available.
-- `Fixtures/MongoContainerFixture` surfaces a MongoDB connection string, preferring explicit/local clusters first and
-  provisioning a disposable Testcontainers-backed instance when Docker is reachable.
-- `Pipeline/TestPipelineDockerExtensions` wires the fixture into a pipeline run and surfaces diagnostics
-  whenever Docker is unavailable.
-- `Pipeline/TestPipelineMongoExtensions` registers the Mongo fixture so scenarios can request a Mongo connection with a single call.
+- `Fixtures/RedisContainerFixture` / `PostgresContainerFixture` / `MongoContainerFixture` /
+  `WeaviateContainerFixture` / `OpenSearchContainerFixture` / `ElasticSearchContainerFixture` /
+  `CouchbaseContainerFixture` — all follow the same pattern: env-var override → local TCP ping →
+  Testcontainers Docker daemon → Docker CLI fallback. Each has a matching
+  `TestPipeline<Name>Extensions.Using<Name>Container()` and `TestContext<Name>Extensions.Get<Name>Fixture()`.
+- `Pipeline/TestPipelineDockerExtensions` wires the daemon fixture into a pipeline run and surfaces
+  diagnostics whenever Docker is unavailable.
+
+## Integration tests are canon (ARCH-0079)
+
+Every `Koan.*.Adapter.*`, `Koan.*.Connector.*`, and `Koan.Cache.Coherence.*` package ships at
+least one integration spec that exercises the adapter against real infrastructure. Every pillar
+core ships at least one boot-smoke spec that goes through `services.AddKoan()` reflective
+discovery and verifies the pillar's primary service resolves. This is mandatory before release;
+ad-hoc helpers and per-suite ports of the same fixture logic are rejected.
+
+### `KoanIntegrationHost` — the canon helper
+
+All integration tests build their host through `Koan.Testing.Integration.KoanIntegrationHost`:
+
+```csharp
+await using var host = await KoanIntegrationHost.Configure()
+    .WithSetting("Koan:Data:Redis:ConnectionString", redis.ConnectionString)  // ARCH-0080 canonical key
+    .ConfigureServices(services => services.AddKoan())          // Reference = Intent
+    .StartAsync(ct);
+
+var client = host.Services.GetRequiredService<ICacheClient>();
+```
+
+The helper:
+- Builds a real `IHost` (via `HostBuilder`) so `IHostApplicationLifetime` and the full hosted-
+  services lifecycle are available — bare `ServiceCollection.BuildServiceProvider()` lacks both
+  and silently breaks tests that touch hosted services.
+- Seeds in-memory configuration from a dictionary (`WithSetting` / `WithSettings`).
+- Stays bootstrap-agnostic — tests choose `s.AddKoan()` (full reflective discovery), `s.AddKoanCore()`
+  + manual registrations (partial), or mock-injection variants.
+- Returns an `IntegrationHost` wrapper that implements `IAsyncDisposable` (so `await using` works
+  cleanly — `IHost` itself only declares `IDisposable`).
+
+### Why bother
+
+Three commits on `feat/koan-cache-pillar` proved the canon's value before it was even codified:
+
+| Bug class | Surfaced by | Why unit tests missed it |
+|---|---|---|
+| `TryAddEnumerable<TService>(factory)` indistinguishable-descriptor throw | SQLite integration test (first thing to combine `AddKoanCache + adapter` in one DI graph) | Unit tests hand-roll their DI graphs and skip `AddKoanCache` |
+| `CacheWriteOptions.GetEffectiveL1Ttl` not clamped to L2 | Redis SWR integration test | Unit assertions encoded the buggy behavior as "expected" |
+| Cross-pillar `IConnectionMultiplexer` registration race | Full-DI bootstrap smoke | Unit tests never compose adapter packages |
+| `StartupProbeService` aborts host startup on any infra adapter unavailability | Attempt to write per-pillar boot smokes against a project transitively referencing Redis | Unit tests never start real hosted services through `IHost.StartAsync` |
+
+Without the integration tests, these would have shipped. With them, they're caught at PR time.
+
+### Adding an adapter integration test
+
+1. Create `tests/Suites/<Domain>/<Adapter>/Koan.<Domain>.<Adapter>.Tests/` (mirrors the adapter
+   project's path under `src/`).
+2. Reference `tests/Shared/Koan.Testing/Koan.Testing.csproj` plus the adapter's project + its
+   pillar core.
+3. Use `KoanIntegrationHost.Configure().ConfigureServices(s => s.AddKoan()).StartAsync(ct)` to
+   build the host. Don't invoke `new KoanAutoRegistrar().Initialize(services)` manually — that
+   bypasses the reflective-discovery path that production apps actually use.
+4. For adapters that need real infrastructure, request a container via the pipeline's
+   `.RequireDocker().UsingXxxContainer()` chain. The container fixture is shared across the test
+   class via the `TestPipeline` machinery.
+
+### Exemptions
+
+The canon's only standing exemption is orchestration adapters (Docker, Podman, Compose
+renderers) — the adapter under test IS the container runtime, so Testcontainers is recursive.
+Each must instead ship an alternative integration test (e.g., filesystem fixture asserting the
+shape of a generated Compose file). Other exemptions require an ADR amendment.
 
 ## Legacy Tree
 

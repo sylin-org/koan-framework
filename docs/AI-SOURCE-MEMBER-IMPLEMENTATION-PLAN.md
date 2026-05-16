@@ -12,12 +12,13 @@
 ### Greenfield Principle: Break-and-Rebuild
 
 **No Backward Compatibility Concerns:**
+
 - This is framework v0.x - breaking changes acceptable
 - Clean break establishes correct patterns from start
 - Remove ALL legacy concepts completely
 - Future-proof architecture for v1.0
 
-**Core Mantra:** *"Leave no straggler code behind"*
+**Core Mantra:** _"Leave no straggler code behind"_
 
 ---
 
@@ -26,6 +27,7 @@
 ### 1.1 Create New Classes
 
 **File:** `src/Koan.AI.Contracts/Sources/AiMemberDefinition.cs` (NEW)
+
 ```csharp
 namespace Koan.AI.Contracts.Sources;
 
@@ -65,6 +67,7 @@ public sealed class AiMemberDefinition
 ```
 
 **File:** Update `src/Koan.AI.Contracts/Sources/AiSourceDefinition.cs`
+
 ```csharp
 namespace Koan.AI.Contracts.Sources;
 
@@ -116,6 +119,7 @@ public sealed class AiSourceDefinition
 ### 1.2 Update IAiSourceRegistry
 
 **File:** `src/Koan.AI.Contracts/Sources/IAiSourceRegistry.cs`
+
 ```csharp
 namespace Koan.AI.Contracts.Sources;
 
@@ -157,6 +161,7 @@ public interface IAiSourceRegistry
 ### 1.3 Delete Obsolete Classes
 
 **DELETE COMPLETELY:**
+
 ```
 src/Koan.AI.Contracts/Sources/AiGroupDefinition.cs          ❌ DELETE
 src/Koan.AI.Contracts/Sources/IAiGroupRegistry.cs           ❌ DELETE
@@ -164,6 +169,7 @@ src/Koan.AI/Sources/AiGroupRegistry.cs                       ❌ DELETE
 ```
 
 **Verification:**
+
 ```bash
 # After deletion, these should find nothing:
 grep -r "AiGroupDefinition" src/
@@ -421,7 +427,9 @@ public static IServiceCollection AddAi(this IServiceCollection services, IConfig
     // Rest unchanged
     services.AddHostedService<AiSourceHealthMonitor>();
     services.TryAddSingleton<IAiAdapterRegistry, InMemoryAdapterRegistry>();
-    services.TryAddSingleton<IAiRouter, DefaultAiRouter>();
+    services.TryAddSingleton<AiRoutingEngine>();
+    services.TryAddSingleton<IChatClient, AdapterBackedChatClient>();
+    services.TryAddSingleton<IEmbeddingGenerator<string, Embedding<float>>, AdapterBackedEmbeddingGenerator>();
     services.TryAddSingleton<IAi, RouterAi>();
 
     return services;
@@ -437,6 +445,7 @@ public static IServiceCollection AddAi(this IServiceCollection services, IConfig
 **File:** `src/Connectors/AI/Ollama/Initialization/OllamaDiscoveryService.cs`
 
 **Key Changes:**
+
 1. Create source named "ollama" (not "ollama-auto")
 2. Members named "ollama::host", "ollama::container" (not "ollama-auto-host")
 3. Register source with members, not individual "sources"
@@ -588,6 +597,7 @@ private Dictionary<string, AiCapabilityConfig> MergeCapabilities(List<AiMemberDe
 **File:** `src/Koan.AI/DefaultAiRouter.cs`
 
 **Delete methods:**
+
 - `GetOrCreateGroupAdapter()` ❌
 - All group-related logic ❌
 
@@ -1093,7 +1103,7 @@ public class OllamaDiscoveryTests : IClassFixture<OllamaTestFixture>
 
 **File:** `src/Koan.AI/README.md`
 
-```markdown
+````markdown
 # Koan.AI
 
 ## Quick Start
@@ -1108,6 +1118,7 @@ services.AddKoan();
 var response = await Ai.Embed("some text");
 // Auto-discovers Ollama, creates "ollama" source with members
 ```
+````
 
 ### Named Sources
 
@@ -1151,7 +1162,8 @@ await Ai.Embed("text", new AiEmbeddingsRequest
 - **Policy**: Selection strategy (fallback, round-robin, weighted)
 
 See [AI-SOURCE-MEMBER-ARCHITECTURE.md](../../docs/AI-SOURCE-MEMBER-ARCHITECTURE.md) for details.
-```
+
+````
 
 ---
 
@@ -1186,17 +1198,16 @@ See [AI-SOURCE-MEMBER-ARCHITECTURE.md](../../docs/AI-SOURCE-MEMBER-ARCHITECTURE.
     "ollama-auto-host": { "ConnectionString": "..." }
   }
 }
-```
+````
 
 **After:**
+
 ```json
 {
   "Koan:Ai:Sources": {
     "ollama": {
       "Policy": "fallback",
-      "Members": [
-        { "Name": "ollama::host", "ConnectionString": "..." }
-      ]
+      "Members": [{ "Name": "ollama::host", "ConnectionString": "..." }]
     }
   }
 }
@@ -1213,6 +1224,7 @@ See [AI-SOURCE-MEMBER-ARCHITECTURE.md](../../docs/AI-SOURCE-MEMBER-ARCHITECTURE.
 ## No Backward Compatibility
 
 This is v0.x - breaking changes expected. Clean migration required.
+
 ```
 
 ---
@@ -1319,3 +1331,4 @@ This is v0.x - breaking changes expected. Clean migration required.
 6. Tag breaking change release
 
 **Ready for implementation - awaiting approval to proceed.**
+```

@@ -10,13 +10,13 @@ public static class DockerEnvironment
 
     public sealed record ProbeResult(bool Available, string? Endpoint, string? Message = null);
 
-    public static async Task<ProbeResult> ProbeAsync()
+    public static async Task<ProbeResult> Probe()
     {
         var dockerHost = Environment.GetEnvironmentVariable("DOCKER_HOST");
         if (!string.IsNullOrWhiteSpace(dockerHost))
         {
             Log($"Probe: DOCKER_HOST={dockerHost}");
-            if (await PingAsync(dockerHost!).ConfigureAwait(false))
+            if (await Ping(dockerHost!).ConfigureAwait(false))
             {
                 Log("Probe: DOCKER_HOST ping succeeded.");
                 return new(true, dockerHost);
@@ -41,7 +41,7 @@ public static class DockerEnvironment
             foreach (var pipe in pipeCandidates)
             {
                 Log($"Probe: Trying named pipe {pipe}");
-                if (await PingAsync(pipe).ConfigureAwait(false))
+                if (await Ping(pipe).ConfigureAwait(false))
                 {
                     Log($"Probe: Named pipe {pipe} succeeded.");
                     return new(true, pipe);
@@ -50,7 +50,7 @@ public static class DockerEnvironment
 
             var tcp = "http://localhost:2375";
             Log($"Probe: Trying TCP {tcp}");
-            if (await PingAsync(tcp).ConfigureAwait(false))
+            if (await Ping(tcp).ConfigureAwait(false))
             {
                 return new(true, tcp);
             }
@@ -59,31 +59,31 @@ public static class DockerEnvironment
         {
             var unix = "unix:///var/run/docker.sock";
             Log($"Probe: Trying unix socket {unix}");
-            if (await PingAsync(unix).ConfigureAwait(false))
+            if (await Ping(unix).ConfigureAwait(false))
             {
                 return new(true, unix);
             }
 
             var tcp = "http://localhost:2375";
             Log($"Probe: Trying TCP {tcp}");
-            if (await PingAsync(tcp).ConfigureAwait(false))
+            if (await Ping(tcp).ConfigureAwait(false))
             {
                 return new(true, tcp);
             }
         }
 
-        var cliEndpoint = await TryGetDockerEndpointFromCliAsync().ConfigureAwait(false);
+        var cliEndpoint = await TryGetDockerEndpointFromCli().ConfigureAwait(false);
         if (!string.IsNullOrWhiteSpace(cliEndpoint))
         {
             cliEndpoint = NormalizeEndpoint(cliEndpoint!);
             Log($"Probe: CLI endpoint candidate {cliEndpoint}");
 
-            var version = await TryGetDockerVersionAsync().ConfigureAwait(false);
+            var version = await TryGetDockerVersion().ConfigureAwait(false);
             var message = string.IsNullOrWhiteSpace(version)
                 ? "Derived from docker CLI context"
                 : $"CLI ok: {version}";
 
-            if (await PingAsync(cliEndpoint).ConfigureAwait(false))
+            if (await Ping(cliEndpoint).ConfigureAwait(false))
             {
                 Log($"Probe: CLI detection succeeded. {message}");
                 return new(true, cliEndpoint, message);
@@ -104,7 +104,7 @@ public static class DockerEnvironment
         return cfg.CreateClient();
     }
 
-    private static async Task<bool> PingAsync(string endpoint)
+    private static async Task<bool> Ping(string endpoint)
     {
         try
         {
@@ -119,9 +119,9 @@ public static class DockerEnvironment
         }
     }
 
-    private static async Task<string?> TryGetDockerEndpointFromCliAsync()
+    private static async Task<string?> TryGetDockerEndpointFromCli()
     {
-        var (ctxOk, ctxOutput) = await TryRunDockerCliAsync("context show").ConfigureAwait(false);
+        var (ctxOk, ctxOutput) = await TryRunDockerCli("context show").ConfigureAwait(false);
         if (!ctxOk)
         {
             Log($"Probe: docker context show failed. {Truncate(ctxOutput)}");
@@ -134,7 +134,7 @@ public static class DockerEnvironment
         }
 
         var inspectArgs = $"context inspect {contextName}";
-        var (inspectOk, inspectOutput) = await TryRunDockerCliAsync(inspectArgs).ConfigureAwait(false);
+        var (inspectOk, inspectOutput) = await TryRunDockerCli(inspectArgs).ConfigureAwait(false);
         if (!inspectOk || string.IsNullOrWhiteSpace(inspectOutput))
         {
             if (!inspectOk)
@@ -188,7 +188,7 @@ public static class DockerEnvironment
         return endpoint;
     }
 
-    private static async Task<string?> TryGetDockerVersionAsync()
+    private static async Task<string?> TryGetDockerVersion()
     {
         var attempts = new[]
         {
@@ -199,7 +199,7 @@ public static class DockerEnvironment
 
         foreach (var args in attempts)
         {
-            var (ok, output) = await TryRunDockerCliAsync(args).ConfigureAwait(false);
+            var (ok, output) = await TryRunDockerCli(args).ConfigureAwait(false);
             if (!ok || string.IsNullOrWhiteSpace(output))
             {
                 continue;
@@ -227,7 +227,7 @@ public static class DockerEnvironment
         }
     }
 
-    private static async Task<(bool ok, string? output)> TryRunDockerCliAsync(string arguments)
+    private static async Task<(bool ok, string? output)> TryRunDockerCli(string arguments)
     {
         try
         {
@@ -272,7 +272,7 @@ public static class DockerEnvironment
     {
         if (string.IsNullOrEmpty(value))
         {
-            return string.Empty;
+            return "";
         }
 
         return value.Length <= MaxLogPayloadLength

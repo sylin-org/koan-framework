@@ -56,6 +56,51 @@ public sealed class JobRunBuilder<TJob, TContext, TResult>
         return this;
     }
 
+    /// <summary>
+    /// Declare that this job won't start until each listed job id reaches a terminal state.
+    /// A dependency ending in <see cref="JobStatus.Failed"/> / <see cref="JobStatus.Cancelled"/>
+    /// poisons the dependent. Additive — multiple calls append rather than replace. See ADR-0017.
+    /// </summary>
+    public JobRunBuilder<TJob, TContext, TResult> WaitFor(params string[] jobIds)
+    {
+        if (jobIds is null || jobIds.Length == 0) return this;
+        _mutators.Add(job =>
+        {
+            foreach (var id in jobIds)
+            {
+                if (!string.IsNullOrWhiteSpace(id) && !job.WaitForJobIds.Contains(id))
+                {
+                    job.WaitForJobIds.Add(id);
+                }
+            }
+        });
+        return this;
+    }
+
+    /// <summary>
+    /// Declare that this job won't start until at least one <see cref="JobStatus.Completed"/>
+    /// job of each listed type exists. One successful run satisfies the type-based dependency
+    /// permanently for this job. Additive — multiple calls append rather than replace.
+    /// See ADR-0017.
+    /// </summary>
+    public JobRunBuilder<TJob, TContext, TResult> WaitFor(params Type[] jobTypes)
+    {
+        if (jobTypes is null || jobTypes.Length == 0) return this;
+        _mutators.Add(job =>
+        {
+            foreach (var t in jobTypes)
+            {
+                if (t is null) continue;
+                var name = t.FullName ?? t.Name;
+                if (!job.WaitForTypeNames.Contains(name))
+                {
+                    job.WaitForTypeNames.Add(name);
+                }
+            }
+        });
+        return this;
+    }
+
     public Task<TJob> Run(CancellationToken cancellationToken = default)
     {
         var descriptor = BuildDescriptor(cancellationToken);

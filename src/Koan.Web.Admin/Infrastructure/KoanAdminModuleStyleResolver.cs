@@ -78,7 +78,7 @@ internal static class KoanAdminModuleStyleResolver
 
     private static KoanAdminModuleStyle? ParseStyleFromNotes(KoanAdminModuleManifest module)
     {
-        foreach (var note in module.Notes ?? Array.Empty<string>())
+        foreach (var note in module.Notes ?? [])
         {
             if (!TryExtractStylePayload(note, out var payload))
             {
@@ -137,7 +137,7 @@ internal static class KoanAdminModuleStyleResolver
 
     private static bool TryExtractStylePayload(string note, out string payload)
     {
-        payload = string.Empty;
+        payload = "";
         if (string.IsNullOrWhiteSpace(note))
         {
             return false;
@@ -323,7 +323,7 @@ internal static class KoanAdminModuleStyleResolver
         value = value.Replace('-', ' ');
         value = value.Replace('_', ' ');
         var textInfo = CultureInfo.InvariantCulture.TextInfo;
-        return textInfo.ToTitleCase(value.ToLowerInvariant()).Replace(" ", string.Empty);
+        return textInfo.ToTitleCase(value.ToLowerInvariant()).Replace(" ", "");
     }
 
     private static string ResolvePillarKey(PillarDescriptor? descriptor, string? requestedCode, string pillarLabel)
@@ -343,7 +343,7 @@ internal static class KoanAdminModuleStyleResolver
 
     private static bool TryNormalizeColor(string value, out string colorHex)
     {
-        colorHex = string.Empty;
+        colorHex = "";
         if (string.IsNullOrWhiteSpace(value))
         {
             return false;
@@ -400,7 +400,7 @@ internal static class KoanAdminModuleStyleResolver
         }
 
         var hash = 17;
-        var composite = string.Concat(moduleName ?? string.Empty, "|", seed ?? string.Empty);
+        var composite = string.Concat(moduleName ?? "", "|", seed ?? "");
         foreach (var ch in composite)
         {
             hash = unchecked(hash * 31 + ch);

@@ -9,10 +9,10 @@ public class QuotaSpec : IClassFixture<TestPipelineFixture>
     private static readonly JsonSerializerSettings JsonOpts = new() { Formatting = Formatting.None };
     public QuotaSpec(TestPipelineFixture fx) => _fx = fx;
 
-    private async Task<JToken> DirectCallAsync(string toolName, object args)
+    private async Task<JToken> DirectCall(string toolName, object args)
     {
         var json = JObject.Parse(JsonConvert.SerializeObject(args, JsonOpts));
-        var resultObj = await _fx.InvokeRpcAsync("tools/call", Guid.NewGuid().ToString("n"), toolName, json);
+        var resultObj = await _fx.InvokeRpc("tools/call", Guid.NewGuid().ToString("n"), toolName, json);
         return JToken.Parse(JsonConvert.SerializeObject(resultObj, JsonOpts));
     }
 
@@ -25,7 +25,7 @@ public class QuotaSpec : IClassFixture<TestPipelineFixture>
         // If MaxSdkCalls is default 0 (unlimited) this test will pass trivially with a guard.
 
         var code = @"function run() { SDK.Entities.Todo.upsert({ title: 'q1' }); SDK.Entities.Todo.upsert({ title: 'q2' }); SDK.Entities.Todo.upsert({ title: 'q3' }); SDK.Out.answer('done'); }";
-        var result = await DirectCallAsync("koan.code.execute", new { code, correlationId = "quota-maxsdk-1" });
+        var result = await DirectCall("koan.code.execute", new { code, correlationId = "quota-maxsdk-1" });
         // If enforcement was triggered error object surfaces; otherwise success with text
         var errorCode = result["errorCode"]?.Value<string>() ?? result["error_code"]?.Value<string>();
         // Accept either success (unlimited) or sdk_calls_exceeded when configured
@@ -45,7 +45,7 @@ public class QuotaSpec : IClassFixture<TestPipelineFixture>
     {
         // Script deliberately omits SDK.Out.answer
         var code = @"function run() { const a = 1 + 1; }";
-        var result = await DirectCallAsync("koan.code.execute", new { code, correlationId = "quota-requireanswer-1" });
+        var result = await DirectCall("koan.code.execute", new { code, correlationId = "quota-requireanswer-1" });
         var errorCode = result["errorCode"]?.Value<string>();
         // If RequireAnswer not enabled in fixture config, errorCode may be null => treat as skip-like pass
         if (errorCode != null)
@@ -58,7 +58,7 @@ public class QuotaSpec : IClassFixture<TestPipelineFixture>
     public async Task Success_ShouldIncludeDiagnostics()
     {
         var code = @"function run() { SDK.Entities.Todo.upsert({ title: 'diag1' }); SDK.Out.answer('ok'); }";
-        var result = await DirectCallAsync("koan.code.execute", new { code, correlationId = "quota-diagnostics-1" });
+        var result = await DirectCall("koan.code.execute", new { code, correlationId = "quota-diagnostics-1" });
         // Expect success envelope; flattened result has text for success path
         if (result["errorCode"] != null)
         {

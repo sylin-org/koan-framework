@@ -51,17 +51,17 @@ internal sealed class RedisOptionsConfigurator : AdapterOptionsConfigurator<Redi
 
         // Redis-specific configuration
         var database = ReadProviderConfiguration(options.Database,
-            "Koan:Data:Redis:Database",
-            "Koan:Data:Database");
+            Infrastructure.Constants.Configuration.Keys.Database,
+            Infrastructure.Constants.Configuration.Keys.AltDatabase);
 
         var password = ReadProviderConfiguration("",
-            "Koan:Data:Redis:Password",
-            "Koan:Data:Password");
+            Infrastructure.Constants.Configuration.Keys.Password,
+            Infrastructure.Constants.Configuration.Keys.AltPassword);
 
         var explicitConnectionString = ReadProviderConfiguration("",
             Infrastructure.Constants.Discovery.EnvRedisUrl,
             Infrastructure.Constants.Discovery.EnvRedisConnectionString,
-            "Koan:Data:Redis:ConnectionString",
+            Infrastructure.Constants.Configuration.Keys.ConnectionString,
             "ConnectionStrings:Redis");
 
         if (!string.IsNullOrWhiteSpace(explicitConnectionString))
@@ -83,20 +83,13 @@ internal sealed class RedisOptionsConfigurator : AdapterOptionsConfigurator<Redi
         // Configure other Redis-specific options
         options.Database = ReadProviderConfiguration(
             options.Database,
-            "Koan:Data:Redis:Database",
-            "Koan:Data:Database");
+            Infrastructure.Constants.Configuration.Keys.Database,
+            Infrastructure.Constants.Configuration.Keys.AltDatabase);
 
         options.DefaultPageSize = ReadProviderConfiguration(
             options.DefaultPageSize,
-            "Koan:Data:Redis:DefaultPageSize",
-            "Koan:Data:DefaultPageSize");
-
-        options.MaxPageSize = ReadProviderConfiguration(
-            options.MaxPageSize,
-            "Koan:Data:Redis:MaxPageSize",
-            "Koan:Data:MaxPageSize");
-
-        if (options.DefaultPageSize > options.MaxPageSize) options.DefaultPageSize = options.MaxPageSize;
+            Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
+            Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
 
         Logger?.LogInformation("Final Redis Configuration");
         Logger?.LogInformation("Connection: {ConnectionString}", options.ConnectionString);
@@ -137,7 +130,7 @@ internal sealed class RedisOptionsConfigurator : AdapterOptionsConfigurator<Redi
                 context.Parameters["password"] = password;
 
             // Use autonomous discovery coordinator
-            var discoveryTask = _discoveryCoordinator.DiscoverServiceAsync("redis", context);
+            var discoveryTask = _discoveryCoordinator.DiscoverService("redis", context);
             var result = discoveryTask.GetAwaiter().GetResult();
 
             if (result.IsSuccessful)
@@ -160,7 +153,7 @@ internal sealed class RedisOptionsConfigurator : AdapterOptionsConfigurator<Redi
 
     private bool IsAutoDetectionDisabled()
     {
-        return Koan.Core.Configuration.Read(Configuration, "Koan:Data:Redis:DisableAutoDetection", false);
+        return Koan.Core.Configuration.Read(Configuration, Infrastructure.Constants.Configuration.Keys.DisableAutoDetection, false);
     }
 
     private static string BuildRedisConnectionString(string hostname, int port, int? database, string? password)

@@ -10,7 +10,7 @@ namespace g1c1.GardenCoop.Infrastructure;
 // Creates members, plots, sensors, and a few readings to get started
 public static class GardenSeeder
 {
-    public static async Task EnsureSampleDataAsync(IServiceProvider services, ILogger logger, CancellationToken cancellationToken = default)
+    public static async Task EnsureSampleData(IServiceProvider services, ILogger logger, CancellationToken cancellationToken = default)
     {
         using var scope = services.CreateScope();
         var ct = cancellationToken;

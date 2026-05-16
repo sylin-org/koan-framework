@@ -1,5 +1,7 @@
+using System.Text;
 using Microsoft.Extensions.Options;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Naming;
 using Koan.Data.Vector.Abstractions;
 using Koan.Orchestration;
 using Koan.Orchestration.Attributes;
@@ -31,6 +33,8 @@ namespace Koan.Data.Vector.Connector.Weaviate;
     LocalScheme = "http", LocalHost = "localhost", LocalPort = 8080, LocalPattern = "http://{host}:{port}")]
 public sealed class WeaviateVectorAdapterFactory : IVectorAdapterFactory
 {
+    public string Provider => "weaviate";
+
     public bool CanHandle(string provider) => string.Equals(provider, "weaviate", StringComparison.OrdinalIgnoreCase);
 
     public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp)
@@ -42,6 +46,56 @@ public sealed class WeaviateVectorAdapterFactory : IVectorAdapterFactory
         var options = (IOptions<WeaviateOptions>?)sp.GetService(typeof(IOptions<WeaviateOptions>))
             ?? throw new InvalidOperationException("WeaviateOptions not configured; bind Koan:Data:Weaviate.");
         return new WeaviateVectorRepository<TEntity, TKey>(httpFactory, options, sp);
+    }
+
+    // INamingProvider implementation
+    public string RepositorySeparator => "_";  // GraphQL-compliant (NOT "#")
+
+    public string GetStorageName(Type entityType, IServiceProvider services)
+    {
+        // Weaviate class names: GraphQL-compliant (no dots)
+        var convention = new StorageNameResolver.Convention(
+            StorageNamingStyle.FullNamespace,
+            "_",  // Underscore separator (dots invalid in GraphQL)
+            NameCasing.AsIs);
+
+        return StorageNameResolver.Resolve(entityType, convention);
+    }
+
+    public string GetConcretePartition(string partition)
+    {
+        // Weaviate: Replace hyphens with underscores for GraphQL compatibility
+        if (Guid.TryParse(partition, out var guid))
+            return guid.ToString("D").Replace("-", "_");  // D format with hyphens → underscores
+
+        // Named partitions: sanitize for GraphQL identifiers
+        return SanitizeForGraphQL(partition);
+    }
+
+    private static string SanitizeForGraphQL(string partition)
+    {
+        var sanitized = new StringBuilder(partition.Length);
+        for (int i = 0; i < partition.Length; i++)
+        {
+            var c = partition[i];
+            if (i == 0)
+            {
+                // First char must be letter or underscore
+                if (char.IsLetter(c) || c == '_')
+                    sanitized.Append(c);
+                else
+                    sanitized.Append('_');
+            }
+            else
+            {
+                // Subsequent chars: alphanumeric or underscore
+                if (char.IsLetterOrDigit(c) || c == '_')
+                    sanitized.Append(c);
+                else
+                    sanitized.Append('_');
+            }
+        }
+        return sanitized.ToString();
     }
 }
 

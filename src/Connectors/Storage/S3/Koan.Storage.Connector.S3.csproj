@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <KoanPackageKind>Periphery</KoanPackageKind>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Description>S3-compatible storage provider for Koan. Connects to Zen Garden storage via Moss S3 gateway or any S3-compatible endpoint.</Description>
+    <PackageTags>$(CommonPackageTags);storage;s3;minio;zen-garden</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Koan.Storage\Koan.Storage.csproj" />
+    <ProjectReference Include="..\..\..\Koan.ZenGarden\Koan.ZenGarden.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Minio" Version="6.*" />
+  </ItemGroup>
+</Project>

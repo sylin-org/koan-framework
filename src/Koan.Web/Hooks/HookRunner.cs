@@ -27,11 +27,11 @@ internal sealed class HookRunner<TEntity>
     /// <summary>
     /// Run authorization hooks until a non-allow decision appears.
     /// </summary>
-    public async Task<AuthorizeDecision> AuthorizeAsync(HookContext<TEntity> ctx, AuthorizeRequest req)
+    public async Task<AuthorizeDecision> Authorize(HookContext<TEntity> ctx, AuthorizeRequest req)
     {
         foreach (var h in _auth)
         {
-            var d = await h.OnAuthorizeAsync(ctx, req);
+            var d = await h.OnAuthorize(ctx, req);
             if (d is AuthorizeDecision.Forbid or AuthorizeDecision.Challenge) return d;
         }
         return AuthorizeDecision.Allowed();
@@ -40,111 +40,111 @@ internal sealed class HookRunner<TEntity>
     /// <summary>
     /// Allow hooks to mutate query options; returns false if short-circuited.
     /// </summary>
-    public async Task<bool> BuildOptionsAsync(HookContext<TEntity> ctx, QueryOptions opts)
+    public async Task<bool> BuildOptions(HookContext<TEntity> ctx, QueryOptions opts)
     {
         foreach (var h in _opts)
         {
-            await h.OnBuildingOptionsAsync(ctx, opts);
+            await h.OnBuildingOptions(ctx, opts);
             if (ctx.IsShortCircuited) return false;
         }
         return true;
     }
 
-    public async Task<bool> BeforeCollectionAsync(HookContext<TEntity> ctx, QueryOptions opts)
+    public async Task<bool> BeforeCollection(HookContext<TEntity> ctx, QueryOptions opts)
     {
         foreach (var h in _col)
         {
-            await h.OnBeforeFetchAsync(ctx, opts);
+            await h.OnBeforeFetch(ctx, opts);
             if (ctx.IsShortCircuited) return false;
         }
         return true;
     }
 
-    public async Task<bool> AfterCollectionAsync(HookContext<TEntity> ctx, List<TEntity> items)
+    public async Task<bool> AfterCollection(HookContext<TEntity> ctx, List<TEntity> items)
     {
         foreach (var h in _col)
         {
-            await h.OnAfterFetchAsync(ctx, items);
+            await h.OnAfterFetch(ctx, items);
             if (ctx.IsShortCircuited) return false;
         }
         return true;
     }
 
-    public async Task<bool> BeforeModelFetchAsync(HookContext<TEntity> ctx, string id)
+    public async Task<bool> BeforeModelFetch(HookContext<TEntity> ctx, string id)
     {
         foreach (var h in _model)
         {
-            await h.OnBeforeFetchAsync(ctx, id);
+            await h.OnBeforeFetch(ctx, id);
             if (ctx.IsShortCircuited) return false;
         }
         return true;
     }
 
-    public async Task<bool> AfterModelFetchAsync(HookContext<TEntity> ctx, TEntity? model)
+    public async Task<bool> AfterModelFetch(HookContext<TEntity> ctx, TEntity? model)
     {
         foreach (var h in _model)
         {
-            await h.OnAfterFetchAsync(ctx, model);
+            await h.OnAfterFetch(ctx, model);
             if (ctx.IsShortCircuited) return false;
         }
         return true;
     }
 
-    public async Task<bool> BeforeSaveAsync(HookContext<TEntity> ctx, TEntity model)
+    public async Task<bool> BeforeSave(HookContext<TEntity> ctx, TEntity model)
     {
         foreach (var h in _model)
         {
-            await h.OnBeforeSaveAsync(ctx, model);
+            await h.OnBeforeSave(ctx, model);
             if (ctx.IsShortCircuited) return false;
         }
         return true;
     }
 
-    public async Task<bool> AfterSaveAsync(HookContext<TEntity> ctx, TEntity model)
+    public async Task<bool> AfterSave(HookContext<TEntity> ctx, TEntity model)
     {
         foreach (var h in _model)
         {
-            await h.OnAfterSaveAsync(ctx, model);
+            await h.OnAfterSave(ctx, model);
             if (ctx.IsShortCircuited) return false;
         }
         return true;
     }
 
-    public async Task<bool> BeforeDeleteAsync(HookContext<TEntity> ctx, TEntity model)
+    public async Task<bool> BeforeDelete(HookContext<TEntity> ctx, TEntity model)
     {
         foreach (var h in _model)
         {
-            await h.OnBeforeDeleteAsync(ctx, model);
+            await h.OnBeforeDelete(ctx, model);
             if (ctx.IsShortCircuited) return false;
         }
         return true;
     }
 
-    public async Task<bool> AfterDeleteAsync(HookContext<TEntity> ctx, TEntity model)
+    public async Task<bool> AfterDelete(HookContext<TEntity> ctx, TEntity model)
     {
         foreach (var h in _model)
         {
-            await h.OnAfterDeleteAsync(ctx, model);
+            await h.OnAfterDelete(ctx, model);
             if (ctx.IsShortCircuited) return false;
         }
         return true;
     }
 
-    public async Task<bool> BeforePatchAsync(HookContext<TEntity> ctx, string id, object patch)
+    public async Task<bool> BeforePatch(HookContext<TEntity> ctx, string id, object patch)
     {
         foreach (var h in _model)
         {
-            await h.OnBeforePatchAsync(ctx, id, patch);
+            await h.OnBeforePatch(ctx, id, patch);
             if (ctx.IsShortCircuited) return false;
         }
         return true;
     }
 
-    public async Task<bool> AfterPatchAsync(HookContext<TEntity> ctx, TEntity model)
+    public async Task<bool> AfterPatch(HookContext<TEntity> ctx, TEntity model)
     {
         foreach (var h in _model)
         {
-            await h.OnAfterPatchAsync(ctx, model);
+            await h.OnAfterPatch(ctx, model);
             if (ctx.IsShortCircuited) return false;
         }
         return true;
@@ -153,11 +153,11 @@ internal sealed class HookRunner<TEntity>
     /// <summary>
     /// Run emit hooks for collections; allow replacement of payload or short-circuit.
     /// </summary>
-    public async Task<(bool replaced, object payload)> EmitCollectionAsync(HookContext<TEntity> ctx, object payload)
+    public async Task<(bool replaced, object payload)> EmitCollection(HookContext<TEntity> ctx, object payload)
     {
         foreach (var h in _emit)
         {
-            var d = await h.OnEmitCollectionAsync(ctx, payload);
+            var d = await h.OnEmitCollection(ctx, payload);
             if (d is EmitDecision.Replace rep) return (true, rep.Payload);
             if (ctx.IsShortCircuited) return (true, ctx.ShortCircuitResult!);
         }
@@ -167,11 +167,11 @@ internal sealed class HookRunner<TEntity>
     /// <summary>
     /// Run emit hooks for single models; allow replacement of payload or short-circuit.
     /// </summary>
-    public async Task<(bool replaced, object payload)> EmitModelAsync(HookContext<TEntity> ctx, object payload)
+    public async Task<(bool replaced, object payload)> EmitModel(HookContext<TEntity> ctx, object payload)
     {
         foreach (var h in _emit)
         {
-            var d = await h.OnEmitModelAsync(ctx, payload);
+            var d = await h.OnEmitModel(ctx, payload);
             if (d is EmitDecision.Replace rep) return (true, rep.Payload);
             if (ctx.IsShortCircuited) return (true, ctx.ShortCircuitResult!);
         }

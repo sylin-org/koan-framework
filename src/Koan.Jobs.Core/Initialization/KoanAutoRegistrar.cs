@@ -1,6 +1,7 @@
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Jobs;
+using Koan.Jobs.Infrastructure;
 using Koan.Jobs.Options;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,7 +21,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        var options = cfg.GetSection("Koan:Jobs").Get<JobsOptions>();
+        var options = cfg.GetSection(ConfigurationConstants.Section).Get<JobsOptions>();
         module.Describe(ModuleVersion);
         if (options is not null)
         {

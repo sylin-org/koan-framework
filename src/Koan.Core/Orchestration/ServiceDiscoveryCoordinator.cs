@@ -22,7 +22,7 @@ internal sealed class ServiceDiscoveryCoordinator : IServiceDiscoveryCoordinator
         RegisterAdapters(adapters);
     }
 
-    public async Task<AdapterDiscoveryResult> DiscoverServiceAsync(
+    public async Task<AdapterDiscoveryResult> DiscoverService(
         string serviceName,
         DiscoveryContext? context = null,
         CancellationToken cancellationToken = default)
@@ -42,7 +42,7 @@ internal sealed class ServiceDiscoveryCoordinator : IServiceDiscoveryCoordinator
         try
         {
             // Pure delegation - "Adapter, discover yourself"
-            var result = await adapter.DiscoverAsync(context, cancellationToken);
+            var result = await adapter.Discover(context, cancellationToken);
 
             var outcome = result.IsSuccessful ? LogOutcomes.Success : LogOutcomes.Failure;
             KoanLog.ConfigInfo(_logger, LogActions.Result, outcome,

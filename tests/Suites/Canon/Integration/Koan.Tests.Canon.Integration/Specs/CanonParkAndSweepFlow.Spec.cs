@@ -45,7 +45,7 @@ public sealed class CanonParkAndSweepFlowSpec
                 ctx.SetItem(ResultKey, result);
 
                 var harness = ctx.GetRequiredItem<ParkAndSweepHarness>(HarnessKey);
-                await RunParkAndSweepAsync(harness, DateTimeOffset.UtcNow).ConfigureAwait(false);
+                await RunParkAndSweep(harness, DateTimeOffset.UtcNow).ConfigureAwait(false);
 
                 ctx.SetItem(ParkedSnapshotKey, harness.Parked.ToArray());
 
@@ -61,7 +61,7 @@ public sealed class CanonParkAndSweepFlowSpec
                 result.Events.Should().ContainSingle(evt => evt.Phase == CanonPipelinePhase.Intake);
 
                 var stageEvent = result.Events.Single();
-                var stageId = stageEvent.Detail?.Replace("stage:", string.Empty);
+                var stageId = stageEvent.Detail?.Replace("stage:", "");
 
                 harness.StageRecords.Should().BeEmpty();
 
@@ -75,7 +75,7 @@ public sealed class CanonParkAndSweepFlowSpec
 
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 
     private static void ConfigureServices(TestContext ctx, IServiceCollection services)
     {
@@ -94,7 +94,7 @@ public sealed class CanonParkAndSweepFlowSpec
                 pipeline.AddStep(CanonPipelinePhase.Intake, (context, cancellationToken) =>
                 {
                     context.Metadata.SetOrigin(context.Options.Origin ?? "ingest");
-                    context.Metadata.SetTag("tenant", context.Options.Tags.TryGetValue("tenant", out var value) ? value ?? string.Empty : string.Empty);
+                    context.Metadata.SetTag("tenant", context.Options.Tags.TryGetValue("tenant", out var value) ? value ?? "" : "");
                     return ValueTask.CompletedTask;
                 });
             });
@@ -103,7 +103,7 @@ public sealed class CanonParkAndSweepFlowSpec
         });
     }
 
-    private static Task RunParkAndSweepAsync(ParkAndSweepHarness harness, DateTimeOffset referenceTime)
+    private static Task RunParkAndSweep(ParkAndSweepHarness harness, DateTimeOffset referenceTime)
     {
         foreach (var stage in harness.StageRecords.ToArray())
         {
@@ -181,10 +181,10 @@ public sealed class CanonParkAndSweepFlowSpec
             return Task.FromResult(stage);
         }
 
-        public Task<CanonIndex?> GetIndexAsync(string entityType, string key, CancellationToken cancellationToken)
+        public Task<CanonIndex?> GetIndex(string entityType, string key, CancellationToken cancellationToken)
             => Task.FromResult<CanonIndex?>(null);
 
-        public Task UpsertIndexAsync(CanonIndex index, CancellationToken cancellationToken)
+        public Task UpsertIndex(CanonIndex index, CancellationToken cancellationToken)
             => Task.CompletedTask;
 
         public void ParkStage(CanonStage<KeylessCanon> stage, string reasonCode, DateTimeOffset parkedAt)
@@ -236,7 +236,7 @@ public sealed class CanonParkAndSweepFlowSpec
 
     private sealed class NoopAuditSink : ICanonAuditSink
     {
-        public Task WriteAsync(IReadOnlyList<CanonAuditEntry> entries, CancellationToken cancellationToken)
+        public Task Write(IReadOnlyList<CanonAuditEntry> entries, CancellationToken cancellationToken)
             => Task.CompletedTask;
     }
 

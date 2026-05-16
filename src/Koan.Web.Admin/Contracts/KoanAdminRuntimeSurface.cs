@@ -20,7 +20,7 @@ public sealed record KoanAdminRuntimeSurface(
         true,
         true,
         "Runtime snapshot unavailable.",
-        Array.Empty<string>(),
+        [],
         new KoanAdminRuntimeProcess(
             0,
             "unknown",
@@ -35,9 +35,9 @@ public sealed record KoanAdminRuntimeSurface(
             0,
             0),
         new KoanAdminRuntimeMemory(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
-        new KoanAdminRuntimeGc(0, false, "Unknown", Array.Empty<int>(), 0, 0, 0),
+        new KoanAdminRuntimeGc(0, false, "Unknown", [], 0, 0, 0),
         new KoanAdminRuntimeThreadPool(0, 0, 0, 0, 0, 0, 0, 0, 0),
-        new KoanAdminRuntimeMachine(null, null, string.Empty, string.Empty, string.Empty, string.Empty, 0, false, false));
+        new KoanAdminRuntimeMachine(null, null, "", "", "", "", 0, false, false));
 }
 
 public sealed record KoanAdminRuntimeProcess(

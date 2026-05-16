@@ -20,14 +20,14 @@ public sealed record KoanAdminServiceMeshSurface(
     public static readonly KoanAdminServiceMeshSurface Empty = new(
         Enabled: false,
         CapturedAt: DateTimeOffset.UtcNow,
-        OrchestratorChannel: string.Empty,
+        OrchestratorChannel: "",
         TotalServicesCount: 0,
         TotalInstancesCount: 0,
         HealthyInstancesCount: 0,
         DegradedInstancesCount: 0,
         UnhealthyInstancesCount: 0,
         Configuration: null,
-        Services: Array.Empty<KoanAdminServiceSurface>()
+        Services: []
     );
 }
 

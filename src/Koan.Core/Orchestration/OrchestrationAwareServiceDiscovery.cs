@@ -29,7 +29,7 @@ public sealed class OrchestrationAwareServiceDiscovery : IOrchestrationAwareServ
         return _connectionResolver.ResolveConnectionString(serviceName, hints);
     }
 
-    public async Task<ServiceDiscoveryResult> DiscoverServiceAsync(
+    public async Task<ServiceDiscoveryResult> DiscoverService(
         string serviceName,
         ServiceDiscoveryOptions discovery,
         CancellationToken cancellationToken = default)
@@ -37,26 +37,26 @@ public sealed class OrchestrationAwareServiceDiscovery : IOrchestrationAwareServ
         _logger?.LogDebug("Starting service discovery for {ServiceName}", serviceName);
 
         // Phase 1: Check for Aspire service discovery (highest priority)
-        var aspireResult = await TryAspireDiscoveryAsync(serviceName, discovery, cancellationToken);
+        var aspireResult = await TryAspireDiscovery(serviceName, discovery, cancellationToken);
         if (aspireResult != null) return aspireResult;
 
         // Phase 2: Check for explicit configuration
-        var explicitResult = await TryExplicitConfigurationAsync(serviceName, discovery, cancellationToken);
+        var explicitResult = await TryExplicitConfiguration(serviceName, discovery, cancellationToken);
         if (explicitResult != null) return explicitResult;
 
         // Phase 3: Check environment variables
-        var envResult = await TryEnvironmentVariablesAsync(serviceName, discovery, cancellationToken);
+        var envResult = await TryEnvironmentVariables(serviceName, discovery, cancellationToken);
         if (envResult != null) return envResult;
 
         // Phase 4: Orchestration-aware discovery with health checking
-        var orchestrationResult = await TryOrchestrationAwareDiscoveryAsync(serviceName, discovery, cancellationToken);
+        var orchestrationResult = await TryOrchestrationAwareDiscovery(serviceName, discovery, cancellationToken);
         if (orchestrationResult != null) return orchestrationResult;
 
         // Phase 5: Final fallback
         return CreateFallbackResult(serviceName, discovery);
     }
 
-    private async Task<ServiceDiscoveryResult?> TryAspireDiscoveryAsync(
+    private async Task<ServiceDiscoveryResult?> TryAspireDiscovery(
         string serviceName,
         ServiceDiscoveryOptions discovery,
         CancellationToken cancellationToken)
@@ -69,7 +69,7 @@ public sealed class OrchestrationAwareServiceDiscovery : IOrchestrationAwareServ
 
         _logger?.LogDebug("Found Aspire service discovery for {ServiceName}: {Url}", serviceName, aspireUrl);
 
-        var isHealthy = await CheckServiceHealthAsync(aspireUrl, discovery.HealthCheck, cancellationToken);
+        var isHealthy = await CheckServiceHealth(aspireUrl, discovery.HealthCheck, cancellationToken);
 
         return new ServiceDiscoveryResult
         {
@@ -84,7 +84,7 @@ public sealed class OrchestrationAwareServiceDiscovery : IOrchestrationAwareServ
         };
     }
 
-    private async Task<ServiceDiscoveryResult?> TryExplicitConfigurationAsync(
+    private async Task<ServiceDiscoveryResult?> TryExplicitConfiguration(
         string serviceName,
         ServiceDiscoveryOptions discovery,
         CancellationToken cancellationToken)
@@ -104,7 +104,7 @@ public sealed class OrchestrationAwareServiceDiscovery : IOrchestrationAwareServ
             {
                 _logger?.LogDebug("Found explicit configuration for {ServiceName}: {Url}", serviceName, explicitUrl);
 
-                var isHealthy = await CheckServiceHealthAsync(explicitUrl, discovery.HealthCheck, cancellationToken);
+                var isHealthy = await CheckServiceHealth(explicitUrl, discovery.HealthCheck, cancellationToken);
 
                 return new ServiceDiscoveryResult
                 {
@@ -123,7 +123,7 @@ public sealed class OrchestrationAwareServiceDiscovery : IOrchestrationAwareServ
         return null;
     }
 
-    private async Task<ServiceDiscoveryResult?> TryEnvironmentVariablesAsync(
+    private async Task<ServiceDiscoveryResult?> TryEnvironmentVariables(
         string serviceName,
         ServiceDiscoveryOptions discovery,
         CancellationToken cancellationToken)
@@ -159,7 +159,7 @@ public sealed class OrchestrationAwareServiceDiscovery : IOrchestrationAwareServ
         {
             _logger?.LogDebug("Testing environment candidate for {ServiceName}: {Url}", serviceName, candidate);
 
-            var isHealthy = await CheckServiceHealthAsync(candidate, discovery.HealthCheck, cancellationToken);
+            var isHealthy = await CheckServiceHealth(candidate, discovery.HealthCheck, cancellationToken);
             if (isHealthy || discovery.HealthCheck?.Required != true)
             {
                 return new ServiceDiscoveryResult
@@ -178,7 +178,7 @@ public sealed class OrchestrationAwareServiceDiscovery : IOrchestrationAwareServ
         return null;
     }
 
-    private async Task<ServiceDiscoveryResult?> TryOrchestrationAwareDiscoveryAsync(
+    private async Task<ServiceDiscoveryResult?> TryOrchestrationAwareDiscovery(
         string serviceName,
         ServiceDiscoveryOptions discovery,
         CancellationToken cancellationToken)
@@ -192,7 +192,7 @@ public sealed class OrchestrationAwareServiceDiscovery : IOrchestrationAwareServ
         {
             _logger?.LogDebug("Testing orchestration candidate for {ServiceName}: {Url}", serviceName, candidate);
 
-            var isHealthy = await CheckServiceHealthAsync(candidate, discovery.HealthCheck, cancellationToken);
+            var isHealthy = await CheckServiceHealth(candidate, discovery.HealthCheck, cancellationToken);
             if (isHealthy || discovery.HealthCheck?.Required != true)
             {
                 _logger?.LogInformation("Discovered {ServiceName} via orchestration-aware discovery: {Url}",
@@ -278,7 +278,7 @@ public sealed class OrchestrationAwareServiceDiscovery : IOrchestrationAwareServ
         };
     }
 
-    private async Task<bool> CheckServiceHealthAsync(
+    private async Task<bool> CheckServiceHealth(
         string serviceUrl,
         HealthCheckOptions? healthCheck,
         CancellationToken cancellationToken)
@@ -296,7 +296,7 @@ public sealed class OrchestrationAwareServiceDiscovery : IOrchestrationAwareServ
             // Default HTTP health check
             if (!string.IsNullOrWhiteSpace(healthCheck.HealthCheckPath))
             {
-                return await DefaultHttpHealthCheckAsync(serviceUrl, healthCheck, cancellationToken);
+                return await DefaultHttpHealthCheck(serviceUrl, healthCheck, cancellationToken);
             }
 
             // If no health check path specified, assume service is healthy
@@ -309,7 +309,7 @@ public sealed class OrchestrationAwareServiceDiscovery : IOrchestrationAwareServ
         }
     }
 
-    private async Task<bool> DefaultHttpHealthCheckAsync(
+    private async Task<bool> DefaultHttpHealthCheck(
         string serviceUrl,
         HealthCheckOptions healthCheck,
         CancellationToken cancellationToken)

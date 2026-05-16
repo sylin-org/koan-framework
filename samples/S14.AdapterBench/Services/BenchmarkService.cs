@@ -24,7 +24,7 @@ public class BenchmarkService : IBenchmarkService
         _logger = logger ?? NullLogger<BenchmarkService>.Instance;
     }
 
-    public async Task<BenchmarkResult> RunBenchmarkAsync(
+    public async Task<BenchmarkResult> RunBenchmark(
         BenchmarkRequest request,
         IProgress<BenchmarkProgress>? progress = null,
         CancellationToken cancellationToken = default)
@@ -49,12 +49,12 @@ public class BenchmarkService : IBenchmarkService
             if (request.Mode == BenchmarkMode.Sequential)
             {
                 _log.ServiceInfo("benchmark.execute", "sequential", ("providerCount", providers.Count));
-                await RunSequentialBenchmarkAsync(result, providers, request.EntityTiers, progress, cancellationToken);
+                await RunSequentialBenchmark(result, providers, request.EntityTiers, progress, cancellationToken);
             }
             else
             {
                 _log.ServiceInfo("benchmark.execute", "parallel", ("providerCount", providers.Count));
-                await RunParallelBenchmarkAsync(result, providers, request.EntityTiers, progress, cancellationToken);
+                await RunParallelBenchmark(result, providers, request.EntityTiers, progress, cancellationToken);
             }
 
             result.Status = BenchmarkStatus.Completed;
@@ -75,7 +75,7 @@ public class BenchmarkService : IBenchmarkService
         return result;
     }
 
-    private async Task RunSequentialBenchmarkAsync(
+    private async Task RunSequentialBenchmark(
         BenchmarkResult result,
         List<string> providers,
         List<string> entityTiers,
@@ -106,57 +106,57 @@ public class BenchmarkService : IBenchmarkService
             foreach (var tier in entityTiers)
             {
                 // Single Write Test
-                var singleWriteResult = await RunSingleWriteTestAsync(
+                var singleWriteResult = await RunSingleWriteTest(
                     provider, tier, result.EntityCount, progress, completedTests++, totalTests, cancellationToken);
                 providerResult.Tests.Add(singleWriteResult);
 
                 // Batch Write Test
-                var batchWriteResult = await RunBatchWriteTestAsync(
+                var batchWriteResult = await RunBatchWriteTest(
                     provider, tier, result.EntityCount, progress, completedTests++, totalTests, cancellationToken);
                 providerResult.Tests.Add(batchWriteResult);
 
                 // Read By ID Test
-                var readByIdResult = await RunReadByIdTestAsync(
+                var readByIdResult = await RunReadByIdTest(
                     provider, tier, result.EntityCount, progress, completedTests++, totalTests, cancellationToken);
                 providerResult.Tests.Add(readByIdResult);
 
                 // Update Operations Test
-                var updateResult = await RunUpdateTestAsync(
+                var updateResult = await RunUpdateTest(
                     provider, tier, result.EntityCount, progress, completedTests++, totalTests, cancellationToken);
                 providerResult.Tests.Add(updateResult);
 
                 // Query Simple Filter Test
-                var querySimpleResult = await RunQueryTestAsync(
+                var querySimpleResult = await RunQueryTest(
                     provider, tier, "Simple Filter", progress, completedTests++, totalTests, cancellationToken);
                 providerResult.Tests.Add(querySimpleResult);
 
                 // Query Range Filter Test
-                var queryRangeResult = await RunQueryTestAsync(
+                var queryRangeResult = await RunQueryTest(
                     provider, tier, "Range Filter", progress, completedTests++, totalTests, cancellationToken);
                 providerResult.Tests.Add(queryRangeResult);
 
                 // Query Complex Filter Test
-                var queryComplexResult = await RunQueryTestAsync(
+                var queryComplexResult = await RunQueryTest(
                     provider, tier, "Complex Filter", progress, completedTests++, totalTests, cancellationToken);
                 providerResult.Tests.Add(queryComplexResult);
 
                 // Pagination Test
-                var paginationResult = await RunPaginationTestAsync(
+                var paginationResult = await RunPaginationTest(
                     provider, tier, result.EntityCount, progress, completedTests++, totalTests, cancellationToken);
                 providerResult.Tests.Add(paginationResult);
 
                 // RemoveAll Safe Test
-                var removeAllSafeResult = await RunRemoveAllTestAsync(
+                var removeAllSafeResult = await RunRemoveAllTest(
                     provider, tier, result.EntityCount, "Safe", RemoveStrategy.Safe, progress, completedTests++, totalTests, cancellationToken);
                 providerResult.Tests.Add(removeAllSafeResult);
 
                 // RemoveAll Fast Test
-                var removeAllFastResult = await RunRemoveAllTestAsync(
+                var removeAllFastResult = await RunRemoveAllTest(
                     provider, tier, result.EntityCount, "Fast", RemoveStrategy.Fast, progress, completedTests++, totalTests, cancellationToken);
                 providerResult.Tests.Add(removeAllFastResult);
 
                 // RemoveAll Optimized Test
-                var removeAllOptimizedResult = await RunRemoveAllTestAsync(
+                var removeAllOptimizedResult = await RunRemoveAllTest(
                     provider, tier, result.EntityCount, "Optimized", RemoveStrategy.Optimized, progress, completedTests++, totalTests, cancellationToken);
                 providerResult.Tests.Add(removeAllOptimizedResult);
             }
@@ -180,7 +180,7 @@ public class BenchmarkService : IBenchmarkService
 
                 foreach (var tier in entityTiers)
                 {
-                    var migrationResult = await RunCrossProviderMigrationTestAsync(
+                    var migrationResult = await RunCrossProviderMigrationTest(
                         sourceProvider, destProvider, tier, result.EntityCount,
                         progress, completedTests++, totalTests, cancellationToken);
 
@@ -192,7 +192,7 @@ public class BenchmarkService : IBenchmarkService
         }
     }
 
-    private async Task RunParallelBenchmarkAsync(
+    private async Task RunParallelBenchmark(
         BenchmarkResult result,
         List<string> providers,
         List<string> entityTiers,
@@ -252,7 +252,7 @@ public class BenchmarkService : IBenchmarkService
                     _log.ServiceInfo("parallel.tier.start", null, ("provider", provider), ("tier", tier));
 
                     _log.ServiceInfo("parallel.test.start", "single-write", ("provider", provider), ("tier", tier));
-                    var singleWrite = await RunSingleWriteTestAsync(
+                    var singleWrite = await RunSingleWriteTest(
                         provider,
                         tier,
                         result.EntityCount,
@@ -265,7 +265,7 @@ public class BenchmarkService : IBenchmarkService
                     Interlocked.Increment(ref completedTests);
                     UpdateProviderProgress(provider, tier, "Single Writes", ++providerTestsCompleted);
 
-                    var batchWrite = await RunBatchWriteTestAsync(
+                    var batchWrite = await RunBatchWriteTest(
                         provider,
                         tier,
                         result.EntityCount,
@@ -277,7 +277,7 @@ public class BenchmarkService : IBenchmarkService
                     Interlocked.Increment(ref completedTests);
                     UpdateProviderProgress(provider, tier, "Batch Writes", ++providerTestsCompleted);
 
-                    var readById = await RunReadByIdTestAsync(
+                    var readById = await RunReadByIdTest(
                         provider,
                         tier,
                         result.EntityCount,
@@ -289,7 +289,7 @@ public class BenchmarkService : IBenchmarkService
                     Interlocked.Increment(ref completedTests);
                     UpdateProviderProgress(provider, tier, "Read By ID", ++providerTestsCompleted);
 
-                    var update = await RunUpdateTestAsync(
+                    var update = await RunUpdateTest(
                         provider,
                         tier,
                         result.EntityCount,
@@ -301,7 +301,7 @@ public class BenchmarkService : IBenchmarkService
                     Interlocked.Increment(ref completedTests);
                     UpdateProviderProgress(provider, tier, "Update Operations", ++providerTestsCompleted);
 
-                    var querySimple = await RunQueryTestAsync(
+                    var querySimple = await RunQueryTest(
                         provider,
                         tier,
                         "Simple Filter",
@@ -313,7 +313,7 @@ public class BenchmarkService : IBenchmarkService
                     Interlocked.Increment(ref completedTests);
                     UpdateProviderProgress(provider, tier, "Query (Simple)", ++providerTestsCompleted);
 
-                    var queryRange = await RunQueryTestAsync(
+                    var queryRange = await RunQueryTest(
                         provider,
                         tier,
                         "Range Filter",
@@ -325,7 +325,7 @@ public class BenchmarkService : IBenchmarkService
                     Interlocked.Increment(ref completedTests);
                     UpdateProviderProgress(provider, tier, "Query (Range)", ++providerTestsCompleted);
 
-                    var queryComplex = await RunQueryTestAsync(
+                    var queryComplex = await RunQueryTest(
                         provider,
                         tier,
                         "Complex Filter",
@@ -337,7 +337,7 @@ public class BenchmarkService : IBenchmarkService
                     Interlocked.Increment(ref completedTests);
                     UpdateProviderProgress(provider, tier, "Query (Complex)", ++providerTestsCompleted);
 
-                    var pagination = await RunPaginationTestAsync(
+                    var pagination = await RunPaginationTest(
                         provider,
                         tier,
                         result.EntityCount,
@@ -349,7 +349,7 @@ public class BenchmarkService : IBenchmarkService
                     Interlocked.Increment(ref completedTests);
                     UpdateProviderProgress(provider, tier, "Pagination", ++providerTestsCompleted);
 
-                    var removeSafe = await RunRemoveAllTestAsync(
+                    var removeSafe = await RunRemoveAllTest(
                         provider,
                         tier,
                         result.EntityCount,
@@ -363,7 +363,7 @@ public class BenchmarkService : IBenchmarkService
                     Interlocked.Increment(ref completedTests);
                     UpdateProviderProgress(provider, tier, "RemoveAll (Safe)", ++providerTestsCompleted);
 
-                    var removeFast = await RunRemoveAllTestAsync(
+                    var removeFast = await RunRemoveAllTest(
                         provider,
                         tier,
                         result.EntityCount,
@@ -377,7 +377,7 @@ public class BenchmarkService : IBenchmarkService
                     Interlocked.Increment(ref completedTests);
                     UpdateProviderProgress(provider, tier, "RemoveAll (Fast)", ++providerTestsCompleted);
 
-                    var removeOptimized = await RunRemoveAllTestAsync(
+                    var removeOptimized = await RunRemoveAllTest(
                         provider,
                         tier,
                         result.EntityCount,
@@ -419,7 +419,7 @@ public class BenchmarkService : IBenchmarkService
 
                 foreach (var tier in entityTiers)
                 {
-                    var migrationResult = await RunCrossProviderMigrationTestAsync(
+                    var migrationResult = await RunCrossProviderMigrationTest(
                         sourceProvider, destProvider, tier, result.EntityCount,
                         progress, completedTests++, totalTests, cancellationToken);
 
@@ -467,7 +467,7 @@ public class BenchmarkService : IBenchmarkService
         }
     }
 
-    private async Task<TestResult> RunSingleWriteTestAsync(
+    private async Task<TestResult> RunSingleWriteTest(
         string provider,
         string tier,
         int count,
@@ -508,7 +508,7 @@ public class BenchmarkService : IBenchmarkService
                     cancellationToken.ThrowIfCancellationRequested();
 
                     var entity = CreateEntity(tier, i);
-                    await SaveEntityAsync(entity, tier);
+                    await SaveEntity(entity, tier);
 
                     if (i % 100 == 0 && i > 0)
                     {
@@ -549,7 +549,7 @@ public class BenchmarkService : IBenchmarkService
         return testResult;
     }
 
-    private async Task<TestResult> RunBatchWriteTestAsync(
+    private async Task<TestResult> RunBatchWriteTest(
         string provider,
         string tier,
         int count,
@@ -592,7 +592,7 @@ public class BenchmarkService : IBenchmarkService
                         .Select(i => CreateEntity(tier, i))
                         .ToList();
 
-                    await SaveEntitiesBatchAsync(entities, tier);
+                    await SaveEntitiesBatch(entities, tier);
                     batchStopwatch.Stop();
 
                     batchNumber++;
@@ -632,7 +632,7 @@ public class BenchmarkService : IBenchmarkService
         return testResult;
     }
 
-    private async Task<TestResult> RunReadByIdTestAsync(
+    private async Task<TestResult> RunReadByIdTest(
         string provider,
         string tier,
         int count,
@@ -661,7 +661,7 @@ public class BenchmarkService : IBenchmarkService
             // First, get the IDs from the entities we wrote
             using (EntityContext.Adapter(provider))
             {
-                ids = await GetEntityIdsAsync(tier, count);
+                ids = await GetEntityIds(tier, count);
             }
 
             if (ids.Count == 0)
@@ -678,7 +678,7 @@ public class BenchmarkService : IBenchmarkService
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    await GetEntityByIdAsync(tier, ids[i]);
+                    await GetEntityById(tier, ids[i]);
 
                     if (i % 100 == 0)
                     {
@@ -715,7 +715,7 @@ public class BenchmarkService : IBenchmarkService
         return testResult;
     }
 
-    private async Task<TestResult> RunRemoveAllTestAsync(
+    private async Task<TestResult> RunRemoveAllTest(
         string provider,
         string tier,
         int count,
@@ -758,7 +758,7 @@ public class BenchmarkService : IBenchmarkService
                     var entities = Enumerable.Range(batchStart, batchCount)
                         .Select(i => CreateEntity(tier, i))
                         .ToList();
-                    await SaveEntitiesBatchAsync(entities, tier);
+                    await SaveEntitiesBatch(entities, tier);
                 }
 
                 seedStopwatch.Stop();
@@ -770,7 +770,7 @@ public class BenchmarkService : IBenchmarkService
                     provider, tier, testResult.TestName, strategyName);
                 var stopwatch = Stopwatch.StartNew();
 
-                var deletedCount = await RemoveAllByStrategyAsync(tier, strategy);
+                var deletedCount = await RemoveAllByStrategy(tier, strategy);
 
                 stopwatch.Stop();
                 _logger.LogDebug("Provider {Provider} - {Tier} {Test}: Removed {Deleted} entities in {Ms:F0}ms",
@@ -810,7 +810,7 @@ public class BenchmarkService : IBenchmarkService
         return testResult;
     }
 
-    private async Task<long> RemoveAllByStrategyAsync(string tier, RemoveStrategy strategy)
+    private async Task<long> RemoveAllByStrategy(string tier, RemoveStrategy strategy)
     {
         return tier switch
         {
@@ -864,7 +864,7 @@ public class BenchmarkService : IBenchmarkService
         };
     }
 
-    private async Task SaveEntityAsync(object entity, string tier)
+    private async Task SaveEntity(object entity, string tier)
     {
         switch (tier)
         {
@@ -880,7 +880,7 @@ public class BenchmarkService : IBenchmarkService
         }
     }
 
-    private async Task SaveEntitiesBatchAsync(List<object> entities, string tier)
+    private async Task SaveEntitiesBatch(List<object> entities, string tier)
     {
         switch (tier)
         {
@@ -896,7 +896,7 @@ public class BenchmarkService : IBenchmarkService
         }
     }
 
-    private async Task<List<string>> GetEntityIdsAsync(string tier, int limit)
+    private async Task<List<string>> GetEntityIds(string tier, int limit)
     {
         return tier switch
         {
@@ -907,7 +907,7 @@ public class BenchmarkService : IBenchmarkService
         };
     }
 
-    private async Task<object?> GetEntityByIdAsync(string tier, string id)
+    private async Task<object?> GetEntityById(string tier, string id)
     {
         return tier switch
         {
@@ -918,7 +918,7 @@ public class BenchmarkService : IBenchmarkService
         };
     }
 
-    private async Task<TestResult> RunUpdateTestAsync(
+    private async Task<TestResult> RunUpdateTest(
         string provider,
         string tier,
         int count,
@@ -943,7 +943,7 @@ public class BenchmarkService : IBenchmarkService
             List<string> ids;
             using (EntityContext.Adapter(provider))
             {
-                ids = await GetEntityIdsAsync(tier, count);
+                ids = await GetEntityIds(tier, count);
             }
 
             if (ids.Count == 0)
@@ -960,7 +960,7 @@ public class BenchmarkService : IBenchmarkService
                     cancellationToken.ThrowIfCancellationRequested();
 
                     // Load entity
-                    var entity = await GetEntityByIdAsync(tier, ids[i]);
+                    var entity = await GetEntityById(tier, ids[i]);
                     if (entity == null) continue;
 
                     // Modify entity based on tier
@@ -1016,7 +1016,7 @@ public class BenchmarkService : IBenchmarkService
         return testResult;
     }
 
-    private async Task<TestResult> RunQueryTestAsync(
+    private async Task<TestResult> RunQueryTest(
         string provider,
         string tier,
         string filterType,
@@ -1096,7 +1096,7 @@ public class BenchmarkService : IBenchmarkService
         return testResult;
     }
 
-    private async Task<TestResult> RunPaginationTestAsync(
+    private async Task<TestResult> RunPaginationTest(
         string provider,
         string tier,
         int count,
@@ -1156,7 +1156,7 @@ public class BenchmarkService : IBenchmarkService
         return testResult;
     }
 
-    private async Task<TestResult> RunCrossProviderMigrationTestAsync(
+    private async Task<TestResult> RunCrossProviderMigrationTest(
         string sourceProvider,
         string destProvider,
         string tier,
@@ -1223,7 +1223,7 @@ public class BenchmarkService : IBenchmarkService
                     cancellationToken.ThrowIfCancellationRequested();
 
                     var batch = entities.Skip(i).Take(batchSize).ToList();
-                    await SaveEntitiesBatchAsync(batch, tier);
+                    await SaveEntitiesBatch(batch, tier);
                 }
             }
 

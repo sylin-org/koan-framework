@@ -22,7 +22,7 @@ public sealed class JsonInstructionsSpec
     public async Task Instruction_ensure_created_is_idempotent_and_prepares_storage_directory()
     {
         await TestPipeline.For<JsonInstructionsSpec>(_output, nameof(Instruction_ensure_created_is_idempotent_and_prepares_storage_directory))
-            .Using<JsonConnectorFixture>("fixture", static ctx => JsonConnectorFixture.CreateAsync(ctx))
+            .Using<JsonConnectorFixture>("fixture", static ctx => JsonConnectorFixture.Create(ctx))
             .Arrange(static async ctx =>
             {
                 var fixture = ctx.GetRequiredItem<JsonConnectorFixture>("fixture");
@@ -40,14 +40,14 @@ public sealed class JsonInstructionsSpec
                 second.Should().BeTrue();
                 Directory.Exists(fixture.RootPath).Should().BeTrue();
             })
-            .RunAsync();
+            .Run();
     }
 
     [Fact]
     public async Task Instruction_clear_returns_deleted_count_and_truncates_store()
     {
         await TestPipeline.For<JsonInstructionsSpec>(_output, nameof(Instruction_clear_returns_deleted_count_and_truncates_store))
-            .Using<JsonConnectorFixture>("fixture", static ctx => JsonConnectorFixture.CreateAsync(ctx))
+            .Using<JsonConnectorFixture>("fixture", static ctx => JsonConnectorFixture.Create(ctx))
             .Arrange(static async ctx =>
             {
                 var fixture = ctx.GetRequiredItem<JsonConnectorFixture>("fixture");
@@ -61,8 +61,8 @@ public sealed class JsonInstructionsSpec
 
                 await using var lease = fixture.LeasePartition(partition);
 
-                await InstructionProbe.UpsertAsync(new InstructionProbe { Name = "seed" });
-                await InstructionProbe.UpsertAsync(new InstructionProbe { Name = "seed-2" });
+                await InstructionProbe.Upsert(new InstructionProbe { Name = "seed" });
+                await InstructionProbe.Upsert(new InstructionProbe { Name = "seed-2" });
 
                 var countBefore = await InstructionProbe.Count.Exact();
                 countBefore.Should().Be(2);
@@ -75,20 +75,20 @@ public sealed class JsonInstructionsSpec
 
                 var jsonFiles = Directory.Exists(fixture.RootPath)
                     ? Directory.EnumerateFiles(fixture.RootPath, "*.json", SearchOption.AllDirectories).ToArray()
-                    : Array.Empty<string>();
+                    : [];
 
                 jsonFiles.Should().NotBeEmpty();
                 foreach (var path in jsonFiles)
                 {
-                    var contents = await File.ReadAllTextAsync(path);
+                    var contents = await File.ReadAllText(path);
                     contents.Trim().Should().Be("[]");
                 }
             })
-            .RunAsync();
+            .Run();
     }
 
     private sealed class InstructionProbe : Entity<InstructionProbe>
     {
-        public string Name { get; set; } = string.Empty;
+        public string Name { get; set; } = "";
     }
 }

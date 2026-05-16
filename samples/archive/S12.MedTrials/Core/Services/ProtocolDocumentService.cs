@@ -21,7 +21,7 @@ public sealed class ProtocolDocumentService : IProtocolDocumentService
         _logger = logger;
     }
 
-    public async Task<ProtocolDocumentIngestionResult> IngestAsync(ProtocolDocumentIngestionRequest request, CancellationToken ct)
+    public async Task<ProtocolDocumentIngestionResult> Ingest(ProtocolDocumentIngestionRequest request, CancellationToken ct)
     {
         if (request is null) throw new ArgumentNullException(nameof(request));
         if (string.IsNullOrWhiteSpace(request.Content))
@@ -37,7 +37,7 @@ public sealed class ProtocolDocumentService : IProtocolDocumentService
             DocumentType = string.IsNullOrWhiteSpace(request.DocumentType) ? "Protocol" : request.DocumentType,
             Version = request.Version,
             ExtractedText = request.Content.Trim(),
-            Tags = request.Tags ?? Array.Empty<string>(),
+            Tags = request.Tags ?? [],
             EffectiveDate = request.EffectiveDate ?? now,
             IngestedAt = now
         };
@@ -127,12 +127,12 @@ public sealed class ProtocolDocumentService : IProtocolDocumentService
             document.Diagnostics);
     }
 
-    public async Task<ProtocolDocumentQueryResult> QueryAsync(ProtocolDocumentQueryRequest request, CancellationToken ct)
+    public async Task<ProtocolDocumentQueryResult> Query(ProtocolDocumentQueryRequest request, CancellationToken ct)
     {
         if (request is null) throw new ArgumentNullException(nameof(request));
         if (string.IsNullOrWhiteSpace(request.Query))
         {
-            return new ProtocolDocumentQueryResult(Array.Empty<ProtocolDocumentMatch>(), true, null, new[] { "Query text is required." });
+            return new ProtocolDocumentQueryResult([], true, null, new[] { "Query text is required." });
         }
 
         var matches = new List<ProtocolDocumentMatch>();
@@ -235,7 +235,7 @@ public sealed class ProtocolDocumentService : IProtocolDocumentService
     {
         var tags = document.Tags is { Length: > 0 }
             ? $"Tags: {string.Join(", ", document.Tags)}"
-            : string.Empty;
+            : "";
 
         return string.Join('\n', new[]
         {

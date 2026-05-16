@@ -8,7 +8,7 @@ builder.Services.AddMvc(options =>
     options.Filters.Add<S16.PantryPal.Infrastructure.ErrorEnvelopeFilter>();
 });
 var app = builder.Build();
-app.Run();
+app.RunAsync();
 
 namespace S16.PantryPal
 {

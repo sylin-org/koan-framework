@@ -32,7 +32,7 @@ public sealed class CanonMetadataSpec
 
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 
     [Fact]
     public Task Merge_prefers_existing_when_configured()
@@ -67,7 +67,7 @@ public sealed class CanonMetadataSpec
 
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 
     [Fact]
     public Task Record_source_updates_timestamp()
@@ -99,5 +99,5 @@ public sealed class CanonMetadataSpec
 
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 }

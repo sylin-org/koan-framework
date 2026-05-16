@@ -71,7 +71,7 @@ public static class TransformerServiceCollectionExtensions
                                     var entityType = args[0];
                                     var shapeType = args[1];
                                     var acceptProp = t.GetProperty("AcceptContentTypes");
-                                    var acceptValues = (IReadOnlyList<string>?)acceptProp?.GetValue(tr) ?? Array.Empty<string>();
+                                    var acceptValues = (IReadOnlyList<string>?)acceptProp?.GetValue(tr) ?? [];
 
                                     var regMi = typeof(ITransformerRegistry).GetMethod(nameof(ITransformerRegistry.Register))!;
                                     var gm = regMi.MakeGenericMethod(entityType, shapeType);

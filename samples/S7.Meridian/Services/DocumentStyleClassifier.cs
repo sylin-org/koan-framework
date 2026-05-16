@@ -19,7 +19,7 @@ namespace Koan.Samples.Meridian.Services;
 
 public interface IDocumentStyleClassifier
 {
-    Task<DocumentStyleClassification> ClassifyAsync(
+    Task<DocumentStyleClassification> Classify(
         SourceDocument document,
         CancellationToken ct = default);
 }
@@ -40,7 +40,7 @@ public sealed class DocumentStyleClassifier : IDocumentStyleClassifier
         _logger = logger;
     }
 
-    public async Task<DocumentStyleClassification> ClassifyAsync(
+    public async Task<DocumentStyleClassification> Classify(
         SourceDocument document,
         CancellationToken ct = default)
     {
@@ -84,9 +84,8 @@ public sealed class DocumentStyleClassifier : IDocumentStyleClassifier
         var prompt = BuildClassificationPrompt(document, styles);
 
         // Call LLM
-        var chatOptions = new AiChatOptions
+        var chatOptions = new ChatOptions
         {
-            Message = prompt,
             Model = _options.Facts.ExtractionModel,
             Temperature = 0.3, // Lower temperature for consistent classification
             MaxTokens = 0,
@@ -96,7 +95,7 @@ public sealed class DocumentStyleClassifier : IDocumentStyleClassifier
         string raw;
         try
         {
-            raw = await Ai.Chat(chatOptions, ct);
+            raw = await Client.Chat(prompt, chatOptions, ct);
             _logger.LogDebug("LLM document style classification response length: {Length} characters", raw.Length);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -211,9 +210,9 @@ public sealed class DocumentStyleClassifier : IDocumentStyleClassifier
 
             var json = JObject.Parse(cleaned);
 
-            var styleCode = json.Value<string>("styleCode")?.Trim()?.ToUpperInvariant() ?? string.Empty;
+            var styleCode = json.Value<string>("styleCode")?.Trim()?.ToUpperInvariant() ?? "";
             var confidence = json.Value<double?>("confidence") ?? 0.0;
-            var reasoning = json.Value<string>("reasoning")?.Trim() ?? string.Empty;
+            var reasoning = json.Value<string>("reasoning")?.Trim() ?? "";
 
             if (string.IsNullOrWhiteSpace(styleCode))
             {
@@ -269,9 +268,9 @@ public sealed class DocumentStyleClassifier : IDocumentStyleClassifier
 /// </summary>
 public sealed class DocumentStyleClassification
 {
-    public string StyleCode { get; set; } = string.Empty;
+    public string StyleCode { get; set; } = "";
     public string? StyleId { get; set; }
     public int StyleVersion { get; set; }
     public double Confidence { get; set; }
-    public string Reasoning { get; set; } = string.Empty;
+    public string Reasoning { get; set; } = "";
 }

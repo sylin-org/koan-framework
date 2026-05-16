@@ -33,7 +33,7 @@ public sealed class AssemblyCache
     /// <returns>True if added, false if already cached</returns>
     public bool AddAssembly(Assembly assembly)
     {
-        var name = assembly.GetName().Name ?? string.Empty;
+        var name = assembly.GetName().Name ?? "";
         return _assembliesByName.TryAdd(name, assembly);
     }
 

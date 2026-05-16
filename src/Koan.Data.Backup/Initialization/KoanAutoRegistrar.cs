@@ -45,7 +45,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         var defaultStorageProfile = Configuration.ReadWithSource(
             cfg,
             BackupItems.DefaultStorageProfile.Key,
-            defaults.DefaultStorageProfile ?? string.Empty);
+            defaults.DefaultStorageProfile ?? "");
 
         var defaultBatchSize = Configuration.ReadWithSource(
             cfg,
@@ -132,7 +132,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     /// This method is called after all services are registered and the service provider is built.
     /// It builds the backup inventory and emits warnings for uncovered entities.
     /// </remarks>
-    public static async Task ValidateBackupInventoryAsync(IServiceProvider services, ILogger logger)
+    public static async Task ValidateBackupInventory(IServiceProvider services, ILogger logger)
     {
         try
         {
@@ -145,7 +145,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
             Log.BootDebug(LogActions.Inventory, "building", ("module", "Koan.Data.Backup"));
 
-            var inventory = await discoveryService.BuildInventoryAsync();
+            var inventory = await discoveryService.BuildInventory();
             _cachedInventory = inventory;
 
             // Emit inventory summary
@@ -275,7 +275,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         }
 
         var displayValues = resolved
-            .Select(v => (v.Value ?? string.Empty).Trim())
+            .Select(v => (v.Value ?? "").Trim())
             .Where(v => !string.IsNullOrEmpty(v))
             .ToArray();
 
@@ -296,7 +296,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         }
 
         var trimmed = items
-            .Select(i => (i ?? string.Empty).Trim())
+            .Select(i => (i ?? "").Trim())
             .Where(i => i.Length > 0)
             .ToArray();
 

@@ -9,7 +9,6 @@ public sealed class JsonDataOptions
 {
     [Required]
     public string DirectoryPath { get; set; } = ".\\data";
-    // Paging guardrails (used only via options paths for explicit paging; no-options materialization is handled by facade loops)
+    // Default fallback only (NOT a cap). Per ADR no adapter-side cap.
     public int DefaultPageSize { get; set; } = 1000;
-    public int MaxPageSize { get; set; } = 10_000;
 }

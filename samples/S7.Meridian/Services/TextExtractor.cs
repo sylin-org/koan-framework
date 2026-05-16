@@ -12,12 +12,12 @@ namespace Koan.Samples.Meridian.Services;
 
 public interface ITextExtractor
 {
-    Task<TextExtractionResult> ExtractAsync(SourceDocument document, CancellationToken ct);
+    Task<TextExtractionResult> Extract(SourceDocument document, CancellationToken ct);
 }
 
 public sealed class TextExtractionResult
 {
-    public string Text { get; init; } = string.Empty;
+    public string Text { get; init; } = "";
     public double Confidence { get; init; } = 0.0;
     public int PageCount { get; init; } = 0;
     public string Method { get; init; } = "Unknown";
@@ -38,11 +38,11 @@ public sealed class TextExtractor : ITextExtractor
         _logger = logger;
     }
 
-    public async Task<TextExtractionResult> ExtractAsync(SourceDocument document, CancellationToken ct)
+    public async Task<TextExtractionResult> Extract(SourceDocument document, CancellationToken ct)
     {
-        await using var stream = await _storage.OpenReadAsync(document.StorageKey, ct);
+        await using var stream = await _storage.OpenRead(document.StorageKey, ct);
         await using var buffer = new MemoryStream();
-        await stream.CopyToAsync(buffer, ct);
+        await stream.CopyTo(buffer, ct);
         buffer.Position = 0;
 
         var mediaType = document.MediaType?.ToLowerInvariant();
@@ -57,7 +57,7 @@ public sealed class TextExtractor : ITextExtractor
 
             if (ShouldFallbackToOcr(pdfResult))
             {
-                var ocrResult = await TryOcrAsync(buffer, ct);
+                var ocrResult = await TryOcr(buffer, ct);
                 if (ocrResult is not null)
                 {
                     _logger.LogInformation("OCR fallback succeeded for document {DocumentId}.", document.Id);
@@ -77,11 +77,11 @@ public sealed class TextExtractor : ITextExtractor
 
         if (mediaType is "text/plain" or "text/markdown")
         {
-            return await ExtractPlainTextAsync(buffer, ct);
+            return await ExtractPlainText(buffer, ct);
         }
 
         _logger.LogWarning("Unknown media type {MediaType} for document {DocumentId}; falling back to plain text read.", mediaType, document.Id);
-        return await ExtractPlainTextAsync(buffer, ct);
+        return await ExtractPlainText(buffer, ct);
     }
 
     private static TextExtractionResult ExtractFromPdf(Stream pdfStream)
@@ -106,7 +106,7 @@ public sealed class TextExtractor : ITextExtractor
         };
     }
 
-    private async Task<TextExtractionResult> ExtractPlainTextAsync(Stream stream, CancellationToken ct)
+    private async Task<TextExtractionResult> ExtractPlainText(Stream stream, CancellationToken ct)
     {
         stream.Position = 0;
         using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
@@ -129,7 +129,7 @@ public sealed class TextExtractor : ITextExtractor
         {
             return new TextExtractionResult
             {
-                Text = string.Empty,
+                Text = "",
                 Confidence = 0.1,
                 PageCount = 0,
                 Method = "DocxEmpty"
@@ -179,7 +179,7 @@ public sealed class TextExtractor : ITextExtractor
         return whitespaceRatio > 0.5;
     }
 
-    private async Task<TextExtractionResult?> TryOcrAsync(Stream pdfStream, CancellationToken ct)
+    private async Task<TextExtractionResult?> TryOcr(Stream pdfStream, CancellationToken ct)
     {
         if (!_options.Extraction.Ocr.Enabled)
         {
@@ -193,7 +193,7 @@ public sealed class TextExtractor : ITextExtractor
 
         try
         {
-            var result = await _ocrClient.ExtractAsync(pdfStream, ct);
+            var result = await _ocrClient.Extract(pdfStream, ct);
             if (result is null)
             {
                 return null;

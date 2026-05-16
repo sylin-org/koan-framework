@@ -30,7 +30,7 @@ public sealed class CanonizationEvent
     /// <summary>
     /// Human readable message.
     /// </summary>
-    public string Message { get; init; } = string.Empty;
+    public string Message { get; init; } = "";
 
     /// <summary>
     /// Optional structured detail.

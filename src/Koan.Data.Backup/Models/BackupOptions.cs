@@ -5,9 +5,9 @@ namespace Koan.Data.Backup.Models;
 public class BackupOptions
 {
     public string? Description { get; set; }
-    public string[] Tags { get; set; } = Array.Empty<string>();
+    public string[] Tags { get; set; } = [];
     public string? Partition { get; set; }
-    public string StorageProfile { get; set; } = string.Empty;
+    public string StorageProfile { get; set; } = "";
     public CompressionLevel CompressionLevel { get; set; } = CompressionLevel.Optimal;
     public bool VerificationEnabled { get; set; } = true;
     public int BatchSize { get; set; } = 1000;
@@ -29,7 +29,7 @@ public class GlobalBackupOptions : BackupOptions
 public class RestoreOptions
 {
     public string? TargetPartition { get; set; }
-    public string StorageProfile { get; set; } = string.Empty;
+    public string StorageProfile { get; set; } = "";
     public bool ReplaceExisting { get; set; } = false;
     public bool DisableConstraints { get; set; } = true;
     public bool DisableIndexes { get; set; } = true;

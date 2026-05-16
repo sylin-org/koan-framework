@@ -48,7 +48,7 @@ public sealed class PipelineE2ETests
             KoanEnv.TryInitialize(scopedProvider);
 
             using var partition = EntityContext.Partition($"meridian-e2e-{Guid.NewGuid():N}");
-            using var aiScope = Ai.With(new FakeAi());
+            using var aiScope = Client.With(new FakeAi());
             var ct = CancellationToken.None;
 
             var analysisType = new AnalysisType
@@ -78,7 +78,7 @@ public sealed class PipelineE2ETests
             await pipeline.Save(ct);
 
             const string documentText = "Our company had annual revenue of $47.2M in FY2023. We have 150 employees.";
-            var storageKey = await storage.StoreStringAsync(documentText, "financials.txt", "text/plain", ct);
+            var storageKey = await storage.StoreString(documentText, "financials.txt", "text/plain", ct);
 
             var document = new SourceDocument
             {
@@ -106,7 +106,7 @@ public sealed class PipelineE2ETests
             await job.Save(ct);
 
             var processor = scopedProvider.GetRequiredService<IPipelineProcessor>();
-            await processor.ProcessAsync(job, ct);
+            await processor.Process(job, ct);
 
             var extractions = await ExtractedField.Query(e => e.PipelineId == pipeline.Id, ct);
             var fieldSummary = string.Join(", ", extractions.Select(e => $"{e.FieldPath}={e.ValueJson}"));
@@ -143,8 +143,8 @@ public sealed class PipelineE2ETests
                 AppHost.Current = previousHost;
             }
 
-            await scope.DisposeAsync();
-            await (provider as IAsyncDisposable ?? provider).DisposeAsync();
+            await scope.Dispose();
+            await (provider as IAsyncDisposable ?? provider).Dispose();
         }
     }
 
@@ -212,7 +212,7 @@ public sealed class PipelineE2ETests
     {
         private readonly ConcurrentDictionary<string, byte[]> _store = new(StringComparer.OrdinalIgnoreCase);
 
-        public async Task<string> StoreAsync(Stream content, string fileName, string? contentType, CancellationToken ct = default)
+        public async Task<string> Store(Stream content, string fileName, string? contentType, CancellationToken ct = default)
         {
             using var ms = new MemoryStream();
             await content.CopyToAsync(ms, ct).ConfigureAwait(false);
@@ -221,7 +221,7 @@ public sealed class PipelineE2ETests
             return key;
         }
 
-        public Task<Stream> OpenReadAsync(string storageKey, CancellationToken ct = default)
+        public Task<Stream> OpenRead(string storageKey, CancellationToken ct = default)
         {
             if (!_store.TryGetValue(storageKey, out var bytes))
             {
@@ -231,7 +231,7 @@ public sealed class PipelineE2ETests
             return Task.FromResult<Stream>(new MemoryStream(bytes, writable: false));
         }
 
-        public Task<string> StoreStringAsync(string content, string fileName, string? contentType, CancellationToken ct = default)
+        public Task<string> StoreString(string content, string fileName, string? contentType, CancellationToken ct = default)
         {
             var bytes = Encoding.UTF8.GetBytes(content);
             var key = $"fake/{Guid.NewGuid():N}{Path.GetExtension(fileName)}";
@@ -244,7 +244,7 @@ public sealed class PipelineE2ETests
     {
         private readonly ConcurrentDictionary<string, byte[]> _store = new(StringComparer.OrdinalIgnoreCase);
 
-        public async Task<string> StoreAsync(Stream content, string fileName, string? contentType, CancellationToken ct = default)
+        public async Task<string> Store(Stream content, string fileName, string? contentType, CancellationToken ct = default)
         {
             using var ms = new MemoryStream();
             await content.CopyToAsync(ms, ct).ConfigureAwait(false);
@@ -256,9 +256,9 @@ public sealed class PipelineE2ETests
 
     private sealed class FakePdfRenderer : IPdfRenderer
     {
-        public Task<byte[]> RenderAsync(string markdown, CancellationToken ct = default)
+        public Task<byte[]> Render(string markdown, CancellationToken ct = default)
         {
-            var bytes = Encoding.UTF8.GetBytes(markdown ?? string.Empty);
+            var bytes = Encoding.UTF8.GetBytes(markdown ?? "");
             return Task.FromResult(bytes);
         }
     }
@@ -269,7 +269,7 @@ public sealed class PipelineE2ETests
 
         private readonly ConcurrentDictionary<string, CacheEntry> _entries = new(StringComparer.OrdinalIgnoreCase);
 
-        public Task<CachedEmbedding?> GetAsync(string contentHash, string modelId, string entityTypeName, CancellationToken ct = default)
+        public Task<CachedEmbedding?> Get(string contentHash, string modelId, string entityTypeName, CancellationToken ct = default)
         {
             var key = ComposeKey(contentHash, modelId, entityTypeName);
             if (!_entries.TryGetValue(key, out var entry))
@@ -289,21 +289,21 @@ public sealed class PipelineE2ETests
             return Task.FromResult<CachedEmbedding?>(cached);
         }
 
-        public Task SetAsync(string contentHash, string modelId, float[] embedding, string entityTypeName, CancellationToken ct = default)
+        public Task Set(string contentHash, string modelId, float[] embedding, string entityTypeName, CancellationToken ct = default)
         {
             var key = ComposeKey(contentHash, modelId, entityTypeName);
             _entries[key] = new CacheEntry(embedding, DateTimeOffset.UtcNow);
             return Task.CompletedTask;
         }
 
-        public Task<int> FlushAsync(CancellationToken ct = default)
+        public Task<int> Flush(CancellationToken ct = default)
         {
             var count = _entries.Count;
             _entries.Clear();
             return Task.FromResult(count);
         }
 
-        public Task<CacheStats> GetStatsAsync(CancellationToken ct = default)
+        public Task<CacheStats> GetStats(CancellationToken ct = default)
         {
             var total = _entries.Count;
             DateTimeOffset? oldest = null;
@@ -329,22 +329,22 @@ public sealed class PipelineE2ETests
             => $"{entity}:{model}:{hash}";
     }
 
-    private sealed class FakeAi : IAi
+    private sealed class FakeAi : IAiPipeline
     {
-        public Task<AiChatResponse> PromptAsync(AiChatRequest request, CancellationToken ct = default)
+        public Task<AiChatResponse> Prompt(AiChatRequest request, CancellationToken ct = default)
         {
-            var prompt = request.Messages.LastOrDefault()?.Content ?? string.Empty;
+            var prompt = request.Messages.LastOrDefault()?.Content ?? "";
             var response = ResolveResponse(prompt);
             return Task.FromResult(response);
         }
 
-        public async IAsyncEnumerable<AiChatChunk> StreamAsync(AiChatRequest request, [EnumeratorCancellation] CancellationToken ct = default)
+        public async IAsyncEnumerable<AiChatChunk> Stream(AiChatRequest request, [EnumeratorCancellation] CancellationToken ct = default)
         {
-            var response = await PromptAsync(request, ct).ConfigureAwait(false);
+            var response = await Prompt(request, ct).ConfigureAwait(false);
             yield return new AiChatChunk { DeltaText = response.Text, Index = 0, Model = response.Model };
         }
 
-        public Task<AiEmbeddingsResponse> EmbedAsync(AiEmbeddingsRequest request, CancellationToken ct = default)
+        public Task<AiEmbeddingsResponse> Embed(AiEmbeddingsRequest request, CancellationToken ct = default)
         {
             var vectors = request.Input.Select(ComputeVector).ToList();
             return Task.FromResult(new AiEmbeddingsResponse
@@ -355,9 +355,9 @@ public sealed class PipelineE2ETests
             });
         }
 
-        public async Task<string> PromptAsync(string message, string? model = null, AiPromptOptions? opts = null, CancellationToken ct = default)
+        public async Task<string> Prompt(string message, string? model = null, AiPromptOptions? opts = null, CancellationToken ct = default)
         {
-            var response = await PromptAsync(new AiChatRequest
+            var response = await Prompt(new AiChatRequest
             {
                 Model = model,
                 Options = opts,
@@ -367,7 +367,7 @@ public sealed class PipelineE2ETests
             return response.Text;
         }
 
-        public async IAsyncEnumerable<AiChatChunk> StreamAsync(string message, string? model = null, AiPromptOptions? opts = null, [EnumeratorCancellation] CancellationToken ct = default)
+        public async IAsyncEnumerable<AiChatChunk> Stream(string message, string? model = null, AiPromptOptions? opts = null, [EnumeratorCancellation] CancellationToken ct = default)
         {
             var request = new AiChatRequest
             {
@@ -376,7 +376,7 @@ public sealed class PipelineE2ETests
                 Messages = new List<AiMessage> { new("user", message) }
             };
 
-            await foreach (var chunk in StreamAsync(request, ct))
+            await foreach (var chunk in Stream(request, ct))
             {
                 yield return chunk;
             }
@@ -385,7 +385,7 @@ public sealed class PipelineE2ETests
         private static AiChatResponse ResolveResponse(string prompt)
         {
             var match = Regex.Match(prompt, @"Extract the value for '([^']+)'", RegexOptions.IgnoreCase);
-            var field = match.Success ? match.Groups[1].Value : string.Empty;
+            var field = match.Success ? match.Groups[1].Value : "";
 
             if (field.Equals("employees", StringComparison.OrdinalIgnoreCase))
             {

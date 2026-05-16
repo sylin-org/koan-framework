@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Koan.Core;
 using Koan.Core.Modules;
 using Koan.Data.Vector.Abstractions;
+using Koan.Data.Vector.Abstractions.Schema;
 using Koan.Data.Vector.Infrastructure;
 
 namespace Koan.Data.Vector;
@@ -15,6 +16,7 @@ public static class ServiceCollectionVectorExtensions
         services.AddKoanOptions<VectorDefaultsOptions>(Constants.Configuration.DefaultsSection);
         services.AddKoanOptions<VectorWorkflowOptions>(Constants.Configuration.WorkflowsSection);
         services.TryAddSingleton<IVectorWorkflowRegistry, VectorWorkflowRegistry>();
+        services.TryAddSingleton<VectorSchemaRegistry>();
         return services;
     }
 }

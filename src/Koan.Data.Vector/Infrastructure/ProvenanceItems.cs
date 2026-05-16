@@ -11,7 +11,7 @@ internal static class VectorProvenanceItems
     };
 
     internal static readonly ProvenanceItem DefaultProvider = new(
-        "Koan:Data:VectorDefaults:DefaultProvider",
+        Constants.Configuration.Keys.DefaultProvider,
         "Default Vector Provider",
         "Fallback vector provider identifier used when requests omit an explicit target.",
         DefaultConsumers: DefaultProviderConsumers);

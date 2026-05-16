@@ -90,8 +90,8 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
 
     public Task<bool> IsReadyAsync(CancellationToken ct = default) => _provider.IsReadyAsync(ct);
 
-    public Task WaitForReadinessAsync(TimeSpan? timeout = null, CancellationToken ct = default)
-        => _provider.WaitForReadinessAsync(timeout ?? Timeout, ct);
+    public Task WaitForReadiness(TimeSpan? timeout = null, CancellationToken ct = default)
+        => _provider.WaitForReadiness(timeout ?? Timeout, ct);
 
     public ReadinessPolicy Policy => _options.Readiness.Policy;
 
@@ -109,10 +109,10 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
     private Task<TResult> ExecuteWithReadinessAsync<TResult>(Func<Task<TResult>> operation, CancellationToken ct)
         => this.WithReadinessAsync<TResult, TEntity>(operation, ct);
 
-    private Task ExecuteWithReadinessAsync(Func<Task> operation, CancellationToken ct)
-        => this.WithReadinessAsync(operation, ct);
+    private Task ExecuteWithReadiness(Func<Task> operation, CancellationToken ct)
+        => this.WithReadiness(operation, ct);
 
-    private async ValueTask<CouchbaseCollectionContext> ResolveCollectionAsync(CancellationToken ct)
+    private async ValueTask<CouchbaseCollectionContext> ResolveCollection(CancellationToken ct)
     {
         var desired = StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
         if (!string.Equals(_collectionName, desired, StringComparison.Ordinal))
@@ -120,16 +120,16 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             _collectionName = desired;
         }
 
-        return await _provider.GetCollectionContextAsync(_collectionName, ct);
+        return await _provider.GetCollectionContext(_collectionName, ct);
     }
 
-    public Task<TEntity?> GetAsync(TKey id, CancellationToken ct = default)
+    public Task<TEntity?> Get(TKey id, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
         {
             ct.ThrowIfCancellationRequested();
             using var act = CouchbaseTelemetry.Activity.StartActivity("couchbase.get");
             act?.SetTag("entity", typeof(TEntity).FullName);
-            var ctx = await ResolveCollectionAsync(ct);
+            var ctx = await ResolveCollection(ct);
             try
             {
                 var result = await ctx.Collection.GetAsync(GetKey(id), new GetOptions().CancellationToken(ct));
@@ -141,14 +141,14 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             }
             catch (global::Couchbase.Core.Exceptions.UnambiguousTimeoutException ex) when (IsCollectionNotFound(ex))
             {
-                await EnsureCollectionAsync(ctx, ct);
+                await EnsureCollection(ctx, ct);
 
                 var result = await ctx.Collection.GetAsync(GetKey(id), new GetOptions().CancellationToken(ct));
                 return result.ContentAs<TEntity>();
             }
         }, ct);
 
-    public Task<IReadOnlyList<TEntity?>> GetManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    public Task<IReadOnlyList<TEntity?>> GetMany(IEnumerable<TKey> ids, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
         {
             ct.ThrowIfCancellationRequested();
@@ -158,10 +158,10 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
             if (idList.Count == 0)
             {
-                return (IReadOnlyList<TEntity?>)Array.Empty<TEntity?>();
+                return (IReadOnlyList<TEntity?>)[];
             }
 
-            var ctx = await ResolveCollectionAsync(ct);
+            var ctx = await ResolveCollection(ct);
 
             // Build list of keys for batch get
             var keys = idList.Select(id => GetKey(id)).ToList();
@@ -211,22 +211,22 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             }
         }, ct);
 
-    public Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default)
-        => ExecuteWithReadinessAsync(() => QueryInternalAsync(query, null, ct), ct);
+    public Task<IReadOnlyList<TEntity>> Query(object? query, CancellationToken ct = default)
+        => ExecuteWithReadinessAsync(() => QueryInternal(query, null, ct), ct);
 
-    public Task<IReadOnlyList<TEntity>> QueryAsync(object? query, DataQueryOptions? options, CancellationToken ct = default)
-        => ExecuteWithReadinessAsync(() => QueryInternalAsync(query, options, ct), ct);
+    public Task<IReadOnlyList<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
+        => ExecuteWithReadinessAsync(() => QueryInternal(query, options, ct), ct);
 
-    public Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-        => QueryAsync(predicate, null, ct);
+    public Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
+        => Query(predicate, null, ct);
 
-    public Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
+    public Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
         {
             ct.ThrowIfCancellationRequested();
             using var act = CouchbaseTelemetry.Activity.StartActivity("couchbase.query.linq");
             act?.SetTag("entity", typeof(TEntity).FullName);
-            var ctx = await ResolveCollectionAsync(ct);
+            var ctx = await ResolveCollection(ct);
             if (!CouchbaseLinqQueryTranslator.TryTranslate<TEntity, TKey>(predicate, _optimizationInfo, out var translation))
             {
                 throw new NotSupportedException($"Unable to translate expression '{predicate}' to N1QL for Couchbase.");
@@ -238,13 +238,13 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
                 Parameters = translation.Parameters.ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value)
             };
 
-            return await ExecuteQueryAsync(ctx, statement, definition, options, ct);
+            return await ExecuteQuery(ctx, statement, definition, options, ct);
         }, ct);
 
-    private async Task<IReadOnlyList<TEntity>> QueryInternalAsync(object? query, DataQueryOptions? options, CancellationToken ct)
+    private async Task<IReadOnlyList<TEntity>> QueryInternal(object? query, DataQueryOptions? options, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        var ctx = await ResolveCollectionAsync(ct);
+        var ctx = await ResolveCollection(ct);
         var definition = query switch
         {
             CouchbaseQueryDefinition def => def,
@@ -255,16 +255,16 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
         var statement = definition?.Statement ??
             $"SELECT RAW doc FROM `{ctx.BucketName}`.`{ctx.ScopeName}`.`{ctx.CollectionName}` AS doc";
 
-        return await ExecuteQueryAsync(ctx, statement, definition, options, ct);
+        return await ExecuteQuery(ctx, statement, definition, options, ct);
     }
 
-    public Task<CountResult> CountAsync(CountRequest<TEntity> request, CancellationToken ct = default)
+    public Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
         {
             ct.ThrowIfCancellationRequested();
             using var act = CouchbaseTelemetry.Activity.StartActivity("couchbase.count");
             act?.SetTag("entity", typeof(TEntity).FullName);
-            var ctx = await ResolveCollectionAsync(ct);
+            var ctx = await ResolveCollection(ct);
 
             CouchbaseQueryDefinition? definition = null;
             string statement;
@@ -303,13 +303,13 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             return CountResult.Exact(result);
         }, ct);
 
-    public Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)
+    public Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
         {
             ct.ThrowIfCancellationRequested();
             using var act = CouchbaseTelemetry.Activity.StartActivity("couchbase.upsert");
             act?.SetTag("entity", typeof(TEntity).FullName);
-            var ctx = await ResolveCollectionAsync(ct);
+            var ctx = await ResolveCollection(ct);
             PrepareEntityForStorage(model);
             var key = GetKey(model.Id);
             var options = new UpsertOptions().CancellationToken(ct);
@@ -324,7 +324,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             }
             catch (global::Couchbase.Core.Exceptions.UnambiguousTimeoutException ex) when (IsCollectionNotFound(ex))
             {
-                await EnsureCollectionAsync(ctx, ct);
+                await EnsureCollection(ctx, ct);
                 await ctx.Collection.UpsertAsync(key, model, options);
             }
 
@@ -332,13 +332,13 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             return model;
         }, ct);
 
-    public Task<bool> DeleteAsync(TKey id, CancellationToken ct = default)
+    public Task<bool> Delete(TKey id, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
         {
             ct.ThrowIfCancellationRequested();
             using var act = CouchbaseTelemetry.Activity.StartActivity("couchbase.delete");
             act?.SetTag("entity", typeof(TEntity).FullName);
-            var ctx = await ResolveCollectionAsync(ct);
+            var ctx = await ResolveCollection(ct);
             try
             {
                 var options = new RemoveOptions().CancellationToken(ct);
@@ -355,13 +355,13 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             }
         }, ct);
 
-    public Task<int> UpsertManyAsync(IEnumerable<TEntity> models, CancellationToken ct = default)
+    public Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
         {
             ct.ThrowIfCancellationRequested();
             using var act = CouchbaseTelemetry.Activity.StartActivity("couchbase.bulk.upsert");
             act?.SetTag("entity", typeof(TEntity).FullName);
-            var ctx = await ResolveCollectionAsync(ct);
+            var ctx = await ResolveCollection(ct);
             var items = models as ICollection<TEntity> ?? models.ToArray();
             var upsertTasks = new List<Task>(items.Count);
             foreach (var model in items)
@@ -382,19 +382,19 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             return items.Count;
         }, ct);
 
-    public Task<int> DeleteManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    public Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
         {
             ct.ThrowIfCancellationRequested();
             using var act = CouchbaseTelemetry.Activity.StartActivity("couchbase.bulk.delete");
             act?.SetTag("entity", typeof(TEntity).FullName);
-            var ctx = await ResolveCollectionAsync(ct);
+            var ctx = await ResolveCollection(ct);
             var keys = ids as ICollection<TKey> ?? ids.ToArray();
             var tasks = new List<Task<bool>>(keys.Count);
             foreach (var id in keys)
             {
                 ct.ThrowIfCancellationRequested();
-                tasks.Add(RemoveAsync(ctx.Collection, GetKey(id), ct));
+                tasks.Add(Remove(ctx.Collection, GetKey(id), ct));
             }
 
             var results = await Task.WhenAll(tasks);
@@ -403,11 +403,11 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             return deleted;
         }, ct);
 
-    public Task<int> DeleteAllAsync(CancellationToken ct = default)
+    public Task<int> DeleteAll(CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
         {
             ct.ThrowIfCancellationRequested();
-            var ctx = await ResolveCollectionAsync(ct);
+            var ctx = await ResolveCollection(ct);
             var statement = $"DELETE FROM `{ctx.BucketName}`.`{ctx.ScopeName}`.`{ctx.CollectionName}` RETURNING META().id";
             var count = 0;
             await foreach (var _ in ExecuteQueryAsync<dynamic>(ctx, statement, null, null, ct))
@@ -417,11 +417,11 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             return count;
         }, ct);
 
-    public Task<long> RemoveAllAsync(RemoveStrategy strategy, CancellationToken ct = default)
+    public Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
         {
             ct.ThrowIfCancellationRequested();
-            var ctx = await ResolveCollectionAsync(ct);
+            var ctx = await ResolveCollection(ct);
             var statement = $"DELETE FROM `{ctx.BucketName}`.`{ctx.ScopeName}`.`{ctx.CollectionName}` RETURNING META().id";
             var count = 0L;
             await foreach (var _ in ExecuteQueryAsync<dynamic>(ctx, statement, null, null, ct))
@@ -438,21 +438,21 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
     public Task<TResult> ExecuteAsync<TResult>(Instruction instruction, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
         {
-            var ctx = await ResolveCollectionAsync(ct);
+            var ctx = await ResolveCollection(ct);
             switch (instruction.Name)
             {
                 case DataInstructions.EnsureCreated:
-                    await EnsureCollectionAsync(ctx, ct);
+                    await EnsureCollection(ctx, ct);
                     return (TResult)(object)true;
                 case DataInstructions.Clear:
-                    var deleted = await DeleteAllAsync(ct);
+                    var deleted = await DeleteAll(ct);
                     return (TResult)(object)deleted;
                 default:
                     throw new NotSupportedException($"Instruction '{instruction.Name}' not supported by Couchbase adapter.");
             }
         }, ct);
 
-    private async Task EnsureCollectionAsync(CouchbaseCollectionContext ctx, CancellationToken ct)
+    private async Task EnsureCollection(CouchbaseCollectionContext ctx, CancellationToken ct)
     {
         var manager = ctx.Bucket.Collections;
         if (!string.Equals(ctx.ScopeName, "_default", StringComparison.Ordinal))
@@ -486,12 +486,12 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
     private static bool IsAlreadyExists(CouchbaseException ex)
         => ex.Context?.Message?.Contains("already exists", StringComparison.OrdinalIgnoreCase) == true;
 
-    public async Task EnsureHealthyAsync(CancellationToken ct)
+    public async Task EnsureHealthy(CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         var collectionName = StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
-        var ctx = await _provider.GetCollectionContextAsync(collectionName, ct);
-        await EnsureCollectionAsync(ctx, ct);
+        var ctx = await _provider.GetCollectionContext(collectionName, ct);
+        await EnsureCollection(ctx, ct);
     }
 
     public void InvalidateHealth()
@@ -499,7 +499,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
         // No-op: collection health is verified on demand via the provider.
     }
 
-    private async Task<IReadOnlyList<TEntity>> ExecuteQueryAsync(CouchbaseCollectionContext ctx, string statement, CouchbaseQueryDefinition? definition, DataQueryOptions? options, CancellationToken ct)
+    private async Task<IReadOnlyList<TEntity>> ExecuteQuery(CouchbaseCollectionContext ctx, string statement, CouchbaseQueryDefinition? definition, DataQueryOptions? options, CancellationToken ct)
     {
         var rows = new List<TEntity>();
         await foreach (var row in ExecuteQueryAsync<TEntity>(ctx, statement, definition, options, ct))
@@ -552,7 +552,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
         {
             // Extract collection name from the error message or statement
             // Try to create the collection and retry the query once
-            await EnsureCollectionAsync(ctx, ct);
+            await EnsureCollection(ctx, ct);
 
             // Retry the query after creating the collection
             result = await ctx.Cluster.QueryAsync<T>(finalStatement, queryOptions);
@@ -573,13 +573,19 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
 
     private (int offset, int limit) ComputeSkipTake(DataQueryOptions? options)
     {
+        // Check if pagination is active
+        var hasPagination = options?.HasPagination ?? false;
+
+        if (!hasPagination)
+        {
+            // No pagination - return full result set without applying default page size
+            return (0, int.MaxValue);
+        }
+
+        // Pagination is active - apply default fallback only. Per ADR no adapter-side cap.
         var page = options?.Page is int p && p > 0 ? p : 1;
         var sizeReq = options?.PageSize;
         var size = sizeReq is int ps && ps > 0 ? ps : _options.DefaultPageSize;
-
-        // Apply MaxPageSize limit to user-requested page sizes
-        if (size > _options.MaxPageSize) size = _options.MaxPageSize;
-
         var offset = (page - 1) * size;
         return (offset, size);
     }
@@ -616,7 +622,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             _ => Convert.ToString(id, CultureInfo.InvariantCulture) ?? throw new InvalidOperationException("Unable to convert key to string.")
         };
 
-    private async Task<bool> RemoveAsync(ICouchbaseCollection collection, string key, CancellationToken ct)
+    private async Task<bool> Remove(ICouchbaseCollection collection, string key, CancellationToken ct)
     {
         try
         {
@@ -672,11 +678,11 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             return this;
         }
 
-        public async Task<BatchResult> SaveAsync(BatchOptions? options = null, CancellationToken ct = default)
+        public async Task<BatchResult> Save(BatchOptions? options = null, CancellationToken ct = default)
         {
             if (options?.RequireAtomic == true)
             {
-                return await SaveAtomicAsync(ct);
+                return await SaveAtomic(ct);
             }
 
             var added = 0;
@@ -685,22 +691,22 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
 
             foreach (var entity in _upserts)
             {
-                await _repo.UpsertAsync(entity, ct);
+                await _repo.Upsert(entity, ct);
                 added++;
             }
 
             foreach (var (id, mutate) in _mutations)
             {
-                var current = await _repo.GetAsync(id, ct);
+                var current = await _repo.Get(id, ct);
                 if (current is null) continue;
                 mutate(current);
-                await _repo.UpsertAsync(current, ct);
+                await _repo.Upsert(current, ct);
                 updated++;
             }
 
             foreach (var id in _deletes)
             {
-                if (await _repo.DeleteAsync(id, ct))
+                if (await _repo.Delete(id, ct))
                 {
                     deleted++;
                 }
@@ -710,9 +716,9 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             return new BatchResult(added, updated, deleted);
         }
 
-        private async Task<BatchResult> SaveAtomicAsync(CancellationToken ct)
+        private async Task<BatchResult> SaveAtomic(CancellationToken ct)
         {
-            var ctx = await _repo.ResolveCollectionAsync(ct);
+            var ctx = await _repo.ResolveCollection(ct);
             var added = 0;
             var updated = 0;
             var deleted = 0;

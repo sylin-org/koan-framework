@@ -10,10 +10,14 @@ namespace Koan.Data.Core.Configuration;
 /// </summary>
 public static class StorageNameRegistry
 {
-    private static string BagKey(string provider, string? set)
-        => set is null || set.Length == 0 || string.Equals(set, "root", StringComparison.OrdinalIgnoreCase)
-            ? $"name:{provider}:root"
-            : $"name:{provider}:{set}";
+    private static string CacheKey(string provider, string? partition)
+    {
+        var trimmedPartition = partition?.Trim();
+
+        return string.IsNullOrEmpty(trimmedPartition)
+            ? $"name:{provider}"
+            : $"name:{provider}:{trimmedPartition}";
+    }
 
     public static string GetOrCompute<TEntity, TKey>(IServiceProvider sp)
         where TEntity : class, IEntity<TKey>
@@ -21,38 +25,28 @@ public static class StorageNameRegistry
     {
         var cfg = AggregateConfigs.Get<TEntity, TKey>(sp);
         var provider = cfg.Provider;
-        var set = EntityContext.Current?.Partition;
-        var key = BagKey(provider, set);
+        var partition = EntityContext.Current?.Partition;
+        var key = CacheKey(provider, partition);
         return AggregateBags.GetOrAdd<TEntity, TKey, string>(sp, key, () =>
         {
-            // Resolve the provider-specific defaults
-            var providers = sp.GetServices<INamingDefaultsProvider>();
-            INamingDefaultsProvider? defaultsProvider = providers.FirstOrDefault(p => string.Equals(p.Provider, provider, StringComparison.OrdinalIgnoreCase))
-                ?? providers.FirstOrDefault();
-            if (defaultsProvider is null)
-            {
-                // No registered defaults provider; fall back to the DI resolver with built-in defaults
-                var diFallback = sp.GetRequiredService<IStorageNameResolver>();
-                // Prefer global fallback options if configured
-                var fallback = sp.GetService<IOptions<Naming.NamingFallbackOptions>>()?.Value;
-                var convFallback = fallback is not null
-                    ? new StorageNameResolver.Convention(fallback.Style, fallback.Separator, fallback.Casing)
-                    : new StorageNameResolver.Convention(StorageNamingStyle.EntityType, ".", NameCasing.AsIs);
-                var baseName = StorageNameSelector.ResolveName(repository: null, diFallback, typeof(TEntity), convFallback, adapterOverride: null);
-                return AppendSet(baseName, set);
-            }
-            var diResolver = sp.GetRequiredService<IStorageNameResolver>();
-            var conv = defaultsProvider.GetConvention(sp);
-            var overrideFn = defaultsProvider.GetAdapterOverride(sp);
-            var resolved = StorageNameSelector.ResolveName(repository: null, diResolver, typeof(TEntity), conv, overrideFn);
-            return AppendSet(resolved, set);
+            var namingProvider = ResolveProvider(sp, provider);
+            return NamingComposer.Compose(namingProvider, typeof(TEntity), partition, sp);
         });
     }
 
-    private static string AppendSet(string baseName, string? set)
+    private static INamingProvider ResolveProvider(IServiceProvider sp, string providerKey)
     {
-        if (string.IsNullOrWhiteSpace(set) || string.Equals(set, "root", StringComparison.OrdinalIgnoreCase))
-            return baseName;
-        return baseName + "#" + set;
+        // Query ONLY data adapter factories (vector has its own registry)
+        var factories = sp.GetServices<IDataAdapterFactory>();
+
+        foreach (var factory in factories)
+        {
+            if (factory.CanHandle(providerKey))
+                return factory;
+        }
+
+        throw new InvalidOperationException(
+            $"No data adapter registered for provider '{providerKey}'. " +
+            $"Ensure an IDataAdapterFactory implementation is registered for this provider.");
     }
 }

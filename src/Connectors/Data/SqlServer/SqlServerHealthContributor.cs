@@ -9,7 +9,7 @@ internal sealed class SqlServerHealthContributor(IOptions<SqlServerOptions> opti
 {
     public string Name => "data:sqlserver";
     public bool IsCritical => true;
-    public async Task<HealthReport> CheckAsync(CancellationToken ct = default)
+    public async Task<HealthReport> Check(CancellationToken ct = default)
     {
         try
         {

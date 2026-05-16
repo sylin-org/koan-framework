@@ -11,7 +11,7 @@ public sealed partial class DockerProvider : IHostingProvider
     public string Id => "docker";
     public int Priority => 100; // Windows-first default
 
-    public async Task<(bool Ok, string? Reason)> IsAvailableAsync(CancellationToken ct = default)
+    public async Task<(bool Ok, string? Reason)> IsAvailable(CancellationToken ct = default)
     {
         try
         {
@@ -27,7 +27,7 @@ public sealed partial class DockerProvider : IHostingProvider
 
     public async Task Up(string composePath, Profile profile, RunOptions options, CancellationToken ct = default)
     {
-        var detach = options.Detach ? "-d" : string.Empty;
+        var detach = options.Detach ? "-d" : "";
         var (_, _, err) = await Run(DockerCli, $"compose -f \"{composePath}\" up {detach}", ct);
         if (!string.IsNullOrWhiteSpace(err))
         {
@@ -87,16 +87,16 @@ public sealed partial class DockerProvider : IHostingProvider
 
     public async Task Down(string composePath, StopOptions options, CancellationToken ct = default)
     {
-        var vols = options.RemoveVolumes ? "-v" : string.Empty;
+        var vols = options.RemoveVolumes ? "-v" : "";
         await Run(DockerCli, $"compose -f \"{composePath}\" down {vols}", ct);
     }
 
     public async IAsyncEnumerable<string> Logs(LogsOptions options, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
-        var svc = string.IsNullOrWhiteSpace(options.Service) ? string.Empty : options.Service + " ";
-        var follow = options.Follow ? "-f" : string.Empty;
-        var tail = options.Tail is { } t ? $"--tail {t}" : string.Empty;
-        var since = string.IsNullOrWhiteSpace(options.Since) ? string.Empty : $"--since \"{options.Since}\"";
+        var svc = string.IsNullOrWhiteSpace(options.Service) ? "" : options.Service + " ";
+        var follow = options.Follow ? "-f" : "";
+        var tail = options.Tail is { } t ? $"--tail {t}" : "";
+        var since = string.IsNullOrWhiteSpace(options.Since) ? "" : $"--since \"{options.Since}\"";
         await foreach (var line in Stream(DockerCli, $"compose logs {follow} {tail} {since} {svc}", ct))
         {
             yield return line;
@@ -106,7 +106,7 @@ public sealed partial class DockerProvider : IHostingProvider
     public async Task<ProviderStatus> Status(StatusOptions options, CancellationToken ct = default)
     {
         int code = -1;
-        string stdout = string.Empty;
+        string stdout = "";
         try
         {
             var res = await Run(DockerCli, "compose ps --format json", ct);
@@ -120,7 +120,7 @@ public sealed partial class DockerProvider : IHostingProvider
         var services = code == 0 && !string.IsNullOrWhiteSpace(stdout)
             ? ParseComposePsJson(stdout)
             : new List<(string Service, string State, string? Health)>();
-        var (ok, _) = await IsAvailableAsync(ct);
+        var (ok, _) = await IsAvailable(ct);
         var engineVer = ok ? (await Run(DockerCli, "version --format '{{.Server.Version}}'", ct)).StdOut.Trim() : "";
         return new ProviderStatus(Id, engineVer, services);
     }
@@ -130,12 +130,12 @@ public sealed partial class DockerProvider : IHostingProvider
         try
         {
             var (code, outText, _) = await Run(DockerCli, "compose ps --format json", ct);
-            if (code != 0 || string.IsNullOrWhiteSpace(outText)) return Array.Empty<PortBinding>();
+            if (code != 0 || string.IsNullOrWhiteSpace(outText)) return [];
             return ParseComposePsPorts(outText);
         }
         catch
         {
-            return Array.Empty<PortBinding>();
+            return [];
         }
     }
 
@@ -145,13 +145,13 @@ public sealed partial class DockerProvider : IHostingProvider
     static string GetVersionSafe()
     {
         try { return Run(DockerCli, "version --format '{{.Server.Version}}'", CancellationToken.None).GetAwaiter().GetResult().StdOut.Trim(); }
-        catch { return string.Empty; }
+        catch { return ""; }
     }
 
     static string GetEndpointSafe()
     {
         try { return Run(DockerCli, "context show", CancellationToken.None).GetAwaiter().GetResult().StdOut.Trim(); }
-        catch { return string.Empty; }
+        catch { return ""; }
     }
 
     static async Task<(int ExitCode, string StdOut, string StdErr)> Run(string file, string args, CancellationToken ct)
@@ -224,7 +224,7 @@ public sealed partial class DockerProvider : IHostingProvider
                     var health = o["Health"]?.Value<string>();
                     if (string.IsNullOrWhiteSpace(health)) health = null; // normalize empty to null (no healthcheck)
                     if (!string.IsNullOrEmpty(name))
-                        result.Add((name!, state ?? string.Empty, health));
+                        result.Add((name!, state ?? "", health));
                 }
             }
             else
@@ -244,7 +244,7 @@ public sealed partial class DockerProvider : IHostingProvider
                         var health = o["Health"]?.Value<string>();
                         if (string.IsNullOrWhiteSpace(health)) health = null;
                         if (!string.IsNullOrEmpty(name))
-                            result.Add((name!, state ?? string.Empty, health));
+                            result.Add((name!, state ?? "", health));
                     }
                     catch { /* ignore bad lines */ }
                 }

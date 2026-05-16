@@ -114,7 +114,7 @@ internal static class PreemptiveTagFilter
     /// <returns>MD5 hash that would be checked against the preemptive list</returns>
     public static string GetHashForTag(string tag)
     {
-        if (string.IsNullOrWhiteSpace(tag)) return string.Empty;
+        if (string.IsNullOrWhiteSpace(tag)) return "";
         var normalizedTag = tag.Trim().ToLowerInvariant();
         return ComputeMD5Hash(normalizedTag);
     }

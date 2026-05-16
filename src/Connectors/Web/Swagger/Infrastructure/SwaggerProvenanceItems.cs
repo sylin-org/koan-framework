@@ -10,6 +10,7 @@ internal static class SwaggerProvenanceItems
     private const string RoutePrefixKey = Constants.Configuration.Section + ":" + Constants.Configuration.Keys.RoutePrefix;
     private const string RequireAuthKey = Constants.Configuration.Section + ":" + Constants.Configuration.Keys.RequireAuthOutsideDevelopment;
     private const string IncludeXmlCommentsKey = Constants.Configuration.Section + ":" + Constants.Configuration.Keys.IncludeXmlComments;
+    private const string DocumentDisplayNameKey = Constants.Configuration.Section + ":" + Constants.Configuration.Keys.DocumentDisplayName;
 
     private static readonly IReadOnlyCollection<string> Consumers = new[]
     {
@@ -43,6 +44,13 @@ internal static class SwaggerProvenanceItems
         "Include XML Comments",
         "Controls whether XML documentation files are loaded into Swagger metadata.",
         DefaultValue: "true",
+        DefaultConsumers: Consumers);
+
+    internal static readonly ProvenanceItem DocumentDisplayName = new(
+        DocumentDisplayNameKey,
+        "Swagger Document Display Name",
+        "Label used in Swagger UI for the primary OpenAPI document.",
+        DefaultValue: "(application name)",
         DefaultConsumers: Consumers);
 
     internal static readonly ProvenanceItem SwaggerUrl = new(

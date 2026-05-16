@@ -4,7 +4,7 @@ namespace S14.AdapterBench.Services;
 
 public interface IBenchmarkService
 {
-    Task<BenchmarkResult> RunBenchmarkAsync(
+    Task<BenchmarkResult> RunBenchmark(
         BenchmarkRequest request,
         IProgress<BenchmarkProgress>? progress = null,
         CancellationToken cancellationToken = default);

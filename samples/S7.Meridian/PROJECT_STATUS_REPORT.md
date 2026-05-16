@@ -1477,8 +1477,8 @@ tests/S7.Meridian.Tests/
 
 3. **Mock AI Responses**:
    ```csharp
-   var mockAi = new Mock<IAi>();
-   mockAi.Setup(ai => ai.Chat(It.IsAny<AiChatOptions>(), It.IsAny<CancellationToken>()))
+   var mockAi = new Mock<IAiPipeline>();
+   mockAi.Setup(ai => ai.PromptAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<AiPromptOptions>(), It.IsAny<CancellationToken>()))
          .ReturnsAsync("{\"value\": \"$47.2M\", \"confidence\": 0.92, \"passageIndex\": 0}");
    ```
 
@@ -1925,14 +1925,14 @@ private async Task<string> CallAIWithRetry(AiChatOptions options, CancellationTo
 public async Task CallAIWithRetry_TransientFailure_Retries()
 {
     var attemptCount = 0;
-    var mockAi = new Mock<IAi>();
-    mockAi.Setup(ai => ai.Chat(It.IsAny<AiChatOptions>(), It.IsAny<CancellationToken>()))
+    var mockAi = new Mock<IAiPipeline>();
+    mockAi.Setup(ai => ai.PromptAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<AiPromptOptions>(), It.IsAny<CancellationToken>()))
           .Returns(() => {
               if (++attemptCount < 3) throw new HttpRequestException("Transient error");
               return Task.FromResult("{\"value\": \"test\"}");
           });
 
-    var result = await CallAIWithRetry(new AiChatOptions(), CancellationToken.None);
+    var result = await CallAIWithRetry(mockAi.Object, CancellationToken.None);
     Assert.Equal(3, attemptCount); // Retried twice, succeeded on 3rd attempt
 }
 ```

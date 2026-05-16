@@ -19,7 +19,7 @@ internal sealed class RecipeApplier : IKoanInitializer
         // Use a safe logger; avoid building a provider. If a real provider is later added, these logs won't duplicate.
         var logger = (ILogger)NullLogger.Instance;
 
-        var opts = cfg.GetSection("Koan:Recipes").Get<KoanRecipeOptions>() ?? new KoanRecipeOptions();
+        var opts = cfg.GetSection(Infrastructure.ConfigurationConstants.Section).Get<KoanRecipeOptions>() ?? new KoanRecipeOptions();
         var active = opts.Active?.Length > 0 ? new HashSet<string>(opts.Active, StringComparer.OrdinalIgnoreCase) : null;
 
         var recipeTypes = RecipeRegistry.GetRegistered()

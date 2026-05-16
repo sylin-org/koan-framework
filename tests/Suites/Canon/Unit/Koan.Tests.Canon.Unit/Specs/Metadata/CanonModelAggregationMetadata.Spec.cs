@@ -37,7 +37,7 @@ public sealed class CanonModelAggregationMetadataSpec
 
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 
     [Fact]
     public Task Cache_returns_same_instance_for_same_type()
@@ -50,7 +50,7 @@ public sealed class CanonModelAggregationMetadataSpec
                 ReferenceEquals(first, second).Should().BeTrue();
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 
     [Fact]
     public Task Missing_aggregation_keys_throw_meaningful_exception()
@@ -62,14 +62,14 @@ public sealed class CanonModelAggregationMetadataSpec
                     .WithMessage("Canonical entity 'MissingKeyCanon' must declare at least one [AggregationKey] property.");
                 return ValueTask.CompletedTask;
             })
-            .RunAsync();
+            .Run();
 
     [Canon(audit: true)]
     private sealed class ContactCanon : CanonEntity<ContactCanon>
     {
         [AggregationKey]
         [AggregationPolicy(AggregationPolicyKind.SourceOfTruth, Source = "crm", Sources = new[] { "erp" })]
-        public string Email { get; set; } = string.Empty;
+        public string Email { get; set; } = "";
 
         [AggregationKey]
         [AggregationPolicy(AggregationPolicyKind.Max)]

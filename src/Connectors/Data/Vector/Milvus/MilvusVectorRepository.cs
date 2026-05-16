@@ -13,6 +13,7 @@ using Newtonsoft.Json.Linq;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Vector.Abstractions;
+using Koan.Data.Vector.Abstractions.Configuration;
 
 namespace Koan.Data.Vector.Connector.Milvus;
 
@@ -49,7 +50,7 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
         VectorCapabilities.BulkDelete |
         VectorCapabilities.ScoreNormalization;
 
-    public async Task VectorEnsureCreatedAsync(CancellationToken ct = default)
+    public async Task VectorEnsureCreated(CancellationToken ct = default)
     {
         var dimension = _discoveredDimension > 0 ? _discoveredDimension : _options.Dimension ?? -1;
         if (dimension <= 0)
@@ -57,10 +58,10 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
             throw new InvalidOperationException("Milvus vector dimension is unknown. Configure Koan:Data:Milvus:Dimension or upsert a vector to allow discovery.");
         }
 
-        await EnsureCollectionAsync(dimension, ct);
+        await EnsureCollection(dimension, ct);
     }
 
-    public async Task UpsertAsync(TKey id, float[] embedding, object? metadata = null, CancellationToken ct = default)
+    public async Task Upsert(TKey id, float[] embedding, object? metadata = null, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(embedding);
         if (embedding.Length == 0)
@@ -71,14 +72,14 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
         using var _ = MilvusTelemetry.Activity.StartActivity("vector.upsert");
 
         var dimension = EnsureDimension(embedding.Length);
-        await EnsureCollectionAsync(dimension, ct);
+        await EnsureCollection(dimension, ct);
 
         var payload = BuildUpsertBody(new[] { (id, embedding, metadata) });
         var response = await _http.PostAsync("/v2/vectors/upsert", payload, ct);
         await EnsureSuccess(response, "Milvus upsert", ct);
     }
 
-    public async Task<int> UpsertManyAsync(IEnumerable<(TKey Id, float[] Embedding, object? Metadata)> items, CancellationToken ct = default)
+    public async Task<int> UpsertMany(IEnumerable<(TKey Id, float[] Embedding, object? Metadata)> items, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(items);
         using var _ = MilvusTelemetry.Activity.StartActivity("vector.bulkUpsert");
@@ -90,7 +91,7 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
         }
 
         var dimension = EnsureDimension(list[0].Embedding.Length);
-        await EnsureCollectionAsync(dimension, ct);
+        await EnsureCollection(dimension, ct);
 
         foreach (var item in list)
         {
@@ -106,10 +107,10 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
         return list.Count;
     }
 
-    public async Task<bool> DeleteAsync(TKey id, CancellationToken ct = default)
+    public async Task<bool> Delete(TKey id, CancellationToken ct = default)
     {
         using var _ = MilvusTelemetry.Activity.StartActivity("vector.delete");
-        await EnsureCollectionInitializedAsync(ct);
+        await EnsureCollectionInitialized(ct);
 
         var expr = $"{_options.PrimaryFieldName} in [{FormatIdentifier(id)}]";
         var payload = BuildDeleteBody(expr);
@@ -118,11 +119,11 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
         return response.StatusCode != HttpStatusCode.NotFound;
     }
 
-    public async Task<int> DeleteManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    public async Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(ids);
         using var _ = MilvusTelemetry.Activity.StartActivity("vector.bulkDelete");
-        await EnsureCollectionInitializedAsync(ct);
+        await EnsureCollectionInitialized(ct);
 
         var list = ids.ToList();
         if (list.Count == 0)
@@ -137,7 +138,7 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
         return list.Count;
     }
 
-    public async Task<VectorQueryResult<TKey>> SearchAsync(VectorQueryOptions options, CancellationToken ct = default)
+    public async Task<VectorQueryResult<TKey>> Search(VectorQueryOptions options, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(options);
         if (options.Query is null || options.Query.Length == 0)
@@ -148,7 +149,7 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
         using var _ = MilvusTelemetry.Activity.StartActivity("vector.search");
 
         var dimension = EnsureDimension(options.Query.Length);
-        await EnsureCollectionAsync(dimension, ct);
+        await EnsureCollection(dimension, ct);
 
         var topK = Math.Max(1, options.TopK ?? 10);
         var request = BuildSearchBody(options, topK);
@@ -185,13 +186,13 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
 
         if (string.Equals(instruction.Name, DataInstructions.EnsureCreated, StringComparison.OrdinalIgnoreCase))
         {
-            await VectorEnsureCreatedAsync(ct);
+            await VectorEnsureCreated(ct);
             return default!;
         }
 
         if (string.Equals(instruction.Name, DataInstructions.Clear, StringComparison.OrdinalIgnoreCase))
         {
-            await ClearAsync(ct);
+            await Clear(ct);
             return default!;
         }
 
@@ -264,15 +265,15 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
         return new StringContent(body.ToString(Formatting.None), Encoding.UTF8, "application/json");
     }
 
-    private async Task ClearAsync(CancellationToken ct)
+    private async Task Clear(CancellationToken ct)
     {
-        await EnsureCollectionInitializedAsync(ct);
+        await EnsureCollectionInitialized(ct);
         var payload = BuildDeleteBody("true");
         var response = await _http.PostAsync("/v2/vectors/delete", payload, ct);
         await EnsureSuccess(response, "Milvus clear", ct, allowNotFound: true);
     }
 
-    private async Task EnsureCollectionInitializedAsync(CancellationToken ct)
+    private async Task EnsureCollectionInitialized(CancellationToken ct)
     {
         if (_collectionEnsured)
         {
@@ -282,11 +283,11 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
         var dimension = _options.Dimension ?? _discoveredDimension;
         if (dimension > 0)
         {
-            await EnsureCollectionAsync(dimension, ct);
+            await EnsureCollection(dimension, ct);
         }
     }
 
-    private async Task EnsureCollectionAsync(int dimension, CancellationToken ct)
+    private async Task EnsureCollection(int dimension, CancellationToken ct)
     {
         if (_collectionEnsured)
         {
@@ -295,7 +296,7 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
 
         using var _ = MilvusTelemetry.Activity.StartActivity("vector.collection.ensure");
 
-        if (await CollectionExistsAsync(ct))
+        if (await CollectionExists(ct))
         {
             _collectionEnsured = true;
             return;
@@ -322,7 +323,7 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
         _collectionEnsured = true;
     }
 
-    private async Task<bool> CollectionExistsAsync(CancellationToken ct)
+    private async Task<bool> CollectionExists(CancellationToken ct)
     {
         var url = $"/v2/collections/{Uri.EscapeDataString(CollectionName)}?dbName={Uri.EscapeDataString(_options.DatabaseName)}";
         var response = await _http.GetAsync(url, ct);
@@ -340,7 +341,7 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
     }
 
     private string CollectionName
-        => _options.CollectionName ?? Koan.Data.Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_services);
+        => _options.CollectionName ?? VectorStorageNameRegistry.GetOrCompute<TEntity, TKey>(_services);
 
     private int EnsureDimension(int dimension)
     {
@@ -357,7 +358,7 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
     {
         if (string.IsNullOrWhiteSpace(_options.Endpoint))
         {
-            throw new InvalidOperationException("Koan:Data:Milvus:Endpoint must be configured.");
+            throw new InvalidOperationException($"{Infrastructure.Constants.Configuration.Keys.Endpoint} must be configured.");
         }
 
         _http.BaseAddress = new Uri(_options.Endpoint);
@@ -372,7 +373,7 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
         }
         else if (!string.IsNullOrEmpty(_options.Username))
         {
-            var token = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_options.Username}:{_options.Password ?? string.Empty}"));
+            var token = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_options.Username}:{_options.Password ?? ""}"));
             _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", token);
         }
     }
@@ -381,7 +382,7 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
     {
         if (allowNotFound && response.StatusCode == HttpStatusCode.NotFound)
         {
-            return string.Empty;
+            return "";
         }
 
         if (!response.IsSuccessStatusCode)
@@ -410,7 +411,7 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
             return formattable.ToString(null, CultureInfo.InvariantCulture);
         }
 
-        return FormatString(id.ToString() ?? string.Empty);
+        return FormatString(id.ToString() ?? "");
     }
 
     private JValue FormatIdentifierValue(TKey id)
@@ -433,7 +434,7 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
         {
             string s => s,
             Guid guid => guid.ToString("N", CultureInfo.InvariantCulture),
-            _ => id.ToString() ?? string.Empty
+            _ => id.ToString() ?? ""
         };
 
     private string FormatString(string value)

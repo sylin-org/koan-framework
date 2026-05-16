@@ -29,13 +29,13 @@ public sealed class AnalysisTypesController : EntityController<AnalysisType>
     }
 
     [HttpPost(MeridianConstants.AnalysisTypeCatalog.AiSuggestSegment)]
-    public async Task<ActionResult<AnalysisTypeAiSuggestResponse>> SuggestAsync(
+    public async Task<ActionResult<AnalysisTypeAiSuggestResponse>> Suggest(
         [FromBody] AnalysisTypeAiSuggestRequest request,
         CancellationToken ct)
     {
         try
         {
-            var response = await _authoring.SuggestAsync(request, ct);
+            var response = await _authoring.Suggest(request, ct).ConfigureAwait(false);
 
             if (response.Warnings?.Count > 0)
             {
@@ -57,13 +57,13 @@ public sealed class AnalysisTypesController : EntityController<AnalysisType>
     }
 
     [HttpPost("ai-create")]
-    public async Task<ActionResult<AnalysisType>> CreateWithAiAsync(
+    public async Task<ActionResult<AnalysisType>> CreateWithAi(
         [FromBody] AnalysisTypeAiSuggestRequest request,
         CancellationToken ct)
     {
         try
         {
-            var response = await _authoring.SuggestAsync(request, ct);
+            var response = await _authoring.Suggest(request, ct).ConfigureAwait(false);
             var draft = response.Draft;
 
             if (response.Warnings?.Count > 0)
@@ -97,7 +97,7 @@ public sealed class AnalysisTypesController : EntityController<AnalysisType>
                 entity.Description = "AI generated analysis type (no description provided).";
             }
 
-            var saved = await entity.Save(ct);
+            var saved = await entity.Save(ct).ConfigureAwait(false);
             _logger.LogInformation("AI-created analysis type '{Name}' with ID {Id}", saved.Name, saved.Id);
             return Ok(saved);
         }
@@ -118,9 +118,9 @@ public sealed class AnalysisTypesController : EntityController<AnalysisType>
     /// GET /api/analysistypes/codes
     /// </summary>
     [HttpGet("codes")]
-    public async Task<ActionResult> GetTypeCodesAsync(CancellationToken ct)
+    public async Task<ActionResult> GetTypeCodes(CancellationToken ct)
     {
-        var analysisTypes = await AnalysisType.All(ct);
+        var analysisTypes = await AnalysisType.All(ct).ConfigureAwait(false);
 
         var codes = analysisTypes
             .Where(t => !string.IsNullOrWhiteSpace(t.Code))

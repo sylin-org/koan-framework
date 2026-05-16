@@ -4,12 +4,12 @@ namespace S16.PantryPal.Services;
 
 public interface IPantryInsightsService
 {
-    Task<PantryStats> GetStatsAsync(CancellationToken ct = default);
+    Task<PantryStats> GetStats(CancellationToken ct = default);
 }
 
 public sealed class PantryInsightsService : IPantryInsightsService
 {
-    public async Task<PantryStats> GetStatsAsync(CancellationToken ct = default)
+    public async Task<PantryStats> GetStats(CancellationToken ct = default)
     {
         var items = (await PantryItem.All()).ToList();
         var now = DateTime.UtcNow;
@@ -39,7 +39,7 @@ public sealed class PantryStats
     public int ExpiringInWeek { get; init; }
     public int ExpiringInMonth { get; init; }
     public int Expired { get; init; }
-    public CategoryCount[] ByCategory { get; init; } = Array.Empty<CategoryCount>();
+    public CategoryCount[] ByCategory { get; init; } = [];
 }
 
 public record CategoryCount(string Category, int Count);

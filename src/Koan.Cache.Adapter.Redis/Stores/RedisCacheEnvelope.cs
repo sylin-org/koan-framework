@@ -6,7 +6,7 @@ namespace Koan.Cache.Adapter.Redis.Stores;
 
 internal sealed record RedisCacheEnvelope
 {
-    public string Key { get; init; } = string.Empty;
+    public string Key { get; init; } = "";
     public long CreatedUtcTicks { get; init; }
     public long? AbsoluteExpirationUtcTicks { get; init; }
     public long? StaleUntilUtcTicks { get; init; }
@@ -24,10 +24,10 @@ internal sealed record CacheValueModel
     {
         return Kind switch
         {
-            CacheContentKind.Binary => CacheValue.FromBytes(Binary ?? Array.Empty<byte>()),
-            CacheContentKind.String => CacheValue.FromString(Text ?? string.Empty),
-            CacheContentKind.Json => CacheValue.FromJson(Text ?? string.Empty),
-            _ => CacheValue.FromBytes(Binary ?? Array.Empty<byte>())
+            CacheContentKind.Binary => CacheValue.FromBytes(Binary ?? []),
+            CacheContentKind.String => CacheValue.FromString(Text ?? ""),
+            CacheContentKind.Json => CacheValue.FromJson(Text ?? ""),
+            _ => CacheValue.FromBytes(Binary ?? [])
         };
     }
 
@@ -62,13 +62,14 @@ internal sealed record CacheValueModel
 internal sealed record CacheEntryOptionsModel
 {
     public long? AbsoluteTtlTicks { get; init; }
+    public long? L1AbsoluteTtlTicks { get; init; }
     public long? SlidingTtlTicks { get; init; }
     public long? AllowStaleForTicks { get; init; }
     public long? SingleflightTimeoutTicks { get; init; }
     public CacheConsistencyMode Consistency { get; init; }
-    public bool ForcePublishInvalidation { get; init; }
+    public bool ForceCoherenceBroadcast { get; init; }
     public CacheContentKind ContentKind { get; init; }
-    public string[] Tags { get; init; } = Array.Empty<string>();
+    public string[] Tags { get; init; } = [];
     public string? Region { get; init; }
     public string? ScopeId { get; init; }
     public Dictionary<string, string> Metadata { get; init; } = new(StringComparer.Ordinal);
@@ -76,16 +77,17 @@ internal sealed record CacheEntryOptionsModel
     public CacheEntryOptions ToOptions()
     {
         var metadata = Metadata ?? new Dictionary<string, string>(StringComparer.Ordinal);
-        var tags = Tags ?? Array.Empty<string>();
+        var tags = Tags ?? [];
 
         var options = new CacheEntryOptions
         {
             AbsoluteTtl = AbsoluteTtlTicks.HasValue ? TimeSpan.FromTicks(AbsoluteTtlTicks.Value) : null,
+            L1AbsoluteTtl = L1AbsoluteTtlTicks.HasValue ? TimeSpan.FromTicks(L1AbsoluteTtlTicks.Value) : null,
             SlidingTtl = SlidingTtlTicks.HasValue ? TimeSpan.FromTicks(SlidingTtlTicks.Value) : null,
             AllowStaleFor = AllowStaleForTicks.HasValue ? TimeSpan.FromTicks(AllowStaleForTicks.Value) : null,
             SingleflightTimeout = SingleflightTimeoutTicks.HasValue ? TimeSpan.FromTicks(SingleflightTimeoutTicks.Value) : null,
             Consistency = Consistency,
-            ForcePublishInvalidation = ForcePublishInvalidation,
+            ForceCoherenceBroadcast = ForceCoherenceBroadcast,
             ContentKind = ContentKind,
             Region = Region,
             ScopeId = ScopeId,
@@ -103,11 +105,12 @@ internal sealed record CacheEntryOptionsModel
     public static CacheEntryOptionsModel FromOptions(CacheEntryOptions options) => new()
     {
         AbsoluteTtlTicks = options.AbsoluteTtl?.Ticks,
+        L1AbsoluteTtlTicks = options.L1AbsoluteTtl?.Ticks,
         SlidingTtlTicks = options.SlidingTtl?.Ticks,
         AllowStaleForTicks = options.AllowStaleFor?.Ticks,
         SingleflightTimeoutTicks = options.SingleflightTimeout?.Ticks,
         Consistency = options.Consistency,
-        ForcePublishInvalidation = options.ForcePublishInvalidation,
+        ForceCoherenceBroadcast = options.ForceCoherenceBroadcast,
         ContentKind = options.ContentKind,
         Region = options.Region,
         ScopeId = options.ScopeId,
@@ -116,6 +119,6 @@ internal sealed record CacheEntryOptionsModel
             : new Dictionary<string, string>(StringComparer.Ordinal),
         Tags = options.Tags is { Count: > 0 } tags
             ? tags.ToArray()
-            : Array.Empty<string>()
+            : []
     };
 }

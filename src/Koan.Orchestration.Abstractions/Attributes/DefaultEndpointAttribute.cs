@@ -11,7 +11,7 @@ public sealed class DefaultEndpointAttribute : Attribute
         DefaultHost = defaultHost;
         ContainerPort = containerPort;
         Protocol = protocol;
-        ImagePrefixes = imagePrefixes ?? Array.Empty<string>();
+        ImagePrefixes = imagePrefixes ?? [];
     }
 
     public string Scheme { get; }

@@ -12,8 +12,8 @@ namespace Koan.Messaging
     {
         public string Version { get; set; } = "1";
         public string? Source { get; set; }
-        public string Model { get; set; } = string.Empty;
-        public string Type { get; set; } = string.Empty;
+        public string Model { get; set; } = "";
+        public string Type { get; set; } = "";
         public T Payload { get; set; } = default!;
         public DateTimeOffset Timestamp { get; set; } = DateTimeOffset.UtcNow;
         public Dictionary<string, object?> Metadata { get; set; } = new();
