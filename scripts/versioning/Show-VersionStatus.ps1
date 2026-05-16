@@ -2,6 +2,7 @@
 .SYNOPSIS
     Read-only diagnostic for the ARCH-0082 versioning system.
     Shows current versions, classification, and what would bump on the next release.
+    Operator's guide: docs/workbooks/versioning.md.
 
 .DESCRIPTION
     Wraps Update-Versions.ps1 in -DryRun mode plus extra summary tables. Safe to

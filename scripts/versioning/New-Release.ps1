@@ -2,6 +2,7 @@
 .SYNOPSIS
     Finalizes a release: validates state, tags the repo, optionally pushes packages.
     Implements the release half of ARCH-0082.
+    Operator's guide: docs/workbooks/nuget-publishing.md.
 
 .DESCRIPTION
     Prerequisites — script will refuse to proceed if any are missing:
