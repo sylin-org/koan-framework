@@ -14,5 +14,7 @@
     <ProjectReference Include="..\Koan.Media.Abstractions\Koan.Media.Abstractions.csproj" />
     <ProjectReference Include="..\Koan.Media.Core\Koan.Media.Core.csproj" />
     <ProjectReference Include="..\Koan.Storage\Koan.Storage.csproj" />
+    <!-- M11: transform cache rides Koan.Cache (was IMemoryCache-backed) -->
+    <ProjectReference Include="..\Koan.Cache\Koan.Cache.csproj" />
   </ItemGroup>
 </Project>

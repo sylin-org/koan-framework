@@ -23,12 +23,11 @@ public sealed class MemoryAutoRegistrar : IKoanAutoRegistrar
     {
         module.Describe(ModuleVersion);
         var capacity = Configuration.Read(cfg, CacheConstants.Configuration.Memory.TagIndexCapacity, 2048);
-        var stale = Configuration.Read(cfg, CacheConstants.Configuration.Memory.EnableStaleWhileRevalidate, true);
 
-    module.AddSetting("CacheStore.Selected", "memory");
-    module.AddSetting("CacheStore.Candidates", "memory, redis, custom");
-    module.AddSetting("CacheStore.Rationale", "Reference = memory adapter package");
+        module.AddSetting("CacheStore.Selected", "memory");
+        module.AddSetting("CacheStore.Candidates", "memory, redis, custom");
+        module.AddSetting("CacheStore.Rationale", "Reference = memory adapter package");
         module.AddSetting("TagIndexCapacity", capacity.ToString());
-        module.AddSetting("EnableStaleWhileRevalidate", stale.ToString());
+        // SWR is per-call opt-in via CacheReadOptions.AllowStaleFor (ARCH-0078).
     }
 }

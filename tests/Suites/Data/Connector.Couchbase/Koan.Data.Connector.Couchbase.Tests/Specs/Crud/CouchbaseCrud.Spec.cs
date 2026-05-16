@@ -23,15 +23,7 @@ public sealed class CouchbaseCrudSpec
     {
         await TestPipeline.For<CouchbaseCrudSpec>(_output, nameof(Upsert_query_count_and_remove_flow))
             .RequireDocker()
-            .Using<CouchbaseContainerFixture>("couchbase", _ => ValueTask.FromResult(new CouchbaseContainerFixture()), (ctx, fixture) =>
-            {
-                ctx.Diagnostics.Info("couchbase.fixture.ready", new
-                {
-                    available = fixture.IsAvailable,
-                    connectionString = fixture.ConnectionString,
-                    reason = fixture.UnavailableReason
-                });
-            })
+            .UsingCouchbaseContainer()
             .Using<CouchbaseConnectorFixture>("fixture", static ctx => CouchbaseConnectorFixture.Create(ctx))
             .Arrange(static async ctx =>
             {

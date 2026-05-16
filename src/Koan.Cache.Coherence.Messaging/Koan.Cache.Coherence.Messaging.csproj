@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Description>Cache coherence over Koan.Messaging — alternative to Redis pub/sub when an app already has a messaging bus configured. Rides existing infrastructure; preempts the Redis pub/sub channel via [ProviderPriority(150)] when both are registered.</Description>
+    <PackageTags>$(CommonPackageTags);cache;coherence;messaging</PackageTags>
+    <Version>0.7.0</Version>
+    <AssemblyVersion>0.7.0</AssemblyVersion>
+    <FileVersion>0.7.0</FileVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Cache.Abstractions\Koan.Cache.Abstractions.csproj" />
+    <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
+    <ProjectReference Include="..\Koan.Messaging.Core\Koan.Messaging.Core.csproj" />
+    <!-- Analyzer-only reference (KOAN0001): flags bare TryAddEnumerable on cache interfaces. -->
+    <ProjectReference Include="..\Koan.Cache.Analyzers\Koan.Cache.Analyzers.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
+  </ItemGroup>
+</Project>

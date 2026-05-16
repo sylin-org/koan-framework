@@ -26,15 +26,7 @@ public sealed class ElasticSearchVectorSpec
     {
         await TestPipeline.For<ElasticSearchVectorSpec>(_output, nameof(Save_with_vector_and_search_similar))
             .RequireDocker()
-            .Using<ElasticSearchContainerFixture>("elasticsearch", _ => ValueTask.FromResult(new ElasticSearchContainerFixture()), (ctx, fixture) =>
-            {
-                ctx.Diagnostics.Info("elasticsearch.fixture.ready", new
-                {
-                    available = fixture.IsAvailable,
-                    endpoint = fixture.Endpoint,
-                    reason = fixture.UnavailableReason
-                });
-            })
+            .UsingElasticSearchContainer()
             .Using<ElasticSearchConnectorFixture>("fixture", static ctx => ElasticSearchConnectorFixture.Create(ctx))
             .Arrange(static async ctx =>
             {

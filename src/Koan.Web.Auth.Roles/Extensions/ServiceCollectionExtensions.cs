@@ -1,9 +1,7 @@
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Koan.Core.Modules;
 using Koan.Web.Auth.Roles.Contracts;
-using Koan.Web.Auth.Roles.Infrastructure;
 using Koan.Web.Auth.Roles.Options;
 using Koan.Web.Auth.Roles.Services.Stores;
 
@@ -15,26 +13,24 @@ public static class ServiceCollectionExtensions
     {
         services.AddKoanOptions<RoleAttributionOptions>(RoleAttributionOptions.SectionPath);
 
-    services.TryAddSingleton<IRoleAttributionService, Koan.Web.Auth.Roles.Services.DefaultRoleAttributionService>();
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IClaimsTransformation, KoanRoleClaimsTransformation>());
-    services.TryAddEnumerable(ServiceDescriptor.Transient<IRoleMapContributor, Koan.Web.Auth.Roles.Contributors.DefaultCapabilityContributor>());
-    // Singleton: caches the parsed JSON file across requests, gated by mtime + PollInterval.
-    services.TryAddEnumerable(ServiceDescriptor.Singleton<IRoleMapContributor, Koan.Web.Auth.Roles.Contributors.RoleListContributor>());
+        // Live snapshot of DB-backed aliases and policy bindings; surface used by the admin
+        // controller and by host-application contributors that want to normalize roles via the
+        // alias map.
+        services.TryAddSingleton<IRoleConfigSnapshotProvider, Koan.Web.Auth.Roles.Services.DefaultRoleConfigSnapshotProvider>();
 
-    // lightweight in-memory cache for attribution; apps can replace
-    services.TryAddSingleton<IRoleAttributionCache, InMemoryRoleAttributionCache>();
+        // Default stores behind first-class models; apps can replace via DI.
+        services.TryAddSingleton<IRoleStore, DefaultRoleStore>();
+        services.TryAddSingleton<IRoleAliasStore, DefaultRoleAliasStore>();
+        services.TryAddSingleton<IRolePolicyBindingStore, DefaultRolePolicyBindingStore>();
+        services.TryAddSingleton<IRoleBootstrapStateStore, DefaultRoleBootstrapStateStore>();
 
-    // live snapshot of DB-backed aliases and policy bindings
-    services.TryAddSingleton<IRoleConfigSnapshotProvider, Koan.Web.Auth.Roles.Services.DefaultRoleConfigSnapshotProvider>();
+        // Hosted seeder: initializes DB Role/RoleAlias/RolePolicyBinding entities from
+        // configuration templates on first run. Admin-bootstrap modes moved to
+        // AdminBootstrapContributor (see WEB-0065).
+        services.AddHostedService<Koan.Web.Auth.Roles.Hosting.RoleBootstrapHostedService>();
 
-    // Default stores behind first-class models; apps can replace via DI
-    services.TryAddSingleton<IRoleStore, DefaultRoleStore>();
-    services.TryAddSingleton<IRoleAliasStore, DefaultRoleAliasStore>();
-    services.TryAddSingleton<IRolePolicyBindingStore, DefaultRolePolicyBindingStore>();
-    services.TryAddSingleton<IRoleBootstrapStateStore, DefaultRoleBootstrapStateStore>();
-
-    // Hosted seeder to initialize DB from options template and handle admin bootstrap gates
-    services.AddHostedService<Koan.Web.Auth.Roles.Hosting.RoleBootstrapHostedService>();
+        // AdminBootstrapContributor is auto-discovered by Koan.Web.Auth's contributor scan when
+        // this assembly is loaded — no explicit DI registration here.
 
         return services;
     }

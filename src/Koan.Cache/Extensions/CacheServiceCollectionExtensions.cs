@@ -1,41 +1,48 @@
-﻿using Koan.Cache.Abstractions;
+using System;
+using Koan.Cache.Abstractions;
 using Koan.Cache.Abstractions.Adapters;
+using Koan.Cache.Abstractions.Extensions;
 using Koan.Cache.Abstractions.Policies;
 using Koan.Cache.Abstractions.Serialization;
 using Koan.Cache.Abstractions.Stores;
 using Koan.Cache.Adapters;
 using Koan.Cache.Adapters.Memory;
+using Koan.Cache.Coherence;
+using Koan.Cache.Decorators;
+using Koan.Cache.Diagnostics;
 using Koan.Cache.Options;
 using Koan.Cache.Policies;
-using Koan.Cache.Decorators;
 using Koan.Cache.Scope;
 using Koan.Cache.Serialization;
-using Koan.Cache.Singleflight;
 using Koan.Cache.Stores;
-using Koan.Cache.Diagnostics;
+using Koan.Cache.Topology;
 using Koan.Core.Modules;
+using Koan.Core.Singleflight;
+using Koan.Data.Core.Decorators;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Koan.Data.Core.Decorators;
 
 namespace Koan.Cache.Extensions;
 
 public static class CacheServiceCollectionExtensions
 {
+    /// <summary>
+    /// Wire the cache pillar: storage (Memory L1 default), topology resolver, layered cache,
+    /// client, serializers, scope, singleflight, policy registry, and the data-repository
+    /// decorator that auto-applies <c>[Cacheable]</c> policies.
+    /// </summary>
     public static IServiceCollection AddKoanCache(
         this IServiceCollection services,
         IConfiguration? configuration = null,
         Action<CacheOptions>? configure = null)
     {
-        if (services is null)
-        {
-            throw new ArgumentNullException(nameof(services));
-        }
+        ArgumentNullException.ThrowIfNull(services);
 
+        // Options
         if (configuration is not null)
         {
             services.AddKoanOptions<CacheOptions>(configuration, CacheConstants.Configuration.Section, configure);
@@ -43,172 +50,96 @@ public static class CacheServiceCollectionExtensions
         else
         {
             services.AddKoanOptions<CacheOptions>(CacheConstants.Configuration.Section);
-            if (configure is not null)
-            {
-                services.PostConfigure(configure);
-            }
+            if (configure is not null) services.PostConfigure(configure);
         }
 
+        // Cross-cutting primitives
+        services.AddKoanSingleflight();
         services.TryAddSingleton<ICacheScopeAccessor, CacheScopeAccessor>();
-        services.TryAddSingleton<CacheSingleflightRegistry>();
-    services.TryAddSingleton<CacheClient>();
-    services.TryAddSingleton<ICacheClient>(sp => sp.GetRequiredService<CacheClient>());
-    services.TryAddSingleton<ICacheReader>(sp => sp.GetRequiredService<CacheClient>());
-    services.TryAddSingleton<ICacheWriter>(sp => sp.GetRequiredService<CacheClient>());
-    services.TryAddSingleton<CachePolicyRegistry>();
-    services.TryAddSingleton<ICachePolicyRegistry>(sp => sp.GetRequiredService<CachePolicyRegistry>());
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IDataRepositoryDecorator, CacheRepositoryDecorator>());
+        services.TryAddSingleton<CacheInstrumentation>();
 
+        // Serializers (registered as enumerable; resolved by content kind + type at runtime)
         services.TryAddEnumerable(ServiceDescriptor.Singleton<ICacheSerializer, JsonCacheSerializer>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<ICacheSerializer, StringCacheSerializer>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<ICacheSerializer, BinaryCacheSerializer>());
 
-        services.TryAddSingleton<CacheInstrumentation>();
-
-        // Store registry: individual adapters register concrete store singletons.
-        // LayeredCacheStore reads from the registry and becomes the single ICacheStore.
-        services.TryAddSingleton<CacheStoreRegistry>();
-        services.TryAddSingleton<ICacheStoreRegistry>(sp => sp.GetRequiredService<CacheStoreRegistry>());
-        services.TryAddSingleton<LayeredCacheStore>();
-
-        // Default fallback: if no explicit adapter is registered, auto-register the bundled in-memory provider.
-        // This ensures "Reference = Intent" — just adding Koan.Cache gets you a working cache.
+        // Default built-in L1 store: Memory. Adapters add their own stores via
+        // CacheRegistrationExtensions.AddCacheStore<T>() (canonical per the typed-helper
+        // pattern that prevents the indistinguishable-descriptor bug from recurring).
         services.AddMemoryCache();
         services.AddKoanOptions<MemoryCacheAdapterOptions>(CacheConstants.Configuration.Memory.Section);
-        services.TryAddSingleton<MemoryCacheStore>();
+        services.AddCacheStore<MemoryCacheStore>();
 
-        // The ICacheStore singleton is the LayeredCacheStore, which orchestrates L1/L2.
-        // Before returning it, we populate the registry with all known concrete stores.
-        services.TryAddSingleton<ICacheStore>(sp =>
+        // Topology
+        services.TryAddSingleton<CacheStoreRegistry>();
+        services.TryAddSingleton<ICacheStoreRegistry>(sp => sp.GetRequiredService<CacheStoreRegistry>());
+        services.TryAddSingleton<CacheTopologyResolver>();
+        services.TryAddSingleton<CacheTopology>(sp =>
         {
-            var registry = sp.GetRequiredService<CacheStoreRegistry>();
-            PopulateStoreRegistry(sp, registry);
-            return sp.GetRequiredService<LayeredCacheStore>();
+            var registry = sp.GetRequiredService<ICacheStoreRegistry>();
+            var resolver = sp.GetRequiredService<CacheTopologyResolver>();
+            var opts = sp.GetRequiredService<IOptions<CacheOptions>>().Value;
+            return resolver.Resolve(registry.Stores, opts);
         });
+        services.TryAddSingleton<LayeredCache>();
 
-        services.PostConfigure<CacheOptions>(opts =>
-        {
-            if (string.IsNullOrWhiteSpace(opts.Provider))
-            {
-                opts.Provider = "memory";
-            }
-        });
+        // Coherence runtime — coordinator is always registered; activates iff a channel is
+        // present (CoherenceMode.AutoDetect) or required (CoherenceMode.Required). Channels
+        // are registered by adapter packages (Redis, Messaging, InMemory).
+        services.TryAddSingleton<NodeIdProvider>();
+        services.TryAddSingleton<CursorStore>();
+        services.TryAddSingleton<CoherenceCoordinator>();
+        services.AddHostedService(sp => sp.GetRequiredService<CoherenceCoordinator>());
+
+        // Client (consumes LayeredCache; ICacheClient = ICacheReader + ICacheWriter)
+        services.TryAddSingleton<CacheClient>();
+        services.TryAddSingleton<ICacheClient>(sp => sp.GetRequiredService<CacheClient>());
+        services.TryAddSingleton<ICacheReader>(sp => sp.GetRequiredService<CacheClient>());
+        services.TryAddSingleton<ICacheWriter>(sp => sp.GetRequiredService<CacheClient>());
+
+        // Policies + repository decorator
+        services.TryAddSingleton<CachePolicyRegistry>();
+        services.TryAddSingleton<ICachePolicyRegistry>(sp => sp.GetRequiredService<CachePolicyRegistry>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IDataRepositoryDecorator, CacheRepositoryDecorator>());
 
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IConfigureOptions<CacheOptions>, CacheOptionsValidator>());
 
         services.AddHostedService<CachePolicyBootstrapper>();
 
+        // Health check — registered against the standard ASP.NET Core IHealthCheck registry.
+        // Kubernetes / Aspire readiness probes pick it up automatically.
+        services.AddHealthChecks().AddCheck<CacheHealthCheck>(
+            name: "koan-cache",
+            failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Unhealthy,
+            tags: new[] { "cache", "koan" });
+
         return services;
     }
 
+    /// <summary>
+    /// Legacy adapter registration shim. New adapters self-register their <c>ICacheStore</c>
+    /// via their own <c>KoanAutoRegistrar</c>; this method is preserved as a no-op for
+    /// back-compat with older registrars (Sqlite, Redis adapters from before M2).
+    /// </summary>
+    [Obsolete("New adapters register ICacheStore directly. This shim only records the descriptor.")]
     public static IServiceCollection AddKoanCacheAdapter(this IServiceCollection services, string name, IConfiguration? configuration = null)
     {
-        if (services is null)
-        {
-            throw new ArgumentNullException(nameof(services));
-        }
-
+        ArgumentNullException.ThrowIfNull(services);
         if (string.IsNullOrWhiteSpace(name))
-        {
             throw new ArgumentException("Adapter name must be provided.", nameof(name));
-        }
 
-        var registrar = CacheAdapterResolver.Resolve(name);
-        var config = configuration ?? new ConfigurationManager();
-        registrar.Register(services, config);
-
-        services.AddSingleton(new CacheAdapterDescriptor(name, registrar.GetType()));
-
-        services.PostConfigure<CacheOptions>(opts =>
-        {
-            opts.Provider = name;
-        });
-
+        services.AddSingleton(new CacheAdapterDescriptor(name, typeof(CacheAdapterResolver)));
         return services;
-    }
-
-    /// <summary>
-    /// Populates the store registry with all known concrete cache stores.
-    /// Each adapter registers its concrete type as a singleton; we resolve and register them here
-    /// so LayeredCacheStore can discover L1/L2 tiers via the registry.
-    /// </summary>
-    private static void PopulateStoreRegistry(IServiceProvider sp, CacheStoreRegistry registry)
-    {
-        // Always register the built-in memory store
-        var memoryStore = sp.GetService<MemoryCacheStore>();
-        if (memoryStore is not null)
-        {
-            registry.Register(memoryStore);
-        }
-
-        // Discover additional stores from adapter descriptors
-        var descriptors = sp.GetServices<CacheAdapterDescriptor>();
-        foreach (var descriptor in descriptors)
-        {
-            // Skip memory — already handled above
-            if (descriptor.Name.Equals("memory", StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            // Resolve the concrete store by well-known naming convention:
-            // adapter descriptors carry the adapter name, and the concrete store
-            // is already registered as a singleton by the adapter registrar.
-            var store = ResolveStoreForAdapter(sp, descriptor.Name);
-            if (store is not null)
-            {
-                registry.Register(store);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Resolves the concrete ICacheStore for a named adapter.
-    /// Adapters register their concrete store type as a singleton (e.g., RedisCacheStore).
-    /// We look it up via IEnumerable of all registered ICacheStore-assignable singletons.
-    /// </summary>
-    private static ICacheStore? ResolveStoreForAdapter(IServiceProvider sp, string adapterName)
-    {
-        // Try to find a registered store whose ProviderName matches the adapter name.
-        // We cannot resolve IEnumerable<ICacheStore> because that would trigger the
-        // LayeredCacheStore factory (circular). Instead, resolve well-known concrete types
-        // by convention. Additional adapters can extend this via the registry directly.
-        return adapterName.ToLowerInvariant() switch
-        {
-            "redis" => ResolveByType(sp, "Koan.Cache.Adapter.Redis.Stores.RedisCacheStore"),
-            _ => null
-        };
-    }
-
-    private static ICacheStore? ResolveByType(IServiceProvider sp, string typeName)
-    {
-        // Try all loaded assemblies for the type
-        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-        {
-            var type = assembly.GetType(typeName);
-            if (type is not null)
-            {
-                return sp.GetService(type) as ICacheStore;
-            }
-        }
-
-        return null;
     }
 
     private sealed class CacheOptionsValidator : IConfigureOptions<CacheOptions>
     {
         private readonly ILogger<CacheOptionsValidator> _logger;
 
-        public CacheOptionsValidator(ILogger<CacheOptionsValidator> logger)
-        {
-            _logger = logger;
-        }
+        public CacheOptionsValidator(ILogger<CacheOptionsValidator> logger) => _logger = logger;
 
         public void Configure(CacheOptions options)
         {
-            if (string.IsNullOrWhiteSpace(options.Provider))
-            {
-                options.Provider = "memory";
-            }
-
             if (options.DefaultSingleflightTimeout <= TimeSpan.Zero)
             {
                 _logger.LogWarning("CacheOptions.DefaultSingleflightTimeout was {Timeout}. Resetting to 2 seconds.", options.DefaultSingleflightTimeout);

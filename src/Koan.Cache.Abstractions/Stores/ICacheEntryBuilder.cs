@@ -1,10 +1,15 @@
-﻿using System;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Cache.Abstractions.Primitives;
 
 namespace Koan.Cache.Abstractions.Stores;
 
+/// <summary>
+/// Fluent builder for cache entries. Terminal verbs (<see cref="Get"/>, <see cref="Set"/>,
+/// <see cref="Remove"/>, <see cref="Touch"/>, <see cref="Exists"/>, <see cref="GetOrAdd"/>)
+/// execute the operation; configuration verbs return the builder for chaining.
+/// </summary>
 public interface ICacheEntryBuilder<T>
 {
     CacheKey Key { get; }
@@ -23,7 +28,11 @@ public interface ICacheEntryBuilder<T>
 
     ICacheEntryBuilder<T> WithContentKind(CacheContentKind kind);
 
-    ICacheEntryBuilder<T> PublishInvalidation(bool value = true);
+    /// <summary>
+    /// Toggle coherence broadcast on writes through this builder. Default is on
+    /// (writes broadcast invalidations to peer nodes when a coherence channel is registered).
+    /// </summary>
+    ICacheEntryBuilder<T> BroadcastInvalidation(bool value = true);
 
     ICacheEntryBuilder<T> WithConsistency(CacheConsistencyMode mode);
 

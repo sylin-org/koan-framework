@@ -7,6 +7,10 @@
     <Description>Translation service for Koan Service. Supports auto-discovery and dual deployment (NuGet in-process or Docker container).</Description>
     <PackageTags>$(CommonPackageTags);services;translation;ai</PackageTags>
     <Version>0.1.0</Version>
+    <!-- Declares [KoanService] for the translation worker; opt into the orchestration manifest
+         generator. The src/Connectors/ Directory.Build.props handles the rest of the
+         orchestration-aware projects; this is the only one outside that tree. See ARCH-0077. -->
+    <KoanRequiresOrchestrationGenerator>true</KoanRequiresOrchestrationGenerator>
   </PropertyGroup>
 
   <ItemGroup>

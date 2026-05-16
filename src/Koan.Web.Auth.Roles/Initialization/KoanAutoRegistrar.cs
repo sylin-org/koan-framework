@@ -26,16 +26,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         module.Describe(ModuleVersion);
-        var emitPermissionClaims = Koan.Core.Configuration.ReadWithSource(
-            cfg,
-            $"{RoleAttributionOptions.SectionPath}:EmitPermissionClaims",
-            true);
-
-        module.AddSetting(
-            "Auth:Roles:EmitPermissionClaims",
-            emitPermissionClaims.Value.ToString(),
-            source: emitPermissionClaims.Source,
-            consumers: new[] { "Koan.Web.Auth.Roles.PermissionEmitter" });
 
         module.AddTool(
             "Role Administration",

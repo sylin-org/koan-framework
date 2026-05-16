@@ -1,136 +1,98 @@
 # Koan.Web.Auth.Roles
 
-First-class role and permission attribution for ASP.NET Core applications. Enriches `ClaimsPrincipal` with normalized roles and permissions, enabling `[Authorize]` to work with roles or canonical capability policies without custom authorization handlers.
+Role-management surface for Koan: first-class `Role` / `RoleAlias` / `RolePolicyBinding` entities, a REST admin API for CRUD + import/export, and a one-shot admin elevation contributor for FirstUser / ClaimMatch bootstrap.
 
-## Quick Start
+> **Note (WEB-0065):** The per-request claims-transformation attribution pipeline that previously lived here (`IRoleMapContributor`, `IRoleAttributionService`, `KoanRoleClaimsTransformation`, etc.) was removed in `Koan.Web.Auth.Roles` 0.7.0. Role attribution now happens at sign-in via `IKoanAuthEventContributor` in `Koan.Web.Auth`. Applications stamp roles into the cookie identity once per sign-in; the cookie carries the role claims for the life of the session. See [WEB-0065](../../docs/decisions/WEB-0065-auth-event-contributor-pipeline.md) for the full design and migration notes.
 
-Register the module and it works with zero configuration:
+## What this module ships
+
+| | Lives here | Lives in `Koan.Web.Auth` |
+|---|---|---|
+| `Role`, `RoleAlias`, `RolePolicyBinding` entities | ✓ | |
+| `IRoleStore`, `IRoleAliasStore`, `IRolePolicyBindingStore` + defaults | ✓ | |
+| `IRoleBootstrapStateStore` (one-shot elevation persistence) | ✓ | |
+| `RolesAdminController` (admin REST API at `/api/auth/roles`) | ✓ | |
+| Config-template seeding via `RoleBootstrapHostedService` | ✓ | |
+| `AdminBootstrapContributor` (`IKoanAuthEventContributor`) | ✓ | |
+| `IKoanAuthEventContributor` contract + dispatcher | | ✓ |
+| `RoleListFileContributor` (allow/revoke JSON file) | | ✓ |
+
+## Quick start
+
+Reference the package; auto-registration wires everything via `IKoanAutoRegistrar`. No DI code required for the defaults.
 
 ```csharp
 // Program.cs
-builder.Services.AddKoan()
-    .AddKoanWebAuthRoles();
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddKoan().AsWebApi();   // Koan auto-discovers Koan.Web.Auth.Roles
 ```
 
-Now controllers can use roles directly:
+Controllers use standard ASP.NET Core role authorization:
 
 ```csharp
 [Authorize(Roles = "admin")]
 public class AdminController : ControllerBase
 {
-    [HttpGet]
+    [HttpGet("dashboard")]
     public IActionResult Dashboard() => Ok("Admin dashboard");
 }
 ```
 
-## Usage Scenarios
+For roles to actually arrive on the principal, your application needs to stamp them at sign-in via an `IKoanAuthEventContributor`. See **[Stamping roles at sign-in](#stamping-roles-at-sign-in)** below.
 
-### Scenario 1: Default Configuration
+## Stamping roles at sign-in
 
-**Assumption**: Your identity provider emits roles via standard claim types (`roles`, `role`, `groups`, or `ClaimTypes.Role`).
+This module does not, by itself, decide what roles a user has. That decision belongs in your application — most platforms persist roles on their User entity. Implement an `IKoanAuthEventContributor` to bridge your User row to the cookie:
 
 ```csharp
-// Program.cs - no additional configuration needed
-builder.Services.AddKoan()
-    .AddKoanWebAuthRoles();
+using System.Security.Claims;
+using Koan.Web.Auth.Contributors;
+using MyApp.Domain;
 
-// Controllers work immediately with standard role names
-[Authorize(Roles = "admin")]
-public class AdminController : ControllerBase
+public sealed class UserRolesContributor : IKoanAuthEventContributor
 {
-    [HttpGet("users")]
-    public IActionResult GetUsers() => Ok("User list");
-    
-    [HttpPost("users/{id}/suspend")]
-    public IActionResult SuspendUser(string id) => Ok($"User {id} suspended");
-}
+    public async Task OnSignIn(AuthSignInContext ctx, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(ctx.UserId)) return;
+        var user = await User.Get(ctx.UserId, ct);          // Koan Entity<User> statics
+        if (user is null || user.Roles is null) return;
 
-[Authorize(Roles = "moderator")]
-public class ModerationController : ControllerBase
-{
-    [HttpGet("reports")]
-    public IActionResult GetReports() => Ok("Reports list");
-    
-    // Built-in aliases work automatically (administrator → admin)
-    [Authorize(Roles = "admin,moderator")]
-    [HttpPost("reports/{id}/resolve")]
-    public IActionResult ResolveReport(int id) => Ok("Report resolved");
-}
-
-// No authorization required - public endpoint
-public class PublicController : ControllerBase
-{
-    [HttpGet("articles")]
-    public IActionResult GetArticles() => Ok("Public articles");
-    
-    // Development fallback gives 'reader' role when no roles present
-    [Authorize(Roles = "reader")]
-    [HttpGet("drafts")]
-    public IActionResult GetDrafts() => Ok("Draft articles");
-}
-```
-
-**What happens**: Claims transformer extracts roles from incoming claims, applies built-in aliases (`administrator` → `admin`, `viewer` → `reader`), and adds them as `ClaimTypes.Role` claims. Development fallback adds `reader` role when no roles found.
-
-### Scenario 2: Custom Claim Keys
-
-**Need**: Your provider uses custom claim keys like `user_roles` or `permissions`.
-
-```json
-{
-  "Koan": {
-    "Web": {
-      "Auth": {
-        "Roles": {
-          "ClaimKeys": {
-            "Roles": ["user_roles", "groups"],
-            "Permissions": ["user_perms", "scopes"]
-          }
-        }
-      }
+        foreach (var role in user.Roles)
+            ctx.Identity.AddClaim(new Claim(ClaimTypes.Role, role));
     }
-  }
 }
 ```
 
-Controllers use standard authorization patterns regardless of custom claim keys:
+Auto-discovered by `Koan.Web.Auth`'s assembly scan — no DI registration call required. Runs at default priority, after any identity-mapping contributor (the contributor that rewrites the OAuth provider sub to your platform user id should use `Priority = int.MinValue`).
 
-```csharp
-public class BlogController : ControllerBase
-{
-    // Works with custom 'user_roles' claim
-    [Authorize(Roles = "content-author")]
-    [HttpPost("posts")]
-    public IActionResult CreatePost([FromBody] BlogPost post) => Ok("Post created");
-    
-    [Authorize(Roles = "content-editor")]
-    [HttpPut("posts/{id}")]
-    public IActionResult EditPost(int id, [FromBody] BlogPost post) => Ok("Post updated");
-    
-    // Multiple roles from custom claims
-    [Authorize(Roles = "content-editor,admin")]
-    [HttpDelete("posts/{id}")]
-    public IActionResult DeletePost(int id) => Ok("Post deleted");
-}
+Role claims live in the cookie; changes to `User.Roles` take effect on the user's next sign-in.
 
-public class ApiController : ControllerBase
-{
-    // Permissions extracted from 'user_perms' or 'scopes' claims
-    [Authorize(Roles = "api-consumer")]
-    [HttpGet("data")]
-    public IActionResult GetData() => Ok("API data");
-    
-    [Authorize(Roles = "api-publisher")]
-    [HttpPost("data")]
-    public IActionResult PostData([FromBody] object data) => Ok("Data published");
-}
-```
+## Admin REST API
 
-### Scenario 3: Custom Aliases and Bootstrap
+`RolesAdminController` exposes the role-management surface under `/api/auth/roles`. All endpoints require `[Authorize(Policy = "auth.roles.admin")]`, which by default maps to `role:admin`.
 
-**Need**: Map provider-specific role names to your canonical roles, plus auto-elevate first admin.
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/auth/roles` | List all roles |
+| PUT | `/api/auth/roles/{key}` | Upsert role |
+| DELETE | `/api/auth/roles/{key}` | Delete role |
+| GET | `/api/auth/roles/aliases` | List aliases |
+| PUT | `/api/auth/roles/aliases/{alias}` | Upsert alias |
+| DELETE | `/api/auth/roles/aliases/{alias}` | Delete alias |
+| GET | `/api/auth/roles/policy-bindings` | List policy bindings |
+| PUT | `/api/auth/roles/policy-bindings/{policy}` | Upsert binding |
+| DELETE | `/api/auth/roles/policy-bindings/{policy}` | Delete binding |
+| GET | `/api/auth/roles/export` | Export current state as appsettings template |
+| POST | `/api/auth/roles/import?dryRun=&force=` | Import from appsettings template |
+| POST | `/api/auth/roles/reload` | Reload the in-memory snapshot from the stores |
 
-```json
+Production guardrails: `import` and seeding are disabled in Production unless either `KoanEnv.AllowMagicInProduction` or `Koan:Web:Auth:Roles:AllowSeedingInProduction` is true.
+
+## Bootstrap seeding
+
+`RoleBootstrapHostedService` runs once at startup. If the `Role` / `RoleAlias` / `RolePolicyBinding` stores are all empty, it seeds them from the configuration template:
+
+```jsonc
 {
   "Koan": {
     "Web": {
@@ -138,77 +100,17 @@ public class ApiController : ControllerBase
         "Roles": {
           "Aliases": {
             "Map": {
-              "super-user": "admin",
-              "content-creator": "author",
-              "read-only": "reader"
+              "administrator": "admin",
+              "moderator": "moderator",
+              "viewer": "reader"
             }
           },
-          "Bootstrap": {
-            "Mode": "FirstUser"
-          }
-        }
-      }
-    }
-  }
-}
-```
-
-Controllers use your canonical role names regardless of what the identity provider sends:
-
-```csharp
-[Authorize(Roles = "admin")]
-public class SystemController : ControllerBase
-{
-    [HttpGet("settings")]
-    public IActionResult GetSettings() => Ok("System settings");
-    
-    [HttpPost("maintenance")]
-    public IActionResult StartMaintenance() => Ok("Maintenance started");
-}
-
-[Authorize(Roles = "author")]
-public class ContentController : ControllerBase
-{
-    [HttpPost("articles")]
-    public IActionResult CreateArticle() => Ok("Article created");
-    
-    // Multiple roles
-    [Authorize(Roles = "author,admin")]
-    [HttpDelete("articles/{id}")]
-    public IActionResult DeleteArticle(int id) => Ok("Article deleted");
-}
-
-[Authorize(Roles = "reader")]
-public class PublicController : ControllerBase
-{
-    [HttpGet("articles")]
-    public IActionResult GetArticles() => Ok("Article list");
-}
-```
-
-**Result**: First authenticated user gets `admin` role automatically. Provider roles like `super-user` become `admin` in your application, enabling clean authorization logic.
-
-### Scenario 4: Seeded Roles with Import
-
-**Need**: Define roles in configuration and import them into the database.
-
-```json
-{
-  "Koan": {
-    "Web": {
-      "Auth": {
-        "Roles": {
           "Roles": [
             { "Id": "admin", "Display": "Administrator", "Description": "Full system access" },
-            { "Id": "moderator", "Display": "Moderator", "Description": "Content moderation" },
-            { "Id": "author", "Display": "Author", "Description": "Content creation" },
-            { "Id": "subscriber", "Display": "Subscriber", "Description": "Premium content access" }
+            { "Id": "moderator", "Display": "Moderator", "Description": "Content moderation" }
           ],
           "PolicyBindings": [
-            { "Id": "auth.roles.admin", "Requirement": "role:admin" },
-            { "Id": "content.moderate", "Requirement": "role:moderator,admin" },
-            { "Id": "content.publish", "Requirement": "role:author,moderator,admin" },
-            { "Id": "premium.access", "Requirement": "role:subscriber,admin" }
+            { "Id": "auth.roles.admin", "Requirement": "role:admin" }
           ]
         }
       }
@@ -217,255 +119,21 @@ public class PublicController : ControllerBase
 }
 ```
 
-Controllers can use both role-based and policy-based authorization:
+Skipped in Production unless `AllowSeedingInProduction` is set. On non-empty stores the seeder is a no-op.
 
-```csharp
-[Authorize(Roles = "admin")]
-public class AdminController : ControllerBase
-{
-    [HttpGet("dashboard")]
-    public IActionResult Dashboard() => Ok("Admin dashboard");
-    
-    [HttpPost("users/{id}/ban")]
-    public IActionResult BanUser(string id) => Ok($"User {id} banned");
-}
+## Admin bootstrap (`AdminBootstrapContributor`)
 
-public class ContentController : ControllerBase
-{
-    // Use policy for more flexible authorization
-    [Authorize(Policy = "content.publish")]
-    [HttpPost("articles")]
-    public IActionResult PublishArticle([FromBody] Article article) => Ok("Article published");
-    
-    [Authorize(Policy = "content.moderate")]
-    [HttpPost("articles/{id}/approve")]
-    public IActionResult ApproveArticle(int id) => Ok("Article approved");
-    
-    // Role-based for simpler cases
-    [Authorize(Roles = "author")]
-    [HttpPost("drafts")]
-    public IActionResult SaveDraft([FromBody] Article draft) => Ok("Draft saved");
-}
+One-shot admin elevation, configured at `Koan:Web:Auth:Lifecycle:AdminBootstrap` (note: lives in `Koan.Web.Auth`'s options shape):
 
-public class PremiumController : ControllerBase
-{
-    [Authorize(Policy = "premium.access")]
-    [HttpGet("exclusive-content")]
-    public IActionResult GetExclusiveContent() => Ok("Premium content");
-    
-    // Multiple authorization approaches
-    [Authorize(Roles = "subscriber")]
-    [HttpGet("subscriber-only")]
-    public IActionResult GetSubscriberContent() => Ok("Subscriber content");
-}
-```
-
-Import the configuration:
-
-```csharp
-// Import via admin API (authenticated admin required)
-POST /api/auth/roles/import?dryRun=false&force=true
-
-// Or programmatically
-var controller = serviceProvider.GetService<RolesAdminController>();
-await controller.Import(dryRun: false, force: true);
-```
-
-**Result**: Database is populated with roles and policy bindings. Controllers can use either `[Authorize(Roles = "...")]` for simple cases or `[Authorize(Policy = "...")]` for more complex requirements like multiple role options.
-
-### Scenario 5: Policy-Based Authorization
-
-**Need**: Use capability-based policies instead of role checks.
-
-```csharp
-// Enable default policy bindings
-builder.Services.AddKoanWebAuthRoles()
-    .AddKoanRolePolicies(); // Maps roles to capability policies
-
-// Controllers demonstrate different authorization patterns
-public class ModerationController : ControllerBase
-{
-    // Policy-based: allows multiple roles
-    [Authorize(Policy = "content.moderate")]
-    [HttpPost("posts/{id}/moderate")]
-    public IActionResult ModeratePost(int id) => Ok("Post moderated");
-    
-    // Role-based: specific role only  
-    [Authorize(Roles = "admin")]
-    [HttpDelete("posts/{id}")]
-    public IActionResult DeletePost(int id) => Ok("Post deleted");
-    
-    // Mixed: different actions, different requirements
-    [Authorize(Policy = "content.publish")]
-    [HttpPost("posts/{id}/publish")]
-    public IActionResult PublishPost(int id) => Ok("Post published");
-}
-```
-
-### Scenario 6: Custom Role Contributors
-
-**Need**: Add roles from external systems or complex business logic.
-
-```csharp
-public class TeamRoleContributor : IRoleMapContributor
-{
-    private readonly ITeamService _teamService;
-    
-    public TeamRoleContributor(ITeamService teamService)
-    {
-        _teamService = teamService;
-    }
-    
-    public async Task ContributeAsync(ClaimsPrincipal user, ISet<string> roles, ISet<string> permissions, RoleAttributionContext? context, CancellationToken ct)
-    {
-        var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (userId != null)
-        {
-            // Query team membership from external API
-            var teams = await _teamService.GetUserTeams(userId, ct);
-            foreach (var team in teams)
-            {
-                if (team.Role == "lead") roles.Add("team-lead");
-                if (team.Role == "member") roles.Add("team-member");
-                if (team.Department == "Engineering") roles.Add("engineer");
-            }
-        }
-    }
-}
-
-// Register contributor
-builder.Services.AddSingleton<IRoleMapContributor, TeamRoleContributor>();
-```
-
-Controllers can now use the contributed roles:
-
-```csharp
-public class ProjectController : ControllerBase
-{
-    // Uses role contributed by TeamRoleContributor
-    [Authorize(Roles = "team-lead")]
-    [HttpPost("projects")]
-    public IActionResult CreateProject([FromBody] Project project) => Ok("Project created");
-    
-    [Authorize(Roles = "team-member")]
-    [HttpGet("projects/{id}/tasks")]
-    public IActionResult GetTasks(int id) => Ok("Task list");
-    
-    // Combine contributed and standard roles
-    [Authorize(Roles = "engineer,admin")]
-    [HttpPost("projects/{id}/deploy")]
-    public IActionResult DeployProject(int id) => Ok("Project deployed");
-}
-
-public class TeamController : ControllerBase
-{
-    [Authorize(Roles = "team-lead")]
-    [HttpGet("team/members")]
-    public IActionResult GetTeamMembers() => Ok("Team members");
-    
-    [Authorize(Roles = "team-lead,admin")]
-    [HttpPost("team/members/{id}/promote")]
-    public IActionResult PromoteMember(string id) => Ok("Member promoted");
-    
-    // Any team member can view team info
-    [Authorize(Roles = "team-member")]
-    [HttpGet("team/info")]
-    public IActionResult GetTeamInfo() => Ok("Team information");
-}
-```
-
-### Scenario 7: Production Bootstrap with Email List
-
-**Need**: Auto-elevate specific users to admin in production.
-
-```json
+```jsonc
 {
   "Koan": {
     "Web": {
       "Auth": {
-        "Roles": {
-          "Bootstrap": {
-            "Mode": "ClaimMatch",
-            "AdminEmails": ["admin@company.com", "cto@company.com"]
-          },
-          "AllowSeedingInProduction": true
-        }
-      }
-    }
-  }
-}
-```
-
-Controllers work normally, with bootstrap users automatically getting admin access:
-
-```csharp
-[Authorize(Roles = "admin")]
-public class SystemAdminController : ControllerBase
-{
-    [HttpGet("system/health")]
-    public IActionResult GetSystemHealth() => Ok("System healthy");
-    
-    [HttpPost("system/maintenance")]
-    public IActionResult EnableMaintenance() => Ok("Maintenance mode enabled");
-    
-    [HttpGet("users/audit")]
-    public IActionResult GetUserAudit() => Ok("User audit log");
-}
-
-public class ConfigurationController : ControllerBase
-{
-    // Only bootstrap admins can access initially
-    [Authorize(Roles = "admin")]
-    [HttpGet("config")]
-    public IActionResult GetConfiguration() => Ok("System configuration");
-    
-    [Authorize(Roles = "admin")]
-    [HttpPut("config")]
-    public IActionResult UpdateConfiguration([FromBody] object config) => Ok("Configuration updated");
-    
-    // Once other admins are created, they can also access
-    [Authorize(Roles = "admin")]
-    [HttpPost("admin/create")]
-    public IActionResult CreateAdmin([FromBody] CreateAdminRequest request) => Ok("Admin created");
-}
-
-// Regular controllers continue working as normal
-[Authorize(Roles = "user")]
-public class UserController : ControllerBase
-{
-    [HttpGet("profile")]
-    public IActionResult GetProfile() => Ok("User profile");
-    
-    [HttpPut("profile")]
-    public IActionResult UpdateProfile([FromBody] object profile) => Ok("Profile updated");
-}
-```
-
-**Result**: Users with emails `admin@company.com` or `cto@company.com` automatically get `admin` role on first login, enabling initial system setup. Subsequent users follow normal role assignment.
-
-## Recommended Usage Patterns
-
-### Individual Developers / Prototypes
-
-**Pattern**: Start simple, leverage defaults
-- Use zero-configuration setup with built-in aliases
-- Rely on development fallback for quick testing
-- Use FirstUser bootstrap for initial admin access
-
-```csharp
-// Minimal setup
-builder.Services.AddKoan()
-    .AddKoanWebAuthRoles();
-```
-
-```json
-{
-  "Koan": {
-    "Web": {
-      "Auth": {
-        "Roles": {
-          "Bootstrap": {
-            "Mode": "FirstUser"
+        "Lifecycle": {
+          "AdminBootstrap": {
+            "Mode": "ClaimMatch",            // None | FirstUser | ClaimMatch
+            "AdminEmails": ["admin@example.com"]
           }
         }
       }
@@ -474,45 +142,27 @@ builder.Services.AddKoan()
 }
 ```
 
-**Controllers**: Keep authorization simple
-```csharp
-[Authorize(Roles = "admin")]
-public class AdminController : ControllerBase { }
+Modes:
 
-[Authorize(Roles = "user")]  // or rely on dev fallback "reader"
-public class UserController : ControllerBase { }
-```
+- **`None`** (default): no automatic admin. Admin role must be assigned by the application (e.g. via `User.Roles`) or via the role-list override file.
+- **`FirstUser`**: the first authenticated user to reach the contributor gets `admin`. One-shot, persisted via `IRoleBootstrapStateStore`. Useful for development.
+- **`ClaimMatch`**: grants `admin` when a configured claim matches one of `ClaimValues` (or the convenience `AdminEmails` list against `ClaimTypes.Email`).
 
-**Benefits**: Fast setup, no external dependencies, works immediately with common identity providers.
+The contributor runs at `Priority = 100` so it observes claims stamped by earlier contributors. If the principal already has `admin` from an upstream contributor, this is a no-op for that sign-in (and the one-shot is not burned).
 
-### Small Teams (2-10 developers)
+## Override / allow-list file (`RoleListFileContributor`)
 
-**Pattern**: Configuration-driven with team-specific roles
-- Define roles in appsettings for consistency
-- Use email-based bootstrap for known team leads
-- Implement custom aliases for external provider mapping
+For pre-seeding admin emails before the user has signed in for the first time, or for stripping roles a user record still carries, configure the file-backed override channel in `Koan.Web.Auth`:
 
-```json
+```jsonc
 {
   "Koan": {
     "Web": {
       "Auth": {
-        "Roles": {
-          "Roles": [
-            { "Id": "owner", "Display": "Project Owner" },
-            { "Id": "dev", "Display": "Developer" },
-            { "Id": "qa", "Display": "QA Tester" }
-          ],
-          "Aliases": {
-            "Map": {
-              "developer": "dev",
-              "tester": "qa",
-              "lead": "owner"
-            }
-          },
-          "Bootstrap": {
-            "Mode": "ClaimMatch",
-            "AdminEmails": ["lead@team.com", "owner@team.com"]
+        "Lifecycle": {
+          "RoleListFile": {
+            "FilePath": "/data/role-list.json",
+            "PollInterval": "00:00:30"
           }
         }
       }
@@ -521,202 +171,25 @@ public class UserController : ControllerBase { }
 }
 ```
 
-**Controllers**: Role-based with clear team responsibilities
-```csharp
-public class ProjectController : ControllerBase
-{
-    [Authorize(Roles = "owner")]
-    [HttpPost("deploy")]
-    public IActionResult Deploy() => Ok();
-    
-    [Authorize(Roles = "dev,owner")]
-    [HttpPost("commits")]
-    public IActionResult Commit() => Ok();
-    
-    [Authorize(Roles = "qa,owner")]
-    [HttpPost("test-results")]
-    public IActionResult SubmitTestResults() => Ok();
-}
-```
+File shape:
 
-**Import Strategy**: Use configuration import for environment consistency
-```bash
-# Deploy same roles across dev/staging/prod
-POST /api/auth/roles/import?force=true
-```
-
-**Benefits**: Clear role separation, easy onboarding, consistent across environments.
-
-### Corporate Teams / Enterprise
-
-**Pattern**: Policy-driven with fine-grained permissions
-- Use policy bindings for complex authorization scenarios
-- Implement custom contributors for integration with corporate systems (AD, LDAP, HR systems)
-- Separate role management from application deployment
-
-```csharp
-// Corporate integration
-public class ActiveDirectoryRoleContributor : IRoleMapContributor
-{
-    public async Task ContributeAsync(ClaimsPrincipal user, ISet<string> roles, ISet<string> permissions, RoleAttributionContext? context, CancellationToken ct)
-    {
-        var groups = user.FindAll("groups").Select(c => c.Value);
-        
-        // Map AD groups to application roles
-        if (groups.Contains("IT-Admins")) roles.Add("system-admin");
-        if (groups.Contains("Security-Team")) roles.Add("security-officer");
-        if (groups.Contains("Managers")) roles.Add("manager");
-        if (groups.Contains("Employees")) roles.Add("employee");
-        
-        // Department-specific roles
-        if (groups.Contains("Engineering")) roles.Add("engineer");
-        if (groups.Contains("Legal")) roles.Add("legal-counsel");
-    }
-}
-
-// Register enterprise services
-builder.Services.AddKoanWebAuthRoles()
-    .AddKoanRolePolicies()
-    .AddSingleton<IRoleMapContributor, ActiveDirectoryRoleContributor>();
-```
-
-**Policy-First Authorization**:
 ```json
 {
-  "Koan": {
-    "Web": {
-      "Auth": {
-        "Roles": {
-          "PolicyBindings": [
-            { "Id": "data.read", "Requirement": "role:employee,contractor" },
-            { "Id": "data.write", "Requirement": "role:engineer,manager" },
-            { "Id": "data.delete", "Requirement": "role:system-admin" },
-            { "Id": "audit.view", "Requirement": "role:security-officer,system-admin" },
-            { "Id": "user.manage", "Requirement": "role:manager,system-admin" },
-            { "Id": "system.configure", "Requirement": "role:system-admin" }
-          ],
-          "Bootstrap": {
-            "Mode": "ClaimMatch",
-            "ClaimType": "groups",
-            "ClaimValues": ["IT-Admins"]
-          },
-          "AllowSeedingInProduction": false
-        }
-      }
-    }
-  }
+  "allow":  { "user@example.com": ["admin", "curator"] },
+  "revoke": { "ex-admin@example.com": ["admin"] }
 }
 ```
 
-**Controllers**: Policy-based with business capability focus
-```csharp
-public class DataController : ControllerBase
-{
-    [Authorize(Policy = "data.read")]
-    [HttpGet("reports")]
-    public IActionResult GetReports() => Ok();
-    
-    [Authorize(Policy = "data.write")]
-    [HttpPost("reports")]
-    public IActionResult CreateReport() => Ok();
-    
-    [Authorize(Policy = "data.delete")]
-    [HttpDelete("reports/{id}")]
-    public IActionResult DeleteReport(int id) => Ok();
-}
+Empty `FilePath` (default) disables the contributor.
 
-public class AdminController : ControllerBase
-{
-    [Authorize(Policy = "user.manage")]
-    [HttpGet("users")]
-    public IActionResult GetUsers() => Ok();
-    
-    [Authorize(Policy = "audit.view")]
-    [HttpGet("audit-log")]
-    public IActionResult GetAuditLog() => Ok();
-    
-    [Authorize(Policy = "system.configure")]
-    [HttpPut("settings")]
-    public IActionResult UpdateSettings() => Ok();
-}
-```
+## Versioning
 
-**Enterprise Management**:
-- Role definitions managed separately from code
-- Database-driven role/policy management via Admin API
-- Integration with corporate identity systems
-- Audit trails and compliance reporting
+| Version | Notes |
+|---|---|
+| 0.7.0 | Removed the per-request attribution pipeline (WEB-0065). `IRoleMapContributor`, `IRoleAttributionService`, `IRoleAttributionCache`, `KoanRoleClaimsTransformation`, `DefaultRoleAttributionService`, the old `RoleListContributor`, and `DefaultCapabilityContributor` are gone. `AdminBootstrapContributor` is new (ported from inline bootstrap logic). |
+| 0.6.x and earlier | Old per-request attribution pipeline. See WEB-0049 for the original design. |
 
-```csharp
-// Programmatic role management for enterprise workflows
-public class CorporateRoleService
-{
-    private readonly RolesAdminController _rolesAdmin;
-    
-    public async Task SyncWithHRSystem()
-    {
-        // Sync roles based on HR data, org chart changes
-        var hrRoles = await _hrService.GetCurrentRoles();
-        await _rolesAdmin.Import(dryRun: false, force: true);
-    }
-    
-    public async Task OnboardNewEmployee(string email, string department)
-    {
-        // Automatic role assignment based on department
-        var departmentRoles = _departmentRoleMapping[department];
-        // ... role assignment logic
-    }
-}
-```
+## See also
 
-**Benefits**: Scales to large organizations, integrates with existing systems, supports compliance requirements, clear separation of concerns.
-
-## Admin API
-
-Access role management via REST API (requires `auth.roles.admin` policy):
-
-```bash
-# List roles
-GET /api/auth/roles
-
-# Create/update role
-PUT /api/auth/roles/admin
-{
-  "display": "Administrator", 
-  "description": "Full access"
-}
-
-# List aliases
-GET /api/auth/roles/aliases
-
-# Import from configuration
-POST /api/auth/roles/import?dryRun=true&force=true
-
-# Reload snapshot (refreshes cache)
-POST /api/auth/roles/reload
-```
-
-## Development Features
-
-- **Dev Fallback**: Automatically adds `reader` role in Development when user has no roles
-- **Bootstrap Modes**: `FirstUser` or `ClaimMatch` for initial admin setup
-- **Import/Export**: Sync roles between environments via configuration templates
-- **Cache Invalidation**: Attribution results cached per user; cleared on admin changes
-
-## Data Models
-
-Uses first-class Entity statics for clean data access:
-
-```csharp
-// Query roles
-var roles = await Role.All(ct);
-var adminRole = await Role.Get("admin", ct);
-
-// Create/update
-var newRole = new Role { Id = "editor", Display = "Editor" };
-await Role.UpsertMany(new[] { newRole }, ct);
-
-// Aliases and policy bindings work the same way
-var aliases = await RoleAlias.All(ct);
-var bindings = await RolePolicyBinding.All(ct);
-```
+- [WEB-0065](../../docs/decisions/WEB-0065-auth-event-contributor-pipeline.md) — event-contributor pipeline ADR (the design this module now defers to for attribution)
+- [WEB-0049](../../docs/decisions/WEB-0049-role-attribution-layer-and-claims-transformation.md) — superseded; describes the pre-0.7.0 attribution layer

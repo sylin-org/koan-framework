@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -8,25 +8,27 @@ using Koan.Cache.Abstractions.Primitives;
 using Koan.Cache.Abstractions.Stores;
 using Koan.Cache.Adapter.Redis.Options;
 using Koan.Cache.Adapter.Redis.Serialization;
+using Koan.Data.Abstractions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 
 namespace Koan.Cache.Adapter.Redis.Stores;
 
-internal sealed class RedisCacheStore : ICacheStore
+/// <summary>
+/// Distributed L2 cache store backed by Redis. Pure storage — coherence is the responsibility
+/// of <c>RedisCoherenceChannel</c> in the <c>Koan.Cache.Adapter.Redis.Coherence</c> namespace.
+/// </summary>
+[ProviderPriority(100)]
+public sealed class RedisCacheStore : ICacheStore
 {
     private readonly IConnectionMultiplexer _multiplexer;
     private readonly IDatabase _database;
-    private readonly ISubscriber? _subscriber;
     private readonly RedisCacheAdapterOptions _options;
     private readonly ILogger<RedisCacheStore> _logger;
     private readonly string _instancePrefix;
     private readonly string _keyPrefix;
     private readonly string _tagPrefix;
-    private readonly RedisChannel _channel;
-
-    internal RedisChannel Channel => _channel;
 
     public RedisCacheStore(
         IConnectionMultiplexer multiplexer,
@@ -38,35 +40,30 @@ internal sealed class RedisCacheStore : ICacheStore
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         _database = _multiplexer.GetDatabase(_options.Database >= 0 ? _options.Database : -1);
-        _subscriber = _options.EnablePubSubInvalidation ? _multiplexer.GetSubscriber() : null;
-
         _instancePrefix = NormalizePrefix(_options.InstanceName);
         _keyPrefix = NormalizePrefix(string.IsNullOrWhiteSpace(_options.KeyPrefix) ? "cache" : _options.KeyPrefix!);
         _tagPrefix = NormalizePrefix(string.IsNullOrWhiteSpace(_options.TagPrefix) ? "cache:tag" : _options.TagPrefix!);
-        _channel = new RedisChannel(string.IsNullOrWhiteSpace(_options.ChannelName) ? "koan-cache" : _options.ChannelName!, RedisChannel.PatternMode.Literal);
     }
 
-    public string ProviderName => "redis";
+    public string Name => "redis";
 
-    public CacheCapabilities Capabilities { get; } = new(
+    public CacheStorePlacement Placement => CacheStorePlacement.Remote;
+
+    public CacheStoreCapabilities Capabilities { get; } = new(
+        SupportsTags: true,
+        SupportsSlidingTtl: true,
+        SupportsStaleWhileRevalidate: true,
         SupportsBinary: true,
-        SupportsPubSubInvalidation: true,
-        SupportsCompareExchange: false,
-        SupportsRegionScoping: true,
-        Hints: new HashSet<string>(new[] { "tags", "stale-while-revalidate", "singleflight", "pubsub" }, StringComparer.OrdinalIgnoreCase),
-        SupportsSharedAccess: true,
         SupportsPersistence: true);
 
-    public async ValueTask<CacheFetchResult> Fetch(CacheKey key, CacheEntryOptions options, CancellationToken ct)
+    public async ValueTask<CacheFetchResult> Fetch(CacheKey key, CacheReadOptions options, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
 
         var redisKey = BuildRedisKey(key);
-        var raw = await _database.StringGetAsync(redisKey);
+        var raw = await _database.StringGetAsync(redisKey).ConfigureAwait(false);
         if (!raw.HasValue)
-        {
-            return CacheFetchResult.Miss(options);
-        }
+            return CacheFetchResult.Miss(new CacheEntryOptions());
 
         RedisCacheEnvelope envelope;
         try
@@ -76,8 +73,8 @@ internal sealed class RedisCacheStore : ICacheStore
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to deserialize Redis cache entry for {CacheKey}", key.Value);
-            await _database.KeyDeleteAsync(redisKey);
-            return CacheFetchResult.Miss(options);
+            await _database.KeyDeleteAsync(redisKey).ConfigureAwait(false);
+            return CacheFetchResult.Miss(new CacheEntryOptions());
         }
 
         var cachedOptions = envelope.Options.ToOptions();
@@ -91,31 +88,27 @@ internal sealed class RedisCacheStore : ICacheStore
 
         if (staleUntil is { } finalExpiry && finalExpiry <= now)
         {
-            await Evict(redisKey, envelope.Options.Tags);
-            return CacheFetchResult.Miss(options);
+            await Evict(redisKey, envelope.Options.Tags).ConfigureAwait(false);
+            return CacheFetchResult.Miss(new CacheEntryOptions());
         }
 
+        // Per ARCH-0078: read-side AllowStaleFor is the master signal. Past the absolute TTL,
+        // the caller must have explicitly opted into staleness for this read or the store
+        // treats it as Miss.
         var absoluteExpired = absoluteExpiration is { } abs && abs <= now;
-        if (absoluteExpired && !_options.EnableStaleWhileRevalidate)
+        if (absoluteExpired && options.AllowStaleFor is null)
         {
-            await Evict(redisKey, envelope.Options.Tags);
-            return CacheFetchResult.Miss(options);
+            await Evict(redisKey, envelope.Options.Tags).ConfigureAwait(false);
+            return CacheFetchResult.Miss(new CacheEntryOptions());
         }
 
-        if (absoluteExpired && _options.EnableStaleWhileRevalidate && _logger.IsEnabled(LogLevel.Debug))
-        {
-            _logger.LogDebug("Serving stale Redis cache entry for {CacheKey}", key.Value);
-        }
-
-        if (cachedOptions.SlidingTtl is { } sliding && !absoluteExpired)
-        {
-            await RefreshSlidingTtl(redisKey, key, envelope, cachedOptions, now);
-        }
+        if (cachedOptions.SlidingTtl is { } && !absoluteExpired)
+            await RefreshSlidingTtl(redisKey, envelope, cachedOptions, now).ConfigureAwait(false);
 
         return CacheFetchResult.HitResult(envelope.Value.ToCacheValue(), cachedOptions, absoluteExpiration, staleUntil);
     }
 
-    public ValueTask Set(CacheKey key, CacheValue value, CacheEntryOptions options, CancellationToken ct)
+    public ValueTask Set(CacheKey key, CacheValue value, CacheWriteOptions options, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         return SetCore(key, value, options, ct, removeExisting: true);
@@ -126,16 +119,13 @@ internal sealed class RedisCacheStore : ICacheStore
         ct.ThrowIfCancellationRequested();
 
         var redisKey = BuildRedisKey(key);
-        var removed = await _database.StringGetDeleteAsync(redisKey);
-        if (!removed.HasValue)
-        {
-            return false;
-        }
+        var removed = await _database.StringGetDeleteAsync(redisKey).ConfigureAwait(false);
+        if (!removed.HasValue) return false;
 
         try
         {
             var envelope = RedisCacheJsonConverter.DeserializeEnvelope(removed);
-            await RemoveTags(redisKey, envelope.Options.Tags);
+            await RemoveTags(redisKey, envelope.Options.Tags).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -145,16 +135,13 @@ internal sealed class RedisCacheStore : ICacheStore
         return true;
     }
 
-    public async ValueTask Touch(CacheKey key, CacheEntryOptions options, CancellationToken ct)
+    public async ValueTask Touch(CacheKey key, TimeSpan? newAbsoluteTtl, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
 
         var redisKey = BuildRedisKey(key);
-        var raw = await _database.StringGetAsync(redisKey);
-        if (!raw.HasValue)
-        {
-            return;
-        }
+        var raw = await _database.StringGetAsync(redisKey).ConfigureAwait(false);
+        if (!raw.HasValue) return;
 
         RedisCacheEnvelope envelope;
         try
@@ -164,11 +151,12 @@ internal sealed class RedisCacheStore : ICacheStore
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to deserialize Redis cache entry during touch for {CacheKey}", key.Value);
-            await _database.KeyDeleteAsync(redisKey);
+            await _database.KeyDeleteAsync(redisKey).ConfigureAwait(false);
             return;
         }
 
-        await SetCore(key, envelope.Value.ToCacheValue(), envelope.Options.ToOptions(), ct, removeExisting: true);
+        var updatedOptions = envelope.Options.ToOptions() with { AbsoluteTtl = newAbsoluteTtl };
+        await SetCore(key, envelope.Value.ToCacheValue(), updatedOptions.ToWriteOptions(), ct, removeExisting: true).ConfigureAwait(false);
     }
 
     public async ValueTask<bool> Exists(CacheKey key, CancellationToken ct)
@@ -176,11 +164,8 @@ internal sealed class RedisCacheStore : ICacheStore
         ct.ThrowIfCancellationRequested();
 
         var redisKey = BuildRedisKey(key);
-        var raw = await _database.StringGetAsync(redisKey);
-        if (!raw.HasValue)
-        {
-            return false;
-        }
+        var raw = await _database.StringGetAsync(redisKey).ConfigureAwait(false);
+        if (!raw.HasValue) return false;
 
         try
         {
@@ -193,15 +178,11 @@ internal sealed class RedisCacheStore : ICacheStore
                 ? new DateTimeOffset(envelope.StaleUntilUtcTicks.Value, TimeSpan.Zero)
                 : (DateTimeOffset?)null;
 
+            // Per ARCH-0078: Exists reports storage presence (entry within staleness ceiling).
+            // Whether a Fetch surfaces a stale value is the reader's per-call opt-in.
             if (staleUntil is { } finalExpiry && finalExpiry <= now)
             {
-                await Evict(redisKey, envelope.Options.Tags);
-                return false;
-            }
-
-            if (!_options.EnableStaleWhileRevalidate && absoluteExpiration is { } absolute && absolute <= now)
-            {
-                await Evict(redisKey, envelope.Options.Tags);
+                await Evict(redisKey, envelope.Options.Tags).ConfigureAwait(false);
                 return false;
             }
 
@@ -210,32 +191,9 @@ internal sealed class RedisCacheStore : ICacheStore
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to deserialize Redis cache entry during exists check for {CacheKey}", key.Value);
-            await _database.KeyDeleteAsync(redisKey);
+            await _database.KeyDeleteAsync(redisKey).ConfigureAwait(false);
             return false;
         }
-    }
-
-    public ValueTask PublishInvalidation(CacheKey key, CacheEntryOptions options, CancellationToken ct)
-    {
-        if (!_options.EnablePubSubInvalidation || _subscriber is null)
-        {
-            return ValueTask.CompletedTask;
-        }
-
-        ct.ThrowIfCancellationRequested();
-
-        var payload = RedisCacheJsonConverter.SerializeInvalidation(new RedisInvalidationMessage
-        {
-            Key = key.Value,
-            NamespacedKey = BuildRedisKey(key).ToString(),
-            Tags = options.Tags is { Count: > 0 } publishTags
-                ? publishTags.ToArray()
-                : [],
-            Region = options.Region,
-            ScopeId = options.ScopeId
-        });
-
-        return new ValueTask(_subscriber.PublishAsync(_channel, payload, CommandFlags.FireAndForget));
     }
 
     public async IAsyncEnumerable<TaggedCacheKey> EnumerateByTag(string tag, [EnumeratorCancellation] CancellationToken ct)
@@ -253,15 +211,15 @@ internal sealed class RedisCacheStore : ICacheStore
             var memberString = memberValue.ToString();
             if (string.IsNullOrEmpty(memberString))
             {
-                await _database.SetRemoveAsync(tagKey, memberValue);
+                await _database.SetRemoveAsync(tagKey, memberValue).ConfigureAwait(false);
                 continue;
             }
 
             var redisKey = (RedisKey)memberString!;
-            var value = await _database.StringGetAsync(redisKey);
+            var value = await _database.StringGetAsync(redisKey).ConfigureAwait(false);
             if (!value.HasValue)
             {
-                await _database.SetRemoveAsync(tagKey, memberValue);
+                await _database.SetRemoveAsync(tagKey, memberValue).ConfigureAwait(false);
                 continue;
             }
 
@@ -272,7 +230,7 @@ internal sealed class RedisCacheStore : ICacheStore
             }
             catch
             {
-                await _database.SetRemoveAsync(tagKey, memberValue);
+                await _database.SetRemoveAsync(tagKey, memberValue).ConfigureAwait(false);
                 continue;
             }
 
@@ -284,18 +242,18 @@ internal sealed class RedisCacheStore : ICacheStore
         }
     }
 
-    private async ValueTask SetCore(CacheKey key, CacheValue value, CacheEntryOptions options, CancellationToken ct, bool removeExisting)
+    private async ValueTask SetCore(CacheKey key, CacheValue value, CacheWriteOptions options, CancellationToken ct, bool removeExisting)
     {
         var redisKey = BuildRedisKey(key);
         if (removeExisting)
         {
-            var existing = await _database.StringGetAsync(redisKey);
+            var existing = await _database.StringGetAsync(redisKey).ConfigureAwait(false);
             if (existing.HasValue)
             {
                 try
                 {
                     var existingEnvelope = RedisCacheJsonConverter.DeserializeEnvelope(existing);
-                    await RemoveTags(redisKey, existingEnvelope.Options.Tags);
+                    await RemoveTags(redisKey, existingEnvelope.Options.Tags).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
@@ -308,10 +266,9 @@ internal sealed class RedisCacheStore : ICacheStore
         var absoluteExpiration = options.AbsoluteTtl.HasValue ? now.Add(options.AbsoluteTtl.Value) : (DateTimeOffset?)null;
         var staleUntil = absoluteExpiration;
         if (options.AllowStaleFor.HasValue && absoluteExpiration.HasValue)
-        {
             staleUntil = absoluteExpiration.Value.Add(options.AllowStaleFor.Value);
-        }
 
+        var storedOptions = CacheEntryOptions.FromWriteOptions(options);
         var envelope = new RedisCacheEnvelope
         {
             Key = key.Value,
@@ -319,36 +276,31 @@ internal sealed class RedisCacheStore : ICacheStore
             AbsoluteExpirationUtcTicks = absoluteExpiration?.UtcTicks,
             StaleUntilUtcTicks = staleUntil?.UtcTicks,
             Value = CacheValueModel.FromCacheValue(value),
-            Options = CacheEntryOptionsModel.FromOptions(options)
+            Options = CacheEntryOptionsModel.FromOptions(storedOptions)
         };
 
         var expiry = DetermineExpiry(now, absoluteExpiration, staleUntil);
         if (expiry.HasValue && expiry.Value <= TimeSpan.Zero)
         {
-            await _database.KeyDeleteAsync(redisKey);
-            await RemoveTags(redisKey, envelope.Options.Tags);
+            await _database.KeyDeleteAsync(redisKey).ConfigureAwait(false);
+            await RemoveTags(redisKey, envelope.Options.Tags).ConfigureAwait(false);
             return;
         }
 
         var payload = RedisCacheJsonConverter.SerializeEnvelope(envelope);
-        await _database.StringSetAsync(redisKey, payload, expiry);
-        await IndexTags(redisKey, envelope.Options.Tags, expiry);
+        await _database.StringSetAsync(redisKey, payload, expiry).ConfigureAwait(false);
+        await IndexTags(redisKey, envelope.Options.Tags, expiry).ConfigureAwait(false);
     }
 
-    private async Task RefreshSlidingTtl(RedisKey redisKey, CacheKey key, RedisCacheEnvelope envelope, CacheEntryOptions cachedOptions, DateTimeOffset now)
+    private async Task RefreshSlidingTtl(RedisKey redisKey, RedisCacheEnvelope envelope, CacheEntryOptions cachedOptions, DateTimeOffset now)
     {
         var sliding = cachedOptions.SlidingTtl.GetValueOrDefault();
-        if (sliding <= TimeSpan.Zero)
-        {
-            return;
-        }
+        if (sliding <= TimeSpan.Zero) return;
 
         var newAbsolute = now.Add(sliding);
         DateTimeOffset? newStale = newAbsolute;
         if (cachedOptions.AllowStaleFor.HasValue)
-        {
             newStale = newAbsolute.Add(cachedOptions.AllowStaleFor.Value);
-        }
 
         envelope = envelope with
         {
@@ -359,27 +311,8 @@ internal sealed class RedisCacheStore : ICacheStore
 
         var expiry = DetermineExpiry(now, newAbsolute, newStale);
         var payload = RedisCacheJsonConverter.SerializeEnvelope(envelope);
-        await _database.StringSetAsync(redisKey, payload, expiry);
-        await IndexTags(redisKey, cachedOptions.Tags, expiry);
-    }
-
-    internal async ValueTask HandleInvalidationMessage(RedisInvalidationMessage message, CancellationToken ct)
-    {
-        ct.ThrowIfCancellationRequested();
-
-        var redisKey = ResolveRedisKey(message);
-        await _database.KeyDeleteAsync(redisKey);
-        await RemoveTags(redisKey, message.Tags ?? []);
-    }
-
-    private RedisKey ResolveRedisKey(RedisInvalidationMessage message)
-    {
-        if (!string.IsNullOrWhiteSpace(message.NamespacedKey))
-        {
-            return (RedisKey)message.NamespacedKey!;
-        }
-
-        return BuildRedisKey(new CacheKey(message.Key));
+        await _database.StringSetAsync(redisKey, payload, expiry).ConfigureAwait(false);
+        await IndexTags(redisKey, cachedOptions.Tags, expiry).ConfigureAwait(false);
     }
 
     private async Task IndexTags(RedisKey redisKey, IEnumerable<string> tags, TimeSpan? expiry)
@@ -387,61 +320,43 @@ internal sealed class RedisCacheStore : ICacheStore
         var normalized = tags?.Where(static t => !string.IsNullOrWhiteSpace(t))
             .Select(static t => t.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray() ?? [];
+            .ToArray() ?? Array.Empty<string>();
 
-        if (normalized.Length == 0)
-        {
-            return;
-        }
+        if (normalized.Length == 0) return;
 
         foreach (var tag in normalized)
         {
             var tagKey = BuildTagKey(tag);
             var keyString = redisKey.ToString();
-            if (string.IsNullOrEmpty(keyString))
-            {
-                continue;
-            }
+            if (string.IsNullOrEmpty(keyString)) continue;
 
             var namespacedKey = (RedisValue)keyString!;
-            await _database.SetAddAsync(tagKey, namespacedKey);
+            await _database.SetAddAsync(tagKey, namespacedKey).ConfigureAwait(false);
             if (expiry.HasValue)
-            {
-                await _database.KeyExpireAsync(tagKey, expiry);
-            }
+                await _database.KeyExpireAsync(tagKey, expiry).ConfigureAwait(false);
         }
     }
 
     private async Task RemoveTags(RedisKey redisKey, IEnumerable<string> tags)
     {
-        if (tags is null)
-        {
-            return;
-        }
+        if (tags is null) return;
 
         var keyString = redisKey.ToString();
-        if (string.IsNullOrEmpty(keyString))
-        {
-            return;
-        }
+        if (string.IsNullOrEmpty(keyString)) return;
 
         var namespacedKey = (RedisValue)keyString!;
         foreach (var tag in tags)
         {
-            if (string.IsNullOrWhiteSpace(tag))
-            {
-                continue;
-            }
-
+            if (string.IsNullOrWhiteSpace(tag)) continue;
             var tagKey = BuildTagKey(tag.Trim());
-            await _database.SetRemoveAsync(tagKey, namespacedKey);
+            await _database.SetRemoveAsync(tagKey, namespacedKey).ConfigureAwait(false);
         }
     }
 
     private async Task Evict(RedisKey redisKey, IEnumerable<string> tags)
     {
-        await _database.KeyDeleteAsync(redisKey);
-        await RemoveTags(redisKey, tags);
+        await _database.KeyDeleteAsync(redisKey).ConfigureAwait(false);
+        await RemoveTags(redisKey, tags).ConfigureAwait(false);
     }
 
     private static TimeSpan? DetermineExpiry(DateTimeOffset now, DateTimeOffset? absoluteExpiration, DateTimeOffset? staleUntil)
@@ -449,23 +364,13 @@ internal sealed class RedisCacheStore : ICacheStore
         if (staleUntil.HasValue)
         {
             var ttl = staleUntil.Value - now;
-            if (ttl > TimeSpan.Zero)
-            {
-                return ttl;
-            }
-
-            return TimeSpan.Zero;
+            return ttl > TimeSpan.Zero ? ttl : TimeSpan.Zero;
         }
 
         if (absoluteExpiration.HasValue)
         {
             var ttl = absoluteExpiration.Value - now;
-            if (ttl > TimeSpan.Zero)
-            {
-                return ttl;
-            }
-
-            return TimeSpan.Zero;
+            return ttl > TimeSpan.Zero ? ttl : TimeSpan.Zero;
         }
 
         return null;
@@ -477,16 +382,11 @@ internal sealed class RedisCacheStore : ICacheStore
 
     private static string NormalizePrefix(string? value)
     {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return "";
-        }
+        if (string.IsNullOrWhiteSpace(value)) return "";
 
         var trimmed = value.Trim();
         while (trimmed.EndsWith(":", StringComparison.Ordinal))
-        {
             trimmed = trimmed[..^1];
-        }
 
         return trimmed.Length == 0 ? "" : trimmed + ":";
     }

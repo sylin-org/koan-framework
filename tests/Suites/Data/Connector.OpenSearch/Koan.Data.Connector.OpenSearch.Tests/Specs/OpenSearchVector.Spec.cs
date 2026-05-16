@@ -26,15 +26,7 @@ public sealed class OpenSearchVectorSpec
     {
         await TestPipeline.For<OpenSearchVectorSpec>(_output, nameof(Save_with_vector_and_search_similar))
             .RequireDocker()
-            .Using<OpenSearchContainerFixture>("opensearch", _ => ValueTask.FromResult(new OpenSearchContainerFixture()), (ctx, fixture) =>
-            {
-                ctx.Diagnostics.Info("opensearch.fixture.ready", new
-                {
-                    available = fixture.IsAvailable,
-                    endpoint = fixture.Endpoint,
-                    reason = fixture.UnavailableReason
-                });
-            })
+            .UsingOpenSearchContainer()
             .Using<OpenSearchConnectorFixture>("fixture", static ctx => OpenSearchConnectorFixture.Create(ctx))
             .Arrange(static async ctx =>
             {

@@ -1,11 +1,12 @@
 ﻿using System.Text.Json.Serialization;
+using Koan.Cache.Adapter.Redis.Coherence;
 using Koan.Cache.Adapter.Redis.Stores;
 
 namespace Koan.Cache.Adapter.Redis.Serialization;
 
 [JsonSourceGenerationOptions(WriteIndented = false)]
 [JsonSerializable(typeof(RedisCacheEnvelope))]
-[JsonSerializable(typeof(RedisInvalidationMessage))]
+[JsonSerializable(typeof(RedisInvalidationEnvelope))]
 internal partial class RedisCacheSerializerContext : JsonSerializerContext
 {
 }

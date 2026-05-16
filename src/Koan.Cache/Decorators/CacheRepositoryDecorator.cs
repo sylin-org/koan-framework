@@ -3,12 +3,20 @@ using System.Linq;
 using Koan.Cache.Abstractions.Policies;
 using Koan.Cache.Abstractions.Primitives;
 using Koan.Cache.Abstractions.Stores;
+using Koan.Data.Abstractions;
 using Koan.Data.Core.Decorators;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Koan.Cache.Decorators;
 
+/// <summary>
+/// Repository decorator that applies <c>[Cacheable]</c> / <c>[CachePolicy]</c> intent to any
+/// <c>IDataRepository&lt;T,K&gt;</c>. <c>[ProviderPriority(100)]</c> places this in the
+/// "read short-circuit" band — cache hits return before downstream decorators (CQRS, audit)
+/// observe the read. ARCH-0076 (M10) documents the canonical priority bands.
+/// </summary>
+[ProviderPriority(100)]
 internal sealed class CacheRepositoryDecorator : IDataRepositoryDecorator
 {
     private readonly ICachePolicyRegistry _policyRegistry;

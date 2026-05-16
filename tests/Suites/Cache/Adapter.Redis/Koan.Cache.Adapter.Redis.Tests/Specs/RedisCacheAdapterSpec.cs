@@ -1,16 +1,23 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
+using System;
 using System.Threading.Tasks;
+using FluentAssertions;
 using Koan.Cache.Abstractions;
-using Koan.Cache.Abstractions.Policies;
-using Koan.Cache.Adapter.Redis;
-using Koan.Cache.Extensions;
+using Koan.Cache.Abstractions.Primitives;
+using Koan.Cache.Abstractions.Stores;
+using Koan.Cache.Adapter.Redis.Tests.Support;
+using Koan.Testing.Extensions;
+using Koan.Testing.Pipeline;
+using Microsoft.Extensions.DependencyInjection;
+using Xunit;
 using Xunit.Abstractions;
 
 namespace Koan.Cache.Adapter.Redis.Tests.Specs;
 
+/// <summary>
+/// Integration tests for the Redis L2 store. Proves writes survive across separate
+/// <c>ICacheClient</c> instances (sharing the same Redis container), tag indexing roundtrips,
+/// and tag-flush actually removes keys from L2.
+/// </summary>
 public sealed class RedisCacheAdapterSpec
 {
     private readonly ITestOutputHelper _output;
@@ -29,152 +36,125 @@ public sealed class RedisCacheAdapterSpec
             {
                 var fixture = ctx.GetRedisFixture();
                 if (!fixture.IsAvailable || string.IsNullOrWhiteSpace(fixture.ConnectionString))
-                {
                     throw new InvalidOperationException($"Redis unavailable: {fixture.UnavailableReason ?? "unspecified"}");
-                }
 
                 var token = ctx.ExecutionId.ToString("N");
                 var keyPrefix = $"cache:{token}:";
                 var tagPrefix = $"cache:tag:{token}:";
                 var channel = $"koan-cache-{token}";
 
-                await using var providerA = BuildServiceProvider(fixture.ConnectionString!, keyPrefix, tagPrefix, channel);
-                await using var providerB = BuildServiceProvider(fixture.ConnectionString!, keyPrefix, tagPrefix, channel);
-                await using var hostedA = await StartHostedServices(providerA, ctx.Cancellation).ConfigureAwait(false);
-                await using var hostedB = await StartHostedServices(providerB, ctx.Cancellation).ConfigureAwait(false);
+                await using var nodeA = await RedisCacheNode.Start(fixture.ConnectionString!, keyPrefix, tagPrefix, channel, ctx.Cancellation);
+                await using var nodeB = await RedisCacheNode.Start(fixture.ConnectionString!, keyPrefix, tagPrefix, channel, ctx.Cancellation);
 
-                var clientA = providerA.GetRequiredService<ICacheClient>();
-                var clientB = providerB.GetRequiredService<ICacheClient>();
+                var clientA = nodeA.Provider.GetRequiredService<ICacheClient>();
+                var clientB = nodeB.Provider.GetRequiredService<ICacheClient>();
 
                 var key = new CacheKey($"redis-roundtrip-{token}");
-                var writer = clientA.CreateEntry<string>(key)
+                await clientA.CreateEntry<string>(key)
                     .WithAbsoluteTtl(TimeSpan.FromMinutes(5))
-                    .WithTags("redis-integration", token);
+                    .WithTags("redis-integration", token)
+                    .Set("payload", ctx.Cancellation);
 
-                await writer.Set("payload", ctx.Cancellation).ConfigureAwait(false);
+                // B reads from a separate node — must hit L2 (B has no L1 entry for this key).
+                var read = await clientB.CreateEntry<string>(key).Get(ctx.Cancellation);
+                read.Should().Be("payload");
 
-                var reader = clientB.CreateEntry<string>(key);
-                var value = await reader.Get(ctx.Cancellation).ConfigureAwait(false);
-                value.Should().Be("payload");
-
-                var tagCount = await clientB.CountTags(new[] { "redis-integration" }, ctx.Cancellation).ConfigureAwait(false);
+                // Tag index roundtrip via L2.
+                var tagCount = await clientB.CountTags(new[] { "redis-integration" }, ctx.Cancellation);
                 tagCount.Should().Be(1);
 
-                var removed = await clientB.FlushTags(new[] { "redis-integration" }, ctx.Cancellation).ConfigureAwait(false);
+                // Tag flush removes from L2 + broadcasts EvictByTag → both nodes evict L1.
+                var removed = await clientB.FlushTags(new[] { "redis-integration" }, ctx.Cancellation);
                 removed.Should().Be(1);
 
-                var afterFlush = await reader.Get(ctx.Cancellation).ConfigureAwait(false);
-                afterFlush.Should().BeNull();
+                // After flush, both nodes return null.
+                var afterFlushB = await clientB.CreateEntry<string>(key).Get(ctx.Cancellation);
+                afterFlushB.Should().BeNull();
+
+                // Give the broadcast a moment to reach A; then A is also empty.
+                await Task.Delay(250, ctx.Cancellation);
+                var afterFlushA = await clientA.CreateEntry<string>(key).Get(ctx.Cancellation);
+                afterFlushA.Should().BeNull();
             })
             .Run();
 
     [Fact]
-    public Task Stale_entries_expire_after_allowance()
-        => TestPipeline.For<RedisCacheAdapterSpec>(_output, nameof(Stale_entries_expire_after_allowance))
+    public Task Opt_in_AllowStaleFor_surfaces_stale_values_within_window()
+        => TestPipeline.For<RedisCacheAdapterSpec>(_output, nameof(Opt_in_AllowStaleFor_surfaces_stale_values_within_window))
             .RequireDocker()
             .UsingRedisContainer()
             .Act(async ctx =>
             {
                 var fixture = ctx.GetRedisFixture();
                 if (!fixture.IsAvailable || string.IsNullOrWhiteSpace(fixture.ConnectionString))
-                {
                     throw new InvalidOperationException($"Redis unavailable: {fixture.UnavailableReason ?? "unspecified"}");
-                }
 
                 var token = ctx.ExecutionId.ToString("N");
                 var keyPrefix = $"cache:{token}:";
                 var tagPrefix = $"cache:tag:{token}:";
                 var channel = $"koan-cache-{token}-stale";
 
-                await using var provider = BuildServiceProvider(fixture.ConnectionString!, keyPrefix, tagPrefix, channel);
-                await using var hosted = await StartHostedServices(provider, ctx.Cancellation).ConfigureAwait(false);
+                await using var node = await RedisCacheNode.Start(fixture.ConnectionString!, keyPrefix, tagPrefix, channel, ctx.Cancellation);
+                var client = node.Provider.GetRequiredService<ICacheClient>();
 
-                var client = provider.GetRequiredService<ICacheClient>();
-
-                var key = new CacheKey($"redis-stale-{token}");
+                // Per ARCH-0078: caller explicitly opts into SWR via .AllowStaleFor(...). The same
+                // option is used for the write (records staleUntil at write time) and the read
+                // (signals "I'll accept stale within this window").
+                var key = new CacheKey($"redis-swr-optin-{token}");
                 var entry = client.CreateEntry<string>(key)
-                    .WithAbsoluteTtl(TimeSpan.FromMilliseconds(150))
-                    .AllowStaleFor(TimeSpan.FromMilliseconds(200));
+                    .WithAbsoluteTtl(TimeSpan.FromMilliseconds(200))
+                    .AllowStaleFor(TimeSpan.FromSeconds(2));
 
-                await entry.Set("payload", ctx.Cancellation).ConfigureAwait(false);
+                await entry.Set("payload", ctx.Cancellation);
 
-                await Task.Delay(TimeSpan.FromMilliseconds(175), ctx.Cancellation).ConfigureAwait(false);
-                var stale = await entry.Get(ctx.Cancellation).ConfigureAwait(false);
+                // Past absolute TTL but within SWR window → opted-in caller gets stale value.
+                await Task.Delay(TimeSpan.FromMilliseconds(300), ctx.Cancellation);
+                var stale = await entry.Get(ctx.Cancellation);
                 stale.Should().Be("payload");
 
-                await Task.Delay(TimeSpan.FromMilliseconds(250), ctx.Cancellation).ConfigureAwait(false);
-                var final = await entry.Get(ctx.Cancellation).ConfigureAwait(false);
+                // Past SWR allowance → null even for opted-in caller.
+                await Task.Delay(TimeSpan.FromMilliseconds(2500), ctx.Cancellation);
+                var final = await entry.Get(ctx.Cancellation);
                 final.Should().BeNull();
-
-                var exists = await entry.Exists(ctx.Cancellation).ConfigureAwait(false);
-                exists.Should().BeFalse();
             })
             .Run();
 
-    private static ServiceProvider BuildServiceProvider(string connectionString, string keyPrefix, string tagPrefix, string channelName)
-    {
-        var settings = new Dictionary<string, string?>
-        {
-            [CacheConstants.Configuration.ProviderKey] = "redis",
-            [CacheConstants.Configuration.Redis.Configuration] = connectionString,
-            [CacheConstants.Configuration.Redis.KeyPrefix] = keyPrefix,
-            [CacheConstants.Configuration.Redis.TagPrefix] = tagPrefix,
-            [CacheConstants.Configuration.Redis.ChannelName] = channelName
-        };
-
-        var configuration = new ConfigurationManager();
-        foreach (var (key, value) in settings)
-        {
-            configuration[key] = value;
-        }
-
-    _ = typeof(RedisCacheAdapterRegistrar);
-
-        var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(configuration);
-        services.AddLogging();
-        services.AddKoanCache(configuration);
-        services.AddKoanCacheAdapter("redis", configuration);
-
-        var provider = services.BuildServiceProvider();
-        _ = provider.GetRequiredService<ICachePolicyRegistry>();
-
-        return provider;
-    }
-
-    private static async ValueTask<IAsyncDisposable> StartHostedServices(ServiceProvider provider, CancellationToken cancellation)
-    {
-        var hosted = provider.GetServices<IHostedService>().ToArray();
-        foreach (var service in hosted)
-        {
-            await service.Start(cancellation).ConfigureAwait(false);
-        }
-
-        return new HostedServicesScope(hosted);
-    }
-
-    private sealed class HostedServicesScope : IAsyncDisposable
-    {
-        private readonly IHostedService[] _services;
-
-        public HostedServicesScope(IHostedService[] services)
-        {
-            _services = services;
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            foreach (var service in _services.Reverse())
+    [Fact]
+    public Task Default_strict_consistency_returns_null_past_absolute_TTL()
+        => TestPipeline.For<RedisCacheAdapterSpec>(_output, nameof(Default_strict_consistency_returns_null_past_absolute_TTL))
+            .RequireDocker()
+            .UsingRedisContainer()
+            .Act(async ctx =>
             {
-                try
-                {
-                    await service.StopAsync(CancellationToken.None).ConfigureAwait(false);
-                }
-                catch
-                {
-                    // ignored for teardown
-                }
-            }
-        }
-    }
+                var fixture = ctx.GetRedisFixture();
+                if (!fixture.IsAvailable || string.IsNullOrWhiteSpace(fixture.ConnectionString))
+                    throw new InvalidOperationException($"Redis unavailable: {fixture.UnavailableReason ?? "unspecified"}");
+
+                var token = ctx.ExecutionId.ToString("N");
+                var keyPrefix = $"cache:{token}:";
+                var tagPrefix = $"cache:tag:{token}:";
+                var channel = $"koan-cache-{token}-strict";
+
+                await using var node = await RedisCacheNode.Start(fixture.ConnectionString!, keyPrefix, tagPrefix, channel, ctx.Cancellation);
+                var client = node.Provider.GetRequiredService<ICacheClient>();
+
+                var key = new CacheKey($"redis-strict-{token}");
+
+                // No AllowStaleFor — default consistency is Strict. Even if the entry could have
+                // been preserved (no staleness window), past the absolute TTL the read returns null.
+                var entry = client.CreateEntry<string>(key)
+                    .WithAbsoluteTtl(TimeSpan.FromMilliseconds(200));
+
+                await entry.Set("payload", ctx.Cancellation);
+
+                // Within TTL → hit.
+                var fresh = await entry.Get(ctx.Cancellation);
+                fresh.Should().Be("payload");
+
+                // Past TTL → null (no opt-in, default strict).
+                await Task.Delay(TimeSpan.FromMilliseconds(300), ctx.Cancellation);
+                var after = await entry.Get(ctx.Cancellation);
+                after.Should().BeNull("default consistency is strict — no SWR without explicit AllowStaleFor (ARCH-0078)");
+            })
+            .Run();
 }

@@ -1,0 +1,12 @@
+<Project>
+  <!--
+    Every connector under this folder declares orchestration metadata on its adapter factory
+    (typically [KoanService(...)] — see ARCH-0049). The web-auth connectors additionally publish
+    [assembly: AuthProviderDescriptor(...)] for provider discovery. Opt in to the orchestration
+    manifest generator here so the auto-injection (root Directory.Build.props) only fires for
+    projects that actually use it. See ARCH-0077.
+  -->
+  <PropertyGroup>
+    <KoanRequiresOrchestrationGenerator>true</KoanRequiresOrchestrationGenerator>
+  </PropertyGroup>
+</Project>
