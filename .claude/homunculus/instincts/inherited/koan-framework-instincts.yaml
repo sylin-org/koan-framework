@@ -1,0 +1,776 @@
+# Instincts generated from https://github.com/sylin-org/koan-framework
+# Generated: 2026-05-16T07:32:22.380Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: koan-framework-commit-conventional
+trigger: "when writing a commit message"
+confidence: 0.85
+domain: git
+source: repo-analysis
+source_repo: https://github.com/sylin-org/koan-framework
+---
+
+# Koan Framework Commit Conventional
+
+## Action
+
+Use conventional commit format with prefixes: feat, fix, docs, refactor, chore
+
+## Evidence
+
+- 100 commits analyzed
+- Detected conventional commit pattern
+- Examples: feat(vector): add partition-aware vector storage via EntityContext (ARCH-0071), fix(koan.context): job progress persistence and partition context fixes
+
+---
+id: koan-framework-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/sylin-org/koan-framework
+---
+
+# Koan Framework Commit Length
+
+## Action
+
+Write moderate-length commit messages (~65 characters)
+
+## Evidence
+
+- Average commit message length: 65 chars
+- Based on 100 commits
+
+---
+id: koan-framework-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/sylin-org/koan-framework
+---
+
+# Koan Framework Naming Files
+
+## Action
+
+Use PascalCase naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: PascalCase
+
+---
+id: koan-framework-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/sylin-org/koan-framework
+---
+
+# Koan Framework Export Style
+
+## Action
+
+Prefer default exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: default
+
+---
+id: koan-framework-arch-type-based
+trigger: "when adding new code"
+confidence: 0.8
+domain: architecture
+source: repo-analysis
+source_repo: https://github.com/sylin-org/koan-framework
+---
+
+# Koan Framework Arch Type Based
+
+## Action
+
+Place code in the appropriate type folder (components/, services/, utils/, etc.)
+
+## Evidence
+
+- Type-based module organization detected
+- Folders: Connectors, Koan.Data.Core, Koan.Data.Vector.Abstractions, Koan.Data.Vector, Koan.Context
+
+---
+id: koan-framework-test-separate
+trigger: "when writing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/sylin-org/koan-framework
+---
+
+# Koan Framework Test Separate
+
+## Action
+
+Place tests in the tests/ or __tests__/ directory, mirroring src structure
+
+## Evidence
+
+- Separate test directory pattern detected
+- Tests live in dedicated test folders
+
+---
+id: koan-framework-test-naming
+trigger: "when creating a test file"
+confidence: 0.85
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/sylin-org/koan-framework
+---
+
+# Koan Framework Test Naming
+
+## Action
+
+Name test files using the pattern: *.test.ts
+
+## Evidence
+
+- File pattern: *.test.ts
+- Consistent across test files
+
+---
+id: koan-framework-test-types
+trigger: "when planning tests for a feature"
+confidence: 0.7
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/sylin-org/koan-framework
+---
+
+# Koan Framework Test Types
+
+## Action
+
+Write unit, integration tests to match project standards
+
+## Evidence
+
+- Test types detected: unit, integration
+- Coverage config: no
+
+---
+id: koan-framework-workflow-database-migration
+trigger: "when modifying the database schema or adding tables"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/sylin-org/koan-framework
+---
+
+# Koan Framework Workflow Database Migration
+
+## Action
+
+Follow the database-migration workflow:
+1. Create migration file
+2. Update schema definitions
+3. Generate/update types
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: migrations/*
+
+---
+id: koan-framework-workflow-feature-development
+trigger: "when implementing a new feature"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/sylin-org/koan-framework
+---
+
+# Koan Framework Workflow Feature Development
+
+## Action
+
+Follow the feature-development workflow:
+1. Add feature implementation
+2. Add tests for feature
+3. Update documentation
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~19x per month
+- Files: src/koan.context/mcp-sdk/*, src/koan.context/wwwroot/js/components/*, src/services/code-intelligence/koan.service.koancontext/ui/src/*
+
+---
+id: koan-framework-workflow-refactoring
+trigger: "when refactoring code"
+confidence: 0.7
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/sylin-org/koan-framework
+---
+
+# Koan Framework Workflow Refactoring
+
+## Action
+
+Follow the refactoring workflow:
+1. Ensure tests pass before refactor
+2. Refactor code structure
+3. Verify tests still pass
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~4x per month
+- Files: src/**/*
+
+---
+id: koan-framework-workflow-add-or-evolve-entity-with-rest-api
+trigger: "when doing add or evolve entity with rest api"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/sylin-org/koan-framework
+---
+
+# Koan Framework Workflow Add Or Evolve Entity With Rest Api
+
+## Action
+
+Follow the add-or-evolve-entity-with-rest-api workflow:
+1. Create or update entity class in Models/ (e.g., Models/Project.cs, Models/SearchCategory.cs)
+2. Add or update corresponding EntityController<T> in Controllers/ (e.g., Controllers/ProjectsController.cs, Controllers/SearchCategoryController.cs)
+3. Register controller/service in KoanAutoRegistrar.cs or Startup/Program.cs
+4. Optionally add seeder or initializer for default data (e.g., Bootstrap/SearchProfileSeeder.cs, Initialization/TagSeedInitializer.cs)
+5. Update API client/types in UI (e.g., ui/src/api/types.ts, ui/src/api/searchProfiles.ts)
+6. Expose new endpoints in API (e.g., /api/projects, /api/searchcategories, /api/tags)
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: src/Services/code-intelligence/Koan.Service.KoanContext/Models/*.cs, src/Services/code-intelligence/Koan.Service.KoanContext/Controllers/*Controller.cs, src/Services/code-intelligence/Koan.Service.KoanContext/Initialization/KoanAutoRegistrar.cs
+
+---
+id: koan-framework-workflow-feature-development-service-controller-ui
+trigger: "when doing feature development service controller ui"
+confidence: 0.65
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/sylin-org/koan-framework
+---
+
+# Koan Framework Workflow Feature Development Service Controller Ui
+
+## Action
+
+Follow the feature-development-service-controller-ui workflow:
+1. Implement service logic in Services/ (e.g., Search.cs, Indexer.cs, MetricsCollector.cs)
+2. Create or update API controller in Controllers/ (e.g., SearchController.cs, MetricsController.cs)
+3. Update or add UI page/component to surface the feature (e.g., ui/src/pages/SearchPage.tsx, ui/src/pages/MonitoringDashboard.tsx)
+4. Update API client/types in UI (e.g., ui/src/api/search.ts, ui/src/api/metrics.ts)
+5. Wire up service/controller in Program.cs or KoanAutoRegistrar.cs
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~3x per month
+- Files: src/Services/code-intelligence/Koan.Service.KoanContext/Services/*.cs, src/Services/code-intelligence/Koan.Service.KoanContext/Controllers/*Controller.cs, src/Services/code-intelligence/Koan.Service.KoanContext/Program.cs
+
+---
+id: koan-framework-workflow-infrastructure-or-connector-refactor
+trigger: "when doing infrastructure or connector refactor"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/sylin-org/koan-framework
+---
+
+# Koan Framework Workflow Infrastructure Or Connector Refactor
+
+## Action
+
+Follow the infrastructure-or-connector-refactor workflow:
+1. Define or update interface in Abstractions/ (e.g., INamingProvider, INamingDefaultsProvider)
+2. Update all relevant AdapterFactory implementations (e.g., SqliteAdapterFactory.cs, MongoAdapterFactory.cs, WeaviateVectorAdapterFactory.cs)
+3. Update registry logic (e.g., StorageNameRegistry.cs, VectorStorageNameRegistry.cs)
+4. Update repositories to use new registry or interface (e.g., WeaviateVectorRepository.cs)
+5. Update or add tests to verify new behavior (e.g., DataVectorSeparation.Spec.cs)
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: src/Koan.Data.Abstractions/Naming/*.cs, src/Koan.Data.Core/Configuration/StorageNameRegistry.cs, src/Koan.Data.Vector.Abstractions/Configuration/VectorStorageNameRegistry.cs
+
+---
+id: koan-framework-workflow-backend-ui-iteration-with-types
+trigger: "when doing backend ui iteration with types"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/sylin-org/koan-framework
+---
+
+# Koan Framework Workflow Backend Ui Iteration With Types
+
+## Action
+
+Follow the backend-ui-iteration-with-types workflow:
+1. Update backend model (e.g., SearchResultChunk, add nested provenance)
+2. Update API controller to return new structure
+3. Update TypeScript interfaces in ui/src/api/types.ts
+4. Update UI components/pages to use new structure (e.g., SearchPage.tsx)
+5. Rebuild UI assets (wwwroot/assets/)
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: src/Services/code-intelligence/Koan.Service.KoanContext/Models/*.cs, src/Services/code-intelligence/Koan.Service.KoanContext/Controllers/*.cs, src/Services/code-intelligence/Koan.Service.KoanContext/ui/src/api/types.ts
+
+---
+id: koan-framework-workflow-pagination-or-continuation-token-implementation
+trigger: "when doing pagination or continuation token implementation"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/sylin-org/koan-framework
+---
+
+# Koan Framework Workflow Pagination Or Continuation Token Implementation
+
+## Action
+
+Follow the pagination-or-continuation-token-implementation workflow:
+1. Implement continuation token parsing and generation in backend service (e.g., Services/Search.cs, Services/Pagination.cs)
+2. Update API controller to include continuationToken in response (e.g., Controllers/SearchController.cs)
+3. Update UI to consume continuationToken and trigger additional fetches (e.g., SearchPage.tsx)
+4. Update TypeScript types if needed
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: src/Services/code-intelligence/Koan.Service.KoanContext/Services/Search.cs, src/Services/code-intelligence/Koan.Service.KoanContext/Services/Pagination.cs, src/Services/code-intelligence/Koan.Service.KoanContext/Controllers/SearchController.cs
+
+---
+id: koan-framework-workflow-test-suite-expansion-or-update
+trigger: "when doing test suite expansion or update"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/sylin-org/koan-framework
+---
+
+# Koan Framework Workflow Test Suite Expansion Or Update
+
+## Action
+
+Follow the test-suite-expansion-or-update workflow:
+1. Create or update Spec files in tests/Suites/Context/Unit or tests/Suites/Data/Core
+2. Align test entity definitions (e.g., TransactionTestEntity.cs)
+3. Update test pipeline usage (e.g., TestPipeline API)
+4. Verify all tests pass after feature/refactor
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: tests/Suites/Context/Unit/Koan.Tests.Context.Unit/Specs/**/*.cs, tests/Suites/Data/Core/Koan.Tests.Data.Core/Specs/**/*.cs
+
+---
+id: koan-framework-workflow-documentation-and-adr-update
+trigger: "when doing documentation and adr update"
+confidence: 0.65
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/sylin-org/koan-framework
+---
+
+# Koan Framework Workflow Documentation And Adr Update
+
+## Action
+
+Follow the documentation-and-adr-update workflow:
+1. Create or update docs/decisions/*.md with ADRs or proposals
+2. Update guides or howto docs for new patterns
+3. Cross-link related guides and update frontmatter
+4. Document implementation status, rationale, and next steps
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~3x per month
+- Files: docs/decisions/*.md, docs/proposals/*.md, docs/guides/*.md
+
+---
+id: koan-framework-instinct-csharp-class-naming
+trigger: "When creating a new class in C#."
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: sylin-org/koan-framework
+---
+
+# Koan Framework Instinct Csharp Class Naming
+
+## Action
+
+Name the class using PascalCase.
+
+## Evidence
+
+- Pattern in folder structure: Koan.Data.Core, Koan.Context
+- NamingConventions: classes: PascalCase
+
+---
+id: koan-framework-instinct-csharp-function-naming
+trigger: "When defining a function or method in C#."
+confidence: 0.85
+domain: code-style
+source: repo-analysis
+source_repo: sylin-org/koan-framework
+---
+
+# Koan Framework Instinct Csharp Function Naming
+
+## Action
+
+Name the function using camelCase.
+
+## Evidence
+
+- NamingConventions: functions: camelCase
+
+---
+id: koan-framework-instinct-csharp-constant-naming
+trigger: "When declaring a constant in C#."
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: sylin-org/koan-framework
+---
+
+# Koan Framework Instinct Csharp Constant Naming
+
+## Action
+
+Name the constant using SCREAMING_SNAKE_CASE.
+
+## Evidence
+
+- NamingConventions: constants: SCREAMING_SNAKE_CASE
+
+---
+id: koan-framework-instinct-file-naming
+trigger: "When creating a new file (class, controller, model, etc.)."
+confidence: 0.85
+domain: code-style
+source: repo-analysis
+source_repo: sylin-org/koan-framework
+---
+
+# Koan Framework Instinct File Naming
+
+## Action
+
+Name the file using PascalCase.
+
+## Evidence
+
+- NamingConventions: files: PascalCase
+- Examples: Models/Project.cs, Controllers/ProjectsController.cs
+
+---
+id: koan-framework-instinct-import-style-mixed
+trigger: "When importing modules or namespaces."
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: sylin-org/koan-framework
+---
+
+# Koan Framework Instinct Import Style Mixed
+
+## Action
+
+Use either default or named imports as appropriate for the context.
+
+## Evidence
+
+- importStyle: mixed
+- exportStyle: default
+
+---
+id: koan-framework-instinct-test-file-location
+trigger: "When adding or updating tests."
+confidence: 0.9
+domain: testing
+source: repo-analysis
+source_repo: sylin-org/koan-framework
+---
+
+# Koan Framework Instinct Test File Location
+
+## Action
+
+Place test files in the 'tests/Suites/...' directory, matching the context (e.g., Context/Unit, Data/Core).
+
+## Evidence
+
+- testLocation: separate
+- Pattern: tests/Suites/Context/Unit/Koan.Tests.Context.Unit/Specs/**/*.cs
+
+---
+id: koan-framework-instinct-test-type-coverage
+trigger: "When writing tests for a new or refactored feature."
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: sylin-org/koan-framework
+---
+
+# Koan Framework Instinct Test Type Coverage
+
+## Action
+
+Include both unit and integration tests where applicable.
+
+## Evidence
+
+- testTypes: unit, integration
+- test-suite-expansion-or-update workflow
+
+---
+id: koan-framework-instinct-test-spec-naming
+trigger: "When creating a test file."
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: sylin-org/koan-framework
+---
+
+# Koan Framework Instinct Test Spec Naming
+
+## Action
+
+Name the test file with a '.Spec.cs' suffix for behavior-driven tests.
+
+## Evidence
+
+- Pattern: DataVectorSeparation.Spec.cs
+- tests/Suites/Data/Core/Koan.Tests.Data.Core/Specs/Naming/*.cs
+
+---
+id: koan-framework-instinct-git-conventional-commit
+trigger: "When writing a commit message."
+confidence: 0.95
+domain: git
+source: repo-analysis
+source_repo: sylin-org/koan-framework
+---
+
+# Koan Framework Instinct Git Conventional Commit
+
+## Action
+
+Use the conventional commit format: <type>(<scope>): <description>.
+
+## Evidence
+
+- commits.type: conventional
+- Examples: feat(vector): add partition-aware vector storage via EntityContext (ARCH-0071)
+
+---
+id: koan-framework-instinct-git-commit-prefixes
+trigger: "When choosing a commit type."
+confidence: 0.9
+domain: git
+source: repo-analysis
+source_repo: sylin-org/koan-framework
+---
+
+# Koan Framework Instinct Git Commit Prefixes
+
+## Action
+
+Use one of the allowed prefixes: feat, fix, docs, refactor, chore, test.
+
+## Evidence
+
+- commits.prefixes: [feat, fix, docs, refactor, chore, test]
+- Examples: fix(koan.context): job progress persistence and partition context fixes
+
+---
+id: koan-framework-instinct-git-commit-length
+trigger: "When writing a commit message."
+confidence: 0.7
+domain: git
+source: repo-analysis
+source_repo: sylin-org/koan-framework
+---
+
+# Koan Framework Instinct Git Commit Length
+
+## Action
+
+Keep the commit message concise, aiming for around 65 characters.
+
+## Evidence
+
+- commits.averageLength: 65
+
+---
+id: koan-framework-instinct-workflow-add-entity-api
+trigger: "When a new domain concept needs to be managed via API/UI."
+confidence: 0.95
+domain: workflow
+source: repo-analysis
+source_repo: sylin-org/koan-framework
+---
+
+# Koan Framework Instinct Workflow Add Entity Api
+
+## Action
+
+Follow the 'add-or-evolve-entity-with-rest-api' workflow: create/update model, controller, registrar, optional seeder, update UI types, expose endpoints.
+
+## Evidence
+
+- Workflow: add-or-evolve-entity-with-rest-api
+- Files: Models/*.cs, Controllers/*Controller.cs, KoanAutoRegistrar.cs, ui/src/api/types.ts
+
+---
+id: koan-framework-instinct-workflow-feature-dev
+trigger: "When adding a new backend feature with UI integration."
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: sylin-org/koan-framework
+---
+
+# Koan Framework Instinct Workflow Feature Dev
+
+## Action
+
+Follow the 'feature-development-service-controller-ui' workflow: implement service, controller, UI page/component, update API types, wire up in registrar or Program.cs.
+
+## Evidence
+
+- Workflow: feature-development-service-controller-ui
+- Files: Services/*.cs, Controllers/*Controller.cs, ui/src/pages/*.tsx
+
+---
+id: koan-framework-instinct-workflow-infra-refactor
+trigger: "When refactoring or upgrading core infrastructure (adapters, registries)."
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: sylin-org/koan-framework
+---
+
+# Koan Framework Instinct Workflow Infra Refactor
+
+## Action
+
+Follow the 'infrastructure-or-connector-refactor' workflow: update abstractions, factories, registries, repositories, and add tests.
+
+## Evidence
+
+- Workflow: infrastructure-or-connector-refactor
+- Files: Abstractions/Naming/*.cs, *AdapterFactory.cs, *Registry.cs
+
+---
+id: koan-framework-instinct-workflow-backend-ui-types
+trigger: "When backend models change and frontend types/UI must be updated."
+confidence: 0.85
+domain: workflow
+source: repo-analysis
+source_repo: sylin-org/koan-framework
+---
+
+# Koan Framework Instinct Workflow Backend Ui Types
+
+## Action
+
+Follow the 'backend-ui-iteration-with-types' workflow: update backend model, API controller, TypeScript types, UI components, and rebuild assets.
+
+## Evidence
+
+- Workflow: backend-ui-iteration-with-types
+- Files: Models/*.cs, Controllers/*.cs, ui/src/api/types.ts, ui/src/pages/*.tsx
+
+---
+id: koan-framework-instinct-workflow-pagination
+trigger: "When implementing or fixing paginated search results."
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: sylin-org/koan-framework
+---
+
+# Koan Framework Instinct Workflow Pagination
+
+## Action
+
+Follow the 'pagination-or-continuation-token-implementation' workflow: implement token logic in backend, update controller, update UI to use token, update types.
+
+## Evidence
+
+- Workflow: pagination-or-continuation-token-implementation
+- Files: Services/Search.cs, Controllers/SearchController.cs, ui/src/pages/SearchPage.tsx
+
+---
+id: koan-framework-instinct-workflow-test-suite-update
+trigger: "When adding a new feature or refactoring core logic."
+confidence: 0.85
+domain: workflow
+source: repo-analysis
+source_repo: sylin-org/koan-framework
+---
+
+# Koan Framework Instinct Workflow Test Suite Update
+
+## Action
+
+Follow the 'test-suite-expansion-or-update' workflow: create/update Spec files, align test entities, update pipeline usage, verify tests.
+
+## Evidence
+
+- Workflow: test-suite-expansion-or-update
+- Files: tests/Suites/Context/Unit/Koan.Tests.Context.Unit/Specs/**/*.cs
+
+---
+id: koan-framework-instinct-workflow-docs-adr
+trigger: "When introducing or updating a significant architectural change, feature, or workflow."
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: sylin-org/koan-framework
+---
+
+# Koan Framework Instinct Workflow Docs Adr
+
+## Action
+
+Follow the 'documentation-and-adr-update' workflow: update ADRs, guides, proposals, cross-link docs, document rationale and status.
+
+## Evidence
+
+- Workflow: documentation-and-adr-update
+- Files: docs/decisions/*.md, docs/proposals/*.md, docs/guides/*.md
+
