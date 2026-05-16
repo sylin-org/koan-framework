@@ -2,6 +2,7 @@
 .SYNOPSIS
     Computes per-package versions and writes build/versions.props.
     Implements the operational half of ARCH-0082 two-tier versioning.
+    Operator's guide: docs/workbooks/versioning.md.
 
 .DESCRIPTION
     Discovers every Koan NuGet-packable csproj under src/, classifies it

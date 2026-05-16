@@ -1,5 +1,9 @@
 # ────────────────────────────────────────────────────────────────────────────
 # Auto-release on merge to main (ARCH-0082)
+#
+# Required reading before debugging or re-running manually:
+#   docs/workbooks/nuget-publishing.md  (Failure → recovery section)
+#   docs/workbooks/versioning.md        (what determines which packages bump)
 # ────────────────────────────────────────────────────────────────────────────
 # What this does, in order, on every push to main:
 #   1. Builds the full solution (refuses to release a broken build).

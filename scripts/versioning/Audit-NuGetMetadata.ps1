@@ -3,6 +3,7 @@
     Audit NuGet package metadata across all packable csprojs.
     Run before a release to spot missing Description / PackageTags / packageId issues
     that would either reject the package at nuget.org or yield a confusing listing.
+    Operator's guide: docs/workbooks/nuget-publishing.md (Failure → recovery).
 
 .EXAMPLE
     pwsh scripts/versioning/Audit-NuGetMetadata.ps1
