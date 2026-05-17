@@ -373,6 +373,14 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         ct.ThrowIfCancellationRequested();
         using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query:all+opts");
         act?.SetTag("entity", typeof(TEntity).FullName);
+
+        // Dispatch on query shape: ignoring the predicate (earlier behavior) silently returned
+        // the full set, making ?filter= and DELETE /?q= unsafe.
+        if (query is Expression<Func<TEntity, bool>> predicate)
+        {
+            return await Query(predicate, options, ct);
+        }
+
         var (offset, limit) = ComputeSkipTake(options);
         await using var conn = Open();
         var sql = $"SELECT [Id], [Json] FROM [dbo].[{TableName}] {OrderByIdClause} OFFSET {offset} ROWS FETCH NEXT {limit} ROWS ONLY";
@@ -424,6 +432,12 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
                 return await CountWhere(whereSql, parameters);
             }
             catch (NotSupportedException)
+            {
+                var all = await Query((object?)null, ct);
+                var count = (long)all.AsQueryable().Count(request.Predicate);
+                return CountResult.Exact(count);
+            }
+            catch (Microsoft.Data.SqlClient.SqlException ex) when (ex.Number == 207) // Invalid column name
             {
                 var all = await Query((object?)null, ct);
                 var count = (long)all.AsQueryable().Count(request.Predicate);
@@ -488,6 +502,15 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         }
         catch (NotSupportedException)
         {
+            var fallback = await Query((object?)null, options, ct);
+            var filtered = fallback.Items.AsQueryable().Where(predicate).ToList();
+            return RepositoryQueryResult<TEntity>.PaginatedOnly(filtered);
+        }
+        catch (Microsoft.Data.SqlClient.SqlException ex) when (ex.Number == 207) // Invalid column name
+        {
+            // Translator emitted a reference to a column that doesn't exist on this table (e.g.
+            // RewriteWhereForProjection didn't catch a token because the WHERE shape was outside
+            // the regex's grammar). Materialise + filter in-process so the request still succeeds.
             var fallback = await Query((object?)null, options, ct);
             var filtered = fallback.Items.AsQueryable().Where(predicate).ToList();
             return RepositoryQueryResult<TEntity>.PaginatedOnly(filtered);

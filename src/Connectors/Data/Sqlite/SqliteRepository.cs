@@ -483,9 +483,61 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         ct.ThrowIfCancellationRequested();
         using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:all+opts");
         act?.SetTag("entity", typeof(TEntity).FullName);
+
+        // Dispatch on the query shape — the orchestrator passes the predicate / raw query as
+        // object? to keep the IDataRepositoryWithOptions surface narrow. Ignoring it (which the
+        // earlier impl did) silently returned the full set, which made filtering and DELETE
+        // ?q= unsafe.
+        if (query is Expression<Func<TEntity, bool>> predicate)
+        {
+            return await QueryByPredicate(predicate, options, ct);
+        }
+        if (query is string sqlPredicate && !string.IsNullOrWhiteSpace(sqlPredicate))
+        {
+            return await QueryByRawSql(sqlPredicate, options, ct);
+        }
+
         var (offset, limit) = ComputeSkipTake(options);
         using var conn = Open();
         var sql = $"SELECT Id, Json FROM [{TableName}] LIMIT {limit} OFFSET {offset}";
+        var rows = await conn.QueryAsync<(string Id, string Json)>(sql);
+        var items = rows.Select(FromRow).ToList();
+        return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
+    }
+
+    private async Task<RepositoryQueryResult<TEntity>> QueryByPredicate(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct)
+    {
+        var translator = new LinqWhereTranslator<TEntity>(_dialect);
+        try
+        {
+            var (whereSql, parameters) = translator.Translate(predicate);
+            whereSql = RewriteWhereForProjection(whereSql);
+            var (offset, limit) = ComputeSkipTake(options);
+            using var conn = Open();
+            var sql = $"SELECT Id, Json FROM [{TableName}] WHERE {whereSql} ORDER BY Id LIMIT {limit} OFFSET {offset}";
+            var dyn = new DynamicParameters();
+            for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
+            var rows = await conn.QueryAsync<(string Id, string Json)>(sql, dyn);
+            var items = rows.Select(FromRow).ToList();
+            return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
+        }
+        catch (NotSupportedException)
+        {
+            // Translator can't handle this predicate shape — materialize and filter in-process.
+            var all = await Query((object?)null, ct);
+            var filtered = all.AsQueryable().Where(predicate).ToList();
+            var (offset, limit) = ComputeSkipTake(options);
+            var paged = filtered.Skip(offset).Take(limit).ToList();
+            return RepositoryQueryResult<TEntity>.PaginatedOnly(paged);
+        }
+    }
+
+    private async Task<RepositoryQueryResult<TEntity>> QueryByRawSql(string whereSql, DataQueryOptions? options, CancellationToken ct)
+    {
+        whereSql = RewriteWhereForProjection(whereSql);
+        var (offset, limit) = ComputeSkipTake(options);
+        using var conn = Open();
+        var sql = $"SELECT Id, Json FROM [{TableName}] WHERE {whereSql} ORDER BY Id LIMIT {limit} OFFSET {offset}";
         var rows = await conn.QueryAsync<(string Id, string Json)>(sql);
         var items = rows.Select(FromRow).ToList();
         return RepositoryQueryResult<TEntity>.PaginatedOnly(items);

@@ -407,6 +407,23 @@ internal sealed class PostgresRepository<
         ct.ThrowIfCancellationRequested();
         using var act = PgTelemetry.Activity.StartActivity("pg.query:all+opts");
         act?.SetTag("entity", typeof(TEntity).FullName);
+
+        // Dispatch on query shape: ignoring the predicate (the earlier behavior) silently
+        // returned the full set, making ?filter= and DELETE /?q= unsafe across the matrix.
+        if (query is Expression<Func<TEntity, bool>> predicate)
+        {
+            return await Query(predicate, options, ct);
+        }
+        if (query is string sqlPredicate && !string.IsNullOrWhiteSpace(sqlPredicate))
+        {
+            var whereSql = RewriteWhereForProjection(sqlPredicate);
+            var (offsetR, limitR) = ComputeSkipTake(options);
+            await using var connR = Open();
+            var sqlR = $"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE {whereSql} ORDER BY ctid LIMIT {limitR} OFFSET {offsetR}";
+            var rowsR = await connR.QueryAsync<(string Id, string Json)>(sqlR);
+            return RepositoryQueryResult<TEntity>.PaginatedOnly(rowsR.Select(FromRow).ToList());
+        }
+
         var (offset, limit) = ComputeSkipTake(options);
         await using var conn = Open();
         var sql = $"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} ORDER BY ctid LIMIT {limit} OFFSET {offset}";
@@ -532,6 +549,14 @@ internal sealed class PostgresRepository<
         }
         catch (NotSupportedException)
         {
+            var compiled = predicate.Compile();
+            var fallback = await Query((object?)null, options, ct);
+            var filtered = fallback.Items.Where(compiled).ToList();
+            return RepositoryQueryResult<TEntity>.PaginatedOnly(filtered);
+        }
+        catch (Npgsql.PostgresException ex) when (ex.SqlState == "42703") // undefined_column
+        {
+            // Translator emitted a reference to a column that doesn't exist. Materialise + filter.
             var compiled = predicate.Compile();
             var fallback = await Query((object?)null, options, ct);
             var filtered = fallback.Items.Where(compiled).ToList();

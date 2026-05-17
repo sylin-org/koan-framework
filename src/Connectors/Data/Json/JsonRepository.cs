@@ -85,7 +85,16 @@ internal sealed class JsonRepository<TEntity, TKey> :
         ct.ThrowIfCancellationRequested();
         var store = ResolveStore();
         IEnumerable<TEntity> items = store.Values;
-        var totalCount = (long)store.Count;
+
+        // Apply predicate in-process when the orchestrator forwards one through object?.
+        // Ignoring it silently returned the full set, which made ?filter= and DELETE /?q= unsafe.
+        if (query is Expression<Func<TEntity, bool>> predicate)
+        {
+            var compiled = predicate.Compile();
+            items = items.Where(compiled);
+        }
+
+        var totalCount = items is ICollection<TEntity> coll ? (long)coll.Count : items.LongCount();
         return Task.FromResult(BuildResult(items, options, totalCount));
     }
 

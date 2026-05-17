@@ -375,8 +375,26 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         }
 
         using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
-        var removed = await Entity<TEntity, TKey>.Remove(request.Query!, request.Context.CancellationToken);
-        return new EntityEndpointResult(request.Context, new { deleted = removed });
+
+        // Try parsing the query as a JsonFilter first (works on every ILinqQueryRepository adapter).
+        // Falling back to the raw string path requires IStringQueryRepository, which most adapters
+        // don't implement — and the silent "match everything" degrade those exhibit makes DELETE
+        // disastrous. Predicate-first keeps the operation safe by default.
+        if (Koan.Web.Filtering.JsonFilterBuilder.TryBuild<TEntity>(request.Query, out var predicate, out var error))
+        {
+            var items = await Data<TEntity, TKey>.Query(predicate!, request.Context.CancellationToken);
+            var ids = items.Select(e => e.Id).ToList();
+            if (ids.Count == 0) return new EntityEndpointResult(request.Context, new { deleted = 0 });
+            var removedByPredicate = await Data<TEntity, TKey>.DeleteMany(ids, request.Context.CancellationToken);
+            return new EntityEndpointResult(request.Context, new { deleted = removedByPredicate });
+        }
+
+        // JSON parse failed — surface a 400 rather than passing through to a raw string path that
+        // the adapter may not understand.
+        return new EntityEndpointResult(
+            request.Context,
+            null,
+            new BadRequestObjectResult(new { error = error ?? "Invalid filter JSON" }));
     }
 
     public async Task<EntityEndpointResult> DeleteAll(EntityDeleteAllRequest request)
