@@ -1,4 +1,7 @@
 using Microsoft.AspNetCore.Mvc.Testing;
+using Xunit;
+
+[assembly: CollectionBehavior(DisableTestParallelization = true)]
 
 [assembly: WebApplicationFactoryContentRoot(
     key: "Koan.Web.AdapterSurface.Mongo.Tests",

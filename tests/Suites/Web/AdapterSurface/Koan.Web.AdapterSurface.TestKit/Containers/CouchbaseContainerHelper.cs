@@ -4,7 +4,9 @@ namespace Koan.Web.AdapterSurface.TestKit.Containers;
 
 public sealed class CouchbaseContainerHelper : IAsyncDisposable
 {
+#pragma warning disable CS0649 // reserved for future use when Couchbase Testcontainers integration is fixed
     private CouchbaseContainer? _container;
+#pragma warning restore CS0649
 
     public bool IsAvailable { get; private set; }
     public string? UnavailableReason { get; private set; }

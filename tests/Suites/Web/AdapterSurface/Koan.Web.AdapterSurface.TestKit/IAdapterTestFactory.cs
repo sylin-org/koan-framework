@@ -6,7 +6,7 @@ namespace Koan.Web.AdapterSurface.TestKit;
 /// Adapter-specific factory contract consumed by <see cref="AdapterSurfaceSpecsBase{TFactory}"/>.
 /// Each concrete test project implements this against its target adapter.
 /// </summary>
-public interface IAdapterTestFactory : IAsyncLifetime
+public interface IAdapterTestFactory : IAsyncLifetime, IAdapterCapabilities
 {
     /// <summary>True when the backing infrastructure (Docker, local instance, env var) is reachable.</summary>
     bool IsAvailable { get; }

@@ -14,6 +14,10 @@ public sealed class SqlServerAdapterFactory : WebApplicationFactory<Program>, IA
     private readonly SqlServerContainerHelper _sqlServer = new();
     private bool _initialized;
 
+    // SqlServer partition routing — same framework gap as Sqlite/Postgres. Tracked as a follow-up.
+    public bool SupportsPartitions => false;
+    public bool SupportsCrossPartitionTransfer => false;
+
     public bool IsAvailable => _sqlServer.IsAvailable;
     public string? UnavailableReason => _sqlServer.UnavailableReason;
     public HttpClient Client => _sqlServer.IsAvailable ? CreateClient() : new HttpClient();

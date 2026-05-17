@@ -39,8 +39,7 @@ public sealed class MongoContainerHelper : IAsyncDisposable
 
         try
         {
-            _container = new MongoDbBuilder()
-                .WithImage("mongo:7")
+            _container = new MongoDbBuilder("mongo:7")
                 .Build();
             await _container.StartAsync().ConfigureAwait(false);
             var connection = EnsureDatabase(_container.GetConnectionString(), Database);
