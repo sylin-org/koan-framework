@@ -251,10 +251,12 @@ public static class Data<TEntity, TKey>
         }
 
         IReadOnlyList<TEntity> window = items;
+        var orchestratorPaginatedInMemory = false;
         if (!repositoryHandledPagination)
         {
             var skip = Math.Max(page - 1, 0) * pageSize;
             window = items.Skip(skip).Take(pageSize).ToList();
+            orchestratorPaginatedInMemory = true;
         }
 
         return new QueryResult<TEntity>
@@ -263,7 +265,11 @@ public static class Data<TEntity, TKey>
             TotalCount = totalCount,
             Page = page,
             PageSize = hasPagination ? pageSize : window.Count,
-            RepositoryHandledPagination = repositoryHandledPagination,
+            // RepositoryHandledPagination signals to downstream consumers that Items is already a page —
+            // EntityEndpointService uses this flag to decide whether to apply another Skip/Take. We must
+            // set it to true here too, since the orchestrator just paginated in memory. Otherwise the
+            // web layer double-paginates and pages > 1 return an empty slice of a 1-page list.
+            RepositoryHandledPagination = repositoryHandledPagination || orchestratorPaginatedInMemory,
             ExceededSafetyLimit = false,
             IsEstimate = isEstimate
         };

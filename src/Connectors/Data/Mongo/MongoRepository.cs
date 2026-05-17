@@ -371,15 +371,31 @@ internal sealed class MongoRepository<TEntity, TKey> :
                 ? FindWithPredicate(collection, predicate)
                 : collection.Find(Builders<TEntity>.Filter.Empty);
 
-            cursor = cursor.ApplyPaging(options, defaultPageSize,
-                (c, skip, take) => c.Skip(skip).Limit(take));
+            // Apply pagination only when actually requested. The shared ApplyPaging maps
+            // no-pagination → Skip(0).Limit(int.MaxValue), which Mongo's driver does NOT
+            // gracefully treat as "no limit" — it can drop result sets entirely.
+            var paginationHandled = false;
+            if (options is { HasPagination: true })
+            {
+                cursor = cursor.ApplyPaging(options, defaultPageSize,
+                    (c, skip, take) => c.Skip(skip).Limit(take));
+                paginationHandled = true;
+            }
 
             var results = await cursor.ToListAsync(ct).ConfigureAwait(false);
-            return RepositoryQueryResult<TEntity>.PaginatedOnly((IReadOnlyList<TEntity>)results);
+            return new RepositoryQueryResult<TEntity>
+            {
+                Items = (IReadOnlyList<TEntity>)results,
+                PaginationHandled = paginationHandled,
+                SortHandled = RepositoryQueryResult<TEntity>.NoSortHandled,
+            };
         }, ct);
 
-    public Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-        => Query(predicate, null, ct);
+    public async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
+    {
+        var result = await Query(predicate, (DataQueryOptions?)null, ct).ConfigureAwait(false);
+        return result.Items;
+    }
 
     public Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
@@ -390,12 +406,22 @@ internal sealed class MongoRepository<TEntity, TKey> :
             var defaultPageSize = _options.CurrentValue.GetDefaultPageSize();
             var collection = await GetCollection(ct).ConfigureAwait(false);
 
-            var cursor = FindWithPredicate(collection, predicate)
-                .ApplyPaging(options, defaultPageSize,
+            var cursor = FindWithPredicate(collection, predicate);
+            var paginationHandled = false;
+            if (options is { HasPagination: true })
+            {
+                cursor = cursor.ApplyPaging(options, defaultPageSize,
                     (c, skip, take) => c.Skip(skip).Limit(take));
+                paginationHandled = true;
+            }
 
             var results = await cursor.ToListAsync(ct).ConfigureAwait(false);
-            return RepositoryQueryResult<TEntity>.PaginatedOnly((IReadOnlyList<TEntity>)results);
+            return new RepositoryQueryResult<TEntity>
+            {
+                Items = (IReadOnlyList<TEntity>)results,
+                PaginationHandled = paginationHandled,
+                SortHandled = RepositoryQueryResult<TEntity>.NoSortHandled,
+            };
         }, ct);
 
     public Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
