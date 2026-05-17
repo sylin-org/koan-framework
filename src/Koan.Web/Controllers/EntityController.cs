@@ -140,13 +140,9 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
 
     protected virtual QueryOptions BuildOptions()
     {
-        // Delegate to static parser for pure query transformation
-        return EntityQueryParser.Parse(HttpContext.Request.Query, EndpointOptions);
-    }
-
-    protected virtual IQueryable<TEntity> ApplySort(IQueryable<TEntity> query, QueryOptions opts)
-    {
-        return query;
+        // Delegate to static parser for pure query transformation. Sort fields are resolved against TEntity here;
+        // unresolvable fields throw InvalidSortFieldException, which the controller actions convert to 400.
+        return EntityQueryParser.Parse<TEntity>(HttpContext.Request.Query, EndpointOptions);
     }
 
     protected virtual ObjectResult PrepareResponse(object? content)
@@ -214,20 +210,27 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             _ => true
         };
 
-        var options = BuildOptions();
+        QueryOptions options;
+        try
+        {
+            options = BuildOptions();
+        }
+        catch (Koan.Data.Abstractions.Sorting.InvalidSortFieldException ex)
+        {
+            return BadRequest(new { error = ex.Message, field = ex.Field });
+        }
         options.Page = applyPagination ? page : 0;
         options.PageSize = applyPagination ? pageSize : 0;
 
         if (!string.IsNullOrWhiteSpace(policy.DefaultSort) && options.Sort.Count == 0)
         {
-            foreach (var spec in policy.DefaultSort.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            try
             {
-                var desc = spec.StartsWith('-');
-                var field = desc ? spec[1..] : spec;
-                if (!string.IsNullOrWhiteSpace(field))
-                {
-                    options.Sort.Add(new SortSpec(field, desc));
-                }
+                options.Sort.AddRange(Koan.Data.Core.Sorting.SortSpecParser.ParseStrict<TEntity>(policy.DefaultSort));
+            }
+            catch (Koan.Data.Abstractions.Sorting.InvalidSortFieldException ex)
+            {
+                return BadRequest(new { error = $"Invalid PaginationAttribute.DefaultSort: {ex.Message}", field = ex.Field });
             }
         }
 
@@ -270,7 +273,15 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     {
         if (!CanRead) return Forbid();
 
-        var options = BuildOptions();
+        QueryOptions options;
+        try
+        {
+            options = BuildOptions();
+        }
+        catch (Koan.Data.Abstractions.Sorting.InvalidSortFieldException ex)
+        {
+            return BadRequest(new { error = ex.Message, field = ex.Field });
+        }
         var context = CreateRequestContext(options, ct);
 
         string? filterJson = null;
@@ -283,11 +294,51 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             if (jobj.TryGetValue("page", out var p) && (p.Type == JTokenType.Integer || p.Type == JTokenType.String)) options.Page = (int)p;
             if (jobj.TryGetValue("size", out var s) && (s.Type == JTokenType.Integer || s.Type == JTokenType.String)) options.PageSize = (int)s;
             if (jobj.TryGetValue("set", out var st) && st.Type == JTokenType.String) set = st.ToString();
+            // ADR-0093: body sort field. Accepts string array of URL-grammar specs (e.g. ["-createdAt", "+title"]).
+            // Body sort overrides any ?sort= query-string value to keep the schema unambiguous.
+            if (jobj.TryGetValue("sort", out var sortNode))
+            {
+                IEnumerable<string>? rawSpecs = null;
+                if (sortNode.Type == JTokenType.Array)
+                {
+                    rawSpecs = sortNode.Children<JToken>()
+                        .Where(t => t.Type == JTokenType.String)
+                        .Select(t => t.Value<string>()!)
+                        .Where(s => !string.IsNullOrWhiteSpace(s));
+                }
+                else if (sortNode.Type == JTokenType.String)
+                {
+                    var raw = sortNode.Value<string>();
+                    if (!string.IsNullOrWhiteSpace(raw)) rawSpecs = new[] { raw };
+                }
+
+                if (rawSpecs is not null)
+                {
+                    try
+                    {
+                        var collected = new List<SortSpec>();
+                        foreach (var spec in rawSpecs)
+                        {
+                            collected.AddRange(Koan.Data.Core.Sorting.SortSpecParser.ParseStrict<TEntity>(spec));
+                        }
+                        options.Sort.Clear();
+                        options.Sort.AddRange(collected);
+                    }
+                    catch (Koan.Data.Abstractions.Sorting.InvalidSortFieldException ex)
+                    {
+                        return BadRequest(new { error = ex.Message, field = ex.Field });
+                    }
+                }
+            }
             if (jobj.TryGetValue("", out var opt) && opt.Type == JTokenType.Object)
             {
                 var o = (JObject)opt;
                 if (o.TryGetValue("ignoreCase", out var ic) && ic.Type == JTokenType.Boolean && (bool)ic) ignoreCase = true;
             }
+        }
+        catch (Koan.Data.Abstractions.Sorting.InvalidSortFieldException)
+        {
+            throw;  // already handled above; this catch prevents the bare catch from swallowing it
         }
         catch
         {

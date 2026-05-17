@@ -85,12 +85,10 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             return new EntityCollectionResult<TEntity>(context, [], queryResult.Total, null, tooLarge);
         }
 
+        // Sort is now applied by Data<T,K>.QueryWithCount (orchestrator) before the result reaches here.
+        // The orchestrator inspects RepositoryQueryResult.SortHandled and falls back to in-memory sort
+        // when the adapter cannot push it down — see DATA-0092.
         var list = queryResult.Items.ToList();
-
-        if (context.Options.Sort.Count > 0)
-        {
-            list = ApplySort(list, context.Options.Sort);
-        }
 
         var shouldPaginate = request.ApplyPagination;
 
@@ -180,15 +178,11 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             return new EntityCollectionResult<TEntity>(context, [], 0, null, bad);
         }
 
+        // Sort + pagination handled by orchestrator inside QueryCollectionFromBody (DATA-0092).
+        // The caller only sets headers — never paginates again, or we'd page-of-page (regression).
         var list = repositoryItems.ToList();
-        if (context.Options.Sort.Count > 0)
-        {
-            list = ApplySort(list, context.Options.Sort);
-        }
         if (context.Options.PageSize > 0)
         {
-            (list, total) = ApplyPagination(list, context.Options.Page, context.Options.PageSize, total);
-            context.Headers["Koan-InMemory-Paging"] = "true";
             context.Headers["X-Page"] = context.Options.Page.ToString();
             context.Headers["X-Page-Size"] = context.Options.PageSize.ToString();
             context.Headers["X-Total-Count"] = total.ToString();
@@ -480,72 +474,8 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         var items = source.Skip(skip).Take(pageSize).ToList();
         return (items, total);
     }
-    private static List<TEntity> ApplySort(List<TEntity> source, IReadOnlyList<SortSpec> sorts)
-    {
-        if (sorts is null || sorts.Count == 0) return source;
-
-        IOrderedEnumerable<TEntity>? ordered = null;
-        IEnumerable<TEntity> working = source;
-
-        foreach (var sort in sorts)
-        {
-            if (string.IsNullOrWhiteSpace(sort.Field))
-            {
-                continue;
-            }
-
-            var selector = CreateKeySelector(sort.Field);
-            if (selector is null)
-            {
-                continue;
-            }
-
-            ordered = ordered is null
-                ? (sort.Desc ? working.OrderByDescending(selector) : working.OrderBy(selector))
-                : (sort.Desc ? ordered.ThenByDescending(selector) : ordered.ThenBy(selector));
-        }
-
-        return ordered is null ? source : ordered.ToList();
-    }
-
-    private static Func<TEntity, object?>? CreateKeySelector(string field)
-    {
-        var segments = field.Split(".", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (segments.Length == 0)
-        {
-            return null;
-        }
-
-        var props = new PropertyInfo[segments.Length];
-        var currentType = typeof(TEntity);
-
-        for (var i = 0; i < segments.Length; i++)
-        {
-            var prop = currentType.GetProperty(segments[i], BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase);
-            if (prop is null)
-            {
-                return null;
-            }
-
-            props[i] = prop;
-            currentType = prop.PropertyType;
-        }
-
-        return entity =>
-        {
-            object? value = entity;
-            foreach (var prop in props)
-            {
-                if (value is null)
-                {
-                    return null;
-                }
-
-                value = prop.GetValue(value);
-            }
-            return value;
-        };
-    }
+    // In-memory sort moved to Koan.Data.Core.Sorting.InMemorySorter — orchestrator handles fallback.
+    // CreateKeySelector replaced by structured MemberPath walking. See DATA-0092.
 
 
     private sealed class RepositoryQueryResult
@@ -611,21 +541,11 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
         if (options.Sort.Count > 0)
         {
-            queryOptions = queryOptions.WithSort(ToSortString(options.Sort));
+            // Pass structured sort specs through unchanged — adapters consume them directly (DATA-0092).
+            queryOptions = queryOptions.WithSort(options.Sort);
         }
 
         return queryOptions;
-    }
-
-    private static string? ToSortString(IReadOnlyList<SortSpec> sorts)
-    {
-        if (sorts.Count == 0)
-        {
-            return null;
-        }
-
-        return string.Join(",", sorts.Select(s => s.Desc ? $"-{s.Field}" : s.Field));
-
     }
 
     private async Task<(IReadOnlyList<TEntity> Items, long Total)> QueryCollectionFromBody(
@@ -635,48 +555,43 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         CancellationToken cancellationToken)
     {
         using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
-        if (!string.IsNullOrWhiteSpace(request.FilterJson) && repo is ILinqQueryRepository<TEntity, TKey> lrepo)
+
+        // Route body queries through the orchestrator (Data<T,K>.QueryWithCount) so sort/pagination
+        // honour the DATA-0092 contract — adapters get options, orchestrator falls back to in-memory
+        // sort when needed, and we get correct paginate-after-sort semantics. The earlier direct
+        // repo.Query calls bypassed this and silently dropped sort + pagination.
+        var dataOptions = new DataQueryOptions();
+        if (options.PageSize > 0 && options.Page > 0)
+        {
+            dataOptions = dataOptions.WithPagination(options.Page, options.PageSize);
+        }
+        if (!string.IsNullOrWhiteSpace(request.Set))
+        {
+            dataOptions = dataOptions.ForPartition(request.Set);
+        }
+        if (options.Sort.Count > 0)
+        {
+            dataOptions = dataOptions.WithSort(options.Sort);
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.FilterJson))
         {
             if (!JsonFilterBuilder.TryBuild<TEntity>(request.FilterJson!, out var predicate, out var error, new JsonFilterBuilder.BuildOptions { IgnoreCase = request.IgnoreCase }))
             {
                 throw new InvalidOperationException(error ?? "Invalid filter");
             }
-            var items = await lrepo.Query(predicate!, cancellationToken);
-            long total;
-            try
-            {
-                var countRequest = new CountRequest<TEntity> { Predicate = predicate };
-                var countResult = await repo.Count(countRequest, cancellationToken);
-                total = countResult.Value;
-            }
-            catch { total = items.Count; }
-            return (items.ToList(), total);
+            var filtered = await Koan.Data.Core.Data<TEntity, TKey>.QueryWithCount(predicate!, dataOptions, cancellationToken);
+            return (filtered.Items, filtered.TotalCount);
         }
 
-        if (!string.IsNullOrWhiteSpace(options.Q) && repo is IStringQueryRepository<TEntity, TKey> srepo)
+        if (!string.IsNullOrWhiteSpace(options.Q))
         {
-            var items = await srepo.Query(options.Q!, cancellationToken);
-            long total;
-            try
-            {
-                var countRequest = new CountRequest<TEntity> { RawQuery = options.Q };
-                var countResult = await repo.Count(countRequest, cancellationToken);
-                total = countResult.Value;
-            }
-            catch { total = items.Count; }
-            return (items.ToList(), total);
+            var stringQueried = await Koan.Data.Core.Data<TEntity, TKey>.QueryWithCount(options.Q!, dataOptions, cancellationToken);
+            return (stringQueried.Items, stringQueried.TotalCount);
         }
 
-        var all = await repo.Query(null, cancellationToken);
-        long allTotal;
-        try
-        {
-            var countRequest = new CountRequest<TEntity>();
-            var countResult = await repo.Count(countRequest, cancellationToken);
-            allTotal = countResult.Value;
-        }
-        catch { allTotal = all.Count; }
-        return (all.ToList(), allTotal);
+        var allResult = await Koan.Data.Core.Data<TEntity, TKey>.QueryWithCount(dataOptions, cancellationToken);
+        return (allResult.Items, allResult.TotalCount);
     }
 
     private static async Task<IReadOnlyList<object>> EnrichRelationships(IReadOnlyList<TEntity> list, CancellationToken cancellationToken)

@@ -2,6 +2,8 @@ using System;
 using System.Linq;
 using Microsoft.AspNetCore.Http;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Sorting;
+using Koan.Data.Core.Sorting;
 using Koan.Web.Endpoints;
 using Koan.Web.Hooks;
 using Koan.Web.Options;
@@ -9,20 +11,23 @@ using Koan.Web.Options;
 namespace Koan.Web.Queries;
 
 /// <summary>
-/// Static helper for parsing HTTP query parameters into QueryOptions.
-/// Pure function with no dependencies - all parameters passed explicitly.
-/// Thread-safe by design with no mutable state.
+/// Static helper for parsing HTTP query parameters into <see cref="QueryOptions"/>.
+/// Sort fields are resolved against <typeparamref name="TEntity"/> at parse time
+/// (strict by default — unresolvable fields throw <see cref="InvalidSortFieldException"/>).
 /// </summary>
 public static class EntityQueryParser
 {
     /// <summary>
-    /// Parses HTTP query collection into QueryOptions for entity queries.
+    /// Parses HTTP query collection into <see cref="QueryOptions"/> for entity queries.
     /// Supports: q (search), page, pageSize/size, sort, dir, output (shape), view.
     /// </summary>
-    /// <param name="query">The HTTP query collection from Request.Query</param>
-    /// <param name="defaults">Default options for pagination, view, and shape</param>
-    /// <returns>Parsed QueryOptions with pagination, sorting, and shaping</returns>
-    public static QueryOptions Parse(IQueryCollection query, EntityEndpointOptions defaults)
+    public static QueryOptions Parse<TEntity>(IQueryCollection query, EntityEndpointOptions defaults, bool lenient = false)
+        => Parse(typeof(TEntity), query, defaults, lenient);
+
+    /// <summary>
+    /// Non-generic overload; useful for reflective callers (e.g. MCP RequestTranslator).
+    /// </summary>
+    public static QueryOptions Parse(Type entityType, IQueryCollection query, EntityEndpointOptions defaults, bool lenient = false)
     {
         var opts = new QueryOptions
         {
@@ -54,27 +59,32 @@ public static class EntityQueryParser
             opts.PageSize = Math.Min(size, maxSize);
         }
 
-        // Sort specification (comma-separated, prefix with '-' for descending)
+        // Sort specification (comma-separated; prefix '-' for desc, '+' or none for asc)
         if (query.TryGetValue("sort", out var vsort))
         {
-            foreach (var spec in vsort.ToString().Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            var expr = vsort.ToString();
+            if (lenient || ShouldUseLenientMode(query, defaults))
             {
-                var desc = spec.StartsWith('-');
-                var field = desc ? spec[1..] : spec;
-                if (!string.IsNullOrWhiteSpace(field))
+                var result = SortSpecParser.ParseLenient(entityType, expr);
+                opts.Sort.AddRange(result.Specs);
+                if (result.SkippedFields.Count > 0)
                 {
-                    opts.Sort.Add(new SortSpec(field, desc));
+                    opts.Extras["__sort_skipped"] = string.Join(",", result.SkippedFields);
                 }
+            }
+            else
+            {
+                opts.Sort.AddRange(SortSpecParser.ParseStrict(entityType, expr));
             }
         }
 
-        // Direction override for single sort field
+        // Direction override for single sort field (legacy ?dir=asc|desc; kept for compat)
         if (query.TryGetValue("dir", out var vdir) && opts.Sort.Count == 1)
         {
             var direction = vdir.ToString();
             if (string.Equals(direction, "desc", StringComparison.OrdinalIgnoreCase))
             {
-                opts.Sort[0] = new SortSpec(opts.Sort[0].Field, true);
+                opts.Sort[0] = opts.Sort[0] with { Desc = true };
             }
         }
 
@@ -99,5 +109,12 @@ public static class EntityQueryParser
         }
 
         return opts;
+    }
+
+    private static bool ShouldUseLenientMode(IQueryCollection query, EntityEndpointOptions defaults)
+    {
+        if (query.TryGetValue("ignoreUnknownSort", out var v) && bool.TryParse(v.ToString(), out var b) && b)
+            return true;
+        return defaults.LenientSort;
     }
 }
