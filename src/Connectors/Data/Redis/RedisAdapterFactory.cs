@@ -40,7 +40,11 @@ public sealed class RedisAdapterFactory : IDataAdapterFactory
     }
 
     // INamingProvider implementation
-    public string RepositorySeparator => ":";  // Redis convention uses colons
+    // The partition separator must NOT be ':' — Redis key delimiter is ':', and the keyspace
+    // scan pattern is "{keyspace}:*". A colon separator made the default keyspace pattern match
+    // partition-suffixed keys (e.g. default "widgets_surface:*" would match "widgets_surface:alpha:p-001"),
+    // leaking partition data into the default set. Use '#' like the other adapters.
+    public string RepositorySeparator => "#";
 
     public string GetStorageName(Type entityType, IServiceProvider services)
     {
