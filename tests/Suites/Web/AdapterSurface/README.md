@@ -27,6 +27,8 @@ End-to-end HTTP tests that exercise the full `EntityController<T>` surface again
   - `Containers/MongoContainerHelper` — Testcontainers boot for Mongo
   - `Containers/PostgresContainerHelper` — Testcontainers boot for Postgres
   - `Containers/RedisContainerHelper` — Testcontainers boot for Redis
+  - `Containers/SqlServerContainerHelper` — Testcontainers boot for SQL Server
+  - `Containers/CouchbaseContainerHelper` — Testcontainers boot for Couchbase (currently a clean-skip placeholder; see Status)
 
 - **Per-adapter projects** subclass the base + bind a factory.
 
@@ -36,22 +38,24 @@ End-to-end HTTP tests that exercise the full `EntityController<T>` surface again
 |---|---|---|---|
 | **InMemory** | Validated | **21/21 passing** | No container required |
 | **Json** | Validated | **21/21 passing** | File-based, temp directory |
+| **Sqlite** | Validated | **21/21 passing** | File-based, temp directory; per-test reset via `DROP TABLE` enumeration |
 | **Mongo** | Validated | **21/21 passing** | Testcontainer `mongo:7`, gracefully skips without Docker. **The user-reported bug scenario, verified end-to-end against a real document database.** |
-| **Sqlite** | Blocked | — | `EntitySchemaGuard.EnsureHealthy` reports "healthy" but the underlying table is never created in the `WebApplicationFactory`-hosted setup. Existing `tests/Suites/Data/Connector.Sqlite` works via `TestPipelineFixture`, which suggests the Sqlite adapter's auto-create fallback path needs different hosting plumbing than `WebApplicationFactory<Program>` provides. |
-| **Postgres** | Blocked | — | Container startup fails with `InvalidOperationException: cannot hijack chunked or content length stream` — a bug in `DotNet.Testcontainers 1.7.0-beta.2269` that fires when starting containers with `--env` flags. Workaround pattern in `tests/Shared/Koan.Testing/Fixtures/MongoContainerFixture.cs` (Docker CLI fallback) could be ported, or upgrade the Testcontainers stack. |
-| **Redis** | Blocked | — | Same Testcontainers hijack-stream bug, even though Redis needs no env vars. |
-| **SqlServer** | Not started | — | Would hit the same Testcontainers bug as Postgres until the stack is upgraded. |
-| **Couchbase** | Not started | — | Same constraint. |
+| **Postgres** | Validated | **21/21 passing** | Testcontainer `postgres:16-alpine` via `Testcontainers.PostgreSql 4.11.0` |
+| **Redis** | Validated | **21/21 passing** | Testcontainer Redis via `Testcontainers.Redis 4.11.0` |
+| **SqlServer** | Validated | **21/21 passing** | Testcontainer via `Testcontainers.MsSql 4.11.0` |
+| **Couchbase** | Cleanly skipped | 21 skipped | `Testcontainers.Couchbase` exposes KV and management on separate random host ports, but `CouchbaseClusterProvider` derives the management URL from the single KV connection string. Skips with a clear reason; runnable against an externally provisioned cluster by setting `Koan_TESTS_COUCHBASE`. Tracked as a separate framework follow-up. |
 
-**Coverage today: 63 tests passing across 3 adapters covering the full EntityController surface.** The DATA-0092 contract is validated against an in-memory store, a file-based store, and a real Mongo container — proving:
+**Coverage today: 126 tests passing across 7 adapters covering the full EntityController surface.** The DATA-0092 contract is validated end-to-end against in-memory, file-based, document, relational (Sqlite/Postgres/SqlServer), and KV (Redis) backends — proving:
 - The orchestrator's structured sort contract works
 - The in-memory sort fallback for adapters that can't push deep-path down works
 - The original-bug scenario (`?sort=-Sightings.LastChangedAt` with pagination on Mongo) is correctly fixed
 
-## Two bugs caught and fixed during this matrix build
+## Bugs caught and fixed during this matrix build
 
 1. **Mongo's `Skip(0).Limit(int.MaxValue)`** (shared `QueryExtensions.ApplyPaging`) silently dropped result sets. Fixed by skipping pagination application entirely when no pagination is requested.
 2. **`Data<T,K>.QueryWithCount` pagination-flag semantics** — when the orchestrator paginates in memory after refetching unpaginated (the sort-not-pushed-down fallback path), it now sets `RepositoryHandledPagination = true`. The flag's downstream contract with `EntityEndpointService` is "Items is already a page; don't paginate again." Previously the orchestrator only set this flag true when the *repository* handled pagination, causing the web layer to paginate-again the already-paginated window — yielding empty results for `page > 1` on every adapter that couldn't push sort down.
+3. **Postgres + SqlServer `KoanAutoRegistrar` missing `services.AddRelationalOrchestration()`** — Sqlite's auto-registrar had it but the other two relational adapters didn't, so `IRelationalSchemaOrchestrator` was unresolvable when the connector tried to provision tables under `WebApplicationFactory`-style hosting. Fixed both.
+4. **DDL executors had fire-and-forget async** — `MsSqlDdlExecutor`, `PgDdlExecutor`, and `SqliteDdlExecutor` all used `ExecuteScalarAsync()` / `ExecuteNonQueryAsync()` without awaiting. `TableExists` always returned `true` because `Task<object?>` is itself not null, so `CreateTable` never ran and every adapter spec failed with "no such table" / "Invalid object name". Converted all DDL ops to their sync equivalents (DDL is bounded and synchronous by nature). This single fix unblocked Postgres, SqlServer, and Sqlite simultaneously.
 
 ## Adding a new adapter
 
@@ -74,4 +78,10 @@ dotnet test tests/Suites/Web/AdapterSurface/Koan.Web.AdapterSurface.Json.Tests
 
 # Adapters that need Docker; tests gracefully Skip without it
 dotnet test tests/Suites/Web/AdapterSurface/Koan.Web.AdapterSurface.Mongo.Tests
+dotnet test tests/Suites/Web/AdapterSurface/Koan.Web.AdapterSurface.Postgres.Tests
+dotnet test tests/Suites/Web/AdapterSurface/Koan.Web.AdapterSurface.Redis.Tests
+dotnet test tests/Suites/Web/AdapterSurface/Koan.Web.AdapterSurface.SqlServer.Tests
+
+# Couchbase currently always skips (see Status table); set Koan_TESTS_COUCHBASE to run against an external cluster
+dotnet test tests/Suites/Web/AdapterSurface/Koan.Web.AdapterSurface.Couchbase.Tests
 ```

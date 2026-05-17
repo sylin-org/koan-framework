@@ -1,11 +1,11 @@
-using Npgsql;
-using Testcontainers.PostgreSql;
+using Microsoft.Data.SqlClient;
+using Testcontainers.MsSql;
 
 namespace Koan.Web.AdapterSurface.TestKit.Containers;
 
-public sealed class PostgresContainerHelper : IAsyncDisposable
+public sealed class SqlServerContainerHelper : IAsyncDisposable
 {
-    private PostgreSqlContainer? _container;
+    private MsSqlContainer? _container;
 
     public bool IsAvailable { get; private set; }
     public string? UnavailableReason { get; private set; }
@@ -13,8 +13,8 @@ public sealed class PostgresContainerHelper : IAsyncDisposable
 
     public async Task InitializeAsync()
     {
-        var explicitConn = Environment.GetEnvironmentVariable("Koan_TESTS_POSTGRES")
-                          ?? Environment.GetEnvironmentVariable("POSTGRES_CONNECTION_STRING");
+        var explicitConn = Environment.GetEnvironmentVariable("Koan_TESTS_SQLSERVER")
+                          ?? Environment.GetEnvironmentVariable("SQLSERVER_CONNECTION_STRING");
         if (!string.IsNullOrWhiteSpace(explicitConn) && await CanPing(explicitConn).ConfigureAwait(false))
         {
             ConnectionString = explicitConn;
@@ -24,16 +24,13 @@ public sealed class PostgresContainerHelper : IAsyncDisposable
 
         try
         {
-            _container = new PostgreSqlBuilder()
-                .WithImage("postgres:16-alpine")
-                .WithDatabase("koan_surface")
-                .WithUsername("koan")
-                .WithPassword("koan")
+            _container = new MsSqlBuilder()
+                .WithImage("mcr.microsoft.com/mssql/server:2022-latest")
                 .Build();
             await _container.StartAsync().ConfigureAwait(false);
-            var connection = _container.GetConnectionString() + ";Include Error Detail=true";
+            var connection = _container.GetConnectionString() + ";TrustServerCertificate=true";
 
-            for (var attempt = 0; attempt < 30; attempt++)
+            for (var attempt = 0; attempt < 60; attempt++)
             {
                 if (await CanPing(connection).ConfigureAwait(false))
                 {
@@ -41,13 +38,13 @@ public sealed class PostgresContainerHelper : IAsyncDisposable
                     IsAvailable = true;
                     return;
                 }
-                await Task.Delay(500).ConfigureAwait(false);
+                await Task.Delay(1000).ConfigureAwait(false);
             }
-            UnavailableReason = "Postgres container did not respond after 15s.";
+            UnavailableReason = "SqlServer container did not respond after 60s.";
         }
         catch (Exception ex)
         {
-            UnavailableReason = $"Failed to start Postgres: {ex.GetType().Name}: {ex.Message}";
+            UnavailableReason = $"Failed to start SqlServer: {ex.GetType().Name}: {ex.Message}";
         }
     }
 
@@ -56,10 +53,14 @@ public sealed class PostgresContainerHelper : IAsyncDisposable
         if (ConnectionString is null) return;
         try
         {
-            await using var conn = new NpgsqlConnection(ConnectionString);
+            await using var conn = new SqlConnection(ConnectionString);
             await conn.OpenAsync().ConfigureAwait(false);
-            await using var cmd = new NpgsqlCommand(
-                "DO $$ DECLARE r RECORD; BEGIN FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP EXECUTE 'DROP TABLE IF EXISTS public.' || quote_ident(r.tablename) || ' CASCADE'; END LOOP; END $$;",
+            await using var cmd = new SqlCommand(
+                @"DECLARE @sql NVARCHAR(MAX) = N'';
+                  SELECT @sql += 'DROP TABLE [' + s.name + '].[' + t.name + '];' + CHAR(13)
+                  FROM sys.tables t INNER JOIN sys.schemas s ON s.schema_id = t.schema_id
+                  WHERE s.name = 'dbo';
+                  IF LEN(@sql) > 0 EXEC sp_executesql @sql;",
                 conn);
             await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
         }
@@ -78,9 +79,9 @@ public sealed class PostgresContainerHelper : IAsyncDisposable
     {
         try
         {
-            await using var conn = new NpgsqlConnection(connectionString);
+            await using var conn = new SqlConnection(connectionString);
             await conn.OpenAsync().ConfigureAwait(false);
-            await using var cmd = new NpgsqlCommand("SELECT 1", conn);
+            await using var cmd = new SqlCommand("SELECT 1", conn);
             await cmd.ExecuteScalarAsync().ConfigureAwait(false);
             return true;
         }

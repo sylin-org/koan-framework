@@ -1,7 +1,6 @@
-using DotNet.Testcontainers.Builders;
-using DotNet.Testcontainers.Containers;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using Testcontainers.MongoDb;
 
 namespace Koan.Web.AdapterSurface.TestKit.Containers;
 
@@ -13,8 +12,7 @@ namespace Koan.Web.AdapterSurface.TestKit.Containers;
 /// </summary>
 public sealed class MongoContainerHelper : IAsyncDisposable
 {
-    private const int MongoPort = 27017;
-    private TestcontainersContainer? _container;
+    private MongoDbContainer? _container;
 
     public bool IsAvailable { get; private set; }
     public string? UnavailableReason { get; private set; }
@@ -23,8 +21,6 @@ public sealed class MongoContainerHelper : IAsyncDisposable
 
     public async Task InitializeAsync()
     {
-        Environment.SetEnvironmentVariable("TESTCONTAINERS_RYUK_DISABLED", "true");
-
         var explicitConn = Environment.GetEnvironmentVariable("Koan_TESTS_MONGO")
                           ?? Environment.GetEnvironmentVariable("MONGO_CONNECTION_STRING");
         if (!string.IsNullOrWhiteSpace(explicitConn) && await CanPing(explicitConn).ConfigureAwait(false))
@@ -43,16 +39,11 @@ public sealed class MongoContainerHelper : IAsyncDisposable
 
         try
         {
-            _container = new TestcontainersBuilder<TestcontainersContainer>()
+            _container = new MongoDbBuilder()
                 .WithImage("mongo:7")
-                .WithCleanUp(true)
-                .WithPortBinding(MongoPort, assignRandomHostPort: true)
-                .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(MongoPort))
                 .Build();
-
             await _container.StartAsync().ConfigureAwait(false);
-            var mappedPort = _container.GetMappedPublicPort(MongoPort);
-            var connection = EnsureDatabase($"mongodb://localhost:{mappedPort}", Database);
+            var connection = EnsureDatabase(_container.GetConnectionString(), Database);
             if (!await CanPing(connection).ConfigureAwait(false))
             {
                 UnavailableReason = "Mongo container started but did not respond to ping.";
@@ -88,7 +79,6 @@ public sealed class MongoContainerHelper : IAsyncDisposable
 
         if (_container is not null)
         {
-            try { await _container.StopAsync().ConfigureAwait(false); } catch { }
             try { await _container.DisposeAsync().ConfigureAwait(false); } catch { }
         }
     }

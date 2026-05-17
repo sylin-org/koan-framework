@@ -1,13 +1,11 @@
-using DotNet.Testcontainers.Builders;
-using DotNet.Testcontainers.Containers;
 using StackExchange.Redis;
+using Testcontainers.Redis;
 
 namespace Koan.Web.AdapterSurface.TestKit.Containers;
 
 public sealed class RedisContainerHelper : IAsyncDisposable
 {
-    private const int RedisPort = 6379;
-    private TestcontainersContainer? _container;
+    private RedisContainer? _container;
 
     public bool IsAvailable { get; private set; }
     public string? UnavailableReason { get; private set; }
@@ -15,8 +13,6 @@ public sealed class RedisContainerHelper : IAsyncDisposable
 
     public async Task InitializeAsync()
     {
-        Environment.SetEnvironmentVariable("TESTCONTAINERS_RYUK_DISABLED", "true");
-
         var explicitConn = Environment.GetEnvironmentVariable("Koan_TESTS_REDIS")
                           ?? Environment.GetEnvironmentVariable("REDIS_CONNECTION_STRING");
         if (!string.IsNullOrWhiteSpace(explicitConn) && await CanPing(explicitConn).ConfigureAwait(false))
@@ -28,22 +24,22 @@ public sealed class RedisContainerHelper : IAsyncDisposable
 
         try
         {
-            _container = new TestcontainersBuilder<TestcontainersContainer>()
+            _container = new RedisBuilder()
                 .WithImage("redis:7-alpine")
-                .WithCleanUp(true)
-                .WithPortBinding(RedisPort, assignRandomHostPort: true)
-                .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(RedisPort))
                 .Build();
             await _container.StartAsync().ConfigureAwait(false);
-            var mappedPort = _container.GetMappedPublicPort(RedisPort);
-            var connection = $"localhost:{mappedPort}";
-
+            var connection = _container.GetConnectionString();
             for (var attempt = 0; attempt < 30; attempt++)
             {
-                if (await CanPing(connection).ConfigureAwait(false)) { ConnectionString = connection; IsAvailable = true; return; }
+                if (await CanPing(connection).ConfigureAwait(false))
+                {
+                    ConnectionString = connection;
+                    IsAvailable = true;
+                    return;
+                }
                 await Task.Delay(500).ConfigureAwait(false);
             }
-            UnavailableReason = "Redis container did not respond.";
+            UnavailableReason = "Redis container did not respond after 15s.";
         }
         catch (Exception ex)
         {
@@ -72,7 +68,6 @@ public sealed class RedisContainerHelper : IAsyncDisposable
     {
         if (_container is not null)
         {
-            try { await _container.StopAsync().ConfigureAwait(false); } catch { }
             try { await _container.DisposeAsync().ConfigureAwait(false); } catch { }
         }
     }

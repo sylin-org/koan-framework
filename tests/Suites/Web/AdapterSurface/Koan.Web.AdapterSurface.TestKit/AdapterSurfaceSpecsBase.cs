@@ -33,6 +33,20 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
         if (!Factory.IsAvailable) return;
         AppHost.Current = Factory.Services;
         await Factory.ResetAsync();
+
+        // Force explicit schema creation via the EnsureCreated instruction. Relational adapters
+        // route this through the orchestrator's create path, bypassing the lazy validation gate
+        // that otherwise needs DDL allowance at first-operation time. No-op for non-relational
+        // adapters (they handle the instruction or throw NotSupported, both of which we swallow).
+        try
+        {
+            await Koan.Data.Core.Data<Widget, string>.Execute<int>(
+                new Koan.Data.Abstractions.Instructions.Instruction("data.ensureCreated"));
+        }
+        catch
+        {
+            // Not all adapters support EnsureCreated as an instruction; safe to ignore.
+        }
     }
 
     public Task DisposeAsync() => Task.CompletedTask;
