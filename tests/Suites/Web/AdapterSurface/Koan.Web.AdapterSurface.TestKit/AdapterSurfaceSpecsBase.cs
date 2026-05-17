@@ -38,7 +38,7 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
     public Task DisposeAsync() => Task.CompletedTask;
 
     protected void SkipIfUnavailable()
-        => Skip.If(!Factory.IsAvailable, Factory.UnavailableReason ?? "Adapter infrastructure unavailable");
+        => Skip.If(!Factory.IsAvailable, $"[{typeof(TFactory).Name}] {Factory.UnavailableReason ?? "Adapter infrastructure unavailable"}");
 
     // ============================================================================================
     // GET /api/widgets — collection list
