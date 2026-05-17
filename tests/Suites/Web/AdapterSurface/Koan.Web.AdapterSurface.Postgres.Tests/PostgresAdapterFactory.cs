@@ -14,11 +14,6 @@ public sealed class PostgresAdapterFactory : WebApplicationFactory<Program>, IAd
     private readonly PostgresContainerHelper _pg = new();
     private bool _initialized;
 
-    // Postgres partition routing has the same framework gap as Sqlite — see
-    // Koan.Web.AdapterSurface.Sqlite.Tests.SqliteAdapterFactory for the failure shape and tracker.
-    public bool SupportsPartitions => false;
-    public bool SupportsCrossPartitionTransfer => false;
-
     public bool IsAvailable => _pg.IsAvailable;
     public string? UnavailableReason => _pg.UnavailableReason;
     public HttpClient Client => _pg.IsAvailable ? CreateClient() : new HttpClient();

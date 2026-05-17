@@ -22,11 +22,11 @@ public interface IAdapterCapabilities
 
     /// <summary>
     /// DELETE /?q=&lt;filter-json&gt;: server-evaluated filter delete.
-    /// Requires the repository to implement IStringQueryRepository. Default false because most
-    /// adapters only implement ILinqQueryRepository and silently degrade to "delete all" when
-    /// given an unparseable string filter (caught during matrix validation).
+    /// Default true: EntityEndpointService routes through JsonFilterBuilder → LINQ predicate,
+    /// which works on any ILinqQueryRepository adapter. Adapters without ILinqQueryRepository
+    /// or with restrictive query providers can opt out.
     /// </summary>
-    bool SupportsDeleteByQuery => false;
+    bool SupportsDeleteByQuery => true;
 
     /// <summary>DELETE /bulk with body of ids.</summary>
     bool SupportsBulkDelete => true;
@@ -47,8 +47,9 @@ public interface IAdapterCapabilities
     bool SupportsBodyQuery => true;
 
     /// <summary>
-    /// GET / with ?filter=&lt;filter-json&gt; query-string filter. Same caveat as
-    /// SupportsDeleteByQuery — requires IStringQueryRepository for a meaningful evaluation.
+    /// GET / with ?filter=&lt;filter-json&gt; query-string filter.
+    /// Default true: routed through JsonFilterBuilder → LINQ predicate, works on any
+    /// ILinqQueryRepository adapter.
     /// </summary>
-    bool SupportsQueryStringFilter => false;
+    bool SupportsQueryStringFilter => true;
 }

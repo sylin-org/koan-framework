@@ -530,16 +530,7 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
     [SkippableFact]
     public async Task PatchJsonPatch_replace_updates_target_field()
     {
-        // Framework routing limitation: the three PatchXxx actions on EntityController<T> share
-        // `[HttpPatch("{id}")]` and differ only by `[Consumes]`. ASP.NET Core's media-type matcher
-        // treats `application/json` (PatchPartial) as a valid match for `application/json-patch+json`
-        // because of the +json structured-suffix rule, so the router reports an ambiguous match.
-        // Until the framework adds an explicit ConsumesMatcherPolicy override or removes the
-        // application/json handler, the JsonPatch and MergePatch routes are unreachable via standard
-        // routing. Tracked as a follow-up; PatchPartial (Consumes application/json) is the working
-        // path and is exercised in PatchPartialJson_partial_object_updates_listed_fields_only.
         Skip.If(!Factory.SupportsJsonPatch, $"[{typeof(TFactory).Name}] does not support JSON Patch.");
-        Skip.If(true, "PATCH routing ambiguity: see XML doc comment on this spec — framework follow-up.");
         SkipIfUnavailable();
 
         await UpsertWidget("patch-jp", name: "Original", priority: 1);
@@ -569,7 +560,6 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
     public async Task PatchMergePatch_partial_object_merges_into_entity()
     {
         Skip.If(!Factory.SupportsMergePatch, $"[{typeof(TFactory).Name}] does not support Merge Patch.");
-        Skip.If(true, "PATCH routing ambiguity: see XML doc comment on PatchJsonPatch_replace_updates_target_field.");
         SkipIfUnavailable();
 
         await UpsertWidget("patch-merge", name: "Before", priority: 5);
@@ -617,7 +607,6 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
     public async Task PatchJsonPatch_against_missing_id_returns_404()
     {
         Skip.If(!Factory.SupportsJsonPatch, $"[{typeof(TFactory).Name}] does not support JSON Patch.");
-        Skip.If(true, "PATCH routing ambiguity: see XML doc comment on PatchJsonPatch_replace_updates_target_field.");
         SkipIfUnavailable();
 
         var ops = new[] { new { op = "replace", path = "/name", value = "Nope" } };
