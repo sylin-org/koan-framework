@@ -145,14 +145,15 @@ internal sealed class CachedRepository<TEntity, TKey> :
     public Task<IReadOnlyList<TEntity>> Query(object? query, CancellationToken ct = default)
         => _inner.Query(query, ct);
 
-    public Task<IReadOnlyList<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<RepositoryQueryResult<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
     {
         if (_withOptions is null)
         {
-            return _inner.Query(query, ct);
+            var items = await _inner.Query(query, ct);
+            return RepositoryQueryResult<TEntity>.Unhandled(items);
         }
 
-        return _withOptions.Query(query, options, ct);
+        return await _withOptions.Query(query, options, ct);
     }
 
     public Task<IReadOnlyList<TEntity>> Query(string query, CancellationToken ct = default)
@@ -165,36 +166,38 @@ internal sealed class CachedRepository<TEntity, TKey> :
         return _stringQuery.Query(query, ct);
     }
 
-    public Task<IReadOnlyList<TEntity>> Query(string query, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<RepositoryQueryResult<TEntity>> Query(string query, DataQueryOptions? options, CancellationToken ct = default)
     {
         if (_stringQueryWithOptions is not null)
         {
-            return _stringQueryWithOptions.Query(query, options, ct);
+            return await _stringQueryWithOptions.Query(query, options, ct);
         }
 
         if (_stringQuery is not null)
         {
-            return _stringQuery.Query(query, ct);
+            var items = await _stringQuery.Query(query, ct);
+            return RepositoryQueryResult<TEntity>.Unhandled(items);
         }
 
         throw new NotSupportedException($"Repository for {_entityName} does not support string queries.");
     }
 
-    public Task<IReadOnlyList<TEntity>> Query(string query, object? parameters, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> Query(string query, object? parameters, CancellationToken ct = default)
     {
         if (_stringQueryWithOptions is not null)
         {
-            return _stringQueryWithOptions.Query(query, parameters, null, ct);
+            var result = await _stringQueryWithOptions.Query(query, parameters, null, ct);
+            return result.Items;
         }
 
         throw new NotSupportedException($"Repository for {_entityName} does not support parameterized string queries.");
     }
 
-    public Task<IReadOnlyList<TEntity>> Query(string query, object? parameters, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<RepositoryQueryResult<TEntity>> Query(string query, object? parameters, DataQueryOptions? options, CancellationToken ct = default)
     {
         if (_stringQueryWithOptions is not null)
         {
-            return _stringQueryWithOptions.Query(query, parameters, options, ct);
+            return await _stringQueryWithOptions.Query(query, parameters, options, ct);
         }
 
         throw new NotSupportedException($"Repository for {_entityName} does not support parameterized string queries.");
@@ -210,16 +213,17 @@ internal sealed class CachedRepository<TEntity, TKey> :
         return _linq.Query(predicate, ct);
     }
 
-    public Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
     {
         if (_linqWithOptions is not null)
         {
-            return _linqWithOptions.Query(predicate, options, ct);
+            return await _linqWithOptions.Query(predicate, options, ct);
         }
 
         if (_linq is not null)
         {
-            return _linq.Query(predicate, ct);
+            var items = await _linq.Query(predicate, ct);
+            return RepositoryQueryResult<TEntity>.Unhandled(items);
         }
 
         throw new NotSupportedException($"Repository for {_entityName} does not support LINQ queries.");
