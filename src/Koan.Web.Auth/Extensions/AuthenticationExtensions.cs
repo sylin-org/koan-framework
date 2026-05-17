@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Koan.Web.Auth.Flow;
 using Koan.Web.Auth.Options;
 using Newtonsoft.Json.Linq;
 
@@ -36,28 +37,44 @@ public static class AuthenticationExtensions
                 o.Cookie.Name = ".AspNetCore.Koan.cookie";
                 o.SlidingExpiration = true;
 
-                // Avoid HTML redirects for XHR/API callers (send proper 401/403)
+                // Cookie events fan out through AuthFlowDispatcher → every registered
+                // IKoanAuthFlowHandler. JSON-shape detection lives in the built-in
+                // JsonChallengeHandler (Flow/Builtin/JsonChallengeHandler.cs); apps can override
+                // the heuristic via Koan:Web:Auth:Challenge options or ship a higher-priority
+                // handler that marks ResponseHandled to short-circuit.
                 o.Events = new CookieAuthenticationEvents
                 {
-                    OnRedirectToLogin = ctx =>
+                    OnRedirectToLogin = async ctx =>
                     {
-                        if (WantsJson(ctx.Request))
+                        var services = ctx.HttpContext.RequestServices;
+                        var dispatcher = services.GetService<AuthFlowDispatcher>();
+                        var flowCtx = new AuthChallengeContext
                         {
-                            ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                            return Task.CompletedTask;
-                        }
-                        ctx.Response.Redirect(ctx.RedirectUri);
-                        return Task.CompletedTask;
+                            HttpContext = ctx.HttpContext,
+                            Services = services,
+                            DefaultRedirectUri = ctx.RedirectUri,
+                            RedirectUri = ctx.RedirectUri,
+                        };
+                        if (dispatcher is not null)
+                            await dispatcher.DispatchChallenge(flowCtx, ctx.HttpContext.RequestAborted);
+                        if (!flowCtx.ResponseHandled)
+                            ctx.Response.Redirect(flowCtx.RedirectUri);
                     },
-                    OnRedirectToAccessDenied = ctx =>
+                    OnRedirectToAccessDenied = async ctx =>
                     {
-                        if (WantsJson(ctx.Request))
+                        var services = ctx.HttpContext.RequestServices;
+                        var dispatcher = services.GetService<AuthFlowDispatcher>();
+                        var flowCtx = new AuthAccessDeniedContext
                         {
-                            ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
-                            return Task.CompletedTask;
-                        }
-                        ctx.Response.Redirect(ctx.RedirectUri);
-                        return Task.CompletedTask;
+                            HttpContext = ctx.HttpContext,
+                            Services = services,
+                            DefaultRedirectUri = ctx.RedirectUri,
+                            RedirectUri = ctx.RedirectUri,
+                        };
+                        if (dispatcher is not null)
+                            await dispatcher.DispatchAccessDenied(flowCtx, ctx.HttpContext.RequestAborted);
+                        if (!flowCtx.ResponseHandled)
+                            ctx.Response.Redirect(flowCtx.RedirectUri);
                     }
                 };
             });
@@ -134,17 +151,4 @@ public static class AuthenticationExtensions
         return builder;
     }
 
-    private static bool WantsJson(Microsoft.AspNetCore.Http.HttpRequest req)
-    {
-        // Heuristics: JSON Accept header, API path, or AJAX header
-        var accept = req.Headers["Accept"].ToString();
-        if (!string.IsNullOrWhiteSpace(accept) && accept.IndexOf("application/json", StringComparison.OrdinalIgnoreCase) >= 0)
-            return true;
-        var apiPath = req.Path.HasValue && (req.Path.StartsWithSegments("/api") || req.Path.StartsWithSegments("/.well-known"));
-        if (apiPath) return true;
-        var xhr = req.Headers["X-Requested-With"].ToString();
-        if (!string.IsNullOrWhiteSpace(xhr) && string.Equals(xhr, "XMLHttpRequest", StringComparison.OrdinalIgnoreCase))
-            return true;
-        return false;
-    }
 }
