@@ -45,6 +45,7 @@ public sealed class CouchbaseAdapterFactory : WebApplicationFactory<Program>, IA
                     ["Koan:Data:Sources:Default:Adapter"] = "couchbase",
                     ["Koan:Data:Sources:Default:ConnectionString"] = _couchbase.ConnectionString,
                     ["Koan:Data:Couchbase:ConnectionString"] = _couchbase.ConnectionString,
+                    ["Koan:Data:Couchbase:ManagementUrl"] = _couchbase.ManagementUrl,
                     ["Koan:Data:Couchbase:Bucket"] = _couchbase.Bucket,
                     ["Koan:Data:Couchbase:Username"] = _couchbase.Username,
                     ["Koan:Data:Couchbase:Password"] = _couchbase.Password,

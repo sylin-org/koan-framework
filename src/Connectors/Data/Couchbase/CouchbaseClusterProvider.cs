@@ -378,12 +378,23 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
                     _logger?.LogDebug("Auto-provisioned default Couchbase credentials for user {Username}", username);
                 }
 
-                // Extract base URL for REST API calls
-                var baseUrl = options.ConnectionString.Replace("couchbase://", "http://").TrimEnd('/');
-                var schemeEnd = baseUrl.IndexOf("://") + 3;
-                if (baseUrl.IndexOf(':', schemeEnd) == -1)
+                // Resolve the management URL. Explicit CouchbaseOptions.ManagementUrl wins —
+                // necessary for test/container environments where KV and management are mapped
+                // to independent host ports. Otherwise derive from the KV connection string by
+                // swapping the scheme and defaulting to port 8091.
+                string baseUrl;
+                if (!string.IsNullOrWhiteSpace(options.ManagementUrl))
                 {
-                    baseUrl += ":8091";
+                    baseUrl = options.ManagementUrl!.TrimEnd('/');
+                }
+                else
+                {
+                    baseUrl = options.ConnectionString.Replace("couchbase://", "http://").TrimEnd('/');
+                    var schemeEnd = baseUrl.IndexOf("://") + 3;
+                    if (baseUrl.IndexOf(':', schemeEnd) == -1)
+                    {
+                        baseUrl += ":8091";
+                    }
                 }
 
                 // Wait for Couchbase to be ready and check if cluster needs initialization

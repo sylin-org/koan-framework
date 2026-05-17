@@ -4,14 +4,13 @@ namespace Koan.Web.AdapterSurface.TestKit.Containers;
 
 public sealed class CouchbaseContainerHelper : IAsyncDisposable
 {
-#pragma warning disable CS0649 // reserved for future use when Couchbase Testcontainers integration is fixed
     private CouchbaseContainer? _container;
-#pragma warning restore CS0649
 
     public bool IsAvailable { get; private set; }
     public string? UnavailableReason { get; private set; }
     public string? ConnectionString { get; private set; }
-    public string Bucket { get; private set; } = "koan_surface";
+    public string? ManagementUrl { get; private set; }
+    public string Bucket { get; private set; } = "default";
     public string Username { get; private set; } = "Administrator";
     public string Password { get; private set; } = "password";
 
@@ -22,16 +21,26 @@ public sealed class CouchbaseContainerHelper : IAsyncDisposable
         if (!string.IsNullOrWhiteSpace(explicitConn))
         {
             ConnectionString = explicitConn;
+            ManagementUrl = Environment.GetEnvironmentVariable("Koan_TESTS_COUCHBASE_MGMT");
             IsAvailable = true;
             return;
         }
 
-        UnavailableReason =
-            "Couchbase containerised tests are skipped: Testcontainers.Couchbase exposes the KV and management ports " +
-            "on separate random host ports, but Koan's CouchbaseClusterProvider derives the management URL from the " +
-            "single KV connection string. Set Koan_TESTS_COUCHBASE to an externally provisioned cluster connection " +
-            "string to run this adapter's surface specs.";
-        await Task.CompletedTask;
+        try
+        {
+            _container = new CouchbaseBuilder().Build();
+            await _container.StartAsync().ConfigureAwait(false);
+            ConnectionString = _container.GetConnectionString();
+            // CouchbaseContainer maps management port 8091 to a random host port — surface it
+            // explicitly so CouchbaseOptions.ManagementUrl can be passed to the cluster provider.
+            var mgmtPort = _container.GetMappedPublicPort(8091);
+            ManagementUrl = $"http://127.0.0.1:{mgmtPort}";
+            IsAvailable = true;
+        }
+        catch (Exception ex)
+        {
+            UnavailableReason = $"Failed to start Couchbase: {ex.GetType().Name}: {ex.Message}";
+        }
     }
 
     public Task ResetAsync() => Task.CompletedTask;
