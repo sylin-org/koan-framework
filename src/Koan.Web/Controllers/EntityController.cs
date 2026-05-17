@@ -520,22 +520,63 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         return PrepareResponse(result.Payload);
     }
 
+    // Single PATCH action that dispatches by Content-Type. Previously this was three sibling
+    // actions distinguished only by [Consumes(...)], but ASP.NET Core's media-type matcher treats
+    // a `+json` structured suffix (application/json-patch+json, application/merge-patch+json) as
+    // a subset of application/json — so all three endpoints matched any JSON-shaped payload and
+    // the router raised AmbiguousMatchException. One action with explicit dispatch sidesteps that.
     [HttpPatch("{id}")]
-    [Consumes(Infrastructure.KoanWebConstants.ContentTypes.ApplicationJsonPatch)]
-    public virtual async Task<IActionResult> PatchJsonPatch([FromRoute] TKey id, [FromBody] JsonPatchDocument<TEntity> body, CancellationToken ct)
-        => await PatchNormalized(id, NormalizeFromJsonPatch(id, body), ct);
+    [Consumes(
+        Infrastructure.KoanWebConstants.ContentTypes.ApplicationJsonPatch,
+        Infrastructure.KoanWebConstants.ContentTypes.ApplicationMergePatch,
+        Infrastructure.KoanWebConstants.ContentTypes.ApplicationJson)]
+    public virtual async Task<IActionResult> Patch([FromRoute] TKey id, CancellationToken ct)
+    {
+        if (!CanWrite) return Forbid();
 
-    [HttpPatch("{id}")]
-    [Consumes(Infrastructure.KoanWebConstants.ContentTypes.ApplicationMergePatch)]
-    [ApiExplorerSettings(IgnoreApi = true)]
-    public virtual async Task<IActionResult> PatchMerge([FromRoute] TKey id, [FromBody] Newtonsoft.Json.Linq.JToken body, CancellationToken ct)
-        => await PatchNormalized(id, NormalizeFromMergePatch(id, body), ct);
+        // Buffer the body so we can parse it with the right shape per Content-Type.
+        Microsoft.AspNetCore.Http.HttpRequestRewindExtensions.EnableBuffering(HttpContext.Request);
+        string raw;
+        using (var reader = new System.IO.StreamReader(HttpContext.Request.Body, System.Text.Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true))
+        {
+            raw = await reader.ReadToEndAsync(ct);
+            HttpContext.Request.Body.Position = 0;
+        }
 
-    [HttpPatch("{id}")]
-    [Consumes(Infrastructure.KoanWebConstants.ContentTypes.ApplicationJson)]
-    [ApiExplorerSettings(IgnoreApi = true)]
-    public virtual async Task<IActionResult> PatchPartial([FromRoute] TKey id, [FromBody] Newtonsoft.Json.Linq.JToken body, CancellationToken ct)
-        => await PatchNormalized(id, NormalizeFromPartialJson(id, body), ct);
+        var contentType = HttpContext.Request.ContentType ?? Infrastructure.KoanWebConstants.ContentTypes.ApplicationJson;
+        // Take only the media type portion (strip ;charset=...).
+        var mediaType = contentType.Split(';', 2)[0].Trim();
+
+        Koan.Data.Abstractions.Instructions.PatchPayload<TKey> payload;
+        try
+        {
+            if (string.Equals(mediaType, Infrastructure.KoanWebConstants.ContentTypes.ApplicationJsonPatch, StringComparison.OrdinalIgnoreCase))
+            {
+                var doc = string.IsNullOrWhiteSpace(raw)
+                    ? new JsonPatchDocument<TEntity>()
+                    : JsonConvert.DeserializeObject<JsonPatchDocument<TEntity>>(raw)
+                        ?? new JsonPatchDocument<TEntity>();
+                payload = NormalizeFromJsonPatch(id, doc);
+            }
+            else if (string.Equals(mediaType, Infrastructure.KoanWebConstants.ContentTypes.ApplicationMergePatch, StringComparison.OrdinalIgnoreCase))
+            {
+                var token = string.IsNullOrWhiteSpace(raw) ? JValue.CreateNull() : JToken.Parse(raw);
+                payload = NormalizeFromMergePatch(id, token);
+            }
+            else
+            {
+                // Default + application/json: partial-JSON semantics.
+                var token = string.IsNullOrWhiteSpace(raw) ? JValue.CreateNull() : JToken.Parse(raw);
+                payload = NormalizeFromPartialJson(id, token);
+            }
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = $"Invalid PATCH body for content type '{mediaType}': {ex.Message}" });
+        }
+
+        return await PatchNormalized(id, payload, ct);
+    }
 
     private async Task<IActionResult> PatchNormalized(TKey id, Koan.Data.Abstractions.Instructions.PatchPayload<TKey> payload, CancellationToken ct)
     {
