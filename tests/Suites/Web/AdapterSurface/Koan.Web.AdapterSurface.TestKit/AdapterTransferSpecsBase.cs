@@ -32,6 +32,9 @@ public abstract class AdapterTransferSpecsBase<TFactory> : IClassFixture<TFactor
     public async Task InitializeAsync()
     {
         if (!Factory.IsAvailable) return;
+        // Drop the process-wide AggregateConfigs static cache before binding AppHost.Current —
+        // see AdapterPartitionSpecsBase for the full rationale.
+        Koan.Data.Core.AggregateConfigs.Reset();
         AppHost.Current = Factory.Services;
         await Factory.ResetAsync();
 
