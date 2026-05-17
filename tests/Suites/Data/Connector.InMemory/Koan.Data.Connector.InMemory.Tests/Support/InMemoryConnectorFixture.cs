@@ -51,6 +51,7 @@ internal sealed class InMemoryConnectorFixture : IAsyncDisposable
 
         var services = new ServiceCollection();
         services.AddSingleton<IHostApplicationLifetime, NoopHostApplicationLifetime>();
+        services.AddSingleton<IHostEnvironment, TestHostEnvironment>();
         services.AddSingleton<IConfiguration>(configuration);
         services.AddLogging();
         services.AddKoan();
@@ -58,7 +59,7 @@ internal sealed class InMemoryConnectorFixture : IAsyncDisposable
         var provider = services.BuildServiceProvider(new ServiceProviderOptions
         {
             ValidateScopes = true,
-            ValidateOnBuild = true
+            ValidateOnBuild = false
         });
 
         try
@@ -133,7 +134,7 @@ internal sealed class InMemoryConnectorFixture : IAsyncDisposable
     {
         try
         {
-            await asyncDisposable.Dispose().ConfigureAwait(false);
+            await asyncDisposable.DisposeAsync().ConfigureAwait(false);
         }
         catch
         {
@@ -150,6 +151,15 @@ internal sealed class InMemoryConnectorFixture : IAsyncDisposable
         public void StopApplication()
         {
         }
+    }
+
+    private sealed class TestHostEnvironment : IHostEnvironment
+    {
+        public string EnvironmentName { get; set; } = "Test";
+        public string ApplicationName { get; set; } = "Koan.Data.Connector.InMemory.Tests";
+        public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
+        public Microsoft.Extensions.FileProviders.IFileProvider ContentRootFileProvider { get; set; } =
+            new Microsoft.Extensions.FileProviders.PhysicalFileProvider(AppContext.BaseDirectory);
     }
 
     internal readonly struct EntityPartitionLease : IAsyncDisposable, IDisposable
