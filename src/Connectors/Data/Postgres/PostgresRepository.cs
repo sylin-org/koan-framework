@@ -246,7 +246,7 @@ internal sealed class PostgresRepository<
             ""Id"" text PRIMARY KEY,
             ""Json"" jsonb NOT NULL
         );";
-        cmd.ExecuteNonQueryAsync();
+        cmd.ExecuteNonQuery();
 
         // Create expression indexes for projected properties if marked [Index]
         var projections = ProjectionResolver.Get(typeof(TEntity));
@@ -267,7 +267,7 @@ internal sealed class PostgresRepository<
             using var idx = conn.CreateCommand();
             // index on extracted text value for ordering/filtering
             idx.CommandText = $"CREATE INDEX IF NOT EXISTS \"{indexName}\" ON {QualifiedTable} ((\"Json\" #>> '{{{propPath}}}'))";
-            idx.ExecuteNonQueryAsync();
+            idx.ExecuteNonQuery();
         }
         catch { }
     }
@@ -279,7 +279,7 @@ internal sealed class PostgresRepository<
         cmd.CommandText = "SELECT 1 FROM information_schema.tables WHERE table_schema = @s AND table_name = @t";
         cmd.Parameters.AddWithValue("s", schema);
         cmd.Parameters.AddWithValue("t", table);
-        try { var o = cmd.ExecuteScalarAsync(); return o != null; } catch { return false; }
+        try { var o = cmd.ExecuteScalar(); return o is not null; } catch { return false; }
     }
 
     private (string schema, string table) ResolveSchemaAndTable()
@@ -878,7 +878,7 @@ internal sealed class PostgresRepository<
             cmd.CommandText = "SELECT 1 FROM information_schema.tables WHERE table_schema = @s AND table_name = @t";
             cmd.Parameters.AddWithValue("@s", schema ?? (searchPath ?? "public"));
             cmd.Parameters.AddWithValue("@t", table);
-            return cmd.ExecuteScalarAsync() is not null;
+            return cmd.ExecuteScalar() is not null;
         }
         public bool ColumnExists(string schema, string table, string column)
         {
@@ -887,14 +887,14 @@ internal sealed class PostgresRepository<
             cmd.Parameters.AddWithValue("@s", schema ?? (searchPath ?? "public"));
             cmd.Parameters.AddWithValue("@t", table);
             cmd.Parameters.AddWithValue("@c", column);
-            return cmd.ExecuteScalarAsync() is not null;
+            return cmd.ExecuteScalar() is not null;
         }
         public void CreateTableIdJson(string schema, string table, string idColumn = "Id", string jsonColumn = "Json")
         {
             var sch = schema ?? (searchPath ?? "public");
             using var cmd = conn.CreateCommand();
             cmd.CommandText = $"CREATE TABLE IF NOT EXISTS \"{Qual(sch)}\".\"{Qual(table)}\" (\"{Qual(idColumn)}\" text PRIMARY KEY, \"{Qual(jsonColumn)}\" jsonb NOT NULL)";
-            cmd.ExecuteNonQueryAsync();
+            cmd.ExecuteNonQuery();
         }
         public void CreateTableWithColumns(string schema, string table, List<(string Name, Type ClrType, bool Nullable, bool IsComputed, string? JsonPath, bool IsIndexed)> columns)
         {
@@ -930,7 +930,7 @@ internal sealed class PostgresRepository<
             }
 
             cmd.CommandText = $"CREATE TABLE IF NOT EXISTS \"{Qual(sch)}\".\"{Qual(table)}\" ({defs});";
-            try { cmd.ExecuteNonQueryAsync(); } catch { }
+            try { cmd.ExecuteNonQuery(); } catch { }
 
             // Create indexes for indexed columns
             for (int i = 0; i < columns.Count; i++)
@@ -941,7 +941,7 @@ internal sealed class PostgresRepository<
                     var ix = $"IX_{table}_{c.Name}";
                     using var cmd2 = conn.CreateCommand();
                     cmd2.CommandText = $"CREATE INDEX IF NOT EXISTS \"{Qual(ix)}\" ON \"{Qual(sch)}\".\"{Qual(table)}\" (\"{Qual(c.Name)}\");";
-                    try { cmd2.ExecuteNonQueryAsync(); } catch { }
+                    try { cmd2.ExecuteNonQuery(); } catch { }
                 }
             }
         }
@@ -954,7 +954,7 @@ internal sealed class PostgresRepository<
             // @p like $.Prop -> use substring to strip '$.'; simple helper for tests
             var p = conn.CreateCommand();
             cmd.Parameters.AddWithValue("@p", jsonPath);
-            cmd.ExecuteNonQueryAsync();
+            cmd.ExecuteNonQuery();
         }
         public void AddPhysicalColumn(string schema, string table, string column, Type clrType, bool nullable)
         {
@@ -962,7 +962,7 @@ internal sealed class PostgresRepository<
             string pgType = clrType == typeof(int) ? "integer" : clrType == typeof(long) ? "bigint" : clrType == typeof(bool) ? "boolean" : clrType == typeof(DateTime) ? "timestamp with time zone" : "text";
             using var cmd = conn.CreateCommand();
             cmd.CommandText = $"ALTER TABLE \"{Qual(sch)}\".\"{Qual(table)}\" ADD COLUMN IF NOT EXISTS \"{Qual(column)}\" {pgType} {(nullable ? "" : "NOT NULL")}";
-            cmd.ExecuteNonQueryAsync();
+            cmd.ExecuteNonQuery();
         }
         public void CreateIndex(string schema, string table, string indexName, IReadOnlyList<string> columns, bool unique)
         {
@@ -970,7 +970,7 @@ internal sealed class PostgresRepository<
             var cols = string.Join(", ", columns.Select(c => "\"" + Qual(c) + "\""));
             using var cmd = conn.CreateCommand();
             cmd.CommandText = $"CREATE {(unique ? "UNIQUE " : "")}INDEX IF NOT EXISTS \"{Qual(indexName)}\" ON \"{Qual(sch)}\".\"{Qual(table)}\" ({cols})";
-            cmd.ExecuteNonQueryAsync();
+            cmd.ExecuteNonQuery();
         }
     }
 

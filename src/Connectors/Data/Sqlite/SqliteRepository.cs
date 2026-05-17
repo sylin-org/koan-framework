@@ -1183,7 +1183,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             System.Diagnostics.Debug.WriteLine($"[DDL] CreateTableWithColumns: {sql}");
             using var cmd = conn.CreateCommand();
             cmd.CommandText = sql;
-            var result = cmd.ExecuteNonQueryAsync();
+            var result = cmd.ExecuteNonQuery();
             System.Diagnostics.Debug.WriteLine($"[DDL] CREATE TABLE result: {result}");
             // Emit PRAGMA table_info for debugging (debug builds only)
 #if DEBUG
@@ -1262,7 +1262,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             using var cmd = conn.CreateCommand();
             cmd.CommandText = "SELECT 1 FROM sqlite_master WHERE type='table' AND name=@t";
             cmd.Parameters.AddWithValue("@t", table);
-            return cmd.ExecuteScalarAsync() is not null;
+            return cmd.ExecuteScalar() is not null;
         }
         public bool ColumnExists(string schema, string table, string column)
         {
@@ -1293,7 +1293,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             var tname = string.IsNullOrWhiteSpace(table) ? tableName : table;
             System.Diagnostics.Debug.WriteLine($"[DDL] CreateTableIdJson: table={tname}, idColumn={idColumn}, jsonColumn={jsonColumn}");
             cmd.CommandText = $"CREATE TABLE IF NOT EXISTS [{tname}] ([{idColumn}] TEXT PRIMARY KEY, [{jsonColumn}] TEXT NOT NULL)";
-            cmd.ExecuteNonQueryAsync();
+            cmd.ExecuteNonQuery();
         }
         public void AddComputedColumnFromJson(string schema, string table, string column, string jsonPath, bool persisted)
         {
@@ -1309,7 +1309,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             {
                 using var cmd = conn.CreateCommand();
                 cmd.CommandText = $"ALTER TABLE [{table}] ADD COLUMN [{column}] {type}";
-                var result = cmd.ExecuteNonQueryAsync();
+                var result = cmd.ExecuteNonQuery();
                 System.Diagnostics.Debug.WriteLine($"[DDL] ALTER TABLE result: {result}");
             }
             catch (Exception ex)
@@ -1323,7 +1323,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             var cols = string.Join(", ", columns.Select(c => $"[{c}]"));
             using var cmd = conn.CreateCommand();
             cmd.CommandText = $"CREATE {(unique ? "UNIQUE " : "")}INDEX IF NOT EXISTS [{indexName}] ON [{table}] ({cols})";
-            cmd.ExecuteNonQueryAsync();
+            cmd.ExecuteNonQuery();
         }
     }
 
