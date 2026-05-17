@@ -214,32 +214,47 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
     public Task<IReadOnlyList<TEntity>> Query(object? query, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(() => QueryInternal(query, null, ct), ct);
 
-    public Task<IReadOnlyList<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
-        => ExecuteWithReadinessAsync(() => QueryInternal(query, options, ct), ct);
+    public Task<RepositoryQueryResult<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
+        => ExecuteWithReadinessAsync(async () =>
+        {
+            var items = await QueryInternal(query, options, ct);
+            return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
+        }, ct);
 
     public Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-        => Query(predicate, null, ct);
-
-    public Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
         {
             ct.ThrowIfCancellationRequested();
-            using var act = CouchbaseTelemetry.Activity.StartActivity("couchbase.query.linq");
-            act?.SetTag("entity", typeof(TEntity).FullName);
-            var ctx = await ResolveCollection(ct);
-            if (!CouchbaseLinqQueryTranslator.TryTranslate<TEntity, TKey>(predicate, _optimizationInfo, out var translation))
-            {
-                throw new NotSupportedException($"Unable to translate expression '{predicate}' to N1QL for Couchbase.");
-            }
-
-            var statement = $"SELECT RAW doc FROM `{ctx.BucketName}`.`{ctx.ScopeName}`.`{ctx.CollectionName}` AS doc WHERE {translation.WhereClause}";
-            var definition = new CouchbaseQueryDefinition(statement)
-            {
-                Parameters = translation.Parameters.ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value)
-            };
-
-            return await ExecuteQuery(ctx, statement, definition, options, ct);
+            var result = await QueryPredicate(predicate, options: null, ct);
+            return result;
         }, ct);
+
+    public Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
+        => ExecuteWithReadinessAsync(async () =>
+        {
+            var items = await QueryPredicate(predicate, options, ct);
+            return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
+        }, ct);
+
+    private async Task<IReadOnlyList<TEntity>> QueryPredicate(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        using var act = CouchbaseTelemetry.Activity.StartActivity("couchbase.query.linq");
+        act?.SetTag("entity", typeof(TEntity).FullName);
+        var ctx = await ResolveCollection(ct);
+        if (!CouchbaseLinqQueryTranslator.TryTranslate<TEntity, TKey>(predicate, _optimizationInfo, out var translation))
+        {
+            throw new NotSupportedException($"Unable to translate expression '{predicate}' to N1QL for Couchbase.");
+        }
+
+        var statement = $"SELECT RAW doc FROM `{ctx.BucketName}`.`{ctx.ScopeName}`.`{ctx.CollectionName}` AS doc WHERE {translation.WhereClause}";
+        var definition = new CouchbaseQueryDefinition(statement)
+        {
+            Parameters = translation.Parameters.ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value)
+        };
+
+        return await ExecuteQuery(ctx, statement, definition, options, ct);
+    }
 
     private async Task<IReadOnlyList<TEntity>> QueryInternal(object? query, DataQueryOptions? options, CancellationToken ct)
     {

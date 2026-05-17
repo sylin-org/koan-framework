@@ -1,7 +1,10 @@
 using System.Collections.Concurrent;
+using System.Collections.Frozen;
 using System.Linq.Expressions;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Instructions;
+using Koan.Data.Abstractions.Sorting;
+using Koan.Data.Core.Sorting;
 
 namespace Koan.Data.Connector.InMemory;
 
@@ -80,19 +83,19 @@ internal sealed class InMemoryRepository<TEntity, TKey> :
         return Task.FromResult((IReadOnlyList<TEntity>)result);
     }
 
-    public Task<IReadOnlyList<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
+    public Task<RepositoryQueryResult<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        var items = Store.Values.AsQueryable();
+        IEnumerable<TEntity> items = Store.Values;
 
         // Apply LINQ predicate if provided
         if (query is Expression<Func<TEntity, bool>> predicate)
         {
-            items = items.Where(predicate);
+            items = items.AsQueryable().Where(predicate);
         }
 
-        items = ApplyOptions(items, options);
-        return Task.FromResult((IReadOnlyList<TEntity>)items.ToList());
+        var totalCount = items is ICollection<TEntity> coll ? (long)coll.Count : items.LongCount();
+        return Task.FromResult(BuildResult(items, options, totalCount));
     }
 
     // ==================== LINQ Query Operations ====================
@@ -123,12 +126,12 @@ internal sealed class InMemoryRepository<TEntity, TKey> :
         return Task.FromResult((IReadOnlyList<TEntity>)result);
     }
 
-    public Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
+    public Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        var items = Store.Values.AsQueryable().Where(predicate);
-        items = ApplyOptions(items, options);
-        return Task.FromResult((IReadOnlyList<TEntity>)items.ToList());
+        IEnumerable<TEntity> items = Store.Values.AsQueryable().Where(predicate);
+        var totalCount = items.LongCount();
+        return Task.FromResult(BuildResult(items, options, totalCount));
     }
 
     // ==================== Write Operations ====================
@@ -281,22 +284,37 @@ internal sealed class InMemoryRepository<TEntity, TKey> :
 
     // ==================== Helper Methods ====================
 
-    private static IQueryable<TEntity> ApplyOptions(IQueryable<TEntity> items, DataQueryOptions? options)
+    private static RepositoryQueryResult<TEntity> BuildResult(IEnumerable<TEntity> items, DataQueryOptions? options, long totalCount)
     {
-        if (options == null)
-            return items;
+        var sortHandled = RepositoryQueryResult<TEntity>.NoSortHandled;
 
-        // Apply pagination
-        if (options.Page.HasValue && options.PageSize.HasValue)
+        if (options is { } opts && opts.HasSort)
         {
-            var skip = (options.Page.Value - 1) * options.PageSize.Value;
-            items = items.Skip(skip).Take(options.PageSize.Value);
+            var sorted = InMemorySorter.Apply(items, opts.Sort);
+            items = sorted;
+            sortHandled = opts.Sort.ToFrozenSet();
         }
-        else if (options.PageSize.HasValue)
+
+        var paginationHandled = false;
+        if (options is { } o && o.HasPagination)
+        {
+            var skip = (o.Page!.Value - 1) * o.PageSize!.Value;
+            items = items.Skip(skip).Take(o.PageSize.Value);
+            paginationHandled = true;
+        }
+        else if (options?.PageSize.HasValue == true)
         {
             items = items.Take(options.PageSize.Value);
         }
 
-        return items;
+        var list = items is IReadOnlyList<TEntity> ro ? ro : items.ToList();
+        return new RepositoryQueryResult<TEntity>
+        {
+            Items = list,
+            TotalCount = totalCount,
+            IsEstimate = false,
+            PaginationHandled = paginationHandled,
+            SortHandled = sortHandled,
+        };
     }
 }

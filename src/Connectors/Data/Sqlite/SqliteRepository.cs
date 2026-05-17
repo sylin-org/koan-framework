@@ -478,7 +478,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         return rows.Select(FromRow).ToList();
     }
 
-    public async Task<IReadOnlyList<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<RepositoryQueryResult<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:all+opts");
@@ -487,7 +487,8 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         using var conn = Open();
         var sql = $"SELECT Id, Json FROM [{TableName}] LIMIT {limit} OFFSET {offset}";
         var rows = await conn.QueryAsync<(string Id, string Json)>(sql);
-        return rows.Select(FromRow).ToList();
+        var items = rows.Select(FromRow).ToList();
+        return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
     }
 
     public async Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
@@ -581,7 +582,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         }
     }
 
-    public async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:linq+opts");
@@ -599,7 +600,8 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             try
             {
                 var rows = await conn.QueryAsync<(string Id, string Json)>(sql, dyn);
-                return rows.Select(FromRow).ToList();
+                var items = rows.Select(FromRow).ToList();
+                return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
             }
             catch (SqliteException ex) when ((ex.SqliteErrorCode == 1) && ex.Message.Contains("no such column", StringComparison.OrdinalIgnoreCase))
             {
@@ -608,8 +610,9 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         }
         catch (NotSupportedException)
         {
-            var all = await Query((object?)null, options, ct);
-            return all.AsQueryable().Where(predicate).ToList();
+            var fallback = await Query((object?)null, options, ct);
+            var filtered = fallback.Items.AsQueryable().Where(predicate).ToList();
+            return RepositoryQueryResult<TEntity>.PaginatedOnly(filtered);
         }
     }
 
@@ -708,7 +711,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         }
     }
 
-    public async Task<IReadOnlyList<TEntity>> Query(string sql, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<RepositoryQueryResult<TEntity>> Query(string sql, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:string+opts");
@@ -718,10 +721,10 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         {
             var rewritten = RewriteEntityToken(sql);
             rewritten = RewriteSelectForProjection(rewritten);
-            // Also rewrite WHERE predicates inside full SELECT
             rewritten = RewriteWhereInFullSelect(rewritten);
             var rows = await conn.QueryAsync(rewritten);
-            return MapRowsToEntities(rows);
+            var items = MapRowsToEntities(rows);
+            return RepositoryQueryResult<TEntity>.Unhandled(items);
         }
         else
         {
@@ -730,7 +733,8 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             try
             {
                 var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT Id, Json FROM [{TableName}] WHERE " + whereSql + $" LIMIT {limit} OFFSET {offset}");
-                return rows.Select(FromRow).ToList();
+                var items = rows.Select(FromRow).ToList();
+                return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
             }
             catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
             {
@@ -739,12 +743,13 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                 InvalidateHealth(sqliteConn, TableName);
                 EnsureOrchestrated(sqliteConn);
                 var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT Id, Json FROM [{TableName}] WHERE " + whereSql + $" LIMIT {limit} OFFSET {offset}");
-                return rows.Select(FromRow).ToList();
+                var items = rows.Select(FromRow).ToList();
+                return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
             }
         }
     }
 
-    public async Task<IReadOnlyList<TEntity>> Query(string sql, object? parameters, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<RepositoryQueryResult<TEntity>> Query(string sql, object? parameters, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:string:param+opts");
@@ -754,10 +759,10 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         {
             var rewritten = RewriteEntityToken(sql);
             rewritten = RewriteSelectForProjection(rewritten);
-            // Also rewrite WHERE predicates inside full SELECT
             rewritten = RewriteWhereInFullSelect(rewritten);
             var rows = await conn.QueryAsync(rewritten, parameters);
-            return MapRowsToEntities(rows);
+            var items = MapRowsToEntities(rows);
+            return RepositoryQueryResult<TEntity>.Unhandled(items);
         }
         else
         {
@@ -766,7 +771,8 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             try
             {
                 var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT Id, Json FROM [{TableName}] WHERE " + whereSql + $" LIMIT {limit} OFFSET {offset}", parameters);
-                return rows.Select(FromRow).ToList();
+                var items = rows.Select(FromRow).ToList();
+                return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
             }
             catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
             {
@@ -775,7 +781,8 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                 InvalidateHealth(sqliteConn, TableName);
                 EnsureOrchestrated(sqliteConn);
                 var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT Id, Json FROM [{TableName}] WHERE " + whereSql + $" LIMIT {limit} OFFSET {offset}", parameters);
-                return rows.Select(FromRow).ToList();
+                var items = rows.Select(FromRow).ToList();
+                return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
             }
         }
     }

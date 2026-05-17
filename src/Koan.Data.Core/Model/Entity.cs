@@ -103,17 +103,45 @@ namespace Koan.Data.Core.Model
         public static Task<IReadOnlyList<TEntity>> Query(string query, string partition, CancellationToken ct = default)
             => Data<TEntity, TKey>.Query(query, partition, ct);
 
-        // Streaming (IAsyncEnumerable)
+        // Streaming (IAsyncEnumerable). When sort is specified, streaming materializes the full result
+        // before yielding the first item — see ADR-0093.
         public static IAsyncEnumerable<TEntity> AllStream(int? batchSize = null, CancellationToken ct = default)
             => Data<TEntity, TKey>.AllStream(batchSize, ct);
+        public static IAsyncEnumerable<TEntity> AllStream(string sort, int? batchSize = null, CancellationToken ct = default)
+            => Data<TEntity, TKey>.AllStream(sort, batchSize, ct);
+        public static IAsyncEnumerable<TEntity> AllStream(Action<Koan.Data.Core.Sorting.ISortBuilder<TEntity>> sort, int? batchSize = null, CancellationToken ct = default)
+            => Data<TEntity, TKey>.AllStream(sort, batchSize, ct);
+
         public static IAsyncEnumerable<TEntity> QueryStream(string query, int? batchSize = null, CancellationToken ct = default)
             => Data<TEntity, TKey>.QueryStream(query, batchSize, ct);
+        public static IAsyncEnumerable<TEntity> QueryStream(string query, string sort, int? batchSize = null, CancellationToken ct = default)
+            => Data<TEntity, TKey>.QueryStream(query, sort, batchSize, ct);
+        public static IAsyncEnumerable<TEntity> QueryStream(string query, Action<Koan.Data.Core.Sorting.ISortBuilder<TEntity>> sort, int? batchSize = null, CancellationToken ct = default)
+            => Data<TEntity, TKey>.QueryStream(query, sort, batchSize, ct);
 
-        // Basic paging helpers (materialized)
+        // Basic paging helpers (materialized). Sort overloads thread through the orchestrator (ADR-0093).
         public static Task<IReadOnlyList<TEntity>> FirstPage(int size, CancellationToken ct = default)
             => Data<TEntity, TKey>.FirstPage(size, ct);
+        public static Task<IReadOnlyList<TEntity>> FirstPage(int size, string sort, CancellationToken ct = default)
+            => Data<TEntity, TKey>.FirstPage(size, sort, ct);
+        public static Task<IReadOnlyList<TEntity>> FirstPage(int size, Action<Koan.Data.Core.Sorting.ISortBuilder<TEntity>> sort, CancellationToken ct = default)
+            => Data<TEntity, TKey>.FirstPage(size, sort, ct);
+
         public static Task<IReadOnlyList<TEntity>> Page(int page, int size, CancellationToken ct = default)
             => Data<TEntity, TKey>.Page(page, size, ct);
+        public static Task<IReadOnlyList<TEntity>> Page(int page, int size, string sort, CancellationToken ct = default)
+            => Data<TEntity, TKey>.Page(page, size, sort, ct);
+        public static Task<IReadOnlyList<TEntity>> Page(int page, int size, Action<Koan.Data.Core.Sorting.ISortBuilder<TEntity>> sort, CancellationToken ct = default)
+            => Data<TEntity, TKey>.Page(page, size, sort, ct);
+
+        // All with sort — lambda form only (string form ambiguous with existing partition overload; use
+        // Entity.All(new DataQueryOptions().WithSort<T>("...")) for the string surface).
+        public static Task<IReadOnlyList<TEntity>> All(Action<Koan.Data.Core.Sorting.ISortBuilder<TEntity>> sort, CancellationToken ct = default)
+            => Data<TEntity, TKey>.All(sort, ct);
+
+        // Query+predicate with sort
+        public static Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, Action<Koan.Data.Core.Sorting.ISortBuilder<TEntity>> sort, CancellationToken ct = default)
+            => Data<TEntity, TKey>.Query(predicate, sort, ct);
 
         // Counts
         // Simple: await Entity.Count → defaults to optimized

@@ -1,7 +1,10 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Sorting;
+using Koan.Data.Core.Sorting;
 using StackExchange.Redis;
+using System.Collections.Frozen;
 using System.Linq.Expressions;
 using Newtonsoft.Json;
 
@@ -79,13 +82,13 @@ internal sealed class RedisRepository<TEntity, TKey> :
         return items;
     }
 
-    public async Task<IReadOnlyList<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<RepositoryQueryResult<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        var page = options?.Page is int p && p > 1 ? p : 1;
-        var size = options?.PageSize is int ps && ps > 0 ? ps : Math.Max(1, _options.Value.DefaultPageSize);
-        var (items, _) = await ScanAll(page, size, ct);
-        return items;
+        // Redis has no native sort. If sort or partial-fetch is requested, scan everything and let the
+        // orchestrator (or our local helper) do the work — correctness over efficiency for KV stores.
+        var (all, total) = await ScanAll(page: 1, size: int.MaxValue, ct);
+        return BuildResult(all, options, total);
     }
 
     public async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
@@ -96,13 +99,41 @@ internal sealed class RedisRepository<TEntity, TKey> :
         return items.AsQueryable().Where(predicate).ToList();
     }
 
-    public async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        var page = options?.Page is int p && p > 1 ? p : 1;
-        var size = options?.PageSize is int ps && ps > 0 ? ps : Math.Max(1, _options.Value.DefaultPageSize);
-        var (items, _) = await ScanAll(page, size, ct);
-        return items.AsQueryable().Where(predicate).ToList();
+        var (all, _) = await ScanAll(page: 1, size: int.MaxValue, ct);
+        var filtered = all.AsQueryable().Where(predicate).ToList();
+        return BuildResult(filtered, options, filtered.Count);
+    }
+
+    private RepositoryQueryResult<TEntity> BuildResult(IReadOnlyList<TEntity> source, DataQueryOptions? options, long totalCount)
+    {
+        IEnumerable<TEntity> items = source;
+        var sortHandled = RepositoryQueryResult<TEntity>.NoSortHandled;
+        if (options is { } o1 && o1.HasSort)
+        {
+            items = InMemorySorter.Apply(items, o1.Sort);
+            sortHandled = o1.Sort.ToFrozenSet();
+        }
+
+        var paginationHandled = false;
+        if (options is { } o2 && o2.HasPagination)
+        {
+            var skip = (o2.Page!.Value - 1) * o2.PageSize!.Value;
+            items = items.Skip(skip).Take(o2.PageSize.Value);
+            paginationHandled = true;
+        }
+
+        var list = items is IReadOnlyList<TEntity> ro ? ro : items.ToList();
+        return new RepositoryQueryResult<TEntity>
+        {
+            Items = list,
+            TotalCount = totalCount,
+            IsEstimate = false,
+            PaginationHandled = paginationHandled,
+            SortHandled = sortHandled,
+        };
     }
 
     public async Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)

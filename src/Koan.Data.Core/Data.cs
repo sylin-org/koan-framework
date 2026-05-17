@@ -8,6 +8,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Koan.Core;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Instructions;
+using Koan.Data.Abstractions.Sorting;
+using Koan.Data.Core.Sorting;
 
 namespace Koan.Data.Core;
 
@@ -61,7 +63,8 @@ public static class Data<TEntity, TKey>
 
         if (repo is IDataRepositoryWithOptions<TEntity, TKey> repoWithOptions && options is not null)
         {
-            return await repoWithOptions.Query(payload, options, ct);
+            var result = await repoWithOptions.Query(payload, options, ct);
+            return result.Items;
         }
 
         if (request.Predicate is not null && repo is ILinqQueryRepository<TEntity, TKey> linq)
@@ -89,6 +92,9 @@ public static class Data<TEntity, TKey>
         var result = await QueryWithCount(predicate, options, ct);
         return result.Items;
     }
+
+    public static Task<IReadOnlyList<TEntity>> All(Action<Koan.Data.Core.Sorting.ISortBuilder<TEntity>> sort, CancellationToken ct = default)
+        => All(new DataQueryOptions().WithSort<TEntity>(sort), ct);
 
     public static Task<QueryResult<TEntity>> AllWithCount(DataQueryOptions? options = null, CancellationToken ct = default)
     {
@@ -147,35 +153,67 @@ public static class Data<TEntity, TKey>
             precomputedCount = outcome;
         }
 
-        if (hasPagination && repo is IPagedRepository<TEntity, TKey> pagedRepo)
-        {
-            var repoResult = await pagedRepo.QueryPage(query, normalizedOptions, ct);
-            return new QueryResult<TEntity>
-            {
-                Items = repoResult.Items,
-                TotalCount = repoResult.TotalCount,
-                Page = repoResult.Page,
-                PageSize = repoResult.PageSize,
-                RepositoryHandledPagination = true,
-                ExceededSafetyLimit = false,
-                IsEstimate = repoResult.IsEstimate
-            };
-        }
-
         IReadOnlyList<TEntity> items;
         var repositoryHandledPagination = false;
+        var hasSort = providedOptions.HasSort;
+        var sortFullyHandled = !hasSort;
+        long? adapterReportedCount = null;
+        var adapterReportedEstimate = false;
 
         if (repo is IDataRepositoryWithOptions<TEntity, TKey> repoWithOptions)
         {
-            items = await repoWithOptions.Query(query, normalizedOptions, ct);
-            repositoryHandledPagination = hasPagination;
+            var attempt = await repoWithOptions.Query(query, normalizedOptions, ct);
+            sortFullyHandled = attempt.SortFullyHandled(normalizedOptions);
+
+            // If the adapter could not push all requested sort specs down AND pagination was requested,
+            // we must refetch unpaginated so the orchestrator can sort the full set before paginating.
+            // Without this inversion, we'd sort a page of natural-order rows, which is the core bug.
+            if (!sortFullyHandled && hasPagination)
+            {
+                var unpaged = normalizedOptions.WithoutPagination();
+                var refetch = await repoWithOptions.Query(query, unpaged, ct);
+                items = refetch.Items;
+                adapterReportedCount = refetch.TotalCount;
+                adapterReportedEstimate = refetch.IsEstimate;
+                repositoryHandledPagination = false;
+
+                var pendingSpecs = providedOptions.Sort.Where(s => !refetch.SortHandled.Contains(s)).ToList();
+                if (pendingSpecs.Count > 0)
+                {
+                    items = InMemorySorter.Apply(items, pendingSpecs);
+                }
+            }
+            else
+            {
+                items = attempt.Items;
+                adapterReportedCount = attempt.TotalCount;
+                adapterReportedEstimate = attempt.IsEstimate;
+                repositoryHandledPagination = attempt.PaginationHandled && hasPagination;
+
+                if (hasSort && !sortFullyHandled)
+                {
+                    var pendingSpecs = providedOptions.Sort.Where(s => !attempt.SortHandled.Contains(s)).ToList();
+                    if (pendingSpecs.Count > 0)
+                    {
+                        items = InMemorySorter.Apply(items, pendingSpecs);
+                    }
+                }
+            }
         }
         else
         {
             items = await repo.Query(query, ct);
+            if (hasSort)
+            {
+                items = InMemorySorter.Apply(items, providedOptions.Sort);
+            }
         }
 
         CountOutcome? countOutcome = precomputedCount;
+        if (!countOutcome.HasValue && adapterReportedCount.HasValue)
+        {
+            countOutcome = new CountOutcome(adapterReportedCount.Value, adapterReportedEstimate);
+        }
         if (!countOutcome.HasValue && (hasPagination || absoluteMaxRecords.HasValue))
         {
             countOutcome = await CountInternal(query, countStrategy, providedOptions, ct);
@@ -239,6 +277,9 @@ public static class Data<TEntity, TKey>
         var result = await QueryWithCount(predicate, options, ct);
         return result.Items;
     }
+
+    public static Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, Action<Koan.Data.Core.Sorting.ISortBuilder<TEntity>> sort, CancellationToken ct = default)
+        => Query(predicate, new DataQueryOptions().WithSort<TEntity>(sort), ct);
 
     public static Task<IReadOnlyList<TEntity>> Query(string query, CancellationToken ct = default)
         => Query(query, (DataQueryOptions?)null, ct);
@@ -394,16 +435,50 @@ public static class Data<TEntity, TKey>
     public static Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default) => Repo.UpsertMany(models, ct);
     public static IBatchSet<TEntity, TKey> Batch() => Repo.CreateBatch();
 
-    // Streaming helpers (IAsyncEnumerable), stable iteration using options page loops
-    public static async IAsyncEnumerable<TEntity> AllStream(int? batchSize = null, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    // Streaming helpers (IAsyncEnumerable). When sort is requested, streaming materializes the full result
+    // before yielding the first item (sort + true streaming are mutually exclusive).
+    public static IAsyncEnumerable<TEntity> AllStream(int? batchSize = null, CancellationToken ct = default)
+        => AllStreamCore(sortSpecs: null, batchSize, ct);
+
+    public static IAsyncEnumerable<TEntity> AllStream(string sort, int? batchSize = null, CancellationToken ct = default)
+        => AllStreamCore(SortSpecParser.ParseStrict<TEntity>(sort), batchSize, ct);
+
+    public static IAsyncEnumerable<TEntity> AllStream(Action<ISortBuilder<TEntity>> sort, int? batchSize = null, CancellationToken ct = default)
+        => AllStreamCore(SortBuilder<TEntity>.Build(sort), batchSize, ct);
+
+    private static async IAsyncEnumerable<TEntity> AllStreamCore(IReadOnlyList<SortSpec>? sortSpecs, int? batchSize, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
-        // Internal streaming operation - no pagination constraints should apply
+        if (sortSpecs is { Count: > 0 })
+        {
+            var opts = new DataQueryOptions().WithSort(sortSpecs);
+            var result = await QueryWithCount(opts, ct);
+            foreach (var item in result.Items) yield return item;
+            yield break;
+        }
+
         var all = await Repo.Query(null, ct);
         foreach (var item in all) yield return item;
     }
 
-    public static async IAsyncEnumerable<TEntity> QueryStream(string query, int? batchSize = null, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    public static IAsyncEnumerable<TEntity> QueryStream(string query, int? batchSize = null, CancellationToken ct = default)
+        => QueryStreamCore(query, sortSpecs: null, batchSize, ct);
+
+    public static IAsyncEnumerable<TEntity> QueryStream(string query, string sort, int? batchSize = null, CancellationToken ct = default)
+        => QueryStreamCore(query, SortSpecParser.ParseStrict<TEntity>(sort), batchSize, ct);
+
+    public static IAsyncEnumerable<TEntity> QueryStream(string query, Action<ISortBuilder<TEntity>> sort, int? batchSize = null, CancellationToken ct = default)
+        => QueryStreamCore(query, SortBuilder<TEntity>.Build(sort), batchSize, ct);
+
+    private static async IAsyncEnumerable<TEntity> QueryStreamCore(string query, IReadOnlyList<SortSpec>? sortSpecs, int? batchSize, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
+        if (sortSpecs is { Count: > 0 })
+        {
+            var opts = new DataQueryOptions().WithSort(sortSpecs);
+            var result = await QueryWithCount(query, opts, ct);
+            foreach (var item in result.Items) yield return item;
+            yield break;
+        }
+
         var size = batchSize is int bs && bs > 0 ? bs : Koan.Data.Core.Infrastructure.Constants.Defaults.UnboundedLoopPageSize;
         if (Repo is IStringQueryRepositoryWithOptions<TEntity, TKey> srepoOpts)
         {
@@ -413,9 +488,9 @@ public static class Data<TEntity, TKey>
                 ct.ThrowIfCancellationRequested();
                 var opts = new DataQueryOptions(page, size);
                 var batch = await srepoOpts.Query(query, opts, ct);
-                if (batch.Count == 0) yield break;
-                foreach (var item in batch) yield return item;
-                if (batch.Count < size) yield break;
+                if (batch.Items.Count == 0) yield break;
+                foreach (var item in batch.Items) yield return item;
+                if (batch.Items.Count < size) yield break;
                 page++;
             }
         }
@@ -431,25 +506,31 @@ public static class Data<TEntity, TKey>
     }
 
     // Materialized paging helpers
-    public static async Task<IReadOnlyList<TEntity>> FirstPage(int size, CancellationToken ct = default)
-    {
-        if (size <= 0) throw new System.ArgumentOutOfRangeException(nameof(size));
-        if (Repo is IDataRepositoryWithOptions<TEntity, TKey> repoOpts)
-            return await repoOpts.Query(null, new DataQueryOptions(1, size), ct);
-        // Fallback: materialize and take
-        var all = await Repo.Query(null, ct);
-        return all.Take(size).ToList();
-    }
+    public static Task<IReadOnlyList<TEntity>> FirstPage(int size, CancellationToken ct = default)
+        => PageCore(1, size, options: null, ct);
 
-    public static async Task<IReadOnlyList<TEntity>> Page(int page, int size, CancellationToken ct = default)
+    public static Task<IReadOnlyList<TEntity>> FirstPage(int size, string sort, CancellationToken ct = default)
+        => PageCore(1, size, new DataQueryOptions().WithSort<TEntity>(sort), ct);
+
+    public static Task<IReadOnlyList<TEntity>> FirstPage(int size, Action<ISortBuilder<TEntity>> sort, CancellationToken ct = default)
+        => PageCore(1, size, new DataQueryOptions().WithSort<TEntity>(sort), ct);
+
+    public static Task<IReadOnlyList<TEntity>> Page(int page, int size, CancellationToken ct = default)
+        => PageCore(page, size, options: null, ct);
+
+    public static Task<IReadOnlyList<TEntity>> Page(int page, int size, string sort, CancellationToken ct = default)
+        => PageCore(page, size, new DataQueryOptions().WithSort<TEntity>(sort), ct);
+
+    public static Task<IReadOnlyList<TEntity>> Page(int page, int size, Action<ISortBuilder<TEntity>> sort, CancellationToken ct = default)
+        => PageCore(page, size, new DataQueryOptions().WithSort<TEntity>(sort), ct);
+
+    private static async Task<IReadOnlyList<TEntity>> PageCore(int page, int size, DataQueryOptions? options, CancellationToken ct)
     {
         if (page <= 0) throw new System.ArgumentOutOfRangeException(nameof(page));
         if (size <= 0) throw new System.ArgumentOutOfRangeException(nameof(size));
-        if (Repo is IDataRepositoryWithOptions<TEntity, TKey> repoOpts)
-            return await repoOpts.Query(null, new DataQueryOptions(page, size), ct);
-        // Fallback: materialize and page in-memory
-        var all = await Repo.Query(null, ct);
-        return all.Skip((page - 1) * size).Take(size).ToList();
+        var opts = (options ?? new DataQueryOptions()).WithPagination(page, size);
+        var result = await QueryWithCount(opts, ct);
+        return result.Items;
     }
 
     // Partition-scoped helpers (ambient via EntityContext)

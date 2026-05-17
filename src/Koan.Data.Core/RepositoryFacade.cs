@@ -71,13 +71,14 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         await Guard(ct);
         return await _inner.Query(query, ct);
     }
-    public async Task<IReadOnlyList<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<RepositoryQueryResult<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
     {
         await Guard(ct);
         if (_inner is IDataRepositoryWithOptions<TEntity, TKey> with)
             return await with.Query(query, options, ct);
-        // Fallback: ignore options and use base method; adapters will apply guardrails
-        return await _inner.Query(query, ct);
+        // Fallback: ignore options and use base method; orchestrator handles sort/page in memory
+        var items = await _inner.Query(query, ct);
+        return RepositoryQueryResult<TEntity>.Unhandled(items);
     }
     public async Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
     {
@@ -92,13 +93,16 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
             return await linq.Query(predicate, ct);
         throw new NotSupportedException("LINQ queries are not supported by this repository.");
     }
-    public async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
     {
         await Guard(ct);
         if (_inner is ILinqQueryRepositoryWithOptions<TEntity, TKey> linq)
             return await linq.Query(predicate, options, ct);
         if (_inner is ILinqQueryRepository<TEntity, TKey> linqb)
-            return await linqb.Query(predicate, ct);
+        {
+            var items = await linqb.Query(predicate, ct);
+            return RepositoryQueryResult<TEntity>.Unhandled(items);
+        }
         throw new NotSupportedException("LINQ queries are not supported by this repository.");
     }
 
@@ -109,13 +113,16 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
             return await raw.Query(query, ct);
         throw new NotSupportedException("String queries are not supported by this repository.");
     }
-    public async Task<IReadOnlyList<TEntity>> Query(string query, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<RepositoryQueryResult<TEntity>> Query(string query, DataQueryOptions? options, CancellationToken ct = default)
     {
         await Guard(ct);
         if (_inner is IStringQueryRepositoryWithOptions<TEntity, TKey> raw)
             return await raw.Query(query, options, ct);
         if (_inner is IStringQueryRepository<TEntity, TKey> rawb)
-            return await rawb.Query(query, ct);
+        {
+            var items = await rawb.Query(query, ct);
+            return RepositoryQueryResult<TEntity>.Unhandled(items);
+        }
         throw new NotSupportedException("String queries are not supported by this repository.");
     }
 
@@ -123,10 +130,13 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     {
         await Guard(ct);
         if (_inner is IStringQueryRepositoryWithOptions<TEntity, TKey> rawp)
-            return await rawp.Query(query, parameters, null, ct);
+        {
+            var result = await rawp.Query(query, parameters, null, ct);
+            return result.Items;
+        }
         throw new NotSupportedException("Parameterized string queries are not supported by this repository.");
     }
-    public async Task<IReadOnlyList<TEntity>> Query(string query, object? parameters, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<RepositoryQueryResult<TEntity>> Query(string query, object? parameters, DataQueryOptions? options, CancellationToken ct = default)
     {
         await Guard(ct);
         if (_inner is IStringQueryRepositoryWithOptions<TEntity, TKey> rawp)

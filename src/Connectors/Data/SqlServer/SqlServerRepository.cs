@@ -368,7 +368,7 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         return rows.Select(FromRow).ToList();
     }
 
-    public async Task<IReadOnlyList<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<RepositoryQueryResult<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query:all+opts");
@@ -377,7 +377,8 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         await using var conn = Open();
         var sql = $"SELECT [Id], [Json] FROM [dbo].[{TableName}] {OrderByIdClause} OFFSET {offset} ROWS FETCH NEXT {limit} ROWS ONLY";
         var rows = await conn.QueryAsync<(string Id, string Json)>(sql);
-        return rows.Select(FromRow).ToList();
+        var items = rows.Select(FromRow).ToList();
+        return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
     }
 
     public async Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
@@ -466,7 +467,7 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         }
     }
 
-    public async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query:linq+opts");
@@ -482,12 +483,14 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
             var dyn = new DynamicParameters();
             for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
             var rows = await conn.QueryAsync<(string Id, string Json)>(sql, dyn);
-            return rows.Select(FromRow).ToList();
+            var items = rows.Select(FromRow).ToList();
+            return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
         }
         catch (NotSupportedException)
         {
-            var all = await Query((object?)null, options, ct);
-            return all.AsQueryable().Where(predicate).ToList();
+            var fallback = await Query((object?)null, options, ct);
+            var filtered = fallback.Items.AsQueryable().Where(predicate).ToList();
+            return RepositoryQueryResult<TEntity>.PaginatedOnly(filtered);
         }
     }
 
@@ -541,7 +544,7 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         }
     }
 
-    public async Task<IReadOnlyList<TEntity>> Query(string sql, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<RepositoryQueryResult<TEntity>> Query(string sql, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query:string+opts");
@@ -551,18 +554,20 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         {
             var rewritten = RewriteEntityToken(sql);
             var rows = await conn.QueryAsync(rewritten);
-            return MapRowsToEntities(rows);
+            var items = MapRowsToEntities(rows);
+            return RepositoryQueryResult<TEntity>.Unhandled(items);
         }
         else
         {
             var (offset, limit) = ComputeSkipTake(options);
             var whereSql = RewriteWhereForProjection(sql);
             var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT [Id], [Json] FROM [dbo].[{TableName}] WHERE " + whereSql + $" {OrderByIdClause} OFFSET {offset} ROWS FETCH NEXT {limit} ROWS ONLY");
-            return rows.Select(FromRow).ToList();
+            var items = rows.Select(FromRow).ToList();
+            return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
         }
     }
 
-    public async Task<IReadOnlyList<TEntity>> Query(string sql, object? parameters, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<RepositoryQueryResult<TEntity>> Query(string sql, object? parameters, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query:string:param+opts");
@@ -572,14 +577,16 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         {
             var rewritten = RewriteEntityToken(sql);
             var rows = await conn.QueryAsync(rewritten, parameters);
-            return MapRowsToEntities(rows);
+            var items = MapRowsToEntities(rows);
+            return RepositoryQueryResult<TEntity>.Unhandled(items);
         }
         else
         {
             var (offset, limit) = ComputeSkipTake(options);
             var whereSql = RewriteWhereForProjection(sql);
             var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT [Id], [Json] FROM [dbo].[{TableName}] WHERE " + whereSql + $" {OrderByIdClause} OFFSET {offset} ROWS FETCH NEXT {limit} ROWS ONLY", parameters);
-            return rows.Select(FromRow).ToList();
+            var items = rows.Select(FromRow).ToList();
+            return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
         }
     }
 

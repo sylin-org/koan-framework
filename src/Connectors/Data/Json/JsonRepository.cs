@@ -1,7 +1,10 @@
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Sorting;
+using Koan.Data.Core.Sorting;
 using System.Collections.Concurrent;
+using System.Collections.Frozen;
 using System.Linq.Expressions;
 
 namespace Koan.Data.Connector.Json;
@@ -77,16 +80,13 @@ internal sealed class JsonRepository<TEntity, TKey> :
         return Task.FromResult((IReadOnlyList<TEntity>)result);
     }
 
-    public Task<IReadOnlyList<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
+    public Task<RepositoryQueryResult<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var store = ResolveStore();
-        var items = store.Values.AsQueryable();
-        var size = options?.PageSize is int ps && ps > 0 ? ps : Math.Max(1, _options.Value.DefaultPageSize);
-        var page = options?.Page is int p && p > 1 ? p : 1;
-        var skip = (page - 1) * size;
-        var list = items.Skip(skip).Take(size).ToList();
-        return Task.FromResult((IReadOnlyList<TEntity>)list);
+        IEnumerable<TEntity> items = store.Values;
+        var totalCount = (long)store.Count;
+        return Task.FromResult(BuildResult(items, options, totalCount));
     }
 
     public Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
@@ -98,16 +98,47 @@ internal sealed class JsonRepository<TEntity, TKey> :
         return Task.FromResult((IReadOnlyList<TEntity>)list);
     }
 
-    public Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
+    public Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var store = ResolveStore();
-        var items = store.Values.AsQueryable().Where(predicate);
-        var size = options?.PageSize is int ps && ps > 0 ? ps : Math.Max(1, _options.Value.DefaultPageSize);
-        var page = options?.Page is int p && p > 1 ? p : 1;
-        var skip = (page - 1) * size;
-        var list = items.Skip(skip).Take(size).ToList();
-        return Task.FromResult((IReadOnlyList<TEntity>)list);
+        IEnumerable<TEntity> items = store.Values.AsQueryable().Where(predicate);
+        var totalCount = items.LongCount();
+        return Task.FromResult(BuildResult(items, options, totalCount));
+    }
+
+    private RepositoryQueryResult<TEntity> BuildResult(IEnumerable<TEntity> items, DataQueryOptions? options, long totalCount)
+    {
+        var sortHandled = RepositoryQueryResult<TEntity>.NoSortHandled;
+        if (options is { } o1 && o1.HasSort)
+        {
+            items = InMemorySorter.Apply(items, o1.Sort);
+            sortHandled = o1.Sort.ToFrozenSet();
+        }
+
+        var paginationHandled = false;
+        if (options is { } o2 && o2.HasPagination)
+        {
+            var skip = (o2.Page!.Value - 1) * o2.PageSize!.Value;
+            items = items.Skip(skip).Take(o2.PageSize.Value);
+            paginationHandled = true;
+        }
+        else
+        {
+            var size = options?.PageSize is int ps && ps > 0 ? ps : Math.Max(1, _options.Value.DefaultPageSize);
+            items = items.Take(size);
+            paginationHandled = false;
+        }
+
+        var list = items is IReadOnlyList<TEntity> ro ? ro : items.ToList();
+        return new RepositoryQueryResult<TEntity>
+        {
+            Items = list,
+            TotalCount = totalCount,
+            IsEstimate = false,
+            PaginationHandled = paginationHandled,
+            SortHandled = sortHandled,
+        };
     }
 
     public Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)

@@ -402,16 +402,17 @@ internal sealed class PostgresRepository<
         return rows.Select(FromRow).ToList();
     }
 
-    public async Task<IReadOnlyList<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<RepositoryQueryResult<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = PgTelemetry.Activity.StartActivity("pg.query:all+opts");
         act?.SetTag("entity", typeof(TEntity).FullName);
         var (offset, limit) = ComputeSkipTake(options);
         await using var conn = Open();
-    var sql = $"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} ORDER BY ctid LIMIT {limit} OFFSET {offset}";
+        var sql = $"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} ORDER BY ctid LIMIT {limit} OFFSET {offset}";
         var rows = await conn.QueryAsync<(string Id, string Json)>(sql);
-        return rows.Select(FromRow).ToList();
+        var items = rows.Select(FromRow).ToList();
+        return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
     }
 
     public async Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
@@ -510,7 +511,7 @@ internal sealed class PostgresRepository<
         }
     }
 
-    public async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = PgTelemetry.Activity.StartActivity("pg.query:linq+opts");
@@ -526,13 +527,15 @@ internal sealed class PostgresRepository<
             var dyn = new DynamicParameters();
             for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
             var rows = await conn.QueryAsync<(string Id, string Json)>(sql, dyn);
-            return rows.Select(FromRow).ToList();
+            var items = rows.Select(FromRow).ToList();
+            return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
         }
         catch (NotSupportedException)
         {
             var compiled = predicate.Compile();
-            var all = await Query((object?)null, options, ct);
-            return all.Where(compiled).ToList();
+            var fallback = await Query((object?)null, options, ct);
+            var filtered = fallback.Items.Where(compiled).ToList();
+            return RepositoryQueryResult<TEntity>.PaginatedOnly(filtered);
         }
     }
 
@@ -576,7 +579,7 @@ internal sealed class PostgresRepository<
         }
     }
 
-    public async Task<IReadOnlyList<TEntity>> Query(string sql, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<RepositoryQueryResult<TEntity>> Query(string sql, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = PgTelemetry.Activity.StartActivity("pg.query:string+opts");
@@ -586,18 +589,20 @@ internal sealed class PostgresRepository<
         {
             var rewritten = RewriteEntityToken(sql);
             var rows = await conn.QueryAsync(rewritten);
-            return MapRowsToEntities(rows);
+            var items = MapRowsToEntities(rows);
+            return RepositoryQueryResult<TEntity>.Unhandled(items);
         }
         else
         {
             var (offset, limit) = ComputeSkipTake(options);
             var whereSql = RewriteWhereForProjection(sql);
             var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE " + whereSql + $" ORDER BY ctid LIMIT {limit} OFFSET {offset}");
-            return rows.Select(FromRow).ToList();
+            var items = rows.Select(FromRow).ToList();
+            return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
         }
     }
 
-    public async Task<IReadOnlyList<TEntity>> Query(string sql, object? parameters, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<RepositoryQueryResult<TEntity>> Query(string sql, object? parameters, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = PgTelemetry.Activity.StartActivity("pg.query:string:param+opts");
@@ -607,14 +612,16 @@ internal sealed class PostgresRepository<
         {
             var rewritten = RewriteEntityToken(sql);
             var rows = await conn.QueryAsync(rewritten, parameters);
-            return MapRowsToEntities(rows);
+            var items = MapRowsToEntities(rows);
+            return RepositoryQueryResult<TEntity>.Unhandled(items);
         }
         else
         {
             var (offset, limit) = ComputeSkipTake(options);
             var whereSql = RewriteWhereForProjection(sql);
             var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE " + whereSql + $" ORDER BY ctid LIMIT {limit} OFFSET {offset}", parameters);
-            return rows.Select(FromRow).ToList();
+            var items = rows.Select(FromRow).ToList();
+            return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
         }
     }
 

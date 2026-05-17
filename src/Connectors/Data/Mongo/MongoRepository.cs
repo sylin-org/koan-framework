@@ -360,7 +360,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
             return (IReadOnlyList<TEntity>)results;
         }, ct);
 
-    public Task<IReadOnlyList<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
+    public Task<RepositoryQueryResult<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
         {
             ct.ThrowIfCancellationRequested();
@@ -375,13 +375,13 @@ internal sealed class MongoRepository<TEntity, TKey> :
                 (c, skip, take) => c.Skip(skip).Limit(take));
 
             var results = await cursor.ToListAsync(ct).ConfigureAwait(false);
-            return (IReadOnlyList<TEntity>)results;
+            return RepositoryQueryResult<TEntity>.PaginatedOnly((IReadOnlyList<TEntity>)results);
         }, ct);
 
     public Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
         => Query(predicate, null, ct);
 
-    public Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
+    public Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
         {
             ct.ThrowIfCancellationRequested();
@@ -395,7 +395,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
                     (c, skip, take) => c.Skip(skip).Limit(take));
 
             var results = await cursor.ToListAsync(ct).ConfigureAwait(false);
-            return (IReadOnlyList<TEntity>)results;
+            return RepositoryQueryResult<TEntity>.PaginatedOnly((IReadOnlyList<TEntity>)results);
         }, ct);
 
     public Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
