@@ -32,12 +32,10 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
     public async Task InitializeAsync()
     {
         if (!Factory.IsAvailable) return;
-        // Flow-scoped AppHost.Current override (replaces the per-class global mutation).
-        // The AggregateConfigs and EntitySchemaGuard caches still keyed by (Type,Type) without
-        // the IServiceProvider — that gets collapsed in Phase 1c. Until then we drain them
-        // explicitly to prevent stale-provider state across spec classes.
+        // Flow-scoped AppHost.Current override (Phase 1a). EntitySchemaGuard was deleted in
+        // Phase 1c.1 — adapters cache their own readiness state per-instance, so there's no
+        // process-wide cache to drain. AggregateConfigs.Reset() stays until Phase 1c.2.
         Koan.Data.Core.AggregateConfigs.Reset();
-        Koan.Data.Core.Schema.EntitySchemaGuard.ResetAll();
         _scope = AppHost.PushScope(Factory.Services);
         await Factory.ResetAsync();
 

@@ -10,7 +10,6 @@ using Koan.Cache.Abstractions.Stores;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Core;
-using Koan.Data.Core.Schema;
 using Microsoft.Extensions.Logging;
 
 namespace Koan.Cache.Decorators;
@@ -23,8 +22,7 @@ internal sealed class CachedRepository<TEntity, TKey> :
     IStringQueryRepositoryWithOptions<TEntity, TKey>,
     IQueryCapabilities,
     IWriteCapabilities,
-    IInstructionExecutor<TEntity>,
-    ISchemaHealthContributor<TEntity, TKey>
+    IInstructionExecutor<TEntity>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
@@ -34,7 +32,6 @@ internal sealed class CachedRepository<TEntity, TKey> :
     private readonly IStringQueryRepository<TEntity, TKey>? _stringQuery;
     private readonly IStringQueryRepositoryWithOptions<TEntity, TKey>? _stringQueryWithOptions;
     private readonly IInstructionExecutor<TEntity>? _instructionExecutor;
-    private readonly ISchemaHealthContributor<TEntity, TKey>? _schemaContributor;
     private readonly IQueryCapabilities? _queryCapabilitiesSource;
     private readonly IWriteCapabilities? _writeCapabilitiesSource;
     private readonly ICacheClient _cacheClient;
@@ -61,7 +58,6 @@ internal sealed class CachedRepository<TEntity, TKey> :
         _stringQuery = inner as IStringQueryRepository<TEntity, TKey>;
         _stringQueryWithOptions = inner as IStringQueryRepositoryWithOptions<TEntity, TKey>;
         _instructionExecutor = inner as IInstructionExecutor<TEntity>;
-        _schemaContributor = inner as ISchemaHealthContributor<TEntity, TKey>;
         _queryCapabilitiesSource = inner as IQueryCapabilities;
         _writeCapabilitiesSource = inner as IWriteCapabilities;
         _keyAccessor = static entity => ((IEntity<TKey>)entity).Id;
@@ -296,20 +292,7 @@ internal sealed class CachedRepository<TEntity, TKey> :
         return await _instructionExecutor.ExecuteAsync<TResult>(instruction, ct);
     }
 
-    public Task EnsureHealthy(CancellationToken ct)
-    {
-        if (_schemaContributor is null)
-        {
-            return Task.CompletedTask;
-        }
-
-        return _schemaContributor.EnsureHealthy(ct);
-    }
-
-    public void InvalidateHealth()
-    {
-        _schemaContributor?.InvalidateHealth();
-    }
+    public Task EnsureReady(CancellationToken ct = default) => _inner.EnsureReady(ct);
 
     private async ValueTask HandleWrite(IEnumerable<TEntity> entities, CancellationToken ct)
     {

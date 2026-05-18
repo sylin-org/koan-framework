@@ -1,6 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Abstractions;
-using Koan.Data.Core.Schema;
 using System.Collections.Concurrent;
 
 namespace Koan.Data.Core;
@@ -68,9 +67,8 @@ public sealed class AggregateConfig<TEntity, TKey>
             isInitialized.MarkInitialized();
 
             var manager = sp.GetRequiredService<IAggregateIdentityManager>();
-            var guard = sp.GetRequiredService<EntitySchemaGuard<TEntity, TKey>>();
             // Decorate with RepositoryFacade for cross-cutting concerns
-            return new RepositoryFacade<TEntity, TKey>(repo, manager, guard);
+            return new RepositoryFacade<TEntity, TKey>(repo, manager);
         }, LazyThreadSafetyMode.ExecutionAndPublication);
     }
 

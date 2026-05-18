@@ -13,7 +13,6 @@ using Koan.Data.Core;
 using Koan.Data.Core.Configuration;
 using Koan.Data.Core.Extensions;
 using Koan.Data.Core.Optimization;
-using Koan.Data.Core.Schema;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -32,8 +31,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
     IBulkDelete<TKey>,
     IInstructionExecutor<TEntity>,
     IAdapterReadiness,
-    IAdapterReadinessConfiguration,
-    ISchemaHealthContributor<TEntity, TKey>
+    IAdapterReadinessConfiguration
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
@@ -107,7 +105,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
     internal Task<TResult> ExecuteWithinReadinessAsync<TResult>(Func<Task<TResult>> operation, CancellationToken ct)
         => ExecuteWithReadinessAsync(operation, ct);
 
-    public async Task EnsureHealthy(CancellationToken ct)
+    public async Task EnsureReady(CancellationToken ct = default)
     {
         var collectionName = StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
         var collectionKey = BuildCollectionKey();
@@ -146,24 +144,12 @@ internal sealed class MongoRepository<TEntity, TKey> :
         }
     }
 
-    public void InvalidateHealth()
-    {
-        var collectionName = _collectionName;
-        var collectionKey = BuildCollectionKey();
-        _healthyCache.TryRemove(collectionKey, out _);
-
-        if (!string.IsNullOrWhiteSpace(collectionName))
-        {
-            _indexCache.TryRemove(BuildIndexKey(collectionName), out _);
-        }
-    }
-
     private async Task<IMongoCollection<TEntity>> GetCollection(CancellationToken ct)
     {
         var key = BuildCollectionKey();
         if (!_healthyCache.TryGetValue(key, out var healthy) || !healthy)
         {
-            await EnsureHealthy(ct).ConfigureAwait(false);
+            await EnsureReady(ct).ConfigureAwait(false);
         }
 
         return await GetCollectionCore(ct).ConfigureAwait(false);

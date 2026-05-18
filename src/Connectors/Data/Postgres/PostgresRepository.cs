@@ -11,7 +11,6 @@ using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Core;
 using Koan.Data.Core.Optimization;
-using Koan.Data.Core.Schema;
 using Koan.Data.Relational.Linq;
 using Koan.Data.Relational.Orchestration;
 using System.Diagnostics.CodeAnalysis;
@@ -33,8 +32,7 @@ internal sealed class PostgresRepository<
     IQueryCapabilities,
     IWriteCapabilities,
     IBulkDelete<TKey>,
-    IInstructionExecutor<TEntity>,
-    ISchemaHealthContributor<TEntity, TKey>
+    IInstructionExecutor<TEntity>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
@@ -200,7 +198,7 @@ internal sealed class PostgresRepository<
         }, ct);
     }
 
-    public async Task EnsureHealthy(CancellationToken ct)
+    public async Task EnsureReady(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var table = TableName;
@@ -213,20 +211,8 @@ internal sealed class PostgresRepository<
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Postgres ensure healthy failed for {Table}", table);
+            _logger.LogWarning(ex, "Postgres ensure ready failed for {Table}", table);
             throw;
-        }
-    }
-
-    public void InvalidateHealth()
-    {
-        var suffix = $"::{TableName}";
-        foreach (var key in _healthyCache.Keys)
-        {
-            if (key.EndsWith(suffix, StringComparison.Ordinal))
-            {
-                _healthyCache.TryRemove(key, out _);
-            }
         }
     }
 

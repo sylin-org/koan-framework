@@ -12,7 +12,6 @@ using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Core;
 using Koan.Data.Core.Optimization;
-using Koan.Data.Core.Schema;
 using Koan.Data.Relational.Linq;
 using Koan.Data.Relational.Orchestration;
 using System.Linq.Expressions;
@@ -32,8 +31,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
     IWriteCapabilities,
     IBulkUpsert<TKey>,
     IBulkDelete<TKey>,
-    IInstructionExecutor<TEntity>,
-    ISchemaHealthContributor<TEntity, TKey>
+    IInstructionExecutor<TEntity>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
@@ -193,7 +191,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         }, ct);
     }
 
-    public async Task EnsureHealthy(CancellationToken ct)
+    public async Task EnsureReady(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         await using var conn = new SqlConnection(_options.ConnectionString);
@@ -205,20 +203,8 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "SQL Server ensure healthy failed for {Table}", TableName);
+            _logger.LogWarning(ex, "SQL Server ensure ready failed for {Table}", TableName);
             throw;
-        }
-    }
-
-    public void InvalidateHealth()
-    {
-        var suffix = $"::{TableName}";
-        foreach (var key in _healthyCache.Keys)
-        {
-            if (key.EndsWith(suffix, StringComparison.Ordinal))
-            {
-                _healthyCache.TryRemove(key, out _);
-            }
         }
     }
 

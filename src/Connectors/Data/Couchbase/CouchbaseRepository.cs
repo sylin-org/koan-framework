@@ -19,7 +19,6 @@ using Koan.Data.Abstractions.Naming;
 using Koan.Data.Connector.Couchbase.Infrastructure;
 using Koan.Data.Core.Configuration;
 using Koan.Data.Core.Optimization;
-using Koan.Data.Core.Schema;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -37,8 +36,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
     IBulkDelete<TKey>,
     IInstructionExecutor<TEntity>,
     IAdapterReadiness,
-    IAdapterReadinessConfiguration,
-    ISchemaHealthContributor<TEntity, TKey>
+    IAdapterReadinessConfiguration
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
@@ -574,17 +572,12 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
     private static bool IsAlreadyExists(CouchbaseException ex)
         => ex.Context?.Message?.Contains("already exists", StringComparison.OrdinalIgnoreCase) == true;
 
-    public async Task EnsureHealthy(CancellationToken ct)
+    public async Task EnsureReady(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var collectionName = StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
         var ctx = await _provider.GetCollectionContext(collectionName, ct);
         await EnsureCollection(ctx, ct);
-    }
-
-    public void InvalidateHealth()
-    {
-        // No-op: collection health is verified on demand via the provider.
     }
 
     private async Task<IReadOnlyList<TEntity>> ExecuteQuery(CouchbaseCollectionContext ctx, string statement, CouchbaseQueryDefinition? definition, DataQueryOptions? options, CancellationToken ct)

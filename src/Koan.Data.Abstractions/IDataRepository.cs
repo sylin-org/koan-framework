@@ -6,6 +6,18 @@ namespace Koan.Data.Abstractions;
 
 public interface IDataRepository<TEntity, TKey> where TEntity : IEntity<TKey>
 {
+    /// <summary>
+    /// Idempotent. Ensures the backing store is provisioned and reachable. Called by the
+    /// repository facade before any data operation; adapters cache their own readiness state
+    /// (per-instance, naturally bounded to the current ServiceProvider's lifetime).
+    /// </summary>
+    /// <remarks>
+    /// Default implementation is a no-op. Adapters that need provisioning (relational schema,
+    /// Couchbase scope/collection, etc.) override and run their setup with whatever caching /
+    /// retry policy makes sense for them.
+    /// </remarks>
+    Task EnsureReady(CancellationToken ct = default) => Task.CompletedTask;
+
     Task<TEntity?> Get(TKey id, CancellationToken ct = default);
     Task<IReadOnlyList<TEntity?>> GetMany(IEnumerable<TKey> ids, CancellationToken ct = default);
     // Query is handled via the typed interfaces ILinqQueryRepositoryWithOptions and

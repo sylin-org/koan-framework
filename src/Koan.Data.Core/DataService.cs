@@ -2,7 +2,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Abstractions;
 using Koan.Data.Core.Configuration;
-using Koan.Data.Core.Schema;
 using System.Collections.Concurrent;
 
 namespace Koan.Data.Core;
@@ -42,10 +41,11 @@ public sealed class DataService(IServiceProvider sp) : IDataService
         // Create repository with source context
         var repo = factory.Create<TEntity, TKey>(sp, source);
 
-        // Wrap with facade for identity management and schema guard
+        // Wrap with facade for identity management.
+        // Schema readiness is the adapter's responsibility now (IDataRepository.EnsureReady);
+        // the facade calls it before every operation — no separate EntitySchemaGuard layer.
         var manager = sp.GetRequiredService<IAggregateIdentityManager>();
-        var guard = sp.GetRequiredService<EntitySchemaGuard<TEntity, TKey>>();
-        var facade = new RepositoryFacade<TEntity, TKey>(repo, manager, guard);
+        var facade = new RepositoryFacade<TEntity, TKey>(repo, manager);
 
         var decorated = ApplyDecorators(typeof(TEntity), typeof(TKey), facade, sp);
 

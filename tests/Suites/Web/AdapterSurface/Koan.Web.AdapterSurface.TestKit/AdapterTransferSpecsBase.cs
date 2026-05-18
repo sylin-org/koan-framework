@@ -33,9 +33,8 @@ public abstract class AdapterTransferSpecsBase<TFactory> : IClassFixture<TFactor
     public async Task InitializeAsync()
     {
         if (!Factory.IsAvailable) return;
-        // See AdapterSurfaceSpecsBase for the Phase 1a / Phase 1c rationale on these resets.
+        // See AdapterSurfaceSpecsBase for the Phase 1c rationale on this reset.
         Koan.Data.Core.AggregateConfigs.Reset();
-        Koan.Data.Core.Schema.EntitySchemaGuard.ResetAll();
         _scope = AppHost.PushScope(Factory.Services);
         await Factory.ResetAsync();
 

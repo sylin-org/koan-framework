@@ -17,7 +17,7 @@ namespace Koan.Core.Hosting.App;
 /// <para>
 /// This replaces the previous purely-static <c>Current</c> field, which forced test factories
 /// to overwrite a shared global and triggered cross-class pollution (the kind that needed
-/// <c>AggregateConfigs.Reset()</c> and <c>EntitySchemaGuard.ResetAll()</c> band-aids to fix).
+/// <c>AggregateConfigs.Reset()</c> band-aid to fix).
 /// </para>
 /// </remarks>
 public static class AppHost
