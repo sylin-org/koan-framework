@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Reflection;
 using Koan.Data.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
@@ -6,26 +7,23 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Koan.Data.Core.Optimization;
 
 /// <summary>
-/// Extensions for accessing storage optimization metadata via AggregateBag.
+/// Extensions for accessing storage optimization metadata.
 /// </summary>
 public static class StorageOptimizationExtensions
 {
-    private const string OptimizationBagKey = "StorageOptimization";
+    // Optimization analysis is a pure function of (TEntity, TKey) types — no SP dependence —
+    // so a static cache by type pair is safe regardless of how many service providers exist.
+    private static readonly ConcurrentDictionary<(Type, Type), StorageOptimizationInfo> Cache = new();
 
     /// <summary>
-    /// Gets storage optimization info for an entity type.
-    /// Uses AggregateBag for efficient caching - analysis happens once per entity type.
+    /// Gets storage optimization info for an entity type. Analysis runs once per (TEntity, TKey).
     /// </summary>
     public static StorageOptimizationInfo GetStorageOptimization<TEntity, TKey>(this IServiceProvider serviceProvider)
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
-        var result = AggregateBags.GetOrAdd<TEntity, TKey, StorageOptimizationInfo>(
-            serviceProvider,
-            OptimizationBagKey,
-            () => AnalyzeEntityOptimization<TEntity, TKey>());
-
-        return result;
+        _ = serviceProvider; // signature preserved for source compatibility; analysis is SP-independent
+        return Cache.GetOrAdd((typeof(TEntity), typeof(TKey)), _ => AnalyzeEntityOptimization<TEntity, TKey>());
     }
 
     /// <summary>

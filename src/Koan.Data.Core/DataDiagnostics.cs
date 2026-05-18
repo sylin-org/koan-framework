@@ -4,36 +4,23 @@ internal sealed class DataDiagnostics : IDataDiagnostics
 {
     public IReadOnlyList<EntityConfigInfo> GetEntityConfigsSnapshot()
     {
-        // We don’t have a public registry of all entities; inspect the constructed repos from IDataService’s cache if available.
-        // Fallback: scan AggregateConfigs cache via reflection.
+        // Reflect on AggregateConfigs.Cache (still the canonical discovery point for entities
+        // that have been resolved through Data<T,K>).
         var list = new List<EntityConfigInfo>();
-        var aggType = typeof(AggregateConfigs);
-        var cacheField = aggType.GetField("Cache", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        var cacheField = typeof(AggregateConfigs).GetField("Cache",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
         if (cacheField?.GetValue(null) is System.Collections.IDictionary dict)
         {
             foreach (System.Collections.DictionaryEntry de in dict)
             {
                 var key = ((Type, Type))de.Key!;
-                var cfg = de.Value;
-                var providerProp = cfg!.GetType().GetProperty("Provider", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                var idProp = cfg!.GetType().GetProperty("Id", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                var enumerateBags = cfg!.GetType().GetMethod("EnumerateBags", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                var cfg = de.Value!;
+                var providerProp = cfg.GetType().GetProperty("Provider");
+                var idProp = cfg.GetType().GetProperty("Id");
                 var provider = providerProp?.GetValue(cfg) as string ?? "";
                 var idSpec = idProp?.GetValue(cfg);
                 var idName = idSpec?.GetType().GetProperty("Prop")?.GetValue(idSpec)?.GetType().GetProperty("Name")?.GetValue(idSpec)?.ToString();
-                var bags = new List<(string Key, string Type)>();
-                if (enumerateBags is not null)
-                {
-                    var entries = (System.Collections.IEnumerable)enumerateBags.Invoke(cfg, [])!;
-                    foreach (var entry in entries)
-                    {
-                        var et = entry.GetType();
-                        var keyVal = et.GetField("Item1")?.GetValue(entry)?.ToString() ?? et.GetProperty("key")?.GetValue(entry)?.ToString() ?? "";
-                        var valObj = et.GetField("Item2")?.GetValue(entry) ?? et.GetProperty("value")?.GetValue(entry);
-                        bags.Add((keyVal, valObj?.GetType().FullName ?? "null"));
-                    }
-                }
-                list.Add(new EntityConfigInfo(key.Item1.FullName!, key.Item2.FullName!, provider, idName, bags));
+                list.Add(new EntityConfigInfo(key.Item1.FullName!, key.Item2.FullName!, provider, idName));
             }
         }
         return list;

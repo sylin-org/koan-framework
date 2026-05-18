@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
@@ -20,9 +21,8 @@ namespace Koan.Mcp.Schema;
 /// </summary>
 public sealed class SchemaBuilder
 {
-    private static readonly MethodInfo AggregateGetOrAdd = typeof(AggregateBags)
-        .GetMethods(BindingFlags.Public | BindingFlags.Static)
-        .Single(m => m.Name == nameof(AggregateBags.GetOrAdd) && m.GetGenericArguments().Length == 3);
+    // Schema synthesis is a pure function of (entity, key, bagKey) — cacheable globally.
+    private static readonly ConcurrentDictionary<(Type, Type, string), JsonObject> SchemaCache = new();
 
     private readonly IServiceProvider _services;
     private readonly ILogger<SchemaBuilder> _logger;
@@ -72,11 +72,7 @@ public sealed class SchemaBuilder
     }
 
     private JsonObject GetOrBuild(Type entityType, Type keyType, string bagKey, Func<JsonObject> factory)
-    {
-        var method = AggregateGetOrAdd.MakeGenericMethod(entityType, keyType, typeof(JsonObject));
-        var result = method.Invoke(null, new object[] { _services, bagKey, factory });
-        return (JsonObject)result!;
-    }
+        => SchemaCache.GetOrAdd((entityType, keyType, bagKey), _ => factory());
 
     private JsonObject BuildSchemaInternal(Type entityType, Type keyType, EntityEndpointDescriptor descriptor, EntityEndpointOperationDescriptor operation)
     {
