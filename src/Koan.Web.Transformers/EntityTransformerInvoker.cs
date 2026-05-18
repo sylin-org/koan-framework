@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.IO;
 using System.Linq;
@@ -10,6 +10,9 @@ internal sealed class EntityTransformerInvoker<TEntity, TShape>(IEntityTransform
 {
 
     public Type EntityType => typeof(TEntity);
+
+    public bool ShouldActivate(HttpContext context)
+        => inner is not ITransformerActivationPredicate gate || gate.ShouldActivate(context);
 
     public async Task<object?> Parse(Stream body, string contentType, HttpContext httpContext)
     {
