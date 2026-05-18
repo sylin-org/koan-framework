@@ -37,7 +37,8 @@ public class SqlServerCrudAndQueryTests : IClassFixture<Support.SqlServerAutoFix
 
 		await repo.UpsertMany(people, default);
 
-		var all = await repo.Query(null, default);
+		var all = (await ((ILinqQueryRepositoryWithOptions<Person, string>)repo)
+			.Query((System.Linq.Expressions.Expression<Func<Person, bool>>?)null, options: null, default)).Items;
 		all.Should().HaveCount(25);
 
 		var page = await linqRepo.Query(x => x.Age >= 20, default);
@@ -80,7 +81,8 @@ public class SqlServerCrudAndQueryTests : IClassFixture<Support.SqlServerAutoFix
 		var removedMany = await repo.DeleteMany(new[] { "2", "3" }, default);
 		removedMany.Should().Be(2);
 
-		var remaining = await repo.Query(null, default);
+		var remaining = (await ((ILinqQueryRepositoryWithOptions<Person, string>)repo)
+			.Query((System.Linq.Expressions.Expression<Func<Person, bool>>?)null, options: null, default)).Items;
 		remaining.Should().HaveCount(22);
 
 		var finalCount = await repo.Count(new CountRequest<Person>

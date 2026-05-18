@@ -557,7 +557,20 @@ public static class AddKoanGraphQlExtensions
                     }
                     else
                     {
-                        items = await repo.Query(null, ctx.RequestAborted);
+                        // Phase 1b: list-all goes through the typed-options interface.
+                        if (repo is ILinqQueryRepositoryWithOptions<TEntity, string> linqOpts)
+                        {
+                            var result = await linqOpts.Query((System.Linq.Expressions.Expression<Func<TEntity, bool>>?)null, options: null, ctx.RequestAborted);
+                            items = result.Items;
+                        }
+                        else if (repo is ILinqQueryRepository<TEntity, string> linqBasic)
+                        {
+                            items = await linqBasic.Query(_ => true, ctx.RequestAborted);
+                        }
+                        else
+                        {
+                            items = Array.Empty<TEntity>();
+                        }
                         try
                         {
                             var countRequest = new CountRequest<TEntity>();

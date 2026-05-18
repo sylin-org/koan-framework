@@ -74,7 +74,8 @@ public class SqlServerCountTests : IClassFixture<Support.SqlServerAutoFixture>
     await new CountTestEntity { Name = "Match2", Status = "Active" }.Save();
     await new CountTestEntity { Name = "NoMatch", Status = "Inactive" }.Save();
 
-    var all = await repo.Query(null, default);
+    var all = (await ((ILinqQueryRepositoryWithOptions<CountTestEntity, string>)repo)
+        .Query((System.Linq.Expressions.Expression<Func<CountTestEntity, bool>>?)null, options: null, default)).Items;
     all.Should().HaveCount(3);
     all.Count(x => x.Status == "Active").Should().Be(2);
 

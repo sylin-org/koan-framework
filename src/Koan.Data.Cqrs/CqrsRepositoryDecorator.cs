@@ -6,7 +6,7 @@ namespace Koan.Data.Cqrs;
 /// <summary>
 /// Implicit CQRS decorator: records generic events to outbox and optionally mirrors 1:1 to a read source.
 /// </summary>
-internal sealed class CqrsRepositoryDecorator<TEntity, TKey> : IDataRepository<TEntity, TKey>, IQueryCapabilities, IWriteCapabilities
+internal sealed class CqrsRepositoryDecorator<TEntity, TKey> : IDataRepository<TEntity, TKey>, ILinqQueryRepository<TEntity, TKey>, IQueryCapabilities, IWriteCapabilities
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
@@ -34,12 +34,6 @@ internal sealed class CqrsRepositoryDecorator<TEntity, TKey> : IDataRepository<T
     {
         var repo = _routing.GetReadRepository<TEntity, TKey>();
         return repo.GetMany(ids, ct);
-    }
-
-    public Task<IReadOnlyList<TEntity>> Query(object? query, CancellationToken ct = default)
-    {
-        var repo = _routing.GetReadRepository<TEntity, TKey>();
-        return repo.Query(query, ct);
     }
 
     public Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)

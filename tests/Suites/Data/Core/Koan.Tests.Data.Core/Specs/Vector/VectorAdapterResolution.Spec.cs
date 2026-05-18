@@ -135,7 +135,6 @@ public sealed class VectorAdapterResolutionSpec
         }
 
         public string Provider => _provider;
-        public string RepositorySeparator => "#";
 
         public bool CanHandle(string candidate) => string.Equals(candidate, _provider, StringComparison.OrdinalIgnoreCase);
 
@@ -144,11 +143,8 @@ public sealed class VectorAdapterResolutionSpec
             where TKey : notnull
             => new FakeVectorRepo<TEntity, TKey>(_provider);
 
-        public string GetStorageName(Type entityType, IServiceProvider services)
-            => entityType.Name;
-
-        public string GetConcretePartition(string partition)
-            => partition;
+        public string ResolveStorage(Type entityType, string? partition, IServiceProvider services)
+            => string.IsNullOrWhiteSpace(partition) ? entityType.Name : entityType.Name + "#" + partition.Trim();
     }
 
     [SourceAdapter("json")]
