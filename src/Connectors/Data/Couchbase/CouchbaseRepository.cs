@@ -251,7 +251,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
         ct.ThrowIfCancellationRequested();
 
         // Predicate path: the orchestrator forwards LINQ predicates as object? for any adapter
-        // that implements IDataRepositoryWithOptions. Route to QueryPredicate so ?filter= and
+        // that implements ILinqQueryRepositoryWithOptions. Route to QueryPredicate so ?filter= and
         // DELETE /?q= apply the predicate instead of silently returning the full set.
         if (query is Expression<Func<TEntity, bool>> predicate)
         {
