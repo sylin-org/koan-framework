@@ -71,4 +71,13 @@ public interface IVectorAdapterCapabilities
     /// Cosine-similarity adapters typically satisfy this; raw L2 distance does not.
     /// </summary>
     bool SupportsScoreNormalization => false;
+
+    /// <summary>
+    /// A successful Delete is immediately reflected in subsequent Search results from the same
+    /// caller. Most adapters satisfy this trivially. Milvus 2.4 REST is a known exception:
+    /// search runs against growing segments where filter-based deletes don't land until
+    /// segments seal, and the REST API exposes no flush/compact endpoint to force the issue.
+    /// Query (point-lookup) sees the delete immediately; Search (KNN) does not.
+    /// </summary>
+    bool SupportsDeleteImmediatelyVisibleToSearch => true;
 }

@@ -115,6 +115,10 @@ public abstract class VectorAdapterSurfaceSpecsBase<TFactory> : IClassFixture<TF
     [SkippableFact]
     public async Task Delete_removesVector_andIsAbsentFromSearch()
     {
+        Skip.If(!Factory.SupportsDeleteImmediatelyVisibleToSearch,
+            "Adapter does not guarantee a deleted vector is immediately invisible to KNN search " +
+            "(e.g. Milvus 2.4 REST has no flush/compact endpoint and search runs against growing " +
+            "segments where filter-based deletes lag).");
         SkipIfUnavailable();
 
         await Vector<TodoVector>.Save("v1", Embed("alpha", 1));

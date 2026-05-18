@@ -61,10 +61,15 @@ public sealed class MilvusVectorAdapterFactory : IVectorAdapterFactory
 
             if (string.IsNullOrEmpty(trimmed)) return name;
 
+            // Milvus collection names accept only letters / digits / underscores. The `#`
+            // separator the other Koan adapters use is rejected ("Invalid collection name").
+            // Use `_` instead — still unambiguous within the sanitized character set since
+            // SanitizeForMilvus already converts anything non-alphanum to `_` (so a partition
+            // value can't introduce ambiguity with the separator).
             var concrete = Guid.TryParse(trimmed, out var guid)
                 ? guid.ToString("N")
                 : SanitizeForMilvus(trimmed);
-            return name + "#" + concrete;
+            return name + "_" + concrete;
         });
     }
 

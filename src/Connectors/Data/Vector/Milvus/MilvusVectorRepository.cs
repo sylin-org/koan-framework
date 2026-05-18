@@ -1,9 +1,10 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
-
 using System.Globalization;
+using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using Microsoft.Extensions.Logging;
@@ -11,25 +12,38 @@ using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Koan.Data.Abstractions;
-using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Vector.Abstractions;
 using Koan.Data.Vector.Abstractions.Configuration;
 
 namespace Koan.Data.Vector.Connector.Milvus;
 
+/// <summary>
+/// Milvus 2.4 vector adapter. Targets the REST API surface under <c>/v2/vectordb/...</c>
+/// exclusively — the older <c>/v2/collections/*</c> + <c>/v2/vectors/*</c> paths (pre-2.4) are
+/// not supported.
+///
+/// <para>
+/// Per-CollectionName ensured-cache so one repo instance correctly serves multiple partitions
+/// (each <see cref="Koan.Data.Core.EntityContext.Partition"/> maps to its own collection name).
+/// Application-level errors are surfaced: Milvus reports many failures as HTTP 200 with a
+/// non-zero <c>code</c> in the JSON body, so HTTP-status checks alone aren't enough.
+/// </para>
+/// </summary>
 internal sealed class MilvusVectorRepository<TEntity, TKey> :
     IVectorSearchRepository<TEntity, TKey>,
-    IVectorCapabilities,
-    IInstructionExecutor<TEntity>
+    IVectorCapabilities
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
+    // Milvus's "success" code is sometimes 0 (entity ops, generic) and sometimes 200
+    // (collection ops in quick-setup responses). Both are OK; anything else is an error.
+    private static readonly HashSet<int> SuccessCodes = new() { 0, 200 };
+
     private readonly HttpClient _http;
     private readonly MilvusOptions _options;
     private readonly IServiceProvider _services;
     private readonly ILogger<MilvusVectorRepository<TEntity, TKey>>? _logger;
-    private volatile bool _collectionEnsured;
-    private int _discoveredDimension = -1;
+    private readonly ConcurrentDictionary<string, byte> _ensuredCollections = new(StringComparer.Ordinal);
 
     public MilvusVectorRepository(
         IHttpClientFactory httpFactory,
@@ -44,66 +58,78 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
     }
 
     public VectorCapabilities Capabilities =>
-        VectorCapabilities.Knn |
-        VectorCapabilities.Filters |
-        VectorCapabilities.BulkUpsert |
-        VectorCapabilities.BulkDelete |
-        VectorCapabilities.ScoreNormalization;
+        VectorCapabilities.Knn
+        | VectorCapabilities.Filters
+        | VectorCapabilities.BulkUpsert
+        | VectorCapabilities.BulkDelete
+        | VectorCapabilities.ScoreNormalization
+        | VectorCapabilities.DynamicCollections;
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // IVectorSearchRepository<TEntity, TKey>
+    // ─────────────────────────────────────────────────────────────────────────────
 
     public async Task VectorEnsureCreated(CancellationToken ct = default)
     {
-        var dimension = _discoveredDimension > 0 ? _discoveredDimension : _options.Dimension ?? -1;
+        var dimension = _options.Dimension ?? 0;
         if (dimension <= 0)
         {
-            throw new InvalidOperationException("Milvus vector dimension is unknown. Configure Koan:Data:Milvus:Dimension or upsert a vector to allow discovery.");
+            throw new InvalidOperationException(
+                "Milvus vector dimension is unknown. Configure Koan:Data:Milvus:Dimension " +
+                "(defaults to 1536 when unset) or call Upsert first to seed it.");
         }
-
         await EnsureCollection(dimension, ct);
     }
 
     public async Task Upsert(TKey id, float[] embedding, object? metadata = null, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(embedding);
-        if (embedding.Length == 0)
-        {
-            throw new ArgumentException("Embedding must contain values.", nameof(embedding));
-        }
+        if (embedding.Length == 0) throw new ArgumentException("Embedding must contain values.", nameof(embedding));
 
         using var _ = MilvusTelemetry.Activity.StartActivity("vector.upsert");
+        await EnsureCollection(embedding.Length, ct);
 
-        var dimension = EnsureDimension(embedding.Length);
-        await EnsureCollection(dimension, ct);
+        var row = BuildEntityRow(id, embedding, metadata);
+        var body = new JObject
+        {
+            ["dbName"] = _options.DatabaseName,
+            ["collectionName"] = CollectionName,
+            ["data"] = new JArray { row }
+        };
 
-        var payload = BuildUpsertBody(new[] { (id, embedding, metadata) });
-        var response = await _http.PostAsync("/v2/vectors/upsert", payload, ct);
-        await EnsureSuccess(response, "Milvus upsert", ct);
+        await PostAsync("/v2/vectordb/entities/upsert", body, "upsert", ct);
     }
 
     public async Task<int> UpsertMany(IEnumerable<(TKey Id, float[] Embedding, object? Metadata)> items, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(items);
+
         using var _ = MilvusTelemetry.Activity.StartActivity("vector.bulkUpsert");
-
         var list = items.ToList();
-        if (list.Count == 0)
-        {
-            return 0;
-        }
+        if (list.Count == 0) return 0;
 
-        var dimension = EnsureDimension(list[0].Embedding.Length);
+        var dimension = list[0].Embedding.Length;
         await EnsureCollection(dimension, ct);
 
+        var rows = new JArray();
         foreach (var item in list)
         {
             if (item.Embedding.Length != dimension)
             {
-                throw new InvalidOperationException($"Embedding dimension mismatch. Expected {dimension}, received {item.Embedding.Length}.");
+                throw new InvalidOperationException(
+                    $"Embedding dimension mismatch. Expected {dimension}, received {item.Embedding.Length}.");
             }
+            rows.Add(BuildEntityRow(item.Id, item.Embedding, item.Metadata));
         }
 
-        var payload = BuildUpsertBody(list.Select(i => (i.Id, i.Embedding, i.Metadata)));
-        var response = await _http.PostAsync("/v2/vectors/upsert", payload, ct);
-        await EnsureSuccess(response, "Milvus bulk upsert", ct);
+        var body = new JObject
+        {
+            ["dbName"] = _options.DatabaseName,
+            ["collectionName"] = CollectionName,
+            ["data"] = rows
+        };
+
+        await PostAsync("/v2/vectordb/entities/upsert", body, "bulk upsert", ct);
         return list.Count;
     }
 
@@ -112,11 +138,41 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
         using var _ = MilvusTelemetry.Activity.StartActivity("vector.delete");
         await EnsureCollectionInitialized(ct);
 
-        var expr = $"{_options.PrimaryFieldName} in [{FormatIdentifier(id)}]";
-        var payload = BuildDeleteBody(expr);
-        var response = await _http.PostAsync("/v2/vectors/delete", payload, ct);
-        await EnsureSuccess(response, "Milvus delete", ct, allowNotFound: true);
-        return response.StatusCode != HttpStatusCode.NotFound;
+        // Single-id delete uses `==` — `in [<id>]` has a Milvus 2.4 quirk where the delete
+        // can be silently dropped when target entities were upserted in separate requests
+        // rather than a single batch. The `==` operator goes through a different code path
+        // that handles non-sealed segments correctly. Bulk delete continues to use `in [...]`
+        // since `==` doesn't accept a list.
+        var filter = $"{_options.PrimaryFieldName} == {FormatIdentifier(id)}";
+
+        // Milvus REST delete returns 200 even when the id doesn't exist — no count or
+        // row-found indicator. To honour the IVectorSearchRepository contract
+        // (returns true iff the id was present) we pre-query. One extra round-trip per
+        // single delete; bulk delete skips this (returns a best-effort count).
+        var queryBody = new JObject
+        {
+            ["dbName"] = _options.DatabaseName,
+            ["collectionName"] = CollectionName,
+            ["filter"] = filter,
+            ["outputFields"] = new JArray(_options.PrimaryFieldName),
+            ["limit"] = 1
+        };
+        if (!string.IsNullOrWhiteSpace(_options.ConsistencyLevel))
+        {
+            queryBody["consistencyLevel"] = _options.ConsistencyLevel;
+        }
+        var queryResp = await PostAsync("/v2/vectordb/entities/query", queryBody, "delete pre-query", ct);
+        var exists = (queryResp["data"] as JArray)?.Count > 0;
+        if (!exists) return false;
+
+        var body = new JObject
+        {
+            ["dbName"] = _options.DatabaseName,
+            ["collectionName"] = CollectionName,
+            ["filter"] = filter
+        };
+        await PostAsync("/v2/vectordb/entities/delete", body, "delete", ct);
+        return true;
     }
 
     public async Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
@@ -126,15 +182,15 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
         await EnsureCollectionInitialized(ct);
 
         var list = ids.ToList();
-        if (list.Count == 0)
-        {
-            return 0;
-        }
+        if (list.Count == 0) return 0;
 
-        var expr = $"{_options.PrimaryFieldName} in [{string.Join(",", list.Select(FormatIdentifier))}]";
-        var payload = BuildDeleteBody(expr);
-        var response = await _http.PostAsync("/v2/vectors/delete", payload, ct);
-        await EnsureSuccess(response, "Milvus bulk delete", ct, allowNotFound: true);
+        var body = new JObject
+        {
+            ["dbName"] = _options.DatabaseName,
+            ["collectionName"] = CollectionName,
+            ["filter"] = BuildIdFilter(list)
+        };
+        await PostAsync("/v2/vectordb/entities/delete", body, "bulk delete", ct);
         return list.Count;
     }
 
@@ -147,211 +203,203 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
         }
 
         using var _ = MilvusTelemetry.Activity.StartActivity("vector.search");
+        await EnsureCollection(options.Query.Length, ct);
 
-        var dimension = EnsureDimension(options.Query.Length);
-        await EnsureCollection(dimension, ct);
+        var topK = Math.Max(1, options.TopK ?? _options.DefaultTopK);
+        var filter = MilvusFilterTranslator.Translate(options.Filter, _options.MetadataFieldName);
 
-        var topK = Math.Max(1, options.TopK ?? 10);
-        var request = BuildSearchBody(options, topK);
-        var response = await _http.PostAsync("/v2/vectors/search", request, ct);
-        var content = await EnsureSuccess(response, "Milvus search", ct);
+        // Milvus 2.4 search body:
+        //   - `data` is an ARRAY OF vectors (one or more queries in a batch)
+        //   - `annsField` names the vector column to search against
+        //   - `filter` is a string-expression metadata filter (renamed from `expr` in 2.3)
+        //
+        // The `new JArray { new JArray(values) }` shape matters: passing the inner JArray as a
+        // constructor argument would unroll because JArray is IEnumerable<JToken>.
+        var body = new JObject
+        {
+            ["dbName"] = _options.DatabaseName,
+            ["collectionName"] = CollectionName,
+            ["annsField"] = _options.VectorFieldName,
+            ["data"] = new JArray { new JArray(options.Query.Select(v => (double)v)) },
+            ["limit"] = topK,
+            ["outputFields"] = new JArray(_options.PrimaryFieldName, _options.MetadataFieldName)
+        };
+        if (!string.IsNullOrWhiteSpace(filter)) body["filter"] = filter;
+        if (options.Timeout is { } timeout) body["timeoutMs"] = (int)timeout.TotalMilliseconds;
+        // Per-search consistency — Milvus 2.4 reads default to Bounded even when the collection
+        // was created with a stronger level. Sending it on each read makes the configured level
+        // actually take effect.
+        if (!string.IsNullOrWhiteSpace(_options.ConsistencyLevel))
+        {
+            body["consistencyLevel"] = _options.ConsistencyLevel;
+        }
 
-        var parsed = string.IsNullOrWhiteSpace(content) ? new JObject() : JObject.Parse(content);
-        var results = parsed["results"] as JArray ?? new JArray();
+        var parsed = await PostAsync("/v2/vectordb/entities/search", body, "search", ct);
+        var results = parsed["data"] as JArray ?? new JArray();
+
         var matches = new List<VectorMatch<TKey>>(results.Count);
-
         foreach (var row in results.OfType<JObject>())
         {
             var idToken = row[_options.PrimaryFieldName] ?? row["id"];
-            if (idToken is null)
-            {
-                continue;
-            }
+            if (idToken is null) continue;
 
-            var id = ConvertId(idToken);
             var score = row.Value<double?>("score") ?? row.Value<double?>("distance") ?? 0d;
             var metadata = row[_options.MetadataFieldName]?.ToObject<object?>();
-            matches.Add(new VectorMatch<TKey>(id, score, metadata));
+            matches.Add(new VectorMatch<TKey>(ConvertId(idToken), score, metadata));
         }
 
-        var total = parsed["total"]?.Value<int?>();
-        var totalKind = total.HasValue ? VectorTotalKind.Estimated : VectorTotalKind.Unknown;
-
-        return new VectorQueryResult<TKey>(matches, ContinuationToken: null, totalKind);
+        return new VectorQueryResult<TKey>(matches, ContinuationToken: null, VectorTotalKind.Unknown);
     }
 
-    public async Task<TResult> ExecuteAsync<TResult>(Instruction instruction, CancellationToken ct = default)
+    public async Task Flush(CancellationToken ct = default)
     {
-        ArgumentNullException.ThrowIfNull(instruction);
+        using var activity = MilvusTelemetry.Activity.StartActivity("vector.flush");
 
-        if (string.Equals(instruction.Name, DataInstructions.EnsureCreated, StringComparison.OrdinalIgnoreCase))
-        {
-            await VectorEnsureCreated(ct);
-            return default!;
-        }
-
-        if (string.Equals(instruction.Name, DataInstructions.Clear, StringComparison.OrdinalIgnoreCase))
-        {
-            await Clear(ct);
-            return default!;
-        }
-
-        throw new NotSupportedException($"Instruction '{instruction.Name}' not supported by Milvus vector adapter.");
-    }
-
-    private HttpContent BuildUpsertBody(IEnumerable<(TKey Id, float[] Embedding, object? Metadata)> items)
-    {
-        var rows = new JArray();
-        foreach (var item in items)
-        {
-            var row = new JObject
-            {
-                [_options.PrimaryFieldName] = FormatIdentifierValue(item.Id),
-                [_options.VectorFieldName] = new JArray(item.Embedding.Select(v => (double)v))
-            };
-            if (item.Metadata is not null)
-            {
-                row[_options.MetadataFieldName] = JToken.FromObject(item.Metadata);
-            }
-            rows.Add(row);
-        }
-
+        var collectionName = CollectionName;
         var body = new JObject
         {
             ["dbName"] = _options.DatabaseName,
-            ["collectionName"] = CollectionName,
-            ["consistencyLevel"] = _options.ConsistencyLevel,
-            ["data"] = rows
+            ["collectionName"] = collectionName
         };
-
-        return new StringContent(body.ToString(Formatting.None), Encoding.UTF8, "application/json");
+        await PostAsync("/v2/vectordb/collections/drop", body, "flush", ct, allow404: true);
+        _ensuredCollections.TryRemove(collectionName, out _);
     }
 
-    private HttpContent BuildDeleteBody(string expression)
-    {
-        var body = new JObject
-        {
-            ["dbName"] = _options.DatabaseName,
-            ["collectionName"] = CollectionName,
-            ["expr"] = expression
-        };
-        return new StringContent(body.ToString(Formatting.None), Encoding.UTF8, "application/json");
-    }
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Collection management
+    // ─────────────────────────────────────────────────────────────────────────────
 
-    private HttpContent BuildSearchBody(VectorQueryOptions options, int topK)
-    {
-        var filter = MilvusFilterTranslator.Translate(options.Filter, _options.MetadataFieldName);
-        var body = new JObject
-        {
-            ["dbName"] = _options.DatabaseName,
-            ["collectionName"] = CollectionName,
-            ["vectorFieldName"] = _options.VectorFieldName,
-            ["vectors"] = new JArray(new JArray(options.Query.Select(v => (double)v))),
-            ["limit"] = topK,
-            ["metricType"] = _options.Metric,
-            ["outputFields"] = new JArray(_options.PrimaryFieldName, _options.MetadataFieldName)
-        };
-
-        if (!string.IsNullOrWhiteSpace(filter))
-        {
-            body["expr"] = filter;
-        }
-
-        if (options.Timeout is { } timeout)
-        {
-            body["timeoutMs"] = (int)timeout.TotalMilliseconds;
-        }
-
-        return new StringContent(body.ToString(Formatting.None), Encoding.UTF8, "application/json");
-    }
-
-    private async Task Clear(CancellationToken ct)
-    {
-        await EnsureCollectionInitialized(ct);
-        var payload = BuildDeleteBody("true");
-        var response = await _http.PostAsync("/v2/vectors/delete", payload, ct);
-        await EnsureSuccess(response, "Milvus clear", ct, allowNotFound: true);
-    }
+    private string CollectionName
+        => _options.CollectionName ?? VectorAdapterNaming.GetOrCompute<TEntity, TKey>(_services);
 
     private async Task EnsureCollectionInitialized(CancellationToken ct)
     {
-        if (_collectionEnsured)
-        {
-            return;
-        }
-
-        var dimension = _options.Dimension ?? _discoveredDimension;
-        if (dimension > 0)
-        {
-            await EnsureCollection(dimension, ct);
-        }
+        if (_ensuredCollections.ContainsKey(CollectionName)) return;
+        var dimension = _options.Dimension ?? 0;
+        if (dimension > 0) await EnsureCollection(dimension, ct);
     }
 
     private async Task EnsureCollection(int dimension, CancellationToken ct)
     {
-        if (_collectionEnsured)
-        {
-            return;
-        }
+        var collectionName = CollectionName;
+        if (_ensuredCollections.ContainsKey(collectionName)) return;
 
         using var _ = MilvusTelemetry.Activity.StartActivity("vector.collection.ensure");
 
-        if (await CollectionExists(ct))
+        if (await CollectionExists(collectionName, ct))
         {
-            _collectionEnsured = true;
+            _ensuredCollections[collectionName] = 0;
             return;
         }
 
         if (!_options.AutoCreateCollection)
         {
-            throw new InvalidOperationException($"Milvus collection '{CollectionName}' does not exist and auto creation is disabled.");
+            throw new InvalidOperationException(
+                $"Milvus collection '{collectionName}' does not exist and auto-creation is disabled.");
         }
 
+        // Milvus 2.4 "quick setup" body. For string-typed keys (TKey == string or Guid) we
+        // must set idType=VarChar + params.max_length; otherwise Milvus defaults to Int64
+        // and rejects every string id with a strconv.ParseInt error. The `params` field is
+        // typed map[string]string on the server side, so each value must be string-shaped
+        // even when it's logically a number.
+        var isStringKey = typeof(TKey) == typeof(string) || typeof(TKey) == typeof(Guid);
         var body = new JObject
         {
             ["dbName"] = _options.DatabaseName,
-            ["collectionName"] = CollectionName,
+            ["collectionName"] = collectionName,
             ["dimension"] = dimension,
             ["metricType"] = _options.Metric,
             ["primaryFieldName"] = _options.PrimaryFieldName,
-            ["vectorFieldName"] = _options.VectorFieldName,
-            ["metadataFieldName"] = _options.MetadataFieldName
+            ["vectorFieldName"] = _options.VectorFieldName
         };
+        if (isStringKey)
+        {
+            body["idType"] = "VarChar";
+            body["params"] = new JObject { ["max_length"] = "512" };
+        }
+        // Propagate the configured consistency level to the collection (default Bounded means
+        // reads-after-writes can lag, which breaks deterministic test expectations and most
+        // operational use cases). Setting it once at create time means every search and query
+        // against this collection inherits the level — no need to set it per-request.
+        if (!string.IsNullOrWhiteSpace(_options.ConsistencyLevel))
+        {
+            body["consistencyLevel"] = _options.ConsistencyLevel;
+        }
 
-        var response = await _http.PostAsync("/v2/collections/create", new StringContent(body.ToString(Formatting.None), Encoding.UTF8, "application/json"), ct);
-        await EnsureSuccess(response, "Milvus collection create", ct);
-        _collectionEnsured = true;
+        await PostAsync("/v2/vectordb/collections/create", body, "collection create", ct);
+        _ensuredCollections[collectionName] = 0;
     }
 
-    private async Task<bool> CollectionExists(CancellationToken ct)
+    private async Task<bool> CollectionExists(string collectionName, CancellationToken ct)
     {
-        var url = $"/v2/collections/{Uri.EscapeDataString(CollectionName)}?dbName={Uri.EscapeDataString(_options.DatabaseName)}";
-        var response = await _http.GetAsync(url, ct);
-        if (response.StatusCode == HttpStatusCode.NotFound)
+        var body = new JObject
         {
-            return false;
+            ["dbName"] = _options.DatabaseName,
+            ["collectionName"] = collectionName
+        };
+        var parsed = await PostAsync("/v2/vectordb/collections/has", body, "collection has", ct);
+        return parsed["data"]?["has"]?.Value<bool>() ?? false;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Internals
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    private JObject BuildEntityRow(TKey id, float[] embedding, object? metadata)
+    {
+        var row = new JObject
+        {
+            [_options.PrimaryFieldName] = FormatIdentifierValue(id),
+            [_options.VectorFieldName] = new JArray(embedding.Select(v => (double)v))
+        };
+        if (metadata is not null) row[_options.MetadataFieldName] = JToken.FromObject(metadata);
+        return row;
+    }
+
+    private string BuildIdFilter(IEnumerable<TKey> ids)
+    {
+        var formatted = string.Join(",", ids.Select(FormatIdentifier));
+        return $"{_options.PrimaryFieldName} in [{formatted}]";
+    }
+
+    /// <summary>
+    /// POST a JSON body and return the parsed response. Surfaces both HTTP-level failures
+    /// (4xx/5xx → throw) AND Milvus app-level failures (HTTP 200 + non-success <c>code</c>
+    /// in body → throw). When <paramref name="allow404"/> is set, a NotFound is treated as
+    /// a successful no-op and an empty <see cref="JObject"/> returned.
+    /// </summary>
+    private async Task<JObject> PostAsync(string path, JObject body, string operation, CancellationToken ct, bool allow404 = false)
+    {
+        var content = new StringContent(body.ToString(Formatting.None), Encoding.UTF8, "application/json");
+        var response = await _http.PostAsync(path, content, ct);
+        var responseBody = await response.Content.ReadAsStringAsync(ct);
+
+        if (allow404 && response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return new JObject();
         }
 
         if (!response.IsSuccessStatusCode)
         {
-            await EnsureSuccess(response, "Milvus collection describe", ct);
+            throw new InvalidOperationException(
+                $"Milvus {operation} failed: HTTP {(int)response.StatusCode} {response.ReasonPhrase} {responseBody}");
         }
 
-        return true;
-    }
+        if (string.IsNullOrWhiteSpace(responseBody)) return new JObject();
 
-    private string CollectionName
-        => _options.CollectionName ?? VectorAdapterNaming.GetOrCompute<TEntity, TKey>(_services);
+        JObject parsed;
+        try { parsed = JObject.Parse(responseBody); }
+        catch (JsonReaderException) { return new JObject(); }
 
-    private int EnsureDimension(int dimension)
-    {
-        if (_discoveredDimension > 0 && _discoveredDimension != dimension)
+        var code = parsed["code"]?.Value<int?>();
+        if (code is not null && !SuccessCodes.Contains(code.Value))
         {
-            _logger?.LogWarning("Milvus vector dimension changed from {Previous} to {Current}. Using latest value.", _discoveredDimension, dimension);
+            var message = parsed["message"]?.Value<string>() ?? responseBody;
+            throw new InvalidOperationException($"Milvus {operation} failed: code {code}: {message}");
         }
 
-        _discoveredDimension = dimension;
-        return dimension;
+        return parsed;
     }
 
     private void ConfigureHttpClient()
@@ -373,91 +421,37 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
         }
         else if (!string.IsNullOrEmpty(_options.Username))
         {
-            var token = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_options.Username}:{_options.Password ?? ""}"));
-            _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", token);
+            var creds = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_options.Username}:{_options.Password ?? ""}"));
+            _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", creds);
         }
     }
 
-    private async Task<string> EnsureSuccess(HttpResponseMessage response, string operation, CancellationToken ct, bool allowNotFound = false)
+    // Identifier normalization. Two shapes:
+    //   FormatIdentifier  → quoted string for use INSIDE a Milvus filter expression: `id in ["a","b"]`
+    //   FormatIdentifierValue → JValue for the JSON body's data row
+    private static string FormatIdentifier(TKey id)
     {
-        if (allowNotFound && response.StatusCode == HttpStatusCode.NotFound)
-        {
-            return "";
-        }
-
-        if (!response.IsSuccessStatusCode)
-        {
-            var failure = await response.Content.ReadAsStringAsync(ct);
-            throw new InvalidOperationException($"{operation} failed: {(int)response.StatusCode} {response.ReasonPhrase} {failure}");
-        }
-
-        return await response.Content.ReadAsStringAsync(ct);
+        if (id is string s) return Quote(s);
+        if (id is Guid g) return Quote(g.ToString("N", CultureInfo.InvariantCulture));
+        if (id is IFormattable f) return f.ToString(null, CultureInfo.InvariantCulture);
+        return Quote(id.ToString() ?? "");
     }
 
-    private string FormatIdentifier(TKey id)
+    private static JValue FormatIdentifierValue(TKey id)
     {
-        if (typeof(TKey) == typeof(string))
-        {
-            return FormatString((string)(object)id);
-        }
-
-        if (id is Guid guid)
-        {
-            return FormatString(guid.ToString("N", CultureInfo.InvariantCulture));
-        }
-
-        if (id is IFormattable formattable)
-        {
-            return formattable.ToString(null, CultureInfo.InvariantCulture);
-        }
-
-        return FormatString(id.ToString() ?? "");
-    }
-
-    private JValue FormatIdentifierValue(TKey id)
-    {
-        if (typeof(TKey) == typeof(string) || id is Guid)
-        {
-            return new JValue(NormalizeStringId(id));
-        }
-
-        if (id is IFormattable formattable)
-        {
-            return new JValue(formattable.ToString(null, CultureInfo.InvariantCulture));
-        }
-
+        if (id is string s) return new JValue(s);
+        if (id is Guid g) return new JValue(g.ToString("N", CultureInfo.InvariantCulture));
+        if (id is IFormattable f) return new JValue(f.ToString(null, CultureInfo.InvariantCulture));
         return new JValue(id.ToString());
     }
 
-    private string NormalizeStringId(TKey id)
-        => id switch
-        {
-            string s => s,
-            Guid guid => guid.ToString("N", CultureInfo.InvariantCulture),
-            _ => id.ToString() ?? ""
-        };
+    private static string Quote(string value) => $"\"{value.Replace("\"", "\\\"")}\"";
 
-    private string FormatString(string value)
-        => $"\"{value.Replace("\"", "\\\"")}\"";
-
-    private TKey ConvertId(JToken token)
+    private static TKey ConvertId(JToken token)
     {
-        if (typeof(TKey) == typeof(string))
-        {
-            return (TKey)(object)token.Value<string>()!;
-        }
-
-        if (typeof(TKey) == typeof(Guid))
-        {
-            return (TKey)(object)Guid.Parse(token.Value<string>()!);
-        }
-
-        if (typeof(TKey).IsEnum)
-        {
-            return (TKey)Enum.Parse(typeof(TKey), token.Value<string>()!, ignoreCase: true);
-        }
-
+        if (typeof(TKey) == typeof(string)) return (TKey)(object)token.Value<string>()!;
+        if (typeof(TKey) == typeof(Guid)) return (TKey)(object)Guid.Parse(token.Value<string>()!);
+        if (typeof(TKey).IsEnum) return (TKey)Enum.Parse(typeof(TKey), token.Value<string>()!, ignoreCase: true);
         return (TKey)Convert.ChangeType(token.Value<object>()!, typeof(TKey), CultureInfo.InvariantCulture);
     }
 }
-
