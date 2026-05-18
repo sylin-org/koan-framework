@@ -45,4 +45,13 @@ public interface INamingProvider
     /// - MongoDB:  "#" → "MyApp.Todo#6caab928-3952-48a1-ac60-b1d2a1245c9e"
     /// </summary>
     string RepositorySeparator { get; }
+
+    /// <summary>
+    /// When true, NamingComposer skips the partition-suffix step and returns just the storage
+    /// name; the adapter is responsible for reading the partition out of EntityContext and
+    /// applying it via a native isolation primitive (e.g. a Couchbase scope, a Mongo database,
+    /// a separate Postgres schema). Default false preserves the legacy "name#partition" model
+    /// that relational, file, and key-value adapters use.
+    /// </summary>
+    bool UsesNativePartitionContainer => false;
 }

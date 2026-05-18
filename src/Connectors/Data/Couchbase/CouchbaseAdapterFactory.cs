@@ -42,6 +42,12 @@ public sealed class CouchbaseAdapterFactory : IDataAdapterFactory
     // INamingProvider implementation
     public string RepositorySeparator => "#";
 
+    // Partitions in Couchbase map to scopes (a first-class isolation primitive), not to a name
+    // suffix. Returning true here tells NamingComposer to keep the collection name clean and
+    // lets CouchbaseClusterProvider.GetCollectionContext route EntityContext.Current.Partition
+    // into the scope position of bucket.scope.collection.
+    public bool UsesNativePartitionContainer => true;
+
     public string GetStorageName(Type entityType, IServiceProvider services)
     {
         var options = services.GetRequiredService<IOptions<CouchbaseOptions>>().Value;
@@ -68,8 +74,19 @@ public sealed class CouchbaseAdapterFactory : IDataAdapterFactory
 
     public string GetConcretePartition(string partition)
     {
-        // Couchbase: Pass-through (accepts most UTF-8 strings)
-        return partition;
+        // Couchbase scope and collection names accept alphanumeric, underscore, hyphen and
+        // percent only (max 30 chars). Replace anything else with '_' so partition values from
+        // upstream (GUIDs, dotted names, '#' suffixes) become valid identifiers.
+        if (string.IsNullOrEmpty(partition)) return partition;
+        var span = partition.AsSpan();
+        var sb = new System.Text.StringBuilder(span.Length);
+        for (int i = 0; i < span.Length; i++)
+        {
+            var c = span[i];
+            sb.Append(char.IsLetterOrDigit(c) || c == '_' || c == '-' || c == '%' ? c : '_');
+        }
+        var sanitized = sb.ToString();
+        return sanitized.Length <= 30 ? sanitized : sanitized[..30];
     }
 }
 

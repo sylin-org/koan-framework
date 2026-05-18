@@ -382,7 +382,22 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
         var options = _options.CurrentValue;
         var cluster = await EnsureCluster(options, ct);
         var bucket = await EnsureBucket(cluster, options, ct);
-        var scopeName = string.IsNullOrWhiteSpace(options.Scope) ? "_default" : options.Scope!;
+
+        // Partition routing: EntityContext.Current.Partition wins over CouchbaseOptions.Scope.
+        // The adapter advertises UsesNativePartitionContainer = true on its INamingProvider, so
+        // NamingComposer keeps the collection name clean. We map the partition onto the scope,
+        // which is Couchbase's native isolation primitive.
+        var partition = Koan.Data.Core.EntityContext.Current?.Partition;
+        string scopeName;
+        if (!string.IsNullOrWhiteSpace(partition))
+        {
+            scopeName = SanitizeIdentifier(partition);
+        }
+        else
+        {
+            scopeName = string.IsNullOrWhiteSpace(options.Scope) ? "_default" : options.Scope!;
+        }
+
         var scope = await GetScope(bucket, scopeName);
         var finalCollection = string.IsNullOrWhiteSpace(collectionName)
             ? (!string.IsNullOrWhiteSpace(options.Collection) ? options.Collection! : "_default")
@@ -393,6 +408,19 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
             _stateManager.TransitionTo(AdapterReadinessState.Ready);
         }
         return new CouchbaseCollectionContext(cluster, bucket, scope, collection, bucket.Name, scopeName, finalCollection);
+    }
+
+    private static string SanitizeIdentifier(string value)
+    {
+        // Mirror CouchbaseAdapterFactory.GetConcretePartition. Duplicated here so this code
+        // doesn't have to take a dependency on the factory; the rules come from Couchbase server.
+        var sb = new System.Text.StringBuilder(value.Length);
+        foreach (var c in value)
+        {
+            sb.Append(char.IsLetterOrDigit(c) || c == '_' || c == '-' || c == '%' ? c : '_');
+        }
+        var sanitized = sb.ToString();
+        return sanitized.Length <= 30 ? sanitized : sanitized[..30];
     }
 
     private async ValueTask<ICluster> EnsureCluster(CouchbaseOptions options, CancellationToken ct)

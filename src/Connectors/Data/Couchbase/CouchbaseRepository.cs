@@ -259,6 +259,15 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
     private async Task<IReadOnlyList<TEntity>> QueryInternal(object? query, DataQueryOptions? options, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
+
+        // Predicate path: the orchestrator forwards LINQ predicates as object? for any adapter
+        // that implements IDataRepositoryWithOptions. Route to QueryPredicate so ?filter= and
+        // DELETE /?q= apply the predicate instead of silently returning the full set.
+        if (query is Expression<Func<TEntity, bool>> predicate)
+        {
+            return await QueryPredicate(predicate, options, ct);
+        }
+
         var ctx = await ResolveCollection(ct);
         var definition = query switch
         {

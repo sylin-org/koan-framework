@@ -36,6 +36,12 @@ public static class NamingComposer
         if (string.IsNullOrEmpty(trimmedPartition))
             return storageName;
 
+        // Some providers handle partitioning through a native container (Couchbase scope,
+        // future Mongo database-per-partition, etc.). Skip the suffix composition so the
+        // storage name stays clean and the adapter can route partition via its own primitive.
+        if (provider.UsesNativePartitionContainer)
+            return storageName;
+
         // Compose with partition
         var concretePartition = provider.GetConcretePartition(trimmedPartition).Trim();
         return storageName + provider.RepositorySeparator + concretePartition;
