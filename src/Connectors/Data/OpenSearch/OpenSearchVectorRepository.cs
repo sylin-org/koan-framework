@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -28,7 +29,10 @@ internal sealed class OpenSearchVectorRepository<TEntity, TKey> :
     private readonly OpenSearchOptions _options;
     private readonly IServiceProvider _services;
     private readonly ILogger<OpenSearchVectorRepository<TEntity, TKey>>? _logger;
-    private volatile bool _indexEnsured;
+    // Keyed by IndexName — one repo instance serves multiple partitions/storage names, so a
+    // single bool would short-circuit EnsureIndex after the first partition is created. Per-
+    // IndexName tracking is the only correct shape (same fix as Elasticsearch).
+    private readonly ConcurrentDictionary<string, byte> _ensuredIndexes = new(StringComparer.Ordinal);
     private int _discoveredDimension = -1;
 
     public OpenSearchVectorRepository(
@@ -294,23 +298,20 @@ internal sealed class OpenSearchVectorRepository<TEntity, TKey> :
 
     private JObject BuildSearchRequest(VectorQueryOptions options, int topK)
     {
-        var request = new JObject
+        // OpenSearch 2.x KNN query shape (differs from Elasticsearch's 8.x):
+        //   { "query": { "knn": { "<field>": { "vector": [...], "k": N, "filter"?: {...} } } } }
+        // Elasticsearch's top-level "knn" with "field"/"query_vector" is rejected by OS with
+        // "Unknown key for a START_OBJECT in [knn]".
+        var knnFieldBody = new JObject
         {
-            ["size"] = topK,
-            ["knn"] = new JObject
-            {
-                ["field"] = _options.VectorField,
-                ["query_vector"] = new JArray(options.Query.Select(v => (double)v)),
-                ["k"] = topK,
-                ["num_candidates"] = Math.Max(topK, topK * 2)
-            },
-            ["_source"] = new JArray(_options.MetadataField, _options.IdField)
+            ["vector"] = new JArray(options.Query.Select(v => (double)v)),
+            ["k"] = topK
         };
 
         var filter = OpenSearchFilterTranslator.TranslateWhereClause(options.Filter);
         if (filter is not null)
         {
-            request["query"] = new JObject
+            knnFieldBody["filter"] = new JObject
             {
                 ["bool"] = new JObject
                 {
@@ -319,12 +320,47 @@ internal sealed class OpenSearchVectorRepository<TEntity, TKey> :
             };
         }
 
+        var request = new JObject
+        {
+            ["size"] = topK,
+            ["query"] = new JObject
+            {
+                ["knn"] = new JObject
+                {
+                    [_options.VectorField] = knnFieldBody
+                }
+            },
+            ["_source"] = new JArray(_options.MetadataField, _options.IdField)
+        };
+
         if (options.Timeout is { } timeout)
         {
             request["timeout"] = $"{(int)timeout.TotalMilliseconds}ms";
         }
 
         return request;
+    }
+
+    /// <summary>
+    /// Drop the underlying index entirely. Next operation re-creates it lazily with the proper
+    /// knn_vector mapping. Invalidates the per-IndexName ensured-cache.
+    /// </summary>
+    public async Task Flush(CancellationToken ct = default)
+    {
+        using var activity = OpenSearchTelemetry.Activity.StartActivity("vector.flush");
+
+        var indexName = IndexName;
+        var url = $"/{Uri.EscapeDataString(indexName)}";
+        var resp = await _http.DeleteAsync(url, ct);
+
+        // 404 → no-op
+        if (!resp.IsSuccessStatusCode && resp.StatusCode != HttpStatusCode.NotFound)
+        {
+            var body = await resp.Content.ReadAsStringAsync(ct);
+            throw new InvalidOperationException($"OpenSearch flush failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {body}");
+        }
+
+        _ensuredIndexes.TryRemove(indexName, out _);
     }
 
     private async Task Clear(CancellationToken ct)
@@ -349,7 +385,7 @@ internal sealed class OpenSearchVectorRepository<TEntity, TKey> :
 
     private async Task EnsureIndexInitialized(CancellationToken ct)
     {
-        if (_indexEnsured)
+        if (_ensuredIndexes.ContainsKey(IndexName))
         {
             return;
         }
@@ -363,32 +399,37 @@ internal sealed class OpenSearchVectorRepository<TEntity, TKey> :
 
     private async Task EnsureIndex(int dimension, CancellationToken ct)
     {
-        if (_indexEnsured)
+        var indexName = IndexName;
+        if (_ensuredIndexes.ContainsKey(indexName))
         {
             return;
         }
 
         using var _ = OpenSearchTelemetry.Activity.StartActivity("vector.index.ensureCreated");
 
-        var url = $"/{Uri.EscapeDataString(IndexName)}";
+        var url = $"/{Uri.EscapeDataString(indexName)}";
         var probe = await _http.GetAsync(url, ct);
         if (probe.IsSuccessStatusCode)
         {
-            _indexEnsured = true;
+            _ensuredIndexes[indexName] = 0;
             return;
         }
 
         if (_options.DisableIndexAutoCreate)
         {
-            throw new InvalidOperationException($"OpenSearch index '{IndexName}' does not exist and auto creation is disabled.");
+            throw new InvalidOperationException($"OpenSearch index '{indexName}' does not exist and auto creation is disabled.");
         }
 
+        // OpenSearch 2.x KNN index requires `index.knn = true` in settings and `knn_vector`
+        // field type with a method config (engine + space_type). This differs sharply from
+        // Elasticsearch's `dense_vector` + top-level `similarity` model.
         var body = new JObject
         {
             ["settings"] = new JObject
             {
                 ["index"] = new JObject
                 {
+                    ["knn"] = true,
                     ["number_of_shards"] = 1,
                     ["number_of_replicas"] = 0
                 }
@@ -400,10 +441,14 @@ internal sealed class OpenSearchVectorRepository<TEntity, TKey> :
                     [_options.IdField] = new JObject { ["type"] = "keyword" },
                     [_options.VectorField] = new JObject
                     {
-                        ["type"] = "dense_vector",
-                        ["dims"] = dimension,
-                        ["index"] = true,
-                        ["similarity"] = _options.SimilarityMetric
+                        ["type"] = "knn_vector",
+                        ["dimension"] = dimension,
+                        ["method"] = new JObject
+                        {
+                            ["name"] = "hnsw",
+                            ["engine"] = "lucene",
+                            ["space_type"] = MapSpaceType(_options.SimilarityMetric)
+                        }
                     },
                     [_options.MetadataField] = new JObject { ["type"] = "object", ["dynamic"] = true }
                 }
@@ -417,8 +462,24 @@ internal sealed class OpenSearchVectorRepository<TEntity, TKey> :
             throw new InvalidOperationException($"OpenSearch index creation failed: {(int)create.StatusCode} {create.ReasonPhrase} {text}");
         }
 
-        _indexEnsured = true;
+        _ensuredIndexes[indexName] = 0;
     }
+
+    /// <summary>
+    /// Map the cross-provider similarity metric token onto OpenSearch's KNN space_type values.
+    /// OS supports: l2, cosinesimil, innerproduct, l1, linf, hamming, hammingbit. The framework's
+    /// Options field accepts the Elasticsearch-friendly tokens ("cosine", "l2", "dotproduct")
+    /// so adapters look the same to users; we translate at the API boundary.
+    /// </summary>
+    private static string MapSpaceType(string metric) => metric?.ToLowerInvariant() switch
+    {
+        "cosine" or "cosinesimil" => "cosinesimil",
+        "l2" or "euclidean"        => "l2",
+        "dot" or "dotproduct" or "innerproduct" => "innerproduct",
+        "l1"                       => "l1",
+        "linf"                     => "linf",
+        _                          => "cosinesimil"
+    };
 
     private string IndexName
     {
