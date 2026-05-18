@@ -31,6 +31,11 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
     public async Task InitializeAsync()
     {
         if (!Factory.IsAvailable) return;
+        // Drop the process-wide AggregateConfigs static cache and any cached provisioning state
+        // before binding AppHost.Current. Each spec class spins up a fresh WebApplicationFactory
+        // with a new ServiceProvider; the static caches outlive that and pin earlier providers.
+        Koan.Data.Core.AggregateConfigs.Reset();
+        Koan.Data.Core.Schema.EntitySchemaGuard.ResetAll();
         AppHost.Current = Factory.Services;
         await Factory.ResetAsync();
 

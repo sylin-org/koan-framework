@@ -31,12 +31,12 @@ public abstract class AdapterPartitionSpecsBase<TFactory> : IClassFixture<TFacto
     public async Task InitializeAsync()
     {
         if (!Factory.IsAvailable) return;
-        // Drop the process-wide AggregateConfigs static cache before binding AppHost.Current.
-        // Each spec class gets its own WebApplicationFactory<Program> with a fresh ServiceProvider,
-        // but the static cache holds references to the first provider that ran. Clearing here
-        // forces a fresh AggregateConfig per spec class so partition-name resolution doesn't
-        // resolve against a stale provider.
+        // Drop the process-wide AggregateConfigs static cache and any cached provisioning state
+        // before binding AppHost.Current. Each spec class gets its own WebApplicationFactory<Program>
+        // with a fresh ServiceProvider, but the static caches hold references to the first provider
+        // that ran and persist failed-provisioning state for 5 minutes — both block subsequent specs.
         Koan.Data.Core.AggregateConfigs.Reset();
+        Koan.Data.Core.Schema.EntitySchemaGuard.ResetAll();
         AppHost.Current = Factory.Services;
         await Factory.ResetAsync();
 
