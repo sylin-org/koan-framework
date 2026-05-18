@@ -31,6 +31,8 @@ namespace Koan.Data.Connector.ElasticSearch;
     LocalScheme = "http", LocalHost = "localhost", LocalPort = 9200, LocalPattern = "http://{host}:{port}")]
 public sealed class ElasticSearchVectorAdapterFactory : IVectorAdapterFactory
 {
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<(Type, string?), string> _nameCache = new();
+
     public string Provider => "elasticsearch";
 
     public bool CanHandle(string provider)
@@ -48,29 +50,27 @@ public sealed class ElasticSearchVectorAdapterFactory : IVectorAdapterFactory
         return new ElasticSearchVectorRepository<TEntity, TKey>(httpFactory, options, sp);
     }
 
-    // INamingProvider implementation
-    public string RepositorySeparator => "-";  // Elasticsearch uses hyphens in index names
-
-    public string GetStorageName(Type entityType, IServiceProvider services)
+    public string ResolveStorage(Type entityType, string? partition, IServiceProvider services)
     {
-        var opts = services.GetService<IOptions<ElasticSearchOptions>>()?.Value;
-        var separator = opts?.IndexPrefix is not null ? "-" : "_";
-        var convention = new StorageNameResolver.Convention(
-            StorageNamingStyle.EntityType,
-            separator,
-            NameCasing.Lower);
+        var trimmed = partition?.Trim();
+        var cacheKey = (entityType, string.IsNullOrEmpty(trimmed) ? null : trimmed);
+        return _nameCache.GetOrAdd(cacheKey, _ =>
+        {
+            var opts = services.GetService<IOptions<ElasticSearchOptions>>()?.Value;
+            var separator = opts?.IndexPrefix is not null ? "-" : "_";
+            var convention = new StorageNameResolver.Convention(
+                StorageNamingStyle.EntityType,
+                separator,
+                NameCasing.Lower);
+            var name = StorageNameResolver.Resolve(entityType, convention).Trim();
 
-        return StorageNameResolver.Resolve(entityType, convention);
-    }
+            if (string.IsNullOrEmpty(trimmed)) return name;
 
-    public string GetConcretePartition(string partition)
-    {
-        // Elasticsearch: Lowercase and sanitize for index names
-        if (Guid.TryParse(partition, out var guid))
-            return guid.ToString("N");  // Lowercase, no hyphens
-
-        // Named partitions: lowercase
-        return partition.ToLowerInvariant();
+            var concrete = Guid.TryParse(trimmed, out var guid)
+                ? guid.ToString("N")
+                : trimmed.ToLowerInvariant();
+            return name + "-" + concrete;
+        });
     }
 }
 

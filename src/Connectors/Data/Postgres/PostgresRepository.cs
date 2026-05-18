@@ -86,7 +86,7 @@ internal sealed class PostgresRepository<
         }
     }
 
-    private string TableName => Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
+    private string TableName => Core.Configuration.AdapterNaming.GetOrCompute<TEntity, TKey>(_sp);
     private string QualifiedTable => (_options.SearchPath is { Length: > 0 } sp ? $"\"{sp}\"." : "") + "\"" + TableName.Replace("\"", "\"\"") + "\"";
 
     /// <summary>

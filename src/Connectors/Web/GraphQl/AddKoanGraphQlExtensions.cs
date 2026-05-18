@@ -372,25 +372,19 @@ public static class AddKoanGraphQlExtensions
         var allFactories = dataFactories.Concat(vectorFactories);
         var namingProvider = allFactories.FirstOrDefault(p => string.Equals(p.Provider, provider, StringComparison.OrdinalIgnoreCase));
 
-        string baseName;
         if (namingProvider != null)
         {
-            // Use adapter's naming provider
-            baseName = namingProvider.GetStorageName(entityType, sp);
-        }
-        else
-        {
-            // Fallback to default naming conventions
-            var diResolver = sp.GetService<IStorageNameResolver>() ?? new DefaultStorageNameResolver();
-            var fallback = sp.GetService<Microsoft.Extensions.Options.IOptions<Koan.Data.Core.Naming.NamingFallbackOptions>>()?.Value;
-            var convention = fallback is not null
-                ? new StorageNameResolver.Convention(fallback.Style, fallback.Separator, fallback.Casing)
-                : new StorageNameResolver.Convention(StorageNamingStyle.EntityType, ".", NameCasing.AsIs);
-            baseName = StorageNameResolver.Resolve(entityType, convention);
+            // Adapter owns naming — request with no partition so we get the unsuffixed base.
+            return namingProvider.ResolveStorage(entityType, partition: null, sp);
         }
 
-        // Ignore partition suffix for type/field names
-        return baseName.Split('#')[0].Split(namingProvider?.RepositorySeparator ?? "#")[0];
+        // Fallback to default naming conventions
+        var diResolver = sp.GetService<IStorageNameResolver>() ?? new DefaultStorageNameResolver();
+        var fallback = sp.GetService<Microsoft.Extensions.Options.IOptions<Koan.Data.Core.Naming.NamingFallbackOptions>>()?.Value;
+        var convention = fallback is not null
+            ? new StorageNameResolver.Convention(fallback.Style, fallback.Separator, fallback.Casing)
+            : new StorageNameResolver.Convention(StorageNamingStyle.EntityType, ".", NameCasing.AsIs);
+        return StorageNameResolver.Resolve(entityType, convention);
     }
 
     private static string ResolveStorageNameFactory(Type entityType)

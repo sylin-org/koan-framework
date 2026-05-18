@@ -35,7 +35,7 @@ internal sealed class RedisRepository<TEntity, TKey> :
         var sp = Koan.Core.Hosting.App.AppHost.Current;
         if (sp is not null)
         {
-            return Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(sp);
+            return Core.Configuration.AdapterNaming.GetOrCompute<TEntity, TKey>(sp);
         }
         return typeof(TEntity).Name;
     }

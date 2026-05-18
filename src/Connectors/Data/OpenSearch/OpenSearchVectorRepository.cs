@@ -429,7 +429,7 @@ internal sealed class OpenSearchVectorRepository<TEntity, TKey> :
                 return _options.IndexName!;
             }
 
-            var baseName = VectorStorageNameRegistry.GetOrCompute<TEntity, TKey>(_services);
+            var baseName = VectorAdapterNaming.GetOrCompute<TEntity, TKey>(_services);
             baseName = baseName.Replace('#', '-').Replace('.', '-').ToLowerInvariant();
             if (!string.IsNullOrEmpty(_options.IndexPrefix))
             {

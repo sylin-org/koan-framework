@@ -23,6 +23,8 @@ namespace Koan.Data.Connector.Postgres;
     LocalScheme = "postgres", LocalHost = "localhost", LocalPort = 5432, LocalPattern = "postgres://{host}:{port}")]
 public sealed class PostgresAdapterFactory : IDataAdapterFactory
 {
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<(System.Type, string?), string> _nameCache = new();
+
     public string Provider => "postgres";
 
     public bool CanHandle(string provider)
@@ -75,28 +77,27 @@ public sealed class PostgresAdapterFactory : IDataAdapterFactory
         return new PostgresRepository<TEntity, TKey>(sp, sourceOpts, resolver);
     }
 
-    // INamingProvider implementation
-    public string RepositorySeparator => "#";
-
-    public string GetStorageName(Type entityType, IServiceProvider services)
+    public string ResolveStorage(Type entityType, string? partition, IServiceProvider services)
     {
-        var opts = services.GetRequiredService<IOptions<PostgresOptions>>().Value;
-        var convention = new StorageNameResolver.Convention(
-            opts.NamingStyle,
-            opts.Separator,
-            NameCasing.AsIs);
+        var trimmed = partition?.Trim();
+        var cacheKey = (entityType, string.IsNullOrEmpty(trimmed) ? null : trimmed);
+        return _nameCache.GetOrAdd(cacheKey, _ =>
+        {
+            var opts = services.GetRequiredService<IOptions<PostgresOptions>>().Value;
+            var convention = new StorageNameResolver.Convention(
+                opts.NamingStyle,
+                opts.Separator,
+                NameCasing.AsIs);
+            var name = StorageNameResolver.Resolve(entityType, convention).Trim();
 
-        return StorageNameResolver.Resolve(entityType, convention);
-    }
+            if (string.IsNullOrEmpty(trimmed)) return name;
 
-    public string GetConcretePartition(string partition)
-    {
-        // Postgres: Remove hyphens from GUIDs, lowercase
-        if (Guid.TryParse(partition, out var guid))
-            return guid.ToString("N");  // N format = no hyphens, lowercase
-
-        // Named partitions: lowercase for Postgres convention
-        return partition.ToLowerInvariant();
+            // Postgres: GUID partitions → "N" format; named partitions → lowercase.
+            var concrete = Guid.TryParse(trimmed, out var guid)
+                ? guid.ToString("N")
+                : trimmed.ToLowerInvariant();
+            return name + "#" + concrete;
+        });
     }
 }
 

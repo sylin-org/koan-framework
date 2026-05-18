@@ -69,7 +69,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
         _logger = sp.GetService<ILogger<CouchbaseRepository<TEntity, TKey>>>();
         _options = options.Value;
         _optimizationInfo = sp.GetStorageOptimization<TEntity, TKey>();
-        _collectionName = StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
+        _collectionName = AdapterNaming.GetOrCompute<TEntity, TKey>(_sp);
         ArgumentNullException.ThrowIfNull(resolver);
 
         if (!string.IsNullOrWhiteSpace(_options.DurabilityLevel))
@@ -111,7 +111,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
 
     private async ValueTask<CouchbaseCollectionContext> ResolveCollection(CancellationToken ct)
     {
-        var desired = StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
+        var desired = AdapterNaming.GetOrCompute<TEntity, TKey>(_sp);
         if (!string.Equals(_collectionName, desired, StringComparison.Ordinal))
         {
             _collectionName = desired;
@@ -575,7 +575,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
     public async Task EnsureReady(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        var collectionName = StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
+        var collectionName = AdapterNaming.GetOrCompute<TEntity, TKey>(_sp);
         var ctx = await _provider.GetCollectionContext(collectionName, ct);
         await EnsureCollection(ctx, ct);
     }

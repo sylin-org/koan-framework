@@ -59,7 +59,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
         _ = nameResolver; // ensure resolver is materialized for convention overrides
         _logger = sp.GetService<ILogger<MongoRepository<TEntity, TKey>>>();
         _optimizationInfo = sp.GetStorageOptimization<TEntity, TKey>();
-        _collectionName = StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
+        _collectionName = AdapterNaming.GetOrCompute<TEntity, TKey>(_sp);
     }
 
     public QueryCapabilities Capabilities => QueryCapabilities.Linq;
@@ -107,7 +107,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
 
     public async Task EnsureReady(CancellationToken ct = default)
     {
-        var collectionName = StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
+        var collectionName = AdapterNaming.GetOrCompute<TEntity, TKey>(_sp);
         var collectionKey = BuildCollectionKey();
         var schemaLock = GetSchemaLock(collectionKey);
 
@@ -157,7 +157,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
 
     private async Task<IMongoCollection<TEntity>> GetCollectionCore(CancellationToken ct)
     {
-        var desired = StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
+        var desired = AdapterNaming.GetOrCompute<TEntity, TKey>(_sp);
         if (_collection is not null && string.Equals(desired, _collectionName, StringComparison.Ordinal))
         {
             return _collection;
@@ -200,7 +200,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
 
     private string BuildCollectionKey()
     {
-        var storage = StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
+        var storage = AdapterNaming.GetOrCompute<TEntity, TKey>(_sp);
         return $"{BuildServerKey()}|{storage}";
     }
 

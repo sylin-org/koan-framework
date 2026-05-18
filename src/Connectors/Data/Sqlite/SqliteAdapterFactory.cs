@@ -22,6 +22,8 @@ namespace Koan.Data.Connector.Sqlite;
     UriPattern = "Data Source={path}", LocalScheme = "file", LocalHost = "", LocalPort = 0, LocalPattern = "Data Source={path}")]
 public sealed class SqliteAdapterFactory : IDataAdapterFactory
 {
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<(System.Type, string?), string> _nameCache = new();
+
     public string Provider => "sqlite";
 
     public bool CanHandle(string provider) => string.Equals(provider, "sqlite", StringComparison.OrdinalIgnoreCase);
@@ -70,28 +72,26 @@ public sealed class SqliteAdapterFactory : IDataAdapterFactory
         return new SqliteRepository<TEntity, TKey>(sp, sourceOpts, resolver);
     }
 
-    // INamingProvider implementation
-    public string RepositorySeparator => "#";
-
-    public string GetStorageName(Type entityType, IServiceProvider services)
+    public string ResolveStorage(Type entityType, string? partition, IServiceProvider services)
     {
-        var opts = services.GetRequiredService<IOptions<SqliteOptions>>().Value;
-        var convention = new StorageNameResolver.Convention(
-            opts.NamingStyle,
-            opts.Separator,
-            NameCasing.AsIs);
+        var trimmed = partition?.Trim();
+        var cacheKey = (entityType, string.IsNullOrEmpty(trimmed) ? null : trimmed);
+        return _nameCache.GetOrAdd(cacheKey, _ =>
+        {
+            var opts = services.GetRequiredService<IOptions<SqliteOptions>>().Value;
+            var convention = new StorageNameResolver.Convention(
+                opts.NamingStyle,
+                opts.Separator,
+                NameCasing.AsIs);
+            var name = StorageNameResolver.Resolve(entityType, convention).Trim();
 
-        return StorageNameResolver.Resolve(entityType, convention);
-    }
+            if (string.IsNullOrEmpty(trimmed)) return name;
 
-    public string GetConcretePartition(string partition)
-    {
-        // SQLite: Remove hyphens from GUIDs
-        if (Guid.TryParse(partition, out var guid))
-            return guid.ToString("N");  // N format = no hyphens, lowercase
-
-        // Named partitions: sanitize for SQLite table name compatibility
-        return SanitizeForSqlite(partition);
+            var concrete = Guid.TryParse(trimmed, out var guid)
+                ? guid.ToString("N")
+                : SanitizeForSqlite(trimmed);
+            return name + "#" + concrete;
+        });
     }
 
     private static string SanitizeForSqlite(string partition)

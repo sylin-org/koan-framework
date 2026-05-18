@@ -65,8 +65,9 @@ internal sealed class PGVectorRepository<TEntity, TKey>
     {
         get
         {
-            // Uses VectorStorageNameRegistry → automatic "_vector" suffix
-            var name = VectorStorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
+            // Routes to PGVectorAdapterFactory.ResolveStorage; "_vector" suffix is conventional
+            // on the entity class name (DATA-0087).
+            var name = VectorAdapterNaming.GetOrCompute<TEntity, TKey>(_sp);
 
             // Convert to lowercase and sanitize for PostgreSQL
             // Example: "Media_vector#partition1" → "media_vector#partition1"

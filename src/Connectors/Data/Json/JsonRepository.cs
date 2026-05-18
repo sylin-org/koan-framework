@@ -292,8 +292,8 @@ internal sealed class JsonRepository<TEntity, TKey> :
         var sp = Koan.Core.Hosting.App.AppHost.Current;
         if (sp is not null)
         {
-            // Delegate to central naming registry which is set-aware
-            return Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(sp);
+            // Delegate to adapter naming (factory owns the cache and partition composition).
+            return Core.Configuration.AdapterNaming.GetOrCompute<TEntity, TKey>(sp);
         }
         return typeof(TEntity).Name;
     }

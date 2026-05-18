@@ -30,6 +30,7 @@ namespace Koan.Data.Connector.PGVector;
 public sealed class PGVectorAdapterFactory : IVectorAdapterFactory
 {
     private readonly IServiceProvider _serviceProvider;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<(Type, string?), string> _nameCache = new();
 
     public PGVectorAdapterFactory(IServiceProvider serviceProvider)
     {
@@ -62,30 +63,24 @@ public sealed class PGVectorAdapterFactory : IVectorAdapterFactory
         return new PGVectorRepository<TEntity, TKey>(dataSource, sp, options, extensionManager, logger);
     }
 
-    // INamingProvider implementation
-    public string RepositorySeparator => "#";
-
-    public string GetStorageName(Type entityType, IServiceProvider services)
+    public string ResolveStorage(Type entityType, string? partition, IServiceProvider services)
     {
-        // Use lowercase with underscores (PostgreSQL convention)
-        var convention = new StorageNameResolver.Convention(
-            NamingStyle.TypeName,
-            separator: "_",
-            casing: NameCasing.Lower);
+        var trimmed = partition?.Trim();
+        var cacheKey = (entityType, string.IsNullOrEmpty(trimmed) ? null : trimmed);
+        return _nameCache.GetOrAdd(cacheKey, _ =>
+        {
+            var convention = new StorageNameResolver.Convention(
+                NamingStyle.TypeName,
+                separator: "_",
+                casing: NameCasing.Lower);
+            var name = StorageNameResolver.Resolve(entityType, convention).Trim();
 
-        return StorageNameResolver.Resolve(entityType, convention);
-    }
+            if (string.IsNullOrEmpty(trimmed)) return name;
 
-    public string GetConcretePartition(string partition)
-    {
-        // Postgres: Remove hyphens from GUIDs, lowercase, sanitize
-        if (Guid.TryParse(partition, out var guid))
-            return guid.ToString("N");  // N format = no hyphens, lowercase
-
-        // Named partitions: lowercase and sanitize for PostgreSQL table names
-        return partition.ToLowerInvariant()
-            .Replace("-", "_")
-            .Replace(" ", "_")
-            .Replace(".", "_");
+            var concrete = Guid.TryParse(trimmed, out var guid)
+                ? guid.ToString("N")
+                : trimmed.ToLowerInvariant().Replace("-", "_").Replace(" ", "_").Replace(".", "_");
+            return name + "#" + concrete;
+        });
     }
 }

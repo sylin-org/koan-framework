@@ -47,9 +47,9 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
     {
         get
         {
-            // DATA-0086: Use vector-specific naming registry (VectorStorageNameRegistry)
-            // Automatically handles partitions via EntityContext and WeaviateAdapterFactory's INamingProvider
-            return VectorStorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
+            // DATA-0086: vector naming routes to WeaviateVectorAdapterFactory.ResolveStorage,
+            // which owns its own cache and applies partition composition.
+            return VectorAdapterNaming.GetOrCompute<TEntity, TKey>(_sp);
         }
     }
 

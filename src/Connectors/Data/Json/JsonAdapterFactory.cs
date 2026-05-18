@@ -11,6 +11,8 @@ namespace Koan.Data.Connector.Json;
 [ProviderPriority(0)]
 public sealed class JsonAdapterFactory : IDataAdapterFactory
 {
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<(System.Type, string?), string> _nameCache = new();
+
     public string Provider => "json";
 
     public bool CanHandle(string provider) => string.Equals(provider, "json", StringComparison.OrdinalIgnoreCase);
@@ -43,18 +45,11 @@ public sealed class JsonAdapterFactory : IDataAdapterFactory
         return new JsonRepository<TEntity, TKey>(Microsoft.Extensions.Options.Options.Create(sourceOpts));
     }
 
-    // INamingProvider implementation
-    public string RepositorySeparator => "#";
-
-    public string GetStorageName(Type entityType, IServiceProvider services)
+    public string ResolveStorage(Type entityType, string? partition, IServiceProvider services)
     {
-        // JSON: Simple entity name as filename
-        return entityType.Name;
-    }
-
-    public string GetConcretePartition(string partition)
-    {
-        // JSON: Pass-through (used as subdirectory name)
-        return partition;
+        var trimmed = partition?.Trim();
+        var cacheKey = (entityType, string.IsNullOrEmpty(trimmed) ? null : trimmed);
+        return _nameCache.GetOrAdd(cacheKey, _ =>
+            string.IsNullOrEmpty(trimmed) ? entityType.Name : entityType.Name + "#" + trimmed);
     }
 }

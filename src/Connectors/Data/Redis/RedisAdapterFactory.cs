@@ -22,6 +22,8 @@ namespace Koan.Data.Connector.Redis;
     LocalScheme = "redis", LocalHost = "localhost", LocalPort = 6379, LocalPattern = "redis://{host}:{port}")]
 public sealed class RedisAdapterFactory : IDataAdapterFactory
 {
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<(System.Type, string?), string> _nameCache = new();
+
     public string Provider => "redis";
 
     public bool CanHandle(string provider) => string.Equals(provider, "redis", StringComparison.OrdinalIgnoreCase);
@@ -39,23 +41,16 @@ public sealed class RedisAdapterFactory : IDataAdapterFactory
         return new RedisRepository<TEntity, TKey>(opts, muxer, sp.GetService<ILoggerFactory>());
     }
 
-    // INamingProvider implementation
     // The partition separator must NOT be ':' — Redis key delimiter is ':', and the keyspace
     // scan pattern is "{keyspace}:*". A colon separator made the default keyspace pattern match
     // partition-suffixed keys (e.g. default "widgets_surface:*" would match "widgets_surface:alpha:p-001"),
     // leaking partition data into the default set. Use '#' like the other adapters.
-    public string RepositorySeparator => "#";
-
-    public string GetStorageName(Type entityType, IServiceProvider services)
+    public string ResolveStorage(Type entityType, string? partition, IServiceProvider services)
     {
-        // Redis: Simple entity name as key prefix
-        return entityType.Name;
-    }
-
-    public string GetConcretePartition(string partition)
-    {
-        // Redis: Pass-through (used in key hierarchy)
-        return partition;
+        var trimmed = partition?.Trim();
+        var cacheKey = (entityType, string.IsNullOrEmpty(trimmed) ? null : trimmed);
+        return _nameCache.GetOrAdd(cacheKey, _ =>
+            string.IsNullOrEmpty(trimmed) ? entityType.Name : entityType.Name + "#" + trimmed);
     }
 }
 

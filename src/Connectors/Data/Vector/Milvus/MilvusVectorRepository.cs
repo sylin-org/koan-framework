@@ -341,7 +341,7 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
     }
 
     private string CollectionName
-        => _options.CollectionName ?? VectorStorageNameRegistry.GetOrCompute<TEntity, TKey>(_services);
+        => _options.CollectionName ?? VectorAdapterNaming.GetOrCompute<TEntity, TKey>(_services);
 
     private int EnsureDimension(int dimension)
     {

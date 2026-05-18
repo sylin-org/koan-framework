@@ -33,6 +33,8 @@ namespace Koan.Data.Vector.Connector.Weaviate;
     LocalScheme = "http", LocalHost = "localhost", LocalPort = 8080, LocalPattern = "http://{host}:{port}")]
 public sealed class WeaviateVectorAdapterFactory : IVectorAdapterFactory
 {
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<(System.Type, string?), string> _nameCache = new();
+
     public string Provider => "weaviate";
 
     public bool CanHandle(string provider) => string.Equals(provider, "weaviate", StringComparison.OrdinalIgnoreCase);
@@ -48,28 +50,28 @@ public sealed class WeaviateVectorAdapterFactory : IVectorAdapterFactory
         return new WeaviateVectorRepository<TEntity, TKey>(httpFactory, options, sp);
     }
 
-    // INamingProvider implementation
-    public string RepositorySeparator => "_";  // GraphQL-compliant (NOT "#")
-
-    public string GetStorageName(Type entityType, IServiceProvider services)
+    // Weaviate uses '_' (GraphQL-compliant) rather than '#' as the partition separator —
+    // GraphQL identifiers don't allow '#'. Vector class names use FullNamespace + '_' so they
+    // remain valid GraphQL types.
+    public string ResolveStorage(Type entityType, string? partition, IServiceProvider services)
     {
-        // Weaviate class names: GraphQL-compliant (no dots)
-        var convention = new StorageNameResolver.Convention(
-            StorageNamingStyle.FullNamespace,
-            "_",  // Underscore separator (dots invalid in GraphQL)
-            NameCasing.AsIs);
+        var trimmed = partition?.Trim();
+        var cacheKey = (entityType, string.IsNullOrEmpty(trimmed) ? null : trimmed);
+        return _nameCache.GetOrAdd(cacheKey, _ =>
+        {
+            var convention = new StorageNameResolver.Convention(
+                StorageNamingStyle.FullNamespace,
+                "_",
+                NameCasing.AsIs);
+            var name = StorageNameResolver.Resolve(entityType, convention).Trim();
 
-        return StorageNameResolver.Resolve(entityType, convention);
-    }
+            if (string.IsNullOrEmpty(trimmed)) return name;
 
-    public string GetConcretePartition(string partition)
-    {
-        // Weaviate: Replace hyphens with underscores for GraphQL compatibility
-        if (Guid.TryParse(partition, out var guid))
-            return guid.ToString("D").Replace("-", "_");  // D format with hyphens → underscores
-
-        // Named partitions: sanitize for GraphQL identifiers
-        return SanitizeForGraphQL(partition);
+            var concrete = Guid.TryParse(trimmed, out var guid)
+                ? guid.ToString("D").Replace("-", "_")
+                : SanitizeForGraphQL(trimmed);
+            return name + "_" + concrete;
+        });
     }
 
     private static string SanitizeForGraphQL(string partition)

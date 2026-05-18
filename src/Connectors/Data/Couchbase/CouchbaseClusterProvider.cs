@@ -384,9 +384,8 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
         var bucket = await EnsureBucket(cluster, options, ct);
 
         // Partition routing: EntityContext.Current.Partition wins over CouchbaseOptions.Scope.
-        // The adapter advertises UsesNativePartitionContainer = true on its INamingProvider, so
-        // NamingComposer keeps the collection name clean. We map the partition onto the scope,
-        // which is Couchbase's native isolation primitive.
+        // CouchbaseAdapterFactory.ResolveStorage returns just the collection (no partition suffix);
+        // we map the partition onto the scope, which is Couchbase's native isolation primitive.
         var partition = Koan.Data.Core.EntityContext.Current?.Partition;
         string scopeName;
         if (!string.IsNullOrWhiteSpace(partition))
@@ -412,7 +411,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
 
     private static string SanitizeIdentifier(string value)
     {
-        // Mirror CouchbaseAdapterFactory.GetConcretePartition. Duplicated here so this code
+        // Mirror CouchbaseAdapterFactory.FormatScope. Duplicated here so this code
         // doesn't have to take a dependency on the factory; the rules come from Couchbase server.
         var sb = new System.Text.StringBuilder(value.Length);
         foreach (var c in value)

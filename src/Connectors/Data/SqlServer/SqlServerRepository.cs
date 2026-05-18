@@ -87,7 +87,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         }
     }
 
-    private string TableName => Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
+    private string TableName => Core.Configuration.AdapterNaming.GetOrCompute<TEntity, TKey>(_sp);
 
     /// <summary>
     /// Applies storage optimization to entity before writing to SQL Server.

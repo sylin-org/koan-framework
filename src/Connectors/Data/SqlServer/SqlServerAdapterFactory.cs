@@ -23,6 +23,8 @@ namespace Koan.Data.Connector.SqlServer;
     LocalScheme = "mssql", LocalHost = "localhost", LocalPort = 1433, LocalPattern = "mssql://{host}:{port}")]
 public sealed class SqlServerAdapterFactory : IDataAdapterFactory
 {
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<(System.Type, string?), string> _nameCache = new();
+
     public string Provider => "mssql";
 
     public bool CanHandle(string provider)
@@ -77,28 +79,26 @@ public sealed class SqlServerAdapterFactory : IDataAdapterFactory
         return new SqlServerRepository<TEntity, TKey>(sp, sourceOpts, resolver);
     }
 
-    // INamingProvider implementation
-    public string RepositorySeparator => "#";
-
-    public string GetStorageName(Type entityType, IServiceProvider services)
+    public string ResolveStorage(Type entityType, string? partition, IServiceProvider services)
     {
-        var opts = services.GetRequiredService<IOptions<SqlServerOptions>>().Value;
-        var convention = new StorageNameResolver.Convention(
-            opts.NamingStyle,
-            opts.Separator,
-            NameCasing.AsIs);
+        var trimmed = partition?.Trim();
+        var cacheKey = (entityType, string.IsNullOrEmpty(trimmed) ? null : trimmed);
+        return _nameCache.GetOrAdd(cacheKey, _ =>
+        {
+            var opts = services.GetRequiredService<IOptions<SqlServerOptions>>().Value;
+            var convention = new StorageNameResolver.Convention(
+                opts.NamingStyle,
+                opts.Separator,
+                NameCasing.AsIs);
+            var name = StorageNameResolver.Resolve(entityType, convention).Trim();
 
-        return StorageNameResolver.Resolve(entityType, convention);
-    }
+            if (string.IsNullOrEmpty(trimmed)) return name;
 
-    public string GetConcretePartition(string partition)
-    {
-        // SQL Server: Remove hyphens from GUIDs, lowercase
-        if (Guid.TryParse(partition, out var guid))
-            return guid.ToString("N");  // N format = no hyphens, lowercase
-
-        // Named partitions: lowercase for SQL Server convention
-        return partition.ToLowerInvariant();
+            var concrete = Guid.TryParse(trimmed, out var guid)
+                ? guid.ToString("N")
+                : trimmed.ToLowerInvariant();
+            return name + "#" + concrete;
+        });
     }
 }
 

@@ -23,6 +23,8 @@ namespace Koan.Data.Connector.Mongo;
     LocalScheme = "mongodb", LocalHost = "localhost", LocalPort = 27017, LocalPattern = "mongodb://{host}:{port}")]
 public sealed class MongoAdapterFactory : IDataAdapterFactory
 {
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<(System.Type, string?), string> _nameCache = new();
+
     public string Provider => "mongo";
 
     public bool CanHandle(string provider) => string.Equals(provider, "mongo", StringComparison.OrdinalIgnoreCase) || string.Equals(provider, "mongodb", StringComparison.OrdinalIgnoreCase);
@@ -77,34 +79,33 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory
         return new MongoRepository<TEntity, TKey>(clientProvider, optionsMonitor, resolver, sp);
     }
 
-    // INamingProvider implementation
-    public string RepositorySeparator => "#";
-
-    public string GetStorageName(Type entityType, IServiceProvider services)
+    public string ResolveStorage(Type entityType, string? partition, IServiceProvider services)
     {
-        var opts = services.GetRequiredService<IOptions<MongoOptions>>().Value;
-
-        // Check adapter-level override FIRST (MongoOptions.CollectionName)
-        if (opts.CollectionName != null)
+        var trimmed = partition?.Trim();
+        var cacheKey = (entityType, string.IsNullOrEmpty(trimmed) ? null : trimmed);
+        return _nameCache.GetOrAdd(cacheKey, _ =>
         {
-            var overrideName = opts.CollectionName(entityType);
-            if (!string.IsNullOrWhiteSpace(overrideName))
-                return overrideName;
-        }
+            var opts = services.GetRequiredService<IOptions<MongoOptions>>().Value;
 
-        // Fall back to convention
-        var convention = new StorageNameResolver.Convention(
-            opts.NamingStyle,
-            opts.Separator ?? ".",
-            NameCasing.AsIs);
+            string name;
+            if (opts.CollectionName != null
+                && opts.CollectionName(entityType) is { } overrideName
+                && !string.IsNullOrWhiteSpace(overrideName))
+            {
+                name = overrideName.Trim();
+            }
+            else
+            {
+                var convention = new StorageNameResolver.Convention(
+                    opts.NamingStyle,
+                    opts.Separator ?? ".",
+                    NameCasing.AsIs);
+                name = StorageNameResolver.Resolve(entityType, convention).Trim();
+            }
 
-        return StorageNameResolver.Resolve(entityType, convention);
-    }
-
-    public string GetConcretePartition(string partition)
-    {
-        // MongoDB: Pass-through (accepts most UTF-8 strings)
-        return partition;
+            // MongoDB: partition pass-through (accepts most UTF-8 strings).
+            return string.IsNullOrEmpty(trimmed) ? name : name + "#" + trimmed;
+        });
     }
 }
 

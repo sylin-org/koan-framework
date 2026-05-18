@@ -185,7 +185,7 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
         // Resolve via StorageNameResolver defaults for relational. Allow provider-specific schema overrides via options.
         var schema = _optionsMonitor.CurrentValue.DefaultSchema;
         if (string.IsNullOrWhiteSpace(schema)) schema = "dbo";
-        var method = typeof(Core.Configuration.StorageNameRegistry).GetMethods()
+        var method = typeof(Core.Configuration.AdapterNaming).GetMethods()
             .First(m => m.Name == "GetOrCompute" && m.GetGenericArguments().Length == 2);
 
         // Extract the actual TKey type from the entity's IEntity<TKey> interface

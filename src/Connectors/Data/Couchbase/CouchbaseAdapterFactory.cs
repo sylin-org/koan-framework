@@ -20,6 +20,8 @@ namespace Koan.Data.Connector.Couchbase;
     UriPattern = "couchbase://{host}", LocalScheme = "couchbase", LocalHost = "localhost", LocalPort = 8091, LocalPattern = "couchbase://{host}")]
 public sealed class CouchbaseAdapterFactory : IDataAdapterFactory
 {
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<(System.Type, string?), string> _nameCache = new();
+
     public string Provider => "couchbase";
 
     public bool CanHandle(string provider)
@@ -39,44 +41,42 @@ public sealed class CouchbaseAdapterFactory : IDataAdapterFactory
         return new CouchbaseRepository<TEntity, TKey>(provider, resolver, sp, options);
     }
 
-    // INamingProvider implementation
-    public string RepositorySeparator => "#";
-
-    // Partitions in Couchbase map to scopes (a first-class isolation primitive), not to a name
-    // suffix. Returning true here tells NamingComposer to keep the collection name clean and
-    // lets CouchbaseClusterProvider.GetCollectionContext route EntityContext.Current.Partition
-    // into the scope position of bucket.scope.collection.
-    public bool UsesNativePartitionContainer => true;
-
-    public string GetStorageName(Type entityType, IServiceProvider services)
+    // Partition is a native Couchbase scope (bucket.scope.collection), not a name suffix —
+    // CouchbaseClusterProvider.GetCollectionContext routes EntityContext.Current.Partition into
+    // the scope position. ResolveStorage therefore returns just the collection name.
+    public string ResolveStorage(Type entityType, string? partition, IServiceProvider services)
     {
-        var options = services.GetRequiredService<IOptions<CouchbaseOptions>>().Value;
-
-        // Check adapter-level override FIRST
-        if (!string.IsNullOrWhiteSpace(options.Collection))
-            return options.Collection;
-
-        if (options.CollectionName != null)
+        var trimmed = partition?.Trim();
+        var cacheKey = (entityType, string.IsNullOrEmpty(trimmed) ? null : trimmed);
+        return _nameCache.GetOrAdd(cacheKey, _ =>
         {
-            var overrideName = options.CollectionName(entityType);
-            if (!string.IsNullOrWhiteSpace(overrideName))
-                return overrideName;
-        }
+            var options = services.GetRequiredService<IOptions<CouchbaseOptions>>().Value;
 
-        // Fall back to convention
-        var convention = new StorageNameResolver.Convention(
-            options.NamingStyle,
-            options.Separator ?? ".",
-            NameCasing.AsIs);
+            if (!string.IsNullOrWhiteSpace(options.Collection))
+                return options.Collection.Trim();
 
-        return StorageNameResolver.Resolve(entityType, convention);
+            if (options.CollectionName != null
+                && options.CollectionName(entityType) is { } overrideName
+                && !string.IsNullOrWhiteSpace(overrideName))
+            {
+                return overrideName.Trim();
+            }
+
+            var convention = new StorageNameResolver.Convention(
+                options.NamingStyle,
+                options.Separator ?? ".",
+                NameCasing.AsIs);
+            return StorageNameResolver.Resolve(entityType, convention).Trim();
+        });
     }
 
-    public string GetConcretePartition(string partition)
+    /// <summary>
+    /// Format a partition value as a Couchbase scope identifier (alphanumeric / underscore /
+    /// hyphen / percent, max 30 chars). Used by CouchbaseClusterProvider when mapping
+    /// EntityContext.Current.Partition onto bucket.scope.collection.
+    /// </summary>
+    public static string FormatScope(string partition)
     {
-        // Couchbase scope and collection names accept alphanumeric, underscore, hyphen and
-        // percent only (max 30 chars). Replace anything else with '_' so partition values from
-        // upstream (GUIDs, dotted names, '#' suffixes) become valid identifiers.
         if (string.IsNullOrEmpty(partition)) return partition;
         var span = partition.AsSpan();
         var sb = new System.Text.StringBuilder(span.Length);
