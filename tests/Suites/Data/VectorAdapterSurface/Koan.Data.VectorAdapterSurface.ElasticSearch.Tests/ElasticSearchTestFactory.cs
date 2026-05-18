@@ -27,18 +27,15 @@ public sealed class ElasticSearchTestFactory : IVectorAdapterTestFactory
 
     public bool SupportsGetEmbedding         => false; // not implemented in ES vector repo
     public bool SupportsBulkOperations       => true;
-    public bool SupportsFlush                => false; // ES adapter uses the default-throws Flush
+    public bool SupportsFlush                => true;  // adapter overrides: DELETE /<index>
     public bool SupportsExportAll            => true;  // scroll API
     public bool SupportsHybridSearch         => false;
     public bool SupportsMetadataFilters      => true;
     // ES Capabilities flag does not advertise NativeContinuation even though scroll exists; the
     // matrix mirrors what the adapter says, not what it could say.
     public bool SupportsContinuationToken    => false;
-    // ES adapter caches _indexEnsured as a single bool per repo instance; the repo is reused
-    // across partitions, so partition #2 auto-creates with implicit (non-dense_vector) mapping
-    // and subsequent knn search fails. Real adapter bug, not a kit issue — surfaced as a
-    // capability gap until the adapter caches per-(storage name).
-    public bool SupportsPartitionIsolation   => false;
+    // _ensuredIndexes is keyed by IndexName now, so one repo handles all partitions correctly.
+    public bool SupportsPartitionIsolation   => true;
     public bool SupportsDynamicCollections   => true;
     public bool SupportsScoreNormalization   => false;
 
