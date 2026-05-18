@@ -24,8 +24,8 @@ namespace Koan.Data.Connector.Mongo;
 
 internal sealed class MongoRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
-    IDataRepositoryWithOptions<TEntity, TKey>,
     ILinqQueryRepository<TEntity, TKey>,
+    ILinqQueryRepositoryWithOptions<TEntity, TKey>,
     IQueryCapabilities,
     IWriteCapabilities,
     IBulkUpsert<TKey>,
@@ -344,60 +344,13 @@ internal sealed class MongoRepository<TEntity, TKey> :
             return (IReadOnlyList<TEntity?>)results;
         }, ct);
 
-    public Task<IReadOnlyList<TEntity>> Query(object? query, CancellationToken ct = default)
-        => ExecuteWithReadinessAsync(async () =>
-        {
-            ct.ThrowIfCancellationRequested();
-            using var activity = MongoTelemetry.Activity.StartActivity("mongo.query.all");
-            activity?.SetTag("entity", typeof(TEntity).FullName);
-            var collection = await GetCollection(ct).ConfigureAwait(false);
-
-            IFindFluent<TEntity, TEntity> cursor = query is Expression<Func<TEntity, bool>> predicate
-                ? FindWithPredicate(collection, predicate)
-                : collection.Find(Builders<TEntity>.Filter.Empty);
-
-            var results = await cursor.ToListAsync(ct).ConfigureAwait(false);
-            return (IReadOnlyList<TEntity>)results;
-        }, ct);
-
-    public Task<RepositoryQueryResult<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
-        => ExecuteWithReadinessAsync(async () =>
-        {
-            ct.ThrowIfCancellationRequested();
-            var defaultPageSize = _options.CurrentValue.GetDefaultPageSize();
-            var collection = await GetCollection(ct).ConfigureAwait(false);
-
-            IFindFluent<TEntity, TEntity> cursor = query is Expression<Func<TEntity, bool>> predicate
-                ? FindWithPredicate(collection, predicate)
-                : collection.Find(Builders<TEntity>.Filter.Empty);
-
-            // Apply pagination only when actually requested. The shared ApplyPaging maps
-            // no-pagination → Skip(0).Limit(int.MaxValue), which Mongo's driver does NOT
-            // gracefully treat as "no limit" — it can drop result sets entirely.
-            var paginationHandled = false;
-            if (options is { HasPagination: true })
-            {
-                cursor = cursor.ApplyPaging(options, defaultPageSize,
-                    (c, skip, take) => c.Skip(skip).Limit(take));
-                paginationHandled = true;
-            }
-
-            var results = await cursor.ToListAsync(ct).ConfigureAwait(false);
-            return new RepositoryQueryResult<TEntity>
-            {
-                Items = (IReadOnlyList<TEntity>)results,
-                PaginationHandled = paginationHandled,
-                SortHandled = RepositoryQueryResult<TEntity>.NoSortHandled,
-            };
-        }, ct);
-
     public async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
     {
         var result = await Query(predicate, (DataQueryOptions?)null, ct).ConfigureAwait(false);
         return result.Items;
     }
 
-    public Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
+    public Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>>? predicate, DataQueryOptions? options, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
         {
             ct.ThrowIfCancellationRequested();
@@ -406,7 +359,9 @@ internal sealed class MongoRepository<TEntity, TKey> :
             var defaultPageSize = _options.CurrentValue.GetDefaultPageSize();
             var collection = await GetCollection(ct).ConfigureAwait(false);
 
-            var cursor = FindWithPredicate(collection, predicate);
+            var cursor = predicate is null
+                ? collection.Find(Builders<TEntity>.Filter.Empty)
+                : FindWithPredicate(collection, predicate);
             var paginationHandled = false;
             if (options is { HasPagination: true })
             {

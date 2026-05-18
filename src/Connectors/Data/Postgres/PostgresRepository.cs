@@ -28,7 +28,6 @@ internal sealed class PostgresRepository<
     IOptimizedDataRepository<TEntity, TKey>,
     ILinqQueryRepository<TEntity, TKey>,
     IStringQueryRepository<TEntity, TKey>,
-    IDataRepositoryWithOptions<TEntity, TKey>,
     ILinqQueryRepositoryWithOptions<TEntity, TKey>,
     IStringQueryRepositoryWithOptions<TEntity, TKey>,
     IQueryCapabilities,
@@ -391,46 +390,6 @@ internal sealed class PostgresRepository<
         return results;
     }
 
-    public async Task<IReadOnlyList<TEntity>> Query(object? query, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = PgTelemetry.Activity.StartActivity("pg.query:all");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        await using var conn = Open();
-        // DATA-0061: no-options should return full set
-    var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} ORDER BY ctid");
-        return rows.Select(FromRow).ToList();
-    }
-
-    public async Task<RepositoryQueryResult<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = PgTelemetry.Activity.StartActivity("pg.query:all+opts");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-
-        // Dispatch on query shape: ignoring the predicate (the earlier behavior) silently
-        // returned the full set, making ?filter= and DELETE /?q= unsafe across the matrix.
-        if (query is Expression<Func<TEntity, bool>> predicate)
-        {
-            return await Query(predicate, options, ct);
-        }
-        if (query is string sqlPredicate && !string.IsNullOrWhiteSpace(sqlPredicate))
-        {
-            var whereSql = RewriteWhereForProjection(sqlPredicate);
-            var (offsetR, limitR) = ComputeSkipTake(options);
-            await using var connR = Open();
-            var sqlR = $"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE {whereSql} ORDER BY ctid LIMIT {limitR} OFFSET {offsetR}";
-            var rowsR = await connR.QueryAsync<(string Id, string Json)>(sqlR);
-            return RepositoryQueryResult<TEntity>.PaginatedOnly(rowsR.Select(FromRow).ToList());
-        }
-
-        var (offset, limit) = ComputeSkipTake(options);
-        await using var conn = Open();
-        var sql = $"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} ORDER BY ctid LIMIT {limit} OFFSET {offset}";
-        var rows = await conn.QueryAsync<(string Id, string Json)>(sql);
-        var items = rows.Select(FromRow).ToList();
-        return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
-    }
 
     public async Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
     {
@@ -475,8 +434,8 @@ internal sealed class PostgresRepository<
             catch (NotSupportedException)
             {
                 var compiled = request.Predicate.Compile();
-                var all = await Query((object?)null, ct);
-                var count = (long)all.Count(compiled);
+                var all = await Query((Expression<Func<TEntity, bool>>?)null, options: null, ct);
+                var count = (long)all.Items.Count(compiled);
                 return CountResult.Exact(count);
             }
         }
@@ -523,16 +482,27 @@ internal sealed class PostgresRepository<
         catch (NotSupportedException)
         {
             var compiled = predicate.Compile();
-            var all = await Query((object?)null, ct);
-            return all.Where(compiled).ToList();
+            var all = await Query((Expression<Func<TEntity, bool>>?)null, options: null, ct);
+            return all.Items.Where(compiled).ToList();
         }
     }
 
-    public async Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>>? predicate, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = PgTelemetry.Activity.StartActivity("pg.query:linq+opts");
         act?.SetTag("entity", typeof(TEntity).FullName);
+
+        // Null predicate = no filter. Skip the translator entirely.
+        if (predicate is null)
+        {
+            var (off, lim) = ComputeSkipTake(options);
+            await using var connN = Open();
+            var sqlN = $"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} ORDER BY ctid LIMIT {lim} OFFSET {off}";
+            var rowsN = await connN.QueryAsync<(string Id, string Json)>(sqlN);
+            return RepositoryQueryResult<TEntity>.PaginatedOnly(rowsN.Select(FromRow).ToList());
+        }
+
         var translator = new LinqWhereTranslator<TEntity>(_dialect);
         try
         {
@@ -550,7 +520,7 @@ internal sealed class PostgresRepository<
         catch (NotSupportedException)
         {
             var compiled = predicate.Compile();
-            var fallback = await Query((object?)null, options, ct);
+            var fallback = await Query((Expression<Func<TEntity, bool>>?)null, options, ct);
             var filtered = fallback.Items.Where(compiled).ToList();
             return RepositoryQueryResult<TEntity>.PaginatedOnly(filtered);
         }
@@ -558,7 +528,7 @@ internal sealed class PostgresRepository<
         {
             // Translator emitted a reference to a column that doesn't exist. Materialise + filter.
             var compiled = predicate.Compile();
-            var fallback = await Query((object?)null, options, ct);
+            var fallback = await Query((Expression<Func<TEntity, bool>>?)null, options, ct);
             var filtered = fallback.Items.Where(compiled).ToList();
             return RepositoryQueryResult<TEntity>.PaginatedOnly(filtered);
         }

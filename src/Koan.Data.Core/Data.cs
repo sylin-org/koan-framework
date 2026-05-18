@@ -29,6 +29,18 @@ public static class Data<TEntity, TKey>
     public static IWriteCapabilities WriteCaps
         => Repo as IWriteCapabilities ?? new WriteCapsImpl(WriteCapabilities.None);
 
+    private static ILinqQueryRepositoryWithOptions<TEntity, TKey> RequireLinq(IDataRepository<TEntity, TKey> repo)
+        => repo as ILinqQueryRepositoryWithOptions<TEntity, TKey>
+           ?? throw new NotSupportedException(
+               $"The adapter backing {typeof(TEntity).Name} does not implement ILinqQueryRepositoryWithOptions. " +
+               $"Every queryable adapter must support predicate queries with sort/page options.");
+
+    private static IStringQueryRepositoryWithOptions<TEntity, TKey> RequireString(IDataRepository<TEntity, TKey> repo)
+        => repo as IStringQueryRepositoryWithOptions<TEntity, TKey>
+           ?? throw new NotSupportedException(
+               $"The adapter backing {typeof(TEntity).Name} does not support string queries. " +
+               $"Use a LINQ predicate instead, or pick an adapter that implements IStringQueryRepositoryWithOptions.");
+
     private static async Task<CountOutcome> CountInternal(object? query, CountStrategy strategy, DataQueryOptions? options, CancellationToken ct)
     {
         var repo = Repo;
@@ -58,26 +70,21 @@ public static class Data<TEntity, TKey>
 
     private static async Task<IReadOnlyList<TEntity>> LoadItemsForFallback(IDataRepository<TEntity, TKey> repo, CountRequest<TEntity> request, CancellationToken ct)
     {
-        var payload = request.ProviderQuery ?? (object?)request.RawQuery ?? request.Predicate;
-        var options = request.Options;
-
-        if (repo is IDataRepositoryWithOptions<TEntity, TKey> repoWithOptions && options is not null)
+        // Predicate path is canonical now — Count fallback only happens when the adapter's
+        // native Count threw NotSupported, which means it'll have to materialize anyway.
+        var linq = RequireLinq(repo);
+        if (request.Predicate is not null)
         {
-            var result = await repoWithOptions.Query(payload, options, ct);
+            var result = await linq.Query(request.Predicate, request.Options, ct);
             return result.Items;
         }
-
-        if (request.Predicate is not null && repo is ILinqQueryRepository<TEntity, TKey> linq)
+        if (request.RawQuery is not null && repo is IStringQueryRepositoryWithOptions<TEntity, TKey> str)
         {
-            return await linq.Query(request.Predicate, ct);
+            var result = await str.Query(request.RawQuery, request.Options, ct);
+            return result.Items;
         }
-
-        if (request.RawQuery is not null && repo is IStringQueryRepository<TEntity, TKey> str)
-        {
-            return await str.Query(request.RawQuery, ct);
-        }
-
-        return await repo.Query(payload, ct);
+        var allResult = await linq.Query((Expression<Func<TEntity, bool>>?)null, request.Options, ct);
+        return allResult.Items;
     }
     public static Task<TEntity?> Get(TKey id, CancellationToken ct = default) => Repo.Get(id, ct);
     public static Task<IReadOnlyList<TEntity?>> GetMany(IEnumerable<TKey> ids, CancellationToken ct = default) => Repo.GetMany(ids, ct);
@@ -160,52 +167,53 @@ public static class Data<TEntity, TKey>
         long? adapterReportedCount = null;
         var adapterReportedEstimate = false;
 
-        if (repo is IDataRepositoryWithOptions<TEntity, TKey> repoWithOptions)
+        // Dispatch by query type to a typed interface — no more untyped object? slot.
+        // The orchestrator handles the sort-pushdown fallback (refetch unpaginated then sort
+        // in-memory) once at this layer, since the algorithm is identical across query shapes.
+        Func<DataQueryOptions, CancellationToken, Task<RepositoryQueryResult<TEntity>>> typedQuery = query switch
         {
-            var attempt = await repoWithOptions.Query(query, normalizedOptions, ct);
-            sortFullyHandled = attempt.SortFullyHandled(normalizedOptions);
+            null => (opts, c) => RequireLinq(repo).Query((Expression<Func<TEntity, bool>>?)null, opts, c),
+            Expression<Func<TEntity, bool>> predicate => (opts, c) => RequireLinq(repo).Query(predicate, opts, c),
+            string str when !string.IsNullOrWhiteSpace(str) => (opts, c) => RequireString(repo).Query(str, opts, c),
+            _ => throw new NotSupportedException(
+                $"Query of type {query.GetType().FullName} is not supported. Use Expression<Func<{typeof(TEntity).Name},bool>>, string, or null.")
+        };
 
-            // If the adapter could not push all requested sort specs down AND pagination was requested,
-            // we must refetch unpaginated so the orchestrator can sort the full set before paginating.
-            // Without this inversion, we'd sort a page of natural-order rows, which is the core bug.
-            if (!sortFullyHandled && hasPagination)
+        var attempt = await typedQuery(normalizedOptions, ct);
+        sortFullyHandled = attempt.SortFullyHandled(normalizedOptions);
+
+        // If the adapter could not push all requested sort specs down AND pagination was requested,
+        // we must refetch unpaginated so the orchestrator can sort the full set before paginating.
+        // Without this inversion, we'd sort a page of natural-order rows, which is the core bug.
+        if (!sortFullyHandled && hasPagination)
+        {
+            var unpaged = normalizedOptions.WithoutPagination();
+            var refetch = await typedQuery(unpaged, ct);
+            items = refetch.Items;
+            adapterReportedCount = refetch.TotalCount;
+            adapterReportedEstimate = refetch.IsEstimate;
+            repositoryHandledPagination = false;
+
+            var pendingSpecs = providedOptions.Sort.Where(s => !refetch.SortHandled.Contains(s)).ToList();
+            if (pendingSpecs.Count > 0)
             {
-                var unpaged = normalizedOptions.WithoutPagination();
-                var refetch = await repoWithOptions.Query(query, unpaged, ct);
-                items = refetch.Items;
-                adapterReportedCount = refetch.TotalCount;
-                adapterReportedEstimate = refetch.IsEstimate;
-                repositoryHandledPagination = false;
-
-                var pendingSpecs = providedOptions.Sort.Where(s => !refetch.SortHandled.Contains(s)).ToList();
-                if (pendingSpecs.Count > 0)
-                {
-                    items = InMemorySorter.Apply(items, pendingSpecs);
-                }
-            }
-            else
-            {
-                items = attempt.Items;
-                adapterReportedCount = attempt.TotalCount;
-                adapterReportedEstimate = attempt.IsEstimate;
-                repositoryHandledPagination = attempt.PaginationHandled && hasPagination;
-
-                if (hasSort && !sortFullyHandled)
-                {
-                    var pendingSpecs = providedOptions.Sort.Where(s => !attempt.SortHandled.Contains(s)).ToList();
-                    if (pendingSpecs.Count > 0)
-                    {
-                        items = InMemorySorter.Apply(items, pendingSpecs);
-                    }
-                }
+                items = InMemorySorter.Apply(items, pendingSpecs);
             }
         }
         else
         {
-            items = await repo.Query(query, ct);
-            if (hasSort)
+            items = attempt.Items;
+            adapterReportedCount = attempt.TotalCount;
+            adapterReportedEstimate = attempt.IsEstimate;
+            repositoryHandledPagination = attempt.PaginationHandled && hasPagination;
+
+            if (hasSort && !sortFullyHandled)
             {
-                items = InMemorySorter.Apply(items, providedOptions.Sort);
+                var pendingSpecs = providedOptions.Sort.Where(s => !attempt.SortHandled.Contains(s)).ToList();
+                if (pendingSpecs.Count > 0)
+                {
+                    items = InMemorySorter.Apply(items, pendingSpecs);
+                }
             }
         }
 
@@ -462,8 +470,8 @@ public static class Data<TEntity, TKey>
             yield break;
         }
 
-        var all = await Repo.Query(null, ct);
-        foreach (var item in all) yield return item;
+        var all = await RequireLinq(Repo).Query((Expression<Func<TEntity, bool>>?)null, options: null, ct);
+        foreach (var item in all.Items) yield return item;
     }
 
     public static IAsyncEnumerable<TEntity> QueryStream(string query, int? batchSize = null, CancellationToken ct = default)
@@ -549,8 +557,12 @@ public static class Data<TEntity, TKey>
     public static Task<IReadOnlyList<TEntity?>> GetMany(IEnumerable<TKey> ids, string partition, CancellationToken ct = default)
     { using var _ = WithPartition(partition); return Repo.GetMany(ids, ct); }
 
-    public static Task<IReadOnlyList<TEntity>> All(string partition, CancellationToken ct = default)
-    { using var _ = WithPartition(partition); return Repo.Query(null, ct); }
+    public static async Task<IReadOnlyList<TEntity>> All(string partition, CancellationToken ct = default)
+    {
+        using var _ = WithPartition(partition);
+        var result = await RequireLinq(Repo).Query((Expression<Func<TEntity, bool>>?)null, options: null, ct);
+        return result.Items;
+    }
     public static Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, string partition, CancellationToken ct = default)
     {
         using var _ = WithPartition(partition); return (Repo as ILinqQueryRepository<TEntity, TKey>)?.Query(predicate, ct)
@@ -613,8 +625,8 @@ public static class Data<TEntity, TKey>
         }
         else
         {
-            var all = await Repo.Query(null, ct);
-            var filtered = all.AsQueryable().Where(predicate).ToList();
+            var all = await RequireLinq(Repo).Query((Expression<Func<TEntity, bool>>?)null, options: null, ct);
+            var filtered = all.Items.AsQueryable().Where(predicate).ToList();
             var ids = filtered.Select(e => e.Id);
             return await Repo.DeleteMany(ids, ct);
         }
@@ -680,9 +692,7 @@ public static class Data<TEntity, TKey>
     {
         if (string.Equals(fromPartition, toPartition, StringComparison.Ordinal)) return 0;
         using var _from = WithPartition(fromPartition);
-        var source = predicate is null
-            ? await Repo.Query(null, ct)
-            : await (Repo as ILinqQueryRepository<TEntity, TKey>)!.Query(predicate, ct);
+        var source = (await RequireLinq(Repo).Query(predicate, options: null, ct)).Items;
         if (source.Count == 0) return 0;
         var total = 0;
         foreach (var chunk in source.Chunk(Math.Max(1, batchSize)))
@@ -705,9 +715,7 @@ public static class Data<TEntity, TKey>
     {
         if (string.Equals(fromPartition, toPartition, StringComparison.Ordinal)) return 0;
         using var _from = WithPartition(fromPartition);
-        var source = predicate is null
-            ? await Repo.Query(null, ct)
-            : await (Repo as ILinqQueryRepository<TEntity, TKey>)!.Query(predicate, ct);
+        var source = (await RequireLinq(Repo).Query(predicate, options: null, ct)).Items;
         if (source.Count == 0) return 0;
         var total = 0;
         foreach (var chunk in source.Chunk(Math.Max(1, batchSize)))

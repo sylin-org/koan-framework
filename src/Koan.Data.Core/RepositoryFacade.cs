@@ -16,7 +16,6 @@ namespace Koan.Data.Core;
 ///</summary>
 internal sealed class RepositoryFacade<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
-    IDataRepositoryWithOptions<TEntity, TKey>,
     ILinqQueryRepository<TEntity, TKey>,
     IStringQueryRepository<TEntity, TKey>,
     ILinqQueryRepositoryWithOptions<TEntity, TKey>,
@@ -66,20 +65,6 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         await Guard(ct);
         return await _inner.GetMany(ids, ct);
     }
-    public async Task<IReadOnlyList<TEntity>> Query(object? query, CancellationToken ct = default)
-    {
-        await Guard(ct);
-        return await _inner.Query(query, ct);
-    }
-    public async Task<RepositoryQueryResult<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
-    {
-        await Guard(ct);
-        if (_inner is IDataRepositoryWithOptions<TEntity, TKey> with)
-            return await with.Query(query, options, ct);
-        // Fallback: ignore options and use base method; orchestrator handles sort/page in memory
-        var items = await _inner.Query(query, ct);
-        return RepositoryQueryResult<TEntity>.Unhandled(items);
-    }
     public async Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
     {
         await Guard(ct);
@@ -93,12 +78,12 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
             return await linq.Query(predicate, ct);
         throw new NotSupportedException("LINQ queries are not supported by this repository.");
     }
-    public async Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>>? predicate, DataQueryOptions? options, CancellationToken ct = default)
     {
         await Guard(ct);
         if (_inner is ILinqQueryRepositoryWithOptions<TEntity, TKey> linq)
             return await linq.Query(predicate, options, ct);
-        if (_inner is ILinqQueryRepository<TEntity, TKey> linqb)
+        if (predicate is not null && _inner is ILinqQueryRepository<TEntity, TKey> linqb)
         {
             var items = await linqb.Query(predicate, ct);
             return RepositoryQueryResult<TEntity>.Unhandled(items);
@@ -194,8 +179,13 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
             catch (NotSupportedException) { /* fall back */ }
         }
         // Fallback: enumerate ids then delete
-        var all = await _inner.Query(null, ct);
-        var ids = all.Select(e => e.Id);
+        if (_inner is not ILinqQueryRepositoryWithOptions<TEntity, TKey> linq)
+        {
+            throw new NotSupportedException(
+                "Inner repository does not support enumeration; cannot DeleteAll without a fast path.");
+        }
+        var all = await linq.Query((Expression<Func<TEntity, bool>>?)null, options: null, ct);
+        var ids = all.Items.Select(e => e.Id);
         return await _inner.DeleteMany(ids, ct);
     }
 

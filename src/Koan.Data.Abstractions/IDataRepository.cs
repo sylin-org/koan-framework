@@ -8,7 +8,10 @@ public interface IDataRepository<TEntity, TKey> where TEntity : IEntity<TKey>
 {
     Task<TEntity?> Get(TKey id, CancellationToken ct = default);
     Task<IReadOnlyList<TEntity?>> GetMany(IEnumerable<TKey> ids, CancellationToken ct = default);
-    Task<IReadOnlyList<TEntity>> Query(object? query, CancellationToken ct = default);
+    // Query is handled via the typed interfaces ILinqQueryRepositoryWithOptions and
+    // IStringQueryRepositoryWithOptions. The base interface used to expose an untyped
+    // Query(object?, ct) slot — six adapters silently returned the full set when they didn't
+    // dispatch on Expression<> in a runtime switch. Removed in DATA-0095 Phase 1b.
     Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default);
     Task<TEntity> Upsert(TEntity model, CancellationToken ct = default);
     Task<bool> Delete(TKey id, CancellationToken ct = default);

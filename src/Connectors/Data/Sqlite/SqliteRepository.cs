@@ -30,7 +30,6 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     IOptimizedDataRepository<TEntity, TKey>,
     ILinqQueryRepository<TEntity, TKey>,
     IStringQueryRepository<TEntity, TKey>,
-    IDataRepositoryWithOptions<TEntity, TKey>,
     ILinqQueryRepositoryWithOptions<TEntity, TKey>,
     IStringQueryRepositoryWithOptions<TEntity, TKey>,
     IQueryCapabilities,
@@ -467,81 +466,6 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         return results;
     }
 
-    public async Task<IReadOnlyList<TEntity>> Query(object? query, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:all");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        using var conn = Open();
-        // DATA-0061: no-options should return full set
-        var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT Id, Json FROM [{TableName}] ORDER BY Id");
-        return rows.Select(FromRow).ToList();
-    }
-
-    public async Task<RepositoryQueryResult<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:all+opts");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-
-        // Dispatch on the query shape — the orchestrator passes the predicate / raw query as
-        // object? to keep the IDataRepositoryWithOptions surface narrow. Ignoring it (which the
-        // earlier impl did) silently returned the full set, which made filtering and DELETE
-        // ?q= unsafe.
-        if (query is Expression<Func<TEntity, bool>> predicate)
-        {
-            return await QueryByPredicate(predicate, options, ct);
-        }
-        if (query is string sqlPredicate && !string.IsNullOrWhiteSpace(sqlPredicate))
-        {
-            return await QueryByRawSql(sqlPredicate, options, ct);
-        }
-
-        var (offset, limit) = ComputeSkipTake(options);
-        using var conn = Open();
-        var sql = $"SELECT Id, Json FROM [{TableName}] LIMIT {limit} OFFSET {offset}";
-        var rows = await conn.QueryAsync<(string Id, string Json)>(sql);
-        var items = rows.Select(FromRow).ToList();
-        return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
-    }
-
-    private async Task<RepositoryQueryResult<TEntity>> QueryByPredicate(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct)
-    {
-        var translator = new LinqWhereTranslator<TEntity>(_dialect);
-        try
-        {
-            var (whereSql, parameters) = translator.Translate(predicate);
-            whereSql = RewriteWhereForProjection(whereSql);
-            var (offset, limit) = ComputeSkipTake(options);
-            using var conn = Open();
-            var sql = $"SELECT Id, Json FROM [{TableName}] WHERE {whereSql} ORDER BY Id LIMIT {limit} OFFSET {offset}";
-            var dyn = new DynamicParameters();
-            for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
-            var rows = await conn.QueryAsync<(string Id, string Json)>(sql, dyn);
-            var items = rows.Select(FromRow).ToList();
-            return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
-        }
-        catch (NotSupportedException)
-        {
-            // Translator can't handle this predicate shape — materialize and filter in-process.
-            var all = await Query((object?)null, ct);
-            var filtered = all.AsQueryable().Where(predicate).ToList();
-            var (offset, limit) = ComputeSkipTake(options);
-            var paged = filtered.Skip(offset).Take(limit).ToList();
-            return RepositoryQueryResult<TEntity>.PaginatedOnly(paged);
-        }
-    }
-
-    private async Task<RepositoryQueryResult<TEntity>> QueryByRawSql(string whereSql, DataQueryOptions? options, CancellationToken ct)
-    {
-        whereSql = RewriteWhereForProjection(whereSql);
-        var (offset, limit) = ComputeSkipTake(options);
-        using var conn = Open();
-        var sql = $"SELECT Id, Json FROM [{TableName}] WHERE {whereSql} ORDER BY Id LIMIT {limit} OFFSET {offset}";
-        var rows = await conn.QueryAsync<(string Id, string Json)>(sql);
-        var items = rows.Select(FromRow).ToList();
-        return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
-    }
 
     public async Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
     {
@@ -568,8 +492,8 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             catch (NotSupportedException)
             {
                 // Fallback to materialize + count
-                var all = await Query((object?)null, ct);
-                var count = (long)all.AsQueryable().Count(request.Predicate);
+                var all = await Query((Expression<Func<TEntity, bool>>?)null, options: null, ct);
+                var count = (long)all.Items.AsQueryable().Count(request.Predicate);
                 return CountResult.Exact(count);
             }
         }
@@ -629,16 +553,27 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         catch (NotSupportedException)
         {
             // Safe fallback: in-memory filtering for unsupported shapes
-            var all = await Query((object?)null, ct);
-            return all.AsQueryable().Where(predicate).ToList();
+            var all = await Query((Expression<Func<TEntity, bool>>?)null, options: null, ct);
+            return all.Items.AsQueryable().Where(predicate).ToList();
         }
     }
 
-    public async Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>>? predicate, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:linq+opts");
         act?.SetTag("entity", typeof(TEntity).FullName);
+
+        // Null predicate is "give me everything (subject to options)".
+        if (predicate is null)
+        {
+            var (offset0, limit0) = ComputeSkipTake(options);
+            using var conn0 = Open();
+            var sql0 = $"SELECT Id, Json FROM [{TableName}] LIMIT {limit0} OFFSET {offset0}";
+            var rows0 = await conn0.QueryAsync<(string Id, string Json)>(sql0);
+            return RepositoryQueryResult<TEntity>.PaginatedOnly(rows0.Select(FromRow).ToList());
+        }
+
         var translator = new LinqWhereTranslator<TEntity>(_dialect);
         try
         {
@@ -662,7 +597,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         }
         catch (NotSupportedException)
         {
-            var fallback = await Query((object?)null, options, ct);
+            var fallback = await Query((Expression<Func<TEntity, bool>>?)null, options, ct);
             var filtered = fallback.Items.AsQueryable().Where(predicate).ToList();
             return RepositoryQueryResult<TEntity>.PaginatedOnly(filtered);
         }

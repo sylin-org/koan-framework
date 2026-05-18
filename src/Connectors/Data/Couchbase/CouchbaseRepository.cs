@@ -29,7 +29,6 @@ using Koan.Core.Adapters;
 namespace Koan.Data.Connector.Couchbase;
 
 internal sealed class CouchbaseRepository<TEntity, TKey> :
-    IDataRepositoryWithOptions<TEntity, TKey>,
     ILinqQueryRepositoryWithOptions<TEntity, TKey>,
     IOptimizedDataRepository<TEntity, TKey>,
     IQueryCapabilities,
@@ -211,29 +210,20 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             }
         }, ct);
 
-    public Task<IReadOnlyList<TEntity>> Query(object? query, CancellationToken ct = default)
-        => ExecuteWithReadinessAsync(() => QueryInternal(query, null, ct), ct);
-
-    public Task<RepositoryQueryResult<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
-        => ExecuteWithReadinessAsync(async () =>
-        {
-            var items = await QueryInternal(query, options, ct);
-            return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
-        }, ct);
-
     public Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-        => ExecuteWithReadinessAsync(async () =>
-        {
-            ct.ThrowIfCancellationRequested();
-            var result = await QueryPredicate(predicate, options: null, ct);
-            return result;
-        }, ct);
+        => ExecuteWithReadinessAsync(() => QueryPredicate(predicate, options: null, ct), ct);
 
-    public Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
+    public Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>>? predicate, DataQueryOptions? options, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
         {
-            var items = await QueryPredicate(predicate, options, ct);
-            return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
+            // Null predicate = full collection scan with options.
+            if (predicate is null)
+            {
+                var items = await QueryInternal(null, options, ct);
+                return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
+            }
+            var filtered = await QueryPredicate(predicate, options, ct);
+            return RepositoryQueryResult<TEntity>.PaginatedOnly(filtered);
         }, ct);
 
     private async Task<IReadOnlyList<TEntity>> QueryPredicate(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct)

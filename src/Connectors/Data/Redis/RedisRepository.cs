@@ -12,7 +12,6 @@ namespace Koan.Data.Connector.Redis;
 
 internal sealed class RedisRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
-    IDataRepositoryWithOptions<TEntity, TKey>,
     ILinqQueryRepository<TEntity, TKey>,
     ILinqQueryRepositoryWithOptions<TEntity, TKey>,
     IQueryCapabilities,
@@ -74,32 +73,6 @@ internal sealed class RedisRepository<TEntity, TKey> :
         return results;
     }
 
-    public async Task<IReadOnlyList<TEntity>> Query(object? query, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        var pageSize = Math.Max(1, _options.Value.DefaultPageSize);
-        var (items, _) = await ScanAll(page: 1, size: pageSize, ct);
-        return items;
-    }
-
-    public async Task<RepositoryQueryResult<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        // Redis has no native sort. If sort or partial-fetch is requested, scan everything and let the
-        // orchestrator (or our local helper) do the work — correctness over efficiency for KV stores.
-        var (all, total) = await ScanAll(page: 1, size: int.MaxValue, ct);
-
-        // Apply predicate in-process when the orchestrator forwards one through object?.
-        if (query is Expression<Func<TEntity, bool>> predicate)
-        {
-            var compiled = predicate.Compile();
-            var filtered = all.Where(compiled).ToList();
-            return BuildResult(filtered, options, filtered.Count);
-        }
-
-        return BuildResult(all, options, total);
-    }
-
     public async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
@@ -108,10 +81,11 @@ internal sealed class RedisRepository<TEntity, TKey> :
         return items.AsQueryable().Where(predicate).ToList();
     }
 
-    public async Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>>? predicate, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        var (all, _) = await ScanAll(page: 1, size: int.MaxValue, ct);
+        var (all, total) = await ScanAll(page: 1, size: int.MaxValue, ct);
+        if (predicate is null) return BuildResult(all, options, total);
         var filtered = all.AsQueryable().Where(predicate).ToList();
         return BuildResult(filtered, options, filtered.Count);
     }

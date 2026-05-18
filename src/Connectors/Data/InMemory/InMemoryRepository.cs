@@ -14,7 +14,6 @@ namespace Koan.Data.Connector.InMemory;
 /// </summary>
 internal sealed class InMemoryRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
-    IDataRepositoryWithOptions<TEntity, TKey>,
     ILinqQueryRepository<TEntity, TKey>,
     ILinqQueryRepositoryWithOptions<TEntity, TKey>,
     IQueryCapabilities,
@@ -76,28 +75,6 @@ internal sealed class InMemoryRepository<TEntity, TKey> :
         return Task.FromResult((IReadOnlyList<TEntity?>)results);
     }
 
-    public Task<IReadOnlyList<TEntity>> Query(object? query, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        var result = Store.Values.ToList();
-        return Task.FromResult((IReadOnlyList<TEntity>)result);
-    }
-
-    public Task<RepositoryQueryResult<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        IEnumerable<TEntity> items = Store.Values;
-
-        // Apply LINQ predicate if provided
-        if (query is Expression<Func<TEntity, bool>> predicate)
-        {
-            items = items.AsQueryable().Where(predicate);
-        }
-
-        var totalCount = items is ICollection<TEntity> coll ? (long)coll.Count : items.LongCount();
-        return Task.FromResult(BuildResult(items, options, totalCount));
-    }
-
     // ==================== LINQ Query Operations ====================
 
     public Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
@@ -126,11 +103,12 @@ internal sealed class InMemoryRepository<TEntity, TKey> :
         return Task.FromResult((IReadOnlyList<TEntity>)result);
     }
 
-    public Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
+    public Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>>? predicate, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        IEnumerable<TEntity> items = Store.Values.AsQueryable().Where(predicate);
-        var totalCount = items.LongCount();
+        IEnumerable<TEntity> items = Store.Values;
+        if (predicate is not null) items = items.AsQueryable().Where(predicate);
+        var totalCount = items is ICollection<TEntity> coll ? (long)coll.Count : items.LongCount();
         return Task.FromResult(BuildResult(items, options, totalCount));
     }
 

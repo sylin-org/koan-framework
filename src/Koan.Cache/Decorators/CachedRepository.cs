@@ -17,7 +17,6 @@ namespace Koan.Cache.Decorators;
 
 internal sealed class CachedRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
-    IDataRepositoryWithOptions<TEntity, TKey>,
     ILinqQueryRepository<TEntity, TKey>,
     ILinqQueryRepositoryWithOptions<TEntity, TKey>,
     IStringQueryRepository<TEntity, TKey>,
@@ -30,7 +29,6 @@ internal sealed class CachedRepository<TEntity, TKey> :
     where TKey : notnull
 {
     private readonly IDataRepository<TEntity, TKey> _inner;
-    private readonly IDataRepositoryWithOptions<TEntity, TKey>? _withOptions;
     private readonly ILinqQueryRepository<TEntity, TKey>? _linq;
     private readonly ILinqQueryRepositoryWithOptions<TEntity, TKey>? _linqWithOptions;
     private readonly IStringQueryRepository<TEntity, TKey>? _stringQuery;
@@ -58,7 +56,6 @@ internal sealed class CachedRepository<TEntity, TKey> :
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         _entityTemplate = CacheKeyTemplate.For(_entityPolicy.KeyTemplate);
-        _withOptions = inner as IDataRepositoryWithOptions<TEntity, TKey>;
         _linq = inner as ILinqQueryRepository<TEntity, TKey>;
         _linqWithOptions = inner as ILinqQueryRepositoryWithOptions<TEntity, TKey>;
         _stringQuery = inner as IStringQueryRepository<TEntity, TKey>;
@@ -142,20 +139,6 @@ internal sealed class CachedRepository<TEntity, TKey> :
         return _inner.GetMany(ids, ct);
     }
 
-    public Task<IReadOnlyList<TEntity>> Query(object? query, CancellationToken ct = default)
-        => _inner.Query(query, ct);
-
-    public async Task<RepositoryQueryResult<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
-    {
-        if (_withOptions is null)
-        {
-            var items = await _inner.Query(query, ct);
-            return RepositoryQueryResult<TEntity>.Unhandled(items);
-        }
-
-        return await _withOptions.Query(query, options, ct);
-    }
-
     public Task<IReadOnlyList<TEntity>> Query(string query, CancellationToken ct = default)
     {
         if (_stringQuery is null)
@@ -213,14 +196,14 @@ internal sealed class CachedRepository<TEntity, TKey> :
         return _linq.Query(predicate, ct);
     }
 
-    public async Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>>? predicate, DataQueryOptions? options, CancellationToken ct = default)
     {
         if (_linqWithOptions is not null)
         {
             return await _linqWithOptions.Query(predicate, options, ct);
         }
 
-        if (_linq is not null)
+        if (predicate is not null && _linq is not null)
         {
             var items = await _linq.Query(predicate, ct);
             return RepositoryQueryResult<TEntity>.Unhandled(items);

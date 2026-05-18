@@ -26,7 +26,6 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
     IOptimizedDataRepository<TEntity, TKey>,
     ILinqQueryRepository<TEntity, TKey>,
     IStringQueryRepository<TEntity, TKey>,
-    IDataRepositoryWithOptions<TEntity, TKey>,
     ILinqQueryRepositoryWithOptions<TEntity, TKey>,
     IStringQueryRepositoryWithOptions<TEntity, TKey>,
     IQueryCapabilities,
@@ -357,37 +356,6 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         return results;
     }
 
-    public async Task<IReadOnlyList<TEntity>> Query(object? query, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query:all");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        await using var conn = Open();
-        // When no query/options are provided, return all rows (not paginated)
-        var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT [Id], [Json] FROM [dbo].[{TableName}] {OrderByIdClause}");
-        return rows.Select(FromRow).ToList();
-    }
-
-    public async Task<RepositoryQueryResult<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query:all+opts");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-
-        // Dispatch on query shape: ignoring the predicate (earlier behavior) silently returned
-        // the full set, making ?filter= and DELETE /?q= unsafe.
-        if (query is Expression<Func<TEntity, bool>> predicate)
-        {
-            return await Query(predicate, options, ct);
-        }
-
-        var (offset, limit) = ComputeSkipTake(options);
-        await using var conn = Open();
-        var sql = $"SELECT [Id], [Json] FROM [dbo].[{TableName}] {OrderByIdClause} OFFSET {offset} ROWS FETCH NEXT {limit} ROWS ONLY";
-        var rows = await conn.QueryAsync<(string Id, string Json)>(sql);
-        var items = rows.Select(FromRow).ToList();
-        return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
-    }
 
     public async Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
     {
@@ -433,14 +401,14 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
             }
             catch (NotSupportedException)
             {
-                var all = await Query((object?)null, ct);
-                var count = (long)all.AsQueryable().Count(request.Predicate);
+                var all = await Query((Expression<Func<TEntity, bool>>?)null, options: null, ct);
+                var count = (long)all.Items.AsQueryable().Count(request.Predicate);
                 return CountResult.Exact(count);
             }
             catch (Microsoft.Data.SqlClient.SqlException ex) when (ex.Number == 207) // Invalid column name
             {
-                var all = await Query((object?)null, ct);
-                var count = (long)all.AsQueryable().Count(request.Predicate);
+                var all = await Query((Expression<Func<TEntity, bool>>?)null, options: null, ct);
+                var count = (long)all.Items.AsQueryable().Count(request.Predicate);
                 return CountResult.Exact(count);
             }
         }
@@ -476,16 +444,27 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         }
         catch (NotSupportedException)
         {
-            var all = await Query((object?)null, ct);
-            return all.AsQueryable().Where(predicate).ToList();
+            var all = await Query((Expression<Func<TEntity, bool>>?)null, options: null, ct);
+            return all.Items.AsQueryable().Where(predicate).ToList();
         }
     }
 
-    public async Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>>? predicate, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query:linq+opts");
         act?.SetTag("entity", typeof(TEntity).FullName);
+
+        // Null predicate path — no WHERE clause, just pagination.
+        if (predicate is null)
+        {
+            var (offN, limN) = ComputeSkipTake(options);
+            await using var connN = Open();
+            var sqlN = $"SELECT [Id], [Json] FROM [dbo].[{TableName}] {OrderByIdClause} OFFSET {offN} ROWS FETCH NEXT {limN} ROWS ONLY";
+            var rowsN = await connN.QueryAsync<(string Id, string Json)>(sqlN);
+            return RepositoryQueryResult<TEntity>.PaginatedOnly(rowsN.Select(FromRow).ToList());
+        }
+
         var translator = new LinqWhereTranslator<TEntity>(_dialect);
         try
         {
@@ -502,16 +481,13 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         }
         catch (NotSupportedException)
         {
-            var fallback = await Query((object?)null, options, ct);
+            var fallback = await Query((Expression<Func<TEntity, bool>>?)null, options, ct);
             var filtered = fallback.Items.AsQueryable().Where(predicate).ToList();
             return RepositoryQueryResult<TEntity>.PaginatedOnly(filtered);
         }
-        catch (Microsoft.Data.SqlClient.SqlException ex) when (ex.Number == 207) // Invalid column name
+        catch (Microsoft.Data.SqlClient.SqlException ex) when (ex.Number == 207)
         {
-            // Translator emitted a reference to a column that doesn't exist on this table (e.g.
-            // RewriteWhereForProjection didn't catch a token because the WHERE shape was outside
-            // the regex's grammar). Materialise + filter in-process so the request still succeeds.
-            var fallback = await Query((object?)null, options, ct);
+            var fallback = await Query((Expression<Func<TEntity, bool>>?)null, options, ct);
             var filtered = fallback.Items.AsQueryable().Where(predicate).ToList();
             return RepositoryQueryResult<TEntity>.PaginatedOnly(filtered);
         }

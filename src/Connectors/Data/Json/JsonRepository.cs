@@ -17,7 +17,6 @@ namespace Koan.Data.Connector.Json;
 /// </summary>
 internal sealed class JsonRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
-    IDataRepositoryWithOptions<TEntity, TKey>,
     ILinqQueryRepository<TEntity, TKey>,
     ILinqQueryRepositoryWithOptions<TEntity, TKey>,
     IQueryCapabilities,
@@ -70,34 +69,6 @@ internal sealed class JsonRepository<TEntity, TKey> :
         return Task.FromResult((IReadOnlyList<TEntity?>)results);
     }
 
-    public Task<IReadOnlyList<TEntity>> Query(object? query, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        var store = ResolveStore();
-        // No options provided — apply default page size as a fallback (not a cap).
-        var pageSize = Math.Max(1, _options.Value.DefaultPageSize);
-        var result = store.Values.Take(pageSize).ToList();
-        return Task.FromResult((IReadOnlyList<TEntity>)result);
-    }
-
-    public Task<RepositoryQueryResult<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        var store = ResolveStore();
-        IEnumerable<TEntity> items = store.Values;
-
-        // Apply predicate in-process when the orchestrator forwards one through object?.
-        // Ignoring it silently returned the full set, which made ?filter= and DELETE /?q= unsafe.
-        if (query is Expression<Func<TEntity, bool>> predicate)
-        {
-            var compiled = predicate.Compile();
-            items = items.Where(compiled);
-        }
-
-        var totalCount = items is ICollection<TEntity> coll ? (long)coll.Count : items.LongCount();
-        return Task.FromResult(BuildResult(items, options, totalCount));
-    }
-
     public Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
@@ -107,12 +78,17 @@ internal sealed class JsonRepository<TEntity, TKey> :
         return Task.FromResult((IReadOnlyList<TEntity>)list);
     }
 
-    public Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
+    public Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>>? predicate, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var store = ResolveStore();
-        IEnumerable<TEntity> items = store.Values.AsQueryable().Where(predicate);
-        var totalCount = items.LongCount();
+        IEnumerable<TEntity> items = store.Values;
+        if (predicate is not null)
+        {
+            var compiled = predicate.Compile();
+            items = items.Where(compiled);
+        }
+        var totalCount = items is ICollection<TEntity> coll ? (long)coll.Count : items.LongCount();
         return Task.FromResult(BuildResult(items, options, totalCount));
     }
 
