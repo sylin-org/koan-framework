@@ -23,8 +23,8 @@ public abstract class VectorSemanticSpecsBase<TFactory> : IClassFixture<TFactory
     {
         if (!Factory.IsAvailable) return;
         Koan.Data.Core.AggregateConfigs.Reset();
-        _scope = AppHost.PushScope(Factory.Services);
         await Factory.ResetAsync();
+        _scope = AppHost.PushScope(Factory.Services);
         try { await Vector<TodoVector>.EnsureCreated(); } catch { }
     }
 

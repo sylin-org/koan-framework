@@ -14,16 +14,20 @@ namespace Koan.Data.VectorAdapterSurface.InMemory.Tests;
 public sealed class InMemoryVectorTestFactory : IVectorAdapterTestFactory
 {
     private readonly InMemoryVectorAdapterFactory _adapter = new();
-    private readonly Lazy<ServiceProvider> _sp;
-
-    public InMemoryVectorTestFactory()
-    {
-        _sp = new Lazy<ServiceProvider>(BuildProvider, LazyThreadSafetyMode.ExecutionAndPublication);
-    }
+    private ServiceProvider? _sp;
 
     public bool IsAvailable => true;
     public string? UnavailableReason => null;
-    public IServiceProvider Services => _sp.Value;
+    public IServiceProvider Services
+    {
+        get
+        {
+            // Lazy init on first access — supports both spec base lifecycles (factory's own
+            // IAsyncLifetime.InitializeAsync, and access from within a spec's InitializeAsync).
+            if (_sp is null) _sp = BuildProvider();
+            return _sp;
+        }
+    }
     public int EmbeddingDimension => 8;
 
     // Capability overrides — InMemory implements everything except hybrid search.
@@ -51,15 +55,15 @@ public sealed class InMemoryVectorTestFactory : IVectorAdapterTestFactory
 
     public Task DisposeAsync()
     {
-        if (_sp.IsValueCreated) _sp.Value.Dispose();
+        _sp?.Dispose();
         return Task.CompletedTask;
     }
 
     public Task ResetAsync(CancellationToken ct = default)
     {
-        // Mirror the data matrix InMemoryAdapterFactory pattern: also set the static global so
-        // tests that get scheduled on threads where the AsyncLocal hasn't flowed still resolve
-        // the correct provider. The PushScope in the spec base remains the primary signal.
+        // InMemory only needs to clear data — the adapter has no schema/index cache to invalidate.
+        // The data matrix InMemoryAdapterFactory pattern of setting AppHost.Current = Services
+        // gives a global fallback for AsyncLocal-flow gaps; we do the same.
         Koan.Core.Hosting.App.AppHost.Current = Services;
         _adapter.ClearAll();
         return Task.CompletedTask;

@@ -9,12 +9,12 @@ namespace Koan.Data.VectorAdapterSurface.TestKit;
 /// <c>Vector&lt;TodoVector&gt;.Save</c>.
 ///
 /// <para>
-/// The explicit <see cref="StorageNameAttribute"/> keeps storage names short and provider-friendly —
-/// fully-qualified type names contain dots, which Weaviate and PGVector reject in
-/// class/table identifiers.
+/// The explicit <see cref="StorageNameAttribute"/> keeps storage names short and provider-friendly:
+/// fully-qualified type names contain dots that Weaviate rejects in GraphQL class names, and the
+/// PascalCase form satisfies Weaviate's "class names must start with uppercase" rule.
 /// </para>
 /// </summary>
-[StorageName("todos_vector")]
+[StorageName("TodosVector")]
 public sealed class TodoVector : Entity<TodoVector>
 {
     public string Title { get; set; } = "";

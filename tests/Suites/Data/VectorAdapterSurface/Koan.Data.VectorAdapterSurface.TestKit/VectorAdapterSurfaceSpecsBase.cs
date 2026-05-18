@@ -27,8 +27,10 @@ public abstract class VectorAdapterSurfaceSpecsBase<TFactory> : IClassFixture<TF
     {
         if (!Factory.IsAvailable) return;
         Koan.Data.Core.AggregateConfigs.Reset();
-        _scope = AppHost.PushScope(Factory.Services);
+        // ResetAsync may rebuild the SP (Weaviate has to, to invalidate per-instance schema-ensured
+        // cache). Push the scope AFTER reset so the AsyncLocal points at the post-reset Services.
         await Factory.ResetAsync();
+        _scope = AppHost.PushScope(Factory.Services);
         try { await Vector<TodoVector>.EnsureCreated(); } catch { /* not all adapters need this */ }
     }
 

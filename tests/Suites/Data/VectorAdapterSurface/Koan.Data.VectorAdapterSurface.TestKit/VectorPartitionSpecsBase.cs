@@ -27,10 +27,11 @@ public abstract class VectorPartitionSpecsBase<TFactory> : IClassFixture<TFactor
     {
         if (!Factory.IsAvailable) return;
         Koan.Data.Core.AggregateConfigs.Reset();
+        // ResetAsync first (it may rebuild the SP), then push scope to the post-reset Services.
+        await Factory.ResetAsync();
         _scope = AppHost.PushScope(Factory.Services);
 
         // Wipe shared (no-partition) namespace + every known partition.
-        await Factory.ResetAsync();
         foreach (var p in KnownPartitions)
         {
             using (EntityContext.Partition(p))
