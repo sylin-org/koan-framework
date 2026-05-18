@@ -21,7 +21,21 @@
       "TodoRead",
       "TodoWrite",
       "WebSearch",
-      "Edit(/.claude/skills/koan-caching/**)"
+      "Edit(/.claude/skills/koan-caching/**)",
+      "PowerShell(Get-Process -Name testhost -ErrorAction SilentlyContinue)",
+      "PowerShell(Stop-Process -Force)",
+      "PowerShell(Get-Process -Name testhost,dotnet -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -match \"AdapterSurface|testhost\" } | Stop-Process -Force -ErrorAction SilentlyContinue; \"cleared\")",
+      "PowerShell(Get-Process -Name testhost,dotnet -ErrorAction SilentlyContinue | Where-Object { $_.Path -match \"Temp\" -or $_.MainWindowTitle -match \"Postgres|AdapterSurface\" } | Stop-Process -Force -ErrorAction SilentlyContinue; Get-Process -Name testhost -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 3; \"cleared\")",
+      "PowerShell(Stop-Process -Force -ErrorAction SilentlyContinue)",
+      "PowerShell(\"cleared\")",
+      "PowerShell(Get-Process -Name testhost,dotnet -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-Process -Name testhost,dotnet -ErrorAction SilentlyContinue | Select-Object Name,Id,@{n='RunningSec';e={\\(New-TimeSpan -Start $_.StartTime -End \\(Get-Date\\)\\).TotalSeconds}})",
+      "PowerShell($asm = [System.Reflection.Assembly]::LoadFrom\\('C:\\\\Users\\\\onose\\\\.nuget\\\\packages\\\\testcontainers.couchbase\\\\4.11.0\\\\lib\\\\net10.0\\\\Testcontainers.Couchbase.dll'\\); $t = $asm.GetType\\('Testcontainers.Couchbase.CouchbaseBucket'\\); $f = $t.GetField\\('Default', [System.Reflection.BindingFlags]'Static,Public,NonPublic'\\); $def = $f.GetValue\\($null\\); $def.Name)",
+      "PowerShell($asm = [System.Reflection.Assembly]::LoadFrom\\('C:\\\\Users\\\\onose\\\\.nuget\\\\packages\\\\testcontainers.couchbase\\\\4.11.0\\\\lib\\\\net10.0\\\\Testcontainers.Couchbase.dll'\\); $t = $asm.GetType\\('Testcontainers.Couchbase.CouchbaseContainer'\\); $t.GetProperties\\(\\) | Select-Object Name,PropertyType)",
+      "PowerShell(Get-Process testhost -ErrorAction SilentlyContinue | Stop-Process -Force; Write-Output \"testhost killed\"; Get-Process -Name \"dotnet\" -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -eq \"\" } | Select-Object Id, ProcessName | Format-Table)",
+      "PowerShell(Get-Process testhost -ErrorAction SilentlyContinue)",
+      "PowerShell(\"killed testhost\")",
+      "PowerShell(\"ok\")"
     ]
   }
 }
