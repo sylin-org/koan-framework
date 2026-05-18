@@ -35,7 +35,8 @@
       "PowerShell(Get-Process testhost -ErrorAction SilentlyContinue | Stop-Process -Force; Write-Output \"testhost killed\"; Get-Process -Name \"dotnet\" -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -eq \"\" } | Select-Object Id, ProcessName | Format-Table)",
       "PowerShell(Get-Process testhost -ErrorAction SilentlyContinue)",
       "PowerShell(\"killed testhost\")",
-      "PowerShell(\"ok\")"
+      "PowerShell(\"ok\")",
+      "PowerShell([guid]::NewGuid\\(\\).ToString\\(\\).ToUpper\\(\\); [guid]::NewGuid\\(\\).ToString\\(\\).ToUpper\\(\\))"
     ]
   }
 }
