@@ -19,6 +19,7 @@ public abstract class AdapterPartitionSpecsBase<TFactory> : IClassFixture<TFacto
 {
     protected readonly TFactory Factory;
     protected HttpClient Client => Factory.Client;
+    private IDisposable? _scope;
 
     protected AdapterPartitionSpecsBase(TFactory factory) => Factory = factory;
 
@@ -31,13 +32,10 @@ public abstract class AdapterPartitionSpecsBase<TFactory> : IClassFixture<TFacto
     public async Task InitializeAsync()
     {
         if (!Factory.IsAvailable) return;
-        // Drop the process-wide AggregateConfigs static cache and any cached provisioning state
-        // before binding AppHost.Current. Each spec class gets its own WebApplicationFactory<Program>
-        // with a fresh ServiceProvider, but the static caches hold references to the first provider
-        // that ran and persist failed-provisioning state for 5 minutes — both block subsequent specs.
+        // See AdapterSurfaceSpecsBase for the Phase 1a / Phase 1c rationale on these resets.
         Koan.Data.Core.AggregateConfigs.Reset();
         Koan.Data.Core.Schema.EntitySchemaGuard.ResetAll();
-        AppHost.Current = Factory.Services;
+        _scope = AppHost.PushScope(Factory.Services);
         await Factory.ResetAsync();
 
         // Prime base set schema; partition variants will get their own ensure-created paths
@@ -72,7 +70,12 @@ public abstract class AdapterPartitionSpecsBase<TFactory> : IClassFixture<TFacto
         }
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public Task DisposeAsync()
+    {
+        _scope?.Dispose();
+        _scope = null;
+        return Task.CompletedTask;
+    }
 
     protected void SkipIfUnavailable()
         => Skip.If(!Factory.IsAvailable, $"[{typeof(TFactory).Name}] {Factory.UnavailableReason ?? "Adapter infrastructure unavailable"}");

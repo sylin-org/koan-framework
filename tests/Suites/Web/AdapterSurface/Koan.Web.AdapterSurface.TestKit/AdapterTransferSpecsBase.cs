@@ -14,6 +14,7 @@ public abstract class AdapterTransferSpecsBase<TFactory> : IClassFixture<TFactor
     where TFactory : class, IAdapterTestFactory
 {
     protected readonly TFactory Factory;
+    private IDisposable? _scope;
 
     protected AdapterTransferSpecsBase(TFactory factory) => Factory = factory;
 
@@ -32,10 +33,10 @@ public abstract class AdapterTransferSpecsBase<TFactory> : IClassFixture<TFactor
     public async Task InitializeAsync()
     {
         if (!Factory.IsAvailable) return;
-        // Drop process-wide caches before binding AppHost.Current — see AdapterPartitionSpecsBase.
+        // See AdapterSurfaceSpecsBase for the Phase 1a / Phase 1c rationale on these resets.
         Koan.Data.Core.AggregateConfigs.Reset();
         Koan.Data.Core.Schema.EntitySchemaGuard.ResetAll();
-        AppHost.Current = Factory.Services;
+        _scope = AppHost.PushScope(Factory.Services);
         await Factory.ResetAsync();
 
         try
@@ -65,7 +66,12 @@ public abstract class AdapterTransferSpecsBase<TFactory> : IClassFixture<TFactor
         }
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public Task DisposeAsync()
+    {
+        _scope?.Dispose();
+        _scope = null;
+        return Task.CompletedTask;
+    }
 
     protected void SkipIfUnavailable()
         => Skip.If(!Factory.IsAvailable, $"[{typeof(TFactory).Name}] {Factory.UnavailableReason ?? "Adapter infrastructure unavailable"}");

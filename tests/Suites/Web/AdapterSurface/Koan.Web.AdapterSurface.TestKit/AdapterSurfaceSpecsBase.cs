@@ -22,6 +22,7 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
 {
     protected readonly TFactory Factory;
     protected HttpClient Client => Factory.Client;
+    private IDisposable? _scope;
 
     protected AdapterSurfaceSpecsBase(TFactory factory)
     {
@@ -31,12 +32,13 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
     public async Task InitializeAsync()
     {
         if (!Factory.IsAvailable) return;
-        // Drop the process-wide AggregateConfigs static cache and any cached provisioning state
-        // before binding AppHost.Current. Each spec class spins up a fresh WebApplicationFactory
-        // with a new ServiceProvider; the static caches outlive that and pin earlier providers.
+        // Flow-scoped AppHost.Current override (replaces the per-class global mutation).
+        // The AggregateConfigs and EntitySchemaGuard caches still keyed by (Type,Type) without
+        // the IServiceProvider — that gets collapsed in Phase 1c. Until then we drain them
+        // explicitly to prevent stale-provider state across spec classes.
         Koan.Data.Core.AggregateConfigs.Reset();
         Koan.Data.Core.Schema.EntitySchemaGuard.ResetAll();
-        AppHost.Current = Factory.Services;
+        _scope = AppHost.PushScope(Factory.Services);
         await Factory.ResetAsync();
 
         // Force explicit schema creation via the EnsureCreated instruction. Relational adapters
@@ -54,7 +56,12 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
         }
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public Task DisposeAsync()
+    {
+        _scope?.Dispose();
+        _scope = null;
+        return Task.CompletedTask;
+    }
 
     protected void SkipIfUnavailable()
         => Skip.If(!Factory.IsAvailable, $"[{typeof(TFactory).Name}] {Factory.UnavailableReason ?? "Adapter infrastructure unavailable"}");
