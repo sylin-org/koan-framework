@@ -26,6 +26,7 @@ internal static class Constants
             public const string DurabilityLevel = Section + ":Durability";
             public const string Hosts = Section + ":Hosts";
             public const string DisableAutoDetection = Section + ":DisableAutoDetection";
+            public const string ManagementUrl = Section + ":ManagementUrl";
         }
     }
 

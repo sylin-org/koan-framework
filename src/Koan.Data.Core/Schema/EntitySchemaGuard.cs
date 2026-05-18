@@ -13,11 +13,38 @@ namespace Koan.Data.Core.Schema;
 /// <summary>
 /// Coordinates schema provisioning for an entity across adapters and logical sets.
 /// </summary>
+public static class EntitySchemaGuard
+{
+    /// <summary>
+    /// Clears all provisioning state across every entity type. Intended for test harnesses that
+    /// rebuild ServiceProviders between cases — without this, a transient provisioning failure
+    /// from an earlier WebApplicationFactory blocks every subsequent test for the 5-minute
+    /// backoff window.
+    /// </summary>
+    public static void ResetAll() => GuardStateRegistry.Clear();
+}
+
+internal static class GuardStateRegistry
+{
+    private static readonly System.Collections.Concurrent.ConcurrentBag<Action> _clearActions = new();
+    public static void Register(Action clearAction) => _clearActions.Add(clearAction);
+    public static void Clear()
+    {
+        foreach (var action in _clearActions) { try { action(); } catch { } }
+    }
+}
+
 internal sealed class EntitySchemaGuard<TEntity, TKey>
     where TEntity : class, Koan.Data.Abstractions.IEntity<TKey>
     where TKey : notnull
 {
     private static readonly ConcurrentDictionary<string, ProvisionState> _states = new(StringComparer.Ordinal);
+
+    static EntitySchemaGuard()
+    {
+        // Register a clear delegate so EntitySchemaGuard.ResetAll() can flush this type's state.
+        GuardStateRegistry.Register(_states.Clear);
+    }
 
     private readonly IServiceProvider _services;
     private readonly ILogger _logger;
@@ -65,9 +92,14 @@ internal sealed class EntitySchemaGuard<TEntity, TKey>
                 if (elapsed < TimeSpan.FromMinutes(5))
                 {
                     var remaining = TimeSpan.FromMinutes(5) - elapsed;
+                    // Include the original error message so callers can diagnose the failure
+                    // without having to find the very first failed-attempt log line. The first
+                    // version of this message omitted it and hid root causes for the full backoff
+                    // window.
                     throw new InvalidOperationException(
-                        $"Provisioning failed for {typeof(TEntity).Name} on {storageKey}. " +
-                        $"Retry in {remaining:mm\\:ss} (attempt #{state.Error.AttemptCount})");
+                        $"Provisioning failed for {typeof(TEntity).Name} on {storageKey} " +
+                        $"(retry in {remaining:mm\\:ss}, attempt #{state.Error.AttemptCount}): " +
+                        $"{state.Error.Message}");
                 }
             }
         }

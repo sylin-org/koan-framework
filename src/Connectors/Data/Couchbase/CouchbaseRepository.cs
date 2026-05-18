@@ -283,6 +283,10 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
 
             CouchbaseQueryDefinition? definition = null;
             string statement;
+            // The fully-qualified keyspace path the predicate/no-filter variants need to
+            // SELECT from. The original code shipped with a literal `FROM ..` template that
+            // was never filled in, producing "syntax error - at ." on every COUNT request.
+            var fullKeyspace = $"`{ctx.BucketName}`.`{ctx.ScopeName}`.`{ctx.CollectionName}`";
 
             if (request.Predicate is not null)
             {
@@ -291,7 +295,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
                     throw new NotSupportedException($"Unable to translate expression '{request.Predicate}' to N1QL for Couchbase.");
                 }
 
-                statement = $"SELECT RAW COUNT(*) FROM .. AS doc WHERE {translation.WhereClause}";
+                statement = $"SELECT RAW COUNT(*) FROM {fullKeyspace} AS doc WHERE {translation.WhereClause}";
                 definition = new CouchbaseQueryDefinition(statement)
                 {
                     Parameters = translation.Parameters.ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value)
@@ -311,7 +315,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             }
             else
             {
-                statement = $"SELECT RAW COUNT(*) FROM ..";
+                statement = $"SELECT RAW COUNT(*) FROM {fullKeyspace}";
             }
 
             var result = await ExecuteScalarQueryAsync<long>(ctx, statement, definition, ct);
@@ -496,7 +500,77 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
         {
             _logger?.LogDebug("Couchbase collection {Collection} already exists", ctx.CollectionName);
         }
+
+        // Ensure a primary index exists on the collection so N1QL queries don't fail with
+        // "No index available". The Couchbase server only auto-creates the primary index on the
+        // bucket's _default collection — every named collection (or custom-named bucket default)
+        // needs an explicit CREATE PRIMARY INDEX. This is idempotent via IF NOT EXISTS.
+        await EnsurePrimaryIndex(ctx, ct);
     }
+
+    private async Task EnsurePrimaryIndex(CouchbaseCollectionContext ctx, CancellationToken ct)
+    {
+        var bucket = QuoteIdentifier(ctx.BucketName);
+        var scope = QuoteIdentifier(ctx.ScopeName);
+        var collection = QuoteIdentifier(ctx.CollectionName);
+        var keyspace = $"{bucket}.{scope}.{collection}";
+
+        // Two-step: try CREATE PRIMARY INDEX. If it already exists, Couchbase returns error 4300.
+        // We retry briefly because the collection may not yet be registered with N1QL right
+        // after creation.
+        const int maxAttempts = 5;
+        for (int attempt = 0; attempt < maxAttempts; attempt++)
+        {
+            try
+            {
+                await ctx.Cluster.QueryAsync<dynamic>($"CREATE PRIMARY INDEX ON {keyspace}");
+                _logger?.LogDebug("Primary index created on {Keyspace}", keyspace);
+                break;
+            }
+            catch (Exception ex) when (ex.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase)
+                                       || ex.Message.Contains("4300"))
+            {
+                _logger?.LogDebug("Primary index already exists on {Keyspace}", keyspace);
+                break;
+            }
+            catch (Exception ex) when (attempt < maxAttempts - 1)
+            {
+                _logger?.LogDebug(ex, "CREATE PRIMARY INDEX attempt {Attempt}/{Max} failed on {Keyspace}, retrying", attempt + 1, maxAttempts, keyspace);
+                await Task.Delay(1000, ct);
+            }
+        }
+
+        // Wait for the index to come online before returning.
+        for (int attempt = 0; attempt < 30; attempt++)
+        {
+            try
+            {
+                var probe = await ctx.Cluster.QueryAsync<dynamic>(
+                    $"SELECT RAW state FROM system:indexes WHERE bucket_id = $bucket AND scope_id = $scope AND keyspace_id = $collection AND is_primary = true",
+                    options => options.Parameter("bucket", ctx.BucketName)
+                                       .Parameter("scope", ctx.ScopeName)
+                                       .Parameter("collection", ctx.CollectionName));
+                var states = new List<string>();
+                await foreach (var row in probe)
+                {
+                    states.Add(row?.ToString() ?? "");
+                }
+                if (states.Count > 0 && states.All(s => string.Equals(s, "online", StringComparison.OrdinalIgnoreCase)))
+                {
+                    _logger?.LogDebug("Primary index online on {Keyspace}", keyspace);
+                    return;
+                }
+            }
+            catch
+            {
+                // System catalog query may transiently fail during indexer warm-up.
+            }
+            await Task.Delay(500, ct);
+        }
+        _logger?.LogWarning("Primary index on {Keyspace} did not report online after 15s; subsequent queries may fail", keyspace);
+    }
+
+    private static string QuoteIdentifier(string name) => "`" + name.Replace("`", "``") + "`";
 
     private static bool IsAlreadyExists(CouchbaseException ex)
         => ex.Context?.Message?.Contains("already exists", StringComparison.OrdinalIgnoreCase) == true;
@@ -549,6 +623,12 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             queryOptions.Timeout(timeout);
         }
         queryOptions.CancellationToken(ct);
+        // Couchbase N1QL defaults to not_bounded scan consistency — queries can return stale
+        // results immediately after a mutation. RequestPlus blocks the query until the indexer
+        // has caught up with the latest write. The cost is per-query latency, but the alternative
+        // is unpredictable read-after-write behaviour that breaks both EntityController semantics
+        // and any meaningful test assertion.
+        queryOptions.ScanConsistency(global::Couchbase.Query.QueryScanConsistency.RequestPlus);
         if (definition?.Parameters is { Count: > 0 })
         {
             foreach (var parameter in definition.Parameters)

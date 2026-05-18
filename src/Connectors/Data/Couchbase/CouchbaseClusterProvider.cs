@@ -216,26 +216,36 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
         {
             try
             {
-                // Try to connect to Couchbase web console using clean client
-                using var healthClient = new HttpClient();
-                var response = await healthClient.GetAsync($"{baseUrl}/ui/index.html", ct);
+                // .NET HttpClient on net10 reports "response ended prematurely" against
+                // Couchbase's management responses when reading the full body — Couchbase sends a
+                // Content-Length that doesn't match what comes over the socket on some paths.
+                // ResponseHeadersRead lets us treat headers-arrived as readiness.
+                using var healthClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+                var response = await healthClient.GetAsync($"{baseUrl}/ui/index.html", HttpCompletionOption.ResponseHeadersRead, ct);
 
                 if (response.IsSuccessStatusCode)
                 {
                     _logger?.LogDebug("Couchbase web console is ready");
 
                     // Check if cluster is already initialized
-                    if (await IsClusterInitialized(baseUrl, username, password, ct))
+                    var alreadyInitialized = await IsClusterInitialized(baseUrl, username, password, ct);
+                    if (!alreadyInitialized)
+                    {
+                        // Initialize cluster
+                        await InitializeCluster(baseUrl, username, password, ct);
+
+                        // Ensure bucket exists
+                        await EnsureBucketExists(baseUrl, username, password, bucketName, ct);
+                    }
+                    else
                     {
                         _logger?.LogDebug("Couchbase cluster is already initialized");
-                        return true;
                     }
 
-                    // Initialize cluster
-                    await InitializeCluster(baseUrl, username, password, ct);
-
-                    // Ensure bucket exists
-                    await EnsureBucketExists(baseUrl, username, password, bucketName, ct);
+                    // Indexer storage mode must be set before any CREATE INDEX (including the
+                    // primary indexes Koan creates per collection). Idempotent — POSTs the same
+                    // value whether the cluster was fresh or pre-initialized (e.g. Testcontainers).
+                    await EnsureIndexerStorageMode(baseUrl, username, password, ct);
 
                     // Wait for N1QL service to become query-ready
                     await WaitForN1QLServiceReadiness(baseUrl, username, password, ct);
@@ -257,6 +267,39 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
         _logger?.LogWarning("Couchbase was not ready after {MaxRetries} attempts. Proceeding without initialization.", maxRetries);
         _stateManager.TransitionTo(AdapterReadinessState.Degraded);
         return false;
+    }
+
+    private async Task EnsureIndexerStorageMode(string baseUrl, string username, string password, CancellationToken ct)
+    {
+        try
+        {
+            var auth = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{username}:{password}"));
+            using var client = new HttpClient();
+            client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", auth);
+
+            // Try plasma first (Enterprise default), fall back to forestdb (Community editions
+            // reject plasma with HTTP 400 — "The value must be one of the following: [forestdb]").
+            foreach (var mode in new[] { "plasma", "forestdb" })
+            {
+                var body = new FormUrlEncodedContent(new[]
+                {
+                    new KeyValuePair<string, string>("storageMode", mode)
+                });
+                var resp = await client.PostAsync($"{baseUrl}/settings/indexes", body, ct);
+                if (resp.IsSuccessStatusCode)
+                {
+                    _logger?.LogDebug("Indexer storage mode set to {Mode}", mode);
+                    return;
+                }
+                var err = await resp.Content.ReadAsStringAsync(ct);
+                _logger?.LogDebug("Indexer storage mode={Mode} POST returned {Status}: {Error}", mode, resp.StatusCode, err);
+            }
+            _logger?.LogWarning("Failed to set indexer storage mode; CREATE PRIMARY INDEX may fail");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Could not set indexer storage mode");
+        }
     }
 
     private async Task EnsureBucketExists(string baseUrl, string username, string password, string bucketName, CancellationToken ct)
@@ -397,8 +440,18 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
                     }
                 }
 
-                // Wait for Couchbase to be ready and check if cluster needs initialization
-                if (!await WaitForCouchbaseAndCheckInitialization(baseUrl, username, password, options.Bucket, ct))
+                // When ManagementUrl is explicitly configured we assume the caller (e.g.
+                // Testcontainers) has already waited for the cluster to come up — the .NET 10
+                // HttpClient's stricter response parsing reports "response ended prematurely"
+                // against Couchbase's management endpoints and makes the probe loop unreliable.
+                // We still need to ensure the indexer storage mode is set (Testcontainers Couchbase
+                // doesn't always set it) and the N1QL service is reachable.
+                if (!string.IsNullOrWhiteSpace(options.ManagementUrl))
+                {
+                    await EnsureIndexerStorageMode(baseUrl, username, password, ct);
+                    await WaitForN1QLServiceReadiness(baseUrl, username, password, ct);
+                }
+                else if (!await WaitForCouchbaseAndCheckInitialization(baseUrl, username, password, options.Bucket, ct))
                 {
                     _logger?.LogDebug("Couchbase cluster initialization was not needed or failed gracefully");
                 }
@@ -439,9 +492,15 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
             {
                 _logger?.LogDebug("Opening Couchbase bucket {Bucket}", options.Bucket);
 
-                // Retry bucket access with exponential backoff for connection issues
-                const int maxRetries = 5;
+                // Retry bucket access with bounded exponential backoff for connection issues.
+                // The Couchbase server SDK sometimes throws MultiplexingConnection /
+                // SocketNotAvailable during the container's internal bucket warm-up even after the
+                // management API has reported the cluster healthy. The previous 5-attempt /
+                // 500ms-base schedule only waited ~7.5s before giving up, well short of the
+                // ~30s a fresh Testcontainers Couchbase bucket needs.
+                const int maxRetries = 12;
                 const int baseDelayMs = 500;
+                const int maxDelayMs = 3000;
 
                 for (int attempt = 0; attempt < maxRetries; attempt++)
                 {
@@ -465,7 +524,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
                     catch (Exception ex) when (attempt < maxRetries - 1 &&
                         (ex.Message.Contains("MultiplexingConnection") || ex.Message.Contains("SocketNotAvailable")))
                     {
-                        var delay = baseDelayMs * (int)Math.Pow(2, attempt);
+                        var delay = Math.Min(maxDelayMs, baseDelayMs * (int)Math.Pow(2, attempt));
                         _logger?.LogDebug(ex, "Bucket access attempt {Attempt}/{MaxRetries} failed, retrying in {Delay}ms", attempt + 1, maxRetries, delay);
                         await Task.Delay(delay, ct);
                     }
