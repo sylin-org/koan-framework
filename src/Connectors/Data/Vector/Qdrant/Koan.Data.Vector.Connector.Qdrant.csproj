@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <KoanPackageKind>Periphery</KoanPackageKind>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>Koan.Data.Vector.Connector.Qdrant</AssemblyName>
+    <RootNamespace>Koan.Data.Vector.Connector.Qdrant</RootNamespace>
+    <Description>Qdrant vector adapter for Koan: collection management, payload-based metadata filtering, REST-based KNN search with synchronous write semantics (wait=true).</Description>
+    <PackageTags>$(CommonPackageTags);data;vector;qdrant;knn</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\..\Koan.Data.Vector.Abstractions\Koan.Data.Vector.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\..\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <ProjectReference Include="..\..\..\..\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\..\..\..\Koan.Orchestration.Abstractions\Koan.Orchestration.Abstractions.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+  </ItemGroup>
+</Project>
