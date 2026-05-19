@@ -87,9 +87,13 @@ A request that goes through URL override skips, on purpose:
 
 These are deliberate trade-offs. The caller-owned routing model assumes the caller already tracks health and capabilities in its own storage and applies its own enable/disable rules before calling. Koan's job in this mode is the protocol-level executor, nothing more.
 
-### D5. Scope: chat first
+### D5. Scope: chat first, embedding follows
 
-This ADR applies to `AiChatRequest` only. The other request types (`AiEmbeddingsRequest`, `OcrRequest`, `RerankRequest`, etc.) also carry `InternalConnectionString` and would accept the same treatment. Extension to those is deferred until a concrete consumer use case lands; the architecture is identical so the extension is mechanical.
+This ADR launches with `AiChatRequest`. The same treatment extends mechanically to other request types that carry `InternalConnectionString`; the extension lands as the corresponding consumer use case surfaces.
+
+**Embedding extension** (added in the same release): `AiEmbeddingsRequest.OverrideUrl` / `OverrideProvider`, `EmbedOptions.OverrideUrl` / `OverrideProvider`, and `AiCategoryRouter.ResolveEmbeddings` short-circuit. Same shape as chat, same trade-offs, same `SynthesizeOverrideResolution` helper. `Client.Embed(text, options)` propagates the override from `EmbedOptions` to the request.
+
+OCR, rerank, transcribe, etc. follow the same pattern when needed. Each is a ~10-LOC field addition plus a router branch.
 
 ## Consequences
 
