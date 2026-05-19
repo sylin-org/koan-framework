@@ -67,10 +67,28 @@ public sealed class QdrantOptions : IAdapterOptions
     public bool WaitForResult { get; set; } = true;
 
     /// <summary>
-    /// Store the HNSW graph on disk rather than memory. Default false (memory-resident, fastest).
-    /// Enable for collections too large to fit in RAM at the cost of higher search latency.
+    /// Store the original (unquantized) vectors on disk rather than memory. Default <b>true</b> —
+    /// Qdrant is positioned in Koan as the lean cell (resource-constrained deployments); pairing
+    /// on-disk originals with the default scalar quantization codebook in RAM is what produces
+    /// the actual ~4× memory win. Setting this to false alongside <see cref="Quantization"/>
+    /// stores both float32 AND uint8 in RAM (~25% memory penalty over native precision).
+    /// For full-fidelity in-memory search, set both this to false and <see cref="Quantization"/>
+    /// to None.
     /// </summary>
-    public bool OnDisk { get; set; } = false;
+    public bool OnDisk { get; set; } = true;
+
+    /// <summary>
+    /// Vector quantization configuration. Defaults to scalar quantization (uint8 codebook) with
+    /// rescoring — the lean-by-default profile that gives Qdrant its memory-efficiency edge over
+    /// other vector adapters in the Koan matrix. Set to null or
+    /// <c>new QuantizationOptions { Type = "None" }</c> for native float32 precision throughout.
+    ///
+    /// <para>
+    /// See <see cref="QuantizationOptions"/> for the recall-vs-memory tradeoff details and
+    /// per-mode characteristics.
+    /// </para>
+    /// </summary>
+    public QuantizationOptions? Quantization { get; set; } = new QuantizationOptions();
 
     // Query configuration for vector similarity search. MaxTopK is a vector-search domain
     // concept (cost of nearest-neighbour scoring), not a row-page cap; it stays.

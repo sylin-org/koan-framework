@@ -142,6 +142,40 @@ public sealed class QdrantTestFactory : IVectorAdapterTestFactory
         Koan.Core.Hosting.App.AppHost.Current = _sp;
     }
 
+    /// <summary>
+    /// Endpoint URL of the running Qdrant instance, useful for tests that need to inspect
+    /// collection state via the admin HTTP API (e.g. verifying quantization config landed).
+    /// Null until <see cref="InitializeAsync"/> has resolved a backing instance.
+    /// </summary>
+    public string? Endpoint => _endpoint;
+
+    /// <summary>
+    /// Builds an isolated <see cref="IServiceProvider"/> against the same Qdrant instance with
+    /// custom options. Used by adapter-specific specs (e.g. quantization mode coverage) that
+    /// need to vary configuration per test. Caller is responsible for disposing the returned SP.
+    /// </summary>
+    public ServiceProvider BuildServiceProviderWith(Action<QdrantOptions> configure)
+    {
+        if (_endpoint is null) throw new InvalidOperationException("Factory not initialized.");
+
+        var services = new ServiceCollection();
+        services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
+        services.AddLogging();
+        services.AddHttpClient("qdrant", c => c.BaseAddress = new Uri(_endpoint));
+        services.AddKoanDataVector();
+
+        services.AddOptions<QdrantOptions>().Configure(o =>
+        {
+            // Start from the same baseline the matrix uses, then let the spec override.
+            ApplyMatrixDefaults(o, _endpoint, EmbeddingDimension);
+            configure(o);
+        });
+        services.AddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
+        services.AddSingleton<IVectorAdapterFactory, QdrantVectorAdapterFactory>();
+
+        return services.BuildServiceProvider();
+    }
+
     private void BuildSp()
     {
         if (_endpoint is null) throw new InvalidOperationException("Endpoint not resolved.");
@@ -153,19 +187,28 @@ public sealed class QdrantTestFactory : IVectorAdapterTestFactory
         services.AddHttpClient("qdrant", c => c.BaseAddress = new Uri(_endpoint));
         services.AddKoanDataVector();
 
-        services.AddOptions<QdrantOptions>().Configure(o =>
-        {
-            o.ConnectionString = _endpoint;
-            o.Endpoint = _endpoint;
-            o.Dimension = EmbeddingDimension;
-            o.AutoCreateCollection = true;
-            o.Distance = "Cosine";
-            o.WaitForResult = true; // synchronous writes for deterministic test behavior
-        });
+        services.AddOptions<QdrantOptions>().Configure(o => ApplyMatrixDefaults(o, _endpoint, EmbeddingDimension));
         services.AddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
         services.AddSingleton<IVectorAdapterFactory, QdrantVectorAdapterFactory>();
 
         _sp = services.BuildServiceProvider();
+    }
+
+    /// <summary>
+    /// Matrix baseline: lean defaults (scalar quantization on, on-disk originals) — the same
+    /// profile production users get out of the box. Spec-specific factories layer overrides on
+    /// top via <see cref="BuildServiceProviderWith"/>.
+    /// </summary>
+    private static void ApplyMatrixDefaults(QdrantOptions o, string endpoint, int embeddingDimension)
+    {
+        o.ConnectionString = endpoint;
+        o.Endpoint = endpoint;
+        o.Dimension = embeddingDimension;
+        o.AutoCreateCollection = true;
+        o.Distance = "Cosine";
+        o.WaitForResult = true; // synchronous writes for deterministic test behavior
+        // o.OnDisk and o.Quantization keep their adapter-level defaults (true / Scalar) — that's
+        // the lean profile we want the matrix to exercise so prod and test stay in sync.
     }
 
     private static async Task<bool> Ping(string endpoint)

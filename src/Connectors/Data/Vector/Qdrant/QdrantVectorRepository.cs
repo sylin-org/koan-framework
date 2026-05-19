@@ -257,10 +257,23 @@ internal sealed class QdrantVectorRepository<TEntity, TKey> :
             ["with_vector"] = false
         };
         if (filter is not null) body["filter"] = filter;
-        if (options.Timeout is { } timeout) body["params"] = new JObject
+
+        // Search-time params block. Quantization rescore/oversampling only meaningful when
+        // quantization is active for the collection; otherwise we'd be sending no-op fields.
+        var searchParams = new JObject();
+        if (options.Timeout is { } timeout)
         {
-            ["timeout"] = (int)Math.Ceiling(timeout.TotalSeconds)
-        };
+            searchParams["timeout"] = (int)Math.Ceiling(timeout.TotalSeconds);
+        }
+        if (_options.Quantization is { IsEnabled: true } q)
+        {
+            searchParams["quantization"] = new JObject
+            {
+                ["rescore"] = q.Rescore,
+                ["oversampling"] = q.Oversampling
+            };
+        }
+        if (searchParams.HasValues) body["params"] = searchParams;
 
         var url = $"/collections/{Uri.EscapeDataString(CollectionName)}/points/search";
         var parsed = await PostJson(url, body, "search", ct);
@@ -394,6 +407,16 @@ internal sealed class QdrantVectorRepository<TEntity, TKey> :
                 }
             }
         };
+
+        // Lean-by-default quantization. Pairs with on_disk=true on the vector config above to
+        // produce the actual ~4× memory win: float32 originals on disk, uint8 codebook in RAM
+        // (or on disk per AlwaysRam). Without on_disk the originals also stay in RAM and you
+        // pay a memory penalty instead. The two settings are designed to move together.
+        var quantizationBlock = BuildQuantizationConfig(_options.Quantization);
+        if (quantizationBlock is not null)
+        {
+            body["quantization_config"] = quantizationBlock;
+        }
 
         var url = $"/collections/{Uri.EscapeDataString(collectionName)}";
         var resp = await _http.PutAsync(url,
@@ -558,6 +581,49 @@ internal sealed class QdrantVectorRepository<TEntity, TKey> :
             }
             _http.DefaultRequestHeaders.Add("api-key", _options.ApiKey);
         }
+    }
+
+    /// <summary>
+    /// Translates <see cref="QuantizationOptions"/> into the Qdrant collection-create
+    /// <c>quantization_config</c> block. Returns null when quantization is disabled (null
+    /// options or Type=None) so the caller can omit the property entirely from the body.
+    /// </summary>
+    private static JObject? BuildQuantizationConfig(QuantizationOptions? q)
+    {
+        if (q is null || !q.IsEnabled) return null;
+
+        // Qdrant wraps each mode's config under a discriminator key (scalar | product | binary).
+        // The wire format also differs per mode, so we shape each case explicitly rather than
+        // emitting a generic structure that could drift from the API.
+        return q.Type.Trim().ToLowerInvariant() switch
+        {
+            "scalar" => new JObject
+            {
+                ["scalar"] = new JObject
+                {
+                    ["type"] = "int8",
+                    ["quantile"] = q.Quantile ?? 0.99,
+                    ["always_ram"] = q.AlwaysRam
+                }
+            },
+            "product" => new JObject
+            {
+                ["product"] = new JObject
+                {
+                    ["compression"] = q.Compression ?? "x16",
+                    ["always_ram"] = q.AlwaysRam
+                }
+            },
+            "binary" => new JObject
+            {
+                ["binary"] = new JObject
+                {
+                    ["always_ram"] = q.AlwaysRam
+                }
+            },
+            _ => throw new InvalidOperationException(
+                $"Unknown Qdrant quantization type '{q.Type}'. Valid values: Scalar, Product, Binary, None.")
+        };
     }
 
     private static string NormalizeDistance(string distance)

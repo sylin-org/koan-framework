@@ -13,7 +13,7 @@ namespace Koan.Data.Vector.Connector.Qdrant;
     ContainerImage = "qdrant/qdrant",
     DefaultTag = "v1.10.0",
     DefaultPorts = new[] { 6333, 6334 },
-    Capabilities = new[] { "protocol=http", "vector-search=true", "filters=true", "synchronous-writes=true" },
+    Capabilities = new[] { "protocol=http", "vector-search=true", "filters=true", "synchronous-writes=true", "profile=lean", "quantization=scalar-default" },
     Volumes = new[] { "./Data/qdrant:/qdrant/storage" },
     AppEnv = new[] { "Koan__Data__Qdrant__Endpoint=http://{serviceId}:{port}" },
     HealthEndpoint = "/readyz",
