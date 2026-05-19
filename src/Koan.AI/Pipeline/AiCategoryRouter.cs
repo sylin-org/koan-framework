@@ -159,6 +159,17 @@ internal sealed class AiCategoryRouter
     public AiRouteResolution ResolveEmbeddings(AiEmbeddingsRequest request)
     {
         if (request is null) throw new ArgumentNullException(nameof(request));
+
+        // AI-0035: URL override path. Same semantics as the chat-side short-circuit.
+        if (!string.IsNullOrWhiteSpace(request.OverrideUrl))
+        {
+            return SynthesizeOverrideResolution(
+                url: request.OverrideUrl!,
+                provider: request.OverrideProvider,
+                category: AiCapability.Embed,
+                model: request.Model);
+        }
+
         return Resolve(AiCapability.Embed, null, request.Model);
     }
 

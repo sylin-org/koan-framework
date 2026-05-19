@@ -31,6 +31,19 @@ public sealed record EmbedOptions
     /// <summary>Override model for this request.</summary>
     public string? Model { get; init; }
 
+    /// <summary>
+    /// AI-0035: Caller-supplied URL override. When set, the router bypasses source / member
+    /// resolution and dispatches directly to this endpoint. Pair with
+    /// <see cref="OverrideProvider"/> (defaults to <c>"ollama"</c>) to select the adapter.
+    /// </summary>
+    public string? OverrideUrl { get; init; }
+
+    /// <summary>
+    /// AI-0035: Provider identifier paired with <see cref="OverrideUrl"/>. Defaults to
+    /// <c>"ollama"</c> when omitted.
+    /// </summary>
+    public string? OverrideProvider { get; init; }
+
     /// <summary>Vendor-specific options (forwarded to adapter as-is).</summary>
     public IDictionary<string, object>? VendorOptions { get; init; }
 }
