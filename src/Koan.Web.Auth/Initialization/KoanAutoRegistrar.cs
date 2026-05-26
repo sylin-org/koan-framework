@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Koan.Core;
+using Koan.Core.Ordering;
 using Koan.Web.Auth.Extensions;
 using Koan.Web.Auth.Infrastructure;
 using Koan.Web.Extensions;
@@ -17,6 +18,12 @@ using BootSettingSource = Koan.Core.Hosting.Bootstrap.BootSettingSource;
 
 namespace Koan.Web.Auth.Initialization;
 
+// CORE-0091: Koan.Web.Auth's pipeline contributions (Cookie / OAuth auth
+// scheme registration, MeController et al.) depend on Koan.Web having
+// already wired UseRouting + the controller dispatcher. Declaring the
+// ordering explicitly so the bootstrap doesn't depend on
+// ConcurrentDictionary enumeration luck.
+[After(typeof(Koan.Web.Initialization.KoanAutoRegistrar))]
 public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 {
     public string ModuleName => "Koan.Web.Auth";

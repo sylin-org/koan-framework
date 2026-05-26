@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Hosting;
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
+using Koan.Core.Ordering;
 using Koan.Core.Provenance;
 using Koan.Web.Auth.Providers;
 using Koan.Web.Auth.Connector.Test.Infrastructure;
@@ -18,6 +19,17 @@ using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExt
 
 namespace Koan.Web.Auth.Connector.Test.Initialization;
 
+// CORE-0091: This registrar contributes KoanTestProviderStartupFilter,
+// which calls app.UseEndpoints(MapKoanTestProviderEndpoints) — that call
+// requires UseRouting to be in the pipeline first. Koan.Web's startup
+// filter is what puts UseRouting there, so this registrar's Initialize
+// must run AFTER Koan.Web's (and transitively Koan.Web.Auth's). Before
+// CORE-0091 the ordering came from ConcurrentDictionary enumeration
+// luck; under-loaded apps would get the wrong order and the test
+// provider's routes would silently never bind, falling through to the
+// SPA's 404. Declaring the dependency explicitly makes the contract
+// permanent.
+[After(typeof(Koan.Web.Auth.Initialization.KoanAutoRegistrar))]
 public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 {
     public string ModuleName => "Koan.Web.Auth.Connector.Test";

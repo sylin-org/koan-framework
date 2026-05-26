@@ -7,7 +7,8 @@
     Kernel bump : minor (auto-detected from kernel-folder commits)
   -->
   <PropertyGroup>
-    <KoanKernelVersion>0.8.1</KoanKernelVersion>
+    <!-- CORE-0091: kernel bump for [Before]/[After] ordering attributes. -->
+    <KoanKernelVersion>0.8.2</KoanKernelVersion>
   </PropertyGroup>
 
   <!-- Periphery package versions (one PropertyGroup per package). -->
@@ -222,22 +223,22 @@
     <Version>0.8.1</Version>
   </PropertyGroup>
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Web.Auth' and '$(KoanPackageKind)' == 'Periphery'">
-    <Version>0.8.1</Version>
+    <Version>0.8.2</Version>
   </PropertyGroup>
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Web.Auth.Connector.Discord' and '$(KoanPackageKind)' == 'Periphery'">
-    <Version>0.8.1</Version>
+    <Version>0.8.2</Version>
   </PropertyGroup>
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Web.Auth.Connector.Google' and '$(KoanPackageKind)' == 'Periphery'">
-    <Version>0.8.1</Version>
+    <Version>0.8.2</Version>
   </PropertyGroup>
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Web.Auth.Connector.Microsoft' and '$(KoanPackageKind)' == 'Periphery'">
-    <Version>0.8.1</Version>
+    <Version>0.8.2</Version>
   </PropertyGroup>
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Web.Auth.Connector.Oidc' and '$(KoanPackageKind)' == 'Periphery'">
-    <Version>0.8.1</Version>
+    <Version>0.8.2</Version>
   </PropertyGroup>
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Web.Auth.Connector.Test' and '$(KoanPackageKind)' == 'Periphery'">
-    <Version>0.8.1</Version>
+    <Version>0.8.2</Version>
   </PropertyGroup>
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Web.Auth.Roles' and '$(KoanPackageKind)' == 'Periphery'">
     <Version>0.8.1</Version>
@@ -267,7 +268,7 @@
     <Version>0.8.1</Version>
   </PropertyGroup>
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Web.Transformers' and '$(KoanPackageKind)' == 'Periphery'">
-    <Version>0.8.1</Version>
+    <Version>0.8.2</Version>
   </PropertyGroup>
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.WebSockets' and '$(KoanPackageKind)' == 'Periphery'">
     <Version>0.8.1</Version>
