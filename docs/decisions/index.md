@@ -25,6 +25,17 @@ Vision and capability expansion for Koan.AI: model catalog, compute fabric, prom
 | AI-0030 | [Review Queues](AI-0030-review-queues.md) | Proposed | AI-0028 |
 | AI-0031 | [Entity-Aware Agents](AI-0031-entity-aware-agents.md) | Proposed | AI-0026, AI-0014 |
 
+## Media Pillar (MEDIA-0001 – MEDIA-0004)
+
+Storage, variant routing, transform pipeline, and the recipe-based rendering surface.
+
+| ID | Title | Status | Depends On / Supersedes |
+|----|-------|--------|-------------------------|
+| MEDIA-0001 | [Media pillar baseline and storage integration](MEDIA-0001-media-pillar-baseline-and-storage-integration.md) | Accepted | — |
+| MEDIA-0002 | [S6 Social Creator sample and htmx UI](MEDIA-0002-s6-social-creator-and-htmx-ui.md) | Accepted | MEDIA-0001 |
+| MEDIA-0003 | [Variant routing, automatic transforms, and canonical signature](MEDIA-0003-media-variant-routing-and-transforms.md) | Accepted | MEDIA-0001 |
+| MEDIA-0004 | [Recipe pipeline, format-preserving transforms, and overlay composition](MEDIA-0004-recipe-pipeline.md) | Proposed | Extends MEDIA-0003; supersedes DX-0047 encoding policy |
+
 ## Recent Archival / Streamlining Decisions
 
 | ID | Title | Intent |
