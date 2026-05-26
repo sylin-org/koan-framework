@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using Koan.Core.Ordering;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Core.Hosting.Registry;
@@ -50,14 +51,19 @@ public static partial class KoanRegistry
     }
 
     /// <summary>
-    /// Returns all initializer types registered for the current AppDomain.
+    /// Returns all initializer types registered for the current AppDomain,
+    /// topologically sorted to satisfy any <see cref="BeforeAttribute"/> /
+    /// <see cref="AfterAttribute"/> declarations and otherwise broken by a
+    /// stable <c>AssemblyQualifiedName</c> tie-break. See CORE-0091.
     /// </summary>
-    public static Type[] GetInitializerTypes() => _initializerTypes.Keys.ToArray();
+    public static Type[] GetInitializerTypes() => RegistrarOrdering.Sort(_initializerTypes.Keys);
 
     /// <summary>
-    /// Returns all auto-registrar types registered for the current AppDomain.
+    /// Returns all auto-registrar types registered for the current AppDomain,
+    /// sorted by the same rules as <see cref="GetInitializerTypes"/> so that
+    /// provenance / boot-output ordering matches initialization ordering.
     /// </summary>
-    public static Type[] GetAutoRegistrarTypes() => _autoRegistrarTypes.Keys.ToArray();
+    public static Type[] GetAutoRegistrarTypes() => RegistrarOrdering.Sort(_autoRegistrarTypes.Keys);
 
     /// <summary>
     /// Returns background service descriptors registered for the current AppDomain.
