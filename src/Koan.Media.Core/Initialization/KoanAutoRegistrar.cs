@@ -1,14 +1,24 @@
+using System.Reflection;
+using Koan.Core;
 using Koan.Core.Modules;
+using Koan.Media.Abstractions.Recipes;
+using Koan.Media.Core.Recipes;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 
 namespace Koan.Media.Core.Initialization;
 
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Koan.Core;
-using Koan.Media.Core.Operators;
-using Koan.Media.Core.Options;
-
+/// <summary>
+/// DI registrar for Koan.Media.Core. Wires:
+/// <list type="bullet">
+///   <item><see cref="RecipesOptions"/> binding from <c>Koan:Media:Recipes</c></item>
+///   <item><see cref="IMediaRecipeRegistry"/> singleton scanning loaded assemblies for <c>[MediaRecipe]</c></item>
+/// </list>
+/// The pipeline itself is stateless and reached via <c>stream.AsMedia()</c>;
+/// no DI registration needed for the engine.
+/// </summary>
 public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 {
     public string ModuleName => "Koan.Media.Core";
@@ -16,20 +26,38 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        // Bind options from configuration at Koan:Media:Transforms
-        services.AddKoanOptions<MediaTransformOptions>(Infrastructure.ConfigurationConstants.Keys.Transforms);
+        // Bind appsettings recipes
+        services.AddOptions<RecipesOptions>()
+            .BindConfiguration(RecipesOptions.SectionPath);
 
-        services.AddSingleton<IMediaOperator, ResizeOperator>();
-        services.AddSingleton<IMediaOperator, RotateOperator>();
-        services.AddSingleton<IMediaOperator, CropOperator>();
-        services.AddSingleton<IMediaOperator, PadOperator>();
-        services.AddSingleton<IMediaOperator, TypeConverterOperator>();
-        services.AddSingleton<IMediaOperatorRegistry, MediaOperatorRegistry>();
+        // Discover application assemblies for [MediaRecipe] scanning
+        services.TryAddSingleton<IMediaRecipeRegistry>(sp =>
+        {
+            var monitor = sp.GetService<Microsoft.Extensions.Options.IOptionsMonitor<RecipesOptions>>();
+            var logger = sp.GetService<Microsoft.Extensions.Logging.ILogger<MediaRecipeRegistry>>();
+            var assemblies = AppDomain.CurrentDomain.GetAssemblies()
+                .Where(IsScannable)
+                .ToArray();
+            return new MediaRecipeRegistry(assemblies, monitor, logger);
+        });
     }
 
     public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         module.Describe(ModuleVersion);
     }
-}
 
+    private static bool IsScannable(Assembly asm)
+    {
+        if (asm.IsDynamic) return false;
+        var name = asm.GetName().Name ?? "";
+        // Skip framework + test infra; keep app + Koan modules so recipe-bearing
+        // attribute methods in either are discovered.
+        if (name.StartsWith("System", StringComparison.Ordinal)) return false;
+        if (name.StartsWith("Microsoft", StringComparison.Ordinal)) return false;
+        if (name.StartsWith("netstandard", StringComparison.Ordinal)) return false;
+        if (name.StartsWith("xunit", StringComparison.Ordinal)) return false;
+        if (name.StartsWith("FluentAssertions", StringComparison.Ordinal)) return false;
+        return true;
+    }
+}
