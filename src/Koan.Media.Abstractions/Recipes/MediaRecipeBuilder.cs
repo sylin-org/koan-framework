@@ -1,0 +1,249 @@
+using System.Collections.Immutable;
+
+namespace Koan.Media.Abstractions.Recipes;
+
+/// <summary>
+/// Fluent builder for <see cref="MediaRecipe"/>. Each verb produces a
+/// new builder instance (immutable-friendly chaining). Terminal
+/// methods <see cref="Build"/> and the implicit conversion to
+/// <see cref="MediaRecipe"/> materialise the result.
+///
+/// The builder enforces:
+/// <list type="bullet">
+///   <item>At most one step per single-slot stage (shape, size, encode, frame, orient).</item>
+///   <item>A terminal encode step — if none was declared, an implicit
+///   <see cref="EncodeStep"/> with null format (preserve source) is appended at <see cref="Build"/>.</item>
+///   <item>Last-call-wins for <c>.Name()</c> and <c>.Primary()</c> — they apply to the most recently added step.</item>
+/// </list>
+/// </summary>
+public sealed class MediaRecipeBuilder
+{
+    private readonly List<MediaStep> _steps = new();
+    private string? _name;
+    private string? _description;
+    private int _version = 1;
+    private MutatorKind _mutators = MutatorKind.None;
+    private bool _eager;
+
+    internal MediaRecipeBuilder() { }
+
+    public MediaRecipeBuilder WithName(string name)
+    {
+        _name = name;
+        return this;
+    }
+
+    public MediaRecipeBuilder WithDescription(string description)
+    {
+        _description = description;
+        return this;
+    }
+
+    public MediaRecipeBuilder WithVersion(int version)
+    {
+        _version = version;
+        return this;
+    }
+
+    public MediaRecipeBuilder Mutators(MutatorKind kinds)
+    {
+        _mutators = kinds;
+        return this;
+    }
+
+    public MediaRecipeBuilder WithEager(bool eager = true)
+    {
+        _eager = eager;
+        return this;
+    }
+
+    // ----- Stage 2: Orient -----
+
+    /// <summary>EXIF-based auto-orient. Default-on behavior is provided
+    /// by the engine when no orient step is declared; call this
+    /// explicitly to keep EXIF orientation untouched.</summary>
+    public MediaRecipeBuilder AutoOrient(bool keep = false) => Add(new AutoOrientStep(Keep: keep));
+
+    // ----- Stage 3: Frame -----
+
+    public MediaRecipeBuilder ExtractFrame(int index = 0) => Add(new ExtractFrameStep(index));
+
+    // ----- Stage 4: Rotate / Flip -----
+
+    public MediaRecipeBuilder Rotate(int degrees) => Add(new RotateStep(degrees));
+    public MediaRecipeBuilder FlipHorizontal() => Add(new FlipStep(FlipAxis.Horizontal));
+    public MediaRecipeBuilder FlipVertical() => Add(new FlipStep(FlipAxis.Vertical));
+
+    // ----- Stage 5: Shape -----
+
+    public MediaRecipeBuilder Crop(string aspect) => Shape(crop: ParseCrop(aspect));
+    public MediaRecipeBuilder Crop(CropSpec spec) => Shape(crop: spec);
+
+    public MediaRecipeBuilder Fit(
+        Fit mode = Recipes.Fit.Cover,
+        int? width = null,
+        int? height = null,
+        Position? position = null,
+        Background? bg = null)
+    {
+        var shape = new ShapeStep(
+            Crop: width is not null && height is not null
+                ? CropSpec.Pixels(width.Value, height.Value)
+                : null,
+            Fit: mode,
+            Position: position ?? Position.Center,
+            Background: bg ?? Background.Transparent());
+        ReplaceOrAdd(shape, PipelineStage.Shape);
+        return this;
+    }
+
+    /// <summary>Explicit shape declaration with all four CSS-aligned knobs.</summary>
+    public MediaRecipeBuilder Shape(
+        CropSpec? crop = null,
+        Fit fit = Recipes.Fit.Cover,
+        Position? position = null,
+        Background? bg = null)
+    {
+        var shape = new ShapeStep(
+            Crop: crop,
+            Fit: fit,
+            Position: position ?? Position.Center,
+            Background: bg ?? Background.Transparent());
+        ReplaceOrAdd(shape, PipelineStage.Shape);
+        return this;
+    }
+
+    // ----- Stage 6: Size -----
+
+    public MediaRecipeBuilder Resize(int? width = null, int? height = null, double dpr = 1.0)
+    {
+        ReplaceOrAdd(new ResizeStep(width, height, dpr), PipelineStage.Size);
+        return this;
+    }
+
+    /// <summary>Resize to fit within bounds (preserves aspect; both axes capped).</summary>
+    public MediaRecipeBuilder ResizeFit(int maxWidth, int maxHeight) =>
+        Resize(maxWidth, maxHeight).Shape(fit: Recipes.Fit.Contain);
+
+    /// <summary>Resize to cover bounds (preserves aspect; crops overflow).</summary>
+    public MediaRecipeBuilder ResizeCover(int width, int height, Position? position = null) =>
+        Resize(width, height).Shape(
+            crop: CropSpec.Pixels(width, height),
+            fit: Recipes.Fit.Cover,
+            position: position ?? Position.Center);
+
+    // ----- Stage 7: Overlay (placeholder — see MEDIA-0004 §7 follow-up) -----
+    // Overlay step type lives in v2 follow-up PR.
+
+    // ----- Stage 8: Strip -----
+
+    public MediaRecipeBuilder Strip(MetadataKinds kinds = MetadataKinds.All)
+    {
+        ReplaceOrAdd(new StripStep(kinds), PipelineStage.Metadata);
+        return this;
+    }
+
+    // ----- Stage 9: Encode -----
+
+    /// <summary>Encode in the source's own format (the default if no encode is declared).</summary>
+    public MediaRecipeBuilder PreserveFormat(int quality = Recipes.Quality.Web)
+    {
+        ReplaceOrAdd(new EncodeStep(Format: null, Quality: quality), PipelineStage.Encode);
+        return this;
+    }
+
+    /// <summary>Encode as the named format (still preserves animation/alpha if the target supports them).</summary>
+    public MediaRecipeBuilder EncodeAs(string format, int quality = Recipes.Quality.Web)
+    {
+        ReplaceOrAdd(new EncodeStep(Format: format, Quality: quality), PipelineStage.Encode);
+        return this;
+    }
+
+    /// <summary>
+    /// Destructive: change format and drop animation / alpha if the
+    /// target doesn't support them. Explicit verb; engine logs at
+    /// Information.
+    /// </summary>
+    public MediaRecipeBuilder FlattenTo(string format, int quality = Recipes.Quality.Web)
+    {
+        ReplaceOrAdd(new FlattenToStep(Format: format, Quality: quality), PipelineStage.Encode);
+        return this;
+    }
+
+    // ----- Step decorators (apply to last-added step) -----
+
+    public MediaRecipeBuilder Name(string name)
+    {
+        if (_steps.Count == 0) throw new InvalidOperationException("Name() requires a preceding step.");
+        var last = _steps[^1];
+        _steps[^1] = last with { Name = name };
+        return this;
+    }
+
+    public MediaRecipeBuilder Primary()
+    {
+        if (_steps.Count == 0) throw new InvalidOperationException("Primary() requires a preceding step.");
+        var last = _steps[^1];
+        _steps[^1] = last with { Primary = true };
+        return this;
+    }
+
+    // ----- Materialisation -----
+
+    public MediaRecipe Build()
+    {
+        // Append implicit format-preserving encode if the caller didn't declare one
+        if (!_steps.Any(s => s.Stage == PipelineStage.Encode))
+        {
+            _steps.Add(new EncodeStep(Format: null));
+        }
+        return new MediaRecipe
+        {
+            Name = _name,
+            Description = _description,
+            Version = _version,
+            Steps = _steps.ToImmutableArray(),
+            AllowedMutators = _mutators,
+            Eager = _eager,
+        };
+    }
+
+    public static implicit operator MediaRecipe(MediaRecipeBuilder b) => b.Build();
+
+    // ----- internals -----
+
+    private MediaRecipeBuilder Add(MediaStep step)
+    {
+        // Single-slot stages: replace
+        if (step.Stage == PipelineStage.Shape ||
+            step.Stage == PipelineStage.Size ||
+            step.Stage == PipelineStage.Encode ||
+            step.Stage == PipelineStage.Frame ||
+            step.Stage == PipelineStage.Orient ||
+            step.Stage == PipelineStage.Metadata)
+        {
+            ReplaceOrAdd(step, step.Stage);
+        }
+        else
+        {
+            _steps.Add(step);
+        }
+        return this;
+    }
+
+    private void ReplaceOrAdd(MediaStep step, PipelineStage slot)
+    {
+        var existing = _steps.FindIndex(s => s.Stage == slot);
+        if (existing >= 0) _steps[existing] = step;
+        else _steps.Add(step);
+    }
+
+    private static CropSpec ParseCrop(string raw)
+    {
+        if (!CropSpec.TryParse(raw, out var spec))
+        {
+            throw new ArgumentException($"Invalid crop value '{raw}'. Expected 'square', 'W:H', 'WxH', or 'WxH+X,Y'.", nameof(raw));
+        }
+        return spec;
+    }
+}
