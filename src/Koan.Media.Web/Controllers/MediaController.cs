@@ -174,11 +174,27 @@ public sealed class MediaController : ControllerBase
             MediaOutput output;
             try
             {
+                var limits = new MediaPipelineLimits
+                {
+                    MaxSourceMegapixels = _options.MaxSourceMegapixels,
+                    MaxFrameCount = _options.MaxFrameCount,
+                };
                 output = await handle.Bytes
-                    .AsMedia(_logger, _overlayResolver, _fonts)
+                    .AsMedia(_logger, _overlayResolver, _fonts, limits)
                     .Apply(effectiveRecipe)
                     .ToBytesAsync(ct)
                     .ConfigureAwait(false);
+            }
+            catch (MediaSourceLimitException lex)
+            {
+                Response.Headers["X-Koan-Media-LimitExceeded"] = lex.LimitName;
+                return BadRequest(new
+                {
+                    error = lex.Message,
+                    limit = lex.LimitName,
+                    value = lex.Value,
+                    cap = lex.Cap,
+                });
             }
             catch (MediaDecodeException dex)
             {
@@ -198,7 +214,7 @@ public sealed class MediaController : ControllerBase
             }
 
             ApplyDiagnostics(seedRecipe, effectiveRecipe, fingerprint,
-                sourceFormat: output.Format, output: output,
+                sourceFormat: output.SourceFormat, output: output,
                 ignored: parseResult.IgnoredParams, fromCache: "miss");
 
             return File(output.Bytes, output.ContentType);

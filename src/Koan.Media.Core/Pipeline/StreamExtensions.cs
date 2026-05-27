@@ -24,6 +24,8 @@ public static class StreamExtensions
         this Stream source,
         ILogger? logger = null,
         IOverlayResolver? overlayResolver = null,
-        KoanFontRegistry? fonts = null) =>
-        MediaPipeline.From(source, logger, disposeSource: true, overlayResolver: overlayResolver, fonts: fonts);
+        KoanFontRegistry? fonts = null,
+        MediaPipelineLimits? limits = null) =>
+        MediaPipeline.From(source, logger, disposeSource: true,
+            overlayResolver: overlayResolver, fonts: fonts, limits: limits);
 }

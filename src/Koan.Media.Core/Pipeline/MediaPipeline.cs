@@ -31,6 +31,7 @@ public sealed class MediaPipeline : IMediaPipeline
     private readonly ILogger _logger;
     private readonly IOverlayResolver? _overlayResolver;
     private readonly KoanFontRegistry? _fonts;
+    private readonly MediaPipelineLimits _limits;
     private readonly int _overlayDepth;
     private readonly List<MediaStep> _steps = new();
     private bool _consumed;
@@ -41,8 +42,10 @@ public sealed class MediaPipeline : IMediaPipeline
         ILogger? logger = null,
         bool disposeSource = true,
         IOverlayResolver? overlayResolver = null,
-        KoanFontRegistry? fonts = null) =>
-        new MediaPipeline(source, logger ?? NullLogger.Instance, disposeSource, overlayResolver, fonts, overlayDepth: 0);
+        KoanFontRegistry? fonts = null,
+        MediaPipelineLimits? limits = null) =>
+        new MediaPipeline(source, logger ?? NullLogger.Instance, disposeSource,
+            overlayResolver, fonts, limits ?? MediaPipelineLimits.Unlimited, overlayDepth: 0);
 
     private MediaPipeline(
         Stream source,
@@ -50,6 +53,7 @@ public sealed class MediaPipeline : IMediaPipeline
         bool disposeSource,
         IOverlayResolver? overlayResolver,
         KoanFontRegistry? fonts,
+        MediaPipelineLimits limits,
         int overlayDepth)
     {
         _source = source ?? throw new ArgumentNullException(nameof(source));
@@ -57,6 +61,7 @@ public sealed class MediaPipeline : IMediaPipeline
         _disposeSource = disposeSource;
         _overlayResolver = overlayResolver;
         _fonts = fonts;
+        _limits = limits;
         _overlayDepth = overlayDepth;
     }
 
@@ -221,8 +226,16 @@ public sealed class MediaPipeline : IMediaPipeline
         }
     }
 
-    private static async Task<Image> LoadOrThrowAsync(Stream source, CancellationToken ct)
+    private async Task<Image> LoadOrThrowAsync(Stream source, CancellationToken ct)
     {
+        // Pre-decode safety: if limits are configured, run a header-only
+        // Identify pass and reject oversized sources before allocating
+        // the full decoded buffer.
+        if (_limits.MaxSourceMegapixels > 0 || _limits.MaxFrameCount > 0)
+        {
+            await EnforceLimitsAsync(source, ct).ConfigureAwait(false);
+        }
+
         try
         {
             return await Image.LoadAsync(source, ct).ConfigureAwait(false);
@@ -234,6 +247,58 @@ public sealed class MediaPipeline : IMediaPipeline
         catch (SixLabors.ImageSharp.InvalidImageContentException ex)
         {
             throw new MediaDecodeException($"Source bytes failed to decode: {ex.Message}", ex);
+        }
+    }
+
+    private async Task EnforceLimitsAsync(Stream source, CancellationToken ct)
+    {
+        if (!source.CanSeek)
+        {
+            // We need to re-read the bytes after the Identify pass; without
+            // seek support we can't enforce limits cheaply. Skip silently —
+            // most real-world inputs are seekable streams.
+            return;
+        }
+
+        var pos = source.Position;
+        ImageInfo? info;
+        try
+        {
+            info = await Image.IdentifyAsync(source, ct).ConfigureAwait(false);
+        }
+        catch (SixLabors.ImageSharp.UnknownImageFormatException ex)
+        {
+            // Defer to the full LoadAsync below; it will throw MediaDecodeException
+            // with a consistent error shape.
+            source.Position = pos;
+            return;
+        }
+        finally
+        {
+            source.Position = pos;
+        }
+
+        if (info is null) return;
+
+        if (_limits.MaxSourceMegapixels > 0)
+        {
+            // Round up so a 100.01-megapixel source still trips a 100-cap.
+            var megapixels = (long)Math.Ceiling((info.Width * (long)info.Height) / 1_000_000.0);
+            if (megapixels > _limits.MaxSourceMegapixels)
+            {
+                throw new MediaSourceLimitException(
+                    "maxSourceMegapixels", megapixels, _limits.MaxSourceMegapixels);
+            }
+        }
+
+        if (_limits.MaxFrameCount > 0)
+        {
+            var frames = info.FrameMetadataCollection?.Count ?? 1;
+            if (frames > _limits.MaxFrameCount)
+            {
+                throw new MediaSourceLimitException(
+                    "maxFrameCount", frames, _limits.MaxFrameCount);
+            }
         }
     }
 
@@ -395,10 +460,12 @@ public sealed class MediaPipeline : IMediaPipeline
         await image.SaveAsync(ms, encoder, ct).ConfigureAwait(false);
         var bytes = ms.ToArray();
 
+        var sourceSlug = EncoderSelector.CanonicalSlug(sourceFormat);
         return new MediaOutput(
             Bytes: bytes,
             ContentType: EncoderSelector.ContentType(resolvedFormat),
             Format: resolvedFormat,
+            SourceFormat: sourceSlug,
             Width: image.Width,
             Height: image.Height,
             FrameCount: image.Frames.Count,

@@ -105,10 +105,19 @@ public interface IMediaPipeline
 /// <summary>
 /// Encoded bytes plus the metadata needed to serve the result over HTTP.
 /// </summary>
+/// <param name="Bytes">Encoded output bytes.</param>
+/// <param name="ContentType">MIME type matching <paramref name="Format"/>.</param>
+/// <param name="Format">Canonical output format slug (jpeg, png, webp, gif, ...).</param>
+/// <param name="SourceFormat">Canonical source format slug as decoded. Equals <paramref name="Format"/> when the recipe preserves format.</param>
+/// <param name="Width">Output width in pixels.</param>
+/// <param name="Height">Output height in pixels.</param>
+/// <param name="FrameCount">Output frame count (1 for static).</param>
+/// <param name="Fingerprint">Per-output content fingerprint (informational; recipe fingerprint lives on the recipe).</param>
 public sealed record MediaOutput(
     byte[] Bytes,
     string ContentType,
     string Format,
+    string SourceFormat,
     int Width,
     int Height,
     int FrameCount,

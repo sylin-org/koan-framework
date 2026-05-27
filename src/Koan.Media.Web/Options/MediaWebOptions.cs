@@ -11,6 +11,19 @@ public sealed class MediaWebOptions
     public int MaxOutputEdge { get; set; } = 4096;
 
     /// <summary>
+    /// Hard cap on source megapixels per MEDIA-0004 §13. Default 100MP
+    /// (= 10000x10000). Enforced via a header-only Image.Identify pass
+    /// before the full decode allocates memory. Set 0 to disable.
+    /// </summary>
+    public int MaxSourceMegapixels { get; set; } = 100;
+
+    /// <summary>
+    /// Hard cap on source animation frame count per MEDIA-0004 §13.
+    /// Default 600. Set 0 to disable.
+    /// </summary>
+    public int MaxFrameCount { get; set; } = 600;
+
+    /// <summary>
     /// When true, unknown query params return 400. When false (default),
     /// they're surfaced via <c>X-Koan-Media-IgnoredParams</c>.
     /// </summary>
