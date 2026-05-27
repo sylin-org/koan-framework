@@ -419,17 +419,26 @@ public sealed class MediaPipeline : IMediaPipeline
             image.Mutate(ctx => ApplyShapeAndResize(ctx, image.Size, pendingShape, pendingResize));
         }
 
+        // Background compose: when bg is non-transparent + Fit.Contain has
+        // a fully-defined target canvas, build a new sized canvas, paint
+        // it (solid color / dominant / auto-border / cover-blur), and
+        // composite the shaped image onto it. The canvas becomes the
+        // working image for overlays, strip, and encode so all subsequent
+        // stages land on the final pixels.
+        using var composed = BackgroundComposer.TryCompose(image, pendingShape, pendingResize, ct);
+        var working = composed ?? image;
+
         // Overlays composite onto the shaped/sized host before metadata
         // strip and encode so they're part of the final encoded bytes.
         if (pendingOverlay is not null)
         {
             await OverlayCompositor.ApplyAsync(
-                image, pendingOverlay, overlays, fonts, overlayDepth, logger, ct).ConfigureAwait(false);
+                working, pendingOverlay, overlays, fonts, overlayDepth, logger, ct).ConfigureAwait(false);
         }
 
         if (pendingStrip is not null)
         {
-            ApplyStrip(image, pendingStrip.Kinds);
+            ApplyStrip(working, pendingStrip.Kinds);
         }
 
         // Resolve encode step. Implicit format-preserving encode if none declared.
@@ -440,7 +449,7 @@ public sealed class MediaPipeline : IMediaPipeline
             case FlattenToStep flatten:
                 targetFormat = flatten.Format;
                 quality = flatten.Quality;
-                ApplyFlatten(image, flatten.Format);
+                ApplyFlatten(working, flatten.Format);
                 break;
             case EncodeStep encode:
                 targetFormat = encode.Format;
@@ -452,12 +461,14 @@ public sealed class MediaPipeline : IMediaPipeline
                 break;
         }
 
+        // Preserve source-format metadata for diagnostics even when we
+        // swap to a freshly-allocated canvas (which has no DecodedImageFormat).
         var sourceFormat = image.Metadata.DecodedImageFormat;
         var encoder = EncoderSelector.For(sourceFormat, targetFormat, quality);
         var resolvedFormat = targetFormat?.ToLowerInvariant() ?? EncoderSelector.CanonicalSlug(sourceFormat);
 
         await using var ms = new MemoryStream();
-        await image.SaveAsync(ms, encoder, ct).ConfigureAwait(false);
+        await working.SaveAsync(ms, encoder, ct).ConfigureAwait(false);
         var bytes = ms.ToArray();
 
         var sourceSlug = EncoderSelector.CanonicalSlug(sourceFormat);
@@ -466,10 +477,10 @@ public sealed class MediaPipeline : IMediaPipeline
             ContentType: EncoderSelector.ContentType(resolvedFormat),
             Format: resolvedFormat,
             SourceFormat: sourceSlug,
-            Width: image.Width,
-            Height: image.Height,
-            FrameCount: image.Frames.Count,
-            Fingerprint: $"{resolvedFormat}-{image.Width}x{image.Height}-f{image.Frames.Count}-q{quality}");
+            Width: working.Width,
+            Height: working.Height,
+            FrameCount: working.Frames.Count,
+            Fingerprint: $"{resolvedFormat}-{working.Width}x{working.Height}-f{working.Frames.Count}-q{quality}");
     }
 
     private static void ApplyExtractFrame(Image image, int index)
