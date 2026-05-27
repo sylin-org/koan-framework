@@ -1,4 +1,6 @@
+using System.Collections.Immutable;
 using Koan.Media.Abstractions.Recipes;
+using Koan.Media.Core.Fonts;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using SixLabors.ImageSharp;
@@ -27,18 +29,35 @@ public sealed class MediaPipeline : IMediaPipeline
     private readonly Stream _source;
     private readonly bool _disposeSource;
     private readonly ILogger _logger;
+    private readonly IOverlayResolver? _overlayResolver;
+    private readonly KoanFontRegistry? _fonts;
+    private readonly int _overlayDepth;
     private readonly List<MediaStep> _steps = new();
     private bool _consumed;
 
-    /// <summary>Entry point: <c>stream.AsMedia(ct)</c> → pipeline.</summary>
-    public static IMediaPipeline From(Stream source, ILogger? logger = null, bool disposeSource = true) =>
-        new MediaPipeline(source, logger ?? NullLogger.Instance, disposeSource);
+    /// <summary>Entry point: <c>stream.AsMedia()</c> → pipeline.</summary>
+    public static IMediaPipeline From(
+        Stream source,
+        ILogger? logger = null,
+        bool disposeSource = true,
+        IOverlayResolver? overlayResolver = null,
+        KoanFontRegistry? fonts = null) =>
+        new MediaPipeline(source, logger ?? NullLogger.Instance, disposeSource, overlayResolver, fonts, overlayDepth: 0);
 
-    private MediaPipeline(Stream source, ILogger logger, bool disposeSource)
+    private MediaPipeline(
+        Stream source,
+        ILogger logger,
+        bool disposeSource,
+        IOverlayResolver? overlayResolver,
+        KoanFontRegistry? fonts,
+        int overlayDepth)
     {
         _source = source ?? throw new ArgumentNullException(nameof(source));
         _logger = logger;
         _disposeSource = disposeSource;
+        _overlayResolver = overlayResolver;
+        _fonts = fonts;
+        _overlayDepth = overlayDepth;
     }
 
     // ----- builder verbs (mirror MediaRecipeBuilder; single-slot replacement enforced) -----
@@ -95,6 +114,61 @@ public sealed class MediaPipeline : IMediaPipeline
             fit: Fit.Cover,
             position: position ?? Position.Center);
 
+    public IMediaPipeline Overlay(
+        string mediaId,
+        OverlaySize? size = null,
+        Position? position = null,
+        OverlayPadding? padding = null,
+        double opacity = 1.0,
+        int rotate = 0,
+        string? recipeName = null)
+    {
+        var layer = new OverlayLayer(
+            Source: new MediaOverlaySource(mediaId, recipeName),
+            Size: size ?? OverlaySize.Natural,
+            Position: position ?? Position.Center,
+            Padding: padding ?? OverlayPadding.Zero,
+            Opacity: Math.Clamp(opacity, 0.0, 1.0),
+            Rotate: rotate);
+        return AppendOverlayLayer(layer);
+    }
+
+    public IMediaPipeline OverlayText(
+        string text,
+        string? font = null,
+        BackgroundColor? color = null,
+        int fontSize = 32,
+        Position? position = null,
+        OverlayPadding? padding = null,
+        double opacity = 1.0,
+        int rotate = 0)
+    {
+        var layer = new OverlayLayer(
+            Source: new TextOverlaySource(text, font, color, fontSize),
+            Size: OverlaySize.Natural,
+            Position: position ?? Position.Center,
+            Padding: padding ?? OverlayPadding.Zero,
+            Opacity: Math.Clamp(opacity, 0.0, 1.0),
+            Rotate: rotate);
+        return AppendOverlayLayer(layer);
+    }
+
+    private MediaPipeline AppendOverlayLayer(OverlayLayer layer)
+    {
+        EnsureUnconsumed();
+        var existing = _steps.FindIndex(s => s.Stage == PipelineStage.Overlay);
+        if (existing >= 0)
+        {
+            var current = (OverlayStep)_steps[existing];
+            _steps[existing] = current with { Layers = current.Layers.Add(layer) };
+        }
+        else
+        {
+            _steps.Add(new OverlayStep(ImmutableArray.Create(layer)));
+        }
+        return this;
+    }
+
     public IMediaPipeline Strip(MetadataKinds kinds = MetadataKinds.All) =>
         AddStep(new StripStep(kinds));
 
@@ -139,7 +213,7 @@ public sealed class MediaPipeline : IMediaPipeline
         {
             if (_source.CanSeek) _source.Position = 0;
             using var image = await LoadOrThrowAsync(_source, ct).ConfigureAwait(false);
-            return await EncodeAsync(image, _steps, ct).ConfigureAwait(false);
+            return await EncodeAsync(image, _steps, _overlayResolver, _fonts, _overlayDepth, _logger, ct).ConfigureAwait(false);
         }
         finally
         {
@@ -188,7 +262,7 @@ public sealed class MediaPipeline : IMediaPipeline
                 configureBranch(branch);
                 // Clone the decoded image so transforms apply only to this branch
                 using var clone = sourceImage.Clone(_ => { });
-                var output = await EncodeAsync(clone, branch.Steps, ct).ConfigureAwait(false);
+                var output = await EncodeAsync(clone, branch.Steps, _overlayResolver, _fonts, _overlayDepth, _logger, ct).ConfigureAwait(false);
                 variants[name] = output;
             }
             return new MediaBundle(variants);
@@ -206,7 +280,14 @@ public sealed class MediaPipeline : IMediaPipeline
     /// in canonical <see cref="PipelineStage"/> order and encode the
     /// result. Caller owns image disposal.
     /// </summary>
-    private static async Task<MediaOutput> EncodeAsync(Image image, IReadOnlyList<MediaStep> steps, CancellationToken ct)
+    private static async Task<MediaOutput> EncodeAsync(
+        Image image,
+        IReadOnlyList<MediaStep> steps,
+        IOverlayResolver? overlays,
+        KoanFontRegistry? fonts,
+        int overlayDepth,
+        ILogger logger,
+        CancellationToken ct)
     {
         // Default: auto-orient when no explicit orient step is declared.
         var hasOrient = steps.Any(s => s.Stage == PipelineStage.Orient);
@@ -224,6 +305,7 @@ public sealed class MediaPipeline : IMediaPipeline
         MediaStep? encodeStep = null;
         ShapeStep? pendingShape = null;
         ResizeStep? pendingResize = null;
+        OverlayStep? pendingOverlay = null;
         StripStep? pendingStrip = null;
 
         foreach (var step in ordered)
@@ -252,6 +334,9 @@ public sealed class MediaPipeline : IMediaPipeline
                 case ResizeStep resize:
                     pendingResize = resize;
                     break;
+                case OverlayStep overlayStep:
+                    pendingOverlay = overlayStep;
+                    break;
                 case StripStep strip:
                     pendingStrip = strip;
                     break;
@@ -267,6 +352,14 @@ public sealed class MediaPipeline : IMediaPipeline
         if (pendingShape is not null || pendingResize is not null)
         {
             image.Mutate(ctx => ApplyShapeAndResize(ctx, image.Size, pendingShape, pendingResize));
+        }
+
+        // Overlays composite onto the shaped/sized host before metadata
+        // strip and encode so they're part of the final encoded bytes.
+        if (pendingOverlay is not null)
+        {
+            await OverlayCompositor.ApplyAsync(
+                image, pendingOverlay, overlays, fonts, overlayDepth, logger, ct).ConfigureAwait(false);
         }
 
         if (pendingStrip is not null)
@@ -635,6 +728,57 @@ public sealed class MediaPipeline : IMediaPipeline
             Resize(maxWidth, maxHeight).Shape(fit: Fit.Contain);
         public IMediaPipeline ResizeCover(int width, int height, Position? position = null) =>
             Resize(width, height).Shape(crop: CropSpec.Pixels(width, height), fit: Fit.Cover, position: position ?? Position.Center);
+        public IMediaPipeline Overlay(
+            string mediaId,
+            OverlaySize? size = null,
+            Position? position = null,
+            OverlayPadding? padding = null,
+            double opacity = 1.0,
+            int rotate = 0,
+            string? recipeName = null)
+        {
+            var layer = new OverlayLayer(
+                Source: new MediaOverlaySource(mediaId, recipeName),
+                Size: size ?? OverlaySize.Natural,
+                Position: position ?? Position.Center,
+                Padding: padding ?? OverlayPadding.Zero,
+                Opacity: Math.Clamp(opacity, 0.0, 1.0),
+                Rotate: rotate);
+            return AppendOverlayLayer(layer);
+        }
+        public IMediaPipeline OverlayText(
+            string text,
+            string? font = null,
+            BackgroundColor? color = null,
+            int fontSize = 32,
+            Position? position = null,
+            OverlayPadding? padding = null,
+            double opacity = 1.0,
+            int rotate = 0)
+        {
+            var layer = new OverlayLayer(
+                Source: new TextOverlaySource(text, font, color, fontSize),
+                Size: OverlaySize.Natural,
+                Position: position ?? Position.Center,
+                Padding: padding ?? OverlayPadding.Zero,
+                Opacity: Math.Clamp(opacity, 0.0, 1.0),
+                Rotate: rotate);
+            return AppendOverlayLayer(layer);
+        }
+        private IMediaPipeline AppendOverlayLayer(OverlayLayer layer)
+        {
+            var existing = Steps.FindIndex(s => s.Stage == PipelineStage.Overlay);
+            if (existing >= 0)
+            {
+                var current = (OverlayStep)Steps[existing];
+                Steps[existing] = current with { Layers = current.Layers.Add(layer) };
+            }
+            else
+            {
+                Steps.Add(new OverlayStep(ImmutableArray.Create(layer)));
+            }
+            return this;
+        }
         public IMediaPipeline Strip(MetadataKinds kinds = MetadataKinds.All) => Add(new StripStep(kinds));
         public IMediaPipeline PreserveFormat(int quality = Quality.Web) => Add(new EncodeStep(null, quality));
         public IMediaPipeline EncodeAs(string format, int quality = Quality.Web) => Add(new EncodeStep(format, quality));
