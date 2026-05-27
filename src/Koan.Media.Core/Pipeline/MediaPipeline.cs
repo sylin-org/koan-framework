@@ -114,10 +114,12 @@ public sealed class MediaPipeline : IMediaPipeline
         Resize(maxWidth, maxHeight).Shape(fit: Fit.Contain);
 
     public IMediaPipeline ResizeCover(int width, int height, Position? position = null) =>
-        Resize(width, height).Shape(
-            crop: CropSpec.Pixels(width, height),
-            fit: Fit.Cover,
-            position: position ?? Position.Center);
+        // Resize+Fit.Cover maps to ImageSharp's ResizeMode.Crop which already
+        // does scale-then-crop natively. Adding an explicit CropSpec.Pixels
+        // here would cause the Shape stage (40) to do a literal pixel-rect
+        // crop BEFORE the Size stage (50) ever runs — producing a center
+        // chunk of the source instead of a cover-scaled thumbnail.
+        Resize(width, height).Shape(fit: Fit.Cover, position: position ?? Position.Center);
 
     public IMediaPipeline Overlay(
         string mediaId,
@@ -805,7 +807,7 @@ public sealed class MediaPipeline : IMediaPipeline
         public IMediaPipeline ResizeFit(int maxWidth, int maxHeight) =>
             Resize(maxWidth, maxHeight).Shape(fit: Fit.Contain);
         public IMediaPipeline ResizeCover(int width, int height, Position? position = null) =>
-            Resize(width, height).Shape(crop: CropSpec.Pixels(width, height), fit: Fit.Cover, position: position ?? Position.Center);
+            Resize(width, height).Shape(fit: Fit.Cover, position: position ?? Position.Center);
         public IMediaPipeline Overlay(
             string mediaId,
             OverlaySize? size = null,

@@ -152,10 +152,10 @@
        0.10.1 patch: source-side limits enforcement (MaxSourceMegapixels + MaxFrameCount),
        cancellation throughout the pipeline, diagnostic header bug fix (SourceFormat). -->
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Media.Core' and '$(KoanPackageKind)' == 'Periphery'">
-    <Version>0.11.0</Version>
+    <Version>0.11.1</Version>
   </PropertyGroup>
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Media.Web' and '$(KoanPackageKind)' == 'Periphery'">
-    <Version>0.11.0</Version>
+    <Version>0.11.1</Version>
   </PropertyGroup>
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Messaging.Connector.RabbitMq' and '$(KoanPackageKind)' == 'Periphery'">
     <Version>0.8.1</Version>

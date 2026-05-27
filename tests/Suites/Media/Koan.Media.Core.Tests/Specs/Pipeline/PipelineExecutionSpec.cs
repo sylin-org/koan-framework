@@ -41,6 +41,46 @@ public sealed class PipelineExecutionSpec
     }
 
     [Fact]
+    public async Task ResizeCover_scales_source_then_crops_does_not_chunk_center_pixels()
+    {
+        // Regression: a prior bug made ResizeCover stack a Pixels crop
+        // (stage Shape=40) with the Resize (stage Size=50). Stage Shape
+        // ran first and chopped a literal WxH rectangle out of the source
+        // center, then Resize was a no-op on the already-sized image.
+        // Net result: the article-card thumbnail showed only a 480x480
+        // chunk of a 1920x1080 source instead of a downscaled cover.
+        //
+        // Proof: source has a thick red border on a green interior. After
+        // a correct cover scale-then-crop, the border (compressed by the
+        // downscale) is still visible in the output's top/bottom strip.
+        // A literal pixel-chunk crop from the center would yield pure
+        // green — the border never reached.
+        await using var src = Fixtures.JpegWithBorder(
+            innerColor: Color.Lime,
+            borderColor: Color.Red,
+            width: 1920,
+            height: 1080,
+            borderThickness: 120);
+
+        var output = await src.AsMedia()
+            .ResizeCover(480, 480)
+            .ToBytesAsync();
+
+        output.Width.Should().Be(480);
+        output.Height.Should().Be(480);
+
+        using var img = Image.Load<SixLabors.ImageSharp.PixelFormats.Rgba32>(output.Bytes);
+        // Top-center pixel: after a correct cover scale (1080 -> 480,
+        // factor ~0.44), the 120px border compresses to ~53px. The
+        // pixel at (240, 10) should still land inside the red border.
+        var topCenter = img[240, 10];
+        topCenter.R.Should().BeGreaterThan(180,
+            "ResizeCover must scale source before cropping so border survives the downsize");
+        topCenter.G.Should().BeLessThan(80,
+            "if green dominates here, the cover was a literal center pixel-chunk (bug)");
+    }
+
+    [Fact]
     public async Task Crop_square_on_wide_source_produces_square()
     {
         // 1200x800 → square crop → 800x800

@@ -127,10 +127,12 @@ public sealed class MediaRecipeBuilder
 
     /// <summary>Resize to cover bounds (preserves aspect; crops overflow).</summary>
     public MediaRecipeBuilder ResizeCover(int width, int height, Position? position = null) =>
-        Resize(width, height).Shape(
-            crop: CropSpec.Pixels(width, height),
-            fit: Recipes.Fit.Cover,
-            position: position ?? Position.Center);
+        // Resize+Fit.Cover -> ImageSharp ResizeMode.Crop, which scales and
+        // crops natively. Don't add an explicit Pixels crop here: the Shape
+        // stage runs BEFORE Size, so a Pixels crop would chop a literal
+        // WxH rectangle out of the source center and the subsequent resize
+        // would no-op on the already-sized image.
+        Resize(width, height).Shape(fit: Recipes.Fit.Cover, position: position ?? Position.Center);
 
     // ----- Stage 7: Overlay -----
 
