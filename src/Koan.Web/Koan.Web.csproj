@@ -9,9 +9,9 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="10.0.0" />
-    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.13.1" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.13.0" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.13.0" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.15.3" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.2" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.15.1" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />

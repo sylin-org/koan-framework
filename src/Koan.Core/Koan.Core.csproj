@@ -17,11 +17,15 @@
     <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0" />
-    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.13.1" />
-    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.13.1" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.13.0" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.13.0" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.13.0" />
+    <!-- OTel SDK bumped 1.13 -> 1.15 to clear 4 advisories on the OTLP
+         exporter (CVE-2026-40891, CVE-2026-40182, CVE-2026-42191) and the
+         baggage/B3/Jaeger header parser (CVE-2026-40894). Keep all OTel
+         packages on the matching 1.15.x line to avoid SDK version skew. -->
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.15.3" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.2" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.15.1" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
   <ItemGroup>

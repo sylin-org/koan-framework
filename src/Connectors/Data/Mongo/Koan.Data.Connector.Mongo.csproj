@@ -16,7 +16,13 @@
   <ProjectReference Include="..\..\..\Koan.ZenGarden.Core\Koan.ZenGarden.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="MongoDB.Driver" Version="3.5.0" />
+    <PackageReference Include="MongoDB.Driver" Version="3.8.1" />
+    <!-- MongoDB.Driver 3.8.1 transitively pulls SharpCompress 0.30.1 which
+         carries GHSA-6c8g-7p36-r338 (path traversal in WriteToDirectory).
+         Mongo uses SharpCompress for snappy stream decompression — a
+         different code path — but the scanner still flags. Override to
+         0.48.1 which is outside the affected range (advisory: <= 0.47.4). -->
+    <PackageReference Include="SharpCompress" Version="0.48.1" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" Version="10.0.0" />
