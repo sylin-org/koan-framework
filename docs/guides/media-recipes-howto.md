@@ -68,7 +68,7 @@ app.Run();
 
 The recipe registry and pipeline engine register automatically. You
 do need to provide one application-side service: an `IMediaSource`
-that returns bytes for a given media id. We'll wire that in §5 when
+that returns bytes for a given media id. We'll wire that in §6 when
 we get to the HTTP surface.
 
 ---
@@ -322,7 +322,97 @@ never modified — the canvas is what gets encoded.
 
 ---
 
-## 4. Named Recipes: Code + Config
+## 4. Overlays: Watermarks and Captions
+
+**Concepts**
+
+Overlays composite additional layers on top of the host image after
+shape and resize have settled. Two verbs cover the common cases:
+
+- `Overlay(mediaId, ...)` — pull another media entity (a logo, a
+  badge, a frame) from the registry and composite it onto the host.
+  Multiple `Overlay` calls append layers in declared order.
+- `OverlayText(text, ...)` — render a text string with a registered
+  font and composite it. Useful for captions, watermarks, dynamic
+  labels.
+
+Both verbs share the same `Position` and `OverlayPadding` vocabulary
+as the shape step, so anchors like `Position.BottomRight` and a
+`padding: 0.05` work the same way.
+
+**Recipe**
+
+Media overlays need an `IOverlayResolver` registered (the default
+implementation resolves through your `IMediaSource`). Text overlays
+need a `KoanFontRegistry` populated with at least one font:
+
+```csharp
+builder.Services.AddSingleton<KoanFontRegistry>(_ =>
+{
+    var registry = new KoanFontRegistry();
+    registry.Register("inter", File.OpenRead("fonts/Inter-Regular.ttf"));
+    return registry;
+});
+```
+
+**Sample**
+
+```csharp
+// Logo at bottom-right, 10% of the host's short edge, 5% inset, 85% opacity
+await source.AsMedia()
+    .ResizeCover(1200, 800)
+    .Overlay(
+        mediaId: "brand-logo",
+        size: OverlaySize.RelativeShortEdge(0.1),
+        position: Position.BottomRight,
+        padding: new OverlayPadding(0.05),
+        opacity: 0.85)
+    .EncodeAs("webp")
+    .ToBytesAsync();
+
+// Decorative frame + a text caption stacked on top
+await source.AsMedia()
+    .ResizeCover(1080, 1080)
+    .Overlay("frame-square")            // painted first
+    .OverlayText(                       // caption goes on top
+        text: "On sale today",
+        font: "inter",
+        fontSize: 48,
+        color: BackgroundColor.White,
+        position: Position.Bottom,
+        padding: new OverlayPadding(0.08))
+    .EncodeAs("png")
+    .ToBytesAsync();
+```
+
+URL grammar (when the recipe allows the `Overlay` mutator):
+
+```
+GET /media/{id}/poster?overlay=brand-logo&overlay.size=.1
+                      &overlay.position=br&overlay.padding=.05
+```
+
+**Why this works:** Overlays run at stage 8 (after Size, before
+Metadata + Encode), so the layer geometry is computed against the
+final host dimensions — a logo specified at "10% short edge" stays
+proportionally correct whether you render the host at 400×400 or
+2000×2000. Media overlays can themselves reference recipes (the
+`recipeName:` arg), so the logo gets resized and format-converted
+through its own pipeline before being composited.
+
+**Usage Scenarios**
+
+- Brand watermarks baked into every variant served from a public catalog.
+- Dynamic captions for social-share images generated on the fly.
+- Decorative frames (paywall badges, "new" stickers) applied per
+  recipe without baking them into the source bytes.
+
+For the full overlay parameter surface, see the
+[Media Pillar Reference — MutatorKind flags](../reference/media/index.md#mutatorkind-flags).
+
+---
+
+## 5. Named Recipes: Code + Config
 
 **Concepts**
 
@@ -428,11 +518,11 @@ covers `?w=`, `?h=`, `?format=`, `?q=` plus their aliases.
 - Pin the visual contract for a recipe used across thousands of cards.
 - Hotfix the JPEG → WebP swap via ops config without a deploy.
 - Audit which recipes the app exposes via the introspection endpoint
-  (§5).
+  (§9).
 
 ---
 
-## 5. The HTTP Surface
+## 6. The HTTP Surface
 
 **Concepts**
 
@@ -541,7 +631,7 @@ dives:
 
 ---
 
-## 6. Multi-Variant Materialise: One Decode, Many Outputs
+## 7. Multi-Variant Materialise: One Decode, Many Outputs
 
 **Concepts**
 
@@ -592,7 +682,7 @@ independent pipelines.
 
 ---
 
-## 7. Probing Source Properties
+## 8. Probing Source Properties
 
 **Concepts**
 
@@ -657,7 +747,7 @@ pay anyway if you went on to render.
 
 ---
 
-## 8. Introspection: `/media/recipes`
+## 9. Introspection: `/media/recipes`
 
 **Concepts**
 
@@ -718,7 +808,7 @@ intended workflow.
 
 ---
 
-## 9. What's Next
+## 10. What's Next
 
 You've got enough to build a real catalog now. Two areas worth
 exploring as you grow:
