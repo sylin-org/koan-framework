@@ -54,6 +54,11 @@ public sealed class MediaTestServer : IAsyncDisposable
         var inMemorySource = new InMemoryMediaSource();
         builder.Services.AddSingleton<IMediaSource>(inMemorySource);
 
+        // Default IOverlayResolver registration so the controller can
+        // serve overlay requests in tests without extra setup.
+        builder.Services.TryAddSingleton<Koan.Media.Abstractions.Recipes.IOverlayResolver,
+            Koan.Media.Web.Routing.DefaultOverlayResolver>();
+
         // Bind MediaWebOptions from the InMemoryCollection
         builder.Services.AddOptions<MediaWebOptions>()
             .BindConfiguration(MediaWebOptions.SectionPath);
