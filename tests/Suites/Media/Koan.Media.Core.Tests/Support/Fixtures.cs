@@ -165,6 +165,33 @@ public static class Fixtures
         return ms;
     }
 
+    /// <summary>
+    /// JPEG with a solid border and a different solid inner region.
+    /// Useful for Auto bg tests: the border-sample average should
+    /// resolve to <paramref name="borderColor"/>, while the center of
+    /// the source is <paramref name="innerColor"/>.
+    /// </summary>
+    public static Stream JpegWithBorder(
+        Color innerColor,
+        Color borderColor,
+        int width = 400,
+        int height = 400,
+        int borderThickness = 40)
+    {
+        using var img = new Image<Rgba32>(width, height);
+        FillSolid(img, borderColor.ToPixel<Rgba32>());
+        var inner = new Rectangle(
+            borderThickness, borderThickness,
+            Math.Max(1, width - 2 * borderThickness),
+            Math.Max(1, height - 2 * borderThickness));
+        FillRect(img, inner, innerColor.ToPixel<Rgba32>());
+
+        var ms = new MemoryStream();
+        img.SaveAsJpeg(ms, new JpegEncoder { Quality = 95 });
+        ms.Position = 0;
+        return ms;
+    }
+
     /// <summary>Compute SHA-256 hex digest of a stream's bytes without disposing it.</summary>
     public static async Task<string> Sha256Hex(Stream s, CancellationToken ct = default)
     {

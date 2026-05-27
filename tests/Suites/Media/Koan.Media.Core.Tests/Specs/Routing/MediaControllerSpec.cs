@@ -278,5 +278,59 @@ public sealed class MediaControllerSpec
         text.Should().Contain("Recipes");
         text.Should().Contain("hero");
     }
+
+    [Fact]
+    public async Task AdHoc_bg_solid_with_contain_returns_padded_canvas()
+    {
+        // End-to-end through the controller: URL-level bg= flows through
+        // the parser, mutator allowlist, and pipeline into the bytes.
+        await using var server = await MediaTestServer.StartAsync();
+        await server.Source.AddAsync("photo", Fixtures.WideJpeg(width: 1200, height: 600));
+
+        var response = await server.Client.GetAsync(
+            "/media/photo?crop=800x600&fit=contain&bg=00ff00&w=600&h=600&format=png");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Content.Headers.ContentType!.MediaType.Should().Be("image/png");
+
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        using var img = SixLabors.ImageSharp.Image.Load<SixLabors.ImageSharp.PixelFormats.Rgba32>(bytes);
+        img.Width.Should().Be(600, "canvas extended to the requested 1:1 box");
+        img.Height.Should().Be(600);
+        var corner = img[10, 10];
+        corner.G.Should().BeGreaterThan(200, "padding corner is the green bg, not source");
+    }
+
+    [Fact]
+    public async Task AdHoc_bg_blur_returns_target_canvas()
+    {
+        // bg=blur with no radius — composer picks a default. Smoke test
+        // through the controller URL grammar.
+        await using var server = await MediaTestServer.StartAsync();
+        await server.Source.AddAsync("photo", Fixtures.WideJpeg(width: 1200, height: 600));
+
+        var response = await server.Client.GetAsync(
+            "/media/photo?crop=800x600&fit=contain&bg=blur&w=600&h=600&format=png");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        using var img = SixLabors.ImageSharp.Image.Load(bytes);
+        img.Width.Should().Be(600);
+        img.Height.Should().Be(600);
+    }
+
+    [Fact]
+    public async Task AdHoc_bg_without_crop_is_rejected_400()
+    {
+        // bg without crop has nothing to fill — the parser rejects it as
+        // a typo guard rather than silently no-op'ing.
+        await using var server = await MediaTestServer.StartAsync(settings: new()
+        {
+            [$"{Koan.Media.Web.Options.MediaWebOptions.SectionPath}:StrictUnknownParams"] = "true",
+        });
+        await server.Source.AddAsync("photo", Fixtures.WideJpeg());
+
+        var response = await server.Client.GetAsync("/media/photo?bg=red");
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
 }
 
