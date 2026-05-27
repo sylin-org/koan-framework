@@ -132,8 +132,82 @@ public sealed class MediaRecipeBuilder
             fit: Recipes.Fit.Cover,
             position: position ?? Position.Center);
 
-    // ----- Stage 7: Overlay (placeholder — see MEDIA-0004 §7 follow-up) -----
-    // Overlay step type lives in v2 follow-up PR.
+    // ----- Stage 7: Overlay -----
+
+    /// <summary>
+    /// Composite a media-backed overlay layer onto the host image.
+    /// Multiple <see cref="Overlay(string, OverlaySize?, Position?, OverlayPadding?, double, int, string?)"/>
+    /// calls append additional layers to the single overlay slot, drawn
+    /// in declared order (lower index = further back).
+    /// </summary>
+    public MediaRecipeBuilder Overlay(
+        string mediaId,
+        OverlaySize? size = null,
+        Position? position = null,
+        OverlayPadding? padding = null,
+        double opacity = 1.0,
+        int rotate = 0,
+        string? recipeName = null)
+    {
+        if (string.IsNullOrWhiteSpace(mediaId))
+            throw new ArgumentException("Overlay media id is required.", nameof(mediaId));
+        var layer = new OverlayLayer(
+            Source: new MediaOverlaySource(mediaId, recipeName),
+            Size: size ?? OverlaySize.Natural,
+            Position: position ?? Recipes.Position.Center,
+            Padding: padding ?? OverlayPadding.Zero,
+            Opacity: Math.Clamp(opacity, 0.0, 1.0),
+            Rotate: rotate);
+        return AddOverlayLayer(layer);
+    }
+
+    /// <summary>
+    /// Composite a text overlay layer onto the host image. Requires a
+    /// registered font (default: <c>default</c>).
+    /// </summary>
+    public MediaRecipeBuilder OverlayText(
+        string text,
+        string? font = null,
+        BackgroundColor? color = null,
+        int fontSize = 32,
+        Position? position = null,
+        OverlayPadding? padding = null,
+        double opacity = 1.0,
+        int rotate = 0)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            throw new ArgumentException("Overlay text is required.", nameof(text));
+        var layer = new OverlayLayer(
+            Source: new TextOverlaySource(text, font, color, fontSize),
+            Size: OverlaySize.Natural,
+            Position: position ?? Recipes.Position.Center,
+            Padding: padding ?? OverlayPadding.Zero,
+            Opacity: Math.Clamp(opacity, 0.0, 1.0),
+            Rotate: rotate);
+        return AddOverlayLayer(layer);
+    }
+
+    /// <summary>
+    /// Append an explicit <see cref="OverlayLayer"/> instance. Useful when
+    /// configuring text + media overlays in a single batch or when binding
+    /// from config.
+    /// </summary>
+    public MediaRecipeBuilder Overlay(OverlayLayer layer) => AddOverlayLayer(layer);
+
+    private MediaRecipeBuilder AddOverlayLayer(OverlayLayer layer)
+    {
+        var existingIndex = _steps.FindIndex(s => s.Stage == PipelineStage.Overlay);
+        if (existingIndex >= 0)
+        {
+            var existing = (OverlayStep)_steps[existingIndex];
+            _steps[existingIndex] = existing with { Layers = existing.Layers.Add(layer) };
+        }
+        else
+        {
+            _steps.Add(new OverlayStep(Layers: System.Collections.Immutable.ImmutableArray.Create(layer)));
+        }
+        return this;
+    }
 
     // ----- Stage 8: Strip -----
 

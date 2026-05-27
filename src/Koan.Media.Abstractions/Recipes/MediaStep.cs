@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
 
@@ -95,6 +96,50 @@ public sealed record ResizeStep(
         if (Math.Abs(Dpr - 1.0) > 0.001)
         {
             sb.Append(",dpr=").Append(Dpr.ToString("F2", CultureInfo.InvariantCulture));
+        }
+        sb.Append(')');
+    }
+}
+
+/// <summary>
+/// Multi-layer overlay composition. Stage
+/// <see cref="PipelineStage.Overlay"/>. Layers composite in declared
+/// index order (lower index = drawn first / further back).
+/// </summary>
+public sealed record OverlayStep(
+    ImmutableArray<OverlayLayer> Layers,
+    string? Name = null,
+    bool Primary = false)
+    : MediaStep(PipelineStage.Overlay, Name, Primary)
+{
+    public override void WriteFingerprint(StringBuilder sb)
+    {
+        sb.Append("overlay(layers=").Append(Layers.Length).Append(':');
+        for (var i = 0; i < Layers.Length; i++)
+        {
+            if (i > 0) sb.Append('|');
+            var layer = Layers[i];
+            switch (layer.Source)
+            {
+                case MediaOverlaySource media:
+                    sb.Append("m=").Append(media.MediaId);
+                    if (!string.IsNullOrEmpty(media.RecipeName))
+                        sb.Append(",rcp=").Append(media.RecipeName);
+                    break;
+                case TextOverlaySource text:
+                    sb.Append("t=").Append(text.Text);
+                    if (!string.IsNullOrEmpty(text.Font))
+                        sb.Append(",font=").Append(text.Font);
+                    if (text.Color is { } c)
+                        sb.Append(",c=").Append(c.ToCanonical());
+                    sb.Append(",fs=").Append(text.FontSize);
+                    break;
+            }
+            sb.Append(",sz=").Append(layer.Size.ToCanonical());
+            sb.Append(",pos=").Append(layer.Position.ToCanonical());
+            sb.Append(",pad=").Append(layer.Padding.ToCanonical());
+            sb.Append(",op=").Append(layer.Opacity.ToString("0.##", CultureInfo.InvariantCulture));
+            if (layer.Rotate != 0) sb.Append(",rot=").Append(layer.Rotate);
         }
         sb.Append(')');
     }

@@ -51,6 +51,31 @@ public interface IMediaPipeline
     /// <summary>Convenience: cover crop to exact dimensions.</summary>
     IMediaPipeline ResizeCover(int width, int height, Position? position = null);
 
+    /// <summary>
+    /// Composite a media-backed overlay layer onto the host. Multiple
+    /// calls append additional layers (drawn in declared order). Per
+    /// MEDIA-0004 §7.
+    /// </summary>
+    IMediaPipeline Overlay(
+        string mediaId,
+        OverlaySize? size = null,
+        Position? position = null,
+        OverlayPadding? padding = null,
+        double opacity = 1.0,
+        int rotate = 0,
+        string? recipeName = null);
+
+    /// <summary>Composite a text overlay layer onto the host (requires a registered font).</summary>
+    IMediaPipeline OverlayText(
+        string text,
+        string? font = null,
+        BackgroundColor? color = null,
+        int fontSize = 32,
+        Position? position = null,
+        OverlayPadding? padding = null,
+        double opacity = 1.0,
+        int rotate = 0);
+
     /// <summary>Strip selected metadata kinds before encode.</summary>
     IMediaPipeline Strip(MetadataKinds kinds = MetadataKinds.All);
 
