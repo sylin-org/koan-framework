@@ -3,8 +3,8 @@ type: REFERENCE
 domain: media
 title: "Media Pillar Reference"
 audience: [developers, architects, ai-agents]
-last_updated: 2026-05-26
-framework_version: v0.9.0
+last_updated: 2026-05-27
+framework_version: v0.11.1
 status: current
 validation:
   status: not-yet-tested
@@ -15,8 +15,8 @@ validation:
 
 **Document Type**: REFERENCE
 **Target Audience**: Developers, Architects
-**Last Updated**: 2026-05-26
-**Framework Version**: v0.9.0
+**Last Updated**: 2026-05-27
+**Framework Version**: v0.11.1
 
 For the conceptual walkthrough, see the [Media Recipes How-To](../../guides/media-recipes-howto.md).
 For the design rationale, see [MEDIA-0004](../../decisions/MEDIA-0004-recipe-pipeline.md).
@@ -99,7 +99,7 @@ URL-param order:
 5. Rotate    (Rotate, FlipHorizontal/Vertical)
 6. Shape     (Crop + Fit + Position + Background)
 7. Size      (Resize)
-8. Overlay   (composition; v2)
+8. Overlay   (composition — media + text layers)
 9. Metadata  (Strip)
 10. Audio    (reserved for Koan.Media.Video)
 11. Encode   (PreserveFormat / EncodeAs / FlattenTo) — always terminal
@@ -142,11 +142,13 @@ URL-param order:
 
 | Factory | Behaviour |
 |---|---|
-| `Background.Transparent(fallback)` | Default. Preserved on alpha-capable outputs; falls back to `fallback` (default white) on JPEG. |
-| `Background.Solid(BackgroundColor)` | Named (`Black`, `White`) or hex (`new BackgroundColor(0x1a, 0x1a, 0x1a, 255)`). |
-| `Background.Auto(fallback)` | Sample border pixels, average to a solid color. Per-source-hash cached. |
-| `Background.Dominant(fallback)` | k-means dominant color. Per-source-hash cached (~20ms cold). |
-| `Background.Blur(radius)` | Source upscaled + Gaussian blurred behind contained image. Instagram/Spotify style. |
+| `Background.Transparent(fallback)` | Default. Preserved on alpha-capable outputs; falls back to `fallback` (default white) on JPEG. Composer is a no-op — no canvas extension. |
+| `Background.Solid(BackgroundColor)` | Named (`Black`, `White`, `Red`, `Green`, `Blue`, `Gray`, `Silver`) or hex (`new BackgroundColor(0x1a, 0x1a, 0x1a, 0xff)`) or `rgba:r,g,b,a`. |
+| `Background.Auto(fallback)` | Border-strip average on a 16×16 down-sample of the source. Computed per request (no cache today). Best for images with a deliberate frame/border. |
+| `Background.Dominant(fallback)` | 1×1 box-resample of the source — fast area-average that reads as "dominant" for photos and covers. Computed per request. |
+| `Background.Blur(radius)` | Cover-resize a clone of the source to fill the canvas, then Gaussian-blur. `radius:0` picks a sensible default (~4% of canvas short edge). |
+
+Smart backgrounds (`Auto`, `Dominant`, `Blur`) only fire when paired with `Fit.Contain` and a fully-defined target canvas (both `width` and `height` resolvable from the recipe). With `bg=transparent` (the default), the composer is skipped entirely — preserving the v0.10 behavior where `Fit.Contain` produced a proportionally-sized image without padding.
 
 ### `CropSpec` parsers
 
@@ -219,12 +221,12 @@ public static class MyRecipes
 | `Quality` | `?q=`, `?quality=` |
 | `Frame` | `?frame=` |
 | `Position` | `?position=` (rejected without crop) |
-| `Background` | `?bg=`, `?bg-fallback=`, `?bg-blur=` |
+| `Background` | `?bg=` (named color, hex, `auto`, `dominant`, `blur`). Rejected without `crop=`/`aspect=` — there's nothing to fill without a target shape. |
 | `Crop` | `?crop=`, `?aspect=` (replaces recipe's shape slot) |
 | `Fit` | `?fit=` |
 | `Rotate` | `?rotate=`, `?flip=` |
 | `Strip` | `?strip=` |
-| `Overlay` | `?overlay=...` (v2) |
+| `Overlay` | `?overlay={mediaId}` plus `?overlay.size=`, `?overlay.position=`, `?overlay.padding=`, `?overlay.opacity=`, `?overlay.rotate=`, `?overlay.recipe=` |
 | `Common` | Sugar for `Dimensions | Format | Quality` |
 | `All` | Every kind |
 
@@ -329,7 +331,9 @@ Options under `Koan:Media:Web:Storage`:
 
 | Key | Default | Description |
 |---|---|---|
-| `MaxOutputEdge` | `4096` | Hard cap on output dimension (px). Excess returns 400. |
+| `MaxOutputEdge` | `4096` | Hard cap on output dimension (px). Excess returns 400 with `X-Koan-Media-LimitExceeded: maxOutputEdge`. |
+| `MaxSourceMegapixels` | `0` (disabled) | Pre-decode header-only check via `Image.IdentifyAsync`. Excess returns 400 with `X-Koan-Media-LimitExceeded: maxSourceMegapixels` before allocating the full decoded buffer. |
+| `MaxFrameCount` | `0` (disabled) | Pre-decode frame-count cap; same diagnostic header. Protects against animation-bomb sources. |
 | `StrictUnknownParams` | `false` | Unknown params return 400 (true) or surface in `X-Koan-Media-IgnoredParams` (false). |
 | `AllowAdHoc` | `true` | Allow URLs with no recipe seed (false → 400 on bare param requests). |
 | `RoutePrefix` | `/media` | Controller base path. |
@@ -366,10 +370,12 @@ Per-recipe declarations. Schema mirrors the
 - `PipelineStage.Timeline` and `PipelineStage.Audio` are reserved
   slots for the future `Koan.Media.Video` module. Image pipelines
   ignore them; video pipelines populate them.
-- Overlay step type and `MutatorKind.Overlay` are designed per
-  MEDIA-0004 but ship in a follow-up PR.
-- `bg=blur` / `bg=dominant` are designed; v1 lands with the basic
-  surface, smart-background implementations come next.
+- `BlurHash` / dominant-color placeholders for the SPA loading state
+  are designed in MEDIA-0004 but not yet on the API surface.
+- Per-source-hash caching of `Background.Auto` / `Background.Dominant`
+  samples is not implemented today; each render recomputes. Adequate
+  for catalogs where the response cache absorbs the cost; revisit
+  when profiling shows the sample step is hot.
 
 ---
 

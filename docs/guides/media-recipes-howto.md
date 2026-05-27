@@ -4,8 +4,8 @@ domain: media
 title: "Media Recipes How-To"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-05-26
-framework_version: v0.9.0
+last_updated: 2026-05-27
+framework_version: v0.11.1
 validation:
   status: not-yet-tested
   scope: docs/guides/media-recipes-howto.md
@@ -249,13 +249,70 @@ await source.AsMedia()
         background: Background.Transparent(fallback: BackgroundColor.White))
     .EncodeAs("webp")
     .ToBytesAsync();
+
+// Smart backgrounds: when you don't want letterboxing to be a
+// distraction, derive the fill from the source itself. All three
+// modes only fire with Fit.Contain + a fully-defined target canvas
+// (both axes resolvable from the resize step).
+
+// Spotify / YouTube hero-card aesthetic: cover-resize a blurred
+// copy of the source behind the contained image. radius:0 (or the
+// no-arg overload) lets the composer pick a sensible default
+// (~4% of the canvas short edge).
+await source.AsMedia()
+    .Shape(
+        crop: CropSpec.Pixels(800, 600),
+        fit: Fit.Contain,
+        background: Background.Blur())
+    .Resize(600, 600)
+    .ToBytesAsync();
+
+// Single-color fill sampled from the source via 1×1 box-resample.
+// Fast and visually reasonable for photos and album covers.
+await source.AsMedia()
+    .Shape(
+        crop: CropSpec.Pixels(800, 600),
+        fit: Fit.Contain,
+        background: Background.Dominant())
+    .Resize(600, 600)
+    .ToBytesAsync();
+
+// Border-strip average on a 16×16 down-sample. Best when the source
+// has a deliberate background or frame (flat-colored title cards,
+// product shots on a clean backdrop).
+await source.AsMedia()
+    .Shape(
+        crop: CropSpec.Pixels(800, 600),
+        fit: Fit.Contain,
+        background: Background.Auto())
+    .Resize(600, 600)
+    .ToBytesAsync();
 ```
+
+The same modes work in the URL grammar — pair with a recipe that
+allows the `Background` mutator, or use ad-hoc:
+
+```
+GET /media/{id}?crop=800x600&fit=contain&bg=blur&w=600&h=600
+GET /media/{id}?crop=800x600&fit=contain&bg=dominant&w=600&h=600
+GET /media/{id}?crop=800x600&fit=contain&bg=auto&w=600&h=600
+GET /media/{id}?crop=square&fit=contain&bg=1a1a1aff&w=400&h=400
+```
+
+`?bg=` without `?crop=`/`?aspect=` returns 400 — there's nothing to
+fill without a target shape, and silently no-op'ing would mask typos.
 
 **Why this works:** A 1200×800 source under `Crop("square")`
 produces an 800×800 centered window. `Shape(crop: 16:9)` finds the
 largest fitting 16:9 region. The order is fixed (shape → resize),
 which means `?crop=square&w=300` produces a 300×300 output
 regardless of how the caller spelled the URL.
+
+For smart backgrounds, the composer runs after shape+resize: it
+allocates a new Rgba32 canvas at the target size, paints the fill
+(solid color / dominant / auto / cover-blur), then composites the
+shaped image at the requested `Position`. The original image is
+never modified — the canvas is what gets encoded.
 
 **Usage Scenarios**
 
