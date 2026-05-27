@@ -8,11 +8,16 @@
   -->
   <PropertyGroup>
     <!-- CORE-0091: kernel bump for [Before]/[After] ordering attributes. -->
-    <!-- Bumped 0.8.2 -> 0.8.3 for OpenTelemetry 1.13 -> 1.15.3 upgrade in
-         Koan.Core (CVE-2026-40891 et al). Other Kernel packages are
-         unchanged in source; they repack at the new version automatically
-         so the consumer dependency graph stays internally consistent. -->
-    <KoanKernelVersion>0.8.3</KoanKernelVersion>
+    <!-- Kept at 0.8.2 — OTel bump in Koan.Core does not change ANY public
+         contract or shared type, so cascading a kernel-wide major-version
+         bump across 14 packages just to express a transitive PackageReference
+         update creates more harm than good: it desyncs Periphery nuspecs
+         that were packed at the previous kernel version with Periphery
+         packed at the new one (assembly binding mismatch on Cache.Abstractions
+         vs nuspec dep-range). Koan.Core's source change repacks at the same
+         0.8.2 version; vendor consumers must bust their package cache to
+         pick up the refreshed bits. -->
+    <KoanKernelVersion>0.8.2</KoanKernelVersion>
   </PropertyGroup>
 
   <!-- Periphery package versions (one PropertyGroup per package). -->
