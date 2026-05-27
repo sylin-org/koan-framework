@@ -131,6 +131,37 @@ public sealed class MediaControllerSpec
     }
 
     [Fact]
+    public async Task MaxSourceMegapixels_limit_returns_400_with_diagnostic()
+    {
+        await using var server = await MediaTestServer.StartAsync(settings: new()
+        {
+            [$"{Koan.Media.Web.Options.MediaWebOptions.SectionPath}:MaxSourceMegapixels"] = "1",
+        });
+        // 2000x2000 = 4MP, exceeds 1MP cap
+        await server.Source.AddAsync("huge", Fixtures.WideJpeg(width: 2000, height: 2000));
+
+        var response = await server.Client.GetAsync("/media/huge");
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.Headers.Should().Contain(h => h.Key == "X-Koan-Media-LimitExceeded");
+        var limitHeader = response.Headers.GetValues("X-Koan-Media-LimitExceeded").Single();
+        limitHeader.Should().Be("maxSourceMegapixels");
+    }
+
+    [Fact]
+    public async Task MaxFrameCount_limit_returns_400_with_diagnostic()
+    {
+        await using var server = await MediaTestServer.StartAsync(settings: new()
+        {
+            [$"{Koan.Media.Web.Options.MediaWebOptions.SectionPath}:MaxFrameCount"] = "2",
+        });
+        await server.Source.AddAsync("manyframes", Fixtures.AnimatedWebp(frames: 5));
+
+        var response = await server.Client.GetAsync("/media/manyframes");
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.Headers.GetValues("X-Koan-Media-LimitExceeded").Single().Should().Be("maxFrameCount");
+    }
+
+    [Fact]
     public async Task OutputDimension_limit_returns_400()
     {
         await using var server = await MediaTestServer.StartAsync(settings: new()
@@ -171,7 +202,7 @@ public sealed class MediaControllerSpec
     [Fact]
     public async Task Recipes_endpoint_returns_format_shortcuts_and_aliases()
     {
-        await using var server = await MediaTestServer.StartAsync(scanAssemblies: Array.Empty<System.Reflection.Assembly>());
+        await using var server = await MediaTestServer.StartAsync();
         var response = await server.Client.GetAsync("/media/recipes");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
@@ -184,23 +215,38 @@ public sealed class MediaControllerSpec
     [Fact]
     public async Task SingleRecipe_endpoint_returns_404_for_unknown()
     {
-        await using var server = await MediaTestServer.StartAsync(scanAssemblies: Array.Empty<System.Reflection.Assembly>());
+        await using var server = await MediaTestServer.StartAsync();
         var response = await server.Client.GetAsync("/media/recipes/nope");
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]
-    public async Task SingleRecipe_endpoint_returns_full_recipe()
+    public async Task SingleRecipe_endpoint_returns_full_recipe_with_canonical_shape()
     {
-        await using var server = await MediaTestServer.StartAsync();
-        await server.Source.AddAsync("photo", Fixtures.WideJpeg());
+        // Per-test config recipe — no global [MediaRecipe] scan pollution.
+        await using var server = await MediaTestServer.StartAsync(configureServices: services =>
+        {
+            services.PostConfigure<RecipesOptions>(opts =>
+            {
+                opts.Recipes["per-test-recipe"] = new ConfiguredRecipe
+                {
+                    Description = "per-test recipe scoped to a single spec",
+                    Steps = new List<ConfiguredStep>
+                    {
+                        new() { Op = "resize", Width = 200 },
+                        new() { Op = "encodeAs", Format = "webp", Quality = 80 },
+                    },
+                    Mutators = new List<string> { "common" },
+                };
+            });
+        });
 
-        // Use a format shortcut as the "recipe" — those are surfaced via TryResolve but
-        // not in Find. So instead seed a code recipe via the test assembly's [MediaRecipe].
-        // The Registry spec already covers this; here just verify the endpoint shape.
-        var response = await server.Client.GetAsync("/media/recipes/test-controller-recipe");
-        // Either 200 (recipe found via this assembly's scan) or 404 (test isolation):
-        response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);
+        var response = await server.Client.GetAsync("/media/recipes/per-test-recipe");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var json = await response.Content.ReadAsStringAsync();
+        json.Should().Contain("per-test-recipe");
+        json.Should().Contain("\"fingerprint\":");
+        json.Should().Contain("\"steps\":");
     }
 
     [Fact]
@@ -234,13 +280,3 @@ public sealed class MediaControllerSpec
     }
 }
 
-// Sample code recipe scanned by the test assembly — proves attribute discovery
-// reaches the test project in addition to the registered consumer.
-internal static class TestControllerRecipes
-{
-    [Koan.Media.Abstractions.Recipes.MediaRecipe("test-controller-recipe",
-        Description = "discovered via test assembly scan",
-        Mutators = Koan.Media.Abstractions.Recipes.MutatorKind.Common)]
-    public static Koan.Media.Abstractions.Recipes.MediaRecipe Recipe() =>
-        Koan.Media.Abstractions.Recipes.MediaRecipe.New().EncodeAs("webp", Koan.Media.Abstractions.Recipes.Quality.Web);
-}

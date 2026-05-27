@@ -69,7 +69,11 @@ public sealed class MediaTestServer : IAsyncDisposable
         builder.Services.TryAddSingleton<Koan.Media.Abstractions.Recipes.IMediaRecipeRegistry>(sp =>
         {
             var monitor = sp.GetService<IOptionsMonitor<RecipesOptions>>();
-            var assemblies = scanAssemblies ?? new[] { typeof(MediaTestServer).Assembly };
+            // Default to NO assembly scan so tests are isolated by default.
+            // Tests that need code-attribute recipe discovery opt in via the
+            // scanAssemblies parameter; tests that just need config-bound
+            // recipes use PostConfigure<RecipesOptions>.
+            var assemblies = scanAssemblies ?? Array.Empty<Assembly>();
             return new MediaRecipeRegistry(assemblies, monitor, NullLogger<MediaRecipeRegistry>.Instance);
         });
 

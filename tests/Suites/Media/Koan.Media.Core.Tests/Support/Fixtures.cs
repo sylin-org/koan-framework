@@ -4,6 +4,7 @@ using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.Formats.Webp;
 using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
 
 namespace Koan.Media.Core.Tests.Support;
 
@@ -99,6 +100,68 @@ public static class Fixtures
     public static Stream NotAnImage(int byteCount = 16)
     {
         var ms = new MemoryStream(new byte[byteCount]);
+        return ms;
+    }
+
+    /// <summary>
+    /// JPEG with the given EXIF orientation tag set. Two horizontal
+    /// stripes (red on top half, blue on bottom half) so an
+    /// auto-orient pass that runs has detectable visual evidence —
+    /// after correct orientation, the red stripe is always on top.
+    ///
+    /// <para>Orientation values per the EXIF spec:</para>
+    /// <list type="bullet">
+    ///   <item>1 — no rotation (identity)</item>
+    ///   <item>3 — 180° rotation</item>
+    ///   <item>6 — 90° clockwise rotation (very common, iPhone portrait)</item>
+    ///   <item>8 — 90° counter-clockwise rotation</item>
+    /// </list>
+    /// </summary>
+    public static Stream JpegWithExifOrientation(ushort orientation, int width = 200, int height = 100)
+    {
+        // Build the LOGICAL (post-AutoOrient) image first: red top, blue
+        // bottom at (width, height). Then rotate to the STORED bytes so
+        // AutoOrient applying the EXIF correction restores the logical view.
+        //
+        // ImageSharp's AutoOrient applies the rotation indicated by the EXIF
+        // value. For orientation=6 it rotates 90° CW; we therefore store the
+        // image 90° CCW from the logical view so the round-trip lands on the
+        // logical pixels. Symmetric for orientation=8.
+        using var logical = new Image<Rgba32>(width, height);
+        logical.ProcessPixelRows(accessor =>
+        {
+            for (int y = 0; y < accessor.Height; y++)
+            {
+                var row = accessor.GetRowSpan(y);
+                var fill = y < height / 2
+                    ? new Rgba32(255, 0, 0, 255)
+                    : new Rgba32(0, 0, 255, 255);
+                for (int x = 0; x < row.Length; x++) row[x] = fill;
+            }
+        });
+
+        // Mutate-rotate to the stored orientation. The image we save is what
+        // AutoOrient will see; the EXIF tag tells AutoOrient how to undo it.
+        var rotation = orientation switch
+        {
+            3 => RotateMode.Rotate180,
+            6 => RotateMode.Rotate270,  // 270° CW == 90° CCW
+            8 => RotateMode.Rotate90,
+            _ => RotateMode.None,
+        };
+        if (rotation != RotateMode.None)
+        {
+            logical.Mutate(ctx => ctx.Rotate(rotation));
+        }
+
+        logical.Metadata.ExifProfile = new SixLabors.ImageSharp.Metadata.Profiles.Exif.ExifProfile();
+        logical.Metadata.ExifProfile.SetValue(
+            SixLabors.ImageSharp.Metadata.Profiles.Exif.ExifTag.Orientation,
+            orientation);
+
+        var ms = new MemoryStream();
+        logical.SaveAsJpeg(ms, new JpegEncoder { Quality = 95 });
+        ms.Position = 0;
         return ms;
     }
 
