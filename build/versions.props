@@ -118,7 +118,7 @@
     <Version>0.8.1</Version>
   </PropertyGroup>
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Data.Core' and '$(KoanPackageKind)' == 'Periphery'">
-    <Version>0.8.1</Version>
+    <Version>0.9.0</Version>
   </PropertyGroup>
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Data.Cqrs' and '$(KoanPackageKind)' == 'Periphery'">
     <Version>0.8.1</Version>
@@ -272,7 +272,7 @@
     <Version>0.8.1</Version>
   </PropertyGroup>
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Web.Transformers' and '$(KoanPackageKind)' == 'Periphery'">
-    <Version>0.8.2</Version>
+    <Version>0.8.3</Version>
   </PropertyGroup>
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.WebSockets' and '$(KoanPackageKind)' == 'Periphery'">
     <Version>0.8.1</Version>
