@@ -86,6 +86,9 @@ public static class MediaUrlParser
             }
         }
 
+        // Pre-pass: extract overlay layers (own grammar — overlay.N.field — not a step name)
+        var overlayLayers = ExtractOverlayLayers(normalised, ignored, rejected, strict);
+
         // Pass 1: collect step-name-prefixed overrides keyed by step name
         var byStepName = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
         var unprefixed = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -110,6 +113,7 @@ public static class MediaUrlParser
         if (isAdHoc)
         {
             ApplyAdHoc(builder, unprefixed, ignored, rejected, strict);
+            ApplyOverlayLayers(builder, overlayLayers, mutatorAllowed: true);
             return new ParseResult(builder.Build(), ignored, rejected);
         }
 
@@ -119,6 +123,19 @@ public static class MediaUrlParser
         foreach (var (stepName, bag) in byStepName)
         {
             ApplyNamedStep(builder, seedRecipe!, stepName, bag, allowed, ignored, rejected, strict);
+        }
+        // Overlay overrides — only when the recipe declares MutatorKind.Overlay
+        var overlayAllowed = allowed.HasFlag(MutatorKind.Overlay);
+        if (overlayLayers.Count > 0 && !overlayAllowed)
+        {
+            foreach (var (key, value) in EnumerateRejectedOverlayParams(overlayLayers))
+            {
+                Reject(new Dictionary<string, string>(), ignored, rejected, strict, key, value);
+            }
+        }
+        else
+        {
+            ApplyOverlayLayers(builder, overlayLayers, mutatorAllowed: overlayAllowed);
         }
 
         return new ParseResult(builder.Build(), ignored, rejected);
@@ -145,6 +162,9 @@ public static class MediaUrlParser
                 break;
             case ResizeStep rz:
                 b.Resize(rz.Width, rz.Height, rz.Dpr);
+                break;
+            case OverlayStep os:
+                foreach (var layer in os.Layers) b.Overlay(layer);
                 break;
             case StripStep st:
                 b.Strip(st.Kinds);
@@ -529,6 +549,203 @@ public static class MediaUrlParser
         {
             // Other named-step mutations land in follow-up work; reject for now
             foreach (var (k, v) in bag) Reject(bag, ignored, rejected, strict, $"{stepName}.{k}", v);
+        }
+    }
+
+    /// <summary>
+    /// Per MEDIA-0004 §7. Extracts overlay layer definitions from the URL
+    /// param dict, removing them from <paramref name="all"/> so the regular
+    /// step-name-prefix parser doesn't try to treat <c>overlay.0.position</c>
+    /// as a step named "overlay".
+    ///
+    /// <para>Recognised forms:</para>
+    /// <list type="bullet">
+    ///   <item><c>?overlay=ID</c> → layer 0 with media source ID</item>
+    ///   <item><c>?overlay.id=ID</c> → layer 0 (sugar)</item>
+    ///   <item><c>?overlay.N.id=ID</c> / <c>overlay.N.field=val</c> → layer N</item>
+    ///   <item><c>?overlay.text=...</c> / <c>overlay.N.text=...</c> → text source</item>
+    /// </list>
+    /// </summary>
+    private static List<OverlayLayer> ExtractOverlayLayers(
+        IDictionary<string, string> all,
+        List<string> ignored,
+        List<string> rejected,
+        bool strict)
+    {
+        // Bucket params per layer index. Layer 0 catches the bare `overlay=`
+        // and `overlay.<field>=` forms; `overlay.N.<field>=` selects by index.
+        var bucketsByIndex = new SortedDictionary<int, Dictionary<string, string>>();
+        var keysToRemove = new List<string>();
+
+        foreach (var (key, value) in all)
+        {
+            if (!key.StartsWith("overlay", StringComparison.OrdinalIgnoreCase)) continue;
+
+            // Bare ?overlay=ID → layer 0 'id'
+            if (key.Equals("overlay", StringComparison.OrdinalIgnoreCase))
+            {
+                EnsureBucket(bucketsByIndex, 0)["id"] = value;
+                keysToRemove.Add(key);
+                continue;
+            }
+
+            // overlay.<rest>
+            if (!key.StartsWith("overlay.", StringComparison.OrdinalIgnoreCase)) continue;
+
+            var rest = key["overlay.".Length..];
+            int idx = 0;
+            string field = rest;
+            // Try numeric prefix (overlay.N.field)
+            var dot = rest.IndexOf('.', StringComparison.Ordinal);
+            if (dot > 0 && int.TryParse(rest[..dot], System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var parsedIdx))
+            {
+                idx = parsedIdx;
+                field = rest[(dot + 1)..];
+            }
+            EnsureBucket(bucketsByIndex, idx)[field] = value;
+            keysToRemove.Add(key);
+        }
+
+        foreach (var k in keysToRemove) all.Remove(k);
+
+        var layers = new List<OverlayLayer>();
+        foreach (var (idx, bag) in bucketsByIndex)
+        {
+            if (TryBuildLayerFromBag(bag, idx, ignored, rejected, strict, out var layer))
+            {
+                layers.Add(layer);
+            }
+        }
+        return layers;
+    }
+
+    private static Dictionary<string, string> EnsureBucket(SortedDictionary<int, Dictionary<string, string>> dict, int idx)
+    {
+        if (!dict.TryGetValue(idx, out var bag))
+        {
+            bag = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            dict[idx] = bag;
+        }
+        return bag;
+    }
+
+    private static bool TryBuildLayerFromBag(
+        Dictionary<string, string> bag,
+        int layerIndex,
+        List<string> ignored,
+        List<string> rejected,
+        bool strict,
+        out OverlayLayer layer)
+    {
+        layer = null!;
+
+        OverlaySource? source = null;
+        if (bag.TryGetValue("text", out var textVal))
+        {
+            BackgroundColor? color = null;
+            if (bag.TryGetValue("color", out var colorRaw))
+            {
+                if (!BackgroundColor.TryParse(colorRaw, out var parsedColor))
+                {
+                    Reject(bag, ignored, rejected, strict, $"overlay.{layerIndex}.color", colorRaw);
+                }
+                else color = parsedColor;
+            }
+            int fontSize = 32;
+            if (bag.TryGetValue("fontsize", out var sizeRaw))
+            {
+                if (!int.TryParse(sizeRaw, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out fontSize) || fontSize <= 0)
+                {
+                    Reject(bag, ignored, rejected, strict, $"overlay.{layerIndex}.fontSize", sizeRaw);
+                    fontSize = 32;
+                }
+            }
+            source = new TextOverlaySource(textVal, bag.GetValueOrDefault("font"), color, fontSize);
+        }
+        else if (bag.TryGetValue("id", out var idVal))
+        {
+            source = new MediaOverlaySource(idVal, bag.GetValueOrDefault("recipe"));
+        }
+        else
+        {
+            // No id and no text — skip the layer
+            return false;
+        }
+
+        OverlaySize size = OverlaySize.Natural;
+        if (bag.TryGetValue("size", out var sizeRaw2))
+        {
+            if (!OverlaySize.TryParse(sizeRaw2, out size))
+            {
+                Reject(bag, ignored, rejected, strict, $"overlay.{layerIndex}.size", sizeRaw2);
+                size = OverlaySize.Natural;
+            }
+        }
+
+        Position position = Position.Center;
+        if (bag.TryGetValue("position", out var posRaw))
+        {
+            if (!Position.TryParse(posRaw, out position))
+            {
+                Reject(bag, ignored, rejected, strict, $"overlay.{layerIndex}.position", posRaw);
+                position = Position.Center;
+            }
+        }
+
+        OverlayPadding padding = OverlayPadding.Zero;
+        if (bag.TryGetValue("padding", out var padRaw))
+        {
+            if (!OverlayPadding.TryParse(padRaw, out padding))
+            {
+                Reject(bag, ignored, rejected, strict, $"overlay.{layerIndex}.padding", padRaw);
+                padding = OverlayPadding.Zero;
+            }
+        }
+
+        double opacity = 1.0;
+        if (bag.TryGetValue("opacity", out var opaRaw))
+        {
+            if (!double.TryParse(opaRaw, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out opacity))
+            {
+                Reject(bag, ignored, rejected, strict, $"overlay.{layerIndex}.opacity", opaRaw);
+                opacity = 1.0;
+            }
+        }
+
+        int rotate = 0;
+        if (bag.TryGetValue("rotate", out var rotRaw))
+        {
+            if (!int.TryParse(rotRaw, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out rotate))
+            {
+                Reject(bag, ignored, rejected, strict, $"overlay.{layerIndex}.rotate", rotRaw);
+                rotate = 0;
+            }
+        }
+
+        layer = new OverlayLayer(source, size, position, padding, Math.Clamp(opacity, 0.0, 1.0), rotate);
+        return true;
+    }
+
+    private static IEnumerable<(string Key, string Value)> EnumerateRejectedOverlayParams(IList<OverlayLayer> layers)
+    {
+        for (var i = 0; i < layers.Count; i++)
+        {
+            yield return ($"overlay.{i}", layers[i].Source switch
+            {
+                MediaOverlaySource m => m.MediaId,
+                TextOverlaySource t => $"text:{t.Text}",
+                _ => "",
+            });
+        }
+    }
+
+    private static void ApplyOverlayLayers(MediaRecipeBuilder builder, IList<OverlayLayer> layers, bool mutatorAllowed)
+    {
+        if (layers.Count == 0) return;
+        if (!mutatorAllowed) return;
+        foreach (var layer in layers)
+        {
+            builder.Overlay(layer);
         }
     }
 

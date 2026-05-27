@@ -1,9 +1,12 @@
 using Koan.Core;
+using Koan.Media.Abstractions.Recipes;
 using Koan.Media.Web.Controllers;
 using Koan.Media.Web.Options;
+using Koan.Media.Web.Routing;
 using Koan.Web.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 
 namespace Koan.Media.Web.Initialization;
@@ -16,6 +19,9 @@ namespace Koan.Media.Web.Initialization;
 ///   the <see cref="MediaController"/> and <see cref="StorageMediaController{TEntity}"/>
 ///   routes resolve without consumers having to call
 ///   <c>AddKoanControllersFrom</c> themselves</item>
+///   <item>Default <see cref="IOverlayResolver"/> backed by the registered
+///   <see cref="IMediaSource"/> + <see cref="IMediaRecipeRegistry"/> — apps
+///   can replace by registering their own implementation before AddKoan()</item>
 /// </list>
 ///
 /// <para>Applications must still register an
@@ -39,6 +45,12 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // class libraries that ship controllers aren't picked up by the
         // default scan against the entry assembly's references.
         services.AddKoanControllersFrom<MediaController>();
+
+        // Default overlay resolver backed by IMediaSource. TryAdd so a
+        // caller can swap in a custom IOverlayResolver before AddKoan()
+        // (e.g. an in-process logo store for brand assets that aren't
+        // regular MediaEntity rows).
+        services.TryAddSingleton<IOverlayResolver, DefaultOverlayResolver>();
     }
 
     public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)

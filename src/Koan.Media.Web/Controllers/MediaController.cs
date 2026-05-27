@@ -31,19 +31,33 @@ public sealed class MediaController : ControllerBase
 {
     private readonly IMediaRecipeRegistry _registry;
     private readonly IMediaSource _source;
+    private readonly IOverlayResolver? _overlayResolver;
+    private readonly Koan.Media.Core.Fonts.KoanFontRegistry? _fonts;
     private readonly MediaWebOptions _options;
     private readonly ILogger<MediaController> _logger;
+    private readonly IServiceProvider _services;
 
     public MediaController(
         IMediaRecipeRegistry registry,
         IMediaSource source,
         IOptions<MediaWebOptions> options,
-        ILogger<MediaController> logger)
+        ILogger<MediaController> logger,
+        IServiceProvider services,
+        IOverlayResolver? overlayResolver = null,
+        Koan.Media.Core.Fonts.KoanFontRegistry? fonts = null)
     {
         _registry = registry;
         _source = source;
+        _overlayResolver = overlayResolver;
         _options = options.Value;
         _logger = logger;
+        _services = services;
+        // Lazy-apply any AddKoanFont() registrations queued before AddKoan() ran
+        if (fonts is not null)
+        {
+            _fonts = fonts;
+            Koan.Media.Core.Fonts.ServiceCollectionFontExtensions.ApplyPendingFonts(_fonts, services);
+        }
     }
 
     // ----- Recipe introspection -----
@@ -160,7 +174,11 @@ public sealed class MediaController : ControllerBase
             MediaOutput output;
             try
             {
-                output = await handle.Bytes.AsMedia(_logger).Apply(effectiveRecipe).ToBytesAsync(ct).ConfigureAwait(false);
+                output = await handle.Bytes
+                    .AsMedia(_logger, _overlayResolver, _fonts)
+                    .Apply(effectiveRecipe)
+                    .ToBytesAsync(ct)
+                    .ConfigureAwait(false);
             }
             catch (MediaDecodeException dex)
             {
