@@ -229,8 +229,9 @@
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Tagging' and '$(KoanPackageKind)' == 'Periphery'">
     <Version>0.8.1</Version>
   </PropertyGroup>
+  <!-- WEB-0068: QueryOptions.Predicates additive predicate slot for IRequestOptionsHook. -->
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Web' and '$(KoanPackageKind)' == 'Periphery'">
-    <Version>0.8.2</Version>
+    <Version>0.8.3</Version>
   </PropertyGroup>
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Web.Admin' and '$(KoanPackageKind)' == 'Periphery'">
     <Version>0.8.1</Version>

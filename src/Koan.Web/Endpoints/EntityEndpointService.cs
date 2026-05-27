@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.JsonPatch;
@@ -519,19 +520,41 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     {
         using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
 
-        object? queryPayload = null;
+        Expression<Func<TEntity, bool>>? userPredicate = null;
         if (!string.IsNullOrWhiteSpace(request.FilterJson))
         {
-            if (!JsonFilterBuilder.TryBuild<TEntity>(request.FilterJson!, out var predicate, out var error, new JsonFilterBuilder.BuildOptions { IgnoreCase = request.IgnoreCase }))
+            if (!JsonFilterBuilder.TryBuild<TEntity>(request.FilterJson!, out var parsed, out var error, new JsonFilterBuilder.BuildOptions { IgnoreCase = request.IgnoreCase }))
             {
                 throw new InvalidOperationException(error ?? "Invalid filter");
             }
+            userPredicate = parsed;
+        }
 
-            queryPayload = predicate!;
+        // WEB-0068: hook-contributed predicates AND-compose with the user's filter so the adapter
+        // counts and pages against the already-filtered set. When any predicate exists, free-text
+        // Q is dropped — the two paths reach different repository surfaces and can't be combined
+        // at the framework layer.
+        var composed = QueryPredicateComposer.AndAll<TEntity>(userPredicate, options.Predicates);
+
+        object? queryPayload;
+        if (composed is not null)
+        {
+            if (!string.IsNullOrWhiteSpace(options.Q))
+            {
+                _logger?.LogInformation(
+                    "EntityEndpointService<{Entity}> dropped free-text Q because IRequestOptionsHook(s) contributed {Count} predicate(s). See WEB-0068.",
+                    typeof(TEntity).Name,
+                    options.Predicates.Count);
+            }
+            queryPayload = composed;
         }
         else if (!string.IsNullOrWhiteSpace(options.Q))
         {
             queryPayload = options.Q;
+        }
+        else
+        {
+            queryPayload = null;
         }
 
         var dataOptions = BuildDataQueryOptions(request, options);
@@ -592,13 +615,30 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             dataOptions = dataOptions.WithSort(options.Sort);
         }
 
+        Expression<Func<TEntity, bool>>? userPredicate = null;
         if (!string.IsNullOrWhiteSpace(request.FilterJson))
         {
-            if (!JsonFilterBuilder.TryBuild<TEntity>(request.FilterJson!, out var predicate, out var error, new JsonFilterBuilder.BuildOptions { IgnoreCase = request.IgnoreCase }))
+            if (!JsonFilterBuilder.TryBuild<TEntity>(request.FilterJson!, out var parsed, out var error, new JsonFilterBuilder.BuildOptions { IgnoreCase = request.IgnoreCase }))
             {
                 throw new InvalidOperationException(error ?? "Invalid filter");
             }
-            var filtered = await Koan.Data.Core.Data<TEntity, TKey>.QueryWithCount(predicate!, dataOptions, cancellationToken);
+            userPredicate = parsed;
+        }
+
+        // WEB-0068: same composition rule as the GET path — hook predicates AND with the user's
+        // filter, free-text Q is dropped when any predicate contributes.
+        var composed = QueryPredicateComposer.AndAll<TEntity>(userPredicate, options.Predicates);
+
+        if (composed is not null)
+        {
+            if (!string.IsNullOrWhiteSpace(options.Q))
+            {
+                _logger?.LogInformation(
+                    "EntityEndpointService<{Entity}> dropped free-text Q (body-query) because IRequestOptionsHook(s) contributed {Count} predicate(s). See WEB-0068.",
+                    typeof(TEntity).Name,
+                    options.Predicates.Count);
+            }
+            var filtered = await Koan.Data.Core.Data<TEntity, TKey>.QueryWithCount(composed, dataOptions, cancellationToken);
             return (filtered.Items, filtered.TotalCount);
         }
 
