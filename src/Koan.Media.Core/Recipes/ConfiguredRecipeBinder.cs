@@ -114,6 +114,14 @@ public static class ConfiguredRecipeBinder
                     throw new MediaRecipeBindingException("'resize' step requires at least one of width/height.");
                 builder.Resize(s.Width, s.Height, s.Dpr);
                 break;
+            case "overlay":
+                if (s.Layers is null || s.Layers.Count == 0)
+                    throw new MediaRecipeBindingException("'overlay' step requires at least one layer.");
+                foreach (var layer in s.Layers)
+                {
+                    builder.Overlay(BindOverlayLayer(layer));
+                }
+                break;
             case "strip":
                 builder.Strip(ParseStripKinds(s.Kinds));
                 break;
@@ -129,6 +137,57 @@ public static class ConfiguredRecipeBinder
             default:
                 throw new MediaRecipeBindingException(
                     $"Unknown op '{s.Op}'. Allowed: autoOrient, extractFrame, rotate, flip, crop, shape, fit, resize, strip, encodeAs, flattenTo.");
+        }
+    }
+
+    private static OverlayLayer BindOverlayLayer(ConfiguredOverlayLayer layer)
+    {
+        var source = BindOverlaySource(layer.Source);
+
+        OverlaySize size = OverlaySize.Natural;
+        if (layer.Size is not null && !OverlaySize.TryParse(layer.Size, out size))
+            throw new MediaRecipeBindingException($"Invalid overlay size '{layer.Size}'.");
+
+        Position position = Position.Center;
+        if (layer.Position is not null && !Position.TryParse(layer.Position, out position))
+            throw new MediaRecipeBindingException($"Invalid overlay position '{layer.Position}'.");
+
+        OverlayPadding padding = OverlayPadding.Zero;
+        if (layer.Padding is not null && !OverlayPadding.TryParse(layer.Padding, out padding))
+            throw new MediaRecipeBindingException($"Invalid overlay padding '{layer.Padding}'.");
+
+        return new OverlayLayer(
+            Source: source,
+            Size: size,
+            Position: position,
+            Padding: padding,
+            Opacity: Math.Clamp(layer.Opacity, 0.0, 1.0),
+            Rotate: layer.Rotate);
+    }
+
+    private static OverlaySource BindOverlaySource(ConfiguredOverlaySource s)
+    {
+        var kind = (s.Kind ?? "media").Trim().ToLowerInvariant();
+        switch (kind)
+        {
+            case "media":
+                if (string.IsNullOrWhiteSpace(s.MediaId))
+                    throw new MediaRecipeBindingException("Overlay source kind='media' requires 'mediaId'.");
+                return new MediaOverlaySource(s.MediaId!, s.Recipe);
+            case "text":
+                if (string.IsNullOrWhiteSpace(s.Text))
+                    throw new MediaRecipeBindingException("Overlay source kind='text' requires 'text'.");
+                BackgroundColor? color = null;
+                if (s.Color is not null)
+                {
+                    if (!BackgroundColor.TryParse(s.Color, out var parsed))
+                        throw new MediaRecipeBindingException($"Invalid overlay text color '{s.Color}'.");
+                    color = parsed;
+                }
+                return new TextOverlaySource(s.Text!, s.Font, color, s.FontSize);
+            default:
+                throw new MediaRecipeBindingException(
+                    $"Unknown overlay source kind '{s.Kind}'. Allowed: media, text.");
         }
     }
 

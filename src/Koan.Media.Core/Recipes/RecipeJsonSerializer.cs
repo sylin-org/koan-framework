@@ -131,6 +131,10 @@ public static class RecipeJsonSerializer
                     if (rz.Height.HasValue) obj["height"] = rz.Height.Value;
                     if (Math.Abs(rz.Dpr - 1.0) > 0.001) obj["dpr"] = rz.Dpr;
                     break;
+                case OverlayStep os:
+                    obj["op"] = "overlay";
+                    obj["layers"] = SerializeOverlayLayers(os.Layers);
+                    break;
                 case StripStep st:
                     obj["op"] = "strip";
                     obj["kinds"] = SerializeStripKinds(st.Kinds);
@@ -155,6 +159,44 @@ public static class RecipeJsonSerializer
         }
         return arr;
     }
+
+    private static JsonArray SerializeOverlayLayers(System.Collections.Immutable.ImmutableArray<OverlayLayer> layers)
+    {
+        var arr = new JsonArray();
+        foreach (var layer in layers)
+        {
+            var obj = new JsonObject
+            {
+                ["source"] = SerializeOverlaySource(layer.Source),
+                ["size"] = layer.Size.ToCanonical(),
+                ["position"] = layer.Position.ToCanonical(),
+                ["padding"] = layer.Padding.ToCanonical(),
+                ["opacity"] = layer.Opacity,
+            };
+            if (layer.Rotate != 0) obj["rotate"] = layer.Rotate;
+            arr.Add(obj);
+        }
+        return arr;
+    }
+
+    private static JsonObject SerializeOverlaySource(OverlaySource source) => source switch
+    {
+        MediaOverlaySource m => new JsonObject
+        {
+            ["kind"] = "media",
+            ["mediaId"] = m.MediaId,
+            ["recipe"] = m.RecipeName,
+        },
+        TextOverlaySource t => new JsonObject
+        {
+            ["kind"] = "text",
+            ["text"] = t.Text,
+            ["font"] = t.Font,
+            ["color"] = t.Color?.ToCanonical(),
+            ["fontSize"] = t.FontSize,
+        },
+        _ => new JsonObject { ["kind"] = "unknown" },
+    };
 
     private static string SerializeStripKinds(MetadataKinds kinds)
     {

@@ -78,7 +78,12 @@ public sealed class MediaRecipeRegistry : IMediaRecipeRegistry, IDisposable
                 .WithName(canonical)
                 .WithDescription($"Format shortcut: re-encode source as {canonical} at Quality.Web (q={Quality.Web}).")
                 .EncodeAs(canonical, Quality.Web)
-                .Mutators(MutatorKind.Common | MutatorKind.Strip)
+                // Format shortcuts behave like ad-hoc URLs with the format pinned —
+                // every mutator class is permitted (Overlay included) so callers can
+                // do `/media/{id}/png?w=600&overlay=logo` without registering a recipe.
+                .Mutators(MutatorKind.Common | MutatorKind.Strip | MutatorKind.Overlay
+                          | MutatorKind.Crop | MutatorKind.Fit | MutatorKind.Position
+                          | MutatorKind.Background | MutatorKind.Rotate | MutatorKind.Frame)
                 .Build() with { Source = RecipeSource.AdHoc };
             return true;
         }
