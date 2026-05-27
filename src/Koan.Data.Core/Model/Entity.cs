@@ -390,7 +390,17 @@ namespace Koan.Data.Core.Model
             }
         }
 
-        public static async Task<int> Remove(string query, CancellationToken ct = default)
+        /// <summary>
+        /// Remove all entities matching the repository-native <paramref name="query"/>.
+        /// Renamed from <c>Remove(string query, …)</c> in v0.9 to break a silent
+        /// overload collision: when <c>TKey == string</c>, calls like
+        /// <c>Entity.Remove(id, ct)</c> resolved to the non-generic
+        /// <c>Remove(string query, ct)</c> branch and shipped the id to the
+        /// repository as a query expression, throwing
+        /// <c>NotSupportedException: String queries are not supported</c>.
+        /// The verb-explicit name keeps the key-based overload unambiguous.
+        /// </summary>
+        public static async Task<int> RemoveByQuery(string query, CancellationToken ct = default)
         {
             var items = await Data<TEntity, TKey>.Query(query, ct);
             if (!EntityEventRegistry<TEntity, TKey>.HasRemovePipeline)
@@ -410,7 +420,8 @@ namespace Koan.Data.Core.Model
                 ;
         }
 
-        public static async Task<int> Remove(string query, string partition, CancellationToken ct = default)
+        /// <summary>Partitioned variant of <see cref="RemoveByQuery(string, CancellationToken)"/>.</summary>
+        public static async Task<int> RemoveByQuery(string query, string partition, CancellationToken ct = default)
         {
             var items = await Data<TEntity, TKey>.Query(query, partition, ct);
             if (!EntityEventRegistry<TEntity, TKey>.HasRemovePipeline)
