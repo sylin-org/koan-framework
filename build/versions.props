@@ -8,7 +8,11 @@
   -->
   <PropertyGroup>
     <!-- CORE-0091: kernel bump for [Before]/[After] ordering attributes. -->
-    <KoanKernelVersion>0.8.2</KoanKernelVersion>
+    <!-- Bumped 0.8.2 -> 0.8.3 for OpenTelemetry 1.13 -> 1.15.3 upgrade in
+         Koan.Core (CVE-2026-40891 et al). Other Kernel packages are
+         unchanged in source; they repack at the new version automatically
+         so the consumer dependency graph stays internally consistent. -->
+    <KoanKernelVersion>0.8.3</KoanKernelVersion>
   </PropertyGroup>
 
   <!-- Periphery package versions (one PropertyGroup per package). -->
@@ -88,7 +92,7 @@
     <Version>0.8.1</Version>
   </PropertyGroup>
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Data.Connector.Couchbase' and '$(KoanPackageKind)' == 'Periphery'">
-    <Version>0.8.1</Version>
+    <Version>0.8.2</Version>
   </PropertyGroup>
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Data.Connector.ElasticSearch' and '$(KoanPackageKind)' == 'Periphery'">
     <Version>0.8.1</Version>
@@ -100,7 +104,7 @@
     <Version>0.8.1</Version>
   </PropertyGroup>
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Data.Connector.Mongo' and '$(KoanPackageKind)' == 'Periphery'">
-    <Version>0.8.1</Version>
+    <Version>0.8.2</Version>
   </PropertyGroup>
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Data.Connector.OpenSearch' and '$(KoanPackageKind)' == 'Periphery'">
     <Version>0.8.1</Version>
@@ -124,7 +128,7 @@
     <Version>0.8.1</Version>
   </PropertyGroup>
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Data.Cqrs.Outbox.Connector.Mongo' and '$(KoanPackageKind)' == 'Periphery'">
-    <Version>0.8.1</Version>
+    <Version>0.8.2</Version>
   </PropertyGroup>
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Data.Direct' and '$(KoanPackageKind)' == 'Periphery'">
     <Version>0.8.1</Version>
@@ -221,7 +225,7 @@
     <Version>0.8.1</Version>
   </PropertyGroup>
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Web' and '$(KoanPackageKind)' == 'Periphery'">
-    <Version>0.8.1</Version>
+    <Version>0.8.2</Version>
   </PropertyGroup>
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Web.Admin' and '$(KoanPackageKind)' == 'Periphery'">
     <Version>0.8.1</Version>
@@ -254,7 +258,7 @@
     <Version>0.8.1</Version>
   </PropertyGroup>
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Web.Connector.GraphQl' and '$(KoanPackageKind)' == 'Periphery'">
-    <Version>0.8.1</Version>
+    <Version>0.8.2</Version>
   </PropertyGroup>
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Web.Connector.Swagger' and '$(KoanPackageKind)' == 'Periphery'">
     <Version>0.8.1</Version>
