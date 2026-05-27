@@ -72,6 +72,13 @@ _For contributors_: How application initialization actually works
 - Multi-provider storage design
 - Relationship and navigation patterns
 
+### [Media Recipes](media-recipes-howto.md)
+
+- Format-preserving image pipeline (animated WebP, transparent PNG round-trip)
+- Recipe registry: `[MediaRecipe]` attribute + `Koan:Media:Recipes` config
+- HTTP grammar with named recipes, format shortcuts, and mutator allowlists
+- Multi-variant materialisation (one decode, N outputs)
+
 ### [AI Integration](ai-integration.md)
 
 - Vector stores and semantic search

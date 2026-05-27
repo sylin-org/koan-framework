@@ -28,6 +28,7 @@ Step-by-step guides for building with Koan Framework:
 
 - [Building APIs](guides/building-apis.md) - REST APIs with zero configuration
 - [Data Modeling](guides/data-modeling.md) - Entity-first development patterns
+- [Media Recipes](guides/media-recipes-howto.md) - Format-preserving image pipeline + recipe registry
 - [AI Integration](guides/ai-integration.md) - Add AI capabilities to your apps
 - [Authentication](guides/authentication-setup.md) - Zero-config OAuth, JWT, and service-to-service auth
 
