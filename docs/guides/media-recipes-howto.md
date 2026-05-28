@@ -622,6 +622,23 @@ dives:
 | `X-Koan-Media-FromCache` | `hit` / `miss` / `stale-fallback` |
 | `X-Koan-Media-IgnoredParams` | Unknown params (relaxed mode) |
 
+**Skip the pipeline on repeat requests.** Enable the persistent render
+cache so a rendered variant is stored on first request and replayed
+without re-running the resize/encode pipeline:
+
+```jsonc
+// appsettings.json
+"Koan": { "Media": { "Web": {
+  "OutputCache": { "Enabled": true, "Path": "media-cache" }
+} } }
+```
+
+A hit returns `X-Koan-Media-FromCache: hit`. The key is
+`(media id, recipe fingerprint)`, so a recipe edit rotates the key
+automatically — no manual invalidation. See the
+[reference](../reference/media/index.md#koanmediaweboutputcache-mediaoutputcacheoptions)
+for the keying, eviction, and `IMediaOutputCache` override.
+
 **Usage Scenarios**
 
 - SPA `<img>` tags hitting `/media/{id}/poster` for every catalog tile.
