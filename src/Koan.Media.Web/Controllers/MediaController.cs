@@ -2,6 +2,7 @@ using System.Text.Json.Nodes;
 using Koan.Media.Abstractions.Recipes;
 using Koan.Media.Core.Pipeline;
 using Koan.Media.Core.Recipes;
+using Koan.Media.Web.Caching;
 using Koan.Media.Web.Infrastructure;
 using Koan.Media.Web.Options;
 using Koan.Media.Web.Routing;
@@ -36,6 +37,7 @@ public sealed class MediaController : ControllerBase
     private readonly MediaWebOptions _options;
     private readonly ILogger<MediaController> _logger;
     private readonly IServiceProvider _services;
+    private readonly IMediaOutputCache _outputCache;
 
     public MediaController(
         IMediaRecipeRegistry registry,
@@ -44,7 +46,8 @@ public sealed class MediaController : ControllerBase
         ILogger<MediaController> logger,
         IServiceProvider services,
         IOverlayResolver? overlayResolver = null,
-        Koan.Media.Core.Fonts.KoanFontRegistry? fonts = null)
+        Koan.Media.Core.Fonts.KoanFontRegistry? fonts = null,
+        IMediaOutputCache? outputCache = null)
     {
         _registry = registry;
         _source = source;
@@ -52,6 +55,7 @@ public sealed class MediaController : ControllerBase
         _options = options.Value;
         _logger = logger;
         _services = services;
+        _outputCache = outputCache ?? NullMediaOutputCache.Instance;
         // Lazy-apply any AddKoanFont() registrations queued before AddKoan() ran
         if (fonts is not null)
         {
@@ -170,6 +174,20 @@ public sealed class MediaController : ControllerBase
                 return StatusCode(StatusCodes.Status304NotModified);
             }
 
+            // 5b) Persistent render cache — serve stored output and skip the
+            // resize/re-encode pipeline. Key is (id, fingerprint); the source
+            // open above already guaranteed the media exists.
+            var cacheHit = await _outputCache.TryGetAsync(id, fingerprint, ct).ConfigureAwait(false);
+            if (cacheHit is not null)
+            {
+                Response.Headers[HeaderNames.ETag] = etag;
+                Response.Headers[HttpHeaderNames.CacheControl] = _options.DefaultCacheControl;
+                ApplyDiagnostics(seedRecipe, effectiveRecipe, fingerprint,
+                    sourceFormat: null, output: null,
+                    ignored: parseResult.IgnoredParams, fromCache: "hit");
+                return File(cacheHit.Bytes, cacheHit.ContentType);
+            }
+
             // 6) Run pipeline
             MediaOutput output;
             try
@@ -200,6 +218,11 @@ public sealed class MediaController : ControllerBase
             {
                 return UnprocessableEntity(new { error = dex.Message });
             }
+
+            // 6b) Write-through to the render cache. Best-effort: the cache
+            // implementation swallows IO errors so a failure here never faults
+            // the response.
+            await _outputCache.SetAsync(id, fingerprint, output, ct).ConfigureAwait(false);
 
             // 7) Build response
             Response.Headers[HeaderNames.ETag] = etag;

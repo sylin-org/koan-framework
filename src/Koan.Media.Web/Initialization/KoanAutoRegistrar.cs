@@ -1,5 +1,6 @@
 using Koan.Core;
 using Koan.Media.Abstractions.Recipes;
+using Koan.Media.Web.Caching;
 using Koan.Media.Web.Controllers;
 using Koan.Media.Web.Options;
 using Koan.Media.Web.Routing;
@@ -8,6 +9,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Koan.Media.Web.Initialization;
 
@@ -51,6 +54,26 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // (e.g. an in-process logo store for brand assets that aren't
         // regular MediaEntity rows).
         services.TryAddSingleton<IOverlayResolver, DefaultOverlayResolver>();
+
+        // Persistent render-output cache. Resolves to a filesystem-backed
+        // implementation when Koan:Media:Web:OutputCache is enabled with a
+        // Path, otherwise a no-op. TryAdd so an app can register a custom
+        // IMediaOutputCache (e.g. a storage-profile backing) before AddKoan().
+        services.TryAddSingleton<IMediaOutputCache>(sp =>
+        {
+            var opts = sp.GetRequiredService<IOptions<MediaWebOptions>>().Value.OutputCache;
+            if (!opts.Enabled || string.IsNullOrWhiteSpace(opts.Path))
+            {
+                return NullMediaOutputCache.Instance;
+            }
+
+            var env = sp.GetRequiredService<IHostEnvironment>();
+            var root = Path.IsPathRooted(opts.Path)
+                ? opts.Path
+                : Path.Combine(env.ContentRootPath, opts.Path);
+            var logger = sp.GetRequiredService<ILogger<FileSystemMediaOutputCache>>();
+            return new FileSystemMediaOutputCache(root, logger);
+        });
     }
 
     public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)

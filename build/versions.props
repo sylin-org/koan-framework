@@ -163,8 +163,10 @@
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Media.Core' and '$(KoanPackageKind)' == 'Periphery'">
     <Version>0.11.1</Version>
   </PropertyGroup>
+  <!-- 0.11.2: persistent render-output cache (Koan:Media:Web:OutputCache) —
+       additive, opt-in, no-op by default. -->
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Media.Web' and '$(KoanPackageKind)' == 'Periphery'">
-    <Version>0.11.1</Version>
+    <Version>0.11.2</Version>
   </PropertyGroup>
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Messaging.Connector.RabbitMq' and '$(KoanPackageKind)' == 'Periphery'">
     <Version>0.8.1</Version>

@@ -1,7 +1,10 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Koan.Media.Abstractions.Recipes;
 using Koan.Media.Core.Tests.Support;
+using Koan.Media.Web.Caching;
 using Koan.Media.Web.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using SixLabors.ImageSharp;
@@ -331,6 +334,62 @@ public sealed class MediaControllerSpec
 
         var response = await server.Client.GetAsync("/media/photo?bg=red");
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task OutputCache_first_request_renders_and_writes_through_then_serves_from_cache()
+    {
+        var cache = new CaptureReplayCache();
+        await using var server = await MediaTestServer.StartAsync(
+            configureServices: services => services.AddSingleton<IMediaOutputCache>(cache));
+        await server.Source.AddAsync("photo", Fixtures.WideJpeg(width: 800, height: 600));
+
+        // Cold request: miss → pipeline runs → write-through.
+        var first = await server.Client.GetAsync("/media/photo/png?w=100");
+        first.StatusCode.Should().Be(HttpStatusCode.OK);
+        first.Headers.GetValues("X-Koan-Media-FromCache").Single().Should().Be("miss");
+        cache.SetCount.Should().Be(1, "the cold render is persisted write-through");
+        var bytes1 = await first.Content.ReadAsByteArrayAsync();
+
+        // Warm request: same URL → cache hit → pipeline skipped, no re-write.
+        var second = await server.Client.GetAsync("/media/photo/png?w=100");
+        second.StatusCode.Should().Be(HttpStatusCode.OK);
+        second.Headers.GetValues("X-Koan-Media-FromCache").Single().Should().Be("hit");
+        second.Content.Headers.ContentType!.MediaType.Should().Be("image/png");
+        cache.SetCount.Should().Be(1, "a cache hit does not re-render or re-write");
+        var bytes2 = await second.Content.ReadAsByteArrayAsync();
+
+        bytes2.Should().Equal(bytes1, "the served bytes come from the cached render");
+    }
+
+    /// <summary>
+    /// In-memory <see cref="IMediaOutputCache"/> that stores whatever the
+    /// controller writes and replays it on subsequent reads — enough to prove
+    /// the read-through / write-through seam without a filesystem.
+    /// </summary>
+    private sealed class CaptureReplayCache : IMediaOutputCache
+    {
+        private readonly ConcurrentDictionary<string, (byte[] Bytes, string ContentType)> _store = new();
+        public int SetCount { get; private set; }
+
+        public Task<MediaCacheHit?> TryGetAsync(string id, string fingerprint, CancellationToken ct = default)
+        {
+            if (_store.TryGetValue(Key(id, fingerprint), out var entry))
+            {
+                return Task.FromResult<MediaCacheHit?>(
+                    new MediaCacheHit(new MemoryStream(entry.Bytes, writable: false), entry.ContentType));
+            }
+            return Task.FromResult<MediaCacheHit?>(null);
+        }
+
+        public Task SetAsync(string id, string fingerprint, MediaOutput output, CancellationToken ct = default)
+        {
+            SetCount++;
+            _store[Key(id, fingerprint)] = (output.Bytes, output.ContentType);
+            return Task.CompletedTask;
+        }
+
+        private static string Key(string id, string fingerprint) => $"{id}|{fingerprint}";
     }
 }
 

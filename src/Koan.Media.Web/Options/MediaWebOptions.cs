@@ -50,4 +50,11 @@ public sealed class MediaWebOptions
     /// hash (<c>/media/{id}@{shortHash}/...</c>). Default immutable.
     /// </summary>
     public string ImmutableCacheControl { get; set; } = "public, immutable, max-age=31536000";
+
+    /// <summary>
+    /// Persistent render-output cache. Disabled by default; set
+    /// <c>Koan:Media:Web:OutputCache:Enabled</c> + <c>:Path</c> to memoize
+    /// rendered variants on disk and skip the pipeline on repeat requests.
+    /// </summary>
+    public MediaOutputCacheOptions OutputCache { get; set; } = new();
 }
