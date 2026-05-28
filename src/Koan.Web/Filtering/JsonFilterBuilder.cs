@@ -191,8 +191,24 @@ public static class JsonFilterBuilder
         }
         else
         {
-            var list = ((JArray)arrayNode).Select(e => JsonToObject(e, member.Type)).ToList();
-            var constExpr = Expression.Constant(list);
+            // Materialise into a List<TMember> rather than List<object> so the
+            // Enumerable.Contains<TMember>(IEnumerable<TMember>, TMember) call
+            // resolves cleanly. The previous `Select(...).ToList()` produced
+            // a List<object>, which the LINQ provider rejects with
+            //   "Expression of type 'List<object>' cannot be used for parameter
+            //    of type 'IEnumerable<TMember>' of method 'Contains<TMember>'"
+            // whenever TMember is a value type or enum (string worked by
+            // accident because the string branch above uses an explicit
+            // List<string>). Building the list reflectively keeps the
+            // expression strongly typed for any member type that JsonToObject
+            // can produce (enums, ints, longs, doubles, GUIDs, etc.).
+            var listType = typeof(List<>).MakeGenericType(member.Type);
+            var typedList = (System.Collections.IList)Activator.CreateInstance(listType)!;
+            foreach (var element in (JArray)arrayNode)
+            {
+                typedList.Add(JsonToObject(element, member.Type));
+            }
+            var constExpr = Expression.Constant(typedList, listType);
             var contains = typeof(Enumerable)
                 .GetMethods()
                 .First(m => m.Name == "Contains" && m.GetParameters().Length == 2)
