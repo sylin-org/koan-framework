@@ -149,6 +149,46 @@ var product = new Product
 await product.Save();
 ```
 
+**Sharing Shape Across Entities**
+
+Sooner or later you'll have several entities that share fields: a family of catalog records, a set of job types, audited rows that all carry `CreatedBy`. The instinct from classic OOP is to inherit one entity from another. Don't.
+
+```csharp
+// Anti-pattern: do NOT inherit one concrete entity from another
+public class Model  : Entity<Model> { public string? Shared { get; set; } }
+public class Model2 : Model { public string? Extra { get; set; } }  // compiles, looks fine, isn't
+```
+
+This compiles and reads naturally, but it silently splits writes from reads:
+
+- `Save` is `Save<TEntity>(this TEntity)`, so `new Model2().Save()` infers `TEntity = Model2` and writes to a dedicated **Model2** collection (full shape, `Extra` included).
+- `Get` is an inherited static fixed at the CRTP root `Entity<Model>`, so both `Model.Get(id)` AND `Model2.Get(id)` read the **Model** collection.
+
+Net result: the `Model2` row persists correctly but is unreadable through either `.Get(id)`. No exception, no warning. (Validated against real MongoDB.) C# does not let an inherited static re-specialize for the deriving type, so `Model2.Get` simply *is* `Model.Get`.
+
+**The fix: make each entity its own `Entity<T>` root, and lift shared shape into a generic base.**
+
+```csharp
+// Shared fields via a generic base; each entity is its own set
+public abstract class CatalogEntity<T> : Entity<T> where T : CatalogEntity<T>, new()
+{
+    public string? Shared { get; set; }   // every catalog entity gets this
+}
+
+public class Package : CatalogEntity<Package> { }
+public class Mirror  : CatalogEntity<Mirror>  { public string? Extra { get; set; } }
+
+await new Package { Shared = "x" }.Save();
+var p = await Package.Get(id);   // bare .Get(id), returns Package, own collection
+var m = await Mirror.Get(id);    // bare .Get(id), returns Mirror, own collection, isolated
+```
+
+`Package` and `Mirror` are now **siblings** that share shape, each with its own collection. Same-id rows in different types never collide. The bare `Foo.Get(id)` ergonomic is preserved with zero ceremony: no source generator, no `partial`, no `Entity<T>.Get(...)` call form.
+
+**What you trade:** siblings are not substitutable. `Mirror` is not a `Package`, so you cannot pass one where the other is expected or query both as one set. That is the only thing class inheritance would have given you, and it is rarely what you actually want for stored entities. If you genuinely need a polymorphic set (query a base type and get mixed concrete rows back), that is single-table inheritance: one shared collection plus a type discriminator, an explicit opt-in, not the default. For the common case (share fields, store separately), sibling CRTP roots are the answer.
+
+**Rule of thumb:** every concrete entity should read `class Foo : Entity<Foo>` or `class Foo : SomeBase<Foo>`. If you ever see `class Foo : SomeConcreteEntity` (inheriting a type that is itself a set), stop: that is the footgun.
+
 **Usage Scenarios**
 
 - **Web APIs:** Entity<T> eliminates boilerplate. No manual repositories, no hand-written CRUD.
@@ -1147,6 +1187,12 @@ var similar = await MediaItem.Query("vectorDistance < 0.15", ct);
 **Cause:** Forgot to set `EntityContext.Partition()` before query
 **Solution:** Use middleware or filters to set partition automatically
 **Prevention:** Add integration tests validating partition isolation
+
+### Symptom: Saved an entity but `Get()` returns null
+
+**Cause:** The entity inherits from another concrete entity (`class Derived : SomeEntity`), so `Save` writes to the `Derived` collection while the inherited `Get` reads the base (`SomeEntity`) collection
+**Solution:** Make each entity its own root and share fields via a generic base: `class Derived : SharedBase<Derived>` where `SharedBase<T> : Entity<T>` (see Section 1, "Sharing Shape Across Entities")
+**Prevention:** Every concrete entity should read `: Entity<Self>` or `: SomeBase<Self>`, never `: AnotherConcreteEntity`
 
 ---
 

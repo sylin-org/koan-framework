@@ -25,6 +25,8 @@ public sealed class DataService(IServiceProvider sp) : IDataService
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
+        EntityShapeGuard.EnsureOwnRoot(typeof(TEntity));
+
         var sourceRegistry = sp.GetRequiredService<DataSourceRegistry>();
         var (adapter, source) = AdapterResolver.ResolveForEntity<TEntity>(sp, sourceRegistry);
 
