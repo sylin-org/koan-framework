@@ -154,9 +154,13 @@
        (Job<T> : Entity<T>, typed payloads, generic runtime, store layer collapsed). Breaking on
        pre-1.0 = minor bump. Subsumes JOBS-0002 (lanes/coalesce/Push/delayed-visibility).
        0.9.1: drop the internal RecoveryProbe/DummyJob placeholders so JobTypeRegistry no longer
-       discovers them (avoids empty phantom collections). -->
+       discovers them (avoids empty phantom collections).
+       0.10.0: JOBS-0004 partitioned lanes — optional per-partition concurrency tier within a lane
+       (Job.LanePartition + JobLaneOptions.MaxConcurrencyPerPartition/PartitionOverrides), acquired
+       partition-first so one hot key cannot starve the lane-global gate. Additive + opt-in (lanes
+       without MaxConcurrencyPerPartition behave exactly as before). -->
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Jobs.Core' and '$(KoanPackageKind)' == 'Periphery'">
-    <Version>0.9.1</Version>
+    <Version>0.10.0</Version>
   </PropertyGroup>
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Mcp' and '$(KoanPackageKind)' == 'Periphery'">
     <Version>0.8.1</Version>

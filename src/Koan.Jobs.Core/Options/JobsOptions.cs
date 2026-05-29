@@ -27,6 +27,20 @@ public sealed class JobsOptions
 /// <summary>Per-lane settings (see <see cref="JobsOptions.Lanes"/>).</summary>
 public sealed class JobLaneOptions
 {
-    /// <summary>Maximum number of jobs that may execute concurrently in this lane.</summary>
+    /// <summary>Maximum number of jobs that may execute concurrently in this lane — the global cap
+    /// across every partition. 0 falls back to <see cref="JobsOptions.DefaultLaneConcurrency"/>.</summary>
     public int MaxConcurrency { get; set; }
+
+    /// <summary>Optional second concurrency tier (JOBS-0004): the maximum jobs that may run
+    /// concurrently for a single partition key within this lane. 0 (the default) disables
+    /// partitioning, so only <see cref="MaxConcurrency"/> applies. When set, a job's
+    /// <c>LanePartition</c> permit is acquired BEFORE the lane-global permit, so one hot partition's
+    /// backlog cannot fill the global gate and starve the other partitions.</summary>
+    public int MaxConcurrencyPerPartition { get; set; }
+
+    /// <summary>Per-key overrides for <see cref="MaxConcurrencyPerPartition"/>, keyed by the partition
+    /// value (e.g. an upstream brand). A value &gt; 0 caps that key specifically; keys absent here use
+    /// <see cref="MaxConcurrencyPerPartition"/>. Config:
+    /// <c>Koan:Jobs:Lanes:{lane}:PartitionOverrides:{key}</c>.</summary>
+    public Dictionary<string, int> PartitionOverrides { get; } = new(StringComparer.Ordinal);
 }

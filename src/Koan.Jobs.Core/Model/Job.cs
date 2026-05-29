@@ -81,6 +81,13 @@ public abstract class Job<T> : Entity<T>, IKoanJob<T>
     /// <summary>The concurrency lane this job runs in (JOBS-0002). Defaults to <see cref="JobLanes.Default"/>.</summary>
     protected internal virtual string Lane => JobLanes.Default;
 
+    /// <summary>Optional partition key within <see cref="Lane"/> for the second concurrency tier
+    /// (JOBS-0004). When the lane configures <c>MaxConcurrencyPerPartition</c>, jobs sharing a key are
+    /// capped together and acquired partition-first, so one hot partition cannot fill the lane-global
+    /// gate and starve the others. Null (the default) opts the job out of partitioning. Typically
+    /// derived from the typed payload (e.g. an upstream brand).</summary>
+    protected internal virtual string? LanePartition => null;
+
     /// <summary>Retry policy for this job type. Defaults to no retry.</summary>
     protected internal virtual RetryPolicyDescriptor Retry => RetryPolicyDescriptor.None;
 
@@ -104,6 +111,7 @@ public abstract class Job<T> : Entity<T>, IKoanJob<T>
 
     // Internal accessors so the same-assembly runtime can read per-type policy uniformly.
     internal string LaneNameInternal => Lane;
+    internal string? LanePartitionInternal => LanePartition;
     internal RetryPolicyDescriptor RetryInternal => Retry;
     internal string? HostTagInternal => HostTag;
     internal string? CoalesceKeyInternal() => DeriveCoalesceKey();

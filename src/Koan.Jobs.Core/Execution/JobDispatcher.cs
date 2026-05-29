@@ -92,8 +92,10 @@ internal static class JobDispatcher<T> where T : Job<T>, new()
 
         var tracker = new JobProgressTracker<T>(job, broker, cancellations, cancellationToken);
         JobExecutionOutcome outcome;
-        // Lane permit wraps ONLY the job body (JOBS-0002), so deferrals never hold it.
-        using (await lanes.AcquireAsync(item.Lane ?? job.LaneNameInternal, cancellationToken))
+        // Lane permit wraps ONLY the job body (JOBS-0002), so deferrals never hold it. The optional
+        // per-partition tier (JOBS-0004) is taken from the rehydrated job, so it survives re-enqueues
+        // without being threaded through the queue item.
+        using (await lanes.AcquireAsync(item.Lane ?? job.LaneNameInternal, job.LanePartitionInternal, cancellationToken))
         {
             outcome = await Invoke(job, tracker, cancellationToken);
         }
