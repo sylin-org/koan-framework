@@ -7,7 +7,7 @@ namespace Koan.Jobs.Support;
 
 internal static class JobFlowBridge
 {
-    public static void TryPublishEvent(Job job, string eventType, string? error)
+    public static void TryPublishEvent(IKoanJob job, string eventType, string? error)
     {
         var type = Type.GetType("Koan.Flow.Core.Notifications.JobEvent, Koan.Flow.Core");
         if (type == null)
@@ -33,7 +33,7 @@ internal static class JobFlowBridge
         }
     }
 
-    public static void TryPublishProgress(Job job, JobProgressUpdate update)
+    public static void TryPublishProgress(IKoanJob job, JobProgressUpdate update)
     {
         var type = Type.GetType("Koan.Flow.Core.Notifications.JobProgressEvent, Koan.Flow.Core");
         if (type == null)

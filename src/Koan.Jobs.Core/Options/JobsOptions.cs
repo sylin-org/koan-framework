@@ -1,24 +1,32 @@
+using System;
+using System.Collections.Generic;
 using System.Text.Json;
 using Koan.Jobs.Archival;
-using Koan.Jobs.Model;
 
 namespace Koan.Jobs.Options;
 
 public sealed class JobsOptions
 {
-    public JobStorageMode DefaultStore { get; set; } = JobStorageMode.InMemory;
-    public string? DefaultSource { get; set; }
-    public string? DefaultPartition { get; set; }
-    public bool AuditByDefault { get; set; }
+    /// <summary>Publish job lifecycle/progress notifications over messaging when available.</summary>
     public bool PublishEvents { get; set; } = true;
-    public InMemoryStoreOptions InMemory { get; } = new();
     public JobArchivalPolicy Archival { get; } = new();
     public JsonSerializerOptions SerializerOptions { get; } = new(JsonSerializerDefaults.Web);
+
+    /// <summary>
+    /// Per-lane concurrency settings, keyed by lane name (see JOBS-0002). A lane is a named bound
+    /// the worker honours when dispatching execution, so independent lanes run in parallel and each
+    /// is capped. Lanes absent from this map use <see cref="DefaultLaneConcurrency"/>.
+    /// Config: <c>Koan:Jobs:Lanes:{name}:MaxConcurrency</c>.
+    /// </summary>
+    public Dictionary<string, JobLaneOptions> Lanes { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>Concurrency cap for the default lane and any lane not listed in <see cref="Lanes"/>.</summary>
+    public int DefaultLaneConcurrency { get; set; } = Environment.ProcessorCount;
 }
 
-public sealed class InMemoryStoreOptions
+/// <summary>Per-lane settings (see <see cref="JobsOptions.Lanes"/>).</summary>
+public sealed class JobLaneOptions
 {
-    public int CompletedRetentionMinutes { get; set; } = 60;
-    public int FaultedRetentionMinutes { get; set; } = 120;
-    public int SweepIntervalSeconds { get; set; } = 60;
+    /// <summary>Maximum number of jobs that may execute concurrently in this lane.</summary>
+    public int MaxConcurrency { get; set; }
 }

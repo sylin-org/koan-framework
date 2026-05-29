@@ -31,13 +31,13 @@ internal sealed class JobProgressBroker
         return subscription;
     }
 
-    public Task Publish(Job job, CancellationToken cancellationToken)
+    public Task Publish(IKoanJob job, CancellationToken cancellationToken)
     {
         var update = new JobProgressUpdate
         {
             Percentage = job.Progress,
             Message = job.ProgressMessage,
-            EstimatedCompletion = job.EstimatedCompletion,
+            EstimatedCompletion = null,
             UpdatedAt = DateTimeOffset.UtcNow
         };
         return Publish(job.Id, update, cancellationToken);

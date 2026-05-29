@@ -18,14 +18,33 @@ public sealed record RetryPolicyDescriptor(
         BackoffMultiplier: 1,
         RetryOnCancellation: false);
 
-    public static RetryPolicyDescriptor FromAttribute(RetryPolicyAttribute attribute)
+    /// <summary>Exponential-backoff retry policy (JOBS-0003 per-type policy ergonomics).</summary>
+    public static RetryPolicyDescriptor Exponential(
+        int maxAttempts = 3,
+        int initialDelaySeconds = 5,
+        int maxDelaySeconds = 300,
+        double backoffMultiplier = 2.0,
+        bool retryOnCancellation = false)
         => new(
-            Math.Max(1, attribute.MaxAttempts),
-            attribute.Strategy,
-            attribute.Strategy == RetryStrategy.None ? TimeSpan.Zero : TimeSpan.FromSeconds(Math.Max(0, attribute.InitialDelaySeconds)),
-            attribute.Strategy == RetryStrategy.None ? TimeSpan.Zero : TimeSpan.FromSeconds(Math.Max(attribute.InitialDelaySeconds, attribute.MaxDelaySeconds)),
-            attribute.Strategy == RetryStrategy.ExponentialBackoff ? Math.Max(1.1, attribute.BackoffMultiplier) : 1,
-            attribute.RetryOnCancellation);
+            Math.Max(1, maxAttempts),
+            RetryStrategy.ExponentialBackoff,
+            TimeSpan.FromSeconds(Math.Max(0, initialDelaySeconds)),
+            TimeSpan.FromSeconds(Math.Max(initialDelaySeconds, maxDelaySeconds)),
+            Math.Max(1.1, backoffMultiplier),
+            retryOnCancellation);
+
+    /// <summary>Fixed-delay retry policy.</summary>
+    public static RetryPolicyDescriptor FixedDelay(
+        int maxAttempts = 3,
+        int delaySeconds = 5,
+        bool retryOnCancellation = false)
+        => new(
+            Math.Max(1, maxAttempts),
+            RetryStrategy.Fixed,
+            TimeSpan.FromSeconds(Math.Max(0, delaySeconds)),
+            TimeSpan.FromSeconds(Math.Max(0, delaySeconds)),
+            1,
+            retryOnCancellation);
 
     public TimeSpan ComputeDelay(int attempt)
     {

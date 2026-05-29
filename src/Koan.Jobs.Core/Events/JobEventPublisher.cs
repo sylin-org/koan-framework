@@ -21,22 +21,22 @@ internal sealed class JobEventPublisher : IJobEventPublisher
         _messageProxy = services.GetService<IMessageProxy>();
     }
 
-    public Task PublishQueued(Job job, CancellationToken cancellationToken)
+    public Task PublishQueued(IKoanJob job, CancellationToken cancellationToken)
         => PublishEvent(job, "queued", null, cancellationToken);
 
-    public Task PublishStarted(Job job, CancellationToken cancellationToken)
+    public Task PublishStarted(IKoanJob job, CancellationToken cancellationToken)
         => PublishEvent(job, "started", null, cancellationToken);
 
-    public Task PublishCompleted(Job job, CancellationToken cancellationToken)
+    public Task PublishCompleted(IKoanJob job, CancellationToken cancellationToken)
         => PublishEvent(job, "completed", null, cancellationToken);
 
-    public Task PublishFailed(Job job, string? error, CancellationToken cancellationToken)
+    public Task PublishFailed(IKoanJob job, string? error, CancellationToken cancellationToken)
         => PublishEvent(job, "failed", error, cancellationToken);
 
-    public Task PublishCancelled(Job job, CancellationToken cancellationToken)
+    public Task PublishCancelled(IKoanJob job, CancellationToken cancellationToken)
         => PublishEvent(job, "cancelled", null, cancellationToken);
 
-    public Task PublishProgress(Job job, JobProgressUpdate update, CancellationToken cancellationToken)
+    public Task PublishProgress(IKoanJob job, JobProgressUpdate update, CancellationToken cancellationToken)
     {
         _logger.LogDebug("Job {JobId} progress {Progress:P0} - {Message}", job.Id, update.Percentage, update.Message);
         JobFlowBridge.TryPublishProgress(job, update);
@@ -53,7 +53,7 @@ internal sealed class JobEventPublisher : IJobEventPublisher
         return _messageProxy.SendAsync(notification, cancellationToken);
     }
 
-    private Task PublishEvent(Job job, string eventType, string? error, CancellationToken cancellationToken)
+    private Task PublishEvent(IKoanJob job, string eventType, string? error, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Job {JobId} {EventType} (status: {Status})", job.Id, eventType, job.Status);
         JobFlowBridge.TryPublishEvent(job, eventType, error);

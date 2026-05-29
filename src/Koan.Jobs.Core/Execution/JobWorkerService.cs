@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Concurrent;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Core.BackgroundServices;
@@ -32,20 +34,52 @@ internal sealed class JobWorkerService : KoanBackgroundServiceBase
 
     private async Task Run(CancellationToken cancellationToken)
     {
-        await foreach (var item in _queue.ReadAll(cancellationToken))
+        // Single serial claimer reads the ready queue and dispatches each item to a tracked task.
+        // Concurrency is bounded per lane inside the executor (JobLaneRegistry permit around the
+        // job body), so the worker never blocks on dispatch and one slow job can't head-of-line
+        // block the rest. On shutdown we await in-flight tasks for a graceful drain (JOBS-0002).
+        var inFlight = new ConcurrentDictionary<Task, byte>();
+        try
         {
-            try
+            await foreach (var item in _queue.ReadAll(cancellationToken))
             {
-                await _executor.Execute(item, cancellationToken);
+                var task = DispatchAsync(item, cancellationToken);
+                inFlight.TryAdd(task, 0);
+                _ = task.ContinueWith(
+                    t => inFlight.TryRemove(t, out _),
+                    CancellationToken.None,
+                    TaskContinuationOptions.ExecuteSynchronously,
+                    TaskScheduler.Default);
             }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Expected on shutdown — fall through to drain.
+        }
+        finally
+        {
+            var pending = inFlight.Keys.ToArray();
+            if (pending.Length > 0)
             {
-                break;
+                try { await Task.WhenAll(pending); }
+                catch { /* per-task failures are already logged in DispatchAsync */ }
             }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Job execution failed for {JobId}", item.JobId);
-            }
+        }
+    }
+
+    private async Task DispatchAsync(JobQueueItem item, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _executor.Execute(item, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Expected on shutdown.
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Job execution failed for {JobId}", item.JobId);
         }
     }
 }

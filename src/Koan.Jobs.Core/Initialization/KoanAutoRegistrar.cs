@@ -25,7 +25,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         module.Describe(ModuleVersion);
         if (options is not null)
         {
-            module.AddNote($"Jobs default store: {options.DefaultStore}");
+            module.AddNote($"Jobs lanes configured: {options.Lanes.Count}");
         }
     }
 }

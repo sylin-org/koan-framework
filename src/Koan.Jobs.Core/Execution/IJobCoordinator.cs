@@ -1,20 +1,14 @@
-using System.Collections.Generic;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Jobs.Model;
 
 namespace Koan.Jobs.Execution;
 
+/// <summary>Submits and cancels jobs (JOBS-0003). Each job is its own <see cref="Koan.Data.Core.Model.Entity{T}"/>
+/// set; submit persists it and enqueues it for the generic runtime.</summary>
 internal interface IJobCoordinator
 {
-    Task<TJob> Run<TJob, TContext, TResult>(JobRunRequest<TJob, TContext, TResult> request)
-        where TJob : Job<TJob, TContext, TResult>, new();
-
-    Task<TJob?> Refresh<TJob, TContext, TResult>(string jobId, CancellationToken cancellationToken)
-        where TJob : Job<TJob, TContext, TResult>, new();
-
-    Task Cancel<TJob, TContext, TResult>(string jobId, CancellationToken cancellationToken)
-        where TJob : Job<TJob, TContext, TResult>, new();
-
-    Task<IReadOnlyList<JobExecution>> GetExecutions(string jobId, CancellationToken cancellationToken);
+    Task<T> Submit<T>(T job, TimeSpan? delay, CancellationToken cancellationToken) where T : Job<T>, new();
+    Task Cancel<T>(string jobId, CancellationToken cancellationToken) where T : Job<T>, new();
 }

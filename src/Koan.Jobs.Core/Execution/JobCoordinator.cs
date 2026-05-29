@@ -1,170 +1,96 @@
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Jobs.Events;
 using Koan.Jobs.Model;
-using Koan.Jobs.Options;
 using Koan.Jobs.Queue;
-using Koan.Jobs.Store;
-using Koan.Jobs.Support;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace Koan.Jobs.Execution;
 
+/// <summary>
+/// Submits and cancels jobs (JOBS-0003). Submit resolves per-type policy (lane, coalesce key) from
+/// the job instance, dedups against a live job when coalescing, persists the job to its own set, and
+/// enqueues it (immediately or at a future visible-at for delayed start).
+/// </summary>
 internal sealed class JobCoordinator : IJobCoordinator
 {
-    private readonly IJobStoreResolver _resolver;
-    private readonly JobIndexCache _index;
     private readonly IJobQueue _queue;
-    private readonly IJobEventPublisher _eventPublisher;
-    private readonly JobsOptions _options;
+    private readonly IJobEventPublisher _events;
+    private readonly JobCancellations _cancellations;
     private readonly ILogger<JobCoordinator> _logger;
 
-    public JobCoordinator(
-        IJobStoreResolver resolver,
-        JobIndexCache index,
-        IJobQueue queue,
-        IJobEventPublisher eventPublisher,
-        IOptions<JobsOptions> options,
-        ILogger<JobCoordinator> logger)
+    public JobCoordinator(IJobQueue queue, IJobEventPublisher events, JobCancellations cancellations, ILogger<JobCoordinator> logger)
     {
-        _resolver = resolver;
-        _index = index;
         _queue = queue;
-        _eventPublisher = eventPublisher;
-        _options = options.Value;
+        _events = events;
+        _cancellations = cancellations;
         _logger = logger;
     }
 
-    public async Task<TJob> Run<TJob, TContext, TResult>(JobRunRequest<TJob, TContext, TResult> request)
-        where TJob : Job<TJob, TContext, TResult>, new()
+    public async Task<T> Submit<T>(T job, TimeSpan? delay, CancellationToken cancellationToken)
+        where T : Job<T>, new()
     {
-        var cancellationToken = request.CancellationToken;
-        var storageMode = request.StorageMode switch
+        var lane = job.LaneNameInternal;
+        var coalesceKey = job.CoalesceKeyInternal();
+
+        // Coalesce-by-key (JOBS-0002): reuse a live job of the same type+key. Best-effort; handlers
+        // are idempotent so a rare race that mints two is harmless.
+        if (!string.IsNullOrWhiteSpace(coalesceKey))
         {
-            JobStorageMode.Entity => JobStorageMode.Entity,
-            _ => JobStorageMode.InMemory
-        };
-
-        var source = request.Source ?? _options.DefaultSource;
-        var partition = request.Partition ?? _options.DefaultPartition;
-        var audit = request.Audit ?? _options.AuditByDefault;
-
-        var metadata = new JobStoreMetadata(storageMode, source, partition, audit, _options.SerializerOptions);
-        var store = _resolver.Resolve(storageMode);
-
-        var correlationId = request.CorrelationId
-            ?? Activity.Current?.TraceId.ToString();
-
-        var job = new TJob
-        {
-            Status = JobStatus.Queued,
-            QueuedAt = DateTimeOffset.UtcNow,
-            CreatedAt = DateTimeOffset.UtcNow,
-            CorrelationId = correlationId,
-            Progress = 0d,
-            // Stable type identity for WaitFor type-based lookups (see ADR-0017).
-            TypeName = typeof(TJob).FullName ?? typeof(TJob).Name,
-        };
-
-        job.Context = request.Context;
-
-        foreach (var mutator in request.Mutators)
-        {
-            mutator(job);
+            var existing = await Job<T>.Query(
+                j => j.CoalesceKey == coalesceKey
+                     && j.Status != JobStatus.Completed
+                     && j.Status != JobStatus.Failed
+                     && j.Status != JobStatus.Cancelled,
+                cancellationToken);
+            if (existing.Count > 0)
+            {
+                _logger.LogDebug("Coalesced onto existing {JobType} job {JobId} (key {Key}).", typeof(T).Name, existing[0].Id, coalesceKey);
+                return existing[0];
+            }
         }
 
-        if (string.IsNullOrWhiteSpace(job.Name))
-            job.Name = typeof(TJob).Name;
+        var now = DateTimeOffset.UtcNow;
+        var visibleAt = delay is { } d && d > TimeSpan.Zero ? now.Add(d) : now;
 
-        _logger.LogDebug("Queueing job {JobId} ({JobType}) with storage {StorageMode}", job.Id, typeof(TJob).Name, storageMode);
+        job.Status = JobStatus.Queued;
+        job.QueuedAt = visibleAt;
+        job.CreatedAt = job.CreatedAt == default ? now : job.CreatedAt;
+        job.CorrelationId ??= Activity.Current?.TraceId.ToString();
+        job.ResolvedLane = lane;
+        job.CoalesceKey = coalesceKey;
 
-        var saved = await store.Create(job, metadata, cancellationToken);
-        if (saved is not TJob typed)
-            throw new InvalidOperationException($"Store returned unexpected job type {saved.GetType().FullName}." );
+        await job.SaveSelf(cancellationToken);
+        await _events.PublishQueued(job, cancellationToken);
 
-        await _eventPublisher.PublishQueued(typed, cancellationToken);
+        var item = new JobQueueItem(job.Id, typeof(T), lane);
+        if (visibleAt > now) await _queue.Enqueue(item, visibleAt, cancellationToken);
+        else await _queue.Enqueue(item, cancellationToken);
 
-        var baseType = typeof(TJob).BaseType;
-        var genericArguments = baseType?.IsGenericType == true ? baseType.GetGenericArguments() : [];
-        var contextType = genericArguments.Length > 1 ? genericArguments[1] : typeof(object);
-        var resultType = genericArguments.Length > 2 ? genericArguments[2] : typeof(object);
-
-        var queueItem = new JobQueueItem(
-            typed.Id,
-            typeof(TJob),
-            storageMode,
-            source,
-            partition,
-            audit,
-            contextType,
-            resultType);
-
-        await _queue.Enqueue(queueItem, cancellationToken);
-        return typed;
+        _logger.LogDebug("Submitted {JobType} job {JobId} on lane {Lane}.", typeof(T).Name, job.Id, lane);
+        return job;
     }
 
-    public async Task<TJob?> Refresh<TJob, TContext, TResult>(string jobId, CancellationToken cancellationToken)
-        where TJob : Job<TJob, TContext, TResult>, new()
+    public async Task Cancel<T>(string jobId, CancellationToken cancellationToken)
+        where T : Job<T>, new()
     {
-        var (store, metadata, _) = ResolveStore(jobId, JobStorageMode.InMemory);
-        var job = await store.Get(jobId, metadata, cancellationToken);
-        return job as TJob;
-    }
+        _cancellations.Request(jobId);
 
-    public async Task Cancel<TJob, TContext, TResult>(string jobId, CancellationToken cancellationToken)
-        where TJob : Job<TJob, TContext, TResult>, new()
-    {
-        var (store, metadata, mode) = ResolveStore(jobId, _options.DefaultStore);
-        var job = await store.Get(jobId, metadata, cancellationToken);
-        if (job == null)
-            return;
+        var job = await Job<T>.Get(jobId, cancellationToken);
+        if (job is null) return;
+        if (job.Status is JobStatus.Completed or JobStatus.Failed or JobStatus.Cancelled) return;
 
-        if (job.Status is JobStatus.Completed or JobStatus.Failed or JobStatus.Cancelled)
-            return;
-
-        _logger.LogInformation("Cancelling job {JobId} (status: {Status})", job.Id, job.Status);
-
-        if (!_index.TryGet(jobId, out var entry))
-        {
-            entry = new JobIndexEntry(jobId, mode, metadata.Source, metadata.Partition, metadata.Audit, job.GetType());
-            _index.Set(entry);
-        }
-        entry.CancellationRequested = true;
-
-        if (job.Status is JobStatus.Created or JobStatus.Queued)
+        // Not yet running: terminate immediately. Running jobs observe the cancellation flag at their
+        // next checkpoint (the dispatcher/progress tracker).
+        if (job.Status is JobStatus.Created or JobStatus.Queued or JobStatus.Blocked)
         {
             job.Status = JobStatus.Cancelled;
             job.CompletedAt = DateTimeOffset.UtcNow;
             job.Duration = job.CompletedAt - job.CreatedAt;
-            await store.Update(job, metadata, cancellationToken);
-            await _eventPublisher.PublishCancelled(job, cancellationToken);
+            await job.SaveSelf(cancellationToken);
+            await _events.PublishCancelled(job, cancellationToken);
         }
-        else
-        {
-            await store.Update(job, metadata, cancellationToken);
-        }
-    }
-
-    public async Task<IReadOnlyList<JobExecution>> GetExecutions(string jobId, CancellationToken cancellationToken)
-    {
-        var (store, metadata, _) = ResolveStore(jobId, _options.DefaultStore);
-        return await store.ListExecutions(jobId, metadata, cancellationToken);
-    }
-
-    private (IJobStore Store, JobStoreMetadata Metadata, JobStorageMode Mode) ResolveStore(string jobId, JobStorageMode fallback)
-    {
-        if (_index.TryGet(jobId, out var entry))
-        {
-            var metadata = new JobStoreMetadata(entry.StorageMode, entry.Source, entry.Partition, entry.AuditEnabled, _options.SerializerOptions);
-            return (_resolver.Resolve(entry.StorageMode), metadata, entry.StorageMode);
-        }
-
-        var metadataDefault = new JobStoreMetadata(fallback, _options.DefaultSource, _options.DefaultPartition, _options.AuditByDefault, _options.SerializerOptions);
-        return (_resolver.Resolve(fallback), metadataDefault, fallback);
     }
 }

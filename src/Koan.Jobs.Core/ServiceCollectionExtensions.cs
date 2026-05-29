@@ -7,8 +7,6 @@ using Koan.Jobs.Options;
 using Koan.Jobs.Progress;
 using Koan.Jobs.Queue;
 using Koan.Jobs.RateGating;
-using Koan.Jobs.Store;
-using Koan.Jobs.Support;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -19,19 +17,18 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddKoanJobs(this IServiceCollection services)
     {
         services.AddKoanOptions<JobsOptions>(ConfigurationConstants.Section);
-        services.TryAddSingleton<JobIndexCache>();
         services.TryAddSingleton<JobProgressBroker>();
-        services.TryAddSingleton<InMemoryJobStore>();
-        services.TryAddSingleton<EntityJobStore>();
-        services.TryAddSingleton<IJobStoreResolver, JobStoreResolver>();
+        services.TryAddSingleton<JobCancellations>();
+        services.TryAddSingleton<JobTypeRegistry>();
         services.TryAddSingleton<IJobQueue, InMemoryJobQueue>();
         services.TryAddSingleton<IHostRateGate, InMemoryHostRateGate>();
+        services.TryAddSingleton<JobLaneRegistry>();
         services.TryAddSingleton<IJobCoordinator, JobCoordinator>();
         services.TryAddSingleton<JobExecutor>();
         services.TryAddSingleton<IJobEventPublisher, JobEventPublisher>();
 
         services.AddHostedService<JobWorkerService>();
-        services.AddHostedService<InMemoryJobSweeper>();
+        services.AddHostedService<JobRecoveryService>();
         services.AddHostedService<JobArchivalService>();
         return services;
     }
