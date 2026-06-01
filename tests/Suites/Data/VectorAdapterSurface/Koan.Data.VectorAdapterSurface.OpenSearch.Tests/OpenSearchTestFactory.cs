@@ -36,10 +36,7 @@ public sealed class OpenSearchTestFactory : IVectorAdapterTestFactory
     public bool SupportsFlush                => true;  // adapter overrides: DELETE /<index>
     public bool SupportsExportAll            => false; // no export override yet
     public bool SupportsHybridSearch         => false;
-    // AI-0036 §10: live filter-convergence gated off pending end-to-end metadata storage/mapping
-    // (OpenSearch shares ElasticSearch's Lucene path — needs the F6 knn.filter + metadata.<key>.keyword
-    // mapping verified live). Translator + capabilities exist; the storage/mapping path is the gap.
-    public bool SupportsMetadataFilters      => false;
+    public bool SupportsMetadataFilters      => true;  // metadata.<key>.keyword mapping (live-verified; OS pre-filters via query.knn.filter)
     public bool SupportsContinuationToken    => false;
     // _ensuredIndexes is now keyed by IndexName, so multi-partition works correctly.
     public bool SupportsPartitionIsolation   => true;

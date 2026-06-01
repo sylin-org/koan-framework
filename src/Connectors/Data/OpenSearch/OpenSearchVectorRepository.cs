@@ -311,7 +311,7 @@ internal sealed class OpenSearchVectorRepository<TEntity, TKey> :
             ["k"] = topK
         };
 
-        var filter = OpenSearchFilterTranslator.TranslateWhereClause(options.Filter);
+        var filter = OpenSearchFilterTranslator.TranslateWhereClause(options.Filter, _options.MetadataField);
         if (filter is not null)
         {
             knnFieldBody["filter"] = new JObject
