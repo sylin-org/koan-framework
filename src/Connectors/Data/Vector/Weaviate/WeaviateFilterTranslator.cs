@@ -35,7 +35,8 @@ internal static class WeaviateFilterTranslator
             case AnyOf or:
                 return $"{{ operator: Or, operands: [ {string.Join(",", or.Operands.Select(Translate))} ] }}";
             case Not not:
-                return $"{{ operator: Not, operands: [ {Translate(not.Operand)} ] }}";
+                // Weaviate has no generic Not operator — eliminate it via De Morgan down to leaf negations.
+                return Negate(not.Operand);
             case FieldFilter cmp:
                 return TranslateLeaf(cmp);
             default:
@@ -43,14 +44,18 @@ internal static class WeaviateFilterTranslator
         }
     }
 
+    // Weaviate normalizes property names to camelCase (first letter lowercased); match the stored form.
+    private static string Path(FieldFilter f)
+        => $"[{string.Join(',', f.Field.Segments.Select(p => "\"" + Esc(LowerFirst(p)) + "\""))}]";
+
     private static string TranslateLeaf(FieldFilter f)
     {
-        var path = $"[{string.Join(',', f.Field.Segments.Select(p => "\"" + Esc(p) + "\""))}]";
+        var path = Path(f);
         switch (f.Operator)
         {
             case FilterOperator.Eq: return Leaf(path, "Equal", Scalar(f));
-            case FilterOperator.Ne: // null-inclusive: Weaviate Not includes rows lacking the value
-                return $"{{ operator: Not, operands: [ {Leaf(path, "Equal", Scalar(f))} ] }}";
+            case FilterOperator.Ne: // null-inclusive: NotEqual OR IsNull (Weaviate NotEqual excludes missing)
+                return OrNull(Leaf(path, "NotEqual", Scalar(f)), path);
             case FilterOperator.Gt: return Leaf(path, "GreaterThan", Scalar(f));
             case FilterOperator.Gte: return Leaf(path, "GreaterThanEqual", Scalar(f));
             case FilterOperator.Lt: return Leaf(path, "LessThan", Scalar(f));
@@ -69,6 +74,41 @@ internal static class WeaviateFilterTranslator
                     $"Weaviate does not support vector filter operator '{f.Operator}' on metadata field '{f.Field}'.");
         }
     }
+
+    // De Morgan negation (Weaviate lacks a generic Not). Leaf negations are null-inclusive (Or IsNull)
+    // to match the locked oracle semantics (e.g. Not(Eq) matches rows lacking the property).
+    private static string Negate(Filter f) => f switch
+    {
+        AllOf and => $"{{ operator: Or, operands: [ {string.Join(",", and.Operands.Select(Negate))} ] }}",
+        AnyOf or => $"{{ operator: And, operands: [ {string.Join(",", or.Operands.Select(Negate))} ] }}",
+        Not n => Translate(n.Operand),
+        FieldFilter leaf => NegateLeaf(leaf),
+        _ => throw new System.NotSupportedException($"Weaviate cannot negate filter node '{f.GetType().Name}'.")
+    };
+
+    private static string NegateLeaf(FieldFilter f)
+    {
+        var path = Path(f);
+        switch (f.Operator)
+        {
+            case FilterOperator.Eq: return OrNull(Leaf(path, "NotEqual", Scalar(f)), path);
+            case FilterOperator.Ne: return Leaf(path, "Equal", Scalar(f));
+            case FilterOperator.Gt: return OrNull(Leaf(path, "LessThanEqual", Scalar(f)), path);
+            case FilterOperator.Gte: return OrNull(Leaf(path, "LessThan", Scalar(f)), path);
+            case FilterOperator.Lt: return OrNull(Leaf(path, "GreaterThanEqual", Scalar(f)), path);
+            case FilterOperator.Lte: return OrNull(Leaf(path, "GreaterThan", Scalar(f)), path);
+            case FilterOperator.Exists:
+                var present = Scalar(f) is not bool b || b;
+                return $"{{ path: {path}, operator: IsNull, valueBoolean: {(present ? "true" : "false")} }}";
+            default:
+                throw new System.NotSupportedException(
+                    $"Weaviate cannot negate vector filter operator '{f.Operator}' on '{f.Field}'.");
+        }
+    }
+
+    // <clause> OR the property is missing — null-inclusive negation (matches the oracle's locked semantics).
+    private static string OrNull(string clause, string path)
+        => $"{{ operator: Or, operands: [ {clause}, {{ path: {path}, operator: IsNull, valueBoolean: true }} ] }}";
 
     private static string Leaf(string path, string op, object? value)
     {
@@ -109,4 +149,7 @@ internal static class WeaviateFilterTranslator
 
     private static string Esc(string? value)
         => (value ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"");
+
+    private static string LowerFirst(string name)
+        => name.Length == 0 || char.IsLower(name[0]) ? name : char.ToLowerInvariant(name[0]) + name[1..];
 }

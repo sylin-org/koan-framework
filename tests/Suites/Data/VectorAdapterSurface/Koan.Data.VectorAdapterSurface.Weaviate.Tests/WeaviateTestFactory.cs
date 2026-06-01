@@ -35,9 +35,10 @@ public sealed class WeaviateTestFactory : IVectorAdapterTestFactory
     public bool SupportsFlush                => true;
     public bool SupportsExportAll            => true;
     public bool SupportsHybridSearch         => true;  // Weaviate is the only one
-    // AI-0036 §10: live filter-convergence gated off pending end-to-end metadata path. The Upsert now
-    // persists metadata as properties, but filtering still returns empty — needs the autoSchema
-    // property indexing / GraphQL where path verified live before this can converge with the oracle.
+    // AI-0036 §10: filter-convergence gated. Eq/range/Has/Exists work now (metadata persisted as
+    // camelCase properties + autoSchema); the remaining gap is NEGATION on text properties —
+    // NotEqual on a "word"-tokenized text property returns empty, so Ne/Not need a tokenization=field
+    // schema (vs autoSchema) verified live before convergence. Translator + persistence are in place.
     public bool SupportsMetadataFilters      => false;
     public bool SupportsContinuationToken    => true;  // native cursor
     public bool SupportsPartitionIsolation   => true;
@@ -68,6 +69,7 @@ public sealed class WeaviateTestFactory : IVectorAdapterTestFactory
                 .WithImage("semitechnologies/weaviate:1.25.6")
                 .WithEnvironment("QUERY_DEFAULTS_LIMIT", "25")
                 .WithEnvironment("AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED", "true")
+                .WithEnvironment("AUTOSCHEMA_ENABLED", "true") // auto-create metadata properties on insert (filterable)
                 .WithEnvironment("PERSISTENCE_DATA_PATH", "/var/lib/weaviate")
                 .WithEnvironment("DEFAULT_VECTORIZER_MODULE", "none")
                 .WithEnvironment("CLUSTER_HOSTNAME", "node1")

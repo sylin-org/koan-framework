@@ -299,7 +299,9 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
             var key = e.Key?.ToString();
             if (string.IsNullOrEmpty(key) || string.Equals(key, "docId", StringComparison.Ordinal)) continue;
             if (!IsValidWeaviateProperty(key)) continue; // Weaviate property names: [A-Za-z][_0-9A-Za-z]*
-            properties[key] = e.Value;
+            // Weaviate normalizes property names to camelCase (first letter lowercased); store under the
+            // same form the filter translator queries (WeaviatePropertyName) so they match.
+            properties[WeaviatePropertyName(key)] = e.Value;
         }
     }
 
@@ -309,6 +311,10 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         foreach (var c in name) if (!(char.IsLetterOrDigit(c) || c == '_')) return false;
         return true;
     }
+
+    /// <summary>Weaviate lowercases the first letter of property names (GraphQL camelCase convention).</summary>
+    internal static string WeaviatePropertyName(string name)
+        => name.Length == 0 || char.IsLower(name[0]) ? name : char.ToLowerInvariant(name[0]) + name[1..];
 
     public async Task<float[]?> GetEmbedding(TKey id, CancellationToken ct = default)
     {
