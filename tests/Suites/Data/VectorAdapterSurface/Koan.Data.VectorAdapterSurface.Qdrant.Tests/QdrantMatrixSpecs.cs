@@ -16,3 +16,8 @@ public class QdrantSemanticSpecs : VectorSemanticSpecsBase<QdrantTestFactory>
 {
     public QdrantSemanticSpecs(QdrantTestFactory factory) : base(factory) { }
 }
+
+public class QdrantFilterConvergenceSpecs : VectorFilterConvergenceSpecsBase<QdrantTestFactory>
+{
+    public QdrantFilterConvergenceSpecs(QdrantTestFactory factory) : base(factory) { }
+}

@@ -16,3 +16,8 @@ public class InMemoryVectorSemanticSpecs : VectorSemanticSpecsBase<InMemoryVecto
 {
     public InMemoryVectorSemanticSpecs(InMemoryVectorTestFactory factory) : base(factory) { }
 }
+
+public class InMemoryVectorFilterConvergenceSpecs : VectorFilterConvergenceSpecsBase<InMemoryVectorTestFactory>
+{
+    public InMemoryVectorFilterConvergenceSpecs(InMemoryVectorTestFactory factory) : base(factory) { }
+}

@@ -16,3 +16,8 @@ public class WeaviateSemanticSpecs : VectorSemanticSpecsBase<WeaviateTestFactory
 {
     public WeaviateSemanticSpecs(WeaviateTestFactory factory) : base(factory) { }
 }
+
+public class WeaviateFilterConvergenceSpecs : VectorFilterConvergenceSpecsBase<WeaviateTestFactory>
+{
+    public WeaviateFilterConvergenceSpecs(WeaviateTestFactory factory) : base(factory) { }
+}

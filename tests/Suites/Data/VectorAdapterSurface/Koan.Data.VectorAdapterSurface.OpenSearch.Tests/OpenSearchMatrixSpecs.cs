@@ -16,3 +16,8 @@ public class OpenSearchSemanticSpecs : VectorSemanticSpecsBase<OpenSearchTestFac
 {
     public OpenSearchSemanticSpecs(OpenSearchTestFactory factory) : base(factory) { }
 }
+
+public class OpenSearchFilterConvergenceSpecs : VectorFilterConvergenceSpecsBase<OpenSearchTestFactory>
+{
+    public OpenSearchFilterConvergenceSpecs(OpenSearchTestFactory factory) : base(factory) { }
+}

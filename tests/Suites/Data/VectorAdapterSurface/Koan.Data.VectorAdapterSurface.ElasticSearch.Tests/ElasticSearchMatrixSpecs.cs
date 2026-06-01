@@ -16,3 +16,8 @@ public class ElasticSearchSemanticSpecs : VectorSemanticSpecsBase<ElasticSearchT
 {
     public ElasticSearchSemanticSpecs(ElasticSearchTestFactory factory) : base(factory) { }
 }
+
+public class ElasticSearchFilterConvergenceSpecs : VectorFilterConvergenceSpecsBase<ElasticSearchTestFactory>
+{
+    public ElasticSearchFilterConvergenceSpecs(ElasticSearchTestFactory factory) : base(factory) { }
+}

@@ -16,3 +16,8 @@ public class MilvusSemanticSpecs : VectorSemanticSpecsBase<MilvusTestFactory>
 {
     public MilvusSemanticSpecs(MilvusTestFactory factory) : base(factory) { }
 }
+
+public class MilvusFilterConvergenceSpecs : VectorFilterConvergenceSpecsBase<MilvusTestFactory>
+{
+    public MilvusFilterConvergenceSpecs(MilvusTestFactory factory) : base(factory) { }
+}
