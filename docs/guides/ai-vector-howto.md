@@ -684,6 +684,12 @@ await Media.AllStream(batchSize: 100)
 
 **Sample – Re-indexing with new model**
 
+> **Mixed-space guard.** Vectors from different models aren't comparable, so the framework throws
+> `VectorModelMismatchException` if you write a new-model vector into an index still built from the old
+> model. Re-index the whole collection through `EmbeddingMigrator.ReEmbedAll<T>(targetModel: …)` — it
+> resets the model registry for the by-design transition. A manual loop like the one below must reset
+> the registry first (or it trips the guard on the first save).
+
 ```csharp
 public async Task ReindexWithNewModel(string newModelId, CancellationToken ct)
 {

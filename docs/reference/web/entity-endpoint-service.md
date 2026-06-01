@@ -121,8 +121,8 @@ The service resolves `IEntityHookPipeline<TEntity>` from DI (the default pipelin
 ## Request Shaping & Response Metadata
 
 The service understands the same query language as `EntityController`:
-- `q` ? free-text search via `IStringQueryRepository`.
-- `filter` / `filterObj` ? JSON filter compiled into LINQ predicates when `ILinqQueryRepository` is available.
+- `q` ? free-text search via `IRawQueryRepository`.
+- `filter` / `filterObj` ? JSON filter compiled into LINQ predicates when `IQueryRepository` is available.
 - `page` / `size` ? pagination. If the repository lacks native support, the service falls back to in-memory paging and emits `Koan-InMemory-Paging`, `X-Page`, `X-Page-Size`, `X-Total-Count`, and `X-Total-Pages` headers.
 -  `sort` / `dir` ? converted into `QueryOptions.Sort`; the service applies ordering over the retrieved set before pagination so adapters see consistent results even when repositories do not implement sorting. 
 - `view` / `Accept view=` ? negotiated into the `Koan-View` header.

@@ -292,7 +292,7 @@ Providers that support server-side LINQ (Postgres, MongoDB, SQL Server) execute 
 
 **Recipe**
 
-Same packages as before. For best performance, use adapters with `ILinqQueryRepository` support (Postgres, MongoDB, SQL Server).
+Same packages as before. For best performance, use adapters with `IQueryRepository` support (Postgres, MongoDB, SQL Server).
 
 **Sample**
 
@@ -323,7 +323,7 @@ var page3 = await Todo.Page(page: 3, size: 20, ct);
 // Combine with filtering
 var completed = await Todo.Query(
     t => t.Completed,
-    new DataQueryOptions(page: 2, pageSize: 50),
+    new QueryDefinition { Page = 2, PageSize = 50 },
     ct
 );
 ```
@@ -333,12 +333,7 @@ var completed = await Todo.Query(
 ```csharp
 var result = await Todo.QueryWithCount(
     t => t.ProjectId == projectId,
-    new DataQueryOptions(
-        orderBy: nameof(Todo.Created),
-        descending: true,
-        page: 1,
-        pageSize: 20
-    ),
+    new QueryDefinition { Page = 1, PageSize = 20 }.WithSort<Todo>("-Created"), // "-" prefix = descending
     ct
 );
 
