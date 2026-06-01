@@ -6,7 +6,15 @@
     <LangVersion>preview</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <NoWarn>$(NoWarn);NU1902;NU1903</NoWarn>
+    <!--
+      CS0618 globally suppressed in this test suite while MEDIA-0008
+      migrates ToBytesAsync()/MediaOutput.Bytes callers to the streaming
+      WriteToAsync path. The legacy tests intentionally exercise the
+      obsolete buffered surface — they're the regression net that proves
+      the shim still produces identical bytes. The new streaming surface
+      gets its own spec under Specs/Streaming.
+    -->
+    <NoWarn>$(NoWarn);NU1902;NU1903;CS0618</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="FluentAssertions" Version="6.11.0" />

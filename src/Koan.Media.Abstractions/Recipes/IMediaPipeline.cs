@@ -105,8 +105,29 @@ public interface IMediaPipeline
     /// <summary>Inspect source metadata without committing to an encode.</summary>
     Task<MediaInfo> ProbeAsync(CancellationToken ct = default);
 
-    /// <summary>Materialise to a single output, returning the encoded bytes and content type.</summary>
+    /// <summary>
+    /// Materialise to a single output, returning the encoded bytes and content type.
+    /// </summary>
+    /// <remarks>
+    /// Per MEDIA-0008: prefer <see cref="WriteToAsync"/> for production
+    /// rendering paths so animated/large encodes do not allocate the full
+    /// output buffer in memory. This method is retained for tests and
+    /// callers that genuinely need the bytes (e.g. content-addressing,
+    /// hash computation) and decorates <see cref="WriteToAsync"/> via an
+    /// internal <see cref="MemoryStream"/>.
+    /// </remarks>
+    [Obsolete("Use WriteToAsync(Stream, CancellationToken) to stream directly into the response or storage. See MEDIA-0008.", error: false)]
     Task<MediaOutput> ToBytesAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Stream the encoded output directly into <paramref name="destination"/>.
+    /// Returns a <see cref="MediaOutput"/> carrying the terminal-encode
+    /// metadata (content type, dimensions, frame count, fingerprint,
+    /// kind trace) so the HTTP layer can populate response headers
+    /// without buffering the bytes. Per MEDIA-0008 §b — the canonical
+    /// materialisation that replaces <see cref="ToBytesAsync"/>.
+    /// </summary>
+    Task<MediaOutput> WriteToAsync(Stream destination, CancellationToken ct = default);
 
     /// <summary>
     /// Multi-variant materialisation. One decode, N encodes — each
@@ -119,7 +140,14 @@ public interface IMediaPipeline
 /// <summary>
 /// Encoded bytes plus the metadata needed to serve the result over HTTP.
 /// </summary>
-/// <param name="Bytes">Encoded output bytes.</param>
+/// <param name="Bytes">
+/// Encoded output bytes. Per MEDIA-0008 prefer <see cref="WriteToAsync"/> to
+/// stream the bytes directly into the destination (response body, storage
+/// upload) instead of holding the full encoded buffer in memory. This
+/// field is retained for backward compatibility; for the streaming
+/// terminal path it is populated by buffering through a
+/// <see cref="MemoryStream"/> on demand.
+/// </param>
 /// <param name="ContentType">MIME type matching <paramref name="Format"/>.</param>
 /// <param name="Format">Canonical output format slug (jpeg, png, webp, gif, ...).</param>
 /// <param name="SourceFormat">Canonical source format slug as decoded. Equals <paramref name="Format"/> when the recipe preserves format.</param>
@@ -128,6 +156,7 @@ public interface IMediaPipeline
 /// <param name="FrameCount">Output frame count (1 for static).</param>
 /// <param name="Fingerprint">Per-output content fingerprint (informational; recipe fingerprint lives on the recipe).</param>
 public sealed record MediaOutput(
+    [property: Obsolete("Use WriteToAsync(Stream, CancellationToken) to stream the encoded bytes directly into the destination. See MEDIA-0008.", error: false)]
     byte[] Bytes,
     string ContentType,
     string Format,
@@ -145,6 +174,43 @@ public sealed record MediaOutput(
     /// response header. Empty when the source predates kind tracking.
     /// </summary>
     public IReadOnlyList<MediaKind> KindTrace { get; init; } = Array.Empty<MediaKind>();
+
+    private readonly Func<Stream, CancellationToken, Task>? _writeToAsync;
+
+    /// <summary>
+    /// Stream the encoded bytes into <paramref name="destination"/>. Per
+    /// MEDIA-0008, this is the canonical way to surface encoded output —
+    /// HTTP responses thread <see cref="System.IO.Stream"/> end-to-end so
+    /// animated and high-resolution encodes don't allocate the full
+    /// output buffer.
+    /// <para>When unset, the writer falls back to copying
+    /// <see cref="Bytes"/> into the destination — so legacy callers that
+    /// constructed <see cref="MediaOutput"/> without a writer continue
+    /// to work. The recipe pipeline overrides this property with a
+    /// closure that drives the encoder directly into the destination
+    /// (no intermediate <see cref="MemoryStream"/>).</para>
+    /// </summary>
+    public Func<Stream, CancellationToken, Task> WriteToAsync
+    {
+        get => _writeToAsync ?? BufferedWriter;
+        init => _writeToAsync = value;
+    }
+
+    private Task BufferedWriter(Stream destination, CancellationToken ct)
+    {
+#pragma warning disable CS0618 // Falling back to the obsolete byte buffer is the documented default behaviour.
+        var bytes = Bytes ?? Array.Empty<byte>();
+#pragma warning restore CS0618
+        return destination.WriteAsync(bytes, ct).AsTask();
+    }
+
+    /// <summary>
+    /// Optional async-disposable hook the pipeline can attach to release
+    /// the decoded source image once all <see cref="WriteToAsync"/>
+    /// invocations have completed. When unset, the writer is considered
+    /// self-contained (legacy buffered path) and no cleanup is needed.
+    /// </summary>
+    public IAsyncDisposable? RenderResources { get; init; }
 }
 
 /// <summary>

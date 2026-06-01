@@ -62,12 +62,16 @@ public sealed class DefaultOverlayResolver : IOverlayResolver
         // Apply the recipe and return the processed bytes as a fresh
         // MemoryStream so the compositor's Image.LoadAsync sees a regular
         // stream. The handle's source stream is disposed inside AsMedia().
+        // Per MEDIA-0008 the recipe writes directly into the MemoryStream
+        // we hand back to the compositor — no intermediate byte[].
         try
         {
-            var output = await handle.Bytes.AsMedia(_logger)
+            var buffer = new MemoryStream();
+            await handle.Bytes.AsMedia(_logger)
                 .Apply(recipe)
-                .ToBytesAsync(ct).ConfigureAwait(false);
-            return new MemoryStream(output.Bytes, writable: false);
+                .WriteToAsync(buffer, ct).ConfigureAwait(false);
+            buffer.Position = 0;
+            return buffer;
         }
         catch (Exception ex)
         {

@@ -233,8 +233,45 @@ public sealed class MediaPipeline : IMediaPipeline
         }
     }
 
+    [Obsolete("Use WriteToAsync(Stream, CancellationToken) to stream directly into the response or storage. See MEDIA-0008.", error: false)]
     public async Task<MediaOutput> ToBytesAsync(CancellationToken ct = default)
     {
+        // Buffered legacy path: drive the streaming terminal into a
+        // MemoryStream and replay the captured bytes through the
+        // returned MediaOutput. Per MEDIA-0008 §b, this preserves
+        // backward-compat: callers reading output.Bytes still get the
+        // full encoded buffer.
+        using var ms = new MemoryStream();
+        var output = await WriteToAsync(ms, ct).ConfigureAwait(false);
+        var bytes = ms.ToArray();
+        // Detach any disposable render resources — the bytes are
+        // captured, the decoded image is no longer needed.
+        if (output.RenderResources is { } owned)
+        {
+            await owned.DisposeAsync().ConfigureAwait(false);
+        }
+#pragma warning disable CS0618 // Buffered legacy path: surfaces Bytes by contract.
+        return output with
+        {
+            Bytes = bytes,
+            WriteToAsync = (dest, dct) => dest.WriteAsync(bytes, dct).AsTask(),
+            RenderResources = null,
+        };
+#pragma warning restore CS0618
+    }
+
+    /// <summary>
+    /// Streaming terminal. Decodes the source, plans the pipeline, runs
+    /// the mutating stages, and encodes directly into
+    /// <paramref name="destination"/> via ImageSharp's
+    /// <see cref="Image.SaveAsync(Stream, IImageEncoder, CancellationToken)"/>.
+    /// No <see cref="MemoryStream"/> sits between the encoder and the
+    /// destination — animated and high-resolution encodes stream
+    /// through without buffering the full output. Per MEDIA-0008.
+    /// </summary>
+    public async Task<MediaOutput> WriteToAsync(Stream destination, CancellationToken ct = default)
+    {
+        if (destination is null) throw new ArgumentNullException(nameof(destination));
         EnsureUnconsumed();
         _consumed = true;
         try
@@ -244,22 +281,31 @@ public sealed class MediaPipeline : IMediaPipeline
             // derived target, and hand a PNG MemoryStream off to the
             // existing ImageSharp encode chain. The raw SVG is the source
             // of truth in storage; rasterization only fires when a recipe
-            // demands a Raster target.
+            // demands a Raster target. Per MEDIA-0008 §d the SVG path
+            // remains buffered to a MemoryStream for the intermediate
+            // Skia-produced PNG, then streams the final raster encode.
             var svgBytes = await TryReadSvgBytesAsync(_source, ct).ConfigureAwait(false);
             if (svgBytes is not null)
             {
-                return await EncodeSvgAsync(svgBytes, ct).ConfigureAwait(false);
+                return await StreamEncodeSvgAsync(svgBytes, destination, ct).ConfigureAwait(false);
             }
 
             if (_source.CanSeek) _source.Position = 0;
-            using var image = await LoadOrThrowAsync(_source, ct).ConfigureAwait(false);
-
-            // MEDIA-0005: plan before execute. The planner is a pure
-            // function over (probe, steps, encoderAccepts); a failing plan
-            // throws synchronously and never reaches the encode pass.
-            var probe = BuildMediaInfo(image);
-            var plan = PlanOrThrow(probe, _steps);
-            return await EncodeAsync(image, _steps, _overlayResolver, _fonts, _overlayDepth, _logger, plan, ct).ConfigureAwait(false);
+            var image = await LoadOrThrowAsync(_source, ct).ConfigureAwait(false);
+            try
+            {
+                // MEDIA-0005: plan before execute. The planner is a pure
+                // function over (probe, steps, encoderAccepts); a failing plan
+                // throws synchronously and never reaches the encode pass.
+                var probe = BuildMediaInfo(image);
+                var plan = PlanOrThrow(probe, _steps);
+                return await StreamEncodeAsync(
+                    image, _steps, _overlayResolver, _fonts, _overlayDepth, _logger, plan, destination, ct).ConfigureAwait(false);
+            }
+            finally
+            {
+                image.Dispose();
+            }
         }
         finally
         {
@@ -268,14 +314,14 @@ public sealed class MediaPipeline : IMediaPipeline
     }
 
     /// <summary>
-    /// MEDIA-0006 SVG terminal: validate the bytes (defense in depth —
-    /// the controller / job may already have validated), plan against a
-    /// synthetic Vector probe, rasterize at the planner's forward-derived
-    /// target via Svg.Skia, and hand the PNG bytes off to the existing
-    /// ImageSharp encode chain so the recipe's terminal format (WebP /
-    /// JPEG / PNG / …) is produced by the well-tested raster path.
+    /// MEDIA-0006 + MEDIA-0008 streaming SVG terminal: validate, plan,
+    /// rasterize, then stream the recipe's terminal raster encode
+    /// directly into <paramref name="destination"/>. The intermediate
+    /// PNG bytes flow through a <see cref="MemoryStream"/> per MEDIA-0008
+    /// §d (Svg.Skia is buffered by nature; the streaming win comes from
+    /// the final encode).
     /// </summary>
-    private async Task<MediaOutput> EncodeSvgAsync(byte[] svgBytes, CancellationToken ct)
+    private async Task<MediaOutput> StreamEncodeSvgAsync(byte[] svgBytes, Stream destination, CancellationToken ct)
     {
         SvgValidator.ValidateOrThrow(svgBytes);
 
@@ -290,19 +336,25 @@ public sealed class MediaPipeline : IMediaPipeline
         // planner's forward-derived target. Author steps (Resize, Shape,
         // Encode) flow through unchanged.
         using var rasterized = new MemoryStream(pngBytes, writable: false);
-        using var image = await Image.LoadAsync(rasterized, ct).ConfigureAwait(false);
-
-        // Re-plan against the raster-sided probe so KindTrace records the
-        // full Vector -> Raster -> Encode transition.
-        var rasterProbe = BuildMediaInfo(image);
-        var rasterPlan = PlanOrThrow(rasterProbe, _steps);
-        var output = await EncodeAsync(
-            image, _steps, _overlayResolver, _fonts, _overlayDepth, _logger, rasterPlan, ct).ConfigureAwait(false);
-        return output with
+        var image = await Image.LoadAsync(rasterized, ct).ConfigureAwait(false);
+        try
         {
-            SourceFormat = SvgFormat.Slug,
-            KindTrace = plan.KindTrace,
-        };
+            // Re-plan against the raster-sided probe so KindTrace records the
+            // full Vector -> Raster -> Encode transition.
+            var rasterProbe = BuildMediaInfo(image);
+            var rasterPlan = PlanOrThrow(rasterProbe, _steps);
+            var output = await StreamEncodeAsync(
+                image, _steps, _overlayResolver, _fonts, _overlayDepth, _logger, rasterPlan, destination, ct).ConfigureAwait(false);
+            return output with
+            {
+                SourceFormat = SvgFormat.Slug,
+                KindTrace = plan.KindTrace,
+            };
+        }
+        finally
+        {
+            image.Dispose();
+        }
     }
 
     private static (int Width, int Height) ResolveRasterizeTarget(PlanResult plan, MediaInfo svgProbe)
@@ -671,9 +723,12 @@ public sealed class MediaPipeline : IMediaPipeline
     // ----- engine -----
 
     /// <summary>
-    /// Run all <paramref name="steps"/> against <paramref name="image"/>
-    /// in canonical <see cref="PipelineStage"/> order and encode the
-    /// result. Caller owns image disposal.
+    /// Buffered legacy entry point used by <see cref="MaterializeAsync"/>
+    /// — each variant materialises into a self-contained byte buffer so
+    /// the returned <see cref="MediaBundle"/> can be inspected by name
+    /// without retaining the decoded image. Delegates to
+    /// <see cref="StreamEncodeAsync"/> for the actual mutate+encode and
+    /// captures the bytes through an intermediate <see cref="MemoryStream"/>.
     /// </summary>
     private static async Task<MediaOutput> EncodeAsync(
         Image image,
@@ -683,6 +738,38 @@ public sealed class MediaPipeline : IMediaPipeline
         int overlayDepth,
         ILogger logger,
         PlanResult? plan,
+        CancellationToken ct)
+    {
+        await using var ms = new MemoryStream();
+        var output = await StreamEncodeAsync(
+            image, steps, overlays, fonts, overlayDepth, logger, plan, ms, ct).ConfigureAwait(false);
+        var bytes = ms.ToArray();
+#pragma warning disable CS0618 // Bytes is obsolete; buffered Materialize branches still surface bytes for backward compatibility.
+        return output with
+        {
+            Bytes = bytes,
+            WriteToAsync = (dest, dct) => dest.WriteAsync(bytes, dct).AsTask(),
+        };
+#pragma warning restore CS0618
+    }
+
+    /// <summary>
+    /// Streaming engine. Runs all <paramref name="steps"/> against
+    /// <paramref name="image"/> in canonical <see cref="PipelineStage"/>
+    /// order and writes the encoded output directly into
+    /// <paramref name="destination"/>. Caller owns image disposal. Per
+    /// MEDIA-0008: the encoder's <see cref="Image.SaveAsync"/> writes
+    /// straight into the destination — no intermediate buffer.
+    /// </summary>
+    private static async Task<MediaOutput> StreamEncodeAsync(
+        Image image,
+        IReadOnlyList<MediaStep> steps,
+        IOverlayResolver? overlays,
+        KoanFontRegistry? fonts,
+        int overlayDepth,
+        ILogger logger,
+        PlanResult? plan,
+        Stream destination,
         CancellationToken ct)
     {
         // Default: auto-orient when no explicit orient step is declared.
@@ -803,13 +890,15 @@ public sealed class MediaPipeline : IMediaPipeline
         var encoder = EncoderSelector.For(sourceFormat, targetFormat, quality);
         var resolvedFormat = targetFormat?.ToLowerInvariant() ?? EncoderSelector.CanonicalSlug(sourceFormat);
 
-        await using var ms = new MemoryStream();
-        await working.SaveAsync(ms, encoder, ct).ConfigureAwait(false);
-        var bytes = ms.ToArray();
+        // Per MEDIA-0008: stream the encoder output directly into the
+        // destination. No intermediate MemoryStream — animated and
+        // high-resolution encodes flush through chunk-by-chunk.
+        await working.SaveAsync(destination, encoder, ct).ConfigureAwait(false);
 
         var sourceSlug = EncoderSelector.CanonicalSlug(sourceFormat);
+#pragma warning disable CS0618 // Streaming terminal: Bytes is intentionally empty; callers consume bytes via WriteToAsync during the encode.
         return new MediaOutput(
-            Bytes: bytes,
+            Bytes: Array.Empty<byte>(),
             ContentType: EncoderSelector.ContentType(resolvedFormat),
             Format: resolvedFormat,
             SourceFormat: sourceSlug,
@@ -819,7 +908,12 @@ public sealed class MediaPipeline : IMediaPipeline
             Fingerprint: $"{resolvedFormat}-{working.Width}x{working.Height}-f{working.Frames.Count}-q{quality}")
         {
             KindTrace = plan?.KindTrace ?? Array.Empty<MediaKind>(),
+            WriteToAsync = (_, _) => throw new InvalidOperationException(
+                "MediaOutput.WriteToAsync was already consumed by the streaming terminal. " +
+                "Re-render the recipe to write the bytes again, or call IMediaPipeline.ToBytesAsync " +
+                "for a buffered output that supports re-emission."),
         };
+#pragma warning restore CS0618
     }
 
     /// <summary>
@@ -1240,6 +1334,8 @@ public sealed class MediaPipeline : IMediaPipeline
             throw new NotSupportedException("Probe is not supported inside Materialize branches; call Probe on the parent pipeline.");
         public Task<MediaOutput> ToBytesAsync(CancellationToken ct = default) =>
             throw new NotSupportedException("ToBytes is implicit inside Materialize; the bundle returns each branch's output.");
+        public Task<MediaOutput> WriteToAsync(Stream destination, CancellationToken ct = default) =>
+            throw new NotSupportedException("WriteTo is implicit inside Materialize; the bundle returns each branch's output.");
         public Task<MediaBundle> MaterializeAsync(Action<MediaBundleBuilder> configure, CancellationToken ct = default) =>
             throw new NotSupportedException("Nested Materialize is not supported.");
 

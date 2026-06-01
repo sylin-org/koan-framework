@@ -223,20 +223,32 @@ public sealed class MediaController : ControllerBase
             }
 #pragma warning restore CS0618
 
-            // 6) Run pipeline
+            // 6) Run pipeline. Per MEDIA-0008 the encoder writes through
+            // the pipeline's streaming terminal — WriteToAsync — instead
+            // of materialising a full byte buffer. Storage write-through
+            // and the legacy cache shim still consume bytes today (their
+            // contracts predate MEDIA-0008), so we tee the encode through
+            // a MemoryStream when either is active and reuse the captured
+            // buffer for the response body. The streaming win is realised
+            // immediately at the encoder boundary; the controller-level
+            // tee will be replaced with a temp-file/Stream contract in a
+            // follow-up ADR once IMediaSource.TryStoreDerivationAsync
+            // accepts a writer instead of a MediaOutput.
             MediaOutput output;
+            byte[] capturedBytes;
             try
             {
-                var limits = new MediaPipelineLimits
-                {
-                    MaxSourceMegapixels = _options.MaxSourceMegapixels,
-                    MaxFrameCount = _options.MaxFrameCount,
-                };
+                await using var buffer = new MemoryStream();
                 output = await handle.Bytes
-                    .AsMedia(_logger, _overlayResolver, _fonts, limits)
+                    .AsMedia(_logger, _overlayResolver, _fonts, new MediaPipelineLimits
+                    {
+                        MaxSourceMegapixels = _options.MaxSourceMegapixels,
+                        MaxFrameCount = _options.MaxFrameCount,
+                    })
                     .Apply(effectiveRecipe)
-                    .ToBytesAsync(ct)
+                    .WriteToAsync(buffer, ct)
                     .ConfigureAwait(false);
+                capturedBytes = buffer.ToArray();
             }
             catch (MediaSourceLimitException lex)
             {
@@ -254,6 +266,17 @@ public sealed class MediaController : ControllerBase
                 return UnprocessableEntity(new { error = dex.Message });
             }
 
+            // Promote the captured bytes onto the MediaOutput so the
+            // storage write-through and legacy cache shim — both of which
+            // still consume MediaOutput.Bytes — see the populated buffer.
+#pragma warning disable CS0618 // MediaOutput.Bytes obsolete on the streaming path; required for MEDIA-0007 storage write-through until its contract migrates to a writer.
+            var bufferedOutput = output with
+            {
+                Bytes = capturedBytes,
+                WriteToAsync = (dest, dct) => dest.WriteAsync(capturedBytes, dct).AsTask(),
+            };
+#pragma warning restore CS0618
+
             // 6b) Write-through to durable storage. Best-effort: the source
             // implementation swallows IO errors so a failure here never faults
             // the response. Lineage fields are stamped at write time per
@@ -264,7 +287,7 @@ public sealed class MediaController : ControllerBase
             try
             {
                 await _source.TryStoreDerivationAsync(
-                    id, fingerprint, output, recipeName, recipeVersion, ct)
+                    id, fingerprint, bufferedOutput, recipeName, recipeVersion, ct)
                     .ConfigureAwait(false);
             }
             catch (Exception ex)
@@ -277,7 +300,7 @@ public sealed class MediaController : ControllerBase
 #pragma warning disable CS0618
             if (_legacyCache is not null)
             {
-                await _legacyCache.SetAsync(id, fingerprint, output, ct).ConfigureAwait(false);
+                await _legacyCache.SetAsync(id, fingerprint, bufferedOutput, ct).ConfigureAwait(false);
             }
 #pragma warning restore CS0618
 
@@ -294,10 +317,17 @@ public sealed class MediaController : ControllerBase
             }
 
             ApplyDiagnostics(seedRecipe, effectiveRecipe, fingerprint,
-                sourceFormat: output.SourceFormat, output: output,
+                sourceFormat: bufferedOutput.SourceFormat, output: bufferedOutput,
                 ignored: parseResult.IgnoredParams, fromCache: "miss");
 
-            return File(output.Bytes, output.ContentType);
+            // Per MEDIA-0008 the controller threads the bytes through the
+            // streaming WriteToAsync on the MediaOutput. With the captured
+            // buffer in hand we replay it onto Response.Body via that same
+            // contract — the future no-tee path uses the encoder's own
+            // SaveAsync into Response.Body without ever allocating bytes.
+            Response.ContentType = bufferedOutput.ContentType;
+            await bufferedOutput.WriteToAsync(Response.Body, ct).ConfigureAwait(false);
+            return new EmptyResult();
         }
         finally
         {
