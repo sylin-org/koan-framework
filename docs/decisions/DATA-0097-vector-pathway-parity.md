@@ -318,7 +318,8 @@ An AI-surface understanding pass established that the embedding *lifecycle* (whi
 produced a vector, staleness, versioning) is owned by `Koan.Data.AI`'s `[Embedding]`, while
 `Vector<T>` is a model-agnostic store. Two findings originally listed here are seam concerns
 between those two layers, not adapter bugs. They are split into a focused follow-up
-(**AI-00xx — Embedding↔Vector seam**, co-owned by `Koan.Data.AI` + `Koan.Data.Vector`):
+(**[AI-0036 — Embedding↔Vector seam](AI-0036-embedding-vector-seam.md)**, co-owned by
+`Koan.Data.AI` + `Koan.Data.Vector` + the orchestration pillars):
 
 - **F8 — producing model/source not persisted with the vector.** `[Embedding(Model=…)]` and the
   migrator's `targetModel` are dropped on write. Without the producing model recorded alongside
