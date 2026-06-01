@@ -1,3 +1,4 @@
+using Koan.Core.Hosting.App;
 using Koan.Jobs.Model;
 using Koan.Jobs.Progress;
 using Microsoft.AspNetCore.SignalR;
@@ -9,72 +10,49 @@ using S14.AdapterBench.Services;
 namespace S14.AdapterBench.Jobs;
 
 /// <summary>
-/// Background job for running benchmarks asynchronously.
-/// Allows clients to submit benchmark requests and poll for results.
-/// Runs in-memory by default (no .Persist() call = ephemeral).
+/// Background job for running benchmarks asynchronously (JOBS-0003 CRTP model): the request payload
+/// lives on <see cref="Context"/>, the outcome on <see cref="Result"/>, and the work runs in
+/// <see cref="Do"/>. Runs in-memory by default (ephemeral).
 /// </summary>
-public class BenchmarkJob : Job<BenchmarkJob, BenchmarkRequest, BenchmarkResult>
+public class BenchmarkJob : Job<BenchmarkJob>
 {
-    // Injected by Jobs framework
-    public IServiceProvider? ServiceProvider { get; set; }
+    /// <summary>The benchmark request payload (set at submit time).</summary>
+    public BenchmarkRequest Context { get; set; } = new();
 
-    protected override async Task<BenchmarkResult> Execute(
-        BenchmarkRequest context,
-        IJobProgress progress,
-        CancellationToken cancellationToken)
+    /// <summary>The benchmark outcome (written when the job completes).</summary>
+    public BenchmarkResult? Result { get; set; }
+
+    protected override async Task Do(IJobProgress progress, CancellationToken cancellationToken)
     {
-        // Get SignalR hub context from ServiceProvider
-        var hubContext = ServiceProvider?.GetService<IHubContext<BenchmarkHub>>();
-        var logger = ServiceProvider?.GetService<ILogger<BenchmarkService>>();
+        // The Jobs runtime no longer injects a ServiceProvider; resolve services from the ambient host.
+        var services = AppHost.Current;
+        var hubContext = services?.GetService<IHubContext<BenchmarkHub>>();
+        var logger = services?.GetService<ILogger<BenchmarkService>>();
 
-        // Create BenchmarkService
         var benchmarkService = new BenchmarkService(logger);
 
-        // Create progress adapter that forwards to both Job progress AND SignalR
+        // Forward benchmark progress to both the Job framework and SignalR for UI visualization.
         var benchmarkProgress = new Progress<BenchmarkProgress>(p =>
         {
-            // Map benchmark progress to job progress
-            double progressValue = 0.0;
-            if (p.TotalTests > 0)
-            {
-                progressValue = (double)p.CompletedTests / p.TotalTests;
-            }
-
+            var progressValue = p.TotalTests > 0 ? (double)p.CompletedTests / p.TotalTests : 0.0;
             var message = $"{p.CurrentProvider} - {p.CurrentTest}: {p.CurrentOperationCount}/{p.TotalOperations} ({p.CurrentOperationsPerSecond:F0} ops/sec)";
-
-            // Report to Job framework
             progress.Report(progressValue, message);
 
-            // Forward detailed progress to SignalR for UI visualization
-            Console.WriteLine($"[BenchmarkJob] Progress callback - hubContext={(hubContext != null)}, ProviderProgress={(p.ProviderProgress?.Count ?? 0)} providers");
-
-            if (hubContext != null && p.ProviderProgress != null && p.ProviderProgress.Count > 0)
+            if (hubContext != null && p.ProviderProgress is { Count: > 0 })
             {
                 try
                 {
-                    Console.WriteLine($"[BenchmarkJob] Sending ProviderProgressUpdate to SignalR with {p.ProviderProgress.Count} providers");
                     hubContext.Clients.Group("BenchmarkProgress")
                         .SendAsync("ProviderProgressUpdate", p)
                         .GetAwaiter().GetResult();
-                    Console.WriteLine("[BenchmarkJob] SignalR message sent successfully");
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"[BenchmarkJob] SignalR send failed: {ex.Message}");
                 }
             }
-            else
-            {
-                if (hubContext == null)
-                    Console.WriteLine("[BenchmarkJob] hubContext is NULL - cannot send SignalR");
-                if (p.ProviderProgress == null || p.ProviderProgress.Count == 0)
-                    Console.WriteLine($"[BenchmarkJob] ProviderProgress is empty or null - count={p.ProviderProgress?.Count ?? 0}");
-            }
         });
 
-        // Run the benchmark with progress reporting
-        var result = await benchmarkService.RunBenchmark(context, benchmarkProgress, cancellationToken);
-
-        return result;
+        Result = await benchmarkService.RunBenchmark(Context, benchmarkProgress, cancellationToken);
     }
 }

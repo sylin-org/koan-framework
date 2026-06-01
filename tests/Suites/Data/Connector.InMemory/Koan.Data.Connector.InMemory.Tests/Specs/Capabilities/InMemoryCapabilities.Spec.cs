@@ -30,8 +30,7 @@ public sealed class InMemoryCapabilitiesSpec
                 fixture.BindHost();
 
                 var repo = fixture.Data.GetRepository<CapabilityProbe, string>();
-                repo.Should().BeAssignableTo<ILinqQueryRepository<CapabilityProbe, string>>();
-                repo.Should().BeAssignableTo<ILinqQueryRepositoryWithOptions<CapabilityProbe, string>>();
+                repo.Should().BeAssignableTo<IQueryRepository<CapabilityProbe, string>>();
 
                 var queryCaps = repo.Should().BeAssignableTo<IQueryCapabilities>().Subject;
                 queryCaps.Capabilities.Should().Be(QueryCapabilities.Linq);

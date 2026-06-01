@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Koan.Core.Hosting.App;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
@@ -74,16 +75,11 @@ public class SqlServerCountTests : IClassFixture<Support.SqlServerAutoFixture>
     await new CountTestEntity { Name = "Match2", Status = "Active" }.Save();
     await new CountTestEntity { Name = "NoMatch", Status = "Inactive" }.Save();
 
-    var all = (await ((ILinqQueryRepositoryWithOptions<CountTestEntity, string>)repo)
-        .Query((System.Linq.Expressions.Expression<Func<CountTestEntity, bool>>?)null, options: null, default)).Items;
+    var all = (await repo.Query(QueryDefinition.All, default)).Items;
     all.Should().HaveCount(3);
     all.Count(x => x.Status == "Active").Should().Be(2);
 
-        var repoCheck = await repo.Count(new CountRequest<CountTestEntity>
-        {
-            Predicate = x => x.Status == "Active",
-            Options = new DataQueryOptions { CountStrategy = CountStrategy.Exact }
-        });
+        var repoCheck = await repo.Count(new QueryDefinition { Filter = LinqFilterCompiler.Compile<CountTestEntity>(x => x.Status == "Active"), CountStrategy = CountStrategy.Exact });
 
     repoCheck.Value.Should().Be(2);
         repoCheck.IsEstimate.Should().BeFalse();
@@ -102,10 +98,7 @@ public class SqlServerCountTests : IClassFixture<Support.SqlServerAutoFixture>
 
     await new CountTestEntity { Name = "Test" }.Save();
 
-        var result = await repo.Count(new CountRequest<CountTestEntity>
-        {
-            Options = new DataQueryOptions { CountStrategy = CountStrategy.Exact }
-        });
+        var result = await repo.Count(new QueryDefinition { CountStrategy = CountStrategy.Exact });
 
         result.IsEstimate.Should().BeFalse();
         result.Value.Should().Be(1);
@@ -123,10 +116,7 @@ public class SqlServerCountTests : IClassFixture<Support.SqlServerAutoFixture>
             await new CountTestEntity { Name = $"Item{i}" }.Save();
         }
 
-        var result = await repo.Count(new CountRequest<CountTestEntity>
-        {
-            Options = new DataQueryOptions { CountStrategy = CountStrategy.Fast }
-        });
+        var result = await repo.Count(new QueryDefinition { CountStrategy = CountStrategy.Fast });
 
         result.IsEstimate.Should().BeTrue();
         result.Value.Should().BeGreaterThanOrEqualTo(0);
@@ -145,10 +135,7 @@ public class SqlServerCountTests : IClassFixture<Support.SqlServerAutoFixture>
             await new CountTestEntity { Name = $"Item{i}" }.Save();
         }
 
-        var result = await repo.Count(new CountRequest<CountTestEntity>
-        {
-            Options = new DataQueryOptions { CountStrategy = CountStrategy.Exact }
-        });
+        var result = await repo.Count(new QueryDefinition { CountStrategy = CountStrategy.Exact });
 
         result.Value.Should().Be(expected);
         result.IsEstimate.Should().BeFalse();
@@ -166,10 +153,7 @@ public class SqlServerCountTests : IClassFixture<Support.SqlServerAutoFixture>
             await new CountTestEntity { Name = $"Item{i}" }.Save();
         }
 
-        var result = await repo.Count(new CountRequest<CountTestEntity>
-        {
-            Options = new DataQueryOptions { CountStrategy = CountStrategy.Fast }
-        });
+        var result = await repo.Count(new QueryDefinition { CountStrategy = CountStrategy.Fast });
 
         result.Value.Should().BeGreaterThan(0);
         result.IsEstimate.Should().BeTrue();
@@ -187,10 +171,7 @@ public class SqlServerCountTests : IClassFixture<Support.SqlServerAutoFixture>
             await new CountTestEntity { Name = $"Item{i}", Value = i }.Save();
         }
 
-        var result = await repo.Count(new CountRequest<CountTestEntity>
-        {
-            Options = new DataQueryOptions { CountStrategy = CountStrategy.Fast }
-        });
+        var result = await repo.Count(new QueryDefinition { CountStrategy = CountStrategy.Fast });
 
         result.Value.Should().BeGreaterThan(0, "sys.dm_db_partition_stats should report rows");
         result.IsEstimate.Should().BeTrue("Partition stats provide estimates");
@@ -206,11 +187,7 @@ public class SqlServerCountTests : IClassFixture<Support.SqlServerAutoFixture>
     await new CountTestEntity { Name = "Match", Status = "Active" }.Save();
     await new CountTestEntity { Name = "NoMatch", Status = "Inactive" }.Save();
 
-        var result = await repo.Count(new CountRequest<CountTestEntity>
-        {
-            Predicate = x => x.Status == "Active",
-            Options = new DataQueryOptions { CountStrategy = CountStrategy.Fast }
-        });
+        var result = await repo.Count(new QueryDefinition { Filter = LinqFilterCompiler.Compile<CountTestEntity>(x => x.Status == "Active"), CountStrategy = CountStrategy.Fast });
 
         result.Value.Should().Be(1);
         result.IsEstimate.Should().BeFalse();
@@ -225,7 +202,7 @@ public class SqlServerCountTests : IClassFixture<Support.SqlServerAutoFixture>
 
     await new CountTestEntity { Name = "Test" }.Save();
 
-        var result = await repo.Count(new CountRequest<CountTestEntity>());
+        var result = await repo.Count(QueryDefinition.All);
 
         result.Value.Should().Be(1L);
     }
@@ -237,10 +214,7 @@ public class SqlServerCountTests : IClassFixture<Support.SqlServerAutoFixture>
         var (available, repo) = await Prepare();
         if (!available) return;
 
-        var exactResult = await repo.Count(new CountRequest<CountTestEntity>
-        {
-            Options = new DataQueryOptions { CountStrategy = CountStrategy.Exact }
-        });
+        var exactResult = await repo.Count(new QueryDefinition { CountStrategy = CountStrategy.Exact });
 
         exactResult.Value.Should().Be(0);
     }
@@ -256,15 +230,12 @@ public class SqlServerCountTests : IClassFixture<Support.SqlServerAutoFixture>
     await new CountTestEntity { Name = "Beta", Value = 20 }.Save();
     await new CountTestEntity { Name = "Gamma", Value = 30 }.Save();
 
-        var result = await repo.Count(new CountRequest<CountTestEntity>
-        {
-            RawQuery = "[Value] > 15"
-        });
+        var result = await ((IRawQueryRepository<CountTestEntity, string>)repo).CountRaw("[Value] > 15", null, default);
 
         result.Value.Should().Be(2);
     }
 
-    private async Task<(bool Available, IDataRepository<CountTestEntity, string> Repo)> Prepare()
+    private async Task<(bool Available, IQueryRepository<CountTestEntity, string> Repo)> Prepare()
     {
         if (_fx.SkipTests)
         {
@@ -274,7 +245,7 @@ public class SqlServerCountTests : IClassFixture<Support.SqlServerAutoFixture>
         AggregateConfigs.Reset();
         EnsureAppHost();
         await _fx.Data.Execute<CountTestEntity, int>(new Instruction("data.clear"));
-        return (true, _fx.Data.GetRepository<CountTestEntity, string>());
+        return (true, (IQueryRepository<CountTestEntity, string>)_fx.Data.GetRepository<CountTestEntity, string>());
     }
 
     private void EnsureAppHost()

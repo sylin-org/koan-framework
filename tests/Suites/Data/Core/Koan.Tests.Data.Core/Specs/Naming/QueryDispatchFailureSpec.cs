@@ -1,22 +1,22 @@
 using System;
 using System.Collections.Generic;
-using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
 using AwesomeAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Core.Hosting.App;
 using Koan.Data.Abstractions;
-using Koan.Data.Abstractions.Instructions;
 using Xunit;
 
 namespace Koan.Tests.Data.Core.Specs.Naming;
 
 /// <summary>
-/// Verifies the dispatch failure path introduced in DATA-0095 Phase 1b. When an adapter does
-/// not implement the typed query marker interface (ILinq* / IString*WithOptions), <c>Data&lt;T,K&gt;</c>
-/// must throw a clear NotSupportedException identifying the missing capability — not silently
-/// return empty results or fall back to a degraded path.
+/// Verifies the query-dispatch failure path. Querying and counting live on the
+/// <see cref="IQueryRepository{TEntity,TKey}"/> contract (one method over a <c>QueryDefinition</c>);
+/// raw provider queries live on the optional <see cref="IRawQueryRepository{TEntity,TKey}"/> escape
+/// hatch. When the adapter backing an entity implements neither, <c>Data&lt;T,K&gt;</c> must throw a
+/// clear <see cref="NotSupportedException"/> naming the missing capability — not silently return empty
+/// or fall back to a degraded path.
 /// </summary>
 [Collection(nameof(QueryDispatchFailureSpec))]
 [CollectionDefinition(nameof(QueryDispatchFailureSpec), DisableParallelization = true)]
@@ -28,26 +28,26 @@ public class QueryDispatchFailureSpec
     }
 
     [Fact]
-    public async Task StringQuery_onLinqOnlyAdapter_throwsNotSupportedWithDiagnostic()
+    public async Task Query_onAdapterWithoutQueryRepository_throwsNotSupportedWithDiagnostic()
     {
-        using var scope = BuildScopeWithFakeRepo(new LinqOnlyRepo());
-
-        Func<Task> act = () => Koan.Data.Core.Data<Widget, string>.Query("some-raw-string");
-
-        var ex = await act.Should().ThrowAsync<NotSupportedException>();
-        ex.Which.Message.Should().Contain("string queries");
-        ex.Which.Message.Should().Contain(nameof(Widget));
-    }
-
-    [Fact]
-    public async Task LinqQuery_onStringOnlyAdapter_throwsNotSupportedWithDiagnostic()
-    {
-        using var scope = BuildScopeWithFakeRepo(new StringOnlyRepo());
+        using var scope = BuildScopeWithFakeRepo(new CrudOnlyRepo());
 
         Func<Task> act = () => Koan.Data.Core.Data<Widget, string>.Query((Widget w) => w.Name == "x");
 
         var ex = await act.Should().ThrowAsync<NotSupportedException>();
-        ex.Which.Message.Should().Contain("ILinqQueryRepositoryWithOptions");
+        ex.Which.Message.Should().Contain("IQueryRepository");
+        ex.Which.Message.Should().Contain(nameof(Widget));
+    }
+
+    [Fact]
+    public async Task QueryRaw_onAdapterWithoutRawSupport_throwsNotSupportedWithDiagnostic()
+    {
+        using var scope = BuildScopeWithFakeRepo(new CrudOnlyRepo());
+
+        Func<Task> act = () => Koan.Data.Core.Data<Widget, string>.QueryRaw("SELECT * FROM Widget");
+
+        var ex = await act.Should().ThrowAsync<NotSupportedException>();
+        ex.Which.Message.Should().Contain("raw provider queries");
         ex.Which.Message.Should().Contain(nameof(Widget));
     }
 
@@ -73,17 +73,16 @@ public class QueryDispatchFailureSpec
             => throw new NotImplementedException();
     }
 
-    /// <summary>Adapter that supports only ILinqQueryRepository — no string query support.</summary>
-    private sealed class LinqOnlyRepo
-        : IDataRepository<Widget, string>,
-          ILinqQueryRepositoryWithOptions<Widget, string>
+    /// <summary>
+    /// CRUD-only adapter: implements <see cref="IDataRepository{TEntity,TKey}"/> but neither
+    /// <see cref="IQueryRepository{TEntity,TKey}"/> nor <see cref="IRawQueryRepository{TEntity,TKey}"/>.
+    /// </summary>
+    private sealed class CrudOnlyRepo : IDataRepository<Widget, string>
     {
         public Task EnsureReady(CancellationToken ct = default) => Task.CompletedTask;
         public Task<Widget?> Get(string id, CancellationToken ct = default) => Task.FromResult<Widget?>(null);
         public Task<IReadOnlyList<Widget?>> GetMany(IEnumerable<string> ids, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<Widget?>>(Array.Empty<Widget?>());
-        public Task<CountResult> Count(CountRequest<Widget> request, CancellationToken ct = default)
-            => Task.FromResult(new CountResult(0, false));
         public Task<Widget> Upsert(Widget model, CancellationToken ct = default) => Task.FromResult(model);
         public Task<int> UpsertMany(IEnumerable<Widget> models, CancellationToken ct = default) => Task.FromResult(0);
         public Task<bool> Delete(string id, CancellationToken ct = default) => Task.FromResult(false);
@@ -91,50 +90,5 @@ public class QueryDispatchFailureSpec
         public Task<int> DeleteAll(CancellationToken ct = default) => Task.FromResult(0);
         public Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default) => Task.FromResult(0L);
         public IBatchSet<Widget, string> CreateBatch() => throw new NotImplementedException();
-
-        public Task<RepositoryQueryResult<Widget>> Query(
-            Expression<Func<Widget, bool>>? predicate,
-            DataQueryOptions? options,
-            CancellationToken ct = default)
-            => Task.FromResult(RepositoryQueryResult<Widget>.Unhandled(Array.Empty<Widget>()));
-
-        public Task<IReadOnlyList<Widget>> Query(Expression<Func<Widget, bool>> predicate, CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<Widget>>(Array.Empty<Widget>());
-    }
-
-    /// <summary>Adapter that supports only IStringQueryRepository — no LINQ predicate support.</summary>
-    private sealed class StringOnlyRepo
-        : IDataRepository<Widget, string>,
-          IStringQueryRepositoryWithOptions<Widget, string>
-    {
-        public Task EnsureReady(CancellationToken ct = default) => Task.CompletedTask;
-        public Task<Widget?> Get(string id, CancellationToken ct = default) => Task.FromResult<Widget?>(null);
-        public Task<IReadOnlyList<Widget?>> GetMany(IEnumerable<string> ids, CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<Widget?>>(Array.Empty<Widget?>());
-        public Task<CountResult> Count(CountRequest<Widget> request, CancellationToken ct = default)
-            => Task.FromResult(new CountResult(0, false));
-        public Task<Widget> Upsert(Widget model, CancellationToken ct = default) => Task.FromResult(model);
-        public Task<int> UpsertMany(IEnumerable<Widget> models, CancellationToken ct = default) => Task.FromResult(0);
-        public Task<bool> Delete(string id, CancellationToken ct = default) => Task.FromResult(false);
-        public Task<int> DeleteMany(IEnumerable<string> ids, CancellationToken ct = default) => Task.FromResult(0);
-        public Task<int> DeleteAll(CancellationToken ct = default) => Task.FromResult(0);
-        public Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default) => Task.FromResult(0L);
-        public IBatchSet<Widget, string> CreateBatch() => throw new NotImplementedException();
-
-        public Task<RepositoryQueryResult<Widget>> Query(
-            string query,
-            DataQueryOptions? options,
-            CancellationToken ct = default)
-            => Task.FromResult(RepositoryQueryResult<Widget>.Unhandled(Array.Empty<Widget>()));
-
-        public Task<RepositoryQueryResult<Widget>> Query(
-            string query,
-            object? parameters,
-            DataQueryOptions? options,
-            CancellationToken ct = default)
-            => Task.FromResult(RepositoryQueryResult<Widget>.Unhandled(Array.Empty<Widget>()));
-
-        public Task<IReadOnlyList<Widget>> Query(string query, CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<Widget>>(Array.Empty<Widget>());
     }
 }

@@ -30,8 +30,7 @@ public sealed class JsonCapabilitiesSpec
                 fixture.BindHost();
 
                 var repository = fixture.Data.GetRepository<CapabilityProbe, string>();
-                repository.Should().BeAssignableTo<ILinqQueryRepository<CapabilityProbe, string>>();
-                repository.Should().BeAssignableTo<ILinqQueryRepositoryWithOptions<CapabilityProbe, string>>();
+                repository.Should().BeAssignableTo<IQueryRepository<CapabilityProbe, string>>();
 
                 var queryCaps = repository.Should().BeAssignableTo<IQueryCapabilities>().Subject;
                 queryCaps.Capabilities.Should().Be(QueryCapabilities.Linq);

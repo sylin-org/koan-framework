@@ -80,7 +80,7 @@ public sealed class JsonInstructionsSpec
                 jsonFiles.Should().NotBeEmpty();
                 foreach (var path in jsonFiles)
                 {
-                    var contents = await File.ReadAllText(path);
+                    var contents = await File.ReadAllTextAsync(path);
                     contents.Trim().Should().Be("[]");
                 }
             })

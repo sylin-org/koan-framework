@@ -159,7 +159,7 @@ internal sealed class MongoConnectorFixture : IAsyncDisposable
     {
         try
         {
-            await asyncDisposable.Dispose().ConfigureAwait(false);
+            await asyncDisposable.DisposeAsync().ConfigureAwait(false);
         }
         catch
         {

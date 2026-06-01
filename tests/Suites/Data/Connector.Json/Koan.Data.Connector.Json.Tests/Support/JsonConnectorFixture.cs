@@ -138,7 +138,7 @@ internal sealed class JsonConnectorFixture : IAsyncDisposable
     {
         try
         {
-            await asyncDisposable.Dispose().ConfigureAwait(false);
+            await asyncDisposable.DisposeAsync().ConfigureAwait(false);
         }
         finally
         {

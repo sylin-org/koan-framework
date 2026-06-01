@@ -75,8 +75,6 @@ internal sealed class RedisConnectorFixture : IAsyncDisposable
         services.AddLogging();
         services.AddKoan();
         services.AddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
-        services.AddSingleton<IConfigureOptions<RedisOptions>, RedisOptionsConfigurator>();
-        services.AddRedisAdapter();
 
         var provider = services.BuildServiceProvider(new ServiceProviderOptions
         {
@@ -151,7 +149,7 @@ internal sealed class RedisConnectorFixture : IAsyncDisposable
     {
         try
         {
-            await asyncDisposable.Dispose().ConfigureAwait(false);
+            await asyncDisposable.DisposeAsync().ConfigureAwait(false);
         }
         catch
         {

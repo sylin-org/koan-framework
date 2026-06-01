@@ -62,7 +62,7 @@ public sealed class InMemoryCrudSpec
                 var count = await Person.Count.Where(p => p.Age >= 40, CountStrategy.Exact);
                 count.Should().Be(2);
 
-                var removed = await Person.Remove(saved.Id, new DataQueryOptions { Partition = partition });
+                var removed = await Person.Remove(saved.Id, partition);
                 removed.Should().BeTrue();
 
                 var remaining = await Person.All(partition);

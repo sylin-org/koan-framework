@@ -43,17 +43,17 @@ public sealed class InMemorySortingSpec
                 await SeedAsync();
 
                 // Sort ascending
-                var asc = await Widget.All(new DataQueryOptions().WithSort<Widget>("Name"));
+                var asc = await Widget.All(QueryDefinition.All.WithSort<Widget>("Name"));
                 asc.Select(w => w.Name).Should().Equal("Alpha", "Bravo", "Charlie");
 
                 // Sort descending
-                var desc = await Widget.All(new DataQueryOptions().WithSort<Widget>("-Name"));
+                var desc = await Widget.All(QueryDefinition.All.WithSort<Widget>("-Name"));
                 desc.Select(w => w.Name).Should().Equal("Charlie", "Bravo", "Alpha");
 
                 // Multi-field
                 await Widget.Upsert(new Widget { Id = "x1", Name = "Bravo", Priority = 1 });
                 await Widget.Upsert(new Widget { Id = "x2", Name = "Bravo", Priority = 5 });
-                var multi = await Widget.All(new DataQueryOptions().WithSort<Widget>("Name,-Priority"));
+                var multi = await Widget.All(QueryDefinition.All.WithSort<Widget>("Name,-Priority"));
                 var bravo = multi.Where(w => w.Name == "Bravo").ToList();
                 bravo[0].Priority.Should().BeGreaterThan(bravo[1].Priority);
             })
@@ -160,7 +160,7 @@ public sealed class InMemorySortingSpec
                 });
 
                 // -Sightings.LastChangedAt → MAX aggregation, descending. Expected order: b, c, a.
-                var ordered = await Widget.All(new DataQueryOptions().WithSort<Widget>("-Sightings.LastChangedAt"));
+                var ordered = await Widget.All(QueryDefinition.All.WithSort<Widget>("-Sightings.LastChangedAt"));
                 ordered.Select(w => w.Id).Should().Equal("b", "c", "a");
             })
             .Run();

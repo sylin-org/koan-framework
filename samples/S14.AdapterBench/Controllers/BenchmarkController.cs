@@ -32,9 +32,9 @@ public class BenchmarkController : ControllerBase
         [FromBody] BenchmarkRequest request,
         CancellationToken cancellationToken)
     {
-        // Start benchmark as a background job (in-memory, ephemeral)
-        var job = await BenchmarkJob.Start(request, cancellationToken: cancellationToken)
-            .Run(cancellationToken);
+        // Start benchmark as a background job (in-memory, ephemeral). The request payload rides on
+        // the job's Context (JOBS-0003 CRTP model); Submit persists + enqueues it.
+        var job = await new BenchmarkJob { Context = request }.Submit(cancellationToken);
 
         return Ok(new BenchmarkJobResponse
         {
