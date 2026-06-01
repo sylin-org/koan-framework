@@ -7,15 +7,17 @@ using Npgsql;
 using Koan.Core;
 using Koan.Core.Infrastructure;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
+using Koan.Data.Abstractions.Sorting;
 using Koan.Data.Core;
 using Koan.Data.Core.Optimization;
 using Koan.Data.Relational.Linq;
 using Koan.Data.Relational.Orchestration;
+using System.Collections.Frozen;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using System.Linq.Expressions;
 using Newtonsoft.Json;
 
 namespace Koan.Data.Connector.Postgres;
@@ -25,10 +27,8 @@ internal sealed class PostgresRepository<
     TKey> :
     IDataRepository<TEntity, TKey>,
     IOptimizedDataRepository<TEntity, TKey>,
-    ILinqQueryRepository<TEntity, TKey>,
-    IStringQueryRepository<TEntity, TKey>,
-    ILinqQueryRepositoryWithOptions<TEntity, TKey>,
-    IStringQueryRepositoryWithOptions<TEntity, TKey>,
+    IQueryRepository<TEntity, TKey>,
+    IRawQueryRepository<TEntity, TKey>,
     IQueryCapabilities,
     IWriteCapabilities,
     IBulkDelete<TKey>,
@@ -37,6 +37,9 @@ internal sealed class PostgresRepository<
     where TKey : notnull
 {
     public QueryCapabilities Capabilities => QueryCapabilities.Linq | QueryCapabilities.String;
+
+    /// <summary>Operators the Postgres adapter pushes down (DATA-XXXX). Everything else falls to the in-memory floor.</summary>
+    public FilterCapabilities FilterCapabilities => RelationalFilterCapabilities.Default;
     public WriteCapabilities Writes => WriteCapabilities.AtomicBatch | WriteCapabilities.BulkDelete | WriteCapabilities.FastRemove;
 
     // Storage optimization support
@@ -377,23 +380,69 @@ internal sealed class PostgresRepository<
     }
 
 
-    public async Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
+    // ==================== Unified Query (DATA-XXXX) ====================
+
+    public async Task<RepositoryQueryResult<TEntity>> Query(QueryDefinition query, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        using var act = PgTelemetry.Activity.StartActivity("pg.query");
+        act?.SetTag("entity", typeof(TEntity).FullName);
+
+        var (whereSql, parameters) = BuildWhere(query.Filter);
+        var (orderBy, sortHandled) = BuildOrderBy(query.Sort);
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append("SELECT \"Id\", \"Json\"::text FROM ").Append(QualifiedTable);
+        if (whereSql is not null) sb.Append(" WHERE ").Append(whereSql);
+        sb.Append(' ').Append(orderBy);
+
+        var paginationHandled = false;
+        if (query.HasPagination)
+        {
+            var size = query.EffectivePageSize();
+            var offset = (query.EffectivePage() - 1) * size;
+            sb.Append(" LIMIT ").Append(size).Append(" OFFSET ").Append(offset);
+            paginationHandled = true;
+        }
+
+        await using var conn = Open();
+        var dyn = ToDapper(parameters);
+        var rows = await conn.QueryAsync<(string Id, string Json)>(sb.ToString(), dyn);
+        var items = rows.Select(FromRow).ToList();
+
+        long? totalCount = paginationHandled
+            ? await CountCore(whereSql, parameters, ct)
+            : items.Count;
+
+        return new RepositoryQueryResult<TEntity>
+        {
+            Items = items,
+            TotalCount = totalCount,
+            IsEstimate = false,
+            SortHandled = sortHandled,
+            PaginationHandled = paginationHandled,
+        };
+    }
+
+    public async Task<CountResult> Count(QueryDefinition query, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = PgTelemetry.Activity.StartActivity("pg.count");
         act?.SetTag("entity", typeof(TEntity).FullName);
-        await using var conn = Open();
 
-        // Fast count via pg_stat when no predicate and strategy allows it
-        if (request.Predicate is null && request.RawQuery is null && request.ProviderQuery is null)
+        var (whereSql, parameters) = BuildWhere(query.Filter);
+
+        // Fast count via pg_stat when no filter and strategy allows it.
+        if (whereSql is null)
         {
-            var strategy = request.Options?.CountStrategy ?? CountStrategy.Optimized;
+            var strategy = query.CountStrategy ?? CountStrategy.Optimized;
             if (strategy == CountStrategy.Fast || strategy == CountStrategy.Optimized)
             {
                 try
                 {
+                    await using var statConn = Open();
                     var (schema, table) = ResolveSchemaAndTable();
-                    var estimate = await conn.ExecuteScalarAsync<long>(
+                    var estimate = await statConn.ExecuteScalarAsync<long>(
                         @"SELECT n_live_tup FROM pg_stat_user_tables
                           WHERE schemaname = @schema AND relname = @table",
                         new { schema, table });
@@ -407,203 +456,100 @@ internal sealed class PostgresRepository<
             }
         }
 
-        // Exact count based on request type
-        if (request.Predicate is not null)
-        {
-            var translator = new LinqWhereTranslator<TEntity>(_dialect);
-            try
-            {
-                var (whereSql, parameters) = translator.Translate(request.Predicate);
-                whereSql = RewriteWhereForProjection(whereSql);
-                return await CountWhere(whereSql, parameters);
-            }
-            catch (NotSupportedException)
-            {
-                var compiled = request.Predicate.Compile();
-                var all = await Query((Expression<Func<TEntity, bool>>?)null, options: null, ct);
-                var count = (long)all.Items.Count(compiled);
-                return CountResult.Exact(count);
-            }
-        }
-
-        if (request.RawQuery is not null)
-        {
-            var whereSql = RewriteWhereForProjection(request.RawQuery);
-            var count = await conn.ExecuteScalarAsync<long>($"SELECT COUNT(1) FROM {QualifiedTable} WHERE " + whereSql);
-            return CountResult.Exact(count);
-        }
-
-        // No predicate - full table count
-        var totalCount = await conn.ExecuteScalarAsync<long>($"SELECT COUNT(1) FROM {QualifiedTable}");
-        return CountResult.Exact(totalCount);
+        return CountResult.Exact(await CountCore(whereSql, parameters, ct));
     }
 
-    private async Task<CountResult> CountWhere(string whereSql, IReadOnlyList<object?> parameters)
+    private async Task<long> CountCore(string? whereSql, IReadOnlyList<object?> parameters, CancellationToken ct)
     {
         await using var conn = Open();
-        var sql = $"SELECT COUNT(1) FROM {QualifiedTable} WHERE {whereSql}";
+        var sql = whereSql is null
+            ? $"SELECT COUNT(1) FROM {QualifiedTable}"
+            : $"SELECT COUNT(1) FROM {QualifiedTable} WHERE {whereSql}";
+        var dyn = ToDapper(parameters);
+        return await conn.ExecuteScalarAsync<long>(sql, dyn);
+    }
+
+    /// <summary>Translates the (fully-pushable) filter to a WHERE fragment; null filter -> no WHERE.</summary>
+    private (string? whereSql, IReadOnlyList<object?> parameters) BuildWhere(Filter? filter)
+    {
+        if (filter is null) return (null, Array.Empty<object?>());
+        var translator = new SqlFilterTranslator(_dialect, typeof(TEntity), ResolveColumnSql);
+        return translator.Translate(filter);
+    }
+
+    /// <summary>Maps a flat property name to its SQL value expression (projected column or jsonb extraction).</summary>
+    private string ResolveColumnSql(FieldPath field, ResolvedField resolved)
+    {
+        var prop = field.Leaf;
+        if (string.Equals(prop, "Id", StringComparison.Ordinal)) return "\"Id\"";
+        if (string.Equals(prop, "Json", StringComparison.Ordinal)) return "\"Json\"";
+        var projections = ProjectionResolver.Get(typeof(TEntity));
+        var proj = projections.FirstOrDefault(p => string.Equals(p.Property.Name, prop, StringComparison.Ordinal));
+        var json = $"(\"Json\" #>> '{{{prop}}}')";
+        return proj is not null ? $"COALESCE(\"{proj.ColumnName}\"::text, {json})" : json;
+    }
+
+    /// <summary>Builds an ORDER BY clause from the sort specs; falls back to a stable ctid order.</summary>
+    private (string orderBy, IReadOnlySet<SortSpec> sortHandled) BuildOrderBy(IReadOnlyList<SortSpec> sort)
+    {
+        if (sort is null || sort.Count == 0)
+            return ("ORDER BY ctid", RepositoryQueryResult<TEntity>.NoSortHandled);
+
+        var parts = new List<string>(sort.Count);
+        foreach (var spec in sort)
+        {
+            var leaf = spec.Path.Members[spec.Path.Members.Count - 1].Name;
+            var col = ResolveColumnSql(FieldPath.Of(leaf), default!);
+            parts.Add($"{col} {(spec.Desc ? "DESC" : "ASC")}");
+        }
+        var orderBy = "ORDER BY " + string.Join(", ", parts);
+        return (orderBy, sort.ToFrozenSet());
+    }
+
+    private static DynamicParameters ToDapper(IReadOnlyList<object?> parameters)
+    {
         var dyn = new DynamicParameters();
         for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
-        var count = await conn.ExecuteScalarAsync<long>(sql, dyn);
+        return dyn;
+    }
+
+    // ==================== Raw provider query (IRawQueryRepository) ====================
+
+    public async Task<RepositoryQueryResult<TEntity>> QueryRaw(string query, object? parameters, QueryDefinition shaping, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        using var act = PgTelemetry.Activity.StartActivity("pg.query:raw");
+        act?.SetTag("entity", typeof(TEntity).FullName);
+        await using var conn = Open();
+        if (IsFullSelect(query))
+        {
+            var rewritten = RewriteEntityToken(query);
+            var rows = await conn.QueryAsync(rewritten, parameters);
+            var items = MapRowsToEntities(rows);
+            return new RepositoryQueryResult<TEntity> { Items = items };
+        }
+        else
+        {
+            var whereSql = RewriteWhereForProjection(query);
+            var size = shaping.HasPagination ? shaping.EffectivePageSize() : _defaultPageSize;
+            var offset = shaping.HasPagination ? (shaping.EffectivePage() - 1) * size : 0;
+            var sql = $"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE {whereSql} ORDER BY ctid LIMIT {size} OFFSET {offset}";
+            var rows = await conn.QueryAsync<(string Id, string Json)>(sql, parameters);
+            return new RepositoryQueryResult<TEntity>
+            {
+                Items = rows.Select(FromRow).ToList(),
+                PaginationHandled = shaping.HasPagination,
+            };
+        }
+    }
+
+    public async Task<CountResult> CountRaw(string query, object? parameters, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        await using var conn = Open();
+        var whereSql = RewriteWhereForProjection(query);
+        var count = await conn.ExecuteScalarAsync<long>($"SELECT COUNT(1) FROM {QualifiedTable} WHERE {whereSql}", parameters);
         return CountResult.Exact(count);
-    }
-
-    public async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = PgTelemetry.Activity.StartActivity("pg.query:linq");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        var translator = new LinqWhereTranslator<TEntity>(_dialect);
-        try
-        {
-            var (whereSql, parameters) = translator.Translate(predicate);
-            whereSql = RewriteWhereForProjection(whereSql);
-            await using var conn = Open();
-            var sql = $"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE {whereSql} ORDER BY ctid";
-            var dyn = new DynamicParameters();
-            for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
-            var rows = await conn.QueryAsync<(string Id, string Json)>(sql, dyn);
-            return rows.Select(FromRow).ToList();
-        }
-        catch (NotSupportedException)
-        {
-            var compiled = predicate.Compile();
-            var all = await Query((Expression<Func<TEntity, bool>>?)null, options: null, ct);
-            return all.Items.Where(compiled).ToList();
-        }
-    }
-
-    public async Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>>? predicate, DataQueryOptions? options, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = PgTelemetry.Activity.StartActivity("pg.query:linq+opts");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-
-        // Null predicate = no filter. Skip the translator entirely.
-        if (predicate is null)
-        {
-            var (off, lim) = ComputeSkipTake(options);
-            await using var connN = Open();
-            var sqlN = $"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} ORDER BY ctid LIMIT {lim} OFFSET {off}";
-            var rowsN = await connN.QueryAsync<(string Id, string Json)>(sqlN);
-            return RepositoryQueryResult<TEntity>.PaginatedOnly(rowsN.Select(FromRow).ToList());
-        }
-
-        var translator = new LinqWhereTranslator<TEntity>(_dialect);
-        try
-        {
-            var (whereSql, parameters) = translator.Translate(predicate);
-            whereSql = RewriteWhereForProjection(whereSql);
-            var (offset, limit) = ComputeSkipTake(options);
-            await using var conn = Open();
-            var sql = $"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE {whereSql} ORDER BY ctid LIMIT {limit} OFFSET {offset}";
-            var dyn = new DynamicParameters();
-            for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
-            var rows = await conn.QueryAsync<(string Id, string Json)>(sql, dyn);
-            var items = rows.Select(FromRow).ToList();
-            return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
-        }
-        catch (NotSupportedException)
-        {
-            var compiled = predicate.Compile();
-            var fallback = await Query((Expression<Func<TEntity, bool>>?)null, options, ct);
-            var filtered = fallback.Items.Where(compiled).ToList();
-            return RepositoryQueryResult<TEntity>.PaginatedOnly(filtered);
-        }
-        catch (Npgsql.PostgresException ex) when (ex.SqlState == "42703") // undefined_column
-        {
-            // Translator emitted a reference to a column that doesn't exist. Materialise + filter.
-            var compiled = predicate.Compile();
-            var fallback = await Query((Expression<Func<TEntity, bool>>?)null, options, ct);
-            var filtered = fallback.Items.Where(compiled).ToList();
-            return RepositoryQueryResult<TEntity>.PaginatedOnly(filtered);
-        }
-    }
-
-    public async Task<IReadOnlyList<TEntity>> Query(string sql, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = PgTelemetry.Activity.StartActivity("pg.query:string");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        await using var conn = Open();
-        if (IsFullSelect(sql))
-        {
-            var rewritten = RewriteEntityToken(sql);
-            var rows = await conn.QueryAsync(rewritten);
-            return MapRowsToEntities(rows);
-        }
-        else
-        {
-            var whereSql = RewriteWhereForProjection(sql);
-            var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE " + whereSql + $" ORDER BY ctid LIMIT {_defaultPageSize} OFFSET 0");
-            return rows.Select(FromRow).ToList();
-        }
-    }
-
-    public async Task<IReadOnlyList<TEntity>> Query(string sql, object? parameters, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = PgTelemetry.Activity.StartActivity("pg.query:string:param");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        await using var conn = Open();
-        if (IsFullSelect(sql))
-        {
-            var rewritten = RewriteEntityToken(sql);
-            var rows = await conn.QueryAsync(rewritten, parameters);
-            return MapRowsToEntities(rows);
-        }
-        else
-        {
-            var whereSql = RewriteWhereForProjection(sql);
-            var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE " + whereSql + $" ORDER BY ctid LIMIT {_defaultPageSize} OFFSET 0", parameters);
-            return rows.Select(FromRow).ToList();
-        }
-    }
-
-    public async Task<RepositoryQueryResult<TEntity>> Query(string sql, DataQueryOptions? options, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = PgTelemetry.Activity.StartActivity("pg.query:string+opts");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        await using var conn = Open();
-        if (IsFullSelect(sql))
-        {
-            var rewritten = RewriteEntityToken(sql);
-            var rows = await conn.QueryAsync(rewritten);
-            var items = MapRowsToEntities(rows);
-            return RepositoryQueryResult<TEntity>.Unhandled(items);
-        }
-        else
-        {
-            var (offset, limit) = ComputeSkipTake(options);
-            var whereSql = RewriteWhereForProjection(sql);
-            var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE " + whereSql + $" ORDER BY ctid LIMIT {limit} OFFSET {offset}");
-            var items = rows.Select(FromRow).ToList();
-            return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
-        }
-    }
-
-    public async Task<RepositoryQueryResult<TEntity>> Query(string sql, object? parameters, DataQueryOptions? options, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = PgTelemetry.Activity.StartActivity("pg.query:string:param+opts");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        await using var conn = Open();
-        if (IsFullSelect(sql))
-        {
-            var rewritten = RewriteEntityToken(sql);
-            var rows = await conn.QueryAsync(rewritten, parameters);
-            var items = MapRowsToEntities(rows);
-            return RepositoryQueryResult<TEntity>.Unhandled(items);
-        }
-        else
-        {
-            var (offset, limit) = ComputeSkipTake(options);
-            var whereSql = RewriteWhereForProjection(sql);
-            var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE " + whereSql + $" ORDER BY ctid LIMIT {limit} OFFSET {offset}", parameters);
-            var items = rows.Select(FromRow).ToList();
-            return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
-        }
     }
 
 
@@ -678,8 +624,7 @@ internal sealed class PostgresRepository<
         }
 
         // Safe path: DELETE (fires hooks if registered)
-        var countRequest = new CountRequest<TEntity>();
-        var countResult = await Count(countRequest, ct);
+        var countResult = await Count(QueryDefinition.All, ct);
         await conn.ExecuteAsync($"DELETE FROM {QualifiedTable}", ct);
         return countResult.Value;
     }
@@ -961,25 +906,6 @@ internal sealed class PostgresRepository<
         public bool SupportsPersistedComputedColumns => true; // generated columns are stored
         public bool SupportsIndexesOnComputedColumns => true;
         public string ProviderName => "postgresql";
-    }
-
-    private (int offset, int limit) ComputeSkipTake(DataQueryOptions? options)
-    {
-        // Check if pagination is active
-        var hasPagination = options?.HasPagination ?? false;
-
-        if (!hasPagination)
-        {
-            // No pagination - return full result set without applying default page size
-            return (0, int.MaxValue);
-        }
-
-        // Pagination is active - apply default fallback only. Per ADR no adapter-side cap.
-        var page = options?.Page is int p && p > 0 ? p : 1;
-        var sizeReq = options?.PageSize;
-        var size = sizeReq is int ps && ps > 0 ? ps : _defaultPageSize;
-        var offset = (page - 1) * size;
-        return (offset, size);
     }
 
     private string RewriteEntityToken(string sql)

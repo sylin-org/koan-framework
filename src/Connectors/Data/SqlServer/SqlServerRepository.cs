@@ -8,13 +8,15 @@ using Koan.Core;
 using Koan.Core.Infrastructure;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Annotations;
+using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
+using Koan.Data.Abstractions.Sorting;
 using Koan.Data.Core;
 using Koan.Data.Core.Optimization;
 using Koan.Data.Relational.Linq;
 using Koan.Data.Relational.Orchestration;
-using System.Linq.Expressions;
+using System.Collections.Frozen;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 
@@ -23,10 +25,8 @@ namespace Koan.Data.Connector.SqlServer;
 internal sealed class SqlServerRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
     IOptimizedDataRepository<TEntity, TKey>,
-    ILinqQueryRepository<TEntity, TKey>,
-    IStringQueryRepository<TEntity, TKey>,
-    ILinqQueryRepositoryWithOptions<TEntity, TKey>,
-    IStringQueryRepositoryWithOptions<TEntity, TKey>,
+    IQueryRepository<TEntity, TKey>,
+    IRawQueryRepository<TEntity, TKey>,
     IQueryCapabilities,
     IWriteCapabilities,
     IBulkUpsert<TKey>,
@@ -36,6 +36,9 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
     where TKey : notnull
 {
     public QueryCapabilities Capabilities => QueryCapabilities.Linq | QueryCapabilities.String;
+
+    /// <summary>Operators the SQL Server adapter pushes down (DATA-XXXX). Everything else falls to the in-memory floor.</summary>
+    public FilterCapabilities FilterCapabilities => RelationalFilterCapabilities.Default;
     public WriteCapabilities Writes => WriteCapabilities.BulkUpsert | WriteCapabilities.BulkDelete | WriteCapabilities.AtomicBatch | WriteCapabilities.FastRemove;
 
     // Storage optimization support
@@ -343,22 +346,68 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
     }
 
 
-    public async Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
+    // ==================== Unified Query (DATA-XXXX) ====================
+
+    public async Task<RepositoryQueryResult<TEntity>> Query(QueryDefinition query, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query");
+        act?.SetTag("entity", typeof(TEntity).FullName);
+
+        var (whereSql, parameters) = BuildWhere(query.Filter);
+        var (orderBy, sortHandled) = BuildOrderBy(query.Sort);
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append("SELECT [Id], [Json] FROM [dbo].[").Append(TableName).Append(']');
+        if (whereSql is not null) sb.Append(" WHERE ").Append(whereSql);
+        sb.Append(' ').Append(orderBy);
+
+        var paginationHandled = false;
+        if (query.HasPagination)
+        {
+            var size = query.EffectivePageSize();
+            var offset = (query.EffectivePage() - 1) * size;
+            sb.Append(" OFFSET ").Append(offset).Append(" ROWS FETCH NEXT ").Append(size).Append(" ROWS ONLY");
+            paginationHandled = true;
+        }
+
+        await using var conn = Open();
+        var dyn = ToDapper(parameters);
+        var rows = await conn.QueryAsync<(string Id, string Json)>(sb.ToString(), dyn);
+        var items = rows.Select(FromRow).ToList();
+
+        long? totalCount = paginationHandled
+            ? await CountCore(whereSql, parameters, ct)
+            : items.Count;
+
+        return new RepositoryQueryResult<TEntity>
+        {
+            Items = items,
+            TotalCount = totalCount,
+            IsEstimate = false,
+            SortHandled = sortHandled,
+            PaginationHandled = paginationHandled,
+        };
+    }
+
+    public async Task<CountResult> Count(QueryDefinition query, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = SqlServerTelemetry.Activity.StartActivity("mssql.count");
         act?.SetTag("entity", typeof(TEntity).FullName);
-        await using var conn = Open();
 
-        // Fast count via sys.dm_db_partition_stats when no predicate and strategy allows it
-        if (request.Predicate is null && request.RawQuery is null && request.ProviderQuery is null)
+        var (whereSql, parameters) = BuildWhere(query.Filter);
+
+        // Fast count via sys.partitions when no filter and strategy allows it.
+        if (whereSql is null)
         {
-            var strategy = request.Options?.CountStrategy ?? CountStrategy.Optimized;
+            var strategy = query.CountStrategy ?? CountStrategy.Optimized;
             if (strategy == CountStrategy.Fast || strategy == CountStrategy.Optimized)
             {
                 try
                 {
-                    var estimate = await conn.ExecuteScalarAsync<long>(
+                    await using var statConn = Open();
+                    var estimate = await statConn.ExecuteScalarAsync<long>(
                         @"SELECT SUM(p.rows)
                           FROM sys.partitions p
                           INNER JOIN sys.tables t ON p.object_id = t.object_id
@@ -375,204 +424,110 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
             }
         }
 
-        // Exact count based on request type
-        if (request.Predicate is not null)
-        {
-            var translator = new LinqWhereTranslator<TEntity>(_dialect);
-            try
-            {
-                var (whereSql, parameters) = translator.Translate(request.Predicate);
-                whereSql = RewriteWhereForProjection(whereSql);
-                return await CountWhere(whereSql, parameters);
-            }
-            catch (NotSupportedException)
-            {
-                var all = await Query((Expression<Func<TEntity, bool>>?)null, options: null, ct);
-                var count = (long)all.Items.AsQueryable().Count(request.Predicate);
-                return CountResult.Exact(count);
-            }
-            catch (Microsoft.Data.SqlClient.SqlException ex) when (ex.Number == 207) // Invalid column name
-            {
-                var all = await Query((Expression<Func<TEntity, bool>>?)null, options: null, ct);
-                var count = (long)all.Items.AsQueryable().Count(request.Predicate);
-                return CountResult.Exact(count);
-            }
-        }
-
-        if (request.RawQuery is not null)
-        {
-            var whereSql = RewriteWhereForProjection(request.RawQuery);
-            var count = await conn.ExecuteScalarAsync<long>($"SELECT COUNT(1) FROM [dbo].[{TableName}] WHERE " + whereSql);
-            return CountResult.Exact(count);
-        }
-
-        // No predicate - full table count
-        var totalCount = await conn.ExecuteScalarAsync<long>($"SELECT COUNT(1) FROM [dbo].[{TableName}]");
-        return CountResult.Exact(totalCount);
+        return CountResult.Exact(await CountCore(whereSql, parameters, ct));
     }
 
-    public async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query:linq");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        var translator = new LinqWhereTranslator<TEntity>(_dialect);
-        try
-        {
-            var (whereSql, parameters) = translator.Translate(predicate);
-            whereSql = RewriteWhereForProjection(whereSql);
-            await using var conn = Open();
-            var sql = $"SELECT [Id], [Json] FROM [dbo].[{TableName}] WHERE {whereSql} {OrderByIdClause} OFFSET 0 ROWS FETCH NEXT {_defaultPageSize} ROWS ONLY";
-            var dyn = new DynamicParameters();
-            for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
-            var rows = await conn.QueryAsync<(string Id, string Json)>(sql, dyn);
-            return rows.Select(FromRow).ToList();
-        }
-        catch (NotSupportedException)
-        {
-            var all = await Query((Expression<Func<TEntity, bool>>?)null, options: null, ct);
-            return all.Items.AsQueryable().Where(predicate).ToList();
-        }
-    }
-
-    public async Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>>? predicate, DataQueryOptions? options, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query:linq+opts");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-
-        // Null predicate path — no WHERE clause, just pagination.
-        if (predicate is null)
-        {
-            var (offN, limN) = ComputeSkipTake(options);
-            await using var connN = Open();
-            var sqlN = $"SELECT [Id], [Json] FROM [dbo].[{TableName}] {OrderByIdClause} OFFSET {offN} ROWS FETCH NEXT {limN} ROWS ONLY";
-            var rowsN = await connN.QueryAsync<(string Id, string Json)>(sqlN);
-            return RepositoryQueryResult<TEntity>.PaginatedOnly(rowsN.Select(FromRow).ToList());
-        }
-
-        var translator = new LinqWhereTranslator<TEntity>(_dialect);
-        try
-        {
-            var (whereSql, parameters) = translator.Translate(predicate);
-            whereSql = RewriteWhereForProjection(whereSql);
-            var (offset, limit) = ComputeSkipTake(options);
-            await using var conn = Open();
-            var sql = $"SELECT [Id], [Json] FROM [dbo].[{TableName}] WHERE {whereSql} {OrderByIdClause} OFFSET {offset} ROWS FETCH NEXT {limit} ROWS ONLY";
-            var dyn = new DynamicParameters();
-            for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
-            var rows = await conn.QueryAsync<(string Id, string Json)>(sql, dyn);
-            var items = rows.Select(FromRow).ToList();
-            return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
-        }
-        catch (NotSupportedException)
-        {
-            var fallback = await Query((Expression<Func<TEntity, bool>>?)null, options, ct);
-            var filtered = fallback.Items.AsQueryable().Where(predicate).ToList();
-            return RepositoryQueryResult<TEntity>.PaginatedOnly(filtered);
-        }
-        catch (Microsoft.Data.SqlClient.SqlException ex) when (ex.Number == 207)
-        {
-            var fallback = await Query((Expression<Func<TEntity, bool>>?)null, options, ct);
-            var filtered = fallback.Items.AsQueryable().Where(predicate).ToList();
-            return RepositoryQueryResult<TEntity>.PaginatedOnly(filtered);
-        }
-    }
-
-    private async Task<CountResult> CountWhere(string whereSql, IReadOnlyList<object?> parameters)
+    private async Task<long> CountCore(string? whereSql, IReadOnlyList<object?> parameters, CancellationToken ct)
     {
         await using var conn = Open();
-        var sql = $"SELECT COUNT(1) FROM [dbo].[{TableName}] WHERE {whereSql}";
+        var sql = whereSql is null
+            ? $"SELECT COUNT(1) FROM [dbo].[{TableName}]"
+            : $"SELECT COUNT(1) FROM [dbo].[{TableName}] WHERE {whereSql}";
+        var dyn = ToDapper(parameters);
+        return await conn.ExecuteScalarAsync<long>(sql, dyn);
+    }
+
+    /// <summary>Translates the (fully-pushable) filter to a WHERE fragment; null filter -> no WHERE.</summary>
+    private (string? whereSql, IReadOnlyList<object?> parameters) BuildWhere(Filter? filter)
+    {
+        if (filter is null) return (null, Array.Empty<object?>());
+        var translator = new SqlFilterTranslator(_dialect, typeof(TEntity), ResolveColumnSql);
+        return translator.Translate(filter);
+    }
+
+    /// <summary>
+    /// Maps a flat property name to its SQL value expression. Scalar fields lower to a projected
+    /// column or <c>JSON_VALUE</c>; collection fields lower to the array node via <c>JSON_QUERY</c>
+    /// (so the dialect's OPENJSON helpers can iterate it). The entity is serialized camelCase into
+    /// <c>[Json]</c>, so JSON paths use the camelCase property name.
+    /// </summary>
+    private string ResolveColumnSql(FieldPath field, ResolvedField resolved)
+    {
+        var prop = field.Leaf;
+        if (string.Equals(prop, "Id", StringComparison.Ordinal)) return "[Id]";
+        if (string.Equals(prop, "Json", StringComparison.Ordinal)) return "[Json]";
+        var camel = CamelCase.GetPropertyName(prop, hasSpecifiedName: false);
+
+        if (resolved is not null && resolved.TargetsCollection)
+            return $"JSON_QUERY([Json], '$.{camel}')";
+
+        var json = $"JSON_VALUE([Json], '$.{camel}')";
+        var projections = ProjectionResolver.Get(typeof(TEntity));
+        var proj = projections.FirstOrDefault(p => string.Equals(p.Property.Name, prop, StringComparison.Ordinal));
+        return proj is not null ? $"COALESCE([{proj.ColumnName}], {json})" : json;
+    }
+
+    /// <summary>Builds an ORDER BY clause from the sort specs; falls back to a stable Id order.</summary>
+    private (string orderBy, IReadOnlySet<SortSpec> sortHandled) BuildOrderBy(IReadOnlyList<SortSpec> sort)
+    {
+        if (sort is null || sort.Count == 0)
+            return (OrderByIdClause, RepositoryQueryResult<TEntity>.NoSortHandled);
+
+        var parts = new List<string>(sort.Count);
+        foreach (var spec in sort)
+        {
+            var leaf = spec.Path.Members[spec.Path.Members.Count - 1].Name;
+            var col = ResolveColumnSql(FieldPath.Of(leaf), default!);
+            parts.Add($"{col} {(spec.Desc ? "DESC" : "ASC")}");
+        }
+        var orderBy = "ORDER BY " + string.Join(", ", parts);
+        return (orderBy, sort.ToFrozenSet());
+    }
+
+    private static DynamicParameters ToDapper(IReadOnlyList<object?> parameters)
+    {
         var dyn = new DynamicParameters();
         for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
-        var count = await conn.ExecuteScalarAsync<long>(sql, dyn);
+        return dyn;
+    }
+
+    // ==================== Raw provider query (IRawQueryRepository) ====================
+
+    public async Task<RepositoryQueryResult<TEntity>> QueryRaw(string query, object? parameters, QueryDefinition shaping, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query:raw");
+        act?.SetTag("entity", typeof(TEntity).FullName);
+        await using var conn = Open();
+        if (IsFullSelect(query))
+        {
+            var rewritten = RewriteEntityToken(query);
+            var rows = await conn.QueryAsync(rewritten, parameters);
+            var items = MapRowsToEntities(rows);
+            return new RepositoryQueryResult<TEntity> { Items = items };
+        }
+        else
+        {
+            var whereSql = RewriteWhereForProjection(query);
+            var size = shaping.HasPagination ? shaping.EffectivePageSize() : _defaultPageSize;
+            var offset = shaping.HasPagination ? (shaping.EffectivePage() - 1) * size : 0;
+            var sql = $"SELECT [Id], [Json] FROM [dbo].[{TableName}] WHERE {whereSql} {OrderByIdClause} OFFSET {offset} ROWS FETCH NEXT {size} ROWS ONLY";
+            var rows = await conn.QueryAsync<(string Id, string Json)>(sql, parameters);
+            return new RepositoryQueryResult<TEntity>
+            {
+                Items = rows.Select(FromRow).ToList(),
+                PaginationHandled = shaping.HasPagination,
+            };
+        }
+    }
+
+    public async Task<CountResult> CountRaw(string query, object? parameters, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        await using var conn = Open();
+        var whereSql = RewriteWhereForProjection(query);
+        var count = await conn.ExecuteScalarAsync<long>($"SELECT COUNT(1) FROM [dbo].[{TableName}] WHERE {whereSql}", parameters);
         return CountResult.Exact(count);
-    }
-
-    public async Task<IReadOnlyList<TEntity>> Query(string sql, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query:string");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        await using var conn = Open();
-        if (IsFullSelect(sql))
-        {
-            var rewritten = RewriteEntityToken(sql);
-            var rows = await conn.QueryAsync(rewritten);
-            return MapRowsToEntities(rows);
-        }
-        else
-        {
-            var whereSql = RewriteWhereForProjection(sql);
-            var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT [Id], [Json] FROM [dbo].[{TableName}] WHERE " + whereSql + $" {OrderByIdClause} OFFSET 0 ROWS FETCH NEXT {_defaultPageSize} ROWS ONLY");
-            return rows.Select(FromRow).ToList();
-        }
-    }
-
-    public async Task<IReadOnlyList<TEntity>> Query(string sql, object? parameters, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query:string:param");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        await using var conn = Open();
-        if (IsFullSelect(sql))
-        {
-            var rewritten = RewriteEntityToken(sql);
-            var rows = await conn.QueryAsync(rewritten, parameters);
-            return MapRowsToEntities(rows);
-        }
-        else
-        {
-            var whereSql = RewriteWhereForProjection(sql);
-            var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT [Id], [Json] FROM [dbo].[{TableName}] WHERE " + whereSql + $" {OrderByIdClause} OFFSET 0 ROWS FETCH NEXT {_defaultPageSize} ROWS ONLY", parameters);
-            return rows.Select(FromRow).ToList();
-        }
-    }
-
-    public async Task<RepositoryQueryResult<TEntity>> Query(string sql, DataQueryOptions? options, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query:string+opts");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        await using var conn = Open();
-        if (IsFullSelect(sql))
-        {
-            var rewritten = RewriteEntityToken(sql);
-            var rows = await conn.QueryAsync(rewritten);
-            var items = MapRowsToEntities(rows);
-            return RepositoryQueryResult<TEntity>.Unhandled(items);
-        }
-        else
-        {
-            var (offset, limit) = ComputeSkipTake(options);
-            var whereSql = RewriteWhereForProjection(sql);
-            var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT [Id], [Json] FROM [dbo].[{TableName}] WHERE " + whereSql + $" {OrderByIdClause} OFFSET {offset} ROWS FETCH NEXT {limit} ROWS ONLY");
-            var items = rows.Select(FromRow).ToList();
-            return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
-        }
-    }
-
-    public async Task<RepositoryQueryResult<TEntity>> Query(string sql, object? parameters, DataQueryOptions? options, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query:string:param+opts");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        await using var conn = Open();
-        if (IsFullSelect(sql))
-        {
-            var rewritten = RewriteEntityToken(sql);
-            var rows = await conn.QueryAsync(rewritten, parameters);
-            var items = MapRowsToEntities(rows);
-            return RepositoryQueryResult<TEntity>.Unhandled(items);
-        }
-        else
-        {
-            var (offset, limit) = ComputeSkipTake(options);
-            var whereSql = RewriteWhereForProjection(sql);
-            var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT [Id], [Json] FROM [dbo].[{TableName}] WHERE " + whereSql + $" {OrderByIdClause} OFFSET {offset} ROWS FETCH NEXT {limit} ROWS ONLY", parameters);
-            var items = rows.Select(FromRow).ToList();
-            return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
-        }
     }
 
 
@@ -640,8 +595,7 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         }
 
         // Safe path: DELETE (fires hooks if registered)
-        var countRequest = new CountRequest<TEntity>();
-        var countResult = await Count(countRequest, ct);
+        var countResult = await Count(QueryDefinition.All, ct);
         await conn.ExecuteAsync($"DELETE FROM [dbo].[{TableName}]", ct);
         return countResult.Value;
     }
@@ -712,6 +666,14 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         public string EscapeLike(string fragment)
             => fragment.Replace("[", "[[").Replace("%", "[%]").Replace("_", "[_]");
         public string Parameter(int index) => $"@p{index}";
+
+        // List<string> is stored as a JSON array inside [Json]. columnSql is a JSON_QUERY(...) array node;
+        // OPENJSON iterates its elements (value column).
+        public string JsonArrayContains(string columnSql, string parameter)
+            => $"EXISTS (SELECT 1 FROM OPENJSON({columnSql}) WHERE value = {parameter})";
+
+        public string JsonArrayLength(string columnSql)
+            => $"(SELECT COUNT(*) FROM OPENJSON({columnSql}))";
     }
 
     public async Task<TResult> ExecuteAsync<TResult>(Instruction instruction, CancellationToken ct = default)
@@ -855,25 +817,6 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         if (string.IsNullOrWhiteSpace(sql)) return false;
         var s = sql.TrimStart();
         return s.StartsWith("select ", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private (int offset, int limit) ComputeSkipTake(DataQueryOptions? options)
-    {
-        // Check if pagination is active
-        var hasPagination = options?.HasPagination ?? false;
-
-        if (!hasPagination)
-        {
-            // No pagination - return full result set without applying default page size
-            return (0, int.MaxValue);
-        }
-
-        // Pagination is active - apply default fallback only. Per ADR no adapter-side cap.
-        var page = options?.Page is int p && p > 0 ? p : 1;
-        var sizeReq = options?.PageSize;
-        var size = sizeReq is int ps && ps > 0 ? ps : _defaultPageSize;
-        var offset = (page - 1) * size;
-        return (offset, size);
     }
 
     private string RewriteEntityToken(string sql)

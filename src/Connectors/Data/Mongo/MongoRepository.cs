@@ -7,8 +7,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Koan.Core.Adapters;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
+using Koan.Data.Abstractions.Sorting;
 using Koan.Data.Core;
 using Koan.Data.Core.Configuration;
 using Koan.Data.Core.Extensions;
@@ -18,13 +20,13 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using System.Collections.Frozen;
 
 namespace Koan.Data.Connector.Mongo;
 
 internal sealed class MongoRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
-    ILinqQueryRepository<TEntity, TKey>,
-    ILinqQueryRepositoryWithOptions<TEntity, TKey>,
+    IQueryRepository<TEntity, TKey>,
     IQueryCapabilities,
     IWriteCapabilities,
     IBulkUpsert<TKey>,
@@ -65,6 +67,11 @@ internal sealed class MongoRepository<TEntity, TKey> :
     public QueryCapabilities Capabilities => QueryCapabilities.Linq;
     public WriteCapabilities Writes => WriteCapabilities.BulkUpsert | WriteCapabilities.BulkDelete | WriteCapabilities.AtomicBatch | WriteCapabilities.FastRemove;
     public StorageOptimizationInfo OptimizationInfo => _optimizationInfo;
+
+    /// <summary>Operators Mongo translates server-side; the coordinator routes the rest to the in-memory floor.</summary>
+    public FilterCapabilities FilterCapabilities => MongoFilterTranslator<TEntity>.Capabilities;
+
+    private MongoFilterTranslator<TEntity> Translator => new(MapFieldName);
 
     public AdapterReadinessState ReadinessState => _provider.ReadinessState;
     public bool IsReady => _provider.IsReady;
@@ -330,42 +337,48 @@ internal sealed class MongoRepository<TEntity, TKey> :
             return (IReadOnlyList<TEntity?>)results;
         }, ct);
 
-    public async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-    {
-        var result = await Query(predicate, (DataQueryOptions?)null, ct).ConfigureAwait(false);
-        return result.Items;
-    }
+    // ==================== Unified Query (IQueryRepository) ====================
 
-    public Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>>? predicate, DataQueryOptions? options, CancellationToken ct = default)
+    public Task<RepositoryQueryResult<TEntity>> Query(QueryDefinition query, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
         {
             ct.ThrowIfCancellationRequested();
-            using var activity = MongoTelemetry.Activity.StartActivity("mongo.query.linq");
+            using var activity = MongoTelemetry.Activity.StartActivity("mongo.query");
             activity?.SetTag("entity", typeof(TEntity).FullName);
-            var defaultPageSize = _options.CurrentValue.GetDefaultPageSize();
             var collection = await GetCollection(ct).ConfigureAwait(false);
 
-            var cursor = predicate is null
-                ? collection.Find(Builders<TEntity>.Filter.Empty)
-                : FindWithPredicate(collection, predicate);
+            // Filter is guaranteed pushable per FilterCapabilities (the coordinator already split it).
+            var filter = BuildFilter(query.Filter);
+
+            // Sort pushdown: translate every spec; report exactly what we pushed.
+            var (sortDef, sortHandled) = BuildSort(query.Sort);
+
+            // Total count (cheap server-side) so the coordinator need not recount when there is no residual.
+            var totalCount = await collection.CountDocumentsAsync(filter, cancellationToken: ct).ConfigureAwait(false);
+
+            var cursor = collection.Find(filter);
+            if (sortDef is not null) cursor = cursor.Sort(sortDef);
+
             var paginationHandled = false;
-            if (options is { HasPagination: true })
+            if (query.HasPagination)
             {
-                cursor = cursor.ApplyPaging(options, defaultPageSize,
-                    (c, skip, take) => c.Skip(skip).Limit(take));
+                var skip = (query.EffectivePage() - 1) * query.EffectivePageSize();
+                cursor = cursor.Skip(skip).Limit(query.EffectivePageSize());
                 paginationHandled = true;
             }
 
             var results = await cursor.ToListAsync(ct).ConfigureAwait(false);
             return new RepositoryQueryResult<TEntity>
             {
-                Items = (IReadOnlyList<TEntity>)results,
+                Items = results,
+                TotalCount = totalCount,
+                IsEstimate = false,
+                SortHandled = sortHandled,
                 PaginationHandled = paginationHandled,
-                SortHandled = RepositoryQueryResult<TEntity>.NoSortHandled,
             };
         }, ct);
 
-    public Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
+    public Task<CountResult> Count(QueryDefinition query, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
         {
             ct.ThrowIfCancellationRequested();
@@ -373,38 +386,39 @@ internal sealed class MongoRepository<TEntity, TKey> :
             activity?.SetTag("entity", typeof(TEntity).FullName);
             var collection = await GetCollection(ct).ConfigureAwait(false);
 
-            if (request.Strategy == CountStrategy.Fast && request.Predicate is null && request.RawQuery is null && request.ProviderQuery is null)
+            // Fast strategy on an unfiltered count uses Mongo's metadata estimate.
+            if (query.CountStrategy == CountStrategy.Fast && query.Filter is null)
             {
                 var estimate = await collection.EstimatedDocumentCountAsync(cancellationToken: ct).ConfigureAwait(false);
                 return CountResult.Estimate((long)estimate);
             }
 
-            if (request.Predicate is not null)
-            {
-                if (TryBuildGuidFilter(request.Predicate, out var optimizedFilter))
-                {
-                    var optimizedCount = await collection.CountDocumentsAsync(optimizedFilter, cancellationToken: ct).ConfigureAwait(false);
-                    return CountResult.Exact((long)optimizedCount);
-                }
-
-                var count = await collection.CountDocumentsAsync(request.Predicate, cancellationToken: ct).ConfigureAwait(false);
-                return CountResult.Exact((long)count);
-            }
-
-            if (request.ProviderQuery is FilterDefinition<TEntity> filter)
-            {
-                var count = await collection.CountDocumentsAsync(filter, cancellationToken: ct).ConfigureAwait(false);
-                return CountResult.Exact((long)count);
-            }
-
-            if (request.RawQuery is not null)
-            {
-                throw new NotSupportedException("Mongo adapter does not support string-based count queries. Use LINQ or provider filters.");
-            }
-
-            var total = await collection.CountDocumentsAsync(Builders<TEntity>.Filter.Empty, cancellationToken: ct).ConfigureAwait(false);
-            return CountResult.Exact((long)total);
+            var filter = BuildFilter(query.Filter);
+            var count = await collection.CountDocumentsAsync(filter, cancellationToken: ct).ConfigureAwait(false);
+            return CountResult.Exact((long)count);
         }, ct);
+
+    /// <summary>Translate the (already-pushable) filter; null filter is match-all.</summary>
+    private FilterDefinition<TEntity> BuildFilter(Filter? filter)
+        => filter is null ? Builders<TEntity>.Filter.Empty : Translator.Translate(filter, typeof(TEntity));
+
+    /// <summary>Translate sort specs into a Mongo sort definition, reporting which specs were pushed.</summary>
+    private (SortDefinition<TEntity>? Def, IReadOnlySet<SortSpec> Handled) BuildSort(IReadOnlyList<SortSpec> specs)
+    {
+        if (specs.Count == 0) return (null, RepositoryQueryResult<TEntity>.NoSortHandled);
+
+        var keys = Builders<TEntity>.Sort;
+        SortDefinition<TEntity>? def = null;
+        foreach (var spec in specs)
+        {
+            // Sort traverses the same field-name mapping as filters (camelCase + _id carve-out).
+            var name = string.Join('.', spec.Path.Members.Select((m, i)
+                => i == 0 ? MapFieldName(m.Name) : ToCamelCase(m.Name)));
+            var part = spec.Desc ? keys.Descending(name) : keys.Ascending(name);
+            def = def is null ? part : keys.Combine(def, part);
+        }
+        return (def, specs.ToFrozenSet());
+    }
 
     public Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
@@ -578,121 +592,6 @@ internal sealed class MongoRepository<TEntity, TKey> :
             }
 
             throw new InvalidOperationException("Unable to obtain Mongo database from collection.");
-        }
-    }
-
-    private IFindFluent<TEntity, TEntity> FindWithPredicate(IMongoCollection<TEntity> collection, Expression<Func<TEntity, bool>> predicate)
-    {
-        if (TryBuildGuidFilter(predicate, out var optimizedFilter))
-        {
-            return collection.Find(optimizedFilter);
-        }
-
-        return collection.Find(predicate);
-    }
-
-    private bool TryBuildGuidFilter(Expression<Func<TEntity, bool>> predicate, out FilterDefinition<TEntity> filter)
-    {
-        filter = Builders<TEntity>.Filter.Empty;
-        if (predicate is null || predicate.Parameters.Count == 0)
-        {
-            return false;
-        }
-
-        return TryBuildGuidFilter(predicate.Parameters[0], predicate.Body, out filter);
-    }
-
-    private bool TryBuildGuidFilter(ParameterExpression parameter, Expression expression, out FilterDefinition<TEntity> filter)
-    {
-        filter = Builders<TEntity>.Filter.Empty;
-        expression = StripConvert(expression);
-
-        if (expression is BinaryExpression binary)
-        {
-            switch (binary.NodeType)
-            {
-                case ExpressionType.Equal:
-                    if (TryExtractComparison(parameter, binary.Left, binary.Right, out var fieldName, out var value) ||
-                        TryExtractComparison(parameter, binary.Right, binary.Left, out fieldName, out value))
-                    {
-                        if (value is string str && Guid.TryParse(str, out var guid))
-                        {
-                            var elementName = MapFieldName(fieldName);
-                            filter = Builders<TEntity>.Filter.Eq(elementName, new BsonBinaryData(guid, GuidRepresentation.Standard));
-                            return true;
-                        }
-                    }
-                    break;
-                case ExpressionType.AndAlso:
-                    if (TryBuildGuidFilter(parameter, binary.Left, out var left) && TryBuildGuidFilter(parameter, binary.Right, out var right))
-                    {
-                        filter = Builders<TEntity>.Filter.And(left, right);
-                        return true;
-                    }
-                    break;
-                case ExpressionType.OrElse:
-                    if (TryBuildGuidFilter(parameter, binary.Left, out var leftOr) && TryBuildGuidFilter(parameter, binary.Right, out var rightOr))
-                    {
-                        filter = Builders<TEntity>.Filter.Or(leftOr, rightOr);
-                        return true;
-                    }
-                    break;
-            }
-        }
-
-        return false;
-    }
-
-    private bool TryExtractComparison(ParameterExpression parameter, Expression fieldExpression, Expression valueExpression, out string fieldName, out object? value)
-    {
-        fieldName = "";
-        value = null;
-
-        var candidate = StripConvert(fieldExpression) as MemberExpression;
-        if (candidate is null)
-        {
-            return false;
-        }
-
-        if (candidate.Expression is null)
-        {
-            return false;
-        }
-
-        var owner = StripConvert(candidate.Expression);
-        if (owner != parameter)
-        {
-            return false;
-        }
-
-        fieldName = candidate.Member.Name;
-        return TryEvaluateExpression(valueExpression, out value);
-    }
-
-    private static Expression StripConvert(Expression expression)
-    {
-        while (expression.NodeType is ExpressionType.Convert or ExpressionType.ConvertChecked)
-        {
-            expression = ((UnaryExpression)expression).Operand;
-        }
-
-        return expression;
-    }
-
-    private bool TryEvaluateExpression(Expression expression, out object? value)
-    {
-        expression = StripConvert(expression);
-
-        try
-        {
-            var lambda = Expression.Lambda(expression);
-            value = lambda.Compile().DynamicInvoke();
-            return true;
-        }
-        catch
-        {
-            value = null;
-            return false;
         }
     }
 

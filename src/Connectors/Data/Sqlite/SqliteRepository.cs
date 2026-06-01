@@ -10,15 +10,17 @@ using Koan.Core.Infrastructure;
 using Koan.Core.Logging;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Annotations;
+using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
+using Koan.Data.Abstractions.Sorting;
 using Koan.Data.Core;
 using Koan.Data.Core.Optimization;
 using Koan.Data.Relational.Linq;
 using Koan.Data.Relational.Orchestration;
 using System.Collections.Concurrent;
+using System.Collections.Frozen;
 using System.Data;
-using System.Linq.Expressions;
 using System.Diagnostics.CodeAnalysis;
 using Newtonsoft.Json;
 
@@ -27,10 +29,8 @@ namespace Koan.Data.Connector.Sqlite;
 internal sealed class SqliteRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
     IOptimizedDataRepository<TEntity, TKey>,
-    ILinqQueryRepository<TEntity, TKey>,
-    IStringQueryRepository<TEntity, TKey>,
-    ILinqQueryRepositoryWithOptions<TEntity, TKey>,
-    IStringQueryRepositoryWithOptions<TEntity, TKey>,
+    IQueryRepository<TEntity, TKey>,
+    IRawQueryRepository<TEntity, TKey>,
     IQueryCapabilities,
     IWriteCapabilities,
     IBulkUpsert<TKey>,
@@ -40,6 +40,9 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     where TKey : notnull
 {
     public QueryCapabilities Capabilities => QueryCapabilities.Linq | QueryCapabilities.String;
+
+    /// <summary>Operators the SQLite adapter pushes down (DATA-XXXX). Everything else falls to the in-memory floor.</summary>
+    public FilterCapabilities FilterCapabilities => RelationalFilterCapabilities.Default;
     public WriteCapabilities Writes => WriteCapabilities.BulkUpsert | WriteCapabilities.BulkDelete | WriteCapabilities.AtomicBatch | WriteCapabilities.FastRemove;
 
     private readonly IServiceProvider _sp;
@@ -452,310 +455,227 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     }
 
 
-    public async Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
+    // ==================== Unified Query (DATA-XXXX) ====================
+
+    public async Task<RepositoryQueryResult<TEntity>> Query(QueryDefinition query, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query");
+        act?.SetTag("entity", typeof(TEntity).FullName);
+
+        var (whereSql, parameters) = BuildWhere(query.Filter);
+        var (orderBy, sortHandled) = BuildOrderBy(query.Sort);
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append("SELECT Id, Json FROM [").Append(TableName).Append(']');
+        if (whereSql is not null) sb.Append(" WHERE ").Append(whereSql);
+        sb.Append(' ').Append(orderBy);
+
+        var paginationHandled = false;
+        if (query.HasPagination)
+        {
+            var size = query.EffectivePageSize();
+            var offset = (query.EffectivePage() - 1) * size;
+            sb.Append(" LIMIT ").Append(size).Append(" OFFSET ").Append(offset);
+            paginationHandled = true;
+        }
+
+        var dyn = ToDapper(parameters);
+        var items = await ExecuteRows(sb.ToString(), dyn, ct);
+
+        long? totalCount = null;
+        if (paginationHandled)
+            totalCount = await CountCore(whereSql, parameters, ct);
+        else
+            totalCount = items.Count;
+
+        return new RepositoryQueryResult<TEntity>
+        {
+            Items = items,
+            TotalCount = totalCount,
+            IsEstimate = false,
+            SortHandled = sortHandled,
+            PaginationHandled = paginationHandled,
+        };
+    }
+
+    public async Task<CountResult> Count(QueryDefinition query, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = SqliteTelemetry.Activity.StartActivity("sqlite.count");
         act?.SetTag("entity", typeof(TEntity).FullName);
-        using var conn = Open();
-
-        // SQLite doesn't have metadata-based fast count, so always use exact count
-        // Handle predicate-based counts
-        if (request.Predicate is not null)
-        {
-            var translator = new LinqWhereTranslator<TEntity>(_dialect);
-            try
-            {
-                var (whereSql, parameters) = translator.Translate(request.Predicate);
-                whereSql = RewriteWhereForProjection(whereSql);
-                var sql = $"SELECT COUNT(1) FROM [{TableName}] WHERE {whereSql}";
-                var dyn = new DynamicParameters();
-                for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
-                var count = await conn.ExecuteScalarAsync<long>(sql, dyn);
-                return CountResult.Exact(count);
-            }
-            catch (NotSupportedException)
-            {
-                // Fallback to materialize + count
-                var all = await Query((Expression<Func<TEntity, bool>>?)null, options: null, ct);
-                var count = (long)all.Items.AsQueryable().Count(request.Predicate);
-                return CountResult.Exact(count);
-            }
-        }
-
-        // Handle raw query-based counts
-        if (request.RawQuery is not null)
-        {
-            var whereSql = RewriteWhereForProjection(request.RawQuery);
-            try
-            {
-                var count = await conn.ExecuteScalarAsync<long>($"SELECT COUNT(1) FROM [{TableName}] WHERE " + whereSql);
-                return CountResult.Exact(count);
-            }
-            catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
-            {
-                Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
-                var sqliteConn = (SqliteConnection)conn;
-                InvalidateHealth(sqliteConn, TableName);
-                EnsureOrchestrated(sqliteConn);
-                var count = await conn.ExecuteScalarAsync<long>($"SELECT COUNT(1) FROM [{TableName}] WHERE " + whereSql);
-                return CountResult.Exact(count);
-            }
-        }
-
-        // No predicate - full table count
-        var totalCount = await conn.ExecuteScalarAsync<long>($"SELECT COUNT(1) FROM [{TableName}]");
-        return CountResult.Exact(totalCount);
+        var (whereSql, parameters) = BuildWhere(query.Filter);
+        var count = await CountCore(whereSql, parameters, ct);
+        return CountResult.Exact(count);
     }
 
-    public async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
+    private async Task<long> CountCore(string? whereSql, IReadOnlyList<object?> parameters, CancellationToken ct)
     {
-        // Translate predicate to SQL WHERE via relational LINQ translator
-        ct.ThrowIfCancellationRequested();
-        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:linq");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        var translator = new LinqWhereTranslator<TEntity>(_dialect);
+        using var conn = Open();
+        var sql = whereSql is null
+            ? $"SELECT COUNT(1) FROM [{TableName}]"
+            : $"SELECT COUNT(1) FROM [{TableName}] WHERE {whereSql}";
+        var dyn = ToDapper(parameters);
         try
         {
-            var (whereSql, parameters) = translator.Translate(predicate);
-            // Replace property references with projected column or JSON extraction when needed
-            whereSql = RewriteWhereForProjection(whereSql);
-            using var conn = Open();
-            // DATA-0061: no-options should return full set for predicate
-            var sql = $"SELECT Id, Json FROM [{TableName}] WHERE {whereSql} ORDER BY Id";
-            var dyn = new DynamicParameters();
-            for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
-            try
-            {
-                var rows = await conn.QueryAsync<(string Id, string Json)>(sql, dyn);
-                return rows.Select(FromRow).ToList();
-            }
-            catch (SqliteException ex) when ((ex.SqliteErrorCode == 1) && ex.Message.Contains("no such column", StringComparison.OrdinalIgnoreCase))
-            {
-                throw; // columns should be provided via projection or JSON1 rewrite
-            }
+            return await conn.ExecuteScalarAsync<long>(sql, dyn);
         }
-        catch (NotSupportedException)
+        catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
         {
-            // Safe fallback: in-memory filtering for unsupported shapes
-            var all = await Query((Expression<Func<TEntity, bool>>?)null, options: null, ct);
-            return all.Items.AsQueryable().Where(predicate).ToList();
+            Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
+            var sqliteConn = (SqliteConnection)conn;
+            InvalidateHealth(sqliteConn, TableName);
+            EnsureOrchestrated(sqliteConn);
+            return await conn.ExecuteScalarAsync<long>(sql, dyn);
         }
     }
 
-    public async Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>>? predicate, DataQueryOptions? options, CancellationToken ct = default)
+    private async Task<IReadOnlyList<TEntity>> ExecuteRows(string sql, DynamicParameters dyn, CancellationToken ct)
     {
-        ct.ThrowIfCancellationRequested();
-        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:linq+opts");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-
-        // Null predicate is "give me everything (subject to options)".
-        if (predicate is null)
-        {
-            var (offset0, limit0) = ComputeSkipTake(options);
-            using var conn0 = Open();
-            var sql0 = $"SELECT Id, Json FROM [{TableName}] LIMIT {limit0} OFFSET {offset0}";
-            var rows0 = await conn0.QueryAsync<(string Id, string Json)>(sql0);
-            return RepositoryQueryResult<TEntity>.PaginatedOnly(rows0.Select(FromRow).ToList());
-        }
-
-        var translator = new LinqWhereTranslator<TEntity>(_dialect);
+        using var conn = Open();
         try
         {
-            var (whereSql, parameters) = translator.Translate(predicate);
-            whereSql = RewriteWhereForProjection(whereSql);
-            var (offset, limit) = ComputeSkipTake(options);
-            using var conn = Open();
-            var sql = $"SELECT Id, Json FROM [{TableName}] WHERE {whereSql} LIMIT {limit} OFFSET {offset}";
-            var dyn = new DynamicParameters();
-            for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
-            try
-            {
-                var rows = await conn.QueryAsync<(string Id, string Json)>(sql, dyn);
-                var items = rows.Select(FromRow).ToList();
-                return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
-            }
-            catch (SqliteException ex) when ((ex.SqliteErrorCode == 1) && ex.Message.Contains("no such column", StringComparison.OrdinalIgnoreCase))
-            {
-                throw;
-            }
+            var rows = await conn.QueryAsync<(string Id, string Json)>(sql, dyn);
+            return rows.Select(FromRow).ToList();
         }
-        catch (NotSupportedException)
+        catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
         {
-            var fallback = await Query((Expression<Func<TEntity, bool>>?)null, options, ct);
-            var filtered = fallback.Items.AsQueryable().Where(predicate).ToList();
-            return RepositoryQueryResult<TEntity>.PaginatedOnly(filtered);
+            Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
+            var sqliteConn = (SqliteConnection)conn;
+            InvalidateHealth(sqliteConn, TableName);
+            EnsureOrchestrated(sqliteConn);
+            var rows = await conn.QueryAsync<(string Id, string Json)>(sql, dyn);
+            return rows.Select(FromRow).ToList();
         }
     }
 
-
-    public async Task<IReadOnlyList<TEntity>> Query(string sql, CancellationToken ct = default)
+    /// <summary>Translates the (fully-pushable) filter to a WHERE fragment; null filter -> no WHERE.</summary>
+    private (string? whereSql, IReadOnlyList<object?> parameters) BuildWhere(Filter? filter)
     {
-        ct.ThrowIfCancellationRequested();
-        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:string");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        using var conn = Open();
-        if (IsFullSelect(sql))
-        {
-            var rewritten = RewriteEntityToken(sql);
-            rewritten = RewriteSelectForProjection(rewritten);
-            try
-            {
-                // Also rewrite WHERE predicates inside full SELECT for projection correctness
-                rewritten = RewriteWhereInFullSelect(rewritten);
-                var rows = await conn.QueryAsync(rewritten);
-                return MapRowsToEntities(rows);
-            }
-            catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
-            {
-                Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
-                var sqliteConn = (SqliteConnection)conn;
-                InvalidateHealth(sqliteConn, TableName);
-                EnsureOrchestrated(sqliteConn);
-                var rows = await conn.QueryAsync(rewritten);
-                return MapRowsToEntities(rows);
-            }
-        }
-        else
-        {
-            var whereSql = RewriteWhereForProjection(sql);
-            try
-            {
-                var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT Id, Json FROM [{TableName}] WHERE " + whereSql + $" LIMIT {_defaultPageSize}");
-                return rows.Select(FromRow).ToList();
-            }
-            catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
-            {
-                Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
-                var sqliteConn = (SqliteConnection)conn;
-                InvalidateHealth(sqliteConn, TableName);
-                EnsureOrchestrated(sqliteConn);
-                var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT Id, Json FROM [{TableName}] WHERE " + whereSql + $" LIMIT {_defaultPageSize}");
-                return rows.Select(FromRow).ToList();
-            }
-        }
+        if (filter is null) return (null, Array.Empty<object?>());
+        var translator = new SqlFilterTranslator(_dialect, typeof(TEntity), ResolveColumnSql);
+        return translator.Translate(filter);
     }
 
-    public async Task<IReadOnlyList<TEntity>> Query(string sql, object? parameters, CancellationToken ct = default)
+    /// <summary>Maps a flat property name to its SQL value expression (projected column or json_extract).</summary>
+    private string ResolveColumnSql(FieldPath field, ResolvedField resolved)
     {
-        ct.ThrowIfCancellationRequested();
-        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:string:param");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        using var conn = Open();
-        if (IsFullSelect(sql))
-        {
-            var rewritten = RewriteEntityToken(sql);
-            rewritten = RewriteSelectForProjection(rewritten);
-            try
-            {
-                // Also rewrite WHERE predicates inside full SELECT for projection correctness
-                rewritten = RewriteWhereInFullSelect(rewritten);
-                var rows = await conn.QueryAsync(rewritten, parameters);
-                return MapRowsToEntities(rows);
-            }
-            catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
-            {
-                Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
-                var sqliteConn = (SqliteConnection)conn;
-                InvalidateHealth(sqliteConn, TableName);
-                EnsureOrchestrated(sqliteConn);
-                var rows = await conn.QueryAsync(rewritten, parameters);
-                return MapRowsToEntities(rows);
-            }
-        }
-        else
-        {
-            var whereSql = RewriteWhereForProjection(sql);
-            try
-            {
-                var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT Id, Json FROM [{TableName}] WHERE " + whereSql + $" LIMIT {_defaultPageSize}", parameters);
-                return rows.Select(FromRow).ToList();
-            }
-            catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
-            {
-                Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
-                var sqliteConn = (SqliteConnection)conn;
-                InvalidateHealth(sqliteConn, TableName);
-                EnsureOrchestrated(sqliteConn);
-                var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT Id, Json FROM [{TableName}] WHERE " + whereSql + $" LIMIT {_defaultPageSize}", parameters);
-                return rows.Select(FromRow).ToList();
-            }
-        }
+        var prop = field.Leaf;
+        if (string.Equals(prop, "Id", StringComparison.Ordinal)) return "[Id]";
+        if (string.Equals(prop, "Json", StringComparison.Ordinal)) return "[Json]";
+        var projections = ProjectionResolver.Get(typeof(TEntity));
+        var proj = projections.FirstOrDefault(p => string.Equals(p.Property.Name, prop, StringComparison.Ordinal));
+        var json = $"json_extract(Json, '$.{prop}')";
+        return proj is not null ? $"COALESCE([{proj.ColumnName}], {json})" : json;
     }
 
-    public async Task<RepositoryQueryResult<TEntity>> Query(string sql, DataQueryOptions? options, CancellationToken ct = default)
+    /// <summary>Builds an ORDER BY clause from the sort specs; falls back to a stable Id order.</summary>
+    private (string orderBy, IReadOnlySet<SortSpec> sortHandled) BuildOrderBy(IReadOnlyList<SortSpec> sort)
+    {
+        if (sort is null || sort.Count == 0)
+            return ("ORDER BY Id", RepositoryQueryResult<TEntity>.NoSortHandled);
+
+        var parts = new List<string>(sort.Count);
+        foreach (var spec in sort)
+        {
+            var leaf = spec.Path.Members[spec.Path.Members.Count - 1].Name;
+            var col = ResolveColumnSql(FieldPath.Of(leaf), default!);
+            parts.Add($"{col} {(spec.Desc ? "DESC" : "ASC")}");
+        }
+        var orderBy = "ORDER BY " + string.Join(", ", parts);
+        return (orderBy, sort.ToFrozenSet());
+    }
+
+    private static DynamicParameters ToDapper(IReadOnlyList<object?> parameters)
+    {
+        var dyn = new DynamicParameters();
+        for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
+        return dyn;
+    }
+
+    // ==================== Raw provider query (IRawQueryRepository) ====================
+
+    public async Task<RepositoryQueryResult<TEntity>> QueryRaw(string query, object? parameters, QueryDefinition shaping, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:string+opts");
+        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:raw");
         act?.SetTag("entity", typeof(TEntity).FullName);
         using var conn = Open();
-        if (IsFullSelect(sql))
+        if (IsFullSelect(query))
         {
-            var rewritten = RewriteEntityToken(sql);
+            var rewritten = RewriteEntityToken(query);
             rewritten = RewriteSelectForProjection(rewritten);
             rewritten = RewriteWhereInFullSelect(rewritten);
-            var rows = await conn.QueryAsync(rewritten);
+            var rows = await QueryDynamicWithRetry(conn, rewritten, parameters);
             var items = MapRowsToEntities(rows);
-            return RepositoryQueryResult<TEntity>.Unhandled(items);
+            return new RepositoryQueryResult<TEntity> { Items = items };
         }
         else
         {
-            var (offset, limit) = ComputeSkipTake(options);
-            var whereSql = RewriteWhereForProjection(sql);
-            try
+            var whereSql = RewriteWhereForProjection(query);
+            var size = shaping.HasPagination ? shaping.EffectivePageSize() : _defaultPageSize;
+            var offset = shaping.HasPagination ? (shaping.EffectivePage() - 1) * size : 0;
+            var sql = $"SELECT Id, Json FROM [{TableName}] WHERE {whereSql} LIMIT {size} OFFSET {offset}";
+            var items = await QueryRowsWithRetry(conn, sql, parameters);
+            return new RepositoryQueryResult<TEntity>
             {
-                var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT Id, Json FROM [{TableName}] WHERE " + whereSql + $" LIMIT {limit} OFFSET {offset}");
-                var items = rows.Select(FromRow).ToList();
-                return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
-            }
-            catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
-            {
-                Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
-                var sqliteConn = (SqliteConnection)conn;
-                InvalidateHealth(sqliteConn, TableName);
-                EnsureOrchestrated(sqliteConn);
-                var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT Id, Json FROM [{TableName}] WHERE " + whereSql + $" LIMIT {limit} OFFSET {offset}");
-                var items = rows.Select(FromRow).ToList();
-                return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
-            }
+                Items = items,
+                PaginationHandled = shaping.HasPagination,
+            };
         }
     }
 
-    public async Task<RepositoryQueryResult<TEntity>> Query(string sql, object? parameters, DataQueryOptions? options, CancellationToken ct = default)
+    public async Task<CountResult> CountRaw(string query, object? parameters, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:string:param+opts");
-        act?.SetTag("entity", typeof(TEntity).FullName);
         using var conn = Open();
-        if (IsFullSelect(sql))
+        var whereSql = RewriteWhereForProjection(query);
+        var sql = $"SELECT COUNT(1) FROM [{TableName}] WHERE {whereSql}";
+        try
         {
-            var rewritten = RewriteEntityToken(sql);
-            rewritten = RewriteSelectForProjection(rewritten);
-            rewritten = RewriteWhereInFullSelect(rewritten);
-            var rows = await conn.QueryAsync(rewritten, parameters);
-            var items = MapRowsToEntities(rows);
-            return RepositoryQueryResult<TEntity>.Unhandled(items);
+            return CountResult.Exact(await conn.ExecuteScalarAsync<long>(sql, parameters));
         }
-        else
+        catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
         {
-            var (offset, limit) = ComputeSkipTake(options);
-            var whereSql = RewriteWhereForProjection(sql);
-            try
-            {
-                var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT Id, Json FROM [{TableName}] WHERE " + whereSql + $" LIMIT {limit} OFFSET {offset}", parameters);
-                var items = rows.Select(FromRow).ToList();
-                return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
-            }
-            catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
-            {
-                Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
-                var sqliteConn = (SqliteConnection)conn;
-                InvalidateHealth(sqliteConn, TableName);
-                EnsureOrchestrated(sqliteConn);
-                var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT Id, Json FROM [{TableName}] WHERE " + whereSql + $" LIMIT {limit} OFFSET {offset}", parameters);
-                var items = rows.Select(FromRow).ToList();
-                return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
-            }
+            Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
+            var sqliteConn = (SqliteConnection)conn;
+            InvalidateHealth(sqliteConn, TableName);
+            EnsureOrchestrated(sqliteConn);
+            return CountResult.Exact(await conn.ExecuteScalarAsync<long>(sql, parameters));
+        }
+    }
+
+    private async Task<IReadOnlyList<TEntity>> QueryRowsWithRetry(IDbConnection conn, string sql, object? parameters)
+    {
+        try
+        {
+            var rows = await conn.QueryAsync<(string Id, string Json)>(sql, parameters);
+            return rows.Select(FromRow).ToList();
+        }
+        catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
+        {
+            Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
+            var sqliteConn = (SqliteConnection)conn;
+            InvalidateHealth(sqliteConn, TableName);
+            EnsureOrchestrated(sqliteConn);
+            var rows = await conn.QueryAsync<(string Id, string Json)>(sql, parameters);
+            return rows.Select(FromRow).ToList();
+        }
+    }
+
+    private async Task<IEnumerable<dynamic>> QueryDynamicWithRetry(IDbConnection conn, string sql, object? parameters)
+    {
+        try
+        {
+            return await conn.QueryAsync(sql, parameters);
+        }
+        catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
+        {
+            Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
+            var sqliteConn = (SqliteConnection)conn;
+            InvalidateHealth(sqliteConn, TableName);
+            EnsureOrchestrated(sqliteConn);
+            return await conn.QueryAsync(sql, parameters);
         }
     }
 
@@ -825,8 +745,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             : strategy;
 
         // SQLite has no TRUNCATE - both strategies use DELETE
-        var countRequest = new CountRequest<TEntity>();
-        var countResult = await Count(countRequest, ct);
+        var countResult = await Count(QueryDefinition.All, ct);
         await conn.ExecuteAsync($"DELETE FROM [{TableName}]", ct);
 
         if (effectiveStrategy == RemoveStrategy.Fast)
@@ -888,13 +807,20 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         }
     }
 
-    // Minimal SQLite dialect for LINQ translation
+    // Minimal SQLite dialect for the relational filter translator
     private sealed class SqliteDialect : ILinqSqlDialect
     {
         public string QuoteIdent(string ident) => $"[{ident}]";
         public string EscapeLike(string fragment)
             => fragment.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
         public string Parameter(int index) => $"@p{index}";
+
+        // List<string> is stored as a JSON array inside the Json column. json_each iterates it.
+        public string JsonArrayContains(string columnSql, string parameter)
+            => $"EXISTS (SELECT 1 FROM json_each({columnSql}) WHERE value = {parameter})";
+
+        public string JsonArrayLength(string columnSql)
+            => $"json_array_length({columnSql})";
     }
 
     // IInstructionExecutor implementation for schema and raw SQL helpers
@@ -1423,25 +1349,6 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                 _connection = null;
             }
         }
-    }
-
-    private (int offset, int limit) ComputeSkipTake(DataQueryOptions? options)
-    {
-        // Check if pagination is active
-        var hasPagination = options?.HasPagination ?? false;
-
-        if (!hasPagination)
-        {
-            // No pagination - return full result set without applying default page size
-            return (0, int.MaxValue);
-        }
-
-        // Pagination is active - apply default fallback only. Per ADR no adapter-side cap.
-        var page = options?.Page is int p && p > 0 ? p : 1;
-        var sizeReq = options?.PageSize;
-        var size = sizeReq is int ps && ps > 0 ? ps : _defaultPageSize;
-        var offset = (page - 1) * size;
-        return (offset, size);
     }
 
     private string RewriteEntityToken(string sql)

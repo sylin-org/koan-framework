@@ -1,8 +1,8 @@
 using System;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,8 +14,10 @@ using Couchbase.Transactions;
 using Couchbase.Core.Exceptions.KeyValue;
 using Couchbase.Transactions.Error;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
+using Koan.Data.Abstractions.Sorting;
 using Koan.Data.Connector.Couchbase.Infrastructure;
 using Koan.Data.Core.Configuration;
 using Koan.Data.Core.Optimization;
@@ -28,7 +30,9 @@ using Koan.Core.Adapters;
 namespace Koan.Data.Connector.Couchbase;
 
 internal sealed class CouchbaseRepository<TEntity, TKey> :
-    ILinqQueryRepositoryWithOptions<TEntity, TKey>,
+    IDataRepository<TEntity, TKey>,
+    IQueryRepository<TEntity, TKey>,
+    IRawQueryRepository<TEntity, TKey>,
     IOptimizedDataRepository<TEntity, TKey>,
     IQueryCapabilities,
     IWriteCapabilities,
@@ -208,116 +212,209 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             }
         }, ct);
 
-    public Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-        => ExecuteWithReadinessAsync(() => QueryPredicate(predicate, options: null, ct), ct);
+    // ==================== Unified Query (DATA-XXXX) ====================
 
-    public Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>>? predicate, DataQueryOptions? options, CancellationToken ct = default)
+    /// <summary>
+    /// Per-operator pushdown capabilities. The coordinator splits the caller's filter against this
+    /// and only ever hands us nodes we declared pushable; operators left out (e.g. IgnoreCase, or
+    /// any future op) fall to the in-memory floor. This is the single source of truth.
+    /// </summary>
+    public FilterCapabilities FilterCapabilities => CouchbaseN1qlFilterTranslator.Capabilities;
+
+    /// <summary>
+    /// Translator + executor: translate the WHOLE (guaranteed-pushable) filter to a parameterized
+    /// N1QL WHERE clause, push sort + pagination natively, and report what we handled. Never falls
+    /// back, never re-throws translation failures to the caller — the killing of the legacy 500.
+    /// </summary>
+    public Task<RepositoryQueryResult<TEntity>> Query(QueryDefinition query, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
         {
-            // Null predicate = full collection scan with options.
-            if (predicate is null)
+            ct.ThrowIfCancellationRequested();
+            using var act = CouchbaseTelemetry.Activity.StartActivity("couchbase.query");
+            act?.SetTag("entity", typeof(TEntity).FullName);
+            var ctx = await ResolveCollection(ct);
+            var keyspace = FullKeyspace(ctx);
+
+            var (where, parameters) = TranslateFilter(query.Filter);
+            var orderBy = BuildOrderBy(query.Sort, out var sortHandled);
+
+            var sb = new System.Text.StringBuilder();
+            sb.Append("SELECT RAW doc FROM ").Append(keyspace).Append(" AS doc");
+            if (where is not null) sb.Append(" WHERE ").Append(where);
+            if (orderBy is not null) sb.Append(" ORDER BY ").Append(orderBy);
+
+            var paginationHandled = false;
+            if (query.HasPagination)
             {
-                var items = await QueryInternal(null, options, ct);
-                return RepositoryQueryResult<TEntity>.PaginatedOnly(items);
+                var size = query.EffectivePageSize();
+                var offset = (query.EffectivePage() - 1) * size;
+                sb.Append(" LIMIT ").Append(size.ToString(CultureInfo.InvariantCulture))
+                  .Append(" OFFSET ").Append(offset.ToString(CultureInfo.InvariantCulture));
+                paginationHandled = true;
             }
-            var filtered = await QueryPredicate(predicate, options, ct);
-            return RepositoryQueryResult<TEntity>.PaginatedOnly(filtered);
+
+            var statement = sb.ToString();
+            var definition = parameters is null ? null : new CouchbaseQueryDefinition(statement) { Parameters = parameters };
+            var items = await ExecuteQuery(ctx, statement, definition, ct);
+
+            return new RepositoryQueryResult<TEntity>
+            {
+                Items = items,
+                // We only paginate when the entire filter was pushed (the coordinator strips
+                // pagination otherwise), so a server page is always over the fully-filtered set.
+                PaginationHandled = paginationHandled,
+                SortHandled = sortHandled,
+            };
         }, ct);
 
-    private async Task<IReadOnlyList<TEntity>> QueryPredicate(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = CouchbaseTelemetry.Activity.StartActivity("couchbase.query.linq");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        var ctx = await ResolveCollection(ct);
-        if (!CouchbaseLinqQueryTranslator.TryTranslate<TEntity, TKey>(predicate, _optimizationInfo, out var translation))
-        {
-            throw new NotSupportedException($"Unable to translate expression '{predicate}' to N1QL for Couchbase.");
-        }
-
-        var statement = $"SELECT RAW doc FROM `{ctx.BucketName}`.`{ctx.ScopeName}`.`{ctx.CollectionName}` AS doc WHERE {translation.WhereClause}";
-        var definition = new CouchbaseQueryDefinition(statement)
-        {
-            Parameters = translation.Parameters.ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value)
-        };
-
-        return await ExecuteQuery(ctx, statement, definition, options, ct);
-    }
-
-    private async Task<IReadOnlyList<TEntity>> QueryInternal(object? query, DataQueryOptions? options, CancellationToken ct)
-    {
-        ct.ThrowIfCancellationRequested();
-
-        // Predicate path: the orchestrator forwards LINQ predicates as object? for any adapter
-        // that implements ILinqQueryRepositoryWithOptions. Route to QueryPredicate so ?filter= and
-        // DELETE /?q= apply the predicate instead of silently returning the full set.
-        if (query is Expression<Func<TEntity, bool>> predicate)
-        {
-            return await QueryPredicate(predicate, options, ct);
-        }
-
-        var ctx = await ResolveCollection(ct);
-        var definition = query switch
-        {
-            CouchbaseQueryDefinition def => def,
-            string queryStatement when !string.IsNullOrWhiteSpace(queryStatement) => new CouchbaseQueryDefinition(queryStatement),
-            _ => null
-        };
-
-        var statement = definition?.Statement ??
-            $"SELECT RAW doc FROM `{ctx.BucketName}`.`{ctx.ScopeName}`.`{ctx.CollectionName}` AS doc";
-
-        return await ExecuteQuery(ctx, statement, definition, options, ct);
-    }
-
-    public Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
+    public Task<CountResult> Count(QueryDefinition query, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
         {
             ct.ThrowIfCancellationRequested();
             using var act = CouchbaseTelemetry.Activity.StartActivity("couchbase.count");
             act?.SetTag("entity", typeof(TEntity).FullName);
             var ctx = await ResolveCollection(ct);
+            var keyspace = FullKeyspace(ctx);
 
-            CouchbaseQueryDefinition? definition = null;
-            string statement;
-            // The fully-qualified keyspace path the predicate/no-filter variants need to
-            // SELECT from. The original code shipped with a literal `FROM ..` template that
-            // was never filled in, producing "syntax error - at ." on every COUNT request.
-            var fullKeyspace = $"`{ctx.BucketName}`.`{ctx.ScopeName}`.`{ctx.CollectionName}`";
-
-            if (request.Predicate is not null)
-            {
-                if (!CouchbaseLinqQueryTranslator.TryTranslate<TEntity, TKey>(request.Predicate, _optimizationInfo, out var translation))
-                {
-                    throw new NotSupportedException($"Unable to translate expression '{request.Predicate}' to N1QL for Couchbase.");
-                }
-
-                statement = $"SELECT RAW COUNT(*) FROM {fullKeyspace} AS doc WHERE {translation.WhereClause}";
-                definition = new CouchbaseQueryDefinition(statement)
-                {
-                    Parameters = translation.Parameters.ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value)
-                };
-            }
-            else if (request.ProviderQuery is CouchbaseQueryDefinition providerDef)
-            {
-                statement = $"SELECT RAW COUNT(*) FROM ({providerDef.Statement}) AS sub";
-                definition = new CouchbaseQueryDefinition(statement)
-                {
-                    Parameters = providerDef.Parameters
-                };
-            }
-            else if (!string.IsNullOrWhiteSpace(request.RawQuery))
-            {
-                statement = $"SELECT RAW COUNT(*) FROM ({request.RawQuery}) AS sub";
-            }
-            else
-            {
-                statement = $"SELECT RAW COUNT(*) FROM {fullKeyspace}";
-            }
+            var (where, parameters) = TranslateFilter(query.Filter);
+            var statement = where is null
+                ? $"SELECT RAW COUNT(*) FROM {keyspace}"
+                : $"SELECT RAW COUNT(*) FROM {keyspace} AS doc WHERE {where}";
+            var definition = parameters is null ? null : new CouchbaseQueryDefinition(statement) { Parameters = parameters };
 
             var result = await ExecuteScalarQueryAsync<long>(ctx, statement, definition, ct);
             return CountResult.Exact(result);
         }, ct);
+
+    // ==================== Raw N1QL escape hatch (IRawQueryRepository) ====================
+
+    public Task<RepositoryQueryResult<TEntity>> QueryRaw(string query, object? parameters, QueryDefinition shaping, CancellationToken ct = default)
+        => ExecuteWithReadinessAsync(async () =>
+        {
+            ct.ThrowIfCancellationRequested();
+            using var act = CouchbaseTelemetry.Activity.StartActivity("couchbase.query.raw");
+            act?.SetTag("entity", typeof(TEntity).FullName);
+            var ctx = await ResolveCollection(ct);
+
+            var sb = new System.Text.StringBuilder(query);
+            var paginationHandled = false;
+            if (shaping.HasPagination)
+            {
+                var size = shaping.EffectivePageSize();
+                var offset = (shaping.EffectivePage() - 1) * size;
+                sb.Append(" LIMIT ").Append(size.ToString(CultureInfo.InvariantCulture))
+                  .Append(" OFFSET ").Append(offset.ToString(CultureInfo.InvariantCulture));
+                paginationHandled = true;
+            }
+
+            var definition = BuildRawDefinition(sb.ToString(), parameters);
+            var items = await ExecuteQuery(ctx, definition.Statement, definition, ct);
+            return new RepositoryQueryResult<TEntity>
+            {
+                Items = items,
+                PaginationHandled = paginationHandled,
+                SortHandled = RepositoryQueryResult<TEntity>.NoSortHandled,
+            };
+        }, ct);
+
+    public Task<CountResult> CountRaw(string query, object? parameters, CancellationToken ct = default)
+        => ExecuteWithReadinessAsync(async () =>
+        {
+            ct.ThrowIfCancellationRequested();
+            using var act = CouchbaseTelemetry.Activity.StartActivity("couchbase.count.raw");
+            act?.SetTag("entity", typeof(TEntity).FullName);
+            var ctx = await ResolveCollection(ct);
+            // Wrap the caller's N1QL as a subquery so COUNT(*) works regardless of its projection.
+            var inner = BuildRawDefinition(query, parameters);
+            var statement = $"SELECT RAW COUNT(*) FROM ({inner.Statement}) AS sub";
+            var definition = new CouchbaseQueryDefinition(statement) { Parameters = inner.Parameters };
+            var result = await ExecuteScalarQueryAsync<long>(ctx, statement, definition, ct);
+            return CountResult.Exact(result);
+        }, ct);
+
+    /// <summary>
+    /// Translates a (guaranteed-pushable) filter to a parameterized N1QL WHERE body, or (null, null)
+    /// when there is no filter. The translator never throws to us — it only sees declared-pushable
+    /// nodes — but we keep this the single translation entry point so Query/Count stay identical.
+    /// </summary>
+    private (string? Where, IDictionary<string, object?>? Parameters) TranslateFilter(Filter? filter)
+    {
+        if (filter is null) return (null, null);
+        var translation = CouchbaseN1qlFilterTranslator.Translate(filter, typeof(TEntity), _optimizationInfo);
+        return (translation.WhereClause, translation.Parameters.ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value));
+    }
+
+    /// <summary>
+    /// Builds an ORDER BY body from structured sort specs and reports which specs were handled. Sort
+    /// paths resolve to camelCased N1QL field expressions (Id -> META().id). Collection-traversing
+    /// sort paths are NOT pushed (left for the floor) since N1QL has no single-row aggregation here.
+    /// </summary>
+    private string? BuildOrderBy(IReadOnlyList<SortSpec> specs, out IReadOnlySet<SortSpec> handled)
+    {
+        handled = RepositoryQueryResult<TEntity>.NoSortHandled;
+        if (specs is null || specs.Count == 0) return null;
+
+        var handledSet = new HashSet<SortSpec>();
+        var sb = new System.Text.StringBuilder();
+        foreach (var spec in specs)
+        {
+            if (spec.Path.TraversesCollection) continue; // leave collection sort to the floor
+            var field = SortFieldExpression(spec.Path);
+            if (sb.Length > 0) sb.Append(", ");
+            sb.Append(field).Append(spec.Desc ? " DESC" : " ASC");
+            handledSet.Add(spec);
+        }
+
+        if (handledSet.Count == 0) return null;
+        handled = handledSet.ToFrozenSet();
+        return sb.ToString();
+    }
+
+    private string SortFieldExpression(MemberPath path)
+    {
+        if (path.Members.Count == 1 && IsIdMember(path.Members[0].Name))
+            return "META().id";
+        var sb = new System.Text.StringBuilder("doc");
+        foreach (var member in path.Members)
+        {
+            sb.Append('.');
+            sb.Append(QuoteIdentifier(NormalizeProperty(member.Name)));
+        }
+        return sb.ToString();
+    }
+
+    private bool IsIdMember(string memberName)
+        => string.Equals(memberName, _optimizationInfo.IdPropertyName, StringComparison.OrdinalIgnoreCase) ||
+           string.Equals(memberName, "Id", StringComparison.OrdinalIgnoreCase);
+
+    private static string NormalizeProperty(string property)
+        => property.Length == 0 ? property : property[..1].ToLowerInvariant() + property[1..];
+
+    private static string FullKeyspace(CouchbaseCollectionContext ctx)
+        => $"{QuoteIdentifier(ctx.BucketName)}.{QuoteIdentifier(ctx.ScopeName)}.{QuoteIdentifier(ctx.CollectionName)}";
+
+    private static CouchbaseQueryDefinition BuildRawDefinition(string statement, object? parameters)
+    {
+        IDictionary<string, object?>? dict = parameters switch
+        {
+            null => null,
+            IDictionary<string, object?> d => d,
+            CouchbaseQueryDefinition def => def.Parameters,
+            _ => ToParameterDictionary(parameters)
+        };
+        return new CouchbaseQueryDefinition(statement) { Parameters = dict };
+    }
+
+    private static IDictionary<string, object?> ToParameterDictionary(object parameters)
+    {
+        var dict = new Dictionary<string, object?>(StringComparer.Ordinal);
+        foreach (var prop in parameters.GetType().GetProperties())
+        {
+            var name = prop.Name.StartsWith('$') ? prop.Name : "$" + prop.Name;
+            dict[name] = prop.GetValue(parameters);
+        }
+        return dict;
+    }
 
     public Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
@@ -426,7 +523,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             var ctx = await ResolveCollection(ct);
             var statement = $"DELETE FROM `{ctx.BucketName}`.`{ctx.ScopeName}`.`{ctx.CollectionName}` RETURNING META().id";
             var count = 0;
-            await foreach (var _ in ExecuteQueryAsync<dynamic>(ctx, statement, null, null, ct))
+            await foreach (var _ in ExecuteQueryAsync<dynamic>(ctx, statement, null, ct))
             {
                 count++;
             }
@@ -440,7 +537,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             var ctx = await ResolveCollection(ct);
             var statement = $"DELETE FROM `{ctx.BucketName}`.`{ctx.ScopeName}`.`{ctx.CollectionName}` RETURNING META().id";
             var count = 0L;
-            await foreach (var _ in ExecuteQueryAsync<dynamic>(ctx, statement, null, null, ct))
+            await foreach (var _ in ExecuteQueryAsync<dynamic>(ctx, statement, null, ct))
             {
                 count++;
             }
@@ -580,10 +677,10 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
         await EnsureCollection(ctx, ct);
     }
 
-    private async Task<IReadOnlyList<TEntity>> ExecuteQuery(CouchbaseCollectionContext ctx, string statement, CouchbaseQueryDefinition? definition, DataQueryOptions? options, CancellationToken ct)
+    private async Task<IReadOnlyList<TEntity>> ExecuteQuery(CouchbaseCollectionContext ctx, string statement, CouchbaseQueryDefinition? definition, CancellationToken ct)
     {
         var rows = new List<TEntity>();
-        await foreach (var row in ExecuteQueryAsync<TEntity>(ctx, statement, definition, options, ct))
+        await foreach (var row in ExecuteQueryAsync<TEntity>(ctx, statement, definition, ct))
         {
             rows.Add(row);
         }
@@ -592,21 +689,18 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
 
     private async Task<T> ExecuteScalarQueryAsync<T>(CouchbaseCollectionContext ctx, string statement, CouchbaseQueryDefinition? definition, CancellationToken ct)
     {
-        await foreach (var row in ExecuteQueryAsync<T>(ctx, statement, definition, null, ct))
+        await foreach (var row in ExecuteQueryAsync<T>(ctx, statement, definition, ct))
         {
             return row;
         }
         return default!;
     }
 
-    private async IAsyncEnumerable<T> ExecuteQueryAsync<T>(CouchbaseCollectionContext ctx, string statement, CouchbaseQueryDefinition? definition, DataQueryOptions? options, [EnumeratorCancellation] CancellationToken ct)
+    private async IAsyncEnumerable<T> ExecuteQueryAsync<T>(CouchbaseCollectionContext ctx, string statement, CouchbaseQueryDefinition? definition, [EnumeratorCancellation] CancellationToken ct)
     {
+        // Pagination (LIMIT/OFFSET) is composed into the statement by the caller under the unified
+        // contract — this method is now purely "execute the given N1QL".
         var finalStatement = statement;
-        if (options is not null)
-        {
-            var (offset, limit) = ComputeSkipTake(options);
-            finalStatement = $"{finalStatement} LIMIT {limit} OFFSET {offset}";
-        }
 
         var queryOptions = new QueryOptions();
         var timeout = definition?.Timeout ?? _options.QueryTimeout;
@@ -656,25 +750,6 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
     {
         return ex is global::Couchbase.Core.Exceptions.UnambiguousTimeoutException timeout &&
                timeout.Context?.ToString()?.Contains("CollectionNotFound") == true;
-    }
-
-    private (int offset, int limit) ComputeSkipTake(DataQueryOptions? options)
-    {
-        // Check if pagination is active
-        var hasPagination = options?.HasPagination ?? false;
-
-        if (!hasPagination)
-        {
-            // No pagination - return full result set without applying default page size
-            return (0, int.MaxValue);
-        }
-
-        // Pagination is active - apply default fallback only. Per ADR no adapter-side cap.
-        var page = options?.Page is int p && p > 0 ? p : 1;
-        var sizeReq = options?.PageSize;
-        var size = sizeReq is int ps && ps > 0 ? ps : _options.DefaultPageSize;
-        var offset = (page - 1) * size;
-        return (offset, size);
     }
 
     private void PrepareEntityForStorage(TEntity entity)

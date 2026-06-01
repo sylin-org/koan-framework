@@ -64,7 +64,11 @@ public class MongoOptimizationAutoRegistrar : IKoanInitializer
         {
             new CamelCaseElementNameConvention(),
             new EnumRepresentationConvention(BsonType.String),
-            new IgnoreExtraElementsConvention(true)
+            new IgnoreExtraElementsConvention(true),
+            // GUID carve-out (DATA-XXXX): force List<string>/string[] ELEMENTS to serialize as BSON
+            // strings so the global SmartStringGuidSerializer can't rewrite Guid-shaped elements to
+            // BinData (which would corrupt List<string> round-trips and break array containment).
+            new StringCollectionElementConvention()
         };
 
         try
