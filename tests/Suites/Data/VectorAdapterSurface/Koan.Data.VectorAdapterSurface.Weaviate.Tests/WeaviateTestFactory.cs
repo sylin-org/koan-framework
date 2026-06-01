@@ -35,11 +35,10 @@ public sealed class WeaviateTestFactory : IVectorAdapterTestFactory
     public bool SupportsFlush                => true;
     public bool SupportsExportAll            => true;
     public bool SupportsHybridSearch         => true;  // Weaviate is the only one
-    // AI-0036 §10: filter-convergence gated. Eq/range/Has/Exists work now (metadata persisted as
-    // camelCase properties + autoSchema); the remaining gap is NEGATION on text properties —
-    // NotEqual on a "word"-tokenized text property returns empty, so Ne/Not need a tokenization=field
-    // schema (vs autoSchema) verified live before convergence. Translator + persistence are in place.
-    public bool SupportsMetadataFilters      => false;
+    // AI-0036 §10: metadata properties created explicitly with tokenization=field + class-level
+    // indexNullState=true, so exact Equal/NotEqual and null-inclusive negation (Ne/Not via De Morgan
+    // + Or IsNull) work. Live-verified.
+    public bool SupportsMetadataFilters      => true;
     public bool SupportsContinuationToken    => true;  // native cursor
     public bool SupportsPartitionIsolation   => true;
     public bool SupportsDynamicCollections   => true;
