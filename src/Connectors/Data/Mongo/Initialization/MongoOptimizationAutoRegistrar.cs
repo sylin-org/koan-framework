@@ -343,16 +343,14 @@ public class SmartStringGuidSerializer : SerializerBase<string>
             return;
         }
 
-        // Only convert to GUID BinData if the string is a valid GUID
-        if (Guid.TryParse(value, out var guid))
+        // Single source of truth shared with MongoFilterTranslator so the write and query paths
+        // can never drift (DATA-XXXX): a Guid-parseable string is persisted as native UUID BinData.
+        if (MongoGuidEncoding.IsGuidEncoded(value, out var guid))
         {
-            // Store as native MongoDB UUID BinData for optimal performance and indexing
-            var binaryData = new BsonBinaryData(guid, GuidRepresentation.Standard);
-            context.Writer.WriteBinaryData(binaryData);
+            context.Writer.WriteBinaryData(MongoGuidEncoding.ToBinData(guid));
         }
         else
         {
-            // Keep as string if not a valid GUID
             context.Writer.WriteString(value);
         }
     }

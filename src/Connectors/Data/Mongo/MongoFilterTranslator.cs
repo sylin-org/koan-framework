@@ -16,12 +16,13 @@ namespace Koan.Data.Connector.Mongo;
 /// matches missing fields, but we OR in an explicit existence/null check to be robust.
 /// Relational comparisons map straight to <c>$gt/$gte/$lt/$lte</c>.
 ///
-/// GUID handling: scalar equality/membership whose CLR value is a Guid (or a Guid-shaped string
-/// coerced to Guid by the comparable type) is emitted as native UUID BinData — matching how the
-/// global SmartStringGuidSerializer persisted it, so id/Guid lookups hit the UUID index. Collection
-/// (List&lt;string&gt;) element values are emitted as their native CLR type (string stays a BSON
-/// string), because the array element serializer is carved out of the smart serializer (see
-/// MongoOptimizationAutoRegistrar).
+/// GUID handling: a scalar equality/membership value that is a Guid OR a Guid-PARSEABLE string is
+/// emitted as native UUID BinData — via the shared <see cref="MongoGuidEncoding"/> rule that
+/// SmartStringGuidSerializer also uses on write, so Guid scalars AND Guid-shaped string fields (ids,
+/// FKs) match their BinData storage and hit the UUID index. (Keying off the declared comparable type
+/// alone silently broke predicate queries on string-typed Guid FKs — DATA-XXXX.) Collection (List&lt;string&gt;) element
+/// values are emitted as their native CLR type (string stays a BSON string), because the array
+/// element serializer is carved out of the smart serializer (see MongoOptimizationAutoRegistrar).
 /// </summary>
 internal sealed class MongoFilterTranslator<TEntity>
 {
@@ -173,9 +174,19 @@ internal sealed class MongoFilterTranslator<TEntity>
     private static IEnumerable<object> ElementSet(FieldFilter f, ResolvedField field)
         => SetRaw(f.Value).Select(r => ElementValue(r, field));
 
-    /// <summary>Guid -> native UUID BinData (matches SmartStringGuidSerializer); everything else passes through.</summary>
+    /// <summary>
+    /// Coerce a scalar comparison value to match the write encoding, via the single
+    /// <see cref="MongoGuidEncoding"/> rule shared with <c>SmartStringGuidSerializer</c> so the write
+    /// and query paths cannot drift (the drift was DATA-XXXX: a Guid-shaped string FK wrote as BinData
+    /// but queried as a BSON string, so it never matched). Collection ELEMENTS are deliberately NOT
+    /// coerced here (carved out of the smart serializer, stored as BSON strings) — see <see cref="ElementValue"/>.
+    /// </summary>
     private static object CoerceForBson(object? value)
-        => value is Guid g ? new BsonBinaryData(g, GuidRepresentation.Standard) : value ?? BsonNull.Value;
+    {
+        if (value is Guid g) return MongoGuidEncoding.ToBinData(g);
+        if (value is string s && MongoGuidEncoding.IsGuidEncoded(s, out var sg)) return MongoGuidEncoding.ToBinData(sg);
+        return value ?? BsonNull.Value;
+    }
 
     private enum AnchorMode { None, Prefix, Suffix }
 
