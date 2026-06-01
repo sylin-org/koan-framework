@@ -96,7 +96,13 @@ internal static class QdrantFilterTranslator
             : new JObject { ["must"] = new JArray(inner) };
 
     private static string NormalizePath(IReadOnlyList<string> path, string metadataField)
-        => path.Count == 1 ? path[0] : string.Join('.', path);
+    {
+        // Caller metadata is stored nested under payload.<metadataField> (BuildPoint), so a filter
+        // key must be prefixed with it — Qdrant navigates nested payload via dot-paths. If the caller
+        // already qualified the path with the metadata field, leave it as-is.
+        if (path.Count > 0 && path[0] == metadataField) return string.Join('.', path);
+        return metadataField + "." + string.Join('.', path);
+    }
 
     private static object? Scalar(FieldFilter f) => f.Value switch
     {
