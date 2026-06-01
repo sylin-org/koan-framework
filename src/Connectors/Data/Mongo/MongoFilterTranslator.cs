@@ -93,18 +93,22 @@ internal sealed class MongoFilterTranslator<TEntity>
         if (field.TargetsCollection)
             return BuildCollection(op, name, f, field, b);
 
-        var fd = new StringFieldDefinition<TEntity, object>(name);
+        // Scalar comparisons are emitted as raw BsonDocuments (see Doc) so the value lands as a
+        // top-level BsonValue. The typed builder's FieldDefinition<TEntity, object> routes values
+        // through ObjectSerializer, which wraps any non-primitive BsonValue (e.g. BsonBinaryData)
+        // in a {_v: ...} discriminator envelope that never matches the stored value (DATA-XXXX:
+        // Guid-string FK queries silently returned 0 rows even though the write was correct BinData).
         return op switch
         {
-            FilterOperator.Eq => b.Eq(fd, ScalarValue(f, field)),
-            FilterOperator.Ne => b.Ne(fd, ScalarValue(f, field)),
-            FilterOperator.Gt => b.Gt(fd, ScalarValue(f, field)),
-            FilterOperator.Gte => b.Gte(fd, ScalarValue(f, field)),
-            FilterOperator.Lt => b.Lt(fd, ScalarValue(f, field)),
-            FilterOperator.Lte => b.Lte(fd, ScalarValue(f, field)),
-            FilterOperator.In => b.In(fd, SetValues(f, field)),
+            FilterOperator.Eq => Doc(name, ScalarBson(f, field)),
+            FilterOperator.Ne => Doc(name, new BsonDocument("$ne", ScalarBson(f, field))),
+            FilterOperator.Gt => Doc(name, new BsonDocument("$gt", ScalarBson(f, field))),
+            FilterOperator.Gte => Doc(name, new BsonDocument("$gte", ScalarBson(f, field))),
+            FilterOperator.Lt => Doc(name, new BsonDocument("$lt", ScalarBson(f, field))),
+            FilterOperator.Lte => Doc(name, new BsonDocument("$lte", ScalarBson(f, field))),
+            FilterOperator.In => Doc(name, new BsonDocument("$in", new BsonArray(SetBson(f, field)))),
             // Nin must match missing/null too (locked semantics).
-            FilterOperator.Nin => b.Or(b.Nin(fd, SetValues(f, field)), b.Exists(name, false), b.Eq(fd, (object)BsonNull.Value)),
+            FilterOperator.Nin => b.Or(Doc(name, new BsonDocument("$nin", new BsonArray(SetBson(f, field)))), b.Exists(name, false), Doc(name, BsonNull.Value)),
             FilterOperator.StartsWith => b.Regex(name, Anchored(StringScalar(f), f.IgnoreCase, AnchorMode.Prefix)),
             FilterOperator.EndsWith => b.Regex(name, Anchored(StringScalar(f), f.IgnoreCase, AnchorMode.Suffix)),
             FilterOperator.Contains => b.Regex(name, Anchored(StringScalar(f), f.IgnoreCase, AnchorMode.None)),
@@ -164,6 +168,19 @@ internal sealed class MongoFilterTranslator<TEntity>
 
     private static IEnumerable<object> SetValues(FieldFilter f, ResolvedField field)
         => SetRaw(f.Value).Select(x => CoerceForBson(FilterValueConverter.Convert(x, field.ComparableType)));
+
+    // Emit a scalar comparison as a raw BsonDocument (rendered verbatim) instead of through the
+    // typed builder's object FieldDefinition, so a BsonBinaryData value is written as a top-level
+    // BinData rather than wrapped in a {_v: ...} discriminator envelope (DATA-XXXX).
+    private static FilterDefinition<TEntity> Doc(string name, BsonValue value)
+        => new BsonDocumentFilterDefinition<TEntity>(new BsonDocument(name, value));
+
+    private static BsonValue ScalarBson(FieldFilter f, ResolvedField field) => ToBson(ScalarValue(f, field));
+
+    private static IEnumerable<BsonValue> SetBson(FieldFilter f, ResolvedField field) => SetValues(f, field).Select(ToBson);
+
+    /// <summary>A coerced value is already a BsonValue (e.g. BsonBinaryData from CoerceForBson) or a primitive.</summary>
+    private static BsonValue ToBson(object value) => value as BsonValue ?? BsonValue.Create(value);
 
     private static string StringScalar(FieldFilter f) => ScalarRaw(f.Value)?.ToString() ?? string.Empty;
 
