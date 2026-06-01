@@ -267,8 +267,10 @@ public class EmbeddingWorker(
                 estimatedCost: estimatedCost,
                 success: true);
 
-            // Store in vector database
-            await VectorData<TEntity>.SaveWithVector(entity, embedding, null, ct);
+            // Store in vector database — stamp producing model/source so the index is not a
+            // silent mixed-space (AI-0036 W1).
+            var provenance = VectorProvenance.Build(metadata.Model ?? job.Model, metadata.Source, metadata.Version);
+            await VectorData<TEntity>.SaveWithVector(entity, embedding, provenance, ct);
 
             // Update embedding state
             var stateId = EmbeddingState<TEntity>.MakeId(job.EntityId);

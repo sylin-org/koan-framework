@@ -2,7 +2,7 @@
 id: AI-0036
 slug: AI-0036-embedding-vector-seam
 domain: AI
-status: Proposed
+status: Accepted
 date: 2026-05-31
 fulfills: [DATA-0097]
 relates-to: [DATA-0097, DATA-0054, DATA-0084, DATA-0087]
@@ -167,9 +167,9 @@ parser, same operator-aware capabilities. No new filter dialect.
 
 **Read (forwarding):**
 - New `VectorRetrieveOptions` record (lives with `Vector<T>` so all three pillars reference one type).
-- R1 `Chain.Retrieve<T>` — add `filter:` param; `ExecuteRetrieve`/`InvokeVectorSearch` forward full options (read the already-stored `step.Alpha`/`step.Rerank`).
-- R2 `EntityToolGenerator` — extend tool schema (`alpha`, `filter`); parse + forward.
-- R3 `RagRetrievalPipeline` (+ `SearchChunks`, streaming path) — forward `Filter`.
+- R1 `Chain.Retrieve<T>` — **P0:** forward the already-stored `step.Alpha` (now `double?`) + `step.Rerank` via `ExecuteRetrieve`/`InvokeVectorSearch`. **P1:** add a `filter:` param feeding `VectorRetrieveOptions`.
+- R2 `EntityToolGenerator` — **P1:** extend tool schema (`alpha`, `filter`); parse + forward.
+- R3 `RagRetrievalPipeline` (+ `SearchChunks`, streaming path) — **P1:** add a `Filter` slot to `RagQueryOptions` (none exists today) and forward it. *(RAG already forwards `text`/`alpha`/`topK`; filter is the only gap, and it is a slot addition, not a forward.)*
 
 ## 5. Test surfaces
 
@@ -182,27 +182,34 @@ parser, same operator-aware capabilities. No new filter dialect.
 ## 6. Phased plan
 
 - **P0 — stop the silent drops (S, no decisions needed).** These are pure corrections of a
-  fail-silent bug, mirroring DATA-0097 P0:
+  fail-silent bug, mirroring DATA-0097 P0 — only data the layer already *knows* or *advertises*:
   - thread provenance through W1/W2/W3 (the `null` → dict change + the single `VectorProvenance` helper);
-  - have R1 forward `step.Alpha`/`step.Rerank` (already on the step) and R3 forward `Filter`.
-  - Net: nothing the layers already *know* or *advertise* is dropped anymore.
-- **P1 — the typed seam (M).** `VectorRetrieveOptions`; `filter:` on `Chain.Retrieve<T>`; `alpha`/`filter`
-  on the agent tool schema; all three compose the one record. The DSL filter is the DATA-0097 AST.
+  - have R1 forward `step.Alpha`/`step.Rerank` (**already on `ChainStep`**). `Alpha` becomes `double?`
+    (null = pure-vector = today's effective behaviour; set = hybrid with `text = query`, matching
+    `Search`'s own `double? alpha` shape and the RAG pillar's hybrid call). `Rerank` is honoured inline
+    by the existing rerank pass. Default `Retrieve<T>(q)` is unchanged.
+  - Net: nothing the layers already know/advertise is dropped anymore.
+  - *Not in P0:* forwarding a **filter** from any read path — RAG/agent/Chain have **no filter slot
+    today**, so that is a slot *addition* (a typed-options decision), moved to P1.
+- **P1 — the typed seam (M).** `VectorRetrieveOptions`; add a `filter:` slot to `Chain.Retrieve<T>`,
+  `RagQueryOptions`, and the agent `{type}_search` schema; all compose the one record. The DSL filter
+  is the DATA-0097 `Filter` AST / its JSON form — the single filter dialect, no new vocabulary.
 - **P2 — provenance as a guard, not just data (S/M).** W4 model-mismatch guard + "models in index"
   self-report; depends on P1's filter to express the read-back cleanly.
 
-## 7. Open decisions
+## 7. Decisions (ratified 2026-05-31)
 
-1. **Provenance key namespace** — reserved `__embedding.*` (proposed) vs a typed sidecar column the
-   adapters project. `__embedding.*` keeps the store model-agnostic and needs no per-adapter schema
-   change; the typed column is queryable without string keys but is per-adapter work. *(Recommend
-   `__embedding.*` — seam-ready today, zero adapter change.)*
-2. **W4 severity** — hard throw on model mismatch vs warn-and-proceed + health-report flag.
-   *(Recommend: throw when the query path can know the index model and they differ; warn when the
-   index is legitimately multi-model by design.)*
-3. **Where `VectorRetrieveOptions` lives** — `Koan.Data.Vector` (storage, all pillars reference) vs a
-   shared AI abstractions package. *(Recommend `Koan.Data.Vector`: it mirrors `Search`'s own surface
-   and avoids an AI dependency edge into the store.)*
+1. **Provenance key namespace → reserved `__embedding.*` metadata keys.** Keeps the store
+   model-agnostic, needs no per-adapter schema change, is queryable as ordinary filterable metadata,
+   and is seam-ready today. The store never parses the keys; it persists them. Key *constants* live
+   in `Koan.Data.Vector` (the lower layer, so the lifecycle owner and the future read-back guard both
+   reference one definition); the *builder* lives with the lifecycle owner.
+2. **W4 severity → throw when knowable, warn for by-design multi-model.** Fail-loud only at the
+   genuine boundary: when the query path can know the index model and they differ, throw
+   (incomparable spaces = wrong neighbours). When the index is legitimately multi-model by design,
+   warn + surface "models in index" in the health report.
+3. **`VectorRetrieveOptions` lives in `Koan.Data.Vector`.** It mirrors `Search`'s own surface and
+   avoids an AI dependency edge into the store; all pillars reference the one type.
 
 ## 8. Relationship to the AI surface
 

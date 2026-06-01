@@ -471,8 +471,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             embedding = await Koan.AI.Client.Embed(text, ct);
         }
 
-        // Store in vector database
-        await Koan.Data.Vector.VectorData<TEntity>.SaveWithVector(entity, embedding, null, ct);
+        // Store in vector database — stamp producing model/source (AI-0036 W2).
+        var provenance = VectorProvenance.Build(metadata.Model, metadata.Source, metadata.Version);
+        await Koan.Data.Vector.VectorData<TEntity>.SaveWithVector(entity, embedding, provenance, ct);
     }
 
     /// <summary>

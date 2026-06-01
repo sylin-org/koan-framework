@@ -116,7 +116,8 @@ public class Phase3_AsyncQueueTests
     {
         // Arrange
         var logger = Substitute.For<ILogger<Workers.EmbeddingWorker>>();
-        var options = Options.Create(new EmbeddingWorkerOptions());
+        // FQN: `Options` would otherwise bind to the Koan.Data.AI.Options namespace, not the M.E.Options static class.
+        var options = Microsoft.Extensions.Options.Options.Create(new EmbeddingWorkerOptions());
 
         // Act
         var worker = new Workers.EmbeddingWorker(logger, options);

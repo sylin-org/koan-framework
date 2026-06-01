@@ -191,9 +191,14 @@ internal sealed class ChainExecutor : IChainExecutor
         // Generate embedding for the query
         var embedding = await Koan.AI.Client.Embed(queryText, ct);
 
+        // AI-0036 R1: honour the alpha the builder stored instead of silently dropping it. null =
+        // pure-vector (default, identical to prior behaviour); set = hybrid with the query as the
+        // lexical side (Search gates hybrid on a non-null text).
+        var hybridText = step.Alpha is null ? null : queryText;
+
         // Invoke Vector<T>.Search via reflection (entity type is runtime-determined)
         var results = await InvokeVectorSearch(
-            step.EntityType, embedding, step.TopK, ct);
+            step.EntityType, embedding, hybridText, step.Alpha, step.TopK, ct);
 
         // Store retrieved context and citations
         var contextParts = new List<string>();
@@ -209,6 +214,11 @@ internal sealed class ChainExecutor : IChainExecutor
         context.AddCitations(citations);
         context.SetVariable("retrieved", string.Join("\n\n---\n\n", contextParts));
         context.SetOutput(string.Join("\n\n---\n\n", contextParts));
+
+        // AI-0036 R1: honour the inline rerank flag the builder advertised (Retrieve(rerank: true)),
+        // instead of requiring a separate .Rerank() step. Reuses the existing rerank pass.
+        if (step.Rerank)
+            await ExecuteRerank(step, context, ct);
     }
 
     // ── Parse ──
@@ -442,7 +452,7 @@ internal sealed class ChainExecutor : IChainExecutor
     /// Returns (Id, Score, Metadata) tuples.
     /// </summary>
     private static async Task<List<(string Id, double Score, object? Metadata)>> InvokeVectorSearch(
-        Type entityType, float[] embedding, int topK, CancellationToken ct)
+        Type entityType, float[] embedding, string? text, double? alpha, int topK, CancellationToken ct)
     {
         var results = new List<(string Id, double Score, object? Metadata)>();
 
@@ -477,7 +487,9 @@ internal sealed class ChainExecutor : IChainExecutor
             if (searchMethod is null)
                 return results;
 
-            var task = searchMethod.Invoke(null, [embedding, null, null, topK, null, null, null, ct]);
+            // Positional args mirror Search(vector, text, alpha, topK, filter, continuationToken, vectorName, ct).
+            // AI-0036 R1: text+alpha now forwarded; filter stays null until P1 adds a typed filter slot.
+            var task = searchMethod.Invoke(null, [embedding, text, alpha, topK, null, null, null, ct]);
             if (task is null)
                 return results;
 

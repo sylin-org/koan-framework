@@ -246,8 +246,12 @@ public static class EmbeddingMigrator
                     embedding = await Client.Embed(text, ct);
                 }
 
-                // Save to vector database
-                await VectorData<TEntity>.SaveWithVector(entity, embedding, null, ct);
+                // Save to vector database — stamp the TARGET model/source so migrated vectors are
+                // distinguishable from un-migrated ones (AI-0036 W3; this is the worst drop site —
+                // the migration's whole purpose is to change the producing model).
+                var provenance = VectorProvenance.Build(
+                    targetModel ?? metadata.Model, targetSource ?? metadata.Source, metadata.Version, targetProvider);
+                await VectorData<TEntity>.SaveWithVector(entity, embedding, provenance, ct);
 
                 // Update embedding state
                 var stateId = EmbeddingState<TEntity>.MakeId(entity.Id);

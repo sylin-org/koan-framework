@@ -47,8 +47,15 @@ public sealed class ChainBuilder
     public ChainBuilder Chat(string template) =>
         AddStep(new ChainStep(ChainStepKind.Chat, template));
 
-    /// <summary>Add a retrieval step (RAG) with hybrid search.</summary>
-    public ChainBuilder Retrieve<T>(string query, int topK = 5, double alpha = 0.5, bool rerank = false) =>
+    /// <summary>
+    /// Add a retrieval step (RAG). Pure-vector by default; pass <paramref name="alpha"/> to run
+    /// hybrid (semantic+keyword) search with the query as the lexical side (AI-0036 R1).
+    /// </summary>
+    /// <param name="query">Natural-language query; embedded for vector search and used as the hybrid lexical side.</param>
+    /// <param name="topK">Maximum number of results to retrieve.</param>
+    /// <param name="alpha">Hybrid weight (0=keyword, 1=semantic). <c>null</c> = pure-vector.</param>
+    /// <param name="rerank">When true, re-score the retrieved passages by relevance inline.</param>
+    public ChainBuilder Retrieve<T>(string query, int topK = 5, double? alpha = null, bool rerank = false) =>
         AddStep(new ChainStep(ChainStepKind.Retrieve, query) { TopK = topK, Alpha = alpha, Rerank = rerank, EntityType = typeof(T) });
 
     /// <summary>Parse the chain output into a typed object.</summary>
@@ -160,7 +167,12 @@ public enum ChainStepKind
 public sealed record ChainStep(ChainStepKind Kind, string Value)
 {
     public int TopK { get; init; }
-    public double Alpha { get; init; }
+    /// <summary>
+    /// Hybrid semantic-vs-keyword weight (AI-0036 R1). <c>null</c> = pure-vector search (the default);
+    /// when set, the retrieve runs hybrid with the query as the lexical side. Mirrors
+    /// <c>Vector&lt;T&gt;.Search</c>'s own <c>double? alpha</c> — null means "no hybrid", not 0.
+    /// </summary>
+    public double? Alpha { get; init; }
     public bool Rerank { get; init; }
     public Type? EntityType { get; init; }
     public string[]? Categories { get; init; }
