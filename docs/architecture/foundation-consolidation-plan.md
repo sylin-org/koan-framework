@@ -238,9 +238,14 @@ Each facet (1–4) runs:
     green: linter false-positive fixed (`.cs#Lnnn` source anchors no longer mis-checked), 18 stale
     cross-references repointed (docs-lint → 0 errors), and the code-example validator rescoped to
     **instructional** surfaces only (net10.0, diff-scoped, `<!-- validate:skip -->` opt-out).
-- **Next:** Facet 1 implementation, **stage (a)** — land the additive `Capability`/`CapabilitySet`/
-  `ICapabilities` primitive + per-pillar token catalogs + `FilterSupport` with an enum↔token bridge;
-  conformance specs stay green; the ratchet gates each step.
+  - **Facet 1 stage (a) — additive foundation landed:** `Koan.Core.Capabilities`
+    (`Capability` / `CapabilitySet` / `ICapabilities` / `CapabilityNotSupportedException`) + per-pillar
+    catalogs (`DataCaps`, `VectorCaps`) + `FilterSupport` (generalizing both filter records) + the
+    enum↔token bridge. 14 conformance specs green; whole-solution build + ratchet green. Legacy enums
+    untouched (additive only).
+- **Next:** Facet 1 **stage (b)** — migrate consumers cluster by cluster (data query/write → vector →
+  cache → … → web negotiation sites), each step green via the ratchet, deleting the wrapper-record
+  ceremony (`RepoCaps` / `WriteCapsImpl` / …) as each consumer moves to the new surface.
 - Minor cleanup available anytime: `src/Koan.Data.Lucene/` is a stale `obj`-only leftover from the
   `Koan.Data.SearchEngine` rename (0 tracked, 0 in `Koan.sln`) — delete the directory.
 - Minor cleanup available anytime: `src/Koan.Data.Lucene/` is a stale `obj`-only leftover from the
