@@ -1,24 +1,35 @@
+using System.Collections.Concurrent;
+using Koan.Data.Core;
 using Microsoft.Extensions.Logging;
 
 namespace Koan.Data.AI;
 
 /// <summary>
-/// AI-0036 P2 (W4): detects when a vector index is a <b>mixed-space</b> — built from more than one
-/// embedding model — or when a query embedding's model is absent from the index's model set. Vectors
-/// produced by different models are not comparable, so similarity results across a mixed-space index
-/// are silently wrong; this surfaces that hazard.
+/// W4 (AI-0036 P2): prevents a vector index from silently becoming a <b>mixed-space</b> — built from
+/// more than one embedding model, whose vectors are not comparable. Backed by the durable,
+/// per-(entity, partition) <see cref="VectorModelRegistry{TEntity}"/> maintained at write time, so the
+/// check is O(1) and never stale.
 /// </summary>
 /// <remarks>
-/// Posture is <b>WARN-only</b> (AI-0036 §7 decision 3): it logs + reports, never throws. The hard
-/// throw is deferred until a durable, O(1), never-stale write-time per-collection model registry backs
-/// it — without that, a throw would risk false positives (blocking a legitimate query) and false
-/// negatives. The model set is read from the persisted <see cref="EmbeddingState{TEntity}"/> (the
-/// lifecycle owner already records the producing model per entity), so there is no vector-store scan
-/// and no new infrastructure. <see cref="Evaluate"/> is pure so the decision logic is unit-testable.
+/// Posture (AI-0036 §7 decision 3): <b>throw when knowable, warn for by-design multi-model</b>. The
+/// guard fires at the genuine boundary — the WRITE that would introduce a second model into a
+/// single-model index — and throws <see cref="VectorModelMismatchException"/> there, preventing the
+/// corrupt index rather than detecting it after the fact (this also subsumes the read-time
+/// query-mismatch: a guarded single-model index never mismatches a same-model query). A legitimate
+/// model change re-indexes via the <c>EmbeddingMigrator</c>, which <see cref="Reset"/>s the registry.
+/// An index that is already multi-model is tolerated with a WARN. <see cref="Evaluate"/> stays pure
+/// for unit testing.
 /// </remarks>
 public static class VectorModelGuard
 {
-    /// <summary>Pure decision: given the models that produced the index and an optional query model.</summary>
+    // Per-process confirmation cache: once (entity, partition, model) is recorded in the registry we
+    // skip the registry read on subsequent writes. Best-effort; the registry is the durable truth.
+    private static readonly ConcurrentDictionary<string, byte> _confirmed = new();
+
+    private static string Key(string entity, string partition, string model) => $"{entity}|{partition}|{model}";
+    private static string PartLabel(string p) => string.IsNullOrEmpty(p) ? "" : $" (partition '{p}')";
+
+    /// <summary>Pure decision used for diagnostics/health: given the index's models and an optional query model.</summary>
     public static VectorModelReport Evaluate(string entity, IReadOnlyList<string> indexModels, string? queryModel)
     {
         var mixedSpace = indexModels.Count > 1;
@@ -28,23 +39,93 @@ public static class VectorModelGuard
         return new VectorModelReport(entity, indexModels, mixedSpace, queryMismatch);
     }
 
-    /// <summary>The distinct producing models recorded for this entity's index (from EmbeddingState).</summary>
-    public static async Task<IReadOnlyList<string>> ModelsInIndex<TEntity>(CancellationToken ct = default)
-        where TEntity : class
+    /// <summary>
+    /// Pure write-time decision (unit-testable): what to do when writing <paramref name="model"/> into
+    /// an index whose recorded models are <paramref name="indexModels"/>.
+    /// </summary>
+    public static ModelWriteAction DecideWrite(IReadOnlyList<string> indexModels, string model)
     {
-        var states = await EmbeddingState<TEntity>.All(ct);
-        return states
-            .Select(s => s.Model)
-            .Where(m => !string.IsNullOrEmpty(m))
-            .Select(m => m!)
-            .Distinct(StringComparer.Ordinal)
-            .ToList();
+        if (indexModels.Count == 0) return ModelWriteAction.Record;          // first model -> establish
+        if (indexModels.Contains(model)) return ModelWriteAction.AlreadyPresent;
+        if (indexModels.Count == 1) return ModelWriteAction.Throw;           // 2nd model into single-model index
+        return ModelWriteAction.WarnAndRecord;                              // already multi-model -> tolerate
     }
 
     /// <summary>
-    /// Inspects the index (and optionally a query model), logging a WARNING on a mixed-space index or
-    /// a query-model mismatch, and returns the report for self-reporting. Never throws (warn-only).
-    /// Reads the data store, so call it from diagnostics/boot/admin paths — not on every query.
+    /// Write-time guard: records <paramref name="model"/> as a producer of the current (entity,
+    /// partition) vector index, and THROWS <see cref="VectorModelMismatchException"/> if it would
+    /// introduce a second model into a single-model index. Call immediately before writing a vector.
+    /// Unknown (null/empty) model is a no-op (cannot guard). O(1) after the first write per model.
+    /// </summary>
+    public static async Task GuardWrite<TEntity>(string? model, ILogger? logger = null, CancellationToken ct = default)
+        where TEntity : class
+    {
+        if (string.IsNullOrEmpty(model)) return;
+        var entity = typeof(TEntity).Name;
+        var partition = EntityContext.Current?.Partition ?? string.Empty;
+        if (_confirmed.ContainsKey(Key(entity, partition, model))) return;
+
+        var id = VectorModelRegistry<TEntity>.MakeId(partition);
+        var reg = await VectorModelRegistry<TEntity>.Get(id, ct);
+        var current = reg?.Models ?? (IReadOnlyList<string>)Array.Empty<string>();
+
+        switch (DecideWrite(current, model))
+        {
+            case ModelWriteAction.AlreadyPresent:
+                break;
+            case ModelWriteAction.Throw:
+                // single-model index + a different model = accidental mixed-space -> fail loud at the boundary
+                throw new VectorModelMismatchException(entity, partition, current[0], model);
+            case ModelWriteAction.WarnAndRecord:
+                logger?.LogWarning(
+                    "Vector index for {Entity}{Part} is already multi-model ({Models}); recording '{Model}'. " +
+                    "Mixed-space indexes return unreliable neighbours — re-index via EmbeddingMigrator.",
+                    entity, PartLabel(partition), string.Join(", ", current), model);
+                goto case ModelWriteAction.Record;
+            case ModelWriteAction.Record:
+                reg ??= new VectorModelRegistry<TEntity> { Id = id, Partition = partition };
+                reg.Models.Add(model);
+                await reg.Save(ct);
+                break;
+        }
+
+        _confirmed.TryAdd(Key(entity, partition, model), 0);
+    }
+
+    /// <summary>
+    /// Resets the (entity, partition) registry to a single model — used by the EmbeddingMigrator when
+    /// re-indexing the whole collection to a new model (a by-design model transition), so subsequent
+    /// writes of the target model do not trip <see cref="GuardWrite{TEntity}"/>.
+    /// </summary>
+    public static async Task Reset<TEntity>(string? model, CancellationToken ct = default)
+        where TEntity : class
+    {
+        var entity = typeof(TEntity).Name;
+        var partition = EntityContext.Current?.Partition ?? string.Empty;
+        var id = VectorModelRegistry<TEntity>.MakeId(partition);
+        var reg = await VectorModelRegistry<TEntity>.Get(id, ct)
+                  ?? new VectorModelRegistry<TEntity> { Id = id, Partition = partition };
+        reg.Models = string.IsNullOrEmpty(model) ? new List<string>() : new List<string> { model! };
+        await reg.Save(ct);
+
+        foreach (var k in _confirmed.Keys)
+            if (k.StartsWith($"{entity}|{partition}|", StringComparison.Ordinal))
+                _confirmed.TryRemove(k, out _);
+        if (!string.IsNullOrEmpty(model)) _confirmed.TryAdd(Key(entity, partition, model!), 0);
+    }
+
+    /// <summary>The distinct producing models for the current (entity, partition) index — O(1) registry read.</summary>
+    public static async Task<IReadOnlyList<string>> ModelsInIndex<TEntity>(CancellationToken ct = default)
+        where TEntity : class
+    {
+        var partition = EntityContext.Current?.Partition ?? string.Empty;
+        var reg = await VectorModelRegistry<TEntity>.Get(VectorModelRegistry<TEntity>.MakeId(partition), ct);
+        return reg?.Models ?? (IReadOnlyList<string>)Array.Empty<string>();
+    }
+
+    /// <summary>
+    /// Diagnostics/health self-report: reads the registry and WARNS on a mixed-space index or a
+    /// query-model mismatch (never throws — the hard throw is at write time). Surfaces "models in index".
     /// </summary>
     public static async Task<VectorModelReport> Inspect<TEntity>(
         string? queryModel = null, ILogger? logger = null, CancellationToken ct = default)
@@ -76,3 +157,16 @@ public sealed record VectorModelReport(
     IReadOnlyList<string> Models,
     bool MixedSpace,
     bool QueryMismatch);
+
+/// <summary>The write-time decision for <see cref="VectorModelGuard.DecideWrite"/>.</summary>
+public enum ModelWriteAction
+{
+    /// <summary>First/new model on a fresh or multi-model index — record it.</summary>
+    Record,
+    /// <summary>Model already recorded — no-op.</summary>
+    AlreadyPresent,
+    /// <summary>A second model into a single-model index — fail loud (would create a mixed-space index).</summary>
+    Throw,
+    /// <summary>Index already multi-model — record with a warning (do not block).</summary>
+    WarnAndRecord
+}

@@ -253,7 +253,10 @@ verified-correct: the unified `Filter` AST was *promoted from* the former vector
 - **D3 — W4 ships WARN-only first.** Initial P2: WARN + "models in index" health report (the safe
   asymmetry — never a false-positive block). The hard THROW is added only once a **write-time
   per-collection model registry** (O(1), never stale, accumulated on each `SaveWithVector`) backs it,
-  so the throw cannot fire on stale/false data.
+  so the throw cannot fire on stale/false data. **✅ Resolved (2026-06-01):** the registry
+  (`VectorModelRegistry<TEntity>`, keyed per `(entity, partition)`) and the hard throw shipped exactly
+  as conditioned — `GuardWrite` is called immediately before each `SaveWithVector` (`EmbeddingWorker`,
+  `KoanAutoRegistrar`), and throws only against the durable registry it just read, never on stale data.
 
 ### 10.2 Corrections folded in (advisor-level, from the review)
 
@@ -303,7 +306,19 @@ for surface symmetry; the 3 connector READMEs drop the deleted `VectorFilterExpr
 > AST with the entity path (DATA-0056 collapse done). **P1-AI ✅ shipped** (`fb549bae`) — filter DX on
 > Chain (lambda)/RAG/agent via the typed `VectorRetrieveOptions` seam, `ChainExecutor` catch narrowed,
 > write-path facet auto-stamp (D1). **P2 ✅ shipped** (`37ff99c9`) — `VectorModelGuard` warn-only
-> mixed-space/mismatch detection (D3). **InMemory reference completed** (`3759fa81`). **Container
+> mixed-space/mismatch detection (D3). **W4 hard throw ✅ shipped** — the guard moved from warn-only
+> to a sound **write-time** hard throw backed by the durable, O(1), never-stale `VectorModelRegistry`
+> (per-`(entity, partition)`): `GuardWrite` records the producing model and throws
+> `VectorModelMismatchException` when a write would introduce a second model into a single-model index;
+> `EmbeddingMigrator` calls `Reset` so a by-design re-index transitions cleanly. **Refinement vs the
+> original §7.2 read-time framing:** the guard fires at the WRITE boundary (in `Koan.Data.AI`, where
+> the model and registry are both known) rather than at read time — this is strictly stronger and
+> subsumes the read-time query-mismatch (a guarded single-model index can never mismatch a same-model
+> query), and it sidesteps the layering problem that `Koan.Data.Vector`'s `Vector<T>.Search` cannot
+> resolve the query model. `Evaluate`/`Inspect` remain for warn-only health (already-multi-model
+> indexes are tolerated with a WARN). Covered by pure `DecideWrite` unit specs **plus a live
+> `KoanIntegrationHost` lifecycle spec** (establish → no-op → throw → `Reset` → accept) through real
+> `AddKoan()` + InMemory (ARCH-0079). **InMemory reference completed** (`3759fa81`). **Container
 > harness reference live-verified** (`2bdc7864`) — the PGVector convergence spec asserts adapter
 > id-set == `DictionaryFilterEvaluator` oracle across 14 operators against a real pgvector container,
 > and caught + fixed 3 real adapter bugs (Dapper vector binding; Npgsql type reload after CREATE
@@ -314,8 +329,8 @@ for surface symmetry; the 3 connector READMEs drop the deleted `VectorFilterExpr
 > metadata-key paths on Qdrant/Milvus; ES F6 `knn.filter`; ES/OS `metadata.<key>.keyword` mapping;
 > Weaviate metadata persistence + camelCase property names + explicit `tokenization=field` /
 > `indexNullState=true` schema for null-inclusive negation). Samples build green. **Remaining
-> (deferred follow-ups):** W4 hard throw + write-time model registry; a shared Lucene base for ES/OS
-> (currently duplicated-but-capability-pinned).
+> (deferred follow-up):** a shared Lucene base for ES/OS (the two filter translators are currently
+> byte-identical but duplicated — fold into one capability-pinned source of truth to eliminate drift).
 
 - **P1a — additive foundation (no breaking change, no decision blocks it).** `VectorFilterCapabilities`
   (unified `FilterOperator` + `IgnoreCase` + `NestedPaths`; `None`/`Full`); schemaless `VectorFilterReader`
@@ -342,9 +357,15 @@ for surface symmetry; the 3 connector READMEs drop the deleted `VectorFilterExpr
   convenience overloads; agent `{type}_search` + `{type}_query` gain a JSON-DSL `filter` (parsed via the
   schemaless reader for `_search`) + `alpha`; a **PHIL-1 back-compat spec lands first** (no-filter ==
   today at all three entry points).
-- **P2 — W4 guard (WARN-only).** `VectorModelGuard` reads the model-set, **warns** + health-reports on
-  mismatch (silent same-model pass); "models present" in the vector boot/health report. THROW deferred
-  to a follow-up that adds the write-time model registry.
+- **P2 — W4 guard (WARN-only, shipped first).** `VectorModelGuard` reads the model-set, **warns** +
+  health-reports on mismatch (silent same-model pass); "models present" in the vector boot/health report.
+- **P2-followup — W4 hard throw (✅ shipped, supersedes the WARN-only severity at write time).** The
+  durable `VectorModelRegistry<TEntity>` (per `(entity, partition)`) is maintained at write time by
+  `GuardWrite`, which throws `VectorModelMismatchException` on a second model into a single-model index
+  and tolerates already-multi-model indexes with a WARN; `EmbeddingMigrator.Reset` handles by-design
+  transitions. This is the write-time realization of §7.2 decision 3 ("throw when knowable") — strictly
+  stronger than the originally-sketched read-time check and free of its `Koan.Data.Vector` layering
+  problem. `Evaluate`/`Inspect` stay for warn-only diagnostics.
 
 ### 10.4 Test surfaces
 

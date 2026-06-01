@@ -41,4 +41,26 @@ public sealed class VectorModelGuardSpecs
         r.MixedSpace.Should().BeFalse();
         r.QueryMismatch.Should().BeFalse("an empty index cannot mismatch — there is nothing to compare against");
     }
+
+    // --- W4 write-time decision (hard throw) ---
+
+    [Fact]
+    public void Write_to_empty_index_records()
+        => VectorModelGuard.DecideWrite(System.Array.Empty<string>(), "a").Should().Be(ModelWriteAction.Record);
+
+    [Fact]
+    public void Write_same_model_is_noop()
+        => VectorModelGuard.DecideWrite(new[] { "a" }, "a").Should().Be(ModelWriteAction.AlreadyPresent);
+
+    [Fact]
+    public void Write_second_model_into_single_model_index_throws()
+        => VectorModelGuard.DecideWrite(new[] { "a" }, "b").Should().Be(ModelWriteAction.Throw);
+
+    [Fact]
+    public void Write_into_already_multi_model_index_warns_and_records()
+        => VectorModelGuard.DecideWrite(new[] { "a", "b" }, "c").Should().Be(ModelWriteAction.WarnAndRecord);
+
+    [Fact]
+    public void Write_existing_model_into_multi_model_index_is_noop()
+        => VectorModelGuard.DecideWrite(new[] { "a", "b" }, "a").Should().Be(ModelWriteAction.AlreadyPresent);
 }

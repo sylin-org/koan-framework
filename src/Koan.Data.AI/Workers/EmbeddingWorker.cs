@@ -267,6 +267,9 @@ public class EmbeddingWorker(
                 estimatedCost: estimatedCost,
                 success: true);
 
+            // W4 (AI-0036 P2): fail loud before writing if this model would make the index mixed-space.
+            await VectorModelGuard.GuardWrite<TEntity>(metadata.Model ?? job.Model, ct: ct);
+
             // Store in vector database — stamp the producing model/source (provenance, AI-0036 W1) plus
             // the entity's filterable facets under their CLR property names (AI-0036 D1), so metadata
             // filters (incl. the Chain lambda DX) work by construction.

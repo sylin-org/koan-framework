@@ -471,6 +471,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             embedding = await Koan.AI.Client.Embed(text, ct);
         }
 
+        // W4 (AI-0036 P2): fail loud before writing if this model would make the index mixed-space.
+        await VectorModelGuard.GuardWrite<TEntity>(metadata.Model, ct: ct);
+
         // Store in vector database — provenance (AI-0036 W2) + filterable facets (AI-0036 D1).
         var provenance = VectorProvenance.Build(
             metadata.Model, metadata.Source, metadata.Version,

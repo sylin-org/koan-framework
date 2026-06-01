@@ -63,6 +63,10 @@ public static class EmbeddingMigrator
             "Starting re-embedding migration for {EntityType}: model={Model}, source={Source}, provider={Provider}",
             typeof(TEntity).Name, targetModel ?? "default", targetSource ?? "default", targetProvider ?? "default");
 
+        // W4 (AI-0036 P2): re-indexing the whole collection IS a by-design model transition — reset the
+        // model registry to the target so the batch writes below don't trip the mixed-space GuardWrite.
+        await VectorModelGuard.Reset<TEntity>(targetModel ?? metadata.Model, ct);
+
         var result = new MigrationResult
         {
             EntityType = typeof(TEntity).Name,
