@@ -32,6 +32,13 @@ public sealed class PGVectorAdapterFactory : IVectorAdapterFactory
     private readonly IServiceProvider _serviceProvider;
     private readonly System.Collections.Concurrent.ConcurrentDictionary<(Type, string?), string> _nameCache = new();
 
+    static PGVectorAdapterFactory()
+    {
+        // Teach Dapper to bind Pgvector.Vector parameters (UseVector() only covers the Npgsql side).
+        // Without this every embedding upsert/search throws "cannot be used as a parameter value".
+        Dapper.SqlMapper.AddTypeHandler(new Pgvector.Dapper.VectorTypeHandler());
+    }
+
     public PGVectorAdapterFactory(IServiceProvider serviceProvider)
     {
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));

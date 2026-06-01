@@ -82,6 +82,11 @@ internal sealed class PGVectorRepository<TEntity, TKey>
 
         await _extensionManager.EnsureExtension(conn, ct);
 
+        // The data source cached its type catalog on first open — before the 'vector' extension type
+        // existed on a fresh database. Reload so Npgsql can resolve 'vector' for parameter binding;
+        // otherwise every embedding upsert/search throws "Cannot resolve 'vector' to a datatype".
+        await conn.ReloadTypesAsync(ct);
+
         var exists = await conn.ExecuteScalarAsync<bool>(
             "SELECT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = @name)",
             new { name = tableName });

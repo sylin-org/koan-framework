@@ -33,14 +33,12 @@
   </ItemGroup>
 
   <!--
-    DATA-0097 P0: these container-backed integration specs + their base drifted against several
-    framework API migrations (Koan.Core.Bootstrap, IAppHost) alongside the adapter they exercise.
-    Quarantined (not deleted) — they are the seed for the resurrected live-Postgres integration
-    specs tracked as part of DATA-0097 (ARCH-0079 live-store verification). The container-free
-    PGVectorFilterTranslator.Spec.cs runs today.
+    DATA-0097 / AI-0036 P1: PGVectorTestBase is resurrected to host the live-Postgres filter
+    CONVERGENCE spec (the adapter's id-set must equal the DictionaryFilterEvaluator oracle over the
+    same seeded corpus — ARCH-0079 live-store verification). The two older repo/semantic specs remain
+    quarantined: they drifted against further framework API migrations and are a separate cleanup.
   -->
   <ItemGroup>
-    <Compile Remove="Support\PGVectorTestBase.cs" />
     <Compile Remove="Specs\PGVectorRepository.Spec.cs" />
     <Compile Remove="Specs\SemanticSearch.Spec.cs" />
   </ItemGroup>

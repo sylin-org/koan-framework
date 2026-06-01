@@ -58,7 +58,11 @@ internal sealed class PGVectorFilterTranslator : IVectorFilterTranslator<PGVecto
             case AllOf all: Compose(all.Operands, "AND", sb, p, ref c); break;
             case AnyOf any: Compose(any.Operands, "OR", sb, p, ref c); break;
             case Not not: sb.Append("NOT ("); Visit(not.Operand, sb, p, ref c); sb.Append(')'); break;
-            case FieldFilter ff: sb.Append(Leaf(ff, p, ref c)); break;
+            // COALESCE(..., FALSE) coerces each leaf to a TOTAL boolean so SQL three-valued logic
+            // matches the oracle's two-valued locked semantics: a missing-key comparison is FALSE
+            // (not NULL), which makes Not(...) negate correctly (e.g. Not(Eq) matches a missing key).
+            // No effect on non-negated leaves (WHERE excludes NULL and FALSE identically).
+            case FieldFilter ff: sb.Append("COALESCE(").Append(Leaf(ff, p, ref c)).Append(", FALSE)"); break;
             default:
                 throw new NotSupportedException($"PGVector cannot translate filter node '{filter.GetType().Name}'.");
         }
