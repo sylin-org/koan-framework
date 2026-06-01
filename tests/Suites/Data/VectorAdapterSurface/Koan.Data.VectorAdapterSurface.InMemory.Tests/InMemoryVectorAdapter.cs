@@ -62,12 +62,26 @@ internal sealed class InMemoryVectorRepository<TEntity, TKey> : IVectorSearchRep
         _stores = stores;
     }
 
+    // AI-0036 §10: the in-memory reference implements every capability it can model in-process —
+    // kNN, metadata filters (via the oracle), hybrid (vector+keyword blend), continuation paging,
+    // streaming export, bulk ops, score normalization, dynamic collections. The two it does NOT
+    // claim are honest omissions of features a single-vector dictionary cannot model: multi-vector
+    // per entity (one embedding per id) and atomic batch (no transaction boundary).
     public VectorCapabilities Capabilities =>
         VectorCapabilities.Knn
+        | VectorCapabilities.Filters
+        | VectorCapabilities.Hybrid
+        | VectorCapabilities.NativeContinuation
+        | VectorCapabilities.StreamingResults
         | VectorCapabilities.BulkUpsert
         | VectorCapabilities.BulkDelete
         | VectorCapabilities.ScoreNormalization
         | VectorCapabilities.DynamicCollections;
+
+    // AI-0036 §10: the in-memory adapter evaluates the full unified Filter via DictionaryFilterEvaluator
+    // — it IS the convergence oracle, so it declares Full and the coordinator passes every filter through.
+    public Koan.Data.Abstractions.Filtering.VectorFilterCapabilities FilterCapabilities
+        => Koan.Data.Abstractions.Filtering.VectorFilterCapabilities.Full;
 
     private ConcurrentDictionary<string, (float[] Embedding, object? Metadata)> Bucket()
     {
@@ -130,16 +144,85 @@ internal sealed class InMemoryVectorRepository<TEntity, TKey> : IVectorSearchRep
         var bucket = Bucket();
         var query = options.Query;
         var topK = options.TopK ?? 10;
+        var offset = ParseOffset(options.ContinuationToken);
+
+        // Filters: apply the metadata predicate BEFORE ranking (the convergence oracle), so the
+        // in-memory adapter returns the reference id-set every real provider must match.
+        var predicate = options.Filter is null
+            ? null
+            : Koan.Data.Abstractions.Filtering.DictionaryFilterEvaluator.Compile(options.Filter);
+
+        // Hybrid: when SearchText + Alpha are supplied, blend the (normalized) cosine with a lexical
+        // keyword score over the entry's metadata; alpha=1 => pure-vector, alpha=0 => pure-keyword.
+        var hybrid = !string.IsNullOrEmpty(options.SearchText) && options.Alpha is not null;
+        var alpha = options.Alpha ?? 1.0;
 
         var ranked = bucket
-            .Select(kvp => (Id: ParseKey(kvp.Key), Similarity: Cosine(query, kvp.Value.Embedding), Metadata: kvp.Value.Metadata))
-            .OrderByDescending(x => x.Similarity)
-            .Take(topK)
-            .Select(x => new VectorMatch<TKey>(x.Id, x.Similarity, x.Metadata))
+            .Where(kvp => predicate is null || predicate(ToBag(kvp.Value.Metadata)))
+            .Select(kvp => (
+                Id: ParseKey(kvp.Key),
+                Score: hybrid
+                    ? alpha * Normalize(Cosine(query, kvp.Value.Embedding)) + (1 - alpha) * Lexical(options.SearchText!, kvp.Value.Metadata)
+                    : Cosine(query, kvp.Value.Embedding),
+                Metadata: kvp.Value.Metadata))
+            .OrderByDescending(x => x.Score)
             .ToList();
 
-        return Task.FromResult(new VectorQueryResult<TKey>(ranked, null, VectorTotalKind.Exact));
+        // NativeContinuation: offset-based paging via an opaque token (the next offset).
+        var page = ranked.Skip(offset).Take(topK)
+            .Select(x => new VectorMatch<TKey>(x.Id, x.Score, x.Metadata))
+            .ToList();
+        var nextOffset = offset + topK;
+        var continuation = nextOffset < ranked.Count ? nextOffset.ToString(System.Globalization.CultureInfo.InvariantCulture) : null;
+
+        return Task.FromResult(new VectorQueryResult<TKey>(page, continuation, VectorTotalKind.Exact));
     }
+
+    private static int ParseOffset(string? token)
+        => int.TryParse(token, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var o) && o > 0 ? o : 0;
+
+    private static double Normalize(double cosine) => (cosine + 1.0) / 2.0; // [-1,1] -> [0,1]
+
+    // Lexical keyword score: fraction of query terms present (case-insensitive) in the stringified
+    // metadata values. 0 when there is no metadata text to match — hybrid then degrades to vector.
+    private static double Lexical(string text, object? metadata)
+    {
+        var terms = text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (terms.Length == 0) return 0;
+        var hay = MetadataText(metadata);
+        if (hay.Length == 0) return 0;
+        var hits = terms.Count(t => hay.Contains(t, StringComparison.OrdinalIgnoreCase));
+        return (double)hits / terms.Length;
+    }
+
+    private static string MetadataText(object? metadata)
+    {
+        if (metadata is null) return "";
+        if (metadata is System.Collections.IDictionary raw)
+        {
+            var sb = new System.Text.StringBuilder();
+            foreach (System.Collections.DictionaryEntry e in raw) sb.Append(e.Value).Append(' ');
+            return sb.ToString();
+        }
+        return metadata.ToString() ?? "";
+    }
+
+    private static IReadOnlyDictionary<string, object?> ToBag(object? metadata) => metadata switch
+    {
+        IReadOnlyDictionary<string, object?> rod => rod,
+        IDictionary<string, object?> d => new Dictionary<string, object?>(d),
+        System.Collections.IDictionary raw => CoerceRaw(raw),
+        _ => EmptyBag
+    };
+
+    private static IReadOnlyDictionary<string, object?> CoerceRaw(System.Collections.IDictionary raw)
+    {
+        var bag = new Dictionary<string, object?>();
+        foreach (System.Collections.DictionaryEntry e in raw) bag[e.Key?.ToString() ?? ""] = e.Value;
+        return bag;
+    }
+
+    private static readonly IReadOnlyDictionary<string, object?> EmptyBag = new Dictionary<string, object?>();
 
     public Task Flush(CancellationToken ct = default)
     {
