@@ -111,7 +111,7 @@ Eight components replace the sprawl:
    Each adapter implements it once. Implementations:
    - `SqlFilterTranslator` over `ISqlDialect` (harvested `ILinqSqlDialect`) → PG/SqlServer/Sqlite;
      dialects supply JSON-containment SQL (`jsonb @>`/`?|`, `OPENJSON … EXISTS`, `json_each … EXISTS`).
-   - `LuceneFilterTranslator` → ES + OS (collapses the byte-identical pair).
+   - `SearchEngineFilterTranslator` → ES + OS (collapses the byte-identical pair; the two engines share an Apache Lucene foundation).
    - `MongoFilterTranslator` (AST → `FilterDefinition`; absorbs the GUID optimization).
    - `N1qlFilterTranslator` (Couchbase; `ANY x IN field SATISFIES x = $p END`).
    - `InMemoryFilterEvaluator` (AST → compiled delegate) — **this is also the fallback floor engine and the test oracle.**

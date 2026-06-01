@@ -13,6 +13,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Instructions;
+using Koan.Data.SearchEngine;
 using Koan.Data.Vector.Abstractions;
 using Koan.Data.Vector.Abstractions.Configuration;
 
@@ -54,7 +55,7 @@ internal sealed class OpenSearchVectorRepository<TEntity, TKey> :
         VectorCapabilities.BulkDelete;
 
     // AI-0036 §10 / DATA-0097 P1: operator-aware metadata-filter capabilities.
-    public Koan.Data.Abstractions.Filtering.VectorFilterCapabilities FilterCapabilities => OpenSearchFilterTranslator.Caps;
+    public Koan.Data.Abstractions.Filtering.VectorFilterCapabilities FilterCapabilities => SearchEngineFilterTranslator.Caps;
 
     public async Task VectorEnsureCreated(CancellationToken ct = default)
     {
@@ -311,7 +312,7 @@ internal sealed class OpenSearchVectorRepository<TEntity, TKey> :
             ["k"] = topK
         };
 
-        var filter = OpenSearchFilterTranslator.TranslateWhereClause(options.Filter, _options.MetadataField);
+        var filter = SearchEngineFilterTranslator.TranslateWhereClause(options.Filter, _options.MetadataField, "OpenSearch");
         if (filter is not null)
         {
             knnFieldBody["filter"] = new JObject

@@ -328,9 +328,18 @@ for surface symmetry; the 3 connector READMEs drop the deleted `VectorFilterExpr
 > never-tested adapter bugs (Dapper vector binding; Npgsql type reload; COALESCE null-negation;
 > metadata-key paths on Qdrant/Milvus; ES F6 `knn.filter`; ES/OS `metadata.<key>.keyword` mapping;
 > Weaviate metadata persistence + camelCase property names + explicit `tokenization=field` /
-> `indexNullState=true` schema for null-inclusive negation). Samples build green. **Remaining
-> (deferred follow-up):** a shared Lucene base for ES/OS (the two filter translators are currently
-> byte-identical but duplicated — fold into one capability-pinned source of truth to eliminate drift).
+> `indexNullState=true` schema for null-inclusive negation). Samples build green. **Shared search-engine
+> base ✅ shipped** — the byte-identical ES/OS filter translators were folded into one capability-pinned
+> source of truth, the new `Koan.Data.SearchEngine` assembly (named for the engine *category* — like
+> `Koan.Data.Relational` — rather than their shared Apache Lucene foundation, so the dependency reads
+> clearly for non-specialists; mirrors the Relational precedent: a shared lib referenced by the
+> connector family). `public static SearchEngineFilterTranslator` owns the single
+> `VectorFilterCapabilities` constant + the Filter→search-engine-query-DSL translation; an `engine`
+> label parameterizes only the not-supported exception messages so a failure still names the actual
+> adapter ("Elasticsearch"/"OpenSearch"). Both connectors call it; the two duplicate files are deleted.
+> **Re-verified live-green** post-refactor: ES 22/0 and OS 22/0 against real containers (identical
+> id-sets to the `DictionaryFilterEvaluator` oracle) — the extract is behavior-preserving. **All
+> AI-0036 follow-ups are now closed.**
 
 - **P1a — additive foundation (no breaking change, no decision blocks it).** `VectorFilterCapabilities`
   (unified `FilterOperator` + `IgnoreCase` + `NestedPaths`; `None`/`Full`); schemaless `VectorFilterReader`
@@ -343,8 +352,8 @@ for surface symmetry; the 3 connector READMEs drop the deleted `VectorFilterExpr
 - **P1b — keystone flip + adapter migration.** Atomic unit: `VectorQueryOptions.Filter` `object?`→`Filter?`
   + `Vector.cs`/`VectorData.cs`/`VectorWorkflowRegistry.cs` (facade routes string/dict through the reader
   once; `VectorData.Search` invokes the coordinator). Then one file at a time: PGVector (reference) →
-  Qdrant → Milvus → Weaviate (reduced caps, no `In`; close composite drops) → shared Lucene base for
-  ES+OS (one capability constant; ES F6 `knn.filter` fix) → the 2 samples (S5.Recs/S7.Meridian). Each
+  Qdrant → Milvus → Weaviate (reduced caps, no `In`; close composite drops) → shared search-engine base
+  for ES+OS (one capability constant; ES F6 `knn.filter` fix) → the 2 samples (S5.Recs/S7.Meridian). Each
   adapter declares `VectorFilterCapabilities`, drops `TryParse`-at-entry, renders `FilterValue.Set/Scalar`,
   and self-reports its operator set in `Describe()`.
 - **P1c — delete legacy.** Remove `Vector/Filtering/VectorFilter*` + `VectorFilterOperator` +

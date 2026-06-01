@@ -13,6 +13,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Instructions;
+using Koan.Data.SearchEngine;
 using Koan.Data.Vector.Abstractions;
 using Koan.Data.Vector.Abstractions.Configuration;
 
@@ -55,7 +56,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
         VectorCapabilities.BulkDelete;
 
     // AI-0036 §10 / DATA-0097 P1: operator-aware metadata-filter capabilities.
-    public Koan.Data.Abstractions.Filtering.VectorFilterCapabilities FilterCapabilities => ElasticSearchFilterTranslator.Caps;
+    public Koan.Data.Abstractions.Filtering.VectorFilterCapabilities FilterCapabilities => SearchEngineFilterTranslator.Caps;
 
     public async Task VectorEnsureCreated(CancellationToken ct = default)
     {
@@ -436,7 +437,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
             ["_source"] = new JArray(_options.MetadataField, _options.IdField)
         };
 
-        var filter = ElasticSearchFilterTranslator.TranslateWhereClause(options.Filter, _options.MetadataField);
+        var filter = SearchEngineFilterTranslator.TranslateWhereClause(options.Filter, _options.MetadataField, "Elasticsearch");
         if (filter is not null)
         {
             // DATA-0097 F6: the filter must PRE-FILTER the kNN (knn.filter), not sit as a top-level

@@ -467,6 +467,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Vector.Connector.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.VectorAdapterSurface.Qdrant.Tests", "tests\Suites\Data\VectorAdapterSurface\Koan.Data.VectorAdapterSurface.Qdrant.Tests\Koan.Data.VectorAdapterSurface.Qdrant.Tests.csproj", "{65FEA071-D444-4426-9AC3-6F1CAE50FE8D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.SearchEngine", "src\Koan.Data.SearchEngine\Koan.Data.SearchEngine.csproj", "{3FD869F9-4861-463B-AFCB-FA74FFF7F214}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -2311,6 +2313,18 @@ Global
 		{65FEA071-D444-4426-9AC3-6F1CAE50FE8D}.Release|x64.Build.0 = Release|Any CPU
 		{65FEA071-D444-4426-9AC3-6F1CAE50FE8D}.Release|x86.ActiveCfg = Release|Any CPU
 		{65FEA071-D444-4426-9AC3-6F1CAE50FE8D}.Release|x86.Build.0 = Release|Any CPU
+		{3FD869F9-4861-463B-AFCB-FA74FFF7F214}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3FD869F9-4861-463B-AFCB-FA74FFF7F214}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3FD869F9-4861-463B-AFCB-FA74FFF7F214}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{3FD869F9-4861-463B-AFCB-FA74FFF7F214}.Debug|x64.Build.0 = Debug|Any CPU
+		{3FD869F9-4861-463B-AFCB-FA74FFF7F214}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{3FD869F9-4861-463B-AFCB-FA74FFF7F214}.Debug|x86.Build.0 = Debug|Any CPU
+		{3FD869F9-4861-463B-AFCB-FA74FFF7F214}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3FD869F9-4861-463B-AFCB-FA74FFF7F214}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3FD869F9-4861-463B-AFCB-FA74FFF7F214}.Release|x64.ActiveCfg = Release|Any CPU
+		{3FD869F9-4861-463B-AFCB-FA74FFF7F214}.Release|x64.Build.0 = Release|Any CPU
+		{3FD869F9-4861-463B-AFCB-FA74FFF7F214}.Release|x86.ActiveCfg = Release|Any CPU
+		{3FD869F9-4861-463B-AFCB-FA74FFF7F214}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -2544,6 +2558,7 @@ Global
 		{6C030598-AFDC-5B51-63CD-AC12A1489819} = {50016D06-9933-125F-84C4-B9F9B90C374B}
 		{94C78214-7616-4A8D-8116-3B2BBD264F34} = {6C030598-AFDC-5B51-63CD-AC12A1489819}
 		{65FEA071-D444-4426-9AC3-6F1CAE50FE8D} = {E19DE968-F9C4-C371-351B-E94BA6875ADF}
+		{3FD869F9-4861-463B-AFCB-FA74FFF7F214} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {669C5778-BFAE-4972-B427-0AFF99562045}

@@ -4,18 +4,25 @@ using System.Linq;
 using Newtonsoft.Json.Linq;
 using Koan.Data.Abstractions.Filtering;
 
-namespace Koan.Data.Connector.ElasticSearch;
+namespace Koan.Data.SearchEngine;
 
 /// <summary>
-/// Translates the unified <see cref="Filter"/> AST into an Elasticsearch query DSL JObject
-/// (AI-0036 §10 / DATA-0097 P1). Caller metadata is stored nested under the configured metadata field
-/// (object, dynamic), so filter fields are prefixed with it; exact-match (term/terms) and wildcard on
-/// STRING values target the dynamic <c>.keyword</c> sub-field (ES maps strings as analyzed text +
-/// a <c>.keyword</c> sub-field, and term/wildcard only match the keyword form). Numeric range and
-/// exists target the bare field. Lucene <c>bool/must_not</c> is null-inclusive, so Ne/Nin/HasNone
-/// match the convergence oracle. Identical to the OpenSearch translator (duplicated-but-pinned).
+/// Translates the unified <see cref="Filter"/> AST into a search-engine query DSL <see cref="JObject"/>
+/// (AI-0036 §10 / DATA-0097 P1). This is the <b>single source of truth</b> shared by the Elasticsearch
+/// and OpenSearch vector connectors — both are built on Apache Lucene and speak the identical query DSL,
+/// so the translation was previously duplicated-but-pinned across the two adapters and is now folded
+/// here to eliminate drift.
 /// </summary>
-internal static class ElasticSearchFilterTranslator
+/// <remarks>
+/// Caller metadata is stored nested under the configured metadata field (object, dynamic), so filter
+/// fields are prefixed with it; exact-match (term/terms) and wildcard on STRING values target the
+/// dynamic <c>.keyword</c> sub-field (Lucene maps strings as analyzed text + a <c>.keyword</c>
+/// sub-field, and term/wildcard only match the keyword form). Numeric range and exists target the bare
+/// field. Lucene <c>bool/must_not</c> is null-inclusive, so Ne/Nin/HasNone match the convergence oracle.
+/// The <c>engine</c> label only personalizes the not-supported exception messages (e.g. "Elasticsearch"
+/// vs "OpenSearch") so a failure names the adapter the caller is actually using.
+/// </remarks>
+public static class SearchEngineFilterTranslator
 {
     public static readonly VectorFilterCapabilities Caps = VectorFilterCapabilities.Of(
         nestedPaths: true, ignoreCase: false,
@@ -26,22 +33,22 @@ internal static class ElasticSearchFilterTranslator
         FilterOperator.Has, FilterOperator.HasAny, FilterOperator.HasAll, FilterOperator.HasNone,
         FilterOperator.Exists);
 
-    public static JObject? TranslateWhereClause(Filter? filter, string metadataField)
-        => filter is null ? null : Translate(filter, metadataField);
+    public static JObject? TranslateWhereClause(Filter? filter, string metadataField, string engine = "Search engine")
+        => filter is null ? null : Translate(filter, metadataField, engine);
 
-    public static JObject Translate(Filter filter, string mf)
+    public static JObject Translate(Filter filter, string mf, string engine = "Search engine")
     {
         return filter switch
         {
-            AllOf and => Bool("must", and.Operands.Select(o => Translate(o, mf))),
-            AnyOf or => new JObject { ["bool"] = new JObject { ["should"] = new JArray(or.Operands.Select(o => Translate(o, mf)).Cast<object>().ToArray()), ["minimum_should_match"] = 1 } },
-            Not not => new JObject { ["bool"] = new JObject { ["must_not"] = new JArray(Translate(not.Operand, mf)) } },
-            FieldFilter cmp => TranslateLeaf(cmp, mf),
-            _ => throw new System.NotSupportedException($"Elasticsearch cannot translate filter node '{filter.GetType().Name}'.")
+            AllOf and => Bool("must", and.Operands.Select(o => Translate(o, mf, engine))),
+            AnyOf or => new JObject { ["bool"] = new JObject { ["should"] = new JArray(or.Operands.Select(o => Translate(o, mf, engine)).Cast<object>().ToArray()), ["minimum_should_match"] = 1 } },
+            Not not => new JObject { ["bool"] = new JObject { ["must_not"] = new JArray(Translate(not.Operand, mf, engine)) } },
+            FieldFilter cmp => TranslateLeaf(cmp, mf, engine),
+            _ => throw new System.NotSupportedException($"{engine} cannot translate filter node '{filter.GetType().Name}'.")
         };
     }
 
-    private static JObject TranslateLeaf(FieldFilter f, string mf)
+    private static JObject TranslateLeaf(FieldFilter f, string mf, string engine)
     {
         switch (f.Operator)
         {
@@ -71,7 +78,7 @@ internal static class ElasticSearchFilterTranslator
                 return present ? exists : MustNot(exists);
             default:
                 throw new System.NotSupportedException(
-                    $"Elasticsearch does not support vector filter operator '{f.Operator}' on metadata field '{f.Field}'.");
+                    $"{engine} does not support vector filter operator '{f.Operator}' on metadata field '{f.Field}'.");
         }
     }
 
