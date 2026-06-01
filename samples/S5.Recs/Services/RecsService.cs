@@ -587,7 +587,7 @@ internal sealed class RecsService : IRecsService
         RecsQuery query,
         CancellationToken ct)
     {
-        // AI-0036 §10 / DATA-0097 P1: the unified Filter AST. Note "genres" is an array metadata key,
+        // AI-0036 §9 / DATA-0097 P1: the unified Filter AST. Note "genres" is an array metadata key,
         // so genre membership is the collection operator Has (array-contains-element) — NOT the string
         // Contains (substring), which the legacy VectorFilter.Contains ambiguously meant here.
         var filters = new List<Filter>();

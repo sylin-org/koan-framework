@@ -40,4 +40,4 @@ matching is not (declared via `VectorFilterCapabilities`).
 ## References
 
 - DATA-0097 Vector Pathway Parity: `~/decisions/DATA-0097-vector-pathway-parity.md`
-- AI-0036 §10.4 — the ES/OS shared base: `~/decisions/AI-0036-embedding-vector-seam.md`
+- AI-0036 §9.4 — the ES/OS shared base: `~/decisions/AI-0036-embedding-vector-seam.md`

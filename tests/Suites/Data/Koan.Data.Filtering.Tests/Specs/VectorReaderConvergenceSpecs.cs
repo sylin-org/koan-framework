@@ -5,7 +5,7 @@ using Xunit;
 namespace Koan.Data.Filtering.Tests.Specs;
 
 /// <summary>
-/// AI-0036 §10 "one filter model" guard: for the shared scalar DSL subset, the schemaless
+/// AI-0036 §9 "one filter model" guard: for the shared scalar DSL subset, the schemaless
 /// <see cref="VectorFilterReader"/> and the type-bound <see cref="JsonFilterParser"/> lower the same
 /// JSON to the same unified <see cref="Filter"/> tree. Proves the two front-ends cannot drift on the
 /// common surface (operators, $and/$or/$nor, $between/wildcard lowering, scalar normalization).

@@ -67,7 +67,7 @@ public static class FilterSplitter
     }
 
     /// <summary>
-    /// Schemaless split for the vector path (AI-0036 §10 / DATA-0097 P1). Same correctness-safe
+    /// Schemaless split for the vector path (AI-0036 §9 / DATA-0097 P1). Same correctness-safe
     /// AllOf/AnyOf/Not rules as <see cref="Split(Filter, FilterCapabilities, Type)"/>, but the
     /// <see cref="FieldFilter"/> arm <b>never calls <see cref="FieldPathResolver"/></b> (vector
     /// metadata has no CLR type to resolve against) — every leaf is treated as a single metadata key,

@@ -190,7 +190,7 @@ parser, same operator-aware capabilities. No new filter dialect.
   and compose it instead of hand-marshalling positional args. The DSL filter is the unified `Filter`
   AST / its JSON form — the single filter dialect, no new vocabulary.
 - **P2 — provenance as a guard.** The W4 mixed-space guard and the "models in index" self-report read
-  the stamped provenance back; the guard throws at the write boundary (§10.1) and the health report
+  the stamped provenance back; the guard throws at the write boundary (§9.1) and the health report
   makes a multi-model index visible.
 
 ## 7. Decisions
@@ -204,7 +204,7 @@ parser, same operator-aware capabilities. No new filter dialect.
    genuine boundary: a write that would introduce a second model into a single-model index throws
    (incomparable spaces = wrong neighbours). An index that is legitimately multi-model by design is
    tolerated with a warn + a "models in index" health report. The throw is realized at write time
-   (§10.1 D3), which is strictly stronger than a read-time query check.
+   (§9.1 D3), which is strictly stronger than a read-time query check.
 3. **`VectorRetrieveOptions` lives in `Koan.Data.Vector`.** It mirrors `Search`'s own surface and
    avoids an AI dependency edge into the store; all pillars reference the one type.
 
@@ -217,7 +217,7 @@ DDR is the **contract between lifecycle and persistence** (write provenance) and
 responsibilities; it ensures the layers that own model/source and RAG intent actually deliver them
 across the seam DATA-0097 left seam-ready.
 
-## 10. Implementation architecture
+## 9. Implementation architecture
 
 This is the joint design of record for DATA-0097's typed vector `Filter` (collapse + capabilities)
 **and** AI-0036's filter DX (P1) and W4 guard (P2), together, because they share one filter model and
@@ -226,7 +226,7 @@ one coordinator. The vector path uses the one unified `Filter` AST — the forme
 `VectorFilterCoordinator` at `VectorData<T>.Search` enforces residual-is-error below every facade
 overload and above all six repositories.
 
-### 10.1 Decisions
+### 9.1 Decisions
 
 - **D1 — filter DX: metadata-key == entity-property is now CANON; lambda is the primary idiom.**
   `Chain.Retrieve<Doc>(q, filter: d => d.Year > 2020)` compiles via `LinqFilterCompiler` exactly like
@@ -257,7 +257,7 @@ overload and above all six repositories.
   a guarded single-model index can never mismatch a same-model query — and avoids the layering problem
   that `Koan.Data.Vector` cannot resolve the query model.
 
-### 10.2 Filter semantics & capability contract
+### 9.2 Filter semantics & capability contract
 
 1. **The convergence oracle must be built, not assumed.** `InMemoryFilterEvaluator` is type-bound and
    `InMemoryVectorRepository.Search` ignores `options.Filter`. P1a adds a **schemaless
@@ -287,7 +287,7 @@ list), so a missing key is oracle-consistent — `false` for `Eq`, `true` for `N
 null semantics above. A shared `Koan.Data.Vector.TestKit` hosts the InMemory adapter + oracle so the
 six connector test projects and the conformance project reference one definition.
 
-### 10.3 Components
+### 9.3 Components
 
 The pieces below make up the as-built architecture. They carry their original P-labels because code
 comments reference them as anchors; the labels are descriptive groupings, not a delivery sequence.
@@ -305,7 +305,7 @@ comments reference them as anchors; the labels are descriptive groupings, not a 
   `VectorData.Search` invokes the coordinator. Each adapter declares its `VectorFilterCapabilities`,
   renders `FilterValue.Set`/`Scalar`, and self-reports its operator set in `Describe()`: PGVector (the
   reference, full operator set over JSONB), Qdrant, Milvus, Weaviate (intentionally reduced — no `In`),
-  and Elasticsearch + OpenSearch (which share `SearchEngineFilterTranslator`; see §10.4).
+  and Elasticsearch + OpenSearch (which share `SearchEngineFilterTranslator`; see §9.4).
 - **P1-AI — filter DX slots.** The embedding write path auto-stamps CLR-named filterable metadata
   (which makes the lambda sound by construction); `VectorRetrieveOptions` lives in `Koan.Data.Vector`;
   `Chain.Retrieve<T>` takes `Expression<Func<T,bool>>? filter` (+ `Filter?` on `ChainStep`) and
@@ -318,9 +318,9 @@ comments reference them as anchors; the labels are descriptive groupings, not a 
   throws `VectorModelMismatchException` when a write would introduce a second model into a single-model
   index; an already-multi-model index is tolerated with a WARN, and `EmbeddingMigrator.Reset` clears
   the registry for a by-design transition. `Evaluate`/`Inspect` surface "models in index" as warn-only
-  health. (Design rationale in §10.1 D3.)
+  health. (Design rationale in §9.1 D3.)
 
-### 10.4 The Elasticsearch / OpenSearch shared base
+### 9.4 The Elasticsearch / OpenSearch shared base
 
 Elasticsearch and OpenSearch are built on the same Apache Lucene query DSL, so a single
 `SearchEngineFilterTranslator` in the `Koan.Data.SearchEngine` assembly is their one source of truth
@@ -333,7 +333,7 @@ parameterizes only the not-supported exception messages, so a failure still name
 numeric range and exists target the bare field; Lucene's null-inclusive `bool/must_not` gives
 `Ne`/`Nin`/`HasNone` their oracle-matching semantics.
 
-### 10.5 Verification
+### 9.5 Verification
 
 The container-free conformance matrix checks every adapter's pushdown against the
 `DictionaryFilterEvaluator` oracle: MISSING-key null-semantics rows, coercion rows,

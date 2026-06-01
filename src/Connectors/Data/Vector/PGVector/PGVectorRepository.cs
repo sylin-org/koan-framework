@@ -58,7 +58,7 @@ internal sealed class PGVectorRepository<TEntity, TKey>
         VectorCapabilities.BulkDelete |
         VectorCapabilities.DynamicCollections;
 
-    // AI-0036 §10 / DATA-0097 P1: PGVector is the reference adapter — full operator set over JSONB.
+    // AI-0036 §9 / DATA-0097 P1: PGVector is the reference adapter — full operator set over JSONB.
     public Koan.Data.Abstractions.Filtering.VectorFilterCapabilities FilterCapabilities => PGVectorFilterTranslator.Caps;
 
     private string TableName => VectorAdapterNaming.GetOrCompute<TEntity, TKey>(_sp).ToLowerInvariant();
@@ -258,7 +258,7 @@ internal sealed class PGVectorRepository<TEntity, TKey>
         var parameters = new DynamicParameters();
         parameters.Add("embedding", new PgVec(options.Query));
 
-        // AI-0036 §10 / DATA-0097 P1: options.Filter is the typed, coordinator-validated (fully
+        // AI-0036 §9 / DATA-0097 P1: options.Filter is the typed, coordinator-validated (fully
         // pushable) unified Filter. Render it straight to SQL — no re-parse, no silent fallback.
         var where = PGVectorFilterTranslator.Translate(options.Filter, parameters);
         if (!string.IsNullOrEmpty(where))

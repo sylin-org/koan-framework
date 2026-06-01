@@ -5,7 +5,7 @@ namespace Koan.Data.Vector.Abstractions;
 /// <summary>
 /// Per-adapter anti-corruption contract that renders the unified <see cref="Filter"/> AST into a
 /// provider's native metadata-filter representation. The vector analogue of the entity path's
-/// <c>IFilterTranslator&lt;TNative&gt;</c> (AI-0036 §10 / DATA-0097 P1).
+/// <c>IFilterTranslator&lt;TNative&gt;</c> (AI-0036 §9 / DATA-0097 P1).
 /// </summary>
 /// <remarks>
 /// Two deliberate differences from the entity translator:

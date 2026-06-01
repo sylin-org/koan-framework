@@ -65,7 +65,7 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
         | VectorCapabilities.ScoreNormalization
         | VectorCapabilities.DynamicCollections;
 
-    // AI-0036 §10 / DATA-0097 P1: operator-aware metadata-filter capabilities.
+    // AI-0036 §9 / DATA-0097 P1: operator-aware metadata-filter capabilities.
     public Koan.Data.Abstractions.Filtering.VectorFilterCapabilities FilterCapabilities => MilvusFilterTranslator.Caps;
 
     // ─────────────────────────────────────────────────────────────────────────────

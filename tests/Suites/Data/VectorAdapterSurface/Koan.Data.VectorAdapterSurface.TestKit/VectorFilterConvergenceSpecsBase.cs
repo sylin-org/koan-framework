@@ -7,7 +7,7 @@ using Xunit;
 namespace Koan.Data.VectorAdapterSurface.TestKit;
 
 /// <summary>
-/// ARCH-0079 live-store CONVERGENCE for the unified metadata filter (AI-0036 §10 / DATA-0097 P1),
+/// ARCH-0079 live-store CONVERGENCE for the unified metadata filter (AI-0036 §9 / DATA-0097 P1),
 /// shared across every vector adapter. Seeds a corpus (with deliberate null/missing-key rows) and,
 /// for each operator, asserts the adapter's id-set EQUALS the <see cref="DictionaryFilterEvaluator"/>
 /// oracle over the same corpus. Per-provider capability variance is handled uniformly: an operator a

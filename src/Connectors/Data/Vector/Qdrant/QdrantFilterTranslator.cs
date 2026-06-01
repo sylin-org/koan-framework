@@ -9,7 +9,7 @@ namespace Koan.Data.Vector.Connector.Qdrant;
 /// <summary>
 /// Translates the unified <see cref="Filter"/> AST into Qdrant's structured filter DSL
 /// (must / should / must_not arrays of <c>{ key, match | range | values_count | is_empty }</c>),
-/// per AI-0036 §10 / DATA-0097 P1.
+/// per AI-0036 §9 / DATA-0097 P1.
 /// </summary>
 /// <remarks>
 /// Qdrant's <c>must_not</c> is naturally null-inclusive (a point lacking the key satisfies a negated

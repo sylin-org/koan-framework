@@ -6,7 +6,7 @@ namespace Koan.Data.AI;
 
 /// <summary>
 /// Extracts an entity's <b>filterable facets</b> as vector metadata keyed by CLR property name
-/// (AI-0036 §10 D1). Stamping these at embed-write time is what makes the lambda filter DX sound by
+/// (AI-0036 §9 D1). Stamping these at embed-write time is what makes the lambda filter DX sound by
 /// construction: <c>Chain.Retrieve&lt;Doc&gt;(q, filter: d =&gt; d.Year &gt; 2020)</c> lowers to a metadata
 /// key <c>"Year"</c> that this method guarantees exists on the stored vector.
 /// </summary>

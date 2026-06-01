@@ -5,7 +5,7 @@ namespace Koan.Data.Vector.Connector.Weaviate;
 
 /// <summary>
 /// Translates the unified <see cref="Filter"/> AST into Weaviate GraphQL <c>where</c> syntax
-/// (AI-0036 §10 / DATA-0097 P1). Weaviate is the intentionally REDUCED reference: it declares fewer
+/// (AI-0036 §9 / DATA-0097 P1). Weaviate is the intentionally REDUCED reference: it declares fewer
 /// operators than PGVector, so the coordinator hard-errors on the rest — exercising the
 /// residual-is-error path. <c>Ne</c> is rendered null-inclusively as <c>Not(Equal)</c> (Weaviate Not
 /// includes rows lacking the property); <c>Exists</c> maps to <c>IsNull</c>; wildcards map to

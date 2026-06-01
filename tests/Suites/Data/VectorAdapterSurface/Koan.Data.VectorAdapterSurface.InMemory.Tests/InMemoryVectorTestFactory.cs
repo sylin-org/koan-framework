@@ -31,7 +31,7 @@ public sealed class InMemoryVectorTestFactory : IVectorAdapterTestFactory
     public int EmbeddingDimension => 8;
 
     // Capability overrides — the in-memory reference implements every capability it can model
-    // in-process (AI-0036 §10). Multi-vector-per-entity and atomic-batch are honestly omitted (a
+    // in-process (AI-0036 §9). Multi-vector-per-entity and atomic-batch are honestly omitted (a
     // single-vector, non-transactional dictionary cannot model them).
     public bool SupportsGetEmbedding         => true;
     public bool SupportsBulkOperations       => true;

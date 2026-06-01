@@ -8,7 +8,7 @@ namespace Koan.Data.SearchEngine;
 
 /// <summary>
 /// Translates the unified <see cref="Filter"/> AST into a search-engine query DSL <see cref="JObject"/>
-/// (AI-0036 §10 / DATA-0097 P1). This is the <b>single source of truth</b> shared by the Elasticsearch
+/// (AI-0036 §9 / DATA-0097 P1). This is the <b>single source of truth</b> shared by the Elasticsearch
 /// and OpenSearch vector connectors — both are built on Apache Lucene and speak the identical query DSL,
 /// so the translation was previously duplicated-but-pinned across the two adapters and is now folded
 /// here to eliminate drift.

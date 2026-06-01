@@ -6,7 +6,7 @@ public sealed record VectorQueryOptions(
     float[] Query,
     int? TopK = null,
     string? ContinuationToken = null,
-    // AI-0036 §10 / DATA-0097 P1: the typed, unified Filter slot (was object?). The Vector<T>/workflow
+    // AI-0036 §9 / DATA-0097 P1: the typed, unified Filter slot (was object?). The Vector<T>/workflow
     // facades parse string/dict/JSON into this once via VectorFilterReader; VectorFilterCoordinator
     // then validates it (residual-is-error) before any repo sees it.
     Filter? Filter = null,

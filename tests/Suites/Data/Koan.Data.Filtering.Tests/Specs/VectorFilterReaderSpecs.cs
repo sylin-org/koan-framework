@@ -5,7 +5,7 @@ using Xunit;
 namespace Koan.Data.Filtering.Tests.Specs;
 
 /// <summary>
-/// AI-0036 §10 / DATA-0097 P1: the schemaless metadata reader parses the same Mongo-flavoured DSL as
+/// AI-0036 §9 / DATA-0097 P1: the schemaless metadata reader parses the same Mongo-flavoured DSL as
 /// the entity <see cref="JsonFilterParser"/> into the unified <see cref="Filter"/> AST, fail-loud,
 /// without a CLR type. Proves null=no-filter, Filter passthrough, scalar normalization, the operator
 /// set, redundant-form lowering, and the no-lossy-wildcard / fail-loud guards.

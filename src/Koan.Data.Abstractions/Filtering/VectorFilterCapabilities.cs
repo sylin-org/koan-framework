@@ -8,7 +8,7 @@ namespace Koan.Data.Abstractions.Filtering;
 /// statically known — so the capability is a single operator set rather than two.
 /// </summary>
 /// <remarks>
-/// AI-0036 §10 / DATA-0097 P1. This is the contract the <c>VectorFilterCoordinator</c> negotiates
+/// AI-0036 §9 / DATA-0097 P1. This is the contract the <c>VectorFilterCoordinator</c> negotiates
 /// against. Unlike the entity path, an operator the adapter cannot push is <b>not</b> routed to an
 /// in-memory residual — vector search has no in-memory floor (post-kNN filtering silently
 /// under-returns, DATA-0097 §3), so an un-pushable node is a hard error. An adapter therefore

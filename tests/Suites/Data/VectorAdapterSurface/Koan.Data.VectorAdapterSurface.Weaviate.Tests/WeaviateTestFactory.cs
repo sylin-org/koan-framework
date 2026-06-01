@@ -35,7 +35,7 @@ public sealed class WeaviateTestFactory : IVectorAdapterTestFactory
     public bool SupportsFlush                => true;
     public bool SupportsExportAll            => true;
     public bool SupportsHybridSearch         => true;  // Weaviate is the only one
-    // AI-0036 §10: metadata properties created explicitly with tokenization=field + class-level
+    // AI-0036 §9: metadata properties created explicitly with tokenization=field + class-level
     // indexNullState=true, so exact Equal/NotEqual and null-inclusive negation (Ne/Not via De Morgan
     // + Or IsNull) work. Live-verified.
     public bool SupportsMetadataFilters      => true;

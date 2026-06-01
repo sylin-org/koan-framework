@@ -182,7 +182,7 @@ public static class VectorData<TEntity>
     public static Task<VectorQueryResult<string>> Search(VectorQueryOptions options, CancellationToken ct = default)
     {
         var repo = Repo;
-        // AI-0036 §10 / DATA-0097 P1: validate + split the filter (residual-is-error) before the repo
+        // AI-0036 §9 / DATA-0097 P1: validate + split the filter (residual-is-error) before the repo
         // sees it. This is one of the two read boundaries (the other is the workflow registry).
         var gated = Querying.VectorFilterCoordinator.Gate(options, repo);
         return repo.Search(gated, ct);

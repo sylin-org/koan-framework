@@ -30,7 +30,7 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
 
     public VectorCapabilities Capabilities => VectorCapabilities.Knn | VectorCapabilities.Filters | VectorCapabilities.BulkUpsert | VectorCapabilities.BulkDelete | VectorCapabilities.Hybrid | VectorCapabilities.NativeContinuation | VectorCapabilities.DynamicCollections;
 
-    // AI-0036 §10 / DATA-0097 P1: reduced operator-aware metadata-filter capabilities.
+    // AI-0036 §9 / DATA-0097 P1: reduced operator-aware metadata-filter capabilities.
     public Koan.Data.Abstractions.Filtering.VectorFilterCapabilities FilterCapabilities => WeaviateFilterTranslator.Caps;
 
     public WeaviateVectorRepository(IHttpClientFactory httpFactory, IOptions<WeaviateOptions> options, IServiceProvider sp)
@@ -79,7 +79,7 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
             _schemaEnsured = true; return;
         }
         // Create class with manual vectors. indexNullState=true makes the IsNull operator usable
-        // (AI-0036 §10) — required for null-inclusive negation (Ne/Not match rows lacking the property).
+        // (AI-0036 §9) — required for null-inclusive negation (Ne/Not match rows lacking the property).
         var body = new
         {
             @class = cls,
@@ -193,7 +193,7 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         // Weaviate requires UUID ids; derive a deterministic UUID from the entity id (namespaced by class) for stable mapping
         var uuid = DeterministicGuidFromString(ClassName, id!.ToString()!);
 
-        // Persist the caller metadata as Weaviate properties so it is filterable (AI-0036 §10). Define
+        // Persist the caller metadata as Weaviate properties so it is filterable (AI-0036 §9). Define
         // each property EXPLICITLY (tokenization=field) before insert so exact Equal/NotEqual work —
         // autoSchema would otherwise create text properties with "word" tokenization, breaking negation.
         await EnsureMetadataProperties(metadata, ct);
@@ -301,7 +301,7 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         System.Collections.Concurrent.ConcurrentDictionary<string, byte>> _ensuredProps = new();
 
     /// <summary>
-    /// AI-0036 §10: define each caller-metadata property EXPLICITLY before insert with
+    /// AI-0036 §9: define each caller-metadata property EXPLICITLY before insert with
     /// <c>tokenization=field</c> (exact Equal/NotEqual) — autoSchema would otherwise create text
     /// properties with "word" tokenization, breaking negation. Idempotent (422 = already exists);
     /// cached per class to avoid redundant schema calls.
@@ -354,7 +354,7 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         _ => ("text", true)
     };
 
-    // AI-0036 §10: copy caller metadata into Weaviate object properties so it is filterable.
+    // AI-0036 §9: copy caller metadata into Weaviate object properties so it is filterable.
     private static void AppendMetadataProperties(Dictionary<string, object?> properties, object? metadata)
     {
         if (metadata is not System.Collections.IDictionary dict) return;

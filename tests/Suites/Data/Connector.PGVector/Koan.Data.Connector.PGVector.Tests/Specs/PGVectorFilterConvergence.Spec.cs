@@ -7,7 +7,7 @@ using Xunit;
 namespace Koan.Data.Connector.PGVector.Tests.Specs;
 
 /// <summary>
-/// ARCH-0079 live-store CONVERGENCE (AI-0036 §10 / DATA-0097 P1): proves the PGVector translator's
+/// ARCH-0079 live-store CONVERGENCE (AI-0036 §9 / DATA-0097 P1): proves the PGVector translator's
 /// SQL actually executes against real Postgres+pgvector and returns the SAME id-set as the
 /// <see cref="DictionaryFilterEvaluator"/> oracle over an identical seeded corpus — including the
 /// null/missing-key edge cases that distinguish the locked Ne/Nin/HasNone semantics. This is the

@@ -55,7 +55,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
         VectorCapabilities.BulkUpsert |
         VectorCapabilities.BulkDelete;
 
-    // AI-0036 §10 / DATA-0097 P1: operator-aware metadata-filter capabilities.
+    // AI-0036 §9 / DATA-0097 P1: operator-aware metadata-filter capabilities.
     public Koan.Data.Abstractions.Filtering.VectorFilterCapabilities FilterCapabilities => SearchEngineFilterTranslator.Caps;
 
     public async Task VectorEnsureCreated(CancellationToken ct = default)

@@ -6,7 +6,7 @@ using Xunit;
 namespace Koan.Data.Connector.PGVector.Tests.Specs;
 
 /// <summary>
-/// Container-free conformance specs for the PGVector metadata filter translator (AI-0036 §10 /
+/// Container-free conformance specs for the PGVector metadata filter translator (AI-0036 §9 /
 /// DATA-0097 P1). Proves it renders the unified <see cref="Filter"/> AST into a real parameterized
 /// JSONB predicate, with the null-inclusive forms for Ne/Nin/HasNone, and is fail-loud / injection-safe.
 /// Every leaf is wrapped in <c>COALESCE(..., FALSE)</c> so it is a total boolean — this is what makes

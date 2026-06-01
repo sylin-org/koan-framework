@@ -4,7 +4,7 @@ namespace Koan.Data.Abstractions.Filtering;
 
 /// <summary>
 /// Parses the Koan JSON filter DSL into the unified <see cref="Filter"/> AST for <b>schemaless
-/// vector metadata</b> (AI-0036 §10 / DATA-0097 P1). The schemaless twin of
+/// vector metadata</b> (AI-0036 §9 / DATA-0097 P1). The schemaless twin of
 /// <see cref="JsonFilterParser"/>: it accepts the same Mongo-flavoured surface
 /// (<c>$and/$or/$not/$nor</c>, <c>$eq/$ne/$gt/$gte/$lt/$lte</c>, <c>$in/$nin/$exists/$between/$contains</c>,
 /// wildcard strings, <c>$options.ignoreCase</c>) so a filter authored for <c>?filter=</c> reads the
@@ -17,7 +17,7 @@ namespace Koan.Data.Abstractions.Filtering;
 /// <list type="bullet">
 /// <item>No <c>FieldPathResolver</c> / <c>FilterValueConverter</c>: a field is a metadata key
 /// (<see cref="FieldPath.Of(string[])"/> on the dotted name) and scalars keep their JSON-normalized
-/// CLR type (long/double/bool/string/DateTime/Guid) — the coercion contract (AI-0036 §10.2.6).</item>
+/// CLR type (long/double/bool/string/DateTime/Guid) — the coercion contract (AI-0036 §9.2.6).</item>
 /// <item>Collection-ness cannot be inferred, so the scalar keywords keep scalar meaning (<c>$in</c> →
 /// <see cref="FilterOperator.In"/>, not HasAny) and array-valued metadata uses the <b>explicit</b>
 /// collection keywords <c>$has/$hasAny/$hasAll/$hasNone/$size</c>. (The CLR-typed
@@ -172,7 +172,7 @@ public static class VectorFilterReader
         var starts = s.StartsWith('*');
         var ends = s.EndsWith('*');
         var core = s.Trim('*');
-        // AI-0036 §10.2.4: no lossy coercion. An interior wildcard has no exact unified target.
+        // AI-0036 §9.2.4: no lossy coercion. An interior wildcard has no exact unified target.
         if (core.Contains('*'))
             throw new FilterParseException(
                 $"Vector filter pattern '{s}' on '{path}' has an interior wildcard, which has no exact " +

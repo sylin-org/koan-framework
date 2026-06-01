@@ -5,7 +5,7 @@ using Xunit;
 namespace Koan.Data.Filtering.Tests.Specs;
 
 /// <summary>
-/// AI-0036 §10 / DATA-0097 P1: the schemaless convergence ORACLE. Pins the locked null/Nin/HasNone
+/// AI-0036 §9 / DATA-0097 P1: the schemaless convergence ORACLE. Pins the locked null/Nin/HasNone
 /// semantics over metadata bags (the reference id-set every vector adapter's native pushdown must
 /// match), including the data-leak-critical MISSING-key rows and numeric-tolerant comparison.
 /// </summary>

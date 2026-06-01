@@ -275,7 +275,7 @@ must be honest — an unsupported operator cannot degrade, it must 400.
 
 > The storage half of this pathway (the filter collapse + capabilities + coordinator — this DDR's P1)
 > and the AI filter DX + W4 guard (AI-0036 P1/P2) share one filter model and one coordinator; their
-> joint implementation architecture is in [AI-0036 §10](AI-0036-embedding-vector-seam.md).
+> joint implementation architecture is in [AI-0036 §9](AI-0036-embedding-vector-seam.md).
 
 **Phase 1 — Keystone (the frozen contract).** `VectorFilterReader`, `VectorFilterCapabilities`,
 `IVectorFilterTranslator`, `VectorFilterCoordinator`, and the typed `VectorQueryOptions.Filter`,

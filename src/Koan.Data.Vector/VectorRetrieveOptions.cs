@@ -4,7 +4,7 @@ namespace Koan.Data.Vector;
 
 /// <summary>
 /// The typed retrieval-options seam shared by every AI read path (Chain.Retrieve, RAG, agent
-/// {type}_search) — AI-0036 §10 R4. It maps 1:1 onto <c>Vector&lt;T&gt;.Search</c>'s real surface so a
+/// {type}_search) — AI-0036 §9 R4. It maps 1:1 onto <c>Vector&lt;T&gt;.Search</c>'s real surface so a
 /// knob can never again be silently dropped by hand-marshalled positional reflection (the R1/R2/R4
 /// bug). It lives in <c>Koan.Data.Vector</c> so all three orchestration pillars reference one type
 /// with no AI-&gt;store-internals dependency edge.

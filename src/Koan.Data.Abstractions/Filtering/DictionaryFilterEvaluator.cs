@@ -6,7 +6,7 @@ namespace Koan.Data.Abstractions.Filtering;
 /// <summary>
 /// Executes a <see cref="Filter"/> against schemaless metadata bags
 /// (<see cref="IReadOnlyDictionary{TKey,TValue}"/> keyed by metadata key). This is the
-/// <b>convergence oracle</b> for the vector path (AI-0036 §10 / DATA-0097 P1): the reference
+/// <b>convergence oracle</b> for the vector path (AI-0036 §9 / DATA-0097 P1): the reference
 /// result-set every vector adapter's native pushdown must match over a seeded corpus, and the
 /// filter the in-memory test adapter applies.
 /// </summary>

@@ -10,7 +10,7 @@ internal sealed record PGVectorWhere(string? Sql, DynamicParameters Parameters);
 
 /// <summary>
 /// Translates the unified <see cref="Filter"/> AST into a parameterized SQL predicate over the JSONB
-/// <c>metadata</c> column (AI-0036 §10 / DATA-0097 P1). PGVector has the richest filter substrate of
+/// <c>metadata</c> column (AI-0036 §9 / DATA-0097 P1). PGVector has the richest filter substrate of
 /// any vector adapter (full SQL over JSONB), so it is the reference: it declares the complete operator
 /// set and emits the <b>null-inclusive</b> forms for <c>Ne/Nin/HasNone</c> so its result-set matches
 /// the convergence oracle's locked null semantics. It is fail-loud — the coordinator has already

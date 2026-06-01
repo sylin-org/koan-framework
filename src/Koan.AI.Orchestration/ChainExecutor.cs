@@ -473,7 +473,7 @@ internal sealed class ChainExecutor : IChainExecutor
                 return results;
             }
 
-            // AI-0036 §10 R4: forward a typed VectorRetrieveOptions instead of a positional array, so a
+            // AI-0036 §9 R4: forward a typed VectorRetrieveOptions instead of a positional array, so a
             // knob can never be silently dropped. Search(float[], VectorRetrieveOptions, ct).
             var searchMethod = vectorType.GetMethod("Search", [
                 typeof(float[]),

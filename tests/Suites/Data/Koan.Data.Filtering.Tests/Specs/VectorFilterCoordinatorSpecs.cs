@@ -7,7 +7,7 @@ using Xunit;
 namespace Koan.Data.Filtering.Tests.Specs;
 
 /// <summary>
-/// AI-0036 §10 / DATA-0097 P1: the residual-is-error gate. The coordinator returns a fully-pushable
+/// AI-0036 §9 / DATA-0097 P1: the residual-is-error gate. The coordinator returns a fully-pushable
 /// filter or throws <see cref="VectorFilterUnsupportedException"/> — it NEVER returns a residual for
 /// in-memory evaluation (vector search has no in-memory floor; post-kNN filtering under-returns).
 /// </summary>

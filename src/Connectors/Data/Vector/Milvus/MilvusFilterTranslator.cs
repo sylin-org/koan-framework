@@ -8,7 +8,7 @@ namespace Koan.Data.Vector.Connector.Milvus;
 
 /// <summary>
 /// Translates the unified <see cref="Filter"/> AST into a Milvus boolean expression string
-/// (AI-0036 §10 / DATA-0097 P1).
+/// (AI-0036 §9 / DATA-0097 P1).
 /// </summary>
 /// <remarks>
 /// Milvus has no reliable IS-NULL test for dynamic JSON keys, so it cannot faithfully emit the

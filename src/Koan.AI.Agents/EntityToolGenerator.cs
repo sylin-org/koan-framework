@@ -390,7 +390,7 @@ internal static class EntityToolGenerator
             if (isAvailableProp is not null && !(bool)(isAvailableProp.GetValue(null) ?? false))
                 return JsonSerializer.Serialize(new { error = $"Vector search not available for {entityType.Name}" });
 
-            // AI-0036 §10 R4: forward a typed VectorRetrieveOptions, not a positional array.
+            // AI-0036 §9 R4: forward a typed VectorRetrieveOptions, not a positional array.
             var searchMethod = vectorType.GetMethod("Search", [
                 typeof(float[]),
                 typeof(Koan.Data.Vector.VectorRetrieveOptions),

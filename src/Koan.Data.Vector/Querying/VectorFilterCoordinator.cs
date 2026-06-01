@@ -5,7 +5,7 @@ using Koan.Data.Vector.Abstractions;
 namespace Koan.Data.Vector.Querying;
 
 /// <summary>
-/// The single negotiation/enforcement point for vector metadata filtering (AI-0036 §10 /
+/// The single negotiation/enforcement point for vector metadata filtering (AI-0036 §9 /
 /// DATA-0097 P1). It sits at the read boundary inside <c>VectorData&lt;T&gt;.Search</c> — below every
 /// <c>Vector&lt;T&gt;</c> facade overload and above all provider repos — so the residual-is-error
 /// invariant cannot be bypassed by any current or future facade.

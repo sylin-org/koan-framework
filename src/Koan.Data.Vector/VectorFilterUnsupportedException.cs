@@ -4,7 +4,7 @@ namespace Koan.Data.Vector;
 
 /// <summary>
 /// Thrown when a vector metadata filter cannot be fully pushed down to the provider — i.e. the
-/// <c>VectorFilterCoordinator</c> split left a non-empty residual (AI-0036 §10 / DATA-0097 P1).
+/// <c>VectorFilterCoordinator</c> split left a non-empty residual (AI-0036 §9 / DATA-0097 P1).
 /// </summary>
 /// <remarks>
 /// This is the vector path's <b>residual-is-error</b> boundary. Unlike the entity path, there is no

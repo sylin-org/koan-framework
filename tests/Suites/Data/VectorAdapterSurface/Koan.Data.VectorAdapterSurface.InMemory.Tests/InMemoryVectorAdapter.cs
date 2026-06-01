@@ -62,7 +62,7 @@ internal sealed class InMemoryVectorRepository<TEntity, TKey> : IVectorSearchRep
         _stores = stores;
     }
 
-    // AI-0036 §10: the in-memory reference implements every capability it can model in-process —
+    // AI-0036 §9: the in-memory reference implements every capability it can model in-process —
     // kNN, metadata filters (via the oracle), hybrid (vector+keyword blend), continuation paging,
     // streaming export, bulk ops, score normalization, dynamic collections. The two it does NOT
     // claim are honest omissions of features a single-vector dictionary cannot model: multi-vector
@@ -78,7 +78,7 @@ internal sealed class InMemoryVectorRepository<TEntity, TKey> : IVectorSearchRep
         | VectorCapabilities.ScoreNormalization
         | VectorCapabilities.DynamicCollections;
 
-    // AI-0036 §10: the in-memory adapter evaluates the full unified Filter via DictionaryFilterEvaluator
+    // AI-0036 §9: the in-memory adapter evaluates the full unified Filter via DictionaryFilterEvaluator
     // — it IS the convergence oracle, so it declares Full and the coordinator passes every filter through.
     public Koan.Data.Abstractions.Filtering.VectorFilterCapabilities FilterCapabilities
         => Koan.Data.Abstractions.Filtering.VectorFilterCapabilities.Full;

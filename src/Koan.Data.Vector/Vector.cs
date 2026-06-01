@@ -200,7 +200,7 @@ public class Vector<TEntity> where TEntity : class, IEntity<string>
     /// <returns>Vector query results with similarity scores and optional continuation token.</returns>
     /// <remarks>
     /// The <c>object? filter</c> parameter type is the frozen reflection target for
-    /// <c>ChainExecutor</c>/<c>EntityToolGenerator</c> (AI-0036 §10) — do not retype it to
+    /// <c>ChainExecutor</c>/<c>EntityToolGenerator</c> (AI-0036 §9) — do not retype it to
     /// <see cref="Filter"/> until those consumers move off positional reflection.
     /// </remarks>
     public static Task<VectorQueryResult<string>> Search(
@@ -223,7 +223,7 @@ public class Vector<TEntity> where TEntity : class, IEntity<string>
         ), ct);
 
     /// <summary>
-    /// Typed retrieval overload (AI-0036 §10 R4): the AI orchestration pillars build a
+    /// Typed retrieval overload (AI-0036 §9 R4): the AI orchestration pillars build a
     /// <see cref="VectorRetrieveOptions"/> and forward it whole, so a knob can never again be silently
     /// dropped by hand-marshalled positional reflection. <see cref="VectorRetrieveOptions.Rerank"/> is
     /// an orchestrator concern and is not consumed here.

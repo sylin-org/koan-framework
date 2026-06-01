@@ -6,7 +6,7 @@ using Xunit;
 namespace Koan.Data.AI.Tests;
 
 /// <summary>
-/// AI-0036 §10 D1: the embedding write path auto-stamps an entity's filterable facets as metadata
+/// AI-0036 §9 D1: the embedding write path auto-stamps an entity's filterable facets as metadata
 /// keyed by CLR property name, so a metadata filter (incl. the Chain lambda DX) is sound by
 /// construction. These pin which properties become facets and which are excluded.
 /// </summary>
