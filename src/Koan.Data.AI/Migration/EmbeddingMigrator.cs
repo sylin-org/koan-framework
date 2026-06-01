@@ -248,9 +248,10 @@ public static class EmbeddingMigrator
 
                 // Save to vector database — stamp the TARGET model/source so migrated vectors are
                 // distinguishable from un-migrated ones (AI-0036 W3; this is the worst drop site —
-                // the migration's whole purpose is to change the producing model).
+                // the migration's whole purpose is to change the producing model) + filterable facets (D1).
                 var provenance = VectorProvenance.Build(
-                    targetModel ?? metadata.Model, targetSource ?? metadata.Source, metadata.Version, targetProvider);
+                    targetModel ?? metadata.Model, targetSource ?? metadata.Source, metadata.Version, targetProvider,
+                    merge: VectorFilterableMetadata.Extract(entity));
                 await VectorData<TEntity>.SaveWithVector(entity, embedding, provenance, ct);
 
                 // Update embedding state

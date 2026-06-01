@@ -54,7 +54,9 @@ internal static class EntityToolGenerator
             properties = new Dictionary<string, object>
             {
                 ["text"] = new { type = "string", description = "Search query text" },
-                ["top_k"] = new { type = "integer", description = "Maximum results to return (default: 5)" }
+                ["top_k"] = new { type = "integer", description = "Maximum results to return (default: 5)" },
+                ["alpha"] = new { type = "number", description = "Hybrid weight 0=keyword..1=semantic. Omit for pure-vector." },
+                ["filter"] = new { type = "string", description = "Optional metadata filter as a JSON object, e.g. {\"category\":\"legal\",\"year\":{\"$gte\":2020}}. Filters within the current partition only." }
             },
             required = new[] { "text" }
         };
@@ -360,8 +362,24 @@ internal static class EntityToolGenerator
                 topK = parsedInt;
         }
 
+        // AI-0036 P1-AI R2: optional hybrid alpha + metadata filter. The filter is parsed via the
+        // SCHEMALESS VectorFilterReader (metadata keys are not CLR members, so the entity-bound
+        // JsonFilterParser would wrongly 400 on them). A bad filter throws below -> {error} JSON, so
+        // the model self-corrects — never fail-to-match-all. The filter is intra-partition (tenancy
+        // is a partition, not a filter — AI-0036 D2), so it cannot widen past the host-set scope.
+        double? alpha = null;
+        if (args.TryGetValue("alpha", out var alphaObj) && alphaObj is not null)
+        {
+            if (alphaObj is JsonElement aje && aje.TryGetDouble(out var ad)) alpha = ad;
+            else if (double.TryParse(alphaObj.ToString(), out var ap)) alpha = ap;
+        }
+
         try
         {
+            Koan.Data.Abstractions.Filtering.Filter? filter = null;
+            if (args.TryGetValue("filter", out var filterObj) && filterObj is not null)
+                filter = Koan.Data.Abstractions.Filtering.VectorFilterReader.Read(filterObj.ToString());
+
             // Generate embedding
             var embedding = await Koan.AI.Client.Embed(text, ct);
 
@@ -372,21 +390,24 @@ internal static class EntityToolGenerator
             if (isAvailableProp is not null && !(bool)(isAvailableProp.GetValue(null) ?? false))
                 return JsonSerializer.Serialize(new { error = $"Vector search not available for {entityType.Name}" });
 
+            // AI-0036 §10 R4: forward a typed VectorRetrieveOptions, not a positional array.
             var searchMethod = vectorType.GetMethod("Search", [
                 typeof(float[]),
-                typeof(string),
-                typeof(double?),
-                typeof(int?),
-                typeof(object),
-                typeof(string),
-                typeof(string),
+                typeof(Koan.Data.Vector.VectorRetrieveOptions),
                 typeof(CancellationToken)
             ]);
 
             if (searchMethod is null)
                 return JsonSerializer.Serialize(new { error = "Vector.Search method not found" });
 
-            var task = searchMethod.Invoke(null, [embedding, text, null, topK, null, null, null, ct]);
+            var options = new Koan.Data.Vector.VectorRetrieveOptions
+            {
+                Text = text,
+                Alpha = alpha,
+                TopK = topK,
+                Filter = filter
+            };
+            var task = searchMethod.Invoke(null, [embedding, options, ct]);
             if (task is null)
                 return JsonSerializer.Serialize(new { results = Array.Empty<object>() });
 

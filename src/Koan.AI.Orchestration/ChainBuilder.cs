@@ -49,14 +49,31 @@ public sealed class ChainBuilder
 
     /// <summary>
     /// Add a retrieval step (RAG). Pure-vector by default; pass <paramref name="alpha"/> to run
-    /// hybrid (semantic+keyword) search with the query as the lexical side (AI-0036 R1).
+    /// hybrid (semantic+keyword) search with the query as the lexical side (AI-0036 R1), and/or
+    /// <paramref name="filter"/> to scope retrieval by metadata (AI-0036 P1-AI).
     /// </summary>
     /// <param name="query">Natural-language query; embedded for vector search and used as the hybrid lexical side.</param>
     /// <param name="topK">Maximum number of results to retrieve.</param>
     /// <param name="alpha">Hybrid weight (0=keyword, 1=semantic). <c>null</c> = pure-vector.</param>
     /// <param name="rerank">When true, re-score the retrieved passages by relevance inline.</param>
-    public ChainBuilder Retrieve<T>(string query, int topK = 5, double? alpha = null, bool rerank = false) =>
-        AddStep(new ChainStep(ChainStepKind.Retrieve, query) { TopK = topK, Alpha = alpha, Rerank = rerank, EntityType = typeof(T) });
+    /// <param name="filter">
+    /// Optional metadata predicate over <typeparamref name="T"/>, e.g.
+    /// <c>d =&gt; d.TenantId == tid &amp;&amp; d.Year &gt; 2020</c>. Compiled via the same
+    /// <c>LinqFilterCompiler</c> as <c>Entity&lt;T&gt;.Query(predicate)</c>; metadata keys follow the
+    /// CLR property names (the AI-0036 D1 convention). A predicate that cannot be lowered fails loud
+    /// at retrieval (never a silently-empty result).
+    /// </param>
+    public ChainBuilder Retrieve<T>(
+        string query, int topK = 5, double? alpha = null, bool rerank = false,
+        System.Linq.Expressions.Expression<System.Func<T, bool>>? filter = null) =>
+        AddStep(new ChainStep(ChainStepKind.Retrieve, query)
+        {
+            TopK = topK,
+            Alpha = alpha,
+            Rerank = rerank,
+            EntityType = typeof(T),
+            Filter = filter is null ? null : Koan.Data.Abstractions.Filtering.LinqFilterCompiler.Compile(filter)
+        });
 
     /// <summary>Parse the chain output into a typed object.</summary>
     public ChainBuilder Parse<T>() =>
@@ -174,6 +191,8 @@ public sealed record ChainStep(ChainStepKind Kind, string Value)
     /// </summary>
     public double? Alpha { get; init; }
     public bool Rerank { get; init; }
+    /// <summary>Compiled metadata filter for a Retrieve step (AI-0036 P1-AI). null = no filter.</summary>
+    public Koan.Data.Abstractions.Filtering.Filter? Filter { get; init; }
     public Type? EntityType { get; init; }
     public string[]? Categories { get; init; }
     public (string, ChainBuilder)[]? Branches { get; init; }

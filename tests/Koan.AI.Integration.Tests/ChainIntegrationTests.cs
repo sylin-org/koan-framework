@@ -128,6 +128,23 @@ public sealed class ChainIntegrationTests
         step.EntityType.Should().Be(typeof(TestResponse));
     }
 
+    [Fact] // AI-0036 P1-AI PHIL-1: no filter arg => no filter (today's behaviour, unchanged)
+    public void Retrieve_WithoutFilter_HasNullFilter()
+    {
+        var step = Chain.Create().Retrieve<TestResponse>("q").Build().Steps.Single();
+        step.Filter.Should().BeNull();
+    }
+
+    [Fact] // AI-0036 P1-AI: a lambda filter compiles to the unified Filter AST (same path as Entity<T>.Query)
+    public void Retrieve_WithLambdaFilter_CompilesToFilter()
+    {
+        var step = Chain.Create()
+            .Retrieve<TestResponse>("q", filter: r => r.Answer == "x")
+            .Build().Steps.Single();
+        step.Filter.Should().NotBeNull();
+        step.Filter.Should().BeOfType<Koan.Data.Abstractions.Filtering.FieldFilter>();
+    }
+
     [Fact]
     public void WithTools_AddsToolsStep()
     {

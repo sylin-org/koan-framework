@@ -67,6 +67,7 @@ internal sealed class RagRetrievalPipeline : IRagRetrievalPipeline
                 text: query,
                 alpha: _options.HybridAlpha,
                 topK: _options.RerankTopN * 2, // Retrieve 2x for reranking headroom
+                filter: options.Filter,
                 ct: ct);
 
             searchSw.Stop();
@@ -214,7 +215,7 @@ internal sealed class RagRetrievalPipeline : IRagRetrievalPipeline
         var queryEmbedding = await Koan.AI.Client.Embed(query, ct);
         var searchResult = await Koan.Data.Vector.Vector<TEntity>.Search(
             vector: queryEmbedding, text: query, alpha: _options.HybridAlpha,
-            topK: _options.RerankTopN, ct: ct);
+            topK: _options.RerankTopN, filter: options.Filter, ct: ct);
 
         if (searchResult.Matches.Count == 0)
             yield break;
@@ -275,7 +276,8 @@ internal sealed class RagRetrievalPipeline : IRagRetrievalPipeline
         string query,
         int maxResults,
         RagCorpusMetadata metadata,
-        CancellationToken ct) where TEntity : class, IEntity<string>
+        CancellationToken ct,
+        Koan.Data.Abstractions.Filtering.Filter? filter = null) where TEntity : class, IEntity<string>
     {
         if (!Koan.Data.Vector.Vector<TEntity>.IsAvailable)
             return [];
@@ -287,6 +289,7 @@ internal sealed class RagRetrievalPipeline : IRagRetrievalPipeline
             text: query,
             alpha: _options.HybridAlpha,
             topK: maxResults,
+            filter: filter,
             ct: ct);
 
         // Load actual entity text for each result in parallel

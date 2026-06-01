@@ -221,4 +221,20 @@ public class Vector<TEntity> where TEntity : class, IEntity<string>
             SearchText: text,
             Alpha: alpha
         ), ct);
+
+    /// <summary>
+    /// Typed retrieval overload (AI-0036 §10 R4): the AI orchestration pillars build a
+    /// <see cref="VectorRetrieveOptions"/> and forward it whole, so a knob can never again be silently
+    /// dropped by hand-marshalled positional reflection. <see cref="VectorRetrieveOptions.Rerank"/> is
+    /// an orchestrator concern and is not consumed here.
+    /// </summary>
+    public static Task<VectorQueryResult<string>> Search(
+        float[] vector, VectorRetrieveOptions options, CancellationToken ct = default)
+        => VectorData<TEntity>.Search(new VectorQueryOptions(
+            Query: vector,
+            TopK: options.TopK,
+            Filter: options.Filter,
+            SearchText: options.Text,
+            Alpha: options.Alpha
+        ), ct);
 }

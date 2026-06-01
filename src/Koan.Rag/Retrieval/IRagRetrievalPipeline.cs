@@ -30,5 +30,6 @@ internal interface IRagRetrievalPipeline
         string query,
         int maxResults,
         RagCorpusMetadata metadata,
-        CancellationToken ct) where TEntity : class, IEntity<string>;
+        CancellationToken ct,
+        Koan.Data.Abstractions.Filtering.Filter? filter = null) where TEntity : class, IEntity<string>;
 }

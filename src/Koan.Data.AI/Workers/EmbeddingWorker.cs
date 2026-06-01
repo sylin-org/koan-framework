@@ -267,9 +267,12 @@ public class EmbeddingWorker(
                 estimatedCost: estimatedCost,
                 success: true);
 
-            // Store in vector database — stamp producing model/source so the index is not a
-            // silent mixed-space (AI-0036 W1).
-            var provenance = VectorProvenance.Build(metadata.Model ?? job.Model, metadata.Source, metadata.Version);
+            // Store in vector database — stamp the producing model/source (provenance, AI-0036 W1) plus
+            // the entity's filterable facets under their CLR property names (AI-0036 D1), so metadata
+            // filters (incl. the Chain lambda DX) work by construction.
+            var provenance = VectorProvenance.Build(
+                metadata.Model ?? job.Model, metadata.Source, metadata.Version,
+                merge: VectorFilterableMetadata.Extract(entity));
             await VectorData<TEntity>.SaveWithVector(entity, embedding, provenance, ct);
 
             // Update embedding state
