@@ -6,7 +6,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Core;
+using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Sorting;
@@ -28,6 +30,21 @@ public static class Data<TEntity, TKey>
 
     public static IWriteCapabilities WriteCaps
         => Repo as IWriteCapabilities ?? new WriteCapsImpl(WriteCapabilities.None);
+
+    /// <summary>
+    /// The provider's capabilities as the unified <see cref="CapabilitySet"/> (ARCH-0084) — the
+    /// successor to <see cref="QueryCaps"/> / <see cref="WriteCaps"/>. Resolved from the repo's
+    /// native <c>IDescribesCapabilities</c> declaration when present, else bridged from the legacy
+    /// capability markers, so it is correct for both migrated and un-migrated adapters.
+    /// </summary>
+    public static CapabilitySet Capabilities
+    {
+        get
+        {
+            var repo = Repo;
+            return DataCaps.Describe(repo, repo.GetType().Name);
+        }
+    }
 
     private static IQueryRepository<TEntity, TKey> RequireQuery(IDataRepository<TEntity, TKey> repo)
         => repo as IQueryRepository<TEntity, TKey>

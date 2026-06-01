@@ -562,7 +562,7 @@ namespace Koan.Data.Core.Model
         /// Indicates whether the current provider supports fast removal (TRUNCATE/DROP).
         /// </summary>
         public static bool SupportsFastRemove
-            => Data<TEntity, TKey>.WriteCaps.Writes.HasFlag(WriteCapabilities.FastRemove);
+            => Data<TEntity, TKey>.Capabilities.Has(Koan.Data.Abstractions.Capabilities.DataCaps.Write.FastRemove);
 
         // Instance self-remove
         public Task<bool> Remove(CancellationToken ct = default)
