@@ -141,7 +141,7 @@ namespace Koan.Data.Core.Model
             => Data<TEntity, TKey>.Page(page, size, sort, ct);
 
         // All with sort — lambda form only (string form ambiguous with existing partition overload; use
-        // Entity.All(new DataQueryOptions().WithSort<T>("...")) for the string surface).
+        // Entity.All(new QueryDefinition().WithSort("...")) for the string surface).
         public static Task<IReadOnlyList<TEntity>> All(Action<Koan.Data.Core.Sorting.ISortBuilder<TEntity>> sort, CancellationToken ct = default)
             => Data<TEntity, TKey>.All(sort, ct);
 

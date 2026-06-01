@@ -240,14 +240,14 @@ internal static class EntityToolGenerator
 
         try
         {
-            // Call Entity<T>.All(DataQueryOptions, CancellationToken) with pagination
-            var allMethod = FindStaticMethod(entityType, "All",
-                typeof(Koan.Data.Abstractions.DataQueryOptions), typeof(CancellationToken));
+            // Call Entity<T>.Page(page, size, CancellationToken) for server-side pagination.
+            // DATA-0096 removed DataQueryOptions; Page(int,int,ct) is its first-page equivalent.
+            var pageMethod = FindStaticMethod(entityType, "Page",
+                typeof(int), typeof(int), typeof(CancellationToken));
 
-            if (allMethod is not null)
+            if (pageMethod is not null)
             {
-                var options = new Koan.Data.Abstractions.DataQueryOptions(page: 1, pageSize: limit);
-                var result = await InvokeAsyncMethod(allMethod, null, [options, ct]);
+                var result = await InvokeAsyncMethod(pageMethod, null, [1, limit, ct]);
                 return SerializeResult(result);
             }
 
