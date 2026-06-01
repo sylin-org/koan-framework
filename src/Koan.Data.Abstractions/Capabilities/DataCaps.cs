@@ -83,4 +83,22 @@ public static class DataCaps
         if (caps.Has(Write.FastRemove)) flags |= WriteCapabilities.FastRemove;
         return flags;
     }
+
+    // --- resolver: native IDescribesCapabilities, else the legacy enum bridge ---
+
+    /// <summary>
+    /// Resolves the query + write capabilities of <paramref name="source"/>: its native
+    /// <see cref="IDescribesCapabilities"/> declaration when present, otherwise bridged from the
+    /// legacy <see cref="IQueryCapabilities"/> / <see cref="IWriteCapabilities"/> markers.
+    /// </summary>
+    public static CapabilitySet Describe(object source, string? owner = null)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        if (CapabilityResolver.TryDescribe(source, owner) is { } native) return native;
+
+        var set = new CapabilitySet(owner);
+        if (source is IQueryCapabilities q) foreach (var t in From(q.Capabilities)) set.Add(t);
+        if (source is IWriteCapabilities w) foreach (var t in From(w.Writes)) set.Add(t);
+        return set;
+    }
 }

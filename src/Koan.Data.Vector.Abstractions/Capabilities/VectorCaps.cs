@@ -67,4 +67,21 @@ public static class VectorCaps
         if (caps.Has(DynamicCollections)) flags |= VectorCapabilities.DynamicCollections;
         return flags;
     }
+
+    // --- resolver: native IDescribesCapabilities, else the legacy enum bridge ---
+
+    /// <summary>
+    /// Resolves the vector capabilities of <paramref name="source"/>: its native
+    /// <see cref="IDescribesCapabilities"/> declaration when present, otherwise bridged from the
+    /// legacy <see cref="IVectorCapabilities"/> marker.
+    /// </summary>
+    public static CapabilitySet Describe(object source, string? owner = null)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        if (CapabilityResolver.TryDescribe(source, owner) is { } native) return native;
+
+        var set = new CapabilitySet(owner);
+        if (source is IVectorCapabilities v) foreach (var t in From(v.Capabilities)) set.Add(t);
+        return set;
+    }
 }

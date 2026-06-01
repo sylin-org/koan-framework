@@ -243,9 +243,14 @@ Each facet (1–4) runs:
     catalogs (`DataCaps`, `VectorCaps`) + `FilterSupport` (generalizing both filter records) + the
     enum↔token bridge. 14 conformance specs green; whole-solution build + ratchet green. Legacy enums
     untouched (additive only).
-- **Next:** Facet 1 **stage (b)** — migrate consumers cluster by cluster (data query/write → vector →
-  cache → … → web negotiation sites), each step green via the ratchet, deleting the wrapper-record
-  ceremony (`RepoCaps` / `WriteCapsImpl` / …) as each consumer moves to the new surface.
+- **In progress:** Facet 1 **stage (b)** — migration.
+  - **b1 ✓** adapter declaration contract `IDescribesCapabilities` (signature-aligned with Facet 2's
+    `KoanModule.Describe`) + native-or-bridge resolvers (`DataCaps.Describe` / `VectorCaps.Describe`);
+    specs green.
+  - **b2 (next):** switch the framework negotiation sites (`Entity.cs` / relational repos' `HasFlag`,
+    `Data.cs`, the `/.well-known` report, CQRS/cache decorators) to `caps.Has` / `caps.Require`,
+    deleting the wrapper-record ceremony (`RepoCaps` / `WriteCapsImpl` / …) as each site moves.
+  - **b3:** adapters declare natively via `Describe(ICapabilities)`, dropping their enum properties.
 - Minor cleanup available anytime: `src/Koan.Data.Lucene/` is a stale `obj`-only leftover from the
   `Koan.Data.SearchEngine` rename (0 tracked, 0 in `Koan.sln`) — delete the directory.
 - Minor cleanup available anytime: `src/Koan.Data.Lucene/` is a stale `obj`-only leftover from the
