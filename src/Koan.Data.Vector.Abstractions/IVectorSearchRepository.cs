@@ -1,9 +1,20 @@
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Filtering;
 
 namespace Koan.Data.Vector.Abstractions;
 
 public interface IVectorSearchRepository<TEntity, TKey> where TEntity : IEntity<TKey> where TKey : notnull
 {
+    /// <summary>
+    /// The metadata-filter operators/paths this adapter can faithfully push down (AI-0036 §10 /
+    /// DATA-0097 P1). The <c>VectorFilterCoordinator</c> negotiates against this; any clause outside
+    /// it is a hard error (vector search has no in-memory floor — post-kNN filtering under-returns).
+    /// Defaults to <see cref="VectorFilterCapabilities.None"/>, so an adapter that has not yet
+    /// declared real capabilities <b>hard-errors on any filter</b> (the safe failure mode) rather than
+    /// silently ignoring it. Adapters override this once they implement <c>IVectorFilterTranslator</c>.
+    /// </summary>
+    VectorFilterCapabilities FilterCapabilities => VectorFilterCapabilities.None;
+
     Task Upsert(TKey id, float[] embedding, object? metadata = null, CancellationToken ct = default);
     Task<int> UpsertMany(IEnumerable<(TKey Id, float[] Embedding, object? Metadata)> items, CancellationToken ct = default);
     Task<bool> Delete(TKey id, CancellationToken ct = default);

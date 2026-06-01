@@ -1,13 +1,15 @@
-namespace Koan.Data.Vector.Abstractions;
+using Koan.Data.Abstractions.Filtering;
 
-// Re-export or shim minimal contracts for providers to depend on. For now,
-// we type-forward to Koan.Data.Abstractions to avoid churn; future move can relocate types.
+namespace Koan.Data.Vector.Abstractions;
 
 public sealed record VectorQueryOptions(
     float[] Query,
     int? TopK = null,
     string? ContinuationToken = null,
-    object? Filter = null,
+    // AI-0036 §10 / DATA-0097 P1: the typed, unified Filter slot (was object?). The Vector<T>/workflow
+    // facades parse string/dict/JSON into this once via VectorFilterReader; VectorFilterCoordinator
+    // then validates it (residual-is-error) before any repo sees it.
+    Filter? Filter = null,
     TimeSpan? Timeout = null,
     string? VectorName = null,
     string? SearchText = null,  // Hybrid search: text for BM25 keyword matching

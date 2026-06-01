@@ -1,4 +1,5 @@
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Vector.Abstractions;
 using System;
 using System.Collections.Generic;
@@ -191,11 +192,17 @@ public class Vector<TEntity> where TEntity : class, IEntity<string>
     /// <param name="text">Optional text for hybrid BM25 keyword matching. When provided, enables hybrid search.</param>
     /// <param name="alpha">Optional semantic vs keyword weight. 0.0=keyword only, 1.0=semantic only, 0.5=balanced (default).</param>
     /// <param name="topK">Maximum number of results to return.</param>
-    /// <param name="filter">Optional provider-specific filter.</param>
+    /// <param name="filter">Optional metadata filter — the Koan JSON filter DSL (string/JObject/dict),
+    /// or an already-built <see cref="Filter"/>. Parsed once here via <see cref="VectorFilterReader"/>.</param>
     /// <param name="continuationToken">Optional continuation token for pagination. Returned by previous search results.</param>
     /// <param name="vectorName">Optional vector name for multi-vector entities.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Vector query results with similarity scores and optional continuation token.</returns>
+    /// <remarks>
+    /// The <c>object? filter</c> parameter type is the frozen reflection target for
+    /// <c>ChainExecutor</c>/<c>EntityToolGenerator</c> (AI-0036 §10) — do not retype it to
+    /// <see cref="Filter"/> until those consumers move off positional reflection.
+    /// </remarks>
     public static Task<VectorQueryResult<string>> Search(
         float[] vector,
         string? text = null,
@@ -209,7 +216,7 @@ public class Vector<TEntity> where TEntity : class, IEntity<string>
             Query: vector,
             TopK: topK,
             ContinuationToken: continuationToken,
-            Filter: filter,
+            Filter: VectorFilterReader.Read(filter),
             VectorName: vectorName,
             SearchText: text,
             Alpha: alpha

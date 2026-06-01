@@ -1,4 +1,6 @@
+using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Filtering;
+using Koan.Data.Vector.Abstractions;
 
 namespace Koan.Data.Vector.Querying;
 
@@ -33,5 +35,26 @@ public static class VectorFilterCoordinator
             throw VectorFilterUnsupportedException.ForResidual(provider, split.Residual);
 
         return split.Pushable;
+    }
+
+    /// <summary>
+    /// Read-boundary gate: validates <paramref name="options"/>'s filter against
+    /// <paramref name="repo"/>'s declared capabilities and returns the options carrying only the
+    /// validated, fully-pushable filter. Every read path (the <c>Vector&lt;T&gt;</c> facade via
+    /// <c>VectorData.Search</c>, and the workflow registry's <c>Query</c>) routes through here so the
+    /// residual-is-error invariant cannot be bypassed.
+    /// </summary>
+    public static VectorQueryOptions Gate<TEntity, TKey>(
+        VectorQueryOptions options, IVectorSearchRepository<TEntity, TKey> repo)
+        where TEntity : IEntity<TKey> where TKey : notnull
+    {
+        if (options.Filter is null) return options;
+
+        var provider = repo.GetType().Name;
+        var tick = provider.IndexOf('`');
+        if (tick > 0) provider = provider[..tick];
+
+        var pushable = Validate(options.Filter, repo.FilterCapabilities, provider);
+        return options with { Filter = pushable };
     }
 }
