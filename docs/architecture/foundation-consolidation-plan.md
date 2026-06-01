@@ -26,8 +26,21 @@ across tests/samples/docs/connectors and the coherence tax compounds. With **no 
 this is the lowest-cost window to **shake the foundations so the patterns settle** — consolidating
 toward fewer, more meaningful parts. The dogfood apps are both the consumer surface and the ratchet.
 
+**Frame: the framework so far is a viability exercise — now harden it for v1.** Everything built to
+date proved the thesis works (entity-first + Reference=Intent + multi-provider + AI/vector, end to
+end, across diverse dogfood apps). The job now is not to add surface, and not even consolidation for
+its own sake — it is to **remove the development scaffolding and leave the parts that work, ready for
+v1.** Much of the accretion this plan targets — the ~40 capability types, the 7 registration
+interfaces, the split-brain `Add*`-vs-auto-discovery, the aspirational AI sub-pillars — is exactly
+that scaffolding: it existed to *prove* a capability, not because a real product needs it as a
+distinct part. **Consolidation and deletion are the same move seen from two sides.**
+
 ## 1. The design philosophy
 
+- **Descaffold, don't just consolidate.** For every part ask: *is this load-bearing for the proven
+  product, or scaffolding from the proof-of-viability phase?* Load-bearing → keep / harden / merge.
+  Scaffolding (aspirational, exploratory, only-there-to-prove-a-point) → **cut** — do not lovingly
+  refactor it. The destination is v1, not a prettier prototype.
 - **Count developer-facing CONCEPTS, not projects.** Drive down the ideas a developer must hold;
   internal plumbing may remain many small invisible parts.
 - A part earns its place only if a dogfood app reaches for it naturally **or** removing it forces
@@ -50,7 +63,8 @@ A sole implementor with total freedom can refactor forever; the danger is **non-
   ratchet looks like.)
 - **Define "settled" up front:** a new dogfood app of a known shape (CRUD / AI-RAG / media /
   event-driven) can be built end-to-end without editing the framework, and the developer-facing
-  concept count is ≤ a small N.
+  concept count is ≤ a small N. **This is the v1 bar:** the proven surface, scaffolding removed,
+  patterns settled — not feature-complete, but coherent and stable enough to stand as v1.
 - **Watch over-fitting:** sole-consumer bias means "meaningful" can quietly mean "meaningful to
   S5/S6/S14" — keep the dogfood set diverse in shape.
 - **Keep the ADR/DDR trail** through the shake-up. Future-you is also a consumer who needs the *why*.
@@ -180,7 +194,7 @@ implementation is internally staged: additive → migrate → delete).
 | **1** | **Unified capability model** | `Capability`/`CapabilitySet`/`ICapabilities` + `Caps.*` + `*Support`; prove by collapsing the vector+query+write cluster | 0 | `ARCH-008x` |
 | **2** | **`KoanModule`** | one self-describing unit; folds in registrars + 7 interfaces + ~30 `Add*` + bootstrap + self-report | 1 | `ARCH-008x` |
 | **3** | **`Ambient` context** | one per-operation context; collapses the ~5 ambient globals (trickiest) | 1, 2 | `ARCH-008x` |
-| **4** | **Assembly/pillar consolidation** | merge thin sub-projects now that the module is the unit | 2 | `ARCH-008x` / ledger |
+| **4** | **Assembly/pillar consolidation + descaffold** | merge thin sub-projects now that the module is the unit; **cut** aspirational/scaffolding pillars (audit AI Compute/Eval/Models/Training etc. against real dogfood use) | 2 | `ARCH-008x` / ledger |
 
 **Order rationale:** Facet 1 is the smallest self-contained win and a clean generalization of proven
 code (`VectorFilterCapabilities`) — it sets the rhythm. Facet 2 then becomes "the thing that hosts
@@ -214,7 +228,10 @@ Each facet (1–4) runs:
 
 ## 8. Status
 
-- **Done:** design agreed; this plan written.
-- **Next:** Facet 0 (stand up the ratchet) **or** Facet 1 / stage 1 (capability-usage deep research).
+- **Done:** design agreed; this plan written; viability→v1 framing folded in.
+- **In progress:** Facet 1 / stage 1 — capability-usage deep research (the "how many ways to declare /
+  require / report a capability" inventory + which are load-bearing vs scaffolding to cut).
+- **Pending:** Facet 0 (the green ratchet) must be standing before Facet 1 *implementation* lands
+  (research is read-only, so it runs first safely).
 - Minor cleanup available anytime: `src/Koan.Data.Lucene/` is a stale `obj`-only leftover from the
   `Koan.Data.SearchEngine` rename (0 tracked, 0 in `Koan.sln`) — delete the directory.
