@@ -34,15 +34,12 @@ public class MongoOptimizationAutoRegistrar : IKoanInitializer
 
             try
             {
-                // Step 1: Apply global MongoDB driver configuration for v3.5.0 compatibility
+                // Step 1: global driver conventions + Guid/Guid? representation.
                 ConfigureGlobalMongoDriverSettings();
 
-                // Step 2: Scan all assemblies for Entity types requiring optimization
-                // Use direct reflection without requiring a service provider
-                var optimizedEntityTypes = ScanForOptimizedEntityTypes();
-
-                // Step 3: Register global serializers for discovered types
-                RegisterGlobalSerializers(optimizedEntityTypes);
+                // Step 2 (DATA-0098): register the GUID identity serializer per-member, on declared
+                // identity fields only — there is NO global typeof(string) override.
+                RegisterIdentitySerializers();
 
                 _globalConfigurationApplied = true;
             }
@@ -96,181 +93,94 @@ public class MongoOptimizationAutoRegistrar : IKoanInitializer
     }
 
     /// <summary>
-    /// Scans all loaded assemblies for Entity types that require GUID optimization.
+    /// Registers the GUID identity serializer on exactly the GUID-encoded members of each entity —
+    /// the Id of an <c>Entity&lt;T&gt;</c> and parent references to GUID-identity entities, per
+    /// <see cref="IdentityEncoding"/> — via per-type <see cref="BsonClassMap"/>. DATA-0098: there is
+    /// NO global <c>typeof(string)</c> override, so every other string keeps the default serializer,
+    /// encoding is scoped to declared identity (no over-reach), and it cannot drift between the write
+    /// and query paths (both consult <see cref="IdentityEncoding"/>).
     /// </summary>
-    private static List<EntityOptimizationInfo> ScanForOptimizedEntityTypes()
+    private static void RegisterIdentitySerializers()
     {
+        var identitySerializer = new SmartStringGuidSerializer();
 
-        var optimizedTypes = new List<EntityOptimizationInfo>();
-        // Use cached assemblies instead of bespoke AppDomain scanning
+        foreach (var entityType in ScanEntityTypes())
+        {
+            IReadOnlySet<string> members;
+            try
+            {
+                members = IdentityEncoding.GuidEncodedMembers(entityType);
+            }
+            catch
+            {
+                continue; // one entity's metadata must never break global init
+            }
+
+            if (members.Count == 0 || BsonClassMap.IsClassMapRegistered(entityType))
+            {
+                continue;
+            }
+
+            try
+            {
+                var classMap = new BsonClassMap(entityType);
+                classMap.AutoMap();
+                classMap.SetIgnoreExtraElements(true);
+
+                foreach (var member in members)
+                {
+                    classMap.GetMemberMap(member)?.SetSerializer(identitySerializer);
+                }
+
+                BsonClassMap.RegisterClassMap(classMap);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[MONGO-AUTO-REGISTRAR] Failed to register identity serializers for {entityType.Name}: {ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>Concrete, non-abstract <see cref="IEntity{TKey}"/> types from the cached assemblies.</summary>
+    private static IEnumerable<Type> ScanEntityTypes()
+    {
         var assemblies = AssemblyCache.Instance.GetAllAssemblies()
-            .Where(a => !a.IsDynamic && !IsSystemAssembly(a))
-            .ToList();
+            .Where(a => !a.IsDynamic && !IsSystemAssembly(a));
 
         foreach (var assembly in assemblies)
         {
+            Type[] types;
             try
             {
-                var types = assembly.GetTypes()
-                    .Where(t => t.IsClass && !t.IsAbstract)
-                    .ToList();
-
-                foreach (var type in types)
-                {
-                    var optimizationInfo = AnalyzeEntityType(type);
-                    if (optimizationInfo != null)
-                    {
-                        optimizedTypes.Add(optimizationInfo);
-                    }
-                }
+                types = assembly.GetTypes();
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[MONGO-AUTO-REGISTRAR] Error scanning assembly {assembly.FullName}: {ex.Message}");
+                continue;
             }
-        }
 
-        return optimizedTypes;
-    }
-
-    /// <summary>
-    /// Analyzes a type to determine if it's an Entity type that requires optimization.
-    /// </summary>
-    private static EntityOptimizationInfo? AnalyzeEntityType(Type type)
-    {
-        // Look for IEntity<string> implementations
-        var entityInterface = type.GetInterfaces()
-            .FirstOrDefault(i => i.IsGenericType &&
-                               i.GetGenericTypeDefinition() == typeof(IEntity<>) &&
-                               i.GetGenericArguments()[0] == typeof(string));
-
-        if (entityInterface == null)
-            return null;
-
-        // Use direct reflection to check for Entity<T> pattern instead of framework's optimization detection
-        // This duplicates the logic from StorageOptimizationExtensions but avoids service provider dependency
-
-        // Check for explicit OptimizeStorageAttribute first
-        var optimizeAttr = type.GetCustomAttribute<OptimizeStorageAttribute>(inherit: true);
-        if (optimizeAttr != null)
-        {
-            if (optimizeAttr.OptimizationType == StorageOptimizationType.Guid)
+            foreach (var type in types)
             {
-                return new EntityOptimizationInfo
+                if (type.IsClass && !type.IsAbstract && ImplementsEntity(type))
                 {
-                    EntityType = type,
-                    KeyType = typeof(string),
-                    OptimizationType = StorageOptimizationType.Guid,
-                    IdPropertyName = "Id", // Default property name
-                    Reason = optimizeAttr.Reason
-                };
-            }
-            return null; // Explicitly disabled or not GUID
-        }
-
-        // Check for Entity<T> pattern (should be optimized)
-        var baseType = type.BaseType;
-        while (baseType != null)
-        {
-            if (baseType.IsGenericType)
-            {
-                var genericTypeDef = baseType.GetGenericTypeDefinition();
-                var genericArgs = baseType.GetGenericArguments();
-
-                if (genericTypeDef.Name.StartsWith("Entity", StringComparison.Ordinal))
-                {
-                    // Entity<T> pattern (single generic - implicit string) - should optimize
-                    if (genericArgs.Length == 1 && genericArgs[0] == type)
-                    {
-                        return new EntityOptimizationInfo
-                        {
-                            EntityType = type,
-                            KeyType = typeof(string),
-                            OptimizationType = StorageOptimizationType.Guid,
-                            IdPropertyName = "Id", // Default property name
-                            Reason = "Automatic GUID optimization for Entity<T> pattern (implicit string key)"
-                        };
-                    }
-
-                    // Entity<T, string> pattern (explicit string) - don't optimize
-                    if (genericArgs.Length == 2 &&
-                        genericArgs[0] == type &&
-                        genericArgs[1] == typeof(string))
-                    {
-                        return null;
-                    }
+                    yield return type;
                 }
             }
-            baseType = baseType.BaseType;
-        }
-
-        // Default: IEntity<string> implementations without Entity<T> pattern - don't optimize
-        return null;
-    }
-
-    /// <summary>
-    /// Registers global serializers for MongoDB driver v3.5.0 compatibility.
-    /// Uses a global approach that overrides the default string serializer with smart GUID detection.
-    /// </summary>
-    private static void RegisterGlobalSerializers(List<EntityOptimizationInfo> optimizedTypes)
-    {
-        if (!optimizedTypes.Any())
-        {
-            return;
-        }
-
-        try
-        {
-            // For MongoDB driver v3.5.0, BsonClassMap is often ignored
-            // Instead, register a global string serializer that automatically detects and optimizes GUIDs
-            var smartGuidSerializer = new SmartStringGuidSerializer();
-
-            // Override the default string serializer globally - this affects ALL string properties
-            BsonSerializer.RegisterSerializer(typeof(string), smartGuidSerializer);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[MONGO-AUTO-REGISTRAR] Falling back to per-class serializer registration: {ex.Message}");
-            // Fallback to per-class approach
-            RegisterPerClassSerializers(optimizedTypes);
         }
     }
 
-    /// <summary>
-    /// Fallback method using per-class BsonClassMap registration.
-    /// </summary>
-    private static void RegisterPerClassSerializers(List<EntityOptimizationInfo> optimizedTypes)
+    private static bool ImplementsEntity(Type type)
     {
-        var smartGuidSerializer = new SmartStringGuidSerializer();
-
-        foreach (var entityInfo in optimizedTypes)
+        foreach (var iface in type.GetInterfaces())
         {
-            try
+            if (iface.IsGenericType && iface.GetGenericTypeDefinition() == typeof(IEntity<>))
             {
-                if (!BsonClassMap.IsClassMapRegistered(entityInfo.EntityType))
-                {
-                    var classMap = new BsonClassMap(entityInfo.EntityType);
-                    classMap.AutoMap();
-                    classMap.SetIgnoreExtraElements(true);
-
-                    var idProperty = entityInfo.EntityType.GetProperty(entityInfo.IdPropertyName);
-                    if (idProperty != null)
-                    {
-                        var memberMap = classMap.GetMemberMap(entityInfo.IdPropertyName);
-                        if (memberMap != null)
-                        {
-                            memberMap.SetSerializer(smartGuidSerializer);
-                        }
-                    }
-
-                    BsonClassMap.RegisterClassMap(classMap);
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[MONGO-AUTO-REGISTRAR] Failed to register serializer for {entityInfo.EntityType.Name}: {ex.Message}");
+                return true;
             }
         }
+
+        return false;
     }
 
     /// <summary>
@@ -286,18 +196,6 @@ public class MongoOptimizationAutoRegistrar : IKoanInitializer
                name.StartsWith("MongoDB.") ||
                name.Contains("Test");
     }
-}
-
-/// <summary>
-/// Information about an entity type that requires optimization.
-/// </summary>
-public class EntityOptimizationInfo
-{
-    public required Type EntityType { get; set; }
-    public required Type KeyType { get; set; }
-    public required StorageOptimizationType OptimizationType { get; set; }
-    public required string IdPropertyName { get; set; }
-    public required string Reason { get; set; }
 }
 
 /// <summary>
