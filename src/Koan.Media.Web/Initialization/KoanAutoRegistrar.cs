@@ -4,6 +4,7 @@ using Koan.Media.Web.Caching;
 using Koan.Media.Web.Controllers;
 using Koan.Media.Web.Options;
 using Koan.Media.Web.Routing;
+using Koan.Media.Web.Sweep;
 using Koan.Web.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,6 +26,8 @@ namespace Koan.Media.Web.Initialization;
 ///   <item>Default <see cref="IOverlayResolver"/> backed by the registered
 ///   <see cref="IMediaSource"/> + <see cref="IMediaRecipeRegistry"/> — apps
 ///   can replace by registering their own implementation before AddKoan()</item>
+///   <item>Optional <see cref="MediaDerivationSweepService"/> when
+///   <c>Koan:Media:Web:DerivationSweep:Enabled</c> is true</item>
 /// </list>
 ///
 /// <para>Applications must still register an
@@ -32,6 +35,12 @@ namespace Koan.Media.Web.Initialization;
 /// (typically backed by their MediaEntity-derived content layer or by
 /// Koan.Storage); the controller has no opinion on where the source
 /// bytes live.</para>
+///
+/// <para>Per MEDIA-0007, derivations are persisted by the
+/// <see cref="IMediaSource"/> directly. The legacy
+/// <see cref="IMediaOutputCache"/> is only registered when
+/// <c>Koan:Media:Web:OutputCache:Enabled</c> is true — a deliberate opt-in
+/// because the abstraction will be deleted in MEDIA-0008.</para>
 /// </summary>
 public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 {
@@ -55,10 +64,12 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // regular MediaEntity rows).
         services.TryAddSingleton<IOverlayResolver, DefaultOverlayResolver>();
 
-        // Persistent render-output cache. Resolves to a filesystem-backed
-        // implementation when Koan:Media:Web:OutputCache is enabled with a
-        // Path, otherwise a no-op. TryAdd so an app can register a custom
-        // IMediaOutputCache (e.g. a storage-profile backing) before AddKoan().
+        // Legacy persistent render-output cache — MEDIA-0007 demotes this to
+        // an opt-in shim. Only register when the host explicitly enables it
+        // AND configures a path. Hosts on the storage-backed path get nothing
+        // here; the controller probes IMediaSource.OpenDerivationAsync first
+        // and only consults the cache when it is also resolved.
+#pragma warning disable CS0618
         services.TryAddSingleton<IMediaOutputCache>(sp =>
         {
             var opts = sp.GetRequiredService<IOptions<MediaWebOptions>>().Value.OutputCache;
@@ -74,6 +85,14 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             var logger = sp.GetRequiredService<ILogger<FileSystemMediaOutputCache>>();
             return new FileSystemMediaOutputCache(root, logger);
         });
+#pragma warning restore CS0618
+
+        // Orphan-derivation sweep — MEDIA-0007 §d. Always register the
+        // singleton so callers can resolve it for manual sweeps; the hosted
+        // background loop only runs when Enabled is true (the service idles
+        // out on its own and the gate is rechecked per cycle).
+        services.TryAddSingleton<MediaDerivationSweepService>();
+        services.AddHostedService(sp => sp.GetRequiredService<MediaDerivationSweepService>());
     }
 
     public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)

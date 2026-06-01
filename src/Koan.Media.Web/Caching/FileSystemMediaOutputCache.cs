@@ -5,16 +5,24 @@ using Microsoft.Extensions.Logging;
 namespace Koan.Media.Web.Caching;
 
 /// <summary>
-/// Filesystem-backed <see cref="IMediaOutputCache"/>. Stores each render as a
+/// <para><strong>Obsolete — see MEDIA-0007.</strong> Filesystem-sharded
+/// derivation cache. Use storage-backed derivations via
+/// <see cref="Routing.IMediaSource.TryStoreDerivationAsync"/> instead so the
+/// rendered blobs participate in backup/quota/GC like any other storage entity.
+/// This implementation is retained for one release as a transition affordance.
+/// </para>
+///
+/// <para>Filesystem-backed <see cref="IMediaOutputCache"/>. Stores each render as a
 /// single file <c>{root}/{shard}/{id}-{fingerprint}.{ext}</c>, where the
 /// extension is the canonical format slug (so the content-type round-trips
 /// without a sidecar) and <c>shard</c> is the id's first two chars (keeps any
-/// one directory from collecting every entry).
+/// one directory from collecting every entry).</para>
 ///
 /// <para>All IO is wrapped: reads degrade to a miss, writes are best-effort.
 /// Writes go to a temp file then atomic-rename so a concurrent reader never
 /// observes a half-written blob.</para>
 /// </summary>
+[Obsolete("Use IMediaSource.TryStoreDerivationAsync; see MEDIA-0007. Removed in MEDIA-0008.", error: false)]
 internal sealed class FileSystemMediaOutputCache : IMediaOutputCache
 {
     private readonly string _root;

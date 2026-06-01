@@ -336,6 +336,11 @@ public sealed class MediaControllerSpec
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
+    // MEDIA-0007: the legacy IMediaOutputCache cache stays as a transition
+    // shim this release (deleted in MEDIA-0008). The interface and the
+    // record it returns are marked Obsolete; this test still exercises the
+    // legacy path, so the warnings are suppressed locally.
+#pragma warning disable CS0618
     [Fact]
     public async Task OutputCache_first_request_renders_and_writes_through_then_serves_from_cache()
     {
@@ -391,5 +396,6 @@ public sealed class MediaControllerSpec
 
         private static string Key(string id, string fingerprint) => $"{id}|{fingerprint}";
     }
+#pragma warning restore CS0618
 }
 

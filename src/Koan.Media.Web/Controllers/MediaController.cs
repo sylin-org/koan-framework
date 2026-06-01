@@ -26,6 +26,15 @@ namespace Koan.Media.Web.Controllers;
 /// Content-addressable URL (<c>/media/{id}@{hash}/...</c>) and signing
 /// land in follow-up phases per the ADR migration plan. This controller
 /// exposes the base grammar and override layering today.
+///
+/// <para>Per MEDIA-0007, derivations are persisted through the registered
+/// <see cref="IMediaSource"/> directly — the same storage namespace as the
+/// originals, with lineage stamped on <c>SourceMediaId</c>/<c>DerivationKey</c>/
+/// <c>RelationshipType</c>/<c>Tags["recipe-version"]</c>. The legacy
+/// <see cref="IMediaOutputCache"/> is still consulted while it is being phased
+/// out (deletion scheduled in MEDIA-0008); when the source does not persist
+/// derivations and no cache is registered, every request renders from scratch.
+/// </para>
 /// </summary>
 [ApiController]
 public sealed class MediaController : ControllerBase
@@ -37,7 +46,9 @@ public sealed class MediaController : ControllerBase
     private readonly MediaWebOptions _options;
     private readonly ILogger<MediaController> _logger;
     private readonly IServiceProvider _services;
-    private readonly IMediaOutputCache _outputCache;
+#pragma warning disable CS0618 // IMediaOutputCache is obsolete; retained for the MEDIA-0007 transition window.
+    private readonly IMediaOutputCache? _legacyCache;
+#pragma warning restore CS0618
 
     public MediaController(
         IMediaRecipeRegistry registry,
@@ -47,7 +58,9 @@ public sealed class MediaController : ControllerBase
         IServiceProvider services,
         IOverlayResolver? overlayResolver = null,
         Koan.Media.Core.Fonts.KoanFontRegistry? fonts = null,
+#pragma warning disable CS0618
         IMediaOutputCache? outputCache = null)
+#pragma warning restore CS0618
     {
         _registry = registry;
         _source = source;
@@ -55,7 +68,7 @@ public sealed class MediaController : ControllerBase
         _options = options.Value;
         _logger = logger;
         _services = services;
-        _outputCache = outputCache ?? NullMediaOutputCache.Instance;
+        _legacyCache = outputCache;
         // Lazy-apply any AddKoanFont() registrations queued before AddKoan() ran
         if (fonts is not null)
         {
@@ -174,19 +187,41 @@ public sealed class MediaController : ControllerBase
                 return StatusCode(StatusCodes.Status304NotModified);
             }
 
-            // 5b) Persistent render cache — serve stored output and skip the
-            // resize/re-encode pipeline. Key is (id, fingerprint); the source
-            // open above already guaranteed the media exists.
-            var cacheHit = await _outputCache.TryGetAsync(id, fingerprint, ct).ConfigureAwait(false);
-            if (cacheHit is not null)
+            // 5b) Storage-backed derivation lookup — serve a previously persisted
+            // render and skip the resize/re-encode pipeline. Per MEDIA-0007 the
+            // derivation lives under the same storage profile as the source,
+            // keyed by (sourceId, recipeFingerprint).
+            var derivation = await _source
+                .OpenDerivationAsync(id, fingerprint, ct)
+                .ConfigureAwait(false);
+            if (derivation is not null)
             {
                 Response.Headers[HeaderNames.ETag] = etag;
                 Response.Headers[HttpHeaderNames.CacheControl] = _options.DefaultCacheControl;
                 ApplyDiagnostics(seedRecipe, effectiveRecipe, fingerprint,
                     sourceFormat: null, output: null,
                     ignored: parseResult.IgnoredParams, fromCache: "hit");
-                return File(cacheHit.Bytes, cacheHit.ContentType);
+                return File(derivation.Bytes, derivation.ContentType);
             }
+
+            // 5c) Legacy IMediaOutputCache probe. Retained for one release while
+            // hosts migrate to the storage-backed derivation surface. Removed in
+            // MEDIA-0008.
+#pragma warning disable CS0618
+            if (_legacyCache is not null)
+            {
+                var cacheHit = await _legacyCache.TryGetAsync(id, fingerprint, ct).ConfigureAwait(false);
+                if (cacheHit is not null)
+                {
+                    Response.Headers[HeaderNames.ETag] = etag;
+                    Response.Headers[HttpHeaderNames.CacheControl] = _options.DefaultCacheControl;
+                    ApplyDiagnostics(seedRecipe, effectiveRecipe, fingerprint,
+                        sourceFormat: null, output: null,
+                        ignored: parseResult.IgnoredParams, fromCache: "hit");
+                    return File(cacheHit.Bytes, cacheHit.ContentType);
+                }
+            }
+#pragma warning restore CS0618
 
             // 6) Run pipeline
             MediaOutput output;
@@ -219,10 +254,32 @@ public sealed class MediaController : ControllerBase
                 return UnprocessableEntity(new { error = dex.Message });
             }
 
-            // 6b) Write-through to the render cache. Best-effort: the cache
+            // 6b) Write-through to durable storage. Best-effort: the source
             // implementation swallows IO errors so a failure here never faults
-            // the response.
-            await _outputCache.SetAsync(id, fingerprint, output, ct).ConfigureAwait(false);
+            // the response. Lineage fields are stamped at write time per
+            // MEDIA-0007 §b.
+            var recipeName = seedRecipe?.Name ?? effectiveRecipe.Name;
+            var recipeVersion = (seedRecipe?.Version ?? effectiveRecipe.Version)
+                .ToString(System.Globalization.CultureInfo.InvariantCulture);
+            try
+            {
+                await _source.TryStoreDerivationAsync(
+                    id, fingerprint, output, recipeName, recipeVersion, ct)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Derivation write-through failed for {Id}/{Fingerprint}", id, fingerprint);
+            }
+
+            // 6c) Legacy cache write-through (transition window only).
+#pragma warning disable CS0618
+            if (_legacyCache is not null)
+            {
+                await _legacyCache.SetAsync(id, fingerprint, output, ct).ConfigureAwait(false);
+            }
+#pragma warning restore CS0618
 
             // 7) Build response
             Response.Headers[HeaderNames.ETag] = etag;

@@ -14,7 +14,12 @@ namespace Koan.Media.Web.Options;
 ///
 /// <para>Disabled by default: the controller behaves exactly as before unless an
 /// app opts in via configuration.</para>
+///
+/// <para><strong>Obsolete — see MEDIA-0007.</strong> Persistent derivations now
+/// live alongside the source in storage; configure your <c>IMediaSource</c>
+/// implementation instead. Removed in MEDIA-0008.</para>
 /// </summary>
+[Obsolete("Use IMediaSource.TryStoreDerivationAsync; see MEDIA-0007. Removed in MEDIA-0008.", error: false)]
 public sealed class MediaOutputCacheOptions
 {
     /// <summary>Enable the persistent render cache. Default <c>false</c>.</summary>

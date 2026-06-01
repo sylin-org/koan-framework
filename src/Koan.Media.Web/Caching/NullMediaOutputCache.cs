@@ -3,10 +3,15 @@ using Koan.Media.Abstractions.Recipes;
 namespace Koan.Media.Web.Caching;
 
 /// <summary>
-/// No-op cache used when <c>Koan:Media:Web:OutputCache</c> is disabled. Every
+/// <para><strong>Obsolete — see MEDIA-0007.</strong> The controller now no-ops
+/// natively when the registered <see cref="Routing.IMediaSource"/> does not
+/// persist derivations and no legacy cache is configured.</para>
+///
+/// <para>No-op cache used when <c>Koan:Media:Web:OutputCache</c> is disabled. Every
 /// read misses and every write is dropped, so the controller renders exactly as
-/// it did before the feature existed.
+/// it did before the feature existed.</para>
 /// </summary>
+[Obsolete("Derivations now live in storage via IMediaSource.TryStoreDerivationAsync; see MEDIA-0007. Removed in MEDIA-0008.", error: false)]
 internal sealed class NullMediaOutputCache : IMediaOutputCache
 {
     public static readonly NullMediaOutputCache Instance = new();
