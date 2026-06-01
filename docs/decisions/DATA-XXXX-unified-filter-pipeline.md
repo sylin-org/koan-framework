@@ -303,3 +303,42 @@ The pipeline has **zero** tests today; the rebuild ships its own canon.
    in Phase C; adapters fill native `SELECT` pushdown incrementally (mirrors staged sort).
 5. **`?q=` raw string path** — retained as an explicit escape hatch, gated behind a capability
    flag; never the default and never a silent match-all.
+
+---
+
+## 8. Implementation log (break-and-rebuild, Option B)
+
+Strategic refinements adopted mid-implementation (fewer, more meaningful parts):
+
+- **A — Adapter contract inversion.** The adapter is a *translator + executor*, never an
+  orchestrator. `FilterPushdownCoordinator` (Koan.Data.Core) owns the split/residual/sort/
+  paginate-after algorithm once; adapters declare `FilterCapabilities` and translate only the
+  guaranteed-pushable filter they receive. `RepositoryQueryResult.Residual` was removed — the
+  coordinator already knows the residual from the split. This is what makes the 9 copy-pasted
+  relational fallback blocks *deletions with no replacement*.
+- **B — `FilterCapabilities` is the query-capability truth.** The operator-blind `QueryCapabilities`
+  flags enum is demoted to a derived summary; `IDataRepository` is writes-only; raw provider
+  queries live behind `IRawQueryRepository`.
+
+### Status
+
+Landed + green (branch `feat/unified-filter-pipeline`):
+- Core filtering namespace (AST, resolver, converter, evaluator, JSON + LINQ front-ends,
+  capabilities, splitter, coordinator) — 31 unit specs pass.
+- Contract: `QueryDefinition`, per-axis `RepositoryQueryResult`, `IQueryRepository`, `Projection`.
+- Orchestrator (`Data<T,K>`/`Entity<T>`/`RepositoryFacade`) rewritten; entity-first DX preserved
+  (`Query(lambda)`, `Query(string)` = DSL, new `QueryRaw` escape hatch).
+- Adapters InMemory / JSON / Redis = Full floor.
+- Consumers: Web endpoint (EntityController HTTP contract unchanged; `$options` key bug fixed;
+  parse/unsupported → 400), CQRS decorator, soft-delete controller, GraphQL connector.
+- Verified green: Direct, Vector, Vector.Abstractions, Backup, MCP.
+
+In progress:
+- Relational trio (Postgres/SqlServer/Sqlite — shared `SqlFilterTranslator`, native JSON
+  containment), Mongo (`FilterDefinition` + GUID carve-out), Couchbase (N1QL `ANY…SATISFIES`) —
+  migrating in isolated worktrees against the frozen contract.
+
+Pending:
+- Convergence integration suite (identical result-id sets across architecturally-distinct DBs).
+- Vector `VectorQueryOptions.Filter` retype to the shared `Filter` AST.
+- DX regression guard; supersede DATA-0029/0031/0056/0092; update the defensive publication.
