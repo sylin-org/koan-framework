@@ -13,13 +13,19 @@ internal static class QueryFilterComposer
 {
     public static Filter? AndAll<TEntity>(
         Filter? userFilter,
-        IReadOnlyList<Expression<Func<TEntity, bool>>> hookPredicates)
+        IReadOnlyList<LambdaExpression> hookPredicates)
     {
         var all = new List<Filter>();
         if (userFilter is not null) all.Add(userFilter);
         if (hookPredicates is { Count: > 0 })
             foreach (var p in hookPredicates)
-                all.Add(LinqFilterCompiler.Compile(p));
+            {
+                var typed = p as Expression<Func<TEntity, bool>>
+                    ?? throw new InvalidOperationException(
+                        $"QueryOptions.Predicates entry was {p?.GetType().FullName ?? "null"}, expected " +
+                        $"Expression<Func<{typeof(TEntity).FullName}, bool>>. Use QueryOptions.AddPredicate<TEntity>(...).");
+                all.Add(LinqFilterCompiler.Compile(typed));
+            }
 
         return all.Count switch
         {
