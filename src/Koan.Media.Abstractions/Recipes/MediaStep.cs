@@ -17,6 +17,22 @@ public abstract record MediaStep(PipelineStage Stage, string? Name, bool Primary
 {
     /// <summary>Append the step's discriminator and canonical params to the fingerprint payload.</summary>
     public abstract void WriteFingerprint(StringBuilder sb);
+
+    /// <summary>
+    /// Kinds this step accepts as input. Default <see cref="KindSet.All"/> —
+    /// the step does not constrain its input. Per MEDIA-0005 §4 planner
+    /// contract: if <c>currentKind</c> is not in <see cref="AcceptsFrom"/>
+    /// the planner returns <c>KindMismatch</c> with a <c>Sample.First</c>
+    /// suggestion.
+    /// </summary>
+    public virtual KindSet AcceptsFrom => KindSet.All;
+
+    /// <summary>
+    /// Kind this step produces, or null when the step is kind-preserving
+    /// (output kind = input kind). Per MEDIA-0005 §4: a non-null value
+    /// rewrites <c>currentKind</c>; null leaves it unchanged.
+    /// </summary>
+    public virtual MediaKind? ProducesTo => null;
 }
 
 /// <summary>EXIF-based auto-orient. Stage <see cref="PipelineStage.Orient"/>.</summary>
@@ -24,17 +40,59 @@ public sealed record AutoOrientStep(bool Keep = false) : MediaStep(PipelineStage
 {
     public override void WriteFingerprint(StringBuilder sb) =>
         sb.Append("orient(").Append(Keep ? "keep" : "auto").Append(')');
+
+    // Per MEDIA-0005 §4: EXIF orientation applies to raster sources only.
+    // Vector and Timeline sources have no EXIF block; reject upstream so
+    // the planner produces a typed mismatch with a Sample suggestion.
+    public override KindSet AcceptsFrom => KindSet.Of(MediaKind.Raster, MediaKind.AnimatedRaster);
 }
 
 /// <summary>
 /// Animated → still extraction. Stage <see cref="PipelineStage.Frame"/>.
 /// No-op on static sources.
 /// </summary>
+/// <remarks>
+/// Per MEDIA-0005 §Migration: superseded by <see cref="SampleStep"/>.
+/// Existing call sites keep compiling; the canonical fingerprint
+/// representation is emitted via <see cref="SampleStep"/>'s
+/// <see cref="FrameSelector.Index"/> form.
+/// </remarks>
+[Obsolete("Use SampleStep(new FrameSelector.Index(n)) or the Sample.Frame(n) factory.")]
 public sealed record ExtractFrameStep(int Index, string? Name = null, bool Primary = false)
     : MediaStep(PipelineStage.Frame, Name, Primary)
 {
     public override void WriteFingerprint(StringBuilder sb) =>
         sb.Append("frame(").Append(Index).Append(')');
+
+    public override KindSet AcceptsFrom => KindSet.Of(MediaKind.Raster, MediaKind.AnimatedRaster);
+    public override MediaKind? ProducesTo => MediaKind.Raster;
+}
+
+/// <summary>
+/// Kind-agnostic, selector-discriminated collapse from any source
+/// kind into a single <see cref="MediaKind.Raster"/>. Per MEDIA-0005 §2.
+///
+/// Plan-time behavior per source kind:
+/// <list type="bullet">
+///   <item><see cref="MediaKind.Raster"/> — no-op.</item>
+///   <item><see cref="MediaKind.AnimatedRaster"/> — apply the selector.</item>
+///   <item><see cref="MediaKind.Vector"/> — deferred to <c>Rasterize</c> at the encoder boundary.</item>
+///   <item><see cref="MediaKind.Timeline"/> — apply the selector.</item>
+/// </list>
+/// </summary>
+public sealed record SampleStep(FrameSelector Selector, string? Name = null, bool Primary = false)
+    : MediaStep(PipelineStage.Frame, Name, Primary)
+{
+    public override void WriteFingerprint(StringBuilder sb) =>
+        sb.Append("sample(").Append(Selector.ToCanonical()).Append(')');
+
+    public override KindSet AcceptsFrom => KindSet.Of(
+        MediaKind.Raster,
+        MediaKind.AnimatedRaster,
+        MediaKind.Vector,
+        MediaKind.Timeline);
+
+    public override MediaKind? ProducesTo => MediaKind.Raster;
 }
 
 /// <summary>Explicit rotation. Stage <see cref="PipelineStage.Rotate"/>.</summary>
@@ -43,6 +101,10 @@ public sealed record RotateStep(int Degrees, string? Name = null, bool Primary =
 {
     public override void WriteFingerprint(StringBuilder sb) =>
         sb.Append("rotate(").Append(Degrees).Append(')');
+
+    // Geometric transform — kind-agnostic, kind-preserving.
+    public override KindSet AcceptsFrom => KindSet.All;
+    public override MediaKind? ProducesTo => null;
 }
 
 public enum FlipAxis { Horizontal, Vertical }
@@ -53,6 +115,10 @@ public sealed record FlipStep(FlipAxis Axis, string? Name = null, bool Primary =
 {
     public override void WriteFingerprint(StringBuilder sb) =>
         sb.Append("flip(").Append(Axis == FlipAxis.Horizontal ? 'h' : 'v').Append(')');
+
+    // Geometric transform — kind-agnostic, kind-preserving.
+    public override KindSet AcceptsFrom => KindSet.All;
+    public override MediaKind? ProducesTo => null;
 }
 
 /// <summary>
@@ -78,6 +144,12 @@ public sealed record ShapeStep(
         sb.Append(",bg=").Append(Background.ToCanonical());
         sb.Append(')');
     }
+
+    // Shape (crop / fit / position) is a geometric transform — kind-agnostic,
+    // kind-preserving. Planner forward-derives Rasterize from this step's
+    // explicit pixel dimensions when a Vector source reaches the encoder boundary.
+    public override KindSet AcceptsFrom => KindSet.All;
+    public override MediaKind? ProducesTo => null;
 }
 
 /// <summary>Resize step — single slot, stage <see cref="PipelineStage.Size"/>.</summary>
@@ -99,6 +171,12 @@ public sealed record ResizeStep(
         }
         sb.Append(')');
     }
+
+    // Sizing is kind-agnostic and kind-preserving. Per MEDIA-0005 §4
+    // the planner uses this step's target dimensions as the forward-derived
+    // Rasterize target when a Vector source reaches the encoder boundary.
+    public override KindSet AcceptsFrom => KindSet.All;
+    public override MediaKind? ProducesTo => null;
 }
 
 /// <summary>
@@ -143,6 +221,13 @@ public sealed record OverlayStep(
         }
         sb.Append(')');
     }
+
+    // Overlay composition operates in pixel space. Vector / Timeline
+    // sources are rejected upstream — they must Sample to Raster first.
+    // Output kind is preserved (animated sources stay animated when the
+    // engine drives per-frame composition).
+    public override KindSet AcceptsFrom => KindSet.Of(MediaKind.Raster, MediaKind.AnimatedRaster);
+    public override MediaKind? ProducesTo => null;
 }
 
 /// <summary>
@@ -153,6 +238,11 @@ public sealed record StripStep(MetadataKinds Kinds, string? Name = null, bool Pr
 {
     public override void WriteFingerprint(StringBuilder sb) =>
         sb.Append("strip(").Append((int)Kinds).Append(')');
+
+    // Metadata strip is a passthrough across all kinds — the engine
+    // simply drops the requested metadata blocks where they exist.
+    public override KindSet AcceptsFrom => KindSet.All;
+    public override MediaKind? ProducesTo => null;
 }
 
 [Flags]
@@ -185,6 +275,15 @@ public sealed record EncodeStep(
         sb.Append("encode(fmt=").Append(Format ?? "source");
         sb.Append(",q=").Append(Quality.ToString(CultureInfo.InvariantCulture)).Append(')');
     }
+
+    // Encode admission is enforced by the planner's terminal-encoder gate
+    // (MEDIA-0005 §4) using the EncoderAccepts table — Abstractions cannot
+    // reference Core, so the per-step gate stays permissive. The terminal
+    // gate is also where the implicit Rasterize bridge fires for Vector
+    // sources; lifting admission into this step would short-circuit that
+    // forward-derivation.
+    public override KindSet AcceptsFrom => KindSet.All;
+    public override MediaKind? ProducesTo => null;
 }
 
 /// <summary>
@@ -204,4 +303,9 @@ public sealed record FlattenToStep(
         sb.Append("flatten(fmt=").Append(Format);
         sb.Append(",q=").Append(Quality.ToString(CultureInfo.InvariantCulture)).Append(')');
     }
+
+    // FlattenTo is the explicit destructive collapse — admits every kind
+    // and forces a still Raster result regardless of source animation.
+    public override KindSet AcceptsFrom => KindSet.All;
+    public override MediaKind? ProducesTo => MediaKind.Raster;
 }

@@ -18,7 +18,21 @@ public interface IMediaPipeline
     IMediaPipeline AutoOrient(bool keep = false);
 
     /// <summary>Extract a single frame from animated sources; no-op on static.</summary>
+    /// <remarks>
+    /// Per MEDIA-0005: prefer <see cref="Sample(FrameSelector)"/> with
+    /// <see cref="Sample.Frame(int)"/> for the canonical, kind-agnostic
+    /// collapse. This verb continues to compile and delegates to
+    /// <c>Sample(FrameSelector.Index(index))</c>.
+    /// </remarks>
+    [Obsolete("Use Sample(FrameSelector.Index(n)) or the Sample.Frame(n) factory.")]
     IMediaPipeline ExtractFrame(int index = 0);
+
+    /// <summary>
+    /// Kind-agnostic sample. Collapses any source kind into a single
+    /// raster according to the given selector. No-op on
+    /// <see cref="MediaKind.Raster"/>. Per MEDIA-0005 §2.
+    /// </summary>
+    IMediaPipeline Sample(FrameSelector selector);
 
     /// <summary>Rotate by degrees clockwise.</summary>
     IMediaPipeline Rotate(int degrees);
@@ -124,6 +138,13 @@ public sealed record MediaOutput(
     string Fingerprint)
 {
     public bool IsAnimated => FrameCount > 1;
+
+    /// <summary>
+    /// Per-step kind transitions recorded by the planner. Per
+    /// MEDIA-0005 §7: surfaced as the <c>X-Koan-Media-KindTrace</c>
+    /// response header. Empty when the source predates kind tracking.
+    /// </summary>
+    public IReadOnlyList<MediaKind> KindTrace { get; init; } = Array.Empty<MediaKind>();
 }
 
 /// <summary>

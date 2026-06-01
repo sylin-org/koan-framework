@@ -148,8 +148,13 @@ public static class MediaUrlParser
             case AutoOrientStep ao:
                 b.AutoOrient(ao.Keep);
                 break;
+#pragma warning disable CS0618 // Migrate legacy ExtractFrameStep payload to Sample.
             case ExtractFrameStep ef:
-                b.ExtractFrame(ef.Index);
+                b.Sample(new FrameSelector.Index(ef.Index));
+                break;
+#pragma warning restore CS0618
+            case SampleStep ss:
+                b.Sample(ss.Selector);
                 break;
             case RotateStep rs:
                 b.Rotate(rs.Degrees);
@@ -244,7 +249,7 @@ public static class MediaUrlParser
         if (Take(p, "frame") is { } frameRaw)
         {
             if (int.TryParse(frameRaw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var fi))
-                b.ExtractFrame(fi);
+                b.Sample(new FrameSelector.Index(fi));
             else Reject(p, ignored, rejected, strict, "frame", frameRaw);
         }
 
@@ -412,7 +417,7 @@ public static class MediaUrlParser
             }
             else if (int.TryParse(v, NumberStyles.Integer, CultureInfo.InvariantCulture, out var idx))
             {
-                b.ExtractFrame(idx);
+                b.Sample(new FrameSelector.Index(idx));
             }
             else Reject(p, ignored, rejected, strict, "frame", v);
         }

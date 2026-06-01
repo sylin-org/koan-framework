@@ -66,7 +66,23 @@ public sealed class MediaRecipeBuilder
 
     // ----- Stage 3: Frame -----
 
-    public MediaRecipeBuilder ExtractFrame(int index = 0) => Add(new ExtractFrameStep(index));
+    [Obsolete("Use Sample(FrameSelector.Index(n)) or the Sample.Frame(n) factory.")]
+    public MediaRecipeBuilder ExtractFrame(int index = 0) =>
+        // Delegate to Sample so all canonical fingerprints stabilize on the
+        // MEDIA-0005 vocabulary; ExtractFrame is preserved purely for
+        // source compatibility with v1 recipes.
+        Add(new SampleStep(new FrameSelector.Index(index)));
+
+    /// <summary>
+    /// Kind-agnostic collapse to a single raster. Per MEDIA-0005 §2.
+    /// Use the <see cref="Sample"/> factory for ergonomic selector
+    /// construction (<c>Sample.First</c>, <c>Sample.Frame(n)</c>).
+    /// </summary>
+    public MediaRecipeBuilder Sample(FrameSelector selector)
+    {
+        if (selector is null) throw new ArgumentNullException(nameof(selector));
+        return Add(new SampleStep(selector));
+    }
 
     // ----- Stage 4: Rotate / Flip -----
 

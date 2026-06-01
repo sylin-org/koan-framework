@@ -1,21 +1,22 @@
 using System.Collections.Concurrent;
 using System.Collections.Frozen;
-using System.Linq.Expressions;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
-using Koan.Data.Abstractions.Sorting;
 using Koan.Data.Core.Sorting;
 
 namespace Koan.Data.Connector.InMemory;
 
 /// <summary>
-/// In-memory repository with full LINQ support and thread-safe operations.
-/// Supports partition isolation for multi-tenant scenarios.
+/// In-memory repository with full LINQ-to-objects support and thread-safe operations.
+/// Reference "Full floor" adapter under the unified query contract (DATA-XXXX): it declares
+/// <see cref="FilterCapabilities.Full"/> and evaluates the entire <see cref="Filter"/> via
+/// <see cref="InMemoryFilterEvaluator"/> — so the coordinator never produces a residual for it.
+/// Sort and pagination are handled natively (trivially, in memory). Supports partition isolation.
 /// </summary>
 internal sealed class InMemoryRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
-    ILinqQueryRepository<TEntity, TKey>,
-    ILinqQueryRepositoryWithOptions<TEntity, TKey>,
+    IQueryRepository<TEntity, TKey>,
     IQueryCapabilities,
     IWriteCapabilities,
     IInstructionExecutor<TEntity>
@@ -30,23 +31,17 @@ internal sealed class InMemoryRepository<TEntity, TKey> :
         _dataStore = dataStore;
     }
 
-    /// <summary>
-    /// InMemory adapter supports full LINQ-to-Objects capabilities.
-    /// </summary>
+    /// <summary>InMemory supports full LINQ-to-objects capabilities.</summary>
     public QueryCapabilities Capabilities => QueryCapabilities.Linq;
 
-    /// <summary>
-    /// InMemory adapter supports all write operations with atomic batches.
-    /// </summary>
+    /// <summary>InMemory pushes every filter operator (it runs the AST directly in memory).</summary>
+    public FilterCapabilities FilterCapabilities => FilterCapabilities.Full;
+
     public WriteCapabilities Writes =>
         WriteCapabilities.BulkUpsert |
         WriteCapabilities.BulkDelete |
         WriteCapabilities.AtomicBatch;
 
-    /// <summary>
-    /// Resolves the current partition from EntityContext, always returning a valid partition name.
-    /// This ensures partition isolation is respected even when repositories are cached.
-    /// </summary>
     private string CurrentPartition =>
         Koan.Data.Core.EntityContext.Current?.Partition ?? "default";
 
@@ -66,50 +61,59 @@ internal sealed class InMemoryRepository<TEntity, TKey> :
         ct.ThrowIfCancellationRequested();
         var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
         var results = new TEntity?[idList.Count];
-
         for (var i = 0; i < idList.Count; i++)
-        {
             results[i] = Store.TryGetValue(idList[i], out var entity) ? entity : null;
-        }
-
         return Task.FromResult((IReadOnlyList<TEntity?>)results);
     }
 
-    // ==================== LINQ Query Operations ====================
+    // ==================== Unified Query ====================
 
-    public Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
+    public Task<RepositoryQueryResult<TEntity>> Query(QueryDefinition query, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
 
-        IQueryable<TEntity> items = Store.Values.AsQueryable();
+        IEnumerable<TEntity> items = Store.Values;
+        if (query.Filter is not null)
+            items = items.Where(InMemoryFilterEvaluator.Compile<TEntity>(query.Filter));
 
-        if (request.Predicate is not null)
+        // Materialize once for a stable count + ordering.
+        var filtered = items as IReadOnlyList<TEntity> ?? items.ToList();
+        var totalCount = (long)filtered.Count;
+
+        var sortHandled = RepositoryQueryResult<TEntity>.NoSortHandled;
+        IEnumerable<TEntity> ordered = filtered;
+        if (query.HasSort)
         {
-            items = items.Where(request.Predicate);
-        }
-        else if (request.RawQuery is not null || request.ProviderQuery is not null)
-        {
-            throw new NotSupportedException("String or provider-specific count queries are not supported by the in-memory adapter.");
+            ordered = InMemorySorter.Apply(filtered, query.Sort);
+            sortHandled = query.Sort.ToFrozenSet();
         }
 
-        var total = items.Count();
-        return Task.FromResult(new CountResult(total, false));
+        var paginationHandled = false;
+        if (query.HasPagination)
+        {
+            var skip = (query.EffectivePage() - 1) * query.EffectivePageSize();
+            ordered = ordered.Skip(skip).Take(query.EffectivePageSize());
+            paginationHandled = true;
+        }
+
+        var list = ordered as IReadOnlyList<TEntity> ?? ordered.ToList();
+        return Task.FromResult(new RepositoryQueryResult<TEntity>
+        {
+            Items = list,
+            TotalCount = totalCount,
+            IsEstimate = false,
+            SortHandled = sortHandled,
+            PaginationHandled = paginationHandled,
+        });
     }
 
-    public Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        var result = Store.Values.AsQueryable().Where(predicate).ToList();
-        return Task.FromResult((IReadOnlyList<TEntity>)result);
-    }
-
-    public Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>>? predicate, DataQueryOptions? options, CancellationToken ct = default)
+    public Task<CountResult> Count(QueryDefinition query, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         IEnumerable<TEntity> items = Store.Values;
-        if (predicate is not null) items = items.AsQueryable().Where(predicate);
-        var totalCount = items is ICollection<TEntity> coll ? (long)coll.Count : items.LongCount();
-        return Task.FromResult(BuildResult(items, options, totalCount));
+        if (query.Filter is not null)
+            items = items.Where(InMemoryFilterEvaluator.Compile<TEntity>(query.Filter));
+        return Task.FromResult(new CountResult(items.LongCount(), false));
     }
 
     // ==================== Write Operations ====================
@@ -146,8 +150,7 @@ internal sealed class InMemoryRepository<TEntity, TKey> :
         var count = 0;
         foreach (var id in ids)
         {
-            if (Store.TryRemove(id, out _))
-                count++;
+            if (Store.TryRemove(id, out _)) count++;
             ct.ThrowIfCancellationRequested();
         }
         return Task.FromResult(count);
@@ -166,8 +169,6 @@ internal sealed class InMemoryRepository<TEntity, TKey> :
         ct.ThrowIfCancellationRequested();
         var count = Store.Count;
         Store.Clear();
-        // No fast path available - dictionary clear is already instant
-        // Optimized, Fast, and Safe all use same implementation
         return Task.FromResult((long)count);
     }
 
@@ -194,39 +195,18 @@ internal sealed class InMemoryRepository<TEntity, TKey> :
         public Task<BatchResult> Save(BatchOptions? options = null, CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
-
-            // Apply mutations first
             foreach (var (id, mutate) in _mutations)
             {
                 ct.ThrowIfCancellationRequested();
-                if (_repo.Store.TryGetValue(id, out var current))
-                {
-                    mutate(current);
-                    _updates.Add(current);
-                }
+                if (_repo.Store.TryGetValue(id, out var current)) { mutate(current); _updates.Add(current); }
             }
 
-            // Execute batch operations
             var store = _repo.Store;
-            foreach (var entity in _adds)
-            {
-                store[entity.Id] = entity;
-                ct.ThrowIfCancellationRequested();
-            }
-
-            foreach (var entity in _updates)
-            {
-                store[entity.Id] = entity;
-                ct.ThrowIfCancellationRequested();
-            }
+            foreach (var entity in _adds) { store[entity.Id] = entity; ct.ThrowIfCancellationRequested(); }
+            foreach (var entity in _updates) { store[entity.Id] = entity; ct.ThrowIfCancellationRequested(); }
 
             var deletedCount = 0;
-            foreach (var id in _deletes)
-            {
-                if (store.TryRemove(id, out _))
-                    deletedCount++;
-                ct.ThrowIfCancellationRequested();
-            }
+            foreach (var id in _deletes) { if (store.TryRemove(id, out _)) deletedCount++; ct.ThrowIfCancellationRequested(); }
 
             return Task.FromResult(new BatchResult(_adds.Count, _updates.Count, deletedCount));
         }
@@ -237,62 +217,22 @@ internal sealed class InMemoryRepository<TEntity, TKey> :
     public Task<TResult> ExecuteAsync<TResult>(Instruction instruction, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-
         switch (instruction.Name)
         {
             case DataInstructions.EnsureCreated:
-                {
-                    // InMemory storage is always "created" - no initialization needed
-                    object result = true;
-                    return Task.FromResult((TResult)result);
-                }
-
+            {
+                object result = true;
+                return Task.FromResult((TResult)result);
+            }
             case DataInstructions.Clear:
-                {
-                    var count = Store.Count;
-                    Store.Clear();
-                    object result = count;
-                    return Task.FromResult((TResult)result);
-                }
-
+            {
+                var count = Store.Count;
+                Store.Clear();
+                object result = count;
+                return Task.FromResult((TResult)result);
+            }
             default:
                 throw new NotSupportedException($"Instruction '{instruction.Name}' not supported by InMemory adapter for {typeof(TEntity).Name}.");
         }
-    }
-
-    // ==================== Helper Methods ====================
-
-    private static RepositoryQueryResult<TEntity> BuildResult(IEnumerable<TEntity> items, DataQueryOptions? options, long totalCount)
-    {
-        var sortHandled = RepositoryQueryResult<TEntity>.NoSortHandled;
-
-        if (options is { } opts && opts.HasSort)
-        {
-            var sorted = InMemorySorter.Apply(items, opts.Sort);
-            items = sorted;
-            sortHandled = opts.Sort.ToFrozenSet();
-        }
-
-        var paginationHandled = false;
-        if (options is { } o && o.HasPagination)
-        {
-            var skip = (o.Page!.Value - 1) * o.PageSize!.Value;
-            items = items.Skip(skip).Take(o.PageSize.Value);
-            paginationHandled = true;
-        }
-        else if (options?.PageSize.HasValue == true)
-        {
-            items = items.Take(options.PageSize.Value);
-        }
-
-        var list = items is IReadOnlyList<TEntity> ro ? ro : items.ToList();
-        return new RepositoryQueryResult<TEntity>
-        {
-            Items = list,
-            TotalCount = totalCount,
-            IsEstimate = false,
-            PaginationHandled = paginationHandled,
-            SortHandled = sortHandled,
-        };
     }
 }

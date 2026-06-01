@@ -106,10 +106,29 @@ public static class RecipeJsonSerializer
                     obj["op"] = "autoOrient";
                     if (ao.Keep) obj["keep"] = true;
                     break;
+                case SampleStep ss:
+                    obj["op"] = "sample";
+                    switch (ss.Selector)
+                    {
+                        case FrameSelector.Index idx:
+                            obj["selector"] = "index";
+                            obj["index"] = idx.Frame;
+                            break;
+                        case FrameSelector.Time t:
+                            obj["selector"] = "time";
+                            obj["timeMs"] = t.At.TotalMilliseconds;
+                            break;
+                        case FrameSelector.HeuristicBest:
+                            obj["selector"] = "thumbnail";
+                            break;
+                    }
+                    break;
+#pragma warning disable CS0618 // Retained for any direct ExtractFrameStep construction outside the builders.
                 case ExtractFrameStep ef:
                     obj["op"] = "extractFrame";
                     obj["index"] = ef.Index;
                     break;
+#pragma warning restore CS0618
                 case RotateStep rs:
                     obj["op"] = "rotate";
                     obj["degrees"] = rs.Degrees;

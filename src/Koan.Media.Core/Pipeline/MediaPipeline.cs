@@ -76,8 +76,17 @@ public sealed class MediaPipeline : IMediaPipeline
     public IMediaPipeline AutoOrient(bool keep = false) =>
         AddStep(new AutoOrientStep(Keep: keep));
 
+    [Obsolete("Use Sample(FrameSelector.Index(n)) or the Sample.Frame(n) factory.")]
     public IMediaPipeline ExtractFrame(int index = 0) =>
-        AddStep(new ExtractFrameStep(index));
+        // Delegate to Sample so all kind-tracking and fingerprint emission
+        // route through the canonical MEDIA-0005 vocabulary.
+        AddStep(new SampleStep(new FrameSelector.Index(index)));
+
+    public IMediaPipeline Sample(FrameSelector selector)
+    {
+        if (selector is null) throw new ArgumentNullException(nameof(selector));
+        return AddStep(new SampleStep(selector));
+    }
 
     public IMediaPipeline Rotate(int degrees) =>
         AddStep(new RotateStep(degrees));
@@ -220,12 +229,71 @@ public sealed class MediaPipeline : IMediaPipeline
         {
             if (_source.CanSeek) _source.Position = 0;
             using var image = await LoadOrThrowAsync(_source, ct).ConfigureAwait(false);
-            return await EncodeAsync(image, _steps, _overlayResolver, _fonts, _overlayDepth, _logger, ct).ConfigureAwait(false);
+
+            // MEDIA-0005: plan before execute. The planner is a pure
+            // function over (probe, steps, encoderAccepts); a failing plan
+            // throws synchronously and never reaches the encode pass.
+            var probe = BuildMediaInfo(image);
+            var plan = PlanOrThrow(probe, _steps);
+            return await EncodeAsync(image, _steps, _overlayResolver, _fonts, _overlayDepth, _logger, plan, ct).ConfigureAwait(false);
         }
         finally
         {
             await DisposeSourceAsync().ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Run the planner against the given probe and step list. Throws
+    /// <see cref="MediaPipelineKindMismatchException"/> on failure;
+    /// returns the plan on success. Per MEDIA-0005 §5 strict gate.
+    /// </summary>
+    private static PlanResult PlanOrThrow(MediaInfo probe, IReadOnlyList<MediaStep> steps)
+    {
+        var encoderAccepts = ResolveTerminalEncoderAccepts(steps, probe.Format);
+        var plan = MediaPipelinePlanner.Plan(probe, steps, encoderAccepts);
+        if (!plan.Ok)
+        {
+            var err = plan.Error!;
+            throw new MediaPipelineKindMismatchException(
+                stepIndex: err.StepIndex,
+                expectedKinds: err.ExpectedKinds,
+                gotKind: err.GotKind,
+                suggestion: err.Suggestion);
+        }
+        return plan;
+    }
+
+    /// <summary>
+    /// Resolve the terminal encoder's admission set. The terminal step
+    /// is the last <see cref="EncodeStep"/> / <see cref="FlattenToStep"/>;
+    /// when absent or null-format (preserve source), fall back to the
+    /// source's own format slug.
+    /// </summary>
+    private static KindSet ResolveTerminalEncoderAccepts(IReadOnlyList<MediaStep> steps, string sourceFormatSlug)
+    {
+        string? targetSlug = null;
+        for (var i = steps.Count - 1; i >= 0; i--)
+        {
+            switch (steps[i])
+            {
+                case FlattenToStep flatten:
+                    targetSlug = flatten.Format;
+                    i = -1;
+                    break;
+                case EncodeStep encode:
+                    targetSlug = encode.Format ?? sourceFormatSlug;
+                    i = -1;
+                    break;
+            }
+        }
+        targetSlug ??= sourceFormatSlug;
+        var accepts = EncoderAccepts.AcceptsFor(targetSlug);
+        // Unregistered encoders fall through with KindSet.None; if we got
+        // None for an unknown slug, leave it null so the planner doesn't
+        // refuse the source kind against an empty set (the existing
+        // EncoderSelector.For will throw NotSupportedException downstream).
+        return accepts.IsEmpty ? KindSet.All : accepts;
     }
 
     private async Task<Image> LoadOrThrowAsync(Stream source, CancellationToken ct)
@@ -320,6 +388,10 @@ public sealed class MediaPipeline : IMediaPipeline
             // Decode once; clone per variant so transforms don't bleed across branches.
             using var sourceImage = await Image.LoadAsync(_source, ct).ConfigureAwait(false);
 
+            // MEDIA-0005: one probe drives planning for every branch (the
+            // source kind is invariant across variants; only the steps
+            // and terminal encoder differ).
+            var probe = BuildMediaInfo(sourceImage);
             var variants = new Dictionary<string, MediaOutput>(builder.Variants.Count, StringComparer.Ordinal);
             foreach (var (name, configureBranch) in builder.Variants)
             {
@@ -327,9 +399,10 @@ public sealed class MediaPipeline : IMediaPipeline
                 // Each branch records its own step list against a transient pipeline carrier
                 var branch = new StepRecorder();
                 configureBranch(branch);
+                var plan = PlanOrThrow(probe, branch.Steps);
                 // Clone the decoded image so transforms apply only to this branch
                 using var clone = sourceImage.Clone(_ => { });
-                var output = await EncodeAsync(clone, branch.Steps, _overlayResolver, _fonts, _overlayDepth, _logger, ct).ConfigureAwait(false);
+                var output = await EncodeAsync(clone, branch.Steps, _overlayResolver, _fonts, _overlayDepth, _logger, plan, ct).ConfigureAwait(false);
                 variants[name] = output;
             }
             return new MediaBundle(variants);
@@ -354,6 +427,7 @@ public sealed class MediaPipeline : IMediaPipeline
         KoanFontRegistry? fonts,
         int overlayDepth,
         ILogger logger,
+        PlanResult? plan,
         CancellationToken ct)
     {
         // Default: auto-orient when no explicit orient step is declared.
@@ -386,8 +460,13 @@ public sealed class MediaPipeline : IMediaPipeline
                 case AutoOrientStep:
                     // Keep — no-op
                     break;
+#pragma warning disable CS0618 // ExtractFrameStep retained as obsolete alias; engine still handles it.
                 case ExtractFrameStep ef:
                     ApplyExtractFrame(image, ef.Index);
+                    break;
+#pragma warning restore CS0618
+                case SampleStep sample:
+                    ApplySample(image, sample.Selector);
                     break;
                 case RotateStep rs:
                     image.Mutate(x => x.Rotate(rs.Degrees));
@@ -482,7 +561,39 @@ public sealed class MediaPipeline : IMediaPipeline
             Width: working.Width,
             Height: working.Height,
             FrameCount: working.Frames.Count,
-            Fingerprint: $"{resolvedFormat}-{working.Width}x{working.Height}-f{working.Frames.Count}-q{quality}");
+            Fingerprint: $"{resolvedFormat}-{working.Width}x{working.Height}-f{working.Frames.Count}-q{quality}")
+        {
+            KindTrace = plan?.KindTrace ?? Array.Empty<MediaKind>(),
+        };
+    }
+
+    /// <summary>
+    /// Apply a <see cref="SampleStep"/> to the running ImageSharp image.
+    /// No-op on a single-frame raster; selector-driven frame extraction
+    /// on an animated raster; Vector/Timeline paths are not reachable
+    /// here in MEDIA-0005 because no decoder produces those kinds yet.
+    /// </summary>
+    private static void ApplySample(Image image, FrameSelector selector)
+    {
+        if (image.Frames.Count <= 1) return; // Raster path — no-op per MEDIA-0005 §2.
+        switch (selector)
+        {
+            case FrameSelector.Index idx:
+                ApplyExtractFrame(image, idx.Frame);
+                break;
+            case FrameSelector.HeuristicBest:
+                // Heuristic best on AnimatedRaster degrades to first frame
+                // (no decoder-provided thumbnail on the ImageSharp surface).
+                ApplyExtractFrame(image, 0);
+                break;
+            case FrameSelector.Time:
+                // Time selector is meaningful only for Timeline (no decoder
+                // today). On AnimatedRaster, degrade to first frame so
+                // a recipe authored against a future Timeline source still
+                // round-trips when fed an animated raster.
+                ApplyExtractFrame(image, 0);
+                break;
+        }
     }
 
     private static void ApplyExtractFrame(Image image, int index)
@@ -789,7 +900,13 @@ public sealed class MediaPipeline : IMediaPipeline
             return this;
         }
         public IMediaPipeline AutoOrient(bool keep = false) => Add(new AutoOrientStep(keep));
-        public IMediaPipeline ExtractFrame(int index = 0) => Add(new ExtractFrameStep(index));
+        [Obsolete("Use Sample(FrameSelector.Index(n)) or the Sample.Frame(n) factory.")]
+        public IMediaPipeline ExtractFrame(int index = 0) => Add(new SampleStep(new FrameSelector.Index(index)));
+        public IMediaPipeline Sample(FrameSelector selector)
+        {
+            if (selector is null) throw new ArgumentNullException(nameof(selector));
+            return Add(new SampleStep(selector));
+        }
         public IMediaPipeline Rotate(int degrees) => Add(new RotateStep(degrees));
         public IMediaPipeline FlipHorizontal() => Add(new FlipStep(FlipAxis.Horizontal));
         public IMediaPipeline FlipVertical() => Add(new FlipStep(FlipAxis.Vertical));

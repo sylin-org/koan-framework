@@ -1,24 +1,24 @@
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Sorting;
 using Koan.Data.Core.Sorting;
 using System.Collections.Concurrent;
 using System.Collections.Frozen;
-using System.Linq.Expressions;
 
 namespace Koan.Data.Connector.Json;
 
 // Self-registration hook so the adapter is available with AddKoanDataCore()
 
 /// <summary>
-/// In-memory dictionary with JSON file persistence per aggregate.
-/// Supports LINQ queries and bulk upsert/delete.
+/// In-memory dictionary with JSON file persistence per aggregate. A "Full floor" adapter under
+/// the unified query contract (DATA-XXXX): declares <see cref="FilterCapabilities.Full"/> and
+/// evaluates the entire <see cref="Filter"/> via <see cref="InMemoryFilterEvaluator"/>.
 /// </summary>
 internal sealed class JsonRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
-    ILinqQueryRepository<TEntity, TKey>,
-    ILinqQueryRepositoryWithOptions<TEntity, TKey>,
+    IQueryRepository<TEntity, TKey>,
     IQueryCapabilities,
     IWriteCapabilities,
     Abstractions.Instructions.IInstructionExecutor<TEntity>
@@ -36,6 +36,7 @@ internal sealed class JsonRepository<TEntity, TKey> :
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<TKey, TEntity>> _stores = new();
     private readonly ConcurrentDictionary<string, string> _files = new();
     public QueryCapabilities Capabilities => QueryCapabilities.Linq; // supports LINQ predicate
+    public FilterCapabilities FilterCapabilities => FilterCapabilities.Full;
     // JSON adapter does not have native bulk APIs; honor semantics via fallbacks without advertising native bulk
     public WriteCapabilities Writes => default;
 
@@ -69,80 +70,51 @@ internal sealed class JsonRepository<TEntity, TKey> :
         return Task.FromResult((IReadOnlyList<TEntity?>)results);
     }
 
-    public Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        var store = ResolveStore();
-        var pageSize = Math.Max(1, _options.Value.DefaultPageSize);
-        var list = store.Values.AsQueryable().Where(predicate).Take(pageSize).ToList();
-        return Task.FromResult((IReadOnlyList<TEntity>)list);
-    }
-
-    public Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>>? predicate, DataQueryOptions? options, CancellationToken ct = default)
+    public Task<RepositoryQueryResult<TEntity>> Query(QueryDefinition query, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var store = ResolveStore();
         IEnumerable<TEntity> items = store.Values;
-        if (predicate is not null)
-        {
-            var compiled = predicate.Compile();
-            items = items.Where(compiled);
-        }
-        var totalCount = items is ICollection<TEntity> coll ? (long)coll.Count : items.LongCount();
-        return Task.FromResult(BuildResult(items, options, totalCount));
-    }
+        if (query.Filter is not null)
+            items = items.Where(InMemoryFilterEvaluator.Compile<TEntity>(query.Filter));
 
-    private RepositoryQueryResult<TEntity> BuildResult(IEnumerable<TEntity> items, DataQueryOptions? options, long totalCount)
-    {
+        var filtered = items as IReadOnlyList<TEntity> ?? items.ToList();
+        var totalCount = (long)filtered.Count;
+
         var sortHandled = RepositoryQueryResult<TEntity>.NoSortHandled;
-        if (options is { } o1 && o1.HasSort)
+        IEnumerable<TEntity> ordered = filtered;
+        if (query.HasSort)
         {
-            items = InMemorySorter.Apply(items, o1.Sort);
-            sortHandled = o1.Sort.ToFrozenSet();
+            ordered = InMemorySorter.Apply(filtered, query.Sort);
+            sortHandled = query.Sort.ToFrozenSet();
         }
 
         var paginationHandled = false;
-        if (options is { } o2 && o2.HasPagination)
+        if (query.HasPagination)
         {
-            var skip = (o2.Page!.Value - 1) * o2.PageSize!.Value;
-            items = items.Skip(skip).Take(o2.PageSize.Value);
+            var skip = (query.EffectivePage() - 1) * query.EffectivePageSize();
+            ordered = ordered.Skip(skip).Take(query.EffectivePageSize());
             paginationHandled = true;
         }
-        else
-        {
-            var size = options?.PageSize is int ps && ps > 0 ? ps : Math.Max(1, _options.Value.DefaultPageSize);
-            items = items.Take(size);
-            paginationHandled = false;
-        }
 
-        var list = items is IReadOnlyList<TEntity> ro ? ro : items.ToList();
-        return new RepositoryQueryResult<TEntity>
+        var list = ordered as IReadOnlyList<TEntity> ?? ordered.ToList();
+        return Task.FromResult(new RepositoryQueryResult<TEntity>
         {
             Items = list,
             TotalCount = totalCount,
             IsEstimate = false,
-            PaginationHandled = paginationHandled,
             SortHandled = sortHandled,
-        };
+            PaginationHandled = paginationHandled,
+        });
     }
 
-    public Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
+    public Task<CountResult> Count(QueryDefinition query, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        var store = ResolveStore();
-        IQueryable<TEntity> items = store.Values.AsQueryable();
-
-        if (request.Predicate is not null)
-        {
-            items = items.Where(request.Predicate);
-        }
-        else if (request.RawQuery is not null || request.ProviderQuery is not null)
-        {
-            throw new NotSupportedException("JSON adapter only supports LINQ-based count queries.");
-        }
-
-        var total = items.Count();
-        return Task.FromResult(new CountResult(total, false));
+        IEnumerable<TEntity> items = ResolveStore().Values;
+        if (query.Filter is not null)
+            items = items.Where(InMemoryFilterEvaluator.Compile<TEntity>(query.Filter));
+        return Task.FromResult(new CountResult(items.LongCount(), false));
     }
 
     public Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)

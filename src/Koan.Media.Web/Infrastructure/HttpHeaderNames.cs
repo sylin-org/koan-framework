@@ -22,4 +22,7 @@ public static class HttpHeaderNames
     public const string XKoanMediaOutputFormat = "X-Koan-Media-OutputFormat";
     public const string XKoanMediaFrameCount = "X-Koan-Media-FrameCount";
     public const string XKoanMediaIgnoredParams = "X-Koan-Media-IgnoredParams";
+
+    // Planner diagnostics (MEDIA-0005 §7)
+    public const string XKoanMediaKindTrace = "X-Koan-Media-KindTrace";
 }

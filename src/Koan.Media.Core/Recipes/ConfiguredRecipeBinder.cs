@@ -59,8 +59,13 @@ public static class ConfiguredRecipeBinder
             case "autoorient" or "orient":
                 builder.AutoOrient(keep: s.Keep);
                 break;
-            case "extractframe" or "frame":
-                builder.ExtractFrame(s.Index);
+            case "extractframe" or "frame" or "sample":
+                // MEDIA-0005: extractframe/frame are legacy slugs for Sample.
+                // All three route to the canonical Sample step with an Index
+                // selector; richer selectors (time, thumbnail) are
+                // configuration-deferred until the SVG/Timeline decoders
+                // land.
+                builder.Sample(new FrameSelector.Index(s.Index));
                 break;
             case "rotate":
                 builder.Rotate(s.Degrees);

@@ -76,32 +76,36 @@ namespace Koan.Data.Core.Model
         public static Task<IReadOnlyList<TEntity>> All(CancellationToken ct = default)
             => Data<TEntity, TKey>.All(ct);
 
-        public static Task<IReadOnlyList<TEntity>> All(DataQueryOptions? options, CancellationToken ct = default)
-            => Data<TEntity, TKey>.All(options, ct);
+        public static Task<IReadOnlyList<TEntity>> All(QueryDefinition query, CancellationToken ct = default)
+            => Data<TEntity, TKey>.All(query, ct);
 
-        public static Task<QueryResult<TEntity>> AllWithCount(DataQueryOptions? options = null, CancellationToken ct = default)
-            => Data<TEntity, TKey>.AllWithCount(options, ct);
+        public static Task<QueryResult<TEntity>> AllWithCount(QueryDefinition? query = null, CancellationToken ct = default)
+            => Data<TEntity, TKey>.AllWithCount(query, ct);
         public static Task<IReadOnlyList<TEntity>> All(string partition, CancellationToken ct = default)
             => Data<TEntity, TKey>.All(partition, ct);
         public static Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
             => Data<TEntity, TKey>.Query(predicate, ct);
 
-        public static Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
-            => Data<TEntity, TKey>.Query(predicate, options, ct);
+        public static Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, QueryDefinition? query, CancellationToken ct = default)
+            => Data<TEntity, TKey>.Query(predicate, query, ct);
 
-        public static Task<QueryResult<TEntity>> QueryWithCount(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options = null, CancellationToken ct = default)
-            => Data<TEntity, TKey>.QueryWithCount(predicate, options, ct);
+        public static Task<QueryResult<TEntity>> QueryWithCount(Expression<Func<TEntity, bool>> predicate, QueryDefinition? query = null, CancellationToken ct = default)
+            => Data<TEntity, TKey>.QueryWithCount(predicate, query, ct);
 
-        public static Task<IReadOnlyList<TEntity>> Query(string query, CancellationToken ct = default)
-            => Data<TEntity, TKey>.Query(query, ct);
+        /// <summary>Query via the JSON filter DSL (e.g. <c>{ "Tags": { "$in": ["x"] } }</c>). The string
+        /// surface is the provider-agnostic DSL; for provider-native queries use <see cref="QueryRaw"/>.</summary>
+        public static Task<IReadOnlyList<TEntity>> Query(string filterJson, CancellationToken ct = default)
+            => Data<TEntity, TKey>.Query(filterJson, ct);
 
-        public static Task<IReadOnlyList<TEntity>> Query(string query, DataQueryOptions? options, CancellationToken ct = default)
-            => Data<TEntity, TKey>.Query(query, options, ct);
+        public static Task<IReadOnlyList<TEntity>> Query(string filterJson, QueryDefinition? query, CancellationToken ct = default)
+            => Data<TEntity, TKey>.Query(filterJson, query, ct);
 
-        public static Task<QueryResult<TEntity>> QueryWithCount(string query, DataQueryOptions? options = null, CancellationToken ct = default)
-            => Data<TEntity, TKey>.QueryWithCount(query, options, ct);
-        public static Task<IReadOnlyList<TEntity>> Query(string query, string partition, CancellationToken ct = default)
-            => Data<TEntity, TKey>.Query(query, partition, ct);
+        public static Task<QueryResult<TEntity>> QueryWithCount(string filterJson, QueryDefinition? query = null, CancellationToken ct = default)
+            => Data<TEntity, TKey>.QueryWithCount(filterJson, query, ct);
+
+        /// <summary>Provider-native query escape hatch (raw SQL/N1QL/etc.), gated by adapter support.</summary>
+        public static Task<IReadOnlyList<TEntity>> QueryRaw(string providerQuery, object? parameters = null, CancellationToken ct = default)
+            => Data<TEntity, TKey>.QueryRaw(providerQuery, parameters, null, ct);
 
         // Streaming (IAsyncEnumerable). When sort is specified, streaming materializes the full result
         // before yielding the first item — see ADR-0093.
@@ -112,12 +116,14 @@ namespace Koan.Data.Core.Model
         public static IAsyncEnumerable<TEntity> AllStream(Action<Koan.Data.Core.Sorting.ISortBuilder<TEntity>> sort, int? batchSize = null, CancellationToken ct = default)
             => Data<TEntity, TKey>.AllStream(sort, batchSize, ct);
 
-        public static IAsyncEnumerable<TEntity> QueryStream(string query, int? batchSize = null, CancellationToken ct = default)
-            => Data<TEntity, TKey>.QueryStream(query, batchSize, ct);
-        public static IAsyncEnumerable<TEntity> QueryStream(string query, string sort, int? batchSize = null, CancellationToken ct = default)
-            => Data<TEntity, TKey>.QueryStream(query, sort, batchSize, ct);
-        public static IAsyncEnumerable<TEntity> QueryStream(string query, Action<Koan.Data.Core.Sorting.ISortBuilder<TEntity>> sort, int? batchSize = null, CancellationToken ct = default)
-            => Data<TEntity, TKey>.QueryStream(query, sort, batchSize, ct);
+        public static IAsyncEnumerable<TEntity> QueryStream(Expression<Func<TEntity, bool>> predicate, int? batchSize = null, CancellationToken ct = default)
+            => Data<TEntity, TKey>.QueryStream(predicate, batchSize, ct);
+        public static IAsyncEnumerable<TEntity> QueryStream(Expression<Func<TEntity, bool>> predicate, string sort, int? batchSize = null, CancellationToken ct = default)
+            => Data<TEntity, TKey>.QueryStream(predicate, sort, batchSize, ct);
+        public static IAsyncEnumerable<TEntity> QueryStream(string filterJson, int? batchSize = null, CancellationToken ct = default)
+            => Data<TEntity, TKey>.QueryStream(filterJson, batchSize, ct);
+        public static IAsyncEnumerable<TEntity> QueryStream(string filterJson, string sort, int? batchSize = null, CancellationToken ct = default)
+            => Data<TEntity, TKey>.QueryStream(filterJson, sort, batchSize, ct);
 
         // Basic paging helpers (materialized). Sort overloads thread through the orchestrator (ADR-0093).
         public static Task<IReadOnlyList<TEntity>> FirstPage(int size, CancellationToken ct = default)
@@ -157,28 +163,22 @@ namespace Koan.Data.Core.Model
         {
             // Default: await Entity.Count → Optimized strategy
             public System.Runtime.CompilerServices.TaskAwaiter<long> GetAwaiter()
-                => Data<TEntity, TKey>.Count((object?)null, CountStrategy.Optimized, default).GetAwaiter();
+                => Data<TEntity, TKey>.Count(CountStrategy.Optimized, default).GetAwaiter();
 
             public Task<long> Exact(CancellationToken ct = default)
                 => Data<TEntity, TKey>.Count(ct);
 
             public Task<long> Fast(CancellationToken ct = default)
-                => Data<TEntity, TKey>.Count((object?)null, CountStrategy.Fast, ct);
+                => Data<TEntity, TKey>.Count(CountStrategy.Fast, ct);
 
             public Task<long> Optimized(CancellationToken ct = default)
-                => Data<TEntity, TKey>.Count((object?)null, CountStrategy.Optimized, ct);
+                => Data<TEntity, TKey>.Count(CountStrategy.Optimized, ct);
 
             public Task<long> Where(Expression<Func<TEntity, bool>> predicate, CountStrategy strategy = CountStrategy.Optimized, CancellationToken ct = default)
                 => Data<TEntity, TKey>.Count(predicate, strategy, ct);
 
-            public Task<long> Where(Expression<Func<TEntity, bool>> predicate, DataQueryOptions options, CancellationToken ct = default)
-                => Data<TEntity, TKey>.Count(predicate, options, ct);
-
-            public Task<long> Query(string query, CountStrategy strategy = CountStrategy.Optimized, CancellationToken ct = default)
-                => Data<TEntity, TKey>.Count(query, strategy, ct);
-
-            public Task<long> Query(string query, DataQueryOptions options, CancellationToken ct = default)
-                => Data<TEntity, TKey>.Count(query, options, ct);
+            public Task<long> Query(QueryDefinition query, CancellationToken ct = default)
+                => Data<TEntity, TKey>.Count(query, ct);
 
             public Task<long> Partition(string partition, CountStrategy strategy = CountStrategy.Exact, CancellationToken ct = default)
                 => Data<TEntity, TKey>.Count(partition, strategy, ct);
@@ -270,7 +270,7 @@ namespace Koan.Data.Core.Model
                 (entity, token) => Data<TEntity, TKey>.Delete(entity.Id, token),
                 ct);
 
-        public static Task<bool> Remove(TKey id, DataQueryOptions? options, CancellationToken ct = default)
+        public static Task<bool> Remove(TKey id, QueryDefinition? options, CancellationToken ct = default)
         {
             if (options?.Partition is string partition && !string.IsNullOrWhiteSpace(partition))
             {
@@ -303,7 +303,7 @@ namespace Koan.Data.Core.Model
                 ;
         }
 
-        public static Task<int> Remove(IEnumerable<TKey> ids, DataQueryOptions? options, CancellationToken ct = default)
+        public static Task<int> Remove(IEnumerable<TKey> ids, QueryDefinition? options, CancellationToken ct = default)
         {
             if (options?.Partition is string partition && !string.IsNullOrWhiteSpace(partition))
             {
@@ -423,7 +423,8 @@ namespace Koan.Data.Core.Model
         /// <summary>Partitioned variant of <see cref="RemoveByQuery(string, CancellationToken)"/>.</summary>
         public static async Task<int> RemoveByQuery(string query, string partition, CancellationToken ct = default)
         {
-            var items = await Data<TEntity, TKey>.Query(query, partition, ct);
+            using var _ = Data<TEntity, TKey>.WithPartition(partition);
+            var items = await Data<TEntity, TKey>.Query(query, ct);
             if (!EntityEventRegistry<TEntity, TKey>.HasRemovePipeline)
             {
                 return await Data<TEntity, TKey>.DeleteMany(items.Select(e => e.Id), partition, ct);

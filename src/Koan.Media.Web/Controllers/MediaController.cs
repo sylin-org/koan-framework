@@ -266,6 +266,13 @@ public sealed class MediaController : ControllerBase
             Response.Headers[HttpHeaderNames.XKoanMediaOutputFormat] = output.Format;
             Response.Headers[HttpHeaderNames.XKoanMediaFrameCount] =
                 output.FrameCount.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            if (output.KindTrace.Count > 0)
+            {
+                // Per MEDIA-0005 §7: human-readable kind transitions.
+                // Format: "Raster -> Raster -> Raster" (kinds joined by " -> ").
+                Response.Headers[HttpHeaderNames.XKoanMediaKindTrace] =
+                    string.Join(" -> ", output.KindTrace.Select(k => k.ToString()));
+            }
         }
         Response.Headers["X-Koan-Media-FromCache"] = fromCache;
         if (ignored.Count > 0)

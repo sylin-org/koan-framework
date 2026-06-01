@@ -1,0 +1,170 @@
+using System.Collections;
+using System.Linq.Expressions;
+
+namespace Koan.Data.Abstractions.Filtering;
+
+/// <summary>
+/// Lowers a raw LINQ predicate into the normalized <see cref="Filter"/> AST so hand-written
+/// <c>x =&gt; x.Games.Contains("ffxiv")</c> converges with the JSON DSL onto identical nodes
+/// (same pushdown, same fallback, same results). Recognized shapes — logical
+/// <c>&amp;&amp;/||/!</c>, the six comparisons, string <c>StartsWith/EndsWith/Contains</c>, and
+/// collection/scalar <c>Contains</c> — become structured nodes; anything else (arbitrary
+/// method calls, computed expressions) becomes a <see cref="ClrFilter"/> that the evaluator
+/// runs in memory and translators treat as residual. A member chain is only treated as a
+/// <see cref="FieldPath"/> when it actually resolves against the entity, so expressions like
+/// <c>x.Games.Count &gt; 1</c> fall to <see cref="ClrFilter"/> rather than a bogus field.
+/// </summary>
+public static class LinqFilterCompiler
+{
+    public static Filter Compile<T>(Expression<Func<T, bool>> predicate)
+        => Visit(predicate.Body, predicate.Parameters[0], typeof(T));
+
+    private static Filter Visit(Expression e, ParameterExpression param, Type rootType)
+    {
+        switch (e)
+        {
+            case BinaryExpression b when b.NodeType is ExpressionType.AndAlso or ExpressionType.And:
+                return new AllOf(new[] { Visit(b.Left, param, rootType), Visit(b.Right, param, rootType) });
+            case BinaryExpression b when b.NodeType is ExpressionType.OrElse or ExpressionType.Or:
+                return new AnyOf(new[] { Visit(b.Left, param, rootType), Visit(b.Right, param, rootType) });
+            case UnaryExpression u when u.NodeType == ExpressionType.Not:
+                return new Not(Visit(u.Operand, param, rootType));
+            case UnaryExpression u when u.NodeType is ExpressionType.Convert or ExpressionType.ConvertChecked:
+                return Visit(u.Operand, param, rootType);
+            case BinaryExpression b when IsComparison(b.NodeType):
+                return Comparison(b, param, rootType);
+            case MethodCallExpression mc when TryMethod(mc, param, rootType, out var mf):
+                return mf;
+            case MemberExpression m when m.Type == typeof(bool) && TryMemberPath(m, param, rootType, out var bp):
+                return new FieldFilter(bp, FilterOperator.Eq, FilterValue.Of(true));
+            default:
+                return Opaque(e, param);
+        }
+    }
+
+    private static Filter Comparison(BinaryExpression b, ParameterExpression param, Type rootType)
+    {
+        if (TryMemberPath(b.Left, param, rootType, out var pl))
+            return new FieldFilter(pl, MapOperator(b.NodeType), FilterValue.Of(Eval(b.Right)));
+        if (TryMemberPath(b.Right, param, rootType, out var pr))
+            return new FieldFilter(pr, MapOperator(Flip(b.NodeType)), FilterValue.Of(Eval(b.Left)));
+        return Opaque(b, param);
+    }
+
+    private static bool TryMethod(MethodCallExpression mc, ParameterExpression param, Type rootType, out Filter filter)
+    {
+        filter = null!;
+
+        // string instance methods: StartsWith / EndsWith / Contains
+        if (mc.Method.DeclaringType == typeof(string) && mc.Object is not null && mc.Arguments.Count == 1
+            && TryMemberPath(mc.Object, param, rootType, out var sp))
+        {
+            FilterOperator? op = mc.Method.Name switch
+            {
+                nameof(string.StartsWith) => FilterOperator.StartsWith,
+                nameof(string.EndsWith) => FilterOperator.EndsWith,
+                nameof(string.Contains) => FilterOperator.Contains,
+                _ => null
+            };
+            if (op is { } sop) { filter = new FieldFilter(sp, sop, FilterValue.Of(Eval(mc.Arguments[0]))); return true; }
+        }
+
+        // collection / scalar Contains (instance List<T>.Contains or static Enumerable.Contains)
+        if (mc.Method.Name == nameof(Enumerable.Contains))
+        {
+            Expression? source = null, item = null;
+            if (mc.Object is not null && mc.Arguments.Count == 1) { source = mc.Object; item = mc.Arguments[0]; }
+            else if (mc.Method.DeclaringType == typeof(Enumerable) && mc.Arguments.Count == 2) { source = mc.Arguments[0]; item = mc.Arguments[1]; }
+
+            if (source is not null && item is not null)
+            {
+                // member-collection.Contains(constant) -> Has
+                if (IsCollectionType(source.Type) && TryMemberPath(source, param, rootType, out var colPath)
+                    && !TryMemberPath(item, param, rootType, out _))
+                {
+                    filter = new FieldFilter(colPath, FilterOperator.Has, FilterValue.Of(Eval(item)));
+                    return true;
+                }
+                // constant-collection.Contains(member-scalar) -> In
+                if (TryMemberPath(item, param, rootType, out var scalarPath)
+                    && !TryMemberPath(source, param, rootType, out _))
+                {
+                    filter = new FieldFilter(scalarPath, FilterOperator.In, ToSet(Eval(source)));
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static Filter Opaque(Expression e, ParameterExpression param) => new ClrFilter(Expression.Lambda(e, param));
+
+    // --- helpers ---
+
+    private static bool IsComparison(ExpressionType t) => t is ExpressionType.Equal or ExpressionType.NotEqual
+        or ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual or ExpressionType.LessThan or ExpressionType.LessThanOrEqual;
+
+    private static FilterOperator MapOperator(ExpressionType t) => t switch
+    {
+        ExpressionType.Equal => FilterOperator.Eq,
+        ExpressionType.NotEqual => FilterOperator.Ne,
+        ExpressionType.GreaterThan => FilterOperator.Gt,
+        ExpressionType.GreaterThanOrEqual => FilterOperator.Gte,
+        ExpressionType.LessThan => FilterOperator.Lt,
+        ExpressionType.LessThanOrEqual => FilterOperator.Lte,
+        _ => throw new NotSupportedException($"Comparison '{t}' is not supported.")
+    };
+
+    private static ExpressionType Flip(ExpressionType t) => t switch
+    {
+        ExpressionType.GreaterThan => ExpressionType.LessThan,
+        ExpressionType.GreaterThanOrEqual => ExpressionType.LessThanOrEqual,
+        ExpressionType.LessThan => ExpressionType.GreaterThan,
+        ExpressionType.LessThanOrEqual => ExpressionType.GreaterThanOrEqual,
+        _ => t
+    };
+
+    private static bool IsCollectionType(Type t) => FieldPathResolver.TryGetElementType(t) is not null;
+
+    private static bool TryMemberPath(Expression e, ParameterExpression param, Type rootType, out FieldPath path)
+    {
+        path = null!;
+        var segments = new List<string>();
+        var current = Unwrap(e);
+        while (current is MemberExpression m)
+        {
+            segments.Insert(0, m.Member.Name);
+            current = m.Expression is null ? null! : Unwrap(m.Expression);
+        }
+        if (!ReferenceEquals(current, param) || segments.Count == 0) return false;
+
+        var candidate = FieldPath.Of(segments.ToArray());
+        // Only a genuine entity path counts; CLR member access like .Count/.Length that the
+        // model can't resolve falls through to a ClrFilter instead of a bogus field.
+        try { FieldPathResolver.Resolve(rootType, candidate); }
+        catch (InvalidFilterFieldException) { return false; }
+
+        path = candidate;
+        return true;
+    }
+
+    private static Expression Unwrap(Expression e)
+        => e is UnaryExpression u && u.NodeType is ExpressionType.Convert or ExpressionType.ConvertChecked
+            ? Unwrap(u.Operand)
+            : e;
+
+    private static object? Eval(Expression e)
+    {
+        if (e is ConstantExpression c) return c.Value;
+        return Expression.Lambda(Unwrap(e)).Compile().DynamicInvoke();
+    }
+
+    private static FilterValue ToSet(object? value)
+    {
+        var list = new List<object?>();
+        if (value is IEnumerable en and not string)
+            foreach (var x in en) list.Add(x);
+        return FilterValue.Many(list);
+    }
+}
