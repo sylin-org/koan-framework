@@ -42,7 +42,7 @@ public sealed class TextExtractor : ITextExtractor
     {
         await using var stream = await _storage.OpenRead(document.StorageKey, ct);
         await using var buffer = new MemoryStream();
-        await stream.CopyTo(buffer, ct);
+        await stream.CopyToAsync(buffer, ct);
         buffer.Position = 0;
 
         var mediaType = document.MediaType?.ToLowerInvariant();

@@ -92,7 +92,7 @@ public sealed class DocumentMerger : IDocumentMerger
         var sourceCache = new Dictionary<string, SourceDocument?>(StringComparer.OrdinalIgnoreCase);
         var passageCache = new Dictionary<string, Passage?>(StringComparer.OrdinalIgnoreCase);
 
-        var priorDeliverables = (await Deliverable.Query(d => d.PipelineId == pipeline.Id, ct).ConfigureAwait(false)).ToListAsync();
+        var priorDeliverables = await Deliverable.Query(d => d.PipelineId == pipeline.Id, ct).ConfigureAwait(false);
         var nextVersion = priorDeliverables.Count + 1;
 
         foreach (var group in groups)

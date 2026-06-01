@@ -32,9 +32,8 @@ public class ValidationWorker : BackgroundService
                 List<Media> batch;
                 using (EntityContext.Partition("import-raw"))
                 {
-                    var result = await Media.All(
-                        new DataQueryOptions { PageSize = 50 },
-                        stoppingToken);
+                    // DATA-0096: DataQueryOptions removed — FirstPage(size) is the first-N equivalent.
+                    var result = await Media.FirstPage(50, stoppingToken);
                     batch = result.ToList();
                 }
 

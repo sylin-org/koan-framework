@@ -60,7 +60,7 @@ public sealed class TemplateRenderer : ITemplateRenderer
         var context = BuildTemplateContext(data);
 
         var renderer = _stubbleBuilder.Build();
-        var markdown = await renderer.Render(template, context).ConfigureAwait(false);
+        var markdown = renderer.Render(template, context); // Stubble Render is synchronous
 
         if (data.Footnotes.Count > 0)
         {

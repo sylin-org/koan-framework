@@ -12,18 +12,13 @@ builder.Services
     .AddKoan()
     .AsWebApi();
 
-builder.Services.AddOllamaFromConfig();
+// Ollama (Koan.AI.Connector.Ollama) and Swagger (Koan.Web.Connector.Swagger) are wired by
+// Reference = Intent — their KoanAutoRegistrars register the services and the Swagger StartupFilter
+// mounts the UI in development. No explicit AddOllamaFromConfig()/UseSwagger() calls are needed.
 
 var app = builder.Build();
 
 AppHost.Current ??= app.Services;
-
-// Koan Environment Info
-if (KoanEnv.IsDevelopment)
-{
-    app.UseSwagger();
-    app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Meridian API v1"));
-}
 
 app.UseAuthorization();
 app.MapControllers();

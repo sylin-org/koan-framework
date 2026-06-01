@@ -52,7 +52,7 @@ public sealed class PassageChunker : IPassageChunker
         var current = new List<string>();
 
         string? line;
-        while ((line = reader.ReadLineAsync()) != null)
+        while ((line = reader.ReadLine()) != null)
         {
             if (string.IsNullOrWhiteSpace(line))
             {

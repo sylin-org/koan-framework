@@ -316,9 +316,9 @@ internal sealed class SeedService : ISeedService
         {
             using (EntityContext.Partition(null!))
             {
-                var repo = dataSvc.GetRepository<Media, string>();
-                var result = await repo.Count(new CountRequest<Media>(), ct);
-                mediaCount = (int)result.Value;
+                // DATA-0096: CountRequest<T>/repo.Count removed — Entity.Count is the idiomatic
+                // count surface (respects the ambient partition scope).
+                mediaCount = (int)await Media.Count.Exact(ct);
             }
         }
         catch (Exception ex)
