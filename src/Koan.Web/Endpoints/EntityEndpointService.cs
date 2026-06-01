@@ -12,6 +12,7 @@ using Microsoft.Extensions.Logging;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
+using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Web.Filtering;
 using Koan.Web.Hooks;
@@ -62,7 +63,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             queryResult = await QueryCollection(request, context.Options, context.CancellationToken);
             total = queryResult.Total;
         }
-        catch (InvalidOperationException ex)
+        catch (Exception ex) when (ex is InvalidOperationException or FilterParseException or InvalidFilterFieldException or NotSupportedException)
         {
             var bad = new BadRequestObjectResult(new { error = ex.Message });
             return new EntityCollectionResult<TEntity>(context, [], 0, null, bad);
@@ -173,7 +174,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         {
             (repositoryItems, total) = await QueryCollectionFromBody(repo, request, context.Options, context.CancellationToken);
         }
-        catch (InvalidOperationException ex)
+        catch (Exception ex) when (ex is InvalidOperationException or FilterParseException or InvalidFilterFieldException or NotSupportedException)
         {
             var bad = new BadRequestObjectResult(new { error = ex.Message });
             return new EntityCollectionResult<TEntity>(context, [], 0, null, bad);
@@ -377,25 +378,23 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
         using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
 
-        // Try parsing the query as a JsonFilter first (works on every ILinqQueryRepository adapter).
-        // Falling back to the raw string path requires IStringQueryRepository, which most adapters
-        // don't implement — and the silent "match everything" degrade those exhibit makes DELETE
-        // disastrous. Predicate-first keeps the operation safe by default.
-        if (Koan.Web.Filtering.JsonFilterBuilder.TryBuild<TEntity>(request.Query, out var predicate, out var error))
+        // Parse the JSON filter DSL into the unified Filter AST. Works on every adapter (the
+        // coordinator pushes what it can and evaluates the rest in-memory) — never a silent match-all.
+        Filter filter;
+        try
         {
-            var items = await Data<TEntity, TKey>.Query(predicate!, request.Context.CancellationToken);
-            var ids = items.Select(e => e.Id).ToList();
-            if (ids.Count == 0) return new EntityEndpointResult(request.Context, new { deleted = 0 });
-            var removedByPredicate = await Data<TEntity, TKey>.DeleteMany(ids, request.Context.CancellationToken);
-            return new EntityEndpointResult(request.Context, new { deleted = removedByPredicate });
+            filter = JsonFilterParser.Parse<TEntity>(request.Query);
+        }
+        catch (Exception ex) when (ex is FilterParseException or InvalidFilterFieldException)
+        {
+            return new EntityEndpointResult(request.Context, null, new BadRequestObjectResult(new { error = ex.Message }));
         }
 
-        // JSON parse failed — surface a 400 rather than passing through to a raw string path that
-        // the adapter may not understand.
-        return new EntityEndpointResult(
-            request.Context,
-            null,
-            new BadRequestObjectResult(new { error = error ?? "Invalid filter JSON" }));
+        var items = await Data<TEntity, TKey>.All(QueryDefinition.All.Where(filter), request.Context.CancellationToken);
+        var ids = items.Select(e => e.Id).ToList();
+        if (ids.Count == 0) return new EntityEndpointResult(request.Context, new { deleted = 0 });
+        var removedByPredicate = await Data<TEntity, TKey>.DeleteMany(ids, request.Context.CancellationToken);
+        return new EntityEndpointResult(request.Context, new { deleted = removedByPredicate });
     }
 
     public async Task<EntityEndpointResult> DeleteAll(EntityDeleteAllRequest request)
@@ -520,73 +519,47 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     {
         using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
 
-        Expression<Func<TEntity, bool>>? userPredicate = null;
+        Filter? userFilter = null;
         if (!string.IsNullOrWhiteSpace(request.FilterJson))
         {
-            if (!JsonFilterBuilder.TryBuild<TEntity>(request.FilterJson!, out var parsed, out var error, new JsonFilterBuilder.BuildOptions { IgnoreCase = request.IgnoreCase }))
-            {
-                throw new InvalidOperationException(error ?? "Invalid filter");
-            }
-            userPredicate = parsed;
+            userFilter = JsonFilterParser.Parse<TEntity>(request.FilterJson!, new FilterParseOptions { IgnoreCase = request.IgnoreCase });
         }
 
-        // WEB-0068: hook-contributed predicates AND-compose with the user's filter so the adapter
-        // counts and pages against the already-filtered set. When any predicate exists, free-text
-        // Q is dropped — the two paths reach different repository surfaces and can't be combined
-        // at the framework layer.
-        var composed = QueryPredicateComposer.AndAll<TEntity>(userPredicate, options.Predicates);
-
-        object? queryPayload;
-        if (composed is not null)
-        {
-            if (!string.IsNullOrWhiteSpace(options.Q))
-            {
-                _logger?.LogInformation(
-                    "EntityEndpointService<{Entity}> dropped free-text Q because IRequestOptionsHook(s) contributed {Count} predicate(s). See WEB-0068.",
-                    typeof(TEntity).Name,
-                    options.Predicates.Count);
-            }
-            queryPayload = composed;
-        }
-        else if (!string.IsNullOrWhiteSpace(options.Q))
-        {
-            queryPayload = options.Q;
-        }
-        else
-        {
-            queryPayload = null;
-        }
-
-        var dataOptions = BuildDataQueryOptions(request, options);
+        // WEB-0068: hook-contributed predicates AND-compose with the user's filter (all lowered to one
+        // Filter AST) so the adapter counts and pages against the already-filtered set. When any filter
+        // exists, free-text Q is dropped — Q reaches the raw provider surface only.
+        var composed = QueryFilterComposer.AndAll<TEntity>(userFilter, options.Predicates);
+        var queryDef = BuildQueryDefinition(request, options);
         var absoluteMax = request.AbsoluteMaxRecords > 0 ? request.AbsoluteMaxRecords : (int?)null;
 
-        var result = await Data<TEntity, TKey>.QueryWithCount(queryPayload, dataOptions, cancellationToken, absoluteMax);
+        if (composed is null && !string.IsNullOrWhiteSpace(options.Q))
+        {
+            var raw = await Data<TEntity, TKey>.QueryRaw(options.Q!, null, queryDef, cancellationToken);
+            return new RepositoryQueryResult(raw, raw.Count, false, false);
+        }
+        if (composed is not null && !string.IsNullOrWhiteSpace(options.Q))
+        {
+            _logger?.LogInformation(
+                "EntityEndpointService<{Entity}> dropped free-text Q because IRequestOptionsHook(s) contributed {Count} predicate(s). See WEB-0068.",
+                typeof(TEntity).Name,
+                options.Predicates.Count);
+        }
+
+        var result = await Data<TEntity, TKey>.QueryWithCount(queryDef.Where(composed), cancellationToken, absoluteMax);
 
         return new RepositoryQueryResult(result.Items, result.TotalCount, result.RepositoryHandledPagination, result.ExceededSafetyLimit);
     }
 
-    private static DataQueryOptions BuildDataQueryOptions(EntityCollectionRequest request, QueryOptions options)
+    private static QueryDefinition BuildQueryDefinition(EntityCollectionRequest request, QueryOptions options)
     {
-        var queryOptions = new DataQueryOptions();
-
+        var def = QueryDefinition.All;
         if (request.ApplyPagination && options.Page > 0 && options.PageSize > 0)
-        {
-            queryOptions = queryOptions.WithPagination(options.Page, options.PageSize);
-
-        }
-
+            def = def.WithPagination(options.Page, options.PageSize);
         if (!string.IsNullOrWhiteSpace(request.Set))
-        {
-            queryOptions = queryOptions.ForPartition(request.Set);
-        }
-
+            def = def.ForPartition(request.Set);
         if (options.Sort.Count > 0)
-        {
-            // Pass structured sort specs through unchanged — adapters consume them directly (DATA-0092).
-            queryOptions = queryOptions.WithSort(options.Sort);
-        }
-
-        return queryOptions;
+            def = def.WithSort(options.Sort);
+        return def;
     }
 
     private async Task<(IReadOnlyList<TEntity> Items, long Total)> QueryCollectionFromBody(
@@ -597,59 +570,41 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     {
         using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
 
-        // Route body queries through the orchestrator (Data<T,K>.QueryWithCount) so sort/pagination
-        // honour the DATA-0092 contract — adapters get options, orchestrator falls back to in-memory
-        // sort when needed, and we get correct paginate-after-sort semantics. The earlier direct
-        // repo.Query calls bypassed this and silently dropped sort + pagination.
-        var dataOptions = new DataQueryOptions();
+        // Route body queries through the orchestrator (Data<T,K>.QueryWithCount) so the unified
+        // QueryDefinition contract handles split/residual/sort/paginate-after centrally.
+        var queryDef = QueryDefinition.All;
         if (options.PageSize > 0 && options.Page > 0)
-        {
-            dataOptions = dataOptions.WithPagination(options.Page, options.PageSize);
-        }
+            queryDef = queryDef.WithPagination(options.Page, options.PageSize);
         if (!string.IsNullOrWhiteSpace(request.Set))
-        {
-            dataOptions = dataOptions.ForPartition(request.Set);
-        }
+            queryDef = queryDef.ForPartition(request.Set);
         if (options.Sort.Count > 0)
-        {
-            dataOptions = dataOptions.WithSort(options.Sort);
-        }
+            queryDef = queryDef.WithSort(options.Sort);
 
-        Expression<Func<TEntity, bool>>? userPredicate = null;
+        Filter? userFilter = null;
         if (!string.IsNullOrWhiteSpace(request.FilterJson))
         {
-            if (!JsonFilterBuilder.TryBuild<TEntity>(request.FilterJson!, out var parsed, out var error, new JsonFilterBuilder.BuildOptions { IgnoreCase = request.IgnoreCase }))
-            {
-                throw new InvalidOperationException(error ?? "Invalid filter");
-            }
-            userPredicate = parsed;
+            userFilter = JsonFilterParser.Parse<TEntity>(request.FilterJson!, new FilterParseOptions { IgnoreCase = request.IgnoreCase });
         }
 
         // WEB-0068: same composition rule as the GET path — hook predicates AND with the user's
-        // filter, free-text Q is dropped when any predicate contributes.
-        var composed = QueryPredicateComposer.AndAll<TEntity>(userPredicate, options.Predicates);
+        // filter (one Filter AST), free-text Q is dropped when any filter contributes.
+        var composed = QueryFilterComposer.AndAll<TEntity>(userFilter, options.Predicates);
 
-        if (composed is not null)
+        if (composed is null && !string.IsNullOrWhiteSpace(options.Q))
         {
-            if (!string.IsNullOrWhiteSpace(options.Q))
-            {
-                _logger?.LogInformation(
-                    "EntityEndpointService<{Entity}> dropped free-text Q (body-query) because IRequestOptionsHook(s) contributed {Count} predicate(s). See WEB-0068.",
-                    typeof(TEntity).Name,
-                    options.Predicates.Count);
-            }
-            var filtered = await Koan.Data.Core.Data<TEntity, TKey>.QueryWithCount(composed, dataOptions, cancellationToken);
-            return (filtered.Items, filtered.TotalCount);
+            var raw = await Data<TEntity, TKey>.QueryRaw(options.Q!, null, queryDef, cancellationToken);
+            return (raw, raw.Count);
+        }
+        if (composed is not null && !string.IsNullOrWhiteSpace(options.Q))
+        {
+            _logger?.LogInformation(
+                "EntityEndpointService<{Entity}> dropped free-text Q (body-query) because IRequestOptionsHook(s) contributed {Count} predicate(s). See WEB-0068.",
+                typeof(TEntity).Name,
+                options.Predicates.Count);
         }
 
-        if (!string.IsNullOrWhiteSpace(options.Q))
-        {
-            var stringQueried = await Koan.Data.Core.Data<TEntity, TKey>.QueryWithCount(options.Q!, dataOptions, cancellationToken);
-            return (stringQueried.Items, stringQueried.TotalCount);
-        }
-
-        var allResult = await Koan.Data.Core.Data<TEntity, TKey>.QueryWithCount(dataOptions, cancellationToken);
-        return (allResult.Items, allResult.TotalCount);
+        var result = await Koan.Data.Core.Data<TEntity, TKey>.QueryWithCount(queryDef.Where(composed), cancellationToken);
+        return (result.Items, result.TotalCount);
     }
 
     private static async Task<IReadOnlyList<object>> EnrichRelationships(IReadOnlyList<TEntity> list, CancellationToken cancellationToken)
