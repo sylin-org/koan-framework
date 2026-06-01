@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Koan.Core;
+using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Core.Provenance;
 using Koan.Data.Vector.Abstractions;
@@ -32,12 +33,11 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        module.Category("Vector");
-        module.Provider("pgvector");
-        module.Capability("HNSW indexing");
-        module.Capability("IVFFlat indexing");
-        module.Capability("Cosine/L2/InnerProduct metrics");
-        module.Capability("JSONB metadata filtering");
-        module.Capability($"Max dimension: {PGVectorOptions.MaxDimension}");
+        module.Describe(ModuleVersion);
+        module.AddNote("Provider: pgvector (Vector pillar)");
+        module.AddNote("Indexing: HNSW, IVFFlat");
+        module.AddNote("Metrics: Cosine, L2, InnerProduct");
+        module.AddNote("Metadata filtering: JSONB");
+        module.AddNote($"Max dimension: {PGVectorOptions.MaxDimension}");
     }
 }

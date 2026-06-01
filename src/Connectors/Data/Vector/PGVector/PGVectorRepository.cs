@@ -10,18 +10,20 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Npgsql;
-using Pgvector;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Vector.Filtering;
 using Koan.Data.Vector.Abstractions;
 using Koan.Data.Vector.Abstractions.Configuration;
+using PgVec = Pgvector.Vector;
 
 namespace Koan.Data.Connector.PGVector;
 
 /// <summary>
-/// PostgreSQL vector repository using pgvector extension.
-/// Implements IVectorSearchRepository with support for cosine/L2/inner product similarity,
-/// HNSW and IVFFlat indexes, and bulk operations.
-/// Table names automatically include "_vector" suffix per DATA-0087.
+/// PostgreSQL vector repository using the pgvector extension. Reference implementation of the
+/// vector adapter contract (DATA-0097): zero-setup defaults, Reference = Intent registration,
+/// self-reporting capabilities, and a real fail-loud metadata filter translator (no silent
+/// match-all). Supports cosine/L2/inner-product similarity, HNSW + IVFFlat indexes, bulk ops, and
+/// streaming export. Table names carry the "_vector" suffix per DATA-0087.
 /// </summary>
 internal sealed class PGVectorRepository<TEntity, TKey>
     : IVectorSearchRepository<TEntity, TKey>, IVectorCapabilities
@@ -56,33 +58,13 @@ internal sealed class PGVectorRepository<TEntity, TKey>
         VectorCapabilities.BulkDelete |
         VectorCapabilities.DynamicCollections;
 
-    /// <summary>
-    /// Table name with automatic "_vector" suffix per DATA-0087.
-    /// Prevents collisions with entity tables (e.g., "media_vector" vs "media").
-    /// Includes partition if EntityContext.Current?.Partition is set.
-    /// </summary>
-    private string TableName
-    {
-        get
-        {
-            // Routes to PGVectorAdapterFactory.ResolveStorage; "_vector" suffix is conventional
-            // on the entity class name (DATA-0087).
-            var name = VectorAdapterNaming.GetOrCompute<TEntity, TKey>(_sp);
+    private string TableName => VectorAdapterNaming.GetOrCompute<TEntity, TKey>(_sp).ToLowerInvariant();
 
-            // Convert to lowercase and sanitize for PostgreSQL
-            // Example: "Media_vector#partition1" → "media_vector#partition1"
-            return name.ToLowerInvariant();
-        }
-    }
-
-    /// <summary>
-    /// Distance operator based on configured metric.
-    /// </summary>
     private string DistanceOperator => _options.DistanceMetric switch
     {
-        DistanceMetric.Cosine => "<=>",      // Cosine distance
-        DistanceMetric.L2 => "<->",          // Euclidean (L2) distance
-        DistanceMetric.InnerProduct => "<#>", // Negative inner product
+        DistanceMetric.Cosine => "<=>",
+        DistanceMetric.L2 => "<->",
+        DistanceMetric.InnerProduct => "<#>",
         _ => "<=>"
     };
 
@@ -93,12 +75,10 @@ internal sealed class PGVectorRepository<TEntity, TKey>
         using var activity = PGVectorTelemetry.Activity.StartActivity("vector.ensureCreated");
         var tableName = TableName;
 
-        await using var conn = await _dataSource.OpenConnection(ct);
+        await using var conn = await _dataSource.OpenConnectionAsync(ct);
 
-        // Ensure pgvector extension exists
         await _extensionManager.EnsureExtension(conn, ct);
 
-        // Check if table already exists
         var exists = await conn.ExecuteScalarAsync<bool>(
             "SELECT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = @name)",
             new { name = tableName });
@@ -110,15 +90,12 @@ internal sealed class PGVectorRepository<TEntity, TKey>
             return;
         }
 
-        // Validate dimension
         if (!_extensionManager.ValidateDimension(_options.DefaultDimension))
         {
             throw new InvalidOperationException(
-                $"Invalid dimension {_options.DefaultDimension}. " +
-                $"Must be between 1 and {PGVectorOptions.MaxDimension}.");
+                $"Invalid dimension {_options.DefaultDimension}. Must be between 1 and {PGVectorOptions.MaxDimension}.");
         }
 
-        // Create vector table
         var createTableSql = $@"
             CREATE TABLE {tableName} (
                 id TEXT PRIMARY KEY,
@@ -129,32 +106,18 @@ internal sealed class PGVectorRepository<TEntity, TKey>
             )";
 
         await conn.ExecuteAsync(createTableSql);
+        _logger?.LogInformation("Created PGVector table {TableName} with dimension {Dimension}", tableName, _options.DefaultDimension);
 
-        _logger?.LogInformation(
-            "Created PGVector table {TableName} with dimension {Dimension}",
-            tableName,
-            _options.DefaultDimension);
-
-        // Create default index if configured
         if (_options.AutoCreateIndex && _options.DefaultIndexType != IndexType.None)
         {
             var indexBuilder = new PgVectorIndexBuilder(conn, _options, _logger);
-
             switch (_options.DefaultIndexType)
             {
                 case IndexType.Hnsw:
-                    await indexBuilder.CreateHnswIndex(
-                        tableName,
-                        m: _options.HnswM,
-                        efConstruction: _options.HnswEfConstruction,
-                        ct: ct);
+                    await indexBuilder.CreateHnswIndex(tableName, m: _options.HnswM, efConstruction: _options.HnswEfConstruction, ct: ct);
                     break;
-
                 case IndexType.IvfFlat:
-                    await indexBuilder.CreateIvfflatIndex(
-                        tableName,
-                        lists: _options.IvfFlatLists,
-                        ct: ct);
+                    await indexBuilder.CreateIvfflatIndex(tableName, lists: _options.IvfFlatLists, ct: ct);
                     break;
             }
         }
@@ -162,96 +125,70 @@ internal sealed class PGVectorRepository<TEntity, TKey>
         _schemaEnsured = true;
     }
 
-    public async Task Upsert(
-        TKey id,
-        float[] embedding,
-        object? metadata = null,
-        CancellationToken ct = default)
+    public async Task Upsert(TKey id, float[] embedding, object? metadata = null, CancellationToken ct = default)
     {
         await EnsureSchema(ct);
-
         using var activity = PGVectorTelemetry.Activity.StartActivity("vector.upsert");
         var tableName = TableName;
 
-        await using var conn = await _dataSource.OpenConnection(ct);
-
-        var metadataJson = metadata != null
-            ? JsonConvert.SerializeObject(metadata)
-            : null;
-
-        // Use Pgvector.Vector for proper serialization
-        var vector = new Vector(embedding);
+        await using var conn = await _dataSource.OpenConnectionAsync(ct);
 
         var sql = $@"
             INSERT INTO {tableName} (id, embedding, metadata, updated_at)
             VALUES (@id, @embedding, @metadata::jsonb, NOW())
             ON CONFLICT (id) DO UPDATE
-            SET embedding = EXCLUDED.embedding,
-                metadata = EXCLUDED.metadata,
-                updated_at = NOW()";
+            SET embedding = EXCLUDED.embedding, metadata = EXCLUDED.metadata, updated_at = NOW()";
 
         await conn.ExecuteAsync(sql, new
         {
             id = id.ToString(),
-            embedding = vector,
-            metadata = metadataJson
+            embedding = new PgVec(embedding),
+            metadata = metadata != null ? JsonConvert.SerializeObject(metadata) : null
         });
 
         _logger?.LogTrace("Upserted vector {Id} to {TableName}", id, tableName);
     }
 
-    public async Task<int> UpsertMany(
-        IEnumerable<(TKey Id, float[] Embedding, object? Metadata)> items,
-        CancellationToken ct = default)
+    public async Task<int> UpsertMany(IEnumerable<(TKey Id, float[] Embedding, object? Metadata)> items, CancellationToken ct = default)
     {
         await EnsureSchema(ct);
-
         using var activity = PGVectorTelemetry.Activity.StartActivity("vector.upsertMany");
         var tableName = TableName;
         var itemsList = items.ToList();
+        if (itemsList.Count == 0) return 0;
 
-        if (itemsList.Count == 0)
-            return 0;
+        await using var conn = await _dataSource.OpenConnectionAsync(ct);
 
-        await using var conn = await _dataSource.OpenConnection(ct);
-
-        // Use batch insert with VALUES for better performance
-        var batchSize = 100; // Postgres parameter limit considerations
+        const int batchSize = 100;
         var totalInserted = 0;
 
-        for (int i = 0; i < itemsList.Count; i += batchSize)
+        for (var i = 0; i < itemsList.Count; i += batchSize)
         {
             var batch = itemsList.Skip(i).Take(batchSize).ToList();
             var values = new StringBuilder();
             var parameters = new DynamicParameters();
 
-            for (int j = 0; j < batch.Count; j++)
+            for (var j = 0; j < batch.Count; j++)
             {
                 var item = batch[j];
                 if (j > 0) values.Append(", ");
-
                 values.Append($"(@id{j}, @embedding{j}, @metadata{j}::jsonb, NOW())");
-
                 parameters.Add($"id{j}", item.Id.ToString());
-                parameters.Add($"embedding{j}", new Vector(item.Embedding));
-                parameters.Add($"metadata{j}",
-                    item.Metadata != null ? JsonConvert.SerializeObject(item.Metadata) : null);
+                parameters.Add($"embedding{j}", new PgVec(item.Embedding));
+                parameters.Add($"metadata{j}", item.Metadata != null ? JsonConvert.SerializeObject(item.Metadata) : null);
             }
 
             var sql = $@"
                 INSERT INTO {tableName} (id, embedding, metadata, updated_at)
                 VALUES {values}
                 ON CONFLICT (id) DO UPDATE
-                SET embedding = EXCLUDED.embedding,
-                    metadata = EXCLUDED.metadata,
-                    updated_at = NOW()";
+                SET embedding = EXCLUDED.embedding, metadata = EXCLUDED.metadata, updated_at = NOW()";
 
             await conn.ExecuteAsync(sql, parameters);
             totalInserted += batch.Count;
         }
 
         _logger?.LogDebug("Upserted {Count} vectors to {TableName}", totalInserted, tableName);
-
         return totalInserted;
     }
 
@@ -259,14 +196,9 @@ internal sealed class PGVectorRepository<TEntity, TKey>
     {
         using var activity = PGVectorTelemetry.Activity.StartActivity("vector.delete");
         var tableName = TableName;
-
-        await using var conn = await _dataSource.OpenConnection(ct);
-
-        var sql = $"DELETE FROM {tableName} WHERE id = @id";
-        var affected = await conn.ExecuteAsync(sql, new { id = id.ToString() });
-
+        await using var conn = await _dataSource.OpenConnectionAsync(ct);
+        var affected = await conn.ExecuteAsync($"DELETE FROM {tableName} WHERE id = @id", new { id = id.ToString() });
         _logger?.LogTrace("Deleted vector {Id} from {TableName} (affected: {Affected})", id, tableName, affected);
-
         return affected > 0;
     }
 
@@ -275,17 +207,10 @@ internal sealed class PGVectorRepository<TEntity, TKey>
         using var activity = PGVectorTelemetry.Activity.StartActivity("vector.deleteMany");
         var tableName = TableName;
         var idsList = ids.Select(x => x.ToString()).ToArray();
-
-        if (idsList.Length == 0)
-            return 0;
-
-        await using var conn = await _dataSource.OpenConnection(ct);
-
-        var sql = $"DELETE FROM {tableName} WHERE id = ANY(@ids)";
-        var affected = await conn.ExecuteAsync(sql, new { ids = idsList });
-
+        if (idsList.Length == 0) return 0;
+        await using var conn = await _dataSource.OpenConnectionAsync(ct);
+        var affected = await conn.ExecuteAsync($"DELETE FROM {tableName} WHERE id = ANY(@ids)", new { ids = idsList });
         _logger?.LogDebug("Deleted {Count} vectors from {TableName}", affected, tableName);
-
         return affected;
     }
 
@@ -293,118 +218,82 @@ internal sealed class PGVectorRepository<TEntity, TKey>
     {
         using var activity = PGVectorTelemetry.Activity.StartActivity("vector.getEmbedding");
         var tableName = TableName;
-
-        await using var conn = await _dataSource.OpenConnection(ct);
-
-        var sql = $"SELECT embedding FROM {tableName} WHERE id = @id";
-        var result = await conn.QuerySingleOrDefaultAsync<Vector>(sql, new { id = id.ToString() });
-
+        await using var conn = await _dataSource.OpenConnectionAsync(ct);
+        var result = await conn.QuerySingleOrDefaultAsync<PgVec>($"SELECT embedding FROM {tableName} WHERE id = @id", new { id = id.ToString() });
         return result?.ToArray();
     }
 
-    public async Task<Dictionary<TKey, float[]>> GetEmbeddings(
-        IEnumerable<TKey> ids,
-        CancellationToken ct = default)
+    public async Task<Dictionary<TKey, float[]>> GetEmbeddings(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
         using var activity = PGVectorTelemetry.Activity.StartActivity("vector.getEmbeddings");
         var tableName = TableName;
         var idsList = ids.Select(x => x.ToString()).ToArray();
-
-        if (idsList.Length == 0)
-            return new Dictionary<TKey, float[]>();
-
-        await using var conn = await _dataSource.OpenConnection(ct);
-
-        var sql = $"SELECT id, embedding FROM {tableName} WHERE id = ANY(@ids)";
-        var results = await conn.QueryAsync<(string Id, Vector Embedding)>(sql, new { ids = idsList });
-
-        return results.ToDictionary(
-            x => (TKey)(object)x.Id,
-            x => x.Embedding.ToArray());
+        if (idsList.Length == 0) return new Dictionary<TKey, float[]>();
+        await using var conn = await _dataSource.OpenConnectionAsync(ct);
+        var results = await conn.QueryAsync<(string Id, PgVec Embedding)>($"SELECT id, embedding FROM {tableName} WHERE id = ANY(@ids)", new { ids = idsList });
+        return results.ToDictionary(x => (TKey)(object)x.Id, x => x.Embedding.ToArray());
     }
 
-    public async Task<VectorQueryResult<TKey>> Search(
-        VectorQueryOptions options,
-        CancellationToken ct = default)
+    public async Task<VectorQueryResult<TKey>> Search(VectorQueryOptions options, CancellationToken ct = default)
     {
         await EnsureSchema(ct);
-
         using var activity = PGVectorTelemetry.Activity.StartActivity("vector.search");
         var tableName = TableName;
 
-        await using var conn = await _dataSource.OpenConnection(ct);
+        await using var conn = await _dataSource.OpenConnectionAsync(ct);
 
-        // Build search query with appropriate distance operator
         var sql = new StringBuilder();
-        var queryVector = new Vector(options.Query);
-
         sql.AppendLine($@"
-            SELECT
-                id,
-                1 - (embedding {DistanceOperator} @embedding) AS score
+            SELECT id, metadata, 1 - (embedding {DistanceOperator} @embedding) AS score
             FROM {tableName}");
 
         var parameters = new DynamicParameters();
-        parameters.Add("embedding", queryVector);
+        parameters.Add("embedding", new PgVec(options.Query));
 
-        // Apply filters if provided
-        if (options.Filter != null)
+        // F4 fix: translate the metadata filter through the real AST translator (fail-loud),
+        // not a silent JSONB-containment of the serialized object.
+        if (options.Filter is not null)
         {
-            sql.AppendLine("WHERE metadata @> @filter::jsonb");
-            parameters.Add("filter", JsonConvert.SerializeObject(options.Filter));
+            if (!VectorFilterJson.TryParse(options.Filter, out var ast) || ast is null)
+                throw new NotSupportedException("PGVector could not parse the supplied vector metadata filter.");
+            var where = PGVectorFilterTranslator.Translate(ast, parameters);
+            if (!string.IsNullOrEmpty(where))
+                sql.AppendLine($"WHERE {where}");
         }
 
-        // Order by similarity (closest first)
         sql.AppendLine($"ORDER BY embedding {DistanceOperator} @embedding");
-
-        // Apply limit
         var limit = options.TopK ?? _options.DefaultTopK;
         sql.AppendLine($"LIMIT {limit}");
 
-        var results = await conn.QueryAsync<(string Id, double Score)>(sql.ToString(), parameters);
+        var rows = await conn.QueryAsync<(string Id, string? Metadata, double Score)>(sql.ToString(), parameters);
 
-        var searchResults = results.Select(x => new VectorResult<TKey>
-        {
-            Id = (TKey)(object)x.Id,
-            Score = x.Score
-        }).ToList();
+        var matches = rows.Select(x => new VectorMatch<TKey>(
+            (TKey)(object)x.Id,
+            x.Score,
+            x.Metadata != null ? JsonConvert.DeserializeObject<Dictionary<string, object>>(x.Metadata) : null)).ToList();
 
-        _logger?.LogDebug(
-            "Vector search on {TableName} returned {Count} results (limit: {Limit}, metric: {Metric})",
-            tableName,
-            searchResults.Count,
-            limit,
-            _options.DistanceMetric);
+        _logger?.LogDebug("Vector search on {TableName} returned {Count} results (limit: {Limit}, metric: {Metric})",
+            tableName, matches.Count, limit, _options.DistanceMetric);
 
-        return new VectorQueryResult<TKey>
-        {
-            Results = searchResults,
-            ContinuationToken = null // PostgreSQL doesn't need continuation for simple queries
-        };
+        return new VectorQueryResult<TKey>(matches, ContinuationToken: null, TotalKind: VectorTotalKind.Unknown);
     }
 
     public async Task Flush(CancellationToken ct = default)
     {
         using var activity = PGVectorTelemetry.Activity.StartActivity("vector.flush");
         var tableName = TableName;
-
-        await using var conn = await _dataSource.OpenConnection(ct);
-
-        var sql = $"TRUNCATE TABLE {tableName}";
-        await conn.ExecuteAsync(sql);
-
+        await using var conn = await _dataSource.OpenConnectionAsync(ct);
+        await conn.ExecuteAsync($"TRUNCATE TABLE {tableName}");
         _logger?.LogWarning("Flushed all vectors from {TableName}", tableName);
     }
 
-    public async IAsyncEnumerable<VectorExportBatch<TKey>> ExportAll(
-        int? batchSize = null,
-        [EnumeratorCancellation] CancellationToken ct = default)
+    public async IAsyncEnumerable<VectorExportBatch<TKey>> ExportAll(int? batchSize = null, [EnumeratorCancellation] CancellationToken ct = default)
     {
         using var activity = PGVectorTelemetry.Activity.StartActivity("vector.exportAll");
         var tableName = TableName;
         var effectiveBatchSize = batchSize ?? _options.ExportBatchSize;
 
-        await using var conn = await _dataSource.OpenConnection(ct);
+        await using var conn = await _dataSource.OpenConnectionAsync(ct);
 
         var sql = $@"
             SELECT id, embedding, metadata
@@ -414,36 +303,20 @@ internal sealed class PGVectorRepository<TEntity, TKey>
             OFFSET @offset";
 
         var offset = 0;
-
         while (true)
         {
-            var batch = await conn.QueryAsync<(string Id, Vector Embedding, string? Metadata)>(
-                sql,
-                new { offset });
+            var rows = (await conn.QueryAsync<(string Id, PgVec Embedding, string? Metadata)>(sql, new { offset })).ToList();
+            if (rows.Count == 0) break;
 
-            var batchList = batch.ToList();
-            if (batchList.Count == 0)
-                break;
-
-            var exportItems = batchList.Select(x => new VectorExportItem<TKey>
+            foreach (var x in rows)
             {
-                Id = (TKey)(object)x.Id,
-                Embedding = x.Embedding.ToArray(),
-                Metadata = x.Metadata != null
-                    ? JsonConvert.DeserializeObject<Dictionary<string, object>>(x.Metadata)
-                    : null
-            }).ToList();
+                yield return new VectorExportBatch<TKey>(
+                    (TKey)(object)x.Id,
+                    x.Embedding.ToArray(),
+                    x.Metadata != null ? JsonConvert.DeserializeObject<Dictionary<string, object>>(x.Metadata) : null);
+            }
 
-            yield return new VectorExportBatch<TKey>
-            {
-                Items = exportItems,
-                Offset = offset,
-                TotalExported = offset + exportItems.Count
-            };
-
-            if (batchList.Count < effectiveBatchSize)
-                break;
-
+            if (rows.Count < effectiveBatchSize) break;
             offset += effectiveBatchSize;
         }
 

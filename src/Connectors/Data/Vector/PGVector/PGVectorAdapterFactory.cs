@@ -70,9 +70,9 @@ public sealed class PGVectorAdapterFactory : IVectorAdapterFactory
         return _nameCache.GetOrAdd(cacheKey, _ =>
         {
             var convention = new StorageNameResolver.Convention(
-                NamingStyle.TypeName,
-                separator: "_",
-                casing: NameCasing.Lower);
+                StorageNamingStyle.EntityType,
+                "_",
+                NameCasing.Lower);
             var name = StorageNameResolver.Resolve(entityType, convention).Trim();
 
             if (string.IsNullOrEmpty(trimmed)) return name;
