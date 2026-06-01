@@ -2,172 +2,122 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json.Linq;
-using Koan.Data.Abstractions.Vector.Filtering;
+using Koan.Data.Abstractions.Filtering;
 
 namespace Koan.Data.Vector.Connector.Qdrant;
 
 /// <summary>
-/// Translates Koan's provider-agnostic <see cref="VectorFilter"/> AST into Qdrant's structured
-/// filter DSL (must / should / must_not arrays of <c>{ key, match | range }</c> conditions).
-///
-/// <para>
-/// Field paths are dot-flattened. When a path starts with the configured metadata field name,
-/// the prefix stays — Qdrant's payload-key resolution natively handles dot-paths into nested
-/// objects, so e.g. <c>metadata.category</c> looks up <c>payload.metadata.category</c>.
-/// </para>
+/// Translates the unified <see cref="Filter"/> AST into Qdrant's structured filter DSL
+/// (must / should / must_not arrays of <c>{ key, match | range | values_count | is_empty }</c>),
+/// per AI-0036 §10 / DATA-0097 P1.
 /// </summary>
+/// <remarks>
+/// Qdrant's <c>must_not</c> is naturally null-inclusive (a point lacking the key satisfies a negated
+/// match), so <c>Ne/Nin/HasNone</c> match the convergence oracle's locked null semantics. A
+/// <c>match</c> on an array-valued key means "contains", so <c>Has</c>/<c>HasAny</c> reuse the
+/// Eq/In shapes. It declares only operators it can render faithfully; StartsWith/EndsWith/Contains
+/// are deliberately ABSENT (Qdrant text matching needs a full-text payload index and is neither
+/// anchored nor a raw substring match — declaring them would silently mis-match), so they hard-error
+/// at the coordinator. The reader lowers $between/wildcards, so there are no Like/Between arms.
+/// </remarks>
 internal static class QdrantFilterTranslator
 {
-    public static JObject? Translate(object? filter, string metadataField)
-    {
-        if (!VectorFilterJson.TryParse(filter, out var ast) || ast is null)
-        {
-            return null;
-        }
+    public static readonly VectorFilterCapabilities Caps = VectorFilterCapabilities.Of(
+        nestedPaths: true, ignoreCase: false,
+        FilterOperator.Eq, FilterOperator.Ne,
+        FilterOperator.Gt, FilterOperator.Gte, FilterOperator.Lt, FilterOperator.Lte,
+        FilterOperator.In, FilterOperator.Nin,
+        FilterOperator.Has, FilterOperator.HasAny, FilterOperator.HasAll, FilterOperator.HasNone,
+        FilterOperator.Size, FilterOperator.Exists);
 
-        // Top-level filter object must always have must / should / must_not at the root —
-        // even a single comparison becomes `{ "must": [<cond>] }` so the wire shape is
-        // predictable.
-        return WrapMust(Visit(ast, metadataField));
+    public static JObject? Translate(Filter? filter, string metadataField)
+    {
+        if (filter is null) return null;
+        return WrapMust(Visit(filter, metadataField));
     }
 
-    private static JObject Visit(VectorFilter filter, string metadataField)
+    private static JObject Visit(Filter filter, string metadataField)
     {
         return filter switch
         {
-            VectorFilterAnd and => new JObject
-            {
-                ["must"] = new JArray(and.Operands.Select(f => (JToken)Visit(f, metadataField)))
-            },
-            VectorFilterOr or => new JObject
-            {
-                ["should"] = new JArray(or.Operands.Select(f => (JToken)Visit(f, metadataField)))
-            },
-            VectorFilterNot not => new JObject
-            {
-                ["must_not"] = new JArray(Visit(not.Operand, metadataField))
-            },
-            VectorFilterCompare cmp => TranslateCompare(cmp, metadataField),
-            _ => throw new NotSupportedException($"Vector filter '{filter.GetType().Name}' is not supported for Qdrant.")
+            AllOf and => new JObject { ["must"] = new JArray(and.Operands.Select(f => (JToken)Visit(f, metadataField))) },
+            AnyOf or => new JObject { ["should"] = new JArray(or.Operands.Select(f => (JToken)Visit(f, metadataField))) },
+            Not not => new JObject { ["must_not"] = new JArray(Visit(not.Operand, metadataField)) },
+            FieldFilter cmp => TranslateLeaf(cmp, metadataField),
+            _ => throw new NotSupportedException($"Qdrant cannot translate filter node '{filter.GetType().Name}'.")
         };
     }
 
-    private static JObject TranslateCompare(VectorFilterCompare cmp, string metadataField)
+    private static JObject TranslateLeaf(FieldFilter f, string metadataField)
     {
-        var key = NormalizePath(cmp.Path, metadataField);
-
-        return cmp.Operator switch
+        var key = NormalizePath(f.Field.Segments, metadataField);
+        switch (f.Operator)
         {
-            VectorFilterOperator.Eq => new JObject
-            {
-                ["key"] = key,
-                ["match"] = new JObject { ["value"] = ToToken(cmp.Value) }
-            },
-            VectorFilterOperator.Ne => new JObject
-            {
-                ["must_not"] = new JArray(new JObject
-                {
-                    ["key"] = key,
-                    ["match"] = new JObject { ["value"] = ToToken(cmp.Value) }
-                })
-            },
-            VectorFilterOperator.Gt => Range(key, "gt", cmp.Value),
-            VectorFilterOperator.Gte => Range(key, "gte", cmp.Value),
-            VectorFilterOperator.Lt => Range(key, "lt", cmp.Value),
-            VectorFilterOperator.Lte => Range(key, "lte", cmp.Value),
-            VectorFilterOperator.In => new JObject
-            {
-                ["key"] = key,
-                ["match"] = new JObject { ["any"] = ToArray(cmp.Value) }
-            },
-            // Qdrant's full-text match needs a text index on the field, which we don't auto-create.
-            // For contains/like we fall back to substring match via "text" match — Qdrant treats
-            // it as a substring query when no full-text index exists.
-            VectorFilterOperator.Contains => new JObject
-            {
-                ["key"] = key,
-                ["match"] = new JObject { ["text"] = ToText(cmp.Value) }
-            },
-            VectorFilterOperator.Like => new JObject
-            {
-                ["key"] = key,
-                ["match"] = new JObject { ["text"] = ToText(cmp.Value).Replace("%", "") }
-            },
-            VectorFilterOperator.Between => Between(key, cmp.Value),
-            // DATA-0097 F2: fail loud on an operator Qdrant cannot render — never silently treat
-            // it as Eq (which would return a wrong/widened result set with no signal).
-            _ => throw new NotSupportedException(
-                $"Qdrant does not support vector filter operator '{cmp.Operator}' on metadata field '{string.Join(".", cmp.Path)}'.")
-        };
+            case FilterOperator.Eq:
+            case FilterOperator.Has: // match on an array key == contains
+                return Match(key, Scalar(f));
+            case FilterOperator.Ne:
+                return new JObject { ["must_not"] = new JArray(Match(key, Scalar(f))) };
+            case FilterOperator.Gt: return Range(key, "gt", Scalar(f));
+            case FilterOperator.Gte: return Range(key, "gte", Scalar(f));
+            case FilterOperator.Lt: return Range(key, "lt", Scalar(f));
+            case FilterOperator.Lte: return Range(key, "lte", Scalar(f));
+            case FilterOperator.In:
+            case FilterOperator.HasAny:
+                return new JObject { ["key"] = key, ["match"] = new JObject { ["any"] = Arr(f) } };
+            case FilterOperator.Nin:
+            case FilterOperator.HasNone:
+                return new JObject { ["must_not"] = new JArray(new JObject { ["key"] = key, ["match"] = new JObject { ["any"] = Arr(f) } }) };
+            case FilterOperator.HasAll:
+                // composed as conjunction of contains-matches (Qdrant has no native "contains all")
+                return new JObject { ["must"] = new JArray(Set(f).Select(v => (JToken)Match(key, v))) };
+            case FilterOperator.Size:
+                var n = ToToken(Scalar(f));
+                return new JObject { ["key"] = key, ["values_count"] = new JObject { ["gte"] = n, ["lte"] = n } };
+            case FilterOperator.Exists:
+                var present = Scalar(f) is not bool b || b;
+                var isEmpty = new JObject { ["is_empty"] = new JObject { ["key"] = key } };
+                return present ? new JObject { ["must_not"] = new JArray(isEmpty) } : isEmpty;
+            default:
+                throw new NotSupportedException(
+                    $"Qdrant does not support vector filter operator '{f.Operator}' on metadata field '{f.Field}'.");
+        }
     }
+
+    private static JObject Match(string key, object? value)
+        => new() { ["key"] = key, ["match"] = new JObject { ["value"] = ToToken(value) } };
 
     private static JObject Range(string key, string op, object? value)
-    {
-        return new JObject
-        {
-            ["key"] = key,
-            ["range"] = new JObject { [op] = ToToken(value) }
-        };
-    }
-
-    private static JObject Between(string key, object? value)
-    {
-        if (value is IEnumerable<object?> enumerable)
-        {
-            var list = enumerable.ToList();
-            if (list.Count >= 2)
-            {
-                return new JObject
-                {
-                    ["key"] = key,
-                    ["range"] = new JObject
-                    {
-                        ["gte"] = ToToken(list[0]),
-                        ["lte"] = ToToken(list[1])
-                    }
-                };
-            }
-        }
-        throw new NotSupportedException("Between filter requires a collection with at least two values.");
-    }
+        => new() { ["key"] = key, ["range"] = new JObject { [op] = ToToken(value) } };
 
     private static JObject WrapMust(JObject inner)
-    {
-        // A leaf compare returns `{ key, match }` directly; wrap it in a must array. Composite
-        // nodes are already shaped as must/should/must_not at the top so we pass them through.
-        if (inner.ContainsKey("must") || inner.ContainsKey("should") || inner.ContainsKey("must_not"))
-        {
-            return inner;
-        }
-        return new JObject { ["must"] = new JArray(inner) };
-    }
+        => inner.ContainsKey("must") || inner.ContainsKey("should") || inner.ContainsKey("must_not")
+            ? inner
+            : new JObject { ["must"] = new JArray(inner) };
 
     private static string NormalizePath(IReadOnlyList<string> path, string metadataField)
+        => path.Count == 1 ? path[0] : string.Join('.', path);
+
+    private static object? Scalar(FieldFilter f) => f.Value switch
     {
-        // Qdrant resolves dot-paths into nested payload structures natively. The kit stores the
-        // caller-supplied metadata under `payload.<metadataField>` so e.g. a filter on
-        // `metadata.category` works whether the path comes in as ["category"] (treated as
-        // payload-root) or ["metadata", "category"] (matches the nested-object layout).
-        if (path.Count == 1) return path[0];
-        return string.Join('.', path);
-    }
+        FilterValue.Scalar s => s.Value,
+        FilterValue.Set st => st.Values.Count > 0 ? st.Values[0] : null,
+        _ => null
+    };
 
-    private static JToken ToToken(object? value)
-        => value switch
-        {
-            null => JValue.CreateNull(),
-            JToken token => token,
-            _ => JToken.FromObject(value)
-        };
-
-    private static JArray ToArray(object? value)
+    private static IReadOnlyList<object?> Set(FieldFilter f) => f.Value switch
     {
-        if (value is IEnumerable<object?> enumerable)
-        {
-            return new JArray(enumerable.Select(ToToken));
-        }
-        return new JArray(ToToken(value));
-    }
+        FilterValue.Set st => st.Values,
+        FilterValue.Scalar s => new[] { s.Value },
+        _ => Array.Empty<object?>()
+    };
 
-    private static string ToText(object? value) => value?.ToString() ?? "";
+    private static JArray Arr(FieldFilter f) => new(Set(f).Select(ToToken));
+
+    private static JToken ToToken(object? value) => value switch
+    {
+        null => JValue.CreateNull(),
+        JToken token => token,
+        _ => JToken.FromObject(value)
+    };
 }
