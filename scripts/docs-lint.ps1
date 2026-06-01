@@ -354,7 +354,10 @@ foreach ($entry in $docEntries) {
             continue
         }
 
-        if (-not [string]::IsNullOrEmpty($link.Anchor)) {
+        # Only validate anchors into markdown targets. A path like `Foo.cs#L271` is a GitHub
+        # source line-number anchor (or another tool's fragment), not a markdown heading slug,
+        # so heading-slug validation does not apply.
+        if ((-not [string]::IsNullOrEmpty($link.Anchor)) -and ($link.Path -match '\.(md|markdown)$')) {
             $targetData = Resolve-DocData -RelativePath $link.Path -Cache $documentCache
             if ($null -eq $targetData) {
                 continue

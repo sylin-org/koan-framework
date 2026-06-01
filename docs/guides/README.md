@@ -132,7 +132,7 @@ _For contributors_: How application initialization actually works
 - Narrative-bound slice showing Plot, Reading, Reminder, and Member working together
 - SQLite-first setup with Flow hydration scoring and lifecycle events
 - API storyboard with minimal controllers and optional reminder extensions
-- Proposal spec: [Garden Cooperative Journal How-To Spec](../proposals/garden-cooperative-journal.md)
+- Proposal spec: [Garden Cooperative Journal How-To Spec](../proposals/complete/garden-cooperative-journal.md)
 
 ---
 

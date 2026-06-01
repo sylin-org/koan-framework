@@ -1,6 +1,6 @@
 # ARCH-0084: Unified Capability Model
 
-**Status**: Proposed
+**Status**: Accepted (2026-06-01) — detail-mechanism fork resolved to **attach-to-token**; the Gen 1 cut (`Koan.Core.Adapters`) and the `TransactionCapabilities` runtime-state split are both approved. Implementation is gated on Facet 0 (the green ratchet) standing first.
 **Date**: 2026-06-01
 **Deciders**: Enterprise Architect
 **Scope**: Cross-pillar capability **declaration → negotiation → self-report**. Facet 1 of the [foundation consolidation plan](../architecture/foundation-consolidation-plan.md). Lands a generic primitive in `Koan.Core.Capabilities`; migrates the data / vector / cache / storage / orchestration adapters and the `Koan.Web` negotiation sites.

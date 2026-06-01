@@ -461,7 +461,7 @@ app.Run();
 
 **Location**: Throughout `Entity<T>` and `Entity<T, TKey>` classes
 **Pattern**: Static factory methods on entity classes
-**Guidance**: [Entity-First Development Skill](.claude/skills/koan-entity-first/SKILL.md)
+**Guidance**: [Entity-First Development guide](data-modeling.md)
 
 #### Common Patterns
 

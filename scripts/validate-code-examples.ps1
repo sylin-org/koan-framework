@@ -1,12 +1,30 @@
 param(
-    [string]$DocsPath = "documentation",
+    [string]$DocsPath = "docs",
     [string]$WebsitePath = "other/website",
     [string]$ReadmePath = "README.md",
+    [string]$Base = "",                 # git ref: validate only instructional docs changed vs this ref (+ uncommitted). Empty = full sweep.
+    [string[]]$Files = @(),             # explicit .md paths to validate (overrides -Base/-Full)
+    [switch]$Full,                      # validate ALL instructional docs (the manual full-surface sweep)
     [switch]$Fix,
     [switch]$Verbose,
-    [string]$FrameworkVersion = "net9.0",
+    [string]$FrameworkVersion = "net10.0",
     [string]$TempDir = "artifacts/code-validation"
 )
+
+# Leg C of the green ratchet (docs/architecture/foundation-consolidation-plan.md).
+# Only INSTRUCTIONAL docs are compile-validated. Decision/design/proposal/archive docs
+# legitimately contain aspirational or historical code, so they are out of scope by design.
+$script:InstructionalRoots = @(
+    'docs/guides', 'docs/how-to', 'docs/reference', 'docs/getting-started',
+    'docs/examples', 'docs/workbooks', 'docs/patterns', 'docs/api'
+)
+function Test-Instructional {
+    param([string]$RelativePath)
+    $rp = ($RelativePath -replace '\\', '/')
+    if ($rp -ieq 'README.md') { return $true }
+    foreach ($r in $script:InstructionalRoots) { if ($rp -like "$r/*") { return $true } }
+    return $false
+}
 
 $ErrorActionPreference = 'Stop'
 
@@ -41,6 +59,11 @@ function Extract-CodeBlocks {
 
     foreach ($match in $matches) {
         $code = $match.Groups[1].Value.Trim()
+        # Opt-out: a `<!-- validate:skip -->` marker in the ~120 chars before the fence
+        # exempts an intentionally non-compiling snippet (pseudo-code, partial illustration).
+        $preStart = [Math]::Max(0, $match.Index - 120)
+        $preceding = $content.Substring($preStart, $match.Index - $preStart)
+        if ($preceding -match '<!--\s*validate:skip\s*-->') { continue }
         if ($code -and $code.Length -gt 10) { # Skip trivial examples
             $blocks += [PSCustomObject]@{
                 File = $FilePath
@@ -161,26 +184,48 @@ try {
     Create-TestProject -ProjectDir $tempProjectDir
     Write-Host "Test project: $tempProjectDir"
 
-    # Collect all documentation files
+    # Collect documentation files in scope (instructional surfaces only).
+    $repoRootPath = $repoRoot.ProviderPath
+    $candidates = New-Object System.Collections.Generic.List[string]
+
+    if ($Files.Count -gt 0) {
+        foreach ($f in $Files) { if (Test-Instructional $f) { $candidates.Add($f) | Out-Null } }
+        Write-Host "Scope: $($candidates.Count) explicitly-provided instructional file(s)"
+    }
+    elseif ($Base -and -not $Full) {
+        # Diff-scoped: docs changed vs $Base, plus uncommitted (staged + working tree).
+        $changed = @()
+        $changed += (& git diff --name-only "$Base...HEAD" 2>$null)
+        $changed += (& git diff --name-only 2>$null)
+        $changed += (& git diff --name-only --cached 2>$null)
+        $changed = $changed | Where-Object { $_ -and ($_ -match '\.md$') } | Sort-Object -Unique
+        foreach ($c in $changed) { if (Test-Instructional $c) { $candidates.Add($c) | Out-Null } }
+        Write-Host "Scope: diff vs '$Base' -> $($candidates.Count) changed instructional doc(s)"
+    }
+    else {
+        # Full sweep across instructional surfaces.
+        if (Test-Path $DocsPath) {
+            Get-ChildItem -Path $DocsPath -Recurse -Filter '*.md' | ForEach-Object {
+                $rel = [System.IO.Path]::GetRelativePath($repoRootPath, $_.FullName)
+                if (Test-Instructional $rel) { $candidates.Add(($rel -replace '\\', '/')) | Out-Null }
+            }
+        }
+        if (Test-Path $ReadmePath) { $candidates.Add('README.md') | Out-Null }
+        Write-Host "Scope: full instructional sweep -> $($candidates.Count) doc(s)"
+    }
+
     $files = @()
-
-    # Main README
-    if (Test-Path $ReadmePath) {
-        $files += Get-Item $ReadmePath
+    foreach ($c in $candidates) {
+        $full = Join-Path $repoRootPath $c
+        if (Test-Path $full) { $files += Get-Item $full }
     }
 
-    # Documentation folder
-    if (Test-Path $DocsPath) {
-        $files += Get-ChildItem -Path $DocsPath -Recurse -Filter "*.md"
+    if ($files.Count -eq 0) {
+        Write-Success "No instructional docs in scope to validate."
+        exit 0
     }
 
-    # Website content
-    if (Test-Path $WebsitePath) {
-        $files += Get-ChildItem -Path $WebsitePath -Recurse -Filter "*.html"
-        $files += Get-ChildItem -Path $WebsitePath -Recurse -Filter "*.md"
-    }
-
-    Write-Host "Found $($files.Count) documentation files"
+    Write-Host "Found $($files.Count) documentation file(s) in scope"
 
     # Extract all code blocks
     $allBlocks = @()
@@ -200,7 +245,7 @@ try {
 
     if ($allBlocks.Count -eq 0) {
         Write-Warning "No code blocks found to validate"
-        return
+        exit 0
     }
 
     # Validate each code block
@@ -314,6 +359,7 @@ try {
 
     Write-Host ""
     Write-Success "All code examples validated successfully!"
+    exit 0
 }
 finally {
     Pop-Location

@@ -190,7 +190,7 @@ implementation is internally staged: additive → migrate → delete).
 
 | # | Facet | Scope | Depends on | ADR |
 |---|-------|-------|-----------|-----|
-| **0** | **Green ratchet** | merge gate: full solution + every dogfood sample + doc-API lint, all green | — | none (tooling) |
+| **0** | **Green ratchet** ✅ | one gate: `scripts/green-ratchet.ps1` — build `Koan.sln` (framework **+ samples, which live in the sln**) + tests + `docs-lint.ps1` + diff-scoped `validate-code-examples.ps1` | — | tooling (no ADR) |
 | **1** | **Unified capability model** | `Capability`/`CapabilitySet`/`ICapabilities` + `Caps.*` + `*Support`; prove by collapsing the vector+query+write cluster | 0 | `ARCH-008x` |
 | **2** | **`KoanModule`** | one self-describing unit; folds in registrars + 7 interfaces + ~30 `Add*` + bootstrap + self-report | 1 | `ARCH-008x` |
 | **3** | **`Ambient` context** | one per-operation context; collapses the ~5 ambient globals (trickiest) | 1, 2 | `ARCH-008x` |
@@ -228,10 +228,20 @@ Each facet (1–4) runs:
 
 ## 8. Status
 
-- **Done:** design agreed; this plan written; viability→v1 framing folded in.
-- **In progress:** Facet 1 / stage 1 — capability-usage deep research (the "how many ways to declare /
-  require / report a capability" inventory + which are load-bearing vs scaffolding to cut).
-- **Pending:** Facet 0 (the green ratchet) must be standing before Facet 1 *implementation* lands
-  (research is read-only, so it runs first safely).
+- **Done:**
+  - Plan written; viability→v1 framing folded in.
+  - **Facet 1 research + decision → [ARCH-0084](../decisions/ARCH-0084-unified-capability-model.md) (Accepted).**
+    Capability model designed; the Gen-1 cut and the `TransactionCapabilities` split approved;
+    detail-mechanism fork resolved to attach-to-token.
+  - **Facet 0 — green ratchet stood up:** `scripts/green-ratchet.ps1` composes build (framework +
+    samples) + tests + `docs-lint.ps1` + diff-scoped `validate-code-examples.ps1`. Baseline made
+    green: linter false-positive fixed (`.cs#Lnnn` source anchors no longer mis-checked), 18 stale
+    cross-references repointed (docs-lint → 0 errors), and the code-example validator rescoped to
+    **instructional** surfaces only (net10.0, diff-scoped, `<!-- validate:skip -->` opt-out).
+- **Next:** Facet 1 implementation, **stage (a)** — land the additive `Capability`/`CapabilitySet`/
+  `ICapabilities` primitive + per-pillar token catalogs + `FilterSupport` with an enum↔token bridge;
+  conformance specs stay green; the ratchet gates each step.
+- Minor cleanup available anytime: `src/Koan.Data.Lucene/` is a stale `obj`-only leftover from the
+  `Koan.Data.SearchEngine` rename (0 tracked, 0 in `Koan.sln`) — delete the directory.
 - Minor cleanup available anytime: `src/Koan.Data.Lucene/` is a stale `obj`-only leftover from the
   `Koan.Data.SearchEngine` rename (0 tracked, 0 in `Koan.sln`) — delete the directory.

@@ -36,10 +36,10 @@ S16.PantryPal demonstrates how Koan composes vision AI, natural language parsing
 
 | Phase                | Highlights                                                                                                      | References                                                                     |
 | -------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| **Vision**           | Photo upload, AI object detection with bounding-box confirmation, duplicate detection against existing inventory | [`S16-0001`](../../decisions/S16-0001-pantrypal-ai-powered-meal-planning.md)   |
-| **NLP Parsing**      | Natural language input ("5 lbs chicken, expires Friday"), flexible date parsing, smart category defaults         | [`S16-0001`](../../decisions/S16-0001-pantrypal-ai-powered-meal-planning.md)   |
-| **Meal Planning**    | Recipe suggestions from pantry + user preferences, multi-day planning, waste reduction via expiry-aware ranking  | [`S16-0002`](../../decisions/S16-0002-pantrypal-meal-planning-optimization.md) |
-| **MCP Orchestration** | Code Mode scripts for complex workflows, multi-entity aggregation, conditional logic across plan lifecycle       | [`AI-0014`](../../decisions/AI-0014-mcp-code-mode-orchestration.md)            |
+| **Vision**           | Photo upload, AI object detection with bounding-box confirmation, duplicate detection against existing inventory | [`S16-0001`](../../decisions/S16-0001-PantryPal-mcp-ai-showcase.md)   |
+| **NLP Parsing**      | Natural language input ("5 lbs chicken, expires Friday"), flexible date parsing, smart category defaults         | [`S16-0001`](../../decisions/S16-0001-PantryPal-mcp-ai-showcase.md)   |
+| **Meal Planning**    | Recipe suggestions from pantry + user preferences, multi-day planning, waste reduction via expiry-aware ranking  | [`S16-0002`](../../decisions/S16-0002-pantrypal-entity-first-refactor.md) |
+| **MCP Orchestration** | Code Mode scripts for complex workflows, multi-entity aggregation, conditional logic across plan lifecycle       | [`AI-0014`](../../decisions/AI-0014-mcp-code-mode.md)            |
 
 Core entities: `Recipe`, `PantryItem`, `PantryPhoto`, `MealPlan`, `ShoppingList`, `UserProfile` — all follow standard entity-first patterns with automatic GUID v7 generation and category-driven AI routing ([AI-0021](../../decisions/AI-0021-category-driven-ai-with-convention-defaults.md)).
 
@@ -61,4 +61,4 @@ Core entities: `Recipe`, `PantryItem`, `PantryPhoto`, `MealPlan`, `ShoppingList`
 - [`Guides: Data modeling`](../../guides/data-modeling.md)
 - [`Reference: AI module`](../../reference/ai/index.md)
 - [`AI-0021: Category-driven AI with convention defaults`](../../decisions/AI-0021-category-driven-ai-with-convention-defaults.md)
-- [`AI-0014: MCP Code Mode orchestration`](../../decisions/AI-0014-mcp-code-mode-orchestration.md)
+- [`AI-0014: MCP Code Mode orchestration`](../../decisions/AI-0014-mcp-code-mode.md)
