@@ -35,18 +35,35 @@ internal sealed class StringCollectionElementConvention : ConventionBase, IMembe
             return;
         }
 
-        // List<string>, IList<string>, ICollection<string>, IEnumerable<string>, etc.
-        if (memberType.IsGenericType)
+        if (!memberType.IsGenericType) return;
+        var def = memberType.GetGenericTypeDefinition();
+        if (def != typeof(List<>) && def != typeof(IList<>) &&
+            def != typeof(ICollection<>) && def != typeof(IReadOnlyList<>) &&
+            def != typeof(IReadOnlyCollection<>) && def != typeof(IEnumerable<>))
         {
-            var def = memberType.GetGenericTypeDefinition();
-            if (def == typeof(List<>) || def == typeof(IList<>) ||
-                def == typeof(ICollection<>) || def == typeof(IReadOnlyList<>) ||
-                def == typeof(IReadOnlyCollection<>) || def == typeof(IEnumerable<>))
-            {
-                memberMap.SetSerializer(
-                    new EnumerableInterfaceImplementerSerializer<List<string>, string>(stringElementSerializer));
-            }
+            return;
         }
+
+        // Concrete implementation serializer - works directly when the member is List<string>.
+        var listSerializer =
+            new EnumerableInterfaceImplementerSerializer<List<string>, string>(stringElementSerializer);
+
+        if (def == typeof(List<>))
+        {
+            memberMap.SetSerializer(listSerializer);
+            return;
+        }
+
+        // Member is interface-typed (IList, ICollection, IEnumerable, IReadOnlyList,
+        // IReadOnlyCollection). BsonMemberMap.SetSerializer requires
+        // serializer.ValueType == memberType invariantly - "List<string> is assignable
+        // to IReadOnlyList<string>" is not enough. Wrap with the implied-implementation
+        // serializer so the declared ValueType matches the interface while List<string>
+        // is the implementation used for round-trips.
+        var impliedSerializerType = typeof(ImpliedImplementationInterfaceSerializer<,>)
+            .MakeGenericType(memberType, typeof(List<string>));
+        var serializer = (IBsonSerializer)Activator.CreateInstance(impliedSerializerType, listSerializer)!;
+        memberMap.SetSerializer(serializer);
     }
 
     /// <summary>Element type when the member is an enumerable (excluding string), else null.</summary>
