@@ -2,8 +2,15 @@
 id: DATA-0029
 slug: DATA-0029-json-filter-language-and-endpoint
 domain: DATA
-status: Accepted
+status: Superseded
+superseded-by: DATA-0096
 ---
+
+> **Superseded by [DATA-0096](DATA-0096-unified-filter-pipeline.md).** The JSON filter DSL and
+> `/query` endpoint described here are preserved as the developer-facing surface, but the
+> implementation (`JsonFilterBuilder` → `Expression`) was replaced by the unified `Filter` AST
+> (`JsonFilterParser`) and the `QueryDefinition` pipeline. Operator set and semantics are now
+> defined by DATA-0096.
 
 # 0029: JSON filter language and endpoint
 # ADR 0029: JSON Filter Language and Query Endpoint

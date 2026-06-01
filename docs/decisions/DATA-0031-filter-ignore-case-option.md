@@ -2,9 +2,16 @@
 id: DATA-0031
 slug: DATA-0031-filter-ignore-case-option
 domain: DATA
-status: Accepted
+status: Superseded
 date: 2025-08-17
+superseded-by: DATA-0096
 ---
+
+> **Superseded by [DATA-0096](DATA-0096-unified-filter-pipeline.md).** `$options.ignoreCase` is
+> retained as DSL surface, but is now carried as a per-node `FieldFilter.IgnoreCase` flag on the
+> unified `Filter` AST rather than a threaded mutable options object. Adapters that cannot push
+> case-insensitive comparison declare it out of `FilterCapabilities`, and the coordinator's
+> in-memory floor handles it.
 
 # 0031: JSON Filter $options.ignoreCase
  

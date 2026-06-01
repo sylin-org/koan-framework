@@ -1,13 +1,14 @@
 ---
-id: DATA-XXXX
-slug: DATA-XXXX-unified-filter-pipeline
+id: DATA-0096
+slug: DATA-0096-unified-filter-pipeline
 domain: DATA
 status: Accepted
 date: 2026-05-31
-supersedes: [DATA-0029, DATA-0031, DATA-0056, DATA-0092]
+supersedes: [DATA-0029, DATA-0031, DATA-0092]
+supersedes-pending: [DATA-0056]
 ---
 
-# DATA-XXXX: Unified Filter Pipeline (break-and-rebuild)
+# DATA-0096: Unified Filter Pipeline (break-and-rebuild)
 
 ## TL;DR
 
@@ -236,9 +237,14 @@ it prevents silent divergence). Enforced identically in every `IFilterTranslator
   the 7 `DataQueryOptions.With*` copiers (DATA-0092 leftovers).
 
 **Supersede (docs/canon)**
-- DATA-0029 (DSL), DATA-0031 (ignoreCase → AST per-node flag), DATA-0056 (vector AST →
-  unified AST), DATA-0092 (sort → `QuerySpec` axis). Update the defensive-publication doc
-  scope in the same PR (governance footgun if the published prior-art contradicts the code).
+- **Superseded now:** DATA-0029 (DSL), DATA-0031 (ignoreCase → AST per-node flag),
+  DATA-0092 (sort → `QueryDefinition` axis). Headers updated to `status: Superseded`,
+  `superseded-by: DATA-0096`.
+- **Supersession pending:** DATA-0056 (vector filter AST). The unified `Filter` AST was harvested
+  from it, but the vector path is schemaless (no CLR-type binding) and its provider translators are
+  untested with no live store — the node-model collapse is deferred to a scoped follow-up (see §9).
+  DATA-0056 remains authoritative for the vector path until then; its defensive-publication doc is
+  left unchanged to avoid claiming a collapse that has not landed.
 
 ---
 
@@ -333,12 +339,25 @@ Landed + green (branch `feat/unified-filter-pipeline`):
   parse/unsupported → 400), CQRS decorator, soft-delete controller, GraphQL connector.
 - Verified green: Direct, Vector, Vector.Abstractions, Backup, MCP.
 
-In progress:
-- Relational trio (Postgres/SqlServer/Sqlite — shared `SqlFilterTranslator`, native JSON
-  containment), Mongo (`FilterDefinition` + GUID carve-out), Couchbase (N1QL `ANY…SATISFIES`) —
-  migrating in isolated worktrees against the frozen contract.
+Landed since: all 8 data adapters migrated and green — relational trio (shared `SqlFilterTranslator`,
+native JSON containment), Mongo (`FilterDefinition` + GUID carve-out), Couchbase (N1QL
+`ANY…SATISFIES`) — plus `CachedRepository`. Cross-architecture **convergence acceptance gate**
+(19 specs: 18 filters × 5 capability profiles + paginate-after-residual) is green with zero
+infrastructure. ADRs DATA-0029/0031/0092 marked Superseded.
 
-Pending:
-- Convergence integration suite (identical result-id sets across architecturally-distinct DBs).
-- Vector `VectorQueryOptions.Filter` retype to the shared `Filter` AST.
-- DX regression guard; supersede DATA-0029/0031/0056/0092; update the defensive publication.
+## 9. Deferred follow-ups
+
+1. **Vector filter node-model collapse (supersedes DATA-0056).** Repoint the 5 provider translators
+   (Qdrant/Milvus/Weaviate/Elastic/OpenSearch) from `VectorFilter` nodes onto the unified `Filter`
+   AST and retire `VectorFilter*` + `VectorFilterOperator`. NOT done because vector metadata
+   filtering is schemaless (no CLR-type binding/coercion, distinct from entity filtering) and the
+   translators are untested with no live store. Prerequisite: a no-container translator conformance
+   suite (assert each translator's native output for a `Filter`-node matrix), then collapse + delete.
+   The unused `VectorFilterExpression` LINQ lifter has already been deleted (dead code).
+2. **Per-adapter live integration specs (ARCH-0079).** Container-backed specs that replay the
+   convergence corpus against real Sqlite/Postgres/SqlServer/Mongo/Couchbase/Redis, gated by adapter
+   availability — promoting the in-memory convergence proof to live stores.
+3. **Projection pushdown.** The `QueryDefinition.Projection` axis + in-memory floor exist; native
+   `SELECT`-column pushdown per adapter is staged for incremental fill (mirrors how sort was staged).
+4. **Capability self-reporting.** Surface `FilterCapabilities` through `/.well-known/Koan/aggregates`,
+   the boot report, a `Koan-InMemory-Filter` response header, and the MCP filter schema.

@@ -2,9 +2,17 @@
 id: DATA-0092
 slug: DATA-0092-structured-sort-contract-and-adapter-pushdown
 domain: DATA
-status: Accepted
+status: Superseded
 date: 2026-05-17
+superseded-by: DATA-0096
 ---
+
+> **Superseded by [DATA-0096](DATA-0096-unified-filter-pipeline.md).** The structured-sort model
+> (`SortSpec`/`MemberPath`, per-adapter pushdown reporting, in-memory fallback) is retained and
+> absorbed: sort is now one axis of the unified `QueryDefinition`, `RepositoryQueryResult.SortHandled`
+> reports per-axis pushdown alongside filter/pagination/projection, and the refetch-then-sort
+> fallback is owned by the one `FilterPushdownCoordinator`. The `DataQueryOptions` carrier this ADR
+> assumed no longer exists.
 
 # ADR 0092: Structured sort contract and adapter pushdown
 
