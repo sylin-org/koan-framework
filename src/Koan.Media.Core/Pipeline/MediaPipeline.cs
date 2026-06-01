@@ -1,6 +1,8 @@
 using System.Collections.Immutable;
+using System.Xml;
 using Koan.Media.Abstractions.Recipes;
 using Koan.Media.Core.Fonts;
+using Koan.Media.Core.Formats;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using SixLabors.ImageSharp;
@@ -208,6 +210,16 @@ public sealed class MediaPipeline : IMediaPipeline
         _consumed = true;
         try
         {
+            // MEDIA-0006: SVG pre-decode branch. The header sniff is the
+            // first thing every terminal does — Image.LoadAsync throws on
+            // SVG, and Content-Type / extension cannot be trusted.
+            var svgBytes = await TryReadSvgBytesAsync(_source, ct).ConfigureAwait(false);
+            if (svgBytes is not null)
+            {
+                SvgValidator.ValidateOrThrow(svgBytes);
+                return BuildSvgMediaInfo(svgBytes);
+            }
+
             if (_source.CanSeek) _source.Position = 0;
             // Full LoadAsync (not Identify-only) so the alpha-channel and frame-count
             // info are reliably populated across all input formats. Probe is rarely
@@ -227,6 +239,18 @@ public sealed class MediaPipeline : IMediaPipeline
         _consumed = true;
         try
         {
+            // MEDIA-0006: SVG pre-decode branch. Validate, plan against a
+            // synthetic Vector probe, rasterize at the planner's forward-
+            // derived target, and hand a PNG MemoryStream off to the
+            // existing ImageSharp encode chain. The raw SVG is the source
+            // of truth in storage; rasterization only fires when a recipe
+            // demands a Raster target.
+            var svgBytes = await TryReadSvgBytesAsync(_source, ct).ConfigureAwait(false);
+            if (svgBytes is not null)
+            {
+                return await EncodeSvgAsync(svgBytes, ct).ConfigureAwait(false);
+            }
+
             if (_source.CanSeek) _source.Position = 0;
             using var image = await LoadOrThrowAsync(_source, ct).ConfigureAwait(false);
 
@@ -241,6 +265,73 @@ public sealed class MediaPipeline : IMediaPipeline
         {
             await DisposeSourceAsync().ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// MEDIA-0006 SVG terminal: validate the bytes (defense in depth —
+    /// the controller / job may already have validated), plan against a
+    /// synthetic Vector probe, rasterize at the planner's forward-derived
+    /// target via Svg.Skia, and hand the PNG bytes off to the existing
+    /// ImageSharp encode chain so the recipe's terminal format (WebP /
+    /// JPEG / PNG / …) is produced by the well-tested raster path.
+    /// </summary>
+    private async Task<MediaOutput> EncodeSvgAsync(byte[] svgBytes, CancellationToken ct)
+    {
+        SvgValidator.ValidateOrThrow(svgBytes);
+
+        var probe = BuildSvgMediaInfo(svgBytes);
+        var plan = PlanOrThrow(probe, _steps);
+
+        var (targetW, targetH) = ResolveRasterizeTarget(plan, probe);
+        var pngBytes = SvgRasterizer.RenderToPng(svgBytes, targetW, targetH);
+
+        // Strip the implicit Rasterize step before re-entering the raster
+        // pipeline — the rasterizer has already produced bytes at the
+        // planner's forward-derived target. Author steps (Resize, Shape,
+        // Encode) flow through unchanged.
+        using var rasterized = new MemoryStream(pngBytes, writable: false);
+        using var image = await Image.LoadAsync(rasterized, ct).ConfigureAwait(false);
+
+        // Re-plan against the raster-sided probe so KindTrace records the
+        // full Vector -> Raster -> Encode transition.
+        var rasterProbe = BuildMediaInfo(image);
+        var rasterPlan = PlanOrThrow(rasterProbe, _steps);
+        var output = await EncodeAsync(
+            image, _steps, _overlayResolver, _fonts, _overlayDepth, _logger, rasterPlan, ct).ConfigureAwait(false);
+        return output with
+        {
+            SourceFormat = SvgFormat.Slug,
+            KindTrace = plan.KindTrace,
+        };
+    }
+
+    private static (int Width, int Height) ResolveRasterizeTarget(PlanResult plan, MediaInfo svgProbe)
+    {
+        // Planner forward-derives an implicit Rasterize at the encoder
+        // boundary when a Vector reaches a non-Vector encoder. Its
+        // ResolvedParams carry the target dimensions.
+        foreach (var step in plan.Steps)
+        {
+            if (step.Implicit
+                && step.OutputKind == MediaKind.Raster
+                && step.ResolvedParams is { } resolved
+                && resolved.TryGetValue("targetWidth", out var rawW)
+                && resolved.TryGetValue("targetHeight", out var rawH))
+            {
+                var w = Convert.ToInt32(rawW, System.Globalization.CultureInfo.InvariantCulture);
+                var h = Convert.ToInt32(rawH, System.Globalization.CultureInfo.InvariantCulture);
+                if (w > 0 && h > 0) return (w, h);
+            }
+        }
+        // No implicit Rasterize — the recipe has no terminal raster encoder
+        // (e.g. a future SVG-out pipeline) or the planner did not size.
+        // Fall back to the SVG's intrinsic viewBox dimensions.
+        if (svgProbe.Width > 0 && svgProbe.Height > 0)
+        {
+            return (svgProbe.Width, svgProbe.Height);
+        }
+        throw new SvgRasterizationException(
+            "Cannot determine rasterization target: no sizing step and SVG has no usable intrinsic dimensions.");
     }
 
     /// <summary>
@@ -294,6 +385,110 @@ public sealed class MediaPipeline : IMediaPipeline
         // refuse the source kind against an empty set (the existing
         // EncoderSelector.For will throw NotSupportedException downstream).
         return accepts.IsEmpty ? KindSet.All : accepts;
+    }
+
+    /// <summary>
+    /// Peek the first <see cref="SvgFormat.HeaderSniffBytes"/> bytes of the
+    /// source and, if the prefix matches the SVG sniff, return the entire
+    /// payload as a byte array. Returns null when the stream is not SVG
+    /// (the source is rewound for the existing ImageSharp path). The
+    /// returned bytes are subject to <see cref="SvgValidator.MaxSourceBytes"/>;
+    /// payloads beyond the cap are still read, then rejected at validation
+    /// time so the failure mode is one validator, one allowlist.
+    /// </summary>
+    private static async Task<byte[]?> TryReadSvgBytesAsync(Stream source, CancellationToken ct)
+    {
+        if (source is null) return null;
+
+        if (!source.CanSeek)
+        {
+            // Without seek we cannot rewind for the non-SVG fallback;
+            // route the entire stream through a buffered MemoryStream so
+            // the sniff can read freely. This is the legacy-stream slow
+            // path; CanSeek streams (the common case) take the cheap one.
+            // Note: callers that hand us non-seekable streams will incur
+            // a full copy here, but the overall cost is dominated by the
+            // decoder anyway.
+            return await BufferIfSvgAsync(source, ct).ConfigureAwait(false);
+        }
+
+        var origin = source.Position;
+        var header = new byte[SvgFormat.HeaderSniffBytes];
+        var read = await source.ReadAtLeastAsync(header, SvgFormat.HeaderSniffBytes, throwOnEndOfStream: false, ct).ConfigureAwait(false);
+        source.Position = origin;
+        if (!SvgFormat.MatchHeader(header.AsSpan(0, read)))
+        {
+            return null;
+        }
+
+        // SVG confirmed — read the full payload. We buffer here so the
+        // raster fallback can replace the stream with PNG bytes without
+        // touching the original source again.
+        using var ms = new MemoryStream();
+        await source.CopyToAsync(ms, ct).ConfigureAwait(false);
+        return ms.ToArray();
+    }
+
+    private static async Task<byte[]?> BufferIfSvgAsync(Stream source, CancellationToken ct)
+    {
+        using var ms = new MemoryStream();
+        await source.CopyToAsync(ms, ct).ConfigureAwait(false);
+        var bytes = ms.ToArray();
+        return SvgFormat.MatchHeader(bytes.AsSpan(0, Math.Min(bytes.Length, SvgFormat.HeaderSniffBytes)))
+            ? bytes
+            : null;
+    }
+
+    /// <summary>
+    /// Build a Vector-kind <see cref="MediaInfo"/> from the SVG document
+    /// head — viewBox preferred, width/height fallback. Per MEDIA-0006
+    /// §Decision.1.
+    /// </summary>
+    private static MediaInfo BuildSvgMediaInfo(byte[] svgBytes)
+    {
+        var settings = new XmlReaderSettings
+        {
+            DtdProcessing = DtdProcessing.Prohibit,
+            XmlResolver = null,
+            MaxCharactersInDocument = SvgValidator.MaxCharactersInDocument,
+            IgnoreComments = true,
+            IgnoreProcessingInstructions = true,
+            IgnoreWhitespace = true,
+            CloseInput = true,
+        };
+
+        int width = 0;
+        int height = 0;
+        try
+        {
+            using var stream = new MemoryStream(svgBytes, writable: false);
+            using var reader = XmlReader.Create(stream, settings);
+            (width, height) = SvgFormat.ReadViewBoxOrIntrinsicSize(reader);
+        }
+        catch (XmlException ex)
+        {
+            throw new SvgValidationException(
+                $"SVG is not well-formed XML: {ex.Message}",
+                kind: SvgValidationKind.MalformedXml,
+                inner: ex);
+        }
+
+        if (width <= 0 || height <= 0)
+        {
+            throw new SvgValidationException(
+                "SVG has no parseable viewBox or width/height — cannot resolve display extents.",
+                kind: SvgValidationKind.MalformedXml);
+        }
+
+        return new MediaInfo(
+            Format: SvgFormat.Slug,
+            Width: width,
+            Height: height,
+            FrameCount: 1,
+            HasAlpha: true,        // SVG is always alpha-capable
+            ColorDepth: 32,
+            ExifOrientation: null,
+            HasIccProfile: false);
     }
 
     private async Task<Image> LoadOrThrowAsync(Stream source, CancellationToken ct)
@@ -384,6 +579,16 @@ public sealed class MediaPipeline : IMediaPipeline
 
         try
         {
+            // MEDIA-0006: SVG bundle path. Validate once, then rasterize
+            // per-distinct-target across variants (dedupe key = (w, h)
+            // tuple). Each branch re-enters the raster pipeline against
+            // its dedicated PNG decode.
+            var svgBytes = await TryReadSvgBytesAsync(_source, ct).ConfigureAwait(false);
+            if (svgBytes is not null)
+            {
+                return await MaterializeSvgAsync(svgBytes, builder, ct).ConfigureAwait(false);
+            }
+
             if (_source.CanSeek) _source.Position = 0;
             // Decode once; clone per variant so transforms don't bleed across branches.
             using var sourceImage = await Image.LoadAsync(_source, ct).ConfigureAwait(false);
@@ -411,6 +616,56 @@ public sealed class MediaPipeline : IMediaPipeline
         {
             await DisposeSourceAsync().ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// MEDIA-0006 multi-variant SVG materialisation. Rasterizes once per
+    /// distinct target dimension across all variants (dedupe key =
+    /// resolved (w, h) tuple) so two variants requesting 600×750 share a
+    /// rasterization and a third requesting 1200×1500 triggers a second.
+    /// </summary>
+    private async Task<MediaBundle> MaterializeSvgAsync(
+        byte[] svgBytes,
+        MediaBundleBuilder builder,
+        CancellationToken ct)
+    {
+        SvgValidator.ValidateOrThrow(svgBytes);
+        var svgProbe = BuildSvgMediaInfo(svgBytes);
+
+        // Cache rasterized PNG bytes by target dimensions so co-sized
+        // variants reuse a single Skia render pass.
+        var rasterCache = new Dictionary<(int, int), byte[]>();
+        var variants = new Dictionary<string, MediaOutput>(builder.Variants.Count, StringComparer.Ordinal);
+
+        foreach (var (name, configureBranch) in builder.Variants)
+        {
+            ct.ThrowIfCancellationRequested();
+            var branch = new StepRecorder();
+            configureBranch(branch);
+
+            var plan = PlanOrThrow(svgProbe, branch.Steps);
+            var (targetW, targetH) = ResolveRasterizeTarget(plan, svgProbe);
+
+            if (!rasterCache.TryGetValue((targetW, targetH), out var pngBytes))
+            {
+                pngBytes = SvgRasterizer.RenderToPng(svgBytes, targetW, targetH);
+                rasterCache[(targetW, targetH)] = pngBytes;
+            }
+
+            using var rasterized = new MemoryStream(pngBytes, writable: false);
+            using var image = await Image.LoadAsync(rasterized, ct).ConfigureAwait(false);
+            var rasterProbe = BuildMediaInfo(image);
+            var rasterPlan = PlanOrThrow(rasterProbe, branch.Steps);
+            var output = await EncodeAsync(
+                image, branch.Steps, _overlayResolver, _fonts, _overlayDepth, _logger, rasterPlan, ct).ConfigureAwait(false);
+            variants[name] = output with
+            {
+                SourceFormat = SvgFormat.Slug,
+                KindTrace = plan.KindTrace,
+            };
+        }
+
+        return new MediaBundle(variants);
     }
 
     // ----- engine -----

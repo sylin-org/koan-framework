@@ -22,5 +22,13 @@
          DrawText (text overlays), and Fill (background fills). Brings SixLabors.Fonts
          transitively for text rendering. -->
     <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.6" />
+    <!-- MEDIA-0006: SVG decoder + Skia rasterizer. SkiaSharp + Svg.Skia provide
+         the Vector → Raster bridge for SVG inputs. Native binaries are pulled per
+         platform RID at publish time; the managed assembly weight is ~8.3 MiB.
+         Windows natives come implicitly via the default SkiaSharp dependency chain. -->
+    <PackageReference Include="SkiaSharp" Version="3.119.4" />
+    <PackageReference Include="Svg.Skia" Version="3.0.6" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.119.4" />
+    <PackageReference Include="SkiaSharp.NativeAssets.macOS" Version="3.119.4" />
   </ItemGroup>
 </Project>

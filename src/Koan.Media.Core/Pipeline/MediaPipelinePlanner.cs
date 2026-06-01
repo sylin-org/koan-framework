@@ -64,10 +64,12 @@ public static class MediaPipelinePlanner
     {
         if (steps is null) throw new ArgumentNullException(nameof(steps));
 
-        // 1. Initial kind from probe. Only Raster vs AnimatedRaster are
-        // observable from an ImageSharp decode today; Vector and Timeline
-        // arrive in later ADRs but the switch is exhaustive.
-        var currentKind = probe?.IsAnimated == true ? MediaKind.AnimatedRaster : MediaKind.Raster;
+        // 1. Initial kind from probe. SVG (and any future Vector decoder)
+        // declares Format = "svg" up front per MEDIA-0006; otherwise the
+        // decoder-provided IsAnimated flag discriminates Raster vs
+        // AnimatedRaster. Timeline arrives in a later ADR but the switch
+        // is exhaustive at the kind-set level.
+        var currentKind = ResolveInitialKind(probe);
 
         var planned = ImmutableArray.CreateBuilder<PlannedStep>(steps.Count);
         var trace = ImmutableArray.CreateBuilder<MediaKind>(steps.Count + 1);
@@ -183,6 +185,23 @@ public static class MediaPipelinePlanner
             FinalKind: currentKind,
             KindTrace: trace.ToImmutable(),
             Error: null);
+    }
+
+    /// <summary>
+    /// Map the probed format to the initial running <see cref="MediaKind"/>.
+    /// SVG (the first concrete Vector producer per MEDIA-0006) declares
+    /// <c>Format = "svg"</c>; everything else falls back to the raster /
+    /// animated-raster discrimination from the decoder's <c>IsAnimated</c>
+    /// flag.
+    /// </summary>
+    private static MediaKind ResolveInitialKind(MediaInfo? probe)
+    {
+        if (probe is null) return MediaKind.Raster;
+        if (string.Equals(probe.Format, "svg", StringComparison.OrdinalIgnoreCase))
+        {
+            return MediaKind.Vector;
+        }
+        return probe.IsAnimated ? MediaKind.AnimatedRaster : MediaKind.Raster;
     }
 
     /// <summary>
