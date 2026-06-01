@@ -36,7 +36,10 @@ public sealed class OpenSearchTestFactory : IVectorAdapterTestFactory
     public bool SupportsFlush                => true;  // adapter overrides: DELETE /<index>
     public bool SupportsExportAll            => false; // no export override yet
     public bool SupportsHybridSearch         => false;
-    public bool SupportsMetadataFilters      => true;
+    // AI-0036 §10: live filter-convergence gated off pending end-to-end metadata storage/mapping
+    // (OpenSearch shares ElasticSearch's Lucene path — needs the F6 knn.filter + metadata.<key>.keyword
+    // mapping verified live). Translator + capabilities exist; the storage/mapping path is the gap.
+    public bool SupportsMetadataFilters      => false;
     public bool SupportsContinuationToken    => false;
     // _ensuredIndexes is now keyed by IndexName, so multi-partition works correctly.
     public bool SupportsPartitionIsolation   => true;
@@ -60,6 +63,7 @@ public sealed class OpenSearchTestFactory : IVectorAdapterTestFactory
 
         try
         {
+#pragma warning disable CS0618 // Testcontainers parameterless ContainerBuilder ctor deprecated; still functional.
             _container = new ContainerBuilder()
                 .WithImage("opensearchproject/opensearch:2.13.0")
                 .WithEnvironment("discovery.type", "single-node")
@@ -68,6 +72,7 @@ public sealed class OpenSearchTestFactory : IVectorAdapterTestFactory
                 .WithPortBinding(9200, true)
                 .WithWaitStrategy(Wait.ForUnixContainer().UntilHttpRequestIsSucceeded(req => req.ForPath("/_cluster/health").ForPort(9200)))
                 .Build();
+#pragma warning restore CS0618
 
             await _container.StartAsync();
             var port = _container.GetMappedPublicPort(9200);

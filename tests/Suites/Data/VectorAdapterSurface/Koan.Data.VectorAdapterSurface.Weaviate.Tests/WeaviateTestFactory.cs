@@ -35,7 +35,10 @@ public sealed class WeaviateTestFactory : IVectorAdapterTestFactory
     public bool SupportsFlush                => true;
     public bool SupportsExportAll            => true;
     public bool SupportsHybridSearch         => true;  // Weaviate is the only one
-    public bool SupportsMetadataFilters      => true;
+    // AI-0036 §10: live filter-convergence gated off pending end-to-end metadata path. The Upsert now
+    // persists metadata as properties, but filtering still returns empty — needs the autoSchema
+    // property indexing / GraphQL where path verified live before this can converge with the oracle.
+    public bool SupportsMetadataFilters      => false;
     public bool SupportsContinuationToken    => true;  // native cursor
     public bool SupportsPartitionIsolation   => true;
     public bool SupportsDynamicCollections   => true;
@@ -58,6 +61,9 @@ public sealed class WeaviateTestFactory : IVectorAdapterTestFactory
 
         try
         {
+            // Testcontainers deprecated the parameterless ContainerBuilder ctor; the generic-container
+            // pattern (WithImage) still functions — suppress the deprecation (warnings-as-errors).
+#pragma warning disable CS0618
             _container = new ContainerBuilder()
                 .WithImage("semitechnologies/weaviate:1.25.6")
                 .WithEnvironment("QUERY_DEFAULTS_LIMIT", "25")
@@ -69,6 +75,7 @@ public sealed class WeaviateTestFactory : IVectorAdapterTestFactory
                 .WithPortBinding(8080, true)
                 .WithWaitStrategy(Wait.ForUnixContainer().UntilHttpRequestIsSucceeded(req => req.ForPath("/v1/.well-known/ready").ForPort(8080)))
                 .Build();
+#pragma warning restore CS0618
 
             await _container.StartAsync();
             var port = _container.GetMappedPublicPort(8080);

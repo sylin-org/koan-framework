@@ -30,7 +30,10 @@ public sealed class ElasticSearchTestFactory : IVectorAdapterTestFactory
     public bool SupportsFlush                => true;  // adapter overrides: DELETE /<index>
     public bool SupportsExportAll            => true;  // scroll API
     public bool SupportsHybridSearch         => false;
-    public bool SupportsMetadataFilters      => true;
+    // AI-0036 §10: live filter-convergence gated off pending end-to-end metadata mapping. The F6
+    // knn.filter placement is fixed, but term filters still need the metadata.<key>.keyword field
+    // mapping (ES maps strings as text + a .keyword sub-field) verified live before convergence.
+    public bool SupportsMetadataFilters      => false;
     // ES Capabilities flag does not advertise NativeContinuation even though scroll exists; the
     // matrix mirrors what the adapter says, not what it could say.
     public bool SupportsContinuationToken    => false;
@@ -56,6 +59,7 @@ public sealed class ElasticSearchTestFactory : IVectorAdapterTestFactory
 
         try
         {
+#pragma warning disable CS0618 // Testcontainers parameterless ContainerBuilder ctor deprecated; still functional.
             _container = new ContainerBuilder()
                 .WithImage("docker.elastic.co/elasticsearch/elasticsearch:8.13.4")
                 .WithEnvironment("discovery.type", "single-node")
@@ -64,6 +68,7 @@ public sealed class ElasticSearchTestFactory : IVectorAdapterTestFactory
                 .WithPortBinding(9200, true)
                 .WithWaitStrategy(Wait.ForUnixContainer().UntilHttpRequestIsSucceeded(req => req.ForPath("/_cluster/health").ForPort(9200)))
                 .Build();
+#pragma warning restore CS0618
 
             await _container.StartAsync();
             var port = _container.GetMappedPublicPort(9200);

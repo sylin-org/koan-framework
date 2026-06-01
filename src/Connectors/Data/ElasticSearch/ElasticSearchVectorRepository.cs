@@ -439,13 +439,10 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
         var filter = ElasticSearchFilterTranslator.TranslateWhereClause(options.Filter);
         if (filter is not null)
         {
-            request["query"] = new JObject
-            {
-                ["bool"] = new JObject
-                {
-                    ["filter"] = new JArray(filter)
-                }
-            };
+            // DATA-0097 F6: the filter must PRE-FILTER the kNN (knn.filter), not sit as a top-level
+            // query sibling — a sibling query is OR-combined with knn in ES 8.x, so the filter would
+            // not constrain the vector results (it returned the full top-K unfiltered).
+            ((JObject)request["knn"]!)["filter"] = filter;
         }
 
         if (options.Timeout is { } timeout)

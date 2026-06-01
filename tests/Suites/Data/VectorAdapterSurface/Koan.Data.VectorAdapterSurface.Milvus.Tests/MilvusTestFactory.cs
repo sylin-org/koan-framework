@@ -11,6 +11,10 @@ using Koan.Data.Vector.Abstractions;
 using Koan.Data.Vector.Connector.Milvus;
 using Koan.Data.VectorAdapterSurface.TestKit;
 
+// Testcontainers deprecated the parameterless ContainerBuilder ctor (used 3x for the etcd+minio+milvus
+// stack); the generic-container pattern still functions — suppress the deprecation (warnings-as-errors).
+#pragma warning disable CS0618
+
 namespace Koan.Data.VectorAdapterSurface.Milvus.Tests;
 
 /// <summary>
@@ -50,7 +54,10 @@ public sealed class MilvusTestFactory : IVectorAdapterTestFactory
     public bool SupportsFlush                => true;  // adapter overrides: drops the collection
     public bool SupportsExportAll            => false;
     public bool SupportsHybridSearch         => false;
-    public bool SupportsMetadataFilters      => true;  // expr-string filters via MilvusFilterTranslator
+    // AI-0036 §10: live filter-convergence gated off pending end-to-end verification (heavy
+    // etcd+minio+milvus stack not yet run through the convergence oracle). Translator + capabilities
+    // exist (expr-string filters via MilvusFilterTranslator); the metadata storage/query path is unverified.
+    public bool SupportsMetadataFilters      => false;
     public bool SupportsContinuationToken    => false;
     public bool SupportsPartitionIsolation   => true;
     public bool SupportsDynamicCollections   => true;

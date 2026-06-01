@@ -188,12 +188,12 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         // Weaviate requires UUID ids; derive a deterministic UUID from the entity id (namespaced by class) for stable mapping
         var uuid = DeterministicGuidFromString(ClassName, id!.ToString()!);
 
-        // Build properties including searchText from metadata if available
+        // Persist the caller metadata as Weaviate properties so it is filterable (AI-0036 §10 — was
+        // dropping everything except searchText, which is why metadata filters returned nothing).
+        // Weaviate autoSchema creates the properties; skip keys it cannot name (e.g. dotted provenance
+        // keys like __embedding.model — Weaviate property names must be [A-Za-z][_0-9A-Za-z]*).
         var properties = new Dictionary<string, object?> { ["docId"] = id!.ToString() };
-        if (metadata is IReadOnlyDictionary<string, object> metaDict && metaDict.TryGetValue("searchText", out var searchText))
-        {
-            properties["searchText"] = searchText;
-        }
+        AppendMetadataProperties(properties, metadata);
 
         // Persist minimal properties including original doc id for reverse lookup
         // POST object includes class in payload
@@ -288,6 +288,26 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
             if (await Delete(id, ct)) count++;
         }
         return count;
+    }
+
+    // AI-0036 §10: copy caller metadata into Weaviate object properties so it is filterable.
+    private static void AppendMetadataProperties(Dictionary<string, object?> properties, object? metadata)
+    {
+        if (metadata is not System.Collections.IDictionary dict) return;
+        foreach (System.Collections.DictionaryEntry e in dict)
+        {
+            var key = e.Key?.ToString();
+            if (string.IsNullOrEmpty(key) || string.Equals(key, "docId", StringComparison.Ordinal)) continue;
+            if (!IsValidWeaviateProperty(key)) continue; // Weaviate property names: [A-Za-z][_0-9A-Za-z]*
+            properties[key] = e.Value;
+        }
+    }
+
+    private static bool IsValidWeaviateProperty(string name)
+    {
+        if (name.Length == 0 || !char.IsLetter(name[0])) return false;
+        foreach (var c in name) if (!(char.IsLetterOrDigit(c) || c == '_')) return false;
+        return true;
     }
 
     public async Task<float[]?> GetEmbedding(TKey id, CancellationToken ct = default)
