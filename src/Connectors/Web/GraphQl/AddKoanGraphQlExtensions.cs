@@ -531,53 +531,29 @@ public static class AddKoanGraphQlExtensions
 
                 using (var _set = EntityContext.Partition(null!))
                 {
-                    if (!string.IsNullOrWhiteSpace(filterJson) && repo is ILinqQueryRepository<TEntity, string> lrepo)
+                    if (!string.IsNullOrWhiteSpace(filterJson))
                     {
-                        if (!JsonFilterBuilder.TryBuild<TEntity>(filterJson!, out var pr, out var error, new JsonFilterBuilder.BuildOptions { IgnoreCase = ignoreCase }))
-                            throw new GraphQLException(ErrorBuilder.New().SetMessage(error ?? "Invalid filter").SetCode("BAD_FILTER").Build());
-                        items = await lrepo.Query(pr!, ctx.RequestAborted);
-                        try
+                        Koan.Data.Abstractions.Filtering.Filter filter;
+                        try { filter = Koan.Data.Abstractions.Filtering.JsonFilterParser.Parse<TEntity>(filterJson!, new Koan.Data.Abstractions.Filtering.FilterParseOptions { IgnoreCase = ignoreCase }); }
+                        catch (Exception ex) when (ex is Koan.Data.Abstractions.Filtering.FilterParseException or Koan.Data.Abstractions.Filtering.InvalidFilterFieldException)
                         {
-                            var countRequest = new CountRequest<TEntity> { Predicate = pr };
-                            var countResult = await repo.Count(countRequest, ctx.RequestAborted);
-                            total = countResult.Value;
+                            throw new GraphQLException(ErrorBuilder.New().SetMessage(ex.Message).SetCode("BAD_FILTER").Build());
                         }
-                        catch { total = items.Count; }
+                        var result = await Data<TEntity, string>.QueryWithCount(Koan.Data.Abstractions.QueryDefinition.All.Where(filter), ctx.RequestAborted);
+                        items = result.Items;
+                        total = result.TotalCount;
                     }
-                    else if (!string.IsNullOrWhiteSpace(opts.Q) && repo is IStringQueryRepository<TEntity, string> srepo)
+                    else if (!string.IsNullOrWhiteSpace(opts.Q))
                     {
-                        items = await srepo.Query(opts.Q!, ctx.RequestAborted);
-                        try
-                        {
-                            var countRequest = new CountRequest<TEntity> { RawQuery = opts.Q };
-                            var countResult = await repo.Count(countRequest, ctx.RequestAborted);
-                            total = countResult.Value;
-                        }
-                        catch { total = items.Count; }
+                        try { items = await Data<TEntity, string>.QueryRaw(opts.Q!, null, null, ctx.RequestAborted); }
+                        catch (NotSupportedException) { throw new GraphQLException(ErrorBuilder.New().SetMessage("Adapter does not support raw string queries.").SetCode("BAD_FILTER").Build()); }
+                        total = items.Count;
                     }
                     else
                     {
-                        // Phase 1b: list-all goes through the typed-options interface.
-                        if (repo is ILinqQueryRepositoryWithOptions<TEntity, string> linqOpts)
-                        {
-                            var result = await linqOpts.Query((System.Linq.Expressions.Expression<Func<TEntity, bool>>?)null, options: null, ctx.RequestAborted);
-                            items = result.Items;
-                        }
-                        else if (repo is ILinqQueryRepository<TEntity, string> linqBasic)
-                        {
-                            items = await linqBasic.Query(_ => true, ctx.RequestAborted);
-                        }
-                        else
-                        {
-                            items = Array.Empty<TEntity>();
-                        }
-                        try
-                        {
-                            var countRequest = new CountRequest<TEntity>();
-                            var countResult = await repo.Count(countRequest, ctx.RequestAborted);
-                            total = countResult.Value;
-                        }
-                        catch { total = items.Count; }
+                        var result = await Data<TEntity, string>.QueryWithCount(Koan.Data.Abstractions.QueryDefinition.All, ctx.RequestAborted);
+                        items = result.Items;
+                        total = result.TotalCount;
                     }
                 }
 

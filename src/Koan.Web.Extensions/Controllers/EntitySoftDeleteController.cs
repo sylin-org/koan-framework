@@ -129,7 +129,7 @@ public abstract class EntitySoftDeleteController<TEntity, TKey> : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(filter))
         {
-            if (Repo is IStringQueryRepository<TEntity, TKey> srepo)
+            // filter is the JSON filter DSL; Data.Query(string) parses it for every adapter.
             {
                 if (!string.IsNullOrWhiteSpace(from))
                 {

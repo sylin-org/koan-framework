@@ -1,12 +1,14 @@
 using Newtonsoft.Json;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Filtering;
 
 namespace Koan.Data.Cqrs;
 
 /// <summary>
 /// Implicit CQRS decorator: records generic events to outbox and optionally mirrors 1:1 to a read source.
+/// Implements the unified <see cref="IQueryRepository{TEntity,TKey}"/> by delegating to the routed read repo.
 /// </summary>
-internal sealed class CqrsRepositoryDecorator<TEntity, TKey> : IDataRepository<TEntity, TKey>, ILinqQueryRepository<TEntity, TKey>, IQueryCapabilities, IWriteCapabilities
+internal sealed class CqrsRepositoryDecorator<TEntity, TKey> : IDataRepository<TEntity, TKey>, IQueryRepository<TEntity, TKey>, IQueryCapabilities, IWriteCapabilities
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
@@ -24,25 +26,24 @@ internal sealed class CqrsRepositoryDecorator<TEntity, TKey> : IDataRepository<T
     public QueryCapabilities Capabilities => (_inner as IQueryCapabilities)?.Capabilities ?? QueryCapabilities.None;
     public WriteCapabilities Writes => (_inner as IWriteCapabilities)?.Writes ?? WriteCapabilities.None;
 
+    public FilterCapabilities FilterCapabilities
+        => _routing.GetReadRepository<TEntity, TKey>() is IQueryRepository<TEntity, TKey> q ? q.FilterCapabilities : FilterCapabilities.None;
+
     public Task<TEntity?> Get(TKey id, CancellationToken ct = default)
-    {
-        var repo = _routing.GetReadRepository<TEntity, TKey>();
-        return repo.Get(id, ct);
-    }
+        => _routing.GetReadRepository<TEntity, TKey>().Get(id, ct);
 
     public Task<IReadOnlyList<TEntity?>> GetMany(IEnumerable<TKey> ids, CancellationToken ct = default)
-    {
-        var repo = _routing.GetReadRepository<TEntity, TKey>();
-        return repo.GetMany(ids, ct);
-    }
+        => _routing.GetReadRepository<TEntity, TKey>().GetMany(ids, ct);
 
-    public Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
-    {
-        var repo = _routing.GetReadRepository<TEntity, TKey>();
-        return repo.Count(request, ct);
-    }
-    public Task<IReadOnlyList<TEntity>> Query(System.Linq.Expressions.Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-    => (_routing.GetReadRepository<TEntity, TKey>() as ILinqQueryRepository<TEntity, TKey>)?.Query(predicate, ct) ?? Task.FromResult<IReadOnlyList<TEntity>>([]);
+    public Task<RepositoryQueryResult<TEntity>> Query(QueryDefinition query, CancellationToken ct = default)
+        => _routing.GetReadRepository<TEntity, TKey>() is IQueryRepository<TEntity, TKey> q
+            ? q.Query(query, ct)
+            : throw new NotSupportedException("CQRS read repository does not support queries.");
+
+    public Task<CountResult> Count(QueryDefinition query, CancellationToken ct = default)
+        => _routing.GetReadRepository<TEntity, TKey>() is IQueryRepository<TEntity, TKey> q
+            ? q.Count(query, ct)
+            : throw new NotSupportedException("CQRS read repository does not support counts.");
 
     public async Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
     {
@@ -68,21 +69,13 @@ internal sealed class CqrsRepositoryDecorator<TEntity, TKey> : IDataRepository<T
     }
 
     public Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
-    => _routing.GetWriteRepository<TEntity, TKey>().DeleteMany(ids, ct);
+        => _routing.GetWriteRepository<TEntity, TKey>().DeleteMany(ids, ct);
 
     public async Task<int> DeleteAll(CancellationToken ct = default)
-    {
-        var n = await _routing.GetWriteRepository<TEntity, TKey>().DeleteAll(ct);
-        // Optional: outbox could record a summary event; we'll skip event flood for delete-all.
-        return n;
-    }
+        => await _routing.GetWriteRepository<TEntity, TKey>().DeleteAll(ct);
 
     public async Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default)
-    {
-        var n = await _routing.GetWriteRepository<TEntity, TKey>().RemoveAll(strategy, ct);
-        // Optional: outbox could record a summary event; we'll skip event flood for remove-all.
-        return n;
-    }
+        => await _routing.GetWriteRepository<TEntity, TKey>().RemoveAll(strategy, ct);
 
     public IBatchSet<TEntity, TKey> CreateBatch() => _routing.GetWriteRepository<TEntity, TKey>().CreateBatch();
 
@@ -90,7 +83,7 @@ internal sealed class CqrsRepositoryDecorator<TEntity, TKey> : IDataRepository<T
     {
         if (_outbox is null) return;
         var entityId = id is not null ? id!.ToString()! : model is not null ? model.Id?.ToString() ?? "" : "";
-    var payload = model is not null ? JsonConvert.SerializeObject(model) : "{}";
+        var payload = model is not null ? JsonConvert.SerializeObject(model) : "{}";
         var entry = new OutboxEntry(Guid.CreateVersion7().ToString("n"), DateTimeOffset.UtcNow, typeof(TEntity).AssemblyQualifiedName!, op, entityId, payload);
         await _outbox.Append(entry, ct);
     }
