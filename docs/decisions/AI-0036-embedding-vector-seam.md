@@ -307,10 +307,15 @@ for surface symmetry; the 3 connector READMEs drop the deleted `VectorFilterExpr
 > harness reference live-verified** (`2bdc7864`) — the PGVector convergence spec asserts adapter
 > id-set == `DictionaryFilterEvaluator` oracle across 14 operators against a real pgvector container,
 > and caught + fixed 3 real adapter bugs (Dapper vector binding; Npgsql type reload after CREATE
-> EXTENSION; COALESCE total-boolean for null-correct negation). **Remaining:** replicate the
-> convergence spec to the other 5 providers via their existing `VectorAdapterSurface` fixtures (Milvus
-> is the heaviest container); deferred follow-ups (W4 hard throw + write-time model registry; ES F6
-> `knn.filter`; shared Lucene base); and the unrelated pre-existing sample rot (S5.Recs/S7.Meridian).
+> EXTENSION; COALESCE total-boolean for null-correct negation). **ALL 6 providers now live-verified
+> GREEN** against the `DictionaryFilterEvaluator` oracle via the shared `VectorFilterConvergenceSpecsBase`:
+> PGVector, Qdrant, ElasticSearch, OpenSearch, Milvus, Weaviate. The harness caught ~9 real,
+> never-tested adapter bugs (Dapper vector binding; Npgsql type reload; COALESCE null-negation;
+> metadata-key paths on Qdrant/Milvus; ES F6 `knn.filter`; ES/OS `metadata.<key>.keyword` mapping;
+> Weaviate metadata persistence + camelCase property names + explicit `tokenization=field` /
+> `indexNullState=true` schema for null-inclusive negation). Samples build green. **Remaining
+> (deferred follow-ups):** W4 hard throw + write-time model registry; a shared Lucene base for ES/OS
+> (currently duplicated-but-capability-pinned).
 
 - **P1a — additive foundation (no breaking change, no decision blocks it).** `VectorFilterCapabilities`
   (unified `FilterOperator` + `IgnoreCase` + `NestedPaths`; `None`/`Full`); schemaless `VectorFilterReader`
