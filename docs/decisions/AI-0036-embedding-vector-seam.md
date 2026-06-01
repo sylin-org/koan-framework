@@ -181,7 +181,8 @@ parser, same operator-aware capabilities. No new filter dialect.
 
 ## 6. Phased plan
 
-- **P0 — stop the silent drops (S, no decisions needed).** These are pure corrections of a
+- **P0 — stop the silent drops (S, no decisions needed).** ✅ **SHIPPED** (commit `a0efbdee`; the
+  build-unblock it depended on is `c934c9e2`). These are pure corrections of a
   fail-silent bug, mirroring DATA-0097 P0 — only data the layer already *knows* or *advertises*:
   - thread provenance through W1/W2/W3 (the `null` → dict change + the single `VectorProvenance` helper);
   - have R1 forward `step.Alpha`/`step.Rerank` (**already on `ChainStep`**). `Alpha` becomes `double?`
