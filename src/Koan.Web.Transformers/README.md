@@ -2,7 +2,7 @@
 
 HTTP payload transformers for Koan Web: flexible request/response shaping with auto-discovery.
 
-- Target framework: net9.0
+- Target framework: net10.0
 - License: Apache-2.0
 
 ## Install

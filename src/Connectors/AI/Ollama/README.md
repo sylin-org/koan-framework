@@ -2,7 +2,7 @@
 
 Ollama AI provider for Koan: local LLM chat, stream, and embeddings via Ollama endpoint.
 
-- Target framework: net9.0
+- Target framework: net10.0
 - License: Apache-2.0
 
 ## Install

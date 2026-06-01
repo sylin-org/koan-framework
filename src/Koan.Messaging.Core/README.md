@@ -2,7 +2,7 @@
 
 Core messaging abstractions and helpers for Koan: bus configuration, auto-registration, and options binding.
 
-- Target framework: net9.0
+- Target framework: net10.0
 - License: Apache-2.0
 
 ## Install

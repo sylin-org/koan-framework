@@ -2,7 +2,7 @@
 
 GraphQL module providing a controller-hosted GraphQL endpoint and schema for entity types.
 
-- Target framework: net9.0
+- Target framework: net10.0
 - License: Apache-2.0
 
 ## Install

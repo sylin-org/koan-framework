@@ -2,7 +2,7 @@
 
 Minimal HTTP endpoints and health for Koan AI routing; integrates with Koan.Web.
 
-- Target framework: net9.0
+- Target framework: net10.0
 - License: Apache-2.0
 
 ## Install

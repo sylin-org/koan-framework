@@ -2,7 +2,7 @@
 
 Direct data access helpers for Koan (bypass adapters for simple sources and scenarios).
 
-- Target framework: net9.0
+- Target framework: net10.0
 - License: Apache-2.0
 
 ## Install

@@ -2,7 +2,7 @@
 
 SQLite provider for Koan relational data - great for local dev, tests, and simple single-node apps.
 
-- Target framework: net9.0
+- Target framework: net10.0
 - License: Apache-2.0
 
 ## Capabilities

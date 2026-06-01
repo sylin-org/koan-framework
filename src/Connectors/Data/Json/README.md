@@ -2,7 +2,7 @@
 
 JSON file-backed data provider for Koan: simple repository for demos, tests, and local development.
 
-- Target framework: net9.0
+- Target framework: net10.0
 - License: Apache-2.0
 
 ## Capabilities
