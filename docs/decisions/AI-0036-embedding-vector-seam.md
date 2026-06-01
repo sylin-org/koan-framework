@@ -31,33 +31,31 @@ the write and read sides of the AI surface.
 
 ## TL;DR
 
-Post-DATA-0097 the store can filter trustworthily and records whatever metadata you give it. But:
+This DDR defines the two contracts on the seam between the embedding lifecycle (`Koan.Data.AI`) and
+the model-agnostic store (`Koan.Data.Vector`), plus the orchestration layers that read through it:
 
-- **Write side (provenance):** every one of the **three** code paths that persists a vector
-  (`EmbeddingWorker`, the synchronous embed hook, the `EmbeddingMigrator`) calls
-  `SaveWithVector(entity, embedding, **null**, ct)`. The producing model/source is *computed* —
-  threaded into telemetry, cost estimation, and the sidecar `EmbeddingState.Model` — and then
-  **dropped at the store boundary**. The migrator, whose entire purpose is to change the producing
-  model, stamps `null` onto the migrated vector. Result: stored vectors carry **no provenance of
-  which model produced them**. A model change silently creates a **mixed-space index** (vectors
-  from different models are not comparable) with no way to detect it at query, migration, or audit
-  time. This is a silent correctness hazard of the same shape DATA-0097 just closed.
+- **Write side — provenance is metadata the lifecycle owner stamps.** Every write path
+  (`EmbeddingWorker`, the synchronous embed hook, the `EmbeddingMigrator`) routes through a single
+  `VectorProvenance` helper that stamps the producing `model`/`source`/`provider`/`version` into the
+  vector record under a reserved `__embedding.*` namespace. Provenance is co-located with the vector
+  and queryable like any other metadata, so a model mismatch is catchable — the W4 guard throws at the
+  write that would otherwise create a **mixed-space index** (vectors from different models are not
+  comparable). *(Previously all three paths passed `null`, and the producing model survived only in
+  out-of-band sidecars — making a mixed-space index undetectable at query, migration, or audit time.)*
 
-- **Read side (retrieval forwarding):** `Vector<T>.Search` exposes `vector, text, alpha, topK,
-  filter, …`. Three independent entry points read through it, each losing a *different* subset, and
-  **all three drop `filter`** — the exact capability DATA-0097 made trustworthy:
-  - `Chain.Retrieve<T>(query, topK, alpha, rerank)` **advertises** `alpha`/`rerank`, stores them on
-    the step, then forwards **only `topK`** — `alpha`/`rerank` are **silently ignored**. The DX lies.
-  - the agent `{type}_search` tool exposes only `text`+`top_k` — no `alpha`/`filter` slot exists.
-  - the RAG pillar forwards `text`+`alpha` (hybrid ✓) but still **cannot pass a `filter`**.
+- **Read side — one `VectorRetrieveOptions` the entry points compose.** `Chain.Retrieve<T>`, the agent
+  `{type}_search`/`{type}_query` tools, and the RAG pipeline each build and forward the one typed
+  options record (`text`/`alpha`/`topK`/`filter`/`rerank`) instead of hand-marshalling positional
+  args, so the DATA-0097 filter capability is expressible through all three — a tenant- or
+  category-scoped retrieve included. *(Previously each path forwarded a different subset and all three
+  dropped `filter`; `Chain.Retrieve` even advertised `alpha`/`rerank` and silently ignored them.)*
 
-  There is no single retrieval-options contract; each path re-implements forwarding ad hoc and each
-  loses something. A tenant- or category-scoped RAG retrieve is **inexpressible** through any of the
-  three, despite the store now supporting it.
+## 1. Context — the gaps this seam closed
 
-## 1. Findings (grounded)
+Before the seam was defined, the embedding lifecycle computed model/source on the write side and RAG
+intent on the read side, but both were lost crossing the `Vector<T>` boundary. The two sides:
 
-### Write side — provenance dropped at three `SaveWithVector(…, null, …)` sites
+### Write side — provenance was dropped at three `SaveWithVector(…, null, …)` sites
 
 | # | Site | What it knows | What it persists |
 |---|------|---------------|------------------|
@@ -65,16 +63,16 @@ Post-DATA-0097 the store can filter trustworthily and records whatever metadata 
 | **W2** | [Koan.Data.AI/Initialization/KoanAutoRegistrar.cs:475](../../src/Koan.Data.AI/Initialization/KoanAutoRegistrar.cs#L475) | synchronous embed hook; same lifecycle metadata in scope | `null` metadata |
 | **W3** | [EmbeddingMigrator.cs:250](../../src/Koan.Data.AI/Migration/EmbeddingMigrator.cs#L250) | `targetModel`/`targetSource`/`targetProvider` — the migration *is* a model change; written to `EmbeddingState.Model` at 264 | `null` metadata |
 
-The provenance survives only in **out-of-band sidecars** (`EmbeddingState<T>` keyed by entity id;
-ephemeral telemetry). Neither is co-located with the vector, neither is reachable from the vector
-query path, and neither lets the store or a migration audit answer "which model is this vector?"
+The provenance survived only in **out-of-band sidecars** (`EmbeddingState<T>` keyed by entity id;
+ephemeral telemetry). Neither was co-located with the vector, neither was reachable from the vector
+query path, and neither let the store or a migration audit answer "which model is this vector?"
 
-- **W4 — no provenance read-back / guard.** Because nothing is written, nothing checks it: there is
-  no "this index contains vectors from models {A, B}" diagnostic and no fail-loud when a query
-  embedding's model disagrees with the stored vectors' model. Mixed-space indexes return
+- **W4 — no provenance read-back / guard.** Because nothing was written, nothing could check it: there
+  was no "this index contains vectors from models {A, B}" diagnostic and no fail-loud when a query
+  embedding's model disagreed with the stored vectors' model. Mixed-space indexes returned
   plausible-but-wrong neighbours **silently**.
 
-### Read side — `Vector<T>.Search` capability narrowed differently at each entry point
+### Read side — `Vector<T>.Search` capability was narrowed differently at each entry point
 
 `Search(float[] vector, string text, double? alpha, int? topK, object filter, string, string, ct)`.
 
@@ -85,9 +83,9 @@ query path, and neither lets the store or a migration audit answer "which model 
 | **R3** | RAG pillar — [RagRetrievalPipeline.cs:65](../../src/Koan.Rag/Retrieval/RagRetrievalPipeline.cs#L65) | `text`, `alpha`, `topK` | `filter` | **missing capability** — no filter param |
 
 - **R4 — no shared contract.** Three forwarders, three different subsets, **`filter` lost by all
-  three**. The store's read surface (now fail-loud and filter-capable) has no single typed
-  options object the orchestration layers compose; each hand-marshals positional reflection args
-  (`[embedding, …, null, null, null, ct]`), which is exactly how knobs get silently dropped.
+  three**. The store's read surface (fail-loud and filter-capable) had no single typed options object
+  the orchestration layers composed; each hand-marshalled positional reflection args
+  (`[embedding, …, null, null, null, ct]`), which is exactly how knobs got silently dropped.
 
 ## 2. Target architecture
 
@@ -179,36 +177,34 @@ parser, same operator-aware capabilities. No new filter dialect.
 - **Forwarding (R1/R2/R3):** a filtered retrieve through each entry point actually scopes results (not match-all); `Chain.Retrieve(alpha:…, rerank:true)` demonstrably changes ordering vs default (proves no silent drop).
 - **Back-compat:** `Retrieve<T>(q)` / existing agent search / existing RAG call sites behave identically with defaults.
 
-## 6. Phased plan
+## 6. Capabilities
 
-- **P0 — stop the silent drops (S, no decisions needed).** ✅ **SHIPPED** (commit `a0efbdee`; the
-  build-unblock it depended on is `c934c9e2`). These are pure corrections of a
-  fail-silent bug, mirroring DATA-0097 P0 — only data the layer already *knows* or *advertises*:
-  - thread provenance through W1/W2/W3 (the `null` → dict change + the single `VectorProvenance` helper);
-  - have R1 forward `step.Alpha`/`step.Rerank` (**already on `ChainStep`**). `Alpha` becomes `double?`
-    (null = pure-vector = today's effective behaviour; set = hybrid with `text = query`, matching
-    `Search`'s own `double? alpha` shape and the RAG pillar's hybrid call). `Rerank` is honoured inline
-    by the existing rerank pass. Default `Retrieve<T>(q)` is unchanged.
-  - Net: nothing the layers already know/advertise is dropped anymore.
-  - *Not in P0:* forwarding a **filter** from any read path — RAG/agent/Chain have **no filter slot
-    today**, so that is a slot *addition* (a typed-options decision), moved to P1.
-- **P1 — the typed seam (M).** `VectorRetrieveOptions`; add a `filter:` slot to `Chain.Retrieve<T>`,
-  `RagQueryOptions`, and the agent `{type}_search` schema; all compose the one record. The DSL filter
-  is the DATA-0097 `Filter` AST / its JSON form — the single filter dialect, no new vocabulary.
-- **P2 — provenance as a guard, not just data (S/M).** W4 model-mismatch guard + "models in index"
-  self-report; depends on P1's filter to express the read-back cleanly.
+- **P0 — no silent drops.** Provenance is threaded through all three write sites via the single
+  `VectorProvenance` helper — no write passes `null` — and `Chain.Retrieve<T>` forwards
+  `step.Alpha`/`step.Rerank`. `Alpha` is `double?` (null = pure-vector; set = hybrid with
+  `text = query`, matching `Search`'s own `double? alpha` and the RAG pillar's hybrid call); `Rerank`
+  is honoured by the rerank pass. Default `Retrieve<T>(q)` is unchanged — nothing the layer already
+  knows or advertises is dropped.
+- **P1 — the typed seam.** `VectorRetrieveOptions` is the one read-options record; `Chain.Retrieve<T>`,
+  `RagQueryOptions`, and the agent `{type}_search`/`{type}_query` schemas each expose a `filter` slot
+  and compose it instead of hand-marshalling positional args. The DSL filter is the unified `Filter`
+  AST / its JSON form — the single filter dialect, no new vocabulary.
+- **P2 — provenance as a guard.** The W4 mixed-space guard and the "models in index" self-report read
+  the stamped provenance back; the guard throws at the write boundary (§10.1) and the health report
+  makes a multi-model index visible.
 
-## 7. Decisions (ratified 2026-05-31)
+## 7. Decisions
 
 1. **Provenance key namespace → reserved `__embedding.*` metadata keys.** Keeps the store
-   model-agnostic, needs no per-adapter schema change, is queryable as ordinary filterable metadata,
-   and is seam-ready today. The store never parses the keys; it persists them. Key *constants* live
-   in `Koan.Data.Vector` (the lower layer, so the lifecycle owner and the future read-back guard both
-   reference one definition); the *builder* lives with the lifecycle owner.
+   model-agnostic, needs no per-adapter schema change, and is queryable as ordinary filterable
+   metadata. The store never parses the keys; it persists them. Key *constants* live in
+   `Koan.Data.Vector` (the lower layer, so the lifecycle owner and the read-back guard both reference
+   one definition); the *builder* lives with the lifecycle owner.
 2. **W4 severity → throw when knowable, warn for by-design multi-model.** Fail-loud only at the
-   genuine boundary: when the query path can know the index model and they differ, throw
-   (incomparable spaces = wrong neighbours). When the index is legitimately multi-model by design,
-   warn + surface "models in index" in the health report.
+   genuine boundary: a write that would introduce a second model into a single-model index throws
+   (incomparable spaces = wrong neighbours). An index that is legitimately multi-model by design is
+   tolerated with a warn + a "models in index" health report. The throw is realized at write time
+   (§10.1 D3), which is strictly stronger than a read-time query check.
 3. **`VectorRetrieveOptions` lives in `Koan.Data.Vector`.** It mirrors `Search`'s own surface and
    avoids an AI dependency edge into the store; all pillars reference the one type.
 
@@ -221,17 +217,16 @@ DDR is the **contract between lifecycle and persistence** (write provenance) and
 responsibilities; it ensures the layers that own model/source and RAG intent actually deliver them
 across the seam DATA-0097 left seam-ready.
 
-## 10. Hardened P1/P2 plan-of-record (post adversarial review, 2026-06-01)
+## 10. Implementation architecture
 
-A 10-agent discovery + 3-lens adversarial workflow (run `wyzuoe56p`) verified the spine against
-source and found six revision-worthy holes. This section is the **executable plan of record** for
-DATA-0097 P1 (typed vector Filter + collapse + capabilities) **and** AI-0036 P1 (filter DX) + P2
-(W4 guard), jointly, because they share one filter model and one coordinator. The spine is
-verified-correct: the unified `Filter` AST was *promoted from* the former vector-only AST
-(`Filter.cs:13`), so the vector path rejoins its origin; one `VectorFilterCoordinator` at
-`VectorData<T>.Search` enforces residual-is-error below every facade overload and above all 6 repos.
+This is the joint design of record for DATA-0097's typed vector `Filter` (collapse + capabilities)
+**and** AI-0036's filter DX (P1) and W4 guard (P2), together, because they share one filter model and
+one coordinator. The vector path uses the one unified `Filter` AST — the former vector-only AST was
+*promoted into* it (`Filter.cs`), so the vector path and the entity path share a single origin. One
+`VectorFilterCoordinator` at `VectorData<T>.Search` enforces residual-is-error below every facade
+overload and above all six repositories.
 
-### 10.1 Ratified decisions (this session)
+### 10.1 Decisions
 
 - **D1 — filter DX: metadata-key == entity-property is now CANON; lambda is the primary idiom.**
   `Chain.Retrieve<Doc>(q, filter: d => d.Year > 2020)` compiles via `LinqFilterCompiler` exactly like
@@ -250,15 +245,19 @@ verified-correct: the unified `Filter` AST was *promoted from* the former vector
   machinery. Guidance (docs): multi-tenant deployments isolate by partition; co-mingling tenants in
   one partition and relying on a filter is a Koan anti-pattern. *(The entity-web `QueryFilterComposer.AndAll`
   remains the right tool for hook-contributed predicates within a partition, but is not a tenancy boundary.)*
-- **D3 — W4 ships WARN-only first.** Initial P2: WARN + "models in index" health report (the safe
-  asymmetry — never a false-positive block). The hard THROW is added only once a **write-time
-  per-collection model registry** (O(1), never stale, accumulated on each `SaveWithVector`) backs it,
-  so the throw cannot fire on stale/false data. **✅ Resolved (2026-06-01):** the registry
-  (`VectorModelRegistry<TEntity>`, keyed per `(entity, partition)`) and the hard throw shipped exactly
-  as conditioned — `GuardWrite` is called immediately before each `SaveWithVector` (`EmbeddingWorker`,
-  `KoanAutoRegistrar`), and throws only against the durable registry it just read, never on stale data.
+- **D3 — W4 guards at the write boundary, backed by a model registry.** A durable per-collection
+  model registry (`VectorModelRegistry<TEntity>`, keyed per `(entity, partition)`, O(1), never stale)
+  records the producing model on each `SaveWithVector`. `GuardWrite` runs immediately before each
+  write (`EmbeddingWorker`, `KoanAutoRegistrar`) and throws `VectorModelMismatchException` when a write
+  would introduce a second model into a single-model index — fired at the genuine boundary (the write
+  that would corrupt the index), and only against the durable registry it just read, never on stale
+  data. An index that is legitimately multi-model is tolerated with a WARN; `Evaluate`/`Inspect`
+  surface "models in index" as warn-only health, and `EmbeddingMigrator.Reset` clears the registry for
+  a by-design model transition. Guarding at write time is strictly stronger than a read-time check —
+  a guarded single-model index can never mismatch a same-model query — and avoids the layering problem
+  that `Koan.Data.Vector` cannot resolve the query model.
 
-### 10.2 Corrections folded in (advisor-level, from the review)
+### 10.2 Filter semantics & capability contract
 
 1. **The convergence oracle must be built, not assumed.** `InMemoryFilterEvaluator` is type-bound and
    `InMemoryVectorRepository.Search` ignores `options.Filter`. P1a adds a **schemaless
@@ -273,115 +272,74 @@ verified-correct: the unified `Filter` AST was *promoted from* the former vector
 3. **`IgnoreCase` stays a capability dimension.** `VectorFilterCapabilities` keeps `IgnoreCase`; the
    schemaless splitter applies the entity gate `(!f.IgnoreCase || caps.IgnoreCase)` so an unsupported
    case-fold becomes a loud `VectorFilterUnsupportedException`, never a silent case-sensitive query.
-4. **No lossy wildcard/operator coercion.** Reader lowers only leading/trailing `*` →
+4. **No lossy wildcard/operator coercion.** The reader lowers only leading/trailing `*` →
    `StartsWith/EndsWith/Contains`. An **interior/multi-segment** wildcard (`*a*b*`) or raw `Like` with
-   no exact unified target throws `FilterParseException` at read — never a silent narrow/widen. Publish
-   the legacy→unified operator map.
-5. **`ChainExecutor` must not swallow filter errors.** The `catch(Exception)=>results.Clear()`
-   (`ChainExecutor.cs:520`) is narrowed so `VectorFilterUnsupportedException` / `FilterParseException` /
-   `InvalidFilterFieldException` / `NotSupportedException` **propagate** (surface as a chain error),
-   instead of becoming silent empty retrieval. A spec asserts an unsupported Chain filter throws.
-6. **Coercion contract decided now:** the schemaless reader **normalizes obvious numeric/bool literals**
-   so all 6 providers see the same CLR-typed scalar; cross-provider coercion cases are REQUIRED rows in
-   the conformance matrix (not discovered-on-failure).
+   no exact unified target throws `FilterParseException` at read — never a silent narrow/widen.
+5. **Filter errors propagate, never become empty results.** `ChainExecutor` does not swallow filter
+   failures: `VectorFilterUnsupportedException` / `FilterParseException` / `InvalidFilterFieldException`
+   / `NotSupportedException` surface as a chain error rather than a silently-cleared result set.
+6. **Coercion contract.** The schemaless reader normalizes obvious numeric/bool literals so all six
+   providers see the same CLR-typed scalar; cross-provider coercion cases are required rows in the
+   conformance matrix, not discovered-on-failure.
 
-Plus mechanical corrections: the keystone slot-flip (`VectorQueryOptions.cs:10` `object?`→`Filter?`)
-is **one atomic commit** with `Vector.cs` + `VectorData.cs` + `VectorWorkflowRegistry.cs` (all pass
-into that slot); the `Vector<T>.Search(...,object? filter,...)` **reflection target signature is frozen
-byte-for-byte** until `ChainExecutor`/`EntityToolGenerator` migrate off positional reflection (then
-removed); the `object?` facade short-circuits `if (input is Filter f) return f;` (legacy `ParseOrThrow`
-passthrough); `FilterSplitter` gains a concrete `Split(Filter, VectorFilterCapabilities)` overload
-(no `Type`, never calls `FieldPathResolver`, pinned by a spec); the **unknown-metadata-key** contract
-is documented (schemaless ⇒ no static field list; missing key ⇒ oracle-consistent: false for `Eq`,
-true for `Nin/HasNone` per locked null semantics); Weaviate's real silent-widen sources are the
-TryParse-at-entry and composite drop-empties arms (not the unreachable default arm); a shared
-`Koan.Data.Vector.TestKit` hosts the InMemory adapter + oracle so the 6 connector test projects and the
-conformance project reference one definition; agent `{type}_query` gains the same JSON-DSL filter slot
-for surface symmetry; the 3 connector READMEs drop the deleted `VectorFilterExpression` examples.
+The unknown-metadata-key contract is part of this: the metadata path is schemaless (no static field
+list), so a missing key is oracle-consistent — `false` for `Eq`, `true` for `Nin`/`HasNone` per the
+null semantics above. A shared `Koan.Data.Vector.TestKit` hosts the InMemory adapter + oracle so the
+six connector test projects and the conformance project reference one definition.
 
-### 10.3 Staged ledger (build green at every step; compiler is the migration checklist)
+### 10.3 Components
 
-> **Status (2026-06-01):** **P1a/P1b/P1c ✅ shipped** (`25e1e2e1`, `6ee9171b`, `5f2fe980`,
-> `7d33245e`, `947dc051`, `8f20c655`) — the vector storage organ shares the single unified `Filter`
-> AST with the entity path (DATA-0056 collapse done). **P1-AI ✅ shipped** (`fb549bae`) — filter DX on
-> Chain (lambda)/RAG/agent via the typed `VectorRetrieveOptions` seam, `ChainExecutor` catch narrowed,
-> write-path facet auto-stamp (D1). **P2 ✅ shipped** (`37ff99c9`) — `VectorModelGuard` warn-only
-> mixed-space/mismatch detection (D3). **W4 hard throw ✅ shipped** — the guard moved from warn-only
-> to a sound **write-time** hard throw backed by the durable, O(1), never-stale `VectorModelRegistry`
-> (per-`(entity, partition)`): `GuardWrite` records the producing model and throws
-> `VectorModelMismatchException` when a write would introduce a second model into a single-model index;
-> `EmbeddingMigrator` calls `Reset` so a by-design re-index transitions cleanly. **Refinement vs the
-> original §7.2 read-time framing:** the guard fires at the WRITE boundary (in `Koan.Data.AI`, where
-> the model and registry are both known) rather than at read time — this is strictly stronger and
-> subsumes the read-time query-mismatch (a guarded single-model index can never mismatch a same-model
-> query), and it sidesteps the layering problem that `Koan.Data.Vector`'s `Vector<T>.Search` cannot
-> resolve the query model. `Evaluate`/`Inspect` remain for warn-only health (already-multi-model
-> indexes are tolerated with a WARN). Covered by pure `DecideWrite` unit specs **plus a live
-> `KoanIntegrationHost` lifecycle spec** (establish → no-op → throw → `Reset` → accept) through real
-> `AddKoan()` + InMemory (ARCH-0079). **InMemory reference completed** (`3759fa81`). **Container
-> harness reference live-verified** (`2bdc7864`) — the PGVector convergence spec asserts adapter
-> id-set == `DictionaryFilterEvaluator` oracle across 14 operators against a real pgvector container,
-> and caught + fixed 3 real adapter bugs (Dapper vector binding; Npgsql type reload after CREATE
-> EXTENSION; COALESCE total-boolean for null-correct negation). **ALL 6 providers now live-verified
-> GREEN** against the `DictionaryFilterEvaluator` oracle via the shared `VectorFilterConvergenceSpecsBase`:
-> PGVector, Qdrant, ElasticSearch, OpenSearch, Milvus, Weaviate. The harness caught ~9 real,
-> never-tested adapter bugs (Dapper vector binding; Npgsql type reload; COALESCE null-negation;
-> metadata-key paths on Qdrant/Milvus; ES F6 `knn.filter`; ES/OS `metadata.<key>.keyword` mapping;
-> Weaviate metadata persistence + camelCase property names + explicit `tokenization=field` /
-> `indexNullState=true` schema for null-inclusive negation). Samples build green. **Shared search-engine
-> base ✅ shipped** — the byte-identical ES/OS filter translators were folded into one capability-pinned
-> source of truth, the new `Koan.Data.SearchEngine` assembly (named for the engine *category* — like
-> `Koan.Data.Relational` — rather than their shared Apache Lucene foundation, so the dependency reads
-> clearly for non-specialists; mirrors the Relational precedent: a shared lib referenced by the
-> connector family). `public static SearchEngineFilterTranslator` owns the single
-> `VectorFilterCapabilities` constant + the Filter→search-engine-query-DSL translation; an `engine`
-> label parameterizes only the not-supported exception messages so a failure still names the actual
-> adapter ("Elasticsearch"/"OpenSearch"). Both connectors call it; the two duplicate files are deleted.
-> **Re-verified live-green** post-refactor: ES 22/0 and OS 22/0 against real containers (identical
-> id-sets to the `DictionaryFilterEvaluator` oracle) — the extract is behavior-preserving. **All
-> AI-0036 follow-ups are now closed.**
+The pieces below make up the as-built architecture. They carry their original P-labels because code
+comments reference them as anchors; the labels are descriptive groupings, not a delivery sequence.
 
-- **P1a — additive foundation (no breaking change, no decision blocks it).** `VectorFilterCapabilities`
-  (unified `FilterOperator` + `IgnoreCase` + `NestedPaths`; `None`/`Full`); schemaless `VectorFilterReader`
-  (JSON→unified `Filter`, `Filter` passthrough, lower wild/between, normalize scalars, fail-loud);
-  `IVectorFilterTranslator<TNative>` (`Translate(Filter)`, `metadataField` via ctor); `VectorFilterCoordinator`
-  (split + residual-is-error); `VectorFilterUnsupportedException`; `FilterSplitter` schemaless overload;
-  `DictionaryFilterEvaluator` + wire `InMemoryVectorRepository.Search`; shared `Koan.Data.Vector.TestKit`;
-  the container-free **conformance matrix** (operator × node × provider-capability vs oracle id-set) +
-  reader/coordinator specs. **Gate: lands before any fan-out.**
-- **P1b — keystone flip + adapter migration.** Atomic unit: `VectorQueryOptions.Filter` `object?`→`Filter?`
-  + `Vector.cs`/`VectorData.cs`/`VectorWorkflowRegistry.cs` (facade routes string/dict through the reader
-  once; `VectorData.Search` invokes the coordinator). Then one file at a time: PGVector (reference) →
-  Qdrant → Milvus → Weaviate (reduced caps, no `In`; close composite drops) → shared search-engine base
-  for ES+OS (one capability constant; ES F6 `knn.filter` fix) → the 2 samples (S5.Recs/S7.Meridian). Each
-  adapter declares `VectorFilterCapabilities`, drops `TryParse`-at-entry, renders `FilterValue.Set/Scalar`,
-  and self-reports its operator set in `Describe()`.
-- **P1c — delete legacy.** Remove `Vector/Filtering/VectorFilter*` + `VectorFilterOperator` +
-  `VectorFilterJson` once the last consumer compiles against `Filter?`; rewrite the 17 legacy specs.
-- **P1-AI — filter DX slots (independent per entry point, each its own green commit).** Write-path
-  **auto-stamp** of CLR-named filterable metadata (makes the lambda sound); `VectorRetrieveOptions`
-  (`Koan.Data.Vector`); `Chain.Retrieve<T>` gains `Expression<Func<T,bool>>? filter` (+ `Filter?` on
-  `ChainStep`) and `ChainExecutor` builds/forwards `VectorRetrieveOptions` (kills the positional array)
-  and stops swallowing filter errors; `RagQueryOptions.Filter` + pipeline forwarding + `Ask/Search`
-  convenience overloads; agent `{type}_search` + `{type}_query` gain a JSON-DSL `filter` (parsed via the
-  schemaless reader for `_search`) + `alpha`; a **PHIL-1 back-compat spec lands first** (no-filter ==
-  today at all three entry points).
-- **P2 — W4 guard (WARN-only, shipped first).** `VectorModelGuard` reads the model-set, **warns** +
-  health-reports on mismatch (silent same-model pass); "models present" in the vector boot/health report.
-- **P2-followup — W4 hard throw (✅ shipped, supersedes the WARN-only severity at write time).** The
-  durable `VectorModelRegistry<TEntity>` (per `(entity, partition)`) is maintained at write time by
-  `GuardWrite`, which throws `VectorModelMismatchException` on a second model into a single-model index
-  and tolerates already-multi-model indexes with a WARN; `EmbeddingMigrator.Reset` handles by-design
-  transitions. This is the write-time realization of §7.2 decision 3 ("throw when knowable") — strictly
-  stronger than the originally-sketched read-time check and free of its `Koan.Data.Vector` layering
-  problem. `Evaluate`/`Inspect` stay for warn-only diagnostics.
+- **P1a — filter foundation.** `VectorFilterCapabilities` (unified `FilterOperator` + `IgnoreCase` +
+  `NestedPaths`; `None`/`Full`); the schemaless `VectorFilterReader` (JSON → unified `Filter`, `Filter`
+  passthrough, lowers leading/trailing wildcards, normalizes scalars, fails loud);
+  `IVectorFilterTranslator<TNative>` (`Translate(Filter)`, `metadataField` via ctor);
+  `VectorFilterCoordinator` (split + residual-is-error); `VectorFilterUnsupportedException`;
+  `FilterSplitter`'s schemaless overload; `DictionaryFilterEvaluator` wired into
+  `InMemoryVectorRepository.Search`; the shared `Koan.Data.Vector.TestKit`; and the container-free
+  conformance matrix (operator × node × provider-capability vs the oracle id-set).
+- **P1b — typed filter on the store + per-adapter translation.** `VectorQueryOptions.Filter` is
+  `Filter?`; the `Vector`/`VectorData` facade routes string/dict through the reader once and
+  `VectorData.Search` invokes the coordinator. Each adapter declares its `VectorFilterCapabilities`,
+  renders `FilterValue.Set`/`Scalar`, and self-reports its operator set in `Describe()`: PGVector (the
+  reference, full operator set over JSONB), Qdrant, Milvus, Weaviate (intentionally reduced — no `In`),
+  and Elasticsearch + OpenSearch (which share `SearchEngineFilterTranslator`; see §10.4).
+- **P1-AI — filter DX slots.** The embedding write path auto-stamps CLR-named filterable metadata
+  (which makes the lambda sound by construction); `VectorRetrieveOptions` lives in `Koan.Data.Vector`;
+  `Chain.Retrieve<T>` takes `Expression<Func<T,bool>>? filter` (+ `Filter?` on `ChainStep`) and
+  `ChainExecutor` builds and forwards `VectorRetrieveOptions` (no positional array) without swallowing
+  filter errors; `RagQueryOptions.Filter` + pipeline forwarding + `Ask`/`Search` convenience overloads;
+  the agent `{type}_search`/`{type}_query` tools expose a JSON-DSL `filter` (parsed via the schemaless
+  reader) + `alpha`. No-filter calls behave exactly as before at all three entry points.
+- **P2 — W4 mixed-space guard.** `VectorModelGuard.GuardWrite`, backed by the durable
+  `VectorModelRegistry<TEntity>` (per `(entity, partition)`), runs before each `SaveWithVector` and
+  throws `VectorModelMismatchException` when a write would introduce a second model into a single-model
+  index; an already-multi-model index is tolerated with a WARN, and `EmbeddingMigrator.Reset` clears
+  the registry for a by-design transition. `Evaluate`/`Inspect` surface "models in index" as warn-only
+  health. (Design rationale in §10.1 D3.)
 
-### 10.4 Test surfaces
+### 10.4 The Elasticsearch / OpenSearch shared base
 
-Container-free (must pass before fan-out): conformance matrix vs the `DictionaryFilterEvaluator`
-oracle (incl. MISSING-key null-semantics rows, coercion rows, `Not(Eq)`/`Not(Ne)`/nested-`Not` rows,
-unsupported-operator → `VectorFilterUnsupportedException`, `ClrFilter` → hard error); reader convergence
-with `JsonFilterParser` on shared JSON; coordinator residual-is-error; PHIL-1 AI back-compat; W4
-warn/health. **Seeded + quarantined** (ARCH-0079, one per provider, real `AddKoan()` via
-`KoanIntegrationHost`): each operator NOT in the declared set throws; each operator IN the set returns
-the SAME id-set as the oracle over a seeded corpus; ES F6 `knn.filter` parity vs OS; W4 live mismatch.
+Elasticsearch and OpenSearch are built on the same Apache Lucene query DSL, so a single
+`SearchEngineFilterTranslator` in the `Koan.Data.SearchEngine` assembly is their one source of truth
+for `Filter` → query-DSL translation, and it owns the one `VectorFilterCapabilities` constant both
+adapters expose. The assembly is named for the engine *category* (the same convention as
+`Koan.Data.Relational`), so the dependency reads clearly without Lucene knowledge; it mirrors the
+Relational precedent of a shared library referenced by a connector family. An `engine` label
+parameterizes only the not-supported exception messages, so a failure still names the actual adapter
+("Elasticsearch"/"OpenSearch"). String exact-match and wildcard target the `.keyword` sub-field;
+numeric range and exists target the bare field; Lucene's null-inclusive `bool/must_not` gives
+`Ne`/`Nin`/`HasNone` their oracle-matching semantics.
+
+### 10.5 Verification
+
+The container-free conformance matrix checks every adapter's pushdown against the
+`DictionaryFilterEvaluator` oracle: MISSING-key null-semantics rows, coercion rows,
+`Not(Eq)`/`Not(Ne)`/nested-`Not` rows, unsupported-operator → `VectorFilterUnsupportedException`, and
+`ClrFilter` → hard error; plus reader convergence with `JsonFilterParser`, coordinator
+residual-is-error, AI back-compat, and W4 warn/health. Per ARCH-0079, each of the six adapters also
+ships an integration spec through real `AddKoan()` discovery (`KoanIntegrationHost`): an operator
+outside the declared set throws, an operator in the set returns the same id-set as the oracle over a
+seeded corpus against a live container, and a second-model write trips the W4 guard.

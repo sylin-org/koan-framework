@@ -2,9 +2,9 @@
 id: DATA-0097
 slug: DATA-0097-vector-pathway-parity
 domain: DATA
-status: Proposed
+status: Accepted
 date: 2026-05-31
-supersedes-pending: [DATA-0056]
+supersedes: [DATA-0056]
 relates-to: [DATA-0096, DATA-0054, ADR-0051, ADR-0052, ADR-0053, DATA-0078, DATA-0084, DATA-0087]
 ---
 
@@ -36,7 +36,7 @@ scan**. For metadata- or tenant-scoped vector search this is a data-leak-shaped 
 hazard, not a cosmetic gap. This DDR brings it up to par with the entity pillar's
 contract: **one Filter AST**, **operator-aware capability negotiation**, **fail-loud errors**, a
 **typed filter slot**, and a **convergence/conformance test net** — applying the same
-break-and-rebuild freedom (DATA-0096 already marks DATA-0056 supersession-pending).
+break-and-rebuild freedom (this DDR, with DATA-0096, supersedes DATA-0056).
 
 Greenfield: back-compat is not a constraint beyond the developer-facing DX (`Vector<T>.Search`,
 the `[VectorEmbedding]`/`[Embedding]` attributes, the JSON filter shape).
@@ -82,7 +82,7 @@ path was built before the capability-negotiated, fail-loud, typed-filter contrac
 
 - **Vector translators have ZERO tests** — the named prerequisite for any safe rewrite.
 - PGVector sits outside the DATA-0056/0096 "5 translators" framing — an ungoverned 6th path.
-- DATA-0056 is supersession-pending (DATA-0096 §9.1).
+- DATA-0056 is superseded by DATA-0096 (unified Filter AST) + this DDR (the vector collapse).
 
 ---
 
@@ -102,7 +102,7 @@ shape.
                                         │   split: pushable ─┬─ residual
                                         ▼                    │
                           IVectorFilterTranslator<TNative>   │  (no in-memory floor for vectors —
-                          (Qdrant/Milvus/Lucene/N1QL-less)    │   a residual is a HARD ERROR, see §4)
+                          (Qdrant/Milvus/SearchEngine/…)      │   a residual is a HARD ERROR, see §4)
                                         ▼
                           provider kNN query (+ metadata filter + hybrid)
 ```
@@ -135,8 +135,11 @@ shape.
    native filter. The coordinator splits and, finding a non-empty residual, **fails** rather than
    silently dropping it.
 
-6. **Lucene-family dedup.** Extract a shared base for ElasticSearch/OpenSearch (translator + repo);
-   each derived adapter overrides only the ~3 differing lines.
+6. **Search-engine dedup.** Elasticsearch and OpenSearch share one `Filter`→query-DSL translator,
+   `SearchEngineFilterTranslator` in the `Koan.Data.SearchEngine` assembly (the two engines speak the
+   same Apache Lucene query DSL). The translation and the `VectorFilterCapabilities` constant are
+   shared; the repositories stay separate (their REST/transport wiring differs), and an `engine` label
+   keeps not-supported messages naming the actual adapter.
 
 7. **Result envelope + optional-op honesty.** `VectorQueryResult` gains the per-axis "handled"
    signal (filter pushed? hybrid applied? continuation native?); optional ops (`GetEmbedding`,
@@ -213,7 +216,8 @@ must be honest — an unsupported operator cannot degrade, it must 400.
 - `VectorFilterReader` (JSON metadata → `Filter`, no CLR binding).
 - `VectorFilterCapabilities` (operator-aware, per provider).
 - `IVectorFilterTranslator<TNative>` + a `VectorFilterCoordinator` (split + residual-is-error).
-- `LuceneVectorRepositoryBase` + `LuceneVectorFilterTranslator` (ES/OS shared base).
+- `SearchEngineFilterTranslator` in `Koan.Data.SearchEngine` (the ES/OS shared `Filter`→query-DSL
+  translation + capability constant; the repositories stay separate).
 - A vector translator **conformance suite** (no container): every translator renders each
   `(Filter node × operator)` to the expected native shape OR throws `NotSupported` — no silent Eq.
 - A vector **convergence suite**: a canonical metadata-filter corpus asserts each provider's
@@ -233,10 +237,11 @@ must be honest — an unsupported operator cannot degrade, it must 400.
 
 **Remove**
 - `VectorFilter*` node types + `VectorFilterOperator` + `VectorFilterJson` (after collapse).
-- The duplicated OpenSearch translator/repo (folded into the Lucene base).
+- The duplicated OpenSearch translator (folded into the shared `SearchEngineFilterTranslator`; the
+  OpenSearch repository stays separate).
 
 **Supersede (docs/canon)**
-- DATA-0056 → fully Superseded by this DDR once the collapse lands (currently pending).
+- DATA-0056 → Superseded by this DDR (with DATA-0096); the vector collapse landed.
 - Reconcile ADR-0051 (hybrid) and ADR-0053 (continuation) with the new capability facets.
 
 ---
@@ -257,43 +262,33 @@ must be honest — an unsupported operator cannot degrade, it must 400.
 
 ---
 
-## 6. Phased plan (sequenced by risk + dependency)
+## 6. Implementation phases
 
-**Phase 0 — Stop the bleeding (S, low risk).** ✅ **SHIPPED** (commits `24797bde`, `86c63ce1`).
-Independent of the rebuild.
-- F5: PGVector was rebuilt from scratch as the *reference* adapter (it had rotted across 5 API
-  migrations: boot reporting, naming, connection factory, the `Pgvector.Vector` namespace clash, and
-  the reshaped result contracts — 31 errors, never compiled). Now compiles, is fail-loud, has a real
-  `PGVectorFilterTranslator` (also fixing **F4**), 9 container-free conformance specs; the drifted
-  container-backed specs are quarantined as the seed for live-Postgres verification.
-- F1/F3: `VectorFilterJson.ParseOrThrow` distinguishes null-input (no filter) from supplied-but-invalid
-  (throws `FilterParseException`); `In`/`Between` read their array RHS; unknown operators/malformed JSON
-  throw instead of silently mapping to `Eq` / vanishing.
-- F2: the silent `_ => Eq` default arm in all five live translators (Qdrant/Milvus/Weaviate/ES/OS) now
-  throws `NotSupportedException` naming the operator + field.
-- Net: the data-leak-shaped fail-silent class is closed, behind 39 green unit specs, before any
-  redesign. Note F4 landed early (with the PGVector rebuild) rather than waiting for Phase 2.
+**Phase 0 — Fail-loud baseline.** The fail-silent class this DDR targets is closed at the source:
+- PGVector is the *reference* adapter — it compiles, is fail-loud, and has a real
+  `PGVectorFilterTranslator` (F4/F5) with container-free conformance specs.
+- The reader distinguishes null-input (no filter) from supplied-but-invalid (throws
+  `FilterParseException`); `In`/`Between` read their array RHS; unknown operators / malformed JSON
+  throw instead of silently mapping to `Eq` or vanishing (F1/F3).
+- No translator carries a silent `_ => Eq` default arm: an unsupported operator throws
+  `NotSupportedException` naming the operator + field (F2).
 
-> **Executable plan-of-record (2026-06-01):** P1 here is the storage half of a single hardened
-> keystone now specified, decision-complete and adversarially reviewed, in
-> [AI-0036 §10](AI-0036-embedding-vector-seam.md) (run `wyzuoe56p`). It folds the vector-filter
-> collapse + capabilities + coordinator (this DDR's P1) together with the AI filter DX + W4 guard
-> (AI-0036 P1/P2), staged P1a→P2 to stay green file-by-file. Execute from there.
+> The storage half of this pathway (the filter collapse + capabilities + coordinator — this DDR's P1)
+> and the AI filter DX + W4 guard (AI-0036 P1/P2) share one filter model and one coordinator; their
+> joint implementation architecture is in [AI-0036 §10](AI-0036-embedding-vector-seam.md).
 
-**Phase 1 — Keystone (M, freeze the contract).** `VectorFilterReader`,
-`VectorFilterCapabilities`, `IVectorFilterTranslator`, `VectorFilterCoordinator`, retype
-`VectorQueryOptions.Filter`. Ship the conformance matrix + reader specs. No adapter behavior
-change yet beyond compiling against the new contract.
+**Phase 1 — Keystone (the frozen contract).** `VectorFilterReader`, `VectorFilterCapabilities`,
+`IVectorFilterTranslator`, `VectorFilterCoordinator`, and the typed `VectorQueryOptions.Filter`,
+proven by the container-free conformance matrix + reader specs.
 
-**Phase 2 — Adapter fan-out (M, parallel/worktree-isolated).** One worker per adapter: implement
-the translator + declare capabilities + delete legacy. PGVector gets a real translator; ES/OS
-collapse into the Lucene base; ES F6 fixed. Conformance + honesty specs gate each.
+**Phase 2 — Adapter implementations.** Each adapter implements the translator and declares its
+`VectorFilterCapabilities`. PGVector has the richest translator (full SQL over JSONB); Elasticsearch
+and OpenSearch share the `SearchEngineFilterTranslator` (including ES's kNN-filter fix, F6); Qdrant,
+Milvus, and Weaviate (intentionally reduced) round out the set. Conformance + honesty specs cover each.
 
-**Phase 3 — Integration (M).** Cross-provider convergence suite (container-gated), result-envelope
-+ optional-op capability flags, AI write-path model threading (F8), hybrid/continuation
-reconciliation, ADR-0056 full supersession + ADR-0051/0053 updates.
-
-**Parallelism gate:** same as DATA-0096 — Phase 1 is sequential and frozen before Phase 2 fans out.
+**Phase 3 — Integration.** The cross-provider convergence suite (container-backed), the result-envelope
++ optional-op capability flags, AI write-path provenance (F8, AI-0036), and hybrid/continuation
+reconciliation. This DDR supersedes DATA-0056 and reconciles ADR-0051/0053 with the capability facets.
 
 ---
 

@@ -4,8 +4,7 @@ slug: DATA-0096-unified-filter-pipeline
 domain: DATA
 status: Accepted
 date: 2026-05-31
-supersedes: [DATA-0029, DATA-0031, DATA-0092]
-supersedes-pending: [DATA-0056]
+supersedes: [DATA-0029, DATA-0031, DATA-0092, DATA-0056]
 ---
 
 # DATA-0096: Unified Filter Pipeline (break-and-rebuild)
@@ -240,11 +239,12 @@ it prevents silent divergence). Enforced identically in every `IFilterTranslator
 - **Superseded now:** DATA-0029 (DSL), DATA-0031 (ignoreCase → AST per-node flag),
   DATA-0092 (sort → `QueryDefinition` axis). Headers updated to `status: Superseded`,
   `superseded-by: DATA-0096`.
-- **Supersession pending:** DATA-0056 (vector filter AST). The unified `Filter` AST was harvested
-  from it, but the vector path is schemaless (no CLR-type binding) and its provider translators are
-  untested with no live store — the node-model collapse is deferred to a scoped follow-up (see §9).
-  DATA-0056 remains authoritative for the vector path until then; its defensive-publication doc is
-  left unchanged to avoid claiming a collapse that has not landed.
+- **Also superseded:** DATA-0056 (vector filter AST). The unified `Filter` AST was harvested from it,
+  and the vector path has collapsed onto it (DATA-0097): every provider translator is repointed to the
+  unified `Filter` nodes, `VectorFilter*` is retired, and each adapter is verified against the
+  conformance suite and live containers. The vector front-end stays schemaless (arbitrary metadata
+  keys, no CLR-type binding) — the one honest divergence from the entity parser — but consumes the
+  same node model.
 
 ---
 
@@ -347,17 +347,10 @@ infrastructure. ADRs DATA-0029/0031/0092 marked Superseded.
 
 ## 9. Deferred follow-ups
 
-1. **Vector filter node-model collapse (supersedes DATA-0056).** Repoint the 5 provider translators
-   (Qdrant/Milvus/Weaviate/Elastic/OpenSearch) from `VectorFilter` nodes onto the unified `Filter`
-   AST and retire `VectorFilter*` + `VectorFilterOperator`. NOT done because vector metadata
-   filtering is schemaless (no CLR-type binding/coercion, distinct from entity filtering) and the
-   translators are untested with no live store. Prerequisite: a no-container translator conformance
-   suite (assert each translator's native output for a `Filter`-node matrix), then collapse + delete.
-   The unused `VectorFilterExpression` LINQ lifter has already been deleted (dead code).
-2. **Per-adapter live integration specs (ARCH-0079).** Container-backed specs that replay the
+1. **Per-adapter live integration specs (ARCH-0079).** Container-backed specs that replay the
    convergence corpus against real Sqlite/Postgres/SqlServer/Mongo/Couchbase/Redis, gated by adapter
    availability — promoting the in-memory convergence proof to live stores.
-3. **Projection pushdown.** The `QueryDefinition.Projection` axis + in-memory floor exist; native
+2. **Projection pushdown.** The `QueryDefinition.Projection` axis + in-memory floor exist; native
    `SELECT`-column pushdown per adapter is staged for incremental fill (mirrors how sort was staged).
-4. **Capability self-reporting.** Surface `FilterCapabilities` through `/.well-known/Koan/aggregates`,
+3. **Capability self-reporting.** Surface `FilterCapabilities` through `/.well-known/Koan/aggregates`,
    the boot report, a `Koan-InMemory-Filter` response header, and the MCP filter schema.
