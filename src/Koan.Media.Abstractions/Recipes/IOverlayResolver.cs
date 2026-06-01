@@ -9,8 +9,8 @@ namespace Koan.Media.Abstractions.Recipes;
 /// own <see cref="IOverlayResolver"/>.
 ///
 /// <para>Per MEDIA-0004 §7, recipe-on-overlay nesting is depth-capped
-/// at 2 — the compositor passes the nesting depth via
-/// <paramref name="depth"/>, and resolvers should reject calls beyond
+/// at 2 — the compositor passes the nesting depth via the resolver's
+/// <c>depth</c> argument, and resolvers should reject calls beyond
 /// the cap (or simply not recurse).</para>
 /// </summary>
 public interface IOverlayResolver

@@ -20,6 +20,7 @@ public static class StreamExtensions
     /// <param name="logger">Optional logger for destructive-verb diagnostics.</param>
     /// <param name="overlayResolver">Required when the pipeline includes an overlay step backed by media sources.</param>
     /// <param name="fonts">Required when the pipeline includes text overlay layers.</param>
+    /// <param name="limits">Optional pre-decode safety caps (megapixels, frame count); defaults to <see cref="MediaPipelineLimits.Unlimited"/>.</param>
     public static IMediaPipeline AsMedia(
         this Stream source,
         ILogger? logger = null,

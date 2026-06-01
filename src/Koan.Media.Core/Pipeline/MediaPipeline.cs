@@ -20,7 +20,7 @@ namespace Koan.Media.Core.Pipeline;
 /// <list type="bullet">
 ///   <item>Single decode, multi-output via <see cref="MaterializeAsync"/></item>
 ///   <item>Format-preserving by default; <see cref="FlattenTo"/> opts into destructive change</item>
-///   <item>ImageSharp's <c>Image</c> already applies <see cref="Mutate(IImageProcessingContext)"/> to all frames, so animation survives resize/crop/rotate transparently</item>
+///   <item>ImageSharp's <c>Image</c> already applies <c>Mutate(IImageProcessingContext)</c> to all frames, so animation survives resize/crop/rotate transparently</item>
 /// </list>
 ///
 /// Disposal: source stream is disposed at the first terminal call
@@ -583,7 +583,7 @@ public sealed class MediaPipeline : IMediaPipeline
         {
             info = await Image.IdentifyAsync(source, ct).ConfigureAwait(false);
         }
-        catch (SixLabors.ImageSharp.UnknownImageFormatException ex)
+        catch (SixLabors.ImageSharp.UnknownImageFormatException)
         {
             // Defer to the full LoadAsync below; it will throw MediaDecodeException
             // with a consistent error shape.

@@ -4,6 +4,7 @@ using Koan.Media.Core.Pipeline;
 using Koan.Media.Core.Recipes;
 using Koan.Media.Web.Caching;
 using Koan.Media.Web.Infrastructure;
+using Koan.Media.Web.Negotiation;
 using Koan.Media.Web.Options;
 using Koan.Media.Web.Routing;
 using Microsoft.AspNetCore.Http;
@@ -119,6 +120,7 @@ public sealed class MediaController : ControllerBase
     {
         // 1) Resolve seed
         MediaRecipe? seedRecipe = null;
+        var seedIsFormatShortcut = false;
         if (!string.IsNullOrWhiteSpace(seed))
         {
             if (!_registry.TryResolve(seed, out var resolved))
@@ -126,6 +128,11 @@ public sealed class MediaController : ControllerBase
                 return NotFound(new { error = $"Unknown recipe or format shortcut '{seed}'." });
             }
             seedRecipe = resolved;
+            // Per MEDIA-0009 §f: format-shortcut URLs bypass negotiation
+            // entirely. The registry synthesises a format-shortcut recipe
+            // with Source = AdHoc and a pinned EncodeStep.Format; the
+            // controller honours that pin and suppresses Vary: Accept.
+            seedIsFormatShortcut = resolved.Source == RecipeSource.AdHoc;
         }
 
         // 2) Parse query params into an effective recipe
@@ -173,6 +180,33 @@ public sealed class MediaController : ControllerBase
         try
         {
             var effectiveRecipe = parseResult.Recipe;
+
+            // Per MEDIA-0009 §d/e: when the recipe declares an
+            // AllowedOutputFormats allowlist and the seed wasn't a
+            // format-shortcut URL, negotiate the output format from the
+            // request's Accept header against the encoder registry, then
+            // inject the negotiated slug as a synthetic EncodeAs step.
+            // The fingerprint is computed AFTER injection so the cache
+            // key naturally folds in the negotiated format — two
+            // (source, recipe) pairs with different Accept headers
+            // produce distinct cache entries with no cross-format
+            // poisoning.
+            var negotiationHappened = false;
+            if (!seedIsFormatShortcut
+                && !effectiveRecipe.AllowedOutputFormats.IsDefaultOrEmpty
+                && effectiveRecipe.AllowedOutputFormats.Length > 0)
+            {
+                var acceptHeader = Request.Headers.TryGetValue(HeaderNames.Accept, out var rawAccept)
+                    ? rawAccept.ToString()
+                    : null;
+                var negotiated = FormatNegotiator.Negotiate(
+                    effectiveRecipe.AllowedOutputFormats,
+                    acceptHeader,
+                    sourceFormat: string.Empty);
+                effectiveRecipe = InjectSyntheticEncode(effectiveRecipe, negotiated);
+                negotiationHappened = true;
+            }
+
             var fingerprint = effectiveRecipe.Fingerprint();
             var etag = BuildETag(handle.ContentHashHex, fingerprint);
 
@@ -307,11 +341,13 @@ public sealed class MediaController : ControllerBase
             // 7) Build response
             Response.Headers[HeaderNames.ETag] = etag;
             Response.Headers[HttpHeaderNames.CacheControl] = _options.DefaultCacheControl;
-            // Vary: Accept when the recipe did not pin a format AND the seed was empty
-            // (i.e. format negotiation could legitimately differ).
-            var formatPinned = effectiveRecipe.Steps.OfType<EncodeStep>().Any(e => e.Format is not null)
-                || effectiveRecipe.Steps.OfType<FlattenToStep>().Any();
-            if (!formatPinned)
+            // Per MEDIA-0009 §f: Vary: Accept is precise.
+            //   - Format-shortcut URL → no Vary (URL pinned it).
+            //   - Single-format allowlist → no Vary (only one possible output).
+            //   - Multi-format allowlist → Vary: Accept (negotiation could differ per request).
+            //   - No allowlist, format pinned by recipe → no Vary (today's behavior).
+            //   - No allowlist, no pinned format → Vary: Accept (source-preserve can still differ per kind).
+            if (ShouldEmitVaryAccept(effectiveRecipe, parseResult.Recipe, seedIsFormatShortcut, negotiationHappened))
             {
                 Response.Headers[HttpHeaderNames.Vary] = "Accept";
             }
@@ -393,6 +429,75 @@ public sealed class MediaController : ControllerBase
             }
         }
         return false;
+    }
+
+    /// <summary>
+    /// Per MEDIA-0009 §e: inject the negotiated format as a synthetic
+    /// <see cref="EncodeStep"/> so the fingerprint folds in the format
+    /// slug. The synthetic step replaces any existing
+    /// <see cref="EncodeStep"/> in the recipe (single-slot per
+    /// <see cref="PipelineStage.Encode"/>) and preserves the original
+    /// step's quality when one was already declared.
+    /// </summary>
+    private static MediaRecipe InjectSyntheticEncode(MediaRecipe recipe, string negotiatedFormat)
+    {
+        // Carry the existing encode step's quality forward; otherwise
+        // use the Quality.Web default.
+        var quality = Quality.Web;
+        var existingIndex = -1;
+        for (var i = 0; i < recipe.Steps.Length; i++)
+        {
+            if (recipe.Steps[i] is EncodeStep encode)
+            {
+                quality = encode.Quality;
+                existingIndex = i;
+                break;
+            }
+        }
+
+        var synthetic = new EncodeStep(Format: negotiatedFormat, Quality: quality);
+        var rebuilt = existingIndex >= 0
+            ? recipe.Steps.SetItem(existingIndex, synthetic)
+            : recipe.Steps.Add(synthetic);
+        return recipe with { Steps = rebuilt };
+    }
+
+    /// <summary>
+    /// Per MEDIA-0009 §f: precise <c>Vary: Accept</c> rules.
+    /// </summary>
+    /// <param name="effectiveRecipe">
+    /// The recipe after URL overrides and (optionally) the synthetic
+    /// negotiated-encode injection. Used to inspect the actual pinned
+    /// format on the wire.
+    /// </param>
+    /// <param name="declaredRecipe">
+    /// The recipe before negotiation injection — used to read the
+    /// original <see cref="MediaRecipe.AllowedOutputFormats"/> length
+    /// so a multi-format allowlist still emits <c>Vary</c> even though
+    /// the synthetic step has pinned the format on this request.
+    /// </param>
+    /// <param name="seedIsFormatShortcut">True when the URL was a format-shortcut.</param>
+    /// <param name="negotiationHappened">True when the negotiator ran.</param>
+    private static bool ShouldEmitVaryAccept(
+        MediaRecipe effectiveRecipe,
+        MediaRecipe declaredRecipe,
+        bool seedIsFormatShortcut,
+        bool negotiationHappened)
+    {
+        // Format-shortcut URL: operator pinned it, no Vary.
+        if (seedIsFormatShortcut) return false;
+
+        // Multi-format allowlist: negotiation ran and the response
+        // could legitimately differ on Accept — emit Vary.
+        if (negotiationHappened)
+        {
+            return declaredRecipe.AllowedOutputFormats.Length > 1;
+        }
+
+        // No allowlist path: today's behavior — Vary iff no pinned format.
+        var formatPinned = effectiveRecipe.Steps.OfType<EncodeStep>().Any(e => e.Format is not null)
+            || effectiveRecipe.Steps.OfType<FlattenToStep>().Any();
+        return !formatPinned;
     }
 
     private static IEnumerable<string> EnumerateMutators(MutatorKind kinds)

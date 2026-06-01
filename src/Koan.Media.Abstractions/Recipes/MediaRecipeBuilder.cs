@@ -24,6 +24,7 @@ public sealed class MediaRecipeBuilder
     private int _version = 1;
     private MutatorKind _mutators = MutatorKind.None;
     private bool _eager;
+    private ImmutableArray<string> _allowedFormats = ImmutableArray<string>.Empty;
 
     internal MediaRecipeBuilder() { }
 
@@ -54,6 +55,34 @@ public sealed class MediaRecipeBuilder
     public MediaRecipeBuilder WithEager(bool eager = true)
     {
         _eager = eager;
+        return this;
+    }
+
+    /// <summary>
+    /// Per MEDIA-0009 §b: declare the allowlist of output format slugs
+    /// this recipe is willing to emit. The first entry is the recipe's
+    /// preferred-default fallback when the request's <c>Accept</c>
+    /// header offers no overlap with the encoder registry. Empty input
+    /// (no slugs, or all whitespace) is treated as "preserve source" —
+    /// equivalent to never calling this verb.
+    ///
+    /// <para>Slugs are canonicalised to lowercase and trimmed; null and
+    /// blank entries are dropped silently.</para>
+    /// </summary>
+    public MediaRecipeBuilder AllowFormats(params string[] slugs)
+    {
+        if (slugs is null || slugs.Length == 0)
+        {
+            _allowedFormats = ImmutableArray<string>.Empty;
+            return this;
+        }
+        var builder = ImmutableArray.CreateBuilder<string>(slugs.Length);
+        foreach (var raw in slugs)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) continue;
+            builder.Add(raw.Trim().ToLowerInvariant());
+        }
+        _allowedFormats = builder.ToImmutable();
         return this;
     }
 
@@ -297,6 +326,7 @@ public sealed class MediaRecipeBuilder
             Steps = _steps.ToImmutableArray(),
             AllowedMutators = _mutators,
             Eager = _eager,
+            AllowedOutputFormats = _allowedFormats,
         };
     }
 

@@ -80,6 +80,15 @@ public static class MediaUrlParser
                 .WithVersion(seedRecipe.Version);
             if (seedRecipe.Description is { Length: > 0 } d) builder.WithDescription(d);
             allowed = seedRecipe.AllowedMutators;
+            // Per MEDIA-0009 §b: the format allowlist must survive the URL-override
+            // clone so the controller's negotiator can read it. Otherwise the
+            // seed recipe arrives at the controller with an empty allowlist and
+            // the Accept header is silently ignored.
+            if (!seedRecipe.AllowedOutputFormats.IsDefaultOrEmpty
+                && seedRecipe.AllowedOutputFormats.Length > 0)
+            {
+                builder.AllowFormats(seedRecipe.AllowedOutputFormats.ToArray());
+            }
             foreach (var step in seedRecipe.Steps)
             {
                 CopyStep(builder, step);

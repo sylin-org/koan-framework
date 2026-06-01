@@ -178,11 +178,11 @@ public sealed record MediaOutput(
     private readonly Func<Stream, CancellationToken, Task>? _writeToAsync;
 
     /// <summary>
-    /// Stream the encoded bytes into <paramref name="destination"/>. Per
-    /// MEDIA-0008, this is the canonical way to surface encoded output —
-    /// HTTP responses thread <see cref="System.IO.Stream"/> end-to-end so
-    /// animated and high-resolution encodes don't allocate the full
-    /// output buffer.
+    /// Stream the encoded bytes into the caller-supplied destination
+    /// stream. Per MEDIA-0008, this is the canonical way to surface
+    /// encoded output — HTTP responses thread <see cref="System.IO.Stream"/>
+    /// end-to-end so animated and high-resolution encodes don't allocate
+    /// the full output buffer.
     /// <para>When unset, the writer falls back to copying
     /// <see cref="Bytes"/> into the destination — so legacy callers that
     /// constructed <see cref="MediaOutput"/> without a writer continue

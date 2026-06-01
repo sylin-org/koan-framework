@@ -6,10 +6,10 @@ namespace Koan.Media.Abstractions.Recipes;
 /// field disables that specific check; <see cref="Unlimited"/> disables
 /// every check.
 ///
-/// <para>The pipeline checks these via <see cref="SixLabors.ImageSharp.Image.IdentifyAsync"/>
-/// (header-only read) before <see cref="SixLabors.ImageSharp.Image.LoadAsync"/>
-/// so a malicious 50000×50000 PNG can be rejected without ever
-/// allocating the decoded buffer.</para>
+/// <para>The pipeline checks these via ImageSharp's
+/// <c>Image.IdentifyAsync</c> (header-only read) before
+/// <c>Image.LoadAsync</c> so a malicious 50000×50000 PNG can be
+/// rejected without ever allocating the decoded buffer.</para>
 /// </summary>
 public sealed record MediaPipelineLimits
 {

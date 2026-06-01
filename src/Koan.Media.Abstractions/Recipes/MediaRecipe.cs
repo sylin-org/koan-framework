@@ -34,6 +34,21 @@ public sealed record MediaRecipe
     public MutatorKind AllowedMutators { get; init; } = MutatorKind.None;
 
     /// <summary>
+    /// Per MEDIA-0009 §b: the allowlist of output format slugs this
+    /// recipe is willing to emit, in preferred-default order. When empty
+    /// (the default) the recipe preserves the source format — exactly
+    /// the pre-MEDIA-0009 behavior. When non-empty, the format
+    /// negotiator intersects this list with the encoder registry and the
+    /// request's <c>Accept</c> header to pick the highest-q match; the
+    /// first entry is the recipe's preferred fallback when Accept offers
+    /// no overlap.
+    ///
+    /// <para>Adding AVIF to a recipe is appending <c>"avif"</c> to this
+    /// array; no other surface changes.</para>
+    /// </summary>
+    public ImmutableArray<string> AllowedOutputFormats { get; init; } = ImmutableArray<string>.Empty;
+
+    /// <summary>
     /// When true, this recipe pre-warms at upload time via
     /// <c>POST /api/admin/media/{id}/warm</c>. Default false (lazy).
     /// </summary>
