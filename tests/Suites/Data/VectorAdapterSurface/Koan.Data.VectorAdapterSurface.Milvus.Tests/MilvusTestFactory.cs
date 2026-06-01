@@ -54,10 +54,7 @@ public sealed class MilvusTestFactory : IVectorAdapterTestFactory
     public bool SupportsFlush                => true;  // adapter overrides: drops the collection
     public bool SupportsExportAll            => false;
     public bool SupportsHybridSearch         => false;
-    // AI-0036 §10: live filter-convergence gated off pending end-to-end verification (heavy
-    // etcd+minio+milvus stack not yet run through the convergence oracle). Translator + capabilities
-    // exist (expr-string filters via MilvusFilterTranslator); the metadata storage/query path is unverified.
-    public bool SupportsMetadataFilters      => false;
+    public bool SupportsMetadataFilters      => true;  // metadata["key"] JSON-field access via MilvusFilterTranslator (live-verified)
     public bool SupportsContinuationToken    => false;
     public bool SupportsPartitionIsolation   => true;
     public bool SupportsDynamicCollections   => true;

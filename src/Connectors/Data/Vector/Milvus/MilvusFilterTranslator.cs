@@ -69,14 +69,13 @@ internal static class MilvusFilterTranslator
 
     private static string NormalizePath(IReadOnlyList<string> path, string metadataField)
     {
-        if (path.Count == 1) return path[0];
-        if (path[0] == metadataField)
-        {
-            var sb = new StringBuilder(metadataField);
-            for (var i = 1; i < path.Count; i++) sb.Append("['").Append(path[i]).Append("']");
-            return sb.ToString();
-        }
-        return string.Join('.', path);
+        // Caller metadata is stored in the JSON column <metadataField>; filter keys index into it as
+        // metadata["key"]["k2"] (Milvus JSON access). If the caller already qualified with the metadata
+        // field, keep it; otherwise prefix it.
+        var segments = path.Count > 0 && path[0] == metadataField ? path.Skip(1).ToList() : path.ToList();
+        var sb = new StringBuilder(metadataField);
+        foreach (var seg in segments) sb.Append("[\"").Append(seg).Append("\"]");
+        return sb.ToString();
     }
 
     private static object? Scalar(FieldFilter f) => f.Value switch
