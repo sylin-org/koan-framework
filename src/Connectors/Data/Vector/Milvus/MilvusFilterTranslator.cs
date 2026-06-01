@@ -48,7 +48,9 @@ internal static class MilvusFilterTranslator
             VectorFilterOperator.In => TranslateIn(field, cmp.Value),
             VectorFilterOperator.Like => $"like({field}, {value})",
             VectorFilterOperator.Between => TranslateBetween(field, cmp.Value),
-            _ => $"{field} == {value}"
+            // DATA-0097 F2: fail loud rather than silently emitting an equality expression.
+            _ => throw new NotSupportedException(
+                $"Milvus does not support vector filter operator '{cmp.Operator}' on metadata field '{string.Join(".", cmp.Path)}'.")
         };
     }
 

@@ -94,11 +94,10 @@ internal static class QdrantFilterTranslator
                 ["match"] = new JObject { ["text"] = ToText(cmp.Value).Replace("%", "") }
             },
             VectorFilterOperator.Between => Between(key, cmp.Value),
-            _ => new JObject
-            {
-                ["key"] = key,
-                ["match"] = new JObject { ["value"] = ToToken(cmp.Value) }
-            }
+            // DATA-0097 F2: fail loud on an operator Qdrant cannot render — never silently treat
+            // it as Eq (which would return a wrong/widened result set with no signal).
+            _ => throw new NotSupportedException(
+                $"Qdrant does not support vector filter operator '{cmp.Operator}' on metadata field '{string.Join(".", cmp.Path)}'.")
         };
     }
 

@@ -45,9 +45,10 @@ internal static class WeaviateFilterTranslator
                     VectorFilterOperator.Lte => "LessThanEqual",
                     VectorFilterOperator.Like => "Like",
                     VectorFilterOperator.Contains => "ContainsAny",
-                    _ => null
+                    // DATA-0097 F2: fail loud rather than dropping the clause (which silently widens results).
+                    _ => throw new NotSupportedException(
+                        $"Weaviate does not support vector filter operator '{cmp.Operator}' on metadata field '{string.Join(".", cmp.Path)}'.")
                 };
-                if (op is null) return null;
                 var (field, lit) = ValueFieldAndLiteralFromObject(cmp.Value);
                 return $"{{ path: {path}, operator: {op}, {field}: {lit} }}";
             default:

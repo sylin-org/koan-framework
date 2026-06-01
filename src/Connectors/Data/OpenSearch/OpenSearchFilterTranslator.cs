@@ -85,10 +85,9 @@ internal static class OpenSearchFilterTranslator
                 ["terms"] = new JObject { [field] = ToArray(cmp.Value) }
             },
             VectorFilterOperator.Between => Between(field, cmp.Value),
-            _ => new JObject
-            {
-                ["term"] = new JObject { [field] = ToToken(cmp.Value) }
-            }
+            // DATA-0097 F2: fail loud rather than silently emitting a term (equality) query.
+            _ => throw new NotSupportedException(
+                $"OpenSearch does not support vector filter operator '{cmp.Operator}' on metadata field '{string.Join(".", cmp.Path)}'.")
         };
     }
 
