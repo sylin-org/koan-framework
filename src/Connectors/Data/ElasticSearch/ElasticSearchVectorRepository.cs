@@ -436,7 +436,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
             ["_source"] = new JArray(_options.MetadataField, _options.IdField)
         };
 
-        var filter = ElasticSearchFilterTranslator.TranslateWhereClause(options.Filter);
+        var filter = ElasticSearchFilterTranslator.TranslateWhereClause(options.Filter, _options.MetadataField);
         if (filter is not null)
         {
             // DATA-0097 F6: the filter must PRE-FILTER the kNN (knn.filter), not sit as a top-level

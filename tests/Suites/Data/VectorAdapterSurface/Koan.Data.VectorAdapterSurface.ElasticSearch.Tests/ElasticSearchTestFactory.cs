@@ -30,10 +30,7 @@ public sealed class ElasticSearchTestFactory : IVectorAdapterTestFactory
     public bool SupportsFlush                => true;  // adapter overrides: DELETE /<index>
     public bool SupportsExportAll            => true;  // scroll API
     public bool SupportsHybridSearch         => false;
-    // AI-0036 §10: live filter-convergence gated off pending end-to-end metadata mapping. The F6
-    // knn.filter placement is fixed, but term filters still need the metadata.<key>.keyword field
-    // mapping (ES maps strings as text + a .keyword sub-field) verified live before convergence.
-    public bool SupportsMetadataFilters      => false;
+    public bool SupportsMetadataFilters      => true;  // F6 knn.filter + metadata.<key>.keyword mapping (live-verified)
     // ES Capabilities flag does not advertise NativeContinuation even though scroll exists; the
     // matrix mirrors what the adapter says, not what it could say.
     public bool SupportsContinuationToken    => false;
