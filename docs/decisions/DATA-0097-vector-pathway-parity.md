@@ -274,6 +274,12 @@ Independent of the rebuild.
 - Net: the data-leak-shaped fail-silent class is closed, behind 39 green unit specs, before any
   redesign. Note F4 landed early (with the PGVector rebuild) rather than waiting for Phase 2.
 
+> **Executable plan-of-record (2026-06-01):** P1 here is the storage half of a single hardened
+> keystone now specified, decision-complete and adversarially reviewed, in
+> [AI-0036 §10](AI-0036-embedding-vector-seam.md) (run `wyzuoe56p`). It folds the vector-filter
+> collapse + capabilities + coordinator (this DDR's P1) together with the AI filter DX + W4 guard
+> (AI-0036 P1/P2), staged P1a→P2 to stay green file-by-file. Execute from there.
+
 **Phase 1 — Keystone (M, freeze the contract).** `VectorFilterReader`,
 `VectorFilterCapabilities`, `IVectorFilterTranslator`, `VectorFilterCoordinator`, retype
 `VectorQueryOptions.Filter`. Ship the conformance matrix + reader specs. No adapter behavior

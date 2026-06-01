@@ -220,3 +220,119 @@ DDR is the **contract between lifecycle and persistence** (write provenance) and
 **orchestration and persistence** (read options). It does not expand the storage organ's
 responsibilities; it ensures the layers that own model/source and RAG intent actually deliver them
 across the seam DATA-0097 left seam-ready.
+
+## 10. Hardened P1/P2 plan-of-record (post adversarial review, 2026-06-01)
+
+A 10-agent discovery + 3-lens adversarial workflow (run `wyzuoe56p`) verified the spine against
+source and found six revision-worthy holes. This section is the **executable plan of record** for
+DATA-0097 P1 (typed vector Filter + collapse + capabilities) **and** AI-0036 P1 (filter DX) + P2
+(W4 guard), jointly, because they share one filter model and one coordinator. The spine is
+verified-correct: the unified `Filter` AST was *promoted from* the former vector-only AST
+(`Filter.cs:13`), so the vector path rejoins its origin; one `VectorFilterCoordinator` at
+`VectorData<T>.Search` enforces residual-is-error below every facade overload and above all 6 repos.
+
+### 10.1 Ratified decisions (this session)
+
+- **D1 — filter DX: metadata-key == entity-property is now CANON; lambda is the primary idiom.**
+  `Chain.Retrieve<Doc>(q, filter: d => d.Year > 2020)` compiles via `LinqFilterCompiler` exactly like
+  `Entity<T>.Query(predicate)`. To make it sound *by construction* (S5.Recs proves keys are
+  hand-named today), the **embedding write path auto-stamps filterable entity properties as metadata
+  under their CLR property names** (sane default: scalar/string properties; large embedded-text
+  excluded). A `Filter?` overload remains for advanced/explicit-key callers. A lambda over a property
+  the write path did not stamp **fails loud** naming the missing key (never silent non-match).
+- **D2 — tenancy is a PARTITION, not a filter (no AND-composition).** Verified: `Vector<T>.WithPartition`
+  → `EntityContext.Partition` (DATA-0077), and the vector **read** path resolves storage via
+  `VectorAdapterNaming.GetOrCompute` → `factory.ResolveStorage(type, EntityContext.Current?.Partition, sp)`,
+  so a search runs against the partition-suffixed index. A host scopes the partition (`WithPartition(tenantId)`)
+  ambiently *before* invoking agent/Chain/RAG retrieval; an LLM-authored **filter is intra-partition**
+  and structurally cannot address another tenant's index (partition is storage routing, not a filter
+  node). The agent `{type}_search` filter slot therefore ships in P1 **without** AND-composition
+  machinery. Guidance (docs): multi-tenant deployments isolate by partition; co-mingling tenants in
+  one partition and relying on a filter is a Koan anti-pattern. *(The entity-web `QueryFilterComposer.AndAll`
+  remains the right tool for hook-contributed predicates within a partition, but is not a tenancy boundary.)*
+- **D3 — W4 ships WARN-only first.** Initial P2: WARN + "models in index" health report (the safe
+  asymmetry — never a false-positive block). The hard THROW is added only once a **write-time
+  per-collection model registry** (O(1), never stale, accumulated on each `SaveWithVector`) backs it,
+  so the throw cannot fire on stale/false data.
+
+### 10.2 Corrections folded in (advisor-level, from the review)
+
+1. **The convergence oracle must be built, not assumed.** `InMemoryFilterEvaluator` is type-bound and
+   `InMemoryVectorRepository.Search` ignores `options.Filter`. P1a adds a **schemaless
+   `DictionaryFilterEvaluator`** (reads `FieldPath.Leaf` from `IReadOnlyDictionary<string,object>`,
+   porting the locked null/Nin/HasNone semantics verbatim) and wires `InMemoryVectorRepository.Search`
+   to apply it. This is the reference id-set for the conformance matrix.
+2. **Null semantics are part of the capability contract, not just the operator set.** PGVector `Ne`
+   emits `(IS NULL OR <> @p)`; Qdrant/Milvus bare `must_not`/`!=` exclude missing rows differently →
+   same `Nin` returns different id-sets. Each translator must either emit the **null-inclusive** form
+   for `Ne/Nin/HasNone` or **declare the operator absent** (hard-error). Conformance rows seed a
+   MISSING key and assert every adapter's id-set equals the oracle.
+3. **`IgnoreCase` stays a capability dimension.** `VectorFilterCapabilities` keeps `IgnoreCase`; the
+   schemaless splitter applies the entity gate `(!f.IgnoreCase || caps.IgnoreCase)` so an unsupported
+   case-fold becomes a loud `VectorFilterUnsupportedException`, never a silent case-sensitive query.
+4. **No lossy wildcard/operator coercion.** Reader lowers only leading/trailing `*` →
+   `StartsWith/EndsWith/Contains`. An **interior/multi-segment** wildcard (`*a*b*`) or raw `Like` with
+   no exact unified target throws `FilterParseException` at read — never a silent narrow/widen. Publish
+   the legacy→unified operator map.
+5. **`ChainExecutor` must not swallow filter errors.** The `catch(Exception)=>results.Clear()`
+   (`ChainExecutor.cs:520`) is narrowed so `VectorFilterUnsupportedException` / `FilterParseException` /
+   `InvalidFilterFieldException` / `NotSupportedException` **propagate** (surface as a chain error),
+   instead of becoming silent empty retrieval. A spec asserts an unsupported Chain filter throws.
+6. **Coercion contract decided now:** the schemaless reader **normalizes obvious numeric/bool literals**
+   so all 6 providers see the same CLR-typed scalar; cross-provider coercion cases are REQUIRED rows in
+   the conformance matrix (not discovered-on-failure).
+
+Plus mechanical corrections: the keystone slot-flip (`VectorQueryOptions.cs:10` `object?`→`Filter?`)
+is **one atomic commit** with `Vector.cs` + `VectorData.cs` + `VectorWorkflowRegistry.cs` (all pass
+into that slot); the `Vector<T>.Search(...,object? filter,...)` **reflection target signature is frozen
+byte-for-byte** until `ChainExecutor`/`EntityToolGenerator` migrate off positional reflection (then
+removed); the `object?` facade short-circuits `if (input is Filter f) return f;` (legacy `ParseOrThrow`
+passthrough); `FilterSplitter` gains a concrete `Split(Filter, VectorFilterCapabilities)` overload
+(no `Type`, never calls `FieldPathResolver`, pinned by a spec); the **unknown-metadata-key** contract
+is documented (schemaless ⇒ no static field list; missing key ⇒ oracle-consistent: false for `Eq`,
+true for `Nin/HasNone` per locked null semantics); Weaviate's real silent-widen sources are the
+TryParse-at-entry and composite drop-empties arms (not the unreachable default arm); a shared
+`Koan.Data.Vector.TestKit` hosts the InMemory adapter + oracle so the 6 connector test projects and the
+conformance project reference one definition; agent `{type}_query` gains the same JSON-DSL filter slot
+for surface symmetry; the 3 connector READMEs drop the deleted `VectorFilterExpression` examples.
+
+### 10.3 Staged ledger (build green at every step; compiler is the migration checklist)
+
+- **P1a — additive foundation (no breaking change, no decision blocks it).** `VectorFilterCapabilities`
+  (unified `FilterOperator` + `IgnoreCase` + `NestedPaths`; `None`/`Full`); schemaless `VectorFilterReader`
+  (JSON→unified `Filter`, `Filter` passthrough, lower wild/between, normalize scalars, fail-loud);
+  `IVectorFilterTranslator<TNative>` (`Translate(Filter)`, `metadataField` via ctor); `VectorFilterCoordinator`
+  (split + residual-is-error); `VectorFilterUnsupportedException`; `FilterSplitter` schemaless overload;
+  `DictionaryFilterEvaluator` + wire `InMemoryVectorRepository.Search`; shared `Koan.Data.Vector.TestKit`;
+  the container-free **conformance matrix** (operator × node × provider-capability vs oracle id-set) +
+  reader/coordinator specs. **Gate: lands before any fan-out.**
+- **P1b — keystone flip + adapter migration.** Atomic unit: `VectorQueryOptions.Filter` `object?`→`Filter?`
+  + `Vector.cs`/`VectorData.cs`/`VectorWorkflowRegistry.cs` (facade routes string/dict through the reader
+  once; `VectorData.Search` invokes the coordinator). Then one file at a time: PGVector (reference) →
+  Qdrant → Milvus → Weaviate (reduced caps, no `In`; close composite drops) → shared Lucene base for
+  ES+OS (one capability constant; ES F6 `knn.filter` fix) → the 2 samples (S5.Recs/S7.Meridian). Each
+  adapter declares `VectorFilterCapabilities`, drops `TryParse`-at-entry, renders `FilterValue.Set/Scalar`,
+  and self-reports its operator set in `Describe()`.
+- **P1c — delete legacy.** Remove `Vector/Filtering/VectorFilter*` + `VectorFilterOperator` +
+  `VectorFilterJson` once the last consumer compiles against `Filter?`; rewrite the 17 legacy specs.
+- **P1-AI — filter DX slots (independent per entry point, each its own green commit).** Write-path
+  **auto-stamp** of CLR-named filterable metadata (makes the lambda sound); `VectorRetrieveOptions`
+  (`Koan.Data.Vector`); `Chain.Retrieve<T>` gains `Expression<Func<T,bool>>? filter` (+ `Filter?` on
+  `ChainStep`) and `ChainExecutor` builds/forwards `VectorRetrieveOptions` (kills the positional array)
+  and stops swallowing filter errors; `RagQueryOptions.Filter` + pipeline forwarding + `Ask/Search`
+  convenience overloads; agent `{type}_search` + `{type}_query` gain a JSON-DSL `filter` (parsed via the
+  schemaless reader for `_search`) + `alpha`; a **PHIL-1 back-compat spec lands first** (no-filter ==
+  today at all three entry points).
+- **P2 — W4 guard (WARN-only).** `VectorModelGuard` reads the model-set, **warns** + health-reports on
+  mismatch (silent same-model pass); "models present" in the vector boot/health report. THROW deferred
+  to a follow-up that adds the write-time model registry.
+
+### 10.4 Test surfaces
+
+Container-free (must pass before fan-out): conformance matrix vs the `DictionaryFilterEvaluator`
+oracle (incl. MISSING-key null-semantics rows, coercion rows, `Not(Eq)`/`Not(Ne)`/nested-`Not` rows,
+unsupported-operator → `VectorFilterUnsupportedException`, `ClrFilter` → hard error); reader convergence
+with `JsonFilterParser` on shared JSON; coordinator residual-is-error; PHIL-1 AI back-compat; W4
+warn/health. **Seeded + quarantined** (ARCH-0079, one per provider, real `AddKoan()` via
+`KoanIntegrationHost`): each operator NOT in the declared set throws; each operator IN the set returns
+the SAME id-set as the oracle over a seeded corpus; ES F6 `knn.filter` parity vs OS; W4 live mismatch.
