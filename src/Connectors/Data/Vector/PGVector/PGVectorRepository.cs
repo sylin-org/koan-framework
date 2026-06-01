@@ -11,7 +11,7 @@ using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Npgsql;
 using Koan.Data.Abstractions;
-using Koan.Data.Abstractions.Vector.Filtering;
+using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Vector.Abstractions;
 using Koan.Data.Vector.Abstractions.Configuration;
 using PgVec = Pgvector.Vector;
@@ -57,6 +57,9 @@ internal sealed class PGVectorRepository<TEntity, TKey>
         VectorCapabilities.BulkUpsert |
         VectorCapabilities.BulkDelete |
         VectorCapabilities.DynamicCollections;
+
+    // AI-0036 §10 / DATA-0097 P1: PGVector is the reference adapter — full operator set over JSONB.
+    public Koan.Data.Abstractions.Filtering.VectorFilterCapabilities FilterCapabilities => PGVectorFilterTranslator.Caps;
 
     private string TableName => VectorAdapterNaming.GetOrCompute<TEntity, TKey>(_sp).ToLowerInvariant();
 
@@ -250,16 +253,11 @@ internal sealed class PGVectorRepository<TEntity, TKey>
         var parameters = new DynamicParameters();
         parameters.Add("embedding", new PgVec(options.Query));
 
-        // F4 fix: translate the metadata filter through the real AST translator (fail-loud),
-        // not a silent JSONB-containment of the serialized object.
-        if (options.Filter is not null)
-        {
-            if (!VectorFilterJson.TryParse(options.Filter, out var ast) || ast is null)
-                throw new NotSupportedException("PGVector could not parse the supplied vector metadata filter.");
-            var where = PGVectorFilterTranslator.Translate(ast, parameters);
-            if (!string.IsNullOrEmpty(where))
-                sql.AppendLine($"WHERE {where}");
-        }
+        // AI-0036 §10 / DATA-0097 P1: options.Filter is the typed, coordinator-validated (fully
+        // pushable) unified Filter. Render it straight to SQL — no re-parse, no silent fallback.
+        var where = PGVectorFilterTranslator.Translate(options.Filter, parameters);
+        if (!string.IsNullOrEmpty(where))
+            sql.AppendLine($"WHERE {where}");
 
         sql.AppendLine($"ORDER BY embedding {DistanceOperator} @embedding");
         var limit = options.TopK ?? _options.DefaultTopK;
