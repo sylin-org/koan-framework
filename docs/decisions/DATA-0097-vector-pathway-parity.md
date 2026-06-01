@@ -259,12 +259,20 @@ must be honest — an unsupported operator cannot degrade, it must 400.
 
 ## 6. Phased plan (sequenced by risk + dependency)
 
-**Phase 0 — Stop the bleeding (S, low risk, ship immediately).** Independent of the rebuild.
-- Fix the PGVector compile break (F5) — this is a Reference = Intent regression (a referenced
-  provider that doesn't even register), so it is philosophy-priority, not just a build fix.
-- Make `VectorFilterJson.TryParse` fail-loud: distinguish null input from parse failure; throw on
-  the latter. Replace translator `_ => Eq` arms with `throw NotSupported`. Fix array RHS (F3).
-- Net: the data-leak-shaped fail-silent class is closed *before* any redesign, behind new tests.
+**Phase 0 — Stop the bleeding (S, low risk).** ✅ **SHIPPED** (commits `24797bde`, `86c63ce1`).
+Independent of the rebuild.
+- F5: PGVector was rebuilt from scratch as the *reference* adapter (it had rotted across 5 API
+  migrations: boot reporting, naming, connection factory, the `Pgvector.Vector` namespace clash, and
+  the reshaped result contracts — 31 errors, never compiled). Now compiles, is fail-loud, has a real
+  `PGVectorFilterTranslator` (also fixing **F4**), 9 container-free conformance specs; the drifted
+  container-backed specs are quarantined as the seed for live-Postgres verification.
+- F1/F3: `VectorFilterJson.ParseOrThrow` distinguishes null-input (no filter) from supplied-but-invalid
+  (throws `FilterParseException`); `In`/`Between` read their array RHS; unknown operators/malformed JSON
+  throw instead of silently mapping to `Eq` / vanishing.
+- F2: the silent `_ => Eq` default arm in all five live translators (Qdrant/Milvus/Weaviate/ES/OS) now
+  throws `NotSupportedException` naming the operator + field.
+- Net: the data-leak-shaped fail-silent class is closed, behind 39 green unit specs, before any
+  redesign. Note F4 landed early (with the PGVector rebuild) rather than waiting for Phase 2.
 
 **Phase 1 — Keystone (M, freeze the contract).** `VectorFilterReader`,
 `VectorFilterCapabilities`, `IVectorFilterTranslator`, `VectorFilterCoordinator`, retype
