@@ -183,7 +183,8 @@ public sealed class MediaUrlParserSpec
     {
         var recipe = SimpleResizeRecipe(MutatorKind.Common | MutatorKind.Frame);
         var result = MediaUrlParser.Parse(recipe, Q(("frame", "2")));
-        result.Recipe.Steps.OfType<ExtractFrameStep>().Single().Index.Should().Be(2);
+        var sample = result.Recipe.Steps.OfType<SampleStep>().Single();
+        sample.Selector.Should().BeOfType<FrameSelector.Index>().Which.Frame.Should().Be(2);
     }
 
     [Fact]

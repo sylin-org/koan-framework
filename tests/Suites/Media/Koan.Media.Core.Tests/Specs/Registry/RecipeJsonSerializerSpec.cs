@@ -10,7 +10,7 @@ public sealed class RecipeJsonSerializerSpec
         var recipe = MediaRecipe.New()
             .WithName("poster")
             .WithDescription("test poster")
-            .ExtractFrame(0)
+            .Sample(new FrameSelector.Index(0))
             .Crop("1:1")
             .Resize(800).Name("size").Primary()
             .EncodeAs("webp", 80)
@@ -30,14 +30,14 @@ public sealed class RecipeJsonSerializerSpec
         var recipe = MediaRecipe.New()
             .EncodeAs("webp")          // declared first but encode = last stage
             .Resize(400, 300)          // size stage
-            .ExtractFrame(0)           // frame stage
+            .Sample(new FrameSelector.Index(0))           // frame stage
             .Build();
 
         var steps = RecipeJsonSerializer.Serialize(recipe)["steps"]!.AsArray();
         var ops = steps.Select(s => s!["op"]!.GetValue<string>()).ToList();
         // After canonical sort: autoOrient (implicit) is NOT serialized (we only render explicit steps),
         // then frame -> resize -> encode by stage order
-        ops.Should().Equal("extractFrame", "resize", "encodeAs");
+        ops.Should().Equal("sample", "resize", "encodeAs");
     }
 
     [Fact]

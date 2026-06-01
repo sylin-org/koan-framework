@@ -1,3 +1,4 @@
+using Koan.Media.Abstractions.Recipes;
 using Koan.Media.Core.Tests.Support;
 using SixLabors.ImageSharp;
 
@@ -27,7 +28,7 @@ public sealed class MaterializeBundleSpec
         var bundle = await src.AsMedia().MaterializeAsync(b => b
             .Add("display", v => v)
             .Add("thumb-400", v => v.ResizeFit(400, 400).EncodeAs("webp", 70))
-            .Add("poster", v => v.ExtractFrame(0).EncodeAs("png", Quality.Lossless)));
+            .Add("poster", v => v.Sample(new FrameSelector.Index(0)).EncodeAs("png", Quality.Lossless)));
 
         bundle.Variants.Should().ContainKey("display");
         bundle.Variants.Should().ContainKey("thumb-400");
@@ -64,7 +65,7 @@ public sealed class MaterializeBundleSpec
         await using var src = Fixtures.AnimatedWebp(frames: 3, width: 200, height: 200);
         var bundle = await src.AsMedia().MaterializeAsync(b => b
             .Add("display", v => v.ResizeFit(100, 100))
-            .Add("poster", v => v.ExtractFrame(0).EncodeAs("png")));
+            .Add("poster", v => v.Sample(new FrameSelector.Index(0)).EncodeAs("png")));
 
         bundle.Variants["display"].FrameCount.Should().Be(3, "display branch keeps animation");
         bundle.Variants["poster"].FrameCount.Should().Be(1, "poster branch collapsed via ExtractFrame");

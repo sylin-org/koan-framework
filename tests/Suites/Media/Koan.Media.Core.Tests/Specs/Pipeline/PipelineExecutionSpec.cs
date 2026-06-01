@@ -1,3 +1,4 @@
+using Koan.Media.Abstractions.Recipes;
 using Koan.Media.Core.Tests.Support;
 using SixLabors.ImageSharp;
 
@@ -104,7 +105,7 @@ public sealed class PipelineExecutionSpec
     public async Task ExtractFrame_on_animated_collapses_to_single_frame()
     {
         await using var src = Fixtures.AnimatedWebp(frames: 4);
-        var output = await src.AsMedia().ExtractFrame(0).ToBytesAsync();
+        var output = await src.AsMedia().Sample(new FrameSelector.Index(0)).ToBytesAsync();
         output.FrameCount.Should().Be(1);
     }
 
@@ -112,7 +113,7 @@ public sealed class PipelineExecutionSpec
     public async Task ExtractFrame_on_static_is_noop()
     {
         await using var src = Fixtures.WideJpeg();
-        var output = await src.AsMedia().ExtractFrame(0).ToBytesAsync();
+        var output = await src.AsMedia().Sample(new FrameSelector.Index(0)).ToBytesAsync();
         output.FrameCount.Should().Be(1);
     }
 
@@ -120,7 +121,7 @@ public sealed class PipelineExecutionSpec
     public async Task ExtractFrame_out_of_range_throws()
     {
         await using var src = Fixtures.AnimatedWebp(frames: 3);
-        var act = async () => await src.AsMedia().ExtractFrame(99).ToBytesAsync();
+        var act = async () => await src.AsMedia().Sample(new FrameSelector.Index(99)).ToBytesAsync();
         await act.Should().ThrowAsync<ArgumentOutOfRangeException>();
     }
 

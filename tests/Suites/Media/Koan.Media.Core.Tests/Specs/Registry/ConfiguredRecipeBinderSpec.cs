@@ -69,7 +69,8 @@ public sealed class ConfiguredRecipeBinderSpec
             },
         };
         var recipe = ConfiguredRecipeBinder.Bind("poster", configured, RecipeSource.Config);
-        recipe.Steps.OfType<ExtractFrameStep>().Single().Index.Should().Be(0);
+        var sample = recipe.Steps.OfType<SampleStep>().Single();
+        sample.Selector.Should().BeOfType<FrameSelector.Index>().Which.Frame.Should().Be(0);
         recipe.Steps.OfType<FlattenToStep>().Single().Format.Should().Be("jpeg");
     }
 

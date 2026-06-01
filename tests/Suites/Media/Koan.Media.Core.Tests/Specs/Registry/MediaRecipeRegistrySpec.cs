@@ -211,7 +211,7 @@ internal static class TestCodeRecipes
         Description = "test poster",
         Mutators = MutatorKind.Common | MutatorKind.Frame)]
     public static MediaRecipe Poster() => MediaRecipe.New()
-        .ExtractFrame(0)
+        .Sample(new FrameSelector.Index(0))
         .Resize(width: 800).Name("size").Primary()
         .EncodeAs("webp", Quality.Web);
 }
