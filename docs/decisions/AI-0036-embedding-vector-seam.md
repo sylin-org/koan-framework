@@ -298,6 +298,14 @@ for surface symmetry; the 3 connector READMEs drop the deleted `VectorFilterExpr
 
 ### 10.3 Staged ledger (build green at every step; compiler is the migration checklist)
 
+> **Status (2026-06-01):** **P1a ✅ shipped** (`25e1e2e1`), **P1b ✅ shipped** (keystone flip
+> `6ee9171b`; PGVector `5f2fe980`; Qdrant+Milvus `7d33245e`; Weaviate+ES+OS `947dc051`), **P1c ✅
+> shipped** (`8f20c655` — legacy `VectorFilter*`/`VectorFilterJson` deleted, both samples migrated,
+> the DATA-0056 node-model collapse finally done). The vector storage organ now shares the single
+> unified `Filter` AST with the entity path, fail-loud and operator-aware. **Remaining:** the
+> live-store *per-provider convergence* specs (quarantined, need real stores), **P1-AI** (filter DX
+> slots — depends on a pre-existing `Koan.Rag` DATA-0096 break being fixed first), and **P2** (W4).
+
 - **P1a — additive foundation (no breaking change, no decision blocks it).** `VectorFilterCapabilities`
   (unified `FilterOperator` + `IgnoreCase` + `NestedPaths`; `None`/`Full`); schemaless `VectorFilterReader`
   (JSON→unified `Filter`, `Filter` passthrough, lower wild/between, normalize scalars, fail-loud);
