@@ -66,5 +66,58 @@ public static class FilterSplitter
         }
     }
 
+    /// <summary>
+    /// Schemaless split for the vector path (AI-0036 §10 / DATA-0097 P1). Same correctness-safe
+    /// AllOf/AnyOf/Not rules as <see cref="Split(Filter, FilterCapabilities, Type)"/>, but the
+    /// <see cref="FieldFilter"/> arm <b>never calls <see cref="FieldPathResolver"/></b> (vector
+    /// metadata has no CLR type to resolve against) — every leaf is treated as a single metadata key,
+    /// and capability is the single-set <see cref="VectorFilterCapabilities"/>. The
+    /// <c>VectorFilterCoordinator</c> treats any non-empty residual as a hard error (no in-memory
+    /// floor for vectors), so this method only decides pushable-vs-residual; it never evaluates.
+    /// </summary>
+    public static FilterSplit Split(Filter filter, VectorFilterCapabilities caps)
+    {
+        switch (filter)
+        {
+            case AllOf all:
+            {
+                if (all.Operands.Count == 0) return new FilterSplit(filter, null); // match-all
+                var push = new List<Filter>();
+                var res = new List<Filter>();
+                foreach (var child in all.Operands)
+                {
+                    var s = Split(child, caps);
+                    if (s.Pushable is not null) push.Add(s.Pushable);
+                    if (s.Residual is not null) res.Add(s.Residual);
+                }
+                return new FilterSplit(
+                    push.Count == 0 ? null : Conjoin(push),
+                    res.Count == 0 ? null : Conjoin(res));
+            }
+            case AnyOf any:
+            {
+                var fullyPushable = any.Operands.All(c => Split(c, caps).Residual is null);
+                return fullyPushable ? new FilterSplit(filter, null) : new FilterSplit(null, filter);
+            }
+            case Not n:
+            {
+                var inner = Split(n.Operand, caps);
+                return inner.Residual is null ? new FilterSplit(filter, null) : new FilterSplit(null, filter);
+            }
+            case FieldFilter f:
+            {
+                // No FieldPathResolver: schemaless metadata key, no scalar-vs-collection distinction.
+                var pushable = caps.CanPush(f.Operator)
+                    && (caps.NestedPaths || f.Field.Segments.Count == 1)
+                    && (!f.IgnoreCase || caps.IgnoreCase);
+                return pushable ? new FilterSplit(filter, null) : new FilterSplit(null, filter);
+            }
+            case ClrFilter:
+                return new FilterSplit(null, filter); // opaque CLR predicate — never pushable, => hard error
+            default:
+                return new FilterSplit(null, filter);
+        }
+    }
+
     private static Filter Conjoin(List<Filter> items) => items.Count == 1 ? items[0] : new AllOf(items);
 }

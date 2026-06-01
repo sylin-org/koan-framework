@@ -11,6 +11,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\src\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
+    <!-- VectorFilterCoordinator + VectorFilterUnsupportedException (P1a residual-is-error specs). -->
+    <ProjectReference Include="..\..\..\..\src\Koan.Data.Vector\Koan.Data.Vector.csproj" />
   </ItemGroup>
 
   <ItemGroup>
