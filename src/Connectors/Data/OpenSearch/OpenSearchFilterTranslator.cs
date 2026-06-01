@@ -2,155 +2,117 @@ using System.Collections.Generic;
 using System.Linq;
 
 using Newtonsoft.Json.Linq;
-using Koan.Data.Abstractions.Vector.Filtering;
+using Koan.Data.Abstractions.Filtering;
 
 namespace Koan.Data.Connector.OpenSearch;
 
+/// <summary>
+/// Translates the unified <see cref="Filter"/> AST into an OpenSearch query DSL JObject
+/// (AI-0036 §10 / DATA-0097 P1). Identical to the Elasticsearch translator (same Lucene query DSL);
+/// kept duplicated-but-capability-pinned rather than coupling the two connector packages. Lucene
+/// <c>bool/must_not</c> is null-inclusive, so <c>Ne/Nin/HasNone</c> match the convergence oracle.
+/// </summary>
 internal static class OpenSearchFilterTranslator
 {
-    public static JObject? TranslateWhereClause(object? filter)
-    {
-        if (!VectorFilterJson.TryParse(filter, out var ast) || ast is null)
-        {
-            return null;
-        }
+    public static readonly VectorFilterCapabilities Caps = VectorFilterCapabilities.Of(
+        nestedPaths: true, ignoreCase: false,
+        FilterOperator.Eq, FilterOperator.Ne,
+        FilterOperator.Gt, FilterOperator.Gte, FilterOperator.Lt, FilterOperator.Lte,
+        FilterOperator.In, FilterOperator.Nin,
+        FilterOperator.StartsWith, FilterOperator.EndsWith, FilterOperator.Contains,
+        FilterOperator.Has, FilterOperator.HasAny, FilterOperator.HasAll, FilterOperator.HasNone,
+        FilterOperator.Exists);
 
-        return Translate(ast);
-    }
+    public static JObject? TranslateWhereClause(Filter? filter)
+        => filter is null ? null : Translate(filter);
 
-    private static JObject Translate(VectorFilter filter)
+    public static JObject Translate(Filter filter)
     {
         return filter switch
         {
-            VectorFilterAnd and => new JObject
-            {
-                ["bool"] = new JObject
-                {
-                    ["must"] = new JArray(and.Operands.Select(Translate))
-                }
-            },
-            VectorFilterOr or => new JObject
-            {
-                ["bool"] = new JObject
-                {
-                    ["should"] = new JArray(or.Operands.Select(Translate)),
-                    ["minimum_should_match"] = 1
-                }
-            },
-            VectorFilterNot not => new JObject
-            {
-                ["bool"] = new JObject
-                {
-                    ["must_not"] = new JArray(Translate(not.Operand))
-                }
-            },
-            VectorFilterCompare cmp => TranslateCompare(cmp),
-            _ => throw new NotSupportedException($"Vector filter '{filter.GetType().Name}' is not supported for OpenSearch.")
+            AllOf and => Bool("must", and.Operands.Select(Translate)),
+            AnyOf or => new JObject { ["bool"] = new JObject { ["should"] = new JArray(or.Operands.Select(Translate).Cast<object>().ToArray()), ["minimum_should_match"] = 1 } },
+            Not not => new JObject { ["bool"] = new JObject { ["must_not"] = new JArray(Translate(not.Operand)) } },
+            FieldFilter cmp => TranslateLeaf(cmp),
+            _ => throw new System.NotSupportedException($"OpenSearch cannot translate filter node '{filter.GetType().Name}'.")
         };
     }
 
-    private static JObject TranslateCompare(VectorFilterCompare cmp)
+    private static JObject TranslateLeaf(FieldFilter f)
     {
-        var field = string.Join('.', cmp.Path);
-        return cmp.Operator switch
+        var field = string.Join('.', f.Field.Segments);
+        switch (f.Operator)
         {
-            VectorFilterOperator.Eq => new JObject
-            {
-                ["term"] = new JObject { [field] = ToToken(cmp.Value) }
-            },
-            VectorFilterOperator.Ne => new JObject
-            {
-                ["bool"] = new JObject
-                {
-                    ["must_not"] = new JArray(new JObject
-                    {
-                        ["term"] = new JObject { [field] = ToToken(cmp.Value) }
-                    })
-                }
-            },
-            VectorFilterOperator.Gt => Range(field, "gt", cmp.Value),
-            VectorFilterOperator.Gte => Range(field, "gte", cmp.Value),
-            VectorFilterOperator.Lt => Range(field, "lt", cmp.Value),
-            VectorFilterOperator.Lte => Range(field, "lte", cmp.Value),
-            VectorFilterOperator.Like => new JObject
-            {
-                ["wildcard"] = new JObject { [field] = Pattern(cmp.Value) }
-            },
-            VectorFilterOperator.Contains => new JObject
-            {
-                ["match_phrase"] = new JObject { [field] = ToToken(cmp.Value) }
-            },
-            VectorFilterOperator.In => new JObject
-            {
-                ["terms"] = new JObject { [field] = ToArray(cmp.Value) }
-            },
-            VectorFilterOperator.Between => Between(field, cmp.Value),
-            // DATA-0097 F2: fail loud rather than silently emitting a term (equality) query.
-            _ => throw new NotSupportedException(
-                $"OpenSearch does not support vector filter operator '{cmp.Operator}' on metadata field '{string.Join(".", cmp.Path)}'.")
-        };
+            case FilterOperator.Eq:
+            case FilterOperator.Has:
+                return Term(field, Scalar(f));
+            case FilterOperator.Ne:
+                return MustNot(Term(field, Scalar(f)));
+            case FilterOperator.Gt: return Range(field, "gt", Scalar(f));
+            case FilterOperator.Gte: return Range(field, "gte", Scalar(f));
+            case FilterOperator.Lt: return Range(field, "lt", Scalar(f));
+            case FilterOperator.Lte: return Range(field, "lte", Scalar(f));
+            case FilterOperator.In:
+            case FilterOperator.HasAny:
+                return Terms(field, Set(f));
+            case FilterOperator.Nin:
+            case FilterOperator.HasNone:
+                return MustNot(Terms(field, Set(f)));
+            case FilterOperator.HasAll:
+                return Bool("must", Set(f).Select(v => Term(field, v)));
+            case FilterOperator.StartsWith: return Wildcard(field, $"{Wild(ScalarStr(f))}*");
+            case FilterOperator.EndsWith: return Wildcard(field, $"*{Wild(ScalarStr(f))}");
+            case FilterOperator.Contains: return Wildcard(field, $"*{Wild(ScalarStr(f))}*");
+            case FilterOperator.Exists:
+                var present = Scalar(f) is not bool b || b;
+                var exists = new JObject { ["exists"] = new JObject { ["field"] = field } };
+                return present ? exists : MustNot(exists);
+            default:
+                throw new System.NotSupportedException(
+                    $"OpenSearch does not support vector filter operator '{f.Operator}' on metadata field '{f.Field}'.");
+        }
     }
+
+    private static JObject Bool(string clause, IEnumerable<JObject> parts)
+        => new() { ["bool"] = new JObject { [clause] = new JArray(parts.Cast<object>().ToArray()) } };
+
+    private static JObject MustNot(JObject inner)
+        => new() { ["bool"] = new JObject { ["must_not"] = new JArray(inner) } };
+
+    private static JObject Term(string field, object? value)
+        => new() { ["term"] = new JObject { [field] = ToToken(value) } };
+
+    private static JObject Terms(string field, IReadOnlyList<object?> values)
+        => new() { ["terms"] = new JObject { [field] = new JArray(values.Select(ToToken).Cast<object>().ToArray()) } };
 
     private static JObject Range(string field, string op, object? value)
+        => new() { ["range"] = new JObject { [field] = new JObject { [op] = ToToken(value) } } };
+
+    private static JObject Wildcard(string field, string pattern)
+        => new() { ["wildcard"] = new JObject { [field] = pattern } };
+
+    private static object? Scalar(FieldFilter f) => f.Value switch
     {
-        return new JObject
-        {
-            ["range"] = new JObject
-            {
-                [field] = new JObject
-                {
-                    [op] = ToToken(value)
-                }
-            }
-        };
-    }
+        FilterValue.Scalar s => s.Value,
+        FilterValue.Set st => st.Values.Count > 0 ? st.Values[0] : null,
+        _ => null
+    };
 
-    private static JObject Between(string field, object? value)
+    private static string ScalarStr(FieldFilter f) => Scalar(f)?.ToString() ?? "";
+
+    private static IReadOnlyList<object?> Set(FieldFilter f) => f.Value switch
     {
-        if (value is IEnumerable<object?> enumerable)
-        {
-            var list = enumerable.ToList();
-            if (list.Count >= 2)
-            {
-                return new JObject
-                {
-                    ["range"] = new JObject
-                    {
-                        [field] = new JObject
-                        {
-                            ["gte"] = ToToken(list[0]),
-                            ["lte"] = ToToken(list[1])
-                        }
-                    }
-                };
-            }
-        }
+        FilterValue.Set st => st.Values,
+        FilterValue.Scalar s => new[] { s.Value },
+        _ => System.Array.Empty<object?>()
+    };
 
-        throw new NotSupportedException("Between filter requires a collection with at least two values.");
-    }
+    private static string Wild(string s) => s.Replace("\\", "\\\\").Replace("*", "\\*").Replace("?", "\\?");
 
-    private static JToken ToToken(object? value)
-        => value switch
-        {
-            null => JValue.CreateNull(),
-            JToken token => token,
-            _ => JToken.FromObject(value)
-        };
-
-    private static JArray ToArray(object? value)
+    private static JToken ToToken(object? value) => value switch
     {
-        if (value is IEnumerable<object?> enumerable)
-        {
-            return new JArray(enumerable.Select(ToToken));
-        }
-
-        return new JArray(ToToken(value));
-    }
-
-    private static string Pattern(object? value)
-    {
-        var raw = value?.ToString() ?? "";
-        return raw.Replace('%', '*');
-    }
+        null => JValue.CreateNull(),
+        JToken token => token,
+        _ => JToken.FromObject(value)
+    };
 }
-

@@ -53,6 +53,9 @@ internal sealed class OpenSearchVectorRepository<TEntity, TKey> :
         VectorCapabilities.BulkUpsert |
         VectorCapabilities.BulkDelete;
 
+    // AI-0036 §10 / DATA-0097 P1: operator-aware metadata-filter capabilities.
+    public Koan.Data.Abstractions.Filtering.VectorFilterCapabilities FilterCapabilities => OpenSearchFilterTranslator.Caps;
+
     public async Task VectorEnsureCreated(CancellationToken ct = default)
     {
         var dimension = _discoveredDimension > 0 ? _discoveredDimension : _options.Dimension ?? -1;

@@ -30,6 +30,9 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
 
     public VectorCapabilities Capabilities => VectorCapabilities.Knn | VectorCapabilities.Filters | VectorCapabilities.BulkUpsert | VectorCapabilities.BulkDelete | VectorCapabilities.Hybrid | VectorCapabilities.NativeContinuation | VectorCapabilities.DynamicCollections;
 
+    // AI-0036 §10 / DATA-0097 P1: reduced operator-aware metadata-filter capabilities.
+    public Koan.Data.Abstractions.Filtering.VectorFilterCapabilities FilterCapabilities => WeaviateFilterTranslator.Caps;
+
     public WeaviateVectorRepository(IHttpClientFactory httpFactory, IOptions<WeaviateOptions> options, IServiceProvider sp)
     {
         _http = httpFactory.CreateClient("weaviate");
