@@ -1,13 +1,13 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Cache.Abstractions.Policies;
 using Koan.Cache.Abstractions.Primitives;
 using Koan.Cache.Abstractions.Stores;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Core;
 using Microsoft.Extensions.Logging;
@@ -16,10 +16,8 @@ namespace Koan.Cache.Decorators;
 
 internal sealed class CachedRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
-    ILinqQueryRepository<TEntity, TKey>,
-    ILinqQueryRepositoryWithOptions<TEntity, TKey>,
-    IStringQueryRepository<TEntity, TKey>,
-    IStringQueryRepositoryWithOptions<TEntity, TKey>,
+    IQueryRepository<TEntity, TKey>,
+    IRawQueryRepository<TEntity, TKey>,
     IQueryCapabilities,
     IWriteCapabilities,
     IInstructionExecutor<TEntity>
@@ -27,10 +25,8 @@ internal sealed class CachedRepository<TEntity, TKey> :
     where TKey : notnull
 {
     private readonly IDataRepository<TEntity, TKey> _inner;
-    private readonly ILinqQueryRepository<TEntity, TKey>? _linq;
-    private readonly ILinqQueryRepositoryWithOptions<TEntity, TKey>? _linqWithOptions;
-    private readonly IStringQueryRepository<TEntity, TKey>? _stringQuery;
-    private readonly IStringQueryRepositoryWithOptions<TEntity, TKey>? _stringQueryWithOptions;
+    private readonly IQueryRepository<TEntity, TKey>? _query;
+    private readonly IRawQueryRepository<TEntity, TKey>? _rawQuery;
     private readonly IInstructionExecutor<TEntity>? _instructionExecutor;
     private readonly IQueryCapabilities? _queryCapabilitiesSource;
     private readonly IWriteCapabilities? _writeCapabilitiesSource;
@@ -53,10 +49,8 @@ internal sealed class CachedRepository<TEntity, TKey> :
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         _entityTemplate = CacheKeyTemplate.For(_entityPolicy.KeyTemplate);
-        _linq = inner as ILinqQueryRepository<TEntity, TKey>;
-        _linqWithOptions = inner as ILinqQueryRepositoryWithOptions<TEntity, TKey>;
-        _stringQuery = inner as IStringQueryRepository<TEntity, TKey>;
-        _stringQueryWithOptions = inner as IStringQueryRepositoryWithOptions<TEntity, TKey>;
+        _query = inner as IQueryRepository<TEntity, TKey>;
+        _rawQuery = inner as IRawQueryRepository<TEntity, TKey>;
         _instructionExecutor = inner as IInstructionExecutor<TEntity>;
         _queryCapabilitiesSource = inner as IQueryCapabilities;
         _writeCapabilitiesSource = inner as IWriteCapabilities;
@@ -68,8 +62,7 @@ internal sealed class CachedRepository<TEntity, TKey> :
 
     public WriteCapabilities Writes => _writeCapabilitiesSource?.Writes ?? WriteCapabilities.None;
 
-    public Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
-        => _inner.Count(request, ct);
+    public FilterCapabilities FilterCapabilities => _query?.FilterCapabilities ?? FilterCapabilities.None;
 
     public async Task<TEntity?> Get(TKey id, CancellationToken ct = default)
     {
@@ -135,77 +128,50 @@ internal sealed class CachedRepository<TEntity, TKey> :
         return _inner.GetMany(ids, ct);
     }
 
-    public Task<IReadOnlyList<TEntity>> Query(string query, CancellationToken ct = default)
+    // ============================ Query / Count (delegated) ============================
+    // The id-keyed entity cache cannot satisfy arbitrary filters, so structured queries pass
+    // through to the inner repository's unified IQueryRepository contract.
+
+    public Task<RepositoryQueryResult<TEntity>> Query(QueryDefinition query, CancellationToken ct = default)
     {
-        if (_stringQuery is null)
+        if (_query is null)
         {
-            throw new NotSupportedException($"Repository for {_entityName} does not support string queries.");
+            throw new NotSupportedException($"Repository for {_entityName} does not support queries.");
         }
 
-        return _stringQuery.Query(query, ct);
+        return _query.Query(query, ct);
     }
 
-    public async Task<RepositoryQueryResult<TEntity>> Query(string query, DataQueryOptions? options, CancellationToken ct = default)
+    public Task<CountResult> Count(QueryDefinition query, CancellationToken ct = default)
     {
-        if (_stringQueryWithOptions is not null)
+        if (_query is null)
         {
-            return await _stringQueryWithOptions.Query(query, options, ct);
+            throw new NotSupportedException($"Repository for {_entityName} does not support counts.");
         }
 
-        if (_stringQuery is not null)
-        {
-            var items = await _stringQuery.Query(query, ct);
-            return RepositoryQueryResult<TEntity>.Unhandled(items);
-        }
-
-        throw new NotSupportedException($"Repository for {_entityName} does not support string queries.");
+        return _query.Count(query, ct);
     }
 
-    public async Task<IReadOnlyList<TEntity>> Query(string query, object? parameters, CancellationToken ct = default)
+    // ============================ Raw query (delegated passthrough) ============================
+
+    public Task<RepositoryQueryResult<TEntity>> QueryRaw(string query, object? parameters, QueryDefinition shaping, CancellationToken ct = default)
     {
-        if (_stringQueryWithOptions is not null)
+        if (_rawQuery is null)
         {
-            var result = await _stringQueryWithOptions.Query(query, parameters, null, ct);
-            return result.Items;
+            throw new NotSupportedException($"Repository for {_entityName} does not support raw provider queries.");
         }
 
-        throw new NotSupportedException($"Repository for {_entityName} does not support parameterized string queries.");
+        return _rawQuery.QueryRaw(query, parameters, shaping, ct);
     }
 
-    public async Task<RepositoryQueryResult<TEntity>> Query(string query, object? parameters, DataQueryOptions? options, CancellationToken ct = default)
+    public Task<CountResult> CountRaw(string query, object? parameters, CancellationToken ct = default)
     {
-        if (_stringQueryWithOptions is not null)
+        if (_rawQuery is null)
         {
-            return await _stringQueryWithOptions.Query(query, parameters, options, ct);
+            throw new NotSupportedException($"Repository for {_entityName} does not support raw provider queries.");
         }
 
-        throw new NotSupportedException($"Repository for {_entityName} does not support parameterized string queries.");
-    }
-
-    public Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-    {
-        if (_linq is null)
-        {
-            throw new NotSupportedException($"Repository for {_entityName} does not support LINQ queries.");
-        }
-
-        return _linq.Query(predicate, ct);
-    }
-
-    public async Task<RepositoryQueryResult<TEntity>> Query(Expression<Func<TEntity, bool>>? predicate, DataQueryOptions? options, CancellationToken ct = default)
-    {
-        if (_linqWithOptions is not null)
-        {
-            return await _linqWithOptions.Query(predicate, options, ct);
-        }
-
-        if (predicate is not null && _linq is not null)
-        {
-            var items = await _linq.Query(predicate, ct);
-            return RepositoryQueryResult<TEntity>.Unhandled(items);
-        }
-
-        throw new NotSupportedException($"Repository for {_entityName} does not support LINQ queries.");
+        return _rawQuery.CountRaw(query, parameters, ct);
     }
 
     public async Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
