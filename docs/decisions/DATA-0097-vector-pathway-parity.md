@@ -10,12 +10,30 @@ relates-to: [DATA-0096, DATA-0054, ADR-0051, ADR-0052, ADR-0053, DATA-0078, DATA
 
 # DATA-0097: Vector Pathway Parity (break-and-rebuild)
 
+## Scope (read first)
+
+This DDR targets the **vector STORAGE organ** — `Koan.Data.Vector` (`Vector<T>`/`VectorData<T>`
++ the 6 provider adapters): how it stores, kNN-searches, and **filters** pre-computed embeddings.
+That layer is, structurally and correctly, a *data-adapter family* (it lives in `Data.*`, is
+factory-resolved from entity attributes, capability-flagged, and parallels the LINQ/string query
+surface per DATA-0054).
+
+It is **deliberately NOT** the whole vector concern. An AI-surface understanding pass (6-slice
+map + synthesis) established that embeddings live in **three decoupled layers**: (1) *production* —
+`Client.Embed` emits `float[]`, never touches a store; (2) *lifecycle ownership* — `Koan.Data.AI`'s
+`[Embedding]` owns existence/staleness/versioning/re-index and is the only layer that knows the
+producing **model/source**; (3) *persistence* — this DDR's `Vector<T>`, which knows nothing of
+model/source/staleness. Two of this plan's findings (F8 and the dropped RAG params) are therefore
+**not storage-adapter bugs** — they are the **seam** between the embedding-lifecycle owner and the
+storage organ, and are carved out to a joint follow-up (see §8). DATA-0097 fixes the organ; the
+seam contract co-owns the data flowing through it.
+
 ## TL;DR
 
-The vector pathway predates DATA-0096 and still exhibits the exact bug class that work
+The vector storage organ predates DATA-0096 and still exhibits the exact bug class that work
 eliminated from the entity path: **fail-silent filtering that degrades to an unfiltered full
 scan**. For metadata- or tenant-scoped vector search this is a data-leak-shaped correctness
-hazard, not a cosmetic gap. This DDR brings the vector pillar up to par with the entity pillar's
+hazard, not a cosmetic gap. This DDR brings it up to par with the entity pillar's
 contract: **one Filter AST**, **operator-aware capability negotiation**, **fail-loud errors**, a
 **typed filter slot**, and a **convergence/conformance test net** — applying the same
 break-and-rebuild freedom (DATA-0096 already marks DATA-0056 supersession-pending).
@@ -211,7 +229,7 @@ must be honest — an unsupported operator cannot degrade, it must 400.
   (it has the richest substrate — full SQL — so it should support the most operators, not the fewest).
 - ElasticSearch: fix F6 (filter must be a kNN filter, not a sibling query).
 - `VectorQueryResult`: add the per-axis handled envelope.
-- AI write paths: thread `[Embedding(Model=…)]`/`targetModel` through instead of dropping (F8).
+- *(F8 moved — it is an AI-seam concern, not a storage-adapter change; see §8.)*
 
 **Remove**
 - `VectorFilter*` node types + `VectorFilterOperator` + `VectorFilterJson` (after collapse).
@@ -283,3 +301,50 @@ reconciliation, ADR-0056 full supersession + ADR-0051/0053 updates.
    appears in the boot report; (d) the only new throw is the explicit unsupported-operator boundary,
    surfaced as a clear 400 — never setup friction, never silent. A phase that regresses any of these
    is not complete.
+
+---
+
+## 8. The AI seam (carved out — jointly owned, NOT storage-adapter work)
+
+An AI-surface understanding pass established that the embedding *lifecycle* (which model/source
+produced a vector, staleness, versioning) is owned by `Koan.Data.AI`'s `[Embedding]`, while
+`Vector<T>` is a model-agnostic store. Two findings originally listed here are seam concerns
+between those two layers, not adapter bugs. They are split into a focused follow-up
+(**AI-00xx — Embedding↔Vector seam**, co-owned by `Koan.Data.AI` + `Koan.Data.Vector`):
+
+- **F8 — producing model/source not persisted with the vector.** `[Embedding(Model=…)]` and the
+  migrator's `targetModel` are dropped on write. Without the producing model recorded alongside
+  each vector, provider/model migration cannot verify or selectively re-index. Fix: thread
+  model/source into the vector record's metadata at `SaveWithVector` time. *(Belongs to the
+  lifecycle owner; the store just persists the extra metadata fields — DATA-0097 already types the
+  metadata path, so it is seam-ready, not seam-blocking.)*
+- **Retrieval-param forwarding.** `Chain.Retrieve<T>` and agent `{type}_search` accept
+  `alpha`/`rerank`/`hybrid`/`filter` in their builders but forward only `topK` to
+  `Vector<T>.Search` (`ChainExecutor.cs`, `EntityToolGenerator.cs`). The RAG quality knobs are
+  inert. Fix: forward the full option set from the composition boundary down to `Search`. *(This
+  becomes mechanical once DATA-0097 gives `Search` a typed filter + honest capabilities to forward
+  *into*.)*
+
+Sequencing: DATA-0097 (this DDR) lands the trustworthy storage substrate first; the seam follow-up
+then threads model/source + RAG params across it. Neither leaks AI concerns into `Data.*` nor
+leaves the seam half-built.
+
+## 9. Where this sits in the Koan AI surface (context, not scope)
+
+The Koan AI surface is a **full-lifecycle, entity-native AI platform**: a mature inference core
+(`Client.*`) wrapped by eight bounded-context facades (`Model/Prompt/Compute/Chain/Training/
+Dataset/Eval/Review`), whose differentiator is that the same `Entity<T>` is production data,
+embedding source, retrieval target, training/eval data, and feedback sink — no ETL. Vectors are
+**one organ** of that body — the storage-and-retrieval substrate — not a self-contained pillar.
+This DDR makes that organ trustworthy and honest. Layers that sit **above** a corrected vector
+substrate and are explicitly **out of scope** here (status: largely aspirational today):
+
+- **Retrieval-quality eval** — `Eval.Metric.*` declares RecallAtK/NDCG/MRR/Faithfulness but
+  `ComputeMetric` returns a `0.0` placeholder; retrieval quality cannot yet be gated.
+- **Embedding-model training** — `Dataset.From<T>` only hashes the query shape (no materialization)
+  and `ITrainingRuntime` adapters do not exist; `DataFormat.Triplet`/`SentenceTransformer` is unbuilt.
+- **Deep RAG** — AI-0034 (`Rag.Corpus<T>`, concept graph, multi-vector, agentic retrieval) is
+  Proposed; no `Koan.AI.Rag` project exists.
+
+These are noted so the vector substrate is built to *serve* them, but they do not block parity and
+are not part of this DDR.
