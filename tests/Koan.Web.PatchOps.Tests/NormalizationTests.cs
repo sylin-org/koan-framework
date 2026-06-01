@@ -1,4 +1,4 @@
-﻿using FluentAssertions;
+﻿using AwesomeAssertions;
 using Koan.Data.Abstractions.Instructions;
 using Microsoft.AspNetCore.JsonPatch;
 using Newtonsoft.Json.Linq;

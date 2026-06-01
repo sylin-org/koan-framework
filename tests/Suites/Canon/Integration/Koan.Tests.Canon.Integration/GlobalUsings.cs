@@ -1,4 +1,4 @@
-﻿global using FluentAssertions;
+﻿global using AwesomeAssertions;
 global using Koan.Canon.Domain.Annotations;
 global using Koan.Canon.Domain.Audit;
 global using Koan.Canon.Domain.Metadata;

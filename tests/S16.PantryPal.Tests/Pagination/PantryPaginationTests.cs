@@ -1,5 +1,5 @@
 ﻿using System.Linq;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
 using S16.PantryPal.Controllers;

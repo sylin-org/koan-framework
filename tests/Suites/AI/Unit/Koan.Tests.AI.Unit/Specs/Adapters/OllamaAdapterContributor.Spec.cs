@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.AI;
 using Koan.AI.Contracts.Options;
 using Koan.AI.Contracts.Routing;

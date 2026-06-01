@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.Core.Hosting.App;
 using Koan.Data.Core;
 using Xunit;

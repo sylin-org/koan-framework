@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.Samples.Meridian.Contracts;
 using Xunit;
 

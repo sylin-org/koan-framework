@@ -1,4 +1,4 @@
-﻿using FluentAssertions;
+﻿using AwesomeAssertions;
 using S16.PantryPal.Services;
 using S16.PantryPal.Models;
 using Koan.Data.Core.Model;

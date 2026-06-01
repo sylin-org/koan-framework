@@ -1,6 +1,6 @@
 using System;
 using System.Threading.Tasks;
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.Cache.Abstractions;
 using Koan.Cache.Abstractions.Primitives;
 using Koan.Cache.Abstractions.Stores;

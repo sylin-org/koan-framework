@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.Core.Hosting.App;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;

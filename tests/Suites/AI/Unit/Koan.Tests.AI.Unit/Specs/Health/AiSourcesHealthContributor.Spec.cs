@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.AI.Contracts.Sources;
 using Koan.AI.Health;
 using Koan.Core.Observability.Health;

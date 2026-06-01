@@ -1,6 +1,6 @@
 ﻿using System.Security.Cryptography;
 using System.Text;
-using FluentAssertions;
+using AwesomeAssertions;
 using Xunit;
 
 namespace S16.PantryPal.McpHost.Tests;

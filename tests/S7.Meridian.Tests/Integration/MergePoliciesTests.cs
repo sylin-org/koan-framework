@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Text;
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.Core;
 using Koan.Core.Hosting.App;
 using Koan.Data.Core;

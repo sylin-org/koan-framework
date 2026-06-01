@@ -5,7 +5,7 @@ using Koan.AI.Contracts.Models;
 using Koan.AI.Contracts.Options;
 using Koan.Data.AI;
 using Koan.Data.AI.Attributes;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Koan.Tests.AI.Unit.Specs.Embedding;
 

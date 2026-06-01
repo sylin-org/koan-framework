@@ -1,5 +1,5 @@
 using System.Threading.Tasks;
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.Core;
 using Koan.Rag.Abstractions;
 using Koan.Testing.Integration;

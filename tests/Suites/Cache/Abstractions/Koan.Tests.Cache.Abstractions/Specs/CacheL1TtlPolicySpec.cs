@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.Cache.Abstractions.Policies;
 using Koan.Cache.Abstractions.Primitives;
 using System;

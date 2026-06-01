@@ -1,7 +1,7 @@
 using Koan.Data.AI;
 using Koan.Data.AI.Attributes;
 using Koan.Data.Core.Model;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Koan.Tests.AI.Unit.Specs.Embedding;
 

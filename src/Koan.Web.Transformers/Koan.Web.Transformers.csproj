@@ -12,6 +12,6 @@
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.Core" Version="2.3.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Core" Version="2.3.10" />
   </ItemGroup>
 </Project>

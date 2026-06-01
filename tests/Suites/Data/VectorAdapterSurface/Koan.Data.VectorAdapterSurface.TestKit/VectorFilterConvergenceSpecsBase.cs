@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.Core.Hosting.App;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Vector;

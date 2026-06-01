@@ -1,6 +1,6 @@
 using System;
 using System.Threading.Tasks;
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.Core;
 using Koan.Data.Core;
 using Koan.Testing.Integration;

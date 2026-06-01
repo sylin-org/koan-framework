@@ -1,6 +1,6 @@
 using System.Text;
 using System.Net;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 

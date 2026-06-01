@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 using System.Threading.Tasks;
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.Core;
 using Koan.Storage.Abstractions;
 using Koan.Testing.Integration;

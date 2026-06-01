@@ -3,7 +3,7 @@ using Koan.Data.Core;
 using Koan.Data.Core.Model;
 using Koan.Data.Vector;
 using Koan.Tests.Data.Core.Support;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Koan.Tests.Data.Core.Specs.Transactions;
 

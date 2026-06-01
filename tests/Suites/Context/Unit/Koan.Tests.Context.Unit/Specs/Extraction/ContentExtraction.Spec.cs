@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using FluentAssertions;
+using AwesomeAssertions;
 using ExtractionService = Koan.Context.Services.Extraction;
 using Koan.Context.Services;
 using Microsoft.Extensions.Configuration;

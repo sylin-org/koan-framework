@@ -6,7 +6,7 @@ using Koan.Data.Vector;
 using Koan.Data.AI;
 using Koan.Data.AI.Attributes;
 using Koan.Tests.Data.Core.Support;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Koan.Tests.Data.Core.Specs.Integration;
 

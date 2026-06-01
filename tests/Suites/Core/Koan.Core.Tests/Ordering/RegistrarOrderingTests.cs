@@ -1,7 +1,7 @@
 #nullable enable
 using System;
 using System.Linq;
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.Core;
 using Koan.Core.Ordering;
 using Microsoft.Extensions.DependencyInjection;

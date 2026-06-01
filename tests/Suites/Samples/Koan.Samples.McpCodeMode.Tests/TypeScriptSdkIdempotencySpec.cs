@@ -3,7 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
-using FluentAssertions;
+using AwesomeAssertions;
 using Xunit;
 
 namespace Koan.Samples.McpCodeMode.Tests;

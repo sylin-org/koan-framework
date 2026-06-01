@@ -1,7 +1,7 @@
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.Core.Hosting.App;
 using Koan.Data.Vector;
 using Koan.Data.Vector.Connector.Qdrant;

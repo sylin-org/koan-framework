@@ -1,6 +1,6 @@
 using System.Threading;
 using System.Threading.Tasks;
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.Samples.Meridian.Models;
 using Koan.Samples.Meridian.Services;
 using Microsoft.Extensions.Logging.Abstractions;

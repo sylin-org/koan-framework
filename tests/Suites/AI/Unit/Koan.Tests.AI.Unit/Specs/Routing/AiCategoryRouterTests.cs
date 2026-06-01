@@ -4,7 +4,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.AI;
 using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Models;

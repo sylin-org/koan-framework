@@ -1,4 +1,4 @@
-global using FluentAssertions;
+global using AwesomeAssertions;
 global using Koan.Testing;
 global using Koan.Testing.Diagnostics;
 global using Koan.Testing.Extensions;

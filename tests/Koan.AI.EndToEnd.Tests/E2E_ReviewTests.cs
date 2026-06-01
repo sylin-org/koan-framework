@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.AI.Review;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;

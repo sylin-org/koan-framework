@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using Newtonsoft.Json.Linq;
 using Koan.Samples.Meridian.Services;
 using Xunit;

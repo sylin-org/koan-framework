@@ -14,7 +14,7 @@ using Koan.Data.Core;
 using Koan.Samples.Meridian.Infrastructure;
 using Koan.Samples.Meridian.Models;
 using Koan.Samples.Meridian.Services;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;

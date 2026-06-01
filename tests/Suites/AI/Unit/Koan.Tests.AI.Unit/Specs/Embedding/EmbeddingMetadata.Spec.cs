@@ -3,7 +3,7 @@ using Koan.Data.AI.Attributes;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Koan.Tests.AI.Unit.Specs.Embedding;
 

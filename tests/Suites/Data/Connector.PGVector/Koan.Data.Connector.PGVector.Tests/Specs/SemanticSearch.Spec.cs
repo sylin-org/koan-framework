@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using Xunit;
 using Koan.Data.Connector.PGVector.Tests.Support;
 using Koan.Data.Vector.Abstractions;

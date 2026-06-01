@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Security;
 using System.Threading.Tasks;
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.Context.Services; // For FileType, DiscoveredFile
 using Koan.Context.Utilities;
 using Microsoft.Extensions.Configuration;

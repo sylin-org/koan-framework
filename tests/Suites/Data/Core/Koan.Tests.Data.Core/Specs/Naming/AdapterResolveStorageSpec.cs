@@ -1,6 +1,6 @@
 using System;
 using System.Threading;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Abstractions;

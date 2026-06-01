@@ -1,4 +1,4 @@
-﻿using FluentAssertions;
+﻿using AwesomeAssertions;
 using Koan.Samples.Meridian.Infrastructure;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Schema;

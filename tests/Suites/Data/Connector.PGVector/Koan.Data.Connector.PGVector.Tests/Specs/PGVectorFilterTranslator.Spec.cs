@@ -1,5 +1,5 @@
 using Dapper;
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.Data.Abstractions.Filtering;
 using Xunit;
 

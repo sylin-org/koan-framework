@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.Web.Sse;
 using Koan.Web.Sse.Formatting;
 using Koan.Web.Sse.Mvc;

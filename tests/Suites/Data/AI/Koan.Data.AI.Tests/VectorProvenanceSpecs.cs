@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.Data.AI;
 using Koan.Data.Vector;
 using Xunit;

@@ -23,8 +23,8 @@
          different code path — but the scanner still flags. Override to
          0.48.1 which is outside the affected range (advisory: <= 0.47.4). -->
     <PackageReference Include="SharpCompress" Version="0.48.1" />
-    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" Version="10.0.8" />
   </ItemGroup>
 </Project>

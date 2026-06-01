@@ -1,4 +1,4 @@
-﻿global using FluentAssertions;
+﻿global using AwesomeAssertions;
 global using Koan.Cache.Abstractions;
 global using Koan.Cache.Abstractions.Primitives;
 global using Koan.Cache.Abstractions.Stores;

@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.Media.Abstractions.Recipes;
 using Koan.Media.Core.Pipeline;
 using Koan.Media.Core.Tests.Support;

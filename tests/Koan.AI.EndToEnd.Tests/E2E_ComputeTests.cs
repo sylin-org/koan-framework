@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.AI.Compute;
 using Koan.AI.Contracts.Shared;
 using Microsoft.Extensions.DependencyInjection;
