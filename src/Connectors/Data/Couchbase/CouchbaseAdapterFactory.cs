@@ -49,7 +49,9 @@ public sealed class CouchbaseAdapterFactory : IDataAdapterFactory
         return new StorageNamingCapability
         {
             Style = options.NamingStyle,
-            Separator = options.Separator ?? ".",
+            // Couchbase collection names allow only [A-Za-z0-9_-%] — a '.' separator (the FullNamespace
+            // default) produces an invalid collection name and CreateCollectionAsync fails. Use '_'.
+            Separator = "_",
             Casing = NameCasing.AsIs,
             EncodePartitionInName = false,
             NameOverride = entityType => !string.IsNullOrWhiteSpace(options.Collection)

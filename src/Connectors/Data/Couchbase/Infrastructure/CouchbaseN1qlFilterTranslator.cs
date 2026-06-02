@@ -268,7 +268,11 @@ internal sealed class CouchbaseN1qlFilterTranslator
     private static object? NormalizeValue(object? value) => value switch
     {
         Guid guid => guid.ToString("N", CultureInfo.InvariantCulture),
-        Enum enumeration => enumeration.ToString(),
+        // Enums are persisted as their NUMERIC value (the Couchbase SDK's default Newtonsoft serializer,
+        // like the relational adapters, writes enums as integers — e.g. tier:1). Comparing against the
+        // enum NAME ("Pro") never matched the stored number, so filter values must use the same numeric
+        // form. (Caught by the FilterConvergence oracle once Couchbase became testable.)
+        Enum enumeration => System.Convert.ToInt64(enumeration, CultureInfo.InvariantCulture),
         DateTime dt when dt.Kind == DateTimeKind.Unspecified => DateTime.SpecifyKind(dt, DateTimeKind.Utc),
         _ => value
     };
