@@ -123,11 +123,11 @@ public abstract class VectorSemanticSpecsBase<TFactory> : IClassFixture<TFactory
 
         var caps = Vector<TodoVector>.GetCapabilities();
 
-        // We don't assert exact flag-by-flag equality (adapters legitimately differ in detail),
-        // but if the factory advertises hybrid we expect the adapter's Capabilities to include it.
+        // We don't assert exact token-by-token equality (adapters legitimately differ in detail),
+        // but if the factory advertises hybrid we expect the adapter's capabilities to include it.
         if (Factory.SupportsHybridSearch)
-            caps.Should().HaveFlag(Koan.Data.Vector.Abstractions.VectorCapabilities.Hybrid);
+            caps.Has(Koan.Data.Vector.Abstractions.Capabilities.VectorCaps.Hybrid).Should().BeTrue();
         if (Factory.SupportsContinuationToken)
-            caps.Should().HaveFlag(Koan.Data.Vector.Abstractions.VectorCapabilities.NativeContinuation);
+            caps.Has(Koan.Data.Vector.Abstractions.Capabilities.VectorCaps.NativeContinuation).Should().BeTrue();
     }
 }

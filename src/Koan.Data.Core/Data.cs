@@ -26,22 +26,8 @@ public static class Data<TEntity, TKey>
            ?? throw new System.InvalidOperationException("AppHost.Current is not set. Ensure services.AddKoan() and greenfield boot (AppHost.Current + IAppRuntime).");
 
     /// <summary>
-    /// Legacy query-capability view, retained as a bridge over <see cref="Capabilities"/> (ARCH-0084).
-    /// Prefer <see cref="Capabilities"/>; this projection is retired in the Facet 1 delete stage.
-    /// </summary>
-    public static IQueryCapabilities QueryCaps => new Caps(DataCaps.ToQueryCapabilities(Capabilities));
-
-    /// <summary>
-    /// Legacy write-capability view, retained as a bridge over <see cref="Capabilities"/> (ARCH-0084).
-    /// Prefer <see cref="Capabilities"/>; this projection is retired in the Facet 1 delete stage.
-    /// </summary>
-    public static IWriteCapabilities WriteCaps => new WriteCapsImpl(DataCaps.ToWriteCapabilities(Capabilities));
-
-    /// <summary>
-    /// The provider's capabilities as the unified <see cref="CapabilitySet"/> (ARCH-0084) — the
-    /// successor to <see cref="QueryCaps"/> / <see cref="WriteCaps"/>. Resolved from the repo's
-    /// native <c>IDescribesCapabilities</c> declaration when present, else bridged from the legacy
-    /// capability markers, so it is correct for both migrated and un-migrated adapters.
+    /// The provider's capabilities as the unified <see cref="CapabilitySet"/> (ARCH-0084), resolved
+    /// from the repo's native <c>IDescribesCapabilities</c> declaration.
     /// </summary>
     public static CapabilitySet Capabilities
     {
@@ -504,8 +490,6 @@ public static class Data<TEntity, TKey>
         return DataServiceExecuteExtensions.Execute<TEntity, TResult>(data, instr, ct);
     }
 
-    private sealed record Caps(QueryCapabilities Cap) : IQueryCapabilities { public QueryCapabilities Capabilities => Cap; }
-    private sealed record WriteCapsImpl(WriteCapabilities Val) : IWriteCapabilities { public WriteCapabilities Writes => Val; }
 
     // ------------------------------------------------------------------
     // Partition migration helpers (copy/move/clear/replace) + fluent builder

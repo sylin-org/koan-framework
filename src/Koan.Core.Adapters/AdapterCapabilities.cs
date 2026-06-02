@@ -1,5 +1,3 @@
-using Koan.Data.Abstractions;
-
 namespace Koan.Core.Adapters;
 
 /// <summary>
@@ -14,7 +12,6 @@ public class AdapterCapabilities
     public MessagingCapabilities Messaging { get; private set; }
     public OrchestrationCapabilities Orchestration { get; private set; }
     public ExtendedQueryCapabilities Data { get; private set; }
-    public QueryCapabilities QueryCapabilities { get; private set; }
     public List<string> CustomCapabilities { get; private set; } = new();
 
     public static AdapterCapabilities Create() => new();
@@ -52,12 +49,6 @@ public class AdapterCapabilities
     public AdapterCapabilities WithData(ExtendedQueryCapabilities capabilities)
     {
         Data |= capabilities;
-        return this;
-    }
-
-    public AdapterCapabilities WithQueryCapabilities(QueryCapabilities capabilities)
-    {
-        QueryCapabilities |= capabilities;
         return this;
     }
 
@@ -139,9 +130,6 @@ public class AdapterCapabilities
 
         if (Data != ExtendedQueryCapabilities.None)
             summary["Data"] = Data.ToString();
-
-        if (QueryCapabilities != QueryCapabilities.None)
-            summary["QueryCapabilities"] = QueryCapabilities.ToString();
 
         if (CustomCapabilities.Any())
             summary["Custom"] = CustomCapabilities.ToArray();

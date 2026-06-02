@@ -1,6 +1,9 @@
+using System;
+using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using Koan.Data.Core;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Capabilities;
 using S10.DevPortal.Models;
 using S10.DevPortal.Services;
 
@@ -60,23 +63,22 @@ public class DemoController : ControllerBase
     [HttpGet("capabilities")]
     public IActionResult GetCapabilities()
     {
-        var articleQueryCaps = Data<Article, string>.QueryCaps;
-        var articleWriteCaps = Data<Article, string>.WriteCaps;
+        var caps = Data<Article, string>.Capabilities;
 
         return Ok(new
         {
             provider = "current", // TODO: Get actual provider name
             query = new
             {
-                capabilities = articleQueryCaps.Capabilities.ToString(),
-                supportsLinq = articleQueryCaps.Capabilities.HasFlag(QueryCapabilities.Linq),
-                supportsString = articleQueryCaps.Capabilities.HasFlag(QueryCapabilities.String)
+                capabilities = string.Join(", ", caps.All.Where(c => c.Id.StartsWith("query.", StringComparison.Ordinal)).Select(c => c.Id)),
+                supportsLinq = caps.Has(DataCaps.Query.Linq),
+                supportsString = caps.Has(DataCaps.Query.String)
             },
             write = new
             {
-                capabilities = articleWriteCaps.Writes.ToString(),
-                supportsBulkUpsert = articleWriteCaps.Writes.HasFlag(WriteCapabilities.BulkUpsert),
-                supportsBulkDelete = articleWriteCaps.Writes.HasFlag(WriteCapabilities.BulkDelete)
+                capabilities = string.Join(", ", caps.All.Where(c => c.Id.StartsWith("write.", StringComparison.Ordinal)).Select(c => c.Id)),
+                supportsBulkUpsert = caps.Has(DataCaps.Write.BulkUpsert),
+                supportsBulkDelete = caps.Has(DataCaps.Write.BulkDelete)
             },
             entities = new
             {
@@ -173,7 +175,7 @@ public class DemoController : ControllerBase
                 insertMs = insertDuration.TotalMilliseconds,
                 queryMs = queryDuration.TotalMilliseconds
             },
-            capabilities = Data<Article, string>.WriteCaps.Writes.ToString()
+            capabilities = string.Join(", ", Data<Article, string>.Capabilities.All.Where(c => c.Id.StartsWith("write.", StringComparison.Ordinal)).Select(c => c.Id))
         });
     }
 

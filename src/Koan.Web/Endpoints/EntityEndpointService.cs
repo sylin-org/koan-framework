@@ -467,15 +467,14 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         return new EntityModelResult<TEntity>(context, saved, payload);
     }
 
-    // ARCH-0084: negotiate via the unified CapabilitySet — native IDescribesCapabilities when the
-    // adapter has migrated, else bridged from the legacy IQuery/IWriteCapabilities markers.
+    // ARCH-0084: negotiate via the unified CapabilitySet (the adapter's IDescribesCapabilities declaration).
     private static CapabilitySet Capabilities(IDataRepository<TEntity, TKey> repo)
         => DataCaps.Describe(repo, repo.GetType().Name);
 
-    // Renders the Koan-Write-Capabilities header, projecting the unified set back to the legacy flag
-    // string for that external contract (the bridge is retired in ARCH-0084 stage c).
+    // Renders the Koan-Write-Capabilities header as the declared write capability tokens (ARCH-0084).
     private static string WriteCapabilitiesHeader(IDataRepository<TEntity, TKey> repo)
-        => DataCaps.ToWriteCapabilities(DataCaps.Describe(repo, repo.GetType().Name)).ToString();
+        => string.Join(", ", DataCaps.Describe(repo, repo.GetType().Name).All
+            .Where(c => c.Id.StartsWith("write.", StringComparison.Ordinal)).Select(c => c.Id));
 
     private static void CopyHookHeaders(EntityRequestContext context, HookContext<TEntity> hookContext)
     {

@@ -122,19 +122,17 @@ public sealed class WellKnownController(
         {
             var provider = KoanWebHelpers.ResolveProvider(x.Type, sp);
 
-            QueryCapabilities q = QueryCapabilities.None;
-            WriteCapabilities w = WriteCapabilities.None;
+            string[] query = [], write = [];
 
             if (data is not null)
             {
                 try
                 {
                     var repo = KoanWebHelpers.GetRepository(sp, data, x.Type, x.KeyType);
-                    // ARCH-0084: negotiate via the unified resolver (survives the marker drop in stage b3),
-                    // bridged back to the legacy flag enums for the existing rendered shape.
+                    // ARCH-0084: self-report the declared capability tokens directly from the unified set.
                     var caps = DataCaps.Describe(repo, repo.GetType().Name);
-                    q = DataCaps.ToQueryCapabilities(caps);
-                    w = DataCaps.ToWriteCapabilities(caps);
+                    query = caps.All.Where(c => c.Id.StartsWith("query.", StringComparison.Ordinal)).Select(c => c.Id).ToArray();
+                    write = caps.All.Where(c => c.Id.StartsWith("write.", StringComparison.Ordinal)).Select(c => c.Id).ToArray();
                 }
                 catch { }
             }
@@ -144,8 +142,8 @@ public sealed class WellKnownController(
                 type = x.Type.FullName,
                 key = KoanWebHelpers.ToKeyName(x.KeyType),
                 provider,
-                query = KoanWebHelpers.EnumFlags(q),
-                write = KoanWebHelpers.EnumFlags(w)
+                query,
+                write
             };
         }).ToArray();
 

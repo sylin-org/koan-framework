@@ -1,53 +1,19 @@
 using AwesomeAssertions;
 using Koan.Core.Capabilities;
-using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Filtering;
-using Koan.Data.Vector.Abstractions;
 using Koan.Data.Vector.Abstractions.Capabilities;
 using Xunit;
 
 namespace Koan.Data.Filtering.Tests;
 
 /// <summary>
-/// Conformance specs for the ARCH-0084 enum↔token bridge and <see cref="FilterSupport"/>. These
-/// pin the migration scaffolding so the legacy flag enums and the unified model stay in lockstep
-/// until the legacy enums are retired in the delete stage.
+/// Conformance specs for <see cref="FilterSupport"/> (ARCH-0084) — the one structured capability
+/// detail, generalizing the entity scalar/collection split and the vector single-set form, and
+/// riding on a capability token as its attached detail.
 /// </summary>
 public class CapabilityBridgeTests
 {
-    [Fact]
-    public void Query_enum_round_trips_through_tokens()
-    {
-        var flags = QueryCapabilities.Linq | QueryCapabilities.String;
-        var caps = CapabilitySet.Build("data.test", c => { foreach (var t in DataCaps.From(flags)) c.Add(t); });
-
-        caps.Has(DataCaps.Query.Linq).Should().BeTrue();
-        caps.Has(DataCaps.Query.String).Should().BeTrue();
-        caps.Has(DataCaps.Query.FastCount).Should().BeFalse();
-        DataCaps.ToQueryCapabilities(caps).Should().Be(flags);
-    }
-
-    [Fact]
-    public void Write_enum_round_trips_through_tokens()
-    {
-        var flags = WriteCapabilities.BulkUpsert | WriteCapabilities.AtomicBatch | WriteCapabilities.FastRemove;
-        var caps = CapabilitySet.Build(null, c => { foreach (var t in DataCaps.From(flags)) c.Add(t); });
-
-        DataCaps.ToWriteCapabilities(caps).Should().Be(flags);
-    }
-
-    [Fact]
-    public void Vector_enum_round_trips_through_tokens()
-    {
-        var flags = VectorCapabilities.Knn | VectorCapabilities.Filters
-                    | VectorCapabilities.BulkUpsert | VectorCapabilities.DynamicCollections;
-        var caps = CapabilitySet.Build(null, c => { foreach (var t in VectorCaps.From(flags)) c.Add(t); });
-
-        caps.All.Should().HaveCount(4);
-        VectorCaps.ToVectorCapabilities(caps).Should().Be(flags);
-    }
-
     [Fact]
     public void FilterSupport_from_entity_record_preserves_scalar_collection_split()
     {

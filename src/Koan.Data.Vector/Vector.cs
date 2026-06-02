@@ -1,3 +1,4 @@
+using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Vector.Abstractions;
@@ -165,12 +166,11 @@ public class Vector<TEntity> where TEntity : class, IEntity<string>
         throw new InvalidOperationException("Stats requires instruction support by the vector provider.");
     }
 
-    // ARCH-0084: resolve via the unified CapabilitySet (native IDescribesCapabilities, else the
-    // legacy-marker bridge), projected back to the legacy enum for this public API (retired in stage c).
-    public static VectorCapabilities GetCapabilities()
+    /// <summary>The provider's vector capabilities as the unified <see cref="CapabilitySet"/> (ARCH-0084).</summary>
+    public static CapabilitySet GetCapabilities()
         => TryRepo is { } repo
-            ? VectorCaps.ToVectorCapabilities(VectorCaps.Describe(repo, repo.GetType().Name))
-            : VectorCapabilities.None;
+            ? VectorCaps.Describe(repo, repo.GetType().Name)
+            : new CapabilitySet();
 
     /// <summary>
     /// Retrieves the embedding vector for a specific entity by ID.

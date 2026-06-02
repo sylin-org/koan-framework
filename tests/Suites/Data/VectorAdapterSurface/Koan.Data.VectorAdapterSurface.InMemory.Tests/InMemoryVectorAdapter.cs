@@ -1,7 +1,9 @@
 using System.Collections.Concurrent;
+using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Vector.Abstractions;
+using Koan.Data.Vector.Abstractions.Capabilities;
 
 namespace Koan.Data.VectorAdapterSurface.InMemory.Tests;
 
@@ -44,7 +46,7 @@ public sealed class InMemoryVectorAdapterFactory : IVectorAdapterFactory
 /// store dictionary is shared with the factory; the repository's job is to look up the right
 /// bucket each time and operate on it.
 /// </summary>
-internal sealed class InMemoryVectorRepository<TEntity, TKey> : IVectorSearchRepository<TEntity, TKey>, IVectorCapabilities
+internal sealed class InMemoryVectorRepository<TEntity, TKey> : IVectorSearchRepository<TEntity, TKey>, IDescribesCapabilities
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
@@ -67,16 +69,11 @@ internal sealed class InMemoryVectorRepository<TEntity, TKey> : IVectorSearchRep
     // streaming export, bulk ops, score normalization, dynamic collections. The two it does NOT
     // claim are honest omissions of features a single-vector dictionary cannot model: multi-vector
     // per entity (one embedding per id) and atomic batch (no transaction boundary).
-    public VectorCapabilities Capabilities =>
-        VectorCapabilities.Knn
-        | VectorCapabilities.Filters
-        | VectorCapabilities.Hybrid
-        | VectorCapabilities.NativeContinuation
-        | VectorCapabilities.StreamingResults
-        | VectorCapabilities.BulkUpsert
-        | VectorCapabilities.BulkDelete
-        | VectorCapabilities.ScoreNormalization
-        | VectorCapabilities.DynamicCollections;
+    public void Describe(ICapabilities caps) => caps
+        .Add(VectorCaps.Knn).Add(VectorCaps.Filters).Add(VectorCaps.Hybrid)
+        .Add(VectorCaps.NativeContinuation).Add(VectorCaps.StreamingResults)
+        .Add(VectorCaps.BulkUpsert).Add(VectorCaps.BulkDelete)
+        .Add(VectorCaps.ScoreNormalization).Add(VectorCaps.DynamicCollections);
 
     // AI-0036 §9: the in-memory adapter evaluates the full unified Filter via DictionaryFilterEvaluator
     // — it IS the convergence oracle, so it declares Full and the coordinator passes every filter through.
