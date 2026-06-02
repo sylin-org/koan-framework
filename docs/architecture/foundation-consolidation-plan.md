@@ -318,15 +318,23 @@ Each facet (1–4) runs:
     rebased onto `VectorCaps.Describe`. Conformance specs verify each flip end-to-end. The only remaining
     legacy-marker readers are the `DataCaps`/`VectorCaps` bridge fallbacks + the test fakes that pin them.
     Solution + samples green; InMemory data 32, Json 7, Data.Core 111, VectorAdapterSurface 26, Data.Filtering 97.
-  - **stage (c) — the deletion (scoped, distinct pass):** delete `Query/Write/VectorCapabilities` enums +
-    `IQuery/IWrite/IVectorCapabilities` markers + the `DataCaps`/`VectorCaps` From/To/marker-fallback
-    bridges + the `Caps`/`WriteCapsImpl` wrappers + `Data<T>.QueryCaps`/`WriteCaps` + `Vector<T>.GetCapabilities`.
-    Re-render the `/.well-known` aggregate + the `Koan-Write-Capabilities` header directly from `caps.All`
-    (they currently round-trip through the bridge-to-enum). Migrate `S10.DevPortal`, the 4 test fakes, and
-    **reconcile ~45 docs** (DATA-0002/0003 + the capability guides) in the same step (ADR requirement, to
-    prevent re-drift). Blast radius: ~15 src + 4 test + 45 doc files. NOTE: the **Gen-1 cut**
-    (`Koan.Core.Adapters` `AdapterCapabilities`/`Capabilities.cs`/`BaseKoanAdapter`) is independent of this
-    enum deletion and is its own increment (LMStudio rewrite).
+  - **stage (c) ✓ — the deletion (commits `b8b3486e` code + the docs commit):** deleted the 6 legacy
+    types (`Query/Write/VectorCapabilities` enums + `IQuery/IWrite/IVectorCapabilities` markers), gutted the
+    `DataCaps`/`VectorCaps` From/To/marker-fallback bridges (`Describe` is now a thin native-only resolver),
+    removed the `Caps`/`WriteCapsImpl` wrappers + `Data<T>.QueryCaps`/`WriteCaps`; `Vector<T>.GetCapabilities`
+    now returns `CapabilitySet`. The `/.well-known` aggregate + `Koan-Write-Capabilities` header re-render
+    token ids from `caps.All`. Migrated `S10.DevPortal` + the 4 test fakes; reconciled the active capability
+    guides/reference + added supersede banners to DATA-0002/0003 (historical ADRs left intact). Removed the
+    vestigial `QueryCapabilities` field from Gen-1 `AdapterCapabilities`. Solution + samples green;
+    Core 176, Data.Filtering 92, InMemory 32, Json 7, VectorAdapterSurface 26, Web AdapterSurface 56.
+
+  **Facet 1 is COMPLETE** (the unified capability model is the sole surface). Two follow-ons remain, both
+  scoped in ARCH-0084 but independent of the capability migration: the **Gen-1 cut** (`Koan.Core.Adapters`
+  `AdapterCapabilities`/`Capabilities.cs`/`BaseKoanAdapter` — an `LMStudioAdapter` rewrite off the base class)
+  and the **`TransactionCapabilities` runtime-state split**. The **FilterSupport** sub-facet
+  (`FilterCapabilities`/`VectorFilterCapabilities` → `FilterSupport` on the filter token, ~37 files) is also
+  separate. Next facet: **Facet 2 — `KoanModule`** (registration + bootstrap + self-report), which hosts
+  `Describe` and builds directly on the capability model just landed.
   - **Gen-1 cut (independent of the enum migration):** `LMStudioAdapter` is the one consumer but it
     inherits its *entire* scaffolding from `BaseKoanAdapter` (`Logger`, `GetOptions<T>`,
     `GetConnectionString`, `InitializeAdapter`/`CheckAdapterHealth`/`GetAdapterBootstrapMetadata`), so the

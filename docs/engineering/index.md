@@ -75,7 +75,7 @@ See the [NuGet packaging policy](packaging.md) for detailed expectations and fol
 ## Edge Cases & Escalation
 
 - **Large data operations**: Prefer `Entity.AllStream(...)` or explicit paging; flag data guides when new patterns arise.
-- **Provider capabilities**: Guard fallbacks when `Data<TEntity, TKey>.QueryCaps` lacks LINQ pushdown.
+- **Provider capabilities**: Guard fallbacks when `Data<TEntity, TKey>.Capabilities` lacks LINQ pushdown.
 - **Environment detection**: Use `KoanEnv` for environment checks; avoid raw `IHostEnvironment` or env vars.
 - **Configuration overrides**: Introduce typed Options with validation; do not branch on raw configuration keys inside business logic.
 

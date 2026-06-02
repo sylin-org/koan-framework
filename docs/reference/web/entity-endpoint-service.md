@@ -136,9 +136,9 @@ Always propagate `result.Headers` and `result.Warnings` so clients see consisten
 ## Dataset & Capability Awareness
 
 - The `Set` request field scopes operations inside a `DataSetContext`, preserving multitenant routing.
-- `IQueryCapabilities` and `IWriteCapabilities` implementations on repositories populate `EntityRequestContext.Capabilities` and the `Koan-Write-Capabilities` header.
+- A repository's `IDescribesCapabilities` declarations (resolved via `DataCaps.Describe(repo)`) populate `EntityRequestContext.Capabilities` (a `CapabilitySet` carrying both query and write tokens) and the `Koan-Write-Capabilities` header, which emits token-id strings (e.g. `write.bulkUpsert`) rather than enum flag names.
 
-Implement these interfaces on custom repositories so downstream adapters receive accurate capability metadata.
+Implement `IDescribesCapabilities` on custom repositories so downstream adapters receive accurate capability metadata.
 
 ---
 

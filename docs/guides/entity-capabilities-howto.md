@@ -576,7 +576,7 @@ Here's the key insight: **Optimized uses Fast on most providers** (Postgres, SQL
 
 **Recipe**
 
-Same packages as always. Providers with `WriteCapabilities.FastRemove` (Postgres, SQL Server, MongoDB, SQLite, Redis) support fast strategies.
+Same packages as always. Providers with `DataCaps.Write.FastRemove` (Postgres, SQL Server, MongoDB, SQLite, Redis) support fast strategies.
 
 **Sample**
 

@@ -184,10 +184,10 @@ var provider = _registry.GetProvider(typeof(Todo));
 
 ```csharp
 // Framework handles provider differences transparently
-var capabilities = Data<Todo, string>.QueryCaps;
+var capabilities = Data<Todo, string>.Capabilities;
 
 // Automatic fallback when provider lacks features
-if (capabilities.Capabilities.HasFlag(QueryCapabilities.LinqQueries))
+if (capabilities.Has(DataCaps.Query.Linq))
 {
     // Query pushed to database
 }

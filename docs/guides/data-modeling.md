@@ -167,7 +167,7 @@ public static class ProductLifecycle
 ## 7. Wire Configuration and Capabilities
 
 - Declare the default adapter in configuration and scope overrides with `[DataAdapter("alias")]`.
-- Inspect `EntityCaps<T>` or `Data<T, string>.QueryCaps` before enabling transactions, vectors, or sharding.
+- Inspect `EntityCaps<T>` or `Data<T, string>.Capabilities` before enabling transactions, vectors, or sharding.
 - Capture environment-specific overrides in deployment manifests or `launchSettings.json`.
 
 ---

@@ -481,7 +481,7 @@ var result = await customer.Canonize(services, new CanonizationOptions { Origin 
 **Challenge**: Data provider lacks streaming or specific query features.
 
 **Mitigation**:
-- Runtime detects capabilities via `Data<T, K>.QueryCaps`
+- Runtime detects capabilities via `Data<T, K>.Capabilities`
 - Falls back to paged reads (`FirstPage`, `Page`) when streaming unavailable
 - Logs degraded performance warnings for operational visibility
 

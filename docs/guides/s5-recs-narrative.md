@@ -1615,7 +1615,7 @@ Not all providers support all features:
 // Check capabilities before using
 var caps = Vector<Media>.GetCapabilities();
 
-if (caps.HasFlag(VectorCapabilities.Hybrid))
+if (caps.Has(VectorCaps.Hybrid))
 {
     // Use hybrid search
     results = await Vector<Media>.Search(vector, text, alpha);

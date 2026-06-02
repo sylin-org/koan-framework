@@ -8,6 +8,8 @@ date: 2025-08-16
 
 # ADR 0002: Introduce QueryCapabilities flags and IQueryCapabilities
 
+> **Superseded by [ARCH-0084](ARCH-0084-unified-capability-model.md).** The flag-enum + marker-interface model described below was replaced by the unified `CapabilitySet` token model and the types were deleted in its stage-c. This ADR is retained as the historical record.
+
 Context
 - Providers have different query features (e.g., raw string queries vs LINQ predicates). We need a discoverable way to expose capabilities.
 

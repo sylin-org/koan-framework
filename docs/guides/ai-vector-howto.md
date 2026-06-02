@@ -209,7 +209,7 @@ Console.WriteLine($"Indexed {count} items");
 **Recipe**
 
 - Entities indexed with `Vector<T>.Save()` (section 2)
-- Vector provider supporting `VectorCapabilities.Knn`
+- Vector provider supporting `VectorCaps.Knn`
 - Query text embedded using same model as indexed data
 
 **Sample**
@@ -247,7 +247,7 @@ if (!Vector<Media>.IsAvailable)
 }
 
 var capabilities = Vector<Media>.GetCapabilities();
-if (capabilities.HasFlag(VectorCapabilities.Knn))
+if (capabilities.Has(VectorCaps.Knn))
 {
     // Perform vector search
 }
@@ -263,7 +263,7 @@ if (capabilities.HasFlag(VectorCapabilities.Knn))
 - Solves exact title matching for non-English content
 - `alpha` parameter controls semantic vs keyword balance (0.0=keyword, 1.0=semantic)
 - Provider-native fusion (Weaviate, ElasticSearch) for optimal performance
-- Requires `VectorCapabilities.Hybrid` support
+- Requires `VectorCaps.Hybrid` support
 
 **Recipe**
 
@@ -766,10 +766,10 @@ services.AddHealthChecks()
             return HealthCheckResult.Unhealthy("Vector search not configured");
 
         var caps = Vector<Media>.GetCapabilities();
-        if (!caps.HasFlag(VectorCapabilities.Knn))
+        if (!caps.Has(VectorCaps.Knn))
             return HealthCheckResult.Degraded("KNN search not supported");
 
-        if (!caps.HasFlag(VectorCapabilities.Hybrid))
+        if (!caps.Has(VectorCaps.Hybrid))
             return HealthCheckResult.Degraded("Hybrid search not supported");
 
         return HealthCheckResult.Healthy("Vector search operational");
@@ -859,7 +859,7 @@ var titleEmbedding = await Ai.Embed(media.Title);
 var synopsisEmbedding = await Ai.Embed(media.Synopsis);
 
 // Store multiple vectors per entity (if provider supports it)
-if (Vector<Media>.GetCapabilities().HasFlag(VectorCapabilities.MultiVectorPerEntity))
+if (Vector<Media>.GetCapabilities().Has(VectorCaps.MultiVectorPerEntity))
 {
     await Vector<Media>.Save(
         id: media.Id,
