@@ -6,7 +6,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Koan.Core;
 using Koan.Core.Infrastructure;
+using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
@@ -27,19 +29,20 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
     IOptimizedDataRepository<TEntity, TKey>,
     IQueryRepository<TEntity, TKey>,
     IRawQueryRepository<TEntity, TKey>,
-    IQueryCapabilities,
-    IWriteCapabilities,
+    IDescribesCapabilities,
     IBulkUpsert<TKey>,
     IBulkDelete<TKey>,
     IInstructionExecutor<TEntity>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
-    public QueryCapabilities Capabilities => QueryCapabilities.Linq | QueryCapabilities.String;
-
     /// <summary>Operators the SQL Server adapter pushes down (DATA-XXXX). Everything else falls to the in-memory floor.</summary>
     public FilterCapabilities FilterCapabilities => RelationalFilterCapabilities.Default;
-    public WriteCapabilities Writes => WriteCapabilities.BulkUpsert | WriteCapabilities.BulkDelete | WriteCapabilities.AtomicBatch | WriteCapabilities.FastRemove;
+
+    public void Describe(ICapabilities caps) => caps
+        .Add(DataCaps.Query.Linq).Add(DataCaps.Query.String)
+        .Add(DataCaps.Write.BulkUpsert).Add(DataCaps.Write.BulkDelete)
+        .Add(DataCaps.Write.AtomicBatch).Add(DataCaps.Write.FastRemove);
 
     // Storage optimization support
     private readonly StorageOptimizationInfo _optimizationInfo;
@@ -513,7 +516,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
 
         // Resolve Optimized strategy based on provider capabilities
         var effectiveStrategy = strategy == RemoveStrategy.Optimized
-            ? (Writes.HasFlag(WriteCapabilities.FastRemove) ? RemoveStrategy.Fast : RemoveStrategy.Safe)
+            ? RemoveStrategy.Fast // this adapter declares write.fastRemove
             : strategy;
 
         if (effectiveStrategy == RemoveStrategy.Fast)

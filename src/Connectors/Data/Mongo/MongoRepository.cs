@@ -6,7 +6,9 @@ using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Core.Adapters;
+using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
@@ -27,8 +29,7 @@ namespace Koan.Data.Connector.Mongo;
 internal sealed class MongoRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
     IQueryRepository<TEntity, TKey>,
-    IQueryCapabilities,
-    IWriteCapabilities,
+    IDescribesCapabilities,
     IBulkUpsert<TKey>,
     IBulkDelete<TKey>,
     IInstructionExecutor<TEntity>,
@@ -64,8 +65,10 @@ internal sealed class MongoRepository<TEntity, TKey> :
         _collectionName = AdapterNaming.GetOrCompute<TEntity, TKey>(_sp);
     }
 
-    public QueryCapabilities Capabilities => QueryCapabilities.Linq;
-    public WriteCapabilities Writes => WriteCapabilities.BulkUpsert | WriteCapabilities.BulkDelete | WriteCapabilities.AtomicBatch | WriteCapabilities.FastRemove;
+    public void Describe(ICapabilities caps) => caps
+        .Add(DataCaps.Query.Linq)
+        .Add(DataCaps.Write.BulkUpsert).Add(DataCaps.Write.BulkDelete)
+        .Add(DataCaps.Write.AtomicBatch).Add(DataCaps.Write.FastRemove);
     public StorageOptimizationInfo OptimizationInfo => _optimizationInfo;
 
     /// <summary>Operators Mongo translates server-side; the coordinator routes the rest to the in-memory floor.</summary>
@@ -509,7 +512,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
 
             // Resolve Optimized strategy based on provider capabilities
             var effectiveStrategy = strategy == RemoveStrategy.Optimized
-                ? (Writes.HasFlag(WriteCapabilities.FastRemove) ? RemoveStrategy.Fast : RemoveStrategy.Safe)
+                ? RemoveStrategy.Fast // this adapter declares write.fastRemove
                 : strategy;
 
             if (effectiveStrategy == RemoveStrategy.Fast)

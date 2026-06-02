@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
+using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Sorting;
 using Koan.Data.Core.Sorting;
@@ -19,8 +21,7 @@ namespace Koan.Data.Connector.Json;
 internal sealed class JsonRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
     IQueryRepository<TEntity, TKey>,
-    IQueryCapabilities,
-    IWriteCapabilities,
+    IDescribesCapabilities,
     Abstractions.Instructions.IInstructionExecutor<TEntity>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
@@ -35,10 +36,10 @@ internal sealed class JsonRepository<TEntity, TKey> :
     // Maintain per-physical-name stores and file paths so different sets are isolated
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<TKey, TEntity>> _stores = new();
     private readonly ConcurrentDictionary<string, string> _files = new();
-    public QueryCapabilities Capabilities => QueryCapabilities.Linq; // supports LINQ predicate
     public FilterCapabilities FilterCapabilities => FilterCapabilities.Full;
-    // JSON adapter does not have native bulk APIs; honor semantics via fallbacks without advertising native bulk
-    public WriteCapabilities Writes => default;
+
+    // JSON adapter does not have native bulk APIs; honor semantics via fallbacks without advertising native bulk.
+    public void Describe(ICapabilities caps) => caps.Add(DataCaps.Query.Linq); // supports LINQ predicate
 
     public JsonRepository(IOptions<JsonDataOptions> options)
     {

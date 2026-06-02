@@ -13,7 +13,9 @@ using Couchbase.Query;
 using Couchbase.Transactions;
 using Couchbase.Core.Exceptions.KeyValue;
 using Couchbase.Transactions.Error;
+using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
@@ -34,8 +36,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
     IQueryRepository<TEntity, TKey>,
     IRawQueryRepository<TEntity, TKey>,
     IOptimizedDataRepository<TEntity, TKey>,
-    IQueryCapabilities,
-    IWriteCapabilities,
+    IDescribesCapabilities,
     IBulkUpsert<TKey>,
     IBulkDelete<TKey>,
     IInstructionExecutor<TEntity>,
@@ -85,8 +86,9 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
         }
     }
 
-    public QueryCapabilities Capabilities => QueryCapabilities.String | QueryCapabilities.Linq;
-    public WriteCapabilities Writes => WriteCapabilities.BulkUpsert | WriteCapabilities.BulkDelete | WriteCapabilities.AtomicBatch;
+    public void Describe(ICapabilities caps) => caps
+        .Add(DataCaps.Query.String).Add(DataCaps.Query.Linq)
+        .Add(DataCaps.Write.BulkUpsert).Add(DataCaps.Write.BulkDelete).Add(DataCaps.Write.AtomicBatch);
     public StorageOptimizationInfo OptimizationInfo => _optimizationInfo;
 
     public Task<bool> IsReadyAsync(CancellationToken ct = default) => _provider.IsReadyAsync(ct);

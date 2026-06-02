@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
 using System.Collections.Frozen;
+using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Core.Sorting;
@@ -17,8 +19,7 @@ namespace Koan.Data.Connector.InMemory;
 internal sealed class InMemoryRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
     IQueryRepository<TEntity, TKey>,
-    IQueryCapabilities,
-    IWriteCapabilities,
+    IDescribesCapabilities,
     IInstructionExecutor<TEntity>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
@@ -31,16 +32,13 @@ internal sealed class InMemoryRepository<TEntity, TKey> :
         _dataStore = dataStore;
     }
 
-    /// <summary>InMemory supports full LINQ-to-objects capabilities.</summary>
-    public QueryCapabilities Capabilities => QueryCapabilities.Linq;
-
     /// <summary>InMemory pushes every filter operator (it runs the AST directly in memory).</summary>
     public FilterCapabilities FilterCapabilities => FilterCapabilities.Full;
 
-    public WriteCapabilities Writes =>
-        WriteCapabilities.BulkUpsert |
-        WriteCapabilities.BulkDelete |
-        WriteCapabilities.AtomicBatch;
+    /// <summary>InMemory supports full LINQ-to-objects + atomic bulk writes.</summary>
+    public void Describe(ICapabilities caps) => caps
+        .Add(DataCaps.Query.Linq)
+        .Add(DataCaps.Write.BulkUpsert).Add(DataCaps.Write.BulkDelete).Add(DataCaps.Write.AtomicBatch);
 
     private string CurrentPartition =>
         Koan.Data.Core.EntityContext.Current?.Partition ?? "default";

@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Sorting;
 using Koan.Data.Core.Sorting;
@@ -18,8 +20,7 @@ namespace Koan.Data.Connector.Redis;
 internal sealed class RedisRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
     IQueryRepository<TEntity, TKey>,
-    IQueryCapabilities,
-    IWriteCapabilities,
+    IDescribesCapabilities,
     Abstractions.Instructions.IInstructionExecutor<TEntity>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
@@ -31,9 +32,11 @@ internal sealed class RedisRepository<TEntity, TKey> :
     public RedisRepository(IOptions<RedisOptions> options, IConnectionMultiplexer muxer, ILoggerFactory? lf)
     { _options = options; _muxer = muxer; _logger = lf?.CreateLogger("Koan.Data.Connector.Redis"); }
 
-    public QueryCapabilities Capabilities => QueryCapabilities.Linq; // predicate filtering in-memory
     public FilterCapabilities FilterCapabilities => FilterCapabilities.Full;
-    public WriteCapabilities Writes => WriteCapabilities.FastRemove;
+
+    public void Describe(ICapabilities caps) => caps
+        .Add(DataCaps.Query.Linq)            // predicate filtering in-memory
+        .Add(DataCaps.Write.FastRemove);
 
     private string Keyspace()
     {
@@ -175,7 +178,7 @@ internal sealed class RedisRepository<TEntity, TKey> :
 
         // Resolve Optimized strategy based on provider capabilities
         var effectiveStrategy = strategy == RemoveStrategy.Optimized
-            ? (Writes.HasFlag(WriteCapabilities.FastRemove) ? RemoveStrategy.Fast : RemoveStrategy.Safe)
+            ? RemoveStrategy.Fast // this adapter declares write.fastRemove
             : strategy;
 
         if (effectiveStrategy == RemoveStrategy.Fast)
