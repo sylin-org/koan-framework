@@ -1,0 +1,57 @@
+<Project>
+  <!--
+    ARCH-0085 §3: emit a bounded compatibility RANGE for every Koan→Koan package
+    dependency instead of the floor-only ">= X" that `dotnet pack` produces by default
+    from a ProjectReference.
+
+    Why: a floor-only dependency lets a BREAKING newer version of a dependency satisfy a
+    stale dependent (NuGet checks version floors, never ABI), so a stale package resolves
+    against an incompatible kernel and TypeLoadExceptions at runtime in the consumer (the
+    Koan.Cache 0.8.1 × Koan.Data.Abstractions 0.8.2 incident). A bounded range turns that
+    into a loud RESTORE failure (NU1107/NU1608) at the consumer's build instead.
+
+    The band is keyed to the referenced package's own breaking tier (pre-1.0 SemVer):
+      - major == 0  → minor is breaking → [X.Y.Z, X.(Y+1).0)   e.g. [0.8.2, 0.9.0)
+      - major >= 1  → major is breaking → [X.Y.Z, (X+1).0.0)   e.g. [1.2.3, 2.0.0)
+
+    Mechanism: NuGet's `_GetProjectReferenceVersions` target populates
+    @(_ProjectReferencesWithVersions) with a `ProjectVersion` metadata that GenerateNuspec
+    turns into each <dependency version="..."/>. We rewrite that metadata to the band.
+    Only runtime ProjectReferences appear here (analyzer/generator refs with
+    ReferenceOutputAssembly=false are excluded), and every runtime ProjectReference in this
+    repo is a Koan package — so applying to all entries is correct.
+
+    Escape hatch: set $(KoanDisableCompatRanges)=true to fall back to floor-only.
+  -->
+  <Target Name="KoanApplyCompatRanges"
+          AfterTargets="_GetProjectReferenceVersions"
+          Condition="'$(KoanDisableCompatRanges)' != 'true'">
+    <ItemGroup>
+      <!-- 1. Capture major/minor of each referenced project's version. Only CLEAN 3-part release
+           versions are banded: nbgv stamps prerelease builds on non-release branches as
+           "0.17.3-g1a2b3c", which is not a parseable System.Version and is never published anyway,
+           so those keep the floor-only default. -->
+      <_ProjectReferencesWithVersions Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('%(ProjectVersion)', '^[0-9]+\.[0-9]+\.[0-9]+$'))">
+        <_KoanMajor>$([System.Version]::Parse('%(ProjectVersion)').Major)</_KoanMajor>
+        <_KoanMinor>$([System.Version]::Parse('%(ProjectVersion)').Minor)</_KoanMinor>
+      </_ProjectReferencesWithVersions>
+
+      <!-- 2. Compute the exclusive ceiling from the breaking tier (pre-1.0 vs 1.0+). -->
+      <_ProjectReferencesWithVersions Condition="'%(_KoanMajor)' != '' and '%(_KoanMajor)' == '0'">
+        <_KoanCeiling>0.$([MSBuild]::Add('%(_KoanMinor)', 1)).0</_KoanCeiling>
+      </_ProjectReferencesWithVersions>
+      <_ProjectReferencesWithVersions Condition="'%(_KoanMajor)' != '' and '%(_KoanMajor)' != '0'">
+        <_KoanCeiling>$([MSBuild]::Add('%(_KoanMajor)', 1)).0.0</_KoanCeiling>
+      </_ProjectReferencesWithVersions>
+
+      <!-- 3. Rewrite the emitted dependency version to the closed-open band. -->
+      <_ProjectReferencesWithVersions Condition="'%(_KoanCeiling)' != ''">
+        <ProjectVersion>[%(ProjectVersion), %(_KoanCeiling))</ProjectVersion>
+      </_ProjectReferencesWithVersions>
+    </ItemGroup>
+
+    <Message Importance="normal"
+             Text="Koan compat ranges: %(_ProjectReferencesWithVersions.Identity) -> %(_ProjectReferencesWithVersions.ProjectVersion)"
+             Condition="'%(_ProjectReferencesWithVersions._KoanCeiling)' != ''" />
+  </Target>
+</Project>
