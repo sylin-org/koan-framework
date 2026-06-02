@@ -401,7 +401,6 @@ public sealed class MediaPipelinePlannerSpec
     [InlineData("png", new[] { MediaKind.Raster })]
     [InlineData("bmp", new[] { MediaKind.Raster })]
     [InlineData("tiff", new[] { MediaKind.Raster })]
-    [InlineData("avif", new[] { MediaKind.Raster })]
     [InlineData("webp", new[] { MediaKind.Raster, MediaKind.AnimatedRaster })]
     [InlineData("gif", new[] { MediaKind.Raster, MediaKind.AnimatedRaster })]
     public void EncoderAccepts_matrix_matches_documented_kinds(string slug, MediaKind[] expected)

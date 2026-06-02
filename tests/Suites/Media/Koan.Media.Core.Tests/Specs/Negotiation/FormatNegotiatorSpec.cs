@@ -127,15 +127,31 @@ public sealed class FormatNegotiatorSpec
     }
 
     [Fact]
-    public void Q_rank_chooses_avif_when_offered_at_highest_q()
+    public void Non_producible_highest_q_format_falls_through_to_next_producible()
     {
-        // avif at q=1.0 beats webp/jpeg at q=0.9/0.8 even when avif is
-        // not first in the allowlist.
+        // avif is offered at the highest q (1.0), but the framework has no concrete avif encoder, so
+        // EncoderAccepts does not advertise it (it is filtered out of the live registry). The
+        // negotiator must therefore SKIP it and fall through to the next-q producible format (webp),
+        // never promising avif which EncoderSelector would 500 on. MEDIA-0009 regression guard.
         var result = FormatNegotiator.Negotiate(
             recipeAllowedFormats: new[] { "webp", "jpeg", "avif" },
             acceptHeader: "image/avif,image/webp;q=0.9,image/jpeg;q=0.8",
             sourceFormat: "png");
 
-        result.Should().Be("avif");
+        result.Should().Be("webp");
+    }
+
+    [Fact]
+    public void Non_producible_allowlist_default_falls_through_on_no_overlap()
+    {
+        // The recipe lists avif first (preferred default) but avif is not producible. With an Accept
+        // header that overlaps nothing, the defensive fallthrough must skip avif and return the first
+        // PRODUCIBLE allowlist entry (jpeg) — not allowlist[0] (avif), which would 500.
+        var result = FormatNegotiator.Negotiate(
+            recipeAllowedFormats: new[] { "avif", "jpeg" },
+            acceptHeader: "image/gif",
+            sourceFormat: "png");
+
+        result.Should().Be("jpeg");
     }
 }

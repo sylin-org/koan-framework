@@ -170,6 +170,25 @@ The fourth case is the new one. The allowlist genuinely makes the response Accep
 - **No SVG-as-output.** SVG is input-only per MEDIA-0006. A recipe cannot declare `AllowedOutputFormats = ["svg"]`; the resolver would throw `NoCompatibleEncoderException` because no encoder registers `OutputFormat: "svg"`. This is enforced by the registry, not by special-casing in the resolver.
 - **No content-length-based format selection.** The resolver does not encode the source twice to compare byte sizes and pick the smaller one. The recipe author's preference order in `AllowedOutputFormats` is authoritative; runtime optimisation across encodings is a different problem (and probably belongs to an offline derivation job, not to a hot request path).
 
+## Addendum (2026-06-01): producibility is the single source of truth
+
+The algorithm in §d filters the allowlist to `producible` — slugs the encoder registry can actually emit (line 91–95). The original implementation took a shortcut: it filtered only on `EncoderAccepts.MediaTypeFor(slug) is null`, trusting that every slug in `EncoderAccepts` was producible. That trust was misplaced. `EncoderAccepts` was widened to **declare** `avif` (with a MIME type and `Raster` admission) *before* `EncoderSelector` had a concrete AVIF encoder — directly contradicting the "Out of scope" note that the encoder binding lands *after* the table is widened. The result was the classic two-tables-no-source-of-truth split-brain (cf. DATA-0098):
+
+- **Capability table** (`EncoderAccepts._descriptors`) said avif is a real encoder.
+- **Producer** (`EncoderSelector.For`) threw `NotSupportedException` for avif.
+
+So the negotiator happily picked avif for a Chrome client sending `Accept: image/avif`, then `EncoderSelector.For("avif")` 500'd. The tests even enforced the divergence — `EncoderDescriptorMatrixSpec` asserted avif *is* registered and never cross-checked it against the producer.
+
+**Resolution — derive the capability from the producer, in three places, all gated by `EncoderSelector.SupportedFormats` (the single producibility authority):**
+
+1. **`EncoderAccepts.All` (and every lookup the negotiator/planner uses) is now the LIVE registry** — `_descriptors ∩ EncoderSelector.SupportedFormats`. A declared-but-unproducible format (avif until its encoder is wired) is filtered out, so `MediaTypeFor("avif")` is `null` and the negotiator's existing null-skip turns into the fallthrough §d already promised. The avif descriptor stays in `_descriptors` as forward-compat metadata and goes live automatically the moment `EncoderSelector` can produce it.
+2. **The no-overlap / no-Accept fallback** in `FormatNegotiator` no longer returns `recipeAllowedFormats[0]` blind — it returns the first *producible* allowlist entry (`PreferredProducible`), degrading to source format when the whole allowlist is non-producible. A recipe that lists avif first can no longer 500 on a no-overlap request.
+3. **Format-shortcut resolution** (`MediaRecipeRegistry.TryResolve`) gates synthesis by producibility: `?recipe=avif` resolves as *unknown* (honest 404) instead of synthesising an avif-pinned recipe that 500s. avif stays a *reserved name* (no host recipe may claim it) for forward-compat, but is not an advertised/resolvable shortcut until producible. `FormatShortcuts` advertises only producible formats.
+
+A conformance test (`EncoderDescriptorMatrixSpec.Every_advertised_encoder_is_producible_by_the_selector`) now asserts `EncoderAccepts.All ⊆ EncoderSelector` producibility — the cross-check that was missing. Wiring a real AVIF encoder is still the one-line `EncoderSelector` change §0/§191 describes; doing so flips the existing avif descriptor live with zero recipe or consumer churn.
+
+**Fourth path — closed (boot-time recipe validation):** a host config/code recipe that *explicitly* pins `EncodeAs("avif")` (or any non-producible slug) bypasses both the negotiator and the shortcut gate — the planner's terminal gate is deliberately permissive for unknown slugs, deferring to `EncoderSelector.For` which throws. This now fails fast at boot instead of per-request: `RecipeOutputFormatValidator.EnsureProducible` walks every built recipe's `EncodeStep`/`FlattenToStep` and rejects any non-producible `Format` with a `MediaRecipeBindingException` naming the format and listing the producible set. It runs on **both** boot paths — `ConfiguredRecipeBinder` (config/appsettings recipes) and `MediaRecipeRegistry.DiscoverCodeRecipes` (`[MediaRecipe]` code recipes) — so the source of the recipe is irrelevant. To avoid introducing a *second* canonicalizer (which would be a fresh split-brain), the `jpg`→`jpeg` alias folding now lives in exactly one place, `EncoderSelector.CanonicalizeSlug`, and `EncoderSelector.For` consults it too — so `EncodeAs("jpg")` validates *and* produces end-to-end (it previously bound clean and 500'd on the switch default). `EncoderSelector.CanProduce(slug)` is the single producibility predicate the registry shortcut resolver and both validators share.
+
 ## Consequences
 
 **Positive:**

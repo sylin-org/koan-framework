@@ -50,7 +50,7 @@ public static class FormatNegotiator
         if (accepted.Count == 0)
         {
             // Missing or malformed Accept header — recipe's preferred default wins.
-            return recipeAllowedFormats[0];
+            return PreferredProducible(recipeAllowedFormats, sourceFormat);
         }
 
         // Greedy on q-rank: walk Accept entries in descending q order; for
@@ -71,8 +71,29 @@ public static class FormatNegotiator
         }
 
         // No Accept entry overlapped the allowlist — fall back to the
-        // recipe's preferred default per MEDIA-0009 §d.5.
-        return recipeAllowedFormats[0];
+        // recipe's preferred default per MEDIA-0009 §d.5 (defensive: skip
+        // any non-producible allowlist entry so we never promise a format
+        // the encoder would 500 on).
+        return PreferredProducible(recipeAllowedFormats, sourceFormat);
+    }
+
+    /// <summary>
+    /// The recipe's preferred default, skipping any allowlisted slug the framework cannot actually
+    /// produce. Per MEDIA-0009 §d (defensive fallthrough): a recipe may allowlist a forward-compat
+    /// format (e.g. <c>avif</c>) that has no concrete encoder yet — returning it would make the
+    /// encoder throw. Falls through to the next producible entry, and to the source format as a last
+    /// resort when the entire allowlist is non-producible (a misconfigured recipe — preserve source
+    /// rather than 500). The q-rank loop above is already producibility-safe via the null-MediaType
+    /// skip; this guards the no-overlap / no-Accept fallbacks, which would otherwise return
+    /// allowlist[0] blind.
+    /// </summary>
+    private static string PreferredProducible(IReadOnlyList<string> recipeAllowedFormats, string sourceFormat)
+    {
+        foreach (var slug in recipeAllowedFormats)
+        {
+            if (EncoderAccepts.IsRegistered(slug)) return slug;
+        }
+        return sourceFormat;
     }
 
     /// <summary>

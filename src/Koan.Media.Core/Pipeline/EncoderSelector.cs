@@ -24,6 +24,23 @@ public static class EncoderSelector
         "jpeg", "png", "webp", "gif", "bmp", "tiff",
     };
 
+    /// <summary>
+    /// Normalise a format slug to its canonical producible form: trimmed, lowercased, with the "jpg"
+    /// alias folded to "jpeg". This is the ONE canonicalizer — the recipe registry and recipe
+    /// validators delegate here so an alias is never re-derived independently (DATA-0098 single source).
+    /// </summary>
+    public static string CanonicalizeSlug(string? slug) =>
+        (slug ?? string.Empty).Trim().ToLowerInvariant() switch { "jpg" => "jpeg", var s => s };
+
+    /// <summary>
+    /// True when the framework has a concrete encoder for the given format slug (alias-aware). The
+    /// single producibility authority: capability tables, the negotiator's fallthrough, the recipe
+    /// shortcut resolver, and boot-time recipe validation all consult this rather than re-deriving it.
+    /// </summary>
+    public static bool CanProduce(string? slug) =>
+        !string.IsNullOrWhiteSpace(slug)
+        && SupportedFormats.Contains(CanonicalizeSlug(slug), StringComparer.OrdinalIgnoreCase);
+
     /// <summary>True when the named format supports an alpha channel.</summary>
     public static bool SupportsAlpha(string format) => format.ToLowerInvariant() switch
     {
@@ -69,7 +86,7 @@ public static class EncoderSelector
     /// </summary>
     public static IImageEncoder For(IImageFormat? sourceFormat, string? targetFormat, int quality)
     {
-        var slug = targetFormat?.ToLowerInvariant() ?? CanonicalSlug(sourceFormat);
+        var slug = targetFormat is null ? CanonicalSlug(sourceFormat) : CanonicalizeSlug(targetFormat);
         return slug switch
         {
             "jpeg" => new JpegEncoder

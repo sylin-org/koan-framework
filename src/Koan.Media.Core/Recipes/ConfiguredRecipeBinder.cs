@@ -49,6 +49,7 @@ public static class ConfiguredRecipeBinder
         }
 
         var recipe = builder.Build() with { Source = source };
+        RecipeOutputFormatValidator.EnsureProducible(recipe, name);
         return recipe;
     }
 

@@ -35,6 +35,50 @@ public sealed class MediaRecipeRegistrySpec
     }
 
     [Fact]
+    public void Unproducible_reserved_shortcut_does_not_resolve()
+    {
+        // avif is a reserved shortcut name, but EncoderSelector cannot produce it yet — so it must
+        // NOT synthesise a recipe (which would pin avif and 500 in EncoderSelector.For). It resolves
+        // as "unknown" so the controller returns an honest 404. MEDIA-0009 split-brain guard: the
+        // shortcut resolver derives producibility from EncoderSelector (single source of truth).
+        var registry = NewRegistry();
+        registry.TryResolve("avif", out _).Should().BeFalse(
+            "avif has no concrete encoder yet, so the shortcut must not resolve");
+    }
+
+    [Fact]
+    public void FormatShortcuts_advertises_only_producible_formats()
+    {
+        var registry = NewRegistry();
+        registry.FormatShortcuts.Should().Contain(new[] { "jpeg", "jpg", "png", "webp", "gif", "bmp", "tiff" });
+        registry.FormatShortcuts.Should().NotContain("avif",
+            "avif is declared/reserved but not producible, so it must not be advertised as a usable shortcut");
+    }
+
+    [Fact]
+    public void Avif_remains_a_reserved_name_even_though_it_does_not_resolve()
+    {
+        // The reservation is independent of producibility: a recipe still cannot CLAIM the avif name
+        // (forward-compat — so wiring the encoder later cannot collide with a host recipe), even though
+        // the shortcut does not resolve today.
+        var act = () => NewRegistry(
+            options: new RecipesOptions
+            {
+                Recipes = new Dictionary<string, ConfiguredRecipe>
+                {
+                    ["avif"] = new ConfiguredRecipe
+                    {
+                        Steps = new List<ConfiguredStep>
+                        {
+                            new() { Op = "encodeAs", Format = "webp" },
+                        },
+                    },
+                },
+            });
+        act.Should().Throw<MediaRecipeBindingException>();
+    }
+
+    [Fact]
     public void Code_recipe_attribute_is_discovered()
     {
         var registry = NewRegistry(typeof(TestCodeRecipes));
@@ -125,6 +169,51 @@ public sealed class MediaRecipeRegistrySpec
                 },
             });
         act.Should().Throw<MediaRecipeBindingException>();
+    }
+
+    [Fact]
+    public void Config_recipe_pinning_unproducible_format_fails_fast()
+    {
+        // A recipe that explicitly pins a non-producible format (avif before its encoder is wired)
+        // must fail at boot — not 500 per-request. The binder validates EncodeAs/FlattenTo formats
+        // against EncoderSelector (the single producibility authority). MEDIA-0009 residual closed.
+        var act = () => NewRegistry(
+            options: new RecipesOptions
+            {
+                Recipes = new Dictionary<string, ConfiguredRecipe>
+                {
+                    ["hero"] = new ConfiguredRecipe
+                    {
+                        Steps = new List<ConfiguredStep>
+                        {
+                            new() { Op = "encodeAs", Format = "avif" },
+                        },
+                    },
+                },
+            });
+        act.Should().Throw<MediaRecipeBindingException>().WithMessage("*avif*not producible*");
+    }
+
+    [Fact]
+    public void Config_recipe_with_jpg_alias_binds_as_jpeg()
+    {
+        // "jpg" is an alias for the producible "jpeg" — it must bind rather than be rejected as
+        // unknown. The canonicalizer is shared with EncoderSelector (no second alias table).
+        var registry = NewRegistry(
+            options: new RecipesOptions
+            {
+                Recipes = new Dictionary<string, ConfiguredRecipe>
+                {
+                    ["thumb"] = new ConfiguredRecipe
+                    {
+                        Steps = new List<ConfiguredStep>
+                        {
+                            new() { Op = "encodeAs", Format = "jpg" },
+                        },
+                    },
+                },
+            });
+        registry.Find("thumb").Should().NotBeNull();
     }
 
     [Fact]

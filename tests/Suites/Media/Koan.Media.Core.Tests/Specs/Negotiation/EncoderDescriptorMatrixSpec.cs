@@ -8,13 +8,38 @@ namespace Koan.Media.Core.Tests.Specs.Negotiation;
 public sealed class EncoderDescriptorMatrixSpec
 {
     [Fact]
-    public void All_expected_encoders_are_registered()
+    public void All_producible_encoders_are_registered()
     {
-        var slugs = new[] { "jpeg", "png", "webp", "gif", "bmp", "tiff", "avif" };
+        // The live registry is exactly the producible set — what EncoderSelector can emit.
+        var slugs = new[] { "jpeg", "png", "webp", "gif", "bmp", "tiff" };
         foreach (var slug in slugs)
         {
             EncoderAccepts.All.Should().ContainKey(slug, $"encoder '{slug}' must be registered");
         }
+    }
+
+    [Fact]
+    public void Every_advertised_encoder_is_producible_by_the_selector()
+    {
+        // DATA-0098 cross-check: the capability table (EncoderAccepts.All) must be a SUBSET of what
+        // EncoderSelector can actually emit. This is the guard that was missing when avif was
+        // advertised but unproducible (MEDIA-0009) — a 500 at request time instead of a failed test.
+        foreach (var slug in EncoderAccepts.All.Keys)
+        {
+            var act = () => EncoderSelector.For(sourceFormat: null, targetFormat: slug, quality: 80);
+            act.Should().NotThrow($"advertised encoder '{slug}' must be producible by EncoderSelector");
+        }
+    }
+
+    [Fact]
+    public void Declared_but_unproducible_formats_are_not_advertised()
+    {
+        // avif is declared for forward-compat but EncoderSelector has no concrete encoder for it, so
+        // it must NOT appear in the live registry the negotiator intersects against — otherwise it
+        // would be negotiated and 500. It goes live automatically once the encoder is wired.
+        EncoderAccepts.All.Should().NotContainKey("avif");
+        EncoderAccepts.MediaTypeFor("avif").Should().BeNull();
+        EncoderAccepts.IsRegistered("avif").Should().BeFalse();
     }
 
     [Theory]
@@ -22,7 +47,6 @@ public sealed class EncoderDescriptorMatrixSpec
     [InlineData("png", false)]
     [InlineData("bmp", false)]
     [InlineData("tiff", false)]
-    [InlineData("avif", false)]
     [InlineData("webp", true)]
     [InlineData("gif", true)]
     public void PreservesAnimation_matches_encoder_capability(string slug, bool expected)
@@ -38,7 +62,6 @@ public sealed class EncoderDescriptorMatrixSpec
     [InlineData("gif", "image/gif")]
     [InlineData("bmp", "image/bmp")]
     [InlineData("tiff", "image/tiff")]
-    [InlineData("avif", "image/avif")]
     public void MediaType_matches_rfc_6838_image_subtype(string slug, string mediaType)
     {
         EncoderAccepts.All[slug].MediaType.Should().Be(mediaType);
@@ -50,7 +73,6 @@ public sealed class EncoderDescriptorMatrixSpec
     [InlineData("png")]
     [InlineData("bmp")]
     [InlineData("tiff")]
-    [InlineData("avif")]
     public void Still_only_encoders_accept_raster_but_not_animated(string slug)
     {
         var kinds = EncoderAccepts.All[slug].InputAccepts;

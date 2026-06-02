@@ -45,39 +45,53 @@ public static class EncoderAccepts
             ["webp"] = new EncoderDescriptor("webp", KindSet.Of(MediaKind.Raster, MediaKind.AnimatedRaster), "image/webp", PreservesAnimation: true),
             ["gif"] = new EncoderDescriptor("gif", KindSet.Of(MediaKind.Raster, MediaKind.AnimatedRaster), "image/gif", PreservesAnimation: true),
 
-            // AVIF: ImageSharp's AvifEncoder is not in the current package
-            // surface; documented as still-only for forward-compat. When
-            // animated-AVIF lands, this is a one-line change.
+            // AVIF: declared for forward-compat, but ImageSharp's AvifEncoder is not in the current
+            // package surface, so EncoderSelector cannot produce it. It is therefore filtered out of
+            // the live registry (see _live) and never negotiated; recipes that allowlist "avif" fall
+            // through to their next-preferred producible format. Wiring the encoder into
+            // EncoderSelector flips this descriptor live automatically (DATA-0098).
             ["avif"] = new EncoderDescriptor("avif", KindSet.Of(MediaKind.Raster), "image/avif", PreservesAnimation: false),
         };
 
     /// <summary>
-    /// Full encoder registry keyed by canonical format slug. Per
-    /// MEDIA-0009 §a: the registry is a flat, grep-friendly
-    /// <see cref="IReadOnlyDictionary{TKey, TValue}"/> — no generics, no
-    /// type parameters.
+    /// The LIVE encoder registry: only the declared formats the producer (<see cref="EncoderSelector"/>)
+    /// can actually emit. DATA-0098 single-source-of-truth — the capability table is DERIVED from what
+    /// can be produced, never maintained as an independent list. A format declared above but with no
+    /// concrete encoder (e.g. <c>avif</c> until ImageSharp's AvifEncoder is wired into EncoderSelector)
+    /// is excluded here, so the negotiator never advertises or selects it and the next-preferred
+    /// producible format wins. Re-wiring is automatic: add the encoder to EncoderSelector and the
+    /// already-declared descriptor goes live.
     /// </summary>
-    public static IReadOnlyDictionary<string, EncoderDescriptor> All => _descriptors;
+    private static readonly IReadOnlyDictionary<string, EncoderDescriptor> _live =
+        _descriptors
+            .Where(kv => EncoderSelector.SupportedFormats.Contains(kv.Key, StringComparer.OrdinalIgnoreCase))
+            .ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Live encoder registry keyed by canonical format slug — only formats the framework can actually
+    /// produce. This is what the negotiator and planner intersect against.
+    /// </summary>
+    public static IReadOnlyDictionary<string, EncoderDescriptor> All => _live;
 
     /// <summary>
     /// Set of kinds the named encoder accepts. Returns
-    /// <see cref="KindSet.None"/> for unknown slugs (planner will
+    /// <see cref="KindSet.None"/> for unknown/non-producible slugs (planner will
     /// produce an EncoderRefused-equivalent error against an empty set).
     /// </summary>
     public static KindSet AcceptsFor(string formatSlug)
     {
         if (string.IsNullOrWhiteSpace(formatSlug)) return KindSet.None;
-        return _descriptors.TryGetValue(formatSlug, out var d) ? d.InputAccepts : KindSet.None;
+        return _live.TryGetValue(formatSlug, out var d) ? d.InputAccepts : KindSet.None;
     }
 
     /// <summary>
     /// MIME media type for the named encoder, or null when the slug is
-    /// unregistered.
+    /// unregistered or not producible.
     /// </summary>
     public static string? MediaTypeFor(string formatSlug)
     {
         if (string.IsNullOrWhiteSpace(formatSlug)) return null;
-        return _descriptors.TryGetValue(formatSlug, out var d) ? d.MediaType : null;
+        return _live.TryGetValue(formatSlug, out var d) ? d.MediaType : null;
     }
 
     /// <summary>True when the named encoder admits <see cref="MediaKind.AnimatedRaster"/>.</summary>
@@ -88,10 +102,10 @@ public static class EncoderAccepts
     public static bool PreservesAnimation(string formatSlug)
     {
         if (string.IsNullOrWhiteSpace(formatSlug)) return false;
-        return _descriptors.TryGetValue(formatSlug, out var d) && d.PreservesAnimation;
+        return _live.TryGetValue(formatSlug, out var d) && d.PreservesAnimation;
     }
 
-    /// <summary>True when the encoder slug is registered.</summary>
+    /// <summary>True when the encoder slug is registered AND producible.</summary>
     public static bool IsRegistered(string formatSlug) =>
-        !string.IsNullOrWhiteSpace(formatSlug) && _descriptors.ContainsKey(formatSlug);
+        !string.IsNullOrWhiteSpace(formatSlug) && _live.ContainsKey(formatSlug);
 }

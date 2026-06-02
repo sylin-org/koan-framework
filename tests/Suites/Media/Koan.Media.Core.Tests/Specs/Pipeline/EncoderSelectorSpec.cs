@@ -130,4 +130,37 @@ public sealed class EncoderSelectorSpec
         var enc = EncoderSelector.For(sourceFormat: null, targetFormat: null, quality: 80);
         enc.Should().BeOfType<PngEncoder>();
     }
+
+    [Fact]
+    public void For_jpg_alias_is_canonicalised_to_jpeg()
+    {
+        // "jpg" is an alias for "jpeg"; For must produce a JpegEncoder rather than hit the switch
+        // default. Closes the latent alias-500 (a config/code recipe pinning "jpg" used to throw).
+        var enc = EncoderSelector.For(PngFormat.Instance, targetFormat: "jpg", quality: 80);
+        enc.Should().BeOfType<JpegEncoder>();
+    }
+
+    [Theory]
+    [InlineData("jpg", "jpeg")]
+    [InlineData("JPG", "jpeg")]
+    [InlineData("  WebP  ", "webp")]
+    [InlineData("png", "png")]
+    [InlineData("avif", "avif")]
+    public void CanonicalizeSlug_folds_aliases_and_normalises(string input, string expected)
+    {
+        EncoderSelector.CanonicalizeSlug(input).Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("jpeg", true)]
+    [InlineData("jpg", true)]      // alias for the producible jpeg
+    [InlineData("WEBP", true)]
+    [InlineData("avif", false)]    // declared/reserved but no concrete encoder yet
+    [InlineData("wat", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void CanProduce_reflects_concrete_encoder_availability(string? slug, bool expected)
+    {
+        EncoderSelector.CanProduce(slug).Should().Be(expected);
+    }
 }

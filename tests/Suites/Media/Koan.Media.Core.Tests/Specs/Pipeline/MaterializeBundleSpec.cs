@@ -36,7 +36,7 @@ public sealed class MaterializeBundleSpec
 
         bundle.Variants["display"].Width.Should().Be(1200);
         bundle.Variants["display"].Height.Should().Be(800);
-        bundle.Variants["thumb-400"].Width.Should().BeLessOrEqualTo(400);
+        bundle.Variants["thumb-400"].Width.Should().BeLessThanOrEqualTo(400);
         bundle.Variants["thumb-400"].Format.Should().Be("webp");
         bundle.Variants["poster"].Format.Should().Be("png");
     }
@@ -54,9 +54,9 @@ public sealed class MaterializeBundleSpec
         bundle.Variants["original"].Width.Should().Be(800);
         bundle.Variants["original"].Height.Should().Be(600);
         // 'small' bounded ≤100 on the longer side
-        bundle.Variants["small"].Width.Should().BeLessOrEqualTo(100);
+        bundle.Variants["small"].Width.Should().BeLessThanOrEqualTo(100);
         // 'large' bounded ≤400 on the longer side
-        bundle.Variants["large"].Width.Should().BeLessOrEqualTo(400);
+        bundle.Variants["large"].Width.Should().BeLessThanOrEqualTo(400);
     }
 
     [Fact]

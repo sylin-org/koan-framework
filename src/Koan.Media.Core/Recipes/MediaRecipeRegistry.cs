@@ -1,5 +1,6 @@
 using System.Reflection;
 using Koan.Media.Abstractions.Recipes;
+using Koan.Media.Core.Pipeline;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -21,6 +22,14 @@ public sealed class MediaRecipeRegistry : IMediaRecipeRegistry, IDisposable
     /// <summary>Reserved format shortcut names — recipes cannot use them.</summary>
     public static readonly IReadOnlyList<string> ReservedFormatShortcuts =
         new[] { "jpeg", "jpg", "png", "webp", "gif", "bmp", "tiff", "avif" };
+
+    // A reserved shortcut RESOLVES to a synthesised recipe only when its canonical format is producible
+    // by EncoderSelector — the single source of truth (DATA-0098). avif stays a reserved NAME (no recipe
+    // may claim it, for forward-compat) but does not resolve until its encoder is wired into
+    // EncoderSelector, so `?recipe=avif` returns an honest 404 rather than a 500 from
+    // EncoderSelector.For("avif"). It activates automatically once the format becomes producible.
+    private static readonly IReadOnlyList<string> _resolvableShortcuts =
+        ReservedFormatShortcuts.Where(s => EncoderSelector.CanProduce(s)).ToArray();
 
     private readonly Dictionary<string, MediaRecipe> _byName = new(StringComparer.OrdinalIgnoreCase);
     private readonly IReadOnlyDictionary<string, MediaRecipe> _codeRecipes;
@@ -51,7 +60,7 @@ public sealed class MediaRecipeRegistry : IMediaRecipeRegistry, IDisposable
         get { lock (_gate) return _byName.Values.OrderBy(r => r.Name, StringComparer.OrdinalIgnoreCase).ToList(); }
     }
 
-    public IReadOnlyList<string> FormatShortcuts => ReservedFormatShortcuts;
+    public IReadOnlyList<string> FormatShortcuts => _resolvableShortcuts;
 
     public bool TryResolve(string seed, out MediaRecipe recipe)
     {
@@ -69,11 +78,14 @@ public sealed class MediaRecipeRegistry : IMediaRecipeRegistry, IDisposable
             return true;
         }
 
-        // 2) Format shortcut — synthesise an EncodeAs recipe with sensible mutators
+        // 2) Format shortcut — synthesise an EncodeAs recipe with sensible mutators. Gated by
+        // producibility (DATA-0098): a reserved-but-unproducible shortcut (avif) does NOT resolve
+        // here — it would otherwise pin a format EncoderSelector.For 500s on — so it resolves as
+        // "unknown" and the controller returns an honest 404.
         var lower = seed.Trim().ToLowerInvariant();
-        if (ReservedFormatShortcuts.Contains(lower, StringComparer.OrdinalIgnoreCase))
+        if (ReservedFormatShortcuts.Contains(lower, StringComparer.OrdinalIgnoreCase) && EncoderSelector.CanProduce(lower))
         {
-            var canonical = lower switch { "jpg" => "jpeg", _ => lower };
+            var canonical = EncoderSelector.CanonicalizeSlug(lower);
             recipe = MediaRecipe.New()
                 .WithName(canonical)
                 .WithDescription($"Format shortcut: re-encode source as {canonical} at Quality.Web (q={Quality.Web}).")
@@ -206,6 +218,7 @@ public sealed class MediaRecipeRegistry : IMediaRecipeRegistry, IDisposable
                         Eager = attr.Eager,
                         Source = RecipeSource.Code,
                     };
+                    RecipeOutputFormatValidator.EnsureProducible(recipe, attr.Name);
 
                     if (result.ContainsKey(attr.Name))
                     {
