@@ -211,86 +211,23 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         }
     }
 
-    private void EnsureTable(SqlConnection conn)
-    {
-        bool entityReadOnly = typeof(TEntity).GetCustomAttributes(typeof(ReadOnlyAttribute), inherit: true).Any();
-        bool allowDdl = IsDdlAllowed(entityReadOnly);
-        if (!allowDdl)
-        {
-            if (TableExists(conn)) return;
-            return;
-        }
-
-        using var cmd = conn.CreateCommand();
-        var safe = MakeSafeIdentifier(TableName);
-        cmd.CommandText = $@"IF OBJECT_ID(N'[dbo].[{TableName}]', N'U') IS NULL
-BEGIN
-    CREATE TABLE [dbo].[{TableName}] (
-    [Id] NVARCHAR(128) NOT NULL CONSTRAINT [PK_{safe}_Id] PRIMARY KEY,
-        [Json] NVARCHAR(MAX) NOT NULL
-    );
-END";
-        cmd.ExecuteNonQueryAsync();
-
-        var projections = ProjectionResolver.Get(typeof(TEntity));
-        foreach (var p in projections)
-        {
-            var col = p.ColumnName;
-            var path = "$." + p.Property.Name;
-            EnsureComputedColumn(conn, col, path);
-            if (p.IsIndexed) TryCreateIndex(conn, col);
-        }
-        var metaProp = typeof(TEntity).GetProperty("Meta", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.IgnoreCase);
-        if (metaProp is not null) EnsureComputedColumn(conn, "Meta", "$.Meta");
-    }
-
     private static string OrderByIdClause => "ORDER BY TRY_CONVERT(BIGINT, [Id]) ASC, [Id] ASC";
 
-    private static string MakeSafeIdentifier(string name)
-        => string.IsNullOrEmpty(name) ? name : System.Text.RegularExpressions.Regex.Replace(name, "[^A-Za-z0-9_]+", "_");
-
-    private void EnsureComputedColumn(SqlConnection conn, string column, string jsonPath)
-    {
-        if (ColumnExists(conn, column)) return;
-        try
-        {
-            using var add = conn.CreateCommand();
-            add.CommandText = $"ALTER TABLE [dbo].[{TableName}] ADD [{column}] AS JSON_VALUE([Json], '{jsonPath}')";
-            add.ExecuteNonQueryAsync();
-        }
-        catch { }
-    }
-
-    private void TryCreateIndex(SqlConnection conn, string column)
-    {
-        try
-        {
-            using var idx = conn.CreateCommand();
-            idx.CommandText = $@"IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_{TableName}_{column}' AND object_id = OBJECT_ID(N'[dbo].[{TableName}]'))
-CREATE INDEX [IX_{TableName}_{column}] ON [dbo].[{TableName}] ([{column}]);";
-            idx.ExecuteNonQueryAsync();
-        }
-        catch { }
-    }
-
-    private bool TableExists(SqlConnection conn)
+    // Schema creation (table + computed projection columns + indexes) is owned exclusively by the
+    // IRelationalSchemaOrchestrator async path (see EnsureOrchestrated / ExecuteAsync's EnsureCreated
+    // case). The legacy synchronous EnsureTable/EnsureComputedColumn/TryCreateIndex helpers that used
+    // to live here fired DDL via *un-awaited* ExecuteNonQueryAsync()/ExecuteScalarAsync() — disposing
+    // the command mid-flight, racing commands on a non-MARS connection, and (because an un-awaited Task
+    // is never null) reporting every column as already-present so computed columns were never created.
+    // They were dead (nothing called them) and have been removed. The only metadata probe still needed
+    // is TableExists, used by the Clear/SchemaClear instructions to honour "don't create on clear".
+    private static async Task<bool> TableExistsAsync(SqlConnection conn, string tableName, CancellationToken ct)
     {
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT 1 FROM sys.tables WHERE name = @n AND SCHEMA_NAME(schema_id) = 'dbo'";
-        cmd.Parameters.Add(new SqlParameter("@n", TableName));
-        try { var o = cmd.ExecuteScalarAsync(); return o != null; } catch { return false; }
-    }
-
-    private bool ColumnExists(SqlConnection conn, string column)
-    {
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = @"SELECT 1 FROM sys.columns c
-JOIN sys.tables t ON c.object_id = t.object_id
-JOIN sys.schemas s ON t.schema_id = s.schema_id
-WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
-        cmd.Parameters.Add(new SqlParameter("@t", TableName));
-        cmd.Parameters.Add(new SqlParameter("@c", column));
-        try { var o = cmd.ExecuteScalarAsync(); return o != null; } catch { return false; }
+        cmd.Parameters.Add(new SqlParameter("@n", tableName));
+        try { return await cmd.ExecuteScalarAsync(ct) is not null; }
+        catch { return false; }
     }
 
     private TEntity FromRow((string Id, string Json) row)
@@ -710,14 +647,14 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
             case DataInstructions.Clear:
                 {
                     // Do not create the table when clearing; only delete if it exists so we honor DDL policy.
-                    if (!TableExists(conn)) { object res0 = 0; return (TResult)res0; }
+                    if (!await TableExistsAsync(conn, TableName, ct)) { object res0 = 0; return (TResult)res0; }
                     var del = await conn.ExecuteAsync($"DELETE FROM [dbo].[{TableName}]");
                     object res = del; return (TResult)res;
                 }
             case RelationalInstructions.SchemaClear:
                 {
                     // Schema clear should remove the table when present, but must not create it.
-                    if (!TableExists(conn)) { object res0 = 0; return (TResult)res0; }
+                    if (!await TableExistsAsync(conn, TableName, ct)) { object res0 = 0; return (TResult)res0; }
                     var drop = $"IF OBJECT_ID(N'[dbo].[{TableName}]', N'U') IS NOT NULL DROP TABLE [dbo].[{TableName}];";
                     var affected = await conn.ExecuteAsync(drop);
                     try { var key = $"{conn.DataSource}/{conn.Database}::{TableName}"; _healthyCache.TryRemove(key, out _); } catch { }
@@ -748,45 +685,6 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
             default:
                 throw new NotSupportedException($"Instruction '{instruction.Name}' not supported by SQL Server adapter for {typeof(TEntity).Name}.");
         }
-    }
-
-    private object ValidateSchema(SqlConnection conn)
-    {
-        bool entityReadOnly = typeof(TEntity).GetCustomAttributes(typeof(ReadOnlyAttribute), inherit: true).Any();
-        bool ddlAllowed = IsDdlAllowed(entityReadOnly);
-        var table = TableName;
-        var exists = TableExists(conn);
-        var projections = ProjectionResolver.Get(typeof(TEntity));
-        var projectedColumns = projections.Select(p => p.ColumnName).Distinct(StringComparer.Ordinal).ToArray();
-        var missing = new List<string>();
-        if (exists)
-        {
-            var existing = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"SELECT c.name FROM sys.columns c JOIN sys.tables t ON c.object_id = t.object_id JOIN sys.schemas s ON t.schema_id = s.schema_id WHERE t.name = @t AND s.name = 'dbo'";
-            cmd.Parameters.Add(new SqlParameter("@t", table));
-            using var r = cmd.ExecuteReader();
-            while (r.Read()) existing.Add(r.GetString(0));
-            foreach (var col in projectedColumns) if (!existing.Contains(col)) missing.Add(col);
-        }
-
-        var mode = _options.SchemaMatching;
-        string state;
-        if (!exists) state = mode == SchemaMatchingMode.Strict ? "Unhealthy" : "Degraded";
-        else if (missing.Count > 0) state = mode == SchemaMatchingMode.Strict ? "Unhealthy" : "Degraded";
-        else state = "Healthy";
-        return new Dictionary<string, object?>
-        {
-            ["Provider"] = "sqlserver",
-            ["Table"] = table,
-            ["TableExists"] = exists,
-            ["ProjectedColumns"] = projectedColumns,
-            ["MissingColumns"] = missing.ToArray(),
-            ["Policy"] = _options.DdlPolicy.ToString(),
-            ["DdlAllowed"] = ddlAllowed,
-            ["MatchingMode"] = mode.ToString(),
-            ["State"] = state
-        };
     }
 
     private static string GetSqlFromInstruction(Instruction instruction)
@@ -969,21 +867,4 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         return list;
     }
 
-    private bool IsDdlAllowed(bool entityReadOnly)
-    {
-        if (_options.DdlPolicy != SchemaDdlPolicy.AutoCreate) return false;
-        if (entityReadOnly) return false;
-        bool prod = KoanEnv.IsProduction;
-        bool allowMagic = KoanEnv.AllowMagicInProduction || _options.AllowProductionDdl;
-        try
-        {
-            var cfg = _sp.GetService(typeof(IConfiguration)) as IConfiguration;
-            if (cfg is not null)
-            {
-                allowMagic = allowMagic || Configuration.Read(cfg, Constants.Configuration.Koan.AllowMagicInProduction, false);
-            }
-        }
-        catch { }
-        return !prod || allowMagic;
-    }
 }
