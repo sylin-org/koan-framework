@@ -78,4 +78,41 @@ public sealed class LinqFilterCompilerSpecs
         compiled.Should().BeOfType<ClrFilter>();
         Run(compiled).Should().Equal("g1");
     }
+
+    [Fact]
+    public void Optional_filter_with_null_param_short_circuits_to_match_all()
+    {
+        int? minScore = null;
+        // `minScore == null` is true -> the || folds to match-all WITHOUT evaluating minScore.Value
+        // (which would throw "Nullable object must have a value"). The regression this guards against.
+        var linq = ByLinq(g => minScore == null || g.Score >= minScore.Value);
+        linq.Should().Equal("g1", "g2", "g3", "g4");
+    }
+
+    [Fact]
+    public void Optional_filter_with_set_param_applies_the_clause()
+    {
+        int? minScore = 100;
+        var linq = ByLinq(g => minScore == null || g.Score >= minScore.Value);
+        linq.Should().Equal("g1", "g3");
+    }
+
+    [Fact]
+    public void Field_to_field_comparison_degrades_to_clrfilter()
+    {
+        // The value side references the entity -> not a field/value filter; must NOT be Eval()'d
+        // (that would throw), so it degrades to an in-memory ClrFilter and still evaluates.
+        var compiled = LinqFilterCompiler.Compile<Gamer>(g => g.Score > g.Level);
+        compiled.Should().BeOfType<ClrFilter>();
+        Run(compiled).Should().Equal("g1", "g3", "g4");
+    }
+
+    [Fact]
+    public void Entity_argument_method_degrades_to_clrfilter()
+    {
+        // An entity-derived method argument must not be Eval()'d either; degrade, don't throw.
+        var compiled = LinqFilterCompiler.Compile<Gamer>(g => g.Name.StartsWith(g.Id));
+        compiled.Should().BeOfType<ClrFilter>();
+        Run(compiled).Should().BeEmpty();
+    }
 }

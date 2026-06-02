@@ -21,12 +21,18 @@ public static class LinqFilterCompiler
 
     private static Filter Visit(Expression e, ParameterExpression param, Type rootType)
     {
+        // A closed (param-free) boolean subexpression is a compile-time constant: fold it. This keeps
+        // C# short-circuit semantics (see CombineAnd/CombineOr) and avoids eagerly evaluating a captured
+        // expression the runtime would never reach — e.g. `severity.Value` guarded by `severity == null`.
+        if (TryConstBool(e, param, out var folded))
+            return folded ? MatchAll : MatchNone;
+
         switch (e)
         {
             case BinaryExpression b when b.NodeType is ExpressionType.AndAlso or ExpressionType.And:
-                return new AllOf(new[] { Visit(b.Left, param, rootType), Visit(b.Right, param, rootType) });
+                return CombineAnd(b, param, rootType);
             case BinaryExpression b when b.NodeType is ExpressionType.OrElse or ExpressionType.Or:
-                return new AnyOf(new[] { Visit(b.Left, param, rootType), Visit(b.Right, param, rootType) });
+                return CombineOr(b, param, rootType);
             case UnaryExpression u when u.NodeType == ExpressionType.Not:
                 return new Not(Visit(u.Operand, param, rootType));
             case UnaryExpression u when u.NodeType is ExpressionType.Convert or ExpressionType.ConvertChecked:
@@ -42,11 +48,33 @@ public static class LinqFilterCompiler
         }
     }
 
+    // Logical &&/|| mirror C# short-circuit: a constant operand collapses the node WITHOUT visiting
+    // (and thus without evaluating) the other side. The DATA-0096 refactor dropped this, so the
+    // optional-filter idiom `param == null || x.F == param.Value` evaluated `param.Value` on a null
+    // nullable and threw "Nullable object must have a value" (DATA-XXXX regression).
+    private static Filter CombineAnd(BinaryExpression b, ParameterExpression param, Type rootType)
+    {
+        if (TryConstBool(b.Left, param, out var lv)) return lv ? Visit(b.Right, param, rootType) : MatchNone;
+        if (TryConstBool(b.Right, param, out var rv)) return rv ? Visit(b.Left, param, rootType) : MatchNone;
+        return new AllOf(new[] { Visit(b.Left, param, rootType), Visit(b.Right, param, rootType) });
+    }
+
+    private static Filter CombineOr(BinaryExpression b, ParameterExpression param, Type rootType)
+    {
+        if (TryConstBool(b.Left, param, out var lv)) return lv ? MatchAll : Visit(b.Right, param, rootType);
+        if (TryConstBool(b.Right, param, out var rv)) return rv ? MatchAll : Visit(b.Left, param, rootType);
+        return new AnyOf(new[] { Visit(b.Left, param, rootType), Visit(b.Right, param, rootType) });
+    }
+
     private static Filter Comparison(BinaryExpression b, ParameterExpression param, Type rootType)
     {
-        if (TryMemberPath(b.Left, param, rootType, out var pl))
+        // A field-vs-constant comparison becomes a FieldFilter; the value side must be a CLOSED
+        // constant. If it references the entity (field-to-field, e.g. x.Start < x.End, or an
+        // entity-derived expression) it is not a field/value filter and must not be Eval()'d — that
+        // would throw — so it falls to an in-memory ClrFilter (same class as the short-circuit fix).
+        if (TryMemberPath(b.Left, param, rootType, out var pl) && !ReferencesParam(b.Right, param))
             return new FieldFilter(pl, MapOperator(b.NodeType), FilterValue.Of(Eval(b.Right)));
-        if (TryMemberPath(b.Right, param, rootType, out var pr))
+        if (TryMemberPath(b.Right, param, rootType, out var pr) && !ReferencesParam(b.Left, param))
             return new FieldFilter(pr, MapOperator(Flip(b.NodeType)), FilterValue.Of(Eval(b.Left)));
         return Opaque(b, param);
     }
@@ -57,7 +85,7 @@ public static class LinqFilterCompiler
 
         // string instance methods: StartsWith / EndsWith / Contains
         if (mc.Method.DeclaringType == typeof(string) && mc.Object is not null && mc.Arguments.Count == 1
-            && TryMemberPath(mc.Object, param, rootType, out var sp))
+            && TryMemberPath(mc.Object, param, rootType, out var sp) && !ReferencesParam(mc.Arguments[0], param))
         {
             FilterOperator? op = mc.Method.Name switch
             {
@@ -78,16 +106,17 @@ public static class LinqFilterCompiler
 
             if (source is not null && item is not null)
             {
-                // member-collection.Contains(constant) -> Has
+                // member-collection.Contains(constant) -> Has. The item must be a closed constant
+                // (not merely a non-path): an entity-derived item must not be Eval()'d.
                 if (IsCollectionType(source.Type) && TryMemberPath(source, param, rootType, out var colPath)
-                    && !TryMemberPath(item, param, rootType, out _))
+                    && !ReferencesParam(item, param))
                 {
                     filter = new FieldFilter(colPath, FilterOperator.Has, FilterValue.Of(Eval(item)));
                     return true;
                 }
-                // constant-collection.Contains(member-scalar) -> In
+                // constant-collection.Contains(member-scalar) -> In. The source set must be closed.
                 if (TryMemberPath(item, param, rootType, out var scalarPath)
-                    && !TryMemberPath(source, param, rootType, out _))
+                    && !ReferencesParam(source, param))
                 {
                     filter = new FieldFilter(scalarPath, FilterOperator.In, ToSet(Eval(source)));
                     return true;
@@ -158,6 +187,40 @@ public static class LinqFilterCompiler
     {
         if (e is ConstantExpression c) return c.Value;
         return Expression.Lambda(Unwrap(e)).Compile().DynamicInvoke();
+    }
+
+    private static readonly Filter MatchAll = new AllOf(Array.Empty<Filter>());
+    private static readonly Filter MatchNone = new Not(new AllOf(Array.Empty<Filter>()));
+
+    /// <summary>
+    /// True when <paramref name="e"/> is a boolean expression that does not reference the entity
+    /// parameter — a closed constant we can evaluate now (and therefore short-circuit on).
+    /// </summary>
+    private static bool TryConstBool(Expression e, ParameterExpression param, out bool value)
+    {
+        value = false;
+        if (e.Type != typeof(bool) || ReferencesParam(e, param)) return false;
+        if (Eval(e) is bool b) { value = b; return true; }
+        return false;
+    }
+
+    private static bool ReferencesParam(Expression e, ParameterExpression param)
+    {
+        var finder = new ParameterFinder(param);
+        finder.Visit(e);
+        return finder.Found;
+    }
+
+    private sealed class ParameterFinder : ExpressionVisitor
+    {
+        private readonly ParameterExpression _param;
+        public bool Found { get; private set; }
+        public ParameterFinder(ParameterExpression param) => _param = param;
+        protected override Expression VisitParameter(ParameterExpression node)
+        {
+            if (ReferenceEquals(node, _param)) Found = true;
+            return base.VisitParameter(node);
+        }
     }
 
     private static FilterValue ToSet(object? value)
