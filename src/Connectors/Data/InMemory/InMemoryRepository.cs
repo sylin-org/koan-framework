@@ -81,11 +81,19 @@ internal sealed class InMemoryRepository<TEntity, TKey> :
         var totalCount = (long)filtered.Count;
 
         var sortHandled = RepositoryQueryResult<TEntity>.NoSortHandled;
-        IEnumerable<TEntity> ordered = filtered;
+        IEnumerable<TEntity> ordered;
         if (query.HasSort)
         {
             ordered = InMemorySorter.Apply(filtered, query.Sort);
             sortHandled = query.Sort.ToFrozenSet();
+        }
+        else
+        {
+            // Match the relational adapters (SqlServer/SQLite ORDER BY Id, Postgres ORDER BY ctid): an
+            // unsorted query falls back to a stable Id order so results — and any pagination over them —
+            // are deterministic instead of ConcurrentDictionary enumeration order. With GUID v7 ids this
+            // is also insertion order.
+            ordered = filtered.OrderBy(static e => e.Id, Comparer<TKey>.Default);
         }
 
         var paginationHandled = false;
