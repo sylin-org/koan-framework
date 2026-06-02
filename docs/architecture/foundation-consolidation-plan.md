@@ -296,10 +296,32 @@ Each facet (1–4) runs:
   - **b1 ✓** adapter declaration contract `IDescribesCapabilities` (signature-aligned with Facet 2's
     `KoanModule.Describe`) + native-or-bridge resolvers (`DataCaps.Describe` / `VectorCaps.Describe`);
     specs green.
-  - **b2 (next):** switch the framework negotiation sites (`Entity.cs` / relational repos' `HasFlag`,
-    `Data.cs`, the `/.well-known` report, CQRS/cache decorators) to `caps.Has` / `caps.Require`,
-    deleting the wrapper-record ceremony (`RepoCaps` / `WriteCapsImpl` / …) as each site moves.
-  - **b3:** adapters declare natively via `Describe(ICapabilities)`, dropping their enum properties.
+  - **b2 ✓ (web negotiation chain):** `EntityRequestContext.Capabilities` / `HookContext.Capabilities`
+    `IQueryCapabilities`→`CapabilitySet`; `EntityEndpointService`, `WellKnownController`, and the
+    GraphQl connector negotiate via `DataCaps.Describe(repo)` (native-or-bridge); `Koan-Write-Capabilities`
+    header + `/.well-known` rendering preserved via the bridge; 4 wrapper records deleted
+    (`DefaultQueryCapabilities`/`RepositoryCapabilities`/`RepoWriteCaps`/`RepoCaps`). `Entity.cs`'s
+    `FastRemove` hot-path already reads `Data<T>.Capabilities.Has(DataCaps.Write.FastRemove)`. Solution +
+    samples green; Web AdapterSurface (InMemory) 56/56. (commit `ff490212`)
+  - **b3 sequencing finding (the migration is NOT atomic per-adapter):** dropping any adapter's
+    `IQuery/IWriteCapabilities` marker breaks every consumer still reading it through the *bridge
+    fallback* — `RepositoryFacade`, `CqrsRepositoryDecorator`, `CachedRepository` (all wrap an inner repo
+    and re-expose the markers), and the `Data<T>.QueryCaps`/`WriteCaps` statics (consumed by
+    `samples/S10.DevPortal`). So the next landable unit is **decouple-the-consumers**: migrate the
+    facade + both decorators to `IDescribesCapabilities` (delegate `Describe`→`DataCaps.Describe(inner)`)
+    and drop their markers; rebase/retire `Data<T>.QueryCaps`/`WriteCaps` (+ the `Caps`/`WriteCapsImpl`
+    wrappers) onto `Data<T>.Capabilities`, migrating S10. **Only after that foundation can the 8 data +
+    6 vector adapters flip one-at-a-time** (each: implement `Describe` mirroring its enum exactly, drop
+    the enum property + marker), because the facade now reflects inner regardless of how inner declares.
+  - **stage (c):** delete `Query/Write/VectorCapabilities` enums + `IQuery/IWrite/IVectorCapabilities`
+    markers + the `DataCaps`/`VectorCaps` bridges + filter records; reconcile the capability guides +
+    DATA-0002/0003 references in the same step.
+  - **Gen-1 cut (independent of the enum migration):** `LMStudioAdapter` is the one consumer but it
+    inherits its *entire* scaffolding from `BaseKoanAdapter` (`Logger`, `GetOptions<T>`,
+    `GetConnectionString`, `InitializeAdapter`/`CheckAdapterHealth`/`GetAdapterBootstrapMetadata`), so the
+    cut is a real LMStudio rewrite, not just a capability swap. The `Koan.Core.Adapters` **Readiness**
+    subsystem + `AdapterBootReporting` are load-bearing and stay — only the capability surface
+    (`AdapterCapabilities`, `Capabilities.cs` enums, `BaseKoanAdapter`, `Templates/*`) is cut.
 - Minor cleanup available anytime: the non-project ghost dirs (`Koan.Data.Lucene`, `Koan.Canon.Core`,
   `Koan.Cache.Adapter.Memory` — obj-only; `Koan.Flow.Core` — doc-only) carry 0 tracked source and are
   absent from `Koan.sln`; delete the directories.
