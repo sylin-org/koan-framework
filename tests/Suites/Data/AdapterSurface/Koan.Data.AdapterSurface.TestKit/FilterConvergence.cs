@@ -83,8 +83,20 @@ public static class FilterConvergence
             var filter = JsonFilterParser.Parse<ConvergenceWidget>(json);
             var oracle = Corpus.Where(InMemoryFilterEvaluator.Compile<ConvergenceWidget>(filter))
                                .Select(w => w.Id).OrderBy(x => x).ToArray();
-            var actual = (await Data<ConvergenceWidget, string>.Query(json))
+
+            string[] actual;
+            try
+            {
+                actual = (await Data<ConvergenceWidget, string>.Query(json))
                                .Select(w => w.Id).OrderBy(x => x).ToArray();
+            }
+            catch (Exception ex)
+            {
+                // An adapter throwing on a pushable filter is itself a convergence failure — record it
+                // (with the case) rather than aborting the whole matrix, so every defect surfaces at once.
+                failures.Add($"  [{name}] {json}\n      THREW {ex.GetType().Name}: {ex.Message.Split('\n')[0].Trim()}");
+                continue;
+            }
 
             if (!actual.SequenceEqual(oracle))
                 failures.Add($"  [{name}] {json}\n      oracle:  [{string.Join(",", oracle)}]\n      adapter: [{string.Join(",", actual)}]");

@@ -483,10 +483,29 @@ internal sealed class PostgresRepository<
         var prop = field.Leaf;
         if (string.Equals(prop, "Id", StringComparison.Ordinal)) return "\"Id\"";
         if (string.Equals(prop, "Json", StringComparison.Ordinal)) return "\"Json\"";
-        var projections = ProjectionResolver.Get(typeof(TEntity));
-        var proj = projections.FirstOrDefault(p => string.Equals(p.Property.Name, prop, StringComparison.Ordinal));
-        var json = $"(\"Json\" #>> '{{{prop}}}')";
-        return proj is not null ? $"COALESCE(\"{proj.ColumnName}\"::text, {json})" : json;
+        // Filter against the source-of-truth Json with a type-correct cast. Computed/physical columns
+        // are a SEPARATE indexing optimisation (expression indexes), never a correctness dependency:
+        // referencing one that was not materialised is the "column does not exist" bug, and #>> always
+        // yields text so numeric/bool comparisons otherwise fail with "operator does not exist: text > integer".
+        var text = $"(\"Json\" #>> '{{{prop}}}')";
+        return ApplyPgScalarCast(text, resolved);
+    }
+
+    // jsonb #>> yields text; cast to the comparand's SQL family so comparisons type-check. Collection
+    // fields keep text (the dialect casts the array node to jsonb itself). Unknown types stay text
+    // (string/Guid/DateTime compare losslessly as their canonical string form).
+    private static string ApplyPgScalarCast(string textExpr, ResolvedField? resolved)
+    {
+        var type = resolved?.ComparableType;
+        if (type is null || (resolved?.TargetsCollection ?? false)) return textExpr;
+        var t = Nullable.GetUnderlyingType(type) ?? type;
+        if (t.IsEnum) return $"({textExpr})::numeric";                  // enums stored as numbers (Newtonsoft default)
+        if (t == typeof(bool)) return $"({textExpr})::boolean";
+        if (t == typeof(int) || t == typeof(long) || t == typeof(short) || t == typeof(byte)
+            || t == typeof(sbyte) || t == typeof(uint) || t == typeof(ulong) || t == typeof(ushort)
+            || t == typeof(decimal) || t == typeof(double) || t == typeof(float))
+            return $"({textExpr})::numeric";
+        return textExpr;
     }
 
     /// <summary>Builds an ORDER BY clause from the sort specs; falls back to a stable ctid order.</summary>
