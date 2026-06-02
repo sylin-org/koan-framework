@@ -561,12 +561,17 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     private string ResolveColumnSql(FieldPath field, ResolvedField resolved)
     {
         var prop = field.Leaf;
-        if (string.Equals(prop, "Id", StringComparison.Ordinal)) return "[Id]";
-        if (string.Equals(prop, "Json", StringComparison.Ordinal)) return "[Json]";
+        // Qualify every column reference with the table. Bare names work in the main WHERE, but inside a
+        // correlated json_each(...) subquery (collection operators Has/HasAny/HasAll/HasNone) SQLite does
+        // NOT bind a bare column to the outer row — json_each then iterates nothing, so containment matched
+        // zero rows and its negation matched everything. Qualifying the column fixes the correlation.
+        var t = $"[{TableName}]";
+        if (string.Equals(prop, "Id", StringComparison.Ordinal)) return $"{t}.[Id]";
+        if (string.Equals(prop, "Json", StringComparison.Ordinal)) return $"{t}.[Json]";
         var projections = ProjectionResolver.Get(typeof(TEntity));
         var proj = projections.FirstOrDefault(p => string.Equals(p.Property.Name, prop, StringComparison.Ordinal));
-        var json = $"json_extract(Json, '$.{prop}')";
-        return proj is not null ? $"COALESCE([{proj.ColumnName}], {json})" : json;
+        var json = $"json_extract({t}.[Json], '$.{prop}')";
+        return proj is not null ? $"COALESCE({t}.[{proj.ColumnName}], {json})" : json;
     }
 
     /// <summary>Builds an ORDER BY clause from the sort specs; falls back to a stable Id order.</summary>
