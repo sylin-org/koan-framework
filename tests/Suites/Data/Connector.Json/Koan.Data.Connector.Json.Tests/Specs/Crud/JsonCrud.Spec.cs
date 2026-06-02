@@ -73,7 +73,12 @@ public sealed class JsonCrudSpec
                 var removed = await Person.Remove(saved.Id, partition);
                 removed.Should().BeTrue();
 
-                var remainingIds = filtered.Select(p => p.Id).Skip(1).ToArray();
+                // Remove every over-40 person except Grace. Select by a stable attribute rather than by
+                // position in the query result: the unified query contract guarantees a *deterministic*
+                // order for an unsorted query, not necessarily insertion order, so position-based slicing is
+                // not a safe assumption. (filtered still holds the in-memory objects, so Bob now reads as
+                // "Bobby" after the update above.)
+                var remainingIds = filtered.Where(p => p.Name != "Grace").Select(p => p.Id).ToArray();
                 var removedMany = await Person.Remove(remainingIds);
                 removedMany.Should().Be(2);
 
