@@ -311,14 +311,22 @@ Each facet (1–4) runs:
     `DataCaps.Describe` bridge fallback itself** — so the adapter flips are now atomic. Solution + samples
     green; Core 176, Data.Filtering 97, Data.Core 111, Cache.Topology 50, InMemory 32, Json 7, Web
     AdapterSurface (InMemory) 56. (commit `5b39cd1c`)
-  - **b3 (next, now atomic per-adapter):** flip the 8 data + 6 vector adapters one-at-a-time — each
-    implements `Describe(ICapabilities)` mirroring its current enum exactly, drops the enum property +
-    marker interface, and replaces any internal `Writes.HasFlag(FastRemove)` self-check (Mongo/Postgres/
-    Redis/Sqlite/SqlServer) with a constant strategy. The facade now reflects inner regardless of how
-    inner declares, and the conformance specs verify each flip end-to-end.
-  - **stage (c):** delete `Query/Write/VectorCapabilities` enums + `IQuery/IWrite/IVectorCapabilities`
-    markers + the `DataCaps`/`VectorCaps` bridges + filter records; reconcile the capability guides +
-    DATA-0002/0003 references in the same step.
+  - **b3 ✓ (all 14 adapters flipped):** the 8 data (commit `a3282d4d`) + 6 vector (commit `653a7a3b`)
+    connectors now declare natively via `Describe(ICapabilities)` (DataCaps/VectorCaps tokens mirroring
+    their former enums) and dropped the marker interfaces + enum properties; the 5 internal
+    `Writes.HasFlag(FastRemove)` self-checks became constant `RemoveStrategy.Fast`; `Vector<T>.GetCapabilities`
+    rebased onto `VectorCaps.Describe`. Conformance specs verify each flip end-to-end. The only remaining
+    legacy-marker readers are the `DataCaps`/`VectorCaps` bridge fallbacks + the test fakes that pin them.
+    Solution + samples green; InMemory data 32, Json 7, Data.Core 111, VectorAdapterSurface 26, Data.Filtering 97.
+  - **stage (c) — the deletion (scoped, distinct pass):** delete `Query/Write/VectorCapabilities` enums +
+    `IQuery/IWrite/IVectorCapabilities` markers + the `DataCaps`/`VectorCaps` From/To/marker-fallback
+    bridges + the `Caps`/`WriteCapsImpl` wrappers + `Data<T>.QueryCaps`/`WriteCaps` + `Vector<T>.GetCapabilities`.
+    Re-render the `/.well-known` aggregate + the `Koan-Write-Capabilities` header directly from `caps.All`
+    (they currently round-trip through the bridge-to-enum). Migrate `S10.DevPortal`, the 4 test fakes, and
+    **reconcile ~45 docs** (DATA-0002/0003 + the capability guides) in the same step (ADR requirement, to
+    prevent re-drift). Blast radius: ~15 src + 4 test + 45 doc files. NOTE: the **Gen-1 cut**
+    (`Koan.Core.Adapters` `AdapterCapabilities`/`Capabilities.cs`/`BaseKoanAdapter`) is independent of this
+    enum deletion and is its own increment (LMStudio rewrite).
   - **Gen-1 cut (independent of the enum migration):** `LMStudioAdapter` is the one consumer but it
     inherits its *entire* scaffolding from `BaseKoanAdapter` (`Logger`, `GetOptions<T>`,
     `GetConnectionString`, `InitializeAdapter`/`CheckAdapterHealth`/`GetAdapterBootstrapMetadata`), so the
