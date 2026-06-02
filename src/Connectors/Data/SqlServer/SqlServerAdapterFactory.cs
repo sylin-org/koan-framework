@@ -23,8 +23,6 @@ namespace Koan.Data.Connector.SqlServer;
     LocalScheme = "mssql", LocalHost = "localhost", LocalPort = 1433, LocalPattern = "mssql://{host}:{port}")]
 public sealed class SqlServerAdapterFactory : IDataAdapterFactory
 {
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<(System.Type, string?), string> _nameCache = new();
-
     public string Provider => "mssql";
 
     public bool CanHandle(string provider)
@@ -79,26 +77,18 @@ public sealed class SqlServerAdapterFactory : IDataAdapterFactory
         return new SqlServerRepository<TEntity, TKey>(sp, sourceOpts, resolver);
     }
 
-    public string ResolveStorage(Type entityType, string? partition, IServiceProvider services)
+    public StorageNamingCapability GetNamingCapability(IServiceProvider services)
     {
-        var trimmed = partition?.Trim();
-        var cacheKey = (entityType, string.IsNullOrEmpty(trimmed) ? null : trimmed);
-        return _nameCache.GetOrAdd(cacheKey, _ =>
+        var opts = services.GetRequiredService<IOptions<SqlServerOptions>>().Value;
+        return new StorageNamingCapability
         {
-            var opts = services.GetRequiredService<IOptions<SqlServerOptions>>().Value;
-            var convention = new StorageNameResolver.Convention(
-                opts.NamingStyle,
-                opts.Separator,
-                NameCasing.AsIs);
-            var name = StorageNameResolver.Resolve(entityType, convention).Trim();
-
-            if (string.IsNullOrEmpty(trimmed)) return name;
-
-            var concrete = Guid.TryParse(trimmed, out var guid)
-                ? guid.ToString("N")
-                : trimmed.ToLowerInvariant();
-            return name + "#" + concrete;
-        });
+            Style = opts.NamingStyle,
+            Separator = opts.Separator,
+            Casing = NameCasing.AsIs,
+            PartitionSeparator = '#',
+            Partition = new PartitionTokenPolicy { GuidFormat = "N", Lowercase = true },
+            MaxIdentifierBytes = 128, // SQL Server sysname limit
+        };
     }
 }
 

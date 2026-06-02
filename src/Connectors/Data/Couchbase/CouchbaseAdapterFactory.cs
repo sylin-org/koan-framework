@@ -20,8 +20,6 @@ namespace Koan.Data.Connector.Couchbase;
     UriPattern = "couchbase://{host}", LocalScheme = "couchbase", LocalHost = "localhost", LocalPort = 8091, LocalPattern = "couchbase://{host}")]
 public sealed class CouchbaseAdapterFactory : IDataAdapterFactory
 {
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<(System.Type, string?), string> _nameCache = new();
-
     public string Provider => "couchbase";
 
     public bool CanHandle(string provider)
@@ -41,52 +39,45 @@ public sealed class CouchbaseAdapterFactory : IDataAdapterFactory
         return new CouchbaseRepository<TEntity, TKey>(provider, resolver, sp, options);
     }
 
-    // Partition is a native Couchbase scope (bucket.scope.collection), not a name suffix —
-    // CouchbaseClusterProvider.GetCollectionContext routes EntityContext.Current.Partition into
-    // the scope position. ResolveStorage therefore returns just the collection name.
-    public string ResolveStorage(Type entityType, string? partition, IServiceProvider services)
+    // Couchbase isolates a partition through a native scope (bucket.scope.collection), not a name suffix —
+    // CouchbaseClusterProvider.GetCollectionContext routes EntityContext.Current.Partition into the scope
+    // position via FormatScope. So the capability announces EncodePartitionInName = false: the framework
+    // generates just the collection name, and a fixed Collection / CollectionName callback overrides it.
+    public StorageNamingCapability GetNamingCapability(IServiceProvider services)
     {
-        var trimmed = partition?.Trim();
-        var cacheKey = (entityType, string.IsNullOrEmpty(trimmed) ? null : trimmed);
-        return _nameCache.GetOrAdd(cacheKey, _ =>
+        var options = services.GetRequiredService<IOptions<CouchbaseOptions>>().Value;
+        return new StorageNamingCapability
         {
-            var options = services.GetRequiredService<IOptions<CouchbaseOptions>>().Value;
-
-            if (!string.IsNullOrWhiteSpace(options.Collection))
-                return options.Collection.Trim();
-
-            if (options.CollectionName != null
-                && options.CollectionName(entityType) is { } overrideName
-                && !string.IsNullOrWhiteSpace(overrideName))
-            {
-                return overrideName.Trim();
-            }
-
-            var convention = new StorageNameResolver.Convention(
-                options.NamingStyle,
-                options.Separator ?? ".",
-                NameCasing.AsIs);
-            return StorageNameResolver.Resolve(entityType, convention).Trim();
-        });
+            Style = options.NamingStyle,
+            Separator = options.Separator ?? ".",
+            Casing = NameCasing.AsIs,
+            EncodePartitionInName = false,
+            NameOverride = entityType => !string.IsNullOrWhiteSpace(options.Collection)
+                ? options.Collection!.Trim()
+                : options.CollectionName?.Invoke(entityType),
+        };
     }
 
     /// <summary>
-    /// Format a partition value as a Couchbase scope identifier (alphanumeric / underscore /
-    /// hyphen / percent, max 30 chars). Used by CouchbaseClusterProvider when mapping
-    /// EntityContext.Current.Partition onto bucket.scope.collection.
+    /// Format a partition value as a Couchbase scope identifier (alphanumeric / underscore / hyphen /
+    /// percent, max 30 bytes). Used by CouchbaseClusterProvider when mapping EntityContext.Current.Partition
+    /// onto bucket.scope.collection.
     /// </summary>
     public static string FormatScope(string partition)
     {
         if (string.IsNullOrEmpty(partition)) return partition;
-        var span = partition.AsSpan();
-        var sb = new System.Text.StringBuilder(span.Length);
-        for (int i = 0; i < span.Length; i++)
-        {
-            var c = span[i];
+        var sb = new System.Text.StringBuilder(partition.Length);
+        foreach (var c in partition)
             sb.Append(char.IsLetterOrDigit(c) || c == '_' || c == '-' || c == '%' ? c : '_');
-        }
         var sanitized = sb.ToString();
-        return sanitized.Length <= 30 ? sanitized : sanitized[..30];
+
+        const int maxScopeBytes = 30; // Couchbase scope/collection identifier limit
+        if (NamingUtils.ByteLength(sanitized) <= maxScopeBytes) return sanitized;
+        // Bound without colliding: a readable prefix + a deterministic hash. (The previous code truncated
+        // to [..30], which collapsed distinct partitions sharing a 30-char prefix onto the SAME scope —
+        // the same isolation-destroying bug as Postgres' 63-byte truncation.)
+        var hash = NamingUtils.ShortHash(sanitized, 8);
+        return NamingUtils.TrimToBytes(sanitized, maxScopeBytes - hash.Length - 1) + "_" + hash;
     }
 }
 

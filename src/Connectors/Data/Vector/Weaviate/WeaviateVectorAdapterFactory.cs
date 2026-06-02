@@ -33,8 +33,6 @@ namespace Koan.Data.Vector.Connector.Weaviate;
     LocalScheme = "http", LocalHost = "localhost", LocalPort = 8080, LocalPattern = "http://{host}:{port}")]
 public sealed class WeaviateVectorAdapterFactory : IVectorAdapterFactory
 {
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<(System.Type, string?), string> _nameCache = new();
-
     public string Provider => "weaviate";
 
     public bool CanHandle(string provider) => string.Equals(provider, "weaviate", StringComparison.OrdinalIgnoreCase);
@@ -50,54 +48,17 @@ public sealed class WeaviateVectorAdapterFactory : IVectorAdapterFactory
         return new WeaviateVectorRepository<TEntity, TKey>(httpFactory, options, sp);
     }
 
-    // Weaviate uses '_' (GraphQL-compliant) rather than '#' as the partition separator —
-    // GraphQL identifiers don't allow '#'. Vector class names use FullNamespace + '_' so they
-    // remain valid GraphQL types.
-    public string ResolveStorage(Type entityType, string? partition, IServiceProvider services)
-    {
-        var trimmed = partition?.Trim();
-        var cacheKey = (entityType, string.IsNullOrEmpty(trimmed) ? null : trimmed);
-        return _nameCache.GetOrAdd(cacheKey, _ =>
+    // Weaviate class names are GraphQL types: FullNamespace + '_' separator, and the partition uses '_'
+    // (GraphQL identifiers don't allow '#'). The partition token keeps only [A-Za-z0-9_] (the GUID "D"
+    // form's hyphens fold to '_'); the leading char is always a letter because the class name precedes it.
+    public StorageNamingCapability GetNamingCapability(IServiceProvider services)
+        => new()
         {
-            var convention = new StorageNameResolver.Convention(
-                StorageNamingStyle.FullNamespace,
-                "_",
-                NameCasing.AsIs);
-            var name = StorageNameResolver.Resolve(entityType, convention).Trim();
-
-            if (string.IsNullOrEmpty(trimmed)) return name;
-
-            var concrete = Guid.TryParse(trimmed, out var guid)
-                ? guid.ToString("D").Replace("-", "_")
-                : SanitizeForGraphQL(trimmed);
-            return name + "_" + concrete;
-        });
-    }
-
-    private static string SanitizeForGraphQL(string partition)
-    {
-        var sanitized = new StringBuilder(partition.Length);
-        for (int i = 0; i < partition.Length; i++)
-        {
-            var c = partition[i];
-            if (i == 0)
-            {
-                // First char must be letter or underscore
-                if (char.IsLetter(c) || c == '_')
-                    sanitized.Append(c);
-                else
-                    sanitized.Append('_');
-            }
-            else
-            {
-                // Subsequent chars: alphanumeric or underscore
-                if (char.IsLetterOrDigit(c) || c == '_')
-                    sanitized.Append(c);
-                else
-                    sanitized.Append('_');
-            }
-        }
-        return sanitized.ToString();
-    }
+            Style = StorageNamingStyle.FullNamespace,
+            Separator = "_",
+            Casing = NameCasing.AsIs,
+            PartitionSeparator = '_',
+            Partition = new PartitionTokenPolicy { GuidFormat = "D", AllowedExtraChars = "_" },
+        };
 }
 

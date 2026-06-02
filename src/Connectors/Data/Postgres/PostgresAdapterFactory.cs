@@ -23,8 +23,6 @@ namespace Koan.Data.Connector.Postgres;
     LocalScheme = "postgres", LocalHost = "localhost", LocalPort = 5432, LocalPattern = "postgres://{host}:{port}")]
 public sealed class PostgresAdapterFactory : IDataAdapterFactory
 {
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<(System.Type, string?), string> _nameCache = new();
-
     public string Provider => "postgres";
 
     public bool CanHandle(string provider)
@@ -77,27 +75,20 @@ public sealed class PostgresAdapterFactory : IDataAdapterFactory
         return new PostgresRepository<TEntity, TKey>(sp, sourceOpts, resolver);
     }
 
-    public string ResolveStorage(Type entityType, string? partition, IServiceProvider services)
+    public StorageNamingCapability GetNamingCapability(IServiceProvider services)
     {
-        var trimmed = partition?.Trim();
-        var cacheKey = (entityType, string.IsNullOrEmpty(trimmed) ? null : trimmed);
-        return _nameCache.GetOrAdd(cacheKey, _ =>
+        var opts = services.GetRequiredService<IOptions<PostgresOptions>>().Value;
+        return new StorageNamingCapability
         {
-            var opts = services.GetRequiredService<IOptions<PostgresOptions>>().Value;
-            var convention = new StorageNameResolver.Convention(
-                opts.NamingStyle,
-                opts.Separator,
-                NameCasing.AsIs);
-            var name = StorageNameResolver.Resolve(entityType, convention).Trim();
-
-            if (string.IsNullOrEmpty(trimmed)) return name;
-
-            // Postgres: GUID partitions → "N" format; named partitions → lowercase.
-            var concrete = Guid.TryParse(trimmed, out var guid)
-                ? guid.ToString("N")
-                : trimmed.ToLowerInvariant();
-            return name + "#" + concrete;
-        });
+            Style = opts.NamingStyle,
+            Separator = opts.Separator,
+            Casing = NameCasing.AsIs,
+            PartitionSeparator = '#',
+            // Named partitions lowercased; GUIDs as 32-hex. PostgreSQL truncates identifiers at 63 bytes,
+            // so the framework hashes the composed name when it would overflow (preserving isolation).
+            Partition = new PartitionTokenPolicy { GuidFormat = "N", Lowercase = true },
+            MaxIdentifierBytes = 63,
+        };
     }
 }
 

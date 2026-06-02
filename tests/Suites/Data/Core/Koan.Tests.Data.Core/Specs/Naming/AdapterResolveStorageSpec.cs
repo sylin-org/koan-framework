@@ -32,7 +32,7 @@ public class AdapterResolveStorageSpec
     [Fact]
     public void InMemory_nullPartition_returnsBaseName()
     {
-        var factory = new InMemoryAdapterFactory();
+        INamingProvider factory = new InMemoryAdapterFactory();
         var sp = BuildEmptySp();
 
         factory.ResolveStorage(typeof(Widget), partition: null, sp).Should().Be("Widget");
@@ -41,7 +41,7 @@ public class AdapterResolveStorageSpec
     [Fact]
     public void InMemory_whitespacePartition_treatedAsNull()
     {
-        var factory = new InMemoryAdapterFactory();
+        INamingProvider factory = new InMemoryAdapterFactory();
         var sp = BuildEmptySp();
 
         factory.ResolveStorage(typeof(Widget), partition: "   ", sp).Should().Be("Widget");
@@ -51,7 +51,7 @@ public class AdapterResolveStorageSpec
     [Fact]
     public void InMemory_namedPartition_appendedAfterSeparator()
     {
-        var factory = new InMemoryAdapterFactory();
+        INamingProvider factory = new InMemoryAdapterFactory();
         var sp = BuildEmptySp();
 
         factory.ResolveStorage(typeof(Widget), partition: "alpha", sp).Should().Be("Widget#alpha");
@@ -60,7 +60,7 @@ public class AdapterResolveStorageSpec
     [Fact]
     public void InMemory_partitionWhitespaceTrimmed()
     {
-        var factory = new InMemoryAdapterFactory();
+        INamingProvider factory = new InMemoryAdapterFactory();
         var sp = BuildEmptySp();
 
         factory.ResolveStorage(typeof(Widget), partition: "  alpha  ", sp).Should().Be("Widget#alpha");
@@ -69,7 +69,7 @@ public class AdapterResolveStorageSpec
     [Fact]
     public void Json_namedPartition_appendedAfterSeparator()
     {
-        var factory = new JsonAdapterFactory();
+        INamingProvider factory = new JsonAdapterFactory();
         var sp = BuildSpWithOptions(s => s.Configure<JsonDataOptions>(_ => { }));
 
         factory.ResolveStorage(typeof(Widget), partition: "tenant-7", sp).Should().Be("Widget#tenant-7");
@@ -78,7 +78,7 @@ public class AdapterResolveStorageSpec
     [Fact]
     public void Sqlite_guidPartition_normalizedToNFormat()
     {
-        var factory = new SqliteAdapterFactory();
+        INamingProvider factory = new SqliteAdapterFactory();
         var sp = BuildSpWithSqlite();
 
         var guid = new Guid("019a5aff-79cb-7815-8dae-3700a698f840");
@@ -91,7 +91,7 @@ public class AdapterResolveStorageSpec
     [Fact]
     public void Sqlite_namedPartition_sanitizedForTableName()
     {
-        var factory = new SqliteAdapterFactory();
+        INamingProvider factory = new SqliteAdapterFactory();
         var sp = BuildSpWithSqlite();
 
         // SQLite SanitizeForSqlite keeps letters/digits/hyphen/dot/underscore.
@@ -103,7 +103,7 @@ public class AdapterResolveStorageSpec
     [Fact]
     public void Cache_returnsSameInstanceOnRepeatedCalls()
     {
-        var factory = new InMemoryAdapterFactory();
+        INamingProvider factory = new InMemoryAdapterFactory();
         var sp = BuildEmptySp();
 
         var first = factory.ResolveStorage(typeof(Widget), "alpha", sp);
@@ -117,7 +117,7 @@ public class AdapterResolveStorageSpec
     [Fact]
     public void Cache_distinguishesByPartitionKey()
     {
-        var factory = new InMemoryAdapterFactory();
+        INamingProvider factory = new InMemoryAdapterFactory();
         var sp = BuildEmptySp();
 
         var alpha = factory.ResolveStorage(typeof(Widget), "alpha", sp);
@@ -132,7 +132,7 @@ public class AdapterResolveStorageSpec
     [Fact]
     public void Cache_distinguishesByEntityType()
     {
-        var factory = new InMemoryAdapterFactory();
+        INamingProvider factory = new InMemoryAdapterFactory();
         var sp = BuildEmptySp();
 
         factory.ResolveStorage(typeof(Widget), "alpha", sp).Should().Be("Widget#alpha");
@@ -143,7 +143,7 @@ public class AdapterResolveStorageSpec
     public void Cache_treatsWhitespacePartitions_asSameKey()
     {
         // Per the implementation, "  ", "", and null all canonicalize to null in the cache key.
-        var factory = new InMemoryAdapterFactory();
+        INamingProvider factory = new InMemoryAdapterFactory();
         var sp = BuildEmptySp();
 
         var fromNull = factory.ResolveStorage(typeof(Widget), null, sp);

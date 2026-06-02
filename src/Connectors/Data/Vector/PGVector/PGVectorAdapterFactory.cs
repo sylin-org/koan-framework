@@ -30,7 +30,6 @@ namespace Koan.Data.Connector.PGVector;
 public sealed class PGVectorAdapterFactory : IVectorAdapterFactory
 {
     private readonly IServiceProvider _serviceProvider;
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<(Type, string?), string> _nameCache = new();
 
     static PGVectorAdapterFactory()
     {
@@ -70,24 +69,17 @@ public sealed class PGVectorAdapterFactory : IVectorAdapterFactory
         return new PGVectorRepository<TEntity, TKey>(dataSource, sp, options, extensionManager, logger);
     }
 
-    public string ResolveStorage(Type entityType, string? partition, IServiceProvider services)
-    {
-        var trimmed = partition?.Trim();
-        var cacheKey = (entityType, string.IsNullOrEmpty(trimmed) ? null : trimmed);
-        return _nameCache.GetOrAdd(cacheKey, _ =>
+    // PGVector is Postgres-backed: lowercased EntityType names, '#' partition separator, and the same
+    // 63-byte identifier limit (the framework hashes the composed name on overflow). Partition tokens keep
+    // only [A-Za-z0-9_] (hyphens/dots/spaces fold to '_').
+    public StorageNamingCapability GetNamingCapability(IServiceProvider services)
+        => new()
         {
-            var convention = new StorageNameResolver.Convention(
-                StorageNamingStyle.EntityType,
-                "_",
-                NameCasing.Lower);
-            var name = StorageNameResolver.Resolve(entityType, convention).Trim();
-
-            if (string.IsNullOrEmpty(trimmed)) return name;
-
-            var concrete = Guid.TryParse(trimmed, out var guid)
-                ? guid.ToString("N")
-                : trimmed.ToLowerInvariant().Replace("-", "_").Replace(" ", "_").Replace(".", "_");
-            return name + "#" + concrete;
-        });
-    }
+            Style = StorageNamingStyle.EntityType,
+            Separator = "_",
+            Casing = NameCasing.Lower,
+            PartitionSeparator = '#',
+            Partition = new PartitionTokenPolicy { GuidFormat = "N", Lowercase = true, AllowedExtraChars = "" },
+            MaxIdentifierBytes = 63,
+        };
 }

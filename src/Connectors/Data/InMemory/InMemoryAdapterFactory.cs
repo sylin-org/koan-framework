@@ -12,8 +12,6 @@ namespace Koan.Data.Connector.InMemory;
 [ProviderPriority(-100)]
 public sealed class InMemoryAdapterFactory : IDataAdapterFactory
 {
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<(System.Type, string?), string> _nameCache = new();
-
     public string Provider => "inmemory";
 
     public bool CanHandle(string provider) =>
@@ -45,11 +43,12 @@ public sealed class InMemoryAdapterFactory : IDataAdapterFactory
         return "default";
     }
 
-    public string ResolveStorage(Type entityType, string? partition, IServiceProvider services)
-    {
-        var trimmed = partition?.Trim();
-        var cacheKey = (entityType, string.IsNullOrEmpty(trimmed) ? null : trimmed);
-        return _nameCache.GetOrAdd(cacheKey, _ =>
-            string.IsNullOrEmpty(trimmed) ? entityType.Name : entityType.Name + "#" + trimmed);
-    }
+    public StorageNamingCapability GetNamingCapability(IServiceProvider services)
+        => new()
+        {
+            Style = StorageNamingStyle.EntityType,
+            Casing = NameCasing.AsIs,
+            PartitionSeparator = '#',
+            Partition = PartitionTokenPolicy.Default,
+        };
 }

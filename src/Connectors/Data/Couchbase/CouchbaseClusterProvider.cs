@@ -409,18 +409,8 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
         return new CouchbaseCollectionContext(cluster, bucket, scope, collection, bucket.Name, scopeName, finalCollection);
     }
 
-    private static string SanitizeIdentifier(string value)
-    {
-        // Mirror CouchbaseAdapterFactory.FormatScope. Duplicated here so this code
-        // doesn't have to take a dependency on the factory; the rules come from Couchbase server.
-        var sb = new System.Text.StringBuilder(value.Length);
-        foreach (var c in value)
-        {
-            sb.Append(char.IsLetterOrDigit(c) || c == '_' || c == '-' || c == '%' ? c : '_');
-        }
-        var sanitized = sb.ToString();
-        return sanitized.Length <= 30 ? sanitized : sanitized[..30];
-    }
+    // Scope identifier rules (sanitization + 30-byte bounding) live in one place.
+    private static string SanitizeIdentifier(string value) => CouchbaseAdapterFactory.FormatScope(value);
 
     private async ValueTask<ICluster> EnsureCluster(CouchbaseOptions options, CancellationToken ct)
     {

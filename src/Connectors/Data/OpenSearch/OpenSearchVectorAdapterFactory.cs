@@ -31,8 +31,6 @@ namespace Koan.Data.Connector.OpenSearch;
     LocalScheme = "http", LocalHost = "localhost", LocalPort = 9200, LocalPattern = "http://{host}:{port}")]
 public sealed class OpenSearchVectorAdapterFactory : IVectorAdapterFactory
 {
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<(Type, string?), string> _nameCache = new();
-
     public string Provider => "opensearch";
 
     public bool CanHandle(string provider)
@@ -50,27 +48,15 @@ public sealed class OpenSearchVectorAdapterFactory : IVectorAdapterFactory
         return new OpenSearchVectorRepository<TEntity, TKey>(httpFactory, options, sp);
     }
 
-    public string ResolveStorage(Type entityType, string? partition, IServiceProvider services)
-    {
-        var trimmed = partition?.Trim();
-        var cacheKey = (entityType, string.IsNullOrEmpty(trimmed) ? null : trimmed);
-        return _nameCache.GetOrAdd(cacheKey, _ =>
+    // OpenSearch index names are lowercase; the partition uses '-'. (Names are EntityType, so the name
+    // separator is irrelevant; the optional IndexPrefix is applied by the repository.)
+    public StorageNamingCapability GetNamingCapability(IServiceProvider services)
+        => new()
         {
-            var opts = services.GetService<IOptions<OpenSearchOptions>>()?.Value;
-            var separator = opts?.IndexPrefix is not null ? "-" : "_";
-            var convention = new StorageNameResolver.Convention(
-                StorageNamingStyle.EntityType,
-                separator,
-                NameCasing.Lower);
-            var name = StorageNameResolver.Resolve(entityType, convention).Trim();
-
-            if (string.IsNullOrEmpty(trimmed)) return name;
-
-            var concrete = Guid.TryParse(trimmed, out var guid)
-                ? guid.ToString("N")
-                : trimmed.ToLowerInvariant();
-            return name + "-" + concrete;
-        });
-    }
+            Style = StorageNamingStyle.EntityType,
+            Casing = NameCasing.Lower,
+            PartitionSeparator = '-',
+            Partition = new PartitionTokenPolicy { GuidFormat = "N", Lowercase = true, AllowedExtraChars = "-._" },
+        };
 }
 

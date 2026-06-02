@@ -24,8 +24,6 @@ namespace Koan.Data.Vector.Connector.Qdrant;
     LocalScheme = "http", LocalHost = "localhost", LocalPort = 6333, LocalPattern = "http://{host}:{port}")]
 public sealed class QdrantVectorAdapterFactory : IVectorAdapterFactory
 {
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<(Type, string?), string> _nameCache = new();
-
     public string Provider => "qdrant";
 
     public bool CanHandle(string provider)
@@ -42,40 +40,15 @@ public sealed class QdrantVectorAdapterFactory : IVectorAdapterFactory
         return new QdrantVectorRepository<TEntity, TKey>(httpFactory, options, sp);
     }
 
-    public string ResolveStorage(Type entityType, string? partition, IServiceProvider services)
-    {
-        var trimmed = partition?.Trim();
-        var cacheKey = (entityType, string.IsNullOrEmpty(trimmed) ? null : trimmed);
-        return _nameCache.GetOrAdd(cacheKey, _ =>
+    // Qdrant collection names accept [A-Za-z0-9_-] and reject '#', so the partition separator is '_' (as
+    // Milvus settled on); names are lowercased EntityType.
+    public StorageNamingCapability GetNamingCapability(IServiceProvider services)
+        => new()
         {
-            var convention = new StorageNameResolver.Convention(
-                StorageNamingStyle.EntityType,
-                "_",
-                NameCasing.Lower);
-            var name = StorageNameResolver.Resolve(entityType, convention).Trim();
-
-            if (string.IsNullOrEmpty(trimmed)) return name;
-
-            // Qdrant collection names accept letters, digits, hyphens, underscores. The `#`
-            // separator the other Koan adapters use is rejected; we use `_` matching what
-            // Milvus settled on. Partition values are sanitized to the same character set.
-            var concrete = Guid.TryParse(trimmed, out var guid)
-                ? guid.ToString("N")
-                : SanitizeForQdrant(trimmed);
-            return name + "_" + concrete;
-        });
-    }
-
-    private static string SanitizeForQdrant(string partition)
-    {
-        var sanitized = new StringBuilder(partition.Length);
-        foreach (var c in partition.ToLowerInvariant())
-        {
-            if (char.IsLetterOrDigit(c) || c == '_' || c == '-')
-                sanitized.Append(c);
-            else
-                sanitized.Append('_');
-        }
-        return sanitized.ToString();
-    }
+            Style = StorageNamingStyle.EntityType,
+            Separator = "_",
+            Casing = NameCasing.Lower,
+            PartitionSeparator = '_',
+            Partition = new PartitionTokenPolicy { GuidFormat = "N", Lowercase = true, AllowedExtraChars = "-_" },
+        };
 }

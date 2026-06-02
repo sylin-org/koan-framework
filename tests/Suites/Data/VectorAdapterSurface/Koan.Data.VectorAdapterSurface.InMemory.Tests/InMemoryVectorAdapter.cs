@@ -13,7 +13,6 @@ namespace Koan.Data.VectorAdapterSurface.InMemory.Tests;
 /// </summary>
 public sealed class InMemoryVectorAdapterFactory : IVectorAdapterFactory
 {
-    private readonly ConcurrentDictionary<(Type, string?), string> _nameCache = new();
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, (float[] Embedding, object? Metadata)>> _stores = new(StringComparer.Ordinal);
 
     public string Provider => "inmemoryvector";
@@ -22,13 +21,14 @@ public sealed class InMemoryVectorAdapterFactory : IVectorAdapterFactory
         => string.Equals(provider, "inmemoryvector", StringComparison.OrdinalIgnoreCase)
            || string.Equals(provider, "inmemory", StringComparison.OrdinalIgnoreCase);
 
-    public string ResolveStorage(Type entityType, string? partition, IServiceProvider services)
-    {
-        var trimmed = partition?.Trim();
-        var key = (entityType, string.IsNullOrEmpty(trimmed) ? null : trimmed);
-        return _nameCache.GetOrAdd(key, _ =>
-            string.IsNullOrEmpty(trimmed) ? entityType.Name : entityType.Name + "#" + trimmed);
-    }
+    public StorageNamingCapability GetNamingCapability(IServiceProvider services)
+        => new()
+        {
+            Style = StorageNamingStyle.EntityType,
+            Casing = NameCasing.AsIs,
+            PartitionSeparator = '#',
+            Partition = PartitionTokenPolicy.Default,
+        };
 
     public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp)
         where TEntity : class, IEntity<TKey>
@@ -86,7 +86,7 @@ internal sealed class InMemoryVectorRepository<TEntity, TKey> : IVectorSearchRep
     private ConcurrentDictionary<string, (float[] Embedding, object? Metadata)> Bucket()
     {
         var partition = Koan.Data.Core.EntityContext.Current?.Partition;
-        var storage = _factory.ResolveStorage(typeof(TEntity), partition, _sp);
+        var storage = ((Koan.Data.Abstractions.Naming.INamingProvider)_factory).ResolveStorage(typeof(TEntity), partition, _sp);
         return _stores.GetOrAdd(storage, _ => new ConcurrentDictionary<string, (float[], object?)>(StringComparer.Ordinal));
     }
 

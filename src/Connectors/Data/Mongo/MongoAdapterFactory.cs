@@ -23,8 +23,6 @@ namespace Koan.Data.Connector.Mongo;
     LocalScheme = "mongodb", LocalHost = "localhost", LocalPort = 27017, LocalPattern = "mongodb://{host}:{port}")]
 public sealed class MongoAdapterFactory : IDataAdapterFactory
 {
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<(System.Type, string?), string> _nameCache = new();
-
     public string Provider => "mongo";
 
     public bool CanHandle(string provider) => string.Equals(provider, "mongo", StringComparison.OrdinalIgnoreCase) || string.Equals(provider, "mongodb", StringComparison.OrdinalIgnoreCase);
@@ -79,33 +77,18 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory
         return new MongoRepository<TEntity, TKey>(clientProvider, optionsMonitor, resolver, sp);
     }
 
-    public string ResolveStorage(Type entityType, string? partition, IServiceProvider services)
+    public StorageNamingCapability GetNamingCapability(IServiceProvider services)
     {
-        var trimmed = partition?.Trim();
-        var cacheKey = (entityType, string.IsNullOrEmpty(trimmed) ? null : trimmed);
-        return _nameCache.GetOrAdd(cacheKey, _ =>
+        var opts = services.GetRequiredService<IOptions<MongoOptions>>().Value;
+        return new StorageNamingCapability
         {
-            var opts = services.GetRequiredService<IOptions<MongoOptions>>().Value;
-
-            string name;
-            if (opts.CollectionName != null
-                && opts.CollectionName(entityType) is { } overrideName
-                && !string.IsNullOrWhiteSpace(overrideName))
-            {
-                name = overrideName.Trim();
-            }
-            else
-            {
-                var convention = new StorageNameResolver.Convention(
-                    opts.NamingStyle,
-                    opts.Separator ?? ".",
-                    NameCasing.AsIs);
-                name = StorageNameResolver.Resolve(entityType, convention).Trim();
-            }
-
-            // MongoDB: partition pass-through (accepts most UTF-8 strings).
-            return string.IsNullOrEmpty(trimmed) ? name : name + "#" + trimmed;
-        });
+            Style = opts.NamingStyle,
+            Separator = opts.Separator ?? ".",
+            Casing = NameCasing.AsIs,
+            PartitionSeparator = '#',
+            Partition = PartitionTokenPolicy.Default,
+            NameOverride = opts.CollectionName,
+        };
     }
 }
 

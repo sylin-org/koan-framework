@@ -22,8 +22,6 @@ namespace Koan.Data.Connector.Sqlite;
     UriPattern = "Data Source={path}", LocalScheme = "file", LocalHost = "", LocalPort = 0, LocalPattern = "Data Source={path}")]
 public sealed class SqliteAdapterFactory : IDataAdapterFactory
 {
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<(System.Type, string?), string> _nameCache = new();
-
     public string Provider => "sqlite";
 
     public bool CanHandle(string provider) => string.Equals(provider, "sqlite", StringComparison.OrdinalIgnoreCase);
@@ -72,38 +70,17 @@ public sealed class SqliteAdapterFactory : IDataAdapterFactory
         return new SqliteRepository<TEntity, TKey>(sp, sourceOpts, resolver);
     }
 
-    public string ResolveStorage(Type entityType, string? partition, IServiceProvider services)
+    public StorageNamingCapability GetNamingCapability(IServiceProvider services)
     {
-        var trimmed = partition?.Trim();
-        var cacheKey = (entityType, string.IsNullOrEmpty(trimmed) ? null : trimmed);
-        return _nameCache.GetOrAdd(cacheKey, _ =>
+        var opts = services.GetRequiredService<IOptions<SqliteOptions>>().Value;
+        return new StorageNamingCapability
         {
-            var opts = services.GetRequiredService<IOptions<SqliteOptions>>().Value;
-            var convention = new StorageNameResolver.Convention(
-                opts.NamingStyle,
-                opts.Separator,
-                NameCasing.AsIs);
-            var name = StorageNameResolver.Resolve(entityType, convention).Trim();
-
-            if (string.IsNullOrEmpty(trimmed)) return name;
-
-            var concrete = Guid.TryParse(trimmed, out var guid)
-                ? guid.ToString("N")
-                : SanitizeForSqlite(trimmed);
-            return name + "#" + concrete;
-        });
-    }
-
-    private static string SanitizeForSqlite(string partition)
-    {
-        var sanitized = new StringBuilder(partition.Length);
-        foreach (var c in partition)
-        {
-            if (char.IsLetterOrDigit(c) || c == '-' || c == '.' || c == '_')
-                sanitized.Append(c);
-            else
-                sanitized.Append('_');
-        }
-        return sanitized.ToString();
+            Style = opts.NamingStyle,
+            Separator = opts.Separator,
+            Casing = NameCasing.AsIs,
+            PartitionSeparator = '#',
+            // SQLite keeps letters/digits and - . _ ; no practical identifier-length limit.
+            Partition = PartitionTokenPolicy.Default,
+        };
     }
 }

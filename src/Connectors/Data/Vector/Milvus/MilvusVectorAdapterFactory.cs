@@ -29,8 +29,6 @@ namespace Koan.Data.Vector.Connector.Milvus;
     LocalScheme = "http", LocalHost = "localhost", LocalPort = 19530, LocalPattern = "http://{host}:{port}")]
 public sealed class MilvusVectorAdapterFactory : IVectorAdapterFactory
 {
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<(Type, string?), string> _nameCache = new();
-
     public string Provider => "milvus";
 
     public bool CanHandle(string provider)
@@ -47,43 +45,16 @@ public sealed class MilvusVectorAdapterFactory : IVectorAdapterFactory
         return new MilvusVectorRepository<TEntity, TKey>(httpFactory, options, sp);
     }
 
-    public string ResolveStorage(Type entityType, string? partition, IServiceProvider services)
-    {
-        var trimmed = partition?.Trim();
-        var cacheKey = (entityType, string.IsNullOrEmpty(trimmed) ? null : trimmed);
-        return _nameCache.GetOrAdd(cacheKey, _ =>
+    // Milvus collection names accept only [A-Za-z0-9_] and reject '#', so the partition separator is '_'
+    // and the token keeps only [A-Za-z0-9_] (everything else → '_'); names are lowercased EntityType.
+    public StorageNamingCapability GetNamingCapability(IServiceProvider services)
+        => new()
         {
-            var convention = new StorageNameResolver.Convention(
-                StorageNamingStyle.EntityType,
-                "_",
-                NameCasing.Lower);
-            var name = StorageNameResolver.Resolve(entityType, convention).Trim();
-
-            if (string.IsNullOrEmpty(trimmed)) return name;
-
-            // Milvus collection names accept only letters / digits / underscores. The `#`
-            // separator the other Koan adapters use is rejected ("Invalid collection name").
-            // Use `_` instead — still unambiguous within the sanitized character set since
-            // SanitizeForMilvus already converts anything non-alphanum to `_` (so a partition
-            // value can't introduce ambiguity with the separator).
-            var concrete = Guid.TryParse(trimmed, out var guid)
-                ? guid.ToString("N")
-                : SanitizeForMilvus(trimmed);
-            return name + "_" + concrete;
-        });
-    }
-
-    private static string SanitizeForMilvus(string partition)
-    {
-        var sanitized = new StringBuilder(partition.Length);
-        foreach (var c in partition.ToLowerInvariant())
-        {
-            if (char.IsLetterOrDigit(c) || c == '_')
-                sanitized.Append(c);
-            else
-                sanitized.Append('_');
-        }
-        return sanitized.ToString();
-    }
+            Style = StorageNamingStyle.EntityType,
+            Separator = "_",
+            Casing = NameCasing.Lower,
+            PartitionSeparator = '_',
+            Partition = new PartitionTokenPolicy { GuidFormat = "N", Lowercase = true, AllowedExtraChars = "" },
+        };
 }
 

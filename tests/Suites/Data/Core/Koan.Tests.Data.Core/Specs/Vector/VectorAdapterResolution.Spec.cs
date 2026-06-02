@@ -143,8 +143,12 @@ public sealed class VectorAdapterResolutionSpec
             where TKey : notnull
             => new FakeVectorRepo<TEntity, TKey>(_provider);
 
-        public string ResolveStorage(Type entityType, string? partition, IServiceProvider services)
-            => string.IsNullOrWhiteSpace(partition) ? entityType.Name : entityType.Name + "#" + partition.Trim();
+        public Koan.Data.Abstractions.Naming.StorageNamingCapability GetNamingCapability(IServiceProvider services)
+            => new()
+            {
+                Style = Koan.Data.Abstractions.Naming.StorageNamingStyle.EntityType,
+                PartitionSeparator = '#',
+            };
     }
 
     [SourceAdapter("json")]

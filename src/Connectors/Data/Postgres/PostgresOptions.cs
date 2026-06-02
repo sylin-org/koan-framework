@@ -9,7 +9,9 @@ public sealed class PostgresOptions : IAdapterOptions
 {
     [Required]
     public string ConnectionString { get; set; } = "auto"; // DX-first: auto-detect by default
-    public StorageNamingStyle NamingStyle { get; set; } = StorageNamingStyle.FullNamespace;
+    // PostgreSQL truncates identifiers at 63 bytes, so FullNamespace overflows for non-trivial namespaces
+    // (and collapses partitions on truncation). HashedNamespace keeps names short + collision-safe.
+    public StorageNamingStyle NamingStyle { get; set; } = StorageNamingStyle.HashedNamespace;
     public string Separator { get; set; } = ".";
     public string? SearchPath { get; set; } = "public";
     public int DefaultPageSize { get; set; } = 50;
