@@ -34,5 +34,6 @@
     <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Connectors\Data\Sqlite\Koan.Data.Connector.Sqlite.csproj" />
+    <ProjectReference Include="..\..\AdapterSurface\Koan.Data.AdapterSurface.TestKit\Koan.Data.AdapterSurface.TestKit.csproj" />
   </ItemGroup>
 </Project>
