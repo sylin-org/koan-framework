@@ -303,16 +303,19 @@ Each facet (1–4) runs:
     (`DefaultQueryCapabilities`/`RepositoryCapabilities`/`RepoWriteCaps`/`RepoCaps`). `Entity.cs`'s
     `FastRemove` hot-path already reads `Data<T>.Capabilities.Has(DataCaps.Write.FastRemove)`. Solution +
     samples green; Web AdapterSurface (InMemory) 56/56. (commit `ff490212`)
-  - **b3 sequencing finding (the migration is NOT atomic per-adapter):** dropping any adapter's
-    `IQuery/IWriteCapabilities` marker breaks every consumer still reading it through the *bridge
-    fallback* — `RepositoryFacade`, `CqrsRepositoryDecorator`, `CachedRepository` (all wrap an inner repo
-    and re-expose the markers), and the `Data<T>.QueryCaps`/`WriteCaps` statics (consumed by
-    `samples/S10.DevPortal`). So the next landable unit is **decouple-the-consumers**: migrate the
-    facade + both decorators to `IDescribesCapabilities` (delegate `Describe`→`DataCaps.Describe(inner)`)
-    and drop their markers; rebase/retire `Data<T>.QueryCaps`/`WriteCaps` (+ the `Caps`/`WriteCapsImpl`
-    wrappers) onto `Data<T>.Capabilities`, migrating S10. **Only after that foundation can the 8 data +
-    6 vector adapters flip one-at-a-time** (each: implement `Describe` mirroring its enum exactly, drop
-    the enum property + marker), because the facade now reflects inner regardless of how inner declares.
+  - **b3-prereq ✓ (decouple the consumers):** `RepositoryFacade` + `CqrsRepositoryDecorator` +
+    `CachedRepository` now implement `IDescribesCapabilities` (delegate `Describe`→`DataCaps.Describe(_inner)`)
+    and no longer read the markers; `CapabilitySet.CopyInto` added as the forward-correct passthrough;
+    `Data<T>.QueryCaps`/`WriteCaps` rebased onto `Data<T>.Capabilities` (S10 + docs unchanged); 6 connector
+    capability conformance specs moved to the token contract. **The only remaining marker reader is the
+    `DataCaps.Describe` bridge fallback itself** — so the adapter flips are now atomic. Solution + samples
+    green; Core 176, Data.Filtering 97, Data.Core 111, Cache.Topology 50, InMemory 32, Json 7, Web
+    AdapterSurface (InMemory) 56. (commit `5b39cd1c`)
+  - **b3 (next, now atomic per-adapter):** flip the 8 data + 6 vector adapters one-at-a-time — each
+    implements `Describe(ICapabilities)` mirroring its current enum exactly, drops the enum property +
+    marker interface, and replaces any internal `Writes.HasFlag(FastRemove)` self-check (Mongo/Postgres/
+    Redis/Sqlite/SqlServer) with a constant strategy. The facade now reflects inner regardless of how
+    inner declares, and the conformance specs verify each flip end-to-end.
   - **stage (c):** delete `Query/Write/VectorCapabilities` enums + `IQuery/IWrite/IVectorCapabilities`
     markers + the `DataCaps`/`VectorCaps` bridges + filter records; reconcile the capability guides +
     DATA-0002/0003 references in the same step.
