@@ -328,12 +328,31 @@ Each facet (1–4) runs:
     vestigial `QueryCapabilities` field from Gen-1 `AdapterCapabilities`. Solution + samples green;
     Core 176, Data.Filtering 92, InMemory 32, Json 7, VectorAdapterSurface 26, Web AdapterSurface 56.
 
-  **Facet 1 is COMPLETE** (the unified capability model is the sole surface). Two follow-ons remain, both
-  scoped in ARCH-0084 but independent of the capability migration: the **Gen-1 cut** (`Koan.Core.Adapters`
-  `AdapterCapabilities`/`Capabilities.cs`/`BaseKoanAdapter` — an `LMStudioAdapter` rewrite off the base class)
-  and the **`TransactionCapabilities` runtime-state split**. The **FilterSupport** sub-facet
-  (`FilterCapabilities`/`VectorFilterCapabilities` → `FilterSupport` on the filter token, ~37 files) is also
-  separate. Next facet: **Facet 2 — `KoanModule`** (registration + bootstrap + self-report), which hosts
+  **Facet 1 is COMPLETE** (the unified capability model is the sole surface). Follow-ons (all scoped in
+  ARCH-0084, independent of the core capability migration):
+  - **`TransactionCapabilities` runtime-state split ✓** (commit `87fb98d8`) — `TxCaps` tokens
+    (tx.local/distributed/compensation) declared via the coordinator's `Capabilities` set; runtime state
+    (`Adapters`/`TrackedOperationCount`) moved onto the coordinator; `EntityContext.Capabilities` →
+    `EntityContext.CurrentTransaction`; the `TransactionCapabilities` record deleted.
+  - **Gen-1 cut ✓** (commit `9f55e878`) — deleted the abandoned Gen-1 adapter-capability surface
+    (`AdapterCapabilities`, `Capabilities.cs` 6 enums, `BaseKoanAdapter`, `IKoanAdapter`, `Templates/*`,
+    the dead `OrchestrationRuntimeBridge`); rewrote `LMStudioAdapter` off `BaseKoanAdapter` (now lean like
+    `OllamaAdapter`). Kept the load-bearing Readiness subsystem, `AdapterBootReporting`, the
+    `[OrchestrationAware]` attribute, and `UnifiedServiceMetadata`. AI.Unit 151/151, AI.EndToEnd 31/31.
+  - **FilterSupport sub-facet — OPEN (the one remaining; its own focused pass).** Collapse
+    `FilterCapabilities` + `VectorFilterCapabilities` records into the existing `FilterSupport`, attached to
+    the `DataCaps.Query.Filter` / `VectorCaps.Filters` token as detail (read via `caps.Detail<FilterSupport>`).
+    **42 files**, and it re-touches the DATA-0096/0097 filter-pushdown pipeline: `IQueryRepository.FilterCapabilities`
+    (the contract), `FilterPushdownCoordinator.Plan(query, FilterCapabilities, type)`'s signature, every
+    connector filter translator, the `VectorFilterCoordinator`, and the `FilterConvergence` /
+    `VectorFilterConvergenceSpecsBase` TestKits. **Decision needed up front:** (A) type-collapse — swap
+    the record types for `FilterSupport`, keep the separate `FilterCapabilities` property (lower risk,
+    partial); vs (B) full token integration — move filter caps onto the token detail, delete the property
+    (ADR-faithful, higher churn). Either way, **verification requires running the full cross-adapter
+    convergence oracle** (many container-backed) to prove no filter-pushdown regression — which is why it
+    is its own session, not a tail-end rush.
+
+  Next major facet: **Facet 2 — `KoanModule`** (registration + bootstrap + self-report), which hosts
   `Describe` and builds directly on the capability model just landed.
   - **Gen-1 cut (independent of the enum migration):** `LMStudioAdapter` is the one consumer but it
     inherits its *entire* scaffolding from `BaseKoanAdapter` (`Logger`, `GetOptions<T>`,
