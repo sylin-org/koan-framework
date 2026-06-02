@@ -14,7 +14,9 @@ using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Koan.Data.Abstractions;
+using Koan.Core.Capabilities;
 using Koan.Data.Vector.Abstractions;
+using Koan.Data.Vector.Abstractions.Capabilities;
 using Koan.Data.Vector.Abstractions.Configuration;
 
 namespace Koan.Data.Vector.Connector.Qdrant;
@@ -39,7 +41,7 @@ namespace Koan.Data.Vector.Connector.Qdrant;
 /// </summary>
 internal sealed class QdrantVectorRepository<TEntity, TKey> :
     IVectorSearchRepository<TEntity, TKey>,
-    IVectorCapabilities
+    IDescribesCapabilities
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
@@ -61,13 +63,10 @@ internal sealed class QdrantVectorRepository<TEntity, TKey> :
         ConfigureHttpClient();
     }
 
-    public VectorCapabilities Capabilities =>
-        VectorCapabilities.Knn
-        | VectorCapabilities.Filters
-        | VectorCapabilities.BulkUpsert
-        | VectorCapabilities.BulkDelete
-        | VectorCapabilities.ScoreNormalization
-        | VectorCapabilities.DynamicCollections;
+    public void Describe(ICapabilities caps) => caps
+        .Add(VectorCaps.Knn).Add(VectorCaps.Filters)
+        .Add(VectorCaps.BulkUpsert).Add(VectorCaps.BulkDelete)
+        .Add(VectorCaps.ScoreNormalization).Add(VectorCaps.DynamicCollections);
 
     // AI-0036 §9 / DATA-0097 P1: operator-aware metadata-filter capabilities.
     public Koan.Data.Abstractions.Filtering.VectorFilterCapabilities FilterCapabilities => QdrantFilterTranslator.Caps;

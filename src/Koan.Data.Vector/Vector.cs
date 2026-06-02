@@ -1,6 +1,7 @@
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Vector.Abstractions;
+using Koan.Data.Vector.Abstractions.Capabilities;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -164,8 +165,12 @@ public class Vector<TEntity> where TEntity : class, IEntity<string>
         throw new InvalidOperationException("Stats requires instruction support by the vector provider.");
     }
 
+    // ARCH-0084: resolve via the unified CapabilitySet (native IDescribesCapabilities, else the
+    // legacy-marker bridge), projected back to the legacy enum for this public API (retired in stage c).
     public static VectorCapabilities GetCapabilities()
-        => Repo is IVectorCapabilities caps ? caps.Capabilities : VectorCapabilities.None;
+        => TryRepo is { } repo
+            ? VectorCaps.ToVectorCapabilities(VectorCaps.Describe(repo, repo.GetType().Name))
+            : VectorCapabilities.None;
 
     /// <summary>
     /// Retrieves the embedding vector for a specific entity by ID.

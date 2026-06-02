@@ -14,14 +14,16 @@ using Newtonsoft.Json.Linq;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.SearchEngine;
+using Koan.Core.Capabilities;
 using Koan.Data.Vector.Abstractions;
+using Koan.Data.Vector.Abstractions.Capabilities;
 using Koan.Data.Vector.Abstractions.Configuration;
 
 namespace Koan.Data.Connector.ElasticSearch;
 
 internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
     IVectorSearchRepository<TEntity, TKey>,
-    IVectorCapabilities,
+    IDescribesCapabilities,
     IInstructionExecutor<TEntity>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
@@ -49,11 +51,9 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
         ConfigureHttpClient();
     }
 
-    public VectorCapabilities Capabilities =>
-        VectorCapabilities.Knn |
-        VectorCapabilities.Filters |
-        VectorCapabilities.BulkUpsert |
-        VectorCapabilities.BulkDelete;
+    public void Describe(ICapabilities caps) => caps
+        .Add(VectorCaps.Knn).Add(VectorCaps.Filters)
+        .Add(VectorCaps.BulkUpsert).Add(VectorCaps.BulkDelete);
 
     // AI-0036 §9 / DATA-0097 P1: operator-aware metadata-filter capabilities.
     public Koan.Data.Abstractions.Filtering.VectorFilterCapabilities FilterCapabilities => SearchEngineFilterTranslator.Caps;

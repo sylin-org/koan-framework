@@ -12,7 +12,9 @@ using Newtonsoft.Json;
 using Npgsql;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Filtering;
+using Koan.Core.Capabilities;
 using Koan.Data.Vector.Abstractions;
+using Koan.Data.Vector.Abstractions.Capabilities;
 using Koan.Data.Vector.Abstractions.Configuration;
 using PgVec = Pgvector.Vector;
 
@@ -26,7 +28,7 @@ namespace Koan.Data.Connector.PGVector;
 /// streaming export. Table names carry the "_vector" suffix per DATA-0087.
 /// </summary>
 internal sealed class PGVectorRepository<TEntity, TKey>
-    : IVectorSearchRepository<TEntity, TKey>, IVectorCapabilities
+    : IVectorSearchRepository<TEntity, TKey>, IDescribesCapabilities
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
@@ -51,12 +53,10 @@ internal sealed class PGVectorRepository<TEntity, TKey>
         _logger = logger;
     }
 
-    public VectorCapabilities Capabilities =>
-        VectorCapabilities.Knn |
-        VectorCapabilities.Filters |
-        VectorCapabilities.BulkUpsert |
-        VectorCapabilities.BulkDelete |
-        VectorCapabilities.DynamicCollections;
+    public void Describe(ICapabilities caps) => caps
+        .Add(VectorCaps.Knn).Add(VectorCaps.Filters)
+        .Add(VectorCaps.BulkUpsert).Add(VectorCaps.BulkDelete)
+        .Add(VectorCaps.DynamicCollections);
 
     // AI-0036 §9 / DATA-0097 P1: PGVector is the reference adapter — full operator set over JSONB.
     public Koan.Data.Abstractions.Filtering.VectorFilterCapabilities FilterCapabilities => PGVectorFilterTranslator.Caps;

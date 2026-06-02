@@ -8,7 +8,9 @@ using Microsoft.Extensions.Options;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
+using Koan.Core.Capabilities;
 using Koan.Data.Vector.Abstractions;
+using Koan.Data.Vector.Abstractions.Capabilities;
 using Koan.Data.Vector.Abstractions.Configuration;
 using Koan.Data.Vector.Abstractions.Schema;
 using Newtonsoft.Json;
@@ -16,7 +18,7 @@ using Newtonsoft.Json.Linq;
 
 namespace Koan.Data.Vector.Connector.Weaviate;
 
-internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRepository<TEntity, TKey>, IVectorCapabilities, IInstructionExecutor<TEntity>
+internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRepository<TEntity, TKey>, IDescribesCapabilities, IInstructionExecutor<TEntity>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
@@ -28,7 +30,9 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
     private volatile bool _schemaEnsured;
     private volatile int _discoveredDimension = -1; // -1 means not discovered yet
 
-    public VectorCapabilities Capabilities => VectorCapabilities.Knn | VectorCapabilities.Filters | VectorCapabilities.BulkUpsert | VectorCapabilities.BulkDelete | VectorCapabilities.Hybrid | VectorCapabilities.NativeContinuation | VectorCapabilities.DynamicCollections;
+    public void Describe(ICapabilities caps) => caps
+        .Add(VectorCaps.Knn).Add(VectorCaps.Filters).Add(VectorCaps.BulkUpsert).Add(VectorCaps.BulkDelete)
+        .Add(VectorCaps.Hybrid).Add(VectorCaps.NativeContinuation).Add(VectorCaps.DynamicCollections);
 
     // AI-0036 §9 / DATA-0097 P1: reduced operator-aware metadata-filter capabilities.
     public Koan.Data.Abstractions.Filtering.VectorFilterCapabilities FilterCapabilities => WeaviateFilterTranslator.Caps;
