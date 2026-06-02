@@ -1,5 +1,6 @@
 using System;
 using Xunit;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
@@ -29,6 +30,7 @@ public class DataVectorSeparationSpec
     public void DataNaming_UsesDataAdapterFactory()
     {
         var services = new ServiceCollection();
+        services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
         services.AddKoanDataCore();
         var sp = services.BuildServiceProvider();
 

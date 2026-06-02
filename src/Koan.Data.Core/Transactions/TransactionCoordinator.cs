@@ -150,7 +150,7 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
 
     public async Task Commit(CancellationToken ct = default)
     {
-        ThrowIfCompleted();
+        if (_isCompleted) return; // idempotent: a second Commit (or Commit after Rollback) is a no-op
 
         var stopwatch = Stopwatch.StartNew();
 
@@ -199,7 +199,7 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
 
     public async Task Rollback(CancellationToken ct = default)
     {
-        ThrowIfCompleted();
+        if (_isCompleted) return; // idempotent: a second Rollback (or Rollback after Commit) is a no-op
 
         try
         {

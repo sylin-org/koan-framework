@@ -207,37 +207,29 @@ public static class EntityContext
     public static IDisposable Transaction(string name) => With(transaction: name);
 
     /// <summary>
-    /// Commit the current transaction.
-    /// All tracked operations will be executed and committed across all adapters.
+    /// Commit the current transaction. All tracked operations are executed and committed across adapters.
+    /// Idempotent no-op when there is no active transaction (or it has already completed) — calling Commit
+    /// without a transaction, or twice, never throws.
     /// </summary>
-    /// <exception cref="InvalidOperationException">Thrown when not in a transaction</exception>
     /// <exception cref="TransactionException">Thrown when commit fails</exception>
     public static Task Commit(CancellationToken ct = default)
     {
         var current = _current.Value;
         if (current?.TransactionCoordinator == null)
-        {
-            throw new InvalidOperationException(
-                "No active transaction to commit. Use EntityContext.Transaction() to start a transaction.");
-        }
-
+            return Task.CompletedTask; // no active transaction → no-op
         return current.TransactionCoordinator.Commit(ct);
     }
 
     /// <summary>
-    /// Rollback the current transaction.
-    /// All tracked operations will be discarded and marked as rolled back.
+    /// Rollback the current transaction. All tracked operations are discarded. Idempotent no-op when there
+    /// is no active transaction (or it has already completed) — calling Rollback without a transaction, or
+    /// after a commit/rollback, never throws.
     /// </summary>
-    /// <exception cref="InvalidOperationException">Thrown when not in a transaction</exception>
     public static Task Rollback(CancellationToken ct = default)
     {
         var current = _current.Value;
         if (current?.TransactionCoordinator == null)
-        {
-            throw new InvalidOperationException(
-                "No active transaction to rollback. Use EntityContext.Transaction() to start a transaction.");
-        }
-
+            return Task.CompletedTask; // no active transaction → no-op
         return current.TransactionCoordinator.Rollback(ct);
     }
 
@@ -287,21 +279,17 @@ public static class EntityContext
 
             try
             {
-                // Auto-commit if not explicitly committed/rolled back
+                // Disposed without an explicit Commit/Rollback. Default to ROLLBACK (safe — matches
+                // .NET TransactionScope): pending work persists only on an explicit Commit(), so forgetting
+                // to commit or an exception escaping the using-block discards it. Opt into the legacy
+                // auto-commit behavior via TransactionOptions.AutoCommitOnDispose = true.
                 if (_coordinator != null && !_coordinator.IsCompleted)
                 {
-                    var autoCommit = _options?.AutoCommitOnDispose ?? true;
-
+                    var autoCommit = _options?.AutoCommitOnDispose ?? false;
                     if (autoCommit)
-                    {
-                        // Auto-commit on successful dispose
                         _coordinator.Commit(default).GetAwaiter().GetResult();
-                    }
                     else
-                    {
-                        // Auto-rollback if auto-commit disabled
                         _coordinator.Rollback(default).GetAwaiter().GetResult();
-                    }
                 }
             }
             catch

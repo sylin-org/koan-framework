@@ -55,21 +55,23 @@ public static class VectorData<TEntity>
     {
         System.ArgumentNullException.ThrowIfNull(entity);
 
+        var context = Koan.Data.Core.EntityContext.Current;
+
+        // Transaction takes precedence over the workflow path: inside a transaction BOTH operations must
+        // defer and execute atomically on commit. The workflow path (below) persists the vector directly,
+        // so routing to it here would leak the vector during the transaction (entity defers via Save, but
+        // the vector would not).
+        if (context?.TransactionCoordinator != null)
+        {
+            await entity.Save(ct);                       // defers via Data<TEntity, string>
+            await Save(entity, vector, metadata, ct);    // defers via the transaction-aware Save above
+            return;
+        }
+
         if (VectorWorkflow<TEntity>.IsAvailable())
         {
             var payload = NormalizeMetadata(metadata);
             await VectorWorkflow<TEntity>.Save(entity, vector.ToArray(), payload, null, ct);
-            return;
-        }
-
-        var context = Koan.Data.Core.EntityContext.Current;
-
-        if (context?.TransactionCoordinator != null)
-        {
-            // In transaction: defer BOTH operations
-            await entity.Save(ct);  // Defers via Data<TEntity, string>
-            await Save(entity, vector, metadata, ct);  // Defers via our transaction-aware Save above
-            // Both execute atomically on commit
             return;
         }
 
