@@ -25,11 +25,17 @@ public static class Data<TEntity, TKey>
     => Koan.Core.Hosting.App.AppHost.Current?.GetService<IDataService>()?.GetRepository<TEntity, TKey>()
            ?? throw new System.InvalidOperationException("AppHost.Current is not set. Ensure services.AddKoan() and greenfield boot (AppHost.Current + IAppRuntime).");
 
-    public static IQueryCapabilities QueryCaps
-        => Repo as IQueryCapabilities ?? new Caps(QueryCapabilities.None);
+    /// <summary>
+    /// Legacy query-capability view, retained as a bridge over <see cref="Capabilities"/> (ARCH-0084).
+    /// Prefer <see cref="Capabilities"/>; this projection is retired in the Facet 1 delete stage.
+    /// </summary>
+    public static IQueryCapabilities QueryCaps => new Caps(DataCaps.ToQueryCapabilities(Capabilities));
 
-    public static IWriteCapabilities WriteCaps
-        => Repo as IWriteCapabilities ?? new WriteCapsImpl(WriteCapabilities.None);
+    /// <summary>
+    /// Legacy write-capability view, retained as a bridge over <see cref="Capabilities"/> (ARCH-0084).
+    /// Prefer <see cref="Capabilities"/>; this projection is retired in the Facet 1 delete stage.
+    /// </summary>
+    public static IWriteCapabilities WriteCaps => new WriteCapsImpl(DataCaps.ToWriteCapabilities(Capabilities));
 
     /// <summary>
     /// The provider's capabilities as the unified <see cref="CapabilitySet"/> (ARCH-0084) — the

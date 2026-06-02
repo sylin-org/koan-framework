@@ -57,6 +57,21 @@ public sealed class CapabilitySet : ICapabilities
     public IReadOnlyCollection<Capability> All => _tokens.Keys;
 
     /// <summary>
+    /// Copies every declared capability — each token and any attached structured detail — onto
+    /// <paramref name="target"/>. Used by repository decorators to forward an inner provider's
+    /// resolved capabilities through their own <see cref="IDescribesCapabilities.Describe"/>.
+    /// </summary>
+    public void CopyInto(ICapabilities target)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        foreach (var (token, detail) in _tokens)
+        {
+            if (detail is null) target.Add(token);
+            else target.Add(token, detail);
+        }
+    }
+
+    /// <summary>
     /// Convenience builder: <c>CapabilitySet.Build("data.postgres", c =&gt; c.Add(DataCaps.Query.Linq))</c>.
     /// </summary>
     public static CapabilitySet Build(string? owner, Action<ICapabilities> declare)

@@ -1,5 +1,6 @@
 ﻿using System;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Core.Model;
 using Koan.Data.Connector.InMemory.Tests.Support;
 
@@ -32,13 +33,14 @@ public sealed class InMemoryCapabilitiesSpec
                 var repo = fixture.Data.GetRepository<CapabilityProbe, string>();
                 repo.Should().BeAssignableTo<IQueryRepository<CapabilityProbe, string>>();
 
-                var queryCaps = repo.Should().BeAssignableTo<IQueryCapabilities>().Subject;
-                queryCaps.Capabilities.Should().Be(QueryCapabilities.Linq);
-
-                var writeCaps = repo.Should().BeAssignableTo<IWriteCapabilities>().Subject;
-                writeCaps.Writes.Should().HaveFlag(WriteCapabilities.BulkUpsert);
-                writeCaps.Writes.Should().HaveFlag(WriteCapabilities.BulkDelete);
-                writeCaps.Writes.Should().HaveFlag(WriteCapabilities.AtomicBatch);
+                // ARCH-0084: negotiate via the unified CapabilitySet (verifies the facade forwards
+                // the inner adapter's declaration through IDescribesCapabilities).
+                var caps = DataCaps.Describe(repo, repo.GetType().Name);
+                caps.Has(DataCaps.Query.Linq).Should().BeTrue();
+                caps.Has(DataCaps.Query.String).Should().BeFalse();
+                caps.Has(DataCaps.Write.BulkUpsert).Should().BeTrue();
+                caps.Has(DataCaps.Write.BulkDelete).Should().BeTrue();
+                caps.Has(DataCaps.Write.AtomicBatch).Should().BeTrue();
 
                 await CapabilityProbe.Upsert(new CapabilityProbe { Name = "cap" });
                 var count = await CapabilityProbe.Count.Exact();

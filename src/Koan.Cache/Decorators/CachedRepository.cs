@@ -6,7 +6,9 @@ using System.Threading.Tasks;
 using Koan.Cache.Abstractions.Policies;
 using Koan.Cache.Abstractions.Primitives;
 using Koan.Cache.Abstractions.Stores;
+using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Core;
@@ -18,8 +20,7 @@ internal sealed class CachedRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
     IQueryRepository<TEntity, TKey>,
     IRawQueryRepository<TEntity, TKey>,
-    IQueryCapabilities,
-    IWriteCapabilities,
+    IDescribesCapabilities,
     IInstructionExecutor<TEntity>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
@@ -28,8 +29,6 @@ internal sealed class CachedRepository<TEntity, TKey> :
     private readonly IQueryRepository<TEntity, TKey>? _query;
     private readonly IRawQueryRepository<TEntity, TKey>? _rawQuery;
     private readonly IInstructionExecutor<TEntity>? _instructionExecutor;
-    private readonly IQueryCapabilities? _queryCapabilitiesSource;
-    private readonly IWriteCapabilities? _writeCapabilitiesSource;
     private readonly ICacheClient _cacheClient;
     private readonly CachePolicyDescriptor _entityPolicy;
     private readonly CacheKeyTemplate _entityTemplate;
@@ -52,15 +51,14 @@ internal sealed class CachedRepository<TEntity, TKey> :
         _query = inner as IQueryRepository<TEntity, TKey>;
         _rawQuery = inner as IRawQueryRepository<TEntity, TKey>;
         _instructionExecutor = inner as IInstructionExecutor<TEntity>;
-        _queryCapabilitiesSource = inner as IQueryCapabilities;
-        _writeCapabilitiesSource = inner as IWriteCapabilities;
         _keyAccessor = static entity => ((IEntity<TKey>)entity).Id;
         _entityName = typeof(TEntity).Name;
     }
 
-    public QueryCapabilities Capabilities => _queryCapabilitiesSource?.Capabilities ?? QueryCapabilities.None;
-
-    public WriteCapabilities Writes => _writeCapabilitiesSource?.Writes ?? WriteCapabilities.None;
+    // ARCH-0084: forward the inner provider's unified capabilities (native IDescribesCapabilities,
+    // else the legacy-marker bridge).
+    public void Describe(ICapabilities caps)
+        => DataCaps.Describe(_inner, _inner.GetType().Name).CopyInto(caps);
 
     public FilterCapabilities FilterCapabilities => _query?.FilterCapabilities ?? FilterCapabilities.None;
 

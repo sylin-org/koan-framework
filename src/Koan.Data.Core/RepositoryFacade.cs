@@ -1,4 +1,6 @@
+using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Core.Metadata;
@@ -18,8 +20,7 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
     IQueryRepository<TEntity, TKey>,
     IRawQueryRepository<TEntity, TKey>,
-    IQueryCapabilities,
-    IWriteCapabilities,
+    IDescribesCapabilities,
     IInstructionExecutor<TEntity>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
@@ -27,19 +28,17 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     private readonly IDataRepository<TEntity, TKey> _inner;
     private readonly IAggregateIdentityManager _manager;
     private readonly TimestampPropertyBag _timestampBag;
-    private readonly QueryCapabilities _caps;
-    private readonly WriteCapabilities _writeCaps;
 
     public RepositoryFacade(IDataRepository<TEntity, TKey> inner, IAggregateIdentityManager manager)
     {
         _inner = inner; _manager = manager;
         _timestampBag = new TimestampPropertyBag(typeof(TEntity));
-        _caps = inner is IQueryCapabilities qc ? qc.Capabilities : QueryCapabilities.None;
-        _writeCaps = inner is IWriteCapabilities wc ? wc.Writes : WriteCapabilities.None;
     }
 
-    public QueryCapabilities Capabilities => _caps;
-    public WriteCapabilities Writes => _writeCaps;
+    // ARCH-0084: forward the inner provider's unified capabilities (native IDescribesCapabilities,
+    // else the legacy-marker bridge) — so the facade is correct regardless of how inner declares.
+    public void Describe(ICapabilities caps)
+        => DataCaps.Describe(_inner, _inner.GetType().Name).CopyInto(caps);
 
     public FilterCapabilities FilterCapabilities
         => _inner is IQueryRepository<TEntity, TKey> q ? q.FilterCapabilities : FilterCapabilities.None;

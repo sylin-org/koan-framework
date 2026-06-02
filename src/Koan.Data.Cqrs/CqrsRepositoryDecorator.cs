@@ -1,5 +1,7 @@
 using Newtonsoft.Json;
+using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Filtering;
 
 namespace Koan.Data.Cqrs;
@@ -8,7 +10,7 @@ namespace Koan.Data.Cqrs;
 /// Implicit CQRS decorator: records generic events to outbox and optionally mirrors 1:1 to a read source.
 /// Implements the unified <see cref="IQueryRepository{TEntity,TKey}"/> by delegating to the routed read repo.
 /// </summary>
-internal sealed class CqrsRepositoryDecorator<TEntity, TKey> : IDataRepository<TEntity, TKey>, IQueryRepository<TEntity, TKey>, IQueryCapabilities, IWriteCapabilities
+internal sealed class CqrsRepositoryDecorator<TEntity, TKey> : IDataRepository<TEntity, TKey>, IQueryRepository<TEntity, TKey>, IDescribesCapabilities
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
@@ -23,8 +25,10 @@ internal sealed class CqrsRepositoryDecorator<TEntity, TKey> : IDataRepository<T
         _outbox = sp.GetService(typeof(IOutboxStore)) as IOutboxStore;
     }
 
-    public QueryCapabilities Capabilities => (_inner as IQueryCapabilities)?.Capabilities ?? QueryCapabilities.None;
-    public WriteCapabilities Writes => (_inner as IWriteCapabilities)?.Writes ?? WriteCapabilities.None;
+    // ARCH-0084: forward the write-side provider's unified capabilities (matches the prior markers,
+    // which delegated to _inner). Reads/filters keep routing to the read repo below.
+    public void Describe(ICapabilities caps)
+        => DataCaps.Describe(_inner, _inner.GetType().Name).CopyInto(caps);
 
     public FilterCapabilities FilterCapabilities
         => _routing.GetReadRepository<TEntity, TKey>() is IQueryRepository<TEntity, TKey> q ? q.FilterCapabilities : FilterCapabilities.None;
