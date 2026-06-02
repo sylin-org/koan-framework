@@ -235,7 +235,10 @@ public sealed class CrossAdapterTransactionsSpec
             {
                 var partition = ctx.GetRequiredItem<string>("partition");
 
-                TransactionCapabilities? capabilities = null;
+                string[] adapters = [];
+                var trackedCount = 0;
+                var supportsLocal = false;
+                var supportsDistributed = true;
 
                 using (EntityContext.Transaction("capabilities-test"))
                 {
@@ -251,17 +254,20 @@ public sealed class CrossAdapterTransactionsSpec
                         await new TodoEntity { Title = "JSON" }.Save();
                     }
 
-                    // Get capabilities
-                    capabilities = EntityContext.Capabilities;
+                    // ARCH-0084: snapshot the live transaction state before commit (state lives on the coordinator).
+                    var tx = EntityContext.CurrentTransaction!;
+                    adapters = tx.Adapters.ToArray();
+                    trackedCount = tx.TrackedOperationCount;
+                    supportsLocal = tx.Capabilities.Has(TxCaps.Local);
+                    supportsDistributed = tx.Capabilities.Has(TxCaps.Distributed);
 
                     await EntityContext.Commit();
                 }
 
-                capabilities.Should().NotBeNull();
-                capabilities!.Adapters.Should().Contain(a => a == "Default" || a == "json");
-                capabilities.TrackedOperationCount.Should().Be(2);
-                capabilities.SupportsLocalTransactions.Should().BeTrue();
-                capabilities.SupportsDistributedTransactions.Should().BeFalse("best-effort atomicity only");
+                adapters.Should().Contain(a => a == "Default" || a == "json");
+                trackedCount.Should().Be(2);
+                supportsLocal.Should().BeTrue();
+                supportsDistributed.Should().BeFalse("best-effort atomicity only");
             })
             .Run();
     }

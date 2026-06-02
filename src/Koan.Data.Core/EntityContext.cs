@@ -99,10 +99,13 @@ public static class EntityContext
     public static bool InTransaction => _current.Value?.Transaction != null;
 
     /// <summary>
-    /// Get capabilities for the current transaction (null if not in transaction).
+    /// The current transaction coordinator (null if not in a transaction) — exposes its declared
+    /// <see cref="Transactions.ITransactionCoordinator.Capabilities"/> (ARCH-0084 TxCaps tokens) and its
+    /// live <see cref="Transactions.ITransactionCoordinator.Adapters"/> /
+    /// <see cref="Transactions.ITransactionCoordinator.TrackedOperationCount"/>.
     /// </summary>
-    public static TransactionCapabilities? Capabilities =>
-        _current.Value?.TransactionCoordinator?.GetCapabilities();
+    public static Transactions.ITransactionCoordinator? CurrentTransaction =>
+        _current.Value?.TransactionCoordinator;
 
     /// <summary>
     /// Set routing context. Replaces any previous context (does not merge).

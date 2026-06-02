@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
 
 namespace Koan.Data.Core.Transactions;
@@ -68,21 +70,20 @@ public interface ITransactionCoordinator
     Task Rollback(CancellationToken ct = default);
 
     /// <summary>
-    /// Get capabilities for this transaction context.
+    /// The transaction's declared capabilities (ARCH-0084 <see cref="TxCaps"/> tokens).
     /// </summary>
-    TransactionCapabilities GetCapabilities();
-}
+    CapabilitySet Capabilities { get; }
 
-/// <summary>
-/// Transaction capabilities for the current context.
-/// </summary>
-public sealed record TransactionCapabilities(
-    bool SupportsLocalTransactions,
-    bool SupportsDistributedTransactions,
-    bool RequiresCompensation,
-    string[] Adapters,
-    int TrackedOperationCount
-);
+    /// <summary>
+    /// The adapters with operations tracked in this transaction (live runtime state).
+    /// </summary>
+    IReadOnlyList<string> Adapters { get; }
+
+    /// <summary>
+    /// The number of operations tracked across all adapters (live runtime state).
+    /// </summary>
+    int TrackedOperationCount { get; }
+}
 
 /// <summary>
 /// Exception thrown when transaction operations fail.
