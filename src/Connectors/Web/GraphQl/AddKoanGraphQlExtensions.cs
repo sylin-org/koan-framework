@@ -9,10 +9,12 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Koan.Core;
+using Koan.Core.Capabilities;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Annotations;
+using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Core;
 using Koan.Web.Filtering;
@@ -487,9 +489,9 @@ public static class AddKoanGraphQlExtensions
         private readonly IServiceProvider _sp;
         public Resolvers(IServiceProvider sp) { _sp = sp; }
 
-        private static IQueryCapabilities Caps(IDataRepository<TEntity, string> repo)
-            => repo as IQueryCapabilities ?? new RepoCaps(QueryCapabilities.None);
-        private sealed record RepoCaps(QueryCapabilities Cap) : IQueryCapabilities { public QueryCapabilities Capabilities => Cap; }
+        // ARCH-0084: unified CapabilitySet (native IDescribesCapabilities, else legacy-marker bridge).
+        private static CapabilitySet Caps(IDataRepository<TEntity, string> repo)
+            => DataCaps.Describe(repo, repo.GetType().Name);
 
         private GraphQlHooksRunner<TEntity> GetRunner(HttpContext http) => new(http.RequestServices);
 

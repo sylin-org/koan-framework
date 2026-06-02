@@ -9,7 +9,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 
 using Microsoft.Extensions.Logging;
+using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
 using Koan.Data.Abstractions.Filtering;
@@ -322,8 +324,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             await _hookPipeline.AfterSave(hookContext, model);
         }
 
-        var writes = WriteCaps(repo);
-        context.Headers["Koan-Write-Capabilities"] = writes.Writes.ToString();
+        context.Headers["Koan-Write-Capabilities"] = WriteCapabilitiesHeader(repo);
         CopyHookHeaders(context, hookContext);
         return new EntityEndpointResult(context, new { upserted });
     }
@@ -362,8 +363,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     {
         var context = request.Context;
         var repo = _dataService.GetRepository<TEntity, TKey>();
-        var writes = WriteCaps(repo);
-        context.Headers["Koan-Write-Capabilities"] = writes.Writes.ToString();
+        context.Headers["Koan-Write-Capabilities"] = WriteCapabilitiesHeader(repo);
         using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var deleted = await Data<TEntity, TKey>.DeleteMany(request.Ids ?? [], context.CancellationToken);
         return new EntityEndpointResult(context, new { deleted });
@@ -467,11 +467,15 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         return new EntityModelResult<TEntity>(context, saved, payload);
     }
 
-    private static IQueryCapabilities Capabilities(IDataRepository<TEntity, TKey> repo)
-        => repo as IQueryCapabilities ?? new RepositoryCapabilities(QueryCapabilities.None);
+    // ARCH-0084: negotiate via the unified CapabilitySet — native IDescribesCapabilities when the
+    // adapter has migrated, else bridged from the legacy IQuery/IWriteCapabilities markers.
+    private static CapabilitySet Capabilities(IDataRepository<TEntity, TKey> repo)
+        => DataCaps.Describe(repo, repo.GetType().Name);
 
-    private static IWriteCapabilities WriteCaps(IDataRepository<TEntity, TKey> repo)
-        => repo as IWriteCapabilities ?? new RepoWriteCaps(WriteCapabilities.None);
+    // Renders the Koan-Write-Capabilities header, projecting the unified set back to the legacy flag
+    // string for that external contract (the bridge is retired in ARCH-0084 stage c).
+    private static string WriteCapabilitiesHeader(IDataRepository<TEntity, TKey> repo)
+        => DataCaps.ToWriteCapabilities(DataCaps.Describe(repo, repo.GetType().Name)).ToString();
 
     private static void CopyHookHeaders(EntityRequestContext context, HookContext<TEntity> hookContext)
     {
@@ -745,15 +749,6 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         return new EntityModelResult<TEntity>(context, default, shortCircuit, shortCircuit);
     }
 
-    private sealed record RepositoryCapabilities(QueryCapabilities Value) : IQueryCapabilities
-    {
-        public QueryCapabilities Capabilities => Value;
-    }
-
-    private sealed record RepoWriteCaps(WriteCapabilities Value) : IWriteCapabilities
-    {
-        public WriteCapabilities Writes => Value;
-    }
 }
 
 

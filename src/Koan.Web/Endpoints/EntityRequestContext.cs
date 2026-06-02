@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading;
 using Microsoft.AspNetCore.Http;
-using Koan.Data.Abstractions;
+using Koan.Core.Capabilities;
 using Koan.Web.Hooks;
 
 namespace Koan.Web.Endpoints;
@@ -14,8 +14,6 @@ namespace Koan.Web.Endpoints;
 /// </summary>
 public sealed class EntityRequestContext
 {
-    private static readonly IQueryCapabilities EmptyCapabilities = new DefaultQueryCapabilities();
-
     public EntityRequestContext(
         IServiceProvider services,
         QueryOptions options,
@@ -28,7 +26,7 @@ public sealed class EntityRequestContext
         CancellationToken = cancellationToken;
         HttpContext = httpContext;
         User = user ?? httpContext?.User ?? new ClaimsPrincipal();
-        Capabilities = EmptyCapabilities;
+        Capabilities = new CapabilitySet();
     }
 
     public IServiceProvider Services { get; }
@@ -41,7 +39,11 @@ public sealed class EntityRequestContext
 
     public ClaimsPrincipal User { get; }
 
-    public IQueryCapabilities Capabilities { get; set; }
+    /// <summary>
+    /// The backing provider's capabilities as the unified <see cref="CapabilitySet"/> (ARCH-0084).
+    /// Populated by the endpoint from <c>DataCaps.Describe(repo)</c> — carries both query and write tokens.
+    /// </summary>
+    public CapabilitySet Capabilities { get; set; }
 
     public IDictionary<string, string> Headers { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -55,11 +57,6 @@ public sealed class EntityRequestContext
         {
             Warnings.Add(message);
         }
-    }
-
-    private sealed class DefaultQueryCapabilities : IQueryCapabilities
-    {
-        public QueryCapabilities Capabilities => QueryCapabilities.None;
     }
 }
 

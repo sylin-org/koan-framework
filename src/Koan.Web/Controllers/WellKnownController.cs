@@ -8,6 +8,7 @@ using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Observability;
 using Koan.Core.Observability.Health;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Capabilities;
 using Koan.Web.Infrastructure;
 using Koan.Web.Options;
 using System.Diagnostics;
@@ -129,8 +130,11 @@ public sealed class WellKnownController(
                 try
                 {
                     var repo = KoanWebHelpers.GetRepository(sp, data, x.Type, x.KeyType);
-                    if (repo is IQueryCapabilities qc) q = qc.Capabilities;
-                    if (repo is IWriteCapabilities wc) w = wc.Writes;
+                    // ARCH-0084: negotiate via the unified resolver (survives the marker drop in stage b3),
+                    // bridged back to the legacy flag enums for the existing rendered shape.
+                    var caps = DataCaps.Describe(repo, repo.GetType().Name);
+                    q = DataCaps.ToQueryCapabilities(caps);
+                    w = DataCaps.ToWriteCapabilities(caps);
                 }
                 catch { }
             }
