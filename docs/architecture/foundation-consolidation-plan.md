@@ -342,15 +342,34 @@ Each facet (1–4) runs:
   - **FilterSupport sub-facet — OPEN (the one remaining; its own focused pass).** Collapse
     `FilterCapabilities` + `VectorFilterCapabilities` records into the existing `FilterSupport`, attached to
     the `DataCaps.Query.Filter` / `VectorCaps.Filters` token as detail (read via `caps.Detail<FilterSupport>`).
-    **42 files**, and it re-touches the DATA-0096/0097 filter-pushdown pipeline: `IQueryRepository.FilterCapabilities`
-    (the contract), `FilterPushdownCoordinator.Plan(query, FilterCapabilities, type)`'s signature, every
-    connector filter translator, the `VectorFilterCoordinator`, and the `FilterConvergence` /
-    `VectorFilterConvergenceSpecsBase` TestKits. **Decision needed up front:** (A) type-collapse — swap
-    the record types for `FilterSupport`, keep the separate `FilterCapabilities` property (lower risk,
-    partial); vs (B) full token integration — move filter caps onto the token detail, delete the property
-    (ADR-faithful, higher churn). Either way, **verification requires running the full cross-adapter
-    convergence oracle** (many container-backed) to prove no filter-pushdown regression — which is why it
-    is its own session, not a tail-end rush.
+    **Decision: target B (token integration)** — it is what gives the capability model's `Add<TDetail>`/
+    `Detail<T>` mechanism its *one intended consumer*; doing only A (type-collapse, keep property) leaves
+    that mechanism as dead scaffolding. (`CapabilitySet.CopyInto` is already detail-preserving for exactly
+    this, so the facade/decorators propagate the token detail for free.)
+
+    **Executable plan (worked out 2026-06-02; ~40 files, ATOMIC — does not decompose into safe partial
+    commits, so do it in one green push):**
+    - `FilterSupport` is **structurally identical** to `FilterCapabilities` (same fields, same
+      `CanPush(op, collectionField)`, same `None`/`Full`) → the type-collapse is behaviour-preserving. The
+      vector form uses `FilterSupport.Uniform(...)` (Scalar==Collection, since vector metadata is schemaless);
+      the vector splitter arm calls `caps.CanPush(op, collectionField: false)`.
+    - Contracts: `IQueryRepository.FilterCapabilities` and `IVectorSearchRepository.FilterCapabilities`
+      → `FilterSupport`; `FilterSplitter.Split` (both overloads) + `FilterPushdownCoordinator.Plan` +
+      `VectorFilterCoordinator.Validate` take `FilterSupport`.
+    - Sources: `RelationalFilterCapabilities.Default` (→ rename `RelationalFilterSupport`); each vector
+      translator's `.Caps` (`SearchEngine`/`Milvus`/`Qdrant`/`Weaviate`/`PGVector`) and the Mongo/Couchbase
+      translator caps → `FilterSupport`. The 8 data + 6 vector adapter `FilterCapabilities` properties → `FilterSupport`.
+    - For B: each adapter's `Describe` adds `caps.Add(<Filter token>, <its FilterSupport>)`; the coordinator
+      callers read `Data<T>.Capabilities.Detail<FilterSupport>(DataCaps.Query.Filter)` (no caching needed —
+      same per-call `Describe` cost the FastRemove hot-path already accepts); delete the `FilterCapabilities`
+      property from the contract + facade/decorators. Note: vector adapters that fully-qualify
+      `Koan.Data.Abstractions.Filtering.VectorFilterCapabilities` need `using Koan.Data.Abstractions.Filtering;`
+      added for `FilterSupport`.
+    - Delete `FilterCapabilities.cs` + `VectorFilterCapabilities.cs` records + the `FilterSupport.From(...)`
+      bridges; update the `FilterConvergence` / `VectorFilterConvergenceSpecsBase` TestKits + the
+      `CapabilityBridgeTests` `FilterSupport.From` specs.
+    - **Verify with the FULL cross-adapter convergence oracle** (container-backed) — the structural identity
+      makes a bug unlikely but the oracle is the proof. This is why it is its own session, not a tail-end rush.
 
   Next major facet: **Facet 2 — `KoanModule`** (registration + bootstrap + self-report), which hosts
   `Describe` and builds directly on the capability model just landed.
