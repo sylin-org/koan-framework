@@ -93,6 +93,55 @@ Leverage is in the **cross-cutting primitives every pillar re-implements**, not 
 **Already coherent — do NOT churn:** the front-door facades (`Entity<T>`, `Data<T,K>`, `Vector<T>`,
 `Job<T>`, `[Embedding]`); config (`AddKoanOptions<T>`).
 
+### 3a. Verified audit (2026-06-02) — grounding the first-pass map
+
+A six-axis evidence sweep (read-only, file:line) re-checked §3 against the current tree (now **108
+`.csproj`**) after the data/filter/naming stack settled. Corrections and additions:
+
+**Reframe — count distinct *intents*, not projects (sharpens #5).** In a Reference=Intent framework
+each project *is* an opt-in unit, so "merge the thin projects" is wrong by default: merging
+`Koan.Web.Json.Strict` into Web means you can no longer opt into strict JSON without SSE. The merge
+test is **"is this a distinct intent a developer would reference alone?"** — *yes* → keep separate
+even if tiny (`Json.Strict`, `Sse`, `WebSockets`, per-provider connectors, cache adapter/coherence
+packages); *no, internal seam* → merge (`AI.Contracts.Shared`→`Contracts`, `ZenGarden.Core`→
+`ZenGarden`, `Orchestration.Cli.Core`→`Cli`, the ceremony abstractions below). Several of the "~80
+projects" are correctly invisible plumbing.
+
+**Split-brains that *drift into bugs* (do first — correctness, not aesthetics):**
+- **Capability declaration (#1) — three coexisting generations.** Gen-1 (`Koan.Core.Adapters` caps
+  surface) + legacy enums/markers + the new token model, kept in sync by hand-written bridges. Same
+  bug class the filter-caps triple-representation was. → finish [ARCH-0084](../decisions/ARCH-0084-unified-capability-model.md).
+- **Connection-string parsing — 4 orchestration evaluators vs. the canonical `ConnectionStringParser`,
+  with behavioural divergence** (Mongo drops multi-host; Redis drops DB extraction; Postgres re-does
+  key-normalization; Couchbase ad-hoc host split). Self-contained ~180-line fix.
+- **Auth contributors discovered off-registry.** `IKoanAuthEventContributor` uses its *own* reflection
+  scan, invisible to `KoanRegistry`/provenance, fails silently. One of the 7 interfaces in #2.
+- **Messaging — orphaned static `MessagingTransformers`/`MessagingInterceptors`** never wired into the
+  handler lifecycle (`MessagingLifecycleService` reads only `HandlerRegistry`). *Needs confirmation.*
+
+**Refinements to the ranked targets:**
+- **#2 registration:** verified **85 `KoanAutoRegistrar`** + 7 interfaces. The "Add* + auto-registrar"
+  pairs are *mostly the good pattern* (the registrar calls the Add*) — the real smell is the 7
+  overlapping discovery interfaces + fragmented bootstrap, which is the `KoanModule` (Facet 2) target.
+- **#3 ambient:** exactly **5 genuine ambient stacks**; `KoanEnv` is **config, not ambient** (don't
+  fold it). The win is *one push/pop idiom* (`CacheScopeAccessor` is manual/non-IDisposable, the odd
+  one out), not merging genuinely-different payloads.
+- **#5 / Facet 4 deletion candidates (evidence-backed):** the 8 `Koan.AI.{Compute,Training,Agents,
+  Eval,Review,Models,Prompt,Orchestration}` sub-pillars have a **single consumer (`samples/S18.Prism`)**
+  — the sole-consumer over-fit the discipline warns about. Ceremony Abstractions/Core splits to merge:
+  `Rag`, `ServiceMesh`, `Recipe` (single implementer). Jobs + Scheduling are two execution engines
+  (potential unified `Lane(...).OnCron(...)` — needs the ≥2-usage proof).
+- **Zero-risk now (non-project ghosts, not in the 108 csproj):** delete `Koan.Canon.Core`,
+  `Koan.Cache.Adapter.Memory`, `Koan.Data.Lucene` (obj-only), `Koan.Flow.Core` (doc-only),
+  `Koan.Recipe.Observability` (1-file stub); confirm/relocate the orphaned
+  `Koan.Context/Services/IndexingService.cs` (no csproj, compiled by nothing).
+
+**Explicit non-targets (leave alone — discriminating judgment):** the `Guard` migration (~671 inline
+null-checks; idiomatic C#, no drift — cosmetic, *not* a split-brain); `AddKoanOptions` adoption drift
+(real but low-value — opportunistic, not a facet); the event-payload `*Context` classes (correctly
+distinct); the *justified* Abstractions splits (Data/Vector/Cache/Orchestration/Media — multiple
+independent implementers); the front-door facades.
+
 ## 4. The design — two primitives
 
 The insight: #1, #2, #4, #5 are facets of one question — *how does a unit of functionality describe
@@ -251,7 +300,6 @@ Each facet (1–4) runs:
     `Data.cs`, the `/.well-known` report, CQRS/cache decorators) to `caps.Has` / `caps.Require`,
     deleting the wrapper-record ceremony (`RepoCaps` / `WriteCapsImpl` / …) as each site moves.
   - **b3:** adapters declare natively via `Describe(ICapabilities)`, dropping their enum properties.
-- Minor cleanup available anytime: `src/Koan.Data.Lucene/` is a stale `obj`-only leftover from the
-  `Koan.Data.SearchEngine` rename (0 tracked, 0 in `Koan.sln`) — delete the directory.
-- Minor cleanup available anytime: `src/Koan.Data.Lucene/` is a stale `obj`-only leftover from the
-  `Koan.Data.SearchEngine` rename (0 tracked, 0 in `Koan.sln`) — delete the directory.
+- Minor cleanup available anytime: the non-project ghost dirs (`Koan.Data.Lucene`, `Koan.Canon.Core`,
+  `Koan.Cache.Adapter.Memory` — obj-only; `Koan.Flow.Core` — doc-only) carry 0 tracked source and are
+  absent from `Koan.sln`; delete the directories.
