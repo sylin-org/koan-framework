@@ -131,7 +131,12 @@ internal sealed class MongoFilterTranslator<TEntity>
             FilterOperator.Has => b.Eq(arrayField, ElementValue(ScalarRaw(f.Value), field)),
             // $in on an array field matches when any element overlaps the set.
             FilterOperator.HasAny => b.In(arrayField, ElementSet(f, field)),
-            FilterOperator.HasAll => b.All(new StringFieldDefinition<TEntity, IEnumerable<object>>(name), ElementSet(f, field)),
+            // Emit $all as a raw BsonDocument with element values encoded directly. The typed builder's
+            // IEnumerable<object> FieldDefinition would serialize each element through the item serializer
+            // for `object` — which is the registered JObjectSerializer (it claims typeof(object)) — and
+            // that casts every string element to JObject and throws (DATA-0098). This mirrors the scalar
+            // $in/$nin raw-BSON path so element encoding stays consistent and serializer-independent.
+            FilterOperator.HasAll => Doc(name, new BsonDocument("$all", new BsonArray(ElementSet(f, field).Select(ToBson)))),
             // Disjoint from the set; null/missing array is disjoint -> matches (locked semantics).
             FilterOperator.HasNone => b.Or(b.Not(b.In(arrayField, ElementSet(f, field))), b.Exists(name, false)),
             FilterOperator.Size => b.Size(name, System.Convert.ToInt32(ScalarRaw(f.Value))),
@@ -234,6 +239,9 @@ internal sealed class MongoFilterTranslator<TEntity>
 
     private static IEnumerable<object> ElementSet(FieldFilter f, ResolvedField field)
         => SetRaw(f.Value).Select(r => ElementValue(r, field));
+
+    /// <summary>Coerce a collection-element value to a BSON value verbatim (no FieldDefinition serializer).</summary>
+    private static BsonValue ToBson(object e) => e as BsonValue ?? BsonValue.Create(e);
 
 
     private enum AnchorMode { None, Prefix, Suffix }
