@@ -33,5 +33,6 @@
     <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Relational\Koan.Data.Relational.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Connectors\Data\SqlServer\Koan.Data.Connector.SqlServer.csproj" />
+    <ProjectReference Include="..\..\AdapterSurface\Koan.Data.AdapterSurface.TestKit\Koan.Data.AdapterSurface.TestKit.csproj" />
   </ItemGroup>
 </Project>
