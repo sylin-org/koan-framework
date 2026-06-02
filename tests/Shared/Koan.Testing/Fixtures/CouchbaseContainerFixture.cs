@@ -385,6 +385,12 @@ public sealed class CouchbaseContainerFixture : IAsyncDisposable, IInitializable
 
     private async Task<(bool ok, string? connectionString, string? failureReason)> TryStartWithDockerCli(TestContext context)
     {
+        // Defensive: a prior run whose dispose never fired (e.g. the test host was killed) can leave
+        // koan-couchbase-* containers RUNNING. Several lingering Couchbase containers exhaust host memory and
+        // make this run's services fail to start (a fast ~7s failure). Force-remove any orphans first so each
+        // run starts on a clean slate.
+        await RemoveOrphanedCliContainers(context.Cancellation).ConfigureAwait(false);
+
         var containerName = $"koan-couchbase-{Guid.NewGuid():N}";
         var runArgs = $"run --rm -d --name {containerName} -p 127.0.0.1::{CouchbaseRestPort} -p 127.0.0.1::{CouchbaseViewsPort} -p 127.0.0.1::{CouchbaseQueryPort} -p 127.0.0.1::{CouchbaseKvPort} {ImageName}";
         var (runOk, runStdout, runStderr, runExitCode) = await RunDockerCommand(runArgs, context.Cancellation).ConfigureAwait(false);
@@ -518,6 +524,26 @@ public sealed class CouchbaseContainerFixture : IAsyncDisposable, IInitializable
         try { await RunDockerCommand($"rm -f {_cliContainerId}", CancellationToken.None).ConfigureAwait(false); }
         catch { }
         finally { _cliContainerId = null; }
+    }
+
+    /// <summary>
+    /// Force-remove any koan-couchbase-* containers left behind by a prior run whose dispose did not fire.
+    /// Best-effort: keeps the host from accumulating heavyweight Couchbase containers that would memory-starve
+    /// the next run. Safe under the serialized Couchbase suite — no live run shares this name prefix.
+    /// </summary>
+    private async Task RemoveOrphanedCliContainers(CancellationToken cancellation)
+    {
+        try
+        {
+            var (ok, stdout, _, _) = await RunDockerCommand("ps -aq --filter name=koan-couchbase-", cancellation).ConfigureAwait(false);
+            if (!ok || string.IsNullOrWhiteSpace(stdout)) return;
+            foreach (var id in stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                try { await RunDockerCommand($"rm -f {id}", cancellation).ConfigureAwait(false); }
+                catch { /* best effort */ }
+            }
+        }
+        catch { /* best effort */ }
     }
 
     private static int ParseDockerPortOutput(string output)
