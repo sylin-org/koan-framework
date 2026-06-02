@@ -57,9 +57,11 @@ A codec owns `Encode` (used on **write and as the query comparand — the same e
 
 The Mongo auto-registrar registers the GUID-codec serializer on exactly the GUID-encoded members (the Id + guid parent-refs) via `BsonClassMap`, and **removes the global `BsonSerializer.RegisterSerializer(typeof(string), …)` override**. Every other string keeps the default serializer.
 
-### 4. Query path — select by field, never by value
+### 4. Query path — serialize the comparand through the field's own serializer
 
-`MongoFilterTranslator` selects the codec from `(ResolvedField.RootType, leaf property)` via the selection function and emits accordingly (a raw `BsonDocument` carrying the `BinData` for GUID-encoded fields; the plain value otherwise). The value-sniffing helper `MongoGuidEncoding` is removed; its "what is a guid" moves into the codec, its "where to apply" into the selection function.
+`MongoFilterTranslator` encodes each scalar comparison value by running it through the **member serializer** the class map exposes for that field (`BsonClassMap.LookupClassMap(entity).GetMemberMap(prop).GetSerializer()`) — the SAME serializer the write path uses. This subsumes the GUID case (the per-member codec from §3 → UUID BinData) and, crucially, **every other configured representation**: enums (string, via the global `EnumRepresentationConvention`), `DateTime`, `Decimal`, etc. The translator never re-derives a value's BSON form, so write↔query encoding cannot drift for *any* type.
+
+> **Generalization note.** The first cut selected per-field GUID encoding in the query path (`IdentityEncoding` + `MongoGuidEncoding`) — which fixed GUID but left **enum** drift (`{status:"Published"}` written, `{status:1}` queried → 0 rows). Delegating to the member serializer is the general rule: the field's *configured* serializer is the single authority for its stored form. `IdentityEncoding` remains the **write-side** selection (§3, which members get the GUID codec); the query side simply reads whatever serializer that produced. Comparands are emitted as raw `BsonDocument`s so a non-primitive `BsonValue` lands top-level rather than being wrapped by `ObjectSerializer` in a `{_v:…}` envelope.
 
 ### 5. Provider-agnostic
 
@@ -95,7 +97,7 @@ Collections written under the global value-sniffer stored *every* guid-shaped st
 
 ## Tests
 
-A live, per-adapter matrix (ARCH-0079): **{guid-id entity, string-id entity, guid parent-ref, string parent-ref, plain guid-shaped non-id string} × {write→read round-trip equals input, query-by-`Eq` finds it, absent returns empty}**. This asserts both that ids/refs optimize *and* that round-trips are lossless (catches the mutation hazard and the `_v`-wrap regression end-to-end). Plus the no-Docker translator wire-shape unit (already added in `MongoFilterWireShapeSpec`).
+A live, per-adapter matrix (ARCH-0079): **{guid-id entity, string-id entity, guid parent-ref, string parent-ref, string-stored enum, plain guid-shaped non-id string} × {write→read round-trip equals input, query-by-`Eq` finds it, absent returns empty}**. This asserts both that ids/refs optimize *and* that round-trips are lossless (catches the mutation hazard and the `_v`-wrap regression end-to-end). Plus the no-Docker translator wire-shape unit (already added in `MongoFilterWireShapeSpec`).
 
 ## Notes for reviewers
 

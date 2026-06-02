@@ -62,8 +62,8 @@ public sealed class MongoIdentityEncodingMatrixSpec
 
                 await Sighting.UpsertMany(new[]
                 {
-                    new Sighting { PackageId = pkg.Id, CatalogId = "produce", CorrelationId = correlation },
-                    new Sighting { PackageId = pkg.Id, CatalogId = "produce", CorrelationId = Guid.NewGuid().ToString() }
+                    new Sighting { PackageId = pkg.Id, CatalogId = "produce", CorrelationId = correlation, Status = Status.Published },
+                    new Sighting { PackageId = pkg.Id, CatalogId = "produce", CorrelationId = Guid.NewGuid().ToString(), Status = Status.Draft }
                 });
 
                 // --- GUID reference (the regression): query by a guid-shaped FK finds the rows ---
@@ -71,6 +71,9 @@ public sealed class MongoIdentityEncodingMatrixSpec
 
                 // --- Slug reference: query by a string FK finds the rows ---
                 (await Data<Sighting, string>.Query(s => s.CatalogId == "produce", partition)).Should().HaveCount(2);
+
+                // --- Enum: stored as a string (convention); a query by the enum value must match ---
+                (await Data<Sighting, string>.Query(s => s.Status == Status.Published, partition)).Should().HaveCount(1);
 
                 // --- Non-identity guid-shaped string: verbatim round-trip + queryable as a string ---
                 var byCorrelation = await Data<Sighting, string>.Query(s => s.CorrelationId == correlation, partition);
@@ -93,10 +96,13 @@ public sealed class MongoIdentityEncodingMatrixSpec
         public string Name { get; set; } = "";
     }
 
+    private enum Status { Draft, Published }
+
     private sealed class Sighting : Entity<Sighting>
     {
         [Parent(typeof(Package))] public string? PackageId { get; set; }   // GUID-encoded ref
         [Parent(typeof(Catalog))] public string? CatalogId { get; set; }   // string ref (slug-keyed target)
+        public Status Status { get; set; }                                 // enum -> stored as a string (convention)
         public string CorrelationId { get; set; } = "";                    // plain guid-shaped string, NOT an id/ref
     }
 }

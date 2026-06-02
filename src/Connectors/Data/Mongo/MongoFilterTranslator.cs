@@ -1,7 +1,8 @@
 using System.Text.RegularExpressions;
 using Koan.Data.Abstractions.Filtering;
-using Koan.Data.Core.Optimization;
 using MongoDB.Bson;
+using MongoDB.Bson.IO;
+using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
 
 namespace Koan.Data.Connector.Mongo;
@@ -17,13 +18,14 @@ namespace Koan.Data.Connector.Mongo;
 /// matches missing fields, but we OR in an explicit existence/null check to be robust.
 /// Relational comparisons map straight to <c>$gt/$gte/$lt/$lte</c>.
 ///
-/// GUID handling: a scalar equality/membership value that is a Guid OR a Guid-PARSEABLE string is
-/// emitted as native UUID BinData — via the shared <see cref="MongoGuidEncoding"/> rule that
-/// SmartStringGuidSerializer also uses on write, so Guid scalars AND Guid-shaped string fields (ids,
-/// FKs) match their BinData storage and hit the UUID index. (Keying off the declared comparable type
-/// alone silently broke predicate queries on string-typed Guid FKs — DATA-XXXX.) Collection (List&lt;string&gt;) element
-/// values are emitted as their native CLR type (string stays a BSON string), because the array
-/// element serializer is carved out of the smart serializer (see MongoOptimizationAutoRegistrar).
+/// Value encoding (DATA-0098): a scalar comparison value is serialized through the FIELD'S OWN
+/// registered serializer — the same one the write path uses — so the comparand always matches the
+/// stored representation. That covers every type the serialization config defines without special
+/// cases: GUID ids/refs (UUID BinData via the per-member codec), enums (string, via the global
+/// EnumRepresentationConvention), DateTime, Decimal, etc. The translator never re-derives a value's
+/// BSON form, so write↔query encoding cannot drift per type. Collection (List&lt;string&gt;) ELEMENT
+/// values are emitted as their native CLR type (the array element serializer is carved out — see
+/// MongoOptimizationAutoRegistrar).
 /// </summary>
 internal sealed class MongoFilterTranslator<TEntity>
 {
@@ -96,21 +98,21 @@ internal sealed class MongoFilterTranslator<TEntity>
 
         // Scalar comparisons emit a raw BsonDocument (see Doc) so the value lands as a top-level
         // BsonValue rather than being wrapped by ObjectSerializer in a {_v: ...} envelope (DATA-XXXX).
-        // Whether the value is GUID-encoded (string -> UUID BinData) is decided per FIELD from static
-        // metadata (IdentityEncoding — the same selection the write serializer uses), never by sniffing
-        // the value, so the write and query encodings cannot drift.
-        var guidEncoded = IsGuidEncodedField(field);
+        // The comparand is encoded through the FIELD'S OWN serializer (ResolveScalarSerializer) — the
+        // same one the write path uses — so it matches the stored representation for every configured
+        // type (GUID BinData, enum-as-string, DateTime, ...) without the translator re-deriving it.
+        var serializer = ResolveScalarSerializer(field);
         return op switch
         {
-            FilterOperator.Eq => Doc(name, ScalarBson(f, field, guidEncoded)),
-            FilterOperator.Ne => Doc(name, new BsonDocument("$ne", ScalarBson(f, field, guidEncoded))),
-            FilterOperator.Gt => Doc(name, new BsonDocument("$gt", ScalarBson(f, field, guidEncoded))),
-            FilterOperator.Gte => Doc(name, new BsonDocument("$gte", ScalarBson(f, field, guidEncoded))),
-            FilterOperator.Lt => Doc(name, new BsonDocument("$lt", ScalarBson(f, field, guidEncoded))),
-            FilterOperator.Lte => Doc(name, new BsonDocument("$lte", ScalarBson(f, field, guidEncoded))),
-            FilterOperator.In => Doc(name, new BsonDocument("$in", new BsonArray(SetBson(f, field, guidEncoded)))),
+            FilterOperator.Eq => Doc(name, ScalarBson(f, field, serializer)),
+            FilterOperator.Ne => Doc(name, new BsonDocument("$ne", ScalarBson(f, field, serializer))),
+            FilterOperator.Gt => Doc(name, new BsonDocument("$gt", ScalarBson(f, field, serializer))),
+            FilterOperator.Gte => Doc(name, new BsonDocument("$gte", ScalarBson(f, field, serializer))),
+            FilterOperator.Lt => Doc(name, new BsonDocument("$lt", ScalarBson(f, field, serializer))),
+            FilterOperator.Lte => Doc(name, new BsonDocument("$lte", ScalarBson(f, field, serializer))),
+            FilterOperator.In => Doc(name, new BsonDocument("$in", new BsonArray(SetBson(f, field, serializer)))),
             // Nin must match missing/null too (locked semantics).
-            FilterOperator.Nin => b.Or(Doc(name, new BsonDocument("$nin", new BsonArray(SetBson(f, field, guidEncoded)))), b.Exists(name, false), Doc(name, BsonNull.Value)),
+            FilterOperator.Nin => b.Or(Doc(name, new BsonDocument("$nin", new BsonArray(SetBson(f, field, serializer)))), b.Exists(name, false), Doc(name, BsonNull.Value)),
             FilterOperator.StartsWith => b.Regex(name, Anchored(StringScalar(f), f.IgnoreCase, AnchorMode.Prefix)),
             FilterOperator.EndsWith => b.Regex(name, Anchored(StringScalar(f), f.IgnoreCase, AnchorMode.Suffix)),
             FilterOperator.Contains => b.Regex(name, Anchored(StringScalar(f), f.IgnoreCase, AnchorMode.None)),
@@ -164,33 +166,58 @@ internal sealed class MongoFilterTranslator<TEntity>
         _ => Array.Empty<object?>()
     };
 
-    // DATA-0098: a field is GUID-encoded iff IdentityEncoding says so (the entity's Id, or a declared
-    // parent reference to a GUID-identity entity) — the SAME selection the write serializer uses. Only
-    // top-level scalar fields are encoded here; nested paths fall through as plain values.
-    private static bool IsGuidEncodedField(ResolvedField field)
-        => field.Members.Count == 1
-           && IdentityEncoding.IsGuidEncoded(field.RootType, field.Members[0].Name);
+    /// <summary>
+    /// The serializer registered for a top-level scalar field — the SAME one the write path uses, so it
+    /// encodes the comparand exactly as stored (the per-member GUID codec, enum-as-string, DateTime, …).
+    /// Returns null for nested paths or when no member map exists, in which case the value is emitted
+    /// verbatim. This is what makes the translator honour the whole serialization config instead of
+    /// re-deriving each type (DATA-0098).
+    /// </summary>
+    private static IBsonSerializer? ResolveScalarSerializer(ResolvedField field)
+    {
+        if (field.Members.Count != 1) return null;
+        try
+        {
+            return BsonClassMap.LookupClassMap(field.RootType)?.GetMemberMap(field.Members[0].Name)?.GetSerializer();
+        }
+        catch
+        {
+            return null;
+        }
+    }
 
-    private static BsonValue ScalarBson(FieldFilter f, ResolvedField field, bool guidEncoded)
-        => ToBson(FilterValueConverter.Convert(ScalarRaw(f.Value), field.ComparableType), guidEncoded);
+    private static BsonValue ScalarBson(FieldFilter f, ResolvedField field, IBsonSerializer? serializer)
+        => Encode(FilterValueConverter.Convert(ScalarRaw(f.Value), field.ComparableType), serializer);
 
-    private static IEnumerable<BsonValue> SetBson(FieldFilter f, ResolvedField field, bool guidEncoded)
-        => SetRaw(f.Value).Select(x => ToBson(FilterValueConverter.Convert(x, field.ComparableType), guidEncoded));
+    private static IEnumerable<BsonValue> SetBson(FieldFilter f, ResolvedField field, IBsonSerializer? serializer)
+        => SetRaw(f.Value).Select(x => Encode(FilterValueConverter.Convert(x, field.ComparableType), serializer));
 
     /// <summary>
-    /// Convert a coerced comparison value to its stored BSON form. For a GUID-encoded field a
-    /// Guid-parseable string (or Guid) becomes UUID BinData via the shared <see cref="MongoGuidEncoding"/>
-    /// codec — exactly what the write serializer stores — so the comparand matches. Otherwise the value
-    /// is emitted verbatim; a guid-shaped string in a non-identity field stays a BSON string (no sniffing).
+    /// Encode a comparison value to BSON through the field's own <paramref name="serializer"/>, so the
+    /// comparand matches the stored form for every configured type. Falls back to a verbatim value when
+    /// no serializer applies or the value's CLR type doesn't match the serializer's value type.
     /// </summary>
-    private static BsonValue ToBson(object? value, bool guidEncoded)
+    private static BsonValue Encode(object? value, IBsonSerializer? serializer)
     {
-        if (guidEncoded)
+        if (value is null) return BsonNull.Value;
+        if (serializer is not null && serializer.ValueType.IsInstanceOfType(value))
         {
-            if (value is Guid g) return MongoGuidEncoding.ToBinData(g);
-            if (value is string s && MongoGuidEncoding.IsGuidEncoded(s, out var sg)) return MongoGuidEncoding.ToBinData(sg);
+            return SerializeToBsonValue(serializer, value);
         }
-        return value as BsonValue ?? (value is null ? BsonNull.Value : BsonValue.Create(value));
+        return value as BsonValue ?? BsonValue.Create(value);
+    }
+
+    private static BsonValue SerializeToBsonValue(IBsonSerializer serializer, object value)
+    {
+        var document = new BsonDocument();
+        using (var writer = new BsonDocumentWriter(document))
+        {
+            writer.WriteStartDocument();
+            writer.WriteName("v");
+            serializer.Serialize(BsonSerializationContext.CreateRoot(writer), new BsonSerializationArgs { NominalType = serializer.ValueType }, value);
+            writer.WriteEndDocument();
+        }
+        return document["v"];
     }
 
     // Emit a scalar comparison as a raw BsonDocument (rendered verbatim) instead of through the
