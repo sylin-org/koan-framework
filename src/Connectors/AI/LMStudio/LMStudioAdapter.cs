@@ -23,7 +23,7 @@ using Koan.AI.Connector.LMStudio.Infrastructure;
 namespace Koan.AI.Connector.LMStudio;
 
 [AiAdapterDescriptor(priority: 12, Weight = 2)]
-internal sealed class LMStudioAdapter : BaseKoanAdapter,
+internal sealed class LMStudioAdapter :
     IChatAdapter,
     IEmbedAdapter,
     IAdapterReadiness,
@@ -31,6 +31,8 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
     IAsyncAdapterInitializer
 {
     private readonly HttpClient _http;
+    private readonly ILogger _logger;
+    private readonly IConfiguration _configuration;
     private readonly LMStudioOptions _options;
     private readonly string _defaultModel;
     private readonly AdapterReadinessConfiguration _readiness;
@@ -40,18 +42,11 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
     private Task? _initializationTask;
     private UnifiedServiceMetadata? _orchestrationContext;
 
-    public override ServiceType ServiceType => ServiceType.Ai;
-    public override string AdapterId => Constants.Adapter.Type;
-    public override string DisplayName => "LM Studio AI Provider";
-
-    public override AdapterCapabilities Capabilities => AdapterCapabilities.Create()
-        .WithHealth(HealthCapabilities.Basic | HealthCapabilities.ConnectionHealth | HealthCapabilities.ResponseTime)
-        .WithConfiguration(ConfigurationCapabilities.EnvironmentVariables | ConfigurationCapabilities.ConfigurationFiles | ConfigurationCapabilities.OrchestrationAware)
-    .WithSecurity(SecurityCapabilities.Authentication | SecurityCapabilities.TokenBased)
-        .WithCustom("chat", "streaming", "openai_compatible");
+    private string AdapterId => Constants.Adapter.Type;
+    public string DisplayName => "LM Studio AI Provider";
 
     public string Id => AdapterId;
-    public override string Name => DisplayName;
+    public string Name => DisplayName;
     public string Type => Constants.Adapter.Type;
     public IAiModelManager? ModelManager => null;
 
@@ -71,11 +66,12 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
         IConfiguration configuration,
         AdaptersReadinessOptions? readinessDefaults = null,
         LMStudioOptions? resolvedOptions = null)
-        : base(logger, configuration)
     {
         _http = http;
+        _logger = logger;
+        _configuration = configuration;
         _readinessDefaults = readinessDefaults ?? new AdaptersReadinessOptions();
-        _options = resolvedOptions ?? GetOptions<LMStudioOptions>();
+        _options = resolvedOptions ?? _configuration.GetSection(Constants.Section).Get<LMStudioOptions>() ?? new LMStudioOptions();
         _readiness = (AdapterReadinessConfiguration)(_options.Readiness ?? new AdapterReadinessConfiguration());
 
         if (_readiness.Timeout <= TimeSpan.Zero)
@@ -112,7 +108,7 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
         var body = await response.Content.ReadAsStringAsync(ct);
         if (!response.IsSuccessStatusCode)
         {
-            Logger.LogWarning("LM Studio chat request failed ({Status}): {Body}", (int)response.StatusCode, body);
+            _logger.LogWarning("LM Studio chat request failed ({Status}): {Body}", (int)response.StatusCode, body);
             response.EnsureSuccessStatusCode();
         }
 
@@ -199,7 +195,7 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
         var body = await response.Content.ReadAsStringAsync(ct);
         if (!response.IsSuccessStatusCode)
         {
-            Logger.LogWarning("LM Studio embeddings request failed ({Status}): {Body}", (int)response.StatusCode, body);
+            _logger.LogWarning("LM Studio embeddings request failed ({Status}): {Body}", (int)response.StatusCode, body);
             response.EnsureSuccessStatusCode();
         }
 
@@ -303,7 +299,7 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
     public TimeSpan Timeout => _readiness.Timeout > TimeSpan.Zero ? _readiness.Timeout : _readinessDefaults.DefaultTimeout;
     public bool EnableReadinessGating => _readiness.EnableReadinessGating;
 
-    protected override async Task InitializeAdapter(CancellationToken cancellationToken = default)
+    public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         ApplyConfiguredBaseAddress();
         _ = EnsureInitializationStarted();
@@ -314,7 +310,7 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
         }
         catch (AdapterNotReadyException ex)
         {
-            Logger.LogWarning(ex, "[{AdapterId}] LM Studio adapter not ready after initialization (state={State})", AdapterId, ReadinessState);
+            _logger.LogWarning(ex, "[{AdapterId}] LM Studio adapter not ready after initialization (state={State})", AdapterId, ReadinessState);
         }
     }
 
@@ -331,69 +327,8 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
         }
         catch (AdapterNotReadyException ex)
         {
-            Logger.LogWarning(ex, "[{AdapterId}] LM Studio adapter not ready after orchestration initialization (state={State})", AdapterId, ReadinessState);
+            _logger.LogWarning(ex, "[{AdapterId}] LM Studio adapter not ready after orchestration initialization (state={State})", AdapterId, ReadinessState);
         }
-    }
-
-    protected override async Task<IReadOnlyDictionary<string, object?>?> CheckAdapterHealth(CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-            using var request = new HttpRequestMessage(HttpMethod.Get, Constants.Discovery.ModelsPath);
-            AttachAuth(request);
-            using var response = await _http.SendAsync(request, cancellationToken);
-            stopwatch.Stop();
-
-            var payload = await response.Content.ReadAsStringAsync(cancellationToken);
-
-            var metadata = new Dictionary<string, object?>
-            {
-                ["status"] = response.IsSuccessStatusCode ? "healthy" : "unhealthy",
-                ["response_time_ms"] = stopwatch.ElapsedMilliseconds,
-                ["base_url"] = _http.BaseAddress?.ToString(),
-                ["default_model"] = _defaultModel,
-                ["orchestration_aware"] = _orchestrationContext != null,
-                ["readiness_state"] = ReadinessState.ToString()
-            };
-
-            try
-            {
-                var doc = JsonConvert.DeserializeObject<ModelsResponse>(payload);
-                metadata["available_models"] = doc?.data?.Count ?? 0;
-                metadata["model_list"] = doc?.data?.Take(5).Select(m => m.id).ToArray();
-            }
-            catch (Exception ex)
-            {
-                metadata["models_error"] = ex.Message;
-            }
-
-            return metadata;
-        }
-        catch (Exception ex)
-        {
-            Logger.LogWarning(ex, "[{AdapterId}] Health check failed", AdapterId);
-            return new Dictionary<string, object?>
-            {
-                ["status"] = "unhealthy",
-                ["error"] = ex.Message
-            };
-        }
-    }
-
-    protected override Task<IReadOnlyDictionary<string, object?>?> GetAdapterBootstrapMetadata(CancellationToken cancellationToken = default)
-    {
-        var metadata = new Dictionary<string, object?>
-        {
-            ["base_url"] = _http.BaseAddress?.ToString(),
-            ["default_model"] = _defaultModel,
-            ["provider"] = "LM Studio",
-            ["features"] = new[] { "chat", "streaming", "embeddings", "openai_compatible" },
-            ["runtime_capabilities"] = Capabilities.GetCapabilitySummary(),
-            ["readiness_state"] = ReadinessState.ToString()
-        };
-
-        return Task.FromResult<IReadOnlyDictionary<string, object?>?>(metadata);
     }
 
     private Task EnsureInitializationStarted()
@@ -438,13 +373,13 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
         catch (OperationCanceledException ex)
         {
             _stateManager.TransitionTo(AdapterReadinessState.Failed);
-            Logger.LogError(ex, "[{AdapterId}] LM Studio readiness timed out after {Timeout}", AdapterId, ReadinessTimeout);
+            _logger.LogError(ex, "[{AdapterId}] LM Studio readiness timed out after {Timeout}", AdapterId, ReadinessTimeout);
             throw new InvalidOperationException($"LM Studio readiness timed out after {ReadinessTimeout}.", ex);
         }
         catch (Exception ex)
         {
             _stateManager.TransitionTo(AdapterReadinessState.Failed);
-            Logger.LogError(ex, "[{AdapterId}] LM Studio readiness failed", AdapterId);
+            _logger.LogError(ex, "[{AdapterId}] LM Studio readiness failed", AdapterId);
             throw;
         }
     }
@@ -473,7 +408,7 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
         }
         catch (Exception ex)
         {
-            Logger.LogWarning(ex, "[{AdapterId}] Failed to verify default model '{Model}'", AdapterId, _defaultModel);
+            _logger.LogWarning(ex, "[{AdapterId}] Failed to verify default model '{Model}'", AdapterId, _defaultModel);
             return false;
         }
     }
@@ -503,7 +438,7 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
 
         if (!Uri.TryCreate(configured, UriKind.Absolute, out var resolved))
         {
-            Logger.LogWarning("LM Studio adapter: Ignoring invalid base URL '{BaseUrl}'", configured);
+            _logger.LogWarning("LM Studio adapter: Ignoring invalid base URL '{BaseUrl}'", configured);
             return;
         }
 
@@ -526,7 +461,7 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
             return NormalizeBase(_options.BaseUrl);
         }
 
-        var legacy = GetConnectionString();
+        var legacy = _configuration.GetConnectionString(AdapterId);
         if (!string.IsNullOrWhiteSpace(legacy) &&
             !string.Equals(legacy, "auto", StringComparison.OrdinalIgnoreCase))
         {
@@ -685,7 +620,7 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
                 }
                 catch (JsonException ex)
                 {
-                    Logger.LogDebug(ex, "Failed to deserialize LM Studio stream payload: {Payload}", payload);
+                    _logger.LogDebug(ex, "Failed to deserialize LM Studio stream payload: {Payload}", payload);
                 }
 
                 if (chunk != null)
