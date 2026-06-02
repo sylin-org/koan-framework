@@ -67,6 +67,7 @@ internal sealed class CouchbaseConnectorFixture : IAsyncDisposable
 
         var services = new ServiceCollection();
         services.AddSingleton<IHostApplicationLifetime, NoopHostApplicationLifetime>();
+        services.AddSingleton<IHostEnvironment, TestHostEnvironment>();
         services.AddSingleton<IConfiguration>(configuration);
         services.AddLogging();
         services.AddKoan();
@@ -162,6 +163,15 @@ internal sealed class CouchbaseConnectorFixture : IAsyncDisposable
         public void StopApplication()
         {
         }
+    }
+
+    private sealed class TestHostEnvironment : IHostEnvironment
+    {
+        public string EnvironmentName { get; set; } = "Test";
+        public string ApplicationName { get; set; } = "Koan.Data.Connector.Couchbase.Tests";
+        public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
+        public Microsoft.Extensions.FileProviders.IFileProvider ContentRootFileProvider { get; set; } =
+            new Microsoft.Extensions.FileProviders.PhysicalFileProvider(AppContext.BaseDirectory);
     }
 
     internal readonly struct EntityPartitionLease : IAsyncDisposable, IDisposable
