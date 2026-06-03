@@ -95,6 +95,46 @@ public sealed record SampleStep(FrameSelector Selector, string? Name = null, boo
     public override MediaKind? ProducesTo => MediaKind.Raster;
 }
 
+/// <summary>
+/// Animation trim — bound an animated source to its first <see cref="Frames"/>
+/// frames or first <see cref="Seconds"/> of playback. Stage
+/// <see cref="PipelineStage.Timeline"/>. Exactly one of the two bounds is
+/// populated per step; the builder enforces this. No-op on a static source
+/// (frame count &lt;= 1).
+///
+/// <para>The frames variant is decoder-agnostic — drops every frame past
+/// the cap. The seconds variant walks per-frame delay metadata
+/// (WebP / GIF / APNG) summing real playback time until the cap is
+/// reached. When the source format's metadata isn't recognised, the
+/// step degrades to no-op (animation preserved verbatim) so a recipe is
+/// never silently destructive on a format it can't introspect.</para>
+/// </summary>
+public sealed record TrimStep(
+    int? Frames = null,
+    double? Seconds = null,
+    string? Name = null,
+    bool Primary = false)
+    : MediaStep(PipelineStage.Timeline, Name, Primary)
+{
+    public override void WriteFingerprint(StringBuilder sb)
+    {
+        sb.Append("trim(");
+        if (Frames is int f) sb.Append("frames=").Append(f.ToString(CultureInfo.InvariantCulture));
+        else if (Seconds is double s) sb.Append("seconds=").Append(s.ToString("F3", CultureInfo.InvariantCulture));
+        sb.Append(')');
+    }
+
+    // Timeline step — applies to animated/timeline sources and is a
+    // no-op on raster/vector. Same accept-set shape as SampleStep so
+    // the planner doesn't need to special-case Trim against a static
+    // source (it just falls through unchanged).
+    public override KindSet AcceptsFrom => KindSet.Of(
+        MediaKind.Raster,
+        MediaKind.AnimatedRaster,
+        MediaKind.Timeline);
+    public override MediaKind? ProducesTo => null;
+}
+
 /// <summary>Explicit rotation. Stage <see cref="PipelineStage.Rotate"/>.</summary>
 public sealed record RotateStep(int Degrees, string? Name = null, bool Primary = false)
     : MediaStep(PipelineStage.Rotate, Name, Primary)

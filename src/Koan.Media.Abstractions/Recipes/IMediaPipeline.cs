@@ -34,6 +34,32 @@ public interface IMediaPipeline
     /// </summary>
     IMediaPipeline Sample(FrameSelector selector);
 
+    /// <summary>
+    /// Trim an animated source to its first <paramref name="frames"/>
+    /// frames. No-op on a static source. Use named-arg form
+    /// (<c>Trim(frames: 60)</c>) — it pairs with the seconds overload and
+    /// reads as intent in recipe code.
+    /// </summary>
+    IMediaPipeline Trim(int frames);
+
+    /// <summary>
+    /// Trim an animated source to its first <paramref name="seconds"/>
+    /// of playback, walking per-frame delay metadata to find the cutoff.
+    /// Accepts fractional values (<c>Trim(seconds: 0.5)</c>). No-op on a
+    /// static source or when the format's frame-delay metadata isn't
+    /// recognised — the step never silently flattens.
+    /// </summary>
+    IMediaPipeline Trim(double seconds);
+
+    /// <summary>
+    /// Collapse an animated source to a single frame, picked at index
+    /// <paramref name="at"/> (default 0). The loud, opt-in alternative to
+    /// <c>Sample(FrameSelector.Index(n))</c> when the call site's intent
+    /// is "make this static" — the name reads at a glance so a future
+    /// reader can't miss that the recipe is destroying animation.
+    /// </summary>
+    IMediaPipeline Freeze(int at = 0);
+
     /// <summary>Rotate by degrees clockwise.</summary>
     IMediaPipeline Rotate(int degrees);
 

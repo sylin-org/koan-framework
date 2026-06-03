@@ -20,9 +20,10 @@ public enum PipelineStage
     Frame = 20,
 
     /// <summary>
-    /// Timeline operations — video-only (trim, speed, concat). Image
-    /// pipeline ignores. Reserved slot so <c>Koan.Media.Video</c>
-    /// ships without enum reshuffling.
+    /// Timeline operations — frame-range / speed / concat. Applies to any
+    /// timed media: animated WebP / GIF / APNG today, plus video when
+    /// <c>Koan.Media.Video</c> ships. <c>Trim</c> / <c>TrimStep</c> live
+    /// here. No-op on static sources.
     /// </summary>
     Timeline = 25,
 

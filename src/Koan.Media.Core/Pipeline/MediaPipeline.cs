@@ -90,6 +90,24 @@ public sealed class MediaPipeline : IMediaPipeline
         return AddStep(new SampleStep(selector));
     }
 
+    public IMediaPipeline Trim(int frames)
+    {
+        if (frames < 1) throw new ArgumentOutOfRangeException(nameof(frames), "Trim frame count must be >= 1.");
+        return AddStep(new TrimStep(Frames: frames));
+    }
+
+    public IMediaPipeline Trim(double seconds)
+    {
+        if (!(seconds > 0)) throw new ArgumentOutOfRangeException(nameof(seconds), "Trim duration must be > 0 seconds.");
+        return AddStep(new TrimStep(Seconds: seconds));
+    }
+
+    public IMediaPipeline Freeze(int at = 0)
+    {
+        if (at < 0) throw new ArgumentOutOfRangeException(nameof(at), "Freeze frame index must be >= 0.");
+        return AddStep(new SampleStep(new FrameSelector.Index(at)));
+    }
+
     public IMediaPipeline Rotate(int degrees) =>
         AddStep(new RotateStep(degrees));
 
@@ -814,6 +832,9 @@ public sealed class MediaPipeline : IMediaPipeline
                 case SampleStep sample:
                     ApplySample(image, sample.Selector);
                     break;
+                case TrimStep trim:
+                    ApplyTrim(image, trim);
+                    break;
                 case RotateStep rs:
                     image.Mutate(x => x.Rotate(rs.Degrees));
                     break;
@@ -961,6 +982,89 @@ public sealed class MediaPipeline : IMediaPipeline
         {
             if (i != index) image.Frames.RemoveFrame(i);
         }
+    }
+
+    /// <summary>
+    /// Apply a <see cref="TrimStep"/> to the running image. No-op on a
+    /// static source (frame count &lt;= 1). The frames-variant trims
+    /// every index past the cap; the seconds-variant walks per-frame
+    /// delay metadata (WebP / GIF / APNG) summing playback time until
+    /// the cap is reached, then trims at that frame. Unrecognised
+    /// format metadata degrades to no-op so the step is never silently
+    /// destructive on a format we can't introspect.
+    /// </summary>
+    private static void ApplyTrim(Image image, TrimStep step)
+    {
+        if (image.Frames.Count <= 1) return;
+
+        var cutoffFrames = step.Frames ?? FramesUnderDuration(image, step.Seconds ?? 0);
+        if (cutoffFrames <= 0) return; // unknown metadata → preserve animation
+        if (cutoffFrames >= image.Frames.Count) return; // already short enough
+
+        // Remove from the tail so earlier indices stay stable.
+        for (var i = image.Frames.Count - 1; i >= cutoffFrames; i--)
+        {
+            image.Frames.RemoveFrame(i);
+        }
+    }
+
+    /// <summary>
+    /// Walk per-frame delay metadata for the recognised animated formats
+    /// (WebP, GIF, APNG) summing playback time until <paramref name="seconds"/>
+    /// is met. Returns the first index whose cumulative time meets or
+    /// exceeds the cap (so frames [0..returnedIndex) are kept). Returns 0
+    /// when the format's frame-delay metadata isn't recognised — the
+    /// caller treats that as "leave animation alone."
+    /// </summary>
+    private static int FramesUnderDuration(Image image, double seconds)
+    {
+        if (seconds <= 0) return 0;
+        var capMs = seconds * 1000.0;
+        var decoded = image.Metadata.DecodedImageFormat;
+
+        double cumulativeMs = 0;
+        for (var i = 0; i < image.Frames.Count; i++)
+        {
+            var meta = image.Frames[i].Metadata;
+            double frameMs;
+            if (decoded is SixLabors.ImageSharp.Formats.Webp.WebpFormat)
+            {
+                // WebpFrameMetadata.FrameDelay is documented in milliseconds.
+                frameMs = meta.GetWebpMetadata().FrameDelay;
+            }
+            else if (decoded is SixLabors.ImageSharp.Formats.Gif.GifFormat)
+            {
+                // GifFrameMetadata.FrameDelay is in 1/100s units (centiseconds).
+                frameMs = meta.GetGifMetadata().FrameDelay * 10.0;
+            }
+            else if (decoded is SixLabors.ImageSharp.Formats.Png.PngFormat)
+            {
+                // APNG: numerator/denominator in seconds. Default denominator is 100.
+                var png = meta.GetPngMetadata();
+                var num = png.FrameDelay.Numerator;
+                var denom = png.FrameDelay.Denominator == 0 ? 100u : png.FrameDelay.Denominator;
+                frameMs = num * 1000.0 / denom;
+            }
+            else
+            {
+                // Unknown — abort, signal "leave it alone."
+                return 0;
+            }
+
+            // Many encoders set a per-frame delay of 0 to mean "use default"
+            // (typically ~100ms). Without that fallback a 0-delay anim would
+            // satisfy any cap at frame 1 and trim almost everything away.
+            if (frameMs <= 0) frameMs = 100;
+
+            cumulativeMs += frameMs;
+            if (cumulativeMs >= capMs)
+            {
+                // Keep frames [0..i] inclusive → cutoffFrames = i + 1.
+                return i + 1;
+            }
+        }
+        // Cap exceeds full playback length — nothing to trim.
+        return image.Frames.Count;
     }
 
     private static void ApplyShapeAndResize(
@@ -1270,6 +1374,21 @@ public sealed class MediaPipeline : IMediaPipeline
         {
             if (selector is null) throw new ArgumentNullException(nameof(selector));
             return Add(new SampleStep(selector));
+        }
+        public IMediaPipeline Trim(int frames)
+        {
+            if (frames < 1) throw new ArgumentOutOfRangeException(nameof(frames), "Trim frame count must be >= 1.");
+            return Add(new TrimStep(Frames: frames));
+        }
+        public IMediaPipeline Trim(double seconds)
+        {
+            if (!(seconds > 0)) throw new ArgumentOutOfRangeException(nameof(seconds), "Trim duration must be > 0 seconds.");
+            return Add(new TrimStep(Seconds: seconds));
+        }
+        public IMediaPipeline Freeze(int at = 0)
+        {
+            if (at < 0) throw new ArgumentOutOfRangeException(nameof(at), "Freeze frame index must be >= 0.");
+            return Add(new SampleStep(new FrameSelector.Index(at)));
         }
         public IMediaPipeline Rotate(int degrees) => Add(new RotateStep(degrees));
         public IMediaPipeline FlipHorizontal() => Add(new FlipStep(FlipAxis.Horizontal));

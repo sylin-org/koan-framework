@@ -194,4 +194,104 @@ public sealed class FormatPreservationSpec
         output.Width.Should().Be(600, "ResizeCover's contract is to fill the target box");
         output.Height.Should().Be(400);
     }
+
+    // -----------------------------------------------------------------
+    // Trim / Freeze — explicit animation-bounding verbs that replace the
+    // silent Sample(FrameSelector.Index(N)) collapse for recipes whose
+    // intent is "cap this animation" / "make this static".
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public async Task Trim_frames_keeps_first_n_frames_only()
+    {
+        await using var src = Fixtures.AnimatedWebp(frames: 6);
+        var output = await src.AsMedia().Trim(frames: 3).ToBytesAsync();
+
+        using var roundTrip = Image.Load(output.Bytes);
+        roundTrip.Frames.Count.Should().Be(3, "Trim caps the animation at the requested frame count");
+        output.Format.Should().Be("webp");
+    }
+
+    [Fact]
+    public async Task Trim_frames_is_no_op_when_source_is_already_short_enough()
+    {
+        await using var src = Fixtures.AnimatedWebp(frames: 3);
+        var output = await src.AsMedia().Trim(frames: 10).ToBytesAsync();
+
+        using var roundTrip = Image.Load(output.Bytes);
+        roundTrip.Frames.Count.Should().Be(3, "no frames to drop — source kept verbatim");
+    }
+
+    [Fact]
+    public async Task Trim_frames_is_no_op_on_static_source()
+    {
+        await using var src = Fixtures.TransparentPng();
+        var output = await src.AsMedia().Trim(frames: 1).ToBytesAsync();
+
+        using var roundTrip = Image.Load(output.Bytes);
+        roundTrip.Frames.Count.Should().Be(1, "Trim on a static source is silently a no-op");
+    }
+
+    [Fact]
+    public async Task Trim_seconds_walks_frame_delays_to_pick_the_cutoff()
+    {
+        // The Fixtures.AnimatedWebp doesn't set per-frame delays explicitly,
+        // so the engine's fallback (100ms per delay-zero frame) kicks in.
+        // 10 frames × 100ms = 1000ms of playback; capping at 0.3s should
+        // keep the first 3 frames (cumulative 300ms meets the cap).
+        await using var src = Fixtures.AnimatedWebp(frames: 10);
+        var output = await src.AsMedia().Trim(seconds: 0.3).ToBytesAsync();
+
+        using var roundTrip = Image.Load(output.Bytes);
+        roundTrip.Frames.Count.Should().Be(3, "300ms cap maps to 3 × 100ms-fallback frames");
+    }
+
+    [Fact]
+    public async Task Trim_seconds_is_no_op_when_cap_exceeds_full_playback()
+    {
+        await using var src = Fixtures.AnimatedWebp(frames: 4);
+        // 4 frames × 100ms = 400ms total; cap at 5s easily covers everything.
+        var output = await src.AsMedia().Trim(seconds: 5.0).ToBytesAsync();
+
+        using var roundTrip = Image.Load(output.Bytes);
+        roundTrip.Frames.Count.Should().Be(4);
+    }
+
+    [Fact]
+    public async Task Freeze_collapses_animation_to_first_frame_by_default()
+    {
+        await using var src = Fixtures.AnimatedWebp(frames: 5);
+        var output = await src.AsMedia().Freeze().ToBytesAsync();
+
+        using var roundTrip = Image.Load(output.Bytes);
+        roundTrip.Frames.Count.Should().Be(1, "Freeze is the loud explicit single-frame collapse");
+    }
+
+    [Fact]
+    public async Task Freeze_collapses_animation_to_named_frame_when_at_is_set()
+    {
+        await using var src = Fixtures.AnimatedWebp(frames: 5);
+        var output = await src.AsMedia().Freeze(at: 2).ToBytesAsync();
+
+        using var roundTrip = Image.Load(output.Bytes);
+        roundTrip.Frames.Count.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Trim_frames_with_invalid_count_throws_at_recipe_time()
+    {
+        // Fail loud: callers shouldn't be able to author a Trim that drops
+        // every frame (Freeze is the explicit verb for that).
+        await using var src = Fixtures.AnimatedWebp(frames: 3);
+        var act = () => src.AsMedia().Trim(frames: 0).ToBytesAsync();
+        await act.Should().ThrowAsync<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public async Task Trim_seconds_with_non_positive_throws_at_recipe_time()
+    {
+        await using var src = Fixtures.AnimatedWebp(frames: 3);
+        var act = () => src.AsMedia().Trim(seconds: 0).ToBytesAsync();
+        await act.Should().ThrowAsync<ArgumentOutOfRangeException>();
+    }
 }

@@ -106,11 +106,54 @@ public sealed class MediaRecipeBuilder
     /// Kind-agnostic collapse to a single raster. Per MEDIA-0005 §2.
     /// Use the <see cref="Sample"/> factory for ergonomic selector
     /// construction (<c>Sample.First</c>, <c>Sample.Frame(n)</c>).
+    ///
+    /// <para><b>Heads up.</b> <c>Sample(Index(N))</c> is a silent animation
+    /// collapse — the generic name reads as "sample a frame" but the
+    /// effect on an animated source is the same destructive flatten as
+    /// <see cref="Freeze"/>. Prefer <see cref="Freeze"/> at the call site
+    /// when the intent is "make this static"; reserve <c>Sample</c> for
+    /// recipes that genuinely need a non-trivial <c>FrameSelector</c>
+    /// (heuristic best, time-keyed pick on a future Timeline source).</para>
     /// </summary>
     public MediaRecipeBuilder Sample(FrameSelector selector)
     {
         if (selector is null) throw new ArgumentNullException(nameof(selector));
         return Add(new SampleStep(selector));
+    }
+
+    /// <summary>
+    /// Trim an animated source to its first <paramref name="frames"/>
+    /// frames. No-op on a static source. See <see cref="TrimStep"/> for
+    /// the full semantic; prefer named-arg form (<c>Trim(frames: 60)</c>)
+    /// so callers can't confuse this with the seconds overload.
+    /// </summary>
+    public MediaRecipeBuilder Trim(int frames)
+    {
+        if (frames < 1) throw new ArgumentOutOfRangeException(nameof(frames), "Trim frame count must be >= 1.");
+        return Add(new TrimStep(Frames: frames));
+    }
+
+    /// <summary>
+    /// Trim an animated source to its first <paramref name="seconds"/>
+    /// of playback. Accepts fractional values. No-op on a static source
+    /// or on a format whose frame-delay metadata isn't recognised. See
+    /// <see cref="TrimStep"/> for the full semantic.
+    /// </summary>
+    public MediaRecipeBuilder Trim(double seconds)
+    {
+        if (!(seconds > 0)) throw new ArgumentOutOfRangeException(nameof(seconds), "Trim duration must be > 0 seconds.");
+        return Add(new TrimStep(Seconds: seconds));
+    }
+
+    /// <summary>
+    /// Collapse an animated source to a single frame at index
+    /// <paramref name="at"/>. The loud, opt-in form of
+    /// <c>Sample(FrameSelector.Index(at))</c>.
+    /// </summary>
+    public MediaRecipeBuilder Freeze(int at = 0)
+    {
+        if (at < 0) throw new ArgumentOutOfRangeException(nameof(at), "Freeze frame index must be >= 0.");
+        return Add(new SampleStep(new FrameSelector.Index(at)));
     }
 
     // ----- Stage 4: Rotate / Flip -----
