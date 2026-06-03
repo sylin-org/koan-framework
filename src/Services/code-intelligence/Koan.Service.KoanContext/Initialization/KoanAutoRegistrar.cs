@@ -57,6 +57,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddHostedService(sp => sp.GetRequiredService<TagSeedInitializer>());
         services.AddHostedService<VectorSyncWorker>();
 
+        // Scheduled maintenance task (folded from the former JobMaintenanceTaskRegistration initializer, ARCH-0086).
+        services.AddSingleton<Koan.Scheduling.IScheduledTask, Koan.Context.Tasks.JobMaintenanceTask>();
+
         services.AddScoped<Koan.Web.Hooks.IModelHook<TagVocabularyEntry>, TagVocabularyHooks>();
         services.AddScoped<Koan.Web.Hooks.IModelHook<TagRule>, TagRuleHooks>();
         services.AddScoped<Koan.Web.Hooks.IModelHook<TagPipeline>, TagPipelineHooks>();

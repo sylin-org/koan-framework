@@ -1,6 +1,6 @@
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
-using Koan.Core.Modules;
+using Koan.Core.Provenance;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -8,19 +8,25 @@ using Koan.Web.Connector.GraphQl;
 
 namespace Koan.Web.Connector.GraphQl.Initialization;
 
-public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
+/// <summary>
+/// Koan.Web.Connector.GraphQl boot module (ARCH-0086). Replaces the former <c>KoanAutoRegistrar</c> +
+/// the redundant <c>KoanGraphQlInitializer</c> (both of which called <c>AddKoanGraphQl()</c> — a live
+/// double-registration) with one <see cref="KoanModule"/>: <see cref="Register"/> wires the GraphQL
+/// endpoint once; <see cref="Report"/> publishes the same provenance as before. Id preserves the prior
+/// ModuleName so boot reports are unchanged.
+/// </summary>
+public sealed class KoanGraphQlModule : KoanModule
 {
-    public string ModuleName => "Koan.Web.Connector.GraphQl";
-    public string? ModuleVersion => typeof(KoanAutoRegistrar).Assembly.GetName().Version?.ToString();
+    public override string Id => "Koan.Web.Connector.GraphQl";
 
-    public void Initialize(IServiceCollection services)
+    public override void Register(IServiceCollection services)
     {
         services.AddKoanGraphQl();
     }
 
-    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
+    public override void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        module.Describe(ModuleVersion);
+        module.Describe(Version);
         var options = new GraphQlOptions();
         cfg.GetSection(Infrastructure.Constants.Configuration.Section).Bind(options);
 
