@@ -1,12 +1,13 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Koan.Core;
 using Koan.Web.Auth.Contributors;
 
 namespace Koan.Web.Auth.Flow;
 
 /// <summary>
-/// Single discoverable plug-in surface for the cookie-auth lifecycle. Auto-discovered by reflection
-/// (no DI registration required); registered as a scoped service. Each event runs the full
-/// pipeline of handlers once in <see cref="Priority"/> order, sequentially.
+/// Single discoverable plug-in surface for the cookie-auth lifecycle. Auto-discovered via
+/// <see cref="KoanDiscoverableAttribute"/> (registry-backed; no DI registration required); registered as a
+/// scoped service. Each event runs the full pipeline of handlers once in <see cref="Priority"/> order, sequentially.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -47,6 +48,7 @@ namespace Koan.Web.Auth.Flow;
 ///     short-circuit on that signal — every handler observes the same context.</item>
 /// </list>
 /// </remarks>
+[KoanDiscoverable]
 public interface IKoanAuthFlowHandler
 {
     /// <summary>Lower values run first within a single event invocation. Default 0. Identity-mapping uses <see cref="int.MinValue"/>.</summary>

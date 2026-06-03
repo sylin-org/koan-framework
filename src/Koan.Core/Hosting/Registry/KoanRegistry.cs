@@ -13,6 +13,8 @@ public static partial class KoanRegistry
     private static readonly ConcurrentDictionary<Type, byte> _autoRegistrarTypes = new(TypeEqualityComparer.Instance);
     private static readonly ConcurrentDictionary<Type, BackgroundServiceDescriptor> _backgroundServices = new(TypeEqualityComparer.Instance);
     private static readonly ConcurrentDictionary<Type, ServiceDiscoveryAdapterDescriptor> _serviceDiscoveryAdapters = new(TypeEqualityComparer.Instance);
+    // Generic [KoanDiscoverable] discovery: implementer types keyed by the marked interface Type (ARCH-0086).
+    private static readonly ConcurrentDictionary<Type, ConcurrentDictionary<Type, byte>> _discoveredImplementors = new(TypeEqualityComparer.Instance);
 
     public static void RegisterInitializers(IEnumerable<Type> types)
     {
@@ -76,6 +78,31 @@ public static partial class KoanRegistry
     public static ServiceDiscoveryAdapterDescriptor[] GetServiceDiscoveryAdapters() => _serviceDiscoveryAdapters.Values.ToArray();
 
     /// <summary>
+    /// Registers concrete implementers of a <c>[KoanDiscoverable]</c>-marked interface, keyed by that
+    /// interface <see cref="Type"/>. Populated by the source generator (build-time) and
+    /// <c>RegistryManifestLoader</c> (runtime fallback). Idempotent. See ARCH-0086.
+    /// </summary>
+    public static void RegisterDiscoveredImplementors(Type contract, IEnumerable<Type> implementers)
+    {
+        if (contract is null) return;
+        var set = _discoveredImplementors.GetOrAdd(contract, static _ => new ConcurrentDictionary<Type, byte>(TypeEqualityComparer.Instance));
+        foreach (var type in implementers)
+        {
+            if (type is null) continue;
+            set.TryAdd(type, 0);
+        }
+    }
+
+    /// <summary>
+    /// Returns the discovered concrete implementers of a <c>[KoanDiscoverable]</c>-marked interface —
+    /// the registry-backed replacement for bespoke <c>AppDomain</c> reflection scans (ARCH-0086).
+    /// </summary>
+    public static Type[] GetDiscoveredImplementors(Type contract)
+        => contract is not null && _discoveredImplementors.TryGetValue(contract, out var set)
+            ? set.Keys.ToArray()
+            : Array.Empty<Type>();
+
+    /// <summary>
     /// Clears all registered items; intended for testing only.
     /// </summary>
     internal static void ResetForTesting()
@@ -84,6 +111,7 @@ public static partial class KoanRegistry
         _autoRegistrarTypes.Clear();
         _backgroundServices.Clear();
         _serviceDiscoveryAdapters.Clear();
+        _discoveredImplementors.Clear();
     }
 
     public readonly record struct BackgroundServiceDescriptor(

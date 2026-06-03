@@ -82,7 +82,7 @@ public abstract class KoanModule : IKoanAutoRegistrar
 
 1. **`KoanModule` subsumes `IKoanAutoRegistrar` + `IKoanInitializer`** via the bridge — authors write `KoanModule`; the two interfaces become internal plumbing (kept, since 85 registrars still implement them, but no longer the authoring surface).
 2. **First-class `Start`** + `KoanModuleHost` (new lifecycle; folds scattered bootstrap).
-3. **Route `IKoanAuthEventContributor` through `KoanRegistry`** — teach the source generator to recognize it (like it already does for `IKoanBackgroundService`), delete the bespoke `AppDomain` scan; `Koan.Web.Auth` reads the contributor types from the registry. Kills the one off-registry split-brain.
+3. **Route off-registry discovery through `KoanRegistry`** — generalized to a `[KoanDiscoverable]` interface marker rather than special-casing one interface in the generator. Any interface marked `[KoanDiscoverable]` has its implementers auto-registered (build-time generator + runtime `RegistryManifestLoader` fallback), keyed by the interface `Type`, and queried with `KoanRegistry.GetDiscoveredImplementors(typeof(T))`. `Koan.Web.Auth` marks **both** `IKoanAuthEventContributor` and `IKoanAuthFlowHandler` and deletes **both** bespoke `AppDomain` scans. Kills the off-registry split-brain class — not just the one instance — and fixes the latent "misses lazily-loaded assemblies" bug (the bootstrap force-loads the closure before any registrar reads the registry).
 4. **`Report` rename** disambiguates the two `Describe`s.
 
 ### Out of scope (stays as-is — distinct concerns)
@@ -91,8 +91,8 @@ public abstract class KoanModule : IKoanAutoRegistrar
 
 ### Staged migration ledger (green at every step; gated by the Facet 0 ratchet)
 
-- **(a) Additive foundation.** Land `KoanModule` + `KoanModuleHost` + teach the source generator about `IKoanAuthEventContributor`. Nothing migrates yet; everything compiles and runs unchanged. Conformance: a tiny `KoanModule` discovers, registers, reports, and starts through the existing pipeline.
-- **(b) Auth de-split.** Move `IKoanAuthEventContributor` discovery onto `KoanRegistry`; delete the `AppDomain` scan. (Self-contained, high value.)
+- **(a) Additive foundation. ✅ DONE (29b27e3c).** Landed `KoanModule` + `KoanModuleHost`. Nothing migrated; everything compiles and runs unchanged. Conformance: a tiny `KoanModule` discovers, registers, reports, and starts through the existing pipeline (`KoanModuleTests`, Core 179/179). _(The generator teaching moved to stage (b), where it landed as the generic `[KoanDiscoverable]` mechanism.)_
+- **(b) Auth de-split. ✅ DONE.** Added the generic `[KoanDiscoverable]` marker + `KoanRegistry.Register/GetDiscoveredImplementors` (Type-keyed) + generator detection/emission + `RegistryManifestLoader` runtime fallback. Marked `IKoanAuthEventContributor` **and** `IKoanAuthFlowHandler`; deleted both `AppDomain` scans in `Koan.Web.Auth`. Canon: `AuthDiscoverableContributorSpec` proves end-to-end through real `AddKoan()` that the built-in contributor is discovered via the registry, wired into scoped DI, and that the legacy wrapper stays out of the registration (ARCH-0079). Build green; Core 179/179, Web.Auth 9/9, Bootstrap auth specs 3/3.
 - **(c) Opportunistic migration.** Convert registrars to `KoanModule` when a pillar is already being touched — collapse its bootstrap hosted service into `Start`, its `Initialize` into `Register`, its `Describe` into `Report`. Drive from dogfood; never a big-bang. Fold the 8 `IKoanInitializer`-only types first (smallest, clearest win).
 - **(d) Settle.** When the dogfood apps' pillars are migrated and a new pillar can be authored as one `KoanModule` with an ordered `Start`, Facet 2 is "settled." `IKoanInitializer`/`IKoanAutoRegistrar` may remain as the internal discovered interfaces indefinitely (invisible plumbing) — deleting them is **not** a goal.
 

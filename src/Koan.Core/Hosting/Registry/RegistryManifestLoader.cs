@@ -79,6 +79,8 @@ internal static class RegistryManifestLoader
         var autoRegistrars = new List<Type>();
         var backgroundServices = new List<KoanRegistry.BackgroundServiceDescriptor>();
         var discoveryAdapters = new List<KoanRegistry.ServiceDiscoveryAdapterDescriptor>();
+        // [KoanDiscoverable] implementers, accumulated per marked-interface contract (ARCH-0086).
+        var discoverables = new Dictionary<Type, List<Type>>();
 
         foreach (var type in types)
         {
@@ -103,6 +105,17 @@ internal static class RegistryManifestLoader
                 if (BackgroundServiceInterface.IsAssignableFrom(type))
                 {
                     backgroundServices.Add(BuildBackgroundDescriptor(type));
+                }
+
+                foreach (var contract in type.GetInterfaces())
+                {
+                    if (contract.GetCustomAttribute<KoanDiscoverableAttribute>(inherit: false) is null) continue;
+                    if (!discoverables.TryGetValue(contract, out var implementers))
+                    {
+                        implementers = new List<Type>();
+                        discoverables[contract] = implementers;
+                    }
+                    implementers.Add(type);
                 }
             }
             catch
@@ -134,6 +147,10 @@ internal static class RegistryManifestLoader
             KoanRegistry.RegisterServiceDiscoveryAdapters(discoveryAdapters);
         }
 
+        foreach (var pair in discoverables)
+        {
+            KoanRegistry.RegisterDiscoveredImplementors(pair.Key, pair.Value);
+        }
     }
 
     private static KoanRegistry.BackgroundServiceDescriptor BuildBackgroundDescriptor(Type type)

@@ -1,5 +1,4 @@
 using System;
-using System.Reflection;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
@@ -9,6 +8,7 @@ using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Koan.Core;
+using Koan.Core.Hosting.Registry;
 using Koan.Core.Modules;
 using Koan.Web.Auth.Contributors;
 using Koan.Web.Auth.Domain;
@@ -45,10 +45,10 @@ public static class ServiceCollectionExtensions
         // the projection (e.g. to redact email or omit custom claims) before this call lands.
         services.TryAddSingleton<ICurrentUserProjector, DefaultCurrentUserProjector>();
 
-        // Event-contributor pipeline (WEB-0065). Scan loaded assemblies for IKoanAuthEventContributor
-        // implementations and register them as scoped (so they can depend on per-request services such
-        // as DB sessions). AuthEventDispatcher composes the list in Priority order. Apps add a
-        // contributor by simply implementing the interface — no DI registration call required.
+        // Event-contributor pipeline (WEB-0065). Register every [KoanDiscoverable] IKoanAuthEventContributor
+        // (discovered via KoanRegistry — build-time generator + runtime fallback) as scoped, so they can
+        // depend on per-request services such as DB sessions. AuthEventDispatcher composes the list in
+        // Priority order. Apps add a contributor by simply implementing the interface — no DI call required.
         DiscoverAndRegisterAuthEventContributors(services);
         services.TryAddScoped<AuthEventDispatcher>();
 
@@ -190,59 +190,39 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Scan loaded assemblies for non-abstract <see cref="IKoanAuthEventContributor"/> types and
-    /// register each as a scoped service. Follows the same scan-tolerant pattern used elsewhere in
-    /// Koan (skips assemblies that fail <see cref="Assembly.GetTypes"/>, swallows individual type
-    /// failures). Idempotent: <see cref="ServiceCollectionDescriptorExtensions.TryAddEnumerable(IServiceCollection, ServiceDescriptor)"/>
-    /// ensures the same concrete type is not registered twice.
+    /// Register every discovered <see cref="IKoanAuthEventContributor"/> as a scoped service. Discovery
+    /// runs through <see cref="KoanRegistry.GetDiscoveredImplementors(Type)"/> — populated at build time by
+    /// the source generator and at runtime by <c>RegistryManifestLoader</c> from the <c>[KoanDiscoverable]</c>
+    /// marker on the interface — so this no longer scans <c>AppDomain</c> assemblies (which miss
+    /// lazily-loaded Koan assemblies). Idempotent via
+    /// <see cref="ServiceCollectionDescriptorExtensions.TryAddEnumerable(IServiceCollection, ServiceDescriptor)"/>.
     /// </summary>
     private static void DiscoverAndRegisterAuthEventContributors(IServiceCollection services)
     {
         var contract = typeof(IKoanAuthEventContributor);
-        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        foreach (var type in KoanRegistry.GetDiscoveredImplementors(contract))
         {
-            Type[] types;
-            try { types = assembly.GetTypes(); }
-            catch (ReflectionTypeLoadException ex) { types = ex.Types.Where(t => t is not null).Select(t => t!).ToArray(); }
-            catch { continue; }
-
-            foreach (var type in types)
-            {
-                if (type.IsAbstract || type.IsInterface) continue;
-                if (!contract.IsAssignableFrom(type)) continue;
-                services.TryAddEnumerable(ServiceDescriptor.Scoped(contract, type));
-                // AuthFlowDispatcher consumes IEnumerable<IKoanAuthEventContributor> directly and
-                // wraps each instance in a LegacyAuthContributorAdapter at construction time, so
-                // no separate flow-handler registration is needed for legacy contributors.
-            }
+            // AuthFlowDispatcher consumes IEnumerable<IKoanAuthEventContributor> directly and wraps each
+            // instance in a LegacyAuthContributorAdapter at construction time, so no separate flow-handler
+            // registration is needed for legacy contributors.
+            services.TryAddEnumerable(ServiceDescriptor.Scoped(contract, type));
         }
     }
 
     /// <summary>
-    /// Scan loaded assemblies for non-abstract <see cref="IKoanAuthFlowHandler"/> types and register
-    /// them as scoped services. Mirrors <see cref="DiscoverAndRegisterAuthEventContributors"/>:
-    /// scan-tolerant, idempotent via <see cref="ServiceCollectionDescriptorExtensions.TryAddEnumerable"/>.
+    /// Register every discovered <see cref="IKoanAuthFlowHandler"/> as a scoped service, via the same
+    /// <c>[KoanDiscoverable]</c> registry path as <see cref="DiscoverAndRegisterAuthEventContributors"/>.
     /// </summary>
     private static void DiscoverAndRegisterAuthFlowHandlers(IServiceCollection services)
     {
         var contract = typeof(IKoanAuthFlowHandler);
-        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        foreach (var type in KoanRegistry.GetDiscoveredImplementors(contract))
         {
-            Type[] types;
-            try { types = assembly.GetTypes(); }
-            catch (ReflectionTypeLoadException ex) { types = ex.Types.Where(t => t is not null).Select(t => t!).ToArray(); }
-            catch { continue; }
-
-            foreach (var type in types)
-            {
-                if (type.IsAbstract || type.IsInterface) continue;
-                // LegacyAuthContributorAdapter is a runtime wrapper instantiated by the dispatcher,
-                // not a discoverable handler — skip it here so we don't accidentally surface a
-                // singleton no-op adapter through the registration.
-                if (type == typeof(LegacyAuthContributorAdapter)) continue;
-                if (!contract.IsAssignableFrom(type)) continue;
-                services.TryAddEnumerable(ServiceDescriptor.Scoped(contract, type));
-            }
+            // LegacyAuthContributorAdapter is a runtime wrapper instantiated by the dispatcher, not a
+            // discoverable handler — skip it so we don't surface a singleton no-op adapter through the
+            // registration (it implements IKoanAuthFlowHandler, so discovery would otherwise include it).
+            if (type == typeof(LegacyAuthContributorAdapter)) continue;
+            services.TryAddEnumerable(ServiceDescriptor.Scoped(contract, type));
         }
     }
 
