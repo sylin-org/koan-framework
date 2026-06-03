@@ -152,13 +152,23 @@ public sealed record ShapeStep(
     public override MediaKind? ProducesTo => null;
 }
 
-/// <summary>Resize step — single slot, stage <see cref="PipelineStage.Size"/>.</summary>
+/// <summary>
+/// Resize step — single slot, stage <see cref="PipelineStage.Size"/>.
+///
+/// <para><see cref="Upscale"/> defaults to <c>false</c>: when the source
+/// already fits inside the target box on both axes, the resize is skipped
+/// entirely (source dimensions and bytes survive). This prevents the
+/// recipe author from accidentally inflating a small source — historically
+/// a silent-and-expensive failure mode for animated WebP / GIF sources
+/// where each frame had to be re-encoded at the enlarged size.</para>
+/// </summary>
 public sealed record ResizeStep(
     int? Width,
     int? Height,
     double Dpr = 1.0,
     string? Name = null,
-    bool Primary = false)
+    bool Primary = false,
+    bool Upscale = false)
     : MediaStep(PipelineStage.Size, Name, Primary)
 {
     public override void WriteFingerprint(StringBuilder sb)
@@ -168,6 +178,14 @@ public sealed record ResizeStep(
         if (Math.Abs(Dpr - 1.0) > 0.001)
         {
             sb.Append(",dpr=").Append(Dpr.ToString("F2", CultureInfo.InvariantCulture));
+        }
+        // Default is false; only emit when true so existing recipe fingerprints
+        // don't churn. Existing cached derivations on those fingerprints were
+        // produced before the no-upscale behavior — they continue to serve
+        // until evicted, and re-renders on cache miss pick up the new default.
+        if (Upscale)
+        {
+            sb.Append(",upscale=true");
         }
         sb.Append(')');
     }

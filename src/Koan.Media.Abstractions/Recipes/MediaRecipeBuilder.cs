@@ -160,24 +160,36 @@ public sealed class MediaRecipeBuilder
 
     // ----- Stage 6: Size -----
 
-    public MediaRecipeBuilder Resize(int? width = null, int? height = null, double dpr = 1.0)
+    /// <summary>
+    /// Single-slot resize. <paramref name="upscale"/> defaults to <c>false</c>;
+    /// see <see cref="ResizeStep.Upscale"/> for the rationale.
+    /// </summary>
+    public MediaRecipeBuilder Resize(int? width = null, int? height = null, double dpr = 1.0, bool upscale = false)
     {
-        ReplaceOrAdd(new ResizeStep(width, height, dpr), PipelineStage.Size);
+        ReplaceOrAdd(new ResizeStep(width, height, dpr, Upscale: upscale), PipelineStage.Size);
         return this;
     }
 
-    /// <summary>Resize to fit within bounds (preserves aspect; both axes capped).</summary>
+    /// <summary>
+    /// Resize to fit within bounds (preserves aspect; both axes capped). Inherits
+    /// <see cref="Resize"/>'s default <c>upscale: false</c> — a "fit within"
+    /// semantic that does not enlarge a smaller source.
+    /// </summary>
     public MediaRecipeBuilder ResizeFit(int maxWidth, int maxHeight) =>
         Resize(maxWidth, maxHeight).Shape(fit: Recipes.Fit.Contain);
 
-    /// <summary>Resize to cover bounds (preserves aspect; crops overflow).</summary>
+    /// <summary>
+    /// Resize to cover bounds (preserves aspect; crops overflow). Opts INTO
+    /// <c>upscale: true</c> because covering a target box by definition
+    /// requires enlarging a smaller source.
+    /// </summary>
     public MediaRecipeBuilder ResizeCover(int width, int height, Position? position = null) =>
         // Resize+Fit.Cover -> ImageSharp ResizeMode.Crop, which scales and
         // crops natively. Don't add an explicit Pixels crop here: the Shape
         // stage runs BEFORE Size, so a Pixels crop would chop a literal
         // WxH rectangle out of the source center and the subsequent resize
         // would no-op on the already-sized image.
-        Resize(width, height).Shape(fit: Recipes.Fit.Cover, position: position ?? Position.Center);
+        Resize(width, height, upscale: true).Shape(fit: Recipes.Fit.Cover, position: position ?? Position.Center);
 
     // ----- Stage 7: Overlay -----
 

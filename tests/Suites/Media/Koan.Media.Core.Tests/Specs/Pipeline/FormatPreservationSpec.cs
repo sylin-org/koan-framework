@@ -127,4 +127,71 @@ public sealed class FormatPreservationSpec
         using var roundTrip = Image.Load(output.Bytes);
         roundTrip.Frames.Count.Should().Be(2, "no-op pipeline preserves frame count");
     }
+
+    /// <summary>
+    /// <c>Resize</c> defaults to <c>upscale: false</c> — a smaller source must NOT
+    /// be enlarged to fill a bigger target box. Sloppy upscaling silently inflates
+    /// output bytes and encode time (the package-hero recipe on a 720x302 animated
+    /// WebP source upscaled to 1600 wide produced a 90 MB / 558-frame output that
+    /// timed out the origin behind CloudFlare; see the dogfeeder report in
+    /// gposingway/bundlingways-emporium.v2 commit history).
+    /// </summary>
+    [Fact]
+    public async Task Resize_does_not_upscale_smaller_source_by_default()
+    {
+        await using var src = Fixtures.AnimatedWebp(frames: 4, width: 120, height: 80);
+        // Target 1600 wide — would historically upscale by ~13x. The new default
+        // skips the resize entirely so the source dimensions and bytes survive.
+        var output = await src.AsMedia().Resize(width: 1600).ToBytesAsync();
+
+        output.Width.Should().Be(120, "smaller source must not be enlarged at default Resize");
+        output.Height.Should().Be(80);
+        using var roundTrip = Image.Load(output.Bytes);
+        roundTrip.Frames.Count.Should().Be(4, "all frames survive the no-op pass");
+    }
+
+    /// <summary>
+    /// Explicit opt-in to upscale is honored when callers DO want a smaller
+    /// source enlarged (e.g. retina source supply from a small upstream).
+    /// </summary>
+    [Fact]
+    public async Task Resize_with_upscale_true_does_upscale_smaller_source()
+    {
+        await using var src = Fixtures.AnimatedWebp(frames: 3, width: 100, height: 80);
+        var output = await src.AsMedia().Resize(width: 400, upscale: true).ToBytesAsync();
+
+        output.Width.Should().Be(400, "explicit upscale opt-in must enlarge");
+        output.Height.Should().Be(320, "aspect preserved on width-only resize");
+        using var roundTrip = Image.Load(output.Bytes);
+        roundTrip.Frames.Count.Should().Be(3, "upscaled animation keeps frames");
+    }
+
+    /// <summary>
+    /// <c>ResizeFit</c> inherits the new <c>upscale: false</c> default — a
+    /// "fit within bounds" semantic that doesn't enlarge.
+    /// </summary>
+    [Fact]
+    public async Task ResizeFit_does_not_upscale_smaller_source_by_default()
+    {
+        await using var src = Fixtures.AnimatedWebp(frames: 3, width: 100, height: 80);
+        var output = await src.AsMedia().ResizeFit(800, 600).ToBytesAsync();
+
+        output.Width.Should().Be(100, "ResizeFit on a smaller source is a no-op");
+        output.Height.Should().Be(80);
+    }
+
+    /// <summary>
+    /// <c>ResizeCover</c> opts INTO upscale by name — covering a target box
+    /// fundamentally requires enlarging a smaller source. Without upscale, a
+    /// 100x80 source wrapped in a 600x400 "cover" recipe wouldn't actually cover.
+    /// </summary>
+    [Fact]
+    public async Task ResizeCover_upscales_smaller_source_by_design()
+    {
+        await using var src = Fixtures.AnimatedWebp(frames: 3, width: 100, height: 80);
+        var output = await src.AsMedia().ResizeCover(600, 400).ToBytesAsync();
+
+        output.Width.Should().Be(600, "ResizeCover's contract is to fill the target box");
+        output.Height.Should().Be(400);
+    }
 }

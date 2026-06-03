@@ -118,8 +118,8 @@ public sealed class MediaPipeline : IMediaPipeline
         return Crop(parsed);
     }
 
-    public IMediaPipeline Resize(int? width = null, int? height = null, double dpr = 1.0) =>
-        AddStep(new ResizeStep(width, height, dpr));
+    public IMediaPipeline Resize(int? width = null, int? height = null, double dpr = 1.0, bool upscale = false) =>
+        AddStep(new ResizeStep(width, height, dpr, Upscale: upscale));
 
     public IMediaPipeline ResizeFit(int maxWidth, int maxHeight) =>
         Resize(maxWidth, maxHeight).Shape(fit: Fit.Contain);
@@ -130,7 +130,11 @@ public sealed class MediaPipeline : IMediaPipeline
         // here would cause the Shape stage (40) to do a literal pixel-rect
         // crop BEFORE the Size stage (50) ever runs — producing a center
         // chunk of the source instead of a cover-scaled thumbnail.
-        Resize(width, height).Shape(fit: Fit.Cover, position: position ?? Position.Center);
+        //
+        // upscale=true: covering a target box requires enlarging a smaller
+        // source by definition; the no-upscale default would silently
+        // under-fill the box for sub-target inputs.
+        Resize(width, height, upscale: true).Shape(fit: Fit.Cover, position: position ?? Position.Center);
 
     public IMediaPipeline Overlay(
         string mediaId,
@@ -1001,32 +1005,43 @@ public sealed class MediaPipeline : IMediaPipeline
         // Resize pass
         if (resize is { } rz)
         {
-            var (rw, rh) = ResolveResizeDimensions(ctx.GetCurrentSize(), rz);
+            var currentSize = ctx.GetCurrentSize();
+            var (rw, rh) = ResolveResizeDimensions(currentSize, rz);
             if (rw is not null && rh is not null)
             {
-                var resizeOptions = new ResizeOptions
+                // No-upscale guard: when the source already fits inside the
+                // target on both axes and the caller did NOT opt into
+                // upscaling, skip the resize entirely. Defaulting Upscale to
+                // false here covers Fit.ScaleDown (which historically had its
+                // own no-upscale check below) AND every plain Resize call
+                // that doesn't pin a Fit. The intent is to stop silently
+                // enlarging small sources — animated WebP/GIF sources are
+                // particularly painful because every frame gets re-encoded
+                // at the inflated size (see MEDIA-0010 thread).
+                var skip = !rz.Upscale
+                    && currentSize.Width <= rw.Value
+                    && currentSize.Height <= rh.Value;
+                if (skip)
                 {
-                    Size = new Size(rw.Value, rh.Value),
-                    Mode = shape?.Fit switch
-                    {
-                        Fit.Cover => ResizeMode.Crop,
-                        Fit.Contain => ResizeMode.Max,
-                        Fit.Fill => ResizeMode.Stretch,
-                        Fit.ScaleDown => ResizeMode.Max,
-                        Fit.None => ResizeMode.Manual,
-                        _ => ResizeMode.Max,
-                    },
-                };
-                if (shape?.Fit == Fit.ScaleDown)
-                {
-                    var currentSize = ctx.GetCurrentSize();
-                    if (currentSize.Width <= rw.Value && currentSize.Height <= rh.Value)
-                    {
-                        // never upscale
-                        resizeOptions = null!;
-                    }
+                    // no-op
                 }
-                if (resizeOptions is not null) ctx.Resize(resizeOptions);
+                else
+                {
+                    var resizeOptions = new ResizeOptions
+                    {
+                        Size = new Size(rw.Value, rh.Value),
+                        Mode = shape?.Fit switch
+                        {
+                            Fit.Cover => ResizeMode.Crop,
+                            Fit.Contain => ResizeMode.Max,
+                            Fit.Fill => ResizeMode.Stretch,
+                            Fit.ScaleDown => ResizeMode.Max,
+                            Fit.None => ResizeMode.Manual,
+                            _ => ResizeMode.Max,
+                        },
+                    };
+                    ctx.Resize(resizeOptions);
+                }
             }
         }
         else if (shape is { Fit: Fit.Contain, Crop: { } cropForFit })
@@ -1268,12 +1283,12 @@ public sealed class MediaPipeline : IMediaPipeline
                 throw new ArgumentException($"Invalid crop value '{spec}'.", nameof(spec));
             return Crop(parsed);
         }
-        public IMediaPipeline Resize(int? width = null, int? height = null, double dpr = 1.0) =>
-            Add(new ResizeStep(width, height, dpr));
+        public IMediaPipeline Resize(int? width = null, int? height = null, double dpr = 1.0, bool upscale = false) =>
+            Add(new ResizeStep(width, height, dpr, Upscale: upscale));
         public IMediaPipeline ResizeFit(int maxWidth, int maxHeight) =>
             Resize(maxWidth, maxHeight).Shape(fit: Fit.Contain);
         public IMediaPipeline ResizeCover(int width, int height, Position? position = null) =>
-            Resize(width, height).Shape(fit: Fit.Cover, position: position ?? Position.Center);
+            Resize(width, height, upscale: true).Shape(fit: Fit.Cover, position: position ?? Position.Center);
         public IMediaPipeline Overlay(
             string mediaId,
             OverlaySize? size = null,

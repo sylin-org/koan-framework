@@ -56,8 +56,15 @@ public interface IMediaPipeline
     /// <summary>Convenience: parse a crop spec string (<c>square</c>, <c>16:9</c>, <c>400x200</c>) and apply.</summary>
     IMediaPipeline Crop(string spec);
 
-    /// <summary>Single-slot resize.</summary>
-    IMediaPipeline Resize(int? width = null, int? height = null, double dpr = 1.0);
+    /// <summary>
+    /// Single-slot resize. <paramref name="upscale"/> defaults to <c>false</c>:
+    /// when the source already fits inside the target box on both axes the
+    /// resize is skipped (the source dimensions and bytes survive). Set
+    /// <c>upscale: true</c> when the caller genuinely needs a smaller source
+    /// enlarged (rare); the convenience <c>ResizeCover</c> sets it for you
+    /// because covering a target box requires enlarging by definition.
+    /// </summary>
+    IMediaPipeline Resize(int? width = null, int? height = null, double dpr = 1.0, bool upscale = false);
 
     /// <summary>Convenience: fit-within with both axes capped.</summary>
     IMediaPipeline ResizeFit(int maxWidth, int maxHeight);
