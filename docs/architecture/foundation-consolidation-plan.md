@@ -350,9 +350,22 @@ Each facet (1–4) runs:
     VectorAdapterSurface 26/26.** (Container-backed adapters compile green with byte-identical operator sets;
     a container oracle run is the final belt-and-suspenders check.)
 
-  **All three ARCH-0084 follow-ons are now complete.** Next major facet: **Facet 2 — `KoanModule`**
-  (registration + bootstrap + self-report), which hosts `Describe` and builds directly on the capability
-  model just landed.
+  **All three ARCH-0084 follow-ons are now complete.**
+
+- **Facet 2 — `KoanModule`: research + decision + ADR done → [ARCH-0086](../decisions/ARCH-0086-koan-module.md) (Accepted).**
+  Deep read of the registration/bootstrap *machinery* corrected the plan's premise in two ways: (1) the
+  surface is mostly sound — discovery is already build-time source-generated (`KoanRegistry`), ordering is
+  already declarative+topological (`[Before]/[After]`), and the `Add*` methods are mostly the registrar's
+  own delegate; the genuinely real smells are narrow (no first-class `Start`; `IKoanInitializer` duplicates
+  the registrar; the **`IKoanAuthEventContributor` off-registry `AppDomain` scan** is the one true split-brain).
+  (2) **Capabilities can't live on the module** — `IDescribesCapabilities` (ARCH-0084) is per-type/runtime
+  (the provider), the registrar is per-assembly/boot; they are different granularities, so §4.1's sketch of
+  `KoanModule.Describe(ICapabilities)` is **corrected** — the module owns Id/DependsOn/Register/Start/Report,
+  capabilities stay on the provider. **Decisions (architect-confirmed):** additive `KoanModule` base that
+  *implements* `IKoanAutoRegistrar` (reuse discovery/ordering unchanged; migrate opportunistically, no
+  big-bang); keep `[Before]/[After]`. Staged ledger: (a) land `KoanModule` + `KoanModuleHost` + teach the
+  source-gen about `IKoanAuthEventContributor` → (b) auth de-split → (c) opportunistic registrar migration
+  (fold bootstrap hosted services into `Start`) → (d) settle.
 - Minor cleanup available anytime: the non-project ghost dirs (`Koan.Data.Lucene`, `Koan.Canon.Core`,
   `Koan.Cache.Adapter.Memory` — obj-only; `Koan.Flow.Core` — doc-only) carry 0 tracked source and are
   absent from `Koan.sln`; delete the directories.
