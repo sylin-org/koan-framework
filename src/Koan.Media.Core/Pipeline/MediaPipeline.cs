@@ -612,6 +612,17 @@ public sealed class MediaPipeline : IMediaPipeline
             source.Position = pos;
             return;
         }
+        catch (SixLabors.ImageSharp.InvalidImageContentException)
+        {
+            // Corrupt-but-format-recognised source (e.g. PNG CRC mismatch on
+            // an IDAT chunk). Identify pre-decodes far enough to hit the
+            // corruption; LoadAsync would surface the same error wrapped as
+            // MediaDecodeException with the consistent error shape. Defer to
+            // it so the controller's existing 422 handler catches it instead
+            // of a raw ImageSharp exception escaping the pipeline as a 500.
+            source.Position = pos;
+            return;
+        }
         finally
         {
             source.Position = pos;
