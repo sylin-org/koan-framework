@@ -20,7 +20,7 @@ internal sealed record PGVectorWhere(string? Sql, DynamicParameters Parameters);
 /// </summary>
 internal sealed class PGVectorFilterTranslator : IVectorFilterTranslator<PGVectorWhere>
 {
-    public static readonly VectorFilterCapabilities Caps = VectorFilterCapabilities.Of(
+    public static readonly FilterSupport Caps = FilterSupport.Uniform(
         nestedPaths: true, ignoreCase: true,
         FilterOperator.Eq, FilterOperator.Ne,
         FilterOperator.Gt, FilterOperator.Gte, FilterOperator.Lt, FilterOperator.Lte,
@@ -30,7 +30,7 @@ internal sealed class PGVectorFilterTranslator : IVectorFilterTranslator<PGVecto
         FilterOperator.Has, FilterOperator.HasAny, FilterOperator.HasAll, FilterOperator.HasNone,
         FilterOperator.Size);
 
-    public VectorFilterCapabilities Capabilities => Caps;
+    public FilterSupport Capabilities => Caps;
 
     public PGVectorWhere Translate(Filter filter)
     {

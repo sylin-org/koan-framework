@@ -14,7 +14,7 @@ public readonly record struct FinalizedQuery<TEntity>(
 /// <summary>
 /// The single owner of the partial-pushdown algorithm. An adapter is a translator + executor; this
 /// coordinator is the orchestrator. It splits the caller's filter against the adapter's declared
-/// <see cref="FilterCapabilities"/>, invokes the adapter with only the pushable portion, then applies
+/// <see cref="FilterSupport"/>, invokes the adapter with only the pushable portion, then applies
 /// — in the only correctness-safe order — the residual filter, the unhandled sort, and pagination.
 /// Pagination is applied <b>after</b> the residual, which structurally eliminates the relational
 /// mis-pagination bug (old adapters paginated the unfiltered set, then filtered). Because this lives
@@ -27,7 +27,7 @@ public static class FilterPushdownCoordinator
     /// residual the coordinator must evaluate afterwards. When a residual exists, pagination is stripped
     /// from the adapter definition (the page must be taken after the residual filter).
     /// </summary>
-    public static (QueryDefinition AdapterQuery, Filter? Residual) Plan(QueryDefinition query, FilterCapabilities caps, Type entityType)
+    public static (QueryDefinition AdapterQuery, Filter? Residual) Plan(QueryDefinition query, FilterSupport caps, Type entityType)
     {
         if (query.Filter is null)
             return (query, null);

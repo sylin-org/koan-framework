@@ -60,12 +60,10 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
     }
 
     public void Describe(ICapabilities caps) => caps
-        .Add(VectorCaps.Knn).Add(VectorCaps.Filters)
+        .Add(VectorCaps.Knn).Add(VectorCaps.Filters, MilvusFilterTranslator.Caps)
         .Add(VectorCaps.BulkUpsert).Add(VectorCaps.BulkDelete)
         .Add(VectorCaps.ScoreNormalization).Add(VectorCaps.DynamicCollections);
 
-    // AI-0036 §9 / DATA-0097 P1: operator-aware metadata-filter capabilities.
-    public Koan.Data.Abstractions.Filtering.VectorFilterCapabilities FilterCapabilities => MilvusFilterTranslator.Caps;
 
     // ─────────────────────────────────────────────────────────────────────────────
     // IVectorSearchRepository<TEntity, TKey>

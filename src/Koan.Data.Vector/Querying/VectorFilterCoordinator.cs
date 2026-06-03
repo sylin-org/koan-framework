@@ -1,6 +1,7 @@
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Vector.Abstractions;
+using Koan.Data.Vector.Abstractions.Capabilities;
 
 namespace Koan.Data.Vector.Querying;
 
@@ -12,7 +13,7 @@ namespace Koan.Data.Vector.Querying;
 /// </summary>
 /// <remarks>
 /// It runs the shared <see cref="FilterSplitter"/> split against the adapter's
-/// <see cref="VectorFilterCapabilities"/> and, unlike the entity <c>FilterPushdownCoordinator</c>,
+/// <see cref="FilterSupport"/> and, unlike the entity <c>FilterPushdownCoordinator</c>,
 /// treats <b>any non-empty residual as a hard error</b> (<see cref="VectorFilterUnsupportedException"/>).
 /// Vector search has no in-memory floor: evaluating a residual after the kNN top-K would silently
 /// drop matching rows that the truncated candidate set never contained (DATA-0097 §3). The repo
@@ -26,7 +27,7 @@ public static class VectorFilterCoordinator
     /// there is no filter). Throws <see cref="VectorFilterUnsupportedException"/> if any clause cannot
     /// be pushed.
     /// </summary>
-    public static Filter? Validate(Filter? filter, VectorFilterCapabilities capabilities, string provider)
+    public static Filter? Validate(Filter? filter, FilterSupport capabilities, string provider)
     {
         if (filter is null) return null;
 
@@ -54,7 +55,10 @@ public static class VectorFilterCoordinator
         var tick = provider.IndexOf('`');
         if (tick > 0) provider = provider[..tick];
 
-        var pushable = Validate(options.Filter, repo.FilterCapabilities, provider);
+        // ARCH-0084: the adapter declares its filter support as the FilterSupport detail on its
+        // VectorCaps.Filters token (no separate property). Absent token => None => any filter hard-errors.
+        var caps = VectorCaps.Describe(repo, provider).Detail<FilterSupport>(VectorCaps.Filters) ?? FilterSupport.None;
+        var pushable = Validate(options.Filter, caps, provider);
         return options with { Filter = pushable };
     }
 }

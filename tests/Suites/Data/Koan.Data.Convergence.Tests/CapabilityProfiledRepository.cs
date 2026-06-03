@@ -6,7 +6,7 @@ namespace Koan.Data.Convergence.Tests;
 
 /// <summary>
 /// A minimal in-memory <see cref="IQueryRepository{TEntity,TKey}"/> whose declared
-/// <see cref="FilterCapabilities"/> are configurable. It models an architecturally-distinct
+/// <see cref="FilterSupport"/> are configurable. It models an architecturally-distinct
 /// adapter's pushdown boundary: it "pushes" exactly the operators it declares (by evaluating
 /// only that sub-filter against its store) and reports an honest result; everything it does NOT
 /// declare is left for the framework's <c>FilterPushdownCoordinator</c> to finish in memory.
@@ -22,13 +22,13 @@ internal sealed class CapabilityProfiledRepository : IQueryRepository<Widget, st
 {
     private readonly IReadOnlyList<Widget> _store;
 
-    public CapabilityProfiledRepository(IReadOnlyList<Widget> store, FilterCapabilities caps)
+    public CapabilityProfiledRepository(IReadOnlyList<Widget> store, FilterSupport caps)
     {
         _store = store;
-        FilterCapabilities = caps;
+        FilterSupport = caps;
     }
 
-    public FilterCapabilities FilterCapabilities { get; }
+    public FilterSupport FilterSupport { get; }
 
     public Task<RepositoryQueryResult<Widget>> Query(QueryDefinition query, CancellationToken ct = default)
     {
@@ -75,24 +75,24 @@ internal static class CapabilityProfiles
     };
 
     /// <summary>Pushes everything — InMemory / JSON / Redis floor adapters.</summary>
-    public static FilterCapabilities Full => FilterCapabilities.Full;
+    public static FilterSupport Full => FilterSupport.Full;
 
     /// <summary>Pushes nothing — the always-residual baseline (degenerate KV adapter).</summary>
-    public static FilterCapabilities None => FilterCapabilities.None;
+    public static FilterSupport None => FilterSupport.None;
 
     /// <summary>Scalar only — collection containment goes to the floor (a JSON-blob store w/o array ops).</summary>
-    public static FilterCapabilities ScalarOnly => new(
+    public static FilterSupport ScalarOnly => new(
         AllScalar.ToFrozenSet(), FrozenSet<FilterOperator>.Empty, NestedPaths: true, IgnoreCase: false);
 
     /// <summary>Scalar + collection, no ignoreCase/nested — the relational trio (PG/SqlServer/Sqlite).</summary>
-    public static FilterCapabilities Relational => new(
+    public static FilterSupport Relational => new(
         AllScalar.ToFrozenSet(), AllCollection.ToFrozenSet(), NestedPaths: false, IgnoreCase: false);
 
     /// <summary>Collection only — a contrived boundary to stress the OR-of-split path.</summary>
-    public static FilterCapabilities CollectionOnly => new(
+    public static FilterSupport CollectionOnly => new(
         FrozenSet<FilterOperator>.Empty, AllCollection.ToFrozenSet(), NestedPaths: false, IgnoreCase: false);
 
-    public static IReadOnlyDictionary<string, FilterCapabilities> All => new Dictionary<string, FilterCapabilities>
+    public static IReadOnlyDictionary<string, FilterSupport> All => new Dictionary<string, FilterSupport>
     {
         ["Full (InMemory/JSON/Redis)"] = Full,
         ["Relational (PG/SqlServer/Sqlite)"] = Relational,

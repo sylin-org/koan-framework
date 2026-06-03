@@ -17,7 +17,7 @@ public sealed class FilterSplitterSpecs
     };
 
     // Adapter that pushes scalar comparisons/membership only — no collection operators.
-    private static readonly FilterCapabilities ScalarOnly = new(
+    private static readonly FilterSupport ScalarOnly = new(
         ScalarOperators: new HashSet<FilterOperator>
         {
             FilterOperator.Eq, FilterOperator.Ne, FilterOperator.Gt, FilterOperator.Gte,
@@ -77,7 +77,7 @@ public sealed class FilterSplitterSpecs
     public void None_capability_pushes_nothing()
     {
         var full = JsonFilterParser.Parse<Gamer>("{ \"Level\": { \"$gte\": 10 } }");
-        var split = FilterSplitter.Split(full, FilterCapabilities.None, typeof(Gamer));
+        var split = FilterSplitter.Split(full, FilterSupport.None, typeof(Gamer));
 
         split.Pushable.Should().BeNull();
         split.Residual.Should().NotBeNull();

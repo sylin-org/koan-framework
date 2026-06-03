@@ -15,25 +15,23 @@ namespace Koan.Data.Filtering.Tests;
 public class CapabilityBridgeTests
 {
     [Fact]
-    public void FilterSupport_from_entity_record_preserves_scalar_collection_split()
+    public void FilterSupport_Of_preserves_scalar_collection_split()
     {
-        var fc = new FilterCapabilities(
-            ScalarOperators: new HashSet<FilterOperator> { FilterOperator.Eq, FilterOperator.In },
-            CollectionOperators: new HashSet<FilterOperator> { FilterOperator.Has },
-            NestedPaths: true, IgnoreCase: false);
+        var fs = FilterSupport.Of(
+            new[] { FilterOperator.Eq, FilterOperator.In },
+            new[] { FilterOperator.Has },
+            nestedPaths: true, ignoreCase: false);
 
-        var fs = FilterSupport.From(fc);
         fs.CanPush(FilterOperator.Eq, collectionField: false).Should().BeTrue();
         fs.CanPush(FilterOperator.Eq, collectionField: true).Should().BeFalse();   // split preserved
         fs.CanPush(FilterOperator.Has, collectionField: true).Should().BeTrue();
     }
 
     [Fact]
-    public void FilterSupport_from_vector_record_uses_one_set_for_both_axes()
+    public void FilterSupport_Uniform_uses_one_set_for_both_axes()
     {
-        var vfc = VectorFilterCapabilities.Of(nestedPaths: true, ignoreCase: false, FilterOperator.Eq, FilterOperator.In);
+        var fs = FilterSupport.Uniform(nestedPaths: true, ignoreCase: false, FilterOperator.Eq, FilterOperator.In);
 
-        var fs = FilterSupport.From(vfc);
         fs.CanPush(FilterOperator.In, collectionField: false).Should().BeTrue();
         fs.CanPush(FilterOperator.In, collectionField: true).Should().BeTrue();    // schemaless: no split
     }

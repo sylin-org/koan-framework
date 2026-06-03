@@ -39,7 +39,7 @@ internal sealed class MongoFilterTranslator<TEntity>
     /// floor via the coordinator. Mongo translates all scalar comparison/membership/string operators
     /// plus all collection-containment operators against native array/BSON semantics.
     /// </summary>
-    public static FilterCapabilities Capabilities { get; } = new(
+    public static FilterSupport Capabilities { get; } = new(
         ScalarOperators: new HashSet<FilterOperator>
         {
             FilterOperator.Eq, FilterOperator.Ne,

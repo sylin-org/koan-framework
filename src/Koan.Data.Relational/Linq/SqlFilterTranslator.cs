@@ -10,7 +10,7 @@ namespace Koan.Data.Relational.Linq;
 /// Replaces the legacy LINQ-Expression-walking <c>LinqWhereTranslator</c>: the front-end now lowers
 /// LINQ and the JSON DSL into the provider-agnostic <see cref="Filter"/> model, and this class lowers
 /// that model onto SQL. The framework's <c>FilterPushdownCoordinator</c> guarantees the filter handed
-/// here contains <b>only</b> nodes the adapter declared pushable in its <see cref="FilterCapabilities"/>,
+/// here contains <b>only</b> nodes the adapter declared pushable in its <see cref="FilterSupport"/>,
 /// so this translator never computes a residual and never sees an un-pushable operator — it translates
 /// the whole tree.
 ///

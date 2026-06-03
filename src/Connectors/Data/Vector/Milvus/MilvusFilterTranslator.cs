@@ -21,7 +21,7 @@ namespace Koan.Data.Vector.Connector.Milvus;
 /// </remarks>
 internal static class MilvusFilterTranslator
 {
-    public static readonly VectorFilterCapabilities Caps = VectorFilterCapabilities.Of(
+    public static readonly FilterSupport Caps = FilterSupport.Uniform(
         nestedPaths: true, ignoreCase: false,
         FilterOperator.Eq,
         FilterOperator.Gt, FilterOperator.Gte, FilterOperator.Lt, FilterOperator.Lte,

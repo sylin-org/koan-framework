@@ -38,6 +38,11 @@ public static class Data<TEntity, TKey>
         }
     }
 
+    // ARCH-0084: the adapter's filter support is the FilterSupport detail on its DataCaps.Query.Filter
+    // capability token (no separate property). Absent token => None => every filter node is residual.
+    private static FilterSupport ResolveFilterSupport(IDataRepository<TEntity, TKey> repo)
+        => DataCaps.Describe(repo, repo.GetType().Name).Detail<FilterSupport>(DataCaps.Query.Filter) ?? FilterSupport.None;
+
     private static IQueryRepository<TEntity, TKey> RequireQuery(IDataRepository<TEntity, TKey> repo)
         => repo as IQueryRepository<TEntity, TKey>
            ?? throw new NotSupportedException(
@@ -67,6 +72,7 @@ public static class Data<TEntity, TKey>
     {
         var repo = Repo;
         var q = repo as IQueryRepository<TEntity, TKey> ?? RequireQuery(repo);
+        var filterSupport = ResolveFilterSupport(repo);
         var countStrategy = query.CountStrategy ?? CountStrategy.Optimized;
         query = query.WithCountStrategy(countStrategy);
 
@@ -75,7 +81,7 @@ public static class Data<TEntity, TKey>
         // Safety cap on unpaged queries: count first, refuse if over the cap.
         if (!hasPagination && absoluteMaxRecords.HasValue)
         {
-            var planForCount = FilterPushdownCoordinator.Plan(query, q.FilterCapabilities, typeof(TEntity));
+            var planForCount = FilterPushdownCoordinator.Plan(query, filterSupport, typeof(TEntity));
             // Only a clean count when nothing residual; otherwise we must materialize to know the true total.
             if (planForCount.Residual is null)
             {
@@ -85,7 +91,7 @@ public static class Data<TEntity, TKey>
             }
         }
 
-        var (adapterQuery, residual) = FilterPushdownCoordinator.Plan(query, q.FilterCapabilities, typeof(TEntity));
+        var (adapterQuery, residual) = FilterPushdownCoordinator.Plan(query, filterSupport, typeof(TEntity));
         var adapterResult = await q.Query(adapterQuery, ct);
         var finalized = FilterPushdownCoordinator.Finalize(query, residual, adapterResult);
 
@@ -134,8 +140,9 @@ public static class Data<TEntity, TKey>
     {
         var repo = Repo;
         var q = RequireQuery(repo);
+        var filterSupport = ResolveFilterSupport(repo);
         query = query.WithCountStrategy(strategy);
-        var (adapterQuery, residual) = FilterPushdownCoordinator.Plan(query, q.FilterCapabilities, typeof(TEntity));
+        var (adapterQuery, residual) = FilterPushdownCoordinator.Plan(query, filterSupport, typeof(TEntity));
         if (residual is null)
             return (await q.Count(adapterQuery, ct)).Value;
 

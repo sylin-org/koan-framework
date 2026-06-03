@@ -40,9 +40,6 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     public void Describe(ICapabilities caps)
         => DataCaps.Describe(_inner, _inner.GetType().Name).CopyInto(caps);
 
-    public FilterCapabilities FilterCapabilities
-        => _inner is IQueryRepository<TEntity, TKey> q ? q.FilterCapabilities : FilterCapabilities.None;
-
     public Task EnsureReady(CancellationToken ct = default) => _inner.EnsureReady(ct);
 
     private async Task Guard(CancellationToken ct)

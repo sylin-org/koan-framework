@@ -88,7 +88,8 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
 
     public void Describe(ICapabilities caps) => caps
         .Add(DataCaps.Query.String).Add(DataCaps.Query.Linq)
-        .Add(DataCaps.Write.BulkUpsert).Add(DataCaps.Write.BulkDelete).Add(DataCaps.Write.AtomicBatch);
+        .Add(DataCaps.Write.BulkUpsert).Add(DataCaps.Write.BulkDelete).Add(DataCaps.Write.AtomicBatch)
+        .Add(DataCaps.Query.Filter, CouchbaseN1qlFilterTranslator.Capabilities);
     public StorageOptimizationInfo OptimizationInfo => _optimizationInfo;
 
     public Task<bool> IsReadyAsync(CancellationToken ct = default) => _provider.IsReadyAsync(ct);
@@ -216,12 +217,6 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
 
     // ==================== Unified Query (DATA-XXXX) ====================
 
-    /// <summary>
-    /// Per-operator pushdown capabilities. The coordinator splits the caller's filter against this
-    /// and only ever hands us nodes we declared pushable; operators left out (e.g. IgnoreCase, or
-    /// any future op) fall to the in-memory floor. This is the single source of truth.
-    /// </summary>
-    public FilterCapabilities FilterCapabilities => CouchbaseN1qlFilterTranslator.Capabilities;
 
     /// <summary>
     /// Translator + executor: translate the WHOLE (guaranteed-pushable) filter to a parameterized

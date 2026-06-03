@@ -30,9 +30,6 @@ internal sealed class CqrsRepositoryDecorator<TEntity, TKey> : IDataRepository<T
     public void Describe(ICapabilities caps)
         => DataCaps.Describe(_inner, _inner.GetType().Name).CopyInto(caps);
 
-    public FilterCapabilities FilterCapabilities
-        => _routing.GetReadRepository<TEntity, TKey>() is IQueryRepository<TEntity, TKey> q ? q.FilterCapabilities : FilterCapabilities.None;
-
     public Task<TEntity?> Get(TKey id, CancellationToken ct = default)
         => _routing.GetReadRepository<TEntity, TKey>().Get(id, ct);
 

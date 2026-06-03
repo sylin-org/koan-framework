@@ -10,7 +10,7 @@ namespace Koan.Data.Vector.Abstractions;
 /// <remarks>
 /// Two deliberate differences from the entity translator:
 /// <list type="bullet">
-/// <item>It declares <see cref="VectorFilterCapabilities"/> (a single operator set — vector metadata
+/// <item>It declares <see cref="FilterSupport"/> via <c>Uniform</c> (a single operator set — vector metadata
 /// is schemaless, so there is no scalar-vs-collection split).</item>
 /// <item><see cref="Translate"/> receives an <b>already-validated, fully-pushable</b> <see cref="Filter"/>
 /// (the <c>VectorFilterCoordinator</c> has run the split and rejected any residual as a hard error),
@@ -26,7 +26,7 @@ namespace Koan.Data.Vector.Abstractions;
 public interface IVectorFilterTranslator<out TNative>
 {
     /// <summary>The operators/paths this adapter can faithfully push down onto stored metadata.</summary>
-    VectorFilterCapabilities Capabilities { get; }
+    FilterSupport Capabilities { get; }
 
     /// <summary>
     /// Renders a fully-pushable filter into the provider's native representation. The input is

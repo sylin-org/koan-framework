@@ -3,7 +3,7 @@ using Koan.Data.Abstractions.Filtering;
 namespace Koan.Data.Relational.Linq;
 
 /// <summary>
-/// The <see cref="FilterCapabilities"/> the relational adapters (Sqlite / Postgres / SqlServer) can
+/// The <see cref="FilterSupport"/> the relational adapters (Sqlite / Postgres / SqlServer) can
 /// push down via <see cref="SqlFilterTranslator"/>. Centralized so the relational trio declares one
 /// honest, identical surface (DATA-XXXX).
 ///
@@ -18,9 +18,9 @@ namespace Koan.Data.Relational.Linq;
 /// floor owns it to stay convergent with the oracle.</item>
 /// </list>
 /// </summary>
-public static class RelationalFilterCapabilities
+public static class RelationalFilterSupport
 {
-    public static FilterCapabilities Default { get; } = new(
+    public static FilterSupport Default { get; } = new(
         ScalarOperators: new HashSet<FilterOperator>
         {
             FilterOperator.Eq, FilterOperator.Ne,

@@ -5,7 +5,7 @@ public sealed record FilterSplit(Filter? Pushable, Filter? Residual);
 
 /// <summary>
 /// Splits a <see cref="Filter"/> into the part an adapter can push down (per its
-/// <see cref="FilterCapabilities"/>) and the residual the caller evaluates in memory. The
+/// <see cref="FilterSupport"/>) and the residual the caller evaluates in memory. The
 /// split preserves results — <c>eval(full) == eval(pushable) AND eval(residual)</c> — by
 /// following the only correctness-safe rules:
 /// <list type="bullet">
@@ -21,7 +21,7 @@ public sealed record FilterSplit(Filter? Pushable, Filter? Residual);
 /// </summary>
 public static class FilterSplitter
 {
-    public static FilterSplit Split(Filter filter, FilterCapabilities caps, Type entityType)
+    public static FilterSplit Split(Filter filter, FilterSupport caps, Type entityType)
     {
         switch (filter)
         {
@@ -68,14 +68,15 @@ public static class FilterSplitter
 
     /// <summary>
     /// Schemaless split for the vector path (AI-0036 §9 / DATA-0097 P1). Same correctness-safe
-    /// AllOf/AnyOf/Not rules as <see cref="Split(Filter, FilterCapabilities, Type)"/>, but the
+    /// AllOf/AnyOf/Not rules as <see cref="Split(Filter, FilterSupport, Type)"/>, but the
     /// <see cref="FieldFilter"/> arm <b>never calls <see cref="FieldPathResolver"/></b> (vector
     /// metadata has no CLR type to resolve against) — every leaf is treated as a single metadata key,
-    /// and capability is the single-set <see cref="VectorFilterCapabilities"/>. The
-    /// <c>VectorFilterCoordinator</c> treats any non-empty residual as a hard error (no in-memory
-    /// floor for vectors), so this method only decides pushable-vs-residual; it never evaluates.
+    /// and capability is the schemaless single-set <see cref="FilterSupport"/> (Scalar==Collection via
+    /// <see cref="FilterSupport.Uniform"/>). The <c>VectorFilterCoordinator</c> treats any non-empty
+    /// residual as a hard error (no in-memory floor for vectors), so this method only decides
+    /// pushable-vs-residual; it never evaluates.
     /// </summary>
-    public static FilterSplit Split(Filter filter, VectorFilterCapabilities caps)
+    public static FilterSplit Split(Filter filter, FilterSupport caps)
     {
         switch (filter)
         {
@@ -106,8 +107,9 @@ public static class FilterSplitter
             }
             case FieldFilter f:
             {
-                // No FieldPathResolver: schemaless metadata key, no scalar-vs-collection distinction.
-                var pushable = caps.CanPush(f.Operator)
+                // No FieldPathResolver: schemaless metadata key, no scalar-vs-collection distinction
+                // (FilterSupport is built via Uniform, so Scalar==Collection — collectionField is moot).
+                var pushable = caps.CanPush(f.Operator, collectionField: false)
                     && (caps.NestedPaths || f.Field.Segments.Count == 1)
                     && (!f.IgnoreCase || caps.IgnoreCase);
                 return pushable ? new FilterSplit(filter, null) : new FilterSplit(null, filter);

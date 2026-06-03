@@ -51,7 +51,7 @@ internal sealed class CouchbaseN1qlFilterTranslator
     /// diverging from the evaluator's Ordinal-vs-OrdinalIgnoreCase oracle, so case-insensitive
     /// nodes become residual instead of being mistranslated.
     /// </summary>
-    public static FilterCapabilities Capabilities { get; } =
+    public static FilterSupport Capabilities { get; } =
         new(ScalarOps, CollectionOps, NestedPaths: true, IgnoreCase: false);
 
     private readonly StorageOptimizationInfo _optimization;

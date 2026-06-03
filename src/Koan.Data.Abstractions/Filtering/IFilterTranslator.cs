@@ -21,7 +21,7 @@ public sealed record FilterTranslation<TNative>(TNative? Pushed, Filter? Residua
 /// </summary>
 public interface IFilterTranslator<TNative>
 {
-    FilterCapabilities Capabilities { get; }
+    FilterSupport Capabilities { get; }
 
     FilterTranslation<TNative> Translate(Filter filter, Type entityType);
 }

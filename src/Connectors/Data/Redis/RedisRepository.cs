@@ -15,7 +15,7 @@ namespace Koan.Data.Connector.Redis;
 /// <summary>
 /// Redis key/value store. A "Full floor" adapter under the unified query contract (DATA-XXXX):
 /// it scans the keyspace, materializes entities, and evaluates the entire <see cref="Filter"/>
-/// via <see cref="InMemoryFilterEvaluator"/> (declares <see cref="FilterCapabilities.Full"/>).
+/// via <see cref="InMemoryFilterEvaluator"/> (declares <see cref="FilterSupport.Full"/>).
 /// </summary>
 internal sealed class RedisRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
@@ -32,11 +32,10 @@ internal sealed class RedisRepository<TEntity, TKey> :
     public RedisRepository(IOptions<RedisOptions> options, IConnectionMultiplexer muxer, ILoggerFactory? lf)
     { _options = options; _muxer = muxer; _logger = lf?.CreateLogger("Koan.Data.Connector.Redis"); }
 
-    public FilterCapabilities FilterCapabilities => FilterCapabilities.Full;
-
     public void Describe(ICapabilities caps) => caps
         .Add(DataCaps.Query.Linq)            // predicate filtering in-memory
-        .Add(DataCaps.Write.FastRemove);
+        .Add(DataCaps.Write.FastRemove)
+        .Add(DataCaps.Query.Filter, FilterSupport.Full);
 
     private string Keyspace()
     {

@@ -13,8 +13,8 @@ namespace Koan.Data.Filtering.Tests.Specs;
 /// </summary>
 public sealed class VectorFilterCoordinatorSpecs
 {
-    private static readonly VectorFilterCapabilities ScalarOnly =
-        VectorFilterCapabilities.Of(nestedPaths: true, ignoreCase: false,
+    private static readonly FilterSupport ScalarOnly =
+        FilterSupport.Uniform(nestedPaths: true, ignoreCase: false,
             FilterOperator.Eq, FilterOperator.Ne, FilterOperator.Gt, FilterOperator.Gte,
             FilterOperator.Lt, FilterOperator.Lte, FilterOperator.In, FilterOperator.Nin);
 
@@ -81,7 +81,7 @@ public sealed class VectorFilterCoordinatorSpecs
     [Fact]
     public void IgnoreCase_node_passes_when_capability_allows_it()
     {
-        var caps = VectorFilterCapabilities.Of(nestedPaths: true, ignoreCase: true, FilterOperator.Eq);
+        var caps = FilterSupport.Uniform(nestedPaths: true, ignoreCase: true, FilterOperator.Eq);
         var f = (FieldFilter)Filter.On(FieldPath.Of("name"), FilterOperator.Eq, FilterValue.Of("acme")) with { IgnoreCase = true };
         VectorFilterCoordinator.Validate(f, caps, "test").Should().BeSameAs(f);
     }

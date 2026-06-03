@@ -54,12 +54,10 @@ internal sealed class PGVectorRepository<TEntity, TKey>
     }
 
     public void Describe(ICapabilities caps) => caps
-        .Add(VectorCaps.Knn).Add(VectorCaps.Filters)
+        .Add(VectorCaps.Knn).Add(VectorCaps.Filters, PGVectorFilterTranslator.Caps)
         .Add(VectorCaps.BulkUpsert).Add(VectorCaps.BulkDelete)
         .Add(VectorCaps.DynamicCollections);
 
-    // AI-0036 §9 / DATA-0097 P1: PGVector is the reference adapter — full operator set over JSONB.
-    public Koan.Data.Abstractions.Filtering.VectorFilterCapabilities FilterCapabilities => PGVectorFilterTranslator.Caps;
 
     private string TableName => VectorAdapterNaming.GetOrCompute<TEntity, TKey>(_sp).ToLowerInvariant();
 

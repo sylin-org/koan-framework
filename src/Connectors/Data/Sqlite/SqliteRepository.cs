@@ -40,13 +40,11 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
-    /// <summary>Operators the SQLite adapter pushes down (DATA-XXXX). Everything else falls to the in-memory floor.</summary>
-    public FilterCapabilities FilterCapabilities => RelationalFilterCapabilities.Default;
-
     public void Describe(ICapabilities caps) => caps
         .Add(DataCaps.Query.Linq).Add(DataCaps.Query.String)
         .Add(DataCaps.Write.BulkUpsert).Add(DataCaps.Write.BulkDelete)
-        .Add(DataCaps.Write.AtomicBatch).Add(DataCaps.Write.FastRemove);
+        .Add(DataCaps.Write.AtomicBatch).Add(DataCaps.Write.FastRemove)
+        .Add(DataCaps.Query.Filter, RelationalFilterSupport.Default);
 
     private readonly IServiceProvider _sp;
     private readonly SqliteOptions _options;

@@ -24,7 +24,7 @@ namespace Koan.Data.SearchEngine;
 /// </remarks>
 public static class SearchEngineFilterTranslator
 {
-    public static readonly VectorFilterCapabilities Caps = VectorFilterCapabilities.Of(
+    public static readonly FilterSupport Caps = FilterSupport.Uniform(
         nestedPaths: true, ignoreCase: false,
         FilterOperator.Eq, FilterOperator.Ne,
         FilterOperator.Gt, FilterOperator.Gte, FilterOperator.Lt, FilterOperator.Lte,

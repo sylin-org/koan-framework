@@ -31,11 +31,9 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
     private volatile int _discoveredDimension = -1; // -1 means not discovered yet
 
     public void Describe(ICapabilities caps) => caps
-        .Add(VectorCaps.Knn).Add(VectorCaps.Filters).Add(VectorCaps.BulkUpsert).Add(VectorCaps.BulkDelete)
+        .Add(VectorCaps.Knn).Add(VectorCaps.Filters, WeaviateFilterTranslator.Caps).Add(VectorCaps.BulkUpsert).Add(VectorCaps.BulkDelete)
         .Add(VectorCaps.Hybrid).Add(VectorCaps.NativeContinuation).Add(VectorCaps.DynamicCollections);
 
-    // AI-0036 §9 / DATA-0097 P1: reduced operator-aware metadata-filter capabilities.
-    public Koan.Data.Abstractions.Filtering.VectorFilterCapabilities FilterCapabilities => WeaviateFilterTranslator.Caps;
 
     public WeaviateVectorRepository(IHttpClientFactory httpFactory, IOptions<WeaviateOptions> options, IServiceProvider sp)
     {

@@ -339,46 +339,20 @@ Each facet (1–4) runs:
     the dead `OrchestrationRuntimeBridge`); rewrote `LMStudioAdapter` off `BaseKoanAdapter` (now lean like
     `OllamaAdapter`). Kept the load-bearing Readiness subsystem, `AdapterBootReporting`, the
     `[OrchestrationAware]` attribute, and `UnifiedServiceMetadata`. AI.Unit 151/151, AI.EndToEnd 31/31.
-  - **FilterSupport sub-facet — OPEN (the one remaining; its own focused pass).** Collapse
-    `FilterCapabilities` + `VectorFilterCapabilities` records into the existing `FilterSupport`, attached to
-    the `DataCaps.Query.Filter` / `VectorCaps.Filters` token as detail (read via `caps.Detail<FilterSupport>`).
-    **Decision: target B (token integration)** — it is what gives the capability model's `Add<TDetail>`/
-    `Detail<T>` mechanism its *one intended consumer*; doing only A (type-collapse, keep property) leaves
-    that mechanism as dead scaffolding. (`CapabilitySet.CopyInto` is already detail-preserving for exactly
-    this, so the facade/decorators propagate the token detail for free.)
+  - **FilterSupport sub-facet ✓ DONE.** `FilterCapabilities` + `VectorFilterCapabilities` records deleted;
+    each adapter now declares its filter support as the `FilterSupport` detail on its `DataCaps.Query.Filter`
+    / `VectorCaps.Filters` token (`Describe`), and the coordinators resolve it via `caps.Detail<FilterSupport>`
+    — giving the capability model's `Add<TDetail>`/`Detail<T>` mechanism its one intended consumer. The
+    `IQueryRepository.FilterCapabilities` / `IVectorSearchRepository.FilterCapabilities` properties are gone;
+    `RelationalFilterCapabilities`→`RelationalFilterSupport`; the splitter/coordinators/translators all take
+    `FilterSupport`. ~40 files, behaviour-preserving (FilterSupport ≡ FilterCapabilities structurally).
+    **Verified by the convergence oracle: Convergence 19/19, Filtering 92/92, InMemory 32/32, Json 7/7,
+    VectorAdapterSurface 26/26.** (Container-backed adapters compile green with byte-identical operator sets;
+    a container oracle run is the final belt-and-suspenders check.)
 
-    **Executable plan (worked out 2026-06-02; ~40 files, ATOMIC — does not decompose into safe partial
-    commits, so do it in one green push):**
-    - `FilterSupport` is **structurally identical** to `FilterCapabilities` (same fields, same
-      `CanPush(op, collectionField)`, same `None`/`Full`) → the type-collapse is behaviour-preserving. The
-      vector form uses `FilterSupport.Uniform(...)` (Scalar==Collection, since vector metadata is schemaless);
-      the vector splitter arm calls `caps.CanPush(op, collectionField: false)`.
-    - Contracts: `IQueryRepository.FilterCapabilities` and `IVectorSearchRepository.FilterCapabilities`
-      → `FilterSupport`; `FilterSplitter.Split` (both overloads) + `FilterPushdownCoordinator.Plan` +
-      `VectorFilterCoordinator.Validate` take `FilterSupport`.
-    - Sources: `RelationalFilterCapabilities.Default` (→ rename `RelationalFilterSupport`); each vector
-      translator's `.Caps` (`SearchEngine`/`Milvus`/`Qdrant`/`Weaviate`/`PGVector`) and the Mongo/Couchbase
-      translator caps → `FilterSupport`. The 8 data + 6 vector adapter `FilterCapabilities` properties → `FilterSupport`.
-    - For B: each adapter's `Describe` adds `caps.Add(<Filter token>, <its FilterSupport>)`; the coordinator
-      callers read `Data<T>.Capabilities.Detail<FilterSupport>(DataCaps.Query.Filter)` (no caching needed —
-      same per-call `Describe` cost the FastRemove hot-path already accepts); delete the `FilterCapabilities`
-      property from the contract + facade/decorators. Note: vector adapters that fully-qualify
-      `Koan.Data.Abstractions.Filtering.VectorFilterCapabilities` need `using Koan.Data.Abstractions.Filtering;`
-      added for `FilterSupport`.
-    - Delete `FilterCapabilities.cs` + `VectorFilterCapabilities.cs` records + the `FilterSupport.From(...)`
-      bridges; update the `FilterConvergence` / `VectorFilterConvergenceSpecsBase` TestKits + the
-      `CapabilityBridgeTests` `FilterSupport.From` specs.
-    - **Verify with the FULL cross-adapter convergence oracle** (container-backed) — the structural identity
-      makes a bug unlikely but the oracle is the proof. This is why it is its own session, not a tail-end rush.
-
-  Next major facet: **Facet 2 — `KoanModule`** (registration + bootstrap + self-report), which hosts
-  `Describe` and builds directly on the capability model just landed.
-  - **Gen-1 cut (independent of the enum migration):** `LMStudioAdapter` is the one consumer but it
-    inherits its *entire* scaffolding from `BaseKoanAdapter` (`Logger`, `GetOptions<T>`,
-    `GetConnectionString`, `InitializeAdapter`/`CheckAdapterHealth`/`GetAdapterBootstrapMetadata`), so the
-    cut is a real LMStudio rewrite, not just a capability swap. The `Koan.Core.Adapters` **Readiness**
-    subsystem + `AdapterBootReporting` are load-bearing and stay — only the capability surface
-    (`AdapterCapabilities`, `Capabilities.cs` enums, `BaseKoanAdapter`, `Templates/*`) is cut.
+  **All three ARCH-0084 follow-ons are now complete.** Next major facet: **Facet 2 — `KoanModule`**
+  (registration + bootstrap + self-report), which hosts `Describe` and builds directly on the capability
+  model just landed.
 - Minor cleanup available anytime: the non-project ghost dirs (`Koan.Data.Lucene`, `Koan.Canon.Core`,
   `Koan.Cache.Adapter.Memory` — obj-only; `Koan.Flow.Core` — doc-only) carry 0 tracked source and are
   absent from `Koan.sln`; delete the directories.

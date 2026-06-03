@@ -15,7 +15,7 @@ namespace Koan.Data.Connector.Json;
 
 /// <summary>
 /// In-memory dictionary with JSON file persistence per aggregate. A "Full floor" adapter under
-/// the unified query contract (DATA-XXXX): declares <see cref="FilterCapabilities.Full"/> and
+/// the unified query contract (DATA-XXXX): declares <see cref="FilterSupport.Full"/> and
 /// evaluates the entire <see cref="Filter"/> via <see cref="InMemoryFilterEvaluator"/>.
 /// </summary>
 internal sealed class JsonRepository<TEntity, TKey> :
@@ -36,10 +36,11 @@ internal sealed class JsonRepository<TEntity, TKey> :
     // Maintain per-physical-name stores and file paths so different sets are isolated
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<TKey, TEntity>> _stores = new();
     private readonly ConcurrentDictionary<string, string> _files = new();
-    public FilterCapabilities FilterCapabilities => FilterCapabilities.Full;
 
     // JSON adapter does not have native bulk APIs; honor semantics via fallbacks without advertising native bulk.
-    public void Describe(ICapabilities caps) => caps.Add(DataCaps.Query.Linq); // supports LINQ predicate
+    public void Describe(ICapabilities caps) => caps
+        .Add(DataCaps.Query.Linq) // supports LINQ predicate
+        .Add(DataCaps.Query.Filter, FilterSupport.Full);
 
     public JsonRepository(IOptions<JsonDataOptions> options)
     {

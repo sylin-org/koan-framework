@@ -69,16 +69,14 @@ internal sealed class InMemoryVectorRepository<TEntity, TKey> : IVectorSearchRep
     // streaming export, bulk ops, score normalization, dynamic collections. The two it does NOT
     // claim are honest omissions of features a single-vector dictionary cannot model: multi-vector
     // per entity (one embedding per id) and atomic batch (no transaction boundary).
+    // AI-0036 §9: the in-memory adapter evaluates the full unified Filter via DictionaryFilterEvaluator
+    // — it IS the convergence oracle, so it declares Filters with FilterSupport.Full and the coordinator
+    // passes every filter through.
     public void Describe(ICapabilities caps) => caps
-        .Add(VectorCaps.Knn).Add(VectorCaps.Filters).Add(VectorCaps.Hybrid)
+        .Add(VectorCaps.Knn).Add(VectorCaps.Filters, Koan.Data.Abstractions.Filtering.FilterSupport.Full).Add(VectorCaps.Hybrid)
         .Add(VectorCaps.NativeContinuation).Add(VectorCaps.StreamingResults)
         .Add(VectorCaps.BulkUpsert).Add(VectorCaps.BulkDelete)
         .Add(VectorCaps.ScoreNormalization).Add(VectorCaps.DynamicCollections);
-
-    // AI-0036 §9: the in-memory adapter evaluates the full unified Filter via DictionaryFilterEvaluator
-    // — it IS the convergence oracle, so it declares Full and the coordinator passes every filter through.
-    public Koan.Data.Abstractions.Filtering.VectorFilterCapabilities FilterCapabilities
-        => Koan.Data.Abstractions.Filtering.VectorFilterCapabilities.Full;
 
     private ConcurrentDictionary<string, (float[] Embedding, object? Metadata)> Bucket()
     {

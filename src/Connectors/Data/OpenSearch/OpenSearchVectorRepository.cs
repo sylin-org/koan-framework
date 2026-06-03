@@ -51,11 +51,9 @@ internal sealed class OpenSearchVectorRepository<TEntity, TKey> :
     }
 
     public void Describe(ICapabilities caps) => caps
-        .Add(VectorCaps.Knn).Add(VectorCaps.Filters)
+        .Add(VectorCaps.Knn).Add(VectorCaps.Filters, SearchEngineFilterTranslator.Caps)
         .Add(VectorCaps.BulkUpsert).Add(VectorCaps.BulkDelete);
 
-    // AI-0036 §9 / DATA-0097 P1: operator-aware metadata-filter capabilities.
-    public Koan.Data.Abstractions.Filtering.VectorFilterCapabilities FilterCapabilities => SearchEngineFilterTranslator.Caps;
 
     public async Task VectorEnsureCreated(CancellationToken ct = default)
     {

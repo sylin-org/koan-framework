@@ -37,12 +37,10 @@ internal sealed class PostgresRepository<
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
-    /// <summary>Operators the Postgres adapter pushes down (DATA-XXXX). Everything else falls to the in-memory floor.</summary>
-    public FilterCapabilities FilterCapabilities => RelationalFilterCapabilities.Default;
-
     public void Describe(ICapabilities caps) => caps
         .Add(DataCaps.Query.Linq).Add(DataCaps.Query.String)
-        .Add(DataCaps.Write.AtomicBatch).Add(DataCaps.Write.BulkDelete).Add(DataCaps.Write.FastRemove);
+        .Add(DataCaps.Write.AtomicBatch).Add(DataCaps.Write.BulkDelete).Add(DataCaps.Write.FastRemove)
+        .Add(DataCaps.Query.Filter, RelationalFilterSupport.Default);
 
     // Storage optimization support
     private readonly StorageOptimizationInfo _optimizationInfo;

@@ -9,7 +9,8 @@ namespace Koan.Data.Abstractions;
 /// the untyped <c>object?</c> slot.
 ///
 /// CONTRACT (DATA-XXXX): the framework's <c>FilterPushdownCoordinator</c> splits the caller's filter
-/// against this adapter's declared <see cref="FilterCapabilities"/> and invokes <see cref="Query"/>
+/// against this adapter's declared filter support (the <c>FilterSupport</c> detail on the adapter's
+/// <c>DataCaps.Query.Filter</c> capability token, ARCH-0084) and invokes <see cref="Query"/>
 /// with a <see cref="QueryDefinition"/> whose <c>Filter</c> contains <b>only nodes this adapter
 /// declared pushable</b>. The adapter therefore translates the WHOLE filter it receives — it never
 /// computes a residual, never splits, never falls back. The coordinator evaluates the residual,
@@ -23,13 +24,9 @@ public interface IQueryRepository<TEntity, TKey>
     where TEntity : IEntity<TKey>
     where TKey : notnull
 {
-    /// <summary>Per-operator / field-kind pushdown capabilities — the single source of truth for what
-    /// this adapter can translate (drives the split and capability self-reporting). A conformance test
-    /// enforces that the adapter can in fact translate everything it declares here.</summary>
-    FilterCapabilities FilterCapabilities { get; }
-
-    /// <summary>Execute a query whose filter is guaranteed pushable per <see cref="FilterCapabilities"/>;
-    /// report per-axis what was handled natively.</summary>
+    /// <summary>Execute a query whose filter is guaranteed pushable per the adapter's declared
+    /// <c>FilterSupport</c> (the detail on its <c>DataCaps.Query.Filter</c> token); report per-axis what
+    /// was handled natively.</summary>
     Task<RepositoryQueryResult<TEntity>> Query(QueryDefinition query, CancellationToken ct = default);
 
     /// <summary>Count matching entities for a guaranteed-pushable filter + count strategy (no materialization).</summary>

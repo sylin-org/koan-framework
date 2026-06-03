@@ -12,7 +12,7 @@ namespace Koan.Data.Connector.InMemory;
 /// <summary>
 /// In-memory repository with full LINQ-to-objects support and thread-safe operations.
 /// Reference "Full floor" adapter under the unified query contract (DATA-XXXX): it declares
-/// <see cref="FilterCapabilities.Full"/> and evaluates the entire <see cref="Filter"/> via
+/// <see cref="FilterSupport.Full"/> and evaluates the entire <see cref="Filter"/> via
 /// <see cref="InMemoryFilterEvaluator"/> — so the coordinator never produces a residual for it.
 /// Sort and pagination are handled natively (trivially, in memory). Supports partition isolation.
 /// </summary>
@@ -32,13 +32,11 @@ internal sealed class InMemoryRepository<TEntity, TKey> :
         _dataStore = dataStore;
     }
 
-    /// <summary>InMemory pushes every filter operator (it runs the AST directly in memory).</summary>
-    public FilterCapabilities FilterCapabilities => FilterCapabilities.Full;
-
     /// <summary>InMemory supports full LINQ-to-objects + atomic bulk writes.</summary>
     public void Describe(ICapabilities caps) => caps
         .Add(DataCaps.Query.Linq)
-        .Add(DataCaps.Write.BulkUpsert).Add(DataCaps.Write.BulkDelete).Add(DataCaps.Write.AtomicBatch);
+        .Add(DataCaps.Write.BulkUpsert).Add(DataCaps.Write.BulkDelete).Add(DataCaps.Write.AtomicBatch)
+        .Add(DataCaps.Query.Filter, FilterSupport.Full);
 
     private string CurrentPartition =>
         Koan.Data.Core.EntityContext.Current?.Partition ?? "default";

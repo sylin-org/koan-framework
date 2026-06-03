@@ -3,8 +3,8 @@ namespace Koan.Data.Abstractions.Filtering;
 /// <summary>
 /// The one structured capability detail in the framework (ARCH-0084): the operator set a provider
 /// can push down for filtering, attached to the <c>DataCaps.Query.Filter</c> / <c>VectorCaps.Filters</c>
-/// token. Generalizes both <see cref="FilterCapabilities"/> (entity path, scalar-vs-collection split)
-/// and <see cref="VectorFilterCapabilities"/> (vector path, schemaless single set via <see cref="Uniform"/>).
+/// token. Covers both the entity path (scalar-vs-collection split) and the vector path (schemaless
+/// single set via <see cref="Uniform"/>, where Scalar==Collection).
 /// An operator the provider cannot honour faithfully must be left out so negotiation fails loud.
 /// </summary>
 public sealed record FilterSupport(
@@ -36,19 +36,5 @@ public sealed record FilterSupport(
     {
         var set = new HashSet<FilterOperator>(operators);
         return new(set, set, nestedPaths, ignoreCase);
-    }
-
-    /// <summary>Bridge from the legacy entity record (migration scaffolding; retired in the delete stage).</summary>
-    public static FilterSupport From(FilterCapabilities caps)
-    {
-        ArgumentNullException.ThrowIfNull(caps);
-        return new(caps.ScalarOperators, caps.CollectionOperators, caps.NestedPaths, caps.IgnoreCase);
-    }
-
-    /// <summary>Bridge from the legacy vector record (migration scaffolding; retired in the delete stage).</summary>
-    public static FilterSupport From(VectorFilterCapabilities caps)
-    {
-        ArgumentNullException.ThrowIfNull(caps);
-        return new(caps.Operators, caps.Operators, caps.NestedPaths, caps.IgnoreCase);
     }
 }

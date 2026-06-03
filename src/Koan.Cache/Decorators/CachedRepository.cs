@@ -60,7 +60,6 @@ internal sealed class CachedRepository<TEntity, TKey> :
     public void Describe(ICapabilities caps)
         => DataCaps.Describe(_inner, _inner.GetType().Name).CopyInto(caps);
 
-    public FilterCapabilities FilterCapabilities => _query?.FilterCapabilities ?? FilterCapabilities.None;
 
     public async Task<TEntity?> Get(TKey id, CancellationToken ct = default)
     {

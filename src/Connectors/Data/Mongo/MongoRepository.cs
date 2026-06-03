@@ -68,11 +68,10 @@ internal sealed class MongoRepository<TEntity, TKey> :
     public void Describe(ICapabilities caps) => caps
         .Add(DataCaps.Query.Linq)
         .Add(DataCaps.Write.BulkUpsert).Add(DataCaps.Write.BulkDelete)
-        .Add(DataCaps.Write.AtomicBatch).Add(DataCaps.Write.FastRemove);
+        .Add(DataCaps.Write.AtomicBatch).Add(DataCaps.Write.FastRemove)
+        .Add(DataCaps.Query.Filter, MongoFilterTranslator<TEntity>.Capabilities);
     public StorageOptimizationInfo OptimizationInfo => _optimizationInfo;
 
-    /// <summary>Operators Mongo translates server-side; the coordinator routes the rest to the in-memory floor.</summary>
-    public FilterCapabilities FilterCapabilities => MongoFilterTranslator<TEntity>.Capabilities;
 
     private MongoFilterTranslator<TEntity> Translator => new(MapFieldName);
 
@@ -350,7 +349,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
             activity?.SetTag("entity", typeof(TEntity).FullName);
             var collection = await GetCollection(ct).ConfigureAwait(false);
 
-            // Filter is guaranteed pushable per FilterCapabilities (the coordinator already split it).
+            // Filter is guaranteed pushable per FilterSupport (the coordinator already split it).
             var filter = BuildFilter(query.Filter);
 
             // Sort pushdown: translate every spec; report exactly what we pushed.
