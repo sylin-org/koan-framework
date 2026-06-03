@@ -63,7 +63,11 @@ public sealed class DiagnosticHeaderSpec
         await using var server = await MediaTestServer.StartAsync();
         await server.Source.AddAsync("anim", Fixtures.AnimatedWebp(frames: 4));
 
-        var response = await server.Client.GetAsync("/media/anim");
+        // Modifier forces the pipeline path; diagnostic headers are a
+        // pipeline-output concept (FrameCount is the OUTPUT count), so
+        // they're only set when the pipeline runs. The bare URL is now
+        // a raw-byte passthrough and doesn't stamp these.
+        var response = await server.Client.GetAsync("/media/anim?w=80");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         response.Headers.GetValues(HttpHeaderNames.XKoanMediaFrameCount).Single()
             .Should().Be("4", "header must match output frame count for animated sources");
@@ -75,7 +79,7 @@ public sealed class DiagnosticHeaderSpec
         await using var server = await MediaTestServer.StartAsync();
         await server.Source.AddAsync("static", Fixtures.WideJpeg());
 
-        var response = await server.Client.GetAsync("/media/static");
+        var response = await server.Client.GetAsync("/media/static?w=200");
         response.Headers.GetValues(HttpHeaderNames.XKoanMediaFrameCount).Single().Should().Be("1");
     }
 
@@ -108,8 +112,11 @@ public sealed class DiagnosticHeaderSpec
         await using var server = await MediaTestServer.StartAsync();
         await server.Source.AddAsync("photo", Fixtures.WideJpeg(width: 100, height: 100));
 
-        // No format shortcut, no ?format= override → preserved.
-        var response = await server.Client.GetAsync("/media/photo");
+        // No format shortcut, no ?format= override → preserved. Use ?w=
+        // to push through the pipeline so the diagnostic headers (which
+        // are a pipeline-output concept) get stamped; bare URL is now a
+        // raw-byte passthrough with no header decoration.
+        var response = await server.Client.GetAsync("/media/photo?w=50");
         var sourceFmt = response.Headers.GetValues(HttpHeaderNames.XKoanMediaSourceFormat).Single();
         var outputFmt = response.Headers.GetValues(HttpHeaderNames.XKoanMediaOutputFormat).Single();
         sourceFmt.Should().Be(outputFmt);

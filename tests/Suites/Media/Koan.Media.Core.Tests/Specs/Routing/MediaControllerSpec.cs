@@ -46,6 +46,65 @@ public sealed class MediaControllerSpec
         response.Content.Headers.ContentType!.MediaType.Should().Be("image/png");
     }
 
+    /// <summary>
+    /// Bare <c>/media/{id}</c> with no recipe, no query modifiers, and no
+    /// AllowedOutputFormats negotiation surface MUST stream the source
+    /// bytes verbatim with their stored ContentType. The image pipeline
+    /// is bypassed entirely - the endpoint becomes content-addressable
+    /// raw byte serving when no transform is requested.
+    ///
+    /// <para>Regression for the gposingway video-as-source case: an
+    /// MP4 stored under an ArticleMedia hash was 422'ing on bare
+    /// <c>/media/{id}</c> because the controller always pushed bytes
+    /// through the image decoder, which rightly rejected MP4 magic.
+    /// The article's <c>&lt;video&gt;</c> tag then loaded nothing.</para>
+    /// </summary>
+    [Fact]
+    public async Task GetOriginal_streams_raw_bytes_with_stored_ContentType_for_non_image_source()
+    {
+        await using var server = await MediaTestServer.StartAsync();
+        // Synthesize "video bytes" - an MP4 magic header is enough to
+        // make ImageSharp reject them as not-an-image. The body is
+        // arbitrary; we only need round-trip fidelity, not playable
+        // video.
+        var fakeMp4 = new byte[] {
+            0x00, 0x00, 0x00, 0x20, (byte)'f', (byte)'t', (byte)'y', (byte)'p',
+            (byte)'i', (byte)'s', (byte)'o', (byte)'m',
+            0xDE, 0xAD, 0xBE, 0xEF,
+        };
+        await using var src = new MemoryStream(fakeMp4);
+        await server.Source.AddAsync("clip", src, contentType: "video/mp4");
+
+        var response = await server.Client.GetAsync("/media/clip");
+        response.StatusCode.Should().Be(HttpStatusCode.OK,
+            "non-image source must round-trip cleanly through the no-recipe path");
+        response.Content.Headers.ContentType!.MediaType.Should().Be("video/mp4",
+            "the stored ContentType must surface verbatim");
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        bytes.Should().Equal(fakeMp4, "raw bytes must be byte-identical to the source");
+    }
+
+    [Fact]
+    public async Task GetOriginal_with_query_modifier_runs_pipeline_even_when_unsuitable()
+    {
+        // ?w=200 is a modifier - it injects a ResizeStep onto the
+        // recipe, so the no-transform fast-path does NOT fire. The
+        // image pipeline then refuses to decode the non-image source
+        // and surfaces a typed 422. This is the contract: modifiers
+        // mean "transform", and the framework should not silently
+        // hand back raw bytes when a transform was requested.
+        await using var server = await MediaTestServer.StartAsync();
+        var fakeMp4 = new byte[] {
+            0x00, 0x00, 0x00, 0x20, (byte)'f', (byte)'t', (byte)'y', (byte)'p',
+            (byte)'i', (byte)'s', (byte)'o', (byte)'m',
+        };
+        await using var src = new MemoryStream(fakeMp4);
+        await server.Source.AddAsync("clip", src, contentType: "video/mp4");
+
+        var response = await server.Client.GetAsync("/media/clip?w=200");
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+    }
+
     [Fact]
     public async Task GetWithUnknownSeed_returns_404()
     {
@@ -143,7 +202,10 @@ public sealed class MediaControllerSpec
         // 2000x2000 = 4MP, exceeds 1MP cap
         await server.Source.AddAsync("huge", Fixtures.WideJpeg(width: 2000, height: 2000));
 
-        var response = await server.Client.GetAsync("/media/huge");
+        // Use ?w=500 to push the request through the pipeline; the
+        // no-transform fast path doesn't run the decoder so source limits
+        // (which guard decoder memory) don't fire there.
+        var response = await server.Client.GetAsync("/media/huge?w=500");
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         response.Headers.Should().Contain(h => h.Key == "X-Koan-Media-LimitExceeded");
         var limitHeader = response.Headers.GetValues("X-Koan-Media-LimitExceeded").Single();
@@ -159,9 +221,32 @@ public sealed class MediaControllerSpec
         });
         await server.Source.AddAsync("manyframes", Fixtures.AnimatedWebp(frames: 5));
 
-        var response = await server.Client.GetAsync("/media/manyframes");
+        // Modifier forces the pipeline path so the frame-count guard fires.
+        var response = await server.Client.GetAsync("/media/manyframes?w=50");
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         response.Headers.GetValues("X-Koan-Media-LimitExceeded").Single().Should().Be("maxFrameCount");
+    }
+
+    /// <summary>
+    /// The no-transform fast-path bypasses the decoder, so source-side
+    /// limits (which exist to guard decoder memory allocation) do NOT
+    /// fire on a bare <c>/media/{id}</c> URL. This is by design: when no
+    /// recipe and no modifiers are requested, the framework just streams
+    /// the bytes - there's no allocation to guard against. The cost is
+    /// bytes-on-the-wire, which is bounded by the source's stored size.
+    /// </summary>
+    [Fact]
+    public async Task Bare_URL_skips_source_limits_because_no_decode_happens()
+    {
+        await using var server = await MediaTestServer.StartAsync(settings: new()
+        {
+            [$"{Koan.Media.Web.Options.MediaWebOptions.SectionPath}:MaxSourceMegapixels"] = "1",
+        });
+        await server.Source.AddAsync("huge", Fixtures.WideJpeg(width: 2000, height: 2000));
+
+        var response = await server.Client.GetAsync("/media/huge");
+        response.StatusCode.Should().Be(HttpStatusCode.OK,
+            "bare URL streams raw bytes without decoder allocation, so source-limit guard doesn't apply");
     }
 
     [Fact]

@@ -89,7 +89,8 @@ public sealed record MediaSourceHandle(
     string Id,
     Stream Bytes,
     string ContentHashHex,
-    DateTimeOffset? LastModified) : IAsyncDisposable
+    DateTimeOffset? LastModified,
+    string ContentType = "application/octet-stream") : IAsyncDisposable
 {
     public ValueTask DisposeAsync() => Bytes.DisposeAsync();
 }

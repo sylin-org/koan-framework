@@ -181,6 +181,59 @@ public sealed class MediaController : ControllerBase
         {
             var effectiveRecipe = parseResult.Recipe;
 
+            // 4a) No-transform fast path. When the URL carries no recipe
+            // name, no mutator query params, and the parsed recipe has
+            // no AllowedOutputFormats negotiation surface, there is
+            // literally nothing for the pipeline to do - skip the
+            // decode-and-encode entirely and stream the source bytes
+            // verbatim with their stored ContentType. This is what
+            // makes `/media/{id}` work for non-image content
+            // (video, archives, ...) without the image pipeline
+            // throwing MediaDecodeException; a recipe URL still routes
+            // through the pipeline below and will surface a typed
+            // error for non-image sources requested through an
+            // image-transform recipe.
+            //
+            // "No transforms" here means: no AllowedOutputFormats
+            // negotiation surface AND the recipe's step list is either
+            // empty OR contains only the implicit format-preserving
+            // EncodeStep that MediaRecipeBuilder.Build() injects when
+            // the caller didn't declare one (EncodeStep with
+            // Format: null). Any other step (Resize from ?w=, Shape,
+            // Sample, etc.) means a real transform was requested.
+            //
+            // ETag keys raw responses under a "raw" suffix so a cached
+            // raw byte response can't poison a future recipe response
+            // at the same source id.
+            var hasOnlyImplicitEncode = effectiveRecipe.Steps.Length == 0
+                || (effectiveRecipe.Steps.Length == 1
+                    && effectiveRecipe.Steps[0] is EncodeStep es
+                    && es.Format is null);
+            if (hasOnlyImplicitEncode
+                && effectiveRecipe.AllowedOutputFormats.IsDefaultOrEmpty)
+            {
+                var rawEtag = BuildETag(handle.ContentHashHex, "raw");
+                if (Request.Headers.TryGetValue(HttpHeaderNames.IfNoneMatch, out var rawIfNone)
+                    && rawIfNone.ToString().Contains(rawEtag, StringComparison.Ordinal))
+                {
+                    Response.Headers[HeaderNames.ETag] = rawEtag;
+                    Response.Headers[HttpHeaderNames.CacheControl] = _options.DefaultCacheControl;
+                    return StatusCode(StatusCodes.Status304NotModified);
+                }
+                Response.Headers[HeaderNames.ETag] = rawEtag;
+                Response.Headers[HttpHeaderNames.CacheControl] = _options.DefaultCacheControl;
+                if (handle.LastModified is { } lm)
+                {
+                    Response.Headers[HeaderNames.LastModified] = lm.ToString("R");
+                }
+                Response.ContentType = handle.ContentType;
+                // Stream directly to Response.Body so the outer finally's
+                // handle.DisposeAsync() doesn't race with FileStreamResult
+                // reading the stream after the action returns.
+                await handle.Bytes.CopyToAsync(Response.Body, ct).ConfigureAwait(false);
+                return new EmptyResult();
+            }
+
             // Per MEDIA-0009 §d/e: when the recipe declares an
             // AllowedOutputFormats allowlist and the seed wasn't a
             // format-shortcut URL, negotiate the output format from the
