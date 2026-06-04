@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Reflection;
 
 namespace Koan.Data.Abstractions.Filtering;
@@ -15,12 +16,30 @@ public static class FieldPathResolver
 {
     private const BindingFlags Flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase;
 
+    // Resolution is a pure function of (rootType, path) and reflection-bound, so it is memoized: every
+    // pushed filter AND sort spec resolves its field on the (hot) per-query translation path, and the
+    // reflective member walk is otherwise repeated for the same handful of (type, path) pairs forever.
+    // FieldPath itself is not value-equal (its Segments list compares by reference), so the key is the
+    // joined path string — allocation-free for the common single-segment case. Only successful resolutions
+    // are cached; an unresolvable path keeps throwing (the strict contract callers depend on).
+    private static readonly ConcurrentDictionary<(Type Root, string Path), ResolvedField> _cache = new();
+
     public static ResolvedField Resolve(Type rootType, FieldPath path)
     {
         if (rootType is null) throw new ArgumentNullException(nameof(rootType));
         if (path is null || path.Segments.Count == 0)
             throw new InvalidFilterFieldException(path?.ToString() ?? string.Empty, rootType!, string.Empty, "Field path is empty.");
 
+        var key = (rootType, path.Segments.Count == 1 ? path.Segments[0] : string.Join('.', path.Segments));
+        if (_cache.TryGetValue(key, out var cached)) return cached;
+
+        var resolved = ResolveCore(rootType, path);
+        _cache[key] = resolved;
+        return resolved;
+    }
+
+    private static ResolvedField ResolveCore(Type rootType, FieldPath path)
+    {
         var members = new MemberInfo[path.Segments.Count];
         var currentType = rootType;
 

@@ -48,17 +48,18 @@ public static class ComparableScalarEncoding
         _ => value,
     };
 
-    /// <summary>The converters relational adapters add to their JSON settings so stored values match the
-    /// comparand encoding above. Each handles BOTH the value type and its <see cref="Nullable{T}"/> form —
-    /// a <see cref="JsonConverter{T}"/> for a value type is NOT applied to <c>T?</c> members by Newtonsoft,
-    /// which would silently leave nullable fields on the default (non-comparable) encoding.</summary>
-    public static JsonConverter[] JsonConverters() => new JsonConverter[]
-    {
-        new DateTimeOffsetUtcConverter(),
-        new TimeSpanTicksConverter(),
-        new DateOnlyTextConverter(),
-        new TimeOnlyTextConverter(),
-    };
+    // The converters are stateless and thread-safe, so they are shared singletons — re-allocating them on
+    // every settings build would be per-repository-instance waste on the (hot) serialization path. Each
+    // handles BOTH the value type and its Nullable<T> form: a JsonConverter<T> for a value type is NOT
+    // applied to T? members by Newtonsoft, which would silently leave nullable fields on the default
+    // (non-comparable) encoding.
+    private static readonly JsonConverter _dateTimeOffset = new DateTimeOffsetUtcConverter();
+    private static readonly JsonConverter _timeSpan = new TimeSpanTicksConverter();
+    private static readonly JsonConverter _dateOnly = new DateOnlyTextConverter();
+    private static readonly JsonConverter _timeOnly = new TimeOnlyTextConverter();
+
+    /// <summary>The shared canonical converters relational adapters add to their JSON settings.</summary>
+    public static JsonConverter[] JsonConverters() => new[] { _dateTimeOffset, _timeSpan, _dateOnly, _timeOnly };
 
     /// <summary>Registers the canonical converters onto an adapter's <see cref="JsonSerializerSettings"/>
     /// (used for both serialize and deserialize), leaving the naming strategy and other settings intact.</summary>
@@ -70,7 +71,10 @@ public static class ComparableScalarEncoding
         // members whose value merely looks like a date. With None, our converters receive raw string/number
         // tokens and own all temporal parsing.
         settings.DateParseHandling = DateParseHandling.None;
-        foreach (var c in JsonConverters()) settings.Converters.Add(c);
+        settings.Converters.Add(_dateTimeOffset);
+        settings.Converters.Add(_timeSpan);
+        settings.Converters.Add(_dateOnly);
+        settings.Converters.Add(_timeOnly);
         return settings;
     }
 
