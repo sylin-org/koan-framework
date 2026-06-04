@@ -300,8 +300,11 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         if (whereSql is not null) sb.Append(" WHERE ").Append(whereSql);
         sb.Append(' ').Append(orderBy);
 
+        // Only push pagination when the sort was fully pushed down; otherwise the coordinator must finish the
+        // sort in memory first, which requires the full matching set (paginating here would window the wrong rows).
+        var sortFullyHandled = query.Sort is null || query.Sort.Count == 0 || sortHandled.Count == query.Sort.Count;
         var paginationHandled = false;
-        if (query.HasPagination)
+        if (query.HasPagination && sortFullyHandled)
         {
             var size = query.EffectivePageSize();
             var offset = (query.EffectivePage() - 1) * size;
@@ -415,14 +418,25 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
             return (OrderByIdClause, RepositoryQueryResult<TEntity>.NoSortHandled);
 
         var parts = new List<string>(sort.Count);
+        var handled = new List<SortSpec>(sort.Count);
         foreach (var spec in sort)
         {
-            var leaf = spec.Path.Members[spec.Path.Members.Count - 1].Name;
+            // Only a single-member (top-level scalar) path pushes down via JSON_VALUE. Deep / collection
+            // paths (e.g. an aggregate over a nested array like "Sightings.LastChangedAt") are left
+            // UNHANDLED so the coordinator finishes them with the in-memory sorter — a leaf-only JSON_VALUE
+            // would sort by the wrong (top-level, usually NULL) value while falsely claiming the sort applied.
+            if (spec.Path.Members.Count != 1)
+                continue;
+            var leaf = spec.Path.Members[0].Name;
             var col = ResolveColumnSql(FieldPath.Of(leaf), default!);
             parts.Add($"{col} {(spec.Desc ? "DESC" : "ASC")}");
+            handled.Add(spec);
         }
+
+        if (parts.Count == 0)
+            return (OrderByIdClause, RepositoryQueryResult<TEntity>.NoSortHandled);
         var orderBy = "ORDER BY " + string.Join(", ", parts);
-        return (orderBy, sort.ToFrozenSet());
+        return (orderBy, handled.ToFrozenSet());
     }
 
     private static DynamicParameters ToDapper(IReadOnlyList<object?> parameters)
