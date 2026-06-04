@@ -81,9 +81,10 @@ public static class EntityContext
 
             if (!PartitionNameValidator.IsValid(Partition))
                 throw new ArgumentException(
-                    $"Invalid partition name '{Partition}'. " +
-                    $"Must start with letter, contain only alphanumeric characters, '-' or '.', " +
-                    $"and not end with '.' or '-'.",
+                    $"Invalid partition name '{Partition}'. A partition name must be a GUID, or contain only " +
+                    $"letters, digits, '-', '.', or '_', so that distinct partitions cannot collide after " +
+                    $"identifier sanitization (which maps every other character to '_'). Re-encode names that " +
+                    $"contain spaces, '/', '$', or similar before using them as a partition.",
                     nameof(Partition));
         }
     }
@@ -145,9 +146,10 @@ public static class EntityContext
         var effectiveCacheBehavior = cacheBehavior ?? prev?.CacheBehavior;
 
         var newContext = new ContextState(effectiveSource, effectiveAdapter, effectivePartition, effectiveTransaction, effectiveCacheBehavior);
-        // Note: Partition name validation is deferred to adapters, which format partition identifiers
-        // (e.g., SQLite may normalize GUID "019a..." to an adapter-specific value)
-        // newContext.ValidatePartitionName();
+        // Fail fast on partition names that would NOT survive identifier sanitization unchanged — their lossy
+        // character replacement could collide a distinct partition onto the same physical store (data bleed).
+        // GUIDs and already-identifier-safe names pass; see PartitionNameValidator.
+        newContext.ValidatePartitionName();
 
         ITransactionCoordinator? coordinatorForScope = null;
         var activeCoordinator = preserveTransaction ? prev?.TransactionCoordinator : null;
