@@ -252,6 +252,48 @@ public abstract class AdapterPartitionSpecsBase<TFactory> : IClassFixture<TFacto
     }
 
     // ============================================================================================
+    // Concurrent cross-partition isolation (regression guard for the Mongo shared-mutable-state race)
+    // ============================================================================================
+
+    /// <summary>
+    /// Interleaved concurrent writes across partitions must each land in their own partition's store.
+    /// Every request shares the process-wide singleton repository; an adapter that caches partition-specific
+    /// state in a mutable instance field (as Mongo did) misroutes writes here. The sequential isolation specs
+    /// above cannot catch it because they never interleave two partitions in flight.
+    /// </summary>
+    [SkippableFact]
+    public async Task Concurrent_writes_across_partitions_remain_isolated()
+    {
+        SkipIfPartitionsUnsupported();
+        SkipIfUnavailable();
+
+        const int perPartition = 25;
+        var partitions = KnownPartitions;
+
+        var posts = new List<Task>();
+        foreach (var partition in partitions)
+        {
+            for (var i = 0; i < perPartition; i++)
+            {
+                posts.Add(PostWidget($"{partition}-{i:D3}", name: partition, set: partition));
+            }
+        }
+        await Task.WhenAll(posts);
+
+        foreach (var partition in partitions)
+        {
+            var rows = await ReadItems(await Client.GetAsync($"/api/widgets?set={partition}"));
+            rows.Should().OnlyContain(
+                e => IdOf(e)!.StartsWith(partition + "-", StringComparison.Ordinal),
+                $"partition '{partition}' must not contain rows written under a different partition");
+            rows.Should().HaveCount(perPartition,
+                $"partition '{partition}' should hold exactly its {perPartition} concurrent writes");
+        }
+
+        (await ReadItems(await Client.GetAsync("/api/widgets"))).Should().BeEmpty("the default set received no writes");
+    }
+
+    // ============================================================================================
     // Helpers
     // ============================================================================================
 
