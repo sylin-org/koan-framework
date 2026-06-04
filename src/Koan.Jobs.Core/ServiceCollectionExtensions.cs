@@ -29,6 +29,7 @@ public static class ServiceCollectionExtensions
 
         services.AddHostedService<JobWorkerService>();
         services.AddHostedService<JobRecoveryService>();
+        services.AddHostedService<JobOrphanReaper>();
         services.AddHostedService<JobArchivalService>();
         return services;
     }

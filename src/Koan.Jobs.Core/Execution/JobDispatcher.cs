@@ -3,12 +3,14 @@ using System.Threading;
 using System.Threading.Tasks;
 using Koan.Jobs.Events;
 using Koan.Jobs.Model;
+using Koan.Jobs.Options;
 using Koan.Jobs.Progress;
 using Koan.Jobs.Queue;
 using Koan.Jobs.RateGating;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace Koan.Jobs.Execution;
 
@@ -16,8 +18,10 @@ namespace Koan.Jobs.Execution;
 /// Runs one dispatch of a typed job (JOBS-0003). Generic on the concrete type, so it reads and
 /// mutates the job's typed payload and shared runtime fields directly (no discriminator, no
 /// reflection past the type-resolution the worker already did). Honours cancellation, the host rate
-/// gate, typed WaitFor dependencies, the concurrency-lane permit (around the body only), and the
-/// per-type retry policy. Deferrals re-enqueue with a future visible-at (JOBS-0002), never sleeping.
+/// gate, typed WaitFor dependencies, the concurrency-lane permit (around load + body), the
+/// per-type retry policy, and stamps a refreshable lease so a dead worker's Running rows are
+/// recoverable by <c>JobOrphanReaper</c>. Deferrals re-enqueue with a future visible-at (JOBS-0002),
+/// never sleeping.
 /// </summary>
 internal static class JobDispatcher<T> where T : Job<T>, new()
 {
@@ -30,9 +34,37 @@ internal static class JobDispatcher<T> where T : Job<T>, new()
         var events = services.GetRequiredService<IJobEventPublisher>();
         var cancellations = services.GetRequiredService<JobCancellations>();
         var registry = services.GetRequiredService<JobTypeRegistry>();
+        var options = services.GetRequiredService<IOptions<JobsOptions>>().Value;
         var logger = services.GetService<ILoggerFactory>()?.CreateLogger("Koan.Jobs.Dispatcher")
             ?? (ILogger)NullLogger.Instance;
 
+        // Lane gate FIRST (JOBS Option B): per fanout-task we must NOT open a Mongo connection or
+        // round-trip Job<T>.Get before the lane semaphore throttles concurrency. The queue item's
+        // Lane was stamped from job.LaneNameInternal at enqueue, so gating on it here is consistent
+        // with the per-type lane choice. The partition tier (JOBS-0004) still requires the loaded
+        // job, so we acquire only the lane-global permit here and let the partition permit be
+        // taken inside, after the load — that's a fast in-memory operation against the lane that
+        // already holds us. The lane permit is held for the entire dispatch: load + deferral
+        // checks + body. Deferrals release it immediately on the using-scope exit.
+        using (await lanes.AcquireAsync(item.Lane, cancellationToken))
+        {
+            await RunGated(item, queue, rateGate, lanes, broker, events, cancellations, registry, options, logger, cancellationToken);
+        }
+    }
+
+    private static async Task RunGated(
+        JobQueueItem item,
+        IJobQueue queue,
+        IHostRateGate rateGate,
+        JobLaneRegistry lanes,
+        JobProgressBroker broker,
+        IJobEventPublisher events,
+        JobCancellations cancellations,
+        JobTypeRegistry registry,
+        JobsOptions options,
+        ILogger logger,
+        CancellationToken cancellationToken)
+    {
         var job = await Job<T>.Get(item.JobId, cancellationToken);
         if (job is null)
         {
@@ -87,17 +119,33 @@ internal static class JobDispatcher<T> where T : Job<T>, new()
         job.StartedAt ??= DateTimeOffset.UtcNow;
         job.LastError = null;
         job.ProgressMessage = null;
+        job.LeasedUntil = DateTimeOffset.UtcNow.Add(options.LeaseDuration);
         await job.SaveSelf(cancellationToken);
         await events.PublishStarted(job, cancellationToken);
 
         var tracker = new JobProgressTracker<T>(job, broker, cancellations, cancellationToken);
         JobExecutionOutcome outcome;
-        // Lane permit wraps ONLY the job body (JOBS-0002), so deferrals never hold it. The optional
-        // per-partition tier (JOBS-0004) is taken from the rehydrated job, so it survives re-enqueues
-        // without being threaded through the queue item.
+        // Acquire the optional per-partition tier on top of the lane permit we already hold. The
+        // partition gate is taken from the rehydrated job and survives re-enqueues without being
+        // threaded through the queue item.
         using (await lanes.AcquireAsync(item.Lane ?? job.LaneNameInternal, job.LanePartitionInternal, cancellationToken))
         {
-            outcome = await Invoke(job, tracker, cancellationToken);
+            // Heartbeat refreshes LeasedUntil for the lifetime of the body so a stalled worker's
+            // row is reaped, but a long-running healthy job is not. Cancelled deterministically when
+            // the body completes (success, fault, or cancellation).
+            using var heartbeatCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var heartbeat = StartHeartbeat(job, options, logger, heartbeatCts.Token);
+            try
+            {
+                outcome = await Invoke(job, tracker, cancellationToken);
+            }
+            finally
+            {
+                heartbeatCts.Cancel();
+                try { await heartbeat; }
+                catch (OperationCanceledException) { /* expected on stop */ }
+                catch (Exception ex) { logger.LogDebug(ex, "Heartbeat task ended with an unexpected error for {JobId}.", job.Id); }
+            }
         }
         await tracker.Flush(cancellationToken);
 
@@ -139,6 +187,7 @@ internal static class JobDispatcher<T> where T : Job<T>, new()
         var retryAt = DateTimeOffset.UtcNow.Add(delay);
         job.Status = JobStatus.Queued;
         job.QueuedAt = retryAt;
+        job.LeasedUntil = null;
         await job.SaveSelf(cancellationToken);
         await events.PublishFailed(job, job.LastError, cancellationToken);
         await queue.Enqueue(new JobQueueItem(job.Id, typeof(T), item.Lane), retryAt, cancellationToken);
@@ -168,6 +217,7 @@ internal static class JobDispatcher<T> where T : Job<T>, new()
         job.Status = status;
         job.CompletedAt = DateTimeOffset.UtcNow;
         job.Duration = job.CompletedAt - job.CreatedAt;
+        job.LeasedUntil = null;
         if (error != null) job.LastError = error;
         await job.SaveSelf(cancellationToken);
         switch (status)
@@ -177,6 +227,39 @@ internal static class JobDispatcher<T> where T : Job<T>, new()
             case JobStatus.Cancelled: await events.PublishCancelled(job, cancellationToken); break;
         }
         cancellations.Clear(job.Id);
+    }
+
+    /// <summary>Refresh <see cref="Job{T}.LeasedUntil"/> at a fixed cadence so the reaper does not
+    /// treat a healthy long-running job as orphaned. Stops on cancellation; per-tick failures are
+    /// logged at Debug and tolerated — the worst case is a single missed refresh which gets caught
+    /// up on the next tick well before LeaseDuration elapses.</summary>
+    private static async Task StartHeartbeat(Job<T> job, JobsOptions options, ILogger logger, CancellationToken cancellationToken)
+    {
+        var interval = options.LeaseHeartbeatInterval > TimeSpan.Zero ? options.LeaseHeartbeatInterval : TimeSpan.FromSeconds(30);
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(interval, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            try
+            {
+                job.LeasedUntil = DateTimeOffset.UtcNow.Add(options.LeaseDuration);
+                await job.SaveSelf(cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception ex)
+            {
+                logger.LogDebug(ex, "Heartbeat refresh failed for {JobId}; will retry next tick.", job.Id);
+            }
+        }
     }
 
     private enum DependencyOutcome { Ready, Blocked, Poisoned }

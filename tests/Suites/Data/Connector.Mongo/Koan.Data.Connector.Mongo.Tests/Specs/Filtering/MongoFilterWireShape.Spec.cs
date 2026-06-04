@@ -32,6 +32,7 @@ public sealed class MongoFilterWireShapeSpec
         [Parent(typeof(Pkg))] public string? PackageId { get; set; }
         public Status Status { get; set; }
         public string Note { get; set; } = "";
+        public DateTimeOffset? LeasedUntil { get; set; }
     }
 
     static MongoFilterWireShapeSpec()
@@ -90,5 +91,23 @@ public sealed class MongoFilterWireShapeSpec
 
         doc["Note"].BsonType.Should().Be(BsonType.String);                 // no over-reach
         doc["Note"].AsString.Should().Be(guidShaped);
+    }
+
+    [Fact]
+    public void Nullable_DateTimeOffset_filter_routes_through_field_serializer()
+    {
+        // Regression: a DateTimeOffset filter against a DateTimeOffset? field used to throw
+        // ArgumentException "System.DateTimeOffset cannot be mapped to a BsonValue" because the
+        // field serializer's nominal type was Nullable<DateTimeOffset> and IsInstanceOfType
+        // returns false for a plain DateTimeOffset value, so Encode fell through to
+        // BsonValue.Create which has no native DateTimeOffset mapping. Surfaced via the
+        // Koan.Jobs JobOrphanReaper query (Status == Running && LeasedUntil < now).
+        var now = DateTimeOffset.UtcNow;
+
+        var doc = Translate(s => s.LeasedUntil < now);
+
+        var probe = doc["LeasedUntil"];
+        probe.BsonType.Should().Be(BsonType.Document);                     // $lt operator wraps the value
+        probe.AsBsonDocument.Contains("$lt").Should().BeTrue();
     }
 }

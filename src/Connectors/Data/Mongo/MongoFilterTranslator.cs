@@ -201,13 +201,24 @@ internal sealed class MongoFilterTranslator<TEntity>
     /// Encode a comparison value to BSON through the field's own <paramref name="serializer"/>, so the
     /// comparand matches the stored form for every configured type. Falls back to a verbatim value when
     /// no serializer applies or the value's CLR type doesn't match the serializer's value type.
+    ///
+    /// <para>Nullable handling: when the field is e.g. <c>DateTimeOffset?</c> and the filter value is a
+    /// plain <c>DateTimeOffset</c>, <see cref="Type.IsInstanceOfType"/> returns false because
+    /// <c>typeof(DateTimeOffset?).IsAssignableFrom(typeof(DateTimeOffset))</c> is false (nullable
+    /// assignment rules). Unwrap the nullable for the check so the field's own serializer handles the
+    /// value instead of falling through to <see cref="BsonValue.Create"/> — which throws on
+    /// <c>DateTimeOffset</c> because <see cref="BsonTypeMapper"/> has no built-in mapping for it.</para>
     /// </summary>
     private static BsonValue Encode(object? value, IBsonSerializer? serializer)
     {
         if (value is null) return BsonNull.Value;
-        if (serializer is not null && serializer.ValueType.IsInstanceOfType(value))
+        if (serializer is not null)
         {
-            return SerializeToBsonValue(serializer, value);
+            var serializerValueType = Nullable.GetUnderlyingType(serializer.ValueType) ?? serializer.ValueType;
+            if (serializerValueType.IsInstanceOfType(value))
+            {
+                return SerializeToBsonValue(serializer, value);
+            }
         }
         return value as BsonValue ?? BsonValue.Create(value);
     }

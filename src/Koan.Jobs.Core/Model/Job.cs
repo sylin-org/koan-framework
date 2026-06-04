@@ -43,6 +43,14 @@ public abstract class Job<T> : Entity<T>, IKoanJob<T>
     public DateTimeOffset? CompletedAt { get; set; }
     public TimeSpan? Duration { get; set; }
 
+    /// <summary>Lease expiry stamped by the dispatcher when the job flips to <see cref="JobStatus.Running"/>
+    /// and refreshed by an in-process heartbeat for the lifetime of the body. A non-terminal Running row
+    /// whose lease has lapsed is treated as an orphan by <c>JobOrphanReaper</c> and reverted to
+    /// <see cref="JobStatus.Queued"/> for re-dispatch. Null means "not currently leased" (the row is
+    /// either pre-Running or already terminal).</summary>
+    [Index]
+    public DateTimeOffset? LeasedUntil { get; set; }
+
     [Index]
     [MaxLength(64)]
     public string? CorrelationId { get; set; }

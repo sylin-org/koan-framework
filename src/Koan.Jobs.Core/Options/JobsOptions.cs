@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text.Json;
 using Koan.Jobs.Archival;
+using Koan.Jobs.Model;
 
 namespace Koan.Jobs.Options;
 
@@ -22,6 +23,20 @@ public sealed class JobsOptions
 
     /// <summary>Concurrency cap for the default lane and any lane not listed in <see cref="Lanes"/>.</summary>
     public int DefaultLaneConcurrency { get; set; } = Environment.ProcessorCount;
+
+    /// <summary>Lifetime of the lease stamped on a job when it flips to <see cref="Model.JobStatus.Running"/>
+    /// (JOBS orphan recovery). The lease is refreshed by an in-process heartbeat for the duration of the
+    /// body; if the worker dies, the row's lease lapses and <c>JobOrphanReaper</c> reverts it to
+    /// <see cref="Model.JobStatus.Queued"/>. Must comfortably exceed <see cref="LeaseHeartbeatInterval"/>.</summary>
+    public TimeSpan LeaseDuration { get; set; } = TimeSpan.FromMinutes(2);
+
+    /// <summary>How often the dispatcher refreshes the running job's <c>LeasedUntil</c> stamp. Should be
+    /// well under <see cref="LeaseDuration"/> so the lease never lapses while the worker is alive.</summary>
+    public TimeSpan LeaseHeartbeatInterval { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>How often <c>JobOrphanReaper</c> wakes to scan for non-terminal Running jobs whose lease
+    /// has lapsed and revert them to <see cref="Model.JobStatus.Queued"/> for re-dispatch.</summary>
+    public TimeSpan ReaperInterval { get; set; } = TimeSpan.FromSeconds(30);
 }
 
 /// <summary>Per-lane settings (see <see cref="JobsOptions.Lanes"/>).</summary>
