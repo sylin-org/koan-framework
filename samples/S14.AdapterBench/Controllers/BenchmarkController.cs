@@ -1,3 +1,4 @@
+using Koan.Jobs;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using S14.AdapterBench.Hubs;
@@ -32,14 +33,16 @@ public class BenchmarkController : ControllerBase
         [FromBody] BenchmarkRequest request,
         CancellationToken cancellationToken)
     {
-        // Start benchmark as a background job (in-memory, ephemeral). The request payload rides on
-        // the job's Context (JOBS-0003 CRTP model); Submit persists + enqueues it.
-        var job = await new BenchmarkJob { Context = request }.Submit(cancellationToken);
+        // Start benchmark as a background job (in-memory, ephemeral). The request payload rides on the
+        // work-item's Context (JOBS-0005 entity-first model); Submit persists + enqueues it.
+        var work = new BenchmarkJob { Context = request };
+        await work.Job.Submit("", cancellationToken);
+        var status = await work.Job.Status(cancellationToken);
 
         return Ok(new BenchmarkJobResponse
         {
-            JobId = job.Id,
-            Status = job.Status.ToString(),
+            JobId = work.Id,
+            Status = (status ?? JobStatus.Queued).ToString(),
             Message = "Benchmark job started. Use GET /api/benchmark/status/{jobId} to check progress."
         });
     }
@@ -53,26 +56,29 @@ public class BenchmarkController : ControllerBase
         string jobId,
         CancellationToken cancellationToken)
     {
-        // Create a temporary job instance to call Refresh
-        var tempJob = new BenchmarkJob { Id = jobId };
-        var job = await tempJob.Refresh(cancellationToken);
-
-        if (job == null)
+        // Load the work-item (carries Result) and its latest ledger entry (carries lifecycle/progress).
+        var work = await BenchmarkJob.Get(jobId, cancellationToken);
+        if (work == null)
         {
             return NotFound(new { Message = $"Benchmark job {jobId} not found" });
         }
 
+        var records = await BenchmarkJob.Jobs.Query(new JobQuery(WorkId: jobId), cancellationToken);
+        var rec = records.OrderByDescending(r => r.FirstSubmittedAt).FirstOrDefault();
+        var startedAt = rec?.Transitions.FirstOrDefault(t => t.To == JobStatus.Running)?.At;
+        var completedAt = rec is { IsTerminal: true } ? rec.LastSettledAt : null;
+
         var response = new BenchmarkJobStatusResponse
         {
-            JobId = job.Id,
-            Status = job.Status.ToString(),
-            Progress = job.Progress,
-            ProgressMessage = job.ProgressMessage,
-            StartedAt = job.StartedAt,
-            CompletedAt = job.CompletedAt,
-            Duration = job.Duration,
-            Result = job.Result,
-            Error = job.LastError
+            JobId = jobId,
+            Status = (rec?.Status ?? JobStatus.Queued).ToString(),
+            Progress = rec?.ProgressFraction ?? 0,
+            ProgressMessage = rec?.ProgressMessage,
+            StartedAt = startedAt,
+            CompletedAt = completedAt,
+            Duration = startedAt.HasValue && completedAt.HasValue ? completedAt - startedAt : null,
+            Result = work.Result,
+            Error = rec?.LastError
         };
 
         return Ok(response);
@@ -86,8 +92,7 @@ public class BenchmarkController : ControllerBase
         string jobId,
         CancellationToken cancellationToken)
     {
-        var tempJob = new BenchmarkJob { Id = jobId };
-        await tempJob.Cancel(cancellationToken);
+        await BenchmarkJob.Jobs.Cancel(jobId, cancellationToken);
         return Ok(new { Message = $"Benchmark job {jobId} cancellation requested" });
     }
 

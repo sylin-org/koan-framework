@@ -54,7 +54,7 @@
     <ProjectReference Include="..\..\..\..\..\src\Koan.Media.Core\Koan.Media.Core.csproj" />
 
     <!-- Jobs pillar (JobsPillarBootstrapSpec) -->
-    <ProjectReference Include="..\..\..\..\..\src\Koan.Jobs.Core\Koan.Jobs.Core.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Jobs\Koan.Jobs.csproj" />
 
     <!-- Rag pillar (RagPillarBootstrapSpec) -->
     <ProjectReference Include="..\..\..\..\..\src\Koan.Rag\Koan.Rag.csproj" />

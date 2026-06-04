@@ -1,8 +1,8 @@
-using Koan.Core.Hosting.App;
-using Koan.Jobs.Model;
-using Koan.Jobs.Progress;
+using Koan.Data.Core.Model;
+using Koan.Jobs;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using S14.AdapterBench.Hubs;
 using S14.AdapterBench.Models;
 using S14.AdapterBench.Services;
@@ -10,33 +10,29 @@ using S14.AdapterBench.Services;
 namespace S14.AdapterBench.Jobs;
 
 /// <summary>
-/// Background job for running benchmarks asynchronously (JOBS-0003 CRTP model): the request payload
-/// lives on <see cref="Context"/>, the outcome on <see cref="Result"/>, and the work runs in
-/// <see cref="Do"/>. Runs in-memory by default (ephemeral).
+/// Background benchmark run (JOBS-0005 entity-first model): the request rides on <see cref="Context"/>, the outcome
+/// on <see cref="Result"/>, and the work runs in the static <see cref="Execute"/> handler. Ephemeral (in-memory tier).
 /// </summary>
-public class BenchmarkJob : Job<BenchmarkJob>
+public sealed class BenchmarkJob : Entity<BenchmarkJob>, IKoanJob<BenchmarkJob>
 {
     /// <summary>The benchmark request payload (set at submit time).</summary>
     public BenchmarkRequest Context { get; set; } = new();
 
-    /// <summary>The benchmark outcome (written when the job completes).</summary>
+    /// <summary>The benchmark outcome (written when the job completes; persisted as work-item state).</summary>
     public BenchmarkResult? Result { get; set; }
 
-    protected override async Task Do(IJobProgress progress, CancellationToken cancellationToken)
+    public static async Task Execute(BenchmarkJob job, JobContext ctx, CancellationToken ct)
     {
-        // The Jobs runtime no longer injects a ServiceProvider; resolve services from the ambient host.
-        var services = AppHost.Current;
-        var hubContext = services?.GetService<IHubContext<BenchmarkHub>>();
-        var logger = services?.GetService<ILogger<BenchmarkService>>();
-
+        var hubContext = ctx.Services.GetService<IHubContext<BenchmarkHub>>();
+        var logger = ctx.Services.GetService<ILogger<BenchmarkService>>();
         var benchmarkService = new BenchmarkService(logger);
 
-        // Forward benchmark progress to both the Job framework and SignalR for UI visualization.
+        // Forward benchmark progress to both the durable ledger (ctx.Progress) and SignalR for UI visualization.
         var benchmarkProgress = new Progress<BenchmarkProgress>(p =>
         {
-            var progressValue = p.TotalTests > 0 ? (double)p.CompletedTests / p.TotalTests : 0.0;
+            var value = p.TotalTests > 0 ? (double)p.CompletedTests / p.TotalTests : 0.0;
             var message = $"{p.CurrentProvider} - {p.CurrentTest}: {p.CurrentOperationCount}/{p.TotalOperations} ({p.CurrentOperationsPerSecond:F0} ops/sec)";
-            progress.Report(progressValue, message);
+            _ = ctx.Progress(value, message);
 
             if (hubContext != null && p.ProviderProgress is { Count: > 0 })
             {
@@ -53,6 +49,6 @@ public class BenchmarkJob : Job<BenchmarkJob>
             }
         });
 
-        Result = await benchmarkService.RunBenchmark(Context, benchmarkProgress, cancellationToken);
+        job.Result = await benchmarkService.RunBenchmark(job.Context, benchmarkProgress, ct);
     }
 }
