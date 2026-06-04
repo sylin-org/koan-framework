@@ -110,4 +110,32 @@ public sealed class MongoFilterWireShapeSpec
         probe.BsonType.Should().Be(BsonType.Document);                     // $lt operator wraps the value
         probe.AsBsonDocument.Contains("$lt").Should().BeTrue();
     }
+
+    // A standalone non-Sighting class with NO pre-registered class map: simulates the prod scenario
+    // where MongoOptimizationAutoRegistrar skipped registration (e.g. no GUID-encoded identity members,
+    // so `members.Count == 0 → continue`) and ResolveScalarSerializer returns null at translate time.
+    // With the old BsonValue.Create fallback this throws on DateTimeOffset; with the registry fallback
+    // it routes through BsonSerializer.LookupSerializer(typeof(DateTimeOffset)) and produces valid BSON.
+    private sealed class UnregisteredLeaseProbe : Entity<UnregisteredLeaseProbe>
+    {
+        public DateTimeOffset? LeasedUntil { get; set; }
+    }
+
+    [Fact]
+    public void DateTimeOffset_filter_survives_missing_field_serializer_via_registry_fallback()
+    {
+        // No BsonClassMap.RegisterClassMap<UnregisteredLeaseProbe>() in the static ctor: this class
+        // map is never pre-registered. ResolveScalarSerializer can return null here; Encode must not
+        // fall through to BsonValue.Create (which throws on DateTimeOffset).
+        var now = DateTimeOffset.UtcNow;
+        var translator = new MongoFilterTranslator<UnregisteredLeaseProbe>(n => n);
+        var compiled = LinqFilterCompiler.Compile<UnregisteredLeaseProbe>(p => p.LeasedUntil < now);
+
+        var filter = translator.Translate(compiled, typeof(UnregisteredLeaseProbe));
+
+        var registry = BsonSerializer.SerializerRegistry;
+        var doc = filter.Render(new RenderArgs<UnregisteredLeaseProbe>(registry.GetSerializer<UnregisteredLeaseProbe>(), registry));
+        doc["LeasedUntil"].BsonType.Should().Be(BsonType.Document);
+        doc["LeasedUntil"].AsBsonDocument.Contains("$lt").Should().BeTrue();
+    }
 }

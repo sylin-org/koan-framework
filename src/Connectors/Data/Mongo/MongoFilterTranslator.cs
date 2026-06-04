@@ -174,9 +174,13 @@ internal sealed class MongoFilterTranslator<TEntity>
     /// <summary>
     /// The serializer registered for a top-level scalar field — the SAME one the write path uses, so it
     /// encodes the comparand exactly as stored (the per-member GUID codec, enum-as-string, DateTime, …).
-    /// Returns null for nested paths or when no member map exists, in which case the value is emitted
-    /// verbatim. This is what makes the translator honour the whole serialization config instead of
-    /// re-deriving each type (DATA-0098).
+    /// Returns null for nested paths or when no member map exists, in which case the encoder falls back
+    /// to the driver's serializer registry (see <see cref="Encode"/>). This is what makes the translator
+    /// honour the whole serialization config instead of re-deriving each type (DATA-0098).
+    ///
+    /// <para>Specific lookup failures (an absent member map, a class-map AutoMap throwing on an
+    /// unrelated property) are swallowed so a single fragile member can't poison filter building for
+    /// the entire entity. The robust <see cref="Encode"/> fallback then takes over.</para>
     /// </summary>
     private static IBsonSerializer? ResolveScalarSerializer(ResolvedField field)
     {
@@ -198,20 +202,35 @@ internal sealed class MongoFilterTranslator<TEntity>
         => SetRaw(f.Value).Select(x => Encode(FilterValueConverter.Convert(x, field.ComparableType), serializer));
 
     /// <summary>
-    /// Encode a comparison value to BSON through the field's own <paramref name="serializer"/>, so the
-    /// comparand matches the stored form for every configured type. Falls back to a verbatim value when
-    /// no serializer applies or the value's CLR type doesn't match the serializer's value type.
+    /// Encode a comparison value to BSON. Two-tier strategy:
     ///
-    /// <para>Nullable handling: when the field is e.g. <c>DateTimeOffset?</c> and the filter value is a
-    /// plain <c>DateTimeOffset</c>, <see cref="Type.IsInstanceOfType"/> returns false because
-    /// <c>typeof(DateTimeOffset?).IsAssignableFrom(typeof(DateTimeOffset))</c> is false (nullable
-    /// assignment rules). Unwrap the nullable for the check so the field's own serializer handles the
-    /// value instead of falling through to <see cref="BsonValue.Create"/> — which throws on
-    /// <c>DateTimeOffset</c> because <see cref="BsonTypeMapper"/> has no built-in mapping for it.</para>
+    /// <list type="number">
+    /// <item><b>Field's own serializer (DATA-0098).</b> When the field has a registered serializer
+    /// whose value type matches the value (with nullable unwrap so <c>DateTimeOffset</c> matches a
+    /// <c>NullableSerializer&lt;DateTimeOffset&gt;</c> on a <c>DateTimeOffset?</c> field), encode
+    /// through it. This keeps write↔query encoding aligned for per-member configs (GUID codec on Ids,
+    /// enum-as-string, custom converters).</item>
+    /// <item><b>Driver registry fallback.</b> Otherwise, look up the registered serializer for the
+    /// VALUE's runtime CLR type via <see cref="BsonSerializer.LookupSerializer(Type)"/> and encode
+    /// through that. The driver guarantees a serializer for any CLR type it can write (including
+    /// <c>DateTimeOffset</c>, <c>TimeSpan</c>, and types <see cref="BsonTypeMapper"/> has no native
+    /// mapping for), so this fallback never throws on a CLR-side type the driver knows about.</item>
+    /// </list>
+    ///
+    /// <para>The previous fallback was <see cref="BsonValue.Create"/>, which routes to
+    /// <see cref="BsonTypeMapper.MapToBsonValue"/> and throws on every CLR type outside a fixed
+    /// primitive set. That caused filter builds against fields whose class-map lookup happened to
+    /// return null (e.g. lazy AutoMap on a closed-generic <c>Job&lt;T&gt;</c>-derived type whose
+    /// MongoFilterTranslator caller had no pre-registered identity members, so the optimization
+    /// auto-registrar skipped it) to crash with
+    /// "<c>.NET type System.DateTimeOffset cannot be mapped to a BsonValue</c>" — surfaced by the
+    /// JobOrphanReaper's <c>LeasedUntil &lt; now</c> predicate.</para>
     /// </summary>
     private static BsonValue Encode(object? value, IBsonSerializer? serializer)
     {
         if (value is null) return BsonNull.Value;
+        if (value is BsonValue bv) return bv;
+
         if (serializer is not null)
         {
             var serializerValueType = Nullable.GetUnderlyingType(serializer.ValueType) ?? serializer.ValueType;
@@ -220,7 +239,8 @@ internal sealed class MongoFilterTranslator<TEntity>
                 return SerializeToBsonValue(serializer, value);
             }
         }
-        return value as BsonValue ?? BsonValue.Create(value);
+
+        return SerializeToBsonValue(BsonSerializer.LookupSerializer(value.GetType()), value);
     }
 
     private static BsonValue SerializeToBsonValue(IBsonSerializer serializer, object value)
