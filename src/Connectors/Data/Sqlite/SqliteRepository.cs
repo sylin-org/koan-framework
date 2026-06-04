@@ -18,6 +18,7 @@ using Koan.Data.Abstractions.Naming;
 using Koan.Data.Abstractions.Sorting;
 using Koan.Data.Core;
 using Koan.Data.Core.Optimization;
+using Koan.Data.Relational;
 using Koan.Data.Relational.Linq;
 using Koan.Data.Relational.Orchestration;
 using System.Collections.Concurrent;
@@ -352,15 +353,22 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         { _healthyCache[cacheKey] = true; }
     }
 
+    // Comparable-encoding contract (DATA-0100): the canonical converters make DateTimeOffset (UTC-ISO
+    // text), TimeSpan (ticks), DateOnly/TimeOnly (fixed text) persist in an order-preserving form that
+    // matches the filter comparand. Default (PascalCase) naming is preserved — ResolveColumnSql reads
+    // json_extract($.{prop}) with the PascalCase property name.
+    private static readonly JsonSerializerSettings _json =
+        ComparableScalarEncoding.Apply(new JsonSerializerSettings());
+
     // Basic serialization helpers
     private static TEntity FromRow((string Id, string Json) row)
-        => JsonConvert.DeserializeObject<TEntity>(row.Json)!;
+        => JsonConvert.DeserializeObject<TEntity>(row.Json, _json)!;
     private (string Id, string Json) ToRow(TEntity e)
     {
         // Apply optimization before serialization
         OptimizeEntityForStorage(e, _optimizationInfo);
 
-        var json = JsonConvert.SerializeObject(e);
+        var json = JsonConvert.SerializeObject(e, _json);
         var id = e.Id!.ToString()!;
         return (id, json);
     }
@@ -572,7 +580,19 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         var projections = ProjectionResolver.Get(typeof(TEntity));
         var proj = projections.FirstOrDefault(p => string.Equals(p.Property.Name, prop, StringComparison.Ordinal));
         var json = $"json_extract({t}.[Json], '$.{prop}')";
-        return proj is not null ? $"COALESCE({t}.[{proj.ColumnName}], {json})" : json;
+        var expr = proj is not null ? $"COALESCE({t}.[{proj.ColumnName}], {json})" : json;
+        return ApplyScalarCast(expr, resolved);
+    }
+
+    // Comparable-encoding contract (DATA-0100): TimeSpan persists as Int64 ticks (a JSON number); cast the
+    // extraction to INTEGER so it compares by duration. DateTimeOffset / DateOnly / TimeOnly persist as
+    // monotonic fixed-width TEXT and compare correctly without a cast.
+    private static string ApplyScalarCast(string expr, ResolvedField? resolved)
+    {
+        var type = resolved?.ComparableType;
+        if (type is null || (resolved?.TargetsCollection ?? false)) return expr;
+        var t = Nullable.GetUnderlyingType(type) ?? type;
+        return t == typeof(TimeSpan) ? $"CAST({expr} AS INTEGER)" : expr;
     }
 
     /// <summary>Builds an ORDER BY clause from the sort specs; falls back to a stable Id order.</summary>
@@ -585,7 +605,12 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         foreach (var spec in sort)
         {
             var leaf = spec.Path.Members[spec.Path.Members.Count - 1].Name;
-            var col = ResolveColumnSql(FieldPath.Of(leaf), default!);
+            // Resolve the leaf so ResolveColumnSql applies the comparable-encoding cast (TimeSpan ->
+            // INTEGER) to the ORDER BY column too, not only to filter predicates (DATA-0100). Fall back
+            // to the bare expression on an unresolvable path.
+            ResolvedField? rf = null;
+            try { rf = FieldPathResolver.Resolve(typeof(TEntity), FieldPath.Of(leaf)); } catch { /* leave null */ }
+            var col = ResolveColumnSql(FieldPath.Of(leaf), rf!);
             parts.Add($"{col} {(spec.Desc ? "DESC" : "ASC")}");
         }
         var orderBy = "ORDER BY " + string.Join(", ", parts);
@@ -1395,7 +1420,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             // Prefer Json column if present
             if (dict.TryGetValue("Json", out var jsonVal) && jsonVal is string jsonStr && !string.IsNullOrWhiteSpace(jsonStr))
             {
-                var ent = JsonConvert.DeserializeObject<TEntity>(jsonStr);
+                var ent = JsonConvert.DeserializeObject<TEntity>(jsonStr, _json);
                 if (ent is not null) list.Add(ent);
                 continue;
             }

@@ -15,6 +15,7 @@ using Koan.Data.Abstractions.Naming;
 using Koan.Data.Abstractions.Sorting;
 using Koan.Data.Core;
 using Koan.Data.Core.Optimization;
+using Koan.Data.Relational;
 using Koan.Data.Relational.Linq;
 using Koan.Data.Relational.Orchestration;
 using System.Collections.Frozen;
@@ -277,12 +278,19 @@ internal sealed class PostgresRepository<
         return (schema, table);
     }
 
+    // Comparable-encoding contract (DATA-0100): canonical converters make DateTimeOffset (UTC-ISO text),
+    // TimeSpan (ticks), DateOnly/TimeOnly (fixed text) persist in an order-preserving form matching the
+    // filter comparand. Default (PascalCase) naming is preserved — ResolveColumnSql reads
+    // ("Json" #>> '{prop}') with the PascalCase property name.
+    private static readonly JsonSerializerSettings _json =
+        ComparableScalarEncoding.Apply(new JsonSerializerSettings());
+
     private static TEntity FromRow((string Id, string Json) row)
-        => JsonConvert.DeserializeObject<TEntity>(row.Json)!;
+        => JsonConvert.DeserializeObject<TEntity>(row.Json, _json)!;
 
     private (object Id, string Json) ToRowOptimized(TEntity e)
     {
-        var json = JsonConvert.SerializeObject(e);
+        var json = JsonConvert.SerializeObject(e, _json);
         var stringId = e.Id!.ToString()!;
         // Apply storage optimization before serialization
         OptimizeEntityForStorage(e, _optimizationInfo);
@@ -508,6 +516,10 @@ internal sealed class PostgresRepository<
             || t == typeof(sbyte) || t == typeof(uint) || t == typeof(ulong) || t == typeof(ushort)
             || t == typeof(decimal) || t == typeof(double) || t == typeof(float))
             return $"({textExpr})::numeric";
+        // Comparable-encoding contract (DATA-0100): TimeSpan persists as Int64 ticks (a JSON number) ->
+        // cast so it compares by duration. DateTimeOffset / DateOnly / TimeOnly persist as monotonic
+        // fixed-width UTC/ISO TEXT and compare correctly as-is (no cast).
+        if (t == typeof(TimeSpan)) return $"({textExpr})::numeric";
         return textExpr;
     }
 
@@ -528,7 +540,12 @@ internal sealed class PostgresRepository<
             if (spec.Path.Members.Count != 1)
                 continue;
             var leaf = spec.Path.Members[0].Name;
-            var col = ResolveColumnSql(FieldPath.Of(leaf), default!);
+            // Resolve the leaf so ResolveColumnSql applies the comparable-encoding cast (TimeSpan ->
+            // numeric) to the ORDER BY column too, not only to filter predicates (DATA-0100). Fall back
+            // to the bare text expression on an unresolvable path.
+            ResolvedField? rf = null;
+            try { rf = FieldPathResolver.Resolve(typeof(TEntity), FieldPath.Of(leaf)); } catch { /* leave null */ }
+            var col = ResolveColumnSql(FieldPath.Of(leaf), rf!);
             parts.Add($"{col} {(spec.Desc ? "DESC" : "ASC")}");
             handled.Add(spec);
         }
@@ -1035,7 +1052,7 @@ internal sealed class PostgresRepository<
                 {
                     try
                     {
-                        var ent = Newtonsoft.Json.JsonConvert.DeserializeObject<TEntity>(jsonStr!);
+                        var ent = Newtonsoft.Json.JsonConvert.DeserializeObject<TEntity>(jsonStr!, _json);
                         if (ent is not null) list.Add(ent);
                         continue;
                     }

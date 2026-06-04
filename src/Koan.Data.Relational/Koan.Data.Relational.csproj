@@ -8,6 +8,12 @@
     <PackageTags>$(CommonPackageTags);data;relational;efcore;sql</PackageTags>
   </PropertyGroup>
   <ItemGroup>
+    <!-- Comparable-encoding contract (DATA-0100): the shared JsonConverters that canonicalise
+         DateTimeOffset/TimeSpan/DateOnly/TimeOnly on the relational write path. Relational adapters
+         persist entities as a JSON document via Newtonsoft. -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
     <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
   </ItemGroup>

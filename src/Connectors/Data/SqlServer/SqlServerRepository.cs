@@ -16,6 +16,7 @@ using Koan.Data.Abstractions.Naming;
 using Koan.Data.Abstractions.Sorting;
 using Koan.Data.Core;
 using Koan.Data.Core.Optimization;
+using Koan.Data.Relational;
 using Koan.Data.Relational.Linq;
 using Koan.Data.Relational.Orchestration;
 using System.Collections.Frozen;
@@ -82,6 +83,10 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
             Formatting = options.JsonWriteIndented ? Formatting.Indented : Formatting.None,
             NullValueHandling = options.JsonIgnoreNullValues ? NullValueHandling.Ignore : NullValueHandling.Include
         };
+        // Comparable-encoding contract (DATA-0100): DateTimeOffset -> UTC-ISO text, TimeSpan -> ticks,
+        // DateOnly/TimeOnly -> fixed text, so stored values are order-preserving and match the filter
+        // comparand (which SqlFilterTranslator encodes identically).
+        ComparableScalarEncoding.Apply(_json);
 
         // Log optimization strategy for diagnostics
         if (_optimizationInfo.IsOptimized)
@@ -408,7 +413,12 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         // "Invalid column name 'X'" bug. Mirrors the Postgres adapter's ResolveColumnSql, which learned the
         // same lesson. (The optimiser can still match a computed-column index defined on the same
         // JSON_VALUE expression, so the optimisation is preserved when the column does exist.)
-        return $"JSON_VALUE([Json], '$.{camel}')";
+        var expr = $"JSON_VALUE([Json], '$.{camel}')";
+        // Comparable-encoding contract (DATA-0100): TimeSpan persists as Int64 ticks -> cast so it
+        // compares by duration. DateTimeOffset / DateOnly / TimeOnly persist as monotonic fixed-width
+        // UTC/ISO TEXT and compare correctly as nvarchar (no cast).
+        var leaf = Nullable.GetUnderlyingType(resolved?.ComparableType ?? typeof(object)) ?? resolved?.ComparableType;
+        return leaf == typeof(TimeSpan) ? $"CAST({expr} AS BIGINT)" : expr;
     }
 
     /// <summary>Builds an ORDER BY clause from the sort specs; falls back to a stable Id order.</summary>
@@ -428,7 +438,12 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
             if (spec.Path.Members.Count != 1)
                 continue;
             var leaf = spec.Path.Members[0].Name;
-            var col = ResolveColumnSql(FieldPath.Of(leaf), default!);
+            // Resolve the leaf so ResolveColumnSql applies the comparable-encoding cast (TimeSpan ->
+            // BIGINT) to the ORDER BY column too, not only to filter predicates (DATA-0100). Fall back
+            // to the bare expression on an unresolvable path.
+            ResolvedField? rf = null;
+            try { rf = FieldPathResolver.Resolve(typeof(TEntity), FieldPath.Of(leaf)); } catch { /* leave null */ }
+            var col = ResolveColumnSql(FieldPath.Of(leaf), rf!);
             parts.Add($"{col} {(spec.Desc ? "DESC" : "ASC")}");
             handled.Add(spec);
         }

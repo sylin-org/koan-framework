@@ -193,7 +193,12 @@ public sealed class SqlFilterTranslator
     private string AddParam(object? value)
     {
         var idx = _parameters.Count;
-        _parameters.Add(value);
+        // Comparable-encoding contract (DATA-0100): encode the comparand to the SAME canonical store form
+        // the write path produces (DateTimeOffset -> UTC-ISO text, TimeSpan -> ticks, DateOnly/TimeOnly ->
+        // fixed text), so a pushed comparison is like-for-like. The ADO.NET drivers otherwise bind these
+        // CLR types in a form that does not match the stored JSON text (or cannot bind them at all).
+        // Non-governed types pass through unchanged.
+        _parameters.Add(ComparableScalarEncoding.EncodeComparand(value));
         return _dialect.Parameter(idx);
     }
 
