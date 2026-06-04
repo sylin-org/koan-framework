@@ -88,6 +88,11 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory
             PartitionSeparator = '#',
             Partition = PartitionTokenPolicy.Default,
             NameOverride = opts.CollectionName,
+            // MongoDB's namespace (db.collection) limit is 255 bytes; reserve for the max 64-byte database
+            // name + the '.' separator so the collection name alone is always valid. Without this, a very
+            // long partition suffix would produce an over-limit collection name (StorageNameGenerator only
+            // clamps when a limit is declared); with it, the overflow is hashed injectively instead.
+            MaxIdentifierBytes = 255 - 64 - 1,
         };
     }
 }
