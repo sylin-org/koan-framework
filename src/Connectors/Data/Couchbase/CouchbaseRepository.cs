@@ -240,8 +240,12 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             if (where is not null) sb.Append(" WHERE ").Append(where);
             if (orderBy is not null) sb.Append(" ORDER BY ").Append(orderBy);
 
+            // Only push pagination when the sort was fully pushed down. A deep / collection sort is finished by
+            // the coordinator's in-memory sorter, which needs the full matching set — paginating here would window
+            // the wrong rows. (Filter residual already strips pagination upstream; this covers sort residual.)
+            var sortFullyHandled = query.Sort is null || query.Sort.Count == 0 || sortHandled.Count == query.Sort.Count;
             var paginationHandled = false;
-            if (query.HasPagination)
+            if (query.HasPagination && sortFullyHandled)
             {
                 var size = query.EffectivePageSize();
                 var offset = (query.EffectivePage() - 1) * size;
