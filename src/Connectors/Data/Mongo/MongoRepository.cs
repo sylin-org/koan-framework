@@ -43,8 +43,12 @@ internal sealed class MongoRepository<TEntity, TKey> :
     private readonly IServiceProvider _sp;
     private readonly ILogger? _logger;
     private readonly StorageOptimizationInfo _optimizationInfo;
-    private IMongoCollection<TEntity>? _collection;
-    private string _collectionName;
+    // Collections are resolved per-operation from the ambient partition and cached by their resolved name.
+    // A single shared mutable "current collection" field would race across concurrent partitions: this
+    // repository is process-wide-cached by DataService (a singleton) with a cache key that omits the
+    // partition, so concurrent flows under different partitions share one instance — a shared field would
+    // let one flow's write land in another partition's collection.
+    private readonly ConcurrentDictionary<string, IMongoCollection<TEntity>> _collections = new(StringComparer.Ordinal);
 
     private static readonly ConcurrentDictionary<string, bool> _healthyCache = new(StringComparer.Ordinal);
     private static readonly ConcurrentDictionary<string, bool> _indexCache = new(StringComparer.Ordinal);
@@ -62,7 +66,6 @@ internal sealed class MongoRepository<TEntity, TKey> :
         _ = nameResolver; // ensure resolver is materialized for convention overrides
         _logger = sp.GetService<ILogger<MongoRepository<TEntity, TKey>>>();
         _optimizationInfo = sp.GetStorageOptimization<TEntity, TKey>();
-        _collectionName = AdapterNaming.GetOrCompute<TEntity, TKey>(_sp);
     }
 
     public void Describe(ICapabilities caps) => caps
@@ -134,10 +137,9 @@ internal sealed class MongoRepository<TEntity, TKey> :
                 await database.CreateCollectionAsync(collectionName, cancellationToken: ct).ConfigureAwait(false);
             }
 
-            _collection = database.GetCollection<TEntity>(collectionName);
-            _collectionName = collectionName;
+            var collection = _collections.GetOrAdd(collectionName, n => database.GetCollection<TEntity>(n));
 
-            await EnsureIndexes(_collection, ct).ConfigureAwait(false);
+            await EnsureIndexes(collection, ct).ConfigureAwait(false);
             _healthyCache[collectionKey] = true;
         }
         catch (Exception ex)
@@ -155,27 +157,23 @@ internal sealed class MongoRepository<TEntity, TKey> :
 
     private async Task<IMongoCollection<TEntity>> GetCollection(CancellationToken ct)
     {
+        // Resolve the collection for THIS call's ambient partition into a local — never shared mutable state.
+        // Concurrent flows under different partitions each resolve their own name and get their own handle,
+        // so a write can never land in another partition's collection.
+        var name = AdapterNaming.GetOrCompute<TEntity, TKey>(_sp);
         var key = BuildCollectionKey();
         if (!_healthyCache.TryGetValue(key, out var healthy) || !healthy)
         {
             await EnsureReady(ct).ConfigureAwait(false);
         }
 
-        return await GetCollectionCore(ct).ConfigureAwait(false);
-    }
-
-    private async Task<IMongoCollection<TEntity>> GetCollectionCore(CancellationToken ct)
-    {
-        var desired = AdapterNaming.GetOrCompute<TEntity, TKey>(_sp);
-        if (_collection is not null && string.Equals(desired, _collectionName, StringComparison.Ordinal))
+        if (_collections.TryGetValue(name, out var cached))
         {
-            return _collection;
+            return cached;
         }
 
         var database = await _provider.GetDatabase(ct).ConfigureAwait(false);
-        _collection = database.GetCollection<TEntity>(desired);
-        _collectionName = desired;
-        return _collection;
+        return _collections.GetOrAdd(name, n => database.GetCollection<TEntity>(n));
     }
 
     private static SemaphoreSlim GetSchemaLock(string key)
@@ -516,16 +514,19 @@ internal sealed class MongoRepository<TEntity, TKey> :
 
             if (effectiveStrategy == RemoveStrategy.Fast)
             {
-                // Fast path: drop collection and recreate (loses indexes briefly)
+                // Fast path: drop collection and recreate (loses indexes briefly). Operate on the collection
+                // resolved for THIS call's partition — never a shared field.
                 var database = GetDatabase(collection);
+                var name = collection.CollectionNamespace.CollectionName;
                 var estimatedCount = await collection.EstimatedDocumentCountAsync(cancellationToken: ct).ConfigureAwait(false);
 
-                await database.DropCollectionAsync(_collectionName, ct).ConfigureAwait(false);
-                await database.CreateCollectionAsync(_collectionName, cancellationToken: ct).ConfigureAwait(false);
+                await database.DropCollectionAsync(name, ct).ConfigureAwait(false);
+                await database.CreateCollectionAsync(name, cancellationToken: ct).ConfigureAwait(false);
 
                 // Recreate collection reference and indexes
-                _collection = database.GetCollection<TEntity>(_collectionName);
-                await EnsureIndexes(_collection, ct).ConfigureAwait(false);
+                var recreated = database.GetCollection<TEntity>(name);
+                _collections[name] = recreated;
+                await EnsureIndexes(recreated, ct).ConfigureAwait(false);
 
                 return estimatedCount;
             }
@@ -547,20 +548,21 @@ internal sealed class MongoRepository<TEntity, TKey> :
                     {
                         var collection = await GetCollection(ct).ConfigureAwait(false);
                         var database = GetDatabase(collection);
+                        var name = collection.CollectionNamespace.CollectionName;
 
                         try
                         {
                             var existing = await database.ListCollectionNamesAsync(cancellationToken: ct).ConfigureAwait(false);
                             var names = await existing.ToListAsync(ct).ConfigureAwait(false);
-                            if (!names.Contains(_collectionName, StringComparer.Ordinal))
+                            if (!names.Contains(name, StringComparer.Ordinal))
                             {
-                                await database.CreateCollectionAsync(_collectionName, cancellationToken: ct).ConfigureAwait(false);
-                                _logger?.LogDebug("Mongo ensureCreated created collection {Name}", _collectionName);
+                                await database.CreateCollectionAsync(name, cancellationToken: ct).ConfigureAwait(false);
+                                _logger?.LogDebug("Mongo ensureCreated created collection {Name}", name);
                             }
                         }
                         catch (Exception ex)
                         {
-                            _logger?.LogWarning(ex, "Mongo ensureCreated encountered an error for collection {Name}", _collectionName);
+                            _logger?.LogWarning(ex, "Mongo ensureCreated encountered an error for collection {Name}", name);
                         }
 
                         object ok = true;
