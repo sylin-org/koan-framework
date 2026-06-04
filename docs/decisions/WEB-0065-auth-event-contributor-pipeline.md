@@ -47,7 +47,15 @@ owned by `Koan.Web.Auth`.
 
 ### `IKoanAuthEventContributor`
 
-Auto-discovered (assembly scan, no `services.AddX<>()` registration). Three lifecycle hooks:
+Auto-discovered (no `services.AddX<>()` registration). Three lifecycle hooks:
+
+> **Discovery (updated by ARCH-0086 stage b):** the contract is now marked `[KoanDiscoverable]` and its
+> implementers are resolved through the single `KoanRegistry` authority
+> (`KoanRegistry.GetDiscoveredImplementors(typeof(IKoanAuthEventContributor))`) — populated at build time by
+> the source generator and at runtime by `RegistryManifestLoader`. This replaced the original bespoke
+> `AppDomain.CurrentDomain.GetAssemblies()` reflection scan, which missed lazily-loaded Koan assemblies. See
+> ARCH-0086 §4 for the generalized `[KoanDiscoverable]` mechanism.
+
 
 ```csharp
 namespace Koan.Web.Auth.Contributors;

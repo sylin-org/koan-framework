@@ -185,6 +185,79 @@ internal sealed class PostgresDiscoveryAdapter : ServiceDiscoveryAdapterBase
 
 ---
 
+## Bootstrap & Modules
+
+### KoanModule
+
+**Location:** `Koan.Core` (`KoanModule`; host `Koan.Core.Hosting.Modules.KoanModuleHost`)
+
+The boot-time module primitive (ARCH-0086). Extend it to author one self-describing unit instead of
+hand-writing the `IKoanInitializer` + `IKoanAutoRegistrar` pair. It **implements** `IKoanAutoRegistrar`, so
+the existing source-generated discovery (`KoanRegistry`) and topological ordering (`RegistrarOrdering` via
+`[Before]`/`[After]`) apply unchanged.
+
+#### Members
+- `string Id` (abstract) — canonical module id, e.g. `"data.postgres"`; surfaces as `ModuleName`.
+- `string? Version` (virtual) — defaults to the declaring assembly version.
+- `void Register(IServiceCollection services)` (virtual) — register DI services. Replaces `Initialize`.
+- `Task Start(IServiceProvider sp, CancellationToken ct)` (virtual) — one-time startup work, DI available,
+  ordered against other modules by `[Before]`/`[After]`, run by `KoanModuleHost`. Folds the "register a
+  bootstrap `IHostedService` for startup" idiom into one verb.
+- `void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)` (virtual) — publish
+  provenance. Named `Report` (not `Describe`) to disambiguate from per-provider capabilities
+  (`IDescribesCapabilities.Describe`, ARCH-0084).
+
+#### Usage Example
+
+```csharp
+public sealed class MyPillarModule : KoanModule
+{
+    public override string Id => "my.pillar";
+
+    public override void Register(IServiceCollection services)
+        => services.AddSingleton<IMyService, MyService>();
+
+    public override Task Start(IServiceProvider sp, CancellationToken ct)
+    {
+        // one-time startup work, DI available, ordered by [Before]/[After]
+        return Task.CompletedTask;
+    }
+}
+```
+
+#### When to Use
+New boot-time modules (a pillar, connector, or app-level wiring). Recurring periodic/pokable work stays on
+the `IKoanBackgroundService` family — `Start` models one-time ordered startup only. Code that registers
+services (e.g. recipes) or must run before the container is built belongs in `Register`, not `Start` (which
+receives an already-built `IServiceProvider`).
+
+### [KoanDiscoverable] + KoanRegistry.GetDiscoveredImplementors
+
+**Location:** `Koan.Core` (`KoanDiscoverableAttribute`; `Koan.Core.Hosting.Registry.KoanRegistry`)
+
+Mark an **interface** with `[KoanDiscoverable]` and every concrete implementer is auto-registered into the
+central `KoanRegistry` — at build time by the source generator and at runtime by `RegistryManifestLoader` —
+keyed by the interface `Type`. Query it with `KoanRegistry.GetDiscoveredImplementors(typeof(T))`. This
+replaces bespoke `AppDomain.CurrentDomain.GetAssemblies()` reflection scans, which miss lazily-loaded Koan
+assemblies and bypass the single discovery authority (ARCH-0086 §4).
+
+#### Usage Example
+
+```csharp
+[KoanDiscoverable]
+public interface IMyPlugin { /* ... */ }
+
+// elsewhere (e.g. inside a module/registrar), wire the discovered implementers:
+foreach (var type in KoanRegistry.GetDiscoveredImplementors(typeof(IMyPlugin)))
+    services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IMyPlugin), type));
+```
+
+#### When to Use
+Any "many implementers of one contract, discovered without explicit registration" surface — instead of
+hand-rolling an `AppDomain` assembly scan. Used by `IKoanAuthEventContributor` / `IKoanAuthFlowHandler`.
+
+---
+
 ## Configuration & Options
 
 ### Configuration.ReadWithSource\<T\>
@@ -489,6 +562,30 @@ await todo.Delete();
 - Avoiding manual repository injection
 - Following Koan's "Reference = Intent" pattern
 - Rapid prototyping and sample code
+
+### PartitionNameValidator
+
+**Location:** `Koan.Data.Core` (`PartitionNameValidator`; enforced in `EntityContext.With`)
+
+Validates partition names so distinct partitions cannot collide after identifier sanitization. Adapters turn
+a partition into a storage identifier via `PartitionTokenPolicy`, which maps every disallowed character to the
+same `_` — a lossy mapping that would collapse `tenant/7`, `tenant 7`, and `tenant_7` onto one store.
+`EntityContext.With(partition:)` rejects exactly those names up front (`ArgumentException`) so the mapping stays
+injective.
+
+**Rule:** a partition name is valid iff it is a **GUID**, or every character (after trimming) is a letter,
+digit, or one of `-` `.` `_`. Whitespace-only is treated as "no partition" (not an error).
+
+```csharp
+using (EntityContext.Partition("tenant-7")) { /* ok */ }
+using (EntityContext.Partition("019a5aff-79cb-7815-8dae-3700a698f840")) { /* ok — GUID */ }
+using (EntityContext.Partition("tenant/7")) { /* throws ArgumentException — would collide with tenant_7 */ }
+```
+
+#### When to Use
+- You don't call it directly — it runs automatically on every `EntityContext.With(partition:)` /
+  `EntityContext.Partition(...)`. Catch `ArgumentException` if you route user-supplied partition values and want
+  to surface a friendly error; otherwise re-encode names to the allowed set before use. See DATA-0077 §4.
 
 ---
 

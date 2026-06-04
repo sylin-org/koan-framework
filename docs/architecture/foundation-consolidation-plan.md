@@ -114,8 +114,10 @@ projects" are correctly invisible plumbing.
 - **Connection-string parsing — 4 orchestration evaluators vs. the canonical `ConnectionStringParser`,
   with behavioural divergence** (Mongo drops multi-host; Redis drops DB extraction; Postgres re-does
   key-normalization; Couchbase ad-hoc host split). Self-contained ~180-line fix.
-- **Auth contributors discovered off-registry.** `IKoanAuthEventContributor` uses its *own* reflection
-  scan, invisible to `KoanRegistry`/provenance, fails silently. One of the 7 interfaces in #2.
+- **Auth contributors discovered off-registry.** ✅ FIXED (ARCH-0086 stage b): `IKoanAuthEventContributor`
+  *and* `IKoanAuthFlowHandler` are now marked `[KoanDiscoverable]` and resolved through
+  `KoanRegistry.GetDiscoveredImplementors(Type)`; the bespoke `AppDomain` scan (which missed lazily-loaded
+  assemblies) is deleted. Was one of the 7 interfaces in #2.
 - **Messaging — orphaned static `MessagingTransformers`/`MessagingInterceptors`** never wired into the
   handler lifecycle (`MessagingLifecycleService` reads only `HandlerRegistry`). *Needs confirmation.*
 
@@ -352,7 +354,7 @@ Each facet (1–4) runs:
 
   **All three ARCH-0084 follow-ons are now complete.**
 
-- **Facet 2 — `KoanModule`: research + decision + ADR done → [ARCH-0086](../decisions/ARCH-0086-koan-module.md) (Accepted).**
+- **Facet 2 — `KoanModule`: ✅ SETTLED (2026-06-03) → [ARCH-0086](../decisions/ARCH-0086-koan-module.md).**
   Deep read of the registration/bootstrap *machinery* corrected the plan's premise in two ways: (1) the
   surface is mostly sound — discovery is already build-time source-generated (`KoanRegistry`), ordering is
   already declarative+topological (`[Before]/[After]`), and the `Add*` methods are mostly the registrar's
@@ -363,9 +365,15 @@ Each facet (1–4) runs:
   `KoanModule.Describe(ICapabilities)` is **corrected** — the module owns Id/DependsOn/Register/Start/Report,
   capabilities stay on the provider. **Decisions (architect-confirmed):** additive `KoanModule` base that
   *implements* `IKoanAutoRegistrar` (reuse discovery/ordering unchanged; migrate opportunistically, no
-  big-bang); keep `[Before]/[After]`. Staged ledger: (a) land `KoanModule` + `KoanModuleHost` + teach the
-  source-gen about `IKoanAuthEventContributor` → (b) auth de-split → (c) opportunistic registrar migration
-  (fold bootstrap hosted services into `Start`) → (d) settle.
+  big-bang); keep `[Before]/[After]`. Staged ledger — **all stages complete, settled 2026-06-03**:
+  (a) ✅ landed `KoanModule` + `KoanModuleHost`; (b) ✅ auth de-split via the generic `[KoanDiscoverable]`
+  marker + `KoanRegistry.GetDiscoveredImplementors` (covers both `IKoanAuthEventContributor` and
+  `IKoanAuthFlowHandler`); (c) ✅ pass 1 folded the `IKoanInitializer`-only types onto `KoanModule` (healing
+  3 in-assembly registration↔provenance splits + killing a GraphQl double-registration) — pass 2 *corrected*
+  the premise that recipes / the Mongo driver-config would move to `Start` (recipes register services, so
+  they are Initialize-phase; the Mongo driver-config must run early), so the genuine `Start` candidates are
+  one-time bootstrap hosted services, migrated opportunistically; (d) ✅ settled — a new pillar can be
+  authored as one `KoanModule` with an ordered `Start` (proven by `KoanModuleTests`). See ARCH-0086 for the full ledger.
 - Minor cleanup available anytime: the non-project ghost dirs (`Koan.Data.Lucene`, `Koan.Canon.Core`,
   `Koan.Cache.Adapter.Memory` — obj-only; `Koan.Flow.Core` — doc-only) carry 0 tracked source and are
   absent from `Koan.sln`; delete the directories.

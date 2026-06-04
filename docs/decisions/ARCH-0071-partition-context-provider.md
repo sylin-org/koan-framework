@@ -283,7 +283,7 @@ Different providers handle partitions differently:
 
 **Mitigation:**
 - ✅ **Server-side only:** Partition ID comes from server logic (JWT claims, middleware), never from client input
-- ✅ **Validation:** `BeginScope()` validates partition ID format (alphanumeric + hyphens/underscores only)
+- ✅ **Validation:** `EntityContext.With(partition:)` validates the partition name and throws `ArgumentException` on invalid input — it must be a GUID, or contain only letters, digits, `-`, `.`, `_` (see DATA-0077 §4). Lossy/ambiguous names (spaces, `/`, `$`, …) are rejected, so a hostile value can never collapse onto another tenant's store via sanitization.
 - ✅ **Authorization:** Application layer enforces which partitions a user can access
 
 ### Partition Leakage

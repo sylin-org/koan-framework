@@ -143,18 +143,32 @@ using (EntityContext.Partition("archive"))
 
 ### 4. Partition Naming Rules
 
-**Pattern:** `^[a-zA-Z][a-zA-Z0-9\-\.]*[a-zA-Z0-9]$|^[a-zA-Z]$`
+Partition names are **validated and enforced** at `EntityContext.With(...)` (and the
+`Partition`/`Source`/`Adapter` helpers): an invalid name throws `ArgumentException` immediately,
+rather than being silently sanitized into a possibly-colliding identifier. The rule is
+**collision-safety driven** (`PartitionNameValidator`): adapters turn a partition into a storage
+identifier via `PartitionTokenPolicy`, which maps every disallowed character to the same `_` — a
+lossy mapping that would collapse `tenant/7`, `tenant 7`, and `tenant_7` onto one store. The front
+door rejects exactly those names so the mapping stays injective.
 
-**Rules:**
-- MUST start with a letter (a-z, A-Z)
-- MAY contain alphanumeric, hyphen (-), or period (.)
-- MUST NOT end with hyphen or period
-- Case-sensitive (if adapter supports it)
-- Single letter is valid (e.g., "a", "B")
+**Rule:** a partition name is valid iff it is a **GUID** (normalized injectively), **or** every
+character (after trimming) is a letter, digit, or one of `-` `.` `_`. Whitespace-only is treated as
+"no partition" (not an error). Case-sensitive where the adapter supports it.
 
 **Examples:**
-- ✅ Valid: `archive`, `cold-tier`, `backup.v2`, `A`, `prod-us-east-1`
-- ❌ Invalid: `1archive` (starts with digit), `backup-` (ends with hyphen), `test.` (ends with period)
+- ✅ Valid: `archive`, `cold-tier`, `backup.v2`, `tenant_7`, `A`, `prod-us-east-1`, numeric ids like
+  `42`, and GUIDs (e.g. `019a5aff-79cb-7815-8dae-3700a698f840`).
+- ❌ Invalid (throws): names containing spaces, `/`, `$`, `%`, or other characters outside the set
+  above — re-encode them before use.
+
+> **History:** earlier drafts required "start with a letter, no underscore, no GUID" and validation
+> was disabled (names silently sanitized). That allowed distinct partitions to collide. The rule
+> above (GUID or identifier-safe) is the enforced canon; it accepts GUIDs/numerics/underscores and
+> rejects only the lossy, collision-prone names.
+>
+> **Residual:** adapters that fold case (e.g. Couchbase lowercases scope names) can still collide
+> `Tenant` with `tenant`; that is an adapter-specific concern narrower than the cross-adapter
+> lossy-replacement this validator closes.
 
 ### 5. Adapter Resolution Priority
 

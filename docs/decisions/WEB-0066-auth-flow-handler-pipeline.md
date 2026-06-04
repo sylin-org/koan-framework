@@ -42,8 +42,13 @@ heuristics either flip options or ship a higher-priority handler.
 ## Decision
 
 Introduce `IKoanAuthFlowHandler` — a single discoverable interface that covers every cookie
-auth lifecycle event. Auto-discovered (assembly scan, no DI registration), scoped lifetime,
+auth lifecycle event. Auto-discovered (no DI registration), scoped lifetime,
 dispatched in `Priority` order, sequentially.
+
+> **Discovery (updated by ARCH-0086 stage b):** like `IKoanAuthEventContributor`, this contract is marked
+> `[KoanDiscoverable]` and its implementers are resolved through `KoanRegistry`
+> (`GetDiscoveredImplementors(typeof(IKoanAuthFlowHandler))`), not a bespoke `AppDomain` assembly scan. The
+> runtime wrapper `LegacyAuthContributorAdapter` is excluded from the registration. See ARCH-0086 §4.
 
 ### `IKoanAuthFlowHandler`
 

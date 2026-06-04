@@ -44,13 +44,18 @@ Framework knowledge is provided through **Agent Skills** in `.claude/skills/` th
 **Immediate red flags** that trigger `koan-entity-first` skill with anti-patterns:
 - Manual `IRepository<T>` interfaces
 - Injecting repositories into services
-- Manual service registration in Program.cs (except via `KoanAutoRegistrar`)
+- Manual service registration in Program.cs (except via `KoanModule` / `KoanAutoRegistrar`)
 - Custom ORM/DbContext usage instead of Entity<T>
 - Provider-specific code without capability detection
 
 ## Framework Utilities
 
 **Before writing new helper methods**, check if Koan Framework already provides them:
+
+### Bootstrap & Modules (ARCH-0086)
+- **KoanModule** (`Koan.Core`) — Boot-time module primitive. Extend it to author one self-describing unit: `Id`, `Register(services)` (DI), `Start(sp, ct)` (ordered one-time startup), `Report(...)` (provenance). It implements `IKoanAutoRegistrar`, so existing source-gen discovery + `[Before]`/`[After]` ordering apply unchanged. Preferred over hand-writing `IKoanInitializer` / `IKoanAutoRegistrar`.
+- **[KoanDiscoverable]** + **KoanRegistry.GetDiscoveredImplementors** (`Koan.Core`) — Mark an *interface* `[KoanDiscoverable]` and its implementers are auto-registered into `KoanRegistry` (build-time generator + runtime `RegistryManifestLoader`), queried with `KoanRegistry.GetDiscoveredImplementors(typeof(T))`. Replaces bespoke `AppDomain.GetAssemblies()` scans (which miss lazily-loaded assemblies). Used by the auth contributor / flow-handler pipelines.
+- **PartitionNameValidator** (`Koan.Data.Core`) — Enforced at `EntityContext.With(partition:)`: a partition name must be a GUID or contain only letters/digits/`-`/`.`/`_`, else `ArgumentException`. Prevents distinct partitions colliding after identifier sanitization (DATA-0077 §4).
 
 ### Orchestration & Discovery
 - **ConnectionStringParser** (`Koan.Core.Orchestration`) - Parse/build connection strings for Postgres, SQL Server, MongoDB, Redis, SQLite
