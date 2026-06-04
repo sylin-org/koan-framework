@@ -90,6 +90,31 @@ public class MongoOptimizationAutoRegistrar : IKoanInitializer
         {
             // Already registered - safe to ignore
         }
+
+        // Comparable-encoding contract (DATA-0100): a filterable/sortable scalar must persist in a
+        // representation whose store-native ordering equals its CLR ordering. The driver's DEFAULT
+        // DateTimeOffset encoding is a Document {DateTime, Ticks, Offset} — $lt/$gt on it is
+        // lexicographic field-by-field, correct today only by the accident that DateTime is field 0;
+        // and the default TimeSpan encoding is a String ("1.00:00:00") that does NOT sort by duration
+        // (1-day sorts before 23h). Pin both to comparable primitives, mirroring the Guid block above:
+        //   DateTimeOffset -> BsonType.DateTime  (the UTC instant; the offset is NOT persisted)
+        //   TimeSpan       -> BsonType.Int64     (ticks)
+        // DateOnly/TimeOnly already default to comparable primitives (DateTime / Int64) and need no
+        // registration. Each registration is guarded INDIVIDUALLY: if one type is already registered by a
+        // third party (throws BsonSerializationException), the others must still be applied — a single
+        // shared try/catch would silently leave e.g. TimeSpan on the broken string encoding.
+        TryRegister(typeof(DateTimeOffset), new DateTimeOffsetSerializer(BsonType.DateTime));
+        TryRegister(typeof(DateTimeOffset?), new NullableSerializer<DateTimeOffset>(new DateTimeOffsetSerializer(BsonType.DateTime)));
+        TryRegister(typeof(TimeSpan), new TimeSpanSerializer(BsonType.Int64));
+        TryRegister(typeof(TimeSpan?), new NullableSerializer<TimeSpan>(new TimeSpanSerializer(BsonType.Int64)));
+    }
+
+    /// <summary>Register a serializer, tolerating the "already registered" case per-type so one failure
+    /// cannot skip the remaining registrations (comparable-encoding contract, DATA-0100).</summary>
+    private static void TryRegister(Type type, IBsonSerializer serializer)
+    {
+        try { BsonSerializer.RegisterSerializer(type, serializer); }
+        catch (BsonSerializationException) { /* already registered - safe to ignore */ }
     }
 
     /// <summary>
