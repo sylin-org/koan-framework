@@ -126,7 +126,7 @@
     <Version>0.8.1</Version>
   </PropertyGroup>
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Data.Connector.Mongo' and '$(KoanPackageKind)' == 'Periphery'">
-    <Version>0.8.3</Version>
+    <Version>0.8.2</Version>
   </PropertyGroup>
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Data.Connector.OpenSearch' and '$(KoanPackageKind)' == 'Periphery'">
     <Version>0.8.1</Version>
