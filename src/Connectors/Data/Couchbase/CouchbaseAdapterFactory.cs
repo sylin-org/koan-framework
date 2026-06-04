@@ -69,16 +69,24 @@ public sealed class CouchbaseAdapterFactory : IDataAdapterFactory
     {
         if (string.IsNullOrEmpty(partition)) return partition;
         var sb = new System.Text.StringBuilder(partition.Length);
+        var faithful = true;
         foreach (var c in partition)
-            sb.Append(char.IsLetterOrDigit(c) || c == '_' || c == '-' || c == '%' ? c : '_');
+        {
+            if (char.IsLetterOrDigit(c) || c == '_' || c == '-' || c == '%') sb.Append(c);
+            else { sb.Append('_'); faithful = false; }
+        }
         var sanitized = sb.ToString();
 
         const int maxScopeBytes = 30; // Couchbase scope/collection identifier limit
-        if (NamingUtils.ByteLength(sanitized) <= maxScopeBytes) return sanitized;
-        // Bound without colliding: a readable prefix + a deterministic hash. (The previous code truncated
-        // to [..30], which collapsed distinct partitions sharing a 30-char prefix onto the SAME scope —
-        // the same isolation-destroying bug as Postgres' 63-byte truncation.)
-        var hash = NamingUtils.ShortHash(sanitized, 8);
+        // Injective: return the sanitized form only when it FAITHFULLY represents the original — no character
+        // was replaced AND it fits the limit. Otherwise append a deterministic hash of the ORIGINAL so distinct
+        // partitions can never collapse onto one scope. Both lossy '_' replacement (e.g. "a.b" and "a_b" both
+        // sanitize to "a_b" — '.' passes the front-door validator but Couchbase scopes forbid it) and
+        // over-length truncation are collision sources; hashing the original closes both. (The previous code
+        // guarded only length, and hashed the sanitized form — which still collided distinct originals that
+        // sanitized alike.)
+        if (faithful && NamingUtils.ByteLength(sanitized) <= maxScopeBytes) return sanitized;
+        var hash = NamingUtils.ShortHash(partition, 8);
         return NamingUtils.TrimToBytes(sanitized, maxScopeBytes - hash.Length - 1) + "_" + hash;
     }
 }
