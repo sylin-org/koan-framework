@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using Koan.Data.Abstractions.Filtering;
 using MongoDB.Bson;
@@ -178,17 +179,38 @@ internal sealed class MongoFilterTranslator<TEntity>
     /// verbatim. This is what makes the translator honour the whole serialization config instead of
     /// re-deriving each type (DATA-0098).
     /// </summary>
+    // Memoized (RootType, memberName) -> serializer. The class-map graph is frozen after bootstrap, so the
+    // resolution is stable; the hot path (per scalar comparison during query translation) becomes a single
+    // O(1) lookup with no allocation, instead of re-scanning AllMemberMaps + a LINQ closure each call. Only
+    // successful (non-null) resolutions are cached, so a query that somehow ran before registration retries.
+    private static readonly ConcurrentDictionary<(Type Root, string Member), IBsonSerializer> _scalarSerializers = new();
+
     private static IBsonSerializer? ResolveScalarSerializer(ResolvedField field)
     {
         if (field.Members.Count != 1) return null;
+        (Type Root, string Member) key = (field.RootType, field.Members[0].Name);
+        if (_scalarSerializers.TryGetValue(key, out var cached)) return cached;
+
+        IBsonSerializer? resolved;
         try
         {
-            return BsonClassMap.LookupClassMap(field.RootType)?.GetMemberMap(field.Members[0].Name)?.GetSerializer();
+            // AllMemberMaps, NOT GetMemberMap: GetMemberMap returns only members DECLARED on the looked-up
+            // class. A member declared on an abstract/generic base — e.g. Job<T>.LeasedUntil on the CRTP
+            // base (Job<T> : Entity<T>) — is therefore absent, ResolveScalarSerializer returns null, and the
+            // comparand falls through to BsonValue.Create, which throws on DateTimeOffset/TimeSpan/DateOnly/
+            // TimeOnly and silently mis-encodes a base-declared enum (drift to its int ordinal). AllMemberMaps
+            // includes INHERITED members with their resolved serializers (DATA-0100 residual fix).
+            resolved = BsonClassMap.LookupClassMap(key.Root)
+                ?.AllMemberMaps.FirstOrDefault(m => string.Equals(m.MemberName, key.Member, StringComparison.Ordinal))
+                ?.GetSerializer();
         }
         catch
         {
-            return null;
+            resolved = null;
         }
+
+        if (resolved is not null) _scalarSerializers[key] = resolved;
+        return resolved;
     }
 
     private static BsonValue ScalarBson(FieldFilter f, ResolvedField field, IBsonSerializer? serializer)

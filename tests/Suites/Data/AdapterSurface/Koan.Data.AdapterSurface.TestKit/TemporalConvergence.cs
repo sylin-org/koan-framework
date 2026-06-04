@@ -7,11 +7,13 @@ using Koan.Data.Core.Sorting;
 namespace Koan.Data.AdapterSurface.TestKit;
 
 /// <summary>
-/// An <see cref="Entity{T}"/> carrying every composite scalar that the comparable-encoding contract
-/// (DATA-0100) governs: <see cref="DateTimeOffset"/>, <see cref="TimeSpan"/>, <see cref="DateOnly"/>,
-/// <see cref="TimeOnly"/> (plus nullable variants). Used by <see cref="TemporalConvergence"/>.
+/// Abstract generic CRTP base that DECLARES every composite scalar the comparable-encoding contract
+/// (DATA-0100) governs. Mirrors <c>Job&lt;T&gt; : Entity&lt;T&gt;</c> deliberately: the members live on
+/// an abstract generic intermediate base, not the concrete leaf. This is the shape that exposed the
+/// residual reaper throw — the Mongo class-map member lookup must find INHERITED members, not only
+/// declared ones. A flat entity (e.g. ConvergenceWidget) does not exercise that path.
 /// </summary>
-public sealed class TemporalWidget : Entity<TemporalWidget, string>
+public abstract class TemporalWidgetBase<T> : Entity<T> where T : TemporalWidgetBase<T>, new()
 {
     public string Name { get; set; } = "";
     public DateTimeOffset Ts { get; set; }
@@ -21,6 +23,10 @@ public sealed class TemporalWidget : Entity<TemporalWidget, string>
     public DateOnly Day { get; set; }
     public TimeOnly Tod { get; set; }
 }
+
+/// <summary>Concrete leaf used by <see cref="TemporalConvergence"/> — carries no members of its own, so
+/// every governed scalar is inherited (the <c>Job&lt;T&gt;</c> hierarchy shape).</summary>
+public sealed class TemporalWidget : TemporalWidgetBase<TemporalWidget> { }
 
 /// <summary>
 /// Cross-adapter ORACLE for the comparable-encoding contract (DATA-0100, ARCH-0079). Proves that range
