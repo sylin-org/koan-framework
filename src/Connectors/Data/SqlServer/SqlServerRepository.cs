@@ -399,10 +399,13 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         if (resolved is not null && resolved.TargetsCollection)
             return $"JSON_QUERY([Json], '$.{camel}')";
 
-        var json = $"JSON_VALUE([Json], '$.{camel}')";
-        var projections = ProjectionResolver.Get(typeof(TEntity));
-        var proj = projections.FirstOrDefault(p => string.Equals(p.Property.Name, prop, StringComparison.Ordinal));
-        return proj is not null ? $"COALESCE([{proj.ColumnName}], {json})" : json;
+        // Filter/sort against the source-of-truth [Json] via JSON_VALUE. Persisted computed projection
+        // columns are a SEPARATE indexing optimisation, never a correctness dependency: referencing one
+        // that was not materialised (entities with a Json materialisation shape never get them) is the
+        // "Invalid column name 'X'" bug. Mirrors the Postgres adapter's ResolveColumnSql, which learned the
+        // same lesson. (The optimiser can still match a computed-column index defined on the same
+        // JSON_VALUE expression, so the optimisation is preserved when the column does exist.)
+        return $"JSON_VALUE([Json], '$.{camel}')";
     }
 
     /// <summary>Builds an ORDER BY clause from the sort specs; falls back to a stable Id order.</summary>
@@ -761,8 +764,10 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
                     return column;
                 }
 
-                var json = BuildJsonAccessor(token);
-                return $"COALESCE({column}, {json})";
+                // Physical projection columns are an indexing optimisation, not a correctness dependency —
+                // always resolve against [Json] (see ResolveColumnSql). Referencing an unmaterialised column
+                // is the "Invalid column name" bug.
+                return BuildJsonAccessor(token);
             }
 
             return BuildJsonAccessor(token);
