@@ -21,6 +21,7 @@ public sealed class JobTypeBinding
         Func<object, CancellationToken, Task> save,
         Func<object, JobContext, CancellationToken, Task> execute,
         Func<object, string> getId,
+        Func<string, object> newSingleton,
         string[] chain,
         JobPersistenceMode persistence,
         string? pinnedProvider,
@@ -34,6 +35,7 @@ public sealed class JobTypeBinding
         Save = save;
         Execute = execute;
         GetId = getId;
+        NewSingleton = newSingleton;
         Chain = chain;
         Persistence = persistence;
         PinnedProvider = pinnedProvider;
@@ -49,6 +51,9 @@ public sealed class JobTypeBinding
     public Func<object, CancellationToken, Task> Save { get; }
     public Func<object, JobContext, CancellationToken, Task> Execute { get; }
     public Func<object, string> GetId { get; }
+    /// <summary>Create a fresh work-item instance with a stable id — used for type-level triggers and scheduled
+    /// singleton ticks, which have no caller-supplied instance.</summary>
+    public Func<string, object> NewSingleton { get; }
     public string[] Chain { get; }
     public JobPersistenceMode Persistence { get; }
     public string? PinnedProvider { get; }
@@ -136,9 +141,10 @@ internal static class JobTypeBinder
         Func<object, CancellationToken, Task> save = (o, ct) => Entity<T>.Upsert((T)o, ct);
         Func<object, JobContext, CancellationToken, Task> execute = (o, ctx, ct) => T.Execute((T)o, ctx, ct);
         Func<object, string> getId = o => ((T)o).Id;
+        Func<string, object> newSingleton = id => { var t = Activator.CreateInstance<T>(); t.Id = id; return t; };
 
         return new JobTypeBinding(
-            clr.FullName!, clr, load, save, execute, getId, chain,
+            clr.FullName!, clr, load, save, execute, getId, newSingleton, chain,
             persist?.Mode ?? JobPersistenceMode.Auto, persist?.Provider,
             actions, coalesceProps, gateProp);
     }

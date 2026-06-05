@@ -12,6 +12,11 @@ public interface IJobCoordinator
     /// <summary>Submit one action across many work-items in a single bulk enqueue.</summary>
     Task<int> SubmitManyAsync(IEnumerable<object> workItems, string action, TimeSpan? after, CancellationToken ct);
 
+    /// <summary>Submit an action at the type level (no caller instance) against an auto-provisioned singleton
+    /// work-item — the on-demand twin of a scheduled tick. Overlap is coalesced when the type declares an
+    /// idempotency key.</summary>
+    Task<JobHandle> TriggerAsync(string workType, string action, CancellationToken ct);
+
     /// <summary>Durably cancel every active job for a work-item (pre-run → terminate; running → cooperative).</summary>
     Task CancelWorkAsync(string workType, string workId, CancellationToken ct);
 

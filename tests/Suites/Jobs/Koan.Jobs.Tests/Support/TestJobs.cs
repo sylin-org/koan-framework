@@ -228,6 +228,38 @@ public sealed class AbortChain : Entity<AbortChain>, IKoanJob<AbortChain>
     }
 }
 
+/// <summary>Type-level trigger target: records the action it ran (no caller instance — runs against a singleton).</summary>
+public sealed class TickJob : Entity<TickJob>, IKoanJob<TickJob>
+{
+    public static int Executions;
+    public static string? LastAction;
+
+    public static Task Execute(TickJob job, JobContext ctx, CancellationToken ct)
+    {
+        Interlocked.Increment(ref Executions);
+        LastAction = ctx.Action;
+        return Task.CompletedTask;
+    }
+
+    public static void Reset() { Executions = 0; LastAction = null; }
+}
+
+/// <summary>Idempotent singleton sweep: overlapping type-level triggers coalesce onto one in-flight tick.</summary>
+[JobIdempotent(nameof(Key))]
+public sealed class SweepTick : Entity<SweepTick>, IKoanJob<SweepTick>
+{
+    public string Key => "sweep-singleton"; // stable coalesce key
+    public static int Executions;
+
+    public static Task Execute(SweepTick job, JobContext ctx, CancellationToken ct)
+    {
+        Interlocked.Increment(ref Executions);
+        return Task.CompletedTask;
+    }
+
+    public static void Reset() => Executions = 0;
+}
+
 /// <summary>Level-triggered reconcile: a scheduled action that runs only when its sweep releases it.</summary>
 [JobAction(Stage.PrepareToFetch, Schedule = "00:10:00")]
 public sealed class Reconciled : Entity<Reconciled>, IKoanJob<Reconciled>

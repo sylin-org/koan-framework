@@ -6,6 +6,9 @@ namespace Koan.Jobs;
 /// <inheritdoc/>
 public sealed class JobCoordinator : IJobCoordinator
 {
+    /// <summary>Stable id of the per-type singleton work-item used by type-level triggers and scheduled ticks.</summary>
+    internal const string SingletonWorkId = "__koan_job_singleton__";
+
     private readonly IJobLedger _ledger;
     private readonly JobTypeRegistry _registry;
     private readonly JobOrchestrator _orchestrator;
@@ -68,6 +71,13 @@ public sealed class JobCoordinator : IJobCoordinator
         if (batch.Count > 0) await _ledger.AppendMany(batch, ct);
         if (_options.Mode == JobMode.Inline) await _orchestrator.DrainAsync(ct);
         return batch.Count;
+    }
+
+    public async Task<JobHandle> TriggerAsync(string workType, string action, CancellationToken ct)
+    {
+        var binding = _registry.Require(workType);
+        var workItem = await binding.Load(SingletonWorkId, ct) ?? binding.NewSingleton(SingletonWorkId);
+        return await SubmitAsync(workItem, action, null, ct);
     }
 
     public async Task CancelWorkAsync(string workType, string workId, CancellationToken ct)

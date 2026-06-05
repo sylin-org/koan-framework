@@ -45,6 +45,11 @@ public readonly struct JobStatics<T> where T : Entity<T>, IKoanJob<T>
     public Task<int> Submit(IEnumerable<T> models, string action = "", CancellationToken ct = default)
         => JobAmbient.Coordinator.SubmitManyAsync(models.Cast<object>(), action, null, ct);
 
+    /// <summary>Trigger an action at the type level (no instance) — the on-demand twin of a scheduled tick. Runs
+    /// against an auto-provisioned singleton; overlap coalesces when the type declares an idempotency key.</summary>
+    public Task<JobHandle> Trigger(string action, CancellationToken ct = default)
+        => JobAmbient.Coordinator.TriggerAsync(typeof(T).FullName!, action, ct);
+
     /// <summary>Durably cancel a work-item's active job(s) by id.</summary>
     public Task Cancel(string workId, CancellationToken ct = default)
         => JobAmbient.Coordinator.CancelWorkAsync(typeof(T).FullName!, workId, ct);
