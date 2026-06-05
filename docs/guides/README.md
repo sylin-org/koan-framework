@@ -72,6 +72,12 @@ _For contributors_: How application initialization actually works
 - Multi-provider storage design
 - Relationship and navigation patterns
 
+### [Background Jobs](jobs-howto.md)
+
+- Entity-first jobs: one `Execute` method, no queues or workers to wire
+- Chains, per-action policy (retry/timeout/lanes), idempotency, and cooperative backoff
+- Scheduling (reconcile loops), durability tiers, and distributed claim strategies
+
 ### [Media Recipes](media-recipes-howto.md)
 
 - Format-preserving image pipeline (animated WebP, transparent PNG round-trip)

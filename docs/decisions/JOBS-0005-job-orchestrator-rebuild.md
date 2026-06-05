@@ -1,6 +1,6 @@
 # JOBS-0005: Job Orchestrator rebuild — a durable, edge+level-triggered state machine
 
-**Status**: **Accepted (2026-06-04)** — all positions ratified by the architect (§12); ready for phased implementation. Greenfield rebuild: **supersedes JOBS-0001, JOBS-0002, JOBS-0003** and the in-code "JOBS-0004" partition tier. The current `Koan.Jobs.Core` module is discarded.
+**Status**: **Accepted (2026-06-04)** · **Implemented — in-memory + durable tiers, SQLite-verified (2026-06-04; see §16)**. All positions ratified by the architect (§12). Greenfield rebuild: **supersedes JOBS-0001, JOBS-0002, JOBS-0003** and the in-code "JOBS-0004" partition tier. The current `Koan.Jobs.Core` module is discarded.
 **Date**: 2026-06-04
 **Deciders**: Enterprise Architect
 **Scope**: Replace the scattered job subsystem with a single, encapsulated **Job Orchestrator** concern that owns a ledger, dispatch/recall, cancellation, and scheduling. Define the entity-first authoring surface, the capability-graded backend, and the state-machine execution model (edge-triggered `Submit` + level-triggered `Schedule`).
@@ -151,6 +151,7 @@ public sealed class PresetPackage : Entity<PresetPackage>, IKoanJob<PresetPackag
 - **`[JobAction(action, …)]`** — *per-action* policy (the only place per-action policy lives): `Timeout`, `MaxAttempts`, `OnFailure`, `Lane` (defaults to the action name), `MaxConcurrency`, `Schedule`. Type-level defaults apply where an action is unspecified.
 - **`[JobChain(a, b, c, d)]`** — type-level **linear** pipeline; on a step's success the orchestrator persists the (mutated) work-item and auto-advances to the next stage **unless** the handler called `ctx.StopChain()`/`ctx.ContinueWith()`.
 - **`[JobIdempotent(keys…)]`** — declared idempotency/coalesce key `(type, keys…, action)`; re-delivery is deduped, concurrent duplicates coalesce.
+- **`[JobPersistence(Auto | InMemory | DataStore)]`** — per-type durability override of the capability election (§8/§16); Wolverine-style durable-vs-buffered.
 
 ## 6. Decision — two trigger models
 
@@ -344,7 +345,7 @@ All positions below are **adopted as the decision** (each proposed/recommended o
 11. **Gate-key declaration** — `[JobGate(nameof(Source))]` (declarative, readable at dispatch) vs a dynamic `string? GateKey` convention vs both. *Proposed:* **both** — attribute for the common static case, `GateKey` override for per-tenant/per-host dynamic keys. **Recommend: accept.**
 12. **Reschedule honoring + jitter** — *Proposed:* `ctx.Reschedule`/`Backoff` honor the supplied delay (e.g. a 429 `Retry-After`) as the base, and the orchestrator adds **release jitter** (spread `visibleAt` past `ReleaseAt`) so a deferred herd doesn't wake in lockstep; lane `MaxConcurrency` is the second line of defense. **Recommend: accept** (jitter default ~a few seconds or ±10% of the delay — to be tuned).
 13. **Runaway guards (`Deadline` + `MaxReschedules`)** — *Proposed:* `Deadline` (total wall-clock) is the **primary** guard; `MaxReschedules` (count) is a **secondary**, default-high/off spin-guard; the reschedule counter is **separate** from the retry `Attempt` counter. *Open:* whether `Deadline` should have a sane default cap (e.g. 24h) so a forgotten `Deadline` can't accumulate infinitely-deferred jobs. **Recommend: accept both as optional; lean toward a 24h default `Deadline`.**
-14. **Accessor surface (`.Job` / `.Jobs`)** — instance `model.Job.Submit()` + static facade `MyModel.Jobs.Cancel(id)`/`.Where(…)` + constrained collection `list.Submit(action)`. **Hard C# constraint: a static and an instance member cannot share the name `Job`** (CS0102) — hence singular instance `Job` + plural static `Jobs`. *Open:* implement via **source generator** (emits `partial` members per `IKoanJob` type — safe, on-brand, needs `partial`) vs **C# 14 / .NET 10 extension properties** (no `partial`, but verify the generic-constrained shape compiles). **Recommend: source generator**; also reserve/diagnose the `Job` name vs a domain property called `Job`. Handlers receive a read-only `ctx.State` (`JobState`) for stateful decisions (decided, not open).
+14. **Accessor surface (`.Job` / `.Jobs`)** — instance `model.Job.Submit()` + static facade `MyModel.Jobs.Cancel(id)`/`.Where(…)` + constrained collection `list.Submit(action)`. **Hard C# constraint: a static and an instance member cannot share the name `Job`** (CS0102) — hence singular instance `Job` + plural static `Jobs`. *Open:* implement via **source generator** (emits `partial` members per `IKoanJob` type — safe, on-brand, needs `partial`) vs **C# 14 / .NET 10 extension properties** (no `partial`, but verify the generic-constrained shape compiles). **Recommend: source generator**; also reserve/diagnose the `Job` name vs a domain property called `Job`. Handlers receive a read-only `ctx.State` (`JobState`) for stateful decisions (decided, not open). **Resolved at implementation (§16): C# 14 extension members — both `model.Job` and `MyModel.Jobs` compile, so no source generator is used.**
 
 ## 13. Test surface (a first-class deliverable; ARCH-0079 integration-as-canon)
 
@@ -397,4 +398,27 @@ Greenfield: delete `Koan.Jobs.Core`, re-author against `IKoanJob<T>`. Dogfeed re
 - **Kubernetes controllers / operators** — level-triggered reconciliation (the `Schedule` model); edge-for-latency, level-for-correctness.
 - **Azure Durable Functions** — function chaining (the `[JobChain]` shape).
 - **Sidekiq / Coravel** — per-state Redis structures; minimal in-proc queue (the Local tier's smallness).
-```
+
+## 16. Implementation status (2026-06-04)
+
+Built as a single project **`src/Koan.Jobs`** (no Abstractions/Core split — extract only if an external adapter later needs the contracts). The in-memory and durable tiers are complete and verified; the distributed tier and the per-DB container matrix follow.
+
+**Shipped & verified**
+- **In-memory tier** — the full engine (claim/execute/settle/chain/reschedule/backoff/gate/cancel/timeout/lanes/reap/schedule) behind `IJobLedger`, with **21 behavioral specs green** via a `FakeTimeProvider` harness.
+- **Durable tier** — `DataJobLedger` over `Entity<JobRecord>` plus parallel `JobGateRecord` and `JobClaimTicket` sets (no per-DB job adapters; durability follows the ambient data adapter). Capability election picks it when a durable adapter is present. **Verified on a live SQLite store (4 green)**: election, durable persist + complete, claim-query translation, chain advance, lease reclaim.
+
+**Refinements adopted during implementation** (these supersede the proposed text where they differ)
+- **Accessor → C# 14 extension members.** Resolves Open Q §12.14: both `model.Job` (instance) and `MyModel.Jobs` (static) compile as extension members, so **no source generator** is used — one fewer moving part.
+- **`[JobPersistence(Auto | InMemory | DataStore)]`** added (§5) — per-type durability override (Wolverine-style durable-vs-buffered). A `Provider` pin to a named store is reserved.
+- **`JobsOptions.ClaimStrategy`** — the durable claim is graded: `Optimistic` (default; last-write-wins under the at-least-once + idempotent contract) and `Ticket` (a leaderless GUIDv7 "bakery" election over the parallel ticket set — adapter-generic including Mongo, probabilistic, NTP-dependent). The hard-guarantee **`NativeCas`** tier is deferred to a future Koan.Data primitive (a generic conditional-update / `ExecuteUpdate`-style capability) plus a consensus/sync module.
+- **Clock = `System.TimeProvider`** (no bespoke `IClock`); `FakeTimeProvider` drives deterministic tests.
+- **Scheduled actions** use a *parked-and-released* model: a scheduled job waits (a future-visibility sentinel) until its reconcile sweep releases it on the declared interval.
+- **Chain advance** = settle the current `JobRecord` Completed and append a **new** `JobRecord` for the next stage (one ledger entry per stage; the work-item carries state forward by id).
+
+**Remaining**
+- Per-DB container matrix (Mongo / Postgres / SQL Server) + a crash-recovery harness (process restart, stale-lease guard, mid-chain resume).
+- A behavioral-suite convergence refactor so the *same* suite runs on every tier (ARCH-0079).
+- The distributed tier: competing-consumers test, cross-node gate, the `+bus` transport package, and per-type `[JobPersistence]` two-ledger routing.
+- Boot-report polish.
+
+**Authoring guide:** [Background Jobs How-To](../guides/jobs-howto.md).
