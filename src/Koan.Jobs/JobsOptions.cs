@@ -48,4 +48,10 @@ public sealed class JobsOptions
     /// <summary>When false, the background worker loop does not run — the orchestrator is driven explicitly
     /// (deterministic tests advance the clock and call Drain/Reap/ReleaseScheduled themselves).</summary>
     public bool EnableWorker { get; set; } = true;
+
+    /// <summary>How the durable tier secures a claim under competing consumers (default <see cref="ClaimStrategy.Optimistic"/>).</summary>
+    public ClaimStrategy ClaimStrategy { get; set; } = ClaimStrategy.Optimistic;
+
+    /// <summary>The reservation window for <see cref="ClaimStrategy.Ticket"/> — must exceed clock skew + write propagation.</summary>
+    public TimeSpan ClaimWindow { get; set; } = TimeSpan.FromSeconds(1);
 }
