@@ -38,12 +38,26 @@ public static class KoanIntegrationHost
         private readonly Dictionary<string, string?> _settings = new(StringComparer.Ordinal);
         private Action<IServiceCollection>? _configureServices;
         private Action<IConfigurationBuilder>? _configureAppConfiguration;
+        // A test host must never run as Production: the bare generic-host default ("Production") trips the
+        // relational DDL guard (DDL-not-allowed-in-production), so durable adapters (Postgres/SqlServer) never
+        // auto-create their tables. "Test" is the neutral choice — non-production (DDL allowed) but not
+        // "Development" (which would arm self-orchestration heuristics). Override via WithEnvironment.
+        private string _environment = "Test";
 
         /// <summary>Set a single configuration key/value pair (merged into in-memory config).</summary>
         public Builder WithSetting(string key, string? value)
         {
             if (string.IsNullOrEmpty(key)) throw new ArgumentException("Configuration key cannot be empty.", nameof(key));
             _settings[key] = value;
+            return this;
+        }
+
+        /// <summary>Override the host environment name (default "Test"). A non-production environment is
+        /// required for relational adapters to auto-create schema in integration tests.</summary>
+        public Builder WithEnvironment(string environment)
+        {
+            if (string.IsNullOrWhiteSpace(environment)) throw new ArgumentException("Environment cannot be empty.", nameof(environment));
+            _environment = environment;
             return this;
         }
 
@@ -88,6 +102,7 @@ public static class KoanIntegrationHost
         public IntegrationHost Build()
         {
             var host = new HostBuilder()
+                .UseEnvironment(_environment)
                 .ConfigureAppConfiguration(cfg =>
                 {
                     if (_settings.Count > 0) cfg.AddInMemoryCollection(_settings);
