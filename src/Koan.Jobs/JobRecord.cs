@@ -46,6 +46,10 @@ public sealed class JobRecord : Entity<JobRecord>
     // --- gate (cooperative backoff) ---
     public string? GateKey { get; set; }
 
+    /// <summary>When true (default), this job holds its work-item exclusively: no other job for the same
+    /// <c>(WorkType, WorkId)</c> may run concurrently. False for <c>[ParallelSafe]</c> types (JOBS-0005 §17.2).</summary>
+    public bool Exclusive { get; set; } = true;
+
     // --- cancellation (durable marker) ---
     public DateTimeOffset? CancelRequestedAt { get; set; }
 

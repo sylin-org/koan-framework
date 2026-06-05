@@ -84,7 +84,9 @@ Kick it off from anywhere—a controller, a service, a startup task:
 await new ThumbnailJob { SourceUrl = url }.Job.Submit();
 ```
 
-The job runs in the background. Koan persists the entity, claims the job on a worker, runs `Execute`, and saves the mutated entity. When `Execute` returns, the job is **Completed**.
+The job runs in the background. Koan persists the entity, claims the job on a worker, runs `Execute`, and—if you changed it—saves the entity it handed you. When `Execute` returns, the job is **Completed**.
+
+> **Mutate the entity you're given.** Koan loads the work-item fresh, passes it to `Execute`, and persists *that* reference if you changed it (untouched → nothing is written). So do your work on the `job` parameter—don't reload a second copy and save it yourself, or your write and Koan's will race. Need an escape hatch? A handler that genuinely owns its own persistence simply leaves the passed entity untouched; Koan then writes nothing.
 
 **Check on it later** by the entity's id:
 
@@ -198,6 +200,8 @@ public sealed class PresetPackage : Entity<PresetPackage>, IKoanJob<PresetPackag
 - **`MaxAttempts`** — failed runs retry with exponential backoff; once exhausted the job is **Failed**.
 - **`OnFailure`** — `Abort` (default) stops a chain on failure; `Continue` proceeds to the next stage anyway.
 - **`Lane` / `MaxConcurrency`** — a lane is a concurrency pool. By default each action is its own lane, so a slow `Fetch` never starves `Publish`. Set `Lane` to share a pool, `MaxConcurrency` to cap it.
+
+**One entity, one job at a time.** Independently of lanes, Koan serializes jobs by work-item id: two different actions on the *same* entity (say `FetchPreview` and `DriftCheck` on one `Package`) never run concurrently—the entity is processed in order, like a FIFO group keyed by its id. Different entities still run fully in parallel. If a type's actions are genuinely independent and you want them to overlap on one instance, opt out with `[ParallelSafe]` on the class—an assertion that they don't conflict.
 
 **When to use it.** Whenever an action talks to something rate-limited, slow, or fragile—tune its retries, timeout, and concurrency independently of the others.
 
@@ -444,6 +448,7 @@ public sealed class MyJob : Entity<MyJob>, IKoanJob<MyJob>
 [JobIdempotent(nameof(Key))]                          // dedupe + coalesce
 [JobGate(nameof(Host))]                               // shared cooperative-backoff key
 [JobPersistence(JobPersistenceMode.InMemory)]         // per-type durability
+[ParallelSafe]                                        // opt out of per-entity serialization
 
 // Submit & operate
 await myJob.Job.Submit();                 await myJob.Job.Submit(action);

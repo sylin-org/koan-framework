@@ -429,3 +429,29 @@ Built as a single project **`src/Koan.Jobs`** (no Abstractions/Core split — ex
 - **Boot-report — shipped**: `KoanJobsModule.Report` publishes the discovered job-type count (`jobs.types`); the worker logs a startup summary `[Koan.Jobs] ledger={ledger} · {N} job types · {M} scheduled · claim={strategy}` (the runtime-elected ledger is only available there, not in `Report`). Bootstrap spec asserts both reads resolve and never throw through real `AddKoan()`.
 
 **Authoring guide:** [Background Jobs How-To](../guides/jobs-howto.md).
+
+## 17. Addendum (2026-06-05): work-item write safety
+
+Dogfooding (gposingway) surfaced two ways a handler can silently lose a write. Both are framework concerns, not app concerns, and the fixes make *"an entity is a consistency unit"* — the promise entity-first quietly makes — true by default. Two layers: one protects a single handler from itself; one serializes concurrent handlers on the same entity.
+
+### 17.1 Conditional auto-save (dirty-detection)
+
+**Problem.** The orchestrator loads the work-item fresh at dispatch (`binding.Load`), runs `Execute`, then auto-saves the work-item on success (`binding.Save(workItem)`). A handler that loads its *own* second copy of the same entity, mutates it, and saves it — then returns — has its write **clobbered** by the framework's auto-save of the *original* (unmutated) reference. A silent lost write. (Note: this is a stale **write**, not a stale read — "pull latest before handling" already happens and does not address it.)
+
+**Decision.** Auto-save becomes **conditional**: snapshot the work-item's serialized form right after `Load`, and at settle save **only if the in-memory reference actually changed**. A handler that worked on its own copy left `workItem` clean → the framework no-ops → its write stands.
+
+**Mechanism.** Serialize the loaded `workItem` to a deterministic string (System.Text.Json over the entity's public state) and keep it (or its hash). At `SettleSuccessAsync`, re-serialize and compare; skip `binding.Save` when equal. The comparison is *internal* (load vs. settle, same serializer), so it needs only determinism + public-state coverage — it does not need to match the data layer's wire format. Serialization is wrapped so an exotic/cyclic entity that can't be snapshotted **degrades to always-save** (the prior behavior) rather than failing the job. Failure directions are asymmetric: a spurious "dirty" costs one redundant write; a real change can never serialize identically under a deterministic serializer, so a change is never missed.
+
+**Consequences.** The 80% ergonomic (mutate the passed reference → it persists) is unchanged. Pure side-effect handlers (mutate nothing) stop emitting no-op writes. Chain advance is unaffected — a clean work-item means the next stage loads the already-persisted state. Escape hatch reserved for handlers that fully own persistence (currently: just don't mutate the reference; an explicit opt-out attribute can be added if a real case appears). **Boundary:** this protects a single handler against its own double-write; it does *not* protect two *different* handlers racing on the same entity — that is 17.2.
+
+### 17.2 Per-entity serialization by default (`[ParallelSafe]` opt-out)
+
+**Problem.** The orchestrator serializes per `(Lane, MaxConcurrency)` and coalesces per `(action, IdempotentKey)`, but two *different* actions on the same entity (e.g. `FetchPreview` + `DriftCheck` on one `Package`) can run concurrently — each loads, mutates its own copy, and saves; last-writer-wins. 17.1 cannot fix this (both copies were legitimately mutated).
+
+**Decision.** A job's work-item id is its **ordering key** — same key is processed **one at a time** (the Kafka-partition / SQS-FIFO-group model), **by default**. This is the entity-first / actor-lineage default (Temporal, Akka serialize per-id; queue systems default parallel + opt-in lock — Koan.Jobs, being entity-first, takes the former). Opt out per work-type with **`[ParallelSafe]`** — an *assertion* by the author that the type's actions are independent and may run concurrently on one instance. Because the default *is* serialization, there is no `[JobExclusive]` attribute (exclusivity is the unnamed baseline) — the only marker is the rare opt-out.
+
+**Mechanism.** Each `JobRecord` carries an `Exclusive` flag (`true` by default; `false` for `[ParallelSafe]` types), set by `JobRecordFactory`. `ClaimNext` gains one skip predicate alongside the existing lane / gate / cancel ones: **an exclusive candidate is not claimable while any job for the same `(WorkType, WorkId)` is `Running`.** In-memory: a running-set check; durable: a `Status==Running` probe folded into `SelectCandidate`. No new gate type — gates are time-released backoff; this is settle-released. Since `[ParallelSafe]` is per-type and an entity has exactly one type, an entity's jobs are uniformly exclusive or uniformly parallel-safe, so the predicate needs only the candidate's own flag (no reader/writer mixing).
+
+**Guarantee.** Intra-node: strict. Cross-node: **claim-strength** — two nodes can still claim two actions for one entity in the same instant (both probe "any Running?" pre-commit), the same probabilistic window as the claim itself. A hard cross-node guarantee awaits the deferred `NativeCas` / entity-lease primitive; this is consistent with the existing `ClaimStrategy` grading (best-effort now, hard later). Composes cleanly: two chain *runs* on one entity serialize by default, `[JobIdempotent]` still coalesces duplicate triggers ahead of that, and different entities parallelize fully.
+
+**Status:** both shipped 2026-06-05 with specs in `JobBehaviorSuite` (proven across all five tiers — in-memory, SQLite, Postgres, Mongo, SQL Server).

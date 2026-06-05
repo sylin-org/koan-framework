@@ -22,6 +22,7 @@ internal static class JobRecordFactory
             Lane = policy.Lane,
             CoalesceKey = binding.CoalesceKey(workItem, action),
             GateKey = binding.GateKey(workItem),
+            Exclusive = !binding.ParallelSafe,   // per-entity serialization unless the type opts out
             Deadline = now + policy.Deadline,
             CorrelationId = correlationId,
         };

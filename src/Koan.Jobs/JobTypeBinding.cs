@@ -25,6 +25,7 @@ public sealed class JobTypeBinding
         string[] chain,
         JobPersistenceMode persistence,
         string? pinnedProvider,
+        bool parallelSafe,
         IReadOnlyDictionary<string, JobActionAttribute> actions,
         PropertyInfo[] coalesceProps,
         PropertyInfo? gateProp)
@@ -39,6 +40,7 @@ public sealed class JobTypeBinding
         Chain = chain;
         Persistence = persistence;
         PinnedProvider = pinnedProvider;
+        ParallelSafe = parallelSafe;
         _actions = actions;
         _coalesceProps = coalesceProps;
         _gateProp = gateProp;
@@ -57,6 +59,10 @@ public sealed class JobTypeBinding
     public string[] Chain { get; }
     public JobPersistenceMode Persistence { get; }
     public string? PinnedProvider { get; }
+
+    /// <summary>True when the type opts out of per-entity serialization (<c>[ParallelSafe]</c>): its actions may
+    /// run concurrently on one instance. Default false — jobs for the same instance are serialized (JOBS-0005 §17.2).</summary>
+    public bool ParallelSafe { get; }
 
     /// <summary>The next stage after <paramref name="action"/> in the declared <c>[JobChain]</c>, or null (terminal / not chained).</summary>
     public string? NextInChain(string action)
@@ -127,6 +133,7 @@ internal static class JobTypeBinder
         var idem = clr.GetCustomAttribute<JobIdempotentAttribute>(inherit: true);
         var gate = clr.GetCustomAttribute<JobGateAttribute>(inherit: true);
         var persist = clr.GetCustomAttribute<JobPersistenceAttribute>(inherit: true);
+        var parallelSafe = clr.GetCustomAttribute<ParallelSafeAttribute>(inherit: true) is not null;
 
         var coalesceProps = (idem?.Keys ?? Array.Empty<string>())
             .Select(k => clr.GetProperty(k, PropFlags)
@@ -145,7 +152,7 @@ internal static class JobTypeBinder
 
         return new JobTypeBinding(
             clr.FullName!, clr, load, save, execute, getId, newSingleton, chain,
-            persist?.Mode ?? JobPersistenceMode.Auto, persist?.Provider,
+            persist?.Mode ?? JobPersistenceMode.Auto, persist?.Provider, parallelSafe,
             actions, coalesceProps, gateProp);
     }
 }

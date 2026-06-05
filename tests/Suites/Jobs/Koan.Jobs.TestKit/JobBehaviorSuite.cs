@@ -442,4 +442,54 @@ public abstract class JobBehaviorSuite
         (await host.StatusOf<GreetJob>(okId)).Should().BeNull("completed past retention is purged");
         (await host.StatusOf<FlakyJob>(badId)).Should().Be(JobStatus.Failed, "failed is retained");
     }
+
+    // --- work-item write safety (§17) ---
+
+    [Fact]
+    public async Task autosave_persists_a_mutation_to_the_passed_reference()
+    {
+        GreetJob.Reset();
+        await using var host = await CreateHostAsync();
+        var g = new GreetJob { Name = "Ada" };
+        var id = g.Id;
+        await g.Job.Submit();
+        await host.Drain();
+        (await GreetJob.Get(id))!.Greeting.Should().Be("Hello, Ada", "mutating the passed reference persists (the 80% path)");
+    }
+
+    [Fact]
+    public async Task conditional_autosave_does_not_clobber_a_handlers_own_write()
+    {
+        await using var host = await CreateHostAsync();
+        var j = new SelfSaveJob();
+        var id = j.Id;
+        await j.Job.Submit();
+        await host.Drain();
+        // The handler saved its own copy and never touched the passed reference; the framework must not overwrite it.
+        (await SelfSaveJob.Get(id))!.Result.Should().Be(SelfSaveJob.Written);
+    }
+
+    [Fact]
+    public async Task exclusive_is_the_default_one_action_per_entity_at_a_time()
+    {
+        ExclusiveJob.Reset();
+        await using var host = await CreateHostAsync();
+        var e = new ExclusiveJob();
+        await e.Job.Submit(ExclusiveJob.ActionA);
+        await e.Job.Submit(ExclusiveJob.ActionB);   // same entity, different action, different lane
+        await host.Drain();
+        ExclusiveJob.Peak.Should().Be(1, "different actions on one entity must not run concurrently by default");
+    }
+
+    [Fact]
+    public async Task parallel_safe_allows_concurrent_actions_on_one_entity()
+    {
+        ParallelJob.Reset();
+        await using var host = await CreateHostAsync();
+        var e = new ParallelJob();
+        await e.Job.Submit(ParallelJob.ActionA);
+        await e.Job.Submit(ParallelJob.ActionB);
+        await host.Drain();
+        ParallelJob.Peak.Should().Be(2, "[ParallelSafe] lifts per-entity serialization");
+    }
 }

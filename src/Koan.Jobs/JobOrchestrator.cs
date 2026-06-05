@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -94,6 +95,8 @@ public sealed class JobOrchestrator
         catch (Exception ex) { await SettleFailureAsync(rec, binding, policy, ex); return; }
         if (workItem is null) { await SettleFailureAsync(rec, binding, policy, new InvalidOperationException($"Work-item {rec.WorkType}/{rec.WorkId} not found.")); return; }
 
+        var snapshot = Snapshot(workItem);   // for conditional auto-save (§17.1): only persist if the handler mutates it
+
         using var timeoutCts = policy.Timeout is { } to
             ? new CancellationTokenSource(to, _clock)
             : new CancellationTokenSource();
@@ -106,7 +109,7 @@ public sealed class JobOrchestrator
         try
         {
             await binding.Execute(workItem, ctx, linked.Token);
-            await SettleSuccessAsync(rec, workItem, binding, policy, ctx);
+            await SettleSuccessAsync(rec, workItem, binding, policy, ctx, snapshot);
         }
         catch (RescheduleException rex)
         {
@@ -134,7 +137,7 @@ public sealed class JobOrchestrator
 
     // --- settle paths ---
 
-    private async Task SettleSuccessAsync(JobRecord rec, object workItem, JobTypeBinding binding, ResolvedActionPolicy policy, JobContext ctx)
+    private async Task SettleSuccessAsync(JobRecord rec, object workItem, JobTypeBinding binding, ResolvedActionPolicy policy, JobContext ctx, string? snapshot)
     {
         if (ctx.Signal is JobSignal.Reschedule or JobSignal.Backoff)
         {
@@ -143,7 +146,10 @@ public sealed class JobOrchestrator
             return;
         }
 
-        await binding.Save(workItem, CancellationToken.None);
+        // Conditional auto-save (§17.1): persist the work-item only if the handler mutated the loaded reference.
+        // A handler that worked on its own copy (and saved it) left this one clean — don't clobber its write.
+        if (snapshot is null || Snapshot(workItem) != snapshot)
+            await binding.Save(workItem, CancellationToken.None);
 
         var now = _clock.GetUtcNow();
         var next = ctx.Signal switch
@@ -319,5 +325,15 @@ public sealed class JobOrchestrator
     {
         r.Transitions.Add(new JobTransition { At = at, From = r.Status, To = to, Note = note });
         r.Status = to;
+    }
+
+    /// <summary>Deterministic snapshot of a work-item's serialized state for conditional auto-save (§17.1). The
+    /// comparison is internal (load vs. settle, same serializer), so it needs only determinism + public-state
+    /// coverage. Returns null when the entity can't be serialized (cyclic/exotic) → the caller degrades to
+    /// always-save, never failing the job over a snapshot.</summary>
+    private static string? Snapshot(object workItem)
+    {
+        try { return JsonSerializer.Serialize(workItem, workItem.GetType()); }
+        catch { return null; }
     }
 }

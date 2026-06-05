@@ -44,12 +44,19 @@ public sealed class InMemoryJobLedger : IJobLedger
     {
         lock (_gate)
         {
+            // Per-entity serialization (§17.2): an exclusive job can't be claimed while another job for the same
+            // (WorkType, WorkId) is already running.
+            var busy = _records.Values
+                .Where(r => r.Status == JobStatus.Running)
+                .Select(r => (r.WorkType, r.WorkId))
+                .ToHashSet();
             var candidate = _records.Values
                 .Where(r => r.Status == JobStatus.Queued
                             && r.VisibleAt <= now
                             && r.CancelRequestedAt is null
                             && !saturatedLanes.Contains(r.Lane)
-                            && !IsGated(r.GateKey, now))
+                            && !IsGated(r.GateKey, now)
+                            && !(r.Exclusive && busy.Contains((r.WorkType, r.WorkId))))
                 .OrderBy(r => r.VisibleAt)
                 .ThenBy(r => r.FirstSubmittedAt)
                 .FirstOrDefault();

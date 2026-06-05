@@ -122,11 +122,16 @@ public sealed class DataJobLedger : IJobLedger
     {
         var queued = await JobRecord.Query(r => r.Status == JobStatus.Queued, ct);
         var gatedKeys = (await ActiveGates(now, ct)).Select(g => g.GateKey).ToHashSet(StringComparer.Ordinal);
+        // Per-entity serialization (§17.2): exclude exclusive candidates whose (WorkType, WorkId) is already running.
+        var busy = (await JobRecord.Query(r => r.Status == JobStatus.Running, ct))
+            .Select(r => (r.WorkType, r.WorkId))
+            .ToHashSet();
         return queued
             .Where(r => r.VisibleAt <= now
                         && r.CancelRequestedAt is null
                         && !saturatedLanes.Contains(r.Lane)
-                        && (r.GateKey is null || !gatedKeys.Contains(r.GateKey)))
+                        && (r.GateKey is null || !gatedKeys.Contains(r.GateKey))
+                        && !(r.Exclusive && busy.Contains((r.WorkType, r.WorkId))))
             .OrderBy(r => r.VisibleAt)
             .ThenBy(r => r.FirstSubmittedAt)
             .FirstOrDefault();

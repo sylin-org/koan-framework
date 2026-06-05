@@ -320,3 +320,67 @@ public sealed class NightlyJob : Entity<NightlyJob>, IKoanJob<NightlyJob>
 
     public static void Reset() => Executions = 0;
 }
+
+internal static class Probe
+{
+    public static void Max(ref int target, int value)
+    {
+        int seen;
+        do { seen = target; if (value <= seen) return; }
+        while (Interlocked.CompareExchange(ref target, value, seen) != seen);
+    }
+}
+
+/// <summary>Conditional auto-save footgun (§17.1): the handler edits a SECOND copy and saves it, never touching
+/// the passed reference. Naive always-save would clobber this with the unmutated reference.</summary>
+public sealed class SelfSaveJob : Entity<SelfSaveJob>, IKoanJob<SelfSaveJob>
+{
+    public const string Written = "handler-wrote-this";
+    public string Result { get; set; } = "";
+
+    public static async Task Execute(SelfSaveJob job, JobContext ctx, CancellationToken ct)
+    {
+        var fresh = await SelfSaveJob.Get(job.Id, ct);
+        fresh!.Result = Written;
+        await SelfSaveJob.Upsert(fresh, ct);
+        // job.Result stays "" — the framework must NOT auto-save over fresh's write.
+    }
+}
+
+/// <summary>Two actions on one entity, each in its own lane (so only per-entity serialization can hold them
+/// apart). Records peak concurrency to prove exclusivity is the default (§17.2).</summary>
+public sealed class ExclusiveJob : Entity<ExclusiveJob>, IKoanJob<ExclusiveJob>
+{
+    public const string ActionA = "a";
+    public const string ActionB = "b";
+    public static int Current;
+    public static int Peak;
+
+    public static async Task Execute(ExclusiveJob job, JobContext ctx, CancellationToken ct)
+    {
+        Probe.Max(ref Peak, Interlocked.Increment(ref Current));
+        try { await Task.Delay(TimeSpan.FromMilliseconds(60), ct); }
+        finally { Interlocked.Decrement(ref Current); }
+    }
+
+    public static void Reset() { Current = 0; Peak = 0; }
+}
+
+/// <summary>Same shape as <see cref="ExclusiveJob"/> but opts out of per-entity serialization via [ParallelSafe].</summary>
+[ParallelSafe]
+public sealed class ParallelJob : Entity<ParallelJob>, IKoanJob<ParallelJob>
+{
+    public const string ActionA = "a";
+    public const string ActionB = "b";
+    public static int Current;
+    public static int Peak;
+
+    public static async Task Execute(ParallelJob job, JobContext ctx, CancellationToken ct)
+    {
+        Probe.Max(ref Peak, Interlocked.Increment(ref Current));
+        try { await Task.Delay(TimeSpan.FromMilliseconds(60), ct); }
+        finally { Interlocked.Decrement(ref Current); }
+    }
+
+    public static void Reset() { Current = 0; Peak = 0; }
+}

@@ -58,6 +58,18 @@ public sealed class JobIdempotentAttribute : Attribute
     public string[] Keys { get; }
 }
 
+/// <summary>
+/// Opt out of per-entity serialization (JOBS-0005 §17.2). By default a work-item's id is its ordering key —
+/// jobs for the same instance run one at a time (the Kafka-partition / SQS-FIFO-group model), so two different
+/// actions on one entity can't race. Marking the type <c>[ParallelSafe]</c> is an <em>assertion</em> that its
+/// actions are independent and may run concurrently on a single instance. There is deliberately no opposite
+/// attribute — exclusivity is the unnamed default.
+/// </summary>
+[AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
+public sealed class ParallelSafeAttribute : Attribute
+{
+}
+
 /// <summary>Declares the resource the work-item contends for, so the orchestrator can check the shared
 /// gate at dispatch <em>without</em> running the handler. The value is a work-item property name whose
 /// value forms the gate key (e.g. <c>[JobGate(nameof(Source))]</c>); a dynamic <c>GateKey</c> override
