@@ -21,19 +21,30 @@ public sealed class LaneScheduleReapSpec
     }
 
     [Fact]
-    public async Task scheduled_action_is_parked_until_its_sweep_releases_it()
+    public async Task scheduled_action_runs_when_the_scheduler_ticks()
     {
         Reconciled.Reset();
         await using var host = await JobsTestHost.StartAsync();
-        var r = new Reconciled();
 
-        await r.Job.Submit(Stage.PrepareToFetch);
         await host.Drain();
-        Reconciled.Executions.Should().Be(0, "a scheduled action is parked; it does not run on submit");
+        Reconciled.Executions.Should().Be(0, "nothing runs until the scheduler submits it");
 
-        await host.ReleaseScheduled();
+        await host.TriggerDue();   // first tick submits a fresh job
         await host.Drain();
-        Reconciled.Executions.Should().Be(1, "the reconcile sweep releases the parked job");
+        Reconciled.Executions.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task recurring_schedule_actually_recurs()
+    {
+        Reconciled.Reset();
+        await using var host = await JobsTestHost.StartAsync();
+
+        await host.TriggerDue(); await host.Drain();                                         // t0 → 1
+        host.Advance(TimeSpan.FromMinutes(10)); await host.TriggerDue(); await host.Drain(); // → 2
+        host.Advance(TimeSpan.FromMinutes(10)); await host.TriggerDue(); await host.Drain(); // → 3
+
+        Reconciled.Executions.Should().Be(3, "each interval the scheduler submits a fresh job");
     }
 
     [Fact]
@@ -42,20 +53,40 @@ public sealed class LaneScheduleReapSpec
         Reconciled.Reset();
         await using var host = await JobsTestHost.StartAsync();
 
-        await new Reconciled().Job.Submit(Stage.PrepareToFetch);
-        await host.ReleaseScheduled();   // first sweep releases
-        await host.Drain();
+        await host.TriggerDue(); await host.Drain();   // t0 → 1
         Reconciled.Executions.Should().Be(1);
 
-        await new Reconciled().Job.Submit(Stage.PrepareToFetch);
-        await host.ReleaseScheduled();   // interval (10m) not elapsed → not released
-        await host.Drain();
+        await host.TriggerDue(); await host.Drain();   // immediate: interval (10m) not elapsed → no submit
         Reconciled.Executions.Should().Be(1);
 
         host.Advance(TimeSpan.FromMinutes(10));
-        await host.ReleaseScheduled();   // interval elapsed → released
-        await host.Drain();
+        await host.TriggerDue(); await host.Drain();   // due → 2
         Reconciled.Executions.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task continuous_schedule_fires_every_tick()
+    {
+        Heartbeat.Reset();
+        await using var host = await JobsTestHost.StartAsync();
+
+        await host.TriggerDue(); await host.Drain();
+        await host.TriggerDue(); await host.Drain();   // @continuous: no interval gate
+        await host.TriggerDue(); await host.Drain();
+
+        Heartbeat.Executions.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task boot_action_runs_once_at_boot()
+    {
+        BootOnce.Reset();
+        await using var host = await JobsTestHost.StartAsync();
+
+        await host.Boot();
+        await host.Drain();
+
+        BootOnce.Executions.Should().Be(1);
     }
 
     [Fact]

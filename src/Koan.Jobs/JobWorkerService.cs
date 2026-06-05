@@ -31,8 +31,12 @@ internal sealed class JobWorkerService : BackgroundService
     {
         if (_options.Mode == JobMode.Inline || !_options.EnableWorker) return;
 
-        try { await _scheduler.RecoverAsync(stoppingToken); }
-        catch (Exception ex) { _logger.LogError(ex, "Job boot recovery failed"); }
+        try
+        {
+            await _scheduler.RecoverAsync(stoppingToken);          // reclaim anything left mid-flight by a crash
+            await _scheduler.SubmitBootActionsAsync(stoppingToken); // fire @boot actions once
+        }
+        catch (Exception ex) { _logger.LogError(ex, "Job boot sequence failed"); }
 
         var lastReap = _clock.GetUtcNow();
         while (!stoppingToken.IsCancellationRequested)
@@ -45,7 +49,7 @@ internal sealed class JobWorkerService : BackgroundService
                     await _scheduler.ReapAsync(stoppingToken);
                     lastReap = now;
                 }
-                await _scheduler.ReleaseScheduledAsync(stoppingToken);
+                await _scheduler.TriggerDueAsync(stoppingToken);   // recurring initiator: submit due scheduled actions
                 await _orchestrator.DrainAsync(stoppingToken);
             }
             catch (OperationCanceledException) { break; }

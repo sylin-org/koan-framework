@@ -63,7 +63,8 @@ public sealed class JobsTestHost : IAsyncDisposable
 
     public void Advance(TimeSpan by) => Clock.Advance(by);
     public Task Drain(CancellationToken ct = default) => Orchestrator.DrainAsync(ct);
-    public Task ReleaseScheduled(CancellationToken ct = default) => Scheduler.ReleaseScheduledAsync(ct);
+    public Task TriggerDue(CancellationToken ct = default) => Scheduler.TriggerDueAsync(ct);
+    public Task Boot(CancellationToken ct = default) => Scheduler.SubmitBootActionsAsync(ct);
     public Task Reap(CancellationToken ct = default) => Scheduler.ReapAsync(ct);
 
     public Task<JobStatus?> StatusOf<T>(string workId) where T : Entity<T>, IKoanJob<T>

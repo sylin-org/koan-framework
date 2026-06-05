@@ -260,13 +260,43 @@ public sealed class SweepTick : Entity<SweepTick>, IKoanJob<SweepTick>
     public static void Reset() => Executions = 0;
 }
 
-/// <summary>Level-triggered reconcile: a scheduled action that runs only when its sweep releases it.</summary>
+/// <summary>Interval-scheduled reconcile: the scheduler submits a fresh job on its cadence.</summary>
 [JobAction(Stage.PrepareToFetch, Schedule = "00:10:00")]
 public sealed class Reconciled : Entity<Reconciled>, IKoanJob<Reconciled>
 {
     public static int Executions;
 
     public static Task Execute(Reconciled job, JobContext ctx, CancellationToken ct)
+    {
+        Interlocked.Increment(ref Executions);
+        return Task.CompletedTask;
+    }
+
+    public static void Reset() => Executions = 0;
+}
+
+/// <summary>A <c>@boot</c> action — submitted once at startup.</summary>
+[JobAction("init", Schedule = "@boot")]
+public sealed class BootOnce : Entity<BootOnce>, IKoanJob<BootOnce>
+{
+    public static int Executions;
+
+    public static Task Execute(BootOnce job, JobContext ctx, CancellationToken ct)
+    {
+        Interlocked.Increment(ref Executions);
+        return Task.CompletedTask;
+    }
+
+    public static void Reset() => Executions = 0;
+}
+
+/// <summary>A <c>@continuous</c> action — submitted on every scheduler tick.</summary>
+[JobAction("beat", Schedule = "@continuous")]
+public sealed class Heartbeat : Entity<Heartbeat>, IKoanJob<Heartbeat>
+{
+    public static int Executions;
+
+    public static Task Execute(Heartbeat job, JobContext ctx, CancellationToken ct)
     {
         Interlocked.Increment(ref Executions);
         return Task.CompletedTask;

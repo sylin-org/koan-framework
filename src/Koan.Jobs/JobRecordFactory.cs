@@ -4,16 +4,13 @@ namespace Koan.Jobs;
 /// so both compute lane / coalesce key / gate key / deadline identically.</summary>
 internal static class JobRecordFactory
 {
-    /// <summary>A scheduled (level-triggered) action's jobs are <em>parked</em> until their reconcile sweep releases
-    /// them, hence <see cref="DateTimeOffset.MaxValue"/>; edge-triggered jobs are visible now (or after a delay).</summary>
-    public static DateTimeOffset VisibleAt(ResolvedActionPolicy policy, DateTimeOffset now, TimeSpan? after)
-        => policy.Schedule is not null ? DateTimeOffset.MaxValue : after is { } d ? now + d : now;
-
     public static JobRecord Create(
         JobTypeBinding binding, ResolvedActionPolicy policy, object workItem,
         string workId, string action, DateTimeOffset now, TimeSpan? after, string? correlationId)
     {
-        var visibleAt = VisibleAt(policy, now, after);
+        // Scheduling is an initiator concern (the scheduler submits on a cadence), not a job state — every job is
+        // visible now (or after an explicit delay). No parking.
+        var visibleAt = after is { } d ? now + d : now;
         var rec = new JobRecord
         {
             WorkType = binding.WorkType,

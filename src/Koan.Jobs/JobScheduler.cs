@@ -4,13 +4,15 @@ using Microsoft.Extensions.Options;
 namespace Koan.Jobs;
 
 /// <summary>
-/// Drives the level-triggered sweeps (JOBS-0005 §6). One engine subsumes the three legacy services: the reaper
-/// (<c>@continuous</c>), boot recovery (<c>@boot</c>), and user-declared recurring reconciles. A scheduled action's
-/// jobs are parked at submit and this releases (makes due) the ones whose interval has elapsed.
+/// The recurring initiator (JOBS-0005 §6). Scheduling is separated from jobs: a scheduled action does not park —
+/// the scheduler <b>submits a fresh job on its cadence</b>, going through the normal claim/run/settle path.
+/// Recurrence comes from re-submitting; overlap is collapsed by coalescing (a stable <c>[JobIdempotent]</c> key).
+/// One engine subsumes the legacy reaper (<c>@continuous</c> reclaim), boot recovery (<c>@boot</c>), and recurring
+/// reconciles. Every submit is a type-level <see cref="IJobCoordinator.TriggerAsync"/> against the per-type singleton.
 /// </summary>
 public sealed class JobScheduler
 {
-    private readonly IJobLedger _ledger;
+    private readonly IJobCoordinator _coordinator;
     private readonly JobTypeRegistry _registry;
     private readonly JobOrchestrator _orchestrator;
     private readonly JobsOptions _options;
@@ -18,10 +20,10 @@ public sealed class JobScheduler
     private readonly ILogger<JobScheduler> _logger;
     private readonly Dictionary<(string Type, string Action), DateTimeOffset> _lastRun = new();
 
-    public JobScheduler(IJobLedger ledger, JobTypeRegistry registry, JobOrchestrator orchestrator,
+    public JobScheduler(IJobCoordinator coordinator, JobTypeRegistry registry, JobOrchestrator orchestrator,
         IOptions<JobsOptions> options, TimeProvider clock, ILogger<JobScheduler> logger)
     {
-        _ledger = ledger;
+        _coordinator = coordinator;
         _registry = registry;
         _orchestrator = orchestrator;
         _options = options.Value;
@@ -32,12 +34,23 @@ public sealed class JobScheduler
     /// <summary>Reclaim Running jobs whose lease lapsed (the reaper).</summary>
     public Task ReapAsync(CancellationToken ct = default) => _orchestrator.ReapAsync(ct);
 
-    /// <summary>Boot recovery: reclaim anything left mid-flight by a crash. With the ledger as truth there is no
-    /// volatile queue to rebuild — reaping the lapsed-lease set is the whole job.</summary>
+    /// <summary>Boot recovery: reclaim anything left mid-flight by a crash. The ledger is the truth, so reaping the
+    /// lapsed-lease set is the whole job.</summary>
     public Task RecoverAsync(CancellationToken ct = default) => ReapAsync(ct);
 
-    /// <summary>Release the parked jobs of every scheduled action whose interval has elapsed (the recurring reconcile).</summary>
-    public async Task ReleaseScheduledAsync(CancellationToken ct = default)
+    /// <summary>Submit each <c>@boot</c> action once (called at startup).</summary>
+    public async Task SubmitBootActionsAsync(CancellationToken ct = default)
+    {
+        foreach (var binding in _registry.All)
+            foreach (var action in binding.ScheduledActions(_options))
+                if (ParseSchedule(action.Schedule).Kind == ScheduleKind.Boot)
+                    await _coordinator.TriggerAsync(binding.WorkType, action.Action, ct);
+    }
+
+    /// <summary>Submit a fresh job for every scheduled action whose cadence is due. The worker calls this each tick;
+    /// tests call it explicitly. First fire is immediate; thereafter gated by the interval. <c>@continuous</c> fires
+    /// every tick.</summary>
+    public async Task TriggerDueAsync(CancellationToken ct = default)
     {
         var now = _clock.GetUtcNow();
         foreach (var binding in _registry.All)
@@ -48,7 +61,7 @@ public sealed class JobScheduler
                 if (kind is ScheduleKind.Boot or ScheduleKind.None) continue;
                 if (kind is ScheduleKind.Cron)
                 {
-                    _logger.LogWarning("Cron schedule '{Schedule}' on {Type}.{Action} is not yet supported (deferred); skipping.",
+                    _logger.LogWarning("Cron schedule '{Schedule}' on {Type}.{Action} is not yet supported; skipping.",
                         action.Schedule, binding.WorkType, action.Action);
                     continue;
                 }
@@ -56,14 +69,7 @@ public sealed class JobScheduler
                 var key = (binding.WorkType, action.Action);
                 if (_lastRun.TryGetValue(key, out var last) && now - last < interval) continue;
                 _lastRun[key] = now;
-
-                foreach (var rec in await _ledger.InStage(binding.WorkType, action.Action, ct))
-                {
-                    if (rec.VisibleAt <= now) continue; // already due
-                    rec.VisibleAt = now;
-                    rec.Transitions.Add(new JobTransition { At = now, From = rec.Status, To = rec.Status, Note = "released by schedule" });
-                    await _ledger.Update(rec, ct);
-                }
+                await _coordinator.TriggerAsync(binding.WorkType, action.Action, ct);
             }
         }
     }
