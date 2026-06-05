@@ -266,28 +266,41 @@ Once one job hits the 429 and calls `Backoff`, every other job for the same `Hos
 
 ## 7. Scheduling: run work on a cadence
 
-**Concept.** Besides kicking a job off directly (edge-triggered), an action can be **scheduled**—Koan periodically sweeps every record resting in that stage and runs it. It's the reconcile-loop model: edge for latency, schedule for "make sure this keeps happening."
+**Concept.** Besides kicking a job off directly (edge-triggered), an action can be **scheduled**. On the cadence you declare, Koan submits a fresh job for that action and runs it the normal way—claim, execute, settle. It's the reconcile-loop model: edge for latency, schedule for "make sure this keeps happening."
 
 **Recipe.** Add a `Schedule` to the action's `[JobAction]`.
 
 **Sample.**
 
 ```csharp
-[JobAction(Stage.PrepareToFetch, Schedule = "00:10:00")]   // every 10 minutes
-public sealed class PresetPackage : Entity<PresetPackage>, IKoanJob<PresetPackage> { … }
+[JobAction("Reconcile",   Schedule = "00:10:00")]   // every 10 minutes (a TimeSpan interval)
+[JobAction("NightlySweep", Schedule = "0 2 * * *")] // cron — daily at 02:00 UTC
+[JobAction("Warm",         Schedule = "@boot")]      // once at startup
+[JobAction("Pump",         Schedule = "@continuous")]// every scheduler tick
+public sealed class Maintenance : Entity<Maintenance>, IKoanJob<Maintenance> { … }
 ```
 
-`Schedule` accepts an **interval** (`"00:10:00"`) or a **sentinel** (`@continuous`, `@boot`). A scheduled action's jobs wait for their sweep rather than running on submit, so the cadence is exactly the schedule.
+`Schedule` accepts a **TimeSpan interval** (`"00:10:00"`), a **cron** expression (`"0 2 * * *"`), or a **sentinel** (`@boot`, `@continuous`). A scheduled action runs on its own **singleton** work-item, so its handler typically does the bulk operation or fans out per-entity submits:
 
-**When to use it.** Periodic reconciliation, retries of a whole class of work, "every night at…" maintenance. It also makes the system self-healing: if a one-off submission is ever missed, the next sweep picks the work up anyway.
+```csharp
+public static async Task Execute(Maintenance _, JobContext ctx, CancellationToken ct)
+{
+    foreach (var pkg in await Package.Query(p => p.NeedsRefresh, ct))
+        await pkg.Job.Submit("MirrorRefresh");   // the tick fans out edge jobs; the orchestrator stays domain-ignorant
+}
+```
+
+Pair a scheduled action with `[JobIdempotent]` (a stable key) so an overlapping tick **coalesces** onto the one still in flight instead of piling up.
+
+**When to use it.** Periodic reconciliation, retries of a whole class of work, "every night at…" maintenance. It also makes the system self-healing: edge submits give low latency, the schedule guarantees the work eventually happens. To run a scheduled action **on demand**, see `Trigger` in §8.
 
 ---
 
 ## 8. Batches and the type-level facade
 
-**Concept.** `model.Job.X` operates on one instance; `MyModel.Jobs.X` is the **whole job subsystem** for the type—batch submit, query, cancel by id.
+**Concept.** `model.Job.X` operates on one instance; `MyModel.Jobs.X` is the **whole job subsystem** for the type—batch submit, trigger a type-level action, query, cancel by id.
 
-**Recipe.** Use the instance accessor for one item, the static facade for many.
+**Recipe.** Use the instance accessor for one item, the static facade for many (or for no instance at all).
 
 **Sample.**
 
@@ -299,13 +312,18 @@ await pkg.Job.Submit(Stage.Fetch);
 List<PresetPackage> packages = …;
 await packages.Submit(Stage.Fetch);
 
+// run a type-level action now, with no instance (the on-demand twin of a schedule)
+await PresetPackage.Jobs.Trigger(Stage.Discover);
+
 // the type's job subsystem
 await PresetPackage.Jobs.Cancel(id);
 var running = await PresetPackage.Jobs.WithStatus(JobStatus.Running);
 var mine    = await PresetPackage.Jobs.Query(new JobQuery(Action: Stage.Fetch));
 ```
 
-**When to use it.** `list.Submit(action)` for fan-out; `MyModel.Jobs` for dashboards, admin actions, and operating on jobs by id.
+**`Trigger` vs `Submit`.** `instance.Job.Submit(action)` runs the action for *that* instance; `MyModel.Jobs.Trigger(action)` runs it at the **type level** against an auto-provisioned singleton—the manual counterpart to a `Schedule`. Both return a `JobHandle`, so you can `await (await …).Completion(timeout)` to run-and-wait.
+
+**When to use it.** `list.Submit(action)` for fan-out; `Jobs.Trigger(action)` for "run the nightly sweep now" admin actions; `MyModel.Jobs` for dashboards and operating on jobs by id.
 
 ---
 
@@ -415,6 +433,7 @@ await myJob.Job.Submit();                 await myJob.Job.Submit(action);
 await myJob.Job.Submit(action, after);    await list.Submit(action);
 await myJob.Job.Cancel();                 await MyJob.Jobs.Cancel(id);
 await myJob.Job.Status();                 await MyJob.Jobs.WithStatus(JobStatus.Running);
+await MyJob.Jobs.Trigger(action);         // type-level action, no instance (schedule's on-demand twin)
 
 // From a handler
 ctx.Progress(0.4, "…");  ctx.ContinueWith(next);  ctx.StopChain();

@@ -412,13 +412,14 @@ Built as a single project **`src/Koan.Jobs`** (no Abstractions/Core split — ex
 - **`[JobPersistence(Auto | InMemory | DataStore)]`** added (§5) — per-type durability override (Wolverine-style durable-vs-buffered). A `Provider` pin to a named store is reserved.
 - **`JobsOptions.ClaimStrategy`** — the durable claim is graded: `Optimistic` (default; last-write-wins under the at-least-once + idempotent contract) and `Ticket` (a leaderless GUIDv7 "bakery" election over the parallel ticket set — adapter-generic including Mongo, probabilistic, NTP-dependent). The hard-guarantee **`NativeCas`** tier is deferred to a future Koan.Data primitive (a generic conditional-update / `ExecuteUpdate`-style capability) plus a consensus/sync module.
 - **Clock = `System.TimeProvider`** (no bespoke `IClock`); `FakeTimeProvider` drives deterministic tests.
-- **Scheduled actions** use a *parked-and-released* model: a scheduled job waits (a future-visibility sentinel) until its reconcile sweep releases it on the declared interval.
+- **Scheduling is an initiator concern, not a job state.** A scheduled action does not park; the scheduler submits a fresh job on the cadence (TimeSpan interval / cron via Cronos / `@boot` / `@continuous`) against the per-type singleton, and recurrence comes from re-submitting (overlap coalesces via `[JobIdempotent]`). `MyModel.Jobs.Trigger(action)` is the on-demand twin (a type-level singleton submit).
 - **Chain advance** = settle the current `JobRecord` Completed and append a **new** `JobRecord` for the next stage (one ledger entry per stage; the work-item carries state forward by id).
 
 **Remaining**
 - Per-DB container matrix (Mongo / Postgres / SQL Server) + a crash-recovery harness (process restart, stale-lease guard, mid-chain resume).
 - A behavioral-suite convergence refactor so the *same* suite runs on every tier (ARCH-0079).
 - The distributed tier: competing-consumers test, cross-node gate, the `+bus` transport package, and per-type `[JobPersistence]` two-ledger routing.
+- Transactional outbox (`Submit`-on-commit) and the terminal archival sweep — both still pending.
 - Boot-report polish.
 
 **Authoring guide:** [Background Jobs How-To](../guides/jobs-howto.md).
