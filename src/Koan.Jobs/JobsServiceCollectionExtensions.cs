@@ -16,9 +16,13 @@ public static class JobsServiceCollectionExtensions
         if (configure is not null) services.Configure(configure);
 
         services.TryAddSingleton(TimeProvider.System);
-        // Capability election: a durable data adapter present → data-backed ledger; else in-memory (Local tier).
+        // Capability election. No durable adapter → in-memory only (Local tier). Durable adapter present →
+        // RoutingJobLedger so [JobPersistence(InMemory)] types stay volatile while Auto/DataStore types persist.
         services.TryAddSingleton<IJobLedger>(sp => HasDurableDataAdapter(sp)
-            ? new DataJobLedger(sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<IOptions<JobsOptions>>())
+            ? new RoutingJobLedger(
+                new InMemoryJobLedger(),
+                new DataJobLedger(sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<IOptions<JobsOptions>>()),
+                sp.GetRequiredService<JobTypeRegistry>())
             : new InMemoryJobLedger());
         services.TryAddSingleton(_ => JobTypeRegistry.FromDiscovery());
         services.TryAddSingleton<JobOrchestrator>();

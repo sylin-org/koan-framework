@@ -361,7 +361,7 @@ Honor it in long-running handlers by passing `ct` to the calls you `await`. A ca
 public sealed class PingJob : Entity<PingJob>, IKoanJob<PingJob> { … }
 ```
 
-`Auto` (default) follows your adapters; `InMemory` keeps a job ephemeral even when a store is present; `DataStore` insists on durability.
+`Auto` (default) follows your adapters; `InMemory` keeps a job's queue state volatile even when a store is present (the orchestration is ephemeral—handy for a torrent of fire-and-forget work you don't want touching the database); `DataStore` insists on durability. Mixed tiers coexist in one app: durable and in-memory jobs run side by side, and a cooperative gate (§6) set by one is honored by the other—so a 429 backoff still protects a shared host across tiers.
 
 **Claim strategy.** When several nodes compete for the same job, choose how they settle it in `JobsOptions`:
 

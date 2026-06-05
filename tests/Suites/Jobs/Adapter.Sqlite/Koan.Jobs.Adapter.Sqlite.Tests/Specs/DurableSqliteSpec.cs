@@ -11,10 +11,11 @@ namespace Koan.Jobs.Adapter.Sqlite.Tests.Specs;
 public sealed class DurableSqliteSpec
 {
     [Fact]
-    public async Task election_picks_the_data_backed_ledger()
+    public async Task election_picks_the_routing_ledger_over_a_durable_adapter()
     {
         await using var host = await JobsHarness.StartSqliteAsync();
-        host.Ledger.Should().BeOfType<DataJobLedger>();
+        // A durable adapter elects the RoutingJobLedger: durable for Auto/DataStore types, volatile for InMemory.
+        host.Ledger.Should().BeOfType<RoutingJobLedger>();
     }
 
     [Fact]
