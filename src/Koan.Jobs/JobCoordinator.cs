@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Koan.Data.Core;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 namespace Koan.Jobs;
@@ -14,18 +15,29 @@ public sealed class JobCoordinator : IJobCoordinator
     private readonly JobTypeRegistry _registry;
     private readonly JobOrchestrator _orchestrator;
     private readonly IJobTransport _transport;
+    private readonly IServiceProvider _services;
     private readonly JobsOptions _options;
     private readonly TimeProvider _clock;
 
     public JobCoordinator(IJobLedger ledger, JobTypeRegistry registry, JobOrchestrator orchestrator,
-        IJobTransport transport, IOptions<JobsOptions> options, TimeProvider clock)
+        IJobTransport transport, IServiceProvider services, IOptions<JobsOptions> options, TimeProvider clock)
     {
         _ledger = ledger;
         _registry = registry;
         _orchestrator = orchestrator;
         _transport = transport;
+        _services = services;
         _options = options.Value;
         _clock = clock;
+    }
+
+    /// <summary>Resolve a job's gate key at submit. A property-based <c>[JobGate]</c> is read inline; a method-based
+    /// resolver (§18) runs inside a DI scope so it can use scoped services (or load a related entity).</summary>
+    private async Task<string?> ResolveGateKey(JobTypeBinding binding, object workItem, CancellationToken ct)
+    {
+        if (!binding.HasGateResolver) return binding.GateKey(workItem);
+        using var scope = _services.CreateScope();
+        return await binding.ResolveGateKey(workItem, scope.ServiceProvider, ct);
     }
 
     public async Task<JobHandle> SubmitAsync(object workItem, string action, TimeSpan? after, CancellationToken ct)
@@ -44,7 +56,8 @@ public sealed class JobCoordinator : IJobCoordinator
             if (existing is not null) return Handle(existing.Id); // collapse concurrent / duplicate submit
         }
 
-        var rec = JobRecordFactory.Create(binding, policy, workItem, workId, action, now, after, Correlation());
+        var gateKey = await ResolveGateKey(binding, workItem, ct);
+        var rec = JobRecordFactory.Create(binding, policy, workItem, workId, action, now, after, Correlation(), gateKey);
         await _ledger.Append(rec, ct);
 
         // Transactional outbox: inside an ambient transaction the work-item Save + the ledger Append enlist (TrackSave)
@@ -72,7 +85,8 @@ public sealed class JobCoordinator : IJobCoordinator
             if (coalesceKey is not null && await _ledger.FindActiveByCoalesceKey(binding.WorkType, coalesceKey, ct) is not null)
                 continue;
 
-            batch.Add(JobRecordFactory.Create(binding, policy, workItem, workId, action, now, after, correlation));
+            var gateKey = await ResolveGateKey(binding, workItem, ct);
+            batch.Add(JobRecordFactory.Create(binding, policy, workItem, workId, action, now, after, correlation, gateKey));
         }
 
         if (batch.Count > 0) await _ledger.AppendMany(batch, ct);

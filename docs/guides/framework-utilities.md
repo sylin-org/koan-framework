@@ -624,7 +624,7 @@ await mailbatch.Submit();                  // batch (IEnumerable<T>)
 | `[JobAction(action, Timeout/MaxAttempts/OnFailure/Lane/MaxConcurrency/Schedule/Deadline/MaxReschedules)]` | per-action policy |
 | `[JobChain(a,b,c)]` | linear pipeline (auto-advance, one ledger entry per stage) |
 | `[JobIdempotent(keys)]` | collapse concurrent / duplicate submits |
-| `[JobGate(prop)]` | shared resource gate for cooperative backoff |
+| `[JobGate(member)]` | shared resource gate for cooperative backoff; `member` is a property **or** an async resolver method `Task<string?>(IServiceProvider, CancellationToken)` for runtime-derived keys (§18) |
 | `[JobPersistence(Auto\|InMemory\|DataStore)]` | per-type durability routing (`RoutingJobLedger`) |
 | `[ParallelSafe]` | opt out of per-entity serialization (default: jobs for one entity run one at a time) |
 | `JobContext` verbs | `Reschedule(after\|until)` (defer, no retry consumed), `Backoff(after, key)` (cross-node gate), `ContinueWith` / `StopChain`, `Progress` |

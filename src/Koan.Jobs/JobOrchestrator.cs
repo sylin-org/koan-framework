@@ -170,7 +170,8 @@ public sealed class JobOrchestrator
         if (next is not null)
         {
             var nextPolicy = binding.ResolvePolicy(next, _options);
-            var nextRec = JobRecordFactory.Create(binding, nextPolicy, workItem, rec.WorkId, next, now, null, rec.CorrelationId);
+            // Chain stages inherit the gate key resolved at submit (the chain's gate pool is fixed — §18).
+            var nextRec = JobRecordFactory.Create(binding, nextPolicy, workItem, rec.WorkId, next, now, null, rec.CorrelationId, rec.GateKey);
             await _ledger.Append(nextRec, CancellationToken.None);
         }
     }
@@ -201,7 +202,7 @@ public sealed class JobOrchestrator
             if (wi is not null)
             {
                 var nextPolicy = binding.ResolvePolicy(next, _options);
-                await _ledger.Append(JobRecordFactory.Create(binding, nextPolicy, wi, rec.WorkId, next, now, null, rec.CorrelationId), CancellationToken.None);
+                await _ledger.Append(JobRecordFactory.Create(binding, nextPolicy, wi, rec.WorkId, next, now, null, rec.CorrelationId, rec.GateKey), CancellationToken.None);
             }
         }
     }

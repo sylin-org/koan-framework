@@ -505,4 +505,40 @@ public abstract class JobBehaviorSuite
         await host.Drain();
         ExclusiveJob.Peak.Should().Be(2, "serialization is per-entity, not global — different entities still parallelize");
     }
+
+    // --- runtime-resolved gate keys (§18) ---
+
+    [Fact]
+    public async Task a_resolved_gate_key_defers_only_same_host_siblings()
+    {
+        RemoteFetch.Reset();
+        await using var host = await CreateHostAsync();
+        var xma = new RemoteTarget { Host = "xivmodarchive.com" }; await RemoteTarget.Upsert(xma);
+        var gh  = new RemoteTarget { Host = "github.com" };        await RemoteTarget.Upsert(gh);
+        RemoteFetch.Throttled = "xivmodarchive.com";
+
+        // 1. one xivmodarchive fetch hits the 503 and backs off the resolved host pool.
+        var first = new RemoteFetch { TargetId = xma.Id };
+        await first.Job.Submit(RemoteFetch.Refresh);
+        await host.Drain();
+        RemoteFetch.Executed.Should().Be(1);
+        RemoteFetch.Ran.Should().NotContain(first.Id, "it backed off, it didn't complete");
+
+        // 2. siblings submitted while the gate is active: same host is gated at dispatch (never runs); other host runs.
+        var xmaSibling = new RemoteFetch { TargetId = xma.Id };
+        var ghJob      = new RemoteFetch { TargetId = gh.Id };
+        await xmaSibling.Job.Submit(RemoteFetch.Refresh);
+        await ghJob.Job.Submit(RemoteFetch.Refresh);
+        await host.Drain();
+        RemoteFetch.Ran.Should().Contain(ghJob.Id, "a different host is unaffected by the xivmodarchive gate");
+        RemoteFetch.Ran.Should().NotContain(xmaSibling.Id);
+        RemoteFetch.Executed.Should().Be(2, "the gated sibling never ran — only the github fetch executed");
+
+        // 3. host recovers, gate releases → the xivmodarchive jobs run.
+        RemoteFetch.Throttled = null;
+        host.Advance(TimeSpan.FromMinutes(11));
+        await host.Drain();
+        RemoteFetch.Ran.Should().Contain(first.Id);
+        RemoteFetch.Ran.Should().Contain(xmaSibling.Id);
+    }
 }

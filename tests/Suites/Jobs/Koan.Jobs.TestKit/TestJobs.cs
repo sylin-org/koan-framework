@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Koan.Data.Core.Model;
 using Koan.Jobs;
 
@@ -383,4 +384,42 @@ public sealed class ParallelJob : Entity<ParallelJob>, IKoanJob<ParallelJob>
     }
 
     public static void Reset() { Current = 0; Peak = 0; }
+}
+
+/// <summary>A related entity carrying the gate identity (the host) the work-item itself does not declare.</summary>
+public sealed class RemoteTarget : Entity<RemoteTarget>
+{
+    public string Host { get; set; } = "";
+}
+
+/// <summary>Runtime-resolved gate key (§18): the host isn't on the work-item — the resolver loads the related
+/// <see cref="RemoteTarget"/> at submit. One host's 503 (<c>ctx.Backoff</c>) defers only same-host siblings.</summary>
+[JobGate(nameof(ResolveHostGate))]
+public sealed class RemoteFetch : Entity<RemoteFetch>, IKoanJob<RemoteFetch>
+{
+    public const string Refresh = nameof(Refresh);
+    public string TargetId { get; set; } = "";
+    public static readonly ConcurrentBag<string> Ran = new();
+    public static int Executed;
+    public static string? Throttled;     // host that currently returns 503 (set by the test)
+
+    public async Task<string?> ResolveHostGate(IServiceProvider sp, CancellationToken ct)
+    {
+        var target = await RemoteTarget.Get(TargetId, ct);   // async, off-entity resolution
+        return target is null ? null : $"host:{target.Host}";
+    }
+
+    public static async Task Execute(RemoteFetch job, JobContext ctx, CancellationToken ct)
+    {
+        Interlocked.Increment(ref Executed);
+        var target = await RemoteTarget.Get(job.TargetId, ct);
+        if (target is not null && target.Host == Throttled)
+        {
+            ctx.Backoff(TimeSpan.FromMinutes(10));   // 503 → back off the resolved host pool (default key = resolved GateKey)
+            return;
+        }
+        Ran.Add(job.Id);
+    }
+
+    public static void Reset() { Ran.Clear(); Executed = 0; Throttled = null; }
 }

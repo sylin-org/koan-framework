@@ -6,7 +6,7 @@ internal static class JobRecordFactory
 {
     public static JobRecord Create(
         JobTypeBinding binding, ResolvedActionPolicy policy, object workItem,
-        string workId, string action, DateTimeOffset now, TimeSpan? after, string? correlationId)
+        string workId, string action, DateTimeOffset now, TimeSpan? after, string? correlationId, string? gateKey)
     {
         // Scheduling is an initiator concern (the scheduler submits on a cadence), not a job state — every job is
         // visible now (or after an explicit delay). No parking.
@@ -21,7 +21,7 @@ internal static class JobRecordFactory
             FirstSubmittedAt = now,
             Lane = policy.Lane,
             CoalesceKey = binding.CoalesceKey(workItem, action),
-            GateKey = binding.GateKey(workItem),
+            GateKey = gateKey,                   // resolved by the caller (property value or async resolver — §18)
             Exclusive = !binding.ParallelSafe,   // per-entity serialization unless the type opts out
             Deadline = now + policy.Deadline,
             CorrelationId = correlationId,

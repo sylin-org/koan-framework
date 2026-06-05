@@ -13,6 +13,7 @@ public sealed class JobTypeBinding
     private readonly IReadOnlyDictionary<string, JobActionAttribute> _actions;
     private readonly PropertyInfo[] _coalesceProps;
     private readonly PropertyInfo? _gateProp;
+    private readonly Func<object, IServiceProvider, CancellationToken, Task<string?>>? _gateResolver;
 
     internal JobTypeBinding(
         string workType,
@@ -28,7 +29,8 @@ public sealed class JobTypeBinding
         bool parallelSafe,
         IReadOnlyDictionary<string, JobActionAttribute> actions,
         PropertyInfo[] coalesceProps,
-        PropertyInfo? gateProp)
+        PropertyInfo? gateProp,
+        Func<object, IServiceProvider, CancellationToken, Task<string?>>? gateResolver)
     {
         WorkType = workType;
         ClrType = clrType;
@@ -44,6 +46,7 @@ public sealed class JobTypeBinding
         _actions = actions;
         _coalesceProps = coalesceProps;
         _gateProp = gateProp;
+        _gateResolver = gateResolver;
     }
 
     /// <summary>Stable type key (the work-item type's full name); stored on each <see cref="JobRecord.WorkType"/>.</summary>
@@ -104,8 +107,17 @@ public sealed class JobTypeBinding
         return string.Join('|', parts);
     }
 
-    /// <summary>The gate key a work-item contends for (from <c>[JobGate(prop)]</c>), or null.</summary>
+    /// <summary>The gate key from a <c>[JobGate(property)]</c> (sync, no DI), or null. For the method-form resolver
+    /// use <see cref="ResolveGateKey"/>; check <see cref="HasGateResolver"/> first.</summary>
     public string? GateKey(object workItem) => _gateProp?.GetValue(workItem)?.ToString();
+
+    /// <summary>True when <c>[JobGate]</c> names an async resolver method rather than a property (JOBS-0005 §18).</summary>
+    public bool HasGateResolver => _gateResolver is not null;
+
+    /// <summary>Resolve the gate key at submit: the async resolver if the type declared one (<c>[JobGate(nameof(Method))]</c>
+    /// where the member is <c>Task&lt;string?&gt; Method(IServiceProvider, CancellationToken)</c>), else the property value.</summary>
+    public Task<string?> ResolveGateKey(object workItem, IServiceProvider services, CancellationToken ct)
+        => _gateResolver is not null ? _gateResolver(workItem, services, ct) : Task.FromResult(GateKey(workItem));
 
     private static TimeSpan? ParseSpan(string? s)
         => string.IsNullOrWhiteSpace(s) ? null : TimeSpan.TryParse(s, out var t) ? t : null;
@@ -139,9 +151,25 @@ internal static class JobTypeBinder
             .Select(k => clr.GetProperty(k, PropFlags)
                 ?? throw new InvalidOperationException($"[JobIdempotent] key '{k}' is not a public property of {clr.Name}."))
             .ToArray();
-        var gateProp = gate is null ? null
-            : clr.GetProperty(gate.Property, PropFlags)
-              ?? throw new InvalidOperationException($"[JobGate] property '{gate.Property}' is not a public property of {clr.Name}.");
+        // [JobGate] names a property (sync value) OR a method (async, DI-capable resolver — JOBS-0005 §18).
+        PropertyInfo? gateProp = null;
+        Func<object, IServiceProvider, CancellationToken, Task<string?>>? gateResolver = null;
+        if (gate is not null)
+        {
+            gateProp = clr.GetProperty(gate.Property, PropFlags);
+            if (gateProp is null)
+            {
+                var method = clr.GetMethod(gate.Property, PropFlags, binder: null,
+                    types: new[] { typeof(IServiceProvider), typeof(CancellationToken) }, modifiers: null);
+                if (method is null || method.ReturnType != typeof(Task<string?>))
+                    throw new InvalidOperationException(
+                        $"[JobGate] member '{gate.Property}' on {clr.Name} must be a public property, or a public method " +
+                        $"'Task<string?> {gate.Property}(IServiceProvider, CancellationToken)'.");
+                var del = (Func<T, IServiceProvider, CancellationToken, Task<string?>>)Delegate.CreateDelegate(
+                    typeof(Func<T, IServiceProvider, CancellationToken, Task<string?>>), method);
+                gateResolver = (o, sp, ct) => del((T)o, sp, ct);
+            }
+        }
 
         // Bound once: the static-abstract handler and the active-record load/save on the constructed Entity<T> base.
         Func<string, CancellationToken, Task<object?>> load = async (id, ct) => await Entity<T>.Get(id, ct);
@@ -153,6 +181,6 @@ internal static class JobTypeBinder
         return new JobTypeBinding(
             clr.FullName!, clr, load, save, execute, getId, newSingleton, chain,
             persist?.Mode ?? JobPersistenceMode.Auto, persist?.Provider, parallelSafe,
-            actions, coalesceProps, gateProp);
+            actions, coalesceProps, gateProp, gateResolver);
     }
 }

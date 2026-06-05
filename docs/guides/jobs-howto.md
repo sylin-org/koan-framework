@@ -261,6 +261,25 @@ public sealed class FetchJob : Entity<FetchJob>, IKoanJob<FetchJob>
 
 Once one job hits the 429 and calls `Backoff`, every other job for the same `Host` is deferred **at dispatch—without running**—until the cooldown passes. `ctx.State` gives the handler its own history (`Reschedules`, `Attempt`, `FirstSubmittedAt`, …) so it can escalate from "+5 minutes" to "tomorrow morning."
 
+**When the gate identity isn't a property on the entity.** `[JobGate]` can name a **method** instead of a property — an async resolver that composes the key from a related entity, a registry, or anything in DI, evaluated once at submit:
+
+```csharp
+[JobGate(nameof(ResolveHostGate))]
+public sealed class Mirror : Entity<Mirror>, IKoanJob<Mirror>
+{
+    public string PackageId { get; set; } = "";
+
+    // the host lives on the navigated Package, not on Mirror — so resolve it
+    public async Task<string?> ResolveHostGate(IServiceProvider sp, CancellationToken ct)
+    {
+        var pkg = await Package.Get(PackageId, ct);
+        return pkg is null ? null : $"host:{new Uri(pkg.UpstreamArchive).Host}";
+    }
+}
+```
+
+The resolved key is frozen onto the job exactly like a property gate, so dispatch matching is unchanged and `ctx.Backoff()` (no argument) reuses it — one host's 503 defers only the siblings that resolved to the *same* host. No synthetic `Host` column on the entity. (The resolver runs at submit, so the gate identity must be knowable then — true for a host or upstream endpoint; a value chosen only at call time is out of scope.)
+
 - `ctx.Reschedule(TimeSpan after)` / `ctx.Reschedule(DateTimeOffset until)` — defer this job; **no retry consumed**.
 - `ctx.Backoff(TimeSpan after, key?)` — defer **and** gate the resource so peers wait too.
 
@@ -446,7 +465,7 @@ public sealed class MyJob : Entity<MyJob>, IKoanJob<MyJob>
 [JobChain(A, B, C)]                                  // linear pipeline
 [JobAction(A, Timeout="…", MaxAttempts=…, OnFailure=…, Lane="…", MaxConcurrency=…, Schedule="…")]
 [JobIdempotent(nameof(Key))]                          // dedupe + coalesce
-[JobGate(nameof(Host))]                               // shared cooperative-backoff key
+[JobGate(nameof(Host))]                               // shared backoff key — a property, or an async resolver method
 [JobPersistence(JobPersistenceMode.InMemory)]         // per-type durability
 [ParallelSafe]                                        // opt out of per-entity serialization
 
