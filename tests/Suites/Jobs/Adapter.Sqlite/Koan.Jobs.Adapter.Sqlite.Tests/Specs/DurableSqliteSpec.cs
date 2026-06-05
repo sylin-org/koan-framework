@@ -1,3 +1,4 @@
+using Koan.Data.Core;
 using Koan.Jobs.Adapter.Sqlite.Tests.Support;
 
 namespace Koan.Jobs.Adapter.Sqlite.Tests.Specs;
@@ -26,6 +27,45 @@ public sealed class DurableSqliteSpec
 
         DurableJob.Executions.Should().Be(1);
         (await DurableJob.Get(id))!.Output.Should().Be("x-done");
+        (await host.StatusOf<DurableJob>(id)).Should().Be(JobStatus.Completed);
+    }
+
+    [Fact]
+    public async Task submit_in_a_rolled_back_transaction_never_enqueues()
+    {
+        DurableJob.Reset();
+        await using var host = await DurableHost.StartAsync();
+        var j = new DurableJob { Input = "x" };
+        var id = j.Id;
+
+        using (EntityContext.Transaction("rollback"))
+        {
+            await j.Job.Submit();
+            await EntityContext.Rollback();
+        }
+
+        await host.Drain();
+        DurableJob.Executions.Should().Be(0, "a rolled-back transaction must not enqueue the job");
+        (await host.StatusOf<DurableJob>(id)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task submit_in_a_committed_transaction_enqueues_once_on_commit()
+    {
+        DurableJob.Reset();
+        await using var host = await DurableHost.StartAsync();
+        var j = new DurableJob { Input = "y" };
+        var id = j.Id;
+
+        using (EntityContext.Transaction("commit"))
+        {
+            await j.Job.Submit();
+            (await host.StatusOf<DurableJob>(id)).Should().BeNull("the job is deferred until commit (outbox)");
+            await EntityContext.Commit();
+        }
+
+        await host.Drain();
+        DurableJob.Executions.Should().Be(1);
         (await host.StatusOf<DurableJob>(id)).Should().Be(JobStatus.Completed);
     }
 

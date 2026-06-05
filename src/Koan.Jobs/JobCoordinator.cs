@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Koan.Data.Core;
 using Microsoft.Extensions.Options;
 
 namespace Koan.Jobs;
@@ -44,7 +45,10 @@ public sealed class JobCoordinator : IJobCoordinator
         var rec = JobRecordFactory.Create(binding, policy, workItem, workId, action, now, after, Correlation());
         await _ledger.Append(rec, ct);
 
-        if (_options.Mode == JobMode.Inline) await _orchestrator.DrainAsync(ct);
+        // Transactional outbox: inside an ambient transaction the work-item Save + the ledger Append enlist (TrackSave)
+        // and only become claimable on commit (discarded on rollback). Don't inline-drain mid-transaction — the row
+        // isn't visible yet; the worker (or a post-commit drain) picks it up.
+        if (_options.Mode == JobMode.Inline && !EntityContext.InTransaction) await _orchestrator.DrainAsync(ct);
         return Handle(rec.Id);
     }
 
@@ -69,7 +73,7 @@ public sealed class JobCoordinator : IJobCoordinator
         }
 
         if (batch.Count > 0) await _ledger.AppendMany(batch, ct);
-        if (_options.Mode == JobMode.Inline) await _orchestrator.DrainAsync(ct);
+        if (_options.Mode == JobMode.Inline && !EntityContext.InTransaction) await _orchestrator.DrainAsync(ct);
         return batch.Count;
     }
 

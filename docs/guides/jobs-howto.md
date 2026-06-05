@@ -373,6 +373,19 @@ builder.Services.AddKoanJobs(o => o.ClaimStrategy = ClaimStrategy.Ticket);
 
 **When to use which.** Single service → defaults. Multiple replicas pulling the same queue → `Ticket`. A torrent of fire-and-forget pings you don't want cluttering the store → `[JobPersistence(InMemory)]`.
 
+**Transactional submit (outbox).** On the durable tier, a `Submit` inside an ambient transaction is part of that transaction—the job is enqueued **on commit** and **discarded on rollback**. So a job submitted as a side effect of saving an entity can never be "saved but never enqueued," and a rolled-back save never leaves a stray job:
+
+```csharp
+using (EntityContext.Transaction("publish"))
+{
+    await order.Save();
+    await order.Job.Submit(Stage.Notify);   // enqueued only if the transaction commits
+    await EntityContext.Commit();
+}
+```
+
+No configuration—it's automatic whenever a transaction is in scope.
+
 ---
 
 ## 11. Testing your jobs
