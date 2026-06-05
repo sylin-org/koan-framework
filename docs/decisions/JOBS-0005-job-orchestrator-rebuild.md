@@ -426,6 +426,6 @@ Built as a single project **`src/Koan.Jobs`** (no Abstractions/Core split — ex
 - Remaining in this tier: the `+bus` push-transport package (`Koan.Jobs.Transport.Messaging` riding `Koan.Messaging`).
 - **Transactional outbox — shipped** (automatic): on the durable tier a `Submit` inside an ambient transaction enlists (`TrackSave`) and is enqueued on commit / discarded on rollback; inline mode skips its synchronous drain inside a transaction.
 - **Terminal archival — shipped**: a worker sweep (`ArchiveInterval`) purges Completed/Cancelled rows older than `ArchiveAfter` (default 7d) via `IJobLedger.PurgeArchivable`; Failed/Dead are retained (replayable).
-- Boot-report polish.
+- **Boot-report — shipped**: `KoanJobsModule.Report` publishes the discovered job-type count (`jobs.types`); the worker logs a startup summary `[Koan.Jobs] ledger={ledger} · {N} job types · {M} scheduled · claim={strategy}` (the runtime-elected ledger is only available there, not in `Report`). Bootstrap spec asserts both reads resolve and never throw through real `AddKoan()`.
 
 **Authoring guide:** [Background Jobs How-To](../guides/jobs-howto.md).

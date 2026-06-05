@@ -1,9 +1,11 @@
+using System.Linq;
 using System.Threading.Tasks;
 using AwesomeAssertions;
 using Koan.Core;
 using Koan.Jobs;
 using Koan.Testing.Integration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -31,5 +33,13 @@ public sealed class JobsPillarBootstrapSpec
 
         host.Services.GetRequiredService<IJobCoordinator>().Should().NotBeNull();
         host.Services.GetRequiredService<IJobLedger>().Should().NotBeNull();
+
+        // The worker's boot summary ("[Koan.Jobs] ledger=… · N job types · M scheduled · claim=…") and the
+        // module's boot-report both read the registry; prove those reads resolve and never throw.
+        var registry = host.Services.GetRequiredService<JobTypeRegistry>();
+        registry.Should().NotBeNull();
+        var options = host.Services.GetRequiredService<IOptions<JobsOptions>>().Value;
+        var bootSummary = () => registry.All.Sum(b => b.ScheduledActions(options).Count());
+        bootSummary.Should().NotThrow();
     }
 }

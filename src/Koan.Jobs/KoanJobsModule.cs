@@ -17,5 +17,10 @@ public sealed class KoanJobsModule : KoanModule
     public override void Register(IServiceCollection services) => services.AddKoanJobs();
 
     public override void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
-        => module.Describe(Version);
+    {
+        module.Describe(Version);
+        module.SetSetting("jobs.types", b => b
+            .Label("Discovered job types")
+            .Value(JobTypeRegistry.FromDiscovery().Count.ToString()));
+    }
 }

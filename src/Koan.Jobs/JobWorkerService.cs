@@ -1,3 +1,4 @@
+using System.Linq;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -13,15 +14,19 @@ internal sealed class JobWorkerService : BackgroundService
 {
     private readonly JobOrchestrator _orchestrator;
     private readonly JobScheduler _scheduler;
+    private readonly IJobLedger _ledger;
+    private readonly JobTypeRegistry _registry;
     private readonly JobsOptions _options;
     private readonly TimeProvider _clock;
     private readonly ILogger<JobWorkerService> _logger;
 
-    public JobWorkerService(JobOrchestrator orchestrator, JobScheduler scheduler,
-        IOptions<JobsOptions> options, TimeProvider clock, ILogger<JobWorkerService> logger)
+    public JobWorkerService(JobOrchestrator orchestrator, JobScheduler scheduler, IJobLedger ledger,
+        JobTypeRegistry registry, IOptions<JobsOptions> options, TimeProvider clock, ILogger<JobWorkerService> logger)
     {
         _orchestrator = orchestrator;
         _scheduler = scheduler;
+        _ledger = ledger;
+        _registry = registry;
         _options = options.Value;
         _clock = clock;
         _logger = logger;
@@ -30,6 +35,10 @@ internal sealed class JobWorkerService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         if (_options.Mode == JobMode.Inline || !_options.EnableWorker) return;
+
+        var scheduled = _registry.All.Sum(b => b.ScheduledActions(_options).Count());
+        _logger.LogInformation("[Koan.Jobs] ledger={Ledger} · {Types} job types · {Scheduled} scheduled · claim={Claim}",
+            _ledger.GetType().Name, _registry.Count, scheduled, _options.ClaimStrategy);
 
         try
         {
