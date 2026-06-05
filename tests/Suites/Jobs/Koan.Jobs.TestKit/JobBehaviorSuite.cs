@@ -1,0 +1,445 @@
+using AwesomeAssertions;
+using Koan.Jobs;
+using Xunit;
+
+namespace Koan.Jobs.TestKit;
+
+/// <summary>
+/// The behavioral contract of the orchestrator, identical across every tier (ARCH-0079). A tier provides a
+/// <see cref="CreateHostAsync"/>; these specs then run unchanged on in-memory and on each durable adapter — that
+/// sameness is the proof of the constant at-least-once + idempotent guarantee.
+/// </summary>
+public abstract class JobBehaviorSuite
+{
+    /// <summary>Build a harness for this tier (in-memory, SQLite, Mongo, …).</summary>
+    protected abstract Task<JobsHarness> CreateHostAsync(Action<JobsOptions>? configure = null);
+
+    // --- discovery + edge ---
+
+    [Fact]
+    public async Task discovery_binds_job_types()
+    {
+        await using var host = await CreateHostAsync();
+        host.Registry.Count.Should().BeGreaterThan(0);
+        host.Registry.Get(typeof(GreetJob).FullName!).Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task single_action_runs_and_mutates_work_item()
+    {
+        GreetJob.Reset();
+        await using var host = await CreateHostAsync();
+        var j = new GreetJob { Name = "Koan" };
+        var id = j.Id;
+        await j.Job.Submit();
+        await host.Drain();
+        GreetJob.Executions.Should().Be(1);
+        (await GreetJob.Get(id))!.Greeting.Should().Be("Hello, Koan");
+        (await host.StatusOf<GreetJob>(id)).Should().Be(JobStatus.Completed);
+    }
+
+    [Fact]
+    public async Task batch_submit_runs_every_work_item()
+    {
+        GreetJob.Reset();
+        await using var host = await CreateHostAsync();
+        var jobs = Enumerable.Range(0, 25).Select(i => new GreetJob { Name = $"n{i}" }).ToList();
+        await jobs.Submit();
+        await host.Drain();
+        GreetJob.Executions.Should().Be(25);
+    }
+
+    [Fact]
+    public async Task idempotent_submit_coalesces_duplicates()
+    {
+        DedupeJob.Reset();
+        await using var host = await CreateHostAsync();
+        await new DedupeJob { Key = "k1" }.Job.Submit();
+        await new DedupeJob { Key = "k1" }.Job.Submit();
+        await new DedupeJob { Key = "k2" }.Job.Submit();
+        await host.Drain();
+        DedupeJob.Executions.Should().Be(2);
+    }
+
+    // --- chain ---
+
+    [Fact]
+    public async Task linear_chain_advances_and_carries_saga_state()
+    {
+        await using var host = await CreateHostAsync();
+        var p = new Pipeline();
+        var id = p.Id;
+        await p.Job.Submit(Stage.Fetch);
+        await host.Drain();
+        var saved = await Pipeline.Get(id);
+        saved!.Fetched.Should().Be("raw");
+        saved.Parsed.Should().Be("raw-parsed");
+        saved.Minted.Should().BeTrue();
+        saved.Published.Should().BeTrue();
+        saved.Trail.Should().Equal(Stage.Fetch, Stage.Parse, Stage.Mint, Stage.Publish);
+    }
+
+    [Fact]
+    public async Task stop_chain_halts_after_current_step()
+    {
+        BranchJob.Reset();
+        BranchJob.Mode = "stop";
+        await using var host = await CreateHostAsync();
+        var j = new BranchJob();
+        var id = j.Id;
+        await j.Job.Submit("a");
+        await host.Drain();
+        (await BranchJob.Get(id))!.Trail.Should().Equal("a");
+    }
+
+    [Fact]
+    public async Task continue_with_branches_to_an_off_chain_action()
+    {
+        BranchJob.Reset();
+        BranchJob.Mode = "branch";
+        await using var host = await CreateHostAsync();
+        var j = new BranchJob();
+        var id = j.Id;
+        await j.Job.Submit("a");
+        await host.Drain();
+        (await BranchJob.Get(id))!.Trail.Should().Equal("a", "z");
+    }
+
+    [Fact]
+    public async Task on_failure_continue_advances_the_chain()
+    {
+        await using var host = await CreateHostAsync();
+        var j = new ContinueChain();
+        var id = j.Id;
+        await j.Job.Submit(Step.One);
+        await host.Drain();
+        (await ContinueChain.Get(id))!.TwoRan.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task on_failure_abort_stops_the_chain()
+    {
+        await using var host = await CreateHostAsync();
+        var j = new AbortChain();
+        var id = j.Id;
+        await j.Job.Submit(Step.One);
+        await host.Drain();
+        (await AbortChain.Get(id))!.TwoRan.Should().BeFalse();
+    }
+
+    // --- cooperative backoff ---
+
+    [Fact]
+    public async Task reschedule_defers_without_consuming_an_attempt()
+    {
+        RescheduleJob.Reset();
+        RescheduleJob.RescheduleUntil = 2;
+        await using var host = await CreateHostAsync();
+        var j = new RescheduleJob();
+        var id = j.Id;
+        await j.Job.Submit();
+        await host.Drain();
+        RescheduleJob.Executions.Should().Be(1);
+        await host.Drain();
+        RescheduleJob.Executions.Should().Be(1);
+        host.Advance(TimeSpan.FromMinutes(5)); await host.Drain();
+        host.Advance(TimeSpan.FromMinutes(5)); await host.Drain();
+        RescheduleJob.Executions.Should().Be(3);
+        var rec = await host.JobFor<RescheduleJob>(id);
+        rec!.Status.Should().Be(JobStatus.Completed);
+        rec.Reschedules.Should().Be(2);
+        rec.Attempt.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task max_reschedules_dead_letters()
+    {
+        RescheduleJob.Reset();
+        RescheduleJob.RescheduleUntil = 99;
+        await using var host = await CreateHostAsync(o => o.DefaultMaxReschedules = 1);
+        var j = new RescheduleJob();
+        var id = j.Id;
+        await j.Job.Submit();
+        await host.Drain();
+        host.Advance(TimeSpan.FromMinutes(5)); await host.Drain();
+        var rec = await host.JobFor<RescheduleJob>(id);
+        rec!.Status.Should().Be(JobStatus.Dead);
+        rec.DeadReason.Should().Be(nameof(DeadReason.PerpetuallyDeferred));
+    }
+
+    [Fact]
+    public async Task backoff_gate_defers_peers_at_dispatch_without_running()
+    {
+        GatedJob.Reset();
+        GatedJob.Trip429 = true;
+        await using var host = await CreateHostAsync();
+        var a = new GatedJob { Host = "api" };
+        var b = new GatedJob { Host = "api" };
+        var c = new GatedJob { Host = "api" };
+        await a.Job.Submit();
+        await host.Drain();
+        GatedJob.Executions.Should().Be(1);
+        await b.Job.Submit();
+        await c.Job.Submit();
+        await host.Drain();
+        GatedJob.Executions.Should().Be(1);
+        host.Advance(TimeSpan.FromMinutes(5));
+        await host.Drain();
+        (await host.StatusOf<GatedJob>(a.Id)).Should().Be(JobStatus.Completed);
+        (await host.StatusOf<GatedJob>(b.Id)).Should().Be(JobStatus.Completed);
+        (await host.StatusOf<GatedJob>(c.Id)).Should().Be(JobStatus.Completed);
+    }
+
+    // --- retry / cancel / timeout ---
+
+    [Fact]
+    public async Task retries_then_succeeds()
+    {
+        FlakyJob.Reset();
+        FlakyJob.SucceedAtAttempt = 3;
+        await using var host = await CreateHostAsync();
+        var job = new FlakyJob();
+        var id = job.Id;
+        await job.Job.Submit(FlakyJob.Action);
+        await host.Drain();
+        host.Advance(TimeSpan.FromMinutes(1)); await host.Drain();
+        host.Advance(TimeSpan.FromMinutes(1)); await host.Drain();
+        FlakyJob.Executions.Should().Be(3);
+        (await host.StatusOf<FlakyJob>(id)).Should().Be(JobStatus.Completed);
+    }
+
+    [Fact]
+    public async Task poison_fails_after_exhausting_retries()
+    {
+        FlakyJob.Reset();
+        FlakyJob.SucceedAtAttempt = 99;
+        await using var host = await CreateHostAsync();
+        var job = new FlakyJob();
+        var id = job.Id;
+        await job.Job.Submit(FlakyJob.Action);
+        for (var i = 0; i < 3; i++) { await host.Drain(); host.Advance(TimeSpan.FromMinutes(1)); }
+        FlakyJob.Executions.Should().Be(3);
+        var rec = await host.JobFor<FlakyJob>(id);
+        rec!.Status.Should().Be(JobStatus.Failed);
+        rec.DeadReason.Should().Be(nameof(DeadReason.Poison));
+    }
+
+    [Fact]
+    public async Task cancel_queued_job_never_runs()
+    {
+        GreetJob.Reset();
+        await using var host = await CreateHostAsync();
+        var job = new GreetJob { Name = "x" };
+        var id = job.Id;
+        await job.Job.Submit();
+        await job.Job.Cancel();
+        (await host.StatusOf<GreetJob>(id)).Should().Be(JobStatus.Cancelled);
+        await host.Drain();
+        GreetJob.Executions.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task cancel_running_job_cooperatively()
+    {
+        WaitJob.Reset();
+        await using var host = await CreateHostAsync();
+        var job = new WaitJob();
+        var id = job.Id;
+        await job.Job.Submit(WaitJob.Action);
+        var drain = host.Drain();
+        await Wait.Until(() => WaitJob.Executions == 1);
+        await host.Coordinator.CancelWorkAsync(typeof(WaitJob).FullName!, id, default);
+        await drain;
+        (await host.StatusOf<WaitJob>(id)).Should().Be(JobStatus.Cancelled);
+        WaitJob.Cancellations.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task timeout_fails_the_job()
+    {
+        WaitJob.Reset();
+        await using var host = await CreateHostAsync();
+        var job = new WaitJob();
+        var id = job.Id;
+        await job.Job.Submit(WaitJob.Action);
+        var drain = host.Drain();
+        await Wait.Until(() => WaitJob.Executions == 1);
+        host.Advance(TimeSpan.FromSeconds(31));
+        await drain;
+        (await host.StatusOf<WaitJob>(id)).Should().Be(JobStatus.Failed);
+        WaitJob.Cancellations.Should().Be(1);
+    }
+
+    // --- lanes ---
+
+    [Fact]
+    public async Task lane_caps_concurrency()
+    {
+        SlowJob.Reset();
+        await using var host = await CreateHostAsync();
+        var jobs = Enumerable.Range(0, 6).Select(_ => new SlowJob()).ToList();
+        await jobs.Submit(SlowJob.Action);
+        await host.Drain();
+        SlowJob.Peak.Should().BeLessThanOrEqualTo(2);
+        var done = await host.Coordinator.WhereAsync(new JobQuery(WorkType: typeof(SlowJob).FullName!, Status: JobStatus.Completed), default);
+        done.Should().HaveCount(6);
+    }
+
+    // --- scheduling (initiator submits on cadence) ---
+
+    [Fact]
+    public async Task scheduled_action_runs_when_the_scheduler_ticks()
+    {
+        Reconciled.Reset();
+        await using var host = await CreateHostAsync();
+        await host.Drain();
+        Reconciled.Executions.Should().Be(0);
+        await host.TriggerDue();
+        await host.Drain();
+        Reconciled.Executions.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task recurring_schedule_actually_recurs()
+    {
+        Reconciled.Reset();
+        await using var host = await CreateHostAsync();
+        await host.TriggerDue(); await host.Drain();
+        host.Advance(TimeSpan.FromMinutes(10)); await host.TriggerDue(); await host.Drain();
+        host.Advance(TimeSpan.FromMinutes(10)); await host.TriggerDue(); await host.Drain();
+        Reconciled.Executions.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task schedule_respects_its_interval()
+    {
+        Reconciled.Reset();
+        await using var host = await CreateHostAsync();
+        await host.TriggerDue(); await host.Drain();
+        Reconciled.Executions.Should().Be(1);
+        await host.TriggerDue(); await host.Drain();
+        Reconciled.Executions.Should().Be(1);
+        host.Advance(TimeSpan.FromMinutes(10));
+        await host.TriggerDue(); await host.Drain();
+        Reconciled.Executions.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task continuous_schedule_fires_every_tick()
+    {
+        Heartbeat.Reset();
+        await using var host = await CreateHostAsync();
+        await host.TriggerDue(); await host.Drain();
+        await host.TriggerDue(); await host.Drain();
+        await host.TriggerDue(); await host.Drain();
+        Heartbeat.Executions.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task cron_schedule_fires_at_its_occurrence_and_recurs_daily()
+    {
+        NightlyJob.Reset();
+        await using var host = await CreateHostAsync();
+        await host.TriggerDue(); await host.Drain();
+        NightlyJob.Executions.Should().Be(0);
+        host.Advance(TimeSpan.FromHours(3));
+        await host.TriggerDue(); await host.Drain();
+        NightlyJob.Executions.Should().Be(1);
+        host.Advance(TimeSpan.FromHours(1));
+        await host.TriggerDue(); await host.Drain();
+        NightlyJob.Executions.Should().Be(1);
+        host.Advance(TimeSpan.FromHours(23));
+        await host.TriggerDue(); await host.Drain();
+        NightlyJob.Executions.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task boot_action_runs_once_at_boot()
+    {
+        BootOnce.Reset();
+        await using var host = await CreateHostAsync();
+        await host.Boot();
+        await host.Drain();
+        BootOnce.Executions.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task reaper_reclaims_a_lapsed_lease()
+    {
+        GreetJob.Reset();
+        await using var host = await CreateHostAsync();
+        var g = new GreetJob { Name = "recovered" };
+        var id = g.Id;
+        await GreetJob.Upsert(g);
+        var now = host.Clock.GetUtcNow();
+        await host.Ledger.Append(new JobRecord
+        {
+            WorkType = typeof(GreetJob).FullName!,
+            WorkId = id,
+            Action = "",
+            Status = JobStatus.Running,
+            Attempt = 1,
+            Lane = "default",
+            FirstSubmittedAt = now,
+            VisibleAt = now,
+            LeaseUntil = now - TimeSpan.FromMinutes(1),
+            Owner = "dead-worker",
+        }, default);
+        await host.Reap();
+        await host.Drain();
+        GreetJob.Executions.Should().Be(1);
+        (await host.StatusOf<GreetJob>(id)).Should().Be(JobStatus.Completed);
+    }
+
+    // --- type-level trigger ---
+
+    [Fact]
+    public async Task trigger_runs_a_type_level_action_without_an_instance()
+    {
+        TickJob.Reset();
+        await using var host = await CreateHostAsync();
+        await TickJob.Jobs.Trigger("sweep");
+        await host.Drain();
+        TickJob.Executions.Should().Be(1);
+        TickJob.LastAction.Should().Be("sweep");
+    }
+
+    [Fact]
+    public async Task overlapping_triggers_coalesce_on_an_idempotent_singleton()
+    {
+        SweepTick.Reset();
+        await using var host = await CreateHostAsync();
+        await SweepTick.Jobs.Trigger("sweep");
+        await SweepTick.Jobs.Trigger("sweep");
+        await host.Drain();
+        SweepTick.Executions.Should().Be(1);
+    }
+
+    // --- archival ---
+
+    [Fact]
+    public async Task archival_purges_completed_past_retention_keeps_failed()
+    {
+        GreetJob.Reset();
+        FlakyJob.Reset();
+        FlakyJob.SucceedAtAttempt = 99;
+        await using var host = await CreateHostAsync(o => o.ArchiveAfter = TimeSpan.FromHours(1));
+
+        var ok = new GreetJob { Name = "x" };
+        var okId = ok.Id;
+        await ok.Job.Submit();
+        await host.Drain();
+
+        var bad = new FlakyJob();
+        var badId = bad.Id;
+        await bad.Job.Submit(FlakyJob.Action);
+        for (var i = 0; i < 3; i++) { await host.Drain(); host.Advance(TimeSpan.FromMinutes(1)); }
+        (await host.StatusOf<FlakyJob>(badId)).Should().Be(JobStatus.Failed);
+
+        host.Advance(TimeSpan.FromHours(2));
+        await host.Archive();
+
+        (await host.StatusOf<GreetJob>(okId)).Should().BeNull("completed past retention is purged");
+        (await host.StatusOf<FlakyJob>(badId)).Should().Be(JobStatus.Failed, "failed is retained");
+    }
+}

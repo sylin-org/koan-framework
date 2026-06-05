@@ -1,41 +1,28 @@
+using AwesomeAssertions;
 using Koan.Data.Core;
-using Koan.Jobs.Adapter.Sqlite.Tests.Support;
+using Koan.Jobs;
+using Koan.Jobs.TestKit;
+using Xunit;
 
 namespace Koan.Jobs.Adapter.Sqlite.Tests.Specs;
 
-/// <summary>Proves the data-backed ledger works on a real SQLite store: election, durable persistence + claim
-/// (query translation), chain advance, and lease reclaim. ARCH-0079 — through real AddKoan() discovery.</summary>
+/// <summary>Tier-specific durable proofs (the shared behaviors run via <c>SqliteBehaviors</c>): the election picks
+/// the data-backed ledger, and the transactional outbox enlists in an ambient transaction.</summary>
 public sealed class DurableSqliteSpec
 {
     [Fact]
-    public async Task election_picks_the_data_backed_ledger_when_a_durable_adapter_is_present()
+    public async Task election_picks_the_data_backed_ledger()
     {
-        await using var host = await DurableHost.StartAsync();
+        await using var host = await JobsHarness.StartSqliteAsync();
         host.Ledger.Should().BeOfType<DataJobLedger>();
-    }
-
-    [Fact]
-    public async Task single_action_persists_and_completes_over_sqlite()
-    {
-        DurableJob.Reset();
-        await using var host = await DurableHost.StartAsync();
-        var j = new DurableJob { Input = "x" };
-        var id = j.Id;
-
-        await j.Job.Submit();
-        await host.Drain();
-
-        DurableJob.Executions.Should().Be(1);
-        (await DurableJob.Get(id))!.Output.Should().Be("x-done");
-        (await host.StatusOf<DurableJob>(id)).Should().Be(JobStatus.Completed);
     }
 
     [Fact]
     public async Task submit_in_a_rolled_back_transaction_never_enqueues()
     {
-        DurableJob.Reset();
-        await using var host = await DurableHost.StartAsync();
-        var j = new DurableJob { Input = "x" };
+        GreetJob.Reset();
+        await using var host = await JobsHarness.StartSqliteAsync();
+        var j = new GreetJob { Name = "x" };
         var id = j.Id;
 
         using (EntityContext.Transaction("rollback"))
@@ -45,101 +32,27 @@ public sealed class DurableSqliteSpec
         }
 
         await host.Drain();
-        DurableJob.Executions.Should().Be(0, "a rolled-back transaction must not enqueue the job");
-        (await host.StatusOf<DurableJob>(id)).Should().BeNull();
+        GreetJob.Executions.Should().Be(0, "a rolled-back transaction must not enqueue the job");
+        (await host.StatusOf<GreetJob>(id)).Should().BeNull();
     }
 
     [Fact]
     public async Task submit_in_a_committed_transaction_enqueues_once_on_commit()
     {
-        DurableJob.Reset();
-        await using var host = await DurableHost.StartAsync();
-        var j = new DurableJob { Input = "y" };
+        GreetJob.Reset();
+        await using var host = await JobsHarness.StartSqliteAsync();
+        var j = new GreetJob { Name = "y" };
         var id = j.Id;
 
         using (EntityContext.Transaction("commit"))
         {
             await j.Job.Submit();
-            (await host.StatusOf<DurableJob>(id)).Should().BeNull("the job is deferred until commit (outbox)");
+            (await host.StatusOf<GreetJob>(id)).Should().BeNull("deferred until commit (outbox)");
             await EntityContext.Commit();
         }
 
         await host.Drain();
-        DurableJob.Executions.Should().Be(1);
-        (await host.StatusOf<DurableJob>(id)).Should().Be(JobStatus.Completed);
-    }
-
-    [Fact]
-    public async Task type_level_trigger_runs_over_sqlite()
-    {
-        DurableTick.Reset();
-        await using var host = await DurableHost.StartAsync();
-
-        await DurableTick.Jobs.Trigger("sweep");
-        await host.Drain();
-
-        DurableTick.Executions.Should().Be(1);
-    }
-
-    [Fact]
-    public async Task archival_purges_completed_jobs_over_sqlite()
-    {
-        DurableJob.Reset();
-        await using var host = await DurableHost.StartAsync(o => o.ArchiveAfter = TimeSpan.FromHours(1));
-        var j = new DurableJob { Input = "x" };
-        var id = j.Id;
-        await j.Job.Submit();
-        await host.Drain();
-        (await host.StatusOf<DurableJob>(id)).Should().Be(JobStatus.Completed);
-
-        host.Advance(TimeSpan.FromHours(2));
-        (await host.Archive()).Should().Be(1);
-        (await host.StatusOf<DurableJob>(id)).Should().BeNull();
-    }
-
-    [Fact]
-    public async Task chain_advances_over_sqlite()
-    {
-        await using var host = await DurableHost.StartAsync();
-        var p = new DurablePipeline();
-        var id = p.Id;
-
-        await p.Job.Submit(DStage.A);
-        await host.Drain();
-
-        (await DurablePipeline.Get(id))!.Trail.Should().Equal(DStage.A, DStage.B, DStage.C);
-        (await host.StatusOf<DurablePipeline>(id)).Should().Be(JobStatus.Completed);
-    }
-
-    [Fact]
-    public async Task reaper_reclaims_a_lapsed_lease_over_sqlite()
-    {
-        DurableJob.Reset();
-        await using var host = await DurableHost.StartAsync();
-
-        var g = new DurableJob { Input = "r" };
-        var id = g.Id;
-        await DurableJob.Upsert(g);
-
-        var now = host.Clock.GetUtcNow();
-        await host.Ledger.Append(new JobRecord
-        {
-            WorkType = typeof(DurableJob).FullName!,
-            WorkId = id,
-            Action = "",
-            Status = JobStatus.Running,
-            Attempt = 1,
-            Lane = "default",
-            FirstSubmittedAt = now,
-            VisibleAt = now,
-            LeaseUntil = now - TimeSpan.FromMinutes(1),
-            Owner = "dead-worker",
-        }, default);
-
-        await host.Reap();
-        await host.Drain();
-
-        DurableJob.Executions.Should().Be(1);
-        (await host.StatusOf<DurableJob>(id)).Should().Be(JobStatus.Completed);
+        GreetJob.Executions.Should().Be(1);
+        (await host.StatusOf<GreetJob>(id)).Should().Be(JobStatus.Completed);
     }
 }

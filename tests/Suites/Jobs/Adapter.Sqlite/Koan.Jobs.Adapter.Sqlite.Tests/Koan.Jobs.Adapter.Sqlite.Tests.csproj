@@ -11,9 +11,7 @@
     <PackageReference Include="AwesomeAssertions" Version="9.4.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\..\src\Koan.Jobs\Koan.Jobs.csproj" />
-    <ProjectReference Include="..\..\..\..\..\src\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\..\Koan.Jobs.TestKit\Koan.Jobs.TestKit.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Connectors\Data\Sqlite\Koan.Data.Connector.Sqlite.csproj" />
-    <ProjectReference Include="..\..\..\..\Shared\Koan.Testing\Koan.Testing.csproj" />
   </ItemGroup>
 </Project>

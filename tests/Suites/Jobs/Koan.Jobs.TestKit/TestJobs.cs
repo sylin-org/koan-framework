@@ -1,6 +1,7 @@
 using Koan.Data.Core.Model;
+using Koan.Jobs;
 
-namespace Koan.Jobs.Tests.Support;
+namespace Koan.Jobs.TestKit;
 
 /// <summary>Action/stage tokens for the test pipeline.</summary>
 public static class Stage
@@ -59,7 +60,7 @@ public sealed class FlakyJob : Entity<FlakyJob>, IKoanJob<FlakyJob>
 {
     public const string Action = "work";
     public static int Executions;
-    public static int SucceedAtAttempt = 1; // succeed once Attempt >= this
+    public static int SucceedAtAttempt = 1;
 
     public static Task Execute(FlakyJob job, JobContext ctx, CancellationToken ct)
     {
@@ -182,7 +183,7 @@ public static class Step
 public sealed class BranchJob : Entity<BranchJob>, IKoanJob<BranchJob>
 {
     public List<string> Trail { get; set; } = new();
-    public static string Mode = "chain"; // "chain" | "stop" | "branch"
+    public static string Mode = "chain";
 
     public static Task Execute(BranchJob job, JobContext ctx, CancellationToken ct)
     {
@@ -248,7 +249,7 @@ public sealed class TickJob : Entity<TickJob>, IKoanJob<TickJob>
 [JobIdempotent(nameof(Key))]
 public sealed class SweepTick : Entity<SweepTick>, IKoanJob<SweepTick>
 {
-    public string Key => "sweep-singleton"; // stable coalesce key
+    public string Key => "sweep-singleton";
     public static int Executions;
 
     public static Task Execute(SweepTick job, JobContext ctx, CancellationToken ct)
