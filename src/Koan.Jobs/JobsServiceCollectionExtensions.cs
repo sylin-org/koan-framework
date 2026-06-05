@@ -25,6 +25,8 @@ public static class JobsServiceCollectionExtensions
                 sp.GetRequiredService<JobTypeRegistry>())
             : new InMemoryJobLedger());
         services.TryAddSingleton(_ => JobTypeRegistry.FromDiscovery());
+        // Push-dispatch seam: in-process by default; Koan.Jobs.Transport.Messaging preempts it for cross-node wake.
+        services.TryAddSingleton<IJobTransport, InProcessJobTransport>();
         services.TryAddSingleton<JobOrchestrator>();
         services.TryAddSingleton<JobScheduler>();
         services.TryAddSingleton<IJobCoordinator, JobCoordinator>();

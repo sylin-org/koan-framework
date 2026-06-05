@@ -13,15 +13,17 @@ public sealed class JobCoordinator : IJobCoordinator
     private readonly IJobLedger _ledger;
     private readonly JobTypeRegistry _registry;
     private readonly JobOrchestrator _orchestrator;
+    private readonly IJobTransport _transport;
     private readonly JobsOptions _options;
     private readonly TimeProvider _clock;
 
     public JobCoordinator(IJobLedger ledger, JobTypeRegistry registry, JobOrchestrator orchestrator,
-        IOptions<JobsOptions> options, TimeProvider clock)
+        IJobTransport transport, IOptions<JobsOptions> options, TimeProvider clock)
     {
         _ledger = ledger;
         _registry = registry;
         _orchestrator = orchestrator;
+        _transport = transport;
         _options = options.Value;
         _clock = clock;
     }
@@ -46,8 +48,9 @@ public sealed class JobCoordinator : IJobCoordinator
         await _ledger.Append(rec, ct);
 
         // Transactional outbox: inside an ambient transaction the work-item Save + the ledger Append enlist (TrackSave)
-        // and only become claimable on commit (discarded on rollback). Don't inline-drain mid-transaction — the row
-        // isn't visible yet; the worker (or a post-commit drain) picks it up.
+        // and only become claimable on commit (discarded on rollback). Don't inline-drain or push-notify mid-transaction —
+        // the row isn't visible yet; the worker (or a post-commit drain) picks it up.
+        if (!EntityContext.InTransaction) _transport.Notify();          // wake the worker now (push-dispatch)
         if (_options.Mode == JobMode.Inline && !EntityContext.InTransaction) await _orchestrator.DrainAsync(ct);
         return Handle(rec.Id);
     }
@@ -73,6 +76,7 @@ public sealed class JobCoordinator : IJobCoordinator
         }
 
         if (batch.Count > 0) await _ledger.AppendMany(batch, ct);
+        if (batch.Count > 0 && !EntityContext.InTransaction) _transport.Notify();
         if (_options.Mode == JobMode.Inline && !EntityContext.InTransaction) await _orchestrator.DrainAsync(ct);
         return batch.Count;
     }
