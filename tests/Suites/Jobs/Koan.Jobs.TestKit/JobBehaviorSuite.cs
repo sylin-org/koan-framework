@@ -492,4 +492,17 @@ public abstract class JobBehaviorSuite
         await host.Drain();
         ParallelJob.Peak.Should().Be(2, "[ParallelSafe] lifts per-entity serialization");
     }
+
+    [Fact]
+    public async Task different_entities_run_concurrently()
+    {
+        ExclusiveJob.Reset();
+        await using var host = await CreateHostAsync();
+        var e1 = new ExclusiveJob();
+        var e2 = new ExclusiveJob();
+        await e1.Job.Submit(ExclusiveJob.ActionA);
+        await e2.Job.Submit(ExclusiveJob.ActionA);   // same action/lane, different entities
+        await host.Drain();
+        ExclusiveJob.Peak.Should().Be(2, "serialization is per-entity, not global — different entities still parallelize");
+    }
 }

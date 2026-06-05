@@ -626,7 +626,15 @@ await mailbatch.Submit();                  // batch (IEnumerable<T>)
 | `[JobIdempotent(keys)]` | collapse concurrent / duplicate submits |
 | `[JobGate(prop)]` | shared resource gate for cooperative backoff |
 | `[JobPersistence(Auto\|InMemory\|DataStore)]` | per-type durability routing (`RoutingJobLedger`) |
+| `[ParallelSafe]` | opt out of per-entity serialization (default: jobs for one entity run one at a time) |
 | `JobContext` verbs | `Reschedule(after\|until)` (defer, no retry consumed), `Backoff(after, key)` (cross-node gate), `ContinueWith` / `StopChain`, `Progress` |
+
+#### Work-item write safety (ADR §17)
+
+Two defaults make *an entity a consistency unit*, so handlers don't lose writes:
+
+- **Mutate the entity passed to `Execute`** — the orchestrator auto-saves *that* reference, but **only if it changed**. An untouched reference is never written; a handler that reloads-and-saves its own copy is never clobbered (it left the passed one clean). Don't reload a second copy and save it yourself.
+- **One job per entity at a time** — a work-item id is its ordering key (Kafka-partition / SQS-FIFO model): jobs for the same `(WorkType, WorkId)` are serialized by default; different entities parallelize fully. Opt out per type with `[ParallelSafe]` when the actions are provably independent.
 
 #### Capability ladder
 
