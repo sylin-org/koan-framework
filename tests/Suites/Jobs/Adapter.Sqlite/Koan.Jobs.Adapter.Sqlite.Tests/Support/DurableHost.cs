@@ -60,12 +60,17 @@ public sealed class DurableHost : IAsyncDisposable
         await host.StartAsync();
         var prev = AppHost.Current;
         AppHost.Current = host.Services;
+        // Clean slate: the durable store may be reused in-process across tests; clear the Jobs-owned sets.
+        await JobRecord.RemoveAll();
+        await JobGateRecord.RemoveAll();
+        await JobClaimTicket.RemoveAll();
         return new DurableHost(host, prev, clock, dbPath);
     }
 
     public void Advance(TimeSpan by) => Clock.Advance(by);
     public Task Drain(CancellationToken ct = default) => Orchestrator.DrainAsync(ct);
     public Task Reap(CancellationToken ct = default) => Scheduler.ReapAsync(ct);
+    public Task<int> Archive(CancellationToken ct = default) => Orchestrator.ArchiveAsync(ct);
 
     public Task<JobStatus?> StatusOf<T>(string workId) where T : Entity<T>, IKoanJob<T>
         => Coordinator.StatusAsync(typeof(T).FullName!, workId, default);

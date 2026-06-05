@@ -386,6 +386,8 @@ using (EntityContext.Transaction("publish"))
 
 No configuration—it's automatic whenever a transaction is in scope.
 
+**Retention.** Completed and Cancelled jobs older than `ArchiveAfter` (default 7 days) are swept out automatically so the active ledger stays lean. Failed and Dead jobs are **kept**—they're queryable and replayable. Tune `ArchiveAfter` / `ArchiveInterval`, or set `ArchiveAfter` to zero to disable.
+
 ---
 
 ## 11. Testing your jobs

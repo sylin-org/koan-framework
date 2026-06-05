@@ -54,4 +54,11 @@ public sealed class JobsOptions
 
     /// <summary>The reservation window for <see cref="ClaimStrategy.Ticket"/> — must exceed clock skew + write propagation.</summary>
     public TimeSpan ClaimWindow { get; set; } = TimeSpan.FromSeconds(1);
+
+    /// <summary>Benign terminal rows (Completed/Cancelled) older than this are purged to keep the active ledger lean.
+    /// Failed/Dead are retained (queryable + replayable). Zero or negative disables archival.</summary>
+    public TimeSpan ArchiveAfter { get; set; } = TimeSpan.FromDays(7);
+
+    /// <summary>How often the worker runs the archival sweep.</summary>
+    public TimeSpan ArchiveInterval { get; set; } = TimeSpan.FromHours(1);
 }

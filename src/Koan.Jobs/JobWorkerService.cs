@@ -39,6 +39,7 @@ internal sealed class JobWorkerService : BackgroundService
         catch (Exception ex) { _logger.LogError(ex, "Job boot sequence failed"); }
 
         var lastReap = _clock.GetUtcNow();
+        var lastArchive = _clock.GetUtcNow();
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -48,6 +49,11 @@ internal sealed class JobWorkerService : BackgroundService
                 {
                     await _scheduler.ReapAsync(stoppingToken);
                     lastReap = now;
+                }
+                if (now - lastArchive >= _options.ArchiveInterval)
+                {
+                    await _orchestrator.ArchiveAsync(stoppingToken);
+                    lastArchive = now;
                 }
                 await _scheduler.TriggerDueAsync(stoppingToken);   // recurring initiator: submit due scheduled actions
                 await _orchestrator.DrainAsync(stoppingToken);

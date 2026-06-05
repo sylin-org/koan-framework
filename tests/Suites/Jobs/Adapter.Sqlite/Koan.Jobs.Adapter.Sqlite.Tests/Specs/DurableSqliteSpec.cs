@@ -82,6 +82,22 @@ public sealed class DurableSqliteSpec
     }
 
     [Fact]
+    public async Task archival_purges_completed_jobs_over_sqlite()
+    {
+        DurableJob.Reset();
+        await using var host = await DurableHost.StartAsync(o => o.ArchiveAfter = TimeSpan.FromHours(1));
+        var j = new DurableJob { Input = "x" };
+        var id = j.Id;
+        await j.Job.Submit();
+        await host.Drain();
+        (await host.StatusOf<DurableJob>(id)).Should().Be(JobStatus.Completed);
+
+        host.Advance(TimeSpan.FromHours(2));
+        (await host.Archive()).Should().Be(1);
+        (await host.StatusOf<DurableJob>(id)).Should().BeNull();
+    }
+
+    [Fact]
     public async Task chain_advances_over_sqlite()
     {
         await using var host = await DurableHost.StartAsync();

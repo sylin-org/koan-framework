@@ -108,6 +108,14 @@ public sealed class DataJobLedger : IJobLedger
             .ToList();
     }
 
+    public async Task<int> PurgeArchivable(DateTimeOffset olderThan, CancellationToken ct)
+    {
+        var done = await JobRecord.Query(r => r.Status == JobStatus.Completed || r.Status == JobStatus.Cancelled, ct);
+        var stale = done.Where(r => r.LastSettledAt is { } s && s < olderThan).ToList();
+        foreach (var r in stale) await JobRecord.Remove(r.Id, ct);
+        return stale.Count;
+    }
+
     // --- claim internals ---
 
     private async Task<JobRecord?> SelectCandidate(DateTimeOffset now, IReadOnlyCollection<string> saturatedLanes, CancellationToken ct)

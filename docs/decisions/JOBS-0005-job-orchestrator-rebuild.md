@@ -419,7 +419,8 @@ Built as a single project **`src/Koan.Jobs`** (no Abstractions/Core split — ex
 - Per-DB container matrix (Mongo / Postgres / SQL Server) + a crash-recovery harness (process restart, stale-lease guard, mid-chain resume).
 - A behavioral-suite convergence refactor so the *same* suite runs on every tier (ARCH-0079).
 - The distributed tier: competing-consumers test, cross-node gate, the `+bus` transport package, and per-type `[JobPersistence]` two-ledger routing.
-- **Transactional outbox — shipped** (automatic): on the durable tier a `Submit` inside an ambient transaction enlists (`TrackSave`) and is enqueued on commit / discarded on rollback; inline mode skips its synchronous drain inside a transaction. The terminal archival sweep is still pending.
+- **Transactional outbox — shipped** (automatic): on the durable tier a `Submit` inside an ambient transaction enlists (`TrackSave`) and is enqueued on commit / discarded on rollback; inline mode skips its synchronous drain inside a transaction.
+- **Terminal archival — shipped**: a worker sweep (`ArchiveInterval`) purges Completed/Cancelled rows older than `ArchiveAfter` (default 7d) via `IJobLedger.PurgeArchivable`; Failed/Dead are retained (replayable).
 - Boot-report polish.
 
 **Authoring guide:** [Background Jobs How-To](../guides/jobs-howto.md).

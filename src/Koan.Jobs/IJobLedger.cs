@@ -48,4 +48,8 @@ public interface IJobLedger
     // --- shared resource gates (cooperative backoff) ---
     Task SetGate(string gateKey, DateTimeOffset releaseAt, string? reason, CancellationToken ct);
     Task<IReadOnlyList<JobGate>> ActiveGates(DateTimeOffset now, CancellationToken ct);
+
+    /// <summary>Remove benign terminal rows (Completed/Cancelled) settled before <paramref name="olderThan"/>, keeping
+    /// the active set lean. Failed/Dead are retained (replayable). Returns the number purged.</summary>
+    Task<int> PurgeArchivable(DateTimeOffset olderThan, CancellationToken ct);
 }

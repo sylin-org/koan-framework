@@ -147,6 +147,19 @@ public sealed class InMemoryJobLedger : IJobLedger
         }
     }
 
+    public Task<int> PurgeArchivable(DateTimeOffset olderThan, CancellationToken ct)
+    {
+        lock (_gate)
+        {
+            var stale = _records.Values
+                .Where(r => r.Status is JobStatus.Completed or JobStatus.Cancelled
+                            && r.LastSettledAt is { } s && s < olderThan)
+                .Select(r => r.Id).ToList();
+            foreach (var id in stale) _records.Remove(id);
+            return Task.FromResult(stale.Count);
+        }
+    }
+
     private bool IsGated(string? gateKey, DateTimeOffset now)
         => gateKey is not null && _gates.TryGetValue(gateKey, out var g) && g.ReleaseAt > now;
 

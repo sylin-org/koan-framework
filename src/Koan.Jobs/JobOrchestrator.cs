@@ -256,6 +256,13 @@ public sealed class JobOrchestrator
         await _ledger.Update(rec, CancellationToken.None);
     }
 
+    /// <summary>Archival sweep: purge benign terminal rows (Completed/Cancelled) past <c>ArchiveAfter</c>.</summary>
+    public Task<int> ArchiveAsync(CancellationToken ct = default)
+    {
+        if (_options.ArchiveAfter <= TimeSpan.Zero) return Task.FromResult(0);
+        return _ledger.PurgeArchivable(_clock.GetUtcNow() - _options.ArchiveAfter, ct);
+    }
+
     /// <summary>Reclaim jobs whose lease lapsed (reaper sweep): revert Running → Queued for re-dispatch.</summary>
     public async Task ReapAsync(CancellationToken ct = default)
     {

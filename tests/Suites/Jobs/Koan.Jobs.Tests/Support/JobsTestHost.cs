@@ -66,6 +66,7 @@ public sealed class JobsTestHost : IAsyncDisposable
     public Task TriggerDue(CancellationToken ct = default) => Scheduler.TriggerDueAsync(ct);
     public Task Boot(CancellationToken ct = default) => Scheduler.SubmitBootActionsAsync(ct);
     public Task Reap(CancellationToken ct = default) => Scheduler.ReapAsync(ct);
+    public Task<int> Archive(CancellationToken ct = default) => Orchestrator.ArchiveAsync(ct);
 
     public Task<JobStatus?> StatusOf<T>(string workId) where T : Entity<T>, IKoanJob<T>
         => Coordinator.StatusAsync(typeof(T).FullName!, workId, default);
