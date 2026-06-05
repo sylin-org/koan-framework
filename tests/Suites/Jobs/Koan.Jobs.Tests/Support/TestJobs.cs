@@ -304,3 +304,18 @@ public sealed class Heartbeat : Entity<Heartbeat>, IKoanJob<Heartbeat>
 
     public static void Reset() => Executions = 0;
 }
+
+/// <summary>A cron action — daily at 02:00 UTC.</summary>
+[JobAction("nightly", Schedule = "0 2 * * *")]
+public sealed class NightlyJob : Entity<NightlyJob>, IKoanJob<NightlyJob>
+{
+    public static int Executions;
+
+    public static Task Execute(NightlyJob job, JobContext ctx, CancellationToken ct)
+    {
+        Interlocked.Increment(ref Executions);
+        return Task.CompletedTask;
+    }
+
+    public static void Reset() => Executions = 0;
+}

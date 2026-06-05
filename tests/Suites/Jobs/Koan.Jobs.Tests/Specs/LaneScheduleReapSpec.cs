@@ -78,6 +78,28 @@ public sealed class LaneScheduleReapSpec
     }
 
     [Fact]
+    public async Task cron_schedule_fires_at_its_occurrence_and_recurs_daily()
+    {
+        NightlyJob.Reset();
+        await using var host = await JobsTestHost.StartAsync();   // clock at 2026-01-01T00:00:00Z
+
+        await host.TriggerDue(); await host.Drain();              // baseline; next occurrence is 02:00 → no fire
+        NightlyJob.Executions.Should().Be(0);
+
+        host.Advance(TimeSpan.FromHours(3));                      // 03:00 — past 02:00
+        await host.TriggerDue(); await host.Drain();
+        NightlyJob.Executions.Should().Be(1);
+
+        host.Advance(TimeSpan.FromHours(1));                      // 04:00 — no new occurrence today
+        await host.TriggerDue(); await host.Drain();
+        NightlyJob.Executions.Should().Be(1);
+
+        host.Advance(TimeSpan.FromHours(23));                     // next day 03:00 — past the next 02:00
+        await host.TriggerDue(); await host.Drain();
+        NightlyJob.Executions.Should().Be(2);
+    }
+
+    [Fact]
     public async Task boot_action_runs_once_at_boot()
     {
         BootOnce.Reset();

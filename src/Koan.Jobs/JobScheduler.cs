@@ -1,3 +1,4 @@
+using Cronos;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -19,6 +20,7 @@ public sealed class JobScheduler
     private readonly TimeProvider _clock;
     private readonly ILogger<JobScheduler> _logger;
     private readonly Dictionary<(string Type, string Action), DateTimeOffset> _lastRun = new();
+    private readonly Dictionary<string, CronExpression?> _cronCache = new(StringComparer.Ordinal);
 
     public JobScheduler(IJobCoordinator coordinator, JobTypeRegistry registry, JobOrchestrator orchestrator,
         IOptions<JobsOptions> options, TimeProvider clock, ILogger<JobScheduler> logger)
@@ -59,19 +61,53 @@ public sealed class JobScheduler
             {
                 var (kind, interval) = ParseSchedule(action.Schedule);
                 if (kind is ScheduleKind.Boot or ScheduleKind.None) continue;
+
+                var key = (binding.WorkType, action.Action);
+
                 if (kind is ScheduleKind.Cron)
                 {
-                    _logger.LogWarning("Cron schedule '{Schedule}' on {Type}.{Action} is not yet supported; skipping.",
-                        action.Schedule, binding.WorkType, action.Action);
+                    var cron = GetCron(action.Schedule!);
+                    if (cron is null)
+                    {
+                        _logger.LogWarning("Invalid cron schedule '{Schedule}' on {Type}.{Action}; skipping.",
+                            action.Schedule, binding.WorkType, action.Action);
+                        continue;
+                    }
+                    // Baseline on first sight (cron fires at its scheduled time, not at startup), then fire once the
+                    // next occurrence after the last fire has passed (missed occurrences are not replayed).
+                    if (!_lastRun.TryGetValue(key, out var lastCron)) { _lastRun[key] = now; continue; }
+                    var next = cron.GetNextOccurrence(lastCron.UtcDateTime);
+                    if (next is not { } occurrence || now.UtcDateTime < occurrence) continue;
+                    _lastRun[key] = now;
+                    await _coordinator.TriggerAsync(binding.WorkType, action.Action, ct);
                     continue;
                 }
 
-                var key = (binding.WorkType, action.Action);
+                // interval / @continuous
                 if (_lastRun.TryGetValue(key, out var last) && now - last < interval) continue;
                 _lastRun[key] = now;
                 await _coordinator.TriggerAsync(binding.WorkType, action.Action, ct);
             }
         }
+    }
+
+    private CronExpression? GetCron(string schedule)
+    {
+        if (_cronCache.TryGetValue(schedule, out var cached)) return cached;
+        CronExpression? parsed;
+        try { parsed = CronExpression.Parse(StripCronWrapper(schedule)); }
+        catch (CronFormatException) { parsed = null; }
+        _cronCache[schedule] = parsed;
+        return parsed;
+    }
+
+    /// <summary>Accept both a bare cron expression (<c>"0 2 * * *"</c>) and a <c>cron(...)</c> wrapper.</summary>
+    private static string StripCronWrapper(string s)
+    {
+        s = s.Trim();
+        return s.StartsWith("cron(", StringComparison.OrdinalIgnoreCase) && s.EndsWith(")")
+            ? s[5..^1].Trim()
+            : s;
     }
 
     internal enum ScheduleKind { None, Interval, Continuous, Boot, Cron }
