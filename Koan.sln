@@ -477,6 +477,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Adapter.Sqlite", "Adapter.S
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Jobs.Adapter.Sqlite.Tests", "tests\Suites\Jobs\Adapter.Sqlite\Koan.Jobs.Adapter.Sqlite.Tests\Koan.Jobs.Adapter.Sqlite.Tests.csproj", "{46B2FADB-667B-4907-8CF2-95517153DBA2}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Jobs.TestKit", "tests\Suites\Jobs\Koan.Jobs.TestKit\Koan.Jobs.TestKit.csproj", "{3C568FEC-99D5-442F-9EC0-240CB8B5D748}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -2357,6 +2359,18 @@ Global
 		{46B2FADB-667B-4907-8CF2-95517153DBA2}.Release|x64.Build.0 = Release|Any CPU
 		{46B2FADB-667B-4907-8CF2-95517153DBA2}.Release|x86.ActiveCfg = Release|Any CPU
 		{46B2FADB-667B-4907-8CF2-95517153DBA2}.Release|x86.Build.0 = Release|Any CPU
+		{3C568FEC-99D5-442F-9EC0-240CB8B5D748}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3C568FEC-99D5-442F-9EC0-240CB8B5D748}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3C568FEC-99D5-442F-9EC0-240CB8B5D748}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{3C568FEC-99D5-442F-9EC0-240CB8B5D748}.Debug|x64.Build.0 = Debug|Any CPU
+		{3C568FEC-99D5-442F-9EC0-240CB8B5D748}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{3C568FEC-99D5-442F-9EC0-240CB8B5D748}.Debug|x86.Build.0 = Debug|Any CPU
+		{3C568FEC-99D5-442F-9EC0-240CB8B5D748}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3C568FEC-99D5-442F-9EC0-240CB8B5D748}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3C568FEC-99D5-442F-9EC0-240CB8B5D748}.Release|x64.ActiveCfg = Release|Any CPU
+		{3C568FEC-99D5-442F-9EC0-240CB8B5D748}.Release|x64.Build.0 = Release|Any CPU
+		{3C568FEC-99D5-442F-9EC0-240CB8B5D748}.Release|x86.ActiveCfg = Release|Any CPU
+		{3C568FEC-99D5-442F-9EC0-240CB8B5D748}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -2595,6 +2609,7 @@ Global
 		{43B331E9-57B8-4F8C-BA7F-0EBA0FBCFEF3} = {3169F17F-AD42-9319-BE02-03D146B62241}
 		{7E04713C-3C9A-34E3-9C31-54145A9D020D} = {3169F17F-AD42-9319-BE02-03D146B62241}
 		{46B2FADB-667B-4907-8CF2-95517153DBA2} = {7E04713C-3C9A-34E3-9C31-54145A9D020D}
+		{3C568FEC-99D5-442F-9EC0-240CB8B5D748} = {3169F17F-AD42-9319-BE02-03D146B62241}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {669C5778-BFAE-4972-B427-0AFF99562045}
