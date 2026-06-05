@@ -1,6 +1,8 @@
 using System.IO;
 using Koan.Core;
 using Koan.Core.Hosting.App;
+using Koan.Data.Abstractions.Instructions;
+using Koan.Data.Core;
 using Koan.Data.Core.Model;
 using Koan.Jobs;
 using Koan.Testing.Integration;
@@ -63,7 +65,20 @@ public sealed class JobsHarness : IAsyncDisposable
     public static Task<JobsHarness> StartWithSettingsAsync(IReadOnlyDictionary<string, string?> settings, Action<JobsOptions>? configure = null)
         => StartCore(configure, settings, null);
 
-    private static async Task<JobsHarness> StartCore(Action<JobsOptions>? configure, IReadOnlyDictionary<string, string?>? settings, string? dbPath)
+    /// <summary>SQLite against a specific db file (for crash/restart tests). <paramref name="clearOnStart"/> false =
+    /// reuse the existing data (a "reboot"); <paramref name="ownsDb"/> false = leave the file for the test to manage.</summary>
+    public static Task<JobsHarness> StartSqliteAtAsync(string dbPath, bool clearOnStart, bool ownsDb, Action<JobsOptions>? configure = null)
+    {
+        var settings = new Dictionary<string, string?>(StringComparer.Ordinal)
+        {
+            ["Koan:Environment"] = "Test",
+            ["Koan:Data:Sources:Default:Adapter"] = "sqlite",
+            ["Koan:Data:Sources:Default:ConnectionString"] = $"Data Source={dbPath}",
+        };
+        return StartCore(configure, settings, ownsDb ? dbPath : null, clearOnStart);
+    }
+
+    private static async Task<JobsHarness> StartCore(Action<JobsOptions>? configure, IReadOnlyDictionary<string, string?>? settings, string? dbPath, bool clearOnStart = true)
     {
         var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-01-01T00:00:00Z"));
         var builder = KoanIntegrationHost.Configure();
@@ -84,11 +99,23 @@ public sealed class JobsHarness : IAsyncDisposable
         await host.StartAsync();
         var prev = AppHost.Current;
         AppHost.Current = host.Services;
-        // Clean slate: a durable store may be reused in-process across tests; clear the Jobs-owned sets.
-        await JobRecord.RemoveAll();
-        await JobGateRecord.RemoveAll();
-        await JobClaimTicket.RemoveAll();
+        if (clearOnStart)
+        {
+            await EnsureJobSchema();   // framework-defined entities need their tables ensured on some adapters
+            // Clean slate: a durable store may be reused in-process across tests; clear the Jobs-owned sets.
+            await JobRecord.RemoveAll();
+            await JobGateRecord.RemoveAll();
+            await JobClaimTicket.RemoveAll();
+        }
         return new JobsHarness(host, prev, clock, dbPath);
+    }
+
+    private static async Task EnsureJobSchema()
+    {
+        var ensure = new Instruction(DataInstructions.EnsureCreated);
+        try { await Data<JobRecord, string>.Execute<object?>(ensure); } catch { /* no-op on adapters without schema */ }
+        try { await Data<JobGateRecord, string>.Execute<object?>(ensure); } catch { }
+        try { await Data<JobClaimTicket, string>.Execute<object?>(ensure); } catch { }
     }
 
     public void Advance(TimeSpan by) => Clock.Advance(by);
