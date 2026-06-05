@@ -401,11 +401,11 @@ Greenfield: delete `Koan.Jobs.Core`, re-author against `IKoanJob<T>`. Dogfeed re
 
 ## 16. Implementation status (2026-06-04)
 
-Built as a single project **`src/Koan.Jobs`** (no Abstractions/Core split — extract only if an external adapter later needs the contracts). The in-memory and durable tiers are complete and verified; the per-DB container matrix (SQLite/Postgres/Mongo/SqlServer) and the distributed core ship green. Remaining: the distributed tier's `+bus` transport and per-type `[JobPersistence]` routing.
+Built as a single project **`src/Koan.Jobs`** (no Abstractions/Core split — extract only if an external adapter later needs the contracts), plus the optional **`src/Koan.Jobs.Transport.Messaging`** package for cross-node push-dispatch. **The full capability ladder is complete and green: in-memory → durable → per-DB container matrix (SQLite/Postgres/Mongo/SqlServer) → distributed → `+bus`.** Every item below ships with tests; the detailed status follows.
 
-**Shipped & verified**
-- **In-memory tier** — the full engine (claim/execute/settle/chain/reschedule/backoff/gate/cancel/timeout/lanes/reap/schedule) behind `IJobLedger`, with **21 behavioral specs green** via a `FakeTimeProvider` harness.
-- **Durable tier** — `DataJobLedger` over `Entity<JobRecord>` plus parallel `JobGateRecord` and `JobClaimTicket` sets (no per-DB job adapters; durability follows the ambient data adapter). Capability election picks it when a durable adapter is present. **Verified on a live SQLite store (4 green)**: election, durable persist + complete, claim-query translation, chain advance, lease reclaim.
+**Shipped & verified** (the same behavioral suite — `JobBehaviorSuite`, 28 specs — runs across every tier per ARCH-0079)
+- **In-memory tier** — the full engine (claim/execute/settle/chain/reschedule/backoff/gate/cancel/timeout/lanes/reap/schedule/archival) behind `IJobLedger`, driven by a `FakeTimeProvider` harness. **In-memory project: 32 green** (28 convergence + 2 distributed + 2 transport).
+- **Durable tier** — `DataJobLedger` over `Entity<JobRecord>` plus parallel `JobGateRecord` and `JobClaimTicket` sets (no per-DB job adapters; durability follows the ambient data adapter). Capability election picks it when a durable adapter is present. **Verified on live stores:** SQLite (35: 28 convergence + 3 durable-specific + 3 crash-recovery + 1 routing), **Postgres 28**, **Mongo 28**, **SQL Server 28** — all the same suite.
 
 **Refinements adopted during implementation** (these supersede the proposed text where they differ)
 - **Accessor → C# 14 extension members.** Resolves Open Q §12.14: both `model.Job` (instance) and `MyModel.Jobs` (static) compile as extension members, so **no source generator** is used — one fewer moving part.

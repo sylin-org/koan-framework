@@ -84,6 +84,14 @@ Framework knowledge is provided through **Agent Skills** in `.claude/skills/` th
   - `Koan.Cache.Coherence.InMemory` — fallback channel for tests / single-process verification (priority `int.MinValue`)
 - **Singleflight** (`Koan.Core.Singleflight`) — Stampede-protection primitive lifted out of cache for cross-pillar reuse
 
+### Background Jobs (JOBS-0005)
+- **IKoanJob<TSelf>** (`Koan.Jobs`) — Entity-first jobs: `MyJob : Entity<MyJob>, IKoanJob<MyJob>` with `static Task Execute(MyJob, JobContext, CancellationToken)`. Auto-discovered (`[KoanDiscoverable]`) — no queues/workers/repositories to wire
+- **`.Job` / `.Jobs` accessors** (`Koan.Jobs`) — `myJob.Job.Submit(action)`, `MyJob.Jobs.Trigger(action)` / `.Cancel(id)` / `.Where(...)`, batch `list.Submit(action)` (C# 14 extension members — instance `Job`, static `Jobs`; no source generator)
+- **Job attributes** (`Koan.Jobs`) — `[JobAction(action, Timeout/MaxAttempts/OnFailure/Lane/MaxConcurrency/Schedule/Deadline/MaxReschedules)]`, `[JobChain(a,b,c)]` (linear auto-advance), `[JobIdempotent(keys)]` (coalesce duplicates), `[JobGate(prop)]` (shared resource gate), `[JobPersistence(Auto|InMemory|DataStore)]` (per-type durability routing)
+- **JobContext** (`Koan.Jobs`) — handler control verbs: `ctx.Reschedule(after|until)` (defer without consuming a retry), `ctx.Backoff(after, key)` (set a cross-node resource gate), `ctx.ContinueWith(action)` / `ctx.StopChain`, `ctx.Progress(fraction, msg)`; read-only `ctx.State` for stateful backoff decisions
+- **Capability ladder** — in-memory → durable (`DataJobLedger` over `Entity<JobRecord>`; follows any data adapter) → distributed (competing consumers on the shared ledger) → `+bus` (`Koan.Jobs.Transport.Messaging`, cross-node push-dispatch). **Constant at-least-once + idempotent contract across all tiers**; the ledger is the single source of truth (claim = atomic CAS, never a move). Scheduling is initiator-driven (`Schedule` re-submits on a cadence: interval / cron via Cronos / `@boot` / `@continuous`); transactional outbox + terminal archival are automatic on the durable tier
+- **Authoring guide**: [Background Jobs How-To](docs/guides/jobs-howto.md) · **ADR**: docs/decisions/JOBS-0005
+
 ### Entity Lifecycle
 - **[Timestamp]** (`Koan.Data.Abstractions`) — `[Timestamp]` set-once on creation, `[Timestamp(OnSave = true)]` set on every save
 - **Entity Transfer** (`Koan.Data.Core`) — `Entity<T>.Copy()`, `.Move()`, `.Mirror()` fluent builders for cross-context transfers

@@ -4,12 +4,12 @@ domain: core
 title: "Framework Utilities Guide"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-03-26
+last_updated: 2026-06-05
 framework_version: v0.6.3
 validation:
   date_last_tested: 2026-03-26
   status: verified
-  scope: all-examples-tested
+  scope: all-examples-tested-except-background-jobs-section
 related_guides:
   - entity-capabilities-howto.md
   - data-modeling.md
@@ -32,6 +32,7 @@ related_guides:
 - [Configuration & Options](#configuration--options)
 - [Web API Utilities](#web-api-utilities)
 - [Data Access Helpers](#data-access-helpers)
+- [Background Jobs](#background-jobs)
 - [Common Patterns](#common-patterns)
 - [Provenance & Boot Reporting](#provenance--boot-reporting)
 
@@ -586,6 +587,61 @@ using (EntityContext.Partition("tenant/7")) { /* throws ArgumentException — wo
 - You don't call it directly — it runs automatically on every `EntityContext.With(partition:)` /
   `EntityContext.Partition(...)`. Catch `ArgumentException` if you route user-supplied partition values and want
   to surface a friendly error; otherwise re-encode names to the allowed set before use. See DATA-0077 §4.
+
+---
+
+## Background Jobs
+
+**Location**: `src/Koan.Jobs` (+ optional `src/Koan.Jobs.Transport.Messaging`)
+**Pattern**: Entity-first pillar, auto-discovered (`[KoanDiscoverable]` / `KoanModule`)
+**ADR**: [JOBS-0005](../decisions/JOBS-0005-job-orchestrator-rebuild.md) · **Authoring guide**: [Background Jobs How-To](jobs-howto.md)
+
+**Purpose**: Durable, edge + level-triggered background work with a single orchestrator concern and a
+ledger-as-truth model. A job is a normal `Entity<T>` carrying its own behavior — no queues, workers, or
+repositories to wire. The same job code runs unchanged across tiers; the infrastructure you reference
+(a data adapter, multiple nodes, a message bus) decides durability and scale, never correctness.
+
+#### Entry points
+
+```csharp
+// Define: behavior co-located with the entity
+public sealed class SendEmail : Entity<SendEmail>, IKoanJob<SendEmail>
+{
+    public string To { get; set; } = "";
+    public static async Task Execute(SendEmail job, JobContext ctx, CancellationToken ct) { /* … */ }
+}
+
+// Submit / trigger / query via the .Job (instance) and .Jobs (static) accessors
+await email.Job.Submit();                 // edge trigger
+await SendEmail.Jobs.Trigger("reconcile"); // type-level singleton
+await mailbatch.Submit();                  // batch (IEnumerable<T>)
+```
+
+| Surface | What it does |
+|---|---|
+| `IKoanJob<TSelf>` + `static Execute(...)` | the job contract; auto-discovered |
+| `.Job` / `.Jobs` accessors | `Submit` / `Trigger` / `Cancel` / `Where` / `Status` (C# 14 extension members) |
+| `[JobAction(action, Timeout/MaxAttempts/OnFailure/Lane/MaxConcurrency/Schedule/Deadline/MaxReschedules)]` | per-action policy |
+| `[JobChain(a,b,c)]` | linear pipeline (auto-advance, one ledger entry per stage) |
+| `[JobIdempotent(keys)]` | collapse concurrent / duplicate submits |
+| `[JobGate(prop)]` | shared resource gate for cooperative backoff |
+| `[JobPersistence(Auto\|InMemory\|DataStore)]` | per-type durability routing (`RoutingJobLedger`) |
+| `JobContext` verbs | `Reschedule(after\|until)` (defer, no retry consumed), `Backoff(after, key)` (cross-node gate), `ContinueWith` / `StopChain`, `Progress` |
+
+#### Capability ladder
+
+`in-memory → durable → distributed → +bus` — constant at-least-once + idempotent contract across all of them.
+
+- **In-memory** (no data adapter): fast, ephemeral; `InMemoryJobLedger`.
+- **Durable** (any data adapter — SQLite/Postgres/Mongo/SQL Server): `DataJobLedger` over `Entity<JobRecord>`;
+  transactional outbox (a `Submit` inside an ambient transaction enqueues on commit) and terminal archival are automatic.
+- **Distributed** (several nodes on one store): competing consumers claim atomically (`JobsOptions.ClaimStrategy` =
+  `Optimistic` | `Ticket`); resource gates are honored cross-node.
+- **+bus** (`Koan.Jobs.Transport.Messaging`): cross-node push-dispatch — a submit wakes every node immediately
+  instead of waiting out the poll interval. Latency upgrade only; the ledger stays the truth.
+
+> Scheduling is initiator-driven: a `Schedule` re-submits a fresh job on its cadence (interval / cron via Cronos /
+> `@boot` / `@continuous`) against the per-type singleton — never a parked job. See the how-to for the full model.
 
 ---
 
