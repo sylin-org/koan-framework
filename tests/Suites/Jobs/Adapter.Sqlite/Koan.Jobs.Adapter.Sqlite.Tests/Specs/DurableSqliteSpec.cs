@@ -30,6 +30,18 @@ public sealed class DurableSqliteSpec
     }
 
     [Fact]
+    public async Task type_level_trigger_runs_over_sqlite()
+    {
+        DurableTick.Reset();
+        await using var host = await DurableHost.StartAsync();
+
+        await DurableTick.Jobs.Trigger("sweep");
+        await host.Drain();
+
+        DurableTick.Executions.Should().Be(1);
+    }
+
+    [Fact]
     public async Task chain_advances_over_sqlite()
     {
         await using var host = await DurableHost.StartAsync();
