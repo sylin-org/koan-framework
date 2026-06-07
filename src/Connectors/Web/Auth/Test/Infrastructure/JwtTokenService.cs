@@ -1,25 +1,42 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
-using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using Koan.Web.Auth.Connector.Test.Options;
 
 namespace Koan.Web.Auth.Connector.Test.Infrastructure;
 
+/// <summary>
+/// SEC-0001 §11 — the dev TestProvider signs JWTs with a per-process, NON-DETERMINISTIC asymmetric
+/// (ES256) key. The previous HS256 path derived a symmetric key from a public formula
+/// (<c>issuer:audience:test-provider-key</c>): anyone reading the open-source repo could reconstruct
+/// it and forge a "valid" token. Asymmetric signing means a verifier (the future inbound validator /
+/// published JWKS) can validate without ever holding a key that can mint — "whoever can verify must
+/// not be able to forge." The keypair is generated once (this service is a singleton; see
+/// <c>KoanAutoRegistrar</c>) and lives only for the process lifetime.
+/// </summary>
 public sealed class JwtTokenService
 {
+    // SEC-0001 §6.1: one fixed asymmetric suite; the verifier pins it (no in-band alg negotiation).
+    private const string Algorithm = SecurityAlgorithms.EcdsaSha256; // "ES256"
+
     private readonly ILogger<JwtTokenService> _logger;
+    private readonly ECDsaSecurityKey _signingKey;
 
     public JwtTokenService(ILogger<JwtTokenService> logger)
     {
         _logger = logger;
+        // Per-process ephemeral P-256 keypair — random by construction, not derivable from config.
+        var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        _signingKey = new ECDsaSecurityKey(ecdsa) { KeyId = Guid.NewGuid().ToString("n") };
     }
+
+    /// <summary>Key id (<c>kid</c>) of the current signing key — for JWKS publication / rotation.</summary>
+    public string KeyId => _signingKey.KeyId!;
 
     public string CreateToken(UserProfile profile, DevTokenStore.ClaimEnvelope env, TestProviderOptions options)
     {
-        var signingKey = GetSigningKey(options);
         var tokenHandler = new JwtSecurityTokenHandler();
 
         var claims = new List<Claim>
@@ -30,7 +47,6 @@ public sealed class JwtTokenService
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
         };
-
 
         // Add roles
         foreach (var role in env.Roles)
@@ -59,14 +75,11 @@ public sealed class JwtTokenService
             Expires = DateTime.UtcNow.AddMinutes(options.JwtExpirationMinutes),
             Issuer = options.JwtIssuer,
             Audience = options.JwtAudience,
-            SigningCredentials = new SigningCredentials(signingKey, options.JwtAlgorithm)
+            SigningCredentials = new SigningCredentials(_signingKey, Algorithm)
         };
 
         var token = tokenHandler.CreateToken(tokenDescriptor);
-        var jwt = tokenHandler.WriteToken(token);
-
-
-        return jwt;
+        return tokenHandler.WriteToken(token);
     }
 
     public bool ValidateToken(string token, TestProviderOptions options, out UserProfile profile, out DevTokenStore.ClaimEnvelope env)
@@ -76,13 +89,14 @@ public sealed class JwtTokenService
 
         try
         {
-            var signingKey = GetSigningKey(options);
             var tokenHandler = new JwtSecurityTokenHandler();
 
             var validationParameters = new TokenValidationParameters
             {
                 ValidateIssuerSigningKey = true,
-                IssuerSigningKey = signingKey,
+                IssuerSigningKey = _signingKey,
+                // SEC-0001 §6.1: pin the algorithm; reject alg=none / RS256↔HS256 confusion structurally.
+                ValidAlgorithms = new[] { Algorithm },
                 ValidateIssuer = true,
                 ValidIssuer = options.JwtIssuer,
                 ValidateAudience = true,
@@ -94,7 +108,7 @@ public sealed class JwtTokenService
             var principal = tokenHandler.ValidateToken(token, validationParameters, out var validatedToken);
 
             if (validatedToken is not JwtSecurityToken jwtToken ||
-                !string.Equals(jwtToken.Header.Alg, options.JwtAlgorithm, StringComparison.OrdinalIgnoreCase))
+                !string.Equals(jwtToken.Header.Alg, Algorithm, StringComparison.OrdinalIgnoreCase))
             {
                 _logger.LogWarning("TestProvider JWT: invalid algorithm in token");
                 return false;
@@ -173,26 +187,5 @@ public sealed class JwtTokenService
             _logger.LogWarning(ex, "TestProvider JWT: unexpected error during token validation");
             return false;
         }
-    }
-
-    private static SymmetricSecurityKey GetSigningKey(TestProviderOptions options)
-    {
-        if (!string.IsNullOrWhiteSpace(options.JwtSigningKey))
-        {
-            try
-            {
-                var keyBytes = Convert.FromBase64String(options.JwtSigningKey);
-                return new SymmetricSecurityKey(keyBytes);
-            }
-            catch
-            {
-                // Fall through to auto-generation
-            }
-        }
-
-        // Auto-generate a key for development (deterministic based on other config)
-        var keyMaterial = $"{options.JwtIssuer}:{options.JwtAudience}:test-provider-key";
-        var generatedKeyBytes = SHA256.HashData(Encoding.UTF8.GetBytes(keyMaterial));
-        return new SymmetricSecurityKey(generatedKeyBytes);
     }
 }
