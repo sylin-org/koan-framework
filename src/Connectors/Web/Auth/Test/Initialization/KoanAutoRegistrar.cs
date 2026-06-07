@@ -55,17 +55,15 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             cfg,
             $"{TestProviderOptions.SectionPath}:{nameof(TestProviderOptions.Enabled)}",
             false);
-        var enabled = env.IsDevelopment() || enabledOption.Value;
-        var enabledMode = env.IsDevelopment() && !enabledOption.Value
-            ? ProvenanceModes.FromBootSource(BootSettingSource.Environment, usedDefault: false)
-            : ProvenanceModes.FromConfigurationValue(enabledOption);
+        // SEC-0001 2h: opt-in only — no Development auto-enable (everyday dev login is the zero-config trust identity).
+        var enabled = enabledOption.Value;
 
         module.PublishConfigValue(
             TestProviderItems.Enabled,
             enabledOption,
             displayOverride: enabled ? "true" : "false",
-            modeOverride: enabledMode,
-            usedDefaultOverride: env.IsDevelopment() && !enabledOption.Value ? false : null,
+            modeOverride: ProvenanceModes.FromConfigurationValue(enabledOption),
+            usedDefaultOverride: null,
             sourceKeyOverride: enabledOption.ResolvedKey);
 
         var routeBaseOption = Koan.Core.Configuration.ReadWithSource(
@@ -142,10 +140,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             registeredClientsValue,
             displayOverride: clientCount.ToString());
 
-        if (!env.IsDevelopment() && enabled)
-        {
-            module.AddNote("WARNING: TestProvider is enabled outside Development. Do not use in Production.");
-        }
+        module.AddNote(enabled
+            ? "TestProvider ENABLED — opt-in OAuth-flow simulator (everyday dev login is the zero-config trust identity)."
+            : $"TestProvider disabled (opt-in flow simulator). Set {TestProviderOptions.SectionPath}:Enabled=true to exercise the simulated OAuth flow.");
 
         module.AddTool(
             "Test Provider Login",
