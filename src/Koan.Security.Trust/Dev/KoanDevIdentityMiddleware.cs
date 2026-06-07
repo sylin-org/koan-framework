@@ -6,12 +6,14 @@ using Microsoft.Extensions.Options;
 namespace Koan.Security.Trust.Dev;
 
 /// <summary>
-/// SEC-0001 §4 (Rung 0) — zero-config dev identity. When a request is otherwise unauthenticated, fills in
-/// a dev principal so <c>[Authorize]</c> and <see cref="Identity"/> just work with no OAuth dance. Persona
-/// testing: <c>?_as=&lt;sub&gt;&amp;_roles=a,b</c>; stay unauthenticated with <c>?_as=anonymous</c>.
+/// SEC-0001 §4 / SEC-0003 §2.3 — the <c>?_as=</c> dev persona override. <b>The default is anonymous</b>:
+/// a request is given a (transient, cookie-less) principal ONLY when <c>?_as=&lt;subject&gt;</c> is explicitly
+/// provided — for scripted testing of different users/setups (<c>?_as=alice&amp;_roles=editor</c>). Omitting
+/// <c>?_as</c>, or <c>?_as=anonymous</c>, stays unauthenticated so the public interface is what you see by
+/// default. The everyday dev *login* is the TestProvider page, which mints a real session.
 /// <para>
-/// The auth pipeline (<c>KoanWebAuthStartupFilter</c>) inserts this BETWEEN authentication and authorization,
-/// and ONLY in Development — so it is never present in a production pipeline (the §4.2 fail-closed invariant).
+/// The auth pipeline inserts this BETWEEN authentication and authorization, and ONLY in Development (via the
+/// WEB-0069 contributor) — so it is never present in a production pipeline (the §4.2 fail-closed invariant).
 /// </para>
 /// </summary>
 public sealed class KoanDevIdentityMiddleware
@@ -30,15 +32,15 @@ public sealed class KoanDevIdentityMiddleware
         if (_options.Enabled && context.User?.Identity?.IsAuthenticated != true)
         {
             var asParam = context.Request.Query["_as"].ToString();
-            // ?_as=anonymous opts out (test the unauthenticated path); otherwise auto-sign-in.
-            if (!string.Equals(asParam, "anonymous", StringComparison.OrdinalIgnoreCase))
+            // SEC-0003 §2.3 — DEFAULT ANONYMOUS. Impersonate only when ?_as=<subject> is explicitly given and
+            // is not 'anonymous'. (No ?_as ⇒ do nothing ⇒ the request stays unauthenticated / public.)
+            if (!string.IsNullOrWhiteSpace(asParam) && !string.Equals(asParam, "anonymous", StringComparison.OrdinalIgnoreCase))
             {
-                var subject = string.IsNullOrWhiteSpace(asParam) ? _options.Subject : asParam;
                 var rolesParam = context.Request.Query["_roles"].ToString();
                 var roles = string.IsNullOrWhiteSpace(rolesParam)
                     ? _options.Roles
                     : rolesParam.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-                context.User = BuildPrincipal(subject, roles);
+                context.User = BuildPrincipal(asParam, roles);
             }
         }
 

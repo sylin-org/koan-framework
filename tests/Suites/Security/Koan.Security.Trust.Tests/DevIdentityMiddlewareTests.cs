@@ -10,9 +10,10 @@ using Xunit;
 namespace Koan.Security.Trust.Tests;
 
 /// <summary>
-/// SEC-0001 Phase 2 (Rung 0): the zero-config dev identity fills in an unauthenticated request as a dev
-/// principal, supports the <c>?_as=</c>/<c>_roles=</c> persona switch and <c>?_as=anonymous</c> opt-out,
-/// and never overwrites a real principal. (Development-only insertion is enforced by KoanWebAuthStartupFilter.)
+/// SEC-0003 §2.3: the <c>?_as=</c> dev persona override. <b>Default is anonymous</b> (no <c>?_as</c> ⇒ no
+/// principal); <c>?_as=&lt;sub&gt;&amp;_roles=</c> sets a transient persona; <c>?_as=anonymous</c> stays
+/// anonymous; a real principal is never overwritten; <c>Enabled=false</c> is a no-op. (Development-only
+/// insertion via the WEB-0069 contributor.)
 /// </summary>
 public sealed class DevIdentityMiddlewareTests
 {
@@ -27,12 +28,11 @@ public sealed class DevIdentityMiddlewareTests
     }
 
     [Fact]
-    public async Task Unauthenticated_request_gets_the_default_dev_identity()
+    public async Task Default_request_with_no_persona_stays_anonymous()
     {
+        // SEC-0003 §2.1/§2.3 — no ?_as ⇒ no principal (public by default).
         var ctx = await Run(new DevIdentityOptions());
-        ctx.User.Identity!.IsAuthenticated.Should().BeTrue();
-        ctx.User.FindFirst("sub")!.Value.Should().Be("dev");
-        ctx.User.IsInRole("admin").Should().BeTrue();
+        ctx.User.Identity?.IsAuthenticated.Should().NotBe(true);
     }
 
     [Fact]

@@ -69,11 +69,11 @@ public sealed class AuthEndToEndSpec : IClassFixture<AuthE2EFixture>
     // ── zero-config dev identity ────────────────────────────────────────
 
     [Fact]
-    public async Task Dev_identity_authenticates_unauthenticated_requests_in_development()
+    public async Task Default_is_anonymous_no_auto_signin()
     {
+        // SEC-0003 §2.1 — a fresh request is unauthenticated (public), not auto-signed-in.
         var json = await ReadJson(await _fx.CreateClient().GetAsync("/e2e/whoami"));
-        json.GetProperty("authenticated").GetBoolean().Should().BeTrue();
-        json.GetProperty("id").GetString().Should().NotBeNullOrEmpty();
+        json.GetProperty("authenticated").GetBoolean().Should().BeFalse();
     }
 
     [Fact]
@@ -94,25 +94,26 @@ public sealed class AuthEndToEndSpec : IClassFixture<AuthE2EFixture>
     // ── bare [Authorize] (cookie/default scheme) ────────────────────────
 
     [Fact]
-    public async Task Bare_authorize_passes_with_the_dev_identity()
+    public async Task Bare_authorize_passes_when_impersonating()
     {
-        var res = await _fx.CreateClient().GetAsync("/e2e/cookie");
+        var res = await _fx.CreateClient().GetAsync("/e2e/cookie?_as=alice");
         res.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Fact]
-    public async Task Bare_authorize_is_unauthorized_when_anonymous()
+    public async Task Bare_authorize_is_denied_by_default()
     {
-        var res = await _fx.CreateClient().GetAsync("/e2e/cookie?_as=anonymous");
+        // No ?_as ⇒ anonymous ⇒ [Authorize] denies (the public-first default).
+        var res = await _fx.CreateClient().GetAsync("/e2e/cookie");
         res.IsSuccessStatusCode.Should().BeFalse();
     }
 
     // ── role gate (RBAC over dev-identity roles) ────────────────────────
 
     [Fact]
-    public async Task Role_gate_allows_the_admin_dev_identity()
+    public async Task Role_gate_allows_an_impersonated_admin()
     {
-        var res = await _fx.CreateClient().GetAsync("/e2e/admin");
+        var res = await _fx.CreateClient().GetAsync("/e2e/admin?_as=alice&_roles=admin");
         res.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 

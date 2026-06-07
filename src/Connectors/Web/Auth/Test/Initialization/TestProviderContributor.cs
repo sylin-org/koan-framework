@@ -10,9 +10,10 @@ internal sealed class TestProviderContributor(IConfiguration cfg, IHostEnvironme
     public IReadOnlyDictionary<string, Koan.Web.Auth.Options.ProviderOptions> GetDefaults()
     {
         var o = cfg.GetSection(TestProviderOptions.SectionPath).Get<TestProviderOptions>() ?? new TestProviderOptions();
-        // SEC-0001 2h: opt-in only — the TestProvider no longer auto-enables in Development. The everyday
-        // dev login is the zero-config trust identity (Rung 0); this provider is the opt-in OAuth-flow simulator.
-        var enabled = o.Enabled || o.ExposeInDiscoveryOutsideDevelopment;
+        // SEC-0003 §2.2: the TestProvider IS the zero-config dev login — available in Development with no config
+        // (pick a profile → a real signed session). Opt-in outside Development. (The `?_as=` trust override is the
+        // separate, transient quick-test path; the default everywhere is anonymous.)
+        var enabled = o.Enabled || env.IsDevelopment() || o.ExposeInDiscoveryOutsideDevelopment;
         if (!enabled) return new Dictionary<string, Koan.Web.Auth.Options.ProviderOptions>(StringComparer.OrdinalIgnoreCase);
         return new Dictionary<string, Koan.Web.Auth.Options.ProviderOptions>(StringComparer.OrdinalIgnoreCase)
         {
