@@ -3,7 +3,7 @@
 **Status**: Proposed, 2026-05-17
 **Drivers**: Unified, extensible cookie-auth lifecycle; remove hardcoded JSON-challenge heuristic
 **Deciders**: Koan Framework maintainers
-**Inputs**: `Koan.Web.Auth`, downstream platform (gposingway)
+**Inputs**: `Koan.Web.Auth`, downstream platform (downstream consumer)
 **Outputs**: New `IKoanAuthFlowHandler` contract, configurable `JsonChallengeHandler` built-in, `Koan:Web:Auth:Challenge` options surface
 **Supersedes (in part)**: WEB-0065 (`IKoanAuthEventContributor` is kept as a compatibility shim)
 
@@ -23,7 +23,7 @@ redirect into 401/403 when the request looks JSON-ish (`Accept: application/json
 `X-Requested-With: XMLHttpRequest`, or path under `/api`/`/.well-known`/`/me`). Two operational
 problems:
 
-1. **Hardcoded path list.** Downstream platforms with API surfaces outside `/api` (the gposingway
+1. **Hardcoded path list.** Downstream platforms with API surfaces outside `/api` (the downstream consumer
    platform's `/account/*` and `/v1/account/*` are the immediate trigger) silently fall back to
    redirect-mode for unauthenticated XHR — the SPA sees an opaque-redirect fetch failure instead
    of a clean 401 it can recover from.
@@ -141,7 +141,7 @@ can still be preempted by an app handler at a lower priority. Configurable via
 ```
 
 Defaults match the legacy heuristic plus `/account` and `/v1` so the immediate downstream pain
-(gposingway) is solved out of the box. Apps with different conventions either extend `ApiPaths`
+(downstream consumer) is solved out of the box. Apps with different conventions either extend `ApiPaths`
 or flip `Enabled` to false and ship their own.
 
 ### Discovery and registration

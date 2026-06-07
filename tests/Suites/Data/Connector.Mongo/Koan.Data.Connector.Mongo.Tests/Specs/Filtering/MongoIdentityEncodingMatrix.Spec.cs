@@ -13,7 +13,7 @@ namespace Koan.Data.Connector.Mongo.Tests.Specs.Filtering;
 /// proves the whole contract: GUID ids/refs round-trip and are queryable; slug (string-keyed) ids and
 /// refs round-trip and are queryable; a guid-shaped string on a NON-identity field round-trips
 /// verbatim (no over-reach, no canonicalization) and is queryable as a string; and an absent ref
-/// returns empty (so delete-when-empty stays correct). The guid-ref case is the gposingway regression.
+/// returns empty (so delete-when-empty stays correct). The guid-ref case is the downstream consumer regression.
 /// </summary>
 public sealed class MongoIdentityEncodingMatrixSpec
 {

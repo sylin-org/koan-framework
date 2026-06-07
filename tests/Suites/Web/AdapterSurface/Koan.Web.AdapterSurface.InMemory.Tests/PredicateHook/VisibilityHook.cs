@@ -14,7 +14,7 @@ public sealed class VisibilityHook : IRequestOptionsHook<VisibilityWidget>
 
     public Task OnBuildingOptions(HookContext<VisibilityWidget> ctx, QueryOptions opts)
     {
-        // Hidden is never visible to anyone (mirrors the gposingway Merged semantics).
+        // Hidden is never visible to anyone (mirrors the downstream consumer Merged semantics).
         opts.AddPredicate<VisibilityWidget>(w => w.Status != VisibilityStatus.Hidden);
 
         var role = ctx.Http?.Request.Headers["X-Test-Role"].ToString();

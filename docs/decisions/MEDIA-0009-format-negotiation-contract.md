@@ -26,7 +26,7 @@ Both paths are operator-driven and explicit. Neither admits client preference. T
 
 1. **No way to declare "this recipe can serve WebP or AVIF, pick the best one the client accepts."** Adding AVIF to PackageCard today means either (a) renaming the existing recipe and registering a parallel `package-card-avif` and burning the choice into every URL the UI generates, or (b) parsing `Accept` ad-hoc inside the controller and switching the recipe out from under itself — which breaks the cache key (MEDIA-0007 hashes the recipe, not the response, so two formats would collide on the same cache entry and poison each other).
 
-2. **Consumers hard-code modern formats.** The Gposingway UI knows that PackageCard serves WebP and hard-codes `<img src=".../media/{id}/recipe/package-card">` with no `<picture>` fallback. A Safari 14 client that doesn't speak WebP gets a broken image. The recipe should declare what it can serve and let the controller resolve the right one per-request; the consumer shouldn't have to know.
+2. **Consumers hard-code modern formats.** The Downstream consumer UI knows that PackageCard serves WebP and hard-codes `<img src=".../media/{id}/recipe/package-card">` with no `<picture>` fallback. A Safari 14 client that doesn't speak WebP gets a broken image. The recipe should declare what it can serve and let the controller resolve the right one per-request; the consumer shouldn't have to know.
 
 3. **AVIF adoption requires touching every call site.** With no allowlist primitive, "make PackageCard, PackageSighting, ArticleCard, and ArticleHero serve AVIF where the client supports it" is a four-recipe rewrite plus a controller fork plus a cache-key migration. With the allowlist primitive, it's four `AllowedOutputFormats = [..., "avif"]` edits and one AVIF encoder registration. The leverage ratio is the whole point of this ADR.
 
@@ -157,7 +157,7 @@ The fourth case is the new one. The allowlist genuinely makes the response Accep
 - **Recipes without `AllowedOutputFormats`**: behavior unchanged. Source format is preserved exactly as today. No migration step required.
 - **Recipes opting in to negotiation**: add `.AllowOutputFormats("webp", "avif")` (or equivalent) to the recipe builder. The first slug is the fallback default when Accept offers no overlap.
 - **Format-shortcut URLs (`/media/{id}/webp`, etc.)**: unchanged. The synthesised recipe carries the pinned `EncodeStep.Format` and bypasses negotiation.
-- **Gposingway recipe migration** (per the recon survey):
+- **Downstream consumer recipe migration** (per the recon survey):
   - `PackageCard`, `PackageSighting`, `ArticleCard`: `AllowOutputFormats("webp", "avif")` — prefers WebP until the AVIF encoder is wired, at which point clients sending `Accept: image/avif,image/webp` will receive AVIF without further recipe edits.
   - `PackageHero`, `ArticleHero`: same allowlist (`"webp", "avif"`), same trajectory. The 15-20% byte savings on the hero assets is where AVIF's value concentrates.
   - `AdminPreview`: no allowlist (preserves source format). Editor UX prioritises seeing the source as authored; bandwidth is not the constraint on an admin surface.

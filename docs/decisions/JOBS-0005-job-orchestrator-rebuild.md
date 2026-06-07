@@ -432,7 +432,7 @@ Built as a single project **`src/Koan.Jobs`** (no Abstractions/Core split — ex
 
 ## 17. Addendum (2026-06-05): work-item write safety
 
-Dogfooding (gposingway) surfaced two ways a handler can silently lose a write. Both are framework concerns, not app concerns, and the fixes make *"an entity is a consistency unit"* — the promise entity-first quietly makes — true by default. Two layers: one protects a single handler from itself; one serializes concurrent handlers on the same entity.
+Dogfooding (downstream consumer) surfaced two ways a handler can silently lose a write. Both are framework concerns, not app concerns, and the fixes make *"an entity is a consistency unit"* — the promise entity-first quietly makes — true by default. Two layers: one protects a single handler from itself; one serializes concurrent handlers on the same entity.
 
 ### 17.1 Conditional auto-save (dirty-detection)
 
@@ -458,9 +458,9 @@ Dogfooding (gposingway) surfaced two ways a handler can silently lose a write. B
 
 ## 18. Addendum (2026-06-05): runtime-resolved gate keys
 
-Surfaced by a gposingway proposal (cooperative gating when the gate key isn't a property on the work-item). The cooperative-deferral substrate is otherwise complete; only the *shape of the key* was too rigid.
+Surfaced by a downstream consumer proposal (cooperative gating when the gate key isn't a property on the work-item). The cooperative-deferral substrate is otherwise complete; only the *shape of the key* was too rigid.
 
-**Problem.** `[JobGate(property)]` reads one public property at submit and freezes it onto `JobRecord.GateKey`; the dispatch match (`ClaimNext`) compares that frozen string against live `JobGateRecord`s. This is correct when the gate identity is a value the entity already carries (`Source`, `Provider`). It fails when the identity must be **derived** — a related entity loaded at runtime, a brand→host registry lookup, a host parsed off a navigation property. The gposingway `Mirror` has no `Host` property (the host lives on the navigated `Package.UpstreamArchive`), so no property name yields `xivmodarchive.com` at submit, and queued siblings can't carry a key that matches the dynamic key one of them writes via `ctx.Backoff`. (The **write** side was already dynamic — `ctx.Backoff(after, key)` — so the gap was purely the read/sibling side.)
+**Problem.** `[JobGate(property)]` reads one public property at submit and freezes it onto `JobRecord.GateKey`; the dispatch match (`ClaimNext`) compares that frozen string against live `JobGateRecord`s. This is correct when the gate identity is a value the entity already carries (`Source`, `Provider`). It fails when the identity must be **derived** — a related entity loaded at runtime, a brand→host registry lookup, a host parsed off a navigation property. The downstream consumer `Mirror` has no `Host` property (the host lives on the navigated `Package.UpstreamArchive`), so no property name yields `xivmodarchive.com` at submit, and queued siblings can't carry a key that matches the dynamic key one of them writes via `ctx.Backoff`. (The **write** side was already dynamic — `ctx.Backoff(after, key)` — so the gap was purely the read/sibling side.)
 
 **Decision.** `[JobGate]` may name a **method** as well as a property. A method-form gate is an **async, DI-capable resolver** — `Task<string?> Name(IServiceProvider sp, CancellationToken ct)` — invoked at **submit**, its result frozen onto `JobRecord.GateKey` exactly as the property form. Resolution stays at submit (not dispatch) for two reasons: it keeps the cheap frozen-key dispatch match unchanged, and it makes the key **canonical** — the writer's `ctx.Backoff()` default key and every sibling's `GateKey` derive from the same resolver, so they agree by construction (no write/read key-shape drift). The gate identity for an HTTP host / provider is stable, not late-arriving, so submit-time resolution is sufficient.
 

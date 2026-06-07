@@ -3,7 +3,7 @@
 **Status**: Accepted, 2026-05-15
 **Drivers**: Source-of-truth correctness for role assignments, unified extensibility surface
 **Deciders**: Koan Framework maintainers
-**Inputs**: `Koan.Web.Auth`, `Koan.Web.Auth.Roles`, downstream platform (gposingway emporium)
+**Inputs**: `Koan.Web.Auth`, `Koan.Web.Auth.Roles`, downstream platform (a downstream consumer)
 **Outputs**: New `IKoanAuthEventContributor` contract, removal of per-request role attribution pipeline
 **Supersedes**: WEB-0049 (role attribution layer & claims transformation)
 

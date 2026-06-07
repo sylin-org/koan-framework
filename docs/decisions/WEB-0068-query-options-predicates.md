@@ -5,7 +5,7 @@
 **Deciders**: Koan Framework maintainers
 **Inputs**: `Koan.Web.Hooks` (`IRequestOptionsHook<TEntity>`), `Koan.Web.Filtering.JsonFilterBuilder`, `Koan.Web.Endpoints.EntityEndpointService`
 **Outputs**: `QueryOptions.Predicates`, `QueryOptions.AddPredicate<TEntity>`, `QueryPredicateComposer`, updated `EntityEndpointService.QueryCollection` and `QueryCollectionFromBody`
-**Extends**: hook surface introduced by the request pipeline; consumed by gposingway emporium `PackageVisibilityHook`
+**Extends**: hook surface introduced by the request pipeline; consumed by a downstream consumer `PackageVisibilityHook`
 
 ## Context
 
@@ -41,7 +41,7 @@ from a hook would clash with adapter-specific search semantics and can't AND-com
 `?filter=`. The only escape is for the hook to short-circuit, render the page itself, and re-route
 the request — far past what a hook is supposed to do.
 
-The platform-emporium `PackageVisibilityHook` use case requires:
+The platform-app `PackageVisibilityHook` use case requires:
 
 - Anonymous: `Status == Published`
 - Authenticated user: `Status == Published OR ClaimedByUserId == self`

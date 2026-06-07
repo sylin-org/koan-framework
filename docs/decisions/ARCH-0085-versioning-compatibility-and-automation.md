@@ -12,7 +12,7 @@
 
 ARCH-0082 adopted two-tier versioning (kernel lockstep + periphery independent) to stop version-inflation spam. It explicitly deferred the NuGet-side compatibility story. That deferral produced a production incident:
 
-> A consumer (Gposingway) with `Sylin.Koan.Cache` at `Version="*"` resolved the published `Koan.Cache 0.8.1` against `Koan.Data.Abstractions 0.8.2`. `0.8.1` predates the DATA-0096 unified-pipeline migration (`c5017fea`), which **deleted** `ILinqQueryRepository<,>` from the kernel and replaced it with `IQueryRepository<,>`. `CachedRepository<,>`'s closure still referenced the deleted type → `TypeLoadException` on every decorated repository access.
+> A consumer (Downstream consumer) with `Sylin.Koan.Cache` at `Version="*"` resolved the published `Koan.Cache 0.8.1` against `Koan.Data.Abstractions 0.8.2`. `0.8.1` predates the DATA-0096 unified-pipeline migration (`c5017fea`), which **deleted** `ILinqQueryRepository<,>` from the kernel and replaced it with `IQueryRepository<,>`. `CachedRepository<,>`'s closure still referenced the deleted type → `TypeLoadException` on every decorated repository access.
 
 Three failures stacked:
 

@@ -150,7 +150,7 @@ projection over the unchanged per-type write models).
 ## Migration
 
 - Koan.Jobs.Core rebuilt per the above; tests reshaped per type.
-- Downstream (Gposingway, ADR-0020 Track B) collapses to deletion: jobs persist by default, the
+- Downstream (Downstream consumer, ADR-0020 Track B) collapses to deletion: jobs persist by default, the
   `OperationsRun` apparatus is removed, the admin matrix repoints to per-kind `T.Query`. This
   **supersedes ADR-0009 rev-2** in the app: the discriminator workaround is no longer needed because
   the framework no longer persists an abstract set.

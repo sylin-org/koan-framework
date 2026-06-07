@@ -3,7 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-05-31
 **Decision Makers:** Koan architecture group, Media pillar leads
-**Affected Components:** Koan.Media.Abstractions, Koan.Media.Core, Koan.Media.Web, consuming applications (Gposingway and others)
+**Affected Components:** Koan.Media.Abstractions, Koan.Media.Core, Koan.Media.Web, consuming applications (Downstream consumer and others)
 **Extends:** MEDIA-0005 (Kind-aware pipeline, Sample primitive, and data-driven encoder admission)
 **Related:** MEDIA-0004 (Recipe-based media pipeline), MEDIA-0001 (Media pillar baseline)
 
@@ -20,7 +20,7 @@
 
 ## Context
 
-MEDIA-0005 closed the recipe-vs-source-kind gap by introducing the `Vector` kind, the `Sample` primitive, encoder `Accepts` as data, and a pure-function planner that forward-derives an implicit `Rasterize` step at the encoder boundary. The planner is property-tested against synthetic Vector sources. What MEDIA-0005 deliberately did *not* ship was the first concrete Vector producer: there is no decoder in `Koan.Media.Core` that detects SVG, returns `MediaKind.Vector`, or holds the raw bytes for the planner's deferred rasterization step. The Gposingway corpus — package emblems, mod logos, and the SVG assets the upstream catalogs publish — still fails to ingest.
+MEDIA-0005 closed the recipe-vs-source-kind gap by introducing the `Vector` kind, the `Sample` primitive, encoder `Accepts` as data, and a pure-function planner that forward-derives an implicit `Rasterize` step at the encoder boundary. The planner is property-tested against synthetic Vector sources. What MEDIA-0005 deliberately did *not* ship was the first concrete Vector producer: there is no decoder in `Koan.Media.Core` that detects SVG, returns `MediaKind.Vector`, or holds the raw bytes for the planner's deferred rasterization step. The Downstream consumer corpus — package emblems, mod logos, and the SVG assets the upstream catalogs publish — still fails to ingest.
 
 The gap is narrow but load-bearing:
 
@@ -283,7 +283,7 @@ The following are out of scope and will not be addressed in this ADR. Listing th
 ### Positive
 
 - **Vector quality is preserved for the no-recipe path.** SVG served directly is served as SVG. Browsers render at their native DPI; the asset scales losslessly with the page.
-- **One recipe handles SVG the same as JPEG/GIF/PNG.** The MEDIA-0005 planner's forward-derivation does the work; the recipe author writes nothing new. The Gposingway `PackageCard` recipe gains SVG support the moment this ADR lands.
+- **One recipe handles SVG the same as JPEG/GIF/PNG.** The MEDIA-0005 planner's forward-derivation does the work; the recipe author writes nothing new. The Downstream consumer `PackageCard` recipe gains SVG support the moment this ADR lands.
 - **Future Vector kinds slot in.** PDF (via PdfPig + Skia) and EPS (via Ghostscript bindings) reuse the same shape: detector + validator + rasterizer adapter + planner-driven target. Nothing in `MediaPipeline.From` needs to change again to admit a new Vector kind.
 - **The security boundary is one validator.** `AdminArticleMediaController`, `FetchPreviewImageJob`, and any future SVG-accepting surface share `SvgValidator.ValidateAsync`. The allowlist is one list, in one file, with one test suite.
 
@@ -315,7 +315,7 @@ The following are explicit non-goals for this ADR. Each warrants its own decisio
 - **`SvgValidator` rejection suite.** A representative payload for each forbidden class: `<script>`, `<foreignObject>`, `<iframe>`, `<!DOCTYPE>` with internal subset, `<!ENTITY>` billion-laughs, on-attribute event handler, external `href`, external `xlink:href`, `style` with `url(`, `style` with `expression(`, oversize input (>5 MiB), nesting beyond 32 levels, `feGaussianBlur` with `stdDeviation > 10`.
 - **`SvgRasterizer` target-size correctness.** For target dims `(600, 750)`, `(1200, 1500)`, `(64, 64)`: assert the output PNG decodes back to the requested dimensions, that the alpha channel is preserved, and that the letterbox transparency matches the aspect-ratio difference.
 - **Pipeline integration via `VectorBridge`.** End-to-end test: synthetic SVG → `Resize(600, 750)` → `Encode("webp")`. Assert the planner inserts the implicit Rasterize at the encoder boundary (MEDIA-0005 contract, already covered there), assert `SvgRasterizer` is invoked exactly once with `(600, 750)`, assert the final bytes are valid WebP at 600×750.
-- **End-to-end Vector → Raster → Encode for the three common recipes.** `PackageCard` (WebP, 600×750), `ArticleHero` (WebP, 1200×630), `AdminPreview` (PNG, 256×256). Each test starts from a real SVG fixture from the Gposingway corpus and asserts the rendered output matches a recorded checksum within an LPIPS tolerance.
+- **End-to-end Vector → Raster → Encode for the three common recipes.** `PackageCard` (WebP, 600×750), `ArticleHero` (WebP, 1200×630), `AdminPreview` (PNG, 256×256). Each test starts from a real SVG fixture from the Downstream consumer corpus and asserts the rendered output matches a recorded checksum within an LPIPS tolerance.
 - **Storage policy enforcement.** `FetchPreviewImageJob` test: valid SVG fetched → raw bytes in blob store, `Content-Type: image/svg+xml`, no pipeline execution recorded. Invalid SVG fetched → no blob written, job logs `Warning` with the validator's violation message.
 - **No-rasterize path for no-recipe serving.** `MediaController` test: GET an SVG asset with no recipe applied → response body is byte-identical to the stored bytes, `Content-Type: image/svg+xml`.
 

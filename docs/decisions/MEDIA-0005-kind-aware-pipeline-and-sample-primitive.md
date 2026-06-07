@@ -10,7 +10,7 @@ title: Kind-aware pipeline, Sample primitive, and data-driven encoder admission
 **Status:** Accepted
 **Date:** 2026-05-31
 **Decision Makers:** Koan architecture group, Media pillar leads
-**Affected Components:** Koan.Media.Abstractions, Koan.Media.Core, Koan.Media.Web, consuming applications (Gposingway and others)
+**Affected Components:** Koan.Media.Abstractions, Koan.Media.Core, Koan.Media.Web, consuming applications (Downstream consumer and others)
 **Extends:** MEDIA-0004 (Recipe-based media pipeline, format-preserving transforms, and overlay composition)
 **Related:** MEDIA-0003 (Media variant routing and transforms), MEDIA-0001 (Media pillar baseline)
 
@@ -33,7 +33,7 @@ Six concrete failure modes surface as soon as the consuming surface broadens bey
 
 1. **Hard-coded ImageSharp decode path.** `MediaPipeline.From(Stream)` resolves through `Image.LoadAsync`. There is no seam to admit an SVG decoder, a video demuxer, or any non-raster source. Every step downstream is typed to `Image<TPixel>`. Adding a new source kind today means a parallel pipeline, not a new step.
 
-2. **No SVG path at all.** The Gposingway corpus contains SVG logos and emblem assets that need to render into package cards alongside JPEG and WebP sources. There is no way to express "treat this SVG as a 600×750 raster at encode time" — there is only "fail to decode."
+2. **No SVG path at all.** The Downstream consumer corpus contains SVG logos and emblem assets that need to render into package cards alongside JPEG and WebP sources. There is no way to express "treat this SVG as a 600×750 raster at encode time" — there is only "fail to decode."
 
 3. **`ExtractFrame(0)` no-op only generalizes on raster.** v1 leans on the fact that calling `ExtractFrameStep(0)` against a single-frame raster is harmless. That trick collapses to nothing for Vector (no frames to extract) and is wrong for Timeline (frame 0 of a video is decoded differently from frame 0 of an animated raster). The whole "package card from frame 0 of a GIF or WebP or AVI or static PNG" use case is exactly the case the framework cannot express in one recipe.
 
@@ -43,7 +43,7 @@ Six concrete failure modes surface as soon as the consuming surface broadens bey
 
 6. **Recipes cannot capture "frame 0 of any animated kind."** Writing the package-card recipe today requires either branching on source kind in the caller (defeating the recipe abstraction) or shipping N parallel recipes (`PackageCard_Static`, `PackageCard_Animated`, `PackageCard_Vector`). Both options push pipeline knowledge into application code, which is the exact debt MEDIA-0004 was supposed to retire.
 
-The Gposingway maintainer's load-bearing example — a single `PackageCard` recipe that produces a 600×750 WebP from a JPEG, an animated GIF, a static PNG, an SVG logo, or (eventually) the first frame of an AVI — is unreachable in v1 without per-source branching at the call site. That is the gap this ADR closes.
+The Downstream consumer maintainer's load-bearing example — a single `PackageCard` recipe that produces a 600×750 WebP from a JPEG, an animated GIF, a static PNG, an SVG logo, or (eventually) the first frame of an AVI — is unreachable in v1 without per-source branching at the call site. That is the gap this ADR closes.
 
 ---
 
@@ -234,7 +234,7 @@ This is an additive change for existing callers, with one deprecation:
 - **`MaterializeAsync` and the single-decode multi-output substrate from MEDIA-0004 are untouched.** Multiple variants share one decode and one plan-time evaluation; each variant runs its own encoder pass. Kind tracking is per-variant since each variant may declare a different terminal encoder.
 - **Existing recipes that do not encounter Vector or Timeline sources continue to behave identically.** The planner's behavior on a `Raster` source through a v1-shaped recipe is a no-op layer over the v1 execution path.
 
-The Gposingway recipes (`PackageCard`, `ArticleHero`, `ArticleCard`, `AdminPreview`, `PackageSighting`) all keep their existing definitions. They gain Vector support automatically once the SVG decoder lands (next ADR) — the planner's forward-derived `Rasterize` insertion handles them with no recipe change.
+The Downstream consumer recipes (`PackageCard`, `ArticleHero`, `ArticleCard`, `AdminPreview`, `PackageSighting`) all keep their existing definitions. They gain Vector support automatically once the SVG decoder lands (next ADR) — the planner's forward-derived `Rasterize` insertion handles them with no recipe change.
 
 ---
 

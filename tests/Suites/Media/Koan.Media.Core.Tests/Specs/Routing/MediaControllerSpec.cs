@@ -53,7 +53,7 @@ public sealed class MediaControllerSpec
     /// is bypassed entirely - the endpoint becomes content-addressable
     /// raw byte serving when no transform is requested.
     ///
-    /// <para>Regression for the gposingway video-as-source case: an
+    /// <para>Regression for the downstream consumer video-as-source case: an
     /// MP4 stored under an ArticleMedia hash was 422'ing on bare
     /// <c>/media/{id}</c> because the controller always pushed bytes
     /// through the image decoder, which rightly rejected MP4 magic.

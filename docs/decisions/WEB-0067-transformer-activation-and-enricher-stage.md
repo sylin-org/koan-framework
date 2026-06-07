@@ -3,7 +3,7 @@
 **Status**: Proposed, 2026-05-18
 **Drivers**: Per-request enrichment of entity responses without forking the controller; clean composition of multiple per-user transformations
 **Deciders**: Koan Framework maintainers
-**Inputs**: `Koan.Web.Transformers`, downstream platform (gposingway emporium likes overlay)
+**Inputs**: `Koan.Web.Transformers`, downstream platform (a downstream consumer likes overlay)
 **Outputs**: `ITransformerActivationPredicate`, `IEntityEnricher<TEntity>`, registry resolution split into pipeline + terminal, `EnableEntityTransformersAttribute` removal
 **Extends**: [WEB-0035](WEB-0035-entitycontroller-transformers.md)
 
@@ -20,7 +20,7 @@ mechanism. The activation model has two properties worth restating:
 2. **Activation produces a single winner.** Content negotiation is selective by design — given an
    `Accept: text/csv, application/json;q=0.9`, exactly one transformer wins.
 
-The platform-emporium "user likes overlay" use case violates both properties:
+The platform-app "user likes overlay" use case violates both properties:
 
 - It needs to fire on `application/json` even when the SPA sends `Accept: */*` (the resolver's
   current wildcard-only branch hard-skips to MVC default JSON).

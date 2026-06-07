@@ -80,7 +80,7 @@
        so its CachedRepository<,> fails to load against kernel 0.8.2 (ILinqQueryRepository no longer
        exists) — TypeLoadException on every decorated repo access. Breaking on pre-1.0 = minor bump,
        matching Koan.Data.Core's 0.9.0 for the same wave. Must be republished so a *-resolving consumer
-       (gposingway) stops landing stale 0.8.1 against kernel 0.8.2. Recurrence is now structurally
+       (downstream consumer) stops landing stale 0.8.1 against kernel 0.8.2. Recurrence is now structurally
        prevented by ARCH-0085 (compat ranges, build/compat-ranges.targets) — Cache 0.9.0 packs with
        Koan.Data.Abstractions [0.8.2, 0.9.0), so a future breaking kernel can no longer satisfy it. -->
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Koan.Cache' and '$(KoanPackageKind)' == 'Periphery'">

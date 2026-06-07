@@ -4,7 +4,7 @@
 **Date**: 2026-06-04
 **Deciders**: Enterprise Architect
 **Scope**: How scalar values that can be **filtered or sorted** are encoded to each storage provider so that the **store-native ordering equals the CLR ordering**. Establishes one invariant enforced at the serialization boundary, and canonicalizes the two types that violate it today — `DateTimeOffset` (→ UTC instant) and `TimeSpan` (→ Int64 ticks). Declines the proposed per-adapter type-capability surface, the `SDTO` value struct, and the filter-pipeline rewrite.
-**Related**: **DATA-0098** (identity-encoding codec — sibling: that ADR made write↔query encoding *identical*; this one makes that identical encoding *order-preserving*) · DATA-0096 (unified filter pipeline) · DATA-0092/0093 (sort contract) · ARCH-0084 (unified capability model — why `FilterSupport` stays operator-level) · supersedes the gposingway DateTimeOffset proposal.
+**Related**: **DATA-0098** (identity-encoding codec — sibling: that ADR made write↔query encoding *identical*; this one makes that identical encoding *order-preserving*) · DATA-0096 (unified filter pipeline) · DATA-0092/0093 (sort contract) · ARCH-0084 (unified capability model — why `FilterSupport` stays operator-level) · supersedes the downstream consumer DateTimeOffset proposal.
 
 ---
 

@@ -1,7 +1,7 @@
 # DATA-0100 post-merge finding — reaper still throws on `Job<T>`-derived entities
 
 **Date**: 2026-06-04
-**Author**: gposingway dogfeed
+**Author**: downstream consumer dogfeed
 **Status**: needs decision (the open question #5 in DATA-0100 §7 of the original proposal)
 **Related**: `docs/decisions/DATA-0100-comparable-encoding-contract.md`, `docs/design/DATETIMEOFFSET-CAPABILITY-PROPOSAL.md` §2.3
 
@@ -29,7 +29,7 @@ System.ArgumentException: .NET type System.DateTimeOffset cannot be mapped to a 
 **Storage shape confirms DATA-0100 write-path works:**
 
 ```js
-db.getCollection("Gposingway.Crawling.Application.CaptureJob")
+db.getCollection("DownstreamConsumer.Crawling.Application.CaptureJob")
   .findOne({"leasedUntil": {$ne: null}})
 // { _id: ..., status: "Running", leasedUntil: ISODate("2026-06-04T20:00:05.448Z"), ... }
 // typeof leasedUntil → "Date"  (native BSON Date, not the legacy {DateTime,Ticks,Offset} document)
@@ -38,7 +38,7 @@ db.getCollection("Gposingway.Crawling.Application.CaptureJob")
 **Hand-written equivalent of the reaper's query against the new storage:**
 
 ```js
-db.getCollection("Gposingway.Crawling.Application.CaptureJob").countDocuments({
+db.getCollection("DownstreamConsumer.Crawling.Application.CaptureJob").countDocuments({
     status: "Running",
     $or: [{leasedUntil: null}, {leasedUntil: {$lt: new Date()}}]
 })
@@ -110,7 +110,7 @@ public void Filter_on_DateTimeOffset_member_declared_on_abstract_generic_base()
 
 If the test passes, the bug is something more specific to the `Job<T>` hierarchy (likely `TimeSpan? Duration` or one of the polymorphic dictionaries failing AutoMap and getting silenced). If it fails, the hierarchy itself is enough to reproduce.
 
-## Current pipeline impact (gposingway)
+## Current pipeline impact (downstream consumer)
 
 - Pipeline IS flowing: 362 sightings → 361 captures → 16 evaluates → 2 converges. Writes work.
 - 50 captures stuck `Running` with expired leases; lane gate at saturation; 294 queued behind. Reaper would clear them in one sweep if its query made it past the encoder.

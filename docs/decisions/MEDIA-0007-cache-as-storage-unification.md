@@ -24,11 +24,11 @@ The framework currently ships two parallel storage stories for the same conceptu
 This split has accumulated four concrete pains:
 
 - **Two storage stories to reason about.** Maintainers must remember that "the preview at `/media/{id}/package-card`" lives on disk via `FileSystemMediaOutputCache`, not in the `PreviewImage` table. Schema migrations, retention policies, and disaster-recovery runbooks have to cover both, and reviewers regularly forget the cache exists when reasoning about an entity's lifecycle.
-- **Two URL surfaces for raw bytes.** Gposingway exposes `/api/previews/{key}` and `/api/article-media/{key}` (raw, via `StorageMediaController`) alongside the framework's `/media/{id}` (also raw, via `MediaController` with no seed). Three routes, same job. Clients and ops dashboards have to learn which path serves what, and feature work has to update both surfaces in lockstep.
+- **Two URL surfaces for raw bytes.** Downstream consumer exposes `/api/previews/{key}` and `/api/article-media/{key}` (raw, via `StorageMediaController`) alongside the framework's `/media/{id}` (also raw, via `MediaController` with no seed). Three routes, same job. Clients and ops dashboards have to learn which path serves what, and feature work has to update both surfaces in lockstep.
 - **Cache invalidation requires cross-system coordination.** When a `PreviewImage` row is deleted, its derived renders sit in the cache directory until something else evicts them. The cache has no foreign-key relationship to the source — there's no entity to query, no tag to filter on, no `Deleted` event the cache subscribes to. Today the only honest answer is "wipe the cache root on deploy."
 - **Derivations are invisible to operational tooling.** Storage browsers, S3 lifecycle policies, quota reports, and backup snapshots see source media but not the cache. A 20 GB cache directory doesn't show up in capacity dashboards until the disk fills.
 
-MEDIA-0006 settled the data shape: `IMediaObject` already exposes `SourceMediaId`, `DerivationKey`, `RelationshipType`, and `ThumbnailMediaId`. Those fields are nullable, unused by current Gposingway entities, and ready to carry derivation lineage with zero schema migration. The framework's `Entity<T>.Query(Expression<Func<TEntity, bool>>)` infrastructure can already find "all derivations of source X with recipe fingerprint Y" as a two-field AND predicate. The atomic-write, sharding, and extension-encoded-MIME tricks from `FileSystemMediaOutputCache` are reproducible on top of Koan.Storage profiles. The gap is conceptual, not technical: we have a cache pretending to be storage.
+MEDIA-0006 settled the data shape: `IMediaObject` already exposes `SourceMediaId`, `DerivationKey`, `RelationshipType`, and `ThumbnailMediaId`. Those fields are nullable, unused by current Downstream consumer entities, and ready to carry derivation lineage with zero schema migration. The framework's `Entity<T>.Query(Expression<Func<TEntity, bool>>)` infrastructure can already find "all derivations of source X with recipe fingerprint Y" as a two-field AND predicate. The atomic-write, sharding, and extension-encoded-MIME tricks from `FileSystemMediaOutputCache` are reproducible on top of Koan.Storage profiles. The gap is conceptual, not technical: we have a cache pretending to be storage.
 
 This ADR closes that gap by deleting the cache as a separate concept.
 
@@ -124,12 +124,12 @@ Eviction beyond orphan-cleanup — recipe-version rotation, LRU, quota-driven tr
 
 The recommended path, consistent with the dogfeeding principle, is **deletion**:
 
-- `PreviewsController` and `ArticleMediaController` are removed from Gposingway.
+- `PreviewsController` and `ArticleMediaController` are removed from Downstream consumer.
 - The SPA's five hard-coded call sites (recon: `src/api/articles.ts:41`, `src/components/toCardModel.ts:96`, `src/pages/PackageDetail.tsx:287,376`, `src/pages/admin/ArticleEdit.tsx:873`) already use `/media/{id}/{recipe}`. No SPA churn is required for derivation routes.
 - The two call sites that fetched raw bytes via `/api/previews/{key}` and `/api/article-media/{key}` migrate to `/media/{id}` (no seed = original bytes).
 - The admin endpoints under `/api/admin/article-media` for upload/list/delete are CRUD on entity metadata, not delivery, and stay on their existing routes.
 
-If a host needs legacy compatibility (Gposingway does not), the deprecated controllers can be retained for one release as 301-redirect shims to `/media/{id}`. The framework does not ship that shim; hosts opt in.
+If a host needs legacy compatibility (Downstream consumer does not), the deprecated controllers can be retained for one release as 301-redirect shims to `/media/{id}`. The framework does not ship that shim; hosts opt in.
 
 ## Migration
 
@@ -138,7 +138,7 @@ The framework removes `IMediaOutputCache` from the public surface across two rel
 - **This release (MEDIA-0007).** `IMediaOutputCache` is marked `[Obsolete("Use Koan.Storage; see MEDIA-0007", error: false)]`. `FileSystemMediaOutputCache` is reimplemented as a thin adapter that delegates `TryGetAsync`/`SetAsync` to a Koan.Storage profile under the hood, so existing DI registrations keep working. `NullMediaOutputCache` stays as a no-op for hosts that disable the cache entirely. `MediaController` no longer takes `IMediaOutputCache` in its constructor; the storage path is the only path.
 - **Next release (MEDIA-0008).** `IMediaOutputCache`, `FileSystemMediaOutputCache`, `NullMediaOutputCache`, `MediaCacheHit`, and `MediaOutputCacheOptions` are deleted. Hosts that still register them get a clear DI-resolution failure pointing at MEDIA-0007.
 
-Gposingway migration in this release:
+Downstream consumer migration in this release:
 
 1. Delete `PreviewsController` and `ArticleMediaController`.
 2. Add the two SPA call sites that fetched raw bytes via the legacy routes (article-media library list thumbnails, preview byte fetches outside the recipe path) to use `/media/{id}` directly. The recon shows these are limited and centralized.

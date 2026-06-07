@@ -10,7 +10,7 @@ title: Recipe-based media pipeline, format-preserving transforms, and overlay co
 **Status:** Proposed
 **Date:** 2026-05-26
 **Decision Makers:** Koan architecture group, Media pillar leads
-**Affected Components:** Koan.Media.Abstractions, Koan.Media.Core, Koan.Media.Web, consuming applications (Gposingway and others)
+**Affected Components:** Koan.Media.Abstractions, Koan.Media.Core, Koan.Media.Web, consuming applications (Downstream consumer and others)
 **Supersedes:** DX-0047 (Fluent Media Transformation Pipeline API) — encoding policy and stream-extension API
 **Extends:** MEDIA-0003 (Media variant routing and transforms) — adopts canonical signature and policy model; expands the operator vocabulary
 
@@ -35,7 +35,7 @@ The current Koan.Media pipeline has two coupled deficiencies that surface as sil
    - Wide-gamut sources (Display P3, ProPhoto) → sRGB JPEG (color clipped)
    - ICC profiles → discarded
    - EXIF metadata → discarded
-   The Gposingway investigation found this empirically: ~25% of GitHub-corpus README screenshots were animated WebPs whose motion was being stripped by the cover-extraction pipeline.
+   The Downstream consumer investigation found this empirically: ~25% of GitHub-corpus README screenshots were animated WebPs whose motion was being stripped by the cover-extraction pipeline.
 
 2. **Per-step encode amplification.** Each fluent call materializes through an intermediate `MemoryStream` via `Image.LoadAsync` → `Mutate` → `SaveAsJpegAsync`. A four-step chain (`AutoOrient → ResizeFit → Crop → ConvertFormat`) decodes and re-encodes the source four times. For multi-variant generation (`.Result().Branch()`) the encode cost multiplies linearly with branch count even when branches share preprocessing.
 
@@ -724,7 +724,7 @@ Decode pool saturation returns 503 with `Retry-After`.
 ### Phase 6 — Sample + consumer migration
 
 22. Migrate `samples/S6.SnapVault` to recipe-based usage; remove DX-0047 calls.
-23. Migrate `Gposingway.FetchPreviewImageJob` to drop the forced `ConvertFormat("jpeg")` call; add a `poster` recipe for static thumbnails alongside the preserved-format display variant.
+23. Migrate `DownstreamConsumer.FetchPreviewImageJob` to drop the forced `ConvertFormat("jpeg")` call; add a `poster` recipe for static thumbnails alongside the preserved-format display variant.
 24. Backfill task: regenerate previews for the existing GitHub corpus to recover lost animations and alpha.
 
 ### Phase 7 — Cleanup

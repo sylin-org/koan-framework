@@ -134,7 +134,7 @@ public sealed class FormatPreservationSpec
     /// output bytes and encode time (the package-hero recipe on a 720x302 animated
     /// WebP source upscaled to 1600 wide produced a 90 MB / 558-frame output that
     /// timed out the origin behind CloudFlare; see the dogfeeder report in
-    /// gposingway/bundlingways-emporium.v2 commit history).
+    /// the downstream consumer repo commit history).
     /// </summary>
     [Fact]
     public async Task Resize_does_not_upscale_smaller_source_by_default()

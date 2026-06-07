@@ -106,7 +106,7 @@ public sealed class SourceLimitsSpec
     /// unhandled 500. EnforceLimitsAsync now defers to LoadAsync on
     /// content-decode failure so the typed MediaDecodeException surfaces.
     ///
-    /// <para>Regression for the gposingway home-LAN incident where a
+    /// <para>Regression for the downstream consumer home-LAN incident where a
     /// stored thumbnail's PNG IDAT chunk got corrupted at rest and every
     /// request for it 500'd against the package detail page.</para>
     /// </summary>

@@ -1,7 +1,7 @@
 # DateTimeOffset has no universal storage primitive — adapter-capability proposal
 
 Status: proposal, awaiting Koan-side decision
-Author: external (gposingway dogfeeding session)
+Author: external (downstream consumer dogfeeding session)
 Surfaced via: Koan.Jobs `JobOrphanReaper` failing against the Mongo adapter
 
 ## 1. Summary
@@ -209,7 +209,7 @@ In Koan (`feat/unified-filter-pipeline`):
 - `a17c9c89 fix(mongo): robust value-encode fallback via SerializerRegistry` — REVERTED (`2b03c9ff`).
   This was the speculative guard described in §2.4. Removed because it masks the real bug and the SDTO design makes it unnecessary.
 
-In gposingway:
+In downstream consumer:
 - The `Koan.Data.Connector.Mongo` reference was bumped 0.17.7 → 0.17.8 alongside the guard; that bump is REVERTED (`7fd07393`), keeping 0.17.7 (the version with the nullable-unwrap only).
 
 Net effect on the framework: the only translator change still in-branch is the `Nullable<T>` unwrap. No "guard" code remains.
