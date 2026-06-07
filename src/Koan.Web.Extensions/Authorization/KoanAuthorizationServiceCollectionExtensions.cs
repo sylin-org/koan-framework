@@ -25,6 +25,12 @@ public static class KoanAuthorizationServiceCollectionExtensions
 
         services.AddCapabilityAuthorization(configureCapabilities ?? (_ => { }));
 
+        // SEC-0001 §8 (Phase 2, 2f): the resource-side IAuthorize seam, registered in PARALLEL with the
+        // live IAuthorizationService path (no behaviour change yet). RbacAuthorizer is the Tier-0 in-process
+        // RBAC floor; CapabilityAuthorizer is flipped to route through it in 2k. TryAdd so a host can
+        // substitute a PDP/ReBAC adapter (§8 ladder).
+        services.TryAddSingleton<IAuthorize, RbacAuthorizer>();
+
         if (developmentClaimsTransformer is not null)
         {
             services.AddHttpContextAccessor();
