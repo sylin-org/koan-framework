@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Core;
-using Koan.Core.BackgroundServices;
 using Koan.Testing;
 using Koan.Web;
 using Koan.Web.Controllers;
@@ -43,11 +42,6 @@ public sealed class AuthE2EFixture : KoanTestPipelineFixtureBase
 
         // WEB-0069: verify the endpoint-contributor seam end-to-end (same path MCP uses).
         services.AddSingleton<IKoanEndpointContributor, TestEndpointContributor>();
-
-        // The base fixture runs as Development, where Koan.Core's *example* background services
-        // (DatabaseMigrationService et al.) auto-run and abort startup. This auth e2e doesn't exercise
-        // background services — disable the orchestrator to isolate the auth/authz pipeline.
-        services.Configure<KoanBackgroundServiceOptions>(o => o.Enabled = false);
     }
 
     // ConfigureApp intentionally left as the base no-op: KoanWebStartupFilter (AutoMapControllers) builds the
