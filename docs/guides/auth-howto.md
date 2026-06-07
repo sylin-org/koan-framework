@@ -98,6 +98,12 @@ public IActionResult MyOrders() => Ok(/* ... */);
 
 In Development the dev identity satisfies `[Authorize]`, so you can build the protected feature immediately. An anonymous caller (next section) is challenged.
 
+> **Mentor note.** What does "challenged" look like over HTTP? Koan's cookie scheme is **content-negotiated**.
+> A browser navigation is redirected to your login page (302), but an **API request** — one sending
+> `Accept: application/json`, an `X-Requested-With: XMLHttpRequest` header, or hitting a path under `/api` —
+> gets a clean **401** (or **403** when authenticated-but-unauthorized) instead of a redirect, so a SPA `fetch`
+> has something it can act on. Tune the heuristic (extra API path prefixes, etc.) under `Koan:Web:Auth:Challenge`.
+
 ---
 
 ## 3. Testing as different people — personas
