@@ -11,7 +11,6 @@ using Koan.Web.Auth.Services.Authentication;
 using Koan.Web.Auth.Services.Discovery;
 using Koan.Web.Auth.Services.Http;
 using Koan.Web.Auth.Services.Options;
-using Koan.Web.Auth.Connector.Test.Options;
 using Koan.Web.Auth.Services.Infrastructure;
 using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
 using BootSettingSource = Koan.Core.Hosting.Bootstrap.BootSettingSource;
@@ -47,33 +46,11 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // Configure HTTP clients with authentication
         ConfigureHttpClients(services, serviceMetadata);
 
-        // Auto-configure TestProvider and ServiceAuth with discovered services
-        // Use deferred configuration to avoid building service provider during registration
-        services.PostConfigure<TestProviderOptions>(options =>
-        {
-            var serviceProvider = services.BuildServiceProvider();
-            var config = serviceProvider.GetService<IConfiguration>();
-            var env = serviceProvider.GetService<IHostEnvironment>();
-
-            if (config != null && env != null)
-            {
-                ServiceAutoConfiguration.ConfigureTestProviderForDiscoveredServices(
-                    options, serviceMetadata, config, env);
-            }
-        });
-
-        services.PostConfigure<ServiceAuthOptions>(options =>
-        {
-            var serviceProvider = services.BuildServiceProvider();
-            var config = serviceProvider.GetService<IConfiguration>();
-            var env = serviceProvider.GetService<IHostEnvironment>();
-
-            if (config != null && env != null)
-            {
-                ServiceAutoConfiguration.ConfigureServiceAuthForDiscoveredServices(
-                    options, serviceMetadata, config, env);
-            }
-        });
+        // SEC-0001 2j: removed the ServiceAutoConfiguration PostConfigure blocks. They used a
+        // BuildServiceProvider()-during-registration anti-pattern and the deterministic dev-secret footgun
+        // to register TestProvider client-credentials clients. Service tokens now mint in-process via the
+        // trust IIssuer (2i), so no TestProvider client registration is needed — and Auth.Services no longer
+        // depends on the dev TestProvider at all.
     }
 
     private ServiceMetadata[] DiscoverServices()
@@ -135,9 +112,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     private void ConfigureHttpClients(IServiceCollection services, ServiceMetadata[] serviceMetadata)
     {
-        // Register a named HTTP client for internal token requests (without auth handler to avoid circular dependency)
-        services.AddHttpClient("KoanAuthInternal");
-
         // Default HTTP clients have NO authentication - external APIs should not receive Koan tokens
         // This prevents sending TestProvider JWT tokens to AniList, Weaviate, and other external services
         //
