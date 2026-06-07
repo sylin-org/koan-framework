@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Koan.Core;
 using Koan.Web.Infrastructure;
@@ -93,6 +94,13 @@ internal sealed class KoanWebStartupFilter(IOptions<KoanWebOptions> options, IOp
                     catch (InvalidOperationException)
                     {
                         // No authentication services registered; ignore.
+                    }
+                    // SEC-0001 §4: modules contribute middleware between authentication and authorization here
+                    // (e.g. the zero-config dev identity). This is the supported injection point — see
+                    // IPostAuthenticationContributor — so contributors don't depend on startup-filter ordering.
+                    foreach (var contributor in app.ApplicationServices.GetServices<IPostAuthenticationContributor>())
+                    {
+                        contributor.Configure(app);
                     }
                     try
                     {

@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Core;
@@ -8,7 +7,6 @@ using Koan.Testing;
 using Koan.Web;
 using Koan.Web.Controllers;
 using Koan.Web.Extensions;
-using Koan.Web.Auth.Extensions;
 using Koan.Web.Extensions.Authorization;
 using Koan.Security.Trust.Issuer;
 
@@ -45,13 +43,8 @@ public sealed class AuthE2EFixture : KoanTestPipelineFixtureBase
         services.Configure<KoanBackgroundServiceOptions>(o => o.Enabled = false);
     }
 
-    protected override void ConfigureApp(IApplicationBuilder app)
-    {
-        app.UseRouting();
-        app.UseAuthentication();
-        app.UseAuthorization();
-        app.UseEndpoints(endpoints => endpoints.MapControllers());
-    }
+    // ConfigureApp intentionally left as the base no-op: KoanWebStartupFilter (AutoMapControllers) builds the
+    // full routing→authn→authz→endpoints pipeline, so this exercises the REAL startup-filter wiring.
 
     public string MintBearer(string subject, params string[] roles)
         => Services.GetRequiredService<IIssuer>().Issue(new TrustClaims { Subject = subject, Roles = roles });
