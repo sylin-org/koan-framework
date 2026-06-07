@@ -16,15 +16,15 @@ related_guides:
   - building-apis.md
 ---
 
-# Koan Authentication & Identity: From "Already Signed In" to the Fleet
+# Koan Authentication & Identity: From Public to the Fleet
 
-This guide walks you through Koan's identity story—from the moment you add the package and discover you're *already* authenticated, to roles, real logins, service-to-service tokens, and what changes in production. Think of it as a conversation with a colleague who's wired this up a few times: we'll start with the simplest thing that works and add one idea at a time.
+This guide walks you through Koan's identity story—from a public-by-default app, to logging in as any profile you like in dev, to roles, real logins, service-to-service tokens, and what changes in production. Think of it as a conversation with a colleague who's wired this up a few times: we'll start with the simplest thing that works and add one idea at a time.
 
 A note on scope. This guide is about **identity**—*who is making this request?* Its sibling, the [Authorization How-To](authorization-howto.md), is about **authorization**—*what may they do?* We'll hand off cleanly when we get there. For the full provider/OAuth/SAML configuration reference, see [Authentication Setup](authentication-setup.md).
 
 ---
 
-## 0. The thirty-second version: you're already signed in
+## 0. The thirty-second version: public by default, log in when you want a profile
 
 Reference = intent. Add the auth package:
 
@@ -60,12 +60,18 @@ public sealed class MeController : ControllerBase
 Run it in Development and `GET /me`:
 
 ```json
-{ "isAuthenticated": true, "id": "dev", "roles": ["admin"] }
+{ "isAuthenticated": false, "id": null, "roles": [] }
 ```
 
-You never logged in—yet you're authenticated. That's Koan's **zero-config dev identity**: in Development, an otherwise-unauthenticated request is filled in with a development principal, so `[Authorize]` and `Identity.Current` work from your very first run.
+You're **anonymous** — and that's the point. Your app renders its **public** interface, which is what you want to evaluate the vast majority of the time. Nothing is auto-signed-in.
 
-> **Mentor note.** The most common reason auth feels heavy is that you have to set it *all* up before you can test *anything*. Koan flips that: the instant you reference the package, there's an identity to build against. And it's safe—this convenience is loud in Development and **gone in Production** (we'll get there in §8).
+To become someone, you **log in** — and in Development that's zero-config too. Koan ships a built-in **test login page** (the TestProvider):
+
+- `GET /.well-known/auth/providers` lists **Test (Local)** in Development;
+- send the browser there, pick it, and you land on a page where you set your **subject, roles, and claims**;
+- submit, and you're redirected back with a **real signed session** — now `/me` reflects that profile.
+
+> **Mentor note.** A framework that auto-signs you in as an admin is convenient for a toy and wrong for a real app: real UX changes by profile, and you almost always want the *public* view first. So the default is anonymous, and *logging in* is an explicit act that picks a profile and walks the real session path — no auth bug can hide behind a synthetic admin. (And it's fail-closed: the dev login is **gone in production**, §8.)
 
 ---
 
@@ -82,7 +88,7 @@ var roles = Identity.Current.Roles;     // the roles carried on the credential
 if (Identity.Current.Is("admin")) { /* ... */ }
 ```
 
-Whether the caller arrived with a browser cookie, a bearer token, or the dev identity, they all land in the same place. You read identity one way.
+Whether the caller arrived with a browser cookie, a service bearer token, or a `?_as=` persona, they all land in the same place. You read identity one way.
 
 ---
 
@@ -96,7 +102,7 @@ Identity earns its keep the moment you guard something. Use the standard ASP.NET
 public IActionResult MyOrders() => Ok(/* ... */);
 ```
 
-In Development the dev identity satisfies `[Authorize]`, so you can build the protected feature immediately. An anonymous caller (next section) is challenged.
+By default a request is anonymous, so `[Authorize]` denies it until you log in (§0) or step into a persona (§3) — the same behaviour you'll see in production, with no synthetic admin papering over it. What "denied" looks like over HTTP is content-negotiated:
 
 > **Mentor note.** What does "challenged" look like over HTTP? Koan's cookie scheme is **content-negotiated**.
 > A browser navigation is redirected to your login page (302), but an **API request** — one sending
@@ -106,18 +112,18 @@ In Development the dev identity satisfies `[Authorize]`, so you can build the pr
 
 ---
 
-## 3. Testing as different people — personas
+## 3. Stepping into a persona — the `?_as=` quick override
 
-Here's the part that makes the dev identity genuinely useful: you can step into *any* persona, per request, with no accounts and no login flow.
+The login page (§0) is how a *person* signs in. For **scripted / automated** testing there's a faster path: `?_as=` puts you into a **transient** persona for a single request — no page, no cookie.
 
 | Request | You are… |
 |---|---|
-| `GET /me` | the default dev user (`dev`, role `admin`) |
-| `GET /me?_as=alice` | `alice` |
+| `GET /me` | **anonymous** (the default) |
+| `GET /me?_as=alice` | `alice` (role `admin` by default) |
 | `GET /me?_as=alice&_roles=editor,reviewer` | `alice` with roles `editor`, `reviewer` |
-| `GET /me?_as=anonymous` | **unauthenticated** — for testing your 401 paths |
+| `GET /me?_as=anonymous` | anonymous (explicit) |
 
-> **Mentor note.** This is how you exercise authorization without standing up real users. Want to prove an editor can't approve their own draft? Send the request `?_as=author&_roles=author` and assert the 403. Personas turn "auth testing" into ordinary request testing.
+> **Mentor note.** This is how you exercise authorization across users without standing up accounts. Want to prove an editor can't approve their own draft? Drive the request `?_as=author&_roles=author` and assert the 403. It's Development-only and transient — perfect for an integration test that sweeps several profiles. (For a *real* clickable session, use the login page in §0.)
 
 ---
 
@@ -133,7 +139,7 @@ public IActionResult Reports() => Ok(/* ... */);
 
 Prove both directions with personas:
 
-- `GET /admin/reports` → the dev identity is `admin` → **200**
+- `GET /admin/reports?_as=alice&_roles=admin` → admin → **200**
 - `GET /admin/reports?_as=bob&_roles=viewer` → authenticated, but not admin → **denied**
 
 Roles are deliberately coarse—they belong *in the credential* (the cookie or token). When you need decisions that depend on the specific resource, the specific action, or external policy, that's §7.
@@ -142,7 +148,7 @@ Roles are deliberately coarse—they belong *in the credential* (the cookie or t
 
 ## 5. Real logins — OAuth providers (and the dev TestProvider)
 
-The dev identity is for *building*. Real users sign in through a provider, and in Koan that's configuration, not code.
+Your dev login (§0) is the built-in TestProvider. Real *users* sign in through a real provider — and in Koan that's configuration, not code.
 
 **OAuth (Google, Microsoft, GitHub, …):**
 
@@ -156,13 +162,13 @@ The dev identity is for *building*. Real users sign in through a provider, and i
 
 That's it—`/.well-known/auth/providers` now lists Google, the challenge/callback flow runs, and a cookie session is established. (Multiple providers, SAML, and account linking are covered in [Authentication Setup](authentication-setup.md).)
 
-**Want a real login *screen* in dev** without standing up OAuth? Opt into the **TestProvider**—a built-in fake identity provider with its own login page and token endpoint:
+The **TestProvider** you logged in with at §0 is exactly this: a built-in fake identity provider with its own login page and token endpoint. It's available **zero-config in Development**; to expose it anywhere else (a shared demo, say) opt in explicitly:
 
 ```json
 { "Koan": { "Web": { "Auth": { "TestProvider": { "Enabled": true } } } } }
 ```
 
-> **Mentor note.** Two dev conveniences, two jobs. The **dev identity** (§0) is the zero-friction default—no screen, you're just signed in. The **TestProvider** is when you specifically want to walk the real login → cookie flow in dev (e.g. to test your callback handling). As of v0.7.0 the TestProvider is **opt-in**: it no longer auto-enables just because you're in Development.
+> **Mentor note.** Two dev paths, two jobs. The **TestProvider login** (§0) walks the real challenge → callback → cookie flow and mints a real session — use it to build and test the actual login experience, set roles/claims, and see the profile-specific UX. The **`?_as=` override** (§3) is the transient, no-click path for scripted tests. Neither exists in production.
 
 ---
 
@@ -176,7 +182,7 @@ Browsers carry cookies; services carry **bearer tokens**. Koan validates inbound
 public IActionResult Sync() => Ok(/* ... */);
 ```
 
-A caller presents `Authorization: Bearer <token>`; a missing or invalid token is **401**. In Development, Koan both mints and validates these with a per-process key, so local service-to-service auth works with no setup. When you need to mint one yourself—in a test, or a dev tool—use the issuer:
+A caller presents `Authorization: Bearer <token>`; a missing or invalid token is **401**. Koan signs and validates these with a **shared secret**, `Koan:Security:Trust:Key`, which in a fresh app **defaults to a well-known development value**. Because every Koan service defaults to the *same* key, they all **self-mint valid tokens and trust each other with zero configuration** — local service-to-service auth just works. To mint one yourself — in a test, a dev tool, or a service calling another — use the issuer:
 
 ```csharp
 public sealed class SyncTrigger(IIssuer issuer)
@@ -186,7 +192,7 @@ public sealed class SyncTrigger(IIssuer issuer)
 }
 ```
 
-> **Mentor note.** This is the seed of *fleet identity*: one verifiable token a service presents to any other, validated the same way everywhere. Today's dev keys are **ephemeral** (per process)—fine for local work. Making tokens trusted *across* machines (stable, shared, and federated keys; enrollment) is the trust-fabric roadmap (decision record SEC-0001). The inbound contract—`Koan.bearer`, `Identity.Current`, `[Authorize]`—won't change as that lands.
+> **Mentor note.** This is the seed of *fleet identity*: one verifiable token a service presents to any other, validated the same way everywhere. That default key is **loudly insecure by name** (`super-insecure-shared-secret-replace-asap`) and bootstrap warns you on every start — it's for local dev only, and Koan **refuses to boot** a Production/Staging app that still uses it (§8). For a private team or a shared environment, set `Koan:Security:Trust:Key` to a real secret; every service that shares it interoperates. (Per-node asymmetric identity with *no* shared secret is the SEC-0001 fleet roadmap — the `Koan.bearer` / `Identity.Current` / `[Authorize]` surface won't change as it lands.)
 
 ---
 
@@ -206,8 +212,8 @@ The one-line bridge: **identity** (this guide) establishes *who you are*; **auth
 
 Two things change the moment the environment isn't Development, and you don't have to remember to do either:
 
-1. **The zero-config dev identity disappears.** No auto-sign-in. Real users authenticate through your providers; services through `Koan.bearer`. An unauthenticated request *stays* unauthenticated—`[Authorize]` means it.
-2. **The ephemeral dev issuer refuses to run.** Rather than silently signing tokens with throwaway, per-process keys in production, Koan **fails the boot** unless you've configured a real issuer (or explicitly acknowledged the risk). You wire real keys/providers before you ship—there's no quiet fallback.
+1. **The dev conveniences disappear.** No `?_as=` personas and no zero-config TestProvider login. Real users authenticate through your providers; services through `Koan.bearer`. An unauthenticated request *stays* unauthenticated — `[Authorize]` means it.
+2. **The default insecure key is refused.** In dev, an app with no `Koan:Security:Trust:Key` runs on the public default secret — with a very loud warning banner on every boot. In **Production or Staging**, Koan **refuses to start** on that key: set a real secret first (or, for a throwaway box, `Koan:Security:Trust:AllowInsecureKeyInProduction=true`). No quiet fallback.
 
 > **Mentor note.** The design goal is that you *cannot accidentally ship the dev conveniences*. They're loud in Development and absent—by construction—in Production. "Everyone is admin" can't leak past your environment boundary.
 

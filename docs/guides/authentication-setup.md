@@ -43,19 +43,17 @@ dotnet add package Koan.Web.Auth
 builder.Services.AddKoan();
 ```
 
-In Development you are **already authenticated**: Koan's zero-config dev identity signs every request in as a
-development principal (`id: "dev"`, role `admin`), so `[Authorize]` and `Identity.Current` work immediately—no
-login screen. Step into other personas per request with `?_as=<subject>&_roles=a,b`, or test the unauthenticated
-path with `?_as=anonymous`. This is Development-only and **fails closed in Production**.
+In Development you start out **anonymous** — your app renders its public interface, which is what you usually
+want to evaluate. To log in, Koan ships a built-in **test login page** (the TestProvider), available zero-config
+in Development: visit `/.well-known/auth/providers`, pick **Test (Local)**, and set your subject / roles / claims
+→ you're returned with a real signed session. For scripted testing, step into a transient persona per request
+with `?_as=<subject>&_roles=a,b` (no login page); omit `?_as` for anonymous. All of this is Development-only and
+**fails closed in Production**.
 
-Want a real login *screen* in dev (a fake IdP with a UI)? Opt into the **TestProvider** (as of v0.7.0 it is
-opt-in—no longer auto-enabled in Development):
-
-```json
-{ "Koan": { "Web": { "Auth": { "TestProvider": { "Enabled": true } } } } }
-```
-
-Then visit `/.well-known/auth/providers` and walk the login flow.
+Service-to-service auth also works zero-config: every Koan service self-mints bearer tokens with a default shared
+secret and trusts the others. The default is loudly insecure (`super-insecure-shared-secret-replace-asap`) and is
+**refused in Production/Staging** — set `Koan:Security:Trust:Key` to a real secret before deploying. See the
+progressive [Authentication & Identity How-To](auth-howto.md) for the full story.
 
 ## Google OAuth (2 Lines)
 
