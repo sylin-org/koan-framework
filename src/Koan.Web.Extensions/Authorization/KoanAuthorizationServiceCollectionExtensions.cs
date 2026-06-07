@@ -33,6 +33,7 @@ public static class KoanAuthorizationServiceCollectionExtensions
         services.AddKoanOptions<AuthorizeOptions>(AuthorizeOptions.SectionPath);
         services.TryAddScoped<IAuthorize, Authorizer>();
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizationProvider, RbacAuthorizationProvider>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizationProvider, PolicyAuthorizationProvider>());
 
         if (developmentClaimsTransformer is not null)
         {
