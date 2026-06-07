@@ -8,6 +8,7 @@ using Koan.Mcp.Extensions;
 using Koan.Mcp.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using static Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
 
@@ -22,6 +23,9 @@ public sealed class KoanMcpAutoRegistrar : IKoanAutoRegistrar
     public void Initialize(IServiceCollection services)
     {
         services.AddKoanMcp();
+        // WEB-0069: map MCP endpoints via the typed endpoint-contributor seam (replaces KoanWebStartupFilter's
+        // reflection into this assembly). Self-gates on EnableHttpSseTransport.
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<Koan.Web.Hosting.IKoanEndpointContributor, McpEndpointContributor>());
     }
 
     public void Describe(ProvenanceModuleWriter module, IConfiguration configuration, IHostEnvironment environment)

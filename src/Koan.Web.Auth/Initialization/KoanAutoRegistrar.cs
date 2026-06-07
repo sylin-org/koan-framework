@@ -35,9 +35,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // Ensure auth services are registered once
         services.AddKoanWebAuth();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Microsoft.AspNetCore.Hosting.IStartupFilter, Hosting.KoanWebAuthStartupFilter>());
-        // SEC-0001 §4: the zero-config dev identity injects between authn and authz via the supported
-        // contributor hook on KoanWebStartupFilter — not via startup-filter ordering (which left it dead).
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<Koan.Web.Hosting.IPostAuthenticationContributor, Hosting.DevIdentityContributor>());
+        // SEC-0001 §4 / WEB-0069: the zero-config dev identity injects at the AfterAuthentication stage via the
+        // supported pipeline-contributor seam on KoanWebStartupFilter — not via startup-filter ordering (dead).
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<Koan.Web.Hosting.IKoanWebPipelineContributor, Hosting.DevIdentityContributor>());
 
         // Ensure MVC discovers controllers from this assembly
         services.AddKoanControllersFrom<Controllers.DiscoveryController>();

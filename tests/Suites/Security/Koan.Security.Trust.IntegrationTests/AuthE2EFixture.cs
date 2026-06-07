@@ -1,4 +1,7 @@
 using System.Collections.Generic;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Core;
@@ -8,6 +11,7 @@ using Koan.Web;
 using Koan.Web.Controllers;
 using Koan.Web.Extensions;
 using Koan.Web.Extensions.Authorization;
+using Koan.Web.Hosting;
 using Koan.Security.Trust.Issuer;
 
 namespace Koan.Security.Trust.IntegrationTests;
@@ -37,6 +41,9 @@ public sealed class AuthE2EFixture : KoanTestPipelineFixtureBase
         services.AddKoanAuthorization();
         services.AddKoanControllersFrom<E2EController>();
 
+        // WEB-0069: verify the endpoint-contributor seam end-to-end (same path MCP uses).
+        services.AddSingleton<IKoanEndpointContributor, TestEndpointContributor>();
+
         // The base fixture runs as Development, where Koan.Core's *example* background services
         // (DatabaseMigrationService et al.) auto-run and abort startup. This auth e2e doesn't exercise
         // background services — disable the orchestrator to isolate the auth/authz pipeline.
@@ -48,4 +55,11 @@ public sealed class AuthE2EFixture : KoanTestPipelineFixtureBase
 
     public string MintBearer(string subject, params string[] roles)
         => Services.GetRequiredService<IIssuer>().Issue(new TrustClaims { Subject = subject, Roles = roles });
+}
+
+/// <summary>WEB-0069 — proves an <see cref="IKoanEndpointContributor"/> is invoked inside Koan's UseEndpoints block.</summary>
+internal sealed class TestEndpointContributor : IKoanEndpointContributor
+{
+    public void Map(IEndpointRouteBuilder endpoints)
+        => endpoints.MapGet("/e2e/contributed", () => Results.Ok(new { contributed = true }));
 }

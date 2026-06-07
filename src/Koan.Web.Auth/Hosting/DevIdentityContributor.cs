@@ -12,8 +12,10 @@ namespace Koan.Web.Auth.Hosting;
 /// ordering-fragile insertion that lived in <see cref="KoanWebAuthStartupFilter"/>, which could land after
 /// <see cref="Koan.Web.Hosting.KoanWebStartupFilter"/>'s terminal endpoints and never run.
 /// </summary>
-internal sealed class DevIdentityContributor : IPostAuthenticationContributor
+internal sealed class DevIdentityContributor : IKoanWebPipelineContributor
 {
+    public KoanWebPipelineStage Stage => KoanWebPipelineStage.AfterAuthentication;
+
     public void Configure(IApplicationBuilder app)
     {
         if (app.ApplicationServices.GetService<IHostEnvironment>()?.IsDevelopment() == true)

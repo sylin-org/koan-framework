@@ -25,6 +25,14 @@ public sealed class AuthEndToEndSpec : IClassFixture<AuthE2EFixture>
         response.IsSuccessStatusCode.Should().BeTrue();
     }
 
+    [Fact]
+    public async Task Endpoint_contributor_is_mapped_in_the_pipeline()
+    {
+        // WEB-0069: an IKoanEndpointContributor maps inside Koan's UseEndpoints block (the path MCP uses).
+        var response = await _fx.CreateClient().GetAsync("/e2e/contributed");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
     // ── inbound bearer (Koan.bearer) ────────────────────────────────────
 
     [Fact]
@@ -109,12 +117,16 @@ public sealed class AuthEndToEndSpec : IClassFixture<AuthE2EFixture>
     }
 
     [Fact]
-    public async Task Role_gate_denies_an_authenticated_non_admin()
+    public async Task Role_gate_returns_403_for_an_authenticated_non_admin_api_request()
     {
-        // Authenticated-but-unauthorized: the BFF cookie scheme redirects to its access-denied path (302)
-        // rather than a bare 403 — either way, the non-admin does not reach the endpoint.
-        var res = await _fx.CreateClient().GetAsync("/e2e/admin?_as=bob&_roles=viewer");
-        res.IsSuccessStatusCode.Should().BeFalse();
+        // An API-shaped request (Accept: application/json) gets a real 403 via the built-in content-negotiated
+        // JsonChallengeHandler — not the browser access-denied redirect. (Confirms the cookie scheme is BFF-correct.)
+        var req = new HttpRequestMessage(HttpMethod.Get, "/e2e/admin?_as=bob&_roles=viewer");
+        req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+        var res = await _fx.CreateClient().SendAsync(req);
+
+        res.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     private static async Task<JsonElement> ReadJson(HttpResponseMessage res)

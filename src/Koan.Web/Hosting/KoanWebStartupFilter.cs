@@ -7,7 +7,7 @@ using Koan.Core;
 using Koan.Web.Infrastructure;
 using Koan.Web.Options;
 using System.Diagnostics;
-using System.Reflection;
+using System.Linq;
 
 namespace Koan.Web.Hosting;
 
@@ -84,6 +84,7 @@ internal sealed class KoanWebStartupFilter(IOptions<KoanWebOptions> options, IOp
                 }
                 if (opts.AutoMapControllers)
                 {
+                    RunStage(app, KoanWebPipelineStage.BeforeRouting);
                     app.UseRouting();
                     // Ensure auth middleware is in the correct position (after routing, before endpoints)
                     // Safe even if no authentication schemes are registered.
@@ -95,13 +96,9 @@ internal sealed class KoanWebStartupFilter(IOptions<KoanWebOptions> options, IOp
                     {
                         // No authentication services registered; ignore.
                     }
-                    // SEC-0001 §4: modules contribute middleware between authentication and authorization here
-                    // (e.g. the zero-config dev identity). This is the supported injection point — see
-                    // IPostAuthenticationContributor — so contributors don't depend on startup-filter ordering.
-                    foreach (var contributor in app.ApplicationServices.GetServices<IPostAuthenticationContributor>())
-                    {
-                        contributor.Configure(app);
-                    }
+                    // WEB-0069: modules contribute middleware between authentication and authorization here
+                    // (e.g. the zero-config dev identity), via the supported stage seam — no startup-filter ordering.
+                    RunStage(app, KoanWebPipelineStage.AfterAuthentication);
                     try
                     {
                         app.UseAuthorization();
@@ -110,6 +107,7 @@ internal sealed class KoanWebStartupFilter(IOptions<KoanWebOptions> options, IOp
                     {
                         // No authorization services registered; ignore.
                     }
+                    RunStage(app, KoanWebPipelineStage.AfterAuthorization);
                     // Add minimal tracing header for correlation (always safe)
                     app.Use(async (ctx, next) =>
                     {
@@ -125,15 +123,13 @@ internal sealed class KoanWebStartupFilter(IOptions<KoanWebOptions> options, IOp
                         // MVC controllers handle all endpoints including health
                         endpoints.MapControllers();
 
-                        try
+                        // WEB-0069: modules map their own endpoints via IKoanEndpointContributor (e.g. MCP),
+                        // replacing reflection into module assemblies.
+                        foreach (var contributor in app.ApplicationServices
+                                     .GetServices<IKoanEndpointContributor>()
+                                     .OrderBy(c => c.Order))
                         {
-                            var extensionType = Type.GetType("Koan.Mcp.Extensions.EndpointRouteBuilderExtensions, Koan.Mcp", throwOnError: false);
-                            var mapMethod = extensionType?.GetMethod("MapKoanMcpEndpoints", BindingFlags.Public | BindingFlags.Static);
-                            mapMethod?.Invoke(null, new object[] { endpoints });
-                        }
-                        catch
-                        {
-                            // MCP transport not available; ignore.
+                            contributor.Map(endpoints);
                         }
                     });
                 }
@@ -151,6 +147,18 @@ internal sealed class KoanWebStartupFilter(IOptions<KoanWebOptions> options, IOp
             }
             next(app);
         };
+    }
+
+    // WEB-0069: run the middleware contributors registered for a given pipeline stage, ordered.
+    private static void RunStage(IApplicationBuilder app, KoanWebPipelineStage stage)
+    {
+        foreach (var contributor in app.ApplicationServices
+                     .GetServices<IKoanWebPipelineContributor>()
+                     .Where(c => c.Stage == stage)
+                     .OrderBy(c => c.Order))
+        {
+            contributor.Configure(app);
+        }
     }
 }
 
