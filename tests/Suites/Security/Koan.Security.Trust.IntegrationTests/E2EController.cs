@@ -31,4 +31,9 @@ public sealed class E2EController : ControllerBase
     [Authorize]
     [HttpGet("/e2e/cookie")]
     public IActionResult CookieProtected() => Ok(new { id = Identity.Current.Id });
+
+    // Role gate (ASP.NET RBAC over the dev-identity roles).
+    [Authorize(Roles = "admin")]
+    [HttpGet("/e2e/admin")]
+    public IActionResult AdminOnly() => Ok(new { ok = true });
 }

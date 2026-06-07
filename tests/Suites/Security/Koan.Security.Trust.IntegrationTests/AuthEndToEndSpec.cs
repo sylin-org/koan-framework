@@ -99,6 +99,24 @@ public sealed class AuthEndToEndSpec : IClassFixture<AuthE2EFixture>
         res.IsSuccessStatusCode.Should().BeFalse();
     }
 
+    // ── role gate (RBAC over dev-identity roles) ────────────────────────
+
+    [Fact]
+    public async Task Role_gate_allows_the_admin_dev_identity()
+    {
+        var res = await _fx.CreateClient().GetAsync("/e2e/admin");
+        res.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Role_gate_denies_an_authenticated_non_admin()
+    {
+        // Authenticated-but-unauthorized: the BFF cookie scheme redirects to its access-denied path (302)
+        // rather than a bare 403 — either way, the non-admin does not reach the endpoint.
+        var res = await _fx.CreateClient().GetAsync("/e2e/admin?_as=bob&_roles=viewer");
+        res.IsSuccessStatusCode.Should().BeFalse();
+    }
+
     private static async Task<JsonElement> ReadJson(HttpResponseMessage res)
     {
         using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync());
