@@ -33,8 +33,10 @@ public sealed class TrustModule : KoanModule
         // keypair must be shared, or validation fails non-deterministically.
         services.AddKoanOptions<TrustIssuerOptions>(TrustIssuerOptions.SectionPath);
         services.AddSingleton<IIssuer, DevIssuer>();
-        // Phase 2 increments wire the bearer scheme (2d), ambient Identity (2e), IAuthorize seam (2f),
-        // and the fail-closed boot guard (2g) here.
+        // 2e — the ambient Identity.Current reads HttpContext.User through this accessor (idempotent).
+        services.AddHttpContextAccessor();
+        // The inbound bearer scheme is attached by Koan.Web.Auth.AddKoanWebAuth() via AddKoanBearer (2d).
+        // Phase 2 increments wire the IAuthorize seam (2f) and the fail-closed boot guard (2g) here.
     }
 
     public override void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
