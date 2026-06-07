@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.Extensions.Options;
 using Koan.Web.Extensions.Capabilities;
 using Koan.Web.Hooks;
 
@@ -23,9 +22,11 @@ public sealed class PolicyAuthorizationProvider : IAuthorizationProvider
     private readonly CapabilityAuthorizationOptions _options;
     private readonly IAuthorizationService _authz;
 
-    public PolicyAuthorizationProvider(IOptions<CapabilityAuthorizationOptions> options, IAuthorizationService authz)
+    // AddCapabilityAuthorization registers the raw options instance (not IOptions<>), matching the engine
+    // this provider absorbs.
+    public PolicyAuthorizationProvider(CapabilityAuthorizationOptions options, IAuthorizationService authz)
     {
-        _options = options.Value;
+        _options = options;
         _authz = authz;
     }
 

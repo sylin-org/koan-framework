@@ -40,7 +40,7 @@ public sealed class PolicyAuthorizationProviderTests
         var providers = new IAuthorizationProvider[]
         {
             new RbacAuthorizationProvider(),
-            new PolicyAuthorizationProvider(Microsoft.Extensions.Options.Options.Create(caps), new FakeAuthz(authz ?? (_ => false))),
+            new PolicyAuthorizationProvider(caps, new FakeAuthz(authz ?? (_ => false))),
         };
         return new Authorizer(providers, Microsoft.Extensions.Options.Options.Create(new AuthorizeOptions()));
     }

@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Security.Claims;
 using System.Threading.Tasks;
-using Koan.Core.Modules;
 using Koan.Web.Extensions.Authorization.Internal;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication;
@@ -24,16 +23,9 @@ public static class KoanAuthorizationServiceCollectionExtensions
             configurePolicies?.Invoke(options);
         });
 
+        // AddCapabilityAuthorization now also registers the unified IAuthorize seam + provider ladder (SEC-0002),
+        // so it is available whether an app calls AddKoanAuthorization or AddCapabilityAuthorization directly.
         services.AddCapabilityAuthorization(configureCapabilities ?? (_ => { }));
-
-        // SEC-0002: the unified authorization seam + capability-graded provider ladder. RbacAuthorizationProvider
-        // is the Tier-0 floor; PolicyAuthorizationProvider (absorbing the capability gates) and PDP/ReBAC
-        // adapters register additional rungs. Scoped so a provider can depend on request-scoped services
-        // (e.g. IAuthorizationService).
-        services.AddKoanOptions<AuthorizeOptions>(AuthorizeOptions.SectionPath);
-        services.TryAddScoped<IAuthorize, Authorizer>();
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizationProvider, RbacAuthorizationProvider>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizationProvider, PolicyAuthorizationProvider>());
 
         if (developmentClaimsTransformer is not null)
         {
