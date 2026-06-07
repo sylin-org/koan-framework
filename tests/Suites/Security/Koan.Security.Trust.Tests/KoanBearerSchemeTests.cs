@@ -25,7 +25,7 @@ public sealed class KoanBearerSchemeTests
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddSingleton<IOptions<TrustIssuerOptions>>(Options.Create(new TrustIssuerOptions()));
-        services.AddSingleton<IIssuer, DevIssuer>();
+        services.AddSingleton<IIssuer, SharedKeyIssuer>();
         services.AddAuthentication().AddKoanBearer();
         return services.BuildServiceProvider();
     }
@@ -39,7 +39,7 @@ public sealed class KoanBearerSchemeTests
 
         opts.TokenValidationParameters.Should().NotBeNull();
         opts.TokenValidationParameters.IssuerSigningKey.Should().NotBeNull();
-        opts.TokenValidationParameters.ValidAlgorithms.Should().Contain("ES256");
+        opts.TokenValidationParameters.ValidAlgorithms.Should().Contain("HS256");
         opts.MapInboundClaims.Should().BeFalse();
     }
 
@@ -56,7 +56,8 @@ public sealed class KoanBearerSchemeTests
         var good = issuer.Issue(new TrustClaims { Subject = "alice", Roles = new[] { "admin" } });
         handler.ValidateToken(good, tvp, out _); // does not throw
 
-        var foreign = new DevIssuer(Options.Create(new TrustIssuerOptions()), NullLogger<DevIssuer>.Instance)
+        // "Foreign" now means a DIFFERENT secret — two issuers sharing the same key validate each other by design.
+        var foreign = new SharedKeyIssuer(Options.Create(new TrustIssuerOptions { Key = "a-different-secret" }), NullLogger<SharedKeyIssuer>.Instance)
             .Issue(new TrustClaims { Subject = "mallory" });
         Action validateForeign = () => handler.ValidateToken(foreign, tvp, out _);
         validateForeign.Should().Throw<SecurityTokenException>();

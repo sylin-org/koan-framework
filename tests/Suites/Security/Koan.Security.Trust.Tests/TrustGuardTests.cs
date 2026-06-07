@@ -13,10 +13,10 @@ using Xunit;
 namespace Koan.Security.Trust.Tests;
 
 /// <summary>
-/// SEC-0001 Phase 2 (2g): the fail-closed boot guard. Production + the ephemeral in-process issuer + no
-/// configured issuer refuses to start; a configured issuer or the explicit escape flag boots; non-production
-/// always boots. (Tested by invoking TrustModule.Start directly — a full-AddKoan Production boot would also
-/// trip unrelated production guards; composition through real AddKoan is covered by AuthTrustFabricSpec.)
+/// SEC-0003 §2.5: the fail-closed boot guard. Real-deployment environments (Production / Staging) refuse to
+/// start on the default insecure shared secret; a custom key, a configured issuer, or the explicit escape flag
+/// boots; Development and test environments boot. (Tested by invoking TrustModule.Start directly; composition
+/// through real AddKoan is covered by AuthTrustFabricSpec.)
 /// </summary>
 public sealed class TrustGuardTests
 {
@@ -39,14 +39,21 @@ public sealed class TrustGuardTests
         return () => new TrustModule().Start(sp, CancellationToken.None);
     }
 
-    [Fact]
-    public async Task Production_with_ephemeral_issuer_and_no_config_refuses_to_boot()
-        => await Start("Production").Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*fail-closed*Production*");
+    [Theory]
+    [InlineData("Production")]
+    [InlineData("Staging")]
+    public async Task Real_deployment_with_default_insecure_key_refuses_to_boot(string environment)
+        => await Start(environment).Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*fail-closed*" + environment + "*");
 
     [Fact]
     public async Task Production_with_escape_flag_boots()
-        => await Start("Production", ("Koan:Security:Trust:AllowEphemeralIssuerInProduction", "true"))
+        => await Start("Production", ("Koan:Security:Trust:AllowInsecureKeyInProduction", "true"))
+            .Should().NotThrowAsync();
+
+    [Fact]
+    public async Task Production_with_a_custom_shared_key_boots()
+        => await Start("Production", ("Koan:Security:Trust:Key", "a-real-deployment-secret"))
             .Should().NotThrowAsync();
 
     [Fact]
@@ -57,6 +64,6 @@ public sealed class TrustGuardTests
     [Theory]
     [InlineData("Development")]
     [InlineData("Test")]
-    public async Task Non_production_boots_with_ephemeral_issuer(string environment)
+    public async Task Dev_and_test_boot_with_the_default_key(string environment)
         => await Start(environment).Should().NotThrowAsync();
 }

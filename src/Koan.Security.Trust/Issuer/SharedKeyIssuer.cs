@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
+using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -8,28 +9,36 @@ using Microsoft.IdentityModel.Tokens;
 namespace Koan.Security.Trust.Issuer;
 
 /// <summary>
-/// SEC-0001 §5 (Tier-0) / §11 — the in-process dev issuer: a per-process, NON-DETERMINISTIC asymmetric
-/// (ES256) keypair generated once and held for the process lifetime. Registered as a singleton (every
-/// resolve must share the same key, or validation fails non-deterministically). This is the faithful
-/// absorb of the Test connector's ES256 <c>JwtTokenService</c> behind the <see cref="IIssuer"/> seam;
-/// the original remains until its consumers are rerouted (SEC-0001 Phase 2, 2m).
+/// SEC-0001 §5 / SEC-0003 §2.4 — the shared-secret issuer. Signs <b>HS256</b> with a 256-bit key derived as
+/// <c>SHA-256(<see cref="TrustIssuerOptions.Key"/>)</c>. Because the key defaults to the well-known insecure
+/// value, every service self-mints valid tokens with zero config, and services sharing the key (same box, or
+/// different boxes with the same value) trust each other's tokens. Registered as a singleton.
+/// <para>
+/// Symmetric "whoever holds the key can mint" is the accepted trade-off for the dev / small-trusted-team
+/// rungs; the per-node asymmetric fleet tier (SEC-0001 Rung 2) elects in when a real issuer is configured.
+/// </para>
 /// </summary>
-public sealed class DevIssuer : IIssuer
+public sealed class SharedKeyIssuer : IIssuer
 {
-    private readonly ILogger<DevIssuer> _logger;
+    private readonly ILogger<SharedKeyIssuer> _logger;
     private readonly TrustIssuerOptions _options;
-    private readonly ECDsaSecurityKey _signingKey;
+    private readonly SymmetricSecurityKey _signingKey;
 
-    public DevIssuer(IOptions<TrustIssuerOptions> options, ILogger<DevIssuer> logger)
+    public SharedKeyIssuer(IOptions<TrustIssuerOptions> options, ILogger<SharedKeyIssuer> logger)
     {
         _logger = logger;
         _options = options.Value;
-        var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-        _signingKey = new ECDsaSecurityKey(ecdsa) { KeyId = Guid.NewGuid().ToString("n") };
+        // SHA-256(secret) → a uniform 256-bit HMAC key: valid for any secret length, and deterministic so all
+        // holders of the same secret derive the same key (mutual validation + cross-service self-mint).
+        var keyBytes = SHA256.HashData(Encoding.UTF8.GetBytes(_options.Key));
+        _signingKey = new SymmetricSecurityKey(keyBytes)
+        {
+            KeyId = Convert.ToHexString(keyBytes)[..8].ToLowerInvariant(),
+        };
     }
 
     public string KeyId => _signingKey.KeyId!;
-    public string Algorithm => SecurityAlgorithms.EcdsaSha256; // "ES256"
+    public string Algorithm => SecurityAlgorithms.HmacSha256; // "HS256"
     public string Issuer => _options.Issuer;
     public string Audience => _options.Audience;
     public SecurityKey SignatureKey => _signingKey;

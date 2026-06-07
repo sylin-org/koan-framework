@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
@@ -31,10 +32,11 @@ public sealed class TrustModule : KoanModule
 
     public override void Register(IServiceCollection services)
     {
-        // 2c — the asymmetric (ES256) dev issuer behind the IIssuer seam. Singleton: the per-process
-        // keypair must be shared, or validation fails non-deterministically.
+        // SEC-0003 — the shared-secret (HS256) issuer behind the IIssuer seam. Singleton. Signs with
+        // SHA-256(Koan:Security:Trust:Key); the key defaults to the well-known insecure value so every service
+        // self-mints zero-config (and they trust each other). Fail-closed outside Development (see Start).
         services.AddKoanOptions<TrustIssuerOptions>(TrustIssuerOptions.SectionPath);
-        services.AddSingleton<IIssuer, DevIssuer>();
+        services.AddSingleton<IIssuer, SharedKeyIssuer>();
         // 2e — the ambient Identity.Current reads HttpContext.User through this accessor (idempotent).
         services.AddHttpContextAccessor();
         // Rung 0 — zero-config dev identity options. The middleware is inserted by the auth pipeline in
@@ -45,25 +47,32 @@ public sealed class TrustModule : KoanModule
     }
 
     /// <summary>
-    /// 2g — fail-closed boot guard (SEC-0001 §4.2): refuse to start in Production when the ephemeral
-    /// in-process issuer would back production and no real issuer/key is configured. Throwing here fails
-    /// host startup (KoanModuleHost awaits Start without catching).
+    /// SEC-0003 §2.5 — fail-closed boot guard + the very loud dev warning. Refuse to start when the
+    /// environment is NOT Development and the default insecure shared secret is still in use (unless
+    /// explicitly acknowledged). Throwing here fails host startup (KoanModuleHost awaits Start without
+    /// catching). While the default key IS active (allowed only in dev), emit a loud, framed warning banner.
     /// </summary>
     public override Task Start(IServiceProvider services, CancellationToken ct)
     {
         var env = services.GetRequiredService<IHostEnvironment>();
         var cfg = services.GetRequiredService<IConfiguration>();
-        if (env.IsProduction()
-            && TrustPosture.Detect(cfg) == TrustMode.DevEphemeral
-            && !TrustPosture.AllowEphemeralInProduction(cfg))
+        var mode = TrustPosture.Detect(cfg);
+
+        // Real-deployment environments (Production / Staging) must not run on the public default key. Development
+        // and test environments (e.g. "Test", "Testing") boot with the loud warning below.
+        if (mode == TrustMode.DefaultInsecure && (env.IsProduction() || env.IsStaging()) && !TrustPosture.AllowInsecureKeyInProduction(cfg))
         {
             throw new InvalidOperationException(
-                "SEC-0001 fail-closed: running in Production with the ephemeral in-process trust issuer and no " +
-                "configured issuer. The dev issuer's per-process key cannot back production (multi-instance and " +
-                "restart-safe validation need a stable/shared key). Configure '" + TrustPosture.IssuerKey +
-                "' (or '" + TrustPosture.SharedKeyKey + "'), or set '" + TrustPosture.AllowEphemeralInProductionKey +
-                "=true' to acknowledge an ephemeral-issuer dev/staging deployment.");
+                "SEC-0003 fail-closed: environment '" + env.EnvironmentName + "' is using the DEFAULT INSECURE shared " +
+                "secret ('" + TrustIssuerOptions.DefaultInsecureKey + "'), which is public and forgeable. Set '" +
+                TrustPosture.SharedKeyKey + "' to a real secret (or '" + TrustPosture.IssuerKey + "' for a fleet " +
+                "issuer), or set '" + TrustPosture.AllowInsecureKeyInProductionKey + "=true' to acknowledge a " +
+                "throwaway deployment.");
         }
+
+        if (mode == TrustMode.DefaultInsecure)
+            services.GetService<ILoggerFactory>()?.CreateLogger("Koan.Security.Trust").LogWarning("{Banner}", DefaultKeyWarningBanner);
+
         return Task.CompletedTask;
     }
 
@@ -72,8 +81,19 @@ public sealed class TrustModule : KoanModule
         module.Describe(Version);
         var mode = TrustPosture.Detect(cfg);
         module.AddNote($"Trust mode: {mode}");
-        if (mode == TrustMode.DevEphemeral && !env.IsDevelopment())
-            module.AddNote("WARNING: ephemeral in-process issuer active outside Development — configure "
-                + TrustPosture.IssuerKey + " for production.");
+        if (mode == TrustMode.DefaultInsecure)
+            module.AddNote("WARNING: default INSECURE shared secret in use — set " + TrustPosture.SharedKeyKey
+                + " to a real secret (required outside Development).");
     }
+
+    // SEC-0003 §2.5 — impossible to miss on every dev start while the public default key is active.
+    private const string DefaultKeyWarningBanner =
+        "\n" +
+        "================================================================================\n" +
+        "  ⚠  KOAN TRUST — DEFAULT INSECURE SHARED SECRET IN USE  ⚠\n" +
+        "  Every service self-mints tokens with a PUBLIC, well-known key:\n" +
+        "      '" + TrustIssuerOptions.DefaultInsecureKey + "'\n" +
+        "  Fine for local development — NEVER for shared, staging, or production use.\n" +
+        "  ->  Set 'Koan:Security:Trust:Key' to a real secret before deploying.\n" +
+        "================================================================================";
 }
