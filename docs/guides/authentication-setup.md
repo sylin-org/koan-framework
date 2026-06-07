@@ -11,11 +11,17 @@ validation:
   status: verified
   scope: all-examples-tested
 related_guides:
+  - auth-howto.md
+  - authorization-howto.md
   - building-apis.md
   - entity-capabilities-howto.md
   - mcp-http-sse-howto.md
   - aspire-integration.md
 ---
+
+> **New to Koan auth?** Start with the progressive **[Authentication & Identity How-To](auth-howto.md)** (zero-config
+> dev identity → roles → real logins → service tokens → production). This page is the **provider/configuration
+> reference** it links back to.
 
 # Authentication Setup with Koan
 
@@ -37,9 +43,19 @@ dotnet add package Koan.Web.Auth
 builder.Services.AddKoan();
 ```
 
-Visit `http://localhost:5000/.well-known/auth/providers` to see the TestProvider ready to use.
+In Development you are **already authenticated**: Koan's zero-config dev identity signs every request in as a
+development principal (`id: "dev"`, role `admin`), so `[Authorize]` and `Identity.Current` work immediately—no
+login screen. Step into other personas per request with `?_as=<subject>&_roles=a,b`, or test the unauthenticated
+path with `?_as=anonymous`. This is Development-only and **fails closed in Production**.
 
-Test login: Click any provider button, enter any email, you're logged in.
+Want a real login *screen* in dev (a fake IdP with a UI)? Opt into the **TestProvider** (as of v0.7.0 it is
+opt-in—no longer auto-enabled in Development):
+
+```json
+{ "Koan": { "Web": { "Auth": { "TestProvider": { "Enabled": true } } } } }
+```
+
+Then visit `/.well-known/auth/providers` and walk the login flow.
 
 ## Google OAuth (2 Lines)
 

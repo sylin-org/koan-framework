@@ -91,11 +91,17 @@ _For contributors_: How application initialization actually works
 - AI service integration patterns
 - Embedding and retrieval workflows
 
-### [Authentication Setup](authentication-setup.md)
+### [Authentication & Identity](auth-howto.md)
 
-- Zero-config OAuth and JWT
-- Service-to-service authentication
-- Custom auth provider integration
+- Zero-config dev identity → roles → real logins → service tokens (KSVID) → production
+- `Identity.Current`, persona testing (`?_as=`), and the fail-closed production posture
+- Provider/OAuth/SAML configuration reference: [Authentication Setup](authentication-setup.md)
+
+### [Authorization](authorization-howto.md)
+
+- The `IAuthorize` seam and capability-graded provider ladder
+- Capability gates (`[RequireCapability]`), named policies, and custom PDP/ReBAC providers
+- "Coarse in the token, fine at the resource"
 
 ### [Semantic Pipelines](semantic-pipelines.md)
 
