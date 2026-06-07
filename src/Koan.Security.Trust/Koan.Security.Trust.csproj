@@ -11,11 +11,17 @@
     <PackageTags>$(CommonPackageTags);security;identity;trust;auth;token</PackageTags>
   </PropertyGroup>
   <ItemGroup>
+    <!-- SEC-0001: Trust owns the inbound HTTP verifier (bearer scheme) + ambient over HttpContext,
+         so it is a web-aware security pillar. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.18.0" />
     <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.18.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.8" />
   </ItemGroup>
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
