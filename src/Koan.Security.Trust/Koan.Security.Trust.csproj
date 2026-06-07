@@ -14,6 +14,10 @@
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.18.0" />
+    <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.18.0" />
+  </ItemGroup>
+  <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
       <_Parameter1>Koan.Security.Trust.Tests</_Parameter1>
     </AssemblyAttribute>

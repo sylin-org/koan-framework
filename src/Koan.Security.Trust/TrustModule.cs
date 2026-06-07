@@ -3,7 +3,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
+using Koan.Core.Modules;
 using Koan.Core.Provenance;
+using Koan.Security.Trust.Issuer;
 
 namespace Koan.Security.Trust;
 
@@ -27,8 +29,12 @@ public sealed class TrustModule : KoanModule
 
     public override void Register(IServiceCollection services)
     {
-        // Phase 2 increments wire the issuer, bearer scheme, ambient Identity, IAuthorize seam,
-        // and the fail-closed boot guard here. Intentionally empty in the 2b shell.
+        // 2c — the asymmetric (ES256) dev issuer behind the IIssuer seam. Singleton: the per-process
+        // keypair must be shared, or validation fails non-deterministically.
+        services.AddKoanOptions<TrustIssuerOptions>(TrustIssuerOptions.SectionPath);
+        services.AddSingleton<IIssuer, DevIssuer>();
+        // Phase 2 increments wire the bearer scheme (2d), ambient Identity (2e), IAuthorize seam (2f),
+        // and the fail-closed boot guard (2g) here.
     }
 
     public override void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
