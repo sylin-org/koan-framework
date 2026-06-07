@@ -13,4 +13,9 @@
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\Koan.Web\Koan.Web.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Koan.Web.Extensions.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
 </Project>

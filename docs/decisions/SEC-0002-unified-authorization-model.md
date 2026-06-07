@@ -1,6 +1,6 @@
 # SEC-0002: Unified Authorization Model — one decision seam, declarative requirement sources, capability-graded providers
 
-**Status**: **Proposed (2026-06-07)** — architect selected option **A** (a Koan-native graded seam that reuses ASP.NET `IAuthorizationService` as a provider) in design discussion. Not yet implemented.
+**Status**: **Accepted (2026-06-07)** — architect selected option **A** (a Koan-native graded seam that reuses ASP.NET `IAuthorizationService` as a provider). Implementation underway, phased + copy-then-verify-then-delete: **step 0 (characterization specs pinning the current WEB-0047 behavior) DONE**. WEB-0047 to be marked *Superseded by SEC-0002* once `PolicyAuthorizationProvider` replaces `ICapabilityAuthorizer` (impl step 3).
 **Date**: 2026-06-07
 **Deciders**: Enterprise Architect
 **Scope**: Collapse Koan's fragmented authorization mechanisms into **one** Koan-native decision seam (`IAuthorize`) fed by **declarative requirement sources** and backed by a **capability-graded provider ladder**. Elaborates SEC-0001 §8 (where authorization lives); generalizes and supersedes WEB-0047's capability resolution; supersedes the parallel `IAuthorize`/`RbacAuthorizer` sketch shipped in SEC-0001 Phase 2 (increment 2f).
