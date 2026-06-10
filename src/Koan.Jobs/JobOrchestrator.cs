@@ -263,11 +263,21 @@ public sealed class JobOrchestrator
         await _ledger.Update(rec, CancellationToken.None);
     }
 
-    /// <summary>Archival sweep: purge benign terminal rows (Completed/Cancelled) past <c>ArchiveAfter</c>.</summary>
-    public Task<int> ArchiveAsync(CancellationToken ct = default)
+    /// <summary>Archival sweep (§19.3): purge Completed/Cancelled past <c>ArchiveAfter</c>, Failed/Dead past
+    /// <c>FailedAfter</c>, then trim each work-type's terminal rows to <c>RetainPerWorkType</c>. Each is independently
+    /// gated; all off → no-op. Returns the total rows removed.</summary>
+    public async Task<int> ArchiveAsync(CancellationToken ct = default)
     {
-        if (_options.ArchiveAfter <= TimeSpan.Zero) return Task.FromResult(0);
-        return _ledger.PurgeArchivable(_clock.GetUtcNow() - _options.ArchiveAfter, ct);
+        var now = _clock.GetUtcNow();
+        var purged = 0;
+        if (_options.ArchiveAfter > TimeSpan.Zero)
+            purged += await _ledger.PurgeArchivable(now - _options.ArchiveAfter, ct);
+        if (_options.FailedAfter > TimeSpan.Zero)
+            purged += await _ledger.PurgeFailed(now - _options.FailedAfter, ct);
+        if (_options.RetainPerWorkType > 0)
+            foreach (var binding in _registry.All)
+                purged += await _ledger.TrimTerminal(binding.WorkType, _options.RetainPerWorkType, ct);
+        return purged;
     }
 
     /// <summary>Reclaim jobs whose lease lapsed (reaper sweep): revert Running → Queued for re-dispatch.</summary>

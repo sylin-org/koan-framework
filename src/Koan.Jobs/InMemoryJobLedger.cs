@@ -167,6 +167,35 @@ public sealed class InMemoryJobLedger : IJobLedger
         }
     }
 
+    public Task<int> PurgeFailed(DateTimeOffset olderThan, CancellationToken ct)
+    {
+        lock (_gate)
+        {
+            var stale = _records.Values
+                .Where(r => r.Status is JobStatus.Failed or JobStatus.Dead
+                            && r.LastSettledAt is { } s && s < olderThan)
+                .Select(r => r.Id).ToList();
+            foreach (var id in stale) _records.Remove(id);
+            return Task.FromResult(stale.Count);
+        }
+    }
+
+    public Task<int> TrimTerminal(string workType, int keep, CancellationToken ct)
+    {
+        if (keep <= 0) return Task.FromResult(0);
+        lock (_gate)
+        {
+            var terminal = _records.Values
+                .Where(r => r.WorkType == workType && r.IsTerminal)
+                .OrderByDescending(r => r.LastSettledAt)
+                .ToList();
+            if (terminal.Count <= keep) return Task.FromResult(0);
+            var excess = terminal.Skip(keep).Select(r => r.Id).ToList();
+            foreach (var id in excess) _records.Remove(id);
+            return Task.FromResult(excess.Count);
+        }
+    }
+
     private bool IsGated(string? gateKey, DateTimeOffset now)
         => gateKey is not null && _gates.TryGetValue(gateKey, out var g) && g.ReleaseAt > now;
 

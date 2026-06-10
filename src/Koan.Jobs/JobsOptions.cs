@@ -61,8 +61,17 @@ public sealed class JobsOptions
     public int ClaimScanBatch { get; set; } = 64;
 
     /// <summary>Benign terminal rows (Completed/Cancelled) older than this are purged to keep the active ledger lean.
-    /// Failed/Dead are retained (queryable + replayable). Zero or negative disables archival.</summary>
+    /// Zero or negative disables this window.</summary>
     public TimeSpan ArchiveAfter { get; set; } = TimeSpan.FromDays(7);
+
+    /// <summary>Failed/Dead terminal rows older than this are purged (replayable until then). JOBS-0005 §19.3 closes the
+    /// hole where they were retained forever — the unbounded half of a high-failure ledger. Zero or negative = retain
+    /// indefinitely (the pre-§19 behavior).</summary>
+    public TimeSpan FailedAfter { get; set; } = TimeSpan.FromDays(30);
+
+    /// <summary>Hard cap on terminal rows kept per work-type: the newest N survive, older terminal rows are trimmed on
+    /// the archival sweep. Bounds a high-throughput burst that age-based windows alone miss (JOBS-0005 §19.3). Zero = no cap.</summary>
+    public int RetainPerWorkType { get; set; }
 
     /// <summary>How often the worker runs the archival sweep.</summary>
     public TimeSpan ArchiveInterval { get; set; } = TimeSpan.FromHours(1);

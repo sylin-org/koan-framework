@@ -88,6 +88,13 @@ public sealed class RoutingJobLedger : IJobLedger
     public async Task<int> PurgeArchivable(DateTimeOffset olderThan, CancellationToken ct)
         => await _durable.PurgeArchivable(olderThan, ct) + await _inMemory.PurgeArchivable(olderThan, ct);
 
+    public async Task<int> PurgeFailed(DateTimeOffset olderThan, CancellationToken ct)
+        => await _durable.PurgeFailed(olderThan, ct) + await _inMemory.PurgeFailed(olderThan, ct);
+
+    // A work-type's rows live in exactly one ledger (persistence routing), so trim the owning one.
+    public Task<int> TrimTerminal(string workType, int keep, CancellationToken ct)
+        => For(workType).TrimTerminal(workType, keep, ct);
+
     private static IReadOnlyList<JobRecord> Concat(IReadOnlyList<JobRecord> a, IReadOnlyList<JobRecord> b)
     {
         if (a.Count == 0) return b;

@@ -50,6 +50,14 @@ public interface IJobLedger
     Task<IReadOnlyList<JobGate>> ActiveGates(DateTimeOffset now, CancellationToken ct);
 
     /// <summary>Remove benign terminal rows (Completed/Cancelled) settled before <paramref name="olderThan"/>, keeping
-    /// the active set lean. Failed/Dead are retained (replayable). Returns the number purged.</summary>
+    /// the active set lean. Returns the number purged.</summary>
     Task<int> PurgeArchivable(DateTimeOffset olderThan, CancellationToken ct);
+
+    /// <summary>Remove Failed/Dead rows settled before <paramref name="olderThan"/> (replayable until then) — the §19.3
+    /// completion of retention so failures don't accumulate forever. Returns the number purged.</summary>
+    Task<int> PurgeFailed(DateTimeOffset olderThan, CancellationToken ct);
+
+    /// <summary>Trim terminal rows for a work-type to the newest <paramref name="keep"/>, removing the older terminal
+    /// rows (the per-work-type count cap, §19.3). Returns the number removed.</summary>
+    Task<int> TrimTerminal(string workType, int keep, CancellationToken ct);
 }

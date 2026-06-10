@@ -109,6 +109,31 @@ public sealed class DataJobLedger : IJobLedger
         return stale.Count;
     }
 
+    public async Task<int> PurgeFailed(DateTimeOffset olderThan, CancellationToken ct)
+    {
+        // §19.3 retention completion: Failed/Dead were retained forever; bound them by age (replayable until then).
+        var stale = await JobRecord.Query(
+            r => (r.Status == JobStatus.Failed || r.Status == JobStatus.Dead) && r.LastSettledAt < olderThan, ct);
+        foreach (var r in stale) await JobRecord.Remove(r.Id, ct);
+        return stale.Count;
+    }
+
+    public async Task<int> TrimTerminal(string workType, int keep, CancellationToken ct)
+    {
+        if (keep <= 0) return 0;
+        // The keep-th newest terminal row marks the cutoff; terminal rows settled before it are excess. Two pushed
+        // queries (a bounded page to find the cutoff, then a predicate delete) — no full materialize of the work-type.
+        var sort = SortBuilder<JobRecord>.Build(s => s.OrderByDescending(r => r.LastSettledAt));
+        var newestPage = QueryDefinition.All.WithSort(sort).WithPagination(1, keep);
+        var newest = await JobRecord.Query(r => r.WorkType == workType && r.Status >= JobStatus.Completed, newestPage, ct);
+        if (newest.Count < keep) return 0;                         // under the cap — nothing to trim
+        if (newest[^1].LastSettledAt is not { } cutoff) return 0;
+        var excess = await JobRecord.Query(
+            r => r.WorkType == workType && r.Status >= JobStatus.Completed && r.LastSettledAt < cutoff, ct);
+        foreach (var r in excess) await JobRecord.Remove(r.Id, ct);
+        return excess.Count;
+    }
+
     // --- claim internals ---
 
     private async Task<JobRecord?> SelectCandidate(DateTimeOffset now, IReadOnlyCollection<string> saturatedLanes, CancellationToken ct)

@@ -25,6 +25,11 @@ internal static class JobLedgerPredicates
     public static Expression<Func<JobRecord, bool>> NonTerminal()
         => static r => r.Status < JobStatus.Completed;
 
+    /// <summary>Terminal = <see cref="JobStatus.Completed"/> and above (4..7) — one comparison, the mirror of
+    /// <see cref="NonTerminal"/>.</summary>
+    public static Expression<Func<JobRecord, bool>> Terminal()
+        => static r => r.Status >= JobStatus.Completed;
+
     private static Expression<Func<JobRecord, bool>> And(
         Expression<Func<JobRecord, bool>>? left, Expression<Func<JobRecord, bool>> right)
     {
