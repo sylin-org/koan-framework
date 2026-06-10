@@ -562,7 +562,7 @@ The hot/cold partition **move** (§6, decision §12.7) stays the **opt-in** scal
 
 ## 20. Addendum (2026-06-10): Scale-tier completion — metrics rollup (Tier 2), atomic claim (Tier 3), native TTL retention
 
-**Status**: **Proposed (2026-06-10)** — completes the three scale tiers §19 sketched but deferred (§19.5 metrics, §19.3 Tier 3 SKIP LOCKED + TTL). Awaiting architect ratification of the marked **[RATIFY]** positions. Implementation: PENDING (phased ledger §20.8).
+**Status**: **Accepted (2026-06-10)** — ratified by the architect. Positions: **Tier 2 metrics opt-in, default off** (§20.2); **Tier 3 atomic single-claim first, batch deferred** (§20.3 phase (a); (d) not scheduled); **kept as a JOBS-0005 §20 addendum** (§20.8). Completes the three scale tiers §19 sketched but deferred (§19.5 metrics, §19.3 Tier 3 SKIP LOCKED + TTL). Implementation: in progress, phased ledger §20.8 (a → b → c; d deferred).
 **Why now**: §19 shipped Tier 0 (index + pushdown) and Tier 1 (periodic retention) and proved the cross-tier suite green on all five stores. The three deferred items complete the high-throughput story, and each is **capability-graded** — a correct baseline on every store, a better primitive where the store offers one (the Koan capability ladder, ARCH-0084).
 
 ### 20.1 Scope correction — what Tier 0 already solved
