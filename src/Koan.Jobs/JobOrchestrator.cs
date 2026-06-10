@@ -178,6 +178,7 @@ public sealed class JobOrchestrator
         rec.LastError = null;
         rec.DeferReason = null;
         rec.LastSettledAt = now;
+        rec.ExpireAt = ExpiryAt(_options.ArchiveAfter, now);
         SetStatus(rec, JobStatus.Completed, now, "completed");
         await _ledger.Update(rec, CancellationToken.None);
         _metrics.Record(rec.WorkType, JobStatus.Completed, now);
@@ -208,6 +209,7 @@ public sealed class JobOrchestrator
         }
 
         rec.DeadReason = DeadReason.Poison.ToString();
+        rec.ExpireAt = ExpiryAt(_options.FailedAfter, now);
         SetStatus(rec, JobStatus.Failed, now, $"failed after {policy.MaxAttempts} attempts: {ex.Message}");
         await _ledger.Update(rec, CancellationToken.None);
         _metrics.Record(rec.WorkType, JobStatus.Failed, now);
@@ -240,6 +242,7 @@ public sealed class JobOrchestrator
         if (deadlineHit || maxHit)
         {
             rec.DeadReason = DeadReason.PerpetuallyDeferred.ToString();
+            rec.ExpireAt = ExpiryAt(_options.FailedAfter, now);
             SetStatus(rec, JobStatus.Dead, now, deadlineHit ? "deadline exceeded" : "max reschedules exceeded");
             await _ledger.Update(rec, CancellationToken.None);
             _metrics.Record(rec.WorkType, JobStatus.Dead, now);
@@ -265,6 +268,7 @@ public sealed class JobOrchestrator
         rec.Owner = null;
         rec.LeaseUntil = null;
         rec.LastSettledAt = now;
+        rec.ExpireAt = ExpiryAt(_options.ArchiveAfter, now);
         SetStatus(rec, JobStatus.Cancelled, now, "cancelled");
         await _ledger.Update(rec, CancellationToken.None);
         _metrics.Record(rec.WorkType, JobStatus.Cancelled, now);
@@ -371,6 +375,10 @@ public sealed class JobOrchestrator
         r.Transitions.Add(new JobTransition { At = at, From = r.Status, To = to, Note = note });
         r.Status = to;
     }
+
+    /// <summary>Absolute expiry for a terminal row (§20.4): <c>now + window</c>, or null when the window is disabled
+    /// (≤ 0) so the row is retained indefinitely.</summary>
+    private static DateTimeOffset? ExpiryAt(TimeSpan window, DateTimeOffset now) => window > TimeSpan.Zero ? now + window : null;
 
     /// <summary>Deterministic snapshot of a work-item's serialized state for conditional auto-save (§17.1). The
     /// comparison is internal (load vs. settle, same serializer), so it needs only determinism + public-state

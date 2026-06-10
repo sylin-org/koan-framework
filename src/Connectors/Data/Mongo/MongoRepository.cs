@@ -74,6 +74,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
         .Add(DataCaps.Write.BulkUpsert).Add(DataCaps.Write.BulkDelete)
         .Add(DataCaps.Write.AtomicBatch).Add(DataCaps.Write.FastRemove)
         .Add(DataCaps.Write.ConditionalReplace)
+        .Add(DataCaps.Retention.TtlIndex)
         .Add(DataCaps.Query.Filter, MongoFilterTranslator<TEntity>.Capabilities);
     public StorageOptimizationInfo OptimizationInfo => _optimizationInfo;
 
@@ -258,11 +259,12 @@ internal sealed class MongoRepository<TEntity, TKey> :
                 ? idx.Name!
                 : $"ix_{string.Join("_", idx.Properties.Select(p => p.Name))}";
 
-            models.Add(new CreateIndexModel<TEntity>(keys, new CreateIndexOptions
-            {
-                Name = name,
-                Unique = idx.Unique
-            }));
+            var options = new CreateIndexOptions { Name = name, Unique = idx.Unique };
+            // §20.4 TTL: a single-field [Index(Ttl=true)] timestamp index makes Mongo expire each row once its value is
+            // in the past (expireAfterSeconds = 0). A null/absent value is never expired.
+            if (idx.Ttl && idx.Properties.Count == 1)
+                options.ExpireAfter = TimeSpan.Zero;
+            models.Add(new CreateIndexModel<TEntity>(keys, options));
         }
 
         return models;

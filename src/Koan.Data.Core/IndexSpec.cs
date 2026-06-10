@@ -7,5 +7,6 @@ public sealed record IndexSpec(
     IReadOnlyList<PropertyInfo> Properties,
     bool Unique,
     bool IsPrimaryKey,
-    bool IsImplicit
+    bool IsImplicit,
+    bool Ttl = false
 );

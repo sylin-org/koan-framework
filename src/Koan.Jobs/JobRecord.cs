@@ -43,6 +43,13 @@ public sealed class JobRecord : Entity<JobRecord>
     public DateTimeOffset FirstSubmittedAt { get; set; }
     public DateTimeOffset? LastSettledAt { get; set; }
 
+    /// <summary>Absolute time after which this terminal row may be deleted (JOBS-0005 §20.4) — set at settle per outcome
+    /// (Completed/Cancelled → +ArchiveAfter, Failed/Dead → +FailedAfter). On a TTL-capable store (Mongo) the
+    /// <c>[Index(Ttl)]</c> makes the store expire the row automatically; elsewhere the periodic purge handles it. Null
+    /// (non-terminal) is never expired.</summary>
+    [Index(Group = "ix_jobs_ttl", Ttl = true)]
+    public DateTimeOffset? ExpireAt { get; set; }
+
     /// <summary>Concurrency lane (defaults to the action name).</summary>
     public string Lane { get; set; } = "";
 

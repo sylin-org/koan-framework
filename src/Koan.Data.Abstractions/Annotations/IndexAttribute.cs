@@ -38,6 +38,15 @@ public sealed class IndexAttribute : Attribute
     public bool Unique { get; init; }
 
     /// <summary>
+    /// Marks this as a TTL (time-to-live) index on a single absolute-expiry timestamp property: the store deletes a row
+    /// once that timestamp is in the past. Honored only by adapters that declare
+    /// <see cref="Capabilities.DataCaps.Retention.TtlIndex"/> (e.g. Mongo, via <c>expireAfterSeconds = 0</c>); adapters
+    /// without the capability ignore the index entirely (they don't build a redundant plain index). A null timestamp is
+    /// never expired.
+    /// </summary>
+    public bool Ttl { get; init; }
+
+    /// <summary>
     /// Helper for adapters: when attached to a property, adapters can treat it as a single-field index on that property.
     /// When class-level, returns provided Fields[] or throws if not provided.
     /// </summary>

@@ -705,6 +705,23 @@ public abstract class JobBehaviorSuite
         claimed.Distinct().Should().HaveCount(jobCount);     // each claimed exactly once — no double-claim
     }
 
+    [Fact]
+    public async Task a_settled_job_gets_an_absolute_expiry()
+    {
+        // §20.4: a terminal row carries ExpireAt = LastSettledAt + its per-outcome window (Completed → ArchiveAfter).
+        // TTL-capable stores (Mongo) expire on it automatically via the [Index(Ttl)]; the rest purge by it on the sweep.
+        GreetJob.Reset();
+        await using var host = await CreateHostAsync(o => o.ArchiveAfter = TimeSpan.FromDays(3));
+        var j = new GreetJob { Name = "x" };
+        var id = j.Id;
+        await j.Job.Submit();
+        await host.Drain();
+
+        var rec = await host.JobFor<GreetJob>(id);
+        rec!.Status.Should().Be(JobStatus.Completed);
+        rec.ExpireAt.Should().Be(rec.LastSettledAt!.Value + TimeSpan.FromDays(3));
+    }
+
     private static IReadOnlyCollection<JobRecord> Seed(string workType, int count, JobStatus status, DateTimeOffset baseTime, string idPrefix, bool visible = false)
     {
         var list = new List<JobRecord>(count);

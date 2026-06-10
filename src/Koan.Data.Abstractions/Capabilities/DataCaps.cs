@@ -39,6 +39,15 @@ public static class DataCaps
         public static readonly Capability ConditionalReplace = new("write.conditionalReplace");
     }
 
+    /// <summary>Retention negotiation tokens.</summary>
+    public static class Retention
+    {
+        /// <summary>Provider supports a store-native TTL index — a <c>[Index(Ttl = true)]</c> timestamp property whose
+        /// rows the store expires automatically once it is in the past (e.g. Mongo <c>expireAfterSeconds = 0</c>).
+        /// Adapters without this token ignore TTL indexes entirely. (JOBS-0005 §20.4)</summary>
+        public static readonly Capability TtlIndex = new("retention.ttlIndex");
+    }
+
     /// <summary>
     /// Resolves the data capabilities of <paramref name="source"/> from its
     /// <see cref="IDescribesCapabilities"/> declaration; returns an empty set when it declares none.
