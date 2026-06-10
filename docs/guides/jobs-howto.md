@@ -348,6 +348,43 @@ var mine    = await PresetPackage.Jobs.Query(new JobQuery(Action: Stage.Fetch));
 
 **When to use it.** `list.Submit(action)` for fan-out; `Jobs.Trigger(action)` for "run the nightly sweep now" admin actions; `MyModel.Jobs` for dashboards and operating on jobs by id.
 
+### 8.1 Draining a large source: window, don't multiply
+
+**Concept.** `list.Submit(action)` mints one job *per item*. That's exactly right for hundreds or a few thousand. But reach for it on "import a million rows from an external feed" and you mint a million ledger rows — millions of writes, a saturated active set, and slow dashboards. The ledger is a **lifecycle/audit store** (durable claim, retry, per-row history); that machinery is worth paying for a *job* and pure overhead a million times over for homogeneous rows. The fix isn't a faster engine — it's a coarser **unit of work**: make the **window** the job, not the row.
+
+**Recipe.** Model a *window* over the source as the work-item. Each run processes one window (a bulk `Save`), advances its own cursor, and re-queues itself at the next window with `ctx.ContinueWith`. At most one window is in flight, so the source drains through a handful of ledger rows instead of a million.
+
+**Sample.**
+
+```csharp
+public sealed class ImportWindow : Entity<ImportWindow>, IKoanJob<ImportWindow>
+{
+    public const string Pull = nameof(Pull);
+    public string Source { get; set; } = "";
+    public long   Offset { get; set; }
+    public int    Size   { get; set; } = 1000;
+
+    [JobAction(Pull)]                                    // serialized per work-item by default (§17.2)
+    public static async Task Execute(ImportWindow w, JobContext ctx, CancellationToken ct)
+    {
+        var page = await ExternalSource.Page(w.Source, w.Offset, w.Size, ct);
+        await page.Rows.Save();                          // one bulk upsert of the window
+        ctx.Progress(page.Done ? 1 : (w.Offset + page.Count) / (double)page.Total);
+        if (!page.Done)
+        {
+            w.Offset += page.Count;                      // advance the cursor on THIS entity (auto-saved)
+            ctx.ContinueWith(ImportWindow.Pull);         // re-queue the same work-item at the next window
+        }
+    }
+}
+
+await new ImportWindow { Source = "vendor:catalog" }.Job.Submit(ImportWindow.Pull);   // ONE ledger row
+```
+
+`ctx.ContinueWith(action)` re-queues the *same* work-item, and Koan persists your cursor automatically (it saw `Offset` change). Want parallelism without the explosion? Start a few conveyors over disjoint stripes (`Offset ≡ stripe (mod P)`) — `P` in flight, not a million.
+
+**When to use it.** Any time the source is large or external (tens of thousands of items and up). If you do mint a job per row at scale, Koan won't stop you — but the worker will log a **job-per-row warning** (`JobPerRowWarnThreshold`) pointing right back here.
+
 ---
 
 ## 9. Cancellation
