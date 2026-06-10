@@ -557,3 +557,79 @@ The hot/cold partition **move** (§6, decision §12.7) stays the **opt-in** scal
 **Cross-tier validation (2026-06-10).** The §19 specs were folded into the shared `JobBehaviorSuite` (ARCH-0079) and run on every tier: **in-memory (44), SQLite (50), Postgres (40), SqlServer (40) — deterministically green**. The cross-tier run also corrected a real bug (Mongo enum lexicographic ordering in ledger predicates — equality sets now) and a test-fixture readiness-gating gap.
 
 **`DrainAsync` chain-follow-on race (found + fixed 2026-06-10).** The Mongo tier intermittently flaked the chain/conveyor specs. Root cause: a race in `JobOrchestrator.DrainAsync` (§7). A chain successor is appended inside the predecessor's inflight task; the loop's `RemoveAll(completed); if (inflight.Count==0) break;` ran *before* awaiting inflight, so a successor appended in the window after `ClaimNext` returned null but before that `RemoveAll` was missed — the drain broke with a Queued, visible, unblocked successor and **nothing running**. In-memory/SQLite are too fast to hit the window; production's poll loop re-drains so it never surfaces there; a single `host.Drain()` on higher-latency Mongo exposes it. Fix: re-claim before breaking when a task just settled (`if (settled > 0) continue;`). This is correctness for `DrainAsync`'s contract on every store, not a test band-aid. Validated: Mongo ×8 green (was ~4/5 flaky) + all four other tiers still green. Full investigation: **docs/design/jobs-mongo-suite-flakiness-investigation.md**. (A first attempt — a §17.2 in-memory-exclusivity change — chased a phantom, regressed Mongo, and was reverted; the chain-claim/exclusivity is correct as-is.)
+
+---
+
+## 20. Addendum (2026-06-10): Scale-tier completion — metrics rollup (Tier 2), atomic claim (Tier 3), native TTL retention
+
+**Status**: **Proposed (2026-06-10)** — completes the three scale tiers §19 sketched but deferred (§19.5 metrics, §19.3 Tier 3 SKIP LOCKED + TTL). Awaiting architect ratification of the marked **[RATIFY]** positions. Implementation: PENDING (phased ledger §20.8).
+**Why now**: §19 shipped Tier 0 (index + pushdown) and Tier 1 (periodic retention) and proved the cross-tier suite green on all five stores. The three deferred items complete the high-throughput story, and each is **capability-graded** — a correct baseline on every store, a better primitive where the store offers one (the Koan capability ladder, ARCH-0084).
+
+### 20.1 Scope correction — what Tier 0 already solved
+
+Tier 0's pushed `(WorkType, Status)` index already turns the **active-count** dashboard ("how many Queued/Running?") into an O(matching-range) pushed `COUNT` (`CountActive`) — the original §19 30s timeout is **fixed**. So **Tier 2 is not about active counts.** The remaining gap is **outcome/throughput observability over time** (completed/failed per period, trend rates) that must **survive retention** — and you cannot count history from a ledger whose history Tier 1 deletes. That, and only that, requires accumulation.
+
+### 20.2 Tier 2 — metrics as a worker-batched, node-sharded rollup
+
+**[RATIFY] Decision**: accumulate in memory per node, flush periodically to a **per-node shard row** — *not* a per-settle DB write.
+- Each orchestrator keeps an in-memory tally `(bucket, workType, outcome) → count`, bumped on terminal settle (Completed/Failed/Cancelled/Dead) — free.
+- On a flush cadence (rides the existing archive sweep, or a dedicated `MetricsFlushInterval`), the node writes its accumulated deltas to **its own** shard row: `JobMetric : Entity<JobMetric>` keyed `(bucket, workType, outcome, nodeShard)`. Because **only that node writes its shard**, the read-add-write is contention-free — no cross-node lost updates, no dependence on an atomic `$inc` the data layer doesn't expose.
+- Dashboard read: `JobMetric.Query(bucketRange, workType)` → group by outcome → `sum(Count)` — O(nodes × buckets × outcomes), independent of ledger size and immune to retention.
+- Bucket granularity configurable (default hourly); metric rows are themselves retained/trimmed by bucket age (bounded).
+
+**Alternatives rejected**:
+- *Per-settle sharded `$inc`* (the §19.5 first sketch): one DB write per terminal job — 1M writes for a 1M-job burst — and needs a true atomic increment or risks lost updates. Worker-batched in-memory accumulation yields the identical rollup for ~O(flush) writes. Rejected on write-amplification.
+- *Periodic recompute from the ledger*: cheap, but cannot see purged history; only serves active counts — already handled by Tier 0. Insufficient.
+
+**[RATIFY] Enablement**: recommend **opt-in, default off** (`JobsOptions.Metrics.Enabled`, or Reference = Intent via a `Koan.Jobs.Metrics` marker). Rationale: keep the zero-config single-node path write-free; throughput dashboards are a deliberate choice. (Counter-argument for default-on: Koan's "self-reporting infrastructure" ethos — but the per-flush write on a tiny app is unwarranted. Architect's call.)
+- *Node identity*: `_owner` is ephemeral per boot, so a restart orphans a shard row. Mitigated by bucket retention (old buckets purged → orphans age out). A stable node id is a future refinement.
+
+### 20.3 Tier 3 — atomic, contention-free claim (capability-graded)
+
+**Problem**: the default `Optimistic` claim is last-write-wins, **not a real CAS**. Under multi-node contention, N workers select the same FIFO head, all `Upsert` it `Running`, last writer wins, and **several workers execute the same job** — idempotency (the ratified contract) absorbs the duplicate *effect*, but the duplicate *executions* are wasted. `Ticket` avoids it but pays a ~1s election window. Both *cope* with contention; neither is contention-*free*.
+
+**[RATIFY] Decision**: add a capability-graded claim that uses the store's native atomic-claim primitive when present, electing it at startup and **falling back to the current `ClaimStrategy`** otherwise:
+- **Postgres / SqlServer**: `SELECT … WHERE Queued ∧ VisibleAt≤now ∧ ¬Cancel ORDER BY (VisibleAt, FirstSubmittedAt) LIMIT N FOR UPDATE SKIP LOCKED` (PG) / `WITH (UPDLOCK, READPAST)` (SqlServer), then mark `Running` — one atomic round-trip; each worker gets **distinct** rows; zero wasted CAS. Routed through the existing `RelationalInstructions.Sql*` escape hatch.
+- **Mongo**: `FindOneAndUpdate(filter, sort, set Running, ReturnDocument.After)` — natively atomic single-row claim; loop for a batch.
+- **SQLite / InMemory**: no SKIP LOCKED, but single-writer / in-process lock already makes the claim race-free → keep `Optimistic` unchanged.
+- Gated by a new capability the adapter declares (§20.5); the ledger elects the best claim path, else the current strategy.
+
+**[RATIFY] Phasing**: **(a) atomic single-row claim first** — the contention fix; minimal `DrainAsync` change (still one-at-a-time, but each claim is contention-free and single-execution). **(b) batch claim** of K rows per round-trip later — a throughput optimization that amortizes latency but enlarges the `DrainAsync` change and must compose with the just-fixed chain-follow-on re-claim (§ above). Recommend shipping (a), measuring, then deciding (b).
+
+**Scope note**: claim contention is a **multi-node competing-consumers** problem. A single worker draining a 1M backlog is the only claimer — Tier 0 + the cursor-conveyor (§19.4) already cover that. Tier 3 is the distributed-tier rung of the ladder.
+
+**Alternatives rejected**: a generic cross-adapter atomic-CAS in the data layer — Koan has none today, it's a larger build than the per-adapter native primitive, and SKIP LOCKED is strictly better (no retry storm even with a real CAS).
+
+### 20.4 TTL — store-native expiry where supported (capability-graded)
+
+**[RATIFY] Decision**: add an absolute `ExpireAt` to `JobRecord`, computed at settle per outcome (`Completed/Cancelled → LastSettledAt + ArchiveAfter`; `Failed/Dead → LastSettledAt + FailedAfter`). On TTL-capable stores (Mongo) declare a TTL index on `ExpireAt` (`expireAfterSeconds = 0`) so the store expires rows continuously at **zero app cost**. The Tier 1 periodic purge **remains** the universal mechanism and the backstop (non-TTL stores; Mongo's ~60s TTL granularity; clock skew).
+
+**Why a computed `ExpireAt` (not TTL on `LastSettledAt`)**: a single TTL index can't express per-outcome windows (Completed 7d vs Failed 30d) off one timestamp. Folding the per-outcome window into an absolute `ExpireAt` gives both windows with one index. Non-terminal rows leave `ExpireAt` null → naturally excluded.
+
+**Alternatives rejected**: PG partition-drop — heavier, needs a partition primitive; the periodic purge is sufficient there. Mongo is the only store that earns the native-TTL upgrade today.
+
+### 20.5 Data-layer capability additions (cross-pillar, landed here as first consumer)
+
+These are general-purpose Koan.Data additions, dogfooded by jobs but documented for reuse:
+- **`DataCaps.Claim.SkipLocked`** — declared by Postgres/SqlServer (relational SKIP LOCKED) and Mongo (findAndModify-atomic). Drives the Tier 3 claim election.
+- **`DataCaps.Retention.TtlIndex`** — declared by Mongo. Drives the TTL-index path.
+- **`[Index(Ttl = true)]`** on `IndexAttribute` → Mongo `CreateIndexModel` with `CreateIndexOptions.ExpireAfter = TimeSpan.Zero` on the absolute-expiry field. No-op on adapters lacking the capability.
+- *(Implementation note)* the relational claim runs raw SQL via `RelationalInstructions.Sql*`; the exact `WHERE`/`ORDER BY` syntax depends on the relational storage model (mapped columns vs JSON projection) — **verify in phase (b)/(c) of the ledger**; the `Optimistic` fallback is always available, so feasibility risk is contained.
+
+### 20.6 What does NOT change
+- The **at-least-once + idempotent** contract is unchanged on every tier — Tier 3 reduces *duplicate executions* under contention (efficiency) but does not promise exactly-once.
+- The ledger remains the single source of truth; `JobMetric` is a derived, lossy-tolerant rollup (a drift-correcting full recount is a future option, not required).
+- All five tiers stay green at every step (ARCH-0079 cross-tier specs), gated by the full-green ratchet.
+
+### 20.7 Consequences
+**Positive**: cheap throughput/trend dashboards that survive retention (Tier 2); contention-free, single-execution claiming for competing consumers (Tier 3); continuous zero-overhead expiry on Mongo at scale (TTL); two reusable data-layer capabilities (`SkipLocked`, `TtlIndex`) + `[Index(Ttl)]`.
+**Negative**: a new `JobMetric` entity + a flush path (opt-in); per-adapter claim code behind a capability (more surface, but fallback-guarded); a new `ExpireAt` field + `[Index]` extension.
+**Neutral**: SQLite/InMemory unchanged (claim + retention); PG/SqlServer keep periodic purge; the default zero-config path is unchanged unless metrics/claim-upgrades are present.
+
+### 20.8 Phasing ledger (green at every step; ARCH-0079 cross-tier specs)
+- **(a) Tier 2 metrics (opt-in)** — `JobMetric` entity + in-memory accumulator + periodic flush + dashboard read API + cross-tier spec (counts survive a retention purge).
+- **(b) Tier 3 atomic single claim** — `DataCaps.Claim.SkipLocked` + PG/SqlServer SQL + Mongo findAndModify + InMemory/SQLite fallback + a contention spec (N concurrent claimers, zero duplicate executions).
+- **(c) TTL** — `[Index(Ttl)]` + `DataCaps.Retention.TtlIndex` + Mongo wiring + `ExpireAt` + capability-graded spec (Mongo TTL deletes; others fall to periodic purge).
+- **(d) Tier 3 batch claim** — optional throughput follow-on; ship only if (a–c) measurements justify the larger `DrainAsync` change.
+
+**[RATIFY] ADR placement**: kept as a JOBS-0005 **§20 addendum** (consistent with §17/§18/§19; §19 already framed these tiers) rather than a new JOBS-0006. Trivial to extract if the architect prefers a standalone record.
