@@ -80,4 +80,18 @@ public sealed class JobsOptions
     /// self-reporting guardrail ("window the source with a conveyor"). The framework can't forbid job-per-row, but it
     /// names it. Zero disables the check.</summary>
     public int JobPerRowWarnThreshold { get; set; } = 100_000;
+
+    /// <summary>Opt-in throughput rollup (JOBS-0005 §20.2). When true, each node accumulates terminal outcomes in
+    /// memory and periodically flushes a node-sharded <see cref="JobMetric"/> — cheap throughput/trend dashboards that
+    /// survive retention. Off by default: the zero-config path stays write-free. (Active counts don't need this — they
+    /// come from the indexed ledger, §20.1.)</summary>
+    public bool MetricsEnabled { get; set; }
+
+    /// <summary>How often the worker flushes the in-memory metrics accumulator to its shard rows (when
+    /// <see cref="MetricsEnabled"/>).</summary>
+    public TimeSpan MetricsFlushInterval { get; set; } = TimeSpan.FromSeconds(60);
+
+    /// <summary>Rollup rows last flushed before this window are purged on the archival sweep. Zero or negative =
+    /// retain indefinitely.</summary>
+    public TimeSpan MetricsRetention { get; set; } = TimeSpan.FromDays(30);
 }

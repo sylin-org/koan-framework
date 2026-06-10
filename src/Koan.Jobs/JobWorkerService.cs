@@ -51,6 +51,7 @@ internal sealed class JobWorkerService : BackgroundService
 
         var lastReap = _clock.GetUtcNow();
         var lastArchive = _clock.GetUtcNow();
+        var lastFlush = _clock.GetUtcNow();
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -66,6 +67,11 @@ internal sealed class JobWorkerService : BackgroundService
                     await _orchestrator.ArchiveAsync(stoppingToken);
                     lastArchive = now;
                 }
+                if (_options.MetricsEnabled && now - lastFlush >= _options.MetricsFlushInterval)
+                {
+                    await _orchestrator.FlushMetricsAsync(stoppingToken);   // §20.2 throughput rollup
+                    lastFlush = now;
+                }
                 await _scheduler.TriggerDueAsync(stoppingToken);   // recurring initiator: submit due scheduled actions
                 await _orchestrator.DrainAsync(stoppingToken);
             }
@@ -76,5 +82,9 @@ internal sealed class JobWorkerService : BackgroundService
             try { await _transport.WaitForWork(_options.PollInterval, stoppingToken); }
             catch (OperationCanceledException) { break; }
         }
+
+        // Flush the last accumulated deltas on graceful stop (best-effort; metrics are lossy-tolerant).
+        if (_options.MetricsEnabled)
+            try { await _orchestrator.FlushMetricsAsync(CancellationToken.None); } catch (Exception ex) { _logger.LogDebug(ex, "Final metrics flush failed"); }
     }
 }

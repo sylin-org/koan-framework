@@ -653,6 +653,34 @@ public abstract class JobBehaviorSuite
         rows.Should().OnlyContain(r => r.Status == JobStatus.Completed);
     }
 
+    [Fact]
+    public async Task metrics_rollup_survives_a_retention_purge()
+    {
+        // §20.2: terminal outcomes accrue into a node-sharded JobMetric and SURVIVE a retention purge that deletes the
+        // very JobRecords they counted — the throughput-history half (active counts come from the indexed ledger).
+        GreetJob.Reset();
+        await using var host = await CreateHostAsync(o =>
+        {
+            o.MetricsEnabled = true;
+            o.ArchiveAfter = TimeSpan.FromMinutes(1);   // small window: a short advance makes the Completed rows purgeable
+        });
+        var wt = typeof(GreetJob).FullName!;
+
+        await Enumerable.Range(0, 5).Select(i => new GreetJob { Name = $"n{i}" }).ToList().Submit();
+        await host.Drain();              // 5 complete → 5 in-memory deltas
+        await host.FlushMetrics();       // fold into this node's JobMetric shard row
+
+        var from = host.Clock.GetUtcNow().AddHours(-1);
+        (await JobMetric.Summary(wt, from, host.Clock.GetUtcNow().AddHours(1))).GetValueOrDefault("Completed").Should().Be(5);
+
+        // Purge the ledger: the 5 Completed JobRecords are deleted, but the rollup (retained 30d) is not.
+        host.Advance(TimeSpan.FromMinutes(2));
+        await host.Archive();
+        (await host.Ledger.Query(new JobQuery(WorkType: wt, Status: JobStatus.Completed), default)).Should().BeEmpty();
+
+        (await JobMetric.Summary(wt, from, host.Clock.GetUtcNow().AddHours(1))).GetValueOrDefault("Completed").Should().Be(5);
+    }
+
     private static IReadOnlyCollection<JobRecord> Seed(string workType, int count, JobStatus status, DateTimeOffset baseTime, string idPrefix, bool visible = false)
     {
         var list = new List<JobRecord>(count);

@@ -110,6 +110,7 @@ public sealed class JobsHarness : IAsyncDisposable
             await JobRecord.RemoveAll(RemoveStrategy.Safe);
             await JobGateRecord.RemoveAll(RemoveStrategy.Safe);
             await JobClaimTicket.RemoveAll(RemoveStrategy.Safe);
+            await JobMetric.RemoveAll(RemoveStrategy.Safe);
         }
         return new JobsHarness(host, prev, clock, dbPath);
     }
@@ -120,6 +121,7 @@ public sealed class JobsHarness : IAsyncDisposable
         try { await Data<JobRecord, string>.Execute<object?>(ensure); } catch { /* no-op on adapters without schema */ }
         try { await Data<JobGateRecord, string>.Execute<object?>(ensure); } catch { }
         try { await Data<JobClaimTicket, string>.Execute<object?>(ensure); } catch { }
+        try { await Data<JobMetric, string>.Execute<object?>(ensure); } catch { }
     }
 
     public void Advance(TimeSpan by) => Clock.Advance(by);
@@ -128,6 +130,7 @@ public sealed class JobsHarness : IAsyncDisposable
     public Task Boot(CancellationToken ct = default) => Scheduler.SubmitBootActionsAsync(ct);
     public Task Reap(CancellationToken ct = default) => Scheduler.ReapAsync(ct);
     public Task<int> Archive(CancellationToken ct = default) => Orchestrator.ArchiveAsync(ct);
+    public Task FlushMetrics(CancellationToken ct = default) => Orchestrator.FlushMetricsAsync(ct);
 
     public Task<JobStatus?> StatusOf<T>(string workId) where T : Entity<T>, IKoanJob<T>
         => Coordinator.StatusAsync(typeof(T).FullName!, workId, default);

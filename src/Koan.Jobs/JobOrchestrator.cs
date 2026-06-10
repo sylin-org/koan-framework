@@ -24,6 +24,7 @@ public sealed class JobOrchestrator
     private readonly string _owner = Guid.CreateVersion7().ToString("N");
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _lanes = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _running = new(StringComparer.Ordinal);
+    private readonly JobMetricsRecorder _metrics;
 
     public JobOrchestrator(
         IJobLedger ledger, JobTypeRegistry registry, IOptions<JobsOptions> options,
@@ -35,7 +36,12 @@ public sealed class JobOrchestrator
         _clock = clock;
         _logger = logger;
         _scopes = scopes;
+        _metrics = new JobMetricsRecorder(_options.MetricsEnabled, _owner, _clock);
     }
+
+    /// <summary>Fold this node's accumulated throughput deltas into its <see cref="JobMetric"/> shard rows (§20.2).
+    /// No-op unless <see cref="JobsOptions.MetricsEnabled"/>. Driven by the worker on <c>MetricsFlushInterval</c>.</summary>
+    public Task FlushMetricsAsync(CancellationToken ct = default) => _metrics.FlushAsync(ct);
 
     public string Owner => _owner;
 
@@ -174,6 +180,7 @@ public sealed class JobOrchestrator
         rec.LastSettledAt = now;
         SetStatus(rec, JobStatus.Completed, now, "completed");
         await _ledger.Update(rec, CancellationToken.None);
+        _metrics.Record(rec.WorkType, JobStatus.Completed, now);
 
         if (next is not null)
         {
@@ -203,6 +210,7 @@ public sealed class JobOrchestrator
         rec.DeadReason = DeadReason.Poison.ToString();
         SetStatus(rec, JobStatus.Failed, now, $"failed after {policy.MaxAttempts} attempts: {ex.Message}");
         await _ledger.Update(rec, CancellationToken.None);
+        _metrics.Record(rec.WorkType, JobStatus.Failed, now);
 
         if (policy.OnFailure == OnFailure.Continue && binding.NextInChain(rec.Action) is { } next)
         {
@@ -234,6 +242,7 @@ public sealed class JobOrchestrator
             rec.DeadReason = DeadReason.PerpetuallyDeferred.ToString();
             SetStatus(rec, JobStatus.Dead, now, deadlineHit ? "deadline exceeded" : "max reschedules exceeded");
             await _ledger.Update(rec, CancellationToken.None);
+            _metrics.Record(rec.WorkType, JobStatus.Dead, now);
             return;
         }
 
@@ -258,6 +267,7 @@ public sealed class JobOrchestrator
         rec.LastSettledAt = now;
         SetStatus(rec, JobStatus.Cancelled, now, "cancelled");
         await _ledger.Update(rec, CancellationToken.None);
+        _metrics.Record(rec.WorkType, JobStatus.Cancelled, now);
     }
 
     private async Task SettleShutdownAsync(JobRecord rec)
@@ -285,6 +295,10 @@ public sealed class JobOrchestrator
         if (_options.RetainPerWorkType > 0)
             foreach (var binding in _registry.All)
                 purged += await _ledger.TrimTerminal(binding.WorkType, _options.RetainPerWorkType, ct);
+
+        // §20.2 metrics rollup: bucket-age retention of the node-sharded JobMetric rows.
+        if (_metrics.Enabled && _options.MetricsRetention > TimeSpan.Zero)
+            purged += await _metrics.PurgeAsync(now - _options.MetricsRetention, ct);
 
         // §19.4 self-reporting guardrail: name the job-per-row anti-pattern when a work-type's active set is huge.
         if (_options.JobPerRowWarnThreshold > 0)
