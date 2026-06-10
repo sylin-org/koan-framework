@@ -5,7 +5,7 @@ title: "Authentication Setup with Koan"
 audience: [developers, security-engineers, ai-agents]
 status: current
 last_updated: 2025-11-09
-framework_version: v0.6.3
+framework_version: 0.17.x
 validation:
   date_last_tested: 2025-11-09
   status: verified

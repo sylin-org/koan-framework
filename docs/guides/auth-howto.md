@@ -5,7 +5,7 @@ title: "Authentication & Identity How-To"
 audience: [developers, architects, security-engineers]
 status: current
 last_updated: 2026-06-07
-framework_version: v0.7.0
+framework_version: 0.17.x
 validation:
   date_last_tested: 2026-06-07
   status: verified
@@ -29,7 +29,7 @@ A note on scope. This guide is about **identity**—*who is making this request?
 Reference = intent. Add the auth package:
 
 ```xml
-<PackageReference Include="Koan.Web.Auth" Version="0.7.0" />
+<PackageReference Include="Koan.Web.Auth" Version="0.17.*" />
 ```
 
 Boot the runtime as usual—no auth configuration:
