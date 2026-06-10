@@ -1,3 +1,5 @@
+using Koan.Data.Abstractions;
+using Koan.Data.Core.Sorting;
 using Microsoft.Extensions.Options;
 
 namespace Koan.Jobs;
@@ -62,29 +64,18 @@ public sealed class DataJobLedger : IJobLedger
         return running.Where(r => r.LeaseUntil is { } l && l < now).ToList();
     }
 
-    public async Task<IReadOnlyList<JobRecord>> NonTerminal(CancellationToken ct)
-    {
-        var all = await JobRecord.All(ct);
-        return all.Where(r => !r.IsTerminal).ToList();
-    }
+    public Task<IReadOnlyList<JobRecord>> NonTerminal(CancellationToken ct)
+        // Pushed down (§19.3): Status < Completed — terminals are 4..7, so one comparison, not All() + in-memory filter.
+        => JobRecord.Query(JobLedgerPredicates.NonTerminal(), ct);
 
-    public async Task<IReadOnlyList<JobRecord>> InStage(string workType, string action, CancellationToken ct)
-    {
-        var hits = await JobRecord.Query(r => r.WorkType == workType && r.Action == action, ct);
-        return hits.Where(r => r.Status == JobStatus.Queued).ToList();
-    }
+    public Task<IReadOnlyList<JobRecord>> InStage(string workType, string action, CancellationToken ct)
+        // Pushed down (§19.3): the full (WorkType, Action, Status==Queued) predicate, not WorkType + in-memory filter.
+        => JobRecord.Query(r => r.WorkType == workType && r.Action == action && r.Status == JobStatus.Queued, ct);
 
-    public async Task<IReadOnlyList<JobRecord>> Query(JobQuery query, CancellationToken ct)
-    {
-        var rows = query.WorkType is { } wt
-            ? await JobRecord.Query(r => r.WorkType == wt, ct)
-            : await JobRecord.All(ct);
-        return rows
-            .Where(r => (query.WorkId is null || r.WorkId == query.WorkId)
-                        && (query.Action is null || r.Action == query.Action)
-                        && (query.Status is null || r.Status == query.Status))
-            .ToList();
-    }
+    public Task<IReadOnlyList<JobRecord>> Query(JobQuery query, CancellationToken ct)
+        // Pushed down (§19.3): the declarative facade query becomes a tight conjunctive predicate the store evaluates,
+        // so WithStatus(s) returns only the matching rows — not every JobRecord of the work-type.
+        => JobRecord.Query(JobLedgerPredicates.ForQuery(query), ct);
 
     public async Task SetGate(string gateKey, DateTimeOffset releaseAt, string? reason, CancellationToken ct)
     {
@@ -110,8 +101,10 @@ public sealed class DataJobLedger : IJobLedger
 
     public async Task<int> PurgeArchivable(DateTimeOffset olderThan, CancellationToken ct)
     {
-        var done = await JobRecord.Query(r => r.Status == JobStatus.Completed || r.Status == JobStatus.Cancelled, ct);
-        var stale = done.Where(r => r.LastSettledAt is { } s && s < olderThan).ToList();
+        // Pushed down (§19.3): the LastSettledAt cutoff is in the predicate, so the store returns only the stale
+        // benign-terminal rows — not every Completed/Cancelled row to be filtered in memory.
+        var stale = await JobRecord.Query(
+            r => (r.Status == JobStatus.Completed || r.Status == JobStatus.Cancelled) && r.LastSettledAt < olderThan, ct);
         foreach (var r in stale) await JobRecord.Remove(r.Id, ct);
         return stale.Count;
     }
@@ -120,21 +113,23 @@ public sealed class DataJobLedger : IJobLedger
 
     private async Task<JobRecord?> SelectCandidate(DateTimeOffset now, IReadOnlyCollection<string> saturatedLanes, CancellationToken ct)
     {
-        var queued = await JobRecord.Query(r => r.Status == JobStatus.Queued, ct);
         var gatedKeys = (await ActiveGates(now, ct)).Select(g => g.GateKey).ToHashSet(StringComparer.Ordinal);
-        // Per-entity serialization (§17.2): exclude exclusive candidates whose (WorkType, WorkId) is already running.
+        // §17.2 exclusivity probe — the Running set is bounded by in-flight concurrency, not the backlog, so this is a
+        // small, index-served query (Status prefix of ix_jobs_claim).
         var busy = (await JobRecord.Query(r => r.Status == JobStatus.Running, ct))
             .Select(r => (r.WorkType, r.WorkId))
             .ToHashSet();
-        return queued
-            .Where(r => r.VisibleAt <= now
-                        && r.CancelRequestedAt is null
-                        && !saturatedLanes.Contains(r.Lane)
-                        && (r.GateKey is null || !gatedKeys.Contains(r.GateKey))
-                        && !(r.Exclusive && busy.Contains((r.WorkType, r.WorkId))))
-            .OrderBy(r => r.VisibleAt)
-            .ThenBy(r => r.FirstSubmittedAt)
-            .FirstOrDefault();
+        // The claim's heavy read (§19.3): predicate + (VisibleAt, FirstSubmittedAt) order + LIMIT ClaimScanBatch all
+        // pushed to the store (ix_jobs_claim) — O(batch), not O(backlog). The lane/gate/exclusive filter then runs over
+        // the small ordered window; if the whole window is blocked, the candidate waits for the next poll.
+        var sort = SortBuilder<JobRecord>.Build(s => s.OrderBy(r => r.VisibleAt).ThenBy(r => r.FirstSubmittedAt));
+        var scan = QueryDefinition.All.WithSort(sort).WithPagination(1, Math.Max(1, _options.ClaimScanBatch));
+        var batch = await JobRecord.Query(
+            r => r.Status == JobStatus.Queued && r.VisibleAt <= now && r.CancelRequestedAt == null, scan, ct);
+        return batch.FirstOrDefault(r =>
+            !saturatedLanes.Contains(r.Lane)
+            && (r.GateKey is null || !gatedKeys.Contains(r.GateKey))
+            && !(r.Exclusive && busy.Contains((r.WorkType, r.WorkId))));
     }
 
     private static async Task<JobRecord?> ClaimOptimistic(JobRecord candidate, string owner, DateTimeOffset now, DateTimeOffset leaseUntil, CancellationToken ct)

@@ -1,3 +1,4 @@
+using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Core.Model;
 
 namespace Koan.Jobs;
@@ -11,14 +12,21 @@ namespace Koan.Jobs;
 public sealed class JobRecord : Entity<JobRecord>
 {
     /// <summary>Stable key of the discovered <see cref="IKoanJob"/> work-item type (its full name).</summary>
+    // JOBS-0005 §19.3: (WorkType,Status) serves the dashboard/coalesce; (WorkType,WorkId) the §17.2 exclusivity probe + history.
+    [Index(Group = "ix_jobs_wt_status", Order = 0)]
+    [Index(Group = "ix_jobs_wt_workid", Order = 0)]
     public string WorkType { get; set; } = "";
 
     /// <summary>Id of the work-item entity this job acts on.</summary>
+    [Index(Group = "ix_jobs_wt_workid", Order = 1)]
     public string WorkId { get; set; } = "";
 
     /// <summary>The action/stage being executed (empty for single-action jobs).</summary>
     public string Action { get; set; } = "";
 
+    // JOBS-0005 §19.3: the claim loop's full sort key — Status prefix, then the (VisibleAt, FirstSubmittedAt) order.
+    [Index(Group = "ix_jobs_claim", Order = 0)]
+    [Index(Group = "ix_jobs_wt_status", Order = 1)]
     public JobStatus Status { get; set; } = JobStatus.Created;
 
     /// <summary>Failure-and-retry count (distinct from <see cref="Reschedules"/>).</summary>
@@ -28,8 +36,10 @@ public sealed class JobRecord : Entity<JobRecord>
     public int Reschedules { get; set; }
 
     /// <summary>Ready to claim when <c>VisibleAt &lt;= now</c> (future for delayed/deferred jobs).</summary>
+    [Index(Group = "ix_jobs_claim", Order = 1)]
     public DateTimeOffset VisibleAt { get; set; }
 
+    [Index(Group = "ix_jobs_claim", Order = 2)]
     public DateTimeOffset FirstSubmittedAt { get; set; }
     public DateTimeOffset? LastSettledAt { get; set; }
 

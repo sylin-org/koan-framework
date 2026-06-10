@@ -55,6 +55,11 @@ public sealed class JobsOptions
     /// <summary>The reservation window for <see cref="ClaimStrategy.Ticket"/> — must exceed clock skew + write propagation.</summary>
     public TimeSpan ClaimWindow { get; set; } = TimeSpan.FromSeconds(1);
 
+    /// <summary>Max ready rows the claim loop pulls (ordered, pushed down) per scan before applying the in-memory
+    /// lane/gate/exclusive filter (JOBS-0005 §19.3). Bounds the claim's work to O(batch) instead of O(backlog).
+    /// If the whole batch is filtered out (pathological head-blocking), the candidate waits for the next poll.</summary>
+    public int ClaimScanBatch { get; set; } = 64;
+
     /// <summary>Benign terminal rows (Completed/Cancelled) older than this are purged to keep the active ledger lean.
     /// Failed/Dead are retained (queryable + replayable). Zero or negative disables archival.</summary>
     public TimeSpan ArchiveAfter { get; set; } = TimeSpan.FromDays(7);
