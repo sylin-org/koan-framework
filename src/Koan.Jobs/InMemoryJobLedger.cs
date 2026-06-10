@@ -196,6 +196,12 @@ public sealed class InMemoryJobLedger : IJobLedger
         }
     }
 
+    public Task<long> CountActive(string workType, CancellationToken ct)
+    {
+        lock (_gate)
+            return Task.FromResult((long)_records.Values.Count(r => r.WorkType == workType && !r.IsTerminal));
+    }
+
     private bool IsGated(string? gateKey, DateTimeOffset now)
         => gateKey is not null && _gates.TryGetValue(gateKey, out var g) && g.ReleaseAt > now;
 

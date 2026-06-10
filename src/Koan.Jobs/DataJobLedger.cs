@@ -134,6 +134,12 @@ public sealed class DataJobLedger : IJobLedger
         return excess.Count;
     }
 
+    public async Task<long> CountActive(string workType, CancellationToken ct)
+        // Pushed COUNT (one row materialized): cheap enough to run per work-type each archival sweep.
+        => (await JobRecord.QueryWithCount(
+            r => r.WorkType == workType && r.Status < JobStatus.Completed,
+            QueryDefinition.All.WithPagination(1, 1), ct)).TotalCount;
+
     // --- claim internals ---
 
     private async Task<JobRecord?> SelectCandidate(DateTimeOffset now, IReadOnlyCollection<string> saturatedLanes, CancellationToken ct)

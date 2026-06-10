@@ -95,6 +95,9 @@ public sealed class RoutingJobLedger : IJobLedger
     public Task<int> TrimTerminal(string workType, int keep, CancellationToken ct)
         => For(workType).TrimTerminal(workType, keep, ct);
 
+    public Task<long> CountActive(string workType, CancellationToken ct)
+        => For(workType).CountActive(workType, ct);
+
     private static IReadOnlyList<JobRecord> Concat(IReadOnlyList<JobRecord> a, IReadOnlyList<JobRecord> b)
     {
         if (a.Count == 0) return b;

@@ -75,4 +75,9 @@ public sealed class JobsOptions
 
     /// <summary>How often the worker runs the archival sweep.</summary>
     public TimeSpan ArchiveInterval { get; set; } = TimeSpan.FromHours(1);
+
+    /// <summary>Per-work-type active-row count above which the archival sweep logs a job-per-row warning — the §19.4
+    /// self-reporting guardrail ("window the source with a conveyor"). The framework can't forbid job-per-row, but it
+    /// names it. Zero disables the check.</summary>
+    public int JobPerRowWarnThreshold { get; set; } = 100_000;
 }

@@ -60,4 +60,8 @@ public interface IJobLedger
     /// <summary>Trim terminal rows for a work-type to the newest <paramref name="keep"/>, removing the older terminal
     /// rows (the per-work-type count cap, §19.3). Returns the number removed.</summary>
     Task<int> TrimTerminal(string workType, int keep, CancellationToken ct);
+
+    /// <summary>Count active (non-terminal) rows for a work-type — the cheap pushed probe behind the §19.4
+    /// job-per-row guardrail.</summary>
+    Task<long> CountActive(string workType, CancellationToken ct);
 }

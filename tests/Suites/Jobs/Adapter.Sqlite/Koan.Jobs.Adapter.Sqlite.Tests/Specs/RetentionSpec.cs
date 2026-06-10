@@ -68,6 +68,20 @@ public sealed class RetentionSpec
         remaining.Select(r => r.Id).Should().OnlyContain(id => string.CompareOrdinal(id, "t010") < 0);  // t000..t009
     }
 
+    [Fact]
+    public async Task count_active_counts_only_non_terminal_rows()
+    {
+        await using var h = await JobsHarness.StartSqliteAsync();
+        var now = h.Clock.GetUtcNow();
+        var rows = new List<JobRecord>();
+        for (var i = 0; i < 30; i++) rows.Add(Active($"a{i}"));                  // 30 active (Queued)
+        for (var i = 0; i < 70; i++) rows.Add(Rec($"t{i}", JobStatus.Completed, now));  // 70 terminal
+        await rows.Save();
+
+        // The §19.4 guardrail samples this per work-type each sweep and warns over the threshold.
+        (await h.Ledger.CountActive(WT, default)).Should().Be(30);
+    }
+
     private static JobRecord Rec(string id, JobStatus status, DateTimeOffset settled) => new()
     {
         Id = id,

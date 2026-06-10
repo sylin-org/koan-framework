@@ -277,6 +277,18 @@ public sealed class JobOrchestrator
         if (_options.RetainPerWorkType > 0)
             foreach (var binding in _registry.All)
                 purged += await _ledger.TrimTerminal(binding.WorkType, _options.RetainPerWorkType, ct);
+
+        // §19.4 self-reporting guardrail: name the job-per-row anti-pattern when a work-type's active set is huge.
+        if (_options.JobPerRowWarnThreshold > 0)
+            foreach (var binding in _registry.All)
+            {
+                var active = await _ledger.CountActive(binding.WorkType, ct);
+                if (active > _options.JobPerRowWarnThreshold)
+                    _logger.LogWarning(
+                        "[Koan.Jobs] WorkType '{WorkType}' has {Active:N0} active rows (> {Threshold:N0}) — this looks " +
+                        "like job-per-row. Window the source with a cursor-conveyor (jobs-howto §bulk; JOBS-0005 §19.4).",
+                        binding.WorkType, active, _options.JobPerRowWarnThreshold);
+            }
         return purged;
     }
 
