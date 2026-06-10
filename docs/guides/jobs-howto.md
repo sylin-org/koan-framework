@@ -454,7 +454,7 @@ No configuration—it's automatic whenever a transaction is in scope.
 - **Failed/Dead** older than `FailedAfter` (default **30 days**) are purged — queryable and replayable until then. *Behaviour note:* failures used to be retained **forever**; they're now bounded by default. Set `FailedAfter` to zero to restore indefinite retention.
 - A per-work-type **count cap**, `RetainPerWorkType` (default off): keep only the newest N terminal rows of a type and trim the rest — a burst guard that age windows alone miss.
 
-Set any window to zero to disable it. For a high-throughput type, prefer a short `FailedAfter` plus a cap — and don't mint a job per row in the first place (§8.1).
+Set any window to zero to disable it. For a high-throughput type, prefer a short `FailedAfter` plus a cap — and don't mint a job per row in the first place (§8.1). On a **TTL-capable store (Mongo)** each terminal row also carries an absolute `ExpireAt` (its settle time + the per-outcome window) and a native TTL index, so the store expires rows **continuously between sweeps** at zero app cost; other stores rely on the sweep alone, which remains the universal backstop everywhere.
 
 **Throughput metrics (opt-in).** Active counts ("how many Queued/Running?") come straight from the indexed ledger and need nothing extra. For **throughput/trend history that survives retention** — completed/failed per period — turn on the rollup:
 

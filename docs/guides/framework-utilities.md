@@ -666,7 +666,9 @@ Two defaults make *an entity a consistency unit*, so handlers don't lose writes:
 - **Durable** (any data adapter — SQLite/Postgres/Mongo/SQL Server): `DataJobLedger` over `Entity<JobRecord>`;
   transactional outbox (a `Submit` inside an ambient transaction enqueues on commit) and **retention** are automatic —
   the sweep purges Completed/Cancelled past `ArchiveAfter` (7d) and Failed/Dead past `FailedAfter` (30d), with an
-  optional per-work-type count cap (`RetainPerWorkType`). Ledger reads are pushed down (indexed claim/dashboard queries).
+  optional per-work-type count cap (`RetainPerWorkType`). On a TTL-capable store (Mongo) a native TTL index on the
+  per-outcome `ExpireAt` (`[Index(Ttl)]` / `DataCaps.Retention.TtlIndex`) expires terminal rows continuously between
+  sweeps; the sweep stays the universal backstop (§20.4). Ledger reads are pushed down (indexed claim/dashboard queries).
 - **Distributed** (several nodes on one store): competing consumers claim **contention-free** — on adapters that
   support an atomic conditional claim (SQLite/Postgres/SqlServer/Mongo), the default `Optimistic` strategy marks
   `Running` via a compare-and-set, so each ready job runs on **exactly one** node (no duplicate executions); `Ticket`
