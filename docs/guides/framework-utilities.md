@@ -642,7 +642,9 @@ Two defaults make *an entity a consistency unit*, so handlers don't lose writes:
 
 - **In-memory** (no data adapter): fast, ephemeral; `InMemoryJobLedger`.
 - **Durable** (any data adapter — SQLite/Postgres/Mongo/SQL Server): `DataJobLedger` over `Entity<JobRecord>`;
-  transactional outbox (a `Submit` inside an ambient transaction enqueues on commit) and terminal archival are automatic.
+  transactional outbox (a `Submit` inside an ambient transaction enqueues on commit) and **retention** are automatic —
+  the sweep purges Completed/Cancelled past `ArchiveAfter` (7d) and Failed/Dead past `FailedAfter` (30d), with an
+  optional per-work-type count cap (`RetainPerWorkType`). Ledger reads are pushed down (indexed claim/dashboard queries).
 - **Distributed** (several nodes on one store): competing consumers claim atomically (`JobsOptions.ClaimStrategy` =
   `Optimistic` | `Ticket`); resource gates are honored cross-node.
 - **+bus** (`Koan.Jobs.Transport.Messaging`): cross-node push-dispatch — a submit wakes every node immediately
@@ -650,6 +652,10 @@ Two defaults make *an entity a consistency unit*, so handlers don't lose writes:
 
 > Scheduling is initiator-driven: a `Schedule` re-submits a fresh job on its cadence (interval / cron via Cronos /
 > `@boot` / `@continuous`) against the per-type singleton — never a parked job. See the how-to for the full model.
+
+> Bulk / high throughput: model the **window** as the work-item, not the row — a cursor-conveyor re-queues itself via
+> `ctx.ContinueWith` to drain a large source through a handful of ledger rows (not one per item). The sweep warns
+> (`JobPerRowWarnThreshold`) when a work-type's active set looks like job-per-row. See the how-to §8.1.
 
 ---
 

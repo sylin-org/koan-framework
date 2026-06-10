@@ -448,7 +448,13 @@ using (EntityContext.Transaction("publish"))
 
 No configuration—it's automatic whenever a transaction is in scope.
 
-**Retention.** Completed and Cancelled jobs older than `ArchiveAfter` (default 7 days) are swept out automatically so the active ledger stays lean. Failed and Dead jobs are **kept**—they're queryable and replayable. Tune `ArchiveAfter` / `ArchiveInterval`, or set `ArchiveAfter` to zero to disable.
+**Retention.** A sweep keeps the active ledger lean three ways, all configurable in `JobsOptions` and all running every `ArchiveInterval` (default 1 h):
+
+- **Completed/Cancelled** older than `ArchiveAfter` (default **7 days**) are purged.
+- **Failed/Dead** older than `FailedAfter` (default **30 days**) are purged — queryable and replayable until then. *Behaviour note:* failures used to be retained **forever**; they're now bounded by default. Set `FailedAfter` to zero to restore indefinite retention.
+- A per-work-type **count cap**, `RetainPerWorkType` (default off): keep only the newest N terminal rows of a type and trim the rest — a burst guard that age windows alone miss.
+
+Set any window to zero to disable it. For a high-throughput type, prefer a short `FailedAfter` plus a cap — and don't mint a job per row in the first place (§8.1).
 
 ---
 
@@ -516,6 +522,11 @@ await MyJob.Jobs.Trigger(action);         // type-level action, no instance (sch
 // From a handler
 ctx.Progress(0.4, "…");  ctx.ContinueWith(next);  ctx.StopChain();
 ctx.Reschedule(5.Minutes());  ctx.Backoff(retryAfter);  // (TimeSpan helpers are illustrative)
+
+// Tune — AddKoanJobs(o => …)
+o.ArchiveAfter;  o.FailedAfter;  o.RetainPerWorkType;   // retention: completed/failed windows + per-type cap (§10)
+o.ClaimStrategy;  o.ClaimScanBatch;                     // claim: contention strategy + bounded scan window (§10)
+o.JobPerRowWarnThreshold;                               // warn when a work-type looks like job-per-row (§8.1)
 ```
 
 That's the whole surface. Write the entity, write `Execute`, and let Koan run it—reliably, on whatever infrastructure you've got.
