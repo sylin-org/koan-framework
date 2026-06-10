@@ -423,3 +423,28 @@ public sealed class RemoteFetch : Entity<RemoteFetch>, IKoanJob<RemoteFetch>
 
     public static void Reset() { Ran.Clear(); Executed = 0; Throttled = null; }
 }
+
+/// <summary>Cursor-conveyor (JOBS-0005 §19.4): processes one window of a (fake) source, advances its own cursor, and
+/// re-queues ITSELF at the next window via <c>ctx.ContinueWith</c>. Bounded to ~1 active ledger row — it drains a large
+/// source without minting a row per item. Uses only existing verbs (ContinueWith + conditional auto-save §17.1).</summary>
+public sealed class Conveyor : Entity<Conveyor>, IKoanJob<Conveyor>
+{
+    public const string Pull = nameof(Pull);
+    public int Offset { get; set; }
+    public int Window { get; set; } = 100;
+    public int Total { get; set; } = 1000;
+    public static int ItemsProcessed;
+    public static int WindowsRun;
+
+    public static Task Execute(Conveyor c, JobContext ctx, CancellationToken ct)
+    {
+        var count = Math.Min(c.Window, c.Total - c.Offset);
+        Interlocked.Add(ref ItemsProcessed, count);
+        Interlocked.Increment(ref WindowsRun);
+        c.Offset += count;                          // advance the cursor on THIS entity (auto-saved §17.1)
+        if (c.Offset < c.Total) ctx.ContinueWith(Pull);   // re-queue the same work-item at the next window
+        return Task.CompletedTask;
+    }
+
+    public static void Reset() { ItemsProcessed = 0; WindowsRun = 0; }
+}
