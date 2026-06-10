@@ -506,19 +506,30 @@ public sealed class ImportWindow : Entity<ImportWindow>, IKoanJob<ImportWindow>
     public long   Offset { get; set; }
     public int    Size   { get; set; } = 1000;
 
-    [JobAction("pull")]                                  // serialized per (WorkType,WorkId) by default (§17.2)
+    public const string Pull = nameof(Pull);
+
+    [JobAction(Pull)]                                     // serialized per (WorkType,WorkId) by default (§17.2)
     public static async Task Execute(ImportWindow w, JobContext ctx, CancellationToken ct)
     {
         var page = await ExternalSource.Page(w.Source, w.Offset, w.Size, ct);
         await page.Rows.Save();                           // one bulk upsert of the window
         ctx.Progress(page.Done ? 1 : (w.Offset + page.Count) / (double)page.Total);
         if (!page.Done)
-            ctx.ContinueWith("pull", new ImportWindow { Source = w.Source, Offset = w.Offset + w.Size });
+        {
+            w.Offset += page.Count;                       // advance the cursor on THIS entity (auto-saved §17.1)
+            ctx.ContinueWith(Pull);                       // re-queue the same work-item at the next window
+        }
     }
 }
 
-await new ImportWindow { Source = "vendor:catalog" }.Job.Submit("pull");   // kicks off ONE ledger row
+await new ImportWindow { Source = "vendor:catalog" }.Job.Submit(ImportWindow.Pull);   // kicks off ONE ledger row
 ```
+
+> `ctx.ContinueWith(action)` re-queues the **same** work-item by action (not a new entity), so the conveyor is a
+> self-loop on a mutable-offset entity — the cursor lives on the entity, conditional auto-save (§17.1) persists it,
+> and per-entity serialization (§17.2) guarantees at most one window of a given conveyor runs at a time. Each window
+> is a fresh ledger row (the `ContinueWith` follow-on); the *active* footprint is ~1, and the terminal rows are
+> bounded by retention (19.3).
 
 **Bounded fan** (throughput without explosion): start `P` conveyors over disjoint stripes (`offset ≡ stripe (mod P)`) → `P` in flight, `P` ledger rows at a time. **Pre-fan** (rows already in hand, not external): `rows.InWindowsOf(1000).Submit("process")` mints `total/1000` chunk-jobs rather than `total`.
 
@@ -532,10 +543,13 @@ await new ImportWindow { Source = "vendor:catalog" }.Job.Submit("pull");   // ki
 
 ### Status / phasing
 
-**Proposed 2026-06-10; not yet implemented.** Each tier is its own failing-spec-first slice (ARCH-0079, the `JobBehaviorSuite` across all five tiers):
-- **Tier 0** — the `[Index]` triple + order+limit push-down in every `IJobLedger` read (honors §6/§12.7). Unblocks the dashboard timeout *and* the per-second claim scan. A **scan-shape spec** asserts the predicate + limit are pushed (not in-memory) so it can't silently regress again.
-- **Tier 1** — per-outcome + count-cap retention; TTL index where the store supports it; index-backed batched purge fallback.
-- **Tier 2** — `JobMetric` sharded rollup + dashboard reads off it.
-- **Tier 3** — `AtomicBatchClaim` (SKIP LOCKED) on the capability ladder; the conveyor / bounded-fan patterns + the guardrail documented in `jobs-howto.md §bulk`.
+**Accepted 2026-06-10. Partially implemented (2026-06-10) — verified on real SQLite (the `Koan.Jobs.Adapter.Sqlite.Tests` suite, 48 green).** Each tier is its own failing-spec-first slice (ARCH-0079).
+
+- **Tier 0 — DONE.** The `[Index]` triple `(Status,VisibleAt,FirstSubmittedAt)`/`(WorkType,Status)`/`(WorkType,WorkId)` + predicate/order/limit push-down in every `IJobLedger` read (the claim loop reads a bounded ordered window of `ClaimScanBatch`). `HighVolumeScanShapeSpec`: at 100k, the dashboard returns only matches <2s and the claim finds the FIFO head <1.5s. *(Honors §6/§12.7 — this was the implementation miss, not a new decision.)*
+- **Data-layer (DONE, prerequisite).** SQLite `UpsertMany` was per-row autocommit (one fsync per row) → a bulk `list.Save()`/`AppendMany` of N rows cost N fsyncs. Wrapped in one transaction (Postgres/SqlServer already did; Mongo uses `BulkWrite`). 100k seed: minutes → ~1s.
+- **Tier 1 — DONE.** `FailedAfter` window (closes the forever-retained Failed/Dead hole) + `RetainPerWorkType` count cap, both pushed down; `RetentionSpec` proves it. *(TTL-index variant — let the store expire `LastSettledAt` — is the remaining refinement; the app-side batched purge is the current mechanism.)*
+- **§19.4 — DONE.** The cursor-conveyor pattern (built from existing `ctx.ContinueWith` + auto-save; `ConveyorSpec`: 5000 items → 50 ledger rows) and the job-per-row guardrail (`IJobLedger.CountActive` + a sweep warning over `JobPerRowWarnThreshold`).
+- **Tier 2 — PENDING.** `JobMetric` worker-batched, node-sharded rollup + dashboard reads off it.
+- **Tier 3 — PENDING.** `AtomicBatchClaim` (Postgres `SKIP LOCKED`) on the capability ladder.
 
 The hot/cold partition **move** (§6, decision §12.7) stays the **opt-in** scale layout — windowing makes it unnecessary for the common bulk case, so it is not promoted to default here.
