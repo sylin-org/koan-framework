@@ -429,7 +429,7 @@ public sealed class PingJob : Entity<PingJob>, IKoanJob<PingJob> { … }
 builder.Services.AddKoanJobs(o => o.ClaimStrategy = ClaimStrategy.Ticket);
 ```
 
-`Optimistic` (default) is cheapest and relies on idempotent handlers; `Ticket` runs a leaderless GUIDv7 election (each contender drops a ticket, the earliest wins) to sharply cut duplicate runs across nodes. Both work on every adapter.
+`Optimistic` (default) is cheapest; on durable adapters that support an atomic conditional claim (SQLite, Postgres, SqlServer, Mongo) it marks a job `Running` with a **compare-and-set** — so under competing consumers each ready job is claimed by **exactly one** node (no duplicate runs), with idempotency as the backstop where a store can't. `Ticket` runs a leaderless GUIDv7 election (each contender drops a ticket, the earliest wins). Both work on every adapter.
 
 **When to use which.** Single service → defaults. Multiple replicas pulling the same queue → `Ticket`. A torrent of fire-and-forget pings you don't want cluttering the store → `[JobPersistence(InMemory)]`.
 
@@ -455,6 +455,23 @@ No configuration—it's automatic whenever a transaction is in scope.
 - A per-work-type **count cap**, `RetainPerWorkType` (default off): keep only the newest N terminal rows of a type and trim the rest — a burst guard that age windows alone miss.
 
 Set any window to zero to disable it. For a high-throughput type, prefer a short `FailedAfter` plus a cap — and don't mint a job per row in the first place (§8.1).
+
+**Throughput metrics (opt-in).** Active counts ("how many Queued/Running?") come straight from the indexed ledger and need nothing extra. For **throughput/trend history that survives retention** — completed/failed per period — turn on the rollup:
+
+```csharp
+builder.Services.AddKoanJobs(o => o.MetricsEnabled = true);
+```
+
+Each node tallies terminal outcomes in memory and periodically flushes its own shard of a `JobMetric` rollup, so dashboards read pre-aggregated counts cheaply and they **outlive the rows they counted** (retention deletes the `JobRecord`s; the counts remain):
+
+```csharp
+var since = DateTimeOffset.UtcNow.AddDays(-1);
+IReadOnlyDictionary<string, long> byOutcome =
+    await JobMetric.Summary(typeof(ImportJob).FullName!, since, DateTimeOffset.UtcNow);
+// { "Completed": 18234, "Failed": 12, … }
+```
+
+Off by default (the zero-config path stays write-free); the flush cadence is `MetricsFlushInterval` and the rollup itself is trimmed by `MetricsRetention`.
 
 ---
 

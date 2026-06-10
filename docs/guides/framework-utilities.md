@@ -564,6 +564,28 @@ await todo.Delete();
 - Following Koan's "Reference = Intent" pattern
 - Rapid prototyping and sample code
 
+### Conditional compare-and-set (optimistic concurrency)
+
+**Location:** `Koan.Data.Abstractions` (`IConditionalWriteRepository<TEntity,TKey>`, `DataCaps.Write.ConditionalReplace`)
+
+Atomically replace a row **iff the stored row still matches a guard** — a compare-and-set / optimistic-concurrency
+write. The guard is an ordinary LINQ predicate, lowered through the same filter translator as `Query`, so there is
+no new SQL surface. Declared by SQLite, Postgres, SqlServer, and Mongo (relational conditional `UPDATE … WHERE Id …
+AND <guard>`; Mongo single-document `ReplaceOne` — atomic, no transaction) and forwarded by `RepositoryFacade`.
+
+```csharp
+var repo = Data<Order, string>.As<IConditionalWriteRepository<Order, string>>();
+if (repo is not null && Data<Order, string>.Capabilities.Has(DataCaps.Write.ConditionalReplace))
+{
+    order.Status = OrderStatus.Shipped;
+    bool applied = await repo.ConditionalReplaceAsync(order, o => o.Status == OrderStatus.Paid);
+    // applied == false → someone changed it first (lost the race); re-read and retry.
+}
+```
+
+This is the primitive behind the jobs contention-free claim (JOBS-0005 §20.3). Probe the capability (or null-check
+the cast) and fall back where an adapter doesn't declare it.
+
 ### PartitionNameValidator
 
 **Location:** `Koan.Data.Core` (`PartitionNameValidator`; enforced in `EntityContext.With`)
@@ -645,8 +667,10 @@ Two defaults make *an entity a consistency unit*, so handlers don't lose writes:
   transactional outbox (a `Submit` inside an ambient transaction enqueues on commit) and **retention** are automatic —
   the sweep purges Completed/Cancelled past `ArchiveAfter` (7d) and Failed/Dead past `FailedAfter` (30d), with an
   optional per-work-type count cap (`RetainPerWorkType`). Ledger reads are pushed down (indexed claim/dashboard queries).
-- **Distributed** (several nodes on one store): competing consumers claim atomically (`JobsOptions.ClaimStrategy` =
-  `Optimistic` | `Ticket`); resource gates are honored cross-node.
+- **Distributed** (several nodes on one store): competing consumers claim **contention-free** — on adapters that
+  support an atomic conditional claim (SQLite/Postgres/SqlServer/Mongo), the default `Optimistic` strategy marks
+  `Running` via a compare-and-set, so each ready job runs on **exactly one** node (no duplicate executions); `Ticket`
+  is the leaderless-election alternative. Resource gates are honored cross-node. (JOBS-0005 §20.3)
 - **+bus** (`Koan.Jobs.Transport.Messaging`): cross-node push-dispatch — a submit wakes every node immediately
   instead of waiting out the poll interval. Latency upgrade only; the ledger stays the truth.
 
@@ -656,6 +680,10 @@ Two defaults make *an entity a consistency unit*, so handlers don't lose writes:
 > Bulk / high throughput: model the **window** as the work-item, not the row — a cursor-conveyor re-queues itself via
 > `ctx.ContinueWith` to drain a large source through a handful of ledger rows (not one per item). The sweep warns
 > (`JobPerRowWarnThreshold`) when a work-type's active set looks like job-per-row. See the how-to §8.1.
+
+> Observability: active counts come from the indexed ledger; opt into `JobsOptions.MetricsEnabled` for a
+> node-sharded `JobMetric` throughput rollup that **survives retention** — read it with
+> `JobMetric.Summary(workType, from, to)`. See the how-to §10. (JOBS-0005 §20.2)
 
 ---
 
