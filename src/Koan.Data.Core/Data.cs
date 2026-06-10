@@ -38,6 +38,11 @@ public static class Data<TEntity, TKey>
         }
     }
 
+    /// <summary>The resolved repository cast to an optional capability interface (e.g.
+    /// <see cref="IConditionalWriteRepository{TEntity,TKey}"/>), or <c>null</c> if the backing adapter doesn't
+    /// implement it. The cast IS the capability probe — callers branch on null to a fallback.</summary>
+    public static TCapability? As<TCapability>() where TCapability : class => Repo as TCapability;
+
     // ARCH-0084: the adapter's filter support is the FilterSupport detail on its DataCaps.Query.Filter
     // capability token (no separate property). Absent token => None => every filter node is residual.
     private static FilterSupport ResolveFilterSupport(IDataRepository<TEntity, TKey> repo)

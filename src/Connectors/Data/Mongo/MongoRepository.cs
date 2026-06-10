@@ -32,6 +32,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
     IDescribesCapabilities,
     IBulkUpsert<TKey>,
     IBulkDelete<TKey>,
+    IConditionalWriteRepository<TEntity, TKey>,
     IInstructionExecutor<TEntity>,
     IAdapterReadiness,
     IAdapterReadinessConfiguration
@@ -72,11 +73,24 @@ internal sealed class MongoRepository<TEntity, TKey> :
         .Add(DataCaps.Query.Linq)
         .Add(DataCaps.Write.BulkUpsert).Add(DataCaps.Write.BulkDelete)
         .Add(DataCaps.Write.AtomicBatch).Add(DataCaps.Write.FastRemove)
+        .Add(DataCaps.Write.ConditionalReplace)
         .Add(DataCaps.Query.Filter, MongoFilterTranslator<TEntity>.Capabilities);
     public StorageOptimizationInfo OptimizationInfo => _optimizationInfo;
 
 
     private MongoFilterTranslator<TEntity> Translator => new(MapFieldName);
+
+    /// <summary>Atomic CAS (JOBS-0005 §20.3): a single-document ReplaceOne whose filter is <c>_id == model.Id</c> AND
+    /// the lowered <paramref name="guard"/> — naturally atomic, no transaction. Modified = applied, 0 = lost.</summary>
+    public Task<bool> ConditionalReplaceAsync(TEntity model, Expression<Func<TEntity, bool>> guard, CancellationToken ct = default)
+        => ExecuteWithReadinessAsync(async () =>
+        {
+            var collection = await GetCollection(ct).ConfigureAwait(false);
+            var guardFilter = Translator.Translate(LinqFilterCompiler.Compile(guard), typeof(TEntity));
+            var filter = Builders<TEntity>.Filter.And(Builders<TEntity>.Filter.Eq(x => x.Id, model.Id), guardFilter);
+            var result = await collection.ReplaceOneAsync(filter, model, new ReplaceOptions { IsUpsert = false }, ct).ConfigureAwait(false);
+            return result.IsAcknowledged && result.ModifiedCount > 0;
+        }, ct);
 
     public AdapterReadinessState ReadinessState => _provider.ReadinessState;
     public bool IsReady => _provider.IsReady;

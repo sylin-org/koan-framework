@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Capabilities;
@@ -21,6 +22,7 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     IQueryRepository<TEntity, TKey>,
     IRawQueryRepository<TEntity, TKey>,
     IDescribesCapabilities,
+    IConditionalWriteRepository<TEntity, TKey>,
     IInstructionExecutor<TEntity>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
@@ -149,6 +151,16 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     {
         await Guard(ct);
         return await _inner.RemoveAll(strategy, ct);
+    }
+
+    // Forward the inner adapter's conditional compare-and-set (probe via DataCaps.Write.ConditionalReplace, which the
+    // facade reports from the inner). Only called when the capability was declared, so the inner supports it.
+    public async Task<bool> ConditionalReplaceAsync(TEntity model, Expression<Func<TEntity, bool>> guard, CancellationToken ct = default)
+    {
+        await Guard(ct);
+        if (_inner is IConditionalWriteRepository<TEntity, TKey> cas)
+            return await cas.ConditionalReplaceAsync(model, guard, ct);
+        throw new NotSupportedException($"The adapter backing {typeof(TEntity).Name} does not support conditional replace.");
     }
 
     public IBatchSet<TEntity, TKey> CreateBatch() => new BatchFacade(this);

@@ -21,6 +21,7 @@ using Koan.Data.Relational.Orchestration;
 using System.Collections.Frozen;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Linq.Expressions;
 using Newtonsoft.Json;
 
 namespace Koan.Data.Connector.Postgres;
@@ -34,6 +35,7 @@ internal sealed class PostgresRepository<
     IRawQueryRepository<TEntity, TKey>,
     IDescribesCapabilities,
     IBulkDelete<TKey>,
+    IConditionalWriteRepository<TEntity, TKey>,
     IInstructionExecutor<TEntity>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
@@ -41,6 +43,7 @@ internal sealed class PostgresRepository<
     public void Describe(ICapabilities caps) => caps
         .Add(DataCaps.Query.Linq).Add(DataCaps.Query.String)
         .Add(DataCaps.Write.AtomicBatch).Add(DataCaps.Write.BulkDelete).Add(DataCaps.Write.FastRemove)
+        .Add(DataCaps.Write.ConditionalReplace)
         .Add(DataCaps.Query.Filter, RelationalFilterSupport.Default);
 
     // Storage optimization support
@@ -561,6 +564,24 @@ internal sealed class PostgresRepository<
         var dyn = new DynamicParameters();
         for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
         return dyn;
+    }
+
+    // ==================== Conditional compare-and-set (IConditionalWriteRepository) ====================
+
+    /// <summary>Atomic CAS (JOBS-0005 §20.3): replace the row IFF the stored Json still matches <paramref name="guard"/>,
+    /// which lowers to the same JSON-path WHERE the query path uses. One row affected = applied, zero = lost.</summary>
+    public async Task<bool> ConditionalReplaceAsync(TEntity model, Expression<Func<TEntity, bool>> guard, CancellationToken ct = default)
+    {
+        var (whereSql, parameters) = BuildWhere(LinqFilterCompiler.Compile(guard));
+        var dyn = ToDapper(parameters);
+        var (id, json) = ToRowOptimized(model);
+        dyn.Add("__id", id);
+        dyn.Add("__json", json);
+        var guardClause = whereSql is null ? string.Empty : $" AND ({whereSql})";
+        var sql = $"UPDATE {QualifiedTable} SET \"Json\" = CAST(@__json AS jsonb) WHERE \"Id\" = @__id{guardClause}";
+        await using var conn = Open();
+        var affected = await conn.ExecuteAsync(sql, dyn);
+        return affected > 0;
     }
 
     // ==================== Raw provider query (IRawQueryRepository) ====================

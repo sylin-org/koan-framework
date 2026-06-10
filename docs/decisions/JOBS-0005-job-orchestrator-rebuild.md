@@ -588,17 +588,20 @@ Tier 0's pushed `(WorkType, Status)` index already turns the **active-count** da
 
 **Problem**: the default `Optimistic` claim is last-write-wins, **not a real CAS**. Under multi-node contention, N workers select the same FIFO head, all `Upsert` it `Running`, last writer wins, and **several workers execute the same job** — idempotency (the ratified contract) absorbs the duplicate *effect*, but the duplicate *executions* are wasted. `Ticket` avoids it but pays a ~1s election window. Both *cope* with contention; neither is contention-*free*.
 
-**[RATIFY] Decision**: add a capability-graded claim that uses the store's native atomic-claim primitive when present, electing it at startup and **falling back to the current `ClaimStrategy`** otherwise:
-- **Postgres / SqlServer**: `SELECT … WHERE Queued ∧ VisibleAt≤now ∧ ¬Cancel ORDER BY (VisibleAt, FirstSubmittedAt) LIMIT N FOR UPDATE SKIP LOCKED` (PG) / `WITH (UPDLOCK, READPAST)` (SqlServer), then mark `Running` — one atomic round-trip; each worker gets **distinct** rows; zero wasted CAS. Routed through the existing `RelationalInstructions.Sql*` escape hatch.
-- **Mongo**: `FindOneAndUpdate(filter, sort, set Running, ReturnDocument.After)` — natively atomic single-row claim; loop for a batch.
-- **SQLite / InMemory**: no SKIP LOCKED, but single-writer / in-process lock already makes the claim race-free → keep `Optimistic` unchanged.
-- Gated by a new capability the adapter declares (§20.5); the ledger elects the best claim path, else the current strategy.
+**Decision (ratified; implementation refined the mechanism — 2026-06-10)**: add a generic data-layer **conditional compare-and-set** and have the durable claim mark `Running` through it, falling back to last-write-wins `Optimistic` where absent.
+- **The primitive** — `IConditionalWriteRepository<TEntity,TKey>.ConditionalReplaceAsync(model, guard)` (Koan.Data.Abstractions), declared via **`DataCaps.Write.ConditionalReplace`**: "replace the stored row for `model.Id` **iff** it still matches `guard`." The guard is an ordinary `Expression<Func<TEntity,bool>>` lowered by the *existing* `LinqFilterCompiler` and each adapter's *existing* filter translator — no new SQL/dialect surface.
+  - **Postgres / SqlServer / SQLite**: conditional `UPDATE … SET "Json" = … WHERE "Id" = @id AND <guard-as-json-path>` — 1 row affected = won, 0 = lost.
+  - **Mongo**: `ReplaceOne(_id == id ∧ <guard>, model, upsert:false)` — a single-document atomic replace, **no transaction** (so it works on single-node Mongo); `ModifiedCount > 0` = won.
+  - `RepositoryFacade` forwards the interface to the inner adapter (probed by the capability token).
+- **The claim** — `DataJobLedger` keeps `SelectCandidates` (the §17.2-settled lane/gate/exclusive filter, returning the runnable batch in FIFO order) and marks the head via the CAS with guard `Status==Queued ∧ Owner==null`; on a CAS-loss it **falls through to the next runnable candidate**. This **preserves exclusivity unchanged** and is **single-execution** — two claimers can't both win a row.
 
-**[RATIFY] Phasing**: **(a) atomic single-row claim first** — the contention fix; minimal `DrainAsync` change (still one-at-a-time, but each claim is contention-free and single-execution). **(b) batch claim** of K rows per round-trip later — a throughput optimization that amortizes latency but enlarges the `DrainAsync` change and must compose with the just-fixed chain-follow-on re-claim (§ above). Recommend shipping (a), measuring, then deciding (b).
+**Why CAS-by-id, not literal `SELECT … FOR UPDATE SKIP LOCKED`-the-head**: empirically (verified in impl), Koan stores every entity as a JSON document (`Id` + `Json`), and Mongo's single-doc `findOneAndUpdate` can't express the cross-row **exclusivity** invariant (no subquery). Skip-locked-the-head therefore wouldn't compose with §17.2 on Mongo without a racy claim-then-revert dance — the exact §17.2 hazard. The conditional CAS composes on **every** adapter (incl. single-node Mongo), keeps the settled exclusivity, and delivers the contention *correctness* (no double-execution). It is also broadly reusable (optimistic concurrency for any entity), per the no-stopgaps rule.
+
+**Phasing**: **(a) atomic single-claim — DONE.** The contention fix; the `DrainAsync` loop is unchanged (still one-at-a-time; the ledger iterates its runnable batch internally). **(d) true SKIP-LOCKED distinct-rows** — a throughput optimization that hands each worker a *different* row in one round-trip (relational subquery + Mongo claim-then-check) — remains deferred; the CAS already removes the wasted executions, so (d) is measured-need only.
 
 **Scope note**: claim contention is a **multi-node competing-consumers** problem. A single worker draining a 1M backlog is the only claimer — Tier 0 + the cursor-conveyor (§19.4) already cover that. Tier 3 is the distributed-tier rung of the ladder.
 
-**Alternatives rejected**: a generic cross-adapter atomic-CAS in the data layer — Koan has none today, it's a larger build than the per-adapter native primitive, and SKIP LOCKED is strictly better (no retry storm even with a real CAS).
+**Validation**: a cross-tier `concurrent_claimers_take_distinct_jobs_no_double_claim` spec (8 claimers, 24 jobs) — each job claimed exactly once on all five tiers (in-memory/SQLite via lock/single-writer; PG/SqlServer/Mongo via the CAS).
 
 ### 20.4 TTL — store-native expiry where supported (capability-graded)
 
@@ -611,10 +614,8 @@ Tier 0's pushed `(WorkType, Status)` index already turns the **active-count** da
 ### 20.5 Data-layer capability additions (cross-pillar, landed here as first consumer)
 
 These are general-purpose Koan.Data additions, dogfooded by jobs but documented for reuse:
-- **`DataCaps.Claim.SkipLocked`** — declared by Postgres/SqlServer (relational SKIP LOCKED) and Mongo (findAndModify-atomic). Drives the Tier 3 claim election.
-- **`DataCaps.Retention.TtlIndex`** — declared by Mongo. Drives the TTL-index path.
-- **`[Index(Ttl = true)]`** on `IndexAttribute` → Mongo `CreateIndexModel` with `CreateIndexOptions.ExpireAfter = TimeSpan.Zero` on the absolute-expiry field. No-op on adapters lacking the capability.
-- *(Implementation note)* the relational claim runs raw SQL via `RelationalInstructions.Sql*`; the exact `WHERE`/`ORDER BY` syntax depends on the relational storage model (mapped columns vs JSON projection) — **verify in phase (b)/(c) of the ledger**; the `Optimistic` fallback is always available, so feasibility risk is contained.
+- **`DataCaps.Write.ConditionalReplace`** + **`IConditionalWriteRepository<TEntity,TKey>`** (DONE) — declared/implemented by SQLite, Postgres, SqlServer, Mongo; forwarded by `RepositoryFacade`. A reusable optimistic-concurrency / compare-and-set primitive (the guard reuses the adapter's existing filter translator, so no new SQL surface). Drives the Tier 3 claim.
+- **`DataCaps.Retention.TtlIndex`** + **`[Index(Ttl = true)]`** on `IndexAttribute` → Mongo `CreateIndexModel` with `CreateIndexOptions.ExpireAfter = TimeSpan.Zero` on the absolute-expiry field (TTL phase, pending). No-op on adapters lacking the capability.
 
 ### 20.6 What does NOT change
 - The **at-least-once + idempotent** contract is unchanged on every tier — Tier 3 reduces *duplicate executions* under contention (efficiency) but does not promise exactly-once.
@@ -627,9 +628,9 @@ These are general-purpose Koan.Data additions, dogfooded by jobs but documented 
 **Neutral**: SQLite/InMemory unchanged (claim + retention); PG/SqlServer keep periodic purge; the default zero-config path is unchanged unless metrics/claim-upgrades are present.
 
 ### 20.8 Phasing ledger (green at every step; ARCH-0079 cross-tier specs)
-- **(a) Tier 2 metrics (opt-in)** — `JobMetric` entity + in-memory accumulator + periodic flush + dashboard read API + cross-tier spec (counts survive a retention purge).
-- **(b) Tier 3 atomic single claim** — `DataCaps.Claim.SkipLocked` + PG/SqlServer SQL + Mongo findAndModify + InMemory/SQLite fallback + a contention spec (N concurrent claimers, zero duplicate executions).
-- **(c) TTL** — `[Index(Ttl)]` + `DataCaps.Retention.TtlIndex` + Mongo wiring + `ExpireAt` + capability-graded spec (Mongo TTL deletes; others fall to periodic purge).
-- **(d) Tier 3 batch claim** — optional throughput follow-on; ship only if (a–c) measurements justify the larger `DrainAsync` change.
+- **(a) Tier 2 metrics (opt-in) — ✅ DONE (d40b602e).** `JobMetric` entity + in-memory accumulator + periodic flush + `JobMetric.Summary` read API + cross-tier spec (counts survive a retention purge). Green on all 5 tiers.
+- **(b) Tier 3 atomic single claim — ✅ DONE.** `DataCaps.Write.ConditionalReplace` + `IConditionalWriteRepository` on SQLite/PG/SqlServer/Mongo + `RepositoryFacade` forwarding + `Data<T,K>.As<>` + `DataJobLedger` runnable-batch CAS with optimistic fallback + the `concurrent_claimers_…_no_double_claim` cross-tier spec. Green on all 5 tiers (in-memory 46, SQLite 52, PG 42, SqlServer 42, Mongo 46).
+- **(c) TTL — PENDING.** `[Index(Ttl)]` + `DataCaps.Retention.TtlIndex` + Mongo wiring + `ExpireAt` + capability-graded spec (Mongo TTL deletes; others fall to periodic purge).
+- **(d) Tier 3 batch / true SKIP-LOCKED distinct-rows — DEFERRED.** Optional throughput follow-on; ship only if measurements justify it (the CAS already removes double-execution).
 
-**[RATIFY] ADR placement**: kept as a JOBS-0005 **§20 addendum** (consistent with §17/§18/§19; §19 already framed these tiers) rather than a new JOBS-0006. Trivial to extract if the architect prefers a standalone record.
+**ADR placement**: kept as a JOBS-0005 **§20 addendum** (consistent with §17/§18/§19). Trivial to extract if the architect prefers a standalone record.

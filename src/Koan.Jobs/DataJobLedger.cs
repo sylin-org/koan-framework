@@ -1,4 +1,6 @@
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Capabilities;
+using Koan.Data.Core;
 using Koan.Data.Core.Sorting;
 using Microsoft.Extensions.Options;
 
@@ -38,13 +40,31 @@ public sealed class DataJobLedger : IJobLedger
     public async Task<JobRecord?> ClaimNext(string owner, DateTimeOffset now, DateTimeOffset leaseUntil,
         IReadOnlyCollection<string> saturatedLanes, CancellationToken ct)
     {
-        var candidate = await SelectCandidate(now, saturatedLanes, ct);
-        if (candidate is null) return null;
-        return _options.ClaimStrategy switch
+        var candidates = await SelectCandidates(now, saturatedLanes, ct);
+        if (candidates.Count == 0) return null;
+
+        // Ticket strategy runs its own leaderless election; claim the FIFO head through it.
+        if (_options.ClaimStrategy == ClaimStrategy.Ticket)
+            return await ClaimViaTicket(candidates[0], owner, now, leaseUntil, ct);
+
+        // §20.3 capability-graded claim. On a store with atomic conditional replace, mark Running via a compare-and-set
+        // (apply IFF still Queued && unowned) — contention-free and single-execution: concurrent claimers can't both win,
+        // and a CAS-loss just falls through to the next runnable candidate. Adapters without the capability fall back to
+        // the last-write-wins optimistic mark (idempotency remains the backstop there).
+        var cas = Data<JobRecord, string>.Capabilities.Has(DataCaps.Write.ConditionalReplace)
+            ? Data<JobRecord, string>.As<IConditionalWriteRepository<JobRecord, string>>()
+            : null;
+        if (cas is null)
+            return await ClaimOptimistic(candidates[0], owner, now, leaseUntil, ct);
+
+        foreach (var candidate in candidates)
         {
-            ClaimStrategy.Ticket => await ClaimViaTicket(candidate, owner, now, leaseUntil, ct),
-            _ => await ClaimOptimistic(candidate, owner, now, leaseUntil, ct),
-        };
+            Mark(candidate, owner, now, leaseUntil);
+            if (await cas.ConditionalReplaceAsync(candidate, r => r.Status == JobStatus.Queued && r.Owner == null, ct))
+                return candidate;
+            // lost the race for this row — another worker claimed it; try the next runnable candidate.
+        }
+        return null;
     }
 
     public Task Update(JobRecord record, CancellationToken ct) => JobRecord.Upsert(record, ct);
@@ -142,7 +162,7 @@ public sealed class DataJobLedger : IJobLedger
 
     // --- claim internals ---
 
-    private async Task<JobRecord?> SelectCandidate(DateTimeOffset now, IReadOnlyCollection<string> saturatedLanes, CancellationToken ct)
+    private async Task<IReadOnlyList<JobRecord>> SelectCandidates(DateTimeOffset now, IReadOnlyCollection<string> saturatedLanes, CancellationToken ct)
     {
         var gatedKeys = (await ActiveGates(now, ct)).Select(g => g.GateKey).ToHashSet(StringComparer.Ordinal);
         // §17.2 exclusivity probe — the Running set is bounded by in-flight concurrency, not the backlog, so this is a
@@ -152,15 +172,16 @@ public sealed class DataJobLedger : IJobLedger
             .ToHashSet();
         // The claim's heavy read (§19.3): predicate + (VisibleAt, FirstSubmittedAt) order + LIMIT ClaimScanBatch all
         // pushed to the store (ix_jobs_claim) — O(batch), not O(backlog). The lane/gate/exclusive filter then runs over
-        // the small ordered window; if the whole window is blocked, the candidate waits for the next poll.
+        // the small ordered window, returning the runnable candidates in FIFO order; the claim tries them in turn (a
+        // CAS-loss on the head falls through to the next), so a contended head doesn't waste the whole poll.
         var sort = SortBuilder<JobRecord>.Build(s => s.OrderBy(r => r.VisibleAt).ThenBy(r => r.FirstSubmittedAt));
         var scan = QueryDefinition.All.WithSort(sort).WithPagination(1, Math.Max(1, _options.ClaimScanBatch));
         var batch = await JobRecord.Query(
             r => r.Status == JobStatus.Queued && r.VisibleAt <= now && r.CancelRequestedAt == null, scan, ct);
-        return batch.FirstOrDefault(r =>
+        return batch.Where(r =>
             !saturatedLanes.Contains(r.Lane)
             && (r.GateKey is null || !gatedKeys.Contains(r.GateKey))
-            && !(r.Exclusive && busy.Contains((r.WorkType, r.WorkId))));
+            && !(r.Exclusive && busy.Contains((r.WorkType, r.WorkId)))).ToList();
     }
 
     private static async Task<JobRecord?> ClaimOptimistic(JobRecord candidate, string owner, DateTimeOffset now, DateTimeOffset leaseUntil, CancellationToken ct)

@@ -25,6 +25,7 @@ using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using System.Data;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq.Expressions;
 using Newtonsoft.Json;
 
 namespace Koan.Data.Connector.Sqlite;
@@ -37,6 +38,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     IDescribesCapabilities,
     IBulkUpsert<TKey>,
     IBulkDelete<TKey>,
+    IConditionalWriteRepository<TEntity, TKey>,
     IInstructionExecutor<TEntity>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
@@ -45,6 +47,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         .Add(DataCaps.Query.Linq).Add(DataCaps.Query.String)
         .Add(DataCaps.Write.BulkUpsert).Add(DataCaps.Write.BulkDelete)
         .Add(DataCaps.Write.AtomicBatch).Add(DataCaps.Write.FastRemove)
+        .Add(DataCaps.Write.ConditionalReplace)
         .Add(DataCaps.Query.Filter, RelationalFilterSupport.Default);
 
     private readonly IServiceProvider _sp;
@@ -622,6 +625,24 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         var dyn = new DynamicParameters();
         for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
         return dyn;
+    }
+
+    // ==================== Conditional compare-and-set (IConditionalWriteRepository) ====================
+
+    /// <summary>Atomic CAS (JOBS-0005 §20.3): replace the row IFF the stored Json still matches <paramref name="guard"/>.
+    /// The guard lowers to the same JSON-path WHERE the query path uses; one row affected = applied, zero = lost.</summary>
+    public async Task<bool> ConditionalReplaceAsync(TEntity model, Expression<Func<TEntity, bool>> guard, CancellationToken ct = default)
+    {
+        var (whereSql, parameters) = BuildWhere(LinqFilterCompiler.Compile(guard));
+        var dyn = ToDapper(parameters);
+        var (id, json) = ToRow(model);
+        dyn.Add("__id", id);
+        dyn.Add("__json", json);
+        var guardClause = whereSql is null ? string.Empty : $" AND ({whereSql})";
+        var sql = $"UPDATE [{TableName}] SET Json = @__json WHERE Id = @__id{guardClause}";
+        using var conn = Open();
+        var affected = await conn.ExecuteAsync(sql, dyn);
+        return affected > 0;
     }
 
     // ==================== Raw provider query (IRawQueryRepository) ====================

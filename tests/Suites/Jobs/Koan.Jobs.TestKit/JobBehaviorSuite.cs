@@ -681,6 +681,30 @@ public abstract class JobBehaviorSuite
         (await JobMetric.Summary(wt, from, host.Clock.GetUtcNow().AddHours(1))).GetValueOrDefault("Completed").Should().Be(5);
     }
 
+    [Fact]
+    public async Task concurrent_claimers_take_distinct_jobs_no_double_claim()
+    {
+        // §20.3: under competing consumers the atomic claim hands each ready job to exactly ONE claimer — no double
+        // claim. On durable tiers this exercises the conditional compare-and-set; the in-memory ledger is already
+        // single-claim under its lock. (Without an atomic claim, last-write-wins lets two claimers grab the same row.)
+        await using var host = await CreateHostAsync();
+        var wt = typeof(GreetJob).FullName!;
+        const int jobCount = 24;
+        await host.Ledger.AppendMany(Seed(wt, jobCount, JobStatus.Queued, host.Clock.GetUtcNow(), "c", visible: true), default);
+        host.Advance(TimeSpan.FromSeconds(1));               // all seeded VisibleAt are now in the past → claimable
+        var now = host.Clock.GetUtcNow();
+
+        var claimed = new System.Collections.Concurrent.ConcurrentBag<string>();
+        await Task.WhenAll(Enumerable.Range(0, 8).Select(i => Task.Run(async () =>
+        {
+            while (await host.Ledger.ClaimNext($"owner-{i}", now, now.AddMinutes(1), Array.Empty<string>(), default) is { } rec)
+                claimed.Add(rec.Id);
+        })));
+
+        claimed.Should().HaveCount(jobCount);                // every job claimed
+        claimed.Distinct().Should().HaveCount(jobCount);     // each claimed exactly once — no double-claim
+    }
+
     private static IReadOnlyCollection<JobRecord> Seed(string workType, int count, JobStatus status, DateTimeOffset baseTime, string idPrefix, bool visible = false)
     {
         var list = new List<JobRecord>(count);

@@ -34,6 +34,9 @@ public static class DataCaps
         public static readonly Capability AtomicBatch = new("write.atomicBatch");
         /// <summary>Provider supports a fast (unsafe-for-hooks) remove path.</summary>
         public static readonly Capability FastRemove = new("write.fastRemove");
+        /// <summary>Provider supports an atomic conditional replace (compare-and-set by Id) — see
+        /// <see cref="IConditionalWriteRepository{TEntity,TKey}"/>. Enables contention-free claiming (JOBS-0005 §20.3).</summary>
+        public static readonly Capability ConditionalReplace = new("write.conditionalReplace");
     }
 
     /// <summary>
