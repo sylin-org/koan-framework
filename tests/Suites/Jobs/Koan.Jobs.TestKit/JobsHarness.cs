@@ -1,6 +1,7 @@
 using System.IO;
 using Koan.Core;
 using Koan.Core.Hosting.App;
+using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
@@ -102,10 +103,13 @@ public sealed class JobsHarness : IAsyncDisposable
         if (clearOnStart)
         {
             await EnsureJobSchema();   // framework-defined entities need their tables ensured on some adapters
-            // Clean slate: a durable store may be reused in-process across tests; clear the Jobs-owned sets.
-            await JobRecord.RemoveAll();
-            await JobGateRecord.RemoveAll();
-            await JobClaimTicket.RemoveAll();
+            // Clean slate between specs. Use RemoveStrategy.Safe (DeleteMany), NOT the default Optimized — on Mongo,
+            // Optimized resolves to Fast = drop-and-recreate the collection, and repeating that DDL across the suite's
+            // ~40 rapid host cycles on one server churns the catalog/index builds and flakes intermittently. A
+            // document delete has no DDL and is reliable on every tier.
+            await JobRecord.RemoveAll(RemoveStrategy.Safe);
+            await JobGateRecord.RemoveAll(RemoveStrategy.Safe);
+            await JobClaimTicket.RemoveAll(RemoveStrategy.Safe);
         }
         return new JobsHarness(host, prev, clock, dbPath);
     }
