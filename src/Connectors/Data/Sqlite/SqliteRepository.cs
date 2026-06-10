@@ -722,34 +722,44 @@ internal sealed class SqliteRepository<TEntity, TKey> :
 
     public async Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default)
     {
+        var rows = models as IReadOnlyCollection<TEntity> ?? models.ToList();
+        if (rows.Count == 0) return 0;
         using var conn = Open();
-        // Let SQLite use autocommit - don't impose transaction control at adapter level
+        try
+        {
+            return await UpsertBatch(conn, rows, ct);
+        }
+        catch (SqliteException ex) when (IsNoSuchTable(ex))
+        {
+            // Table may not exist yet due to governance gating; ensure then retry the whole batch once.
+            if (conn is SqliteConnection sc)
+            {
+                Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
+                InvalidateHealth(sc, TableName);
+                EnsureOrchestrated(sc);
+            }
+            return await UpsertBatch(conn, rows, ct);
+        }
+    }
 
+    /// <summary>One transaction per batch: N inserts commit with a single fsync instead of one fsync per row
+    /// (autocommit). The bulk-write path — <c>AppendMany</c>/<c>list.Submit()</c> and windowed saves — is otherwise
+    /// O(N) fsyncs, the write-amplification cliff JOBS-0005 §19 calls out. The connection is freshly opened per call
+    /// (no ambient transaction shares it), so a local transaction is safe and atomic.</summary>
+    private async Task<int> UpsertBatch(IDbConnection conn, IReadOnlyCollection<TEntity> models, CancellationToken ct)
+    {
+        using var tx = conn.BeginTransaction();
+        const string sqlTemplate = "INSERT INTO [{0}] (Id, Json) VALUES (@Id, @Json) ON CONFLICT(Id) DO UPDATE SET Json = excluded.Json;";
+        var sql = string.Format(sqlTemplate, TableName);
         var count = 0;
         foreach (var e in models)
         {
             ct.ThrowIfCancellationRequested();
-
             var row = ToRow(e);
-
-            try
-            {
-                await conn.ExecuteAsync($"INSERT INTO [{TableName}] (Id, Json) VALUES (@Id, @Json) ON CONFLICT(Id) DO UPDATE SET Json = excluded.Json;", new { row.Id, row.Json });
-            }
-            catch (SqliteException ex) when (IsNoSuchTable(ex))
-            {
-                // Table may not exist yet due to governance gating; ensure then retry once
-                if (conn is SqliteConnection sc)
-                {
-                    Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
-                    InvalidateHealth(sc, TableName);
-                    EnsureOrchestrated(sc);
-                }
-                await conn.ExecuteAsync($"INSERT INTO [{TableName}] (Id, Json) VALUES (@Id, @Json) ON CONFLICT(Id) DO UPDATE SET Json = excluded.Json;", new { row.Id, row.Json });
-            }
+            await conn.ExecuteAsync(sql, new { row.Id, row.Json }, tx);
             count++;
         }
-
+        tx.Commit();
         return count;
     }
 
