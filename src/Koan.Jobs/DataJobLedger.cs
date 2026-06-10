@@ -125,11 +125,11 @@ public sealed class DataJobLedger : IJobLedger
         // queries (a bounded page to find the cutoff, then a predicate delete) — no full materialize of the work-type.
         var sort = SortBuilder<JobRecord>.Build(s => s.OrderByDescending(r => r.LastSettledAt));
         var newestPage = QueryDefinition.All.WithSort(sort).WithPagination(1, keep);
-        var newest = await JobRecord.Query(r => r.WorkType == workType && r.Status >= JobStatus.Completed, newestPage, ct);
+        var newest = await JobRecord.Query(JobLedgerPredicates.TerminalOf(workType), newestPage, ct);
         if (newest.Count < keep) return 0;                         // under the cap — nothing to trim
         if (newest[^1].LastSettledAt is not { } cutoff) return 0;
         var excess = await JobRecord.Query(
-            r => r.WorkType == workType && r.Status >= JobStatus.Completed && r.LastSettledAt < cutoff, ct);
+            JobLedgerPredicates.And(JobLedgerPredicates.TerminalOf(workType), r => r.LastSettledAt < cutoff), ct);
         foreach (var r in excess) await JobRecord.Remove(r.Id, ct);
         return excess.Count;
     }
@@ -137,7 +137,7 @@ public sealed class DataJobLedger : IJobLedger
     public async Task<long> CountActive(string workType, CancellationToken ct)
         // Pushed COUNT (one row materialized): cheap enough to run per work-type each archival sweep.
         => (await JobRecord.QueryWithCount(
-            r => r.WorkType == workType && r.Status < JobStatus.Completed,
+            JobLedgerPredicates.ActiveOf(workType),
             QueryDefinition.All.WithPagination(1, 1), ct)).TotalCount;
 
     // --- claim internals ---

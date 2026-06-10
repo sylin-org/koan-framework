@@ -20,17 +20,27 @@ internal static class JobLedgerPredicates
         return p ?? (static r => true);
     }
 
-    /// <summary>Non-terminal = the lifecycle statuses below <see cref="JobStatus.Completed"/> (terminals are 4..7),
-    /// so it pushes as one comparison rather than a four-way OR.</summary>
+    /// <summary>Non-terminal = Created/Queued/Running/Blocked, as an **equality set**, not <c>Status &lt; Completed</c>:
+    /// Mongo persists the enum by NAME, where ordering is lexicographic (not numeric), so an ordering comparison
+    /// silently mismatches there. Equality translates on every store (JSON-number on relational, name on Mongo).</summary>
     public static Expression<Func<JobRecord, bool>> NonTerminal()
-        => static r => r.Status < JobStatus.Completed;
+        => static r => r.Status == JobStatus.Created || r.Status == JobStatus.Queued
+                    || r.Status == JobStatus.Running || r.Status == JobStatus.Blocked;
 
-    /// <summary>Terminal = <see cref="JobStatus.Completed"/> and above (4..7) — one comparison, the mirror of
-    /// <see cref="NonTerminal"/>.</summary>
+    /// <summary>Terminal = Completed/Failed/Cancelled/Dead, as an equality set (portable — see <see cref="NonTerminal"/>).</summary>
     public static Expression<Func<JobRecord, bool>> Terminal()
-        => static r => r.Status >= JobStatus.Completed;
+        => static r => r.Status == JobStatus.Completed || r.Status == JobStatus.Failed
+                    || r.Status == JobStatus.Cancelled || r.Status == JobStatus.Dead;
 
-    private static Expression<Func<JobRecord, bool>> And(
+    /// <summary>Active (non-terminal) rows of a work-type.</summary>
+    public static Expression<Func<JobRecord, bool>> ActiveOf(string workType)
+        => And(r => r.WorkType == workType, NonTerminal());
+
+    /// <summary>Terminal rows of a work-type.</summary>
+    public static Expression<Func<JobRecord, bool>> TerminalOf(string workType)
+        => And(r => r.WorkType == workType, Terminal());
+
+    public static Expression<Func<JobRecord, bool>> And(
         Expression<Func<JobRecord, bool>>? left, Expression<Func<JobRecord, bool>> right)
     {
         if (left is null) return right;
