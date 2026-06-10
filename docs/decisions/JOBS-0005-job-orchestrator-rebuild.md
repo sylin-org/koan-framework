@@ -471,3 +471,71 @@ Surfaced by a downstream consumer proposal (cooperative gating when the gate key
 **Not now (YAGNI):** dispatch-time re-resolution — the only thing submit-time can't express — is needed only for keys that *change after queueing* (e.g. a call-time-selected AI-fleet endpoint). It would require moving the gate check after `binding.Load`; deferred until a real late-binding case appears. No HTTP/Retry-After/token-bucket vocabulary enters Koan (the consumer owns that).
 
 **Status:** shipped 2026-06-05 with a spec in `JobBehaviorSuite` (a resolver loads a related entity; one host's `Backoff` defers only same-host siblings at dispatch while other hosts keep running; gate release resumes them — proven across all five tiers).
+
+## 19. Addendum (2026-06-10): high-throughput / bulk — ledger queries, retention, and "chunk, don't multiply"
+
+Surfaced by a downstream consumer dogfooding a high-throughput import (~160k `JobRecord`s — 89k `Completed` / 68k `Failed` / 2.5k `Queued`; a 4-call "active jobs" dashboard timing out at ~30s). Re-derivation found the dashboard is the *mild* symptom of two defects, and that the underlying scenario — a large external source minting one job per row — is a granularity anti-pattern the engine should *survive* but the authoring surface should *prevent*. This addendum corrects the defects, hardens the engine against legitimate large backlogs, and makes **windowing** the Koan-native way to drain a large source.
+
+### 19.1 Two defects (against the ratified design, not new questions)
+
+**A — the composite index was ratified but never built.** §6 and decision §12.7 put a composite `(status, visibleAt)` index in the **v1 default** (not an opt-in knob). `JobRecord` shipped with **zero `[Index]`** → every ledger read is a COLLSCAN on stores that honor index metadata. Worse, the reads materialize-then-filter in memory: `DataJobLedger.Query` server-filters only `WorkType`, then `.Where`s status/workId in process; **`SelectCandidate` — the claim loop, every `PollInterval` — loads *all* `Queued` *and* *all* `Running` and sorts in memory**; `NonTerminal` does `All()`. The dashboard is on-demand; the claim loop is a per-second double-scan. This is an implementation miss against an accepted decision.
+
+**B — retention has a hole.** Shipped archival (§16) purges only `Completed`/`Cancelled` older than `ArchiveAfter` (7d); **`Failed`/`Dead` are retained forever** — the consumer's ledger was ~43% `Failed`, unbounded by construction. `PurgeArchivable` itself materializes all benign-terminal rows to delete them (a COLLSCAN cleanup).
+
+### 19.2 Why the query fixes don't, alone, save a bulk burst
+
+A 1M-row import where **each row mints a job** costs end-to-end: 1M inserts + 1M claim-updates + 1M settle-updates (+ retries), each transition rewriting an append-only `Transitions` list and moving ~3 index entries — **~6–10M write operations**, dominated by per-row write amplification no index removes. Indexing keeps the hot path *queryable*; it does not make a per-row ledger a sane bulk pipe. Response is two-layered: **harden the engine** (19.3) and **change the authoring granularity** (19.4) — the latter is the real answer.
+
+### 19.3 Engine hardenings (the four cliffs)
+
+1. **Full sort-key index + pushed order+limit.** The claim order is `VisibleAt, FirstSubmittedAt`; in a burst `VisibleAt≈now` across the whole backlog, so `(Status, VisibleAt)` alone still returns the backlog to sort. Index **`(Status, VisibleAt, FirstSubmittedAt)`** and push `ORDER BY … LIMIT 1` (or `LIMIT batch`) into the store so "next" is an O(log n) seek. Add `(WorkType, Status)` (dashboard/coalesce) and `(WorkType, WorkId)` (the §17.2 exclusivity probe + history). Declarative `[Index]`; Reference = Intent for the store that honors it.
+2. **Capability-graded batch claim.** Single-row optimistic claim makes N workers contend on the FIFO head (N−1 wasted CAS each); the `Ticket` window (1s) is incompatible with burst throughput. New `IJobLedger` capability **`AtomicBatchClaim`**: on a row-locking store, lease a chunk with `… FOR UPDATE SKIP LOCKED LIMIT K RETURNING` (Postgres/SqlServer) — zero contention, K rows per round-trip; Mongo falls back to a `findAndModify` loop; in-memory takes K under its lock. Election rides the existing capability ladder (§8) — adding the Postgres connector elects the better claim with no user code.
+3. **TTL-index retention covering Failed/Dead + a count cap.** Prefer a **store-native TTL index** on `LastSettledAt` (Mongo TTL; PG scheduled delete / partition-drop) so expiry costs the engine nothing; extend coverage to **`Failed`/`Dead`** with a separate longer window (replayable until then) **and a per-`WorkType` count cap** (`keep last N`) so a burst is bounded by *count*, not just age. `ArchiveAfter` splits per-outcome (`CompletedAfter` / `FailedAfter` / `Cap`). The app-side batched purge remains the fallback where the store has no TTL.
+4. **Sharded metrics, not a hot counter** — see 19.5.
+
+### 19.4 The Koan-native answer: model the *window* as the work-item ("chunk, don't multiply")
+
+The ledger is a **lifecycle/audit store** — durable claim, retry, cancellation, per-row transition history. That is worth paying for a *job*; it is pure overhead a million times over for homogeneous import rows. Entity-first already prescribes the fix: **the work-item is the unit of work — so make the unit a *window over the source*, not a row.**
+
+**Primary pattern — the cursor-conveyor** (streaming / unknown size, bounded footprint). One window-job; on success it queues the *next* window via the existing `ctx.ContinueWith`. At most ~1 in flight; 1M rows drain as sequential windows, each terminal then swept — the ledger never holds a row per item, and it uses only primitives that already exist:
+
+```csharp
+public sealed class ImportWindow : Entity<ImportWindow>, IKoanJob<ImportWindow>
+{
+    public string Source { get; set; } = "";
+    public long   Offset { get; set; }
+    public int    Size   { get; set; } = 1000;
+
+    [JobAction("pull")]                                  // serialized per (WorkType,WorkId) by default (§17.2)
+    public static async Task Execute(ImportWindow w, JobContext ctx, CancellationToken ct)
+    {
+        var page = await ExternalSource.Page(w.Source, w.Offset, w.Size, ct);
+        await page.Rows.Save();                           // one bulk upsert of the window
+        ctx.Progress(page.Done ? 1 : (w.Offset + page.Count) / (double)page.Total);
+        if (!page.Done)
+            ctx.ContinueWith("pull", new ImportWindow { Source = w.Source, Offset = w.Offset + w.Size });
+    }
+}
+
+await new ImportWindow { Source = "vendor:catalog" }.Job.Submit("pull");   // kicks off ONE ledger row
+```
+
+**Bounded fan** (throughput without explosion): start `P` conveyors over disjoint stripes (`offset ≡ stripe (mod P)`) → `P` in flight, `P` ledger rows at a time. **Pre-fan** (rows already in hand, not external): `rows.InWindowsOf(1000).Submit("process")` mints `total/1000` chunk-jobs rather than `total`.
+
+**Guardrail (self-reporting).** The worker samples per-`WorkType` active counts and the boot/health report warns when one crosses a threshold — `[Koan.Jobs] WorkType 'ImportRow' active=512,000 — job-per-row smell; window the source (jobs-howto §bulk)`. The framework can't forbid a job-per-row design, but it will *name* it.
+
+**Not now (YAGNI):** a built-in fan-out/map-reduce orchestration primitive. The conveyor + bounded-fan cover the dogfed cases with existing verbs; a first-class `Job.Fan(total, window, parallelism)` helper is sugar to add only if the manual stripe pattern recurs.
+
+### 19.5 Metrics as an entity, sharded
+
+`JobMetric : Entity<JobMetric>` keyed `(bucket, workType, outcome, shard)` carrying a `Count` (+ optional duration sums), incremented once per terminal settle into a random `shard ∈ [0,K)`; dashboards sum shards for a bucket. The shard fans concurrent increments across `K` rows (no single hot counter); the `bucket` (e.g. hour) bounds cardinality. This is what makes aggressive trimming **safe** — the counts survive in `JobMetric`, the rows don't. The "active jobs" panel reads `Queued`/`Running` counts from the now-indexed ledger; historical throughput reads `JobMetric`. On by default on the durable tier; off in inline test mode.
+
+### Status / phasing
+
+**Proposed 2026-06-10; not yet implemented.** Each tier is its own failing-spec-first slice (ARCH-0079, the `JobBehaviorSuite` across all five tiers):
+- **Tier 0** — the `[Index]` triple + order+limit push-down in every `IJobLedger` read (honors §6/§12.7). Unblocks the dashboard timeout *and* the per-second claim scan. A **scan-shape spec** asserts the predicate + limit are pushed (not in-memory) so it can't silently regress again.
+- **Tier 1** — per-outcome + count-cap retention; TTL index where the store supports it; index-backed batched purge fallback.
+- **Tier 2** — `JobMetric` sharded rollup + dashboard reads off it.
+- **Tier 3** — `AtomicBatchClaim` (SKIP LOCKED) on the capability ladder; the conveyor / bounded-fan patterns + the guardrail documented in `jobs-howto.md §bulk`.
+
+The hot/cold partition **move** (§6, decision §12.7) stays the **opt-in** scale layout — windowing makes it unnecessary for the common bulk case, so it is not promoted to default here.
