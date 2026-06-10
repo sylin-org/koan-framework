@@ -1,27 +1,66 @@
 ---
 type: DESIGN
 domain: jobs / testing
-title: "Jobs: Mongo cross-tier suite flakiness — investigation & next steps"
-status: investigation-open
+title: "Jobs: Mongo cross-tier suite flakiness — root cause & fix"
+status: resolved
 last_updated: 2026-06-10
 related:
-  - decisions/JOBS-0005-job-orchestrator-rebuild.md (§19)
+  - decisions/JOBS-0005-job-orchestrator-rebuild.md (§7, §19)
+  - src/Koan.Jobs/JobOrchestrator.cs (DrainAsync)
   - tests/Suites/Jobs/Koan.Jobs.TestKit/JobBehaviorSuite.cs
-  - tests/Suites/Jobs/Koan.Jobs.TestKit/JobsHarness.cs
 ---
 
-# Jobs: Mongo cross-tier suite flakiness — investigation & next steps
+# Jobs: Mongo cross-tier suite flakiness — root cause & fix
 
-## TL;DR
+## RESOLVED — it WAS a code defect (a `DrainAsync` race), not a test artifact
 
-Folding the JOBS-0005 §19 specs into the shared `JobBehaviorSuite` (so they run on every tier, ARCH-0079)
-surfaced an **intermittent failure on the Mongo tier only**. Extensive, instrumented investigation **proves the
-jobs orchestrator/ledger and the Mongo data layer are correct** — the flake is **not reproducible in isolation**
-and is therefore an **emergent test-harness/environment artifact**, not a code defect. The exact emergent trigger
-is **not yet pinned**; the next task is to root-cause it and fix it with proper test infrastructure/architecture.
+> **Correction.** An earlier pass of this note concluded the flake was an "emergent test-harness artifact, not a code
+> defect." **That conclusion was wrong.** Instrumenting an actual full-suite run (dumping the ledger the instant a
+> drain gives up) found a real race in `JobOrchestrator.DrainAsync`. The earlier isolated diagnostics missed it
+> because they ran the settle→append→claim sequence *synchronously*, whereas the orchestrator runs the predecessor's
+> settle in a concurrent inflight task that races the claim loop. Lesson: instrument the real loop, not a hand-rolled
+> proxy of it.
 
-**Do not "fix" this by patching specs (loop-drains, retries) — that was tried and rejected. The code is correct;
-the harness is the variable.**
+**Root cause.** A chain successor is appended *inside* the predecessor's inflight task (`SettleSuccessAsync` /
+`SettleFailureAsync` → `_ledger.Append`). `DrainAsync`'s loop did `RemoveAll(completed); if (inflight.Count == 0)
+break;` **before** waiting on the inflight tasks. If `ClaimNext` returned null (successor not yet appended) and the
+predecessor task then completed — appending the successor — in the window before that `RemoveAll`, the loop saw
+`inflight` empty and **broke without re-claiming the just-appended successor**. The drain ended with a Queued,
+visible, ungated successor and **nothing running** (`running=0` in every captured stall) — i.e. claimable work left
+unclaimed. This violates `DrainAsync`'s own contract ("process every currently-ready job to completion, including
+chain follow-ons that become ready").
+
+**Why Mongo-only / intermittent / single-Drain-only:**
+- The race window is the gap between the claim and the inflight check. On **in-memory/SQLite** operations are
+  effectively synchronous, so the window is ~0 → never hit. On **Mongo** every claim/settle is a network round-trip,
+  widening the window → hit intermittently.
+- In **production** the worker runs `DrainAsync` on a continuous poll loop, so a missed successor is claimed on the
+  next tick — the bug is invisible there. A **single `host.Drain()`** in a test asserts immediately, so the early
+  break leaves the chain incomplete and the assertion fails.
+
+**The fix** (`JobOrchestrator.DrainAsync`): don't conclude the drain is done the moment `inflight` empties — if a task
+just settled (it may have appended a follow-on), re-claim before breaking:
+
+```csharp
+var settled = inflight.RemoveAll(t => t.IsCompleted);
+if (inflight.Count == 0)
+{
+    if (settled > 0) continue;   // a task finished and may have enqueued a follow-on — re-claim before giving up
+    break;                       // nothing claimable, nothing in flight → genuinely done
+}
+await Task.WhenAny(inflight);
+inflight.RemoveAll(t => t.IsCompleted);
+```
+
+Because a task only completes *after* its `Append` returns (acknowledged write), the re-claim is guaranteed to see
+the successor. This is correctness for `DrainAsync`'s contract on every store — not a test band-aid.
+
+**Validation:** Mongo suite ×8 green (was ~4/5 flaky); in-memory 44, SQLite 50, Postgres 40, SqlServer 40 — all green
+(the change is in the shared loop, so all tiers re-validated). Diagnostics reverted.
+
+---
+
+## Original investigation (kept for the trail — note the wrong turns)
 
 ## Symptom
 

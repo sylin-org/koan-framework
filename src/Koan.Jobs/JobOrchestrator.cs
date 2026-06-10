@@ -60,8 +60,16 @@ public sealed class JobOrchestrator
                     continue;
                 }
 
-                inflight.RemoveAll(t => t.IsCompleted);
-                if (inflight.Count == 0) break;
+                var settled = inflight.RemoveAll(t => t.IsCompleted);
+                if (inflight.Count == 0)
+                {
+                    // A just-finished task may have appended a chain follow-on (SettleSuccess/Failure → Append). Don't
+                    // conclude the drain is done until a fresh claim confirms nothing became ready: a successor enqueued
+                    // in the window between the claim above and this check would otherwise be missed. The worker's poll
+                    // loop hides this in production, but a single Drain on a higher-latency store (Mongo) exposes it.
+                    if (settled > 0) continue;
+                    break;
+                }
                 await Task.WhenAny(inflight);
                 inflight.RemoveAll(t => t.IsCompleted);
             }
