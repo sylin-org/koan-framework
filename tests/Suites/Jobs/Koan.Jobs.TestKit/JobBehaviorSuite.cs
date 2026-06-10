@@ -541,4 +541,141 @@ public abstract class JobBehaviorSuite
         RemoteFetch.Ran.Should().Contain(first.Id);
         RemoteFetch.Ran.Should().Contain(xmaSibling.Id);
     }
+
+    // --- high-throughput / bulk (§19): the same guarantees on every tier ---
+    // Seeded through the LEDGER (not JobRecord.Save) so the in-memory tier — whose ledger is a dictionary, not the
+    // data store — stays consistent. Volume is enough to exercise a real index, small enough to stay fast on containers.
+
+    /// <summary>Backlog size for the §19 push-down specs; override per tier if a store needs a lighter touch.</summary>
+    protected virtual int ScaleVolume => 2000;
+
+    [Fact]
+    public async Task query_returns_only_the_matching_status_among_a_backlog()
+    {
+        await using var host = await CreateHostAsync();
+        var wt = typeof(GreetJob).FullName!;
+        var now = host.Clock.GetUtcNow();
+        await host.Ledger.AppendMany(Seed(wt, ScaleVolume, JobStatus.Completed, now, "c"), default);   // noise
+        await host.Ledger.AppendMany(Seed(wt, 5, JobStatus.Queued, now, "q"), default);                // needles
+
+        var active = await host.Ledger.Query(new JobQuery(WorkType: wt, Status: JobStatus.Queued), default);
+
+        active.Should().HaveCount(5);                                  // the status filter is applied on the store
+        active.Should().OnlyContain(r => r.Status == JobStatus.Queued);
+    }
+
+    [Fact]
+    public async Task claim_takes_the_fifo_head_of_a_large_backlog()
+    {
+        await using var host = await CreateHostAsync();
+        var now = host.Clock.GetUtcNow();
+        var wt = typeof(GreetJob).FullName!;
+        await host.Ledger.AppendMany(Seed(wt, ScaleVolume, JobStatus.Queued, now.AddDays(-1), "q", visible: true), default);
+
+        var claimed = await host.Ledger.ClaimNext("owner", now, now.AddMinutes(1), Array.Empty<string>(), default);
+
+        claimed.Should().NotBeNull();
+        claimed!.WorkId.Should().Be("q0");            // earliest FirstSubmittedAt → ordered claim, true FIFO head
+        claimed.Status.Should().Be(JobStatus.Running);
+    }
+
+    [Fact]
+    public async Task retention_purges_old_failed_keeps_recent_and_active()
+    {
+        await using var host = await CreateHostAsync(o =>
+        {
+            o.ArchiveAfter = TimeSpan.FromDays(7);
+            o.FailedAfter = TimeSpan.FromDays(30);
+            o.RetainPerWorkType = 0;
+        });
+        var wt = typeof(GreetJob).FullName!;
+        var now = host.Clock.GetUtcNow();
+        await host.Ledger.AppendMany(new[]
+        {
+            Rec(wt, "c-old", JobStatus.Completed, now.AddDays(-10)),  // > 7d  → purged
+            Rec(wt, "c-new", JobStatus.Completed, now.AddDays(-1)),   // < 7d  → kept
+            Rec(wt, "f-old", JobStatus.Failed, now.AddDays(-40)),     // > 30d → purged (formerly retained forever)
+            Rec(wt, "f-new", JobStatus.Failed, now.AddDays(-5)),      // < 30d → kept
+            Rec(wt, "active", JobStatus.Queued, now),                 // active → never purged
+        }, default);
+
+        var purged = await host.Archive();
+
+        purged.Should().Be(2);
+        var ids = (await host.Ledger.Query(new JobQuery(WorkType: wt), default)).Select(r => r.WorkId).ToHashSet();
+        ids.Should().BeEquivalentTo(new[] { "c-new", "f-new", "active" });
+    }
+
+    [Fact]
+    public async Task retention_cap_trims_terminal_to_the_newest_per_worktype()
+    {
+        await using var host = await CreateHostAsync(o =>
+        {
+            o.ArchiveAfter = TimeSpan.Zero;   // windows off — exercise the cap alone
+            o.FailedAfter = TimeSpan.Zero;
+            o.RetainPerWorkType = 10;
+        });
+        var wt = typeof(GreetJob).FullName!;
+        var now = host.Clock.GetUtcNow();
+        await host.Ledger.AppendMany(
+            Enumerable.Range(0, 50).Select(i => Rec(wt, $"t{i:D3}", JobStatus.Completed, now.AddSeconds(-i))).ToList(), default);
+
+        var purged = await host.Archive();
+
+        purged.Should().Be(40);   // keep newest 10
+        (await host.Ledger.Query(new JobQuery(WorkType: wt, Status: JobStatus.Completed), default)).Should().HaveCount(10);
+    }
+
+    [Fact]
+    public async Task count_active_excludes_terminal_rows()
+    {
+        await using var host = await CreateHostAsync();
+        var wt = typeof(GreetJob).FullName!;
+        var now = host.Clock.GetUtcNow();
+        await host.Ledger.AppendMany(Seed(wt, 30, JobStatus.Queued, now, "a"), default);
+        await host.Ledger.AppendMany(Seed(wt, 70, JobStatus.Completed, now, "t"), default);
+
+        (await host.Ledger.CountActive(wt, default)).Should().Be(30);
+    }
+
+    [Fact]
+    public async Task cursor_conveyor_drains_a_source_with_a_bounded_ledger()
+    {
+        Conveyor.Reset();
+        await using var host = await CreateHostAsync();
+        await new Conveyor { Total = 2000, Window = 100 }.Job.Submit(Conveyor.Pull);
+        await host.Drain();
+
+        Conveyor.ItemsProcessed.Should().Be(2000);
+        Conveyor.WindowsRun.Should().Be(20);
+        var rows = await host.Ledger.Query(new JobQuery(WorkType: typeof(Conveyor).FullName!), default);
+        rows.Should().HaveCount(20);                  // one ledger row per window, not per item
+        rows.Should().OnlyContain(r => r.Status == JobStatus.Completed);
+    }
+
+    private static IReadOnlyCollection<JobRecord> Seed(string workType, int count, JobStatus status, DateTimeOffset baseTime, string idPrefix, bool visible = false)
+    {
+        var list = new List<JobRecord>(count);
+        for (var i = 0; i < count; i++)
+        {
+            var at = status >= JobStatus.Completed ? baseTime.AddSeconds(-i - 1)
+                   : visible ? baseTime.AddMilliseconds(i)   // all in the past, strictly ordered (q0 = FIFO head)
+                   : baseTime;
+            list.Add(Rec(workType, $"{idPrefix}{i}", status, at));
+        }
+        return list;
+    }
+
+    private static JobRecord Rec(string workType, string workId, JobStatus status, DateTimeOffset at) => new()
+    {
+        Id = $"{workType}:{workId}",
+        WorkType = workType,
+        WorkId = workId,
+        Action = "",
+        Status = status,
+        VisibleAt = at,
+        FirstSubmittedAt = at,
+        LastSettledAt = status >= JobStatus.Completed ? at : null,
+        Exclusive = true,
+    };
 }

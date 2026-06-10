@@ -17,11 +17,17 @@ public sealed class PostgresJobsFixture : IAsyncLifetime
             .WithPassword("koan")
             .Build();
         await _container.StartAsync();
+        var cs = _container.GetConnectionString();
         Settings = new Dictionary<string, string?>(StringComparer.Ordinal)
         {
             ["Koan:Environment"] = "Test",
             ["Koan:Data:Sources:Default:Adapter"] = "postgres",
-            ["Koan:Data:Sources:Default:ConnectionString"] = _container.GetConnectionString(),
+            ["Koan:Data:Sources:Default:ConnectionString"] = cs,
+            ["Koan:Data:Postgres:ConnectionString"] = cs,
+            // Testcontainers already waits for the container; Koan's per-boot readiness gating is redundant here and,
+            // across the suite's rapid host boot/dispose cycles, intermittently exceeds its window → connection
+            // churn and cascading failures. Disable it, matching the Mongo/SqlServer fixtures.
+            ["Koan:Data:Postgres:Readiness:EnableReadinessGating"] = "false",
         };
     }
 
