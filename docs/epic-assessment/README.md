@@ -92,6 +92,7 @@ wedges instead of marketing the totality.
 | [04-architecture-alignment.md](04-architecture-alignment.md) | The target seam architecture: layering law, contract-type matrix, fixes for the three wrong couplings, discovery doctrine, trust-fabric layering, two shared substrates |
 | [05-leverage-plan.md](05-leverage-plan.md) | The minimal truth set; sequencing for one maintainer; the Win10-ESU go/no-go rule; mapping onto the three repos' existing prompt stashes; operating rules |
 | [06-project-realignment.md](06-project-realignment.md) | Per-project realignment through the Epic + mission lens; mission-aligned opportunities the per-project assessments missed; the solution-driven-maturation process formalized (surface ledger + rotation contract) |
+| [prompts/](prompts/README.md) | The executable form of this analysis: a shared session [CHARTER](prompts/CHARTER.md) plus 16 self-contained, single-session prompts (E01–E16) for lesser models on any provider — phased to compose (canon → seams → trust column → proof → contracts → agent-ready LAN → mission surfaces) |
 
 ## Corrections (2026-06-11, maintainer review)
 

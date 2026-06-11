@@ -117,11 +117,12 @@ form, enforced by R1's gates.
 2. **Decisions batch, implementation serializes.** Wave 0 exists because decisions are the
    only thing cheap to do across all three repos at once.
 3. **Agents inherit the per-repo stashes; the Epic adds only seam cards.** Koan's 06/07,
-   Koi's P01–P13, ZG's 16 prompts are already lesser-model-ready. The genuinely new artifacts
-   are: the Wave-0 cross-repo ADR, the four seam contracts + fixtures, the R9 envelope
-   schema, the Wave-2 demo script, and the §3 Koan inversion track. Write those as
-   self-contained cards in the same style; do not duplicate per-repo work into an Epic
-   backlog.
+   Koi's P01–P13, ZG's 16 prompts are already lesser-model-ready. The Epic's seam cards now
+   exist as the **[prompt stack](prompts/README.md)** (CHARTER + E01–E16): the Wave-0
+   cross-repo ADR (E01), the surface ledger (E02), the seam fixes + contracts (E03–E07),
+   the trust column (E08–E10), the demo (E11), the envelope (E12), and the
+   agent-ready-LAN/mission surfaces (E13–E16). Per-repo work stays in the per-repo stashes;
+   do not duplicate it into an Epic backlog.
 4. **Verification budget goes where the process under-spends it** ([02 §3](02-synergy-audit.md)):
    data planes, release engineering, clean machines, seams. Every agent session that touches
    a seam must end by running the seam's contract corpus against released artifacts — not
