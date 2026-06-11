@@ -47,13 +47,15 @@ The stack's distinguishing word — *sovereign, trusted* — is its least-built 
 
 | Layer | Verified gap |
 |---|---|
-| Koi | TLS proxy has **plausibly never worked** since axum 0.8 (silent panic in `tokio::spawn`; `status()` hardcodes `running: true`); revocation is **roster-only** — a revoked cert stays valid to every TLS verifier for up to 30 days (no CRL/OCSP); **no CSR exists** — the CA generates private keys server-side and ships them over the wire (`JoinResponse.service_key`, `RenewRequest.key_pem`); every documented mutation 401s (per-boot `x-koi-token`); loopback-only bind |
+| Koi | TLS proxy **regressed silently at the axum 0.8 upgrade** (worked before, per maintainer — see README Corrections; silent panic in `tokio::spawn`; `status()` still hardcodes `running: true`; zero data-plane tests to catch it); revocation is **roster-only** — a revoked cert stays valid to every TLS verifier for up to 30 days (no CRL/OCSP); **no CSR exists** — the CA generates private keys server-side and ships them over the wire (`JoinResponse.service_key`, `RenewRequest.key_pem`); every documented mutation 401s (per-boot `x-koi-token`); loopback-only bind |
 | Zen Garden | Moss serves **without client auth** (`with_no_client_auth()`, "mTLS deferred to Phase 4") — the pond's mutual-trust story is one-directional; with pond inactive, :7185 serves **unauthenticated reboot/shutdown/offering-delete**, and `POST /api/v1/stone/deploy` (root code-push) is in *both* route sets — unauthenticated **even with pond active**; `changeme` default passphrase |
 | Koan | **Zero X509/certificate-validation code in src** — no CA pinning, no truststore affordance, no TLS posture at all; `KoiHandler` talks plain HTTP; the planned fleet-identity fabric (KSVID, coherence-epoch revocation) is an unfair-asset bullet, not code |
 
 The end-to-end mutually-authenticated path the Epic narrates — *pond ceremony → mTLS fleet →
 app consuming a service over a Koi-trusted channel* — has **a verified break at every single
-link**. Nothing resembling it has ever run, on any machine.
+link today**, and the full chain structurally cannot have run with mutual auth (moss has
+never verified client certs). Whatever parts of it were exercised in private downstream
+solutions (README Corrections), nothing in these repos guards them now.
 
 ### 2.2 Every seam is private
 
@@ -122,6 +124,17 @@ physical residue). The structural dynamic: *agents generate at superhuman rate; 
 remains human-rate; and verification is preferentially spent where it is pleasant (in-process
 unit tests) rather than where it is risky (data planes, release engineering, strangers'
 machines, cross-repo seams).*
+
+The maintainer's correction (README) refines this without changing its force: the operating
+model is deliberate — **a single serial lane that matures surfaces by exercising them inside
+downstream solutions** (some private, outside these repos). While the lane is on a surface,
+verification is excellent — *live*. The failure mode is what happens when the lane rotates
+away: the exercising solution stops exercising, no mechanical guard stays behind, and the
+surface rots silently (the Koi TLS plane is the type specimen — it worked, an upgrade broke
+it, and `status()` kept saying `running: true`). So the prescription is not "verify more" —
+the lane has no more hours — it is **"leave a guard at the door when you leave the room"**:
+tripwire tests, truth-telling status, and CI that keeps running through dormancy. Formalized
+as the surface ledger + rotation contract in [06 §5](06-project-realignment.md).
 
 **The implication for the Epic is sharp.** A cross-repo, cross-language seam is the hardest
 possible thing to verify under this process — no shared CI, version skew between path deps and

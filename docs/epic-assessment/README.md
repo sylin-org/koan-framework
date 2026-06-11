@@ -71,9 +71,10 @@ is physically wired today: Zen Garden embeds Koi in-process and delegates its en
 certmesh; Koan's mainline Mongo/Weaviate/Ollama/S3 connectors hard-reference ZenGarden
 contracts and a Koan-side handler consumes Koi's mDNS-over-HTTP bridge. The discovery column
 works end-to-end. But the trust column — the stack's namesake — is broken at every layer
-simultaneously (Koi's TLS proxy has plausibly never worked, revocation doesn't revoke, private
-keys ship over the wire, Moss serves without client auth, Zen Garden exposes unauthenticated
-root code-push, and Koan contains zero certificate-handling code), every seam is private
+simultaneously (Koi's TLS proxy regressed silently at the axum 0.8 upgrade and nothing
+noticed — see Corrections below; revocation doesn't revoke, private keys ship over the wire,
+Moss serves without client auth, Zen Garden exposes unauthenticated root code-push, and Koan
+contains zero certificate-handling code), every seam is private
 (sibling path deps, in-tree contracts, hardcoded endpoints — versioned nowhere), and the whole
 estate matures through **one strictly serialized attention stream** (verified: Koan's only
 dormancy, 192 days, is exactly Zen+Koi's construction window). The stack-level work is
@@ -90,6 +91,27 @@ wedges instead of marketing the totality.
 | [03-strategic-opportunities.md](03-strategic-opportunities.md) | The enabler doctrine (Epic-wide canon); stack-level opportunities ranked by uniqueness × feasibility; the five cross-project conflicts that must be resolved first; refused lanes at stack level |
 | [04-architecture-alignment.md](04-architecture-alignment.md) | The target seam architecture: layering law, contract-type matrix, fixes for the three wrong couplings, discovery doctrine, trust-fabric layering, two shared substrates |
 | [05-leverage-plan.md](05-leverage-plan.md) | The minimal truth set; sequencing for one maintainer; the Win10-ESU go/no-go rule; mapping onto the three repos' existing prompt stashes; operating rules |
+| [06-project-realignment.md](06-project-realignment.md) | Per-project realignment through the Epic + mission lens; mission-aligned opportunities the per-project assessments missed; the solution-driven-maturation process formalized (surface ledger + rotation contract) |
+
+## Corrections (2026-06-11, maintainer review)
+
+The first edition of this analysis repeated the Koi assessment's "TLS termination has
+plausibly never worked" framing. The maintainer corrected the history: **the TLS plane did
+work before the axum 0.8 upgrade**. The maintainer operates a single serial lane of focus and
+matures surfaces by **dogfooding them inside downstream solutions — including private
+solutions outside these three repos** that the assessments could not see. The regression
+landed while the lane (and its exercising solution) was elsewhere, and nothing mechanical was
+in place to notice (`status()` hardcodes `running: true`; zero data-plane tests).
+
+Three consequences are folded into the documents: (1) "never worked" claims are re-dated to
+"regressed silently while unexercised" — the *current* breakage and severity stand unchanged;
+(2) assessments that read only the three public repos systematically **under-credit how
+exercised a surface has been** — the dogfood constellation is larger than the public Epic;
+(3) the process finding ([02 §3](02-synergy-audit.md)) is *strengthened*, not weakened:
+rotation is the deliberate operating model, so surfaces need mechanical guards that keep
+running between dogfooding cycles. The realignment doc
+([06](06-project-realignment.md) §5) formalizes this as the surface ledger + rotation
+contract.
 
 ## Relationship to the per-project assessments
 

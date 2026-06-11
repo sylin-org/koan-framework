@@ -106,10 +106,12 @@ event names) are breaking for existing enrolled meshes — document a re-enroll 
 
 ## R6 — Scope the Epic's Koi contract to the five proven planes; exclude the TLS proxy
 
-A contract is only as good as the substrate's tested surface, and the proxy has plausibly
-never worked (silent startup panic; `status()` hardcodes `running: true`; zero data-plane
-tests). Fortunately **neither sibling needs it**: moss terminates its own TLS from certmesh
-certs; rake does client-side TLS; moss's builder already sets `proxy(false)`. The working
+A contract is only as good as the substrate's *guarded* surface, and the proxy is the type
+specimen of the unguarded kind: it worked before the axum 0.8 upgrade, regressed silently
+(startup panic; `status()` hardcodes `running: true`), and has zero data-plane tests to say
+so (README Corrections). Fortunately **neither sibling needs it**: moss terminates its own
+TLS from certmesh certs; rake does client-side TLS; moss's builder already sets
+`proxy(false)`. The working
 pattern is *"certmesh issues, consumers terminate"* — not *"Koi proxies."* The formal contract
 surface is therefore exactly what the siblings already consume: **mdns (register/browse +
 HTTP/SSE bridge), dns, certmesh REST, udp bridging, truststore**. The proxy is re-admitted

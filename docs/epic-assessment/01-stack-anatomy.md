@@ -112,3 +112,12 @@ repos, with two of three layers dormant at any moment as the observed steady sta
 analysis must price that in — the Epic matures at roughly the *sum*, not the max, of the three
 runways, and "dormancy-safe by construction" (tags, CI, pinned published deps) matters more
 than any feature.
+
+**Maintainer framing (correction — see README)**: the serial lane is deliberate, not a
+defect. Surfaces mature by being *exercised inside downstream solutions*, including private
+solutions outside these three repos that this ledger cannot see. Two consequences for reading
+this document: the cadence table understates total activity (the dogfood constellation is
+bigger than the public Epic), and "dormant" means *unguarded*, not *abandoned* — which is
+precisely why the dormancy-safety machinery, plus per-surface tripwires
+([06 §5](06-project-realignment.md)), is the load-bearing recommendation rather than a
+nicety.
