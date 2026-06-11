@@ -60,6 +60,26 @@ framework keeps it honest"** (an agent transcript). Its prerequisites are exactl
 (installable packages), E (one way), and F (loud failures) — a useful sanity check that the
 consolidation plan and the strategy point the same direction.
 
+### §3.1 The second act: trustworthy and verifiable (architect-reviewed expansion)
+
+The four properties above make Koan *legible* to agents; a second set makes it **trustworthy
+and verifiable** — grants, audits, conformance, composition truth. Act one: agents can build on
+it. Act two: you can let them. Ranked by differentiation × fit × cost (design-shape prompt
+cards with proposed APIs: [07-strategic-prompt-stash.md](07-strategic-prompt-stash.md)):
+
+| # | Capability | The gap it exploits | Koan's unfair asset |
+|---|---|---|---|
+| 1 | **Composition lockfile** (behavioral SBOM) | Supply-chain tooling diffs packages, never behavior | Source-gen registry + provenance already collect it; serialization is all that's missing |
+| 2 | **Governed agent access** (grants/audit/revocation for MCP) | MCP's security norm is all-or-nothing bearer access | `[McpEntity]` + capability model + IAuthorize + Trust/KSVID + coherence-epoch revocation |
+| 3 | **Conformance-by-declaration** (your app inherits a test suite) | Agents outpace verification; Rails-style scaffolds are empty shells | The TestKit/oracle machinery exists — point it at the app's entities |
+| 4 | **Multi-tenancy primitive** (`[Tenant]`, capability-graded isolation) | .NET tenancy is DIY or ABP-heavy; Marten is Postgres-pinned | Validated partitions + partition-aware cache/vector; *gated on Facet 3* |
+| 5 | **Scales-down / sovereign** (one AOT binary, air-gapped) | Frameworks scale up; BaaS (Supabase/Convex) can't ship on-prem | Capability ladder scales down; local Ollama; g1c1 AOT dogfood |
+| 6 | **App-level AI evals** (goldens as entities, runs as jobs) | AI client libs give calls; eval SaaS gives platforms; nobody tests *your* AI behavior locally | Pure grammar reuse — with hard boundaries against the shed MLOps lane |
+| 7 | **Agent-operable runtime** (ops verbs as governed tools) | ChatOps is glue code everywhere | Phase 2 of #2: Jobs/Cache verbs already have programmatic surfaces |
+
+Refused lanes (equally strategic to *not* chase): realtime client sync/CRDTs, a workflow
+engine, model serving/registries, UI scaffolding.
+
 ## §4 The second wedge: own the data→AI seam in .NET
 
 Every .NET shop adding AI hand-rolls the same plumbing: chunking, embedding generation and sync,

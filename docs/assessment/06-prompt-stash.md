@@ -645,6 +645,11 @@ VERIFY: run samples/S1.Web, paste the new boot output in your summary; Bootstrap
 
 ## Strategic capabilities (05 §3) — all T3
 
+> **Second-act capabilities** (05 §3.1 — composition lockfile, governed agent access,
+> conformance kits, tenancy, sovereign deploys, AI evals, agent ops) have their own
+> design-shape cards in **[07-strategic-prompt-stash.md](07-strategic-prompt-stash.md)**.
+> As each ADR lands, append its minted T1/T2 implementation cards back here.
+
 ```text
 S1 FRONTIER: Write the ADR for dev-mode MCP introspection ("the app explains itself to
 agents"): a small package exposing entities/adapters/negotiated-capabilities/boot-report as MCP
