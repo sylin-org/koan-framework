@@ -1,0 +1,213 @@
+{
+  "samples": [
+    {
+      "name": "S0.ConsoleJsonRepo",
+      "demonstrates": "Minimal bootstrap in ~50 LOC: services.StartKoan(), Entity<T> statics (Save/Get/All), Batch() builder, AllStream().Pipeline().ForEach().Save() streaming mutation over the JSON file connector. No web host.",
+      "pillars": [
+        "Core (bootstrap)",
+        "Data (Json connector)"
+      ],
+      "tier": "toy",
+      "staleness": "Current. In Koan.sln (CI-built), net10.0, uses the modern streaming Pipeline API. No README of its own — described only in the stale CATALOG.md."
+    },
+    {
+      "name": "S1.Web",
+      "demonstrates": "CRUD fundamentals: EntityController<T>, hierarchical relationships (User/Category -> Todo -> TodoItem) with GetParent/GetChildren navigation, RFC 5988 pagination, streaming, rate limiting + ProblemDetails toggles, AngularJS UI, and [Cacheable(120)] — the live dogfood surface for the v0.7 cache pillar (ARCH-0075/0078). Sqlite + Json connectors, Koan.Admin.",
+      "pillars": [
+        "Core",
+        "Data (Sqlite, Json)",
+        "Web",
+        "Cache",
+        "Admin"
+      ],
+      "tier": "tutorial",
+      "staleness": "Current. In sln, actively modernized (cache attribute added when the pillar shipped). README still accurate for its scope."
+    },
+    {
+      "name": "S3.Mq.Sample",
+      "demonstrates": "Was a RabbitMQ messaging hello-world (entity .Send(), aliasing, auto-subscribe). Today it only sends two messages and sleeps — its handler registrations were stripped, leaving literal '[REMOVED obsolete OnMessage/OnBatch handlers]' and '[REMOVED obsolete SendAsBatch usage]' comments in Program.cs.",
+      "pillars": [
+        "Core",
+        "Messaging (RabbitMq connector)",
+        "Data"
+      ],
+      "tier": "toy (lobotomized)",
+      "staleness": "Severely stale. Builds (in sln) but demonstrates almost nothing; README still documents the deleted OnMessage/OnBatch/SendAsBatch APIs; uses the legacy manual bootstrap (AppHost.Current = sp; IAppRuntime.Discover()/Start()) instead of the host-builder pattern every other sample uses. Messaging pillar effectively has no working sample."
+    },
+    {
+      "name": "S5.Recs (AnimeRadar)",
+      "demonstrates": "Flagship full app (66 files, ~8.0K LOC, 499-line tutorial README that is the declared template for all sample docs): hybrid recommendation engine on Mongo, Weaviate vector search with graceful fallback, [Embedding] auto-embeddings (ARCH-0070), partition-based import pipeline workers using EntityContext.Partition (ARCH-0069), Koan.Scheduling jobs, Auth TestProvider, Web.Backup, Admin dashboards, embedding telemetry (AI-0020).",
+      "pillars": [
+        "Core",
+        "Data (Mongo)",
+        "Vector (Weaviate)",
+        "AI (Ollama)",
+        "Web",
+        "Auth",
+        "Scheduling",
+        "Backup",
+        "Admin",
+        "Observability"
+      ],
+      "tier": "dogfood-app",
+      "staleness": "Maintained — deliberately restored in 2026-06 commit 05f7b911 'fix(samples): restore S5.Recs + S7.Meridian builds (pre-existing rot)'. Minor drift: Program.cs carries manual workarounds (explicit IRelationshipMetadata registration) and obsolete-pattern comments (VectorizationWorker commented out post-ARCH-0070)."
+    },
+    {
+      "name": "S6.SnapVault",
+      "demonstrates": "'Google Photos rival' photo manager (38 files, ~6.8K LOC, 529-line README): media derivative pipeline, three-tier storage (Local + S3), AI vision analysis with the AI-0020 pipeline (Ai.FromImage().ToText()), semantic search, SignalR progress, ZenGarden model advisor (RecommendedModel per AiCapability), [assembly: KoanApp] orchestration manifest.",
+      "pillars": [
+        "Core",
+        "Data (Mongo)",
+        "Media",
+        "Storage (Local, S3)",
+        "AI (Ollama)",
+        "Vector (Weaviate)",
+        "Web",
+        "ZenGarden"
+      ],
+      "tier": "dogfood-app (rotted)",
+      "staleness": "BROKEN: not in Koan.sln, build fails today with NU1605 (sample pins SixLabors.ImageSharp.Drawing 2.1.4 vs Koan.Media.Core's >= 2.1.6). README badges frozen at 'koan v0.6.3' and 'AI-0020 Modernization (2025-01)' while the repo is 0.17.x."
+    },
+    {
+      "name": "S7.Meridian",
+      "demonstrates": "The largest sample (89 files, ~16.1K LOC, 1138-line README plus ~10 phase/architecture planning docs): local-first document intelligence — PDF parsing (PdfPig), hint-driven classification, hybrid Weaviate retrieval, schema-validated LLM extraction with per-value citations and confidence, content-addressed (SHA-512) storage, background processing with heartbeats, versioned deliverables rendered from templates.",
+      "pillars": [
+        "Core",
+        "Data (Mongo)",
+        "Vector (Weaviate)",
+        "AI (Ollama)",
+        "Storage (Local)",
+        "Web",
+        "Observability"
+      ],
+      "tier": "dogfood-app",
+      "staleness": "Builds clean (verified) only because it was hand-restored in 2026-06 ('pre-existing rot'); it is NOT in Koan.sln so nothing prevents re-rot. Docs are phase-tracker style dated 'January 20, 2025'; replaced earlier S7.ContentPlatform/S7.TechDocs (whose untracked bin/obj ghost dir still sits in samples/)."
+    },
+    {
+      "name": "S8.Canon",
+      "demonstrates": "Canon Runtime pipeline tutorial: CanonEntity<T> with GUID v7, ICanonPipelineContributor validation/enrichment phases, CanonEntitiesController<T>, auto-registration via KoanAutoRegistrar. Three csprojs: root S8.Canon.csproj plus nested S8.Canon.Api (adds Mongo + RabbitMQ flavor) and S8.Canon.Shared.",
+      "pillars": [
+        "Core",
+        "Canon",
+        "Data (Json, Mongo)",
+        "Web",
+        "Messaging (Api variant)",
+        "Observability"
+      ],
+      "tier": "tutorial/showcase",
+      "staleness": "Structurally broken: the root S8.Canon.csproj fails with 77 CS0579 duplicate-assembly-attribute errors because it globs the nested Api/Shared project sources into itself (verified). Only the Api + Shared subprojects are in Koan.sln/CI. Last real touch 2026-05 mechanical sweep. Shares the S8 number with PolyglotShop."
+    },
+    {
+      "name": "S8.PolyglotShop",
+      "demonstrates": "Koan ServiceMesh showcase (only 115 LOC of app code + 352-line README): Translation service running in-process vs containerized from the same code, UDP-multicast service discovery, static service API (Translation.Translate()), Ollama-backed translation, e-commerce UI.",
+      "pillars": [
+        "Core",
+        "ServiceMesh",
+        "AI (Ollama)",
+        "Web",
+        "Data (Json)",
+        "Auth",
+        "Admin"
+      ],
+      "tier": "showcase (broken)",
+      "staleness": "BROKEN: not in Koan.sln; build fails with CS1061 — AddOllamaFromConfig() was removed from the framework (verified). README badge claims 'koan v1.0' (a version that never existed). Duplicate S8 numbering with S8.Canon."
+    },
+    {
+      "name": "S10.DevPortal",
+      "demonstrates": "Framework-evaluation demo (~870 LOC): live Mongo <-> Postgres <-> Sqlite provider switching via the current EntityContext.With(provider) API, capability detection with runtime reporting, bulk ops (1000+ records), set routing, relationship navigation, performance comparison UI.",
+      "pillars": [
+        "Core",
+        "Data (Mongo, Postgres, Sqlite)",
+        "Web"
+      ],
+      "tier": "showcase",
+      "staleness": "Code current — it survived the ARCH-0084 legacy-capability-enum deletion (touched 2026-06-02) and uses live EntityContext APIs. README drift: claims '.NET 9.0 SDK' (csproj is net10.0) and port 5090 vs OPS-0014's allocated 5134."
+    },
+    {
+      "name": "S14.AdapterBench",
+      "demonstrates": "Cross-adapter benchmark suite (~1.9K LOC): three entity complexity tiers across Sqlite/Postgres/Mongo/Redis, write/read/stream benchmarks, SignalR live progress, Chart.js dashboards — and BenchmarkJob, a fully current JOBS-0005 entity-first job (Entity<BenchmarkJob> + IKoanJob<BenchmarkJob>, static Execute, ctx.Progress to the durable ledger).",
+      "pillars": [
+        "Core",
+        "Data (Sqlite, Postgres, Mongo, Redis)",
+        "Web",
+        "Jobs"
+      ],
+      "tier": "showcase + active dogfood",
+      "staleness": "Most current sample: updated 2026-06-04 by the JOBS-0005 orchestrator rebuild itself. README says '.NET 9.0 SDK' (minor drift)."
+    },
+    {
+      "name": "S16.PantryPal (API + MCP family)",
+      "demonstrates": "Vision-AI meal planning split into API + MCP host: [McpEntity] on 6 entities (PantryItem, Recipe, MealPlan, ShoppingList, PantryPhoto, UserProfile), MCP over HTTP/SSE via MapKoanMcpEndpoints(), Code Mode multi-entity workflows, grocery detection with bounding boxes, NL quantity parsing, AngularJS+Tailwind SPA.",
+      "pillars": [
+        "Core",
+        "Data (Sqlite)",
+        "Web",
+        "AI (vision)",
+        "MCP",
+        "Storage",
+        "Vector"
+      ],
+      "tier": "showcase",
+      "staleness": "In sln/CI so it compiles, but last meaningful touch pre-2026; README is visibly two documents concatenated mid-line ('...layout details.# S16 PantryPal: AI-Powered Meal Planning') and the frontend service layer is still 'in-memory simulation; easy swap to HTTP'."
+    },
+    {
+      "name": "S18.Prism",
+      "demonstrates": "Personal Knowledge Intelligence app, explicitly self-described in its 1402-line SPECIFICATION.md as 'the dogfood sample for the Koan.AI lifecycle expansion (AI-0022 through AI-0031)': per-space AI stacks, source pull adapters (RSS/HackerNews/GitHub/folder/web), research-brief and model-crawler workers, and references to the entire Koan.AI suite (Models, Prompt, Orchestration, Eval, Review, Agents, Compute, Training) plus ZenGarden, Media, Storage, Vector.",
+      "pillars": [
+        "Core",
+        "Data (Mongo)",
+        "AI (full lifecycle: Models/Prompt/Orchestration/Eval/Review/Agents/Compute/Training)",
+        "Vector (Weaviate)",
+        "Media",
+        "Storage (Local, S3)",
+        "Web",
+        "ZenGarden"
+      ],
+      "tier": "dogfood-app (spec-led, partially implemented)",
+      "staleness": "In sln/CI, net10.0. Has NO README (only the spec + a Dockerfile/start.bat) despite being listed as the 'Expert ✅ Active' flagship in samples/README.md; implemented code (~2.7K LOC) is much smaller than the spec's ambition, so it functions as a forward-looking test rig rather than a teachable example."
+    },
+    {
+      "name": "guides/g1c1.GardenCoop",
+      "demonstrates": "Narrative 'Chapter 1' guide: community-garden slice with entity statics + relationships, write-path automation (reminders upserted from sensor readings), seeders, AngularJS dashboard + admin view, TestProvider auth auto-election, KoanRegistry initializer/auto-registrar introspection printed at boot, and NativeAOT single-file publish — the only sample dogfooding source-gen discovery under AOT trimming.",
+      "pillars": [
+        "Core (registry/source-gen, NativeAOT)",
+        "Data (Sqlite)",
+        "Web",
+        "Auth"
+      ],
+      "tier": "tutorial (guided narrative)",
+      "staleness": "In sln, builds; conceptually current. But it is 'g1c1' — chapter 1 of a guide series that never got a chapter 2."
+    },
+    {
+      "name": "Ghost directories (S4.Web, S7.TechDocs, S8.Location, S9.Location, S12.MedTrials.Core/.McpService, S13.DocMind.Tools, KoanAspireIntegration.AppHost)",
+      "demonstrates": "Nothing — these eight top-level samples/ directories contain ONLY untracked bin/obj build artifacts (0 git-tracked files each, verified). They are leftovers from samples deleted or moved to archive/, and they make samples/ look ~40% larger and more chaotic than it is.",
+      "pillars": [],
+      "tier": "debris",
+      "staleness": "Should be deleted; S11 and S17 never existed in git history at all (pure reserved numbering gaps), S9.Location/S13.DocMind existed and were deleted, the rest were archived under DX-0045 (2025-10-16)."
+    }
+  ],
+  "learningLadder": "Partially coherent: the bottom and top rungs are real, the middle is missing, and the map lies. The documented path S0 (5-min console toy) -> S1 (CRUD/relationships/cache tutorial) -> S10 (multi-provider capability demo) -> S14 (provider selection + jobs) -> S5 (full AI app) -> S16 (MCP) -> S7/S18 (expert dogfood apps) is a genuinely good progression in principle, and the first four rungs are current and CI-protected. But a newcomer following samples/CATALOG.md (frozen 2025-10-16 at 'v0.6.3' while the repo is 0.17.x NBGV) is directed to four phantom samples — S3.NotifyHub, S4.DevHub, S6.MediaHub, S9.OrderFlow, all marked 'In Development' with week-numbered phase plans — none of which were ever built; meanwhile the real S6.SnapVault, S7.Meridian, S8.PolyglotShop, and S18.Prism are absent from the catalog's index entirely. Whole pillars have no working rung: messaging's only sample (S3.Mq.Sample) was lobotomized ('[REMOVED obsolete OnMessage/OnBatch handlers]' literally in Program.cs, README documenting deleted APIs); jobs and cache exist only embedded inside S14/S1 rather than as teachable samples; secrets, scheduling-as-topic, and the new KoanModule/capability-model primitives have no sample at all. Numbering is a fossil record rather than a ladder: S2/S12/S15 archived, S4/S6.Auth/S6.SocialCreator archived, S9/S13 deleted leaving untracked bin/obj ghost dirs at top level, S11/S17 never existed, and S8 is used twice (Canon and PolyglotShop). The deepest structural issue is a two-tier reality: the 12 sample projects inside Koan.sln ride the full-green CI ratchet and stay current, while the four outside it rot on schedule — of those four, S8.PolyglotShop fails to compile (removed AddOllamaFromConfig API), S6.SnapVault fails to restore (NU1605), root S8.Canon throws 77 duplicate-attribute errors, and S7.Meridian builds only because it was hand-restored days ago. Verdict: a newcomer can climb S0->S1->S10->S14 confidently, then must jump straight to large dogfood apps with stale or absent READMEs; the ladder needs middle rungs (messaging, jobs, cache as first-class samples), catalog truth-restoration, sln/CI inclusion for all kept samples, and deletion of ghost dirs.",
+  "dogfoodApps": [
+    "S18.Prism — the explicit dogfood for the Koan.AI lifecycle expansion (AI-0022..AI-0031: Models/Prompt/Chains/Training/Eval/Review/Agents/Compute), per its own SPECIFICATION.md; references 9 Koan.AI.* projects plus ZenGarden/Media/Storage/Vector",
+    "S14.AdapterBench — the data-adapter and Jobs-pillar dogfood; its BenchmarkJob was rewritten as part of the JOBS-0005 orchestrator rebuild (2026-06-04), making it the only sample touched by current framework work",
+    "S5.Recs — the historical flagship and pattern-setter (its README is the declared template); drove ARCH-0069 partition import pipelines, ARCH-0070 [Embedding], AI-0020 telemetry; deliberately kept alive (restored 2026-06)",
+    "S7.Meridian — the RAG/document-intelligence dogfood (largest codebase at 16K LOC); exercises vector+AI+storage+Canon patterns at production scale; restored alongside S5 in 2026-06",
+    "S1.Web — the cache-pillar dogfood ([Cacheable(120)] added when ARCH-0075/0078 shipped)",
+    "S16.PantryPal — the MCP-pillar dogfood ([McpEntity], HTTP/SSE host, Code Mode)",
+    "S10.DevPortal — the capability-model/EntityContext provider-switching dogfood; survived the ARCH-0084 capability-enum deletion as its living demo"
+  ],
+  "observations": [
+    "Two-tier maintenance reality (verified by building): 12 sample projects in Koan.sln are CI-ratchet-protected and current; the 4 outside (S6.SnapVault, S7.Meridian, S8.PolyglotShop, root S8.Canon) rot — S8.PolyglotShop fails CS1061 (AddOllamaFromConfig removed from framework), S6.SnapVault fails NU1605 (ImageSharp.Drawing 2.1.4 pin vs Media.Core 2.1.6), root S8.Canon fails with 77 CS0579 duplicate-attribute errors (globs its nested Api/Shared projects), S7.Meridian builds only because commit 05f7b911 hand-restored it days ago.",
+    "All 16 active csprojs have zero broken ProjectReferences (verified programmatically) and all target net10.0 with current src/Connectors/* paths — reference hygiene is good even where code rots.",
+    "samples/CATALOG.md and samples/README.md are frozen at 2025-10-16 / 'v0.6.3' (repo is 0.17.x via NBGV); they advertise four never-built samples (S3.NotifyHub, S4.DevHub, S6.MediaHub, S9.OrderFlow) as 'In Development (Phase N: Weeks X-Y)' and omit S6.SnapVault, S7.Meridian, S8.PolyglotShop from the catalog; multiple READMEs say '.NET 9.0 SDK'; S10's README port (5090) contradicts OPS-0014 (5134).",
+    "Eight top-level samples/ directories are untracked bin/obj ghosts with 0 git-tracked files (S4.Web, S7.TechDocs, S8.Location, S9.Location, S12.MedTrials.Core, S12.MedTrials.McpService, S13.DocMind.Tools, KoanAspireIntegration.AppHost) — delete candidates that materially distort any directory-listing-based assessment.",
+    "Numbering gaps decoded: S2/S12/S15 + S4.Web/S6.Auth/S6.SocialCreator/KoanAspireIntegration archived under archive/ per DX-0045 (2025-10-16, ARCHIVED.md has per-sample migration guidance); S9.Location and S13.DocMind deleted from tree (history confirms they existed); S11 and S17 never existed in git history; S8 is duplicated (Canon + PolyglotShop).",
+    "S3.Mq.Sample is the clearest decay artifact: Program.cs contains literal '[REMOVED obsolete OnMessage/OnBatch handlers]' placeholders, its README documents the removed APIs, and it still uses the legacy manual bootstrap (AppHost.Current = sp + IAppRuntime.Discover()/Start()) — the messaging pillar currently has no functioning sample.",
+    "Modern-API adoption is genuinely present where samples are alive: EntityContext.With(provider) in S10, EntityContext.Partition in S5, [Cacheable] in S1, IKoanJob<T>+JobContext.Progress in S14, [McpEntity] in S16, [assembly: KoanApp] in S6/S18/g1c1 — but NO sample uses KoanModule (consistent with ARCH-0086 Facet 2 being researched, not yet rolled out).",
+    "Bootstrap patterns are inconsistent across samples (services.StartKoan() in S0; AddKoan().AsWebApi() vs .AsProxiedApi() vs bare AddKoan(); manual AppHost.Current ??= app.Services in ~6 samples vs omitted in others) — a newcomer reading samples in order would not be able to infer the canonical Program.cs.",
+    "Sophistication is bimodal: 3 samples under 120 LOC (S0, S3, S8.PolyglotShop app-code), 4 mid-size demos (S1 412, g1c1 632, S10 872, S14 1.9K), and 5 large apps (S16 3.2K, S18 2.7K+spec, S6 6.8K, S5 8.0K, S7 16.1K LOC) — there is no medium-complexity teaching app between 'demo' and 'flagship'.",
+    "Several large samples carry stale self-congratulation: S6.SnapVault claims 'production-ready' with a v0.6.3 badge and 'AI-0020 Modernization (2025-01)' banner while failing to build; S8.PolyglotShop badges 'koan v1.0' (never a real version); S7.Meridian ships ~10 internal phase-planning docs (PHASE_1_COMPLETE.md etc.) dated January 2025 inside the sample folder.",
+    "S18.Prism, billed in samples/README.md as the 'Expert ✅ Active' flagship, has no README at all — only SPECIFICATION.md — so the most strategically important sample is also the least approachable.",
+    "samples/Directory.Build.props is well-engineered (root props import, IsPackable=false guard per ARCH-0082, orchestration-manifest generator opt-in per ARCH-0077, shared GlobalUsings, conditional wwwroot content) — infrastructure quality exceeds content freshness."
+  ]
+}

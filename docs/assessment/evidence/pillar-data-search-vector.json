@@ -1,0 +1,217 @@
+{
+  "area": "data-search-vector",
+  "projects": [
+    {
+      "name": "Koan.Data.Vector.Abstractions",
+      "purpose": "Provider contracts for the vector pillar: the adapter repository interface, query option/result DTOs, capability tokens (ARCH-0084), adapter factory/attribute, plus a metadata-schema subsystem and workflow interfaces. Marketed as 'providers depend on this package only'.",
+      "keyTypes": [
+        "IVectorSearchRepository<TEntity,TKey> (Upsert/Delete/Search + default-throwing GetEmbedding(s)/Flush/ExportAll)",
+        "VectorQueryOptions / VectorQueryResult<TKey> / VectorMatch",
+        "VectorCaps (capability tokens: Knn, Filters+FilterSupport detail, Hybrid, NativeContinuation, DynamicCollections...)",
+        "IVectorAdapterFactory + VectorAdapterAttribute",
+        "IVectorFilterTranslator<TNative> (anti-corruption contract — see dead/experimental)",
+        "VectorSchemaRegistry / VectorSchemaDescriptor / VectorSchemaAutoGenerator (Schema/)",
+        "IVectorWorkflow / IVectorWorkflowRegistry",
+        "VectorExportBatch<TKey> / VectorInstructions"
+      ],
+      "dependsOn": [
+        "Koan.Data.Abstractions",
+        "Koan.Data.Core"
+      ],
+      "state": "active — last commit 2026-06-02 (ARCH-0084 capability migration), 951 LOC, 1 TODO total; but carries dead surface (VectorEmbeddingAttribute: zero consumers; IVectorFilterTranslator: implemented only by the broken PGVector connector; Schema subsystem: single external consumer Koan.Service.KoanContext)"
+    },
+    {
+      "name": "Koan.Data.Vector",
+      "purpose": "The facade pillar: ambient static Vector<TEntity>/VectorData<TEntity> (transaction-aware save/search, partition scoping via EntityContext), the residual-is-error filter read gate, runtime adapter resolution, and a parallel workflow/profile API. Auto-registers via KoanAutoRegistrar.",
+      "keyTypes": [
+        "Vector<TEntity> (static facade; string-key only, 1:1 delegation to VectorData)",
+        "VectorData<TEntity> (transaction-aware Save/SaveWithVector/Search + metadata normalization)",
+        "VectorFilterCoordinator (single read-boundary gate; residual = hard error VectorFilterUnsupportedException, DATA-0097)",
+        "IVectorService / VectorService (adapter resolution: [VectorAdapter] → VectorDefaultsOptions → Source/DataAdapter attr → highest-priority data provider)",
+        "VectorWorkflow<TEntity> + VectorProfiles + VectorWorkflowOptions (profile-driven parallel API, DATA-0084)",
+        "VectorRetrieveOptions (typed AI-orchestration overload, AI-0036 §9 R4)",
+        "PipelineVectorExtensions / EntityVectorExtensions",
+        "VectorCoordinationException (entity-saved-but-vector-failed)"
+      ],
+      "dependsOn": [
+        "Koan.Data.Core",
+        "Koan.Data.Vector.Abstractions"
+      ],
+      "state": "active — 1,828 LOC, heavily consumed (Koan.Data.AI, Koan.Rag, Koan.AI.Agents, Koan.AI.Orchestration, Koan.Service.KoanContext, samples S5/S6/S7/S16/S18); the VectorWorkflow/VectorProfiles sub-surface inside it is experimental (zero consumers outside one spec)"
+    },
+    {
+      "name": "Koan.Data.SearchEngine",
+      "purpose": "Deliberate 128-LOC micro-library: single source of truth for translating the unified Filter AST into the Lucene query DSL shared by the Elasticsearch and OpenSearch vector connectors (DATA-0097 P1) — folded out of two previously duplicated-but-pinned copies.",
+      "keyTypes": [
+        "SearchEngineFilterTranslator (static; term/terms/range/wildcard/bool/exists, .keyword sub-field handling, null-inclusive negation)",
+        "SearchEngineFilterTranslator.Caps (the one shared FilterSupport constant)"
+      ],
+      "dependsOn": [
+        "Koan.Data.Abstractions"
+      ],
+      "state": "active — NOT a stub: complete, documented (README + TECHNICAL), in sln, both ES and OS reference it; question is only whether one 128-LOC static class warrants a standalone NuGet package"
+    },
+    {
+      "name": "Koan.Data.Lucene",
+      "purpose": "Nothing — directory contains only an untracked obj/ build-leftover (AssemblyInfo cache for a long-gone csproj). No sources, no csproj, no git history, not in Koan.sln.",
+      "keyTypes": [],
+      "dependsOn": [],
+      "state": "tombstone — confirmed: `git log` empty for the path, only obj/Debug/net10.0 artifacts present; safe to delete the directory"
+    },
+    {
+      "name": "Koan.Data.Vector.Connector.Weaviate",
+      "purpose": "Reference vector adapter: schema ensure, KNN + hybrid (BM25+vector) search, cursor continuation, filter pushdown via AST→GraphQL where translator (De Morgan negation lowering), health/discovery/orchestration.",
+      "keyTypes": [
+        "WeaviateVectorRepository",
+        "WeaviateFilterTranslator (static, intentionally REDUCED operator set to exercise residual-is-error)",
+        "WeaviateClient",
+        "WeaviateOptionsConfigurator (ZenGarden connection-intent resolution)",
+        "WeaviateDiscoveryAdapter / WeaviateOrchestrationEvaluator / WeaviateHealthContributor"
+      ],
+      "dependsOn": [
+        "Koan.Data.Abstractions",
+        "Koan.Data.Vector.Abstractions",
+        "Koan.Data.Core",
+        "Koan.Core",
+        "Koan.Orchestration.Abstractions",
+        "Koan.ZenGarden.Core"
+      ],
+      "state": "active — 2,363 LOC, fullest matrix cell (25/25 incl. hybrid + continuation), README+TECHNICAL; quirk: only vector connector coupled to Koan.ZenGarden.Core"
+    },
+    {
+      "name": "Koan.Data.Vector.Connector.Qdrant",
+      "purpose": "The 'lean cell' adapter: scalar quantization + on-disk originals for resource-constrained deployments; payload-based metadata filtering (honestly declares NO substring ops), REST KNN, synchronous writes (wait=true).",
+      "keyTypes": [
+        "QdrantVectorRepository",
+        "QdrantFilterTranslator (static; must/should/must_not DSL; null-inclusive must_not matching the convergence oracle)",
+        "QdrantOptions + QuantizationOptions",
+        "QdrantVectorAdapterFactory",
+        "QdrantDiscoveryAdapter / QdrantHealthContributor"
+      ],
+      "dependsOn": [
+        "Koan.Data.Abstractions",
+        "Koan.Data.Vector.Abstractions",
+        "Koan.Data.Core",
+        "Koan.Core",
+        "Koan.Orchestration.Abstractions"
+      ],
+      "state": "active — 1,682 LOC, in sln with matrix test cell; doc gap: only active vector connector with no README/TECHNICAL"
+    },
+    {
+      "name": "Koan.Data.Vector.Connector.Milvus",
+      "purpose": "Milvus vector adapter: collection management, hybrid metadata filtering, REST-based vector search, health/discovery/telemetry.",
+      "keyTypes": [
+        "MilvusVectorRepository",
+        "MilvusFilterTranslator",
+        "MilvusVectorAdapterFactory",
+        "MilvusOptions / MilvusOptionsConfigurator",
+        "MilvusDiscoveryAdapter / MilvusHealthContributor"
+      ],
+      "dependsOn": [
+        "Koan.Data.Abstractions",
+        "Koan.Data.Vector.Abstractions",
+        "Koan.Data.Core",
+        "Koan.Core",
+        "Koan.Orchestration.Abstractions"
+      ],
+      "state": "active code (1,370 LOC, in sln, README+TECHNICAL, matrix cell wired) but weakest empirical verification: matrix README records 0/25 locally (container OOM at ~2GB), 'wire-up validated; CI hosts should pass'"
+    },
+    {
+      "name": "Koan.Data.Connector.PGVector",
+      "purpose": "PostgreSQL pgvector adapter: native embeddings with HNSW/IVFFlat indexing, Dapper/Npgsql based, extension management; sole implementor of IVectorFilterTranslator<TNative>.",
+      "keyTypes": [
+        "PGVectorRepository : IVectorSearchRepository",
+        "PGVectorFilterTranslator : IVectorFilterTranslator<PGVectorWhere>",
+        "PgVectorIndexBuilder / PgVectorExtensionManager",
+        "PGVectorAdapterFactory",
+        "PGVectorOptions"
+      ],
+      "dependsOn": [
+        "Koan.Data.Core",
+        "Koan.Data.Abstractions",
+        "Koan.Data.Vector.Abstractions",
+        "Koan.Core",
+        "Koan.Orchestration.Abstractions",
+        "Koan.Orchestration.Aspire"
+      ],
+      "state": "stale/broken — csproj comment: IsPackable=false, 'multiple unresolved references (NamingStyle missing, PGVectorOptions.MaxDimension missing)… in-flight branch trusting-mccarthy'; NOT in Koan.sln (neither src nor its test project); matrix README: 'Connector itself doesn't currently compile on this branch'; missing version.json/README/Discovery that siblings have"
+    },
+    {
+      "name": "Koan.Data.Connector.ElasticSearch",
+      "purpose": "Elasticsearch vector adapter (vector-only despite the generic name): index provisioning with dense_vector mappings, ES 8.x kNN search, metadata filter pushdown via shared Koan.Data.SearchEngine translator, instructions (Clear/Rebuild/Stats), health/discovery.",
+      "keyTypes": [
+        "ElasticSearchVectorRepository",
+        "ElasticSearchVectorAdapterFactory",
+        "ElasticSearchOptions / ElasticSearchOptionsConfigurator",
+        "ElasticSearchDiscoveryAdapter / ElasticSearchHealthContributor"
+      ],
+      "dependsOn": [
+        "Koan.Data.Abstractions",
+        "Koan.Data.Vector.Abstractions",
+        "Koan.Data.Core",
+        "Koan.Core",
+        "Koan.Orchestration.Abstractions",
+        "Koan.Data.SearchEngine"
+      ],
+      "state": "active — 1,402 LOC, README+TECHNICAL, matrix cell 15 pass / 10 skip with real capability gaps surfaced as Supports*=false flags"
+    },
+    {
+      "name": "Koan.Data.Connector.OpenSearch",
+      "purpose": "OpenSearch vector adapter: knn_vector index provisioning (index.knn=true), OS 2.x-native KNN query shape (explicitly diverging from ES 8.x top-level knn), shared SearchEngine filter translation, health/discovery.",
+      "keyTypes": [
+        "OpenSearchVectorRepository (inline-documented OS 2.x KNN shape + space_type metric mapping)",
+        "OpenSearchVectorAdapterFactory",
+        "OpenSearchOptions / OpenSearchOptionsConfigurator",
+        "OpenSearchDiscoveryAdapter / OpenSearchHealthContributor"
+      ],
+      "dependsOn": [
+        "Koan.Data.Abstractions",
+        "Koan.Data.Vector.Abstractions",
+        "Koan.Data.Core",
+        "Koan.Core",
+        "Koan.Orchestration.Abstractions",
+        "Koan.Data.SearchEngine"
+      ],
+      "state": "active — 1,272 LOC; current code implements the OS-native query shape, but the matrix README still records the pre-fix '0/25 all skip — adapter emits ES-style KNN that OS rejects', so the status table is stale relative to the code; needs a re-run to confirm"
+    }
+  ],
+  "cohesion": "Strong, recently-hardened core: one contract (IVectorSearchRepository), one facade pathway (Vector<T>→VectorData<T>→VectorFilterCoordinator→repo), one capability vocabulary (VectorCaps tokens with FilterSupport detail, ARCH-0084, migrated 2026-06-02 across all 9 projects in one commit), and one uniform ~25-spec test matrix per adapter. The DATA-0097 'residual-is-error' invariant is enforced at a single choke point and every connector's translator cites it. Fractures: (1) three naming/placement conventions for six vector connectors — Koan.Data.Vector.Connector.{Weaviate,Qdrant,Milvus} under Connectors/Data/Vector/, Koan.Data.Connector.{ElasticSearch,OpenSearch} at Connectors/Data/ root despite being vector-only adapters, and Koan.Data.Connector.PGVector named like the latter but placed in the Vector folder; (2) Koan.Data.Vector.Abstractions depends on Koan.Data.Core (VectorAdapterNaming reaches into EntityContext.Current.Partition), contradicting its own csproj claim 'providers depend on this package only'; (3) a second, parallel save/query API (VectorWorkflow/VectorProfiles/EntityVectorExtensions, DATA-0084) lives beside the Vector<T> facade with zero external adopters, and VectorData.SaveWithVector must branch on its presence; (4) Weaviate alone couples to Koan.ZenGarden.Core for connection-intent resolution; (5) the facade is pinned to IEntity<string> while the repository contract is TKey-generic — generality that no facade exposes.",
+  "redundancies": [
+    "Two public save/search surfaces in one pillar: Vector<T>/VectorData<T> (used by all 5 src consumers + 5 samples) vs VectorWorkflow<T>/VectorProfiles/EntityVectorExtensions.SaveVectorAsync (used by exactly one spec, tests/Suites/Data/Core/.../VectorWorkflow.Spec.cs); SaveWithVector silently routes through the workflow when registered, so both must be co-maintained",
+    "Vector<T> is a ~1:1 delegating wrapper over VectorData<T> — two public static classes with nearly identical members (Save/SaveWithVector/Search/UpsertMany) in the same assembly",
+    "IVectorFilterTranslator<TNative> (abstractions) vs the de facto pattern actually used by all active adapters (internal static translator class + FilterSupport constant surfaced as the VectorCaps.Filters token detail) — the interface's only implementor is the broken PGVector connector; the coordinator never consumes the interface",
+    "Instruction-based maintenance (VectorInstructions IndexClear/IndexRebuild/IndexStats via IInstructionExecutor, implemented only by ES + Weaviate) overlaps with the first-class Flush() on IVectorSearchRepository — Vector<T>.Clear() and Vector<T>.Flush() both mean 'delete all vectors' through different mechanisms",
+    "VectorEmbeddingAttribute (Koan.Data.Vector.Abstractions) duplicates the role of Koan.Data.AI's [Embedding] and has zero consumers anywhere",
+    "ADR overlap: DATA-0060-vector-module-split-and-clean-separation.md and DATA-0085-vector-module-split.md are two ADRs for the same decision domain",
+    "tests/Suites/Data/Vector/Koan.Tests.Data.Vector.Weaviate duplicates (an obsolete fragment of) what VectorAdapterSurface.Weaviate.Tests now covers"
+  ],
+  "deadOrExperimental": [
+    "src/Koan.Data.Lucene — tombstone: only untracked obj/ leftovers, no csproj/sources/git history/sln entry; delete",
+    "src/Connectors/Data/Vector/PGVector + tests/Suites/Data/Connector.PGVector — broken and out of solution; csproj says it doesn't compile (pre-ARCH-0082 breakage), fix parked on branch 'trusting-mccarthy'",
+    "tests/Suites/Data/Vector/Koan.Tests.Data.Vector.Weaviate — orphan: no .csproj, not in sln, its single spec tests WeaviatePartitionMapper which no longer exists in src and imports a dead namespace (Koan.Context.Models)",
+    "VectorWorkflow/VectorProfiles subsystem (VectorWorkflow.cs, VectorProfiles.cs, VectorWorkflowOptions.cs, Workflows/VectorWorkflowRegistry.cs, EntityVectorExtensions.cs + IVectorWorkflow/IVectorWorkflowRegistry/VectorWorkflowSaveManyResult in abstractions) — experimental per DATA-0084; zero consumers outside one spec; fails the redesign's dogfood ≥2-usages bar",
+    "VectorEmbeddingAttribute (abstractions) — zero consumers",
+    "IVectorFilterTranslator<TNative> (abstractions) — only implementor is the dead PGVector connector; active pathway bypasses it",
+    "Schema subsystem (VectorSchemaAttribute/VectorPropertyAttribute/IVectorMetadataDictionary/VectorSchemaAutoGenerator) — alive but single external consumer (Koan.Service.KoanContext models); Weaviate is the only adapter that reads VectorSchemaRegistry",
+    "*.csproj.lscache build artifacts sitting in source dirs (Koan.Data.Vector, Koan.Data.Vector.Abstractions, Weaviate, Milvus, ES, OS, Redis)"
+  ],
+  "consolidationCandidates": [
+    "Delete src/Koan.Data.Lucene outright — it is an obj/ ghost, not a project; its continued existence only generates 'is this a pillar?' questions (this mapping included)",
+    "Decide PGVector: either land/port the 'trusting-mccarthy' fixes and wire it into sln + VectorAdapterSurface matrix, or remove the connector + its orphan test project. As-is it is dead weight that also artificially keeps IVectorFilterTranslator alive and contradicts the no-stopgaps rule",
+    "Cut the workflow/profile subsystem (VectorWorkflow, VectorProfiles, EntityVectorExtensions, Workflows/, IVectorWorkflow*, VectorWorkflowSaveManyResult, DATA-0084 surface) or fold its one real feature (per-profile TopK/Alpha/metadata defaults) into VectorQueryOptions/VectorDefaultsOptions — zero external adopters, and removing it collapses VectorData.SaveWithVector to a single code path",
+    "Merge Vector<T> and VectorData<T> into one facade class — Vector<T> is pure delegation; one fewer public concept at zero capability cost (keep the name Vector<T>, which is what all consumers use)",
+    "Remove IVectorFilterTranslator<TNative> and VectorEmbeddingAttribute from abstractions — the settled pattern (static translator + FilterSupport detail on the VectorCaps.Filters token) is what all six active adapters and the coordinator actually use; keep the pattern, drop the unused abstraction",
+    "Normalize connector identity: move ElasticSearch/OpenSearch under src/Connectors/Data/Vector/ and rename all six to Koan.Data.Vector.Connector.* (or document why ES/OS are 'Data.Connector') — three conventions for one category is pure cartographic noise",
+    "Fold Koan.Data.SearchEngine into the connector layer (e.g., a Koan.Data.Vector.Connector.SearchEngine.Shared source-shared base, or merge into whichever of ES/OS becomes the base package) — a 128-LOC static class as a standalone Kernel-adjacent NuGet is more packaging surface than substance; alternatively accept it as the deliberate dedup seam it documents itself to be (it is well-made; this is a packaging call, not a quality one)",
+    "Break the Abstractions→Koan.Data.Core dependency by moving VectorAdapterNaming's EntityContext.Partition resolution into Koan.Data.Vector — restores the csproj's own 'providers depend on this package only' contract and shrinks the kernel graph",
+    "Retire instruction-based Clear/Rebuild/Stats (VectorInstructions + the Vector<T>.Clear/Rebuild/Stats facade methods) in favor of capability-token-gated first-class members — only 2 of 6 adapters implement instructions, and Flush already covers the main use",
+    "Delete tests/Suites/Data/Vector/ (orphan Weaviate spec tree) — superseded by the VectorAdapterSurface matrix",
+    "Refresh tests/Suites/Data/VectorAdapterSurface/README.md status table — the OpenSearch '0/25 ES-style KNN' row predates the OS 2.x-native query shape now in the code; rerun the matrix and record real cells",
+    "Either promote the Schema subsystem (wire VectorSchemaRegistry into more adapters / the AI seam, document in abstractions README) or shrink it to the KoanContext service that uses it — current half-adoption (only Weaviate honors descriptors) makes metadata projection silently adapter-dependent"
+  ],
+  "maturitySignals": {
+    "tests": "Strong and recently rebuilt: tests/Suites/Data/VectorAdapterSurface is a uniform cross-adapter matrix — one TestKit (VectorAdapterSurfaceSpecsBase 14 CRUD/search specs, VectorPartitionSpecsBase 5 isolation specs, VectorSemanticSpecsBase 6 real-world specs, VectorFilterConvergenceSpecsBase filter-oracle specs) instantiated for InMemory (reference adapter lives inside the test project), Weaviate, ElasticSearch, OpenSearch, Milvus, Qdrant; capability-gated skip-as-pass with audit-trail reasons; all cells in Koan.sln. Plus Koan.Tests.Data.Core vector specs (adapter resolution, workflow) and Koan.Data.Filtering.Tests touching the vector path. Gaps: PGVector tests orphaned out of sln; Milvus cell unverified locally (container OOM); OpenSearch cell status stale in README; no shipped in-memory vector adapter (the reference impl is test-local, so apps can't run vector code without a real store).",
+    "docs": "Exceptional ADR density for the area: DATA-0054 (capability+contracts), DATA-0056 (filter AST+translators), DATA-0060/0085 (module split ×2), DATA-0078 (export), DATA-0084 (workflows/profiles), DATA-0087 (table-name collision), DATA-0096/0097 (unified filter pipeline / vector pathway parity), AI-0036 (embedding↔vector seam), ADR-0051..0055 (hybrid search, pagination, continuation, search profiles, tag-centric search). README+TECHNICAL on the pillar, abstractions, SearchEngine, Weaviate, Milvus, ES, OS — but NOT Qdrant or PGVector. End-to-end guide docs/guides/ai-vector-howto.md (validated 2025-11-09, pins v0.6.3 — stale vs the 0.17.x NBGV reality) and a vector-migration agent skill. Matrix README is the best single map of adapter state but its status table is partially stale.",
+    "codeQuality": "Very clean: exactly 1 TODO across all 9 projects (~12k LOC) — VectorConfigs.cs:78 'Add ILogger injection'; zero NotImplementedException (NotSupportedException is used deliberately as capability backstops with actionable messages); no commented-out code blocks found; doc comments cite governing ADRs inline (DATA-0097/AI-0036 §9 references throughout) including frozen-reflection-target warnings on Vector<T>.Search. Naming is consistent within each connector but inconsistent across the category (three project-id conventions). Warts: .csproj.lscache artifacts committed/lying in 7 source dirs; the PGVector csproj documents its own brokenness; Abstractions→Data.Core layering violation; matrix README drift."
+  }
+}

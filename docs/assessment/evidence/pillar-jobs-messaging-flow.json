@@ -1,0 +1,134 @@
+{
+  "area": "jobs-messaging-flow",
+  "projects": [
+    {
+      "name": "Koan.Jobs",
+      "purpose": "JOBS-0005 rebuilt entity-first job orchestrator: ledger-is-the-queue with a capability ladder (in-memory → durable DataJobLedger over Entity<JobRecord> → distributed competing-consumers → +bus). Includes initiator-driven scheduling (interval / cron via Cronos / @boot / @continuous), chains, gates, idempotency coalescing, retention, and opt-in metrics.",
+      "keyTypes": [
+        "IKoanJob<TSelf> + JobOps<T>/JobStatics<T> accessors (JobAccessor.cs)",
+        "JobRecord : Entity<JobRecord>",
+        "IJobLedger (InMemoryJobLedger / DataJobLedger / RoutingJobLedger)",
+        "JobOrchestrator (392 LOC) + JobWorkerService + JobScheduler",
+        "JobContext (Reschedule/Backoff/ContinueWith/Progress)",
+        "[JobAction]/[JobChain]/[JobIdempotent]/[JobGate]/[JobPersistence]/[ParallelSafe] attributes",
+        "IJobTransport + InProcessJobTransport",
+        "KoanJobsModule : KoanModule, JobsOptions, JobMetric"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.Data.Abstractions",
+        "Koan.Data.Core"
+      ],
+      "state": "active — freshest code in the area (JOBS-0005 complete through §20, recent commits 449836dc/e09313c8); 36 files / ~2,750 LOC; zero TODO/HACK/NotImplemented; already on the new KoanModule (ARCH-0086) primitive; consumed by samples/S14.AdapterBench"
+    },
+    {
+      "name": "Koan.Jobs.Core",
+      "purpose": "Former jobs pillar (JOBS-0001..0003 era), superseded by the JOBS-0005 rebuild in Koan.Jobs.",
+      "keyTypes": [],
+      "dependsOn": [],
+      "state": "tombstone — src/Koan.Jobs.Core contains only bin/, obj/ and a stale Koan.Jobs.Core.csproj.lscache; no .csproj, no .sln entry, no references anywhere. Pure debris awaiting deletion"
+    },
+    {
+      "name": "Koan.Jobs.Transport.Messaging",
+      "purpose": "The '+bus' tier of the jobs capability ladder: fans a lightweight JobReadySignal across nodes over IMessageProxy so peers wake and compete for claims instead of waiting out the poll interval. Ledger remains the source of truth; signal loss is harmless.",
+      "keyTypes": [
+        "MessagingJobTransport : IJobTransport (wraps InProcessJobTransport, origin-echo filter)",
+        "JobReadySignal (OriginNode only — carries no work)",
+        "KoanJobsMessagingModule"
+      ],
+      "dependsOn": [
+        "Koan.Jobs",
+        "Koan.Core",
+        "Koan.Messaging.Core"
+      ],
+      "state": "active — tiny (4 files, 111 LOC), purpose-built, tested via MessagingTransportSpec (unit-level with a CapturingProxy fake; no broker-backed integration spec)"
+    },
+    {
+      "name": "Koan.Scheduling",
+      "purpose": "OPS-0050-era in-process single-node scheduler: IScheduledTask implementations discovered via DI, run by a hosted SchedulingOrchestrator on OnStartup/FixedDelay triggers with per-task timeout, bounded concurrency, and health pushes.",
+      "keyTypes": [
+        "IScheduledTask",
+        "SchedulingOrchestrator (internal, 1s poll loop)",
+        "SchedulingOptions (Koan:Scheduling config)",
+        "ScheduledAttribute",
+        "policy interfaces IOnStartup/IFixedDelay/IHasTimeout/IIsCritical/IHasMaxConcurrency",
+        "dead surface: ICronScheduled/IAllowedWindows/IProvidesLock/IHealthFacts"
+      ],
+      "dependsOn": [
+        "Koan.Core"
+      ],
+      "state": "stale — ~489 LOC frozen at OPS-0050 (2025-08-21) 'Phase 1': cron is literally commented 'reserved for Phase 2' (SchedulingOrchestrator.cs:65) and 4 of its 10 contract interfaces are referenced nowhere in the repo; ZERO tests; only 2 real consumers (samples/S5.Recs S5BootstrapTask, Koan.Service.KoanContext JobMaintenanceTask), both using only the IOnStartup+IHasTimeout subset; functionally subsumed by JOBS-0005 Schedule which is durable, distributed, cron-capable, and tested"
+    },
+    {
+      "name": "Koan.Messaging.Core",
+      "purpose": "Messaging pillar core: provider abstraction (IMessagingProvider auto-selected by priority, IMessageBus, IMessageConsumer) plus the '.Send()/.On<T>()' DX with startup buffering through IMessageProxy/IMessageBuffer and a phase-based MessagingLifecycleService.",
+      "keyTypes": [
+        "IMessagingProvider / IMessageBus / IMessageConsumer",
+        "IMessageProxy + IMessageBuffer (startup buffering)",
+        "MessagingExtensions (.Send<T>() / services.On<T>())",
+        "HandlerRegistry (handlers → consumers at lifecycle phase 3)",
+        "MessagingLifecycleService (provider selection + restart action)",
+        "TransportEnvelope<T> (wire envelope — doc-comment still says 'for strongly-typed Flow messaging')",
+        "MessagingTransformers / MessagingInterceptors static registries",
+        "KoanAutoRegistrar (pre-KoanModule idiom)"
+      ],
+      "dependsOn": [
+        "Koan.Core"
+      ],
+      "state": "active but previous-generation — ~1,010 LOC; live substrate for Jobs +bus and Cache coherence (Koan.Cache.Coherence.Messaging) plus samples S3.Mq.Sample/S8.Canon, but carries pre-redesign idioms: per-send reflection (GetMethod(\"Send\")+MakeGenericMethod every call, MessagingExtensions.cs:103), duck-typed GetMethod(\"SendToQueueAsync\") fallback, AppHost.Current service-locator resolution, static mutable registries, Console.WriteLine fallback logging and Debug.WriteLine-swallowed consumer-creation failures (HandlerRegistry); dead surface inside (IMessageBusSelector, MessagingTransformers with zero registrations, IQueuedMessage with zero implementors); MESS-0021..0029/0070/0071 ADRs describe inbox/aliases/provisioning/batch features that no longer exist in code"
+    },
+    {
+      "name": "Koan.Messaging.Connector.RabbitMq (src/Connectors/Messaging/RabbitMq)",
+      "purpose": "The sole IMessagingProvider implementation: orchestration-aware connection discovery (container/local/Aspire + legacy env vars), type-routed queues, JSON-serialized TransportEnvelope wire format, pause/resume consumers.",
+      "keyTypes": [
+        "RabbitMqProvider : IMessagingProvider (priority 100)",
+        "RabbitMqBus : IMessageBus (internal)",
+        "RabbitMqConsumer : IMessageConsumer (internal)",
+        "RabbitMqOrchestrationEvaluator : BaseOrchestrationEvaluator",
+        "KoanAutoRegistrar"
+      ],
+      "dependsOn": [
+        "Koan.Messaging.Core",
+        "Koan.Core"
+      ],
+      "state": "active but under-tested — ~739 LOC, no TODO markers, but ZERO broker-backed tests (the only test mention is the offline MessagingCorePillarBootstrapSpec, whose remarks explicitly say a broker-backed boot smoke 'belongs in the Koan.Messaging.Connector.RabbitMq adapter suite' — which does not exist; ARCH-0079 canon gap). Minor smell: uses System.Text.Json in code while also packaging Newtonsoft.Json 13.0.4"
+    },
+    {
+      "name": "Koan.Flow.Core",
+      "purpose": "Former Flow pillar (ingest/canonical-id/bindings per FLOW-01xx ADRs), removed from the codebase.",
+      "keyTypes": [],
+      "dependsOn": [],
+      "state": "tombstone — src/Koan.Flow.Core contains only a stray TECHNICAL.md (Sep 2025); no .csproj, no .sln entry, zero project references repo-wide. However ~10 ADRs still describe it as live (FLOW-0070/0101–0106/0110, ARCH-0053, WEB-0050, WEB-0060) and TransportEnvelope<T> in Messaging.Core still cites Flow in its doc-comment"
+    }
+  ],
+  "cohesion": "This area is three generations stitched together rather than one pillar. Top of stack: Koan.Jobs + Koan.Jobs.Transport.Messaging are the framework's newest, most disciplined code (JOBS-0005, KoanModule, 5-tier shared test suite) and form a genuinely cohesive unit. Bottom of stack: Koan.Messaging.Core + RabbitMq connector are a pre-redesign generation (IKoanAutoRegistrar, AppHost.Current locator, reflection dispatch, static registries) whose ADR record (MESS-002x inbox/aliases/provisioning) describes a richer system that no longer exists — the surviving code is essentially 'priority-selected provider + .Send()/.On<T>() + startup buffer'. Off to the side: Koan.Scheduling is an orphaned OPS-0050 fragment that predates and now duplicates JOBS-0005's scheduling, kept alive by exactly two trivial consumers and a vestigial Koan.Web project reference used only by the /.well-known/scheduling endpoint (WellKnownController.cs:74). The main seam: Jobs needs only a fire-and-forget cross-node wake from Messaging (JobReadySignal via IMessageProxy), and Cache coherence similarly needs only a thin signal channel — the heavyweight provider/lifecycle/handler machinery in Messaging.Core is consumed mostly by samples. Flow, which was Messaging's largest historical consumer (TransportEnvelope was built 'for strongly-typed Flow messaging'), is gone, leaving Messaging.Core larger than its remaining in-framework demand.",
+  "redundancies": [
+    "Scheduling triggers duplicate JOBS-0005: IScheduledTask + IOnStartup/IFixedDelay (+never-implemented ICronScheduled) vs [JobAction(Schedule = interval | cron | @boot | @continuous)] — the Jobs version is durable, distributed, cron-capable (Cronos), and tested; Scheduling's is single-node, FixedDelay-only, untested",
+    "Per-task policy duplication: Scheduling's IHasTimeout/IHasMaxConcurrency/IIsCritical interfaces + ScheduledAttribute + per-job options vs Jobs' [JobAction(Timeout/MaxAttempts/MaxConcurrency/Lane)] — two policy-merge systems for the same concepts",
+    "Three independent 'lightweight cross-node signal' implementations in the framework: Jobs' JobReadySignal-over-IMessageProxy, Cache's ICacheCoherenceChannel (Koan.Cache.Coherence.Messaging rides IMessageBus; Redis channel rides pub/sub) — same origin-echo-filtered wake/invalidate pattern rebuilt per pillar",
+    "Two transform/intercept registries in Messaging.Core (MessagingTransformers keyed by string descriptor, MessagingInterceptors keyed by type/interface) where only the interceptor path has any registrations repo-wide",
+    "Two JSON stacks in the RabbitMq connector (System.Text.Json used in code, Newtonsoft.Json packaged in csproj)",
+    "ADR-vs-code redundancy: MESS-0021..0029/0070/0071 and FLOW-*/JOBS-0001..0003 ADR families describe two prior generations whose code is deleted, while the live designs are JOBS-0005 and the slimmed Messaging.Core"
+  ],
+  "deadOrExperimental": [
+    "src/Koan.Jobs.Core — tombstone debris (bin/, obj/, .lscache only; not in .sln); delete",
+    "src/Koan.Flow.Core — tombstone (stray TECHNICAL.md only; not in .sln); delete, plus ~10 FLOW/ARCH-0053/WEB-0050/WEB-0060 ADRs still present as if live",
+    "Koan.Scheduling dead surface: ICronScheduled, IAllowedWindows, IProvidesLock, IHealthFacts — declared, referenced nowhere (OPS-0050 'Phase 2' never happened)",
+    "Koan.Messaging.Core dead surface: IMessageBusSelector (zero references), MessagingTransformers (registry with zero registrations anywhere), IQueuedMessage (zero implementors — the SendToQueue duck-typed reflection path is unreachable), and the 'InMemory: 10' provider promised in IMessagingProvider doc-comment which does not exist (RabbitMq is the only provider)",
+    "TransportEnvelope<T> doc-comment anchors it to the deleted Flow pillar",
+    "samples/archive/S2 references Koan.Messaging.Core from the archive folder (already archived, confirms shrinking consumer base)"
+  ],
+  "consolidationCandidates": [
+    "Cut Koan.Scheduling entirely; migrate its only two consumers (S5.Recs S5BootstrapTask, KoanContext JobMaintenanceTask — both just 'run once at startup with a timeout') to IKoanJob<TSelf> with [JobAction(Schedule = \"@boot\", Timeout = ...)]. JOBS-0005 strictly supersedes every trigger Scheduling actually implements, and adds durability/distribution/cron that Scheduling only promised. Re-point Koan.Web's /.well-known/scheduling endpoint at Jobs schedule state (or drop it), freeing Koan.Web of the whole-project Scheduling reference. Mark OPS-0050 superseded by JOBS-0005. Net: -1 project, -489 LOC, -1 untested pillar, removes the framework's largest conceptual duplicate in this area",
+    "Delete the two tombstone directories (src/Koan.Jobs.Core, src/Koan.Flow.Core) and sweep the ADR ledger: mark JOBS-0001/0002/0003 superseded by JOBS-0005, and FLOW-0070/0101-0106/0110 + ARCH-0053 + WEB-0050/WEB-0060 + MESS-0021..0029/0070/0071 retired/superseded — the docs currently describe two deleted generations as if current",
+    "Slim Koan.Messaging.Core to its real demand: remove IMessageBusSelector, IQueuedMessage + the unreachable SendToQueue reflection path, and MessagingTransformers (fold any future need into MessagingInterceptors); replace the per-send GetMethod+MakeGenericMethod reflection with a cached typed-delegate dispatch; move IMessageProxy resolution off AppHost.Current where feasible; port KoanAutoRegistrar → KoanModule when Facet 2 (ARCH-0086) lands. This is mechanical de-generification, not redesign",
+    "Extract the shared 'cross-node signal' concept: JobReadySignal (Jobs), ICacheCoherenceChannel (Cache), and Redis pub/sub coherence are the same origin-filtered fire-and-forget wake. A single thin signal-channel primitive (in Koan.Core or a small Koan.Signals) would let Koan.Jobs.Transport.Messaging and Koan.Cache.Coherence.Messaging collapse into channel bindings, and clarify Messaging.Core's role as one transport behind that primitive rather than a mandatory pillar dependency",
+    "Close the messaging test gap or shrink the claim: either add an in-memory IMessagingProvider (making 'Reference = Intent' messaging actually function without a broker, enabling integration specs, and matching the doc-comment that already advertises 'InMemory: 10') plus a broker-backed RabbitMq adapter suite per ARCH-0079 — or explicitly demote Messaging to 'RabbitMq-only integration package'. The current state (1 provider, 0 broker tests, canon violation acknowledged inside MessagingCorePillarBootstrapSpec remarks) is the weakest maturity point in the area",
+    "Keep Koan.Jobs.Transport.Messaging as-is (111 LOC is the correct Reference=Intent packaging for the +bus tier) — it is the template the signal-channel consolidation should generalize, not a merge target"
+  ],
+  "maturitySignals": {
+    "tests": "Sharply bimodal. Jobs: exemplary — tests/Suites/Jobs has a shared TestKit (JobBehaviorSuite/JobsHarness) executed across 5 tiers (InMemory via Koan.Jobs.Tests + Sqlite/Postgres/SqlServer/Mongo adapter suites), plus DistributedSpec, TransportSpec, Mongo TTL-index and claim-diagnostic specs; transport package has its own unit spec (fake proxy). Messaging: only an offline boot-smoke (tests/Suites/Integration/Bootstrap/.../MessagingCorePillarBootstrapSpec.cs) asserting IMessageProxy resolves through AddKoan(); zero broker-backed tests and no RabbitMq adapter suite — a gap the spec's own remarks acknowledge against ARCH-0079. Scheduling: zero tests of any kind. Indirect messaging coverage exists via the Cache coherence-messaging suite.",
+    "docs": "Jobs: strong — JOBS-0005 ADR + docs/guides/jobs-howto.md + a dense CLAUDE.md section, though no per-project README/TECHNICAL.md in src/Koan.Jobs. Messaging: README + TECHNICAL.md present, but the 11-ADR MESS family describes inbox/aliases/provisioning/batch features absent from code (severe ADR drift). Scheduling: README/TECHNICAL present but document undelivered aspirations (cron 'Phase 2'); OPS-0050 stale. Flow: ~10 ADRs survive their deleted subject. Net: documentation fidelity is inversely proportional to code age.",
+    "codeQuality": "Zero TODO/HACK/FIXME/NotImplementedException markers across all five live projects — hygiene is good on that axis. Quality split mirrors generation: Koan.Jobs is modern and consistent (sealed types, KoanModule, XML docs cross-referencing ADR sections, save-if-changed/CAS discipline). Koan.Messaging.Core shows pre-redesign idioms: hot-path reflection on every .Send() (MessagingExtensions.cs:103-107), duck-typed method lookup, AppHost.Current service locator, static mutable registries, Console.WriteLine fallback logging and exception-swallowing into Debug.WriteLine (HandlerRegistry.CreateConsumers). RabbitMq connector is functional but mixes JSON stacks and packs provider/bus/consumer into one 381-line file. Scheduling is clean but frozen mid-roadmap with 40% of its public contracts unwired."
+  }
+}

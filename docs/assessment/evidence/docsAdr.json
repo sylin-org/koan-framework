@@ -1,0 +1,188 @@
+{
+  "adrCorpus": {
+    "prefixCounts": [
+      "DATA-: 70",
+      "ARCH-: 55",
+      "AI-: 38",
+      "WEB-: 24",
+      "DX-: 14",
+      "MESS-: 11",
+      "STOR-: 10",
+      "MEDIA-: 9",
+      "FLOW-: 8",
+      "OPS-: 7",
+      "ADR- (legacy generic prefix, ADR-0050..0056 + 1 unnumbered ADR-XXXX draft): 8",
+      "CORE-: 5",
+      "JOBS-: 4",
+      "SEC-: 3",
+      "TEST-: 2",
+      "S16- (sample-specific, PantryPal): 2",
+      "one-offs (1 each): SERV-, PROPOSAL-, LUMEN-, KOAN-CONTEXT-, DEC-, BUILD-, AAAA-0000 (template)",
+      "Total: 279 .md files + index.md + toc.yml + README.md. ~16 distinct prefixes — prefix canon exists (template says ARCH|DATA|WEB|MESS|OPS|DX) but was not enforced: 8 prefixes are outside it, including a generic 'ADR-' series and sample-scoped 'S16-'."
+    ],
+    "formatConsistency": "Three clearly distinguishable generations, sampled 8 across eras. Gen 1 (2025-08, e.g. ARCH-0001, DATA-0002, WEB-0035): YAML frontmatter per AAAA-0000-template (id/slug/domain/status/date), terse Context/Decision/Consequences. Gen 1b (the 'ADR-00xx' series, e.g. ADR-0050): no frontmatter, plain 'Status:' body line — a parallel convention that ignored the template. Gen 2 (2026, e.g. ARCH-0086, DATA-0100, JOBS-0005): no frontmatter; rich bold-field header (**Status**/**Date**/**Deciders**/**Scope**/**Related**) plus long-form narrative with empirical probes, staged implementation ledgers, and explicit supersession chains — far higher quality than Gen 1 but no longer matches the in-repo template. 262/279 files carry some status marker; 17 have none. Status vocabulary drifts badly: Accepted/accepted/approved/current/Implemented/Corrected/Draft/Proposed (grep distribution: 100 'status: Accepted', 27 'Status: Accepted', 20 'status: accepted', 28 Proposed, 8 'approved', 7 'current', 6 'Approved', 1 each Implemented/Corrected/draft).",
+    "statusHygiene": "Index exists but is partial-by-design and stale: docs/decisions/index.md declares the contract ('Superseded only via explicit Supersedes/Superseded-By chain') yet links only 14 of 279 ADRs (a highlights page); toc.yml has 193 hrefs (~70% coverage, manually maintained). Supersession marking is asymmetric: forward declarations are excellent in recent ADRs (JOBS-0005 header explicitly 'supersedes JOBS-0001, JOBS-0002, JOBS-0003'; DATA-0100 supersedes a design doc), but backward marking is inconsistent — only 4-6 files actually carry a Superseded status. Verified failure: JOBS-0001 and JOBS-0002 still read '**Status**: Accepted' with zero mention of supersession despite being explicitly discarded by JOBS-0005. Counter-example showing the good pattern exists: DATA-0002 has a prominent '> Superseded by ARCH-0084' banner — but even there the frontmatter status still says 'Accepted'. Net: a reader landing on an old ADR cannot trust its status field."
+  },
+  "docsTree": [
+    {
+      "dir": "docs/decisions",
+      "fileCount": 280,
+      "verdict": "alive-and-load-bearing — the framework's working memory; touched same-day as code (2026-06-10); the single highest-value corpus"
+    },
+    {
+      "dir": "docs/archive",
+      "fileCount": 101,
+      "verdict": "archive (explicit and self-aware: historical/, proposals/, specs/, analysis/ subfolders) — correctly quarantined"
+    },
+    {
+      "dir": "docs/proposals",
+      "fileCount": 66,
+      "verdict": "feasibility-phase sprawl, redundant-with-decisions+design; dominated by a KOAN-CONTEXT cluster (specs, status reports, appsettings.json, program sketches); has self-aware 'complete/' and 'misaligned/' subfolders = an archive that hasn't been moved; last touched 2026-05-16"
+    },
+    {
+      "dir": "docs/guides",
+      "fileCount": 39,
+      "verdict": "alive-and-load-bearing (jobs-howto.md updated 2026-06-10; linked from CLAUDE.md and skills) — but polluted with one-shot artifacts (s5-recs COMPLETION-SUMMARY, koan-context status/roadmap docs)"
+    },
+    {
+      "dir": "docs/prior-art",
+      "fileCount": 28,
+      "verdict": "misnamed special-purpose archive — 28 'defensive_pub_*' defensive-publication/IP writeups, not developer docs; stale-by-design"
+    },
+    {
+      "dir": "docs/reference",
+      "fileCount": 23,
+      "verdict": "alive (2026-06-02) — per-pillar DocFX reference + _generated adapter matrix; the legitimate 'reference' home"
+    },
+    {
+      "dir": "docs/architecture",
+      "fileCount": 12,
+      "verdict": "alive-and-load-bearing — principles.md (evergreen philosophy) + foundation-consolidation-plan.md + module-ledger (active redesign state); but mixes evergreen canon with in-flight plan docs"
+    },
+    {
+      "dir": "docs/migration",
+      "fileCount": 11,
+      "verdict": "stale one-shot artifacts — .NET 10 migration phase/build/validation reports from a completed migration; archive candidates except v0.x-to-v0.y guides"
+    },
+    {
+      "dir": "docs/design",
+      "fileCount": 10,
+      "verdict": "alive but redundant-with-decisions — it is the pre-ADR feeder tray (DATA-0100 residual finding, jobs proposal, flakiness investigation); touched 2026-06-10; contents graduate into ADRs and then linger"
+    },
+    {
+      "dir": "docs/engineering",
+      "fileCount": 9,
+      "verdict": "alive-ish (2026-06-02) — contributor process docs (packaging, test-authoring, docs-build); overlaps docs/workbooks in purpose"
+    },
+    {
+      "dir": "docs/case-studies",
+      "fileCount": 6,
+      "verdict": "semi-alive — sample showcase narratives (s13-docmind, s16-pantrypal, s18-prism); marketing-adjacent, low load-bearing"
+    },
+    {
+      "dir": "docs/workbooks",
+      "fileCount": 5,
+      "verdict": "alive — operational runbooks per ARCH-0083 (versioning, nuget-publishing, adding-a-connector); overlaps docs/engineering"
+    },
+    {
+      "dir": "docs/api",
+      "fileCount": 5,
+      "verdict": "stale-ish (2025-10-09) — DocFX scaffolding + 3 API notes; thin"
+    },
+    {
+      "dir": "docs/getting-started",
+      "fileCount": 4,
+      "verdict": "alive-and-load-bearing — the documented entry point (overview, quickstart, guide, enterprise-adoption)"
+    },
+    {
+      "dir": "docs/examples",
+      "fileCount": 4,
+      "verdict": "stale (2025-10-09) — entity-pattern recipes; redundant-with-guides"
+    },
+    {
+      "dir": "docs/implementation",
+      "fileCount": 3,
+      "verdict": "stale, redundant-with-proposals/design — phase1 implementation plans (ai/, websockets/); feasibility residue"
+    },
+    {
+      "dir": "docs/testing",
+      "fileCount": 2,
+      "verdict": "stale one-offs — one AI test strategy + one dated execution report; real testing canon lives in tests/README.md (ARCH-0079)"
+    },
+    {
+      "dir": "docs/sessions",
+      "fileCount": 2,
+      "verdict": "stale session logs (2025-10) — archive candidates"
+    },
+    {
+      "dir": "docs/refactoring",
+      "fileCount": 2,
+      "verdict": "stale (2025-11) — ARCHITECTURAL-ANALYSIS + REFACTORING-LEDGER, superseded in practice by architecture/foundation-consolidation-plan.md + module-ledger.md"
+    },
+    {
+      "dir": "docs/qa",
+      "fileCount": 2,
+      "verdict": "stale — two dated Koan-Context QA reports (2025-11-05); archive"
+    },
+    {
+      "dir": "docs/templates",
+      "fileCount": 1,
+      "verdict": "near-dead — one generic document-template.md (the ADR template lives in decisions/ anyway)"
+    },
+    {
+      "dir": "docs/support",
+      "fileCount": 1,
+      "verdict": "alive — troubleshooting.md, linked prominently from docs/index.md; single-file dir though"
+    },
+    {
+      "dir": "docs/specifications",
+      "fileCount": 1,
+      "verdict": "redundant-with-decisions — single SPEC-canon-runtime.md duplicating ARCH-0058 territory"
+    },
+    {
+      "dir": "docs/research",
+      "fileCount": 1,
+      "verdict": "stale — one RAG whitepaper"
+    },
+    {
+      "dir": "docs/patterns",
+      "fileCount": 1,
+      "verdict": "stale (2025-09), redundant-with-guides — one semantic-streaming-pipeline doc"
+    },
+    {
+      "dir": "docs/how-to",
+      "fileCount": 1,
+      "verdict": "redundant-with-guides — single embeddings.md while guides/ already has embedding-best-practices.md and ai-vector-howto.md; pure sprawl evidence"
+    },
+    {
+      "dir": "docs/external",
+      "fileCount": 1,
+      "verdict": "archive — one pasted external article (TypeScript code-mode MCP analysis)"
+    }
+  ],
+  "skills": "13 Koan-specific skills in .claude/skills/ (2,618 lines of SKILL.md total): entity-first (268), bootstrap (470), multi-provider (282), debugging (414), data-modeling (123), api-building (120), ai-integration (254), quickstart (135), relationships (98), performance (109), vector-migration (101), mcp-integration (93), koan-caching (151) — organized in a 4-tier catalog (.claude/skills/README.md) that matches the CLAUDE.md pattern-recognition table (koan-caching is the one post-catalog addition, and there is no jobs skill yet despite JOBS-0005 being the largest recent pillar — a gap by the repo's own skill-creation triggers). Overlap judgment: the relationship to docs/guides is deliberate progressive disclosure, not blind duplication — the catalog states skills 'reference guides while providing curated excerpts', and 11 of 13 skill files contain explicit docs/guides/*.md pointers (ai-integration.md, building-apis.md, data-modeling.md, performance.md, entity-capabilities-howto.md, ai-vector-howto.md, mcp-http-sse-howto.md). So each skill is a condensed, anti-pattern-annotated front-end to a guide. The duplication risk is maintenance skew rather than redundancy: code samples live in both places (e.g. performance skill vs guides/performance.md; api-building vs guides/building-apis.md) with no mechanism keeping them in sync, and skills carry their own version assumptions (framework v0.6.3 era) while guides are being updated through 2026-06.",
+  "philosophyDocs": [
+    "F:/Replica/NAS/Files/repo/github/sylin-org/koan-framework/docs/architecture/principles.md",
+    "F:/Replica/NAS/Files/repo/github/sylin-org/koan-framework/README.md",
+    "F:/Replica/NAS/Files/repo/github/sylin-org/koan-framework/docs/architecture/foundation-consolidation-plan.md",
+    "F:/Replica/NAS/Files/repo/github/sylin-org/koan-framework/CLAUDE.md",
+    "F:/Replica/NAS/Files/repo/github/sylin-org/koan-framework/docs/getting-started/overview.md",
+    "F:/Replica/NAS/Files/repo/github/sylin-org/koan-framework/docs/architecture/comparison.md",
+    "F:/Replica/NAS/Files/repo/github/sylin-org/koan-framework/docs/decisions/ARCH-0084-unified-capability-model.md",
+    "F:/Replica/NAS/Files/repo/github/sylin-org/koan-framework/docs/decisions/ARCH-0086-koan-module.md",
+    "F:/Replica/NAS/Files/repo/github/sylin-org/koan-framework/docs/reference/modules-overview.md",
+    "F:/Replica/NAS/Files/repo/github/sylin-org/koan-framework/docs/getting-started/enterprise-adoption.md"
+  ],
+  "observations": [
+    "Hypothesis CONFIRMED: the docs tree shows feasibility-phase sprawl. 27 subdirs exist (not 26); 10 of them hold <=2 files; at least 6 directories serve the same 'pre-decision design material' role (proposals/, design/, implementation/, specifications/, patterns/, research/) and 2 pairs directly duplicate (how-to/embeddings.md vs guides/embedding-best-practices.md; engineering/ vs workbooks/). The living core is just 6 dirs: decisions, guides, architecture, reference, getting-started, support.",
+    "The git-date gradient is diagnostic: decisions/, design/, guides/ were all touched 2026-06-10 (same day as the JOBS-0005 commits) — the ADR-first workflow is real and current; everything else trails off (proposals/ frozen 2026-05-16, examples/api/patterns/templates frozen Sep-Oct 2025).",
+    "docs/ ROOT itself has loose orphans: _inventory.md (104 KB), ARCHAEOLOGY.md (44 KB), ASPIRE-INTEGRATION.md (45 KB), AI-SOURCE-MEMBER-IMPLEMENTATION-PLAN.md (40 KB), AI-SOURCE-ROUTING-FIX.md, OLLAMA-MODEL-VALIDATION.md — large working files dropped at top level, more sprawl evidence.",
+    "ADR quality is INVERTED relative to hygiene: recent Gen-2 ADRs (ARCH-0086, DATA-0100, JOBS-0005) are exceptional — empirical probes, staged ledgers, explicit supersession chains, named deciders — but they abandoned the repo's own template/frontmatter, so machine-readable status metadata is degrading exactly as content quality peaks.",
+    "Concrete status-hygiene defect to cite: JOBS-0001 and JOBS-0002 are explicitly discarded by JOBS-0005 yet still read '**Status**: Accepted' with zero supersession marker; DATA-0002 shows the correct pattern (inline 'Superseded by ARCH-0084' banner) but even it never flipped its frontmatter status. Only ~4-6 of 279 ADRs carry a Superseded status while far more have been superseded.",
+    "No authoritative ADR index: decisions/index.md links 14/279 (a highlights page), toc.yml covers ~193 entries and is manually maintained ('update it whenever you add a new ADR'). The 38 AI- ADRs listed in index.md are almost all 'Proposed' — a large speculative vision layer (AI-0022..0031 lifecycle expansion) sitting unbuilt in the decision corpus.",
+    "Prefix proliferation mirrors the directory sprawl: the template sanctions 6 domains (ARCH/DATA/WEB/MESS/OPS/DX) but 16 prefixes exist, including one-offs (LUMEN-, SERV-, DEC-, BUILD-, PROPOSAL-, KOAN-CONTEXT-), a sample-scoped series (S16-), and a generic legacy 'ADR-' series that bypassed domain naming entirely.",
+    "proposals/ is self-diagnosing: its 'complete/' and 'misaligned/' subfolders are an admission that finished/abandoned material accumulates in place instead of moving to archive/ — the KOAN-CONTEXT cluster alone spans proposals/ (8 files), guides/ (4 status files), qa/ (2 reports), and a decisions/ one-off prefix.",
+    "prior-art/ (28 files) is not prior-art research — it is a defensive-publication portfolio ('defensive_pub_*'), i.e. an IP strategy artifact misfiled under developer docs.",
+    "Skills gap by the repo's own rules: CLAUDE.md's skill-creation triggers (new pillar, 3+ ADRs, >150-line guide) are all met by Jobs (JOBS-0005 + docs/guides/jobs-howto.md) and arguably by the capability model (ARCH-0084), yet no koan-jobs skill exists — the skills catalog lags the 2026 redesign era."
+  ]
+}

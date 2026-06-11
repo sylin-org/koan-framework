@@ -1,0 +1,244 @@
+{
+  "area": "web-core",
+  "projects": [
+    {
+      "name": "Koan.Web",
+      "purpose": "The HTTP pillar nucleus: attribute-routed EntityController REST surface over Entity<T>, transport-agnostic entity endpoint service (reused by Koan.Mcp), hook pipeline, pagination policy, health/well-known endpoints, secure-headers middleware, web pipeline contributor seam.",
+      "keyTypes": [
+        "EntityController<TEntity,TKey> (726 LOC, 11 routes incl. bulk/patch/query)",
+        "EntitySummaryController<TEntity,TSummary> (IProjectionOf list projection)",
+        "IEntityEndpointService/EntityEndpointService (762 LOC; transport-agnostic — consumed by Koan.Mcp EndpointToolExecutor/RequestTranslator)",
+        "Hook pipeline: IAuthorizeHook/ICollectionHook/IModelHook/IRequestOptionsHook + HookRunner + QueryOptions (WEB-0068 predicates)",
+        "EntityQueryParser (filter/sort/paging) + QueryFilterComposer",
+        "PatchNormalizer (PatchOps)",
+        "IKoanWebPipelineContributor/IKoanEndpointContributor + KoanWebStartupFilter (WEB-0069)",
+        "PaginationAttribute/PaginationPolicy, HealthController, WellKnownController"
+      ],
+      "dependsOn": [
+        "Koan.Data.Core",
+        "Koan.Data.Abstractions",
+        "Koan.Core",
+        "Koan.Scheduling"
+      ],
+      "state": "active — referenced by virtually every web consumer, sample, and the MCP pillar; rich ADR trail (WEB-0035/0046/0068/0069); only 0 TODOs. Two smells: reflection soft-coupling to Koan.Web.Transformers (Type.GetType in ServiceCollectionExtensions:41 + OptionalTransformerInputFormatterConfigurator), and a hard ProjectReference to Koan.Scheduling used solely for one well-known endpoint (WellKnownController.Scheduling)."
+    },
+    {
+      "name": "Koan.Web.Extensions",
+      "purpose": "Entity capability controllers (moderation/soft-delete/audit) registered as generic controllers per entity, plus the capability authorization layer (IAuthorize, policies, RBAC provider). Misnamed — it is really 'entity capabilities + authorization', not generic extensions.",
+      "keyTypes": [
+        "EntityModerationController<TEntity,TKey> / EntitySoftDeleteController / EntityAuditController",
+        "GenericControllers (registry + RouteConvention + FeatureProvider for per-entity generic controller instantiation)",
+        "CapabilityActions (canonical action keys)",
+        "IAuthorize/Authorizer + IAuthorizationProvider (PolicyAuthorizationProvider, RbacAuthorizationProvider)",
+        "RequireCapabilityAttribute + CapabilityAuthorizationOptions/CapabilityDefaultBehavior (WEB-0047)",
+        "IModerationFlow/StandardModerationFlow (WEB-0048)"
+      ],
+      "dependsOn": [
+        "Koan.Data.Core",
+        "Koan.Data.Abstractions",
+        "Koan.Core",
+        "Koan.Web"
+      ],
+      "state": "active — broadest consumer base in the area (10+ samples, Koan.Canon.Web, Koan.Web.Auth.Roles, Security.Trust integration tests, AdapterSurface TestKit); ADRs WEB-0046–0049."
+    },
+    {
+      "name": "Koan.Web.Transformers",
+      "purpose": "Content-negotiation payload shaping: IEntityTransformer (alternate wire formats e.g. CSV) and IEntityEnricher (response decoration) with auto-discovery and a registry, applied via output filter/input formatter on EntityController routes (WEB-0035/WEB-0067).",
+      "keyTypes": [
+        "IEntityTransformer<T,TKey> / IEntityEnricher<T>",
+        "TransformerRegistry/ITransformerRegistry",
+        "EntityOutputTransformFilter / EntityInputTransformFormatter",
+        "ITransformerActivationPredicate, TransformerPriority",
+        "KoanWebTransformersModule (migrated to ARCH-0086 KoanModule)"
+      ],
+      "dependsOn": [
+        "Koan.Web",
+        "Koan.Core"
+      ],
+      "state": "maintained shell, near-zero adoption — only direct consumer is archived samples/S2; yet Koan.Web and Koan.Web.OpenApi both carry reflection shims (Type.GetType) to integrate with it when present. Recently modernized to KoanModule, so it gets maintenance without users."
+    },
+    {
+      "name": "Koan.Web.Json.Strict",
+      "purpose": "Opt-in strict System.Text.Json defaults (no type coercion, exact property names) for contract-precise APIs. Internal naming says 'KoanMinimalJson' — a leftover identity from an earlier 'minimal JSON' concept.",
+      "keyTypes": [
+        "KoanMinimalJson.CreateStrictOptions",
+        "KoanMinimalJsonOptions",
+        "KoanMinimalJsonOptionsConfigurator"
+      ],
+      "dependsOn": [
+        "Koan.Core"
+      ],
+      "state": "experimental splinter — zero consumers in src/ or samples/; only its own 87-LOC test. Also philosophically orphaned: the rest of the web pillar serializes with Newtonsoft (Mvc.NewtonsoftJson)."
+    },
+    {
+      "name": "Koan.Web.OpenApi",
+      "purpose": "OpenAPI 3.1 document generation via Microsoft.AspNetCore.OpenApi with Koan-aware document/operation transformers (pagination metadata from [Pagination], Koan headers, transformer media types via reflection).",
+      "keyTypes": [
+        "KoanOpenApiStartupFilter",
+        "KoanOpenApiOptions",
+        "PaginationOperationTransformer",
+        "KoanHeadersOperationTransformer",
+        "TransformerMediaTypesOperationTransformer (reflects into Koan.Web.Transformers)",
+        "ApplicationIdentityDocumentTransformer"
+      ],
+      "dependsOn": [
+        "Koan.Web",
+        "Koan.Core"
+      ],
+      "state": "active but captive — its only consumer is the Swagger connector; never referenced standalone by any sample or service."
+    },
+    {
+      "name": "Koan.Web.Connector.Swagger",
+      "purpose": "SwaggerUI layer over Koan.Web.OpenApi: idempotent registration, config-driven enablement, pagination-aware metadata. The de-facto 'API docs' package every sample actually references.",
+      "keyTypes": [
+        "AddKoanSwaggerExtensions",
+        "KoanSwaggerStartupFilter",
+        "KoanWebSwaggerOptions",
+        "KoanAutoRegistrar"
+      ],
+      "dependsOn": [
+        "Koan.Web.OpenApi",
+        "Koan.Web"
+      ],
+      "state": "active — 13 consumers (samples + Koan.Service.KoanContext). 373 LOC; thin UI shim whose substrate lives in a separate 837-LOC package."
+    },
+    {
+      "name": "Koan.Web.Connector.GraphQl",
+      "purpose": "Controller-hosted GraphQL endpoint + SDL over IEntity<> types using HotChocolate 13.x (WEB-0041/0042).",
+      "keyTypes": [
+        "GraphQlController / GraphQlSdlController",
+        "IGraphQlExecutor/GraphQlExecutor",
+        "EntityCollection/EntityView (schema types)",
+        "KoanGraphQlModule (KoanModule, ARCH-0086 — fixed a prior live double-registration)",
+        "GraphQlOptions",
+        "KoanGraphQlErrorFilter"
+      ],
+      "dependsOn": [
+        "Koan.Web",
+        "Koan.Data.Core",
+        "Koan.Core"
+      ],
+      "state": "stale adoption / maintained shell — sole consumer is archived samples/S4.Web; zero tests. Recently security-bumped (HotChocolate 13.9.16 for GHSA-qr3m-xw4c-jqw3) with an explicit csproj comment about avoiding the 14/15/16 API reshuffles — i.e. a known version treadmill being carried for one archived sample."
+    },
+    {
+      "name": "Koan.Web.Sse",
+      "purpose": "Server-Sent Events primitives: envelope, formatter, MVC action results, and minimal-API IResult helpers for streaming IAsyncEnumerable<T> as SSE.",
+      "keyTypes": [
+        "SseEnvelope",
+        "SseFormatter",
+        "SseActionResult (MVC)",
+        "SseResults.StreamJson<T> (minimal APIs)",
+        "KoanSseOptions"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.Web"
+      ],
+      "state": "active — genuine cross-pillar primitive consumed by Koan.AI.Web, Koan.Mcp, and Koan.Service.KoanContext; has its own test project (top-level tests/, pre-Suites layout)."
+    },
+    {
+      "name": "Koan.WebSockets",
+      "purpose": "WebSocket stream adapter/factory helpers (wrap HttpContext WebSocket as a Stream).",
+      "keyTypes": [
+        "IWebSocketStreamFactory/WebSocketStreamFactory",
+        "WebSocketStreamAdapter",
+        "HttpContextWebSocketExtensions",
+        "WebSocketStreamOptions"
+      ],
+      "dependsOn": [
+        "Koan.Core"
+      ],
+      "state": "dormant scaffold — zero consumers anywhere in src/ or samples/ (verified by type-usage grep, not just project refs); only its own 474-LOC tests. Also breaks the pillar naming (Koan.WebSockets, not Koan.Web.*) and doesn't even reference Koan.Web. SSE won every realtime use case in the framework."
+    },
+    {
+      "name": "Koan.Web.Backup",
+      "purpose": "REST API over Koan.Data.Backup: async backup/restore operations with polling-based progress, entity discovery endpoints, operation tracking.",
+      "keyTypes": [
+        "BackupController / RestoreController",
+        "EntityController (name-collides with the core Koan.Web concept; backup-scoped entity discovery)",
+        "IBackupProgressNotifier (no-op tombstone — 'SignalR hub removed')",
+        "BackupOperationTracker (in-memory, TODO persistent)",
+        "BackupApiErrorHandlingMiddleware",
+        "BackupRequest/ResponseModels"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.Data.Backup",
+        "Koan.Data.Core",
+        "Koan.Data.Abstractions",
+        "Koan.Web"
+      ],
+      "state": "working but drifting — sole consumer is samples/S5.Recs; 4 of the area's 5 TODOs live here; Hubs/BackupProgressHub.cs is a tombstone (SignalR removed, interface kept as no-op) while the README still advertises 'SignalR-based progress updates'; bundles Swashbuckle.AspNetCore 7.2.0 diverging from the framework's OpenApi/SwaggerUI stack; declares InternalsVisibleTo Koan.Web.Backup.Tests but no such test project exists."
+    },
+    {
+      "name": "Koan.Web.Admin",
+      "purpose": "Admin web surface: prefix-aware dashboard (embedded wwwroot SPA: index.html/app.js/styles.css), status/diagnostics API, LaunchKit endpoints, module style resolution, ServiceMesh surface reporting (WEB-0061/0062/0063).",
+      "keyTypes": [
+        "KoanAdminStatusController / KoanAdminUiController / KoanAdminLaunchKitController / KoanAdminStylesController",
+        "KoanAdminStartupFilter + KoanAdminRouteConvention",
+        "KoanAdminAuthorizationFilter + KoanAdminDevelopmentPolicySetup",
+        "KoanAdminUiAssetProvider (embedded wwwroot)",
+        "KoanAdminRuntimeSurfaceFactory / KoanAdminServiceMeshSurfaceFactory",
+        "Contracts: KoanAdminStatusResponse/ModuleSurface/RuntimeSurface/ServiceMeshSurface"
+      ],
+      "dependsOn": [
+        "Koan.Admin",
+        "Koan.ServiceMesh.Abstractions",
+        "Koan.Web"
+      ],
+      "state": "active — 4 samples consume it; has a Suites test project (AdminControllerSpec, AuthAndRolesSpec, BackupEndpointSpec, ModuleStyleResolverSpec); 3 admin ADRs; 1 TODO (mesh policy placeholder)."
+    },
+    {
+      "name": "Koan.Admin",
+      "purpose": "Headless admin core: options/gating (Enabled, AllowInProduction, EnableWeb, EnableConsoleUi, EnableLaunchKit), route map resolution, runtime manifest service, feature manager, LaunchKit artifact generation. The non-HTTP half of the admin pair.",
+      "keyTypes": [
+        "KoanAdminOptions (+Authorization/Logging/Generate sub-options) + KoanAdminOptionsValidator",
+        "IKoanAdminManifestService/KoanAdminManifestService",
+        "IKoanAdminRouteProvider/KoanAdminRouteProvider + KoanAdminRouteMap",
+        "IKoanAdminFeatureManager",
+        "IKoanAdminLaunchKitService",
+        "KoanAdminPathUtility"
+      ],
+      "dependsOn": [
+        "Koan.Core"
+      ],
+      "state": "active but single-purpose — its only src consumer is Koan.Web.Admin (samples reference it directly only redundantly, since Web.Admin brings it transitively). The EnableConsoleUi option that would justify the headless split has no implementation anywhere in the repo."
+    }
+  ],
+  "cohesion": "Two-tier structure. The nucleus (Koan.Web + Koan.Web.Extensions, ~6.2k LOC) is genuinely cohesive and is the framework's real HTTP pillar: EntityController → IEntityEndpointService → hook pipeline is one well-ADR'd spine (WEB-0035/0046/0068/0069), and the endpoint-service seam is load-bearing beyond HTTP (Koan.Mcp executes entity tools through IEntityEndpointService). Around it, 10 packages totaling ~11.7k LOC form a halo of pairs and splinters: a 2-package OpenAPI story (OpenApi substrate + Swagger UI shim, the former having exactly one consumer), a 2-package admin story (headless core + web surface, the headless half having exactly one consumer and a never-built console-UI rationale), and four near-orphan packages (Transformers, Json.Strict, WebSockets, GraphQl) whose combined real consumer count is one archived sample. Fractures: (1) Koan.Web integrates with Transformers via Type.GetType reflection shims in two places plus a third in OpenApi — deliberate decoupling that instead signals the package boundary is wrong; (2) Koan.Web declares a namespace literally called Koan.Web.Extensions (src/Koan.Web/Extensions/ServiceCollectionExtensions.cs) that collides with the sibling package of the same name; (3) directory convention split — Swagger/GraphQl live under src/Connectors/Web while every other web package sits at src/ root, and Koan.WebSockets breaks the Koan.Web.* prefix; (4) Koan.Web hard-references the Koan.Scheduling pillar for a single well-known endpoint despite already owning an IKoanEndpointContributor inversion seam; (5) two serializer worlds (Newtonsoft in Web/Sse/Backup/GraphQl vs System.Text.Json in Json.Strict).",
+  "redundancies": [
+    "Two-package OpenAPI feature: Koan.Web.OpenApi (837 LOC, sole consumer = Swagger connector) + Koan.Web.Connector.Swagger (373 LOC UI shim) — one user-facing capability split across two packages and two directory conventions",
+    "Three OpenAPI/Swagger stacks in one area: Microsoft.AspNetCore.OpenApi (Koan.Web.OpenApi) + Swashbuckle SwaggerUI 6.6.2 (connector) + full Swashbuckle.AspNetCore 7.2.0 bundled privately by Koan.Web.Backup",
+    "Admin pair: Koan.Admin exists only to serve Koan.Web.Admin; samples redundantly reference both; the headless-core justification (EnableConsoleUi) has no implementation",
+    "Duplicate type names across adjacent packages: AuthorizeRequest exists in both Koan.Web/Hooks and Koan.Web.Extensions/Authorization — two parallel authorization seams (hook-level IAuthorizeHook vs capability-level IAuthorize/Authorizer)",
+    "Koan.Web.Backup/Controllers/EntityController.cs name-collides with the pillar's flagship Koan.Web.Controllers.EntityController",
+    "Namespace collision: Koan.Web's internal Koan.Web.Extensions namespace vs the Koan.Web.Extensions package",
+    "Backup operation tracking (BackupOperationTracker, in-memory, 'TODO: Replace with persistent implementation') reimplements long-running-work orchestration that the Jobs pillar (JOBS-0005 IKoanJob, durable ledger, progress verbs) now provides",
+    "Realtime duplication: Koan.Web.Sse (adopted by 3 src consumers) vs Koan.WebSockets (adopted by zero) — two transports for the same 'push to client' story, one clearly won"
+  ],
+  "deadOrExperimental": [
+    "Koan.WebSockets — zero consumers in src/ or samples/ (verified by type-usage grep); dormant scaffold",
+    "Koan.Web.Json.Strict — zero consumers; internal type still named KoanMinimalJson from an earlier concept; orthogonal STJ island in a Newtonsoft pillar",
+    "Koan.Web.Connector.GraphQl — sole consumer is samples/archive/S4.Web; zero tests; carried on a pinned HotChocolate 13.x with a documented major-version treadmill",
+    "Koan.Web.Transformers as a standalone package — only direct consumer is samples/archive/S2; kept alive via reflection shims in Koan.Web and Koan.Web.OpenApi",
+    "Koan.Web.Backup/Hubs/BackupProgressHub.cs — tombstone: 'SignalR hub removed', interface retained as documented no-op; README still advertises SignalR progress",
+    "Koan.Admin EnableConsoleUi option — gating flag for a console admin UI that does not exist anywhere in the repo",
+    "Koan.Web.Backup InternalsVisibleTo('Koan.Web.Backup.Tests') — points at a test project that was never created"
+  ],
+  "consolidationCandidates": [
+    "Merge Koan.Web.OpenApi + Koan.Web.Connector.Swagger into one package (suggest Koan.Web.OpenApi shipping the UI behind an option) — OpenApi has exactly one consumer (the connector), the pair is 1.2k LOC total, and merging also resolves the src/Connectors/Web vs src/ directory schism",
+    "Merge Koan.Admin into Koan.Web.Admin — the headless split's only rationale (a console admin surface) was never built; Koan.Admin's sole src consumer is Koan.Web.Admin; one package eliminates the samples' redundant double-reference and one project",
+    "Fold Koan.Web.Transformers into Koan.Web — removes all three Type.GetType reflection seams (Koan.Web ServiceCollectionExtensions:41, OptionalTransformerInputFormatterConfigurator, OpenApi TransformerMediaTypesOperationTransformer), makes WEB-0035/0067 first-class instead of optionally-stitched, and costs nothing since standalone adoption is one archived sample",
+    "Cut Koan.WebSockets (or, if WS is strategically required for the Admin dashboard/MCP later, fold SSE+WS into a single Koan.Web.Realtime) — today it has zero consumers while SSE serves every realtime need (AI.Web, Mcp, KoanContext)",
+    "Cut Koan.Web.Json.Strict or absorb it as a KoanWebOptions strict-JSON switch — 241 LOC, zero consumers, and resolving it forces the overdue Newtonsoft-vs-STJ decision for the pillar",
+    "Decide GraphQl: attic it (consumer = one archived sample) or commit with tests and a current HotChocolate — the csproj comment shows the maintenance treadmill is known; carrying 1.2k LOC + a CVE-bearing dependency for an archived sample fails the dogfood-driven ≥2-usages bar",
+    "Rebuild Koan.Web.Backup progress/operation tracking on Koan.Jobs (IKoanJob + durable ledger) instead of the bespoke in-memory BackupOperationTracker; delete the tombstone Hubs file; fix the README's SignalR claims; drop the private Swashbuckle 7.2.0 in favor of the pillar's OpenApi package",
+    "Invert the Koan.Web → Koan.Scheduling dependency: let Scheduling contribute its well-known endpoint via the existing IKoanEndpointContributor seam, so the pillar core stops referencing a sibling pillar for one route",
+    "Rename/re-scope Koan.Web.Extensions to its real identity (entity capabilities + capability authorization), and in the same pass resolve the AuthorizeRequest duplicate and Koan.Web's colliding Koan.Web.Extensions namespace"
+  ],
+  "maturitySignals": {
+    "tests": "Nucleus coverage is strong and canon-compliant (ARCH-0079): tests/Suites/Web/AdapterSurface = a TestKit + 8 adapter-specific integration projects (InMemory/Json/Sqlite/Postgres/SqlServer/Mongo/Redis/Couchbase) driving a WidgetController : EntityController end-to-end through real containers, plus partition and transfer specs; Koan.Web.Sort.Tests (669 LOC endpoint specs), tests/Koan.Web.PatchOps.Tests (311 LOC). Periphery is patchy: Koan.Web.Admin.Tests (Suites, 6 files incl. auth + backup-endpoint specs), Koan.Web.Extensions.Tests (only 184 LOC — thin for a 40-file authorization surface), Transformers (301), Sse (147), WebSockets (474 — more test LOC than consumers), Json.Strict (87). Zero tests for OpenApi, Swagger, GraphQl, and Web.Backup (whose InternalsVisibleTo names a nonexistent test project). Older tests (Sse/WebSockets/PatchOps/Json.Strict) live at tests/ root, outside the Suites layout.",
+    "docs": "Dense ADR trail: WEB-0035 (transformers), WEB-0041/0042 (GraphQL), WEB-0046–0049 (capabilities/moderation/authorization), WEB-0061–0063 (admin surface/visualization/roadmap), WEB-0067–0069 (transformer activation, query predicates, pipeline contributors). API docs: docs/api/web-http-api.md, patch-normalization.md, openapi-generation.md. Guides: building-apis.md, entity-capabilities-howto.md, patch-capabilities-howto.md, authorization-howto.md, mcp-http-sse-howto.md. README coverage is uneven: present for Web, Extensions, Transformers, Swagger, GraphQl, Backup (stale — still sells removed SignalR, emoji-heavy marketing tone); absent for Json.Strict, OpenApi, Sse, WebSockets, Admin, Web.Admin.",
+    "codeQuality": "Very low debt-marker density: 5 TODOs across ~18k LOC, 4 of them concentrated in Koan.Web.Backup (in-memory tracker, stubbed counts/config); no NotImplementedException, no commented-out blocks of note. Active modernization visible (GraphQl and Transformers already migrated to ARCH-0086 KoanModule, GraphQl migration even fixed a live double-registration). Quality seams are structural rather than local: three reflection Type.GetType integration shims, swallowed-exception optional wiring (catch { /* optional */ }), naming drift (KoanMinimalJson inside Json.Strict; Koan.WebSockets outside the Koan.Web.* prefix; duplicate AuthorizeRequest/EntityController type names), and two files near the 800-line ceiling (EntityController 726, EntityEndpointService 762)."
+  }
+}

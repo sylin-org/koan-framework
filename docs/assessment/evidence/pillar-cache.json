@@ -1,0 +1,156 @@
+{
+  "area": "cache",
+  "projects": [
+    {
+      "name": "Koan.Cache",
+      "purpose": "Pillar core (~4,000 LOC): static Cache facade, CacheClient (reader/writer + singleflight), LayeredCache L1/L2 orchestrator, CoherenceCoordinator (IHostedService routing channel invalidations to L1), policy registry/materializer/bootstrapper, [Cacheable] repository decorator, and the built-in Memory L1 store (folded in from the deleted Adapter.Memory package).",
+      "keyTypes": [
+        "Cache (static facade)",
+        "CacheClient : ICacheClient/ICacheReader/ICacheWriter",
+        "LayeredCache (internal, composition L1/L2 verbs: Read/Write/Evict/Touch/EnumerateByTag/ApplyRemoteInvalidation)",
+        "CoherenceCoordinator (+CoherenceCoalescingBuffer, NodeIdProvider, CursorStore)",
+        "CacheTopology / CacheTopologyResolver / CacheStoreRegistry",
+        "CacheRepositoryDecorator + CachedRepository<TEntity,TKey> ([ProviderPriority(100)] read short-circuit band)",
+        "CachePolicyRegistry / CachePolicyMaterializer / CachePolicyBootstrapper",
+        "MemoryCacheStore ([ProviderPriority(10)] default L1)"
+      ],
+      "dependsOn": [
+        "Koan.Cache.Abstractions",
+        "Koan.Core",
+        "Koan.Data.Abstractions",
+        "Koan.Data.Core",
+        "Koan.Cache.Analyzers (analyzer-only ref)"
+      ],
+      "state": "active/settled — rich KoanAutoRegistrar boot report with per-policy health flags (OK/DEGRADED/BUG), exactly 1 TODO in the whole project (GetMany batch caching pass-through at Decorators/CachedRepository.cs:124). Carries Gen-1 residue: CacheAdapterResolver (165-line reflection scanner), [Obsolete] AddKoanCacheAdapter shim, MemoryAutoRegistrar/MemoryCacheAdapterRegistrar (reports defunct module name 'Koan.Cache.Adapter.Memory'), a leftover Koan.Cache.Adapter.Memory.csproj.lscache file, stale doc comment in LayeredCache ('M3 will wire that integration; M2 leaves coherence inactive' — coherence IS wired), and InternalsVisibleTo grants to two nonexistent test assemblies (Koan.Cache.Tests, Koan.Tests.Cache.Unit)."
+    },
+    {
+      "name": "Koan.Cache.Abstractions",
+      "purpose": "Kernel-tier contracts (~1,335 LOC): store/client/builder interfaces, primitives (keys, options, results), policy attributes, coherence channel contracts, and the ARCH-0081 typed registration helpers. Referenced by Koan.Data.Core for the EntityContext.CacheBehavior integration.",
+      "keyTypes": [
+        "ICacheStore + CacheStoreCapabilities/CacheStorePlacement",
+        "ICacheClient / ICacheReader / ICacheWriter / ICacheEntryBuilder<T>",
+        "CacheableAttribute / CachePolicyAttribute / CachePolicyDescriptor / CacheBehavior",
+        "CacheKey / CacheValue / CacheFetchResult / CacheEntryOptions / CacheWriteOptions",
+        "ICoherenceChannel<TMessage> (generic, explicitly designed for future promotion to Koan.Core.Coherence)",
+        "ICacheCoherenceChannel + CacheInvalidation + CoherenceCapabilities + CoherenceMode",
+        "CacheRegistrationExtensions (AddCacheStore<T>/AddCoherenceChannel<T>, ARCH-0081)",
+        "ICacheSerializer"
+      ],
+      "dependsOn": [],
+      "state": "active/settled — minimal deps (only MS config/DI abstractions), clean; one Gen-1 leftover folder (Adapters/: CacheAdapterDescriptor, ICacheAdapterRegistrar) whose only live consumer is the obsolete shim chain in Koan.Cache."
+    },
+    {
+      "name": "Koan.Cache.Adapter.Memory",
+      "purpose": "Former standalone Memory L1 adapter package; its code now lives at src/Koan.Cache/Adapters/Memory.",
+      "keyTypes": [],
+      "dependsOn": [],
+      "state": "tombstone — directory is completely empty, no csproj, not in Koan.sln; mentioned only in docs/architecture/foundation-consolidation-plan.md and docs/assessment/README.md."
+    },
+    {
+      "name": "Koan.Cache.Adapter.Redis",
+      "purpose": "Redis L2 store + Redis pub/sub coherence channel in one package; rides the shared IConnectionMultiplexer from Koan.Data.Connector.Redis (ARCH-0080 shared transport ownership).",
+      "keyTypes": [
+        "RedisCacheStore : ICacheStore ([ProviderPriority(100)], Remote placement, full capability set: tags/sliding/SWR/binary/persistence)",
+        "RedisCoherenceChannel : ICacheCoherenceChannel ([ProviderPriority(100)], pub/sub)",
+        "RedisCacheEnvelope + RedisCacheSerializerContext (source-gen STJ)",
+        "RedisCacheAdapterOptions / RedisCoherenceChannelOptions",
+        "KoanAutoRegistrar (AddCacheStore<RedisCacheStore> + AddCoherenceChannel<RedisCoherenceChannel>)"
+      ],
+      "dependsOn": [
+        "Koan.Cache",
+        "Koan.Cache.Abstractions",
+        "Koan.Data.Connector.Redis",
+        "Koan.Cache.Analyzers (analyzer-only)"
+      ],
+      "state": "active — integration tests (RedisCacheAdapterSpec, RedisCoherenceCornerstoneSpec) go through KoanIntegrationHost per ARCH-0079 canon."
+    },
+    {
+      "name": "Koan.Cache.Adapter.Sqlite",
+      "purpose": "Persistent on-disk L1 store (survives process restart) with tag indexing and TTL eviction; [ProviderPriority(50)] preempts the built-in Memory store (10) by mere reference.",
+      "keyTypes": [
+        "SqliteCacheStore : ICacheStore",
+        "SqliteCacheOptions",
+        "KoanAutoRegistrar"
+      ],
+      "dependsOn": [
+        "Koan.Cache",
+        "Koan.Cache.Abstractions",
+        "Koan.Core",
+        "Koan.Cache.Analyzers (analyzer-only)"
+      ],
+      "state": "active — SqliteCachePersistenceSpec uses KoanIntegrationHost; also exercised by the CrossEngine behavior oracle."
+    },
+    {
+      "name": "Koan.Cache.Analyzers",
+      "purpose": "Single Roslyn analyzer (KOAN0001, netstandard2.0): flags bare TryAddEnumerable(ServiceDescriptor.Singleton<I>(...)) on cache interfaces, which produces an indistinguishable descriptor that throws at boot; steers authors to the ARCH-0081 typed helpers. Wired as analyzer-only ref into all five cache runtime projects.",
+      "keyTypes": [
+        "CacheRegistrationAnalyzer (KOAN0001)",
+        "KnownInterfaces map (internal; documented as 'adding a new pillar interface to the canon: append here')"
+      ],
+      "dependsOn": [],
+      "state": "active but NOT in Koan.sln (neither is its test project Koan.Tests.Cache.Analyzers) — builds only transitively via analyzer ProjectReferences; csproj carries hard-won NuGet packaging lessons from the 0.8.0 first release."
+    },
+    {
+      "name": "Koan.Cache.Coherence.InMemory",
+      "purpose": "In-process coherence channel (~189 LOC): shared InMemoryCoherenceBus lets multiple channels in one process simulate cross-node delivery. Primary use: tests and single-node coherence-wiring verification. Priority int.MinValue so any real transport preempts.",
+      "keyTypes": [
+        "InMemoryCoherenceChannel : ICacheCoherenceChannel",
+        "InMemoryCoherenceBus",
+        "KoanAutoRegistrar"
+      ],
+      "dependsOn": [
+        "Koan.Cache.Abstractions",
+        "Koan.Core",
+        "Koan.Data.Abstractions (solely for ProviderPriorityAttribute)"
+      ],
+      "state": "active — hosts the coherence cornerstone + startup-tolerance specs; no production consumers in src/ or samples/."
+    },
+    {
+      "name": "Koan.Cache.Coherence.Messaging",
+      "purpose": "Coherence over Koan.Messaging (~227 LOC): rides an existing IMessageProxy bus instead of standing up Redis pub/sub; [ProviderPriority(150)] preempts RedisCoherenceChannel (100) when both are present.",
+      "keyTypes": [
+        "MessagingCoherenceChannel : ICacheCoherenceChannel",
+        "MessagingInvalidationEnvelope",
+        "KoanAutoRegistrar (registers services.On<MessagingInvalidationEnvelope> handler at DI-time)"
+      ],
+      "dependsOn": [
+        "Koan.Cache.Abstractions",
+        "Koan.Core",
+        "Koan.Data.Abstractions",
+        "Koan.Messaging.Core"
+      ],
+      "state": "active — channel + envelope specs in tests/Suites/Cache/Coherence.Messaging."
+    }
+  ],
+  "cohesion": "Highest-cohesion pillar surveyed — this IS the reference for 'settled' Koan architecture. Clean three-band layering: Abstractions (Kernel, zero Koan deps) ← Koan.Cache (core + default Memory L1) ← adapters/channels that activate by reference via KoanAutoRegistrar + ARCH-0081 typed helpers + ProviderPriority preemption (Memory 10 < Sqlite 50 L1; Redis-pubsub 100 < Messaging 150 coherence). Storage is strictly separated from coherence (the structural fix ARCH-0075 made over the Gen-1 ARCH-0059 scaffolding, which conflated them), LayeredCache is composition-not-inheritance with a closed verb set, and the architectural invariant (remote invalidation touches L1 only) is enforced in one place and documented at every call site. Seams/fractures: (1) the Gen-1 adapter-registrar machinery (CacheAdapterResolver reflection scanner, ICacheAdapterRegistrar, CacheAdapterDescriptor, [Obsolete] AddKoanCacheAdapter, MemoryAutoRegistrar reporting a module name for a package that no longer exists) still lives inside the otherwise Gen-2 pillar; (2) every cache project depends on Koan.Data.Abstractions purely for ProviderPriorityAttribute — a cross-pillar gravity leak; (3) ICoherenceChannel<T> is explicitly written as 'promote to Koan.Core.Coherence once a second consumer materializes' — and the fleet-trust CAEP-epoch-revocation direction is exactly that consumer; (4) sln hygiene: Koan.Cache.Analyzers and two of nine test projects (Analyzers, CrossEngine) are not in Koan.sln; (5) the web-facing piece (KoanCacheControlMiddleware) lives in Koan.Web but its tests live under tests/Suites/Cache/Web — fine, but the pillar boundary crosses there.",
+  "redundancies": [
+    "Dual adapter-registration models coexist: legacy ICacheAdapterRegistrar/CacheAdapterResolver/AddKoanCacheAdapter (obsolete, reflection-scanning) vs current AddCacheStore<T>/AddCoherenceChannel<T> typed helpers + per-package KoanAutoRegistrar. Only the latter is used by real adapters; the former survives solely to serve itself.",
+    "Two IKoanAutoRegistrar implementations inside the single Koan.Cache assembly (KoanAutoRegistrar + MemoryAutoRegistrar); the Memory one exists only to emit a boot-report module named 'Koan.Cache.Adapter.Memory' — a package that no longer exists — and to call the obsolete shim.",
+    "ADR overlap: ARCH-0059 is formally superseded by ARCH-0075, but ARCH-0060 (control surface: Exists/CacheTagSet/flush helpers) is still status=approved with no cross-reference reconciling it against the 0075 rebuild — readers must diff mentally.",
+    "ICoherenceChannel<TMessage> + ICacheCoherenceChannel marker pair is intentional (DI-resolvable specialization) and documented, not accidental — but it duplicates the channel concept until the planned Koan.Core promotion happens.",
+    "CacheKeyTemplate (283 lines, general-purpose token templating) sits in the Decorators namespace despite serving policies and the EntityCache helpers too.",
+    "csproj Description for Koan.Cache still advertises 'singleflight coordination' although Singleflight was lifted to Koan.Core.Singleflight (the project now only consumes it)."
+  ],
+  "deadOrExperimental": [
+    "src/Koan.Cache.Adapter.Memory — empty tombstone directory (no csproj, not in sln); code folded into src/Koan.Cache/Adapters/Memory",
+    "src/Koan.Cache/Adapters/Memory/Koan.Cache.Adapter.Memory.csproj.lscache — leftover tooling-cache file from the fold-in",
+    "tests/Suites/Cache/Unit/Koan.Tests.Cache.Unit — tombstone test dir containing only TestResults/ (no csproj, no specs), yet still named in Koan.Cache's InternalsVisibleTo",
+    "Gen-1 legacy chain: src/Koan.Cache/Adapters/CacheAdapterResolver.cs (165-line assembly scanner), src/Koan.Cache.Abstractions/Adapters/{CacheAdapterDescriptor,ICacheAdapterRegistrar}.cs, AddKoanCacheAdapter [Obsolete] shim, MemoryAutoRegistrar.cs, MemoryCacheAdapterRegistrar.cs — no consumer outside the chain itself",
+    "InternalsVisibleTo('Koan.Cache.Tests') and InternalsVisibleTo('Koan.Tests.Cache.Unit') in src/Koan.Cache/InternalsVisibleTo.cs — both target assemblies do not exist"
+  ],
+  "consolidationCandidates": [
+    "Cut the entire Gen-1 adapter-registrar chain (CacheAdapterResolver, ICacheAdapterRegistrar, CacheAdapterDescriptor, AddKoanCacheAdapter, MemoryAutoRegistrar, MemoryCacheAdapterRegistrar; ~350 LOC + a reflection/AssemblyLoadContext scanner) because ARCH-0075's own premise was 'no public consumers — break-and-rebuild authorized'; keeping an [Obsolete] back-compat shim with zero constituency contradicts the redesign discipline, and MemoryAutoRegistrar actively misreports a defunct module in boot provenance.",
+    "Delete tombstones: src/Koan.Cache.Adapter.Memory dir, tests/Suites/Cache/Unit dir, the .csproj.lscache leftover, and the two dead InternalsVisibleTo grants — pure hygiene, zero risk.",
+    "Merge Koan.Cache.Coherence.InMemory into Koan.Cache (189 LOC) — same rationale that folded the Memory store in: it is the priority-int.MinValue fallback used by tests/single-process verification, so 'Reference = Intent' buys nothing a CacheOptions flag couldn't; would cut one project. Counter-consideration: keeping it separate keeps any channel registration opt-in, so this is a judgment call the Memory-store precedent already answered.",
+    "Promote ICoherenceChannel<TMessage> (+CoherenceCapabilities, cursor/catch-up semantics, and arguably CoherenceCoordinator's channel-selection logic) to Koan.Core.Coherence — the file itself documents this as the plan once a second consumer exists, and the fleet-trust-fabric direction (CAEP-epoch-over-coherence-channel revocation) is that consumer. A file move with no renames, per its own remarks.",
+    "Generalize Koan.Cache.Analyzers into a framework-wide Koan.Analyzers: the KOAN0001 KnownInterfaces map is explicitly designed for 'adding a new pillar interface to the canon', i.e. the indistinguishable-descriptor bug class is not cache-specific; one analyzer package for ~113 projects beats one per pillar.",
+    "Move ProviderPriorityAttribute from Koan.Data.Abstractions to Koan.Core — both coherence packages (and CoherenceCoordinator's channel ordering) take a Data.Abstractions dependency for this single attribute; relocating it removes a cross-pillar edge from at least 3 cache projects and matches its actual cross-pillar usage (data adapters, cache stores, coherence channels, repository decorators).",
+    "Sln hygiene: add src/Koan.Cache.Analyzers, tests/.../Koan.Tests.Cache.Analyzers, and tests/.../Koan.Tests.Cache.CrossEngine to Koan.sln so solution-level test discovery and IDE loading see them (they currently build/run only when targeted directly or transitively).",
+    "ADR hygiene: annotate ARCH-0060 with its post-ARCH-0075 status (the control surface it defines — Exists, CacheTagSet, tag flush — survived the rebuild, so 'reaffirmed by 0075' is probably the right marker), and fix the stale M2/M3 milestone comment in LayeredCache plus the 'singleflight coordination' csproj description."
+  ],
+  "maturitySignals": {
+    "tests": "Strongest test posture of a periphery pillar: 9 dedicated suites under tests/Suites/Cache (~28 spec files): Abstractions (9 unit specs: attributes, invalidation incl. corner cases, key building, TTL policy, write options, capabilities), Topology (8: LayeredCache, topology resolver, policy materializer, decorator priority, EntityContext.CacheBehavior, health check, instrumentation, trace filter), Coherence.InMemory (cornerstone + startup-tolerance with a FailingCoherenceChannel fake), Coherence.Messaging (channel + envelope), Adapter.Redis (adapter + coherence cornerstone via RedisCacheNode/KoanIntegrationHost — real AddKoan() discovery per ARCH-0079 canon), Adapter.Sqlite (persistence via KoanIntegrationHost), CrossEngine (shared behavior-oracle base run against Memory and Sqlite engines — the FilterConvergence pattern applied to cache), Analyzers (KOAN0001 spec reflecting on KnownInterfaces), Web (middleware unit + TestServer). Gaps: Analyzers and CrossEngine test projects absent from Koan.sln; the Unit suite is a tombstone; CrossEngine oracle does not include a Redis engine (Redis covered separately but not against the shared spec base); GetMany batch caching is untested because unimplemented.",
+    "docs": "Excellent for this repo: 4 cache ADRs with explicit supersession lineage (ARCH-0059 superseded-by-0075, ARCH-0060 control surface, ARCH-0075 pillar rebuild, ARCH-0078 fresh-or-null/SWR-opt-in) plus two adjacent (ARCH-0080 shared transport, ARCH-0081 typed helpers + analyzer — the analyzer csproj even links the ADR in its helpLinkUri); docs/reference/data/cache.md (v0.7.0, TL;DR + boot-report walkthrough); docs/architecture/koan-cache-module.md; a dedicated .claude/skills/koan-caching skill; a full CLAUDE.md section. No per-project README.md in any src/Koan.Cache* directory, and docs/guides has no caching guide (reference doc fills that role). ARCH-0060's status relative to 0075 is the one documented-decision gap.",
+    "codeQuality": "Exemplary: exactly 1 TODO across ~7,200 source LOC (CachedRepository GetMany batch strategy); zero HACK/FIXME/WIP/NotImplementedException; NotSupportedException appears only as legitimate capability guards; XML doc comments cite ADR numbers at decision points (ARCH-0076 priority bands, ARCH-0078 SWR surfacing, ARCH-0079 degraded-mode rationale); invariants enforced and self-checked (boot report computes per-policy OK/DEGRADED/BUG health, materializer rejects L1>L2 TTL at boot); nullable enabled everywhere; consistent naming. Blemishes are all residue, not rot: the Gen-1 legacy chain, one stale milestone comment in LayeredCache, a stale csproj description, dead InternalsVisibleTo grants, and the .lscache leftover."
+  }
+}

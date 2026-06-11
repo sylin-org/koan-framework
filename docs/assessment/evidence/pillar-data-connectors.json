@@ -1,0 +1,235 @@
+{
+  "area": "data-connectors (src/Connectors/Data — entity-store adapter fleet)",
+  "projects": [
+    {
+      "name": "Koan.Data.Connector.Mongo (src/Connectors/Data/Mongo, ~3.3k LOC)",
+      "purpose": "MongoDB document adapter; the flagship NoSQL connector with full pushdown, GUID identity-encoding (DATA-0098), partition-safe collection caching, native TTL retention.",
+      "keyTypes": [
+        "MongoRepository<TEntity,TKey> (772 LOC; IDataRepository+IQueryRepository+IBulkUpsert/Delete+IConditionalWriteRepository+IInstructionExecutor+IAdapterReadiness)",
+        "MongoFilterTranslator<T> (filter→BsonFilter pushdown, declares FilterSupport caps)",
+        "MongoClientProvider",
+        "MongoOptimizationAutoRegistrar (driver-global GUID serializer config, IKoanInitializer)",
+        "MongoHealthContributor",
+        "MongoGuidEncoding",
+        "MongoZenGardenOfferingBinding (cross-pillar coupling)",
+        "MongoOrchestrationEvaluator + MongoDiscoveryAdapter"
+      ],
+      "dependsOn": [
+        "Koan.Data.Abstractions",
+        "Koan.Data.Core",
+        "Koan.Core",
+        "Koan.Core.Adapters",
+        "Koan.Orchestration.Abstractions",
+        "Koan.ZenGarden.Core"
+      ],
+      "state": "active, first-class — richest DataCaps set in fleet (Linq, BulkUpsert/Delete, AtomicBatch, FastRemove, ConditionalReplace, Retention.TtlIndex); just extended for JOBS-0005 §20 (CAS claim + expireAfterSeconds=0 TTL index at MongoRepository.cs:263-265); careful concurrency comments; zero TODOs. Only adapter declaring TtlIndex. Gap: no Query.String/IRawQueryRepository."
+    },
+    {
+      "name": "Koan.Data.Connector.Postgres (~2.3k LOC)",
+      "purpose": "PostgreSQL relational adapter (Dapper+Npgsql) with JSONB projection pushdown, relational schema orchestration, and Aspire dev-container provisioning.",
+      "keyTypes": [
+        "PostgresRepository<TEntity,TKey> (1147 LOC; +IOptimizedDataRepository, IRawQueryRepository, IConditionalWriteRepository)",
+        "PgDialect",
+        "PostgresConnectionFactory",
+        "SchemaDdlPolicy / SchemaMatchingMode (copy-pasted enums)",
+        "PostgresOrchestrationEvaluator + PostgresDiscoveryAdapter",
+        "PostgresHealthContributor",
+        "KoanAutoRegistrar (includes Aspire AddPostgres resource wiring)"
+      ],
+      "dependsOn": [
+        "Koan.Data.Core",
+        "Koan.Data.Relational",
+        "Koan.Data.Abstractions",
+        "Koan.Core",
+        "Koan.Orchestration.Abstractions",
+        "Koan.Orchestration.Aspire"
+      ],
+      "state": "active, first-class — full RelationalFilterSupport pushdown + ConditionalReplace; covered by FilterConvergence oracle + Jobs adapter suite. Seams: does NOT implement IBulkUpsert / declare DataCaps.Write.BulkUpsert (UpsertMany exists at line 633 but capability unadvertised — parity gap vs Sqlite/SqlServer/Mongo); stale TODO 'Configure proper health check' in KoanAutoRegistrar.cs:168 (Aspire section); only adapter (with Redis) taking hard Aspire.Hosting package deps; known pre-existing ToRowOptimized ordering bug (backlog)."
+    },
+    {
+      "name": "Koan.Data.Connector.Sqlite (~2.6k LOC)",
+      "purpose": "SQLite relational adapter for local dev/test and persistent L1 scenarios; same relational orchestration stack as Postgres/SqlServer.",
+      "keyTypes": [
+        "SqliteRepository<TEntity,TKey> (1732 LOC — largest single file in the fleet; full interface set incl. IConditionalWriteRepository)",
+        "SqliteDdlExecutor (in-repo)",
+        "SqliteConnectionFactory",
+        "SqliteToRelationalBridgeConfigurator",
+        "SchemaDdlPolicy/SchemaMatchingMode (dup)",
+        "SqliteHealthContributor",
+        "SqliteDiscoveryAdapter"
+      ],
+      "dependsOn": [
+        "Koan.Data.Abstractions",
+        "Koan.Data.Core",
+        "Koan.Data.Relational"
+      ],
+      "state": "active, first-class — identical cap set to SqlServer (Linq, String, BulkUpsert/Delete, AtomicBatch, FastRemove, ConditionalReplace, RelationalFilterSupport.Default); Jobs+Cache adapter suites ride it. Code smell: 1732-line repository monolith (DDL, instructions, query, batch all inline). No Orchestration/ evaluator (correct — file-based, nothing to containerize)."
+    },
+    {
+      "name": "Koan.Data.Connector.SqlServer (~1.8k LOC)",
+      "purpose": "SQL Server relational adapter with JSON-projection pushdowns; mirrors Sqlite/Postgres shape.",
+      "keyTypes": [
+        "SqlServerRepository<TEntity,TKey> (926 LOC; full interface set incl. IConditionalWriteRepository)",
+        "MsSqlDdlExecutor",
+        "MsSqlStoreFeatures",
+        "SqlServerConnectionFactory",
+        "SchemaDdlPolicy/SchemaMatchingMode (dup)",
+        "SqlServerHealthContributor",
+        "SqlServerDiscoveryAdapter"
+      ],
+      "dependsOn": [
+        "Koan.Data.Abstractions",
+        "Koan.Data.Core",
+        "Koan.Data.Relational",
+        "Koan.Orchestration.Abstractions"
+      ],
+      "state": "active, first-class — cap parity with Sqlite; MARS/DDL bugs recently fixed via FilterConvergence oracle; TECHNICAL.md documents NotSupported-predicate policy. Has Discovery but no Orchestration evaluator and no Aspire wiring (asymmetric vs Postgres); known backlog: orchestrator-columns item."
+    },
+    {
+      "name": "Koan.Data.Connector.Couchbase (~2.9k LOC)",
+      "purpose": "Couchbase document adapter: N1QL pushdown, KV durability levels, real cluster transactions, heaviest readiness machinery in the fleet.",
+      "keyTypes": [
+        "CouchbaseRepository<TEntity,TKey> (958 LOC; +IRawQueryRepository, IOptimizedDataRepository, IAdapterReadiness)",
+        "CouchbaseClusterProvider (751 LOC readiness/state manager)",
+        "CouchbaseN1qlFilterTranslator",
+        "CouchbaseQueryDefinition",
+        "CouchbaseOrchestrationEvaluator + CouchbaseDiscoveryAdapter",
+        "CouchbaseHealthContributor"
+      ],
+      "dependsOn": [
+        "Koan.Data.Abstractions",
+        "Koan.Data.Core",
+        "Koan.Core",
+        "Koan.Core.Adapters",
+        "Koan.Orchestration.Abstractions"
+      ],
+      "state": "active but lagging the capability ladder — declares String/Linq/BulkUpsert/BulkDelete/AtomicBatch + N1QL filter caps but NOT FastRemove, ConditionalReplace, or TtlIndex (skipped by both DATA-0083 and the JOBS-0005 §20 wave; per 'no stopgaps' rule these should be implemented, not floor-dropped). Tests exist (CRUD + FilterConvergence) but RequireDocker-gated with a known Testcontainers-networking backlog item, so it is the least empirically verified of the five real DBs."
+    },
+    {
+      "name": "Koan.Data.Connector.Redis (~1.4k LOC)",
+      "purpose": "Redis key/value adapter: string-key CRUD, full-keyspace SCAN queries with client-side filtering, Aspire dev-container wiring.",
+      "keyTypes": [
+        "RedisRepository<TEntity,TKey> (299 LOC)",
+        "RedisHealthContributor",
+        "RedisOrchestrationEvaluator + RedisDiscoveryAdapter",
+        "KoanAutoRegistrar (302 LOC — larger than the repository itself)"
+      ],
+      "dependsOn": [
+        "Koan.Data.Abstractions",
+        "Koan.Data.Core",
+        "Koan.Core",
+        "Koan.Orchestration.Abstractions",
+        "Koan.Orchestration.Aspire"
+      ],
+      "state": "active build but neglected tier — caps are only Linq (in-memory) + FastRemove + FilterSupport.Full, yet 'Full' is honored by ScanAll(page:1,size:int.MaxValue) + InMemoryFilterEvaluator (RedisRepository.cs:85-90): materialize-everything semantics identical to Json/InMemory, dangerous at scale. No bulk caps, AtomicBatch throws NotSupportedException (line 284), no conditional write, no TTL despite Redis being the natural TTL store. Stale TODO at KoanAutoRegistrar.cs:277. Tests: a single Capabilities spec + fixture — thinnest coverage in the fleet."
+    },
+    {
+      "name": "Koan.Data.Connector.ElasticSearch (~1.4k LOC)",
+      "purpose": "Elasticsearch VECTOR adapter (kNN, index provisioning, metadata filtering via REST) — despite living under Connectors/Data it implements IVectorSearchRepository, not the document-store surface.",
+      "keyTypes": [
+        "ElasticSearchVectorRepository<TEntity,TKey> (704 LOC; VectorCaps.Knn/Filters/BulkUpsert/BulkDelete)",
+        "ElasticSearchVectorAdapterFactory",
+        "ElasticSearchHealthContributor",
+        "ElasticSearchOptionsConfigurator",
+        "SearchEngineFilterTranslator (shared, from Koan.Data.SearchEngine)"
+      ],
+      "dependsOn": [
+        "Koan.Data.Abstractions",
+        "Koan.Data.Vector.Abstractions",
+        "Koan.Data.Core",
+        "Koan.Core",
+        "Koan.Orchestration.Abstractions",
+        "Koan.Data.SearchEngine"
+      ],
+      "state": "active — covered by VectorAdapterSurface TestKit suite; but it is an ~80%-identical twin of OpenSearch (normalized diff of the two repositories is 258 lines out of 1295) and is misfiled relative to src/Connectors/Data/Vector/* (Weaviate/Qdrant/Milvus/PGVector)."
+    },
+    {
+      "name": "Koan.Data.Connector.OpenSearch (~1.3k LOC)",
+      "purpose": "OpenSearch vector adapter; structural clone of the ElasticSearch connector over the shared Koan.Data.SearchEngine translator.",
+      "keyTypes": [
+        "OpenSearchVectorRepository<TEntity,TKey> (591 LOC; same VectorCaps set)",
+        "OpenSearchVectorAdapterFactory",
+        "OpenSearchHealthContributor",
+        "OpenSearchOptionsConfigurator"
+      ],
+      "dependsOn": [
+        "Koan.Data.Abstractions",
+        "Koan.Data.Vector.Abstractions",
+        "Koan.Data.Core",
+        "Koan.Core",
+        "Koan.Orchestration.Abstractions",
+        "Koan.Data.SearchEngine"
+      ],
+      "state": "active — own VectorAdapterSurface test suite; same misfiling and twin-code observation as ElasticSearch (the DATA-0097 SearchEngine extraction got the filter translator but stopped before the repository body)."
+    },
+    {
+      "name": "Koan.Data.Connector.Json (~0.6k LOC)",
+      "purpose": "JSON-file-backed repository for demos/tests/local dev; one file per entity store, client-side filtering.",
+      "keyTypes": [
+        "JsonRepository<TEntity,TKey> (332 LOC; Linq + FilterSupport.Full, no batch — AtomicBatch throws)",
+        "JsonRepo (static DI-bypass factory 'New<TEntity,TKey>(path)')",
+        "JsonDataServiceCollectionExtensions.AddJsonData<T,K>",
+        "JsonAdapterRegistration",
+        "JsonHealthContributor (directory writability check)"
+      ],
+      "dependsOn": [
+        "Koan.Data.Abstractions",
+        "Koan.Data.Core",
+        "Koan.Core",
+        "Koan.Orchestration.Abstractions",
+        "Koan.Core.Adapters"
+      ],
+      "state": "active, deliberately minimal dev-tier — recently touched by the FilterConvergence oracle (default-sort fix). Carries three registration surfaces (KoanAutoRegistrar, JsonAdapterRegistration, AddJsonData extension) plus the JsonRepo escape hatch — surface bloat for a demo adapter."
+    },
+    {
+      "name": "Koan.Data.Connector.InMemory (~0.4k LOC)",
+      "purpose": "Thread-safe in-memory store (per entity-type × partition ConcurrentDictionary) for testing and the bottom rung of every capability ladder (DATA-0081).",
+      "keyTypes": [
+        "InMemoryRepository<TEntity,TKey> (242 LOC; Linq, BulkUpsert/Delete, AtomicBatch, FilterSupport.Full)",
+        "InMemoryDataStore (singleton keyed store)",
+        "InMemoryAdapterFactory"
+      ],
+      "dependsOn": [
+        "Koan.Data.Abstractions",
+        "Koan.Data.Core",
+        "Koan.Core",
+        "Koan.Orchestration.Abstractions",
+        "Koan.Core.Adapters"
+      ],
+      "state": "active, clean, smallest and best-proportioned project in the area; broadest spec set of the dev-tier adapters (CRUD/Batch/Caps/Filtering/Instructions/Partition/Sorting). No health contributor (correct — nothing external). Notably declares AtomicBatch while Redis/Json don't."
+    }
+  ],
+  "cohesion": "Strong as a pillar: all 10 follow one canonical anatomy (Repository + AdapterFactory + Options/OptionsConfigurator + HealthContributor + Infrastructure/Constants + Initialization/KoanAutoRegistrar + Discovery adapter + TECHNICAL.md/README), all flow through the same DataCaps/FilterSupport capability model (ARCH-0084) and the same QueryDefinition/filter-AST pushdown pipeline (DATA-0096/0099/0100). The relational trio (Sqlite/Postgres/SqlServer) additionally shares IRelationalSchemaOrchestrator from Koan.Data.Relational. Fractures: (1) ElasticSearch/OpenSearch are vector adapters parked in the document-connector directory while a sibling Vector/ directory holds the other four vector adapters — the taxonomy lies; (2) capability declaration is uneven where it shouldn't be (Postgres ships UpsertMany but doesn't advertise BulkUpsert; Couchbase missed the ConditionalReplace/FastRemove/Ttl waves; Redis advertises FilterSupport.Full for what is a full-keyspace scan + client-side filter); (3) orchestration/Aspire integration is inconsistent — Postgres and Redis embed Aspire.Hosting packages and resource-builder code in their registrars (with matching stale TODOs), Mongo/Couchbase have evaluator-only orchestration, SqlServer/Sqlite have neither; (4) every adapter has BOTH a manual XRegistration class and a KoanAutoRegistrar registering the same services — two registration paths per adapter × 10 adapters; (5) Mongo uniquely couples to Koan.ZenGarden.Core via an offering binding (with both 'mongo' and 'mongodb' alias ids), the only cross-pillar reference in the fleet.",
+  "redundancies": [
+    "SchemaDdlPolicy.cs + SchemaMatchingMode.cs are byte-identical (namespace aside) in Sqlite/, Postgres/, SqlServer/ — three copies of two public enums that belong in Koan.Data.Relational.",
+    "ElasticSearchVectorRepository (704 LOC) vs OpenSearchVectorRepository (591 LOC): normalized diff is 258/1295 lines (~80% identical); factories, options configurators (189 LOC each), health contributors, and Initialization registrars are likewise parallel — the shared Koan.Data.SearchEngine project only captured the filter translator.",
+    "Dual registration path per adapter: e.g. MongoRegistration.cs:23 and Initialization/KoanAutoRegistrar.cs:59 both TryAddEnumerable the same MongoHealthContributor (same pattern in Couchbase/Postgres/Sqlite/SqlServer/Json) — every service is wired twice in code.",
+    "Redis/Json/InMemory all implement Query() as materialize-all + InMemoryFilterEvaluator.Compile + InMemorySorter — three hand-rolled copies of the same client-side evaluation loop that could be one shared 'naive store' base.",
+    "Per-adapter Telemetry shims (MongoTelemetry, CouchbaseTelemetry, SqliteTelemetry, PgTelemetry, SqlServerTelemetry, ElasticSearchTelemetry, OpenSearchTelemetry) — seven near-identical ActivitySource holders.",
+    "Mongo carries three init units (KoanAutoRegistrar, MongoOptimizationAutoRegistrar, MongoRegistration) plus a local SimpleOptionsMonitor shim; the optimization registrar's process-global driver mutation under a static lock is a second bootstrap idiom inside one adapter.",
+    "Json exposes three+ registration surfaces (KoanAutoRegistrar, JsonAdapterRegistration, AddJsonData<T,K> extension, JsonRepo static factory) for a demo-tier adapter."
+  ],
+  "deadOrExperimental": [
+    "src/Connectors/Data/Cqrs/Outbox/Mongo (Koan.Data.Cqrs.Outbox.Connector.Mongo, ~344 LOC, sibling to the in-scope ten): in Koan.sln but zero hits in tests/ and samples/ — vestigial CQRS-outbox scaffold predating the Jobs transactional outbox; tombstone candidate.",
+    "Json/JsonRepo.cs static DI-bypass factory — dev convenience with no framework consumers found; cut candidate.",
+    "Stale TODO blocks in Aspire sections: Postgres/Initialization/KoanAutoRegistrar.cs:168 and Redis/Initialization/KoanAutoRegistrar.cs:277 ('Configure proper health check' with commented-out WithHealthCheck) — abandoned Aspire health wiring.",
+    "Mongo/Initialization/MongoZenGardenOfferingBinding.cs dual 'mongo'/'mongodb' alias bindings — smells like a compatibility shim awaiting a canonical adapter-id decision.",
+    "Redis adapter as a *data* connector is borderline experimental in practice: one test spec, scan-all queries, no batch/TTL — its real production role in the repo is the Cache/Coherence adapter (separate area), not entity storage."
+  ],
+  "consolidationCandidates": [
+    "Merge ElasticSearch + OpenSearch into one Koan.Data.SearchEngine-based connector with a small dialect seam (auth header, distance-metric names, knn query shape): repositories are ~80% identical and the shared translator already exists; saves ~1.3k LOC and one whole project. While at it, relocate the result under src/Connectors/Data/Vector/ (or rename the package from Data.Connector.* to Vector.*) so the directory taxonomy matches reality.",
+    "Hoist SchemaDdlPolicy/SchemaMatchingMode (and probably the orchestrator-invocation boilerplate around IRelationalSchemaOrchestrator + per-adapter DdlExecutor lookup, repeated at SqliteRepository.cs:225/276/899/981 and SqlServerRepository.cs:179/680/689) into Koan.Data.Relational — three adapters re-declare the same governance enums and the same EnsureCreated choreography.",
+    "Collapse the dual registration path: with ARCH-0086 KoanModule landing, fold each adapter's XRegistration class into its KoanAutoRegistrar/module so there is exactly one wiring unit per adapter (10 classes deleted, removes double-registration risk).",
+    "Extract a shared 'materialized store' base (scan + InMemoryFilterEvaluator + InMemorySorter + paging) consumed by Redis/Json/InMemory; Redis then only contributes KV I/O. Alternatively decide Redis is not an entity store, demote/cut Koan.Data.Connector.Redis, and keep Redis as cache/coherence only — its single-spec test coverage suggests nobody dogfoods it as data.",
+    "Close the capability-parity gaps instead of carrying asymmetry: Postgres should declare/implement IBulkUpsert (UpsertMany already exists); Couchbase should get ConditionalReplace + FastRemove (it has real transactions, so CAS is implementable) or an ADR note saying why not — currently it silently misses the JOBS-0005 §20 ladder; Redis should either gain native TTL/SCAN-cursor paging or stop advertising FilterSupport.Full.",
+    "Move Aspire resource-provisioning out of Postgres/Redis registrars into the orchestration layer (Koan.Orchestration.Aspire) so adapters don't take Aspire.Hosting.* package deps — restores the layering the other 8 adapters already follow and deletes the stale TODO blocks.",
+    "Decouple Mongo from Koan.ZenGarden.Core: the IZenGardenOfferingBinding should be discovered/registered from the ZenGarden side (or via a neutral manifest), not a project reference inside a data adapter — it is the only cross-pillar edge in the fleet.",
+    "Tombstone src/Connectors/Data/Cqrs/Outbox/Mongo (superseded by the Jobs-tier transactional outbox; no consumers).",
+    "Split SqliteRepository.cs (1732 lines) and PostgresRepository.cs (1147 lines) along the seams the other adapters already use (DDL/schema, instructions, query translation) — same behavior, files under the 800-line ceiling."
+  ],
+  "maturitySignals": {
+    "tests": "Best-covered area in the repo. tests/Suites/Data has a per-connector suite for 8 of 10 (Couchbase, InMemory, Json, Mongo, Postgres, Redis, Sqlite, SqlServer) plus shared canon kits: Koan.Data.AdapterSurface.TestKit (FilterConvergence + TemporalConvergence oracles, consumed by Couchbase/InMemory/Mongo/Postgres/Sqlite/SqlServer — NOT Json/Redis) and Koan.Data.VectorAdapterSurface.TestKit (ElasticSearch/OpenSearch suites). Cross-cutting: Koan.Data.Filtering.Tests, Koan.Data.Convergence.Tests, comparable-encoding specs (DATA-0100) on real Mongo/PG/SqlServer/SQLite. Adapters are additionally exercised by Jobs (Sqlite/Postgres/Mongo/SqlServer), Cache (Sqlite/Redis), and Web AdapterSurface (7 adapters) suites. Weak spots: Redis = one Capabilities spec only; Couchbase suites Docker-gated with a known Testcontainers-networking backlog; ES/OS verified only via vector surface.",
+    "docs": "Uniformly good at the project level: every adapter ships README.md + TECHNICAL.md (TECHNICAL docs state pushdown/NotSupported policies explicitly). Deep ADR trail in docs/decisions (DATA-0081 InMemory, 0083 FastRemove, 0086 naming, 0088 auto-config resolver, 0092/0093 sort, 0094 partitions, 0096 unified filter, 0098 identity encoding, 0099/0100 convergence/encoding). Gap: no single adapter×capability matrix doc (no 'adapter-matrix' found in docs/guides or docs/reference); docs/guides/data has only two streaming/access guides — the capability story lives in code (Describe) and scattered ADRs.",
+    "codeQuality": "High and recently worked: only 2 stale TODOs in the whole in-scope fleet (both in abandoned Aspire health-check blocks, Postgres:168/Redis:277); NotSupportedException usage is deliberate and documented policy, not scaffolding; rich intent comments (e.g. MongoRepository partition-race rationale, §20.4 TTL note, SharpCompress/Snappier CVE-pin comments in csproj). Naming is consistent (X{Repository,AdapterFactory,Options,OptionsConfigurator,HealthContributor,Telemetry}). Debt is structural, not hygienic: 1732-line SqliteRepository, copy-pasted enums in the relational trio, ~80%-twin ES/OS repositories, dual registration classes per adapter, and capability declarations drifting from actual behavior at the edges (Postgres BulkUpsert, Redis FilterSupport.Full-via-ScanAll)."
+  }
+}

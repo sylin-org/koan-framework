@@ -1,0 +1,164 @@
+{
+  "area": "media-storage-tagging",
+  "projects": [
+    {
+      "name": "Koan.Media.Abstractions",
+      "purpose": "Media contracts: MediaEntity<T> CRTP model (content-addressable Store/Upload with SHA-256 dedup, lineage fields SourceMediaId/DerivationKey) plus the entire recipe grammar (MediaRecipe, MediaStep, the IMediaPipeline verb surface, overlay/crop/fit primitives). ~2.6k LOC, KoanPackageKind=Kernel.",
+      "keyTypes": [
+        "MediaEntity<TEntity>",
+        "IMediaObject",
+        "MediaRecipe (+ Fingerprint)",
+        "MediaStep / PipelineStage",
+        "IMediaPipeline / MediaOutput / MediaBundle",
+        "FrameSelector / Fit / Position / OverlayLayer",
+        "MediaRecipeBuilder / MediaRecipeAttribute",
+        "MutatorKind"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.Storage",
+        "Koan.Data.Abstractions"
+      ],
+      "state": "active — ADR-driven evolution visible in code (MEDIA-0004/0005/0008/0009 cited in doc comments, [Obsolete] migration paths for ExtractFrame/ToBytesAsync); BUT README is stale/hallucinated: describes MediaAsset/MediaVariant/MediaTask/MediaAssetExtensions which do not exist anywhere in src (grep-verified zero hits)"
+    },
+    {
+      "name": "Koan.Media.Core",
+      "purpose": "The pipeline engine: ImageSharp+Skia execution of the recipe grammar — single-decode/multi-output MediaPipeline, kind-aware planner, streaming encoders, overlay/text compositing, SVG rasterization, font registry, [MediaRecipe] assembly-scanning registry with appsettings override binding. ~4.4k LOC.",
+      "keyTypes": [
+        "MediaPipeline (1509 LOC)",
+        "MediaPipelinePlanner",
+        "EncoderSelector / EncoderAccepts",
+        "MediaRecipeRegistry / ConfiguredRecipeBinder",
+        "SvgRasterizer / SvgValidator",
+        "KoanFontRegistry",
+        "OverlayCompositor / BackgroundComposer",
+        "ProfileMedia / ColdProfileMedia (vestigial)"
+      ],
+      "dependsOn": [
+        "Koan.Media.Abstractions",
+        "Koan.Storage",
+        "Koan.Data.Core",
+        "Koan.Web (DEAD reference — zero Koan.Web/AspNetCore usages in code, grep-verified)"
+      ],
+      "state": "active and heavily tested (~50 spec files); two flaws: dead Koan.Web csproj ref, and README hallucinates a never-shipped API (AddMediaCore, IMediaOperator, MediaPipelineDescriptor — none exist). ProfileMedia/ColdProfileMedia concrete entities baked into the framework lib are used only by samples/archive/S6.SocialCreator"
+    },
+    {
+      "name": "Koan.Media.Web",
+      "purpose": "HTTP surface: MediaController (recipe routes /media/{id}/{seed} + introspection /media/recipes, format negotiation via Accept), StorageMediaController<T> (raw bytes with HEAD/Range/ETag/If-Modified-Since semantics), IMediaSource abstraction that also persists derivations (MEDIA-0007), orphan-derivation sweep service. ~2.6k LOC.",
+      "keyTypes": [
+        "MediaController",
+        "StorageMediaController<TEntity>",
+        "IMediaSource (+ OpenDerivationAsync/TryStoreDerivationAsync)",
+        "FormatNegotiator / AcceptHeaderParser",
+        "MediaUrlParser",
+        "MediaDerivationSweepService",
+        "IMediaOutputCache + FileSystemMediaOutputCache ([Obsolete], deletion scheduled MEDIA-0008)",
+        "MediaWebOptions"
+      ],
+      "dependsOn": [
+        "Koan.Media.Abstractions",
+        "Koan.Media.Core",
+        "Koan.Storage",
+        "Koan.Cache"
+      ],
+      "state": "active, mid-transition: the MEDIA-0007→0008 legacy output-cache removal is scheduled but not executed (6 [Obsolete]-tagged types still shipped + transition shims in MediaController). README stale: documents MediaContentController<T>/MediaContentOptions, which exist only as a stray comment in StorageEntity.cs"
+    },
+    {
+      "name": "Koan.Storage",
+      "purpose": "Blob orchestration pillar: provider contracts (IStorageProvider + capability side-interfaces), profile→provider/container routing in StorageService (streams, SHA-256 on seekable uploads, range reads, cross-profile transfer), StorageEntity<T> CRTP model, plus two availability layers — replication (cache+durable write-through with manifest/journal/eviction) and a legacy WAL write-behind decorator. ~3.1k LOC.",
+      "keyTypes": [
+        "IStorageService / StorageService (540 LOC)",
+        "IStorageProvider + StorageProviderCapabilities (bespoke 4-bool record)",
+        "IStatOperations / IServerSideCopy / IPresignOperations / IListOperations",
+        "StorageEntity<TEntity> / IStorageObject",
+        "StorageBindingAttribute (profile/container binding)",
+        "ReplicatedStorageProvider (+ StorageManifest, SyncJournal — ~1,060 LOC subsystem)",
+        "ResilientStorageDecorator (483 LOC WAL, flagged 'Legacy — superseded by Mode=Replicated' in StorageOptions)",
+        "StorageOptions / StorageFallbackMode"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.Data.Abstractions",
+        "Koan.Data.Core"
+      ],
+      "state": "core is active and tested; the Replication subsystem and ResilientStorageDecorator have ZERO test coverage (grep over tests/ finds no Replicated/Resilient/SyncJournal/StorageManifest references) and the decorator's doc comment references app-specific 'GardenAwareEndpointManager' — app concepts leaked into the pillar core. ReplicatedStorageProvider uses fire-and-forget InitializeAsync"
+    },
+    {
+      "name": "Koan.Storage.Connector.Local",
+      "purpose": "Filesystem provider: atomic temp-file+rename writes, seek/range reads, FileInfo-based stat, File.Copy server-side copy, listing; no presign. ~340 LOC.",
+      "keyTypes": [
+        "LocalStorageProvider",
+        "LocalStorageOptions",
+        "KoanAutoRegistrar"
+      ],
+      "dependsOn": [
+        "Koan.Storage"
+      ],
+      "state": "active — small, clean, tested (LocalStorageProviderTests + StorageConfigurationValidationTests + referenced from Koan.Tests.Integration.Bootstrap per ARCH-0079 canon); has README + TECHNICAL.md"
+    },
+    {
+      "name": "Koan.Storage.Connector.S3",
+      "purpose": "S3-compatible provider on the Minio SDK — but in practice purpose-built for the ZenGarden/Moss gateway: lazy endpoint discovery via IZenGardenClient.BoundEndpoint + S3 port catalog, presign only via a Moss-native HTTP endpoint (POST /api/v1/storage/s3/presign), bucket prefix from AppIdentity. ~706 LOC.",
+      "keyTypes": [
+        "S3StorageProvider",
+        "S3StorageOptions (MossEndpoint, SeedBank fields)",
+        "S3StorageOptionsConfigurator",
+        "KoanAutoRegistrar"
+      ],
+      "dependsOn": [
+        "Koan.Storage",
+        "Koan.ZenGarden (hard csproj reference)",
+        "Minio (NuGet)"
+      ],
+      "state": "active but app-entangled: hard ZenGarden dependency, presign throws NotSupported without a Moss endpoint, OpenRead buffers the ENTIRE object into a MemoryStream (no true streaming despite SupportsSeek=true), and there is no S3 test suite anywhere in tests/ — the only untested storage provider. No README"
+    },
+    {
+      "name": "Koan.Tagging",
+      "purpose": "Tagging primitives: TagSet value facet for entities (Public/Private serialisation-boundary scopes × open-ended named categories), Tag entity for synonym canonicalisation (ParentOf rename-on-write) plus taxonomic Parent walk, and TagSlug kebab-case derivation. 494 LOC across 6 files.",
+      "keyTypes": [
+        "TagSet (+ EScope, PublicTags projection)",
+        "TagScope / TagCategory / TagLocation",
+        "Tag : Entity<Tag> (ParentOf synonyms, Parent hierarchy, NoRender)",
+        "TagSlug"
+      ],
+      "dependsOn": [
+        "Koan.Data.Core"
+      ],
+      "state": "active-but-orphan within the repo: zero consumers in src/ or samples/ (grep-verified — only its own unit-test suite references the csproj). Well-documented and well-tested, but its XML docs carry one external consuming application's domain conventions (game/technique/aesthetic categories, ReShade presets) and cite an 'ADR-0018' that does not exist in this repo's docs/decisions — it was extracted from a downstream app, and the framework itself never dogfoods it"
+    }
+  ],
+  "cohesion": "Two-and-a-half pillars sharing one folder of the map. (1) Media↔Storage layering is genuinely clean, not duplicated: Storage owns bytes/profiles/providers; MediaEntity<T> extends StorageEntity<T> adding only lineage + the transform pipeline; MEDIA-0007 deliberately unified derivation persistence INTO storage (derivations are ordinary storage entities with lineage stamps) rather than maintaining a parallel cache store — the right call, executed with a documented transition. MediaController depends on IMediaSource, not IStorageService, keeping the web layer testable. Real seams: (a) asymmetric abstraction packaging — Media has a separate Abstractions project (consumed independently by Koan.AI) while Storage's contracts live inside the implementation project, forcing Media.Abstractions (a Kernel-kind package) to reference all of Koan.Storage including the untested replication subsystem; (b) the raw-bytes HTTP surface for ANY StorageEntity (StorageMediaController, STOR-0002 territory) lives in Koan.Media.Web, so serving plain blobs requires the media pillar + ImageSharp/Skia dependency chain; (c) ZenGarden app concepts leak into the general pillar twice (S3 connector hard-ref, ResilientStorageDecorator doc contract); (d) Storage's bespoke 4-bool StorageProviderCapabilities record predates the ARCH-0084 unified capability model used elsewhere. (2) Tagging shares nothing conceptually with media/storage — its inclusion in this area is organisational, not architectural; it is a competent 494-LOC micro-library facet of the Data pillar (depends only on Koan.Data.Core), not a pillar of its own.",
+  "redundancies": [
+    "Two availability layers both alive in StorageService: ResilientStorageDecorator (WAL write-behind, Resilient flag self-described as 'Legacy — superseded by Mode=Replicated') and ReplicatedStorageProvider (STOR-0010 successor) — StorageService composes either via per-profile config, maintaining ~1.5k LOC of overlapping offline-tolerance machinery, neither tested",
+    "IMediaOutputCache family (interface + FileSystem/Null impls + MediaCacheHit + MediaOutputCacheOptions, 6 [Obsolete] types) duplicates IMediaSource.OpenDerivationAsync/TryStoreDerivationAsync — acknowledged MEDIA-0007 transition debt whose deletion was scheduled 'in MEDIA-0008' but MEDIA-0008 shipped without it; MediaController still probes both paths",
+    "ETag/conditional-GET/Range response logic implemented twice on the web surface: StorageMediaController<T> (raw bytes) and MediaController (recipe path) each carry their own header handling — deliberate orthogonality per docs, but the HTTP-semantics plumbing is parallel code",
+    "Two unrelated 'Tags' concepts in one area: IStorageObject.Tags (IReadOnlyDictionary<string,string> metadata bag flowing through MediaEntity.Upload) vs Koan.Tagging's TagSet facet — different semantics, same name, never reconciled",
+    "Media.Abstractions-vs-embedded-contracts asymmetry: Storage exposes contracts from inside the implementation package while Media splits them out — two packaging patterns for the same architectural need within one area"
+  ],
+  "deadOrExperimental": [
+    "Koan.Media.Core → Koan.Web project reference: dead (zero code usages of Koan.Web or AspNetCore namespaces in Media.Core, grep-verified)",
+    "ProfileMedia / ColdProfileMedia in src/Koan.Media.Core/Model: only consumer is samples/archive/S6.SocialCreator (an archived sample) — framework-shipped demo entities",
+    "IMediaOutputCache + FileSystemMediaOutputCache + NullMediaOutputCache + MediaCacheHit + MediaOutputCacheOptions: all [Obsolete] with 'Removed in MEDIA-0008' — removal overdue",
+    "ResilientStorageDecorator (483 LOC): legacy path superseded by Replicated mode per its own options doc, untested, references app-specific GardenAwareEndpointManager",
+    "Replication subsystem (ReplicatedStorageProvider/StorageManifest/SyncJournal, ~1,060 LOC): functional-looking, has STOR-0010 ADR, but zero tests anywhere — experimental by evidence",
+    "IMediaPipeline.ExtractFrame and ToBytesAsync/MediaOutput.Bytes: [Obsolete] migration verbs awaiting removal (MEDIA-0005/MEDIA-0008)",
+    "Stale/hallucinated READMEs: Koan.Media.Abstractions and Koan.Media.Core describe a never-shipped API surface (MediaAsset/MediaVariant/MediaTask/AddMediaCore/IMediaOperator); Koan.Media.Web README names nonexistent MediaContentController/MediaContentOptions",
+    "docs/reference/media and docs/reference/storage: index.md stubs only"
+  ],
+  "consolidationCandidates": [
+    "Execute the already-scheduled MEDIA-0008 deletion: remove the IMediaOutputCache family + MediaController/registrar transition shims — the ADR trail says this debt should already be gone; it is the cheapest win in the area",
+    "Cut ResilientStorageDecorator and the legacy Resilient profile flag: superseded by StorageMode.Replicated per its own documentation, untested, and carries app-specific contract assumptions; one availability layer (replication) is enough — then either give ReplicatedStorageProvider an integration spec (ARCH-0079 canon) or demote the whole replication subsystem to experimental status outside the pillar core",
+    "Extract storage contracts (Abstractions/ folder + StorageBindingAttribute + IStorageObject) into Koan.Storage.Abstractions, or mirror Media's pattern — so the Kernel-kind Koan.Media.Abstractions and Koan.Data.Backup/Koan.AI stop pulling StorageService + replication machinery they never use; alternatively fold contracts the other way and merge Media.Abstractions into Media.Core only if Koan.AI's contracts-only dependency can be re-pointed",
+    "Decouple Koan.Storage.Connector.S3 from Koan.ZenGarden: split generic Minio-backed S3 provider (testable against MinIO Testcontainers — it currently has zero tests) from a ZenGarden endpoint-resolution/presign add-on, or rename to Koan.Storage.Connector.ZenGarden to make the coupling honest; also fix OpenRead's full-object MemoryStream buffering while touching it",
+    "Remove the dead Koan.Web reference from Koan.Media.Core.csproj and relocate ProfileMedia/ColdProfileMedia into the archived sample (or delete) — Media.Core should ship no concrete entities",
+    "Move StorageMediaController<T> (raw-bytes HTTP serving, STOR-0002 concern) out of Koan.Media.Web — either into a thin Koan.Storage web surface or alongside EntityController in Koan.Web — so apps serving plain blobs don't drag ImageSharp/SkiaSharp via the media pillar; would also collapse the duplicated ETag/Range plumbing into one place",
+    "Keep Koan.Tagging but reposition it: it is a Data-pillar entity facet, not a pillar — fold it into a model-facets package (or document it as such), scrub the downstream consumer's domain conventions and the dangling external 'ADR-0018' citation from its XML docs, and add at least one in-repo dogfood consumer (sample or pillar) or accept it as deliberately externally-consumed; per the redesign discipline (collapse at ≥2 usages), zero in-repo usages argues against any further investment",
+    "Migrate StorageProviderCapabilities (bespoke 4-bool record) onto the ARCH-0084 unified capability model so storage stops being the odd pillar out",
+    "Regenerate the three Media READMEs from the real surface (MediaEntity/recipes/MediaController) — they currently document a fictional API, which is worse than no README for a framework whose docs are otherwise ADR-grade"
+  ],
+  "maturitySignals": {
+    "tests": "Sharply bimodal. Media: exceptional — tests/Suites/Media/Koan.Media.Core.Tests has ~50 spec files spanning pipeline execution, stage ordering, EXIF, overlays, SVG, streaming output, recipes/fingerprints, format negotiation, URL parsing, HTTP routing (real test server via MediaTestServer + StorageBackedMediaTestServer), caching/lineage/GC; plus Koan.Tests.Integration.Bootstrap composes Media.Core through real AddKoan. Storage core: moderate — 4 specs (CrossProviderBehavior, ErrorHandling, Lifecycle, MetadataPropagation) + Local connector tests + Integration.Bootstrap. Tagging: 4 unit specs (TagSet/TagScope/TagCategory/TagSlug) but no Tag-entity integration spec. Zero coverage: S3 connector, ReplicatedStorageProvider/SyncJournal/StorageManifest, ResilientStorageDecorator — ~2.2k LOC of distributed-correctness-sensitive code with no tests, the area's biggest gap versus the ARCH-0079 'integration tests are canon' rule.",
+    "docs": "ADR coverage is excellent: MEDIA-0001..0009 (a complete, sequential design narrative), STOR-0001..0010, DX-0047, AI-0027, ADR-0055/PROPOSAL-0055 (tag-centric search); docs/guides/media-recipes-howto.md; docs/migration/v0.8-to-v0.9-media.md. Package-level docs are the weak spot: Media.Abstractions/Core READMEs describe a hallucinated API, Media.Web README names renamed types, S3 connector has no README, docs/reference/{media,storage} are index stubs. Tagging README is accurate and good.",
+    "codeQuality": "Very high in the actively-worked code: zero TODO/FIXME/HACK markers across all seven projects (grep-verified); NotSupportedException used only as deliberate capability signaling; rich ADR-cross-referenced XML docs; disciplined [Obsolete]-with-migration-path deprecations; consistent KoanAutoRegistrar + options-binding patterns. Outliers: MediaPipeline.cs at 1,509 LOC (2x the repo's own 800-line guidance), StorageService.cs at 540 LOC juggling routing + replication + resilience composition, S3 OpenRead full-buffering, ReplicatedStorageProvider's fire-and-forget async init, and the framework-wide ambient AppHost.Current service location in StorageEntity/MediaEntity (a known target of the redesign's ambient-context facet, not area-specific debt)."
+  }
+}

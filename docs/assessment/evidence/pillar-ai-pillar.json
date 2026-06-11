@@ -1,0 +1,402 @@
+{
+  "area": "ai-pillar",
+  "projects": [
+    {
+      "name": "Koan.AI",
+      "purpose": "Core AI facade and runtime: static Client with 14 verbs (Chat/Embed/Ocr/Imagine/Transcribe/Speak/Describe/Classify/Extract/Rerank/Translate/Moderate/Edit/Render), MEAI-backed KoanAiPipeline, category-aware routing (AI-0021/0032), source registry + health monitoring.",
+      "keyTypes": [
+        "Client (static facade)",
+        "KoanAiPipeline / IAiPipeline",
+        "AiCategoryRouter + AiRecipeProvider",
+        "AdapterResolver",
+        "AiSourceRegistry / InMemoryAdapterRegistry",
+        "AiSourcesHealthContributor",
+        "AiConversationBuilder"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.AI.Contracts",
+        "Koan.AI.Prompt",
+        "Koan.Storage",
+        "Koan.Media.Abstractions"
+      ],
+      "state": "active, load-bearing — referenced by 5 samples (S5/S6/S7/S8/S18), 2 services (Translation, KoanContext), Data.AI, Rag, and all verticals; 151-test unit suite; born 2025-09. Contains dead sub-surface: Pipelines/ dir (TextPipeline/ImagePipeline/IAiPipelineStage/PipelineContext) has NO entry point — nothing constructs TextPipeline except TextPipeline→ImagePipeline; PipelineAiExtensions.Tokenize also has zero external consumers. README/TECHNICAL.md stale (describe pre-rewrite 'router and registry', 'since 0.2.x', old sylin-labs URLs)."
+    },
+    {
+      "name": "Koan.AI.Contracts",
+      "purpose": "Kernel contracts: adapter interfaces (IAiAdapter + per-modality IChat/IEmbed/IOcr/IImagine/ISpeak/ITranscribe/IRerank/IRender/IEdit), chat/embedding request-response models, per-verb result + options types, IAiPipeline, adapter registry and source definitions.",
+      "keyTypes": [
+        "IAiAdapter",
+        "IChatAdapter / IEmbedAdapter",
+        "AiChatRequest / AiChatResponse / AiChatChunk",
+        "IAiPipeline",
+        "IAiAdapterRegistry",
+        "AiSourceDefinition",
+        "per-verb Options (15 classes) + Result models"
+      ],
+      "dependsOn": [
+        "Koan.Core"
+      ],
+      "state": "active kernel — consumed by every AI project + both services. 87 files / 2.1k LOC (many micro-files). Seam: AiCapability string constants live in Koan.Core/AI/AiCapability.cs, NOT here — contracts split across Koan.Core.AI, Contracts, and Contracts.Shared. Only package dep is Newtonsoft.Json."
+    },
+    {
+      "name": "Koan.AI.Contracts.Shared",
+      "purpose": "Zero-dependency boundary records for the AI-lifecycle vertical family: ModelRef, DatasetRef, JobRef, EvalScore, Lineage, ComputeRequirement, Accelerator/ModelFormat enums.",
+      "keyTypes": [
+        "ModelRef (implicit string conversion)",
+        "DatasetRef",
+        "JobRef",
+        "EvalScore",
+        "ComputeRequirement",
+        "Accelerator / ModelFormat enums"
+      ],
+      "dependsOn": [],
+      "state": "active but tiny — 7 files / 235 LOC, born 2026-05-16 with the vertical drop; 9 tests. Exists only to avoid Contracts' Newtonsoft dependency. Merge candidate."
+    },
+    {
+      "name": "Koan.AI.Agents",
+      "purpose": "Entity-aware autonomous agents (AI-0031): ReAct loop executor with auto-generated tools from Entity<T> and vector search integration.",
+      "keyTypes": [
+        "Agent (static entry)",
+        "AgentBuilder",
+        "AgentExecutor (479-LOC real ReAct loop via Client)",
+        "EntityToolGenerator",
+        "AgentMemory",
+        "PlanStrategy"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.Data.Core",
+        "Koan.AI.Contracts",
+        "Koan.AI.Contracts.Shared",
+        "Koan.AI.Orchestration",
+        "Koan.AI",
+        "Koan.Data.Vector"
+      ],
+      "state": "experimental — born 2026-05-16 big-bang drop; implementation is real (not stubbed) but tested only against FakePipeline/TestCapableAdapter; zero sample usage (S18.Prism references the csproj but never uses the API)."
+    },
+    {
+      "name": "Koan.AI.Compute",
+      "purpose": "Hardware-agnostic compute fabric (AI-0024): discover local CPU/GPU, resolve workload placement; network compute delegation planned via ZenGarden.",
+      "keyTypes": [
+        "Compute (static facade)",
+        "IComputeService / ComputeService",
+        "ComputeResource",
+        "ComputeResolution",
+        "ComputeCapability"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.AI.Contracts.Shared"
+      ],
+      "state": "experimental scaffold — local detection works, but source comments say 'Network compute via ZenGarden is deferred to a future release' and Check() is explicitly '// Stub'. Fleet() returns only the local machine. No consumers beyond fake-backed tests."
+    },
+    {
+      "name": "Koan.AI.Eval",
+      "purpose": "Model evaluation, quality gates, regression and drift detection (AI-0029), resolved through adapters declaring AiCapability.MetricCompute.",
+      "keyTypes": [
+        "Eval (static facade)",
+        "IEvalService / EvalService",
+        "GateBuilder / IGateBuilder",
+        "GateFailedException",
+        "Metric",
+        "DriftResult"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.Data.Core",
+        "Koan.AI",
+        "Koan.AI.Contracts",
+        "Koan.AI.Contracts.Shared"
+      ],
+      "state": "experimental, facade-over-nothing in practice — gate/compare/drift logic is real, but NO adapter in the repo declares MetricCompute (only the external ZenGarden orchestrator could provide it via dynamic discovery); every real call throws 'No adapter with MetricCompute capability registered'. 11 unit + fake-adapter integration tests."
+    },
+    {
+      "name": "Koan.AI.Models",
+      "purpose": "Model lifecycle (AI-0023): search/pull/convert/deploy/rollback across registries, backed by an Entity-stored local catalog (ModelEntry) plus adapter Pull/ModelList capabilities.",
+      "keyTypes": [
+        "Model (static facade)",
+        "IModelService / ModelService (482 LOC)",
+        "ModelEntry (Entity-backed catalog)",
+        "DeployOptions",
+        "ModelQuery"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.Data.Core",
+        "Koan.AI",
+        "Koan.AI.Contracts",
+        "Koan.AI.Contracts.Shared"
+      ],
+      "state": "experimental but the best-backed vertical — Ollama (Pull/ModelList/ModelRemove/ServeGGUF) and HuggingFace (Pull/ModelList) actually provide its capabilities. Only 4 dedicated tests; no sample exercises it."
+    },
+    {
+      "name": "Koan.AI.Orchestration",
+      "purpose": "Typed immutable chain composition (AI-0026): Chain.Create().System().Chat().Parse<T>().Run() with branching, structured output, streaming, and Tool definitions reused by Agents.",
+      "keyTypes": [
+        "Chain (static entry)",
+        "ChainBuilder",
+        "ChainExecutor (647 LOC, real)",
+        "Tool",
+        "ChainMemory",
+        "ChainResult / ChainChunk"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.Data.Core",
+        "Koan.AI.Contracts",
+        "Koan.AI.Contracts.Shared",
+        "Koan.AI.Prompt",
+        "Koan.AI",
+        "Koan.Data.Vector"
+      ],
+      "state": "experimental — real implementation, consumed internally by Koan.AI.Agents and Koan.Rag; fake-backed tests only; zero sample usage."
+    },
+    {
+      "name": "Koan.AI.Prompt",
+      "purpose": "Uri-inspired immutable Prompt primitive (AI-0025): parse/build/resolve {variable} templates, entity-backed PromptEntry versioning and A/B strategies.",
+      "keyTypes": [
+        "Prompt (immutable primitive)",
+        "PromptBuilder",
+        "PromptEntry (Entity-backed)",
+        "PromptStrategy",
+        "OutputSpec",
+        "Example"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.Data.Core",
+        "Koan.AI.Contracts"
+      ],
+      "state": "experimental but self-contained and complete — pure logic, 23 tests, and structurally load-bearing: Koan.AI itself references it (the only vertical pulled into the facade's dependency core)."
+    },
+    {
+      "name": "Koan.AI.Review",
+      "purpose": "Human-in-the-loop review queues (AI-0030): typed queues with filter/display/actions over IReviewable entities; approve/reject/edit/label actions.",
+      "keyTypes": [
+        "Review (static factory)",
+        "ReviewQueue<T>",
+        "ReviewAction<T>",
+        "IReviewable / ReviewStatus",
+        "ReviewQueueRegistry",
+        "ReviewEvents"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.Data.Core"
+      ],
+      "state": "experimental — the ONLY vertical actually used by a sample (S18.Prism FindingsController sets ReviewStatus; ResearchFinding implements IReviewable). 12 tests. Notably has zero AI dependencies — it is a generic entity-review feature wearing the AI namespace."
+    },
+    {
+      "name": "Koan.AI.Training",
+      "purpose": "Training orchestration facade (AI-0028): Train/Align/Run/Resume/Cancel delegated to adapters implementing ITrainingRuntime; dataset management.",
+      "keyTypes": [
+        "Training (static facade)",
+        "ITrainingService / TrainingService",
+        "ITrainingRuntime",
+        "Dataset / DatasetService",
+        "TrainOptions / TrainMethod",
+        "TrainingJob / TrainingProgress"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.Data.Core",
+        "Koan.AI",
+        "Koan.AI.Contracts",
+        "Koan.AI.Contracts.Shared"
+      ],
+      "state": "aspirational facade-over-nothing — ZERO ITrainingRuntime implementers exist in the repo; List() hard-returns empty; adapter loops silently swallow exceptions then throw 'not found in any registered training adapter'. Only fake-backed tests."
+    },
+    {
+      "name": "Koan.AI.Web",
+      "purpose": "Optional ASP.NET controllers for AI: health, adapter list, model list, chat with SSE streaming — keeps Koan.Web decoupled from AI.",
+      "keyTypes": [
+        "AiController",
+        "AiHealthSubscriber",
+        "Constants.Routes"
+      ],
+      "dependsOn": [
+        "Koan.AI",
+        "Koan.AI.Contracts",
+        "Koan.Web.Sse"
+      ],
+      "state": "active-small (291 LOC, since 2025-09) — one consumer (S5.Recs). AiController.Models() silently swallows adapter exceptions (catch { })."
+    },
+    {
+      "name": "Koan.Data.AI",
+      "purpose": "Entity-aware AI operations: EntityAi.Embed/Chat/Ocr, [Embedding] convention pipeline with background EmbeddingWorker, [MediaAnalysis] auto-processing, vector-model guard/provenance, cross-modal MediaAnalysisEmbeddingBridge.",
+      "keyTypes": [
+        "EntityAi",
+        "[Embedding] / [MediaAnalysis] / [EmbedStorage] attributes",
+        "EmbeddingWorker (487 LOC) + EmbedJob",
+        "MediaAnalysisWorker / MediaAnalysisExecutor",
+        "VectorModelGuard / VectorModelRegistry",
+        "EmbeddingMigrator",
+        "EmbeddingTelemetry / EmbeddingCostEstimator"
+      ],
+      "dependsOn": [
+        "Koan.Data.Abstractions",
+        "Koan.Data.Core",
+        "Koan.Data.Vector",
+        "Koan.AI.Contracts",
+        "Koan.AI",
+        "Koan.Core"
+      ],
+      "state": "active, load-bearing — 4 samples (S5/S6/S7/S18), 74-test dedicated suite + embedding/media specs in the 151-test unit suite; documented in CLAUDE.md as canonical utility. One TODO (worker MaxRetries). Contains a genuine duplicate: public MediaAnalysisEmbeddingBridge (root ns) AND internal Workers.MediaAnalysisEmbeddingBridge implement the same Describe→Ocr→Transcript→Classify→Extract composition."
+    },
+    {
+      "name": "Koan.Rag",
+      "purpose": "Entity-native RAG subsystem (AI-0034): [RagCorpus] corpora, contextual chunking, ingestion/retrieval pipelines, concept-graph extraction, GMM distillation trees, UMAP, multi-modal content adapters (pdf/image/audio/text), RAG evaluation.",
+      "keyTypes": [
+        "Rag (static entry: Rag.Corpus<T>().Ingest/Ask, Rag.Compose)",
+        "RagService / RagCorpus<T>",
+        "RagIngestionPipeline / RagRetrievalPipeline",
+        "ContextualChunker",
+        "DistillationTreeBuilder + DiagonalGmmClustering",
+        "EntityExtractor / InMemoryConceptGraphStore",
+        "KoanRagAutoRegistrar"
+      ],
+      "dependsOn": [
+        "Koan.Rag.Abstractions",
+        "Koan.Data.Abstractions",
+        "Koan.Data.Core",
+        "Koan.Data.Vector",
+        "Koan.Data.AI",
+        "Koan.AI.Contracts",
+        "Koan.AI",
+        "Koan.AI.Orchestration",
+        "Koan.Core"
+      ],
+      "state": "experimental incubator — 6.6k LOC (largest project in the pillar) born 2026-05-16; ZERO sample usage; csproj grants InternalsVisibleTo to a Koan.Rag.Tests project that does not exist; only consumer is the Bootstrap integration suite (discovery check). Graph/tree stores are in-memory only. Not covered by docs/guides or the ai-integration skill."
+    },
+    {
+      "name": "Koan.Rag.Abstractions",
+      "purpose": "Kernel contracts for RAG: IRagCorpus/IRagService/IRagSession, query/ingest options and results, concept-graph and distillation-tree store interfaces, content adapter contracts.",
+      "keyTypes": [
+        "IRagCorpus<T> / IRagService",
+        "IRagSession / RagQueryOptions / RagQueryResult",
+        "RagCorpusAttribute",
+        "IConceptGraphStore / IDistillationTreeStore",
+        "IContentAdapter / InterpretationStrategy",
+        "RetrievalStrategy / SearchDepth"
+      ],
+      "dependsOn": [
+        "Koan.Data.Abstractions",
+        "Koan.AI.Contracts"
+      ],
+      "state": "experimental — 44 files / 1.4k LOC with exactly one implementer (Koan.Rag); premature abstraction split."
+    },
+    {
+      "name": "Koan.AI.Connector.Ollama",
+      "purpose": "Ollama provider: chat, streaming, vision, tools, embeddings, model pull/remove/list with dev auto-discovery — the default inference backend for the whole framework.",
+      "keyTypes": [
+        "OllamaAdapter (Chat/Embed/Vision/Streaming/Tools/Pull/ModelRemove/ModelList/ServeGGUF)",
+        "OllamaModelManager",
+        "OllamaAdapterContributor",
+        "OllamaOptions",
+        "OllamaZenGardenOfferingBinding"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.Core.Adapters",
+        "Koan.AI.Contracts",
+        "Koan.Orchestration.Abstractions",
+        "Koan.ZenGarden.Core"
+      ],
+      "state": "active, load-bearing — referenced by every AI sample plus Translation and KoanContext services; unit-tested. Smell: depends on Koan.ZenGarden.Core solely for a 5-line IZenGardenOfferingBinding marker class."
+    },
+    {
+      "name": "Koan.AI.Connector.LMStudio",
+      "purpose": "LM Studio provider (AI-0016): chat, streaming, embeddings, model list via OpenAI-compatible API, with discovery adapter and orchestration evaluator.",
+      "keyTypes": [
+        "LMStudioAdapter (Chat/Embed/Streaming/ModelList/ServeGGUF)",
+        "LMStudioDiscoveryAdapter",
+        "LMStudioAdapterContributor",
+        "LMStudioOrchestrationEvaluator",
+        "LMStudioOptions"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.Core.Adapters",
+        "Koan.AI.Contracts",
+        "Koan.Orchestration.Abstractions"
+      ],
+      "state": "active — rewritten 2026-06-02 in the ARCH-0084 capability cut, unit-tested in the suite; but no sample or service consumes it (alternative-provider insurance)."
+    },
+    {
+      "name": "Koan.AI.Connector.HuggingFace",
+      "purpose": "HuggingFace Hub connector: model search, metadata, format-aware file download — provides Pull/ModelList capabilities backing Model.Pull('org/name').",
+      "keyTypes": [
+        "HuggingFaceAdapter",
+        "HuggingFaceClient",
+        "HuggingFaceOptions",
+        "HfModelInfo / HfFileInfo"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.AI.Models",
+        "Koan.AI.Contracts",
+        "Koan.AI.Contracts.Shared"
+      ],
+      "state": "experimental — born 2026-05-16, real working code, in the sln, but ZERO consumers (no sample, no test, no service references it). Exists purely to make the Models vertical demoable."
+    },
+    {
+      "name": "Koan.AI.Connector.ZenGarden",
+      "purpose": "Bridge to the external Zen Garden AI orchestrator: single adapter that discovers capabilities dynamically and is the ONLY implementer of the full multimodal surface (IImagine/IOcr/ISpeak/ITranscribe/IRerank).",
+      "keyTypes": [
+        "ZenGardenAiAdapter",
+        "ZenGardenAiAdapterContributor",
+        "ZenGardenAiOfferingBinding"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.Core.Adapters",
+        "Koan.AI.Contracts",
+        "Koan.Orchestration.Abstractions",
+        "Koan.ZenGarden.Core"
+      ],
+      "state": "orphan/experimental — NOT in Koan.sln, zero csproj consumers anywhere (samples, tests, services). It is the implied runtime provider for Eval.MetricCompute / multimodal verbs, but nothing in-repo can even build against it via the solution."
+    }
+  ],
+  "cohesion": "The pillar is three strata with very different maturity, not one pillar. (1) A settled, load-bearing core — Koan.AI.Contracts → Koan.AI → Koan.Data.AI + Ollama/LMStudio connectors + Koan.AI.Web — born 2025-09..11, consumed by 5 samples and 2 services, well unit-tested (151 + 74 tests), recently hardened by the ARCH-0084 capability cut. (2) A big-bang vertical family — Agents, Compute, Eval, Models, Orchestration, Prompt, Review, Training, Contracts.Shared, plus HuggingFace and ZenGarden connectors — ALL born on 2026-05-16 implementing the AI-0022 'unified AI lifecycle vision' (ADRs AI-0023..0031). Design language is coherent (static facade → ResolveService → AdapterResolver capability routing) but consumption is near-zero: S18.Prism references all eight csproj's yet uses only Review.ReviewStatus; Training and Eval are facades over capabilities (ITrainingRuntime, MetricCompute) that no in-repo adapter provides — their real backend is the external Zen Garden orchestrator, whose connector isn't even in the solution. (3) A RAG incubator (Koan.Rag + Abstractions, 8k LOC, also 2026-05-16) with zero consumers and a missing test project. Fractures: AI capability constants live in Koan.Core.AI while contracts are split across Koan.AI.Contracts and Koan.AI.Contracts.Shared (three contract homes); the Ollama connector depends on Koan.ZenGarden.Core for a 5-line marker; Koan.AI.Review has no AI dependency at all; Koan.AI carries a dead unreachable Pipelines/ fluent surface alongside the live Pipeline/ MEAI implementation (same-name directories, different eras).",
+  "redundancies": [
+    "Duplicate MediaAnalysisEmbeddingBridge in Koan.Data.AI: public static MediaAnalysisEmbeddingBridge (root namespace, MediaAnalysisEmbeddingBridge.cs) and internal static Workers.MediaAnalysisEmbeddingBridge (Workers/MediaAnalysisEmbeddingBridge.cs) implement the same Describe→Ocr→Transcript→Classify→Extract text composition.",
+    "Two pipeline surfaces inside Koan.AI: live Pipeline/ (KoanAiPipeline over Microsoft.Extensions.AI) vs dead Pipelines/ (TextPipeline/ImagePipeline/IAiPipelineStage fluent stages with no constructor path) — confusingly near-identical directory names.",
+    "Three contract homes for one pillar: Koan.Core/AI (AiCapability constants, IAiRecipeProvider, IAiModelAdvisor), Koan.AI.Contracts (adapter/model contracts), Koan.AI.Contracts.Shared (235-LOC lifecycle records). A consumer must know all three.",
+    "Three+ composition entry surfaces over the same Client: AiConversationBuilder (Koan.AI), Chain/ChainBuilder (Koan.AI.Orchestration), AgentBuilder (Koan.AI.Agents), plus the dead TextPipeline fluent API — overlapping 'compose AI calls' concepts.",
+    "Capability declaration duplicated structurally and stringly: IAiAdapter doc-comment says capability is declared by implementing IChatAdapter/IEmbedAdapter/IOcrAdapter, but routing actually uses the string Capabilities set from Koan.Core.AI.AiCapability — two parallel capability mechanisms.",
+    "Eval/Training/Compute each re-implement the same resolve-capability-or-throw + try-each-adapter-swallow-exceptions loop pattern over AdapterResolver — three thin projects for one delegation pattern.",
+    "RAG overlap: docs/guides/ai-integration.md and the ai-integration skill teach a manual RAG workflow over [Embedding]+vector search (Koan.Data.AI), while Koan.Rag ships a full competing RAG subsystem neither doc mentions — two RAG stories in one framework."
+  ],
+  "deadOrExperimental": [
+    "DEAD: src/Koan.AI/Pipelines/* (TextPipeline, ImagePipeline, IAiPipelineStage, PipelineContext, StorageResult) — no code path constructs TextPipeline; unreachable surface.",
+    "DEAD: src/Koan.AI/PipelineAiExtensions.cs (Tokenize over Koan.Core.Pipelines) — zero consumers outside the defining project.",
+    "DEAD: one of the two MediaAnalysisEmbeddingBridge implementations in Koan.Data.AI.",
+    "TOMBSTONE: tests/Suites/AI/Core/Koan.AI.Tests — only GlobalUsings.cs + testsuite.yaml, no csproj.",
+    "STALE/UNBUILDABLE: tests/Suites/AI/Koan.AI.Core.Tests — net8.0, references nonexistent packages 'Koan.TestPipeline' and 'Koan.AI.Core' (Version=*), not in Koan.sln; its 4 specs (AdapterFallback/FailureModes/Streaming/UnhealthySourceRouting) predate the rewrite.",
+    "ORPHAN: src/Connectors/AI/ZenGarden — not in Koan.sln, zero consumers, yet sole implementer of the multimodal adapter interfaces.",
+    "ORPHAN-ISH: src/Connectors/AI/HuggingFace — in sln, functional, zero consumers.",
+    "FACADE-OVER-NOTHING: Koan.AI.Training (zero ITrainingRuntime implementers; List() returns hardcoded empty) and Koan.AI.Eval (no MetricCompute provider in-repo).",
+    "EXPLICIT STUBS: Koan.AI.Compute network compute ('deferred to a future release') and ReadinessSpec capability checks ('// Stub' comment).",
+    "UNCONSUMED EXPERIMENT: Koan.Rag + Koan.Rag.Abstractions (8k LOC, zero samples, InternalsVisibleTo a nonexistent Koan.Rag.Tests).",
+    "SLN GAP: tests/Suites/Data/AI/Koan.Data.AI.Tests (74 tests) is not in Koan.sln despite being the canonical suite location.",
+    "STALE DOCS: Koan.AI README.md/TECHNICAL.md describe the pre-MEAI 'router and registry' era ('since 0.2.x', sylin-labs URLs)."
+  ],
+  "consolidationCandidates": [
+    "Merge Koan.AI.Contracts.Shared (235 LOC, 7 files) into Koan.AI.Contracts — its only raison d'être is avoiding Contracts' Newtonsoft.Json dependency; dropping/quarantining that single package ref removes the justification. Also move AiCapability + IAiRecipeProvider + IAiModelAdvisor from Koan.Core/AI into the merged contracts so the pillar has ONE contract home.",
+    "Collapse the lifecycle verticals Models + Training + Eval + Compute (4 projects, ~3k LOC combined) into one Koan.AI.Lifecycle package — all four are thin static facades over the identical AdapterResolver-capability delegation pattern, share Contracts.Shared types, were born the same day, and none has an independent consumer. Alternatively: keep Models (it has real Ollama/HF backing) and demote Training/Eval/Compute to contracts-only until a provider exists — per the no-stopgaps rule, shipping facades that can only throw is worse than not shipping.",
+    "Fold Koan.AI.Orchestration + Koan.AI.Agents into Koan.AI (or one Koan.AI.Composition) — Koan.AI already depends on Prompt; Agents already depends on Orchestration and reuses its Tool type; together they are ~2.3k LOC of the same composition story. This turns 4 projects (AI, Prompt, Orchestration, Agents) into 1-2.",
+    "Rename/relocate Koan.AI.Review — it references zero AI projects (only Core + Data.Core); it is a generic entity HITL feature. Either generalize as Koan.Review or fold into the web/data pillar; keeping it under AI inflates the pillar count and misleads.",
+    "Merge Koan.Rag.Abstractions into Koan.Rag (single implementer, 44-file kernel for an unconsumed module) and explicitly mark Koan.Rag experimental/incubating; before promoting, add the missing Koan.Rag.Tests and one sample, or park it. Also decide Koan.Rag vs Koan.Data.AI RAG story — one canonical RAG path.",
+    "Cut or quarantine the ZenGarden AI connector until the Zen Garden integration ships: not in sln, no consumers, and it is load-bearing only for capabilities (MetricCompute, multimodal verbs) the verticals advertise but cannot deliver. Pair with removing the Ollama→Koan.ZenGarden.Core dependency (invert the 5-line IZenGardenOfferingBinding so ZenGarden discovers offerings, not connectors declaring them).",
+    "Decide HuggingFace connector fate alongside the Models consolidation: it is the only non-Ollama Pull provider — either wire it into a sample/test to make Model.Pull('org/name') demonstrably real, or fold its 654 LOC into the lifecycle package as an optional source.",
+    "Delete dead surfaces: Koan.AI/Pipelines/*, PipelineAiExtensions, the duplicate MediaAnalysisEmbeddingBridge, tests/Suites/AI/Core/Koan.AI.Tests, tests/Suites/AI/Koan.AI.Core.Tests (stale csproj), and refresh Koan.AI README/TECHNICAL.",
+    "Test-suite hygiene: add Koan.Data.AI.Tests to Koan.sln; consolidate the three root-level vertical test projects (Koan.AI.EndToEnd.Tests, Koan.AI.Integration.Tests, plus per-vertical micro-projects) into the tests/Suites/AI structure used by the rest of the repo.",
+    "Net effect available: 19 projects → ~8 (Contracts, AI[+Prompt+Orchestration+Agents], Lifecycle[Models+Eval+Training+Compute], Data.AI, AI.Web, Rag[+Abstractions, experimental], Ollama, LMStudio) with HF/ZenGarden as deliberate keep-or-cut decisions."
+  ],
+  "maturitySignals": {
+    "tests": "~364 test methods across 9 projects. Strong: Koan.Tests.AI.Unit (tests/Suites/AI/Unit, 151 tests — routing, conversation, embedding, media analysis, telemetry, Ollama/LMStudio contributors) and Koan.Data.AI.Tests (74 tests incl. VectorModelGuard integration) — though the latter is missing from Koan.sln. The vertical family has dedicated micro-projects at tests/ root (Eval 11, Models 4, Prompt 23, Review 12, Contracts.Shared 9) plus Integration (49) and EndToEnd (31); EndToEnd does use real AddKoan() discovery per ARCH-0079, but ALL vertical capability tests run against TestCapableAdapter/FakePipeline — no test exercises a real provider for Train/MetricCompute/multimodal because none exists in-repo. Koan.Rag has NO tests (InternalsVisibleTo names a nonexistent project; only a bootstrap-discovery touch). Two tombstone/stale suite dirs (tests/Suites/AI/Core/Koan.AI.Tests, tests/Suites/AI/Koan.AI.Core.Tests). CI is disabled (.github/workflows/ci.yml is a noop placeholder), so green-ness is local-only.",
+    "docs": "Heaviest ADR coverage in the repo: 36 AI ADRs (AI-0001..0036) including the complete vertical vision series (AI-0022 unified lifecycle, AI-0023 models, AI-0024 compute, AI-0025 prompt, AI-0026 chains, AI-0028 training, AI-0029 eval, AI-0030 review, AI-0031 agents, AI-0034 RAG-at-scale) — design is documented ahead of adoption. Guides lag reality: docs/guides/ai-integration.md (236 lines) and the ai-integration skill cover only the Data.AI manual-RAG path; neither mentions Koan.Rag, Chain, Agent, Eval, Training, or Compute. Most projects have READMEs, but Koan.AI's README/TECHNICAL.md are stale (pre-rewrite description, 'since 0.2.x', dead sylin-labs links); Koan.Rag, Rag.Abstractions, HuggingFace, and ZenGarden connectors have no README.",
+    "codeQuality": "Marker hygiene is exceptional — exactly ONE TODO across all 19 projects (Data.AI worker MaxRetries), no HACK/FIXME/NotImplementedException, consistent naming and doc-comments (the 2026-05-16 family is clearly generated/curated to one style). Real issues are structural rather than textual: dead unreachable surfaces in Koan.AI (Pipelines/, PipelineAiExtensions), a duplicated bridge class in Data.AI, silent exception swallowing (catch {} in TrainingService adapter loops and AiController.Models), facades whose only runtime behavior is to throw (Training, Eval), and contracts scattered across three assemblies. Micro-file inflation: Koan.AI.Contracts averages ~25 LOC/file (87 files), Rag.Abstractions ~32 LOC/file — abstraction surface grew faster than implementations or consumers."
+  }
+}

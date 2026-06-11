@@ -1,0 +1,89 @@
+{
+  "area": "core-bootstrap",
+  "projects": [
+    {
+      "name": "Koan.Core",
+      "purpose": "The framework kernel: module discovery/registration (IKoanInitializer → IKoanAutoRegistrar → KoanModule), KoanEnv runtime snapshot, AddKoan bootstrap, provenance boot reports, ARCH-0084 capability model, plus a large accreted layer of utilities (logging, JSON, guards, pipelines, background services, orchestration-aware service discovery, OTel wiring).",
+      "keyTypes": [
+        "KoanModule / IKoanAutoRegistrar / IKoanInitializer (3 coexisting generations of the module primitive)",
+        "AppBootstrapper + KoanRegistry + RegistryManifestLoader (assembly-closure scan → source-gen registry → initializer run)",
+        "KoanEnv (static immutable runtime snapshot) + AppHost.Current (ambient SP)",
+        "CapabilitySet / Capability / IDescribesCapabilities (ARCH-0084, replaces ~40 ad-hoc capability types)",
+        "ProvenanceRegistry / ProvenanceModuleWriter (boot self-report subsystem)",
+        "ConnectionStringParser + ServiceDiscoveryAdapterBase + IOrchestrationAwareServiceDiscovery (V1 AND V2 impls coexist)",
+        "KoanLog / KoanConsoleFormatter (bespoke logging subsystem, 1.7k LOC)",
+        "OptionsExtensions.AddKoanOptions<T> + Guard (Must/Be/NotBe) + RegistrarOrdering ([Before]/[After] toposort)"
+      ],
+      "dependsOn": [
+        "Koan.Orchestration.Abstractions"
+      ],
+      "state": "active — actively maintained kernel; ARCH-0084/0086-era types (Capabilities, KoanModule, KoanDiscoverable, Provenance) are fresh, documented, and tested; but contains unreconciled pre-redesign strata: duplicate HealthAggregator at root (never registered; ServiceCollectionExtensions:74 comments around the collision), V1/V2 service discovery both alive, dead fluent-services API (3 TODOs in ServiceBuilder.cs are the project's only TODOs), zero-consumer EntityTransferExtensions. 13.5k LOC, 150 files. TECHNICAL.md is generic boilerplate from 0.2.x"
+    },
+    {
+      "name": "Koan.Core.Adapters",
+      "purpose": "Residue of a gutted 'unified adapter framework': what remains is the adapter readiness pipeline (hosted services that gate adapter init with retry policies), adapter options binding, and boot-report helpers used by ~12 connector auto-registrars.",
+      "keyTypes": [
+        "IAdapterReadiness + AdapterInitializationService + AdapterReadinessMonitor + ReadinessStateManager (readiness lifecycle; implemented by Mongo/Couchbase/LMStudio connectors)",
+        "AdapterOptionsConfigurator / IAdapterOptions (options binding for adapters)",
+        "AdapterBootReporting + BootstrapReport (boot-report surface used by 12+ connector KoanAutoRegistrars)",
+        "MissingTypes.cs — declares BootstrapState in Koan.Core.Hosting.Bootstrap namespace and UnifiedServiceMetadata in Koan.Orchestration namespace (namespace-squatting patch shim)",
+        "OrchestrationAwareAttribute (8-line bare marker)"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.Data.Abstractions",
+        "Koan.Orchestration.Abstractions"
+      ],
+      "state": "active but post-gut. README and TECHNICAL.md (\"validated 2025-09-29\") document BaseKoanAdapter / IKoanAdapter / AdapterCapabilities DSL / OrchestrationRuntimeBridge — NONE of which exist anywhere in src anymore (grep confirms; only a stray mention in Koan.Data.Backup). The 1.36k LOC that remain are real and consumed (7 connector csprojs + Koan.Data.Core + 2 samples reference it), but the package no longer matches its name, docs, or csproj description ('unified adapter framework... and development templates'). No dedicated tests."
+    },
+    {
+      "name": "Koan.Core.Registry.Generators",
+      "purpose": "Roslyn incremental source generator (netstandard2.0, ships as analyzer) that emits per-assembly KoanRegistry manifests at build time — the compile-time half of the discovery system that replaces AppDomain reflection scans.",
+      "keyTypes": [
+        "RegistrySourceGenerator (single 465-line generator; emits KoanRegistry_{Assembly}.g.cs ModuleInitializer)",
+        "Recognized contracts: IKoanInitializer, IKoanAutoRegistrar, IKoanBackgroundService (+periodic/pokable/startup variants), IServiceDiscoveryAdapter, [KoanDiscoverable] interfaces",
+        "Also special-cases Koan.Data.AI.Attributes.EmbeddingAttribute + Koan.Data.AI.EmbeddingRegistry — a data/AI pillar concern hard-coded into the kernel generator"
+      ],
+      "dependsOn": [],
+      "state": "active and clean — single focused file, no TODOs, paired with runtime fallback (RegistryManifestLoader). One layering wart: it knows Data.AI metadata names."
+    }
+  ],
+  "cohesion": "Two-layer geology. The inner kernel is genuinely cohesive and recently re-settled: discovery/registration (KoanModule + KoanDiscoverable + KoanRegistry + generator + RegistrarOrdering + AppBootstrapper), KoanEnv/Configuration, Provenance boot reports, Capabilities (ARCH-0084), OptionsExtensions, Guard — these reference each other tightly, carry current ADRs (ARCH-0084/0086, CORE-0003/0072/0090/0091/0092), and are tested. Around that kernel sits a grab-bag of leaked-in features: Orchestration service discovery is the SINGLE LARGEST directory in Koan.Core (2,460 LOC — bigger than Hosting itself) and is an orchestration-pillar concern; Observability drags 5 OpenTelemetry package refs into every Koan app; AI/ is a 3-file SPI for the AI pillar; Actions/Events are constant catalogs naming Outbox/Canon/Messaging/Scheduling (other pillars' vocabulary in the kernel); Pipelines is a semantic-pipeline feature consumed by 5 pillars; BackgroundServices contains a half-built fluent control plane with zero callers. Clear fracture lines: (1) three coexisting module-primitive generations (82 hand-written IKoanAutoRegistrars vs 7 KoanModule subclasses — ARCH-0086 migration barely started); (2) V1 vs V2 service discovery, with V2 registered in DI while RabbitMq/Vault connectors still `new` V1 directly; (3) two health aggregators (root Koan.Core copy is unregistered dead weight; the 'legacy contributors bridge' the AddKoanCore comment says was 'removed in greenfield' is still registered); (4) two singleflight primitives (static Infrastructure.Singleflight used by relational connectors vs DI ISingleflightRegistry used only by Koan.Cache). Koan.Core.Adapters is a fracture in itself — a package whose architectural raison d'être (BaseKoanAdapter capability negotiation) was deleted, leaving readiness+reporting orphaned under a misleading name, and whose Koan.Data.Abstractions dependency inverts kernel layering. The csproj's defensive `Compile Remove Adapters/**` blocks in Koan.Core are scar tissue from that split.",
+  "redundancies": [
+    "Two HealthAggregator implementations: src/Koan.Core/HealthAggregator.cs (root, internal, never registered) is a near-line-for-line copy of src/Koan.Core/Observability/Health/HealthAggregator.cs (the one AddKoanCore registers); root also carries a parallel HealthAggregatorOptions whose name collision is worked around with full qualification in ServiceCollectionExtensions.cs:74-77",
+    "Two singleflight primitives in the same assembly: static Koan.Core.Infrastructure.Singleflight (consumed by Postgres/Sqlite/SqlServer repositories, plus a 15-line pure-forwarding shim at src/Koan.Data.Relational/Infrastructure/Singleflight.cs) vs DI-based Koan.Core.Singleflight.ISingleflightRegistry/SingleflightRegistry (sole consumer: Koan.Cache CacheClient)",
+    "OrchestrationAwareServiceDiscovery (V1, 344 LOC, owns IOrchestrationAwareConnectionResolver) vs OrchestrationAwareServiceDiscoveryV2 (144 LOC, delegates to IServiceDiscoveryCoordinator): V2 is what ServiceDiscoveryAutoRegistrar registers, yet RabbitMq (x2), Vault (x2) still construct V1 directly; IOrchestrationAwareConnectionResolver has no consumer outside V1",
+    "Three module-primitive generations coexisting: IKoanInitializer, IKoanAutoRegistrar (82 hand-written), KoanModule (7 adopters) — same concept, three contracts, all flowing through the same registry",
+    "Two boot-reporting surfaces: Koan.Core.Adapters.BootstrapReport/AdapterBootReporting vs Koan.Core.Provenance ProvenanceModuleWriter/ProvenanceItem — both narrate adapter startup into boot output",
+    "Generator special-casing vs generic discovery: RegistrySourceGenerator hard-codes 4 dedicated registry channels (initializers, auto-registrars, background services, service-discovery adapters) plus Data.AI embedding entities, alongside the generic [KoanDiscoverable] channel that could subsume them",
+    "ConfigurationConstants exists in both Koan.Core/Infrastructure and Koan.Core.Adapters/Infrastructure"
+  ],
+  "deadOrExperimental": [
+    "src/Koan.Core/Extensions/EntityTransferExtensions.cs — TransferTo<T> JSON-round-trip mapper: zero consumers in src/samples/tests",
+    "src/Koan.Core/BackgroundServices/FluentApi/ (KoanServices.Do/On/Query + ServiceBuilder, 4 files): zero callers anywhere; contains the project's only 3 TODOs ('TODO: Implement actual status tracking') — an unfinished service control plane",
+    "src/Koan.Core/HealthAggregator.cs (root) + root HealthAggregatorOptions.cs — unregistered duplicate of the Observability.Health implementation (~230 LOC dead)",
+    "src/Koan.Core.Adapters/MissingTypes.cs — patch shim declaring types into two foreign namespaces (Koan.Core.Hosting.Bootstrap, Koan.Orchestration)",
+    "src/Koan.Core/Orchestration/OrchestrationAwareServiceDiscovery.cs (V1) + IOrchestrationAwareConnectionResolver — legacy path kept alive only by 4 direct `new` call sites in RabbitMq/Vault connectors",
+    "src/Koan.Core/Json/JsonPathMapper.cs — no consumers found outside Koan.Core",
+    "src/Koan.Core.Adapters/OrchestrationAware.cs — bare marker attribute",
+    "Koan.Core.Adapters README.md + TECHNICAL.md — tombstone docs describing a deleted type system (BaseKoanAdapter, IKoanAdapter, AdapterCapabilities DSL, OrchestrationRuntimeBridge)"
+  ],
+  "consolidationCandidates": [
+    "Dissolve Koan.Core.Adapters: move the Readiness pipeline next to Observability/Health in Koan.Core (it IS health/readiness semantics), AdapterOptionsConfigurator into Koan.Core.Modules options, and AdapterBootReporting onto the Provenance surface; relocate MissingTypes' BootstrapState/UnifiedServiceMetadata to their true namespaces' home assemblies. Rationale: the package's defining abstraction was already deleted, its name/docs/description are false advertising, and it inverts layering by pulling Koan.Data.Abstractions under a 'Core' name. ~1.3k LOC, 19 files — well under the dogfooding bar for a standalone package.",
+    "Delete V1 OrchestrationAwareServiceDiscovery + IOrchestrationAwareConnectionResolver after migrating the 4 RabbitMq/Vault `new` call sites to the DI-registered coordinator path; drop the 'V2' suffix. Removes ~480 LOC and one whole duplicate resolution pipeline.",
+    "Unify singleflight on one primitive: either promote ISingleflightRegistry (DI) or the static Infrastructure.Singleflight, port the other's consumers (relational repos vs CacheClient), and delete the Koan.Data.Relational forwarding shim. The CLAUDE.md claim 'lifted out of cache for cross-pillar reuse' is only half-done — the lift created a second implementation instead of replacing the first.",
+    "Delete the root-level legacy health stratum (HealthAggregator.cs, HealthAggregatorOptions.cs) and decide the IHealthContributor/HealthRegistry/HealthContributorsBridge 'legacy bridge' fate — the AddKoanCore comment says legacy was 'removed in greenfield' yet the bridge is still registered; either make IHealthContributor first-class or finish the removal.",
+    "Cut BackgroundServices/FluentApi + Actions/KoanServiceActions + Events/KoanServiceEvents (~750 LOC): the fluent control plane has zero consumers and the constant catalogs exist only to serve it plus 3 internal services — and they hard-code other pillars' vocabulary (Canon, Outbox) into the kernel. Keep only IKoanBackgroundService family + base classes + orchestrator, or move the constants to their owning pillars.",
+    "Extract OTel wiring (Observability/ServiceCollectionExtensions + ObservabilityOptions) and its 5 OpenTelemetry package refs into a Koan.Observability package — 'Reference = Intent' argues a core-primitives package should not force OTel (incl. AspNetCore instrumentation!) on every console app; Koan.Core's own AddKoanCore never calls it.",
+    "Move AI/ (AiCapability, IAiModelAdvisor, IAiRecipeProvider) to an AI abstractions assembly, and remove the Koan.Data.AI embedding special-case from RegistrySourceGenerator by routing embedding-entity discovery through the generic [KoanDiscoverable]/manifest channel — the kernel generator should not know pillar metadata names.",
+    "Collapse the generator's 4 special-cased registry channels onto the generic [KoanDiscoverable] mechanism where descriptors allow (service discovery adapters are already just a Type; initializers/auto-registrars could be discoverable contracts), shrinking both RegistrySourceGenerator and KoanRegistry's bespoke surface.",
+    "Drive the ARCH-0086 ratchet: 82 hand-written IKoanAutoRegistrars vs 7 KoanModules — converting registrars (mechanical for most) lets IKoanInitializer/IKoanAutoRegistrar become internal bridge details and reduces the module-primitive concept count from 3 to 1.",
+    "Decide Pipelines' home: 360 LOC consumed by AI/Canon/Data/Vector/Messaging extension shims — either bless it as kernel (and document it) or extract Koan.Pipelines; today it is an undocumented feature squatting in Core with PipelineObservabilityExtensions resolving loggers off the AppHost.Current ambient.",
+    "Rewrite or delete Koan.Core.Adapters README/TECHNICAL.md and refresh Koan.Core TECHNICAL.md (generic 0.2.x boilerplate referencing ARCH-0040) — current docs actively mislead about the adapter surface."
+  ],
+  "maturitySignals": {
+    "tests": "Kernel well covered, periphery bare. tests/Suites/Core/Koan.Core.Tests: CapabilitySetTests, KoanModuleTests, AppHostScopeTests, RegistrarOrderingTests, GuardTests, PillarCatalogSpec, ServiceCollectionScanExtensionsSpec, SingleflightRegistrySpec. tests/Suites/Core/Unit/Koan.Tests.Core.Unit: ConnectionStringParserTests, Json canonicalization/error specs, KoanOptions binding spec. The ARCH-0079 canon is honored at the system level: tests/Suites/Integration/Bootstrap has ~14 per-pillar specs exercising real AddKoan() reflective discovery via KoanIntegrationHost. Gaps: Koan.Core.Adapters readiness pipeline has zero dedicated tests (only an LMStudio adapter spec brushes it); orchestration discovery coordinator/V2, BackgroundServices orchestrator+fluent API, Logging, Provenance, and the source generator itself (no generator snapshot tests found) are untested.",
+    "docs": "Strong ADR trail for the new strata: ARCH-0084 (capability model), ARCH-0086 (KoanModule), CORE-0003 (initializer idempotency), CORE-0072 (source-gen registries), CORE-0090/0091/0092, ARCH-0052 (JSON merge), DATA-0057 (singleflight dedupe); CLAUDE.md and docs/guides/framework-utilities.md catalog the utility surface. But package-level docs are stale to the point of harm: Koan.Core.Adapters README/TECHNICAL.md document a deleted type system as 'validated 2025-09-29', and Koan.Core TECHNICAL.md is generic 0.2.x-era boilerplate.",
+    "codeQuality": "Very low marker density: exactly 3 TODOs in 150+ files, all in the unused FluentApi/ServiceBuilder. Naming is consistent in the post-redesign strata (Capabilities, Provenance, KoanModule, Registry — small focused files with ADR cross-references in doc comments). Smells concentrate in the legacy strata: AppBootstrapper's boot loop swallows all initializer exceptions (`catch { /* best-effort */ }`) and reflects into a loader type in its own assembly; MissingTypes.cs squats foreign namespaces; root-level duplicate health files; 'V2' suffix surviving in a registered service name; csproj scar tissue (`Compile Remove ../Koan.Core.Adapters/**`). Console.WriteLine diagnostics in AppBootstrapper bypass the project's own KoanLog subsystem."
+  }
+}
