@@ -1,0 +1,366 @@
+{
+  "claims": [
+    {
+      "claim": "README badge 'Version v0.6.3'",
+      "source": "README.md:7",
+      "verdict": "FALSE",
+      "evidence": "version.json sets NBGV version '0.17' (version.json:3); live builds are 0.17.x. Badge is ~11 minor versions stale. Same stale 'framework_version: v0.6.3' stamped in overview.md:8 and principles.md:7."
+    },
+    {
+      "claim": "'2 minutes to working API' via `dotnet add package Koan.Core Koan.Web Koan.Data.Connector.Sqlite`",
+      "source": "README.md:21-23, README.md:215, README.md:297, overview.md:56",
+      "verdict": "FALSE",
+      "evidence": "Triple-broken: (1) `dotnet add package` accepts one package per invocation; (2) real package IDs are Sylin.Koan.* (Directory.Build.props:31 'PackageId>Sylin.$(MSBuildProjectName)'); (3) nuget.org empirically: Koan.Core/Koan.Web exist only as accidental 0.5.2 publishes, Koan.Data.Connector.Sqlite returns BlobNotFound, Sylin.Koan.* are stale at 0.8.0 vs repo 0.17. A newcomer cannot complete step 1."
+    },
+    {
+      "claim": "`public class Todo : Entity<Todo>` model base",
+      "source": "README.md:28, overview.md:60, principles.md:39",
+      "verdict": "TRUE",
+      "evidence": "src/Koan.Data.Core/Model/Entity.cs:927 `public abstract partial class Entity<TEntity> : Entity<TEntity, string>`."
+    },
+    {
+      "claim": "`class TodosController : EntityController<Todo>` gives full REST CRUD",
+      "source": "README.md:36, overview.md:70, principles.md:72",
+      "verdict": "TRUE",
+      "evidence": "src/Koan.Web/Controllers/EntityController.cs:34,702 — abstract EntityController<TEntity,TKey>/<TEntity> with GetCollection/GetById/Upsert/UpsertMany/Delete/DeleteMany/DeleteByQuery/DeleteAll/Query actions (lines 165-506)."
+    },
+    {
+      "claim": "Health checks included; `curl /api/health` works",
+      "source": "README.md:41, overview.md:87",
+      "verdict": "TRUE",
+      "evidence": "src/Koan.Web/Options/KoanWebOptions.cs:15 HealthPath defaults to '/api/health' (KoanWebConstants.cs:53), served by lightweight alias in src/Koan.Web/Hosting/KoanWebStartupFilter.cs:70-76; HealthController at /health (HealthController.cs:14)."
+    },
+    {
+      "claim": "Auto-generated GUID v7 IDs",
+      "source": "README.md:42",
+      "verdict": "TRUE",
+      "evidence": "src/Koan.Data.Core/Model/Entity.cs:938 `get => _id ??= Guid.CreateVersion7().ToString();`."
+    },
+    {
+      "claim": "SQLite database zero config",
+      "source": "README.md:43, overview.md:90",
+      "verdict": "TRUE",
+      "evidence": "src/Connectors/Data/Sqlite/Discovery/SqliteDiscoveryAdapter.cs:89 falls back to 'Data Source=./data/app.db'; connector has Initialization/ auto-registrar."
+    },
+    {
+      "claim": "Structured logging and telemetry out of the box",
+      "source": "README.md:44, overview.md:90",
+      "verdict": "TRUE",
+      "evidence": "src/Koan.Core/Logging/KoanLogger.cs:64 + KoanLoggerExtensions.cs:18 ('[Koan:modules]' structured events); OpenTelemetry wired in src/Koan.Core/Observability/ServiceCollectionExtensions.cs and Koan.Core.csproj."
+    },
+    {
+      "claim": "`await todo.Save()` instance persistence",
+      "source": "README.md:58, principles.md:57",
+      "verdict": "TRUE",
+      "evidence": "src/Koan.Data.Core/AggregateExtensions.cs:69 `public static Task<TEntity> Save<TEntity>(this TEntity model, CancellationToken ct = default)`."
+    },
+    {
+      "claim": "`await new TodoCompleted { ... }.Send()` message dispatch",
+      "source": "README.md:70, overview.md:114",
+      "verdict": "TRUE",
+      "evidence": "src/Koan.Messaging.Core/MessagingExtensions.cs:82 `public static async Task Send<T>(this T message, string descriptor = default!, ...)`."
+    },
+    {
+      "claim": "`dotnet add package Koan.Messaging.Connector.RabbitMq`",
+      "source": "README.md:68",
+      "verdict": "PARTIAL",
+      "evidence": "Project exists (src/Connectors/Messaging/RabbitMq/Koan.Messaging.Connector.RabbitMq.csproj) but NuGet ID is Sylin.Koan.Messaging.Connector.RabbitMq, stale at 0.8.0 (nuget.org flatcontainer verified); bare ID not on nuget.org."
+    },
+    {
+      "claim": "`dotnet add package Koan.AI.Ollama`",
+      "source": "README.md:81, README.md:233, overview.md:128",
+      "verdict": "FALSE",
+      "evidence": "No such project; real name Koan.AI.Connector.Ollama (src/Connectors/AI/Ollama/Koan.AI.Connector.Ollama.csproj). nuget.org: koan.ai.ollama and sylin.koan.ai.ollama both BlobNotFound; sylin.koan.ai.connector.ollama exists at 0.8.0."
+    },
+    {
+      "claim": "`var suggestions = await ai.Chat(\"...\")`",
+      "source": "README.md:84",
+      "verdict": "PARTIAL",
+      "evidence": "Static `Koan.AI.Client.Chat(string message)` -> Task<string> exists (src/Koan.AI/Client.cs:47), but receiver `ai` is undefined in the snippet — no ambient `ai`; real call is `Client.Chat(...)` or injected IAiPipeline.Prompt."
+    },
+    {
+      "claim": "`await Todo.SemanticSearch(\"project planning tasks\")` / `Product.SemanticSearch(...)`",
+      "source": "README.md:87-90, overview.md:155, overview.md:29",
+      "verdict": "FALSE",
+      "evidence": "Does not compile: SemanticSearch is a method on unrelated static class, not on Entity<T>. Real form: `EntityEmbeddingExtensions.SemanticSearch<TEntity>(query, limit, threshold, partition, ct)` (src/Koan.Data.AI/EntityEmbeddingExtensions.cs:20). No `static class Entity` facade exists either (grep: no match)."
+    },
+    {
+      "claim": "Semantic pipeline chain `.AllStream().Pipeline().ForEach().Tokenize().Embed(new AiEmbedOptions{...}).Branch(OnSuccess.Save().Notify / OnFailure.Trace).ExecuteAsync()`",
+      "source": "README.md:102-117",
+      "verdict": "PARTIAL",
+      "evidence": "Exists: AllStream (Entity.cs:112), Pipeline() (src/Koan.Core/Pipelines/PipelineFluentExtensions.cs:15), ForEach (PipelineDataExtensions.cs:16-32), Tokenize (src/Koan.AI/PipelineAiExtensions.cs:16), Branch (PipelineFluentExtensions.cs:98), OnSuccess/OnFailure (PipelineBranchBuilder.cs:22,32), Save (PipelineDataExtensions.cs:48,71), Notify (PipelineMessagingExtensions.cs:14,40), Trace+env.Error (PipelineObservabilityExtensions.cs:17; PipelineEnvelope.cs:41), ExecuteAsync (PipelineFluentExtensions.cs:118). Broken: no `.Embed()` pipeline stage and no `AiEmbedOptions` type anywhere in src (grep: no match); ironically `Tokenize` already performs the embedding (PipelineAiExtensions.cs:41 calls Client.Embed). Branch `.Notify(doc => ...)` overload actually takes envelope, not entity. Snippet as printed cannot compile."
+    },
+    {
+      "claim": "`Flow.OnUpdate<Todo>(async (todo, previous) => ... UpdateResult.Continue())`",
+      "source": "README.md:130-139, overview.md:167-175",
+      "verdict": "FALSE",
+      "evidence": "No `Flow` static class, no `OnUpdate`, no `UpdateResult` anywhere in src (grep: zero matches). Worse: src/Koan.Flow.Core/ contains ONLY a TECHNICAL.md — no .csproj, no code at all. The entire Flow pillar advertised in overview.md:43 ('Flow orchestrates intake/standardize/projection') is a documentation ghost."
+    },
+    {
+      "claim": "Controller customization `public override async Task<ActionResult<Todo>> Post(Todo todo)` / `Put(string id, Todo todo)`",
+      "source": "README.md:153-158, overview.md:109-118",
+      "verdict": "FALSE",
+      "evidence": "EntityController has no Post or Put methods. Real override point: `public virtual async Task<IActionResult> Upsert([FromBody][ValidateNever] TEntity model, CancellationToken ct)` on [HttpPost(\"\")] (src/Koan.Web/Controllers/EntityController.cs:403-404); no PUT verb exists, return type is IActionResult not ActionResult<T>. Both documented override samples fail to compile."
+    },
+    {
+      "claim": "`koan export compose --profile Local` generates Docker Compose",
+      "source": "README.md:164, overview.md:199",
+      "verdict": "PARTIAL",
+      "evidence": "Verb exists: 'export compose' with --profile flag (src/Koan.Orchestration.Cli/CliApplication.cs:52; CommandRuntime.cs:738 ExportCommandOptions has Profile). But tool installs as `koan-orchestrate`, not `koan` (Koan.Orchestration.Cli.csproj:12 ToolCommandName), and the whole CLI stack is condemned by ARCH-0077 (docs/decisions/ARCH-0077-orchestration-layer-aspire-migration.md)."
+    },
+    {
+      "claim": "Aspire: `builder.AddKoan(); builder.Services.AddKoanWeb();`",
+      "source": "README.md:167-168",
+      "verdict": "PARTIAL",
+      "evidence": "AddKoanWeb exists (src/Koan.Web/Extensions/ServiceCollectionExtensions.cs:23). But no `AddKoan` extension on any builder type — only `IServiceCollection.AddKoan()` (src/Koan.Core/ServiceCollectionExtensions.cs:23). Real Aspire entry point is `AddKoanDiscoveredResources(this IDistributedApplicationBuilder)` (src/Koan.Orchestration.Aspire/Extensions/KoanAspireExtensions.cs:54). Snippet also oddly placed in a bash code block."
+    },
+    {
+      "claim": "EF/AR/Koan comparison table (Koan green on polyglot, multi-tenant, event-driven, semantic pipeline, capability detection)",
+      "source": "README.md:184-192",
+      "verdict": "PARTIAL",
+      "evidence": "Verifiable greens: polyglot (12 data + 4 vector connectors under src/Connectors/Data), capability detection (Data.cs:32 + DataCaps.cs:9), partition routing (EntityContext.With(partition)). Unsupported green: 'Event-driven & projections' rests on the empty Flow pillar (Koan.Flow.Core has zero code) and legacy Messaging; 'Semantic/Vector pipeline' green relies on the non-existent .Embed stage. Linked comparison.md exists (docs/architecture/comparison.md)."
+    },
+    {
+      "claim": "`git clone https://github.com/koan-framework/quickstart` and `.../enterprise-sample`",
+      "source": "README.md:210, README.md:222, README.md:292",
+      "verdict": "FALSE",
+      "evidence": "Empirically verified: api.github.com/repos/koan-framework/quickstart -> 404; api.github.com/orgs/koan-framework -> 404. Neither the org nor the repos exist. Repo actually lives at sylin-org/koan-framework."
+    },
+    {
+      "claim": "'70+ integrated modules'",
+      "source": "README.md:242",
+      "verdict": "TRUE",
+      "evidence": "110 .csproj files under src/ (find count). Caveat from Stage 1: ~25 are zero-consumer experimental, so 'integrated' overstates cohesion but the count holds."
+    },
+    {
+      "claim": "Stack list: Auth (Google, Microsoft, Discord), GraphQL, RabbitMQ, vector DBs",
+      "source": "README.md:244-249",
+      "verdict": "TRUE",
+      "evidence": "src/Connectors/Web/Auth (Koan.Web.Auth.Connector.Google/Microsoft/Discord/Oidc.csproj), Koan.Web.Connector.GraphQl.csproj, Koan.Messaging.Connector.RabbitMq.csproj, Koan.Data.Vector.Connector.{Weaviate,Qdrant,Milvus}.csproj all exist. ('Azure Service Bus' has no connector — only RabbitMq exists for messaging.)"
+    },
+    {
+      "claim": "overview frontmatter: 'status: current, validation verified 2025-10-01, framework_version v0.6.3'",
+      "source": "overview.md:6-12",
+      "verdict": "FALSE",
+      "evidence": "Self-certifies content containing Flow.OnUpdate, Todo.SemanticSearch, Koan.Messaging.InMemory — all non-existent; version is 0.17 (version.json:3). The 'verified' validation stamp is demonstrably untrue."
+    },
+    {
+      "claim": "Flow pillar: 'orchestrates intake -> standardize -> projection pipelines and the semantic pipeline DSL'",
+      "source": "overview.md:43, overview.md:189",
+      "verdict": "FALSE",
+      "evidence": "src/Koan.Flow.Core/ contains a single TECHNICAL.md and no code or csproj (ls verified). The semantic pipeline DSL that does exist lives in Koan.Core/Pipelines + per-pillar extensions, not Flow."
+    },
+    {
+      "claim": "Minimal Program.cs: `builder.Services.AddKoan(); app.Run();` serves controllers",
+      "source": "overview.md:74-80, principles.md:30",
+      "verdict": "TRUE",
+      "evidence": "src/Koan.Core/ServiceCollectionExtensions.cs:23 AddKoan; src/Koan.Web/Hosting/KoanWebStartupFilter.cs auto-configures the web pipeline via IStartupFilter, so no explicit Use* calls needed."
+    },
+    {
+      "claim": "`dotnet add package Koan.Messaging.InMemory`",
+      "source": "overview.md:121",
+      "verdict": "FALSE",
+      "evidence": "No such project in src (only Koan.Messaging.Core + RabbitMq connector; the only in-memory artifact is internal InMemoryMessageBuffer, IMessageBuffer.cs:38). nuget.org: koan.messaging.inmemory and sylin.koan.messaging.inmemory both BlobNotFound."
+    },
+    {
+      "claim": "Inject IAiPipeline; `await _ai.PromptAsync(new AiChatRequest { Messages = { new AiMessage(\"user\", ...) } }); return Ok(suggestion.Text)`",
+      "source": "overview.md:130-151",
+      "verdict": "PARTIAL",
+      "evidence": "IAiPipeline registered (src/Koan.AI/ServiceCollectionExtensions.cs:68); AiChatRequest.Messages (AiChatRequest.cs:5), AiMessage(role, content) ctor (AiMessage.cs:14), AiChatResponse.Text (AiChatResponse.cs:5) all real. But the method is `Prompt`, not `PromptAsync` (src/Koan.AI.Contracts/IAiPipeline.cs:14) — snippet doesn't compile as written."
+    },
+    {
+      "claim": "`await Todo.Get(id)` static fetch",
+      "source": "overview.md:141, principles.md:53, principles.md:286",
+      "verdict": "TRUE",
+      "evidence": "src/Koan.Data.Core/Model/Entity.cs:66 `public static Task<TEntity?> Get(TKey id, CancellationToken ct = default)`."
+    },
+    {
+      "claim": "Stage 3 pipeline `Todo.AllStream().Pipeline().ForEach(...).Save().ExecuteAsync()`",
+      "source": "overview.md:178-183",
+      "verdict": "TRUE",
+      "evidence": "All four verbs exist and chain: PipelineFluentExtensions.cs:15 (Pipeline), PipelineDataExtensions.cs:29-32 (ForEach Action overload), PipelineDataExtensions.cs:48 (Save), PipelineFluentExtensions.cs:118 (ExecuteAsync)."
+    },
+    {
+      "claim": "`Koan.Data.Connector.Postgres` / `Koan.Data.Vector` packages",
+      "source": "overview.md:186, README.md:233",
+      "verdict": "PARTIAL",
+      "evidence": "Projects exist (src/Connectors/Data/Postgres, src/Koan.Data.Vector); NuGet IDs Sylin.Koan.* stale at 0.8.0; bare koan.data.vector on nuget.org is an accidental 0.5.2 publish."
+    },
+    {
+      "claim": "Reference map: Koan CLI at 'packaging/Koan-cli'",
+      "source": "overview.md:217",
+      "verdict": "FALSE",
+      "evidence": "packaging/ contains only Koan.App.nuspec, Koan.nuspec, README.md (ls verified) — no Koan-cli directory. Other reference links (docs/ASPIRE-INTEGRATION.md, docs/reference/flow/index.md, docs/guides/semantic-pipelines.md, docs/architecture/comparison.md) do exist."
+    },
+    {
+      "claim": "quickstart.md is a deprecated redirect to overview.md",
+      "source": "quickstart.md:6,16-18",
+      "verdict": "TRUE",
+      "evidence": "Honestly marked 'status: deprecated' and redirects; no code claims of its own. (README.md:309 still links it as the 'Quickstart Guide'.)"
+    },
+    {
+      "claim": "`var todos = await Todo.All()` works across providers",
+      "source": "principles.md:44",
+      "verdict": "TRUE",
+      "evidence": "src/Koan.Data.Core/Model/Entity.cs:76 static All; provider routing via AdapterResolver (Koan.Data.Core/AdapterResolver.cs)."
+    },
+    {
+      "claim": "`await Todo.Where(t => !t.IsCompleted)` static",
+      "source": "principles.md:54",
+      "verdict": "FALSE",
+      "evidence": "Entity<T> has no static Where (Entity.cs statics: Get/All/Query/AllStream/FirstPage/Page/Remove/UpsertMany). Real form: `Todo.Query(t => !t.IsCompleted)` (Entity.cs:86)."
+    },
+    {
+      "claim": "`await todo.Delete()` instance method",
+      "source": "principles.md:58",
+      "verdict": "FALSE",
+      "evidence": "No Delete instance member or extension on entities. Real form: `todo.Remove()` (src/Koan.Data.Core/AggregateExtensions.cs:157) or static `Todo.Remove(id)` (Entity.cs:266)."
+    },
+    {
+      "claim": "`static Task<User[]> ActiveUsers() => Query().Where(u => u.IsActive);`",
+      "source": "principles.md:114-115",
+      "verdict": "FALSE",
+      "evidence": "No parameterless Query() and Query is not fluent — it takes the predicate directly and returns Task<IReadOnlyList<TEntity>> (Entity.cs:86). Return type User[] also wrong."
+    },
+    {
+      "claim": "`[DataAdapter(\"redis\")]` pins an entity to a provider",
+      "source": "principles.md:119",
+      "verdict": "TRUE",
+      "evidence": "DataAdapterAttribute exists (src/Koan.Data.Abstractions/DataAdapterAttribute.cs:4) and is honored at priority 3 by AdapterResolver (src/Koan.Data.Core/AdapterResolver.cs:58), though marked legacy vs preferred [SourceAdapter] (AdapterResolver.cs:102); Redis connector exists (src/Connectors/Data/Redis)."
+    },
+    {
+      "claim": "`await User.ExecuteSql(\"SELECT * FROM users ...\")` escape hatch",
+      "source": "principles.md:133",
+      "verdict": "FALSE",
+      "evidence": "No ExecuteSql anywhere in src (grep: zero matches). Real escape hatch: `Data<TEntity,TKey>.Execute<TResult>(string sql, ...)` (src/Koan.Data.Core/Data.cs:491) or Instruction-based Execute (Data.cs:471)."
+    },
+    {
+      "claim": "`Configuration.Read(cfg, \"Koan:SomeKey\", defaultValue)`",
+      "source": "principles.md:95",
+      "verdict": "TRUE",
+      "evidence": "src/Koan.Core/Configuration.cs:71 `public static T Read<T>(IConfiguration? cfg, string key, T defaultValue)`."
+    },
+    {
+      "claim": "Auto-registrar sample: `IKoanAutoRegistrar` with ModuleName/ModuleVersion/`Initialize(IServiceCollection)`",
+      "source": "principles.md:148-158",
+      "verdict": "PARTIAL",
+      "evidence": "ModuleName/ModuleVersion real (src/Koan.Core/IKoanAutoRegistrar.cs:9-10); Initialize comes from base IKoanInitializer (IKoanInitializer.cs:7); but the interface also requires `Describe(ProvenanceModuleWriter, IConfiguration, IHostEnvironment)` (IKoanAutoRegistrar.cs:11), omitted in the sample — and ARCH-0086 now prefers KoanModule."
+    },
+    {
+      "claim": "`public interface IDataProvider { Name; CanServe; GetAdapterAsync<T>(); }` + `_registry.GetProvider(typeof(Todo))`",
+      "source": "principles.md:170-180",
+      "verdict": "FALSE",
+      "evidence": "No IDataProvider interface or IDataProviderRegistry in src (grep: only IDataProviderConnectionFactory, Koan.Data.Core/Configuration/IDataProviderConnectionFactory.cs:9). Provider election actually runs through AdapterResolver."
+    },
+    {
+      "claim": "Capability detection: `Data<Todo,string>.Capabilities` + `capabilities.Has(DataCaps.Query.Linq)`",
+      "source": "principles.md:185-198",
+      "verdict": "TRUE",
+      "evidence": "src/Koan.Data.Core/Data.cs:32 `public static CapabilitySet Capabilities`; DataCaps.Query.Linq (src/Koan.Data.Abstractions/Capabilities/DataCaps.cs:9 + e.g. SqliteRepository.cs:47); .Has usage in production code (src/Koan.Jobs/DataJobLedger.cs:54)."
+    },
+    {
+      "claim": "`KoanEnv.IsDevelopment` / `KoanEnv.InContainer`",
+      "source": "principles.md:206-213",
+      "verdict": "TRUE",
+      "evidence": "src/Koan.Core/KoanEnv.cs:221 and :224."
+    },
+    {
+      "claim": "Automatic endpoints GET /api/health, /api/health/live, /api/health/ready",
+      "source": "principles.md:221-223",
+      "verdict": "PARTIAL",
+      "evidence": "/api/health works via alias (KoanWebStartupFilter.cs:70-76). But live/ready are at /health/live and /health/ready (HealthController routes HealthBase='health', HealthLive='live', HealthReady='ready' — KoanWebConstants.cs:50-52); /api/health/live and /api/health/ready do not exist."
+    },
+    {
+      "claim": "`IHealthContributor` sample with `Task<HealthReport> CheckAsync(...)`",
+      "source": "principles.md:225-235",
+      "verdict": "PARTIAL",
+      "evidence": "Interface exists with Name/IsCritical, but the method is `Check`, not `CheckAsync` (src/Koan.Core/IHealthContributor.cs:9). Sample doesn't compile as written."
+    },
+    {
+      "claim": "Config keys `Koan:Data:Postgres:ConnectionString` + env override `KOAN__DATA__POSTGRES__CONNECTIONSTRING`",
+      "source": "principles.md:241-254",
+      "verdict": "TRUE",
+      "evidence": "Postgres section constant 'Koan:Data:Postgres' (src/Connectors/Data/Postgres/Infrastructure/Constants.cs:9); double-underscore env mapping is standard .NET config and used in framework (e.g. SqliteAdapterFactory.cs:20 'Koan__Data__Sqlite__ConnectionString')."
+    },
+    {
+      "claim": "`public class EntityNotFoundException : KoanException`",
+      "source": "principles.md:276-280",
+      "verdict": "FALSE",
+      "evidence": "No KoanException type anywhere in src (grep: zero matches)."
+    },
+    {
+      "claim": "Secure headers applied automatically (X-Frame-Options etc.)",
+      "source": "principles.md:294-297",
+      "verdict": "TRUE",
+      "evidence": "src/Koan.Web/Infrastructure/KoanWebConstants.cs:32 XFrameOptions constant; WebProvenanceItems.cs:15 'Adds Koan's default security headers (HSTS, CSP, X-Frame-Options, etc.) to every response.'"
+    },
+    {
+      "claim": "`Todo.AllStream(batchSize: 1000)` streaming",
+      "source": "principles.md:312",
+      "verdict": "TRUE",
+      "evidence": "src/Koan.Data.Core/Model/Entity.cs:112 `public static IAsyncEnumerable<TEntity> AllStream(int? batchSize = null, ...)` — named arg matches."
+    },
+    {
+      "claim": "`await Product.Query().Where(...).OrderBy(...).Take(50)` pushdown chain",
+      "source": "principles.md:322-325",
+      "verdict": "FALSE",
+      "evidence": "No parameterless Query(); Query(predicate) returns Task<IReadOnlyList<TEntity>> — not a fluent queryable with OrderBy/Take (Entity.cs:86-100). Pushdown is real but expressed via Query(predicate)+sort builder overloads (Entity.cs:149)."
+    },
+    {
+      "claim": "`await Todo.SaveBatch(batch)` batch op",
+      "source": "principles.md:339",
+      "verdict": "FALSE",
+      "evidence": "No SaveBatch anywhere in src (grep: zero matches). Real forms: static `Todo.UpsertMany(models)` (Entity.cs:238) or `models.Save()` IEnumerable extension (AggregateExtensions.cs:185)."
+    },
+    {
+      "claim": "`KoanEnv.DumpSnapshot(logger)` boot report",
+      "source": "principles.md:348",
+      "verdict": "TRUE",
+      "evidence": "src/Koan.Core/KoanEnv.cs:18 `public static void DumpSnapshot(ILogger? logger = null)`."
+    },
+    {
+      "claim": "Boot report output format '[INFO] Koan:modules data→postgresql' / 'Koan:discover' / 'Koan:capabilities'",
+      "source": "principles.md:350-355, principles.md:162-166",
+      "verdict": "PARTIAL",
+      "evidence": "'Koan:modules' channel is real (src/Koan.Core/Logging/KoanLogger.cs:64, KoanLoggerExtensions.cs:18); the specific 'Koan:discover'/'Koan:capabilities' lines and arrow format are illustrative, not verbatim output."
+    },
+    {
+      "claim": "`_logger.LogInformation(Events.ProviderElected, ...)` consistent event IDs",
+      "source": "principles.md:361-363",
+      "verdict": "FALSE",
+      "evidence": "No Events class with ProviderElected in src; only unrelated Koan.Recipe.Abstractions/RecipeLog.cs:7 has a nested Events class."
+    },
+    {
+      "claim": "`builder.Services.AddKoan(options => { options.EnableTelemetry = true; })`",
+      "source": "principles.md:370-374",
+      "verdict": "FALSE",
+      "evidence": "AddKoan has only the parameterless IServiceCollection overload (src/Koan.Core/ServiceCollectionExtensions.cs:23); no options lambda, no EnableTelemetry on any Koan options (only TransactionOptions.EnableTelemetry, unrelated — TransactionOptions.cs:25)."
+    },
+    {
+      "claim": "`public interface IDataProviderV2 : IDataProvider` versioned interfaces",
+      "source": "principles.md:433-434",
+      "verdict": "FALSE",
+      "evidence": "Neither IDataProvider nor IDataProviderV2 exists in src (grep: zero matches). Versioning-by-interface is not the framework's actual evolution mechanism."
+    },
+    {
+      "claim": "`KoanEnv.Features.EnableExperimentalFeature` feature flags",
+      "source": "principles.md:437-440",
+      "verdict": "FALSE",
+      "evidence": "KoanEnv has no Features member (grep KoanEnv.cs: zero matches for Features)."
+    },
+    {
+      "claim": "principles frontmatter 'last_updated 2026-03-23, validation verified 2026-03-25, v0.6.3'",
+      "source": "principles.md:6-12, principles.md:468-469",
+      "verdict": "FALSE",
+      "evidence": "A doc 'verified' 3 months ago still documents ExecuteSql, SaveBatch, KoanException, IDataProvider, KoanEnv.Features, AddKoan(options) — none of which exist. The validation stamp itself is false, and version is 0.17 not 0.6.3."
+    }
+  ],
+  "aggregate": "TRUE: 22 · PARTIAL: 12 · FALSE: 25 · UNVERIFIABLE: 0 (59 distinct claims; duplicates across README/overview/principles merged). By source: README 9 TRUE / 6 PARTIAL / 6 FALSE; overview 5/3/6; principles 10/5/13 — principles.md is the worst offender despite carrying the freshest 'verified 2026-03-25' stamp.",
+  "worstDrifts": [
+    "1. The front door is locked: the very first command (`dotnet add package Koan.Core Koan.Web Koan.Data.Connector.Sqlite`, README.md:23) fails three ways — multi-package syntax invalid, package IDs actually publish as Sylin.Koan.* (Directory.Build.props:31), and nuget.org holds only accidental Koan.Core/Koan.Web 0.5.2 relics + stale Sylin.* 0.8.0 vs repo 0.17 (empirically verified). '2 minutes to working API' is unachievable by any newcomer; building from source is the only path and no doc says so.",
+    "2. The Flow pillar is a ghost: README's flagship event-driven snippet (`Flow.OnUpdate<Todo>` + `UpdateResult.Continue()`, README.md:130) and overview's Stage 3 'Automate with Flow' reference an API with zero matches in src — src/Koan.Flow.Core/ contains a single TECHNICAL.md, no .csproj, no code. A whole advertised pillar (and the comparison table's 'Event-driven & projections 🟩' row) has no implementation.",
+    "3. Both 'works with what you know' onramp repos are 404s: github.com/koan-framework org does not exist, so `git clone .../quickstart` and `.../enterprise-sample` (README.md:210,222,292) dead-end immediately — verified via GitHub API.",
+    "4. Every controller-customization sample fails to compile: documented `override Post(Todo)` / `Put(string id, Todo)` (README.md:153, overview.md:109) don't exist — the real surface is `virtual Task<IActionResult> Upsert([FromBody] TEntity, CancellationToken)` with no PUT verb at all (EntityController.cs:403-404). The first thing a newcomer tries after CRUD breaks.",
+    "5. The entity API in principles.md is systematically wrong despite a 'verified 2026-03-25' stamp: Todo.Where, todo.Delete(), Query().Where().OrderBy().Take(), Todo.SaveBatch, User.ExecuteSql, KoanException, KoanEnv.Features, AddKoan(options) — 8 core snippets in the architecture front-door doc don't exist (real: Query(predicate), Remove(), UpsertMany, Data<T,K>.Execute<TResult>(sql)). Same family: Todo.SemanticSearch and `ai.Chat` in README §3 don't compile (real: EntityEmbeddingExtensions.SemanticSearch<T>(), Client.Chat()). The false validation stamps mean a reader cannot trust even the 'verified' docs."
+  ]
+}
