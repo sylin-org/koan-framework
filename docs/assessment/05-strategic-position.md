@@ -64,8 +64,9 @@ consolidation plan and the strategy point the same direction.
 
 The four properties above make Koan *legible* to agents; a second set makes it **trustworthy
 and verifiable** — grants, audits, conformance, composition truth. Act one: agents can build on
-it. Act two: you can let them. Ranked by differentiation × fit × cost (design-shape prompt
-cards with proposed APIs: [07-strategic-prompt-stash.md](07-strategic-prompt-stash.md)):
+it. Act two: you can let them. Ranked by differentiation × fit × cost (self-contained,
+maturity-ordered build cards with target shapes and reference usage:
+[07-strategic-prompt-stash.md](07-strategic-prompt-stash.md)):
 
 | # | Capability | The gap it exploits | Koan's unfair asset |
 |---|---|---|---|

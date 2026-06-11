@@ -645,10 +645,11 @@ VERIFY: run samples/S1.Web, paste the new boot output in your summary; Bootstrap
 
 ## Strategic capabilities (05 §3) — all T3
 
-> **Second-act capabilities** (05 §3.1 — composition lockfile, governed agent access,
-> conformance kits, tenancy, sovereign deploys, AI evals, agent ops) have their own
-> design-shape cards in **[07-strategic-prompt-stash.md](07-strategic-prompt-stash.md)**.
-> As each ADR lands, append its minted T1/T2 implementation cards back here.
+> **The strategic build cards live in [07-strategic-prompt-stash.md](07-strategic-prompt-stash.md)**
+> — self-contained, maturity-ordered sessions (research → design → implement → verify →
+> document) covering the second-act capabilities. **S1 and S2 below are superseded by 07's
+> P1.2 (introspection) and P5.2 (wedge demo) — do not run them from here.** S3 and S4 remain
+> here and act as gates for 07's Phase 4.
 
 ```text
 S1 FRONTIER: Write the ADR for dev-mode MCP introspection ("the app explains itself to

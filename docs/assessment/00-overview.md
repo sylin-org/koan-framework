@@ -70,7 +70,7 @@ mandatory.
 | [04-recommendations.md](04-recommendations.md) | 8 tracks (A truth, B enforcement, C cut waves, D orchestration migration, E finish migrations, F fail-loud boot, G kernel diet, H docs system), longitudinal metrics, guardrails |
 | [05-strategic-position.md](05-strategic-position.md) | Mission reframe ("Rails for agentic, data-driven .NET apps"), the agent-native thesis, strategic shed list, recorded decisions (Newtonsoft canon), lesser-model session playbook, premium-DX program (docs/narrative/presentation redesign) |
 | [06-prompt-stash.md](06-prompt-stash.md) | Tier-routed implementation prompts (T1/T2 for lesser models, T3 frontier-only): shared preamble, cut templates, per-track recipes, coverage map |
-| [07-strategic-prompt-stash.md](07-strategic-prompt-stash.md) | Second-act design cards (lockfile, governed agent access, conformance kits, tenancy, sovereign, AI evals, agent ops): proposed API shapes + reference usage, design-session prompts |
+| [07-strategic-prompt-stash.md](07-strategic-prompt-stash.md) | Second-act build cards (lockfile, introspection, conformance kits, grants/audit, agent ops, tenancy, AI evals, sovereign, wedge demo): self-contained research→implement→verify sessions for lesser models, maturity-ordered in 5 composing phases, target shapes + reference usage embedded |
 | [evidence/](evidence/) | Raw structured findings from all ~35 auditors + adversarial verdicts |
 
 ## How to consume this (suggested order for the maintainer)

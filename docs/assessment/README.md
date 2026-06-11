@@ -19,7 +19,7 @@ The assessment was produced in stages, each building on the previous. **Start wi
 | 4 | [04-recommendations.md](04-recommendations.md) | What should consolidation do, in what order? |
 | 5 | [05-strategic-position.md](05-strategic-position.md) | What is Koan uniquely positioned to be, what does it shed, and how do agentic sessions (incl. lesser models) work on it? |
 | 6 | [06-prompt-stash.md](06-prompt-stash.md) | Ready-to-paste, tier-routed implementation prompts for every flagged issue and strategic capability. |
-| 7 | [07-strategic-prompt-stash.md](07-strategic-prompt-stash.md) | Design-shape prompt cards for the second-act capabilities (05 §3.1): proposed Koan-idiom APIs + reference usage patterns, frontier design sessions. |
+| 7 | [07-strategic-prompt-stash.md](07-strategic-prompt-stash.md) | Self-contained, maturity-ordered build cards for the second-act capabilities (05 §3.1): target shapes + reference usage embedded, full research→implement→verify sessions runnable by lesser models, phased to compose (self-description → verification → trust → domain power → reach). |
 
 Evidence basis: full project census (csproj/LOC), git churn analysis, 15 parallel pillar/corpus
 audits (Stage 1, [evidence/](evidence/)), 6 philosophy/DX audits incl. a 59-claim promise

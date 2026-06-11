@@ -1,477 +1,567 @@
-# Stage 7 — Strategic capability prompt stash (design shapes)
+# Stage 7 — Strategic capability build stash (self-contained, maturity-ordered)
 
-**Purpose**: prompt cards that drive the **second-act strategic capabilities** (expanding
-[05 §3](05-strategic-position.md)): act one made Koan *legible* to agents; these make it
-*trustworthy and verifiable* — grants, audits, conformance, composition truth. Each card carries
-a **proposed API shape** and a **reference usage pattern** in deliberate Koan idiom, as the
-starting hypothesis for a design session.
+**Purpose**: ready-to-paste session prompts that **build** the second-act strategic capabilities
+([05 §3.1](05-strategic-position.md)). Each card is a complete, self-contained session —
+research → design validation → implementation → tests → docs — sized and pre-decided so that
+**lesser models can execute it end-to-end**. The design is *given* (shapes + reference usage
+below); the session's job is to validate it against the real codebase and build it, not to
+invent it.
 
-> ⚠️ **EVERY C# BLOCK IN THIS FILE IS A PROPOSED DESIGN SHAPE, NOT AN EXISTING API.**
-> Nothing here compiles against current source, by design. This file must be **excluded from
-> the snippet-compile lint**, and no session may cite these shapes as evidence of an existing
-> surface. The shapes are hypothesis A for the ADR — the design session's job is to challenge
-> them.
+**Greenfield posture (applies to every card)**: Koan is pre-1.0 with no external consumers.
+Break-and-rebuild is welcome; a proper architecture set now saves rework later. No `[Obsolete]`
+bridges, no compatibility shims, no dual paths — delete superseded code in the same session.
+The green ratchet (build + tests) is the only backward contract.
 
-**Tier**: all cards are **T3 (frontier) for the design/ADR phase**. Each ADR's staged ledger
-then yields T1/T2 implementation tasks in the style of [06-prompt-stash.md](06-prompt-stash.md)
-— append them there as they're minted. Dependency notes per card.
+> ⚠️ The C# blocks below are **target shapes** — they do not exist until their session ships
+> them. This file stays excluded from the snippet-compile lint; a session may treat its own
+> card's shape as the spec, never as evidence of an existing API.
 
 ---
 
-## [DESIGN-PREAMBLE] — paste atop every design session in this file
+## The maturity ladder — why this order
+
+Each phase makes the next one cheaper and safer. Run phases in order; cards inside a phase are
+independent unless marked.
 
 ```text
-You are designing a new Koan Framework capability with the architect. Method (non-negotiable):
+GATE  (from 06): B1 sln-truth · F1 fail-loud boot · A2 doc-truth sweep   ← run these first
+P1  SELF-DESCRIPTION   the app states what it is        → P1.1 lockfile · P1.2 MCP introspection
+P2  VERIFICATION       changes prove themselves          → P2.1 conformance kits
+P3  TRUST              agents become governed principals → P3.1 grants/audit · P3.2 agent ops
+P4  DOMAIN POWER       capabilities apps build on        → P4.1 tenancy* · P4.2 AI evals**
+P5  REACH              the story ships                   → P5.1 sovereign/AOT · P5.2 wedge demo
+   * P4.1 additionally gated on the ambient-context hardening (Facet 3)
+  ** P4.2 additionally gated on the AI vertical collapse (06 S3)
+```
 
-1. EVIDENCE FIRST: read the named evidence files and the named existing-code anchors before
-   proposing anything. Re-derive every claim this card makes; treat the card as naive input.
-2. PRIOR ART: survey the named prior art from your own knowledge; state for each what it gets
-   right, what it gets wrong, and what Koan's grammar changes about the problem.
-3. SHAPES: present 2-3 alternative API shapes (the card's sketch is hypothesis A, not the
-   answer). For each: pros/cons, concept-count delta, failure modes. Challenge the architect's
-   sketch where it deserves it — no sycophancy.
-4. KOAN DX TENETS — every shape must satisfy all seven, or argue explicitly why one is waived:
-   (a) entity-grammar first: new nouns are entities (queryable, observable) wherever possible;
-   (b) attribute-first declaration on the entity, options for the rest;
-   (c) Reference = Intent: referencing the package activates sane defaults, zero wiring;
-   (d) capability-graded: behavior differences across adapters are declared tokens, negotiated,
-       never silently emulated (ARCH-0084);
-   (e) fail-loud: unsupported = descriptive exception, never narrowing;
-   (f) self-reporting: the feature announces itself and its elections in the boot report;
-   (g) concept budget: state exactly how many new concepts the app developer must learn.
-5. DELIVERABLE: a Gen-2-style ADR (Status/Date/Deciders/Scope/Related; empirical probes; staged
-   implementation ledger with verify steps per stage). Implementation does NOT start in the
-   design session.
-6. STOP: if the design wants a new project, justify it against "fewer but more meaningful
-   parts" (default: the capability lives inside an existing pillar). If it drifts toward a
-   refused lane (workflow engine, model ops, realtime sync, UI scaffolding) — stop and flag.
+Composition logic: P1 gives every later session (and every agent) ground truth to read; P2
+gives every later session a harness to prove itself against; P3 turns the MCP surface from a
+demo into a governed product and unlocks P3.2/P5.2; P4 ships the capabilities customers build
+on, safely, because P1–P3 exist; P5 packages the proof.
+
+---
+
+## [SESSION-PREAMBLE] — paste atop EVERY session in this file
+
+```text
+You are implementing a designed capability for the Koan Framework (.NET 10 meta-framework;
+repo root = working directory). Koan's grammar: Entity<T> is the universal noun (data, REST,
+cache, jobs, embeddings, agent tools); packages self-register ("Reference = Intent",
+source-generated registry); adapters declare capabilities that are negotiated and fail loud
+(ARCH-0084); the app self-reports at boot. Your card gives you the TARGET SHAPE — implement it.
+
+METHOD — work in this order, completing each step before the next:
+1. RESEARCH (read, don't trust): read every file your card's ANCHORS list names, plus the
+   evidence JSON it cites. Verify each assumption the card makes; if reality differs, adapt the
+   plan and record the delta in your final summary. Never reference an API you haven't seen.
+2. PLAN: write a short plan-of-record into the session (files to create/modify, test list,
+   boot-report line, docs touchpoints). Where the card marks DECIDED, do not re-litigate;
+   where it marks DEFAULT, you may deviate only with a one-paragraph justification.
+3. IMPLEMENT — Koan DX tenets are acceptance criteria:
+   (a) entity-grammar first: new nouns are entities wherever possible;
+   (b) attribute-first declaration; options for posture, never for wiring;
+   (c) Reference = Intent: referencing the package/feature activates sane defaults;
+   (d) capability-graded: provider differences are declared tokens, negotiated, never faked;
+   (e) fail-loud: unsupported/misconfigured = descriptive exception naming the fix;
+   (f) self-reporting: add the boot-report line your card specifies;
+   (g) concept budget: the developer-facing surface must match the card's shape — no extra
+       public types without justification.
+   Greenfield rule: replace, don't bridge. Delete superseded paths in this session.
+4. TEST: unit tests for logic + at least one ARCH-0079 integration spec through real AddKoan()
+   (KoanIntegrationHost — see tests/Shared/Koan.Testing). Container-dependent specs must
+   skip cleanly without Docker.
+5. DOCUMENT: update the feature's guide page + the relevant .claude/skills entry + CLAUDE.md
+   utilities list if applicable. Every snippet you write into docs must compile — copy from
+   your own tests.
+6. VERIFY: dotnet build Koan.sln green; dotnet test Koan.sln (non-container) green;
+   scripts/docs-lint.ps1 green if docs touched.
+FINAL SUMMARY: files touched; deltas from the card; evidence citations (file:line) for every
+claim; the boot-report line as actually printed.
+IF BLOCKED: prefer the simplest design that satisfies the tenets and note the compromise;
+revert-and-report only if the build cannot be made green.
 ```
 
 ---
 
-## SC1 · Composition lockfile — the behavioral SBOM 〔rank 1: near-free, compounds everything〕
+# PHASE 1 — SELF-DESCRIPTION
 
-**Gap & assets**: supply-chain tooling diffs *packages*; nothing diffs an app's *behavior
-surface*. Koan's composition is already knowable at build time (source-gen `KoanRegistry`) and
-described at runtime (Provenance, capability reports) — it just isn't serialized as an artifact.
+## P1.1 · Composition lockfile (`koan.lock.json`)
 
-**Proposed shape** *(design target — does not exist)*:
+**Why now**: cheapest card, and every later session + every agent gains ground truth: "what is
+this app, exactly?" — answered without booting it.
+
+**UX/DX after this session**:
+
+```bash
+dotnet build                      # koan.lock.json refreshed automatically
+git diff koan.lock.json           # PR review now SHOWS composition drift:
+                                  #   + "cache:coherence": { "channel": "messaging" }
+```
+
+**Target shape**:
 
 ```jsonc
-// koan.lock.json — emitted by an MSBuild target on build; checked in; diffed in CI
+// koan.lock.json (project root, checked in) — stable, versioned schema
 {
-  "app": { "name": "PantryPal", "koan": "0.17.43", "tfm": "net10.0" },
-  "modules": [
-    { "id": "Koan.Data.Core", "version": "0.17.43" },
-    { "id": "Koan.Data.Connector.Postgres", "version": "0.17.43" }
-  ],
-  "elections": {
-    "data:default": { "adapter": "postgres", "via": "reference-priority" },
-    "cache:l1": { "adapter": "memory", "preemptedBy": null }
-  },
-  "capabilities": {
-    "data:postgres": ["Query.Linq", "Write.BulkUpsert", "Write.ConditionalReplace"]
-  },
-  "configKeys": ["Koan:Data:Postgres:ConnectionString"],
-  "entities": [ { "type": "PantryItem", "traits": ["Cacheable", "Embedding", "McpEntity"] } ]
+  "schema": 1,
+  "app": { "name": "S5.Recs", "koan": "0.17.43", "tfm": "net10.0" },
+  "modules":   [ { "id": "Koan.Data.Connector.Postgres", "version": "0.17.43" } ],
+  "elections": { "data:default": { "adapter": "postgres", "via": "reference-priority" } },
+  "capabilities": { "data:postgres": ["Query.Linq", "Write.BulkUpsert"] },
+  "configKeys": [ "Koan:Data:Postgres:ConnectionString" ],   // KEYS only — never values
+  "entities":  [ { "type": "Anime", "traits": ["Embedding"] } ]
 }
 ```
 
-**Reference usage**:
-
-```bash
-dotnet build                      # lockfile refreshed automatically (Reference = Intent)
-git diff koan.lock.json           # review: "this PR adds a coherence channel" is now visible
-# CI gate: fail when composition drifts without the lockfile committed alongside
-```
-
-An agent reads `koan.lock.json` instead of booting the app; an upgrade tool diffs two lockfiles
-and reports "0.18 removes `Write.ConditionalReplace` from couchbase — your `ImportJob` claim
-path degrades."
-
-**Prompt**:
+**Session prompt**:
 
 ```text
-[DESIGN-PREAMBLE]
-DESIGN TASK: the Koan composition lockfile. Evidence: docs/assessment/evidence/
-pillar-core-bootstrap.json (Provenance, KoanRegistry), 02-philosophy-dx.md §5 (surface census);
-code anchors: src/Koan.Core.Registry.Generators/RegistrySourceGenerator.cs, src/Koan.Core/
-Provenance/**, AppRuntime's RegistrySummarySnapshot. Prior art: package-lock.json/Cargo.lock
-(identity, not behavior), SBOM/CycloneDX (components, not composition), Terraform plan (the
-diff-before-apply UX — closest in spirit), Aspire manifest (deployment topology, not behavior).
-DECIDE: (1) build-time MSBuild target vs first-boot emission vs both (hypothesis: both — build
-target for CI/agents, boot writes the *resolved* twin for drift detection between them);
-(2) schema + stability guarantees (this becomes a public contract — version it);
-(3) what is deliberately EXCLUDED (no secrets, no connection strings — config KEYS only);
-(4) CI gate ergonomics (a tiny comparer the PR gate runs; where does it live — scripts/ not a
-new project). Boundaries: no new pillar; lives in Koan.Core + an MSBuild .targets; no runtime
-behavior change. DELIVERABLE: ADR + staged ledger (stage 1 = emit; stage 2 = comparer + CI;
-stage 3 = entity/trait section fed from the registry).
+[SESSION-PREAMBLE]
+BUILD: the Koan composition lockfile.
+ANCHORS: src/Koan.Core.Registry.Generators/RegistrySourceGenerator.cs (what the build-time
+registry knows) · src/Koan.Core/Provenance/** · src/Koan.Core/Hosting/Runtime/AppRuntime.cs
+(RegistrySummarySnapshot) · docs/assessment/evidence/pillar-core-bootstrap.json.
+DECIDED: two emitters, one schema — (1) an MSBuild target shipped by Koan.Core
+(Sylin.Koan.Core.targets) writes koan.lock.json at build from the source-gen registry +
+referenced-module metadata; (2) at boot, the host writes the RESOLVED twin to
+obj/koan.lock.resolved.json (actual elections + negotiated capabilities) and the boot report
+prints one line: "composition: <n> modules · lockfile ok|DRIFT(<keys>)" comparing the two.
+Config VALUES never appear; config KEYS consumed do. Schema carries "schema": 1.
+DEFAULT: comparer ships as scripts/compare-koan-lock.ps1 (exit 1 on drift) wired into the PR
+gate if .github/workflows/pr-gate.yml exists; entities/traits section read from the registry's
+entity metadata if available at build time, else emitted only in the resolved twin (note which).
+IMPLEMENT in Koan.Core (no new project). TESTS: unit (schema serialization, comparer cases:
+module added / capability removed / key added) + integration: KoanIntegrationHost app asserts
+the resolved twin contains its known module + election. DOCS: docs/guides/composition-lockfile.md
+(generate snippets from your tests) + a line in docs/getting-started/overview.md's
+"When something goes wrong" + README "differentiators" bullet.
+```
+
+## P1.2 · Runtime introspection over MCP — "the app explains itself to agents"
+
+**Why now**: converts the boot-report investment into the agent-native differentiator; every
+later phase (grants, ops, demo) builds on this surface. Read-only by design — governance
+arrives in P3.
+
+**UX/DX after this session**:
+
+```text
+Agent connects to a dev-mode Koan app over MCP and reads resources:
+  koan://app            → name, version, environment, uptime
+  koan://composition    → the resolved lockfile twin (P1.1)
+  koan://entities       → [ { type, traits: [Cacheable, Embedding, McpEntity], adapter } ]
+  koan://capabilities   → negotiated CapabilitySet per source
+  koan://boot-report    → the rendered report, as text
+  koan://health         → aggregated health facts
+The agent doesn't read docs; it asks the running app.
+```
+
+**Target shape** *(app developer's view — zero code)*:
+
+```jsonc
+// Reference Sylin.Koan.Mcp → introspection resources are ON in Development, OFF elsewhere:
+{ "Koan": { "Mcp": { "Introspection": "Development" } } }   // Development | Always | Off
+```
+
+**Session prompt**:
+
+```text
+[SESSION-PREAMBLE]
+BUILD: read-only MCP introspection resources in Koan.Mcp.
+ANCHORS: src/Koan.Mcp/** (McpServer, HttpSseTransport, resource handling — read how tools vs
+resources are modeled in the existing McpRpcHandler) · src/Koan.Core/Provenance/** ·
+src/Koan.Core/Hosting/Runtime/AppRuntime.cs · Koan.Data.Core's EntityMetadataProvider (entity
+traits) · Data<T,K>.Capabilities · docs/assessment/evidence/pillar-periphery-services.json
+(Mcp section).
+DECIDED: MCP *resources* (not tools — read surface), named koan://app, koan://composition,
+koan://entities, koan://capabilities, koan://boot-report, koan://health. Posture option
+Koan:Mcp:Introspection = Development (default) | Always | Off; fail-loud if Always in
+Production without explicit config. No secrets/config values anywhere in any resource —
+config keys only (same rule as P1.1). Boot report line: "mcp.introspection: on(dev) · 6 resources".
+DEFAULT: implement as one IntrospectionResourceProvider in Koan.Mcp (no new project);
+capabilities resource enumerates per-source CapabilitySets via the existing facade; entities
+resource reads the registry/metadata provider — if trait enumeration requires reflection,
+cache it once at startup.
+TESTS: integration spec via KoanIntegrationHost + the MCP test fixture (tests/Fixtures/
+Koan.Mcp.TestHost): request each resource over the in-proc transport, assert shape + the
+no-secrets rule (resource bodies must not contain any configured connection string value —
+write that as an explicit test). DOCS: extend docs/guides/mcp-http-sse-howto.md + the
+mcp-integration skill; add the README beat-3 sentence ("ask the running app") if absent.
 ```
 
 ---
 
-## SC2 · Governed agent access — grants, audit, revocation for MCP 〔rank 2: the flagship〕
+# PHASE 2 — VERIFICATION
 
-**Gap & assets**: the MCP ecosystem's security norm is all-or-nothing bearer access; enterprises
-hand-roll scopes and kill switches. Koan owns every ingredient: `[McpEntity]` + transports,
-the capability model, the `IAuthorize` seam (SEC-0002), Security.Trust identities (KSVID), and
-coherence channels for propagation (the CAEP-epoch revocation design).
+## P2.1 · Conformance-by-declaration — apps inherit a test suite
 
-**Proposed shape** *(design target — does not exist)*:
+**Why now**: from here on, every later card's sample integration gets verified by the kit it
+ships. Agents get their post-change harness.
+
+**UX/DX after this session**:
 
 ```csharp
-// Read-only by default; mutation is an explicit, auditable grant.
-[McpEntity(Expose = McpAccess.Read)]                       // Query/Get only — the safe default
+// In the app's test project — one class per entity; batteries arrive by inheritance,
+// activated by what the entity declares:
+public sealed class AnimeConformance : EntityConformanceSpecs<Anime>
+{
+    protected override Anime NewValid() => new() { Title = "Cowboy Bebop" };
+}
+// dotnet test → round-trip, pushdown-vs-reference-oracle, paging, [Cacheable] coherence,
+//               [Embedding] sync (container-gated) — zero tests written by hand.
+```
+
+**Target shape**:
+
+```csharp
+// Shipped package: Sylin.Koan.Testing  (promotion of tests/Shared/Koan.Testing)
+public abstract class EntityConformanceSpecs<TEntity> where TEntity : Entity<TEntity>, new()
+{
+    protected abstract TEntity NewValid();
+    protected virtual TEntity Mutate(TEntity e) => e;      // optional second hook, no more
+    // [Fact]/[Theory] batteries: RoundTrip, QueryPushdownAgreesWithReferenceEvaluator,
+    // Paging, PartitionIsolation (if partitions used), CacheFreshOrNull + InvalidateOnWrite
+    // (if [Cacheable]), EmbeddingSyncAfterSave (if [Embedding], container-gated).
+}
+```
+
+**Session prompt**:
+
+```text
+[SESSION-PREAMBLE]
+BUILD: consumer conformance kits as a shipped package Sylin.Koan.Testing.
+ANCHORS: tests/Shared/Koan.Testing/** (KoanIntegrationHost, container fixtures, skip-cleanly
+pattern — this project PROMOTES to src/, keep its namespaces) · tests/Suites/Data/AdapterSurface/
+Koan.Data.AdapterSurface.TestKit/FilterConvergence.cs (the oracle pattern to reuse, NOT
+duplicate — reference its evaluator) · src/Koan.Data.Core Model metadata (trait detection) ·
+docs/assessment/evidence/testsBuild.json.
+DECIDED: new project src/Koan.Testing (the justified exception to no-new-projects: it is a
+distinct intent a developer references alone, test-side only, IsPackable). Move
+tests/Shared/Koan.Testing into it; update ALL test csproj references (this is the
+break-and-rebuild move — no duplicate copy left behind). EntityConformanceSpecs<TEntity> with
+exactly two override hooks (NewValid required, Mutate optional). Batteries are trait-gated via
+entity metadata; each battery cites the invariant it pins in its xdoc. Container-dependent
+batteries reuse the existing fixtures and skip cleanly.
+DEFAULT: pushdown-agreement battery delegates to the existing InMemoryFilterEvaluator as the
+reference; if reuse across the project boundary is awkward, link the source file rather than
+duplicating logic (justify whichever you do).
+DOGFOOD (required): add conformance classes for one entity in samples/S1.Web and one in
+samples/S5.Recs; they must pass.
+TESTS: the kit's own meta-tests (a deliberately-broken fake entity fails the right battery).
+DOCS: docs/guides/testing-your-app.md + add the kit to the dotnet-new template card's notes
+(06 H1) + README differentiator line ("your app inherits a test suite").
+```
+
+---
+
+# PHASE 3 — TRUST
+
+## P3.1 · Governed agent access — grants, audit, revocation
+
+**Why now**: P1.2 made the app legible to agents; this makes agent access a *governed,
+revocable, audited grant*. The flagship differentiator. Coordinates with Security.Trust —
+if the Trust fabric ADR has landed, use its identity types; if not, build against `IIssuer`/
+`Identity.Current` as they exist today.
+
+**UX/DX after this session**:
+
+```csharp
+[McpEntity]                                   // exposure now defaults to READ-ONLY
 public sealed class Recipe : Entity<Recipe> { }
 
 [McpEntity(Expose = McpAccess.Read | McpAccess.Mutate, Audit = true)]
 public sealed class PantryItem : Entity<PantryItem> { }
 
-// Grants are entities — queryable, revocable, observable. The Koan move.
-public sealed class AgentGrant : Entity<AgentGrant>
-{
-    public string AgentId { get; set; } = "";              // Trust principal (KSVID)
-    public string EntityType { get; set; } = "";
-    public McpAccess Access { get; set; }
-    public DateTimeOffset? ExpiresAt { get; set; }
-}
-
-// Issue / revoke with the grammar you already know:
+// Grants are entities — the Koan move. Queryable, revocable, observable:
 await new AgentGrant { AgentId = "kitchen-agent", EntityType = nameof(PantryItem),
-                       Access = McpAccess.Mutate, ExpiresAt = DateTimeOffset.UtcNow.AddHours(8) }
-      .Save();
-await grant.Remove();   // revocation propagates fleet-wide via the coherence epoch — seconds, not TTLs
+                       Access = McpAccess.Mutate,
+                       ExpiresAt = DateTimeOffset.UtcNow.AddHours(8) }.Save();
+await grant.Remove();                          // live revocation, fleet-wide
 
-// Every mutating agent action lands as an audit entity:
-var actions = await AgentAction.Query(a => a.AgentId == "kitchen-agent" && a.At > since);
+var trail = await AgentAction.Query(a => a.AgentId == "kitchen-agent");
 ```
 
-**Reference usage**: an agent connects over MCP with a Trust-issued identity; sees only
-read tools for `Recipe`, read+mutate for `PantryItem` while its grant lives; every mutation is
-an `AgentAction` row; ops revokes one grant (or bumps the agent's epoch) and the change is live
-everywhere the coherence channel reaches. Boot report prints the exposed surface:
-`mcp: 2 entities · PantryItem[read,mutate,audited] · Recipe[read]`.
+```text
+Boot report: "mcp: 2 entities · PantryItem[read,mutate,audited] · Recipe[read] · grants: 1 active"
+```
 
-**Prompt**:
+**Session prompt**:
 
 ```text
-[DESIGN-PREAMBLE]
-DESIGN TASK: governed agent access for Koan.Mcp. Evidence: docs/assessment/evidence/
-pillar-periphery-services.json (Mcp section), pillar-web-auth-security.json (Trust, IAuthorize),
-pillar-cache.json (coherence channels, epoch idea); memory of direction: the fleet-trust ADR
-draft (KSVID, CAEP-epoch-over-coherence). Code anchors: src/Koan.Mcp/McpEntityAttribute.cs +
-EndpointToolExecutor (it already rides IEntityEndpointService — the enforcement choke point),
-src/Koan.Web.Extensions/Authorization (IAuthorize seam), src/Koan.Security.Trust/**.
-Prior art: OAuth token exchange / RFC 9396 RAR (rich authorization requests), Biscuit/Macaroon
-attenuation (capability tokens — compare to entity-grants), Kubernetes RBAC (role indirection
-cost), MCP spec auth guidance (thin). DECIDE: (1) grant model — entities (hypothesis A) vs
-claims-in-token vs both (entities for revocability + audit; token carries identity only?);
-(2) default posture (read-only is hypothesis A — challenge: is even read too much by default
-for [McpEntity]-less entities? answer: nothing is exposed without the attribute, keep it);
-(3) enforcement point — EndpointToolExecutor via IAuthorize, NOT per-transport;
-(4) audit write path — entity events vs explicit interceptor; cost on hot path;
-(5) revocation latency contract — epoch bump over ICacheCoherenceChannel (this is the second
-consumer that triggers the channel's documented promotion to Koan.Core — coordinate with that
-move); (6) what Code Mode (Jint sandbox) inherits from grants. Boundaries: no new project if
-it fits in Koan.Mcp + Trust; the Web.Admin/ops-tools half is SC7, not this card.
-DELIVERABLE: ADR + staged ledger; stage 1 must be shippable alone (attribute Expose flags +
-default read-only), grants stage 2, audit stage 3, epoch revocation stage 4.
-DEPENDS ON: Trust fabric ADR (in flight); coordinate, don't fork it.
+[SESSION-PREAMBLE]
+BUILD: governed agent access for Koan.Mcp (grants, audit, revocation).
+ANCHORS: src/Koan.Mcp/McpEntityAttribute.cs + EndpointToolExecutor + RequestTranslator (the
+enforcement choke point — ALL agent calls flow through IEntityEndpointService here; enforce
+once, never per-transport) · src/Koan.Web.Extensions/Authorization (IAuthorize seam, SEC-0002)
+· src/Koan.Security.Trust/** (Identity.Current, IIssuer, TrustClaims) ·
+src/Koan.Cache.Abstractions ICacheCoherenceChannel (revocation transport) ·
+docs/assessment/evidence/pillar-web-auth-security.json + evidence/stage4 if present.
+DECIDED:
+1. Default posture flips: [McpEntity] alone = Query/Get only (McpAccess.Read). Mutation
+   requires Expose declaring it. BREAKING by design — update S16.PantryPal accordingly and say
+   so in the summary.
+2. Grants are entities: AgentGrant : Entity<AgentGrant> { AgentId, EntityType, Access,
+   ExpiresAt? } in Koan.Mcp. Effective access = attribute Expose ∩ grant (no grant needed for
+   Read; mutation always needs a live grant). Cache the grant lookup; invalidate on write
+   (use the cache pillar, not a bespoke dictionary).
+3. Audit: when Audit=true, every MUTATING agent call writes AgentAction : Entity<AgentAction>
+   { AgentId, EntityType, Verb, EntityId, At } — written through the normal entity path so it
+   is queryable/streamable like everything else. Read calls are never audited (volume).
+4. Agent identity: from the MCP session's authenticated principal (Koan.bearer/Trust when
+   configured; in Development, the dev-identity persona). No principal + mutation attempt =
+   fail-loud with the exact message naming the missing grant.
+5. Revocation: grant Remove()/expiry must take effect on running nodes within seconds. DEFAULT
+   transport: piggyback the cache pillar's invalidation of the grant cache (deleting the
+   entity invalidates via the existing decorator + coherence). If [Cacheable] on AgentGrant
+   achieves this with zero new machinery, USE THAT and document it as the mechanism — do not
+   build an epoch system in this session (that belongs to the Trust fabric work).
+TESTS: integration via Koan.Mcp.TestHost — read allowed w/o grant; mutate denied w/o grant
+(assert the error message names grant + entity); mutate allowed with grant; revoke mid-session
+→ next call denied; audit row written exactly once per mutation. DOGFOOD: S16.PantryPal grants
+its agent mutate on PantryItem only.
+DOCS: docs/guides/mcp-governed-access.md + mcp-integration skill + boot-report line.
+```
+
+## P3.2 · Agent-operable runtime — ops verbs as governed tools 〔requires P3.1〕
+
+**UX/DX after this session**:
+
+```jsonc
+{ "Koan": { "Mcp": { "Operations": { "Jobs": true, "Cache": true } } } }   // opt-in per toolset
+```
+
+```text
+Agent (holding an ops grant):
+  tool koan.jobs.trigger  { "workType": "ImportJob", "action": "import" }   → job id
+  tool koan.jobs.status   { "id": "…" }                                     → ledger state
+  tool koan.cache.flush   { "entity": "Recipe" }                            → flushed count
+Every mutating call: AgentAction audit row (P3.1). Destructive verbs take {"confirm": true}.
+Boot report: "mcp.ops: jobs,cache · grants required · audited"
+```
+
+**Session prompt**:
+
+```text
+[SESSION-PREAMBLE]
+BUILD: framework-shipped operational MCP toolsets, governed by P3.1's grant model.
+ANCHORS: src/Koan.Jobs/JobAccessor.cs (Jobs.Trigger/.Cancel/.Where statics) ·
+src/Koan.Cache/EntityCacheExtensions (Flush/FlushAll) · P3.1's grant/audit types ·
+src/Koan.Mcp tool registration path (read how [McpEntity] tools register; ops toolsets follow
+the same registration idiom).
+DECIDED: toolsets are opt-in via Koan:Mcp:Operations (all default OFF, including Development —
+read tools from P1.2 cover dev convenience). Tool names: koan.jobs.{trigger,cancel,status},
+koan.cache.{flush,flushAll}. ALL ops verbs require an AgentGrant with EntityType "@ops:jobs" /
+"@ops:cache" (reuse the grant entity; the @ops: prefix namespaces operational grants —
+validate the prefix). Destructive verbs (cancel, flushAll) require parameter confirm:true,
+else return a descriptive refusal listing what WOULD happen (the dry-run is the default).
+All mutating ops write AgentAction rows.
+DEFAULT: no Data toolset in this session (re-embed/transfer is a later card once demand
+exists — note it in the guide as deliberately absent).
+TESTS: TestHost integration — toolset off ⇒ tools absent from list; on without grant ⇒
+fail-loud naming "@ops:jobs"; trigger with grant ⇒ job actually runs (assert via ledger);
+flushAll without confirm ⇒ dry-run text. DOGFOOD: enable Jobs ops in S14.AdapterBench.
+DOCS: extend docs/guides/mcp-governed-access.md with the ops section; boot-report line.
 ```
 
 ---
 
-## SC3 · Conformance-by-declaration — your app inherits a test suite 〔rank 3〕
+# PHASE 4 — DOMAIN POWER
 
-**Gap & assets**: agents generate code faster than teams can verify it; no framework ships
-*semantic conformance tests derived from declared intents*. Koan's TestKits already do exactly
-this internally (AdapterSurface FilterConvergence oracle, Jobs 5-tier suite, KoanIntegrationHost)
-— for the framework's own entities. Point the same machinery at *the app's* entities.
+## P4.1 · Multi-tenancy primitive 〔gate: Facet 3 ambient-context hardening settled〕
 
-**Proposed shape** *(design target — does not exist; mirrors the existing TestKit idiom)*:
+**UX/DX after this session**:
 
 ```csharp
-// In the app's test project — one class per entity, batteries inherited:
-public sealed class PantryItemConformance : EntityConformanceSpecs<PantryItem>
-{
-    // Inherited [Fact]/[Theory] batteries, gated by what PantryItem declares:
-    //  - round-trip + identity (always)
-    //  - query pushdown agreement vs the in-memory reference evaluator (FilterConvergence,
-    //    against YOUR elected adapter)
-    //  - partition isolation (if partitions/tenancy used)
-    //  - cache: fresh-or-null + invalidation-on-write (if [Cacheable])
-    //  - embedding: sync-after-save, search round-trip (if [Embedding], container-gated)
-    //  - jobs: at-least-once + idempotent re-run (if IKoanJob<T>)
-    protected override PantryItem NewValid() => new() { Name = "rice", Quantity = 2 };
-}
-```
-
-```bash
-dotnet test   # the agent's post-change verification harness — zero tests written by hand
-```
-
-**Prompt**:
-
-```text
-[DESIGN-PREAMBLE]
-DESIGN TASK: consumer-facing conformance kits ("Koan.Testing for apps"). Evidence:
-docs/assessment/evidence/testsBuild.json (TestKit inventory: Data.AdapterSurface.TestKit,
-VectorAdapterSurface, Jobs TestKit, Web AdapterSurface, KoanIntegrationHost); code anchors:
-tests/Suites/Data/AdapterSurface/Koan.Data.AdapterSurface.TestKit/FilterConvergence.cs (the
-oracle pattern), tests/Shared/Koan.Testing/** (container fixtures, skip-when-no-docker).
-Prior art: Rails generated test scaffolds (empty shells — the anti-goal), Pact/contract testing
-(consumer-driven contracts — adjacent), Hypothesis/property-based testing (the oracle kinship),
-xUnit shared spec-base idiom (what the repo already does). DECIDE: (1) packaging — promote
-tests/Shared/Koan.Testing to a shipped Sylin.Koan.Testing package (it currently lives outside
-src/ — this is the "new project" exception to argue); (2) trait-gating mechanics — how the base
-class discovers [Cacheable]/[Embedding]/partitions on TEntity and activates batteries (the
-EntityMetadataProvider already reads traits); (3) data supply contract (NewValid()/mutation
-hooks — keep it to ≤2 overrides for the 80% case); (4) container policy — same skip-cleanly
-fixtures as the framework's own suites; (5) what the dotnet new template (06 H1) includes by
-default. Boundaries: no assertion DSL invention — xunit + the existing AwesomeAssertions; no
-app-logic testing claims (this verifies FRAMEWORK-INTENT conformance, say so in docs).
-DELIVERABLE: ADR + staged ledger (stage 1 = round-trip+pushdown batteries; stage 2 = trait-gated
-cache/embedding; stage 3 = template integration).
-```
-
----
-
-## SC4 · Multi-tenancy as a one-attribute primitive 〔rank 4 — gated on Facet 3〕
-
-**Gap & assets**: .NET tenancy is DIY (EF query filters) or heavyweight (ABP); Marten's
-per-tenant story is Postgres-pinned. Koan already has the substrate: validated partitions,
-partition-aware cache keys, partition-scoped vector search — and a capability model to grade
-isolation honestly.
-
-**Proposed shape** *(design target — does not exist)*:
-
-```csharp
-[Tenant]                                       // tenancy = a declared trait of the entity
-public sealed class Invoice : Entity<Invoice>
-{
-    public decimal Amount { get; set; }
-}
+[Tenant]                                          // one attribute opts the entity in
+public sealed class Invoice : Entity<Invoice> { public decimal Amount { get; set; } }
 ```
 
 ```jsonc
-// appsettings — resolution + posture, not plumbing:
-{ "Koan": { "Tenancy": {
-    "Resolve": "claim:tenant_id",              // web: from the principal; jobs: from work-item
-    "Isolation": "Auto",                       // Auto = strongest the adapter supports
-    "Strict": true                             // no ambient tenant => fail loud, never cross-read
-} } }
+{ "Koan": { "Tenancy": { "Resolve": "claim:tenant_id", "Strict": true } } }
 ```
 
 ```csharp
-// Background/ops code states tenant explicitly — the existing ambient idiom:
+// Web requests: tenant resolved from the principal automatically.
+// Background work states it explicitly — the ambient idiom you already know:
 using (EntityContext.Tenant("acme"))
 {
-    var due = await Invoice.Query(i => i.Amount > 0);      // scoped; cache keys scoped; vectors scoped
+    var due = await Invoice.Query(i => i.Amount > 0);   // data, cache keys, vectors: all scoped
 }
-
-// Capability-graded isolation, declared and negotiated like everything else:
-// DataCaps.Tenancy.PartitionScoped | SchemaScoped | DatabaseScoped
-// Boot report: "tenancy: postgres → SchemaScoped (Auto) · strict"
+// No resolved tenant + Strict ⇒ TenantRequiredException naming the entity and the fix.
+// Boot report: "tenancy: 3 entities · resolve=claim:tenant_id · isolation=partition · strict"
 ```
 
-**Prompt**:
+**Session prompt**:
 
 ```text
-[DESIGN-PREAMBLE]
-DESIGN TASK: first-class tenancy on the partition substrate. Evidence:
-docs/assessment/evidence/pillar-data-core.json (EntityContext, PartitionNameValidator,
-DATA-0077/0094), pillar-cache.json (partition-aware keys); code anchors:
-src/Koan.Data.Core/EntityContext.cs (note the inherit-vs-replace semantics fix, E9 in 06),
-CacheKey.For<T>(id, partition). Prior art: ABP tenancy (feature-complete, concept-heavy — count
-its concepts as the anti-budget), Marten per-tenant databases, EF global query filters (the
-leaky default), Finbuckle.MultiTenant (resolution strategies worth stealing). DECIDE:
-(1) [Tenant] as trait vs tenancy profile in options vs both (hypothesis: attribute opts the
-entity in; options own resolution/posture); (2) isolation grading — new DataCaps.Tenancy token
-group; Auto-election per adapter (partition row-scope everywhere; schema-per-tenant where
-relational DDL allows; database-per-tenant where the adapter can route connections) — each
-level's guarantees stated in the ADR's honesty table; (3) STRICT posture semantics: no resolved
-tenant => throw on [Tenant] entity access (fail-loud), opt-out for migration scenarios;
-(4) interaction with existing raw partitions (tenancy reserves a partition namespace? compose?
-— probe the validator rules empirically); (5) cross-tenant admin path (explicit
-EntityContext.AllTenants() escape hatch with audit, or refuse v1?); (6) jobs/vector/cache
-propagation — enumerate each pillar's tenant-scoping seam and verify by reading, not asserting.
-HARD GATE: Facet 3 (ambient context semantics) must be settled first — this design rides
-AsyncLocal scoping; coordinate with that ADR rather than preceding it.
-DELIVERABLE: ADR + staged ledger; stage 1 = partition-scoped tenancy + strict posture + boot
-report; later stages add graded isolation per adapter.
+[SESSION-PREAMBLE]
+GATE CHECK FIRST: read the ambient-context state — src/Koan.Data.Core/EntityContext.cs and any
+Facet-3/ambient ADR under docs/decisions/. If inherit-vs-replace scope semantics are still
+contradictory/undocumented, STOP and report "gate not met" — this card rides those semantics.
+BUILD: first-class tenancy on the partition substrate.
+ANCHORS: src/Koan.Data.Core/EntityContext.cs (+ PartitionNameValidator, DATA-0077) ·
+CacheKey.For<T>(id, partition) in Koan.Cache.Abstractions · Vector partition scoping in
+src/Koan.Data.Vector/VectorData.cs · docs/assessment/evidence/pillar-data-core.json.
+DECIDED:
+1. [Tenant] attribute (Koan.Data.Abstractions) opts an entity in. Tenancy maps to a RESERVED
+   partition namespace: partition = "t:{tenantId}" (verify the validator accepts ':'; if not,
+   choose the closest legal separator and document). Raw partition use on [Tenant] entities
+   composes as a sub-partition under the tenant: probe how partitions compose today, then
+   implement "t:{tenant}.{partition}" or equivalent legal form.
+2. Resolution: Koan:Tenancy:Resolve = "claim:<name>" (web principal) | "header:<name>" (dev
+   only, warn at boot) ; ambient override via EntityContext.Tenant(string) returning the same
+   IDisposable scope idiom as Partition(). Web resolution = a pipeline contributor using the
+   existing IKoanWebPipelineContributor seam.
+3. Strict=true default: access to a [Tenant] entity with no resolved tenant throws
+   TenantRequiredException (sealed, names entity + the config/scoping fix). Cross-tenant admin:
+   EntityContext.AllTenants() escape scope that (a) requires Strict-off OR an explicit options
+   allowlist, (b) is named in the boot report when used at startup. Keep it minimal.
+4. Isolation grading: v1 ships partition-scoped isolation ONLY (every adapter supports it).
+   Declare token DataCaps.Tenancy.PartitionScoped on the facade so the surface is
+   capability-graded from day one; schema/database isolation are later cards — write the token
+   names into the ADR-style design note but DO NOT implement them.
+TESTS: unit (resolution, strict-throw, scope composition) + integration: two tenants on sqlite
+— full isolation across Query/Get/Save, cache keys distinct (read a cached entity under both
+tenants, assert no bleed), vector search scoped if [Embedding] present (container-gated).
+DOGFOOD: add a [Tenant] entity to samples/S1.Web with a header resolver + README note.
+DOCS: docs/guides/multi-tenancy.md + glossary entries (tenant, isolation) + boot-report line.
 ```
 
----
+## P4.2 · App-level AI evals 〔gate: AI vertical collapse (06 S3) done — the boundary must be physical〕
 
-## SC5 · Scales-down / sovereign deployment 〔rank 5 — positioning + hardening〕
-
-**Gap & assets**: every framework scales up; Koan's capability ladder scales *down* (in-memory →
-SQLite → distributed), the AI seam runs on local Ollama, g1c1 already dogfoods NativeAOT
-single-file publish. The BaaS competitors (Supabase/Convex/Firebase) structurally cannot ship
-air-gapped.
-
-**Proposed shape** *(mostly a verified recipe + guarantees, not new API)*:
-
-```bash
-# One binary. One folder. No cloud. Same grammar as the cluster deployment.
-dotnet publish -c Release -p:PublishAot=true -r linux-x64
-./myapp   # SQLite at ./data, local Ollama if present, vector via the in-process tier
-```
-
-```text
-Boot report (sovereign profile):
-  data → sqlite (./data/app.db) · ai → ollama(localhost) [degrades: semantic search off if absent]
-  jobs → durable(sqlite) · cache → memory · mcp → enabled(local)
-```
-
-**Prompt**:
-
-```text
-[DESIGN-PREAMBLE]
-DESIGN TASK: make "runs air-gapped" a verified, stated guarantee. This is hardening +
-positioning, not a new pillar. Evidence: docs/assessment/evidence/samples.json (g1c1 AOT
-dogfood), 05 §6.1 (the Newtonsoft↔AOT tension — the known blocker to resolve, not relitigate
-the serializer). Code anchors: samples/guides/g1c1.GardenCoop (publish profile),
-Directory.Build.props (trimming posture), the capability ladder docs (JOBS-0005, cache).
-WORK: (1) empirically AOT-publish a representative app (entity+web+sqlite+jobs+cache): catalog
-every trim/AOT warning and runtime failure; Newtonsoft-under-AOT gets a verified verdict
-(works-with-rd.xml? works-with-trimming-disabled-for-NJ? genuinely blocked?) — evidence, not
-opinion; (2) define the sovereign capability profile: exactly which pillars/adapters are in
-(sqlite/json data, durable-sqlite jobs, memory/sqlite cache, Ollama AI with graceful absence,
-local storage, MCP) and what the boot report prints for it; (3) a CI AOT-publish smoke job
-(extends 06 B2) so the guarantee can't silently rot; (4) docs: a "sovereign deployment" guide
-page + README differentiator line, written AFTER the smoke passes (truth-first).
-Boundaries: no [KoanOffline] attribute or new config surface unless the probe proves a real
-need — prefer "the default app already does this" as the outcome. DELIVERABLE: probe report →
-short ADR (guarantees + supported profile) → the CI smoke + guide.
-```
-
----
-
-## SC6 · App-level AI evals — golden sets as entities, runs as jobs 〔rank 6 — hard boundaries〕
-
-**Gap & assets**: AI client libraries (Spring AI, Semantic Kernel) give you calls; eval SaaS
-(LangSmith/Braintrust) gives you platforms; nobody gives a product team *regression tests for
-AI behavior wired to their domain data*, local-first. Koan can express it entirely in existing
-grammar: entities + jobs + health.
-
-**Proposed shape** *(design target — does not exist)*:
+**UX/DX after this session**:
 
 ```csharp
-// A golden expectation is an entity — versioned, queryable, seedable:
-public sealed class SearchGolden : Entity<SearchGolden>
+public sealed class SearchGolden : Entity<SearchGolden>      // golden sets are entities
 {
     public string Query { get; set; } = "";
     public string[] ExpectedIds { get; set; } = [];
 }
 
-// An eval is a job over goldens — same Execute idiom as every other job:
-[JobAction("eval", Schedule = "1.00:00:00")]                  // nightly drift watch
+[JobAction("eval", Schedule = "1.00:00:00")]                 // evals are jobs — nightly drift watch
 public sealed class SearchEval : Entity<SearchEval>, IKoanJob<SearchEval>
 {
     public double RecallAt10 { get; set; }
-
     public static async Task Execute(SearchEval run, JobContext ctx, CancellationToken ct)
     {
         var goldens = await SearchGolden.All(ct);
         run.RecallAt10 = await EvalMetrics.RecallAtK(10, goldens,
-            g => SemanticSearch<Product>(g.Query, limit: 10, ct: ct));
-        if (run.RecallAt10 < 0.85) ctx.Progress(1.0, "DRIFT: recall@10 below floor");
+            g => SemanticSearch<Anime>(g.Query, limit: 10, ct: ct), g => g.ExpectedIds);
     }
 }
-
-// Drift is a health fact, not a dashboard you build:
-// health: ai-eval:search → Degraded (recall@10 0.78 < 0.85 floor, run 2026-06-11)
+// Floor breach ⇒ health: "ai-eval:search → Degraded (recall@10 0.78 < 0.85)"
 ```
 
-**Prompt**:
+**Session prompt**:
 
 ```text
-[DESIGN-PREAMBLE]
-DESIGN TASK: app-level AI evaluation in pure Koan grammar. HARD BOUNDARY FIRST (write it into
-the ADR's scope before anything else): this evaluates THE APP'S AI BEHAVIOR (search relevance,
-extraction accuracy, classification agreement) — it is NOT model ops; no training, no model
-registries, no metric-compute adapters; if the design reaches for AiCapability.MetricCompute
-or the parked Eval vertical's service surface, STOP — that lane was shed (05 §5.1). Reuse from
-the parked Koan.AI.Eval ONLY data shapes that fit entities (EvalScore record); the parked code
-is quarry, not foundation. Evidence: docs/assessment/evidence/pillar-ai-pillar.json (Eval
-facade-over-nothing finding), CLAUDE.md data→AI seam. Code anchors: src/Koan.Data.AI/
-EntityEmbeddingExtensions.cs, src/Koan.Jobs/** (JobContext.Progress, JobMetric), IHealthContributor.
-Prior art: ragas/deepeval (metric vocabulary worth borrowing: recall@k, MRR, faithfulness-lite),
-LangSmith (the SaaS UX to deliberately NOT need), pytest-style golden files. DECIDE:
-(1) metric helper surface (a small static EvalMetrics — counted against the concept budget) vs
-letting apps hand-roll (hypothesis: ship ~5 metrics, no extensibility framework v1);
-(2) where results live (eval runs are job entities already persisted — is a separate result
-entity needed at all?); (3) health integration contract (floor declared where — on the job
-attribute? options?); (4) packaging: inside Koan.Data.AI (hypothesis A — it IS the data→AI
-seam) vs new package (argue against). DELIVERABLE: ADR with the boundary section first +
-staged ledger (stage 1 = metrics + one dogfood eval in S5.Recs; stage 2 = health floors).
+[SESSION-PREAMBLE]
+SCOPE BOUNDARY FIRST (copy into your plan verbatim): this evaluates THE APP'S AI BEHAVIOR.
+No training, no model registries, no model-side metrics, no MetricCompute capability, no reuse
+of any parked Koan.AI.{Eval,Training,Compute} service surface. If the design reaches for any of
+those, stop that thread — entities + jobs + a small static metrics helper is the entire budget.
+BUILD: app-level AI evaluation in Koan.Data.AI (no new project).
+ANCHORS: src/Koan.Data.AI/EntityEmbeddingExtensions.cs · src/Koan.Jobs/** (JobContext,
+JobMetric, health integration if any) · src/Koan.Core IHealthContributor ·
+docs/assessment/evidence/pillar-ai-pillar.json (the facade-over-nothing finding — the
+anti-pattern this card replaces).
+DECIDED: static class EvalMetrics with exactly five metrics v1: RecallAtK, PrecisionAtK, MRR,
+ExactMatchRate, JaccardOverlap — pure functions over (golden, retrieved) pairs, generic over
+the app's entity/golden types via delegates (see shape). No extensibility framework, no
+interfaces, no registry. Eval runs are ordinary IKoanJob entities the APP writes (the framework
+ships metrics + docs + one health helper, not an eval engine). Health: a small
+EvalHealth.Report(name, score, floor) helper that pushes a health fact; Degraded below floor.
+TESTS: unit per metric (known fixtures incl. edge cases: empty golden set, k > results) +
+integration: a fake-embedding eval job runs via the jobs pillar and lands a health fact.
+DOGFOOD (required): a real SearchGolden seed (5 queries) + nightly SearchEval job in
+samples/S5.Recs, asserted by a conformance-style test.
+DOCS: docs/guides/ai-evals.md (lead with the boundary: "this is not MLOps") + ai-integration
+skill section + boot report only if a floor is configured ("ai-eval: 1 suite · floor 0.85").
 ```
 
 ---
 
-## SC7 · Agent-operable runtime — ops verbs as governed tools 〔rank 7 — phase 2 of SC2〕
+# PHASE 5 — REACH
 
-**Gap & assets**: "ChatOps" is glue code everywhere. Once SC2's grants exist and MCP
-introspection (06 S1) lands, exposing the framework's existing ops verbs as governed tools is
-assembly: Jobs trigger/cancel, cache flush, re-embed, backup — all already have programmatic
-surfaces.
+## P5.1 · Sovereign / scales-down deployment — "runs air-gapped", verified
 
-**Proposed shape** *(design target — does not exist)*:
+**UX/DX after this session**:
 
-```jsonc
-// Opt-in, per toolset, governed by the SC2 grant model:
-{ "Koan": { "Mcp": { "Operations": {
-    "Jobs":  true,     // MyJob.Jobs.Trigger / .Cancel as tools, per-worktype grants
-    "Cache": true,     // EntityCache<T>.Flush / tag flush
-    "Data":  false     // re-embed, transfers — off by default; most dangerous last
-} } } }
+```bash
+dotnet publish -c Release -p:PublishAot=true -r linux-x64
+./myapp        # one binary · SQLite at ./data · local Ollama if present · no cloud, no compose
 ```
 
 ```text
-Agent session (with an ops grant):
-  > tool: koan.jobs.trigger { "workType": "ImportJob", "action": "import" }
-  > tool: koan.cache.flush  { "entity": "Recipe" }
-Every call: identity-stamped AgentAction audit row; revocable mid-session via SC2 epoch.
-Boot report: "mcp.ops: jobs,cache → 2 toolsets · grants required · audited"
+Boot report (sovereign profile):
+  data → sqlite(./data/app.db) · jobs → durable(sqlite) · cache → memory
+  ai → ollama(localhost) [absent: semantic search degrades loud, app runs]
 ```
 
-**Prompt**:
+**Session prompt**:
 
 ```text
-[DESIGN-PREAMBLE]
-DESIGN TASK: framework-shipped operational MCP toolsets, governed by SC2. PREREQS: SC2 stages
-1-2 merged; 06 S1 (introspection) at least ADR'd — this card must not fork either. Evidence:
-docs/assessment/evidence/pillar-periphery-services.json (Mcp), CLAUDE.md (.Jobs accessors,
-EntityCacheExtensions). Code anchors: src/Koan.Jobs/JobAccessor.cs (Jobs.Trigger/Cancel),
-src/Koan.Cache/EntityCacheExtensions (Flush/FlushAll), src/Koan.Web.Admin (the surfaces that
-become agent-facing). DECIDE: (1) toolset granularity + naming (koan.jobs.*, koan.cache.* —
-follow MCP tool-naming norms); (2) the danger ladder: which toolsets default-on in Development
-only, which require explicit grants always (hypothesis: ALL mutating ops require a grant even
-in dev — dev convenience is what introspection read-tools are for); (3) idempotency/confirm
-semantics for destructive verbs (FlushAll, Cancel) — MCP has no confirm dialog: design the
-guard (dry-run parameter? two-step token?); (4) Web.Admin convergence: do the admin HTTP
-endpoints and the MCP tools share one service layer (they must — IEntityEndpointService
-precedent). Boundaries: no new project (lives in Koan.Mcp behind options); no bespoke RBAC —
-grants only. DELIVERABLE: ADR + staged ledger (stage 1 = jobs toolset read+trigger; stage 2 =
-cache; stage 3 = data ops behind explicit grants).
+[SESSION-PREAMBLE]
+BUILD: make "runs air-gapped" a verified guarantee — this card is an empirical probe that ends
+in CI + docs, not a new API surface.
+ANCHORS: samples/guides/g1c1.GardenCoop (existing NativeAOT publish dogfood — read its csproj
+and any rd.xml/trimming config) · Directory.Build.props · docs/assessment/05-strategic-position.md
+§6.1 (the Newtonsoft↔AOT tension: produce a verified verdict, do NOT relitigate the serializer).
+WORK, in order:
+1. PROBE: create a minimal probe app (entity + EntityController + sqlite + [Cacheable] + one
+   IKoanJob) under tests/ or samples/ (DECIDED: samples/S2.Sovereign — the number is free);
+   publish with PublishAot=true; catalog EVERY trim/AOT warning and runtime failure into the
+   session summary. For each Newtonsoft-related failure: try (a) TrimmerRootDescriptor rd.xml,
+   (b) DynamicDependency attributes at the throwing sites, (c) JsonSerializerSettings without
+   reflection-emit. Record what actually works — evidence over opinion.
+2. FIX: apply the minimal framework-side fixes the probe demands (rd.xml shipped by Koan.Core?
+   attributes at specific sites?). Greenfield rule applies: if a small piece of framework code
+   is fundamentally AOT-hostile and replaceable, replace it; if a pillar is out of scope for
+   sovereign v1 (e.g. a connector that cannot trim), EXCLUDE it from the supported profile and
+   say so — the profile is allowed to be narrow, it is not allowed to be vague.
+3. GUARANTEE: write the supported sovereign profile into docs/guides/sovereign-deployment.md:
+   exactly which pillars/adapters are in (sqlite/json data, durable-sqlite jobs, memory cache,
+   Ollama-with-graceful-absence, local storage, MCP) and the boot-report shape.
+4. ENFORCE: add an AOT-publish smoke job to CI (publish S2.Sovereign, run it, curl /api/health)
+   so the guarantee cannot rot. Wire into pr-gate as a nightly if publish time is heavy.
+DOCS: the guide + a README differentiator line, written AFTER the smoke passes (truth-first).
+```
+
+## P5.2 · The wedge demo — an agent transcript 〔requires: P1–P3 + 06 Tracks A/B/H1〕
+
+**Session prompt**:
+
+```text
+[SESSION-PREAMBLE]
+BUILD: the wedge-demo artifact — a real, replayable agent-session transcript that builds a
+working multi-provider AI app on Koan in one session, proving the strategy's headline.
+PREREQS (verify, else stop): dotnet-new template exists (06 H1) · packages or source path
+documented truthfully (06 Track A) · P1.2 introspection + P3.1 grants merged.
+WORK: script the session as a checklist FIRST (entity → REST → run + boot report → swap sqlite
+to postgres → [Cacheable] → IKoanJob import → [Embedding] + semantic search → [McpEntity] +
+grant + an agent reading koan://entities and mutating with audit), then EXECUTE it with a
+coding agent against a scratch app, capturing the full transcript (commands, boot reports,
+diffs, the agent's tool calls). Edit only for secrets/noise — authenticity is the point; if a
+step fails, FIX THE FRAMEWORK GAP (file it) and re-run; the published transcript must be real.
+SHIP: docs/case-studies/agent-wedge-demo/ (transcript + the final app source as a sample or
+gist link) + README link under the three-beats section.
 ```
 
 ---
 
-## Sequencing across cards
+## Card → prerequisite map (quick reference)
 
 ```text
-SC1 (lockfile)        → independent; do first (cheap, compounds all later verification)
-SC2 (governed access) → after/with the Trust fabric ADR; triggers the ICoherenceChannel→Core promotion
-SC3 (conformance)     → independent of SC1/SC2; pairs with 06 H1 (template)
-SC4 (tenancy)         → HARD-GATED on Facet 3 (ambient context); design after, not before
-SC5 (sovereign)       → independent probe; its CI smoke rides 06 B2
-SC6 (AI evals)        → after the AI vertical collapse (06 S3) so the boundary is physically clear
-SC7 (agent ops)       → strictly after SC2 stage 2 + 06 S1
+P1.1 lockfile          ← 06 B1 (sln truth)
+P1.2 introspection     ← 06 F1 (fail-loud), P1.1 (composition resource)
+P2.1 conformance       ← 06 B1; pairs with 06 H1 template
+P3.1 grants/audit      ← P1.2; coordinates with Trust fabric ADR
+P3.2 agent ops         ← P3.1
+P4.1 tenancy           ← Facet 3 settled (HARD GATE) + P2.1 (kit verifies isolation)
+P4.2 AI evals          ← 06 S3 (AI collapse) + P2.1
+P5.1 sovereign         ← 06 B2 (CI) for the smoke
+P5.2 wedge demo        ← P1–P3 + 06 A/B/H1
 ```
 
-Each completed ADR mints T1/T2 implementation cards — append them to
-[06-prompt-stash.md](06-prompt-stash.md) under a new "SC implementation" section so the
-lesser-model pipeline stays the single execution queue.
+As each card ships, update [05 §3.1](05-strategic-position.md)'s table status and re-score the
+affected pillar in [03-maturity-model.md](03-maturity-model.md).
