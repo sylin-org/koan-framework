@@ -1,6 +1,11 @@
 # Koan Framework Sample Catalog
 
-**Last Updated**: 2025-10-16 | **Framework Version**: v0.6.3
+> ⚠️ **SUPERSEDED (2026-06-10).** This catalog is frozen at 2025-10 and is no longer accurate:
+> it lists samples that were never built (S3.NotifyHub, S4.DevHub, S6.MediaHub, S9.OrderFlow)
+> and omits real ones. **Use [README.md](README.md)** — the truthful ladder — until this file is
+> regenerated from `Koan.sln` (assessment Track A.4).
+
+**Last Updated**: 2025-10-16 | **Framework Version**: v0.6.3 (stale)
 
 This catalog provides a comprehensive guide to all Koan Framework samples, organized by learning progression and capability coverage.
 

@@ -1,135 +1,68 @@
 # Koan Framework Samples
 
-**Scenario-driven examples demonstrating framework capabilities through real-world applications.**
+**The samples are the curriculum**: each rung teaches a bounded set of concepts; the flagships
+are dogfood applications that drive framework evolution (aspirational reading, not tutorials).
 
----
+> Status below is truthful as of 2026-06: ✅ = in `Koan.sln`, builds, CI-protected ·
+> 🛠 dogfood = large real app, maintained but not a tutorial · ⚠ = on disk but currently broken
+> or not in the solution (being consolidated; see `docs/assessment/`). The old
+> [CATALOG.md](CATALOG.md) is superseded by this page pending regeneration.
 
-## 📚 Browse the Samples
+## The learning ladder (do these in order)
 
-**→ [Complete Sample Catalog](CATALOG.md)** - Full descriptions, capability matrix, learning paths
+| Rung | Sample | Teaches | Time | Status |
+|---|---|---|---|---|
+| 1 | **S0.ConsoleJsonRepo** | Minimal bootstrap; entity statics in a console app | 5 min | ✅ |
+| 2 | **S1.Web** | REST CRUD via `EntityController<T>`, relationships (`[Parent]`), pagination, `[Cacheable]` | 30 min | ✅ |
+| 3 | **S10.DevPortal** | Live multi-provider switching (Mongo ⇄ Postgres ⇄ SQLite), capability detection, bulk ops | 20 min | ✅ |
+| 4 | **S14.AdapterBench** | Cross-adapter benchmarking; **entity-first background jobs** (`IKoanJob<T>`, progress, durable ledger) | 20 min | ✅ |
 
-### Quick Index
+After the ladder, pick by interest:
 
-| Sample | Description | Complexity | Status |
-|--------|-------------|------------|--------|
-| **S0.ConsoleJsonRepo** | Minimal bootstrap - your first Koan app | ⭐ Beginner | ✅ Active |
-| **S1.Web** | CRUD fundamentals with relationships | ⭐ Beginner | ✅ Active |
-| **S3.NotifyHub** | Multi-channel notification platform | ⭐⭐ Intermediate | 🔨 Building |
-| **S4.DevHub** | Secret management & DevOps dashboard | ⭐⭐ Intermediate | 🔨 Building |
-| **S5.Recs** | AI-powered recommendation engine | ⭐⭐⭐ Advanced | ✅ Active |
-| **S6.MediaHub** | Media processing & storage pipeline | ⭐⭐ Intermediate | 🔨 Building |
-| **S8.Canon** | Canon Runtime pipelines | ⭐⭐⭐ Advanced | ✅ Active |
-| **S9.OrderFlow** | Event sourcing & CQRS | ⭐⭐⭐⭐ Expert | 🔨 Building |
-| **S10.DevPortal** | Framework capabilities showcase | ⭐⭐ Demo | ✅ Active |
-| **S14.AdapterBench** | Provider performance benchmarking | ⭐⭐ Demo | ✅ Active |
-| **S16.PantryPal** | Vision AI & MCP Code Mode | ⭐⭐⭐ Advanced | ✅ Active |
-| **S18.Prism** | Personal Knowledge Intelligence — AI-powered Pulse feed | ⭐⭐⭐⭐ Expert | ✅ Active |
+| Sample | What it is | Status |
+|---|---|---|
+| **S5.Recs** | AI recommendation engine: Mongo + Weaviate + Ollama, `[Embedding]` pipeline, partitioned imports, auth, scheduling | ✅ 🛠 dogfood |
+| **S16.PantryPal** (API + MCP host) | Vision AI meal planning; `[McpEntity]` agent tools over HTTP/SSE; MCP Code Mode | ✅ 🛠 dogfood |
+| **S18.Prism** | Personal knowledge intelligence; exercises the AI pillar end-to-end | ✅ 🛠 dogfood (spec-led; no README yet) |
+| **S8.Canon** (Api + Shared) | Canon runtime pipelines (`CanonEntity<T>`, pipeline contributors) | ✅ (root project excluded; use Api) |
+| **g1c1.GardenCoop** (guides/) | Narrative chapter-style guide; the only NativeAOT-publish dogfood | ✅ |
+| **S3.Mq.Sample** | RabbitMQ messaging skeleton | ✅ builds, minimal — being rebuilt as a proper messaging rung |
+| **S7.Meridian** | Document-intelligence flagship (16k LOC) | ⚠ builds (recently restored) but outside `Koan.sln` |
+| **S6.SnapVault** | Photo manager (media + storage + AI) | ⚠ broken (dependency pin); consolidation candidate |
+| **S8.PolyglotShop** | ServiceMesh showcase | ⚠ broken (references retired experimental pillars) |
 
----
+Known gaps the consolidation is addressing: no dedicated **messaging**, **jobs**, or **cache**
+tutorial rungs yet (today they're embedded in S3/S14/S1); several ghost directories from
+archived samples are pending deletion. Don't trust directory listings — trust this table and
+`Koan.sln`.
 
-## 🚀 Getting Started
+## Running a sample
 
-### I'm brand new to Koan
-1. **S0.ConsoleJsonRepo** (5 min) - See it work
-2. **S1.Web** (30 min) - Learn the patterns
-3. **S10.DevPortal** (20 min) - Understand capabilities
+```bash
+# Anything in Koan.sln:
+dotnet run --project samples/S1.Web
 
-### I'm evaluating frameworks
-1. **S10.DevPortal** - See multi-provider transparency
-2. **S14.AdapterBench** - Get objective performance data
-3. **S5.Recs** - See a complete production-ready app
-
-### I'm building with AI
-1. **S5.Recs** - Recommendations & vector search
-2. **S16.PantryPal** - Vision AI & MCP integration
-
-### I need specific capabilities
-→ **See [CATALOG.md](CATALOG.md#capability-coverage-matrix)** for "Which sample shows X?" lookup
-
----
-
-## 📖 Sample Organization
-
-### Family Structure (when applicable)
-
-Some samples use multi-project family structure:
-
-```
-SXX.SampleName/
-├── API/                # Web API application
-├── Core/               # Shared contracts/models (optional)
-├── MCP/                # MCP service host (optional)
-├── Tools/              # CLI/worker tools (optional)
-└── README.md          # Sample documentation
+# Samples with container dependencies ship a start.bat (preferred over docker compose by hand):
+cd samples/S5.Recs && ./start.bat
 ```
 
-### Standalone Structure
+Each sample prints a **boot report** at startup — discovered modules, adapter elections, boot
+phases. Read it; it is the framework's self-description and your first debugging surface.
 
-Most samples use single-project structure:
+## Sample principles
 
-```
-SXX.SampleName/
-├── Controllers/        # API endpoints
-├── Models/            # Entity<T> domain models
-├── Services/          # Business logic
-├── wwwroot/           # UI assets (if applicable)
-├── docker/            # Container definitions
-├── start.bat          # One-command run script
-├── README.md          # Sample documentation
-└── Program.cs         # Koan bootstrap
-```
+1. **Domain-focused** — real applications, not FooService demos
+2. **Entity-first** — `Entity<T>` patterns; no manual repositories
+3. **Reference = Intent** — capabilities arrive by package reference; Program.cs stays minimal
+   (the canonical form is 4 lines — extra incantations in older samples are being removed)
+4. **In the solution = alive** — every kept sample lives in `Koan.sln` and rides CI; anything
+   outside the solution is rotting by definition
+5. **Concept-budgeted** — each README states what new concepts the sample introduces
 
----
+## Contributing a sample
 
-## 🗂️ Guides
+Follow S5.Recs' README style (tutorial narrative, *why* over *what*), one-command run
+(`start.bat`), entity-first patterns only, and add the project to `Koan.sln` in the same PR.
 
-**guides/g1c1.GardenCoop** - Narrative guide demonstrating Koan patterns through community garden scenario
-
----
-
-## 📦 Archived Samples
-
-The following samples have been archived (see `archive/ARCHIVED.md` for details):
-
-- S2, S4.Web, S6.Auth, S6.SocialCreator - No documentation or unclear purpose
-- S12.MedTrials, S15.RedisInbox - Redundant or too minimal
-- KoanAspireIntegration - Integration example, not sample app
-
-**Migration guidance**: See [archive/ARCHIVED.md](archive/ARCHIVED.md)
-
----
-
-## 🎯 Sample Principles
-
-All Koan samples follow these principles:
-
-1. **Domain-Focused** - Real applications, not "FooService" demos
-2. **Entity-First** - Use Entity<T> patterns, not manual repositories
-3. **Auto-Registration** - Demonstrate "Reference = Intent" philosophy
-4. **Progressive Complexity** - Start simple, add sophistication naturally
-5. **Production Patterns** - Show real-world error handling, testing, deployment
-
----
-
-## 📚 Documentation
-
-- **Sample Catalog**: [CATALOG.md](CATALOG.md) - Complete reference
-- **Capability Map**: `docs/architecture/capability-map.md` - Framework layers
-- **Port Allocations**: `docs/decisions/OPS-0014-samples-port-allocation.md`
-- **Strategic Plan**: `docs/decisions/DX-0045-sample-collection-strategic-realignment.md`
-
----
-
-## 🤝 Contributing
-
-Samples welcome! Follow the established patterns:
-- README following S5.Recs template (tutorial-style)
-- Test examples demonstrating key patterns
-- One-command run via `start.bat`/`start.sh`
-- Explain *why*, not just *what*
-
-See main repository CONTRIBUTING.md for details.
-
----
-
-**Questions?** Check the [Complete Catalog](CATALOG.md) or open a GitHub issue.
+- Port allocations: `docs/decisions/OPS-0014-samples-port-allocation.md`
+- Archive policy & history: [archive/ARCHIVED.md](archive/ARCHIVED.md)

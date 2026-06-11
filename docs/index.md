@@ -4,119 +4,101 @@ domain: core
 title: "Koan Framework documentation"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-03-23
-framework_version: v0.6.3
-validation:
-  date_last_tested: 2026-03-23
-  status: verified
-  scope: docs/index.md
 ---
 
 # Koan Framework Documentation
 
-**Zero-configuration .NET for the container-native era. Build sophisticated services that just work.**
+**Model your domain as entities. Reference your intents. Koan composes the rest — and tells you
+exactly what it did.**
 
-## Quick Navigation
+## Quick navigation
 
-### 🚀 [Getting Started](getting-started/overview.md)
+### 🚀 [Getting started](getting-started/overview.md)
 
-Get a Koan API running in 5 minutes or less.
+The golden path: a running app in 60 seconds, then the framework concept-by-concept.
+Short on time? [Quickstart](getting-started/quickstart.md).
 
-### 📖 [Developer Guides](guides/README.md)
+### 📖 [Developer guides](guides/README.md)
 
-Step-by-step guides for building with Koan Framework:
+Task-oriented how-tos:
 
-- [Building APIs](guides/building-apis.md) - REST APIs with zero configuration
-- [Data Modeling](guides/data-modeling.md) - Entity-first development patterns
-- [Media Recipes](guides/media-recipes-howto.md) - Format-preserving image pipeline + recipe registry
-- [AI Integration](guides/ai-integration.md) - Add AI capabilities to your apps
-- [Authentication](guides/authentication-setup.md) - Zero-config OAuth, JWT, and service-to-service auth
+- [Building APIs](guides/building-apis.md) — REST over entities, hooks, pagination
+- [Data modeling](guides/data-modeling.md) — entity-first patterns, relationships
+- [Background jobs](guides/jobs-howto.md) — entity-first jobs, scheduling, the capability ladder
+- [AI integration](guides/ai-integration.md) — embeddings, semantic search, chat
+- [Media recipes](guides/media-recipes-howto.md) — format-preserving image pipeline
+- [Authentication](guides/authentication-setup.md) — auth providers and service auth
 
-### 🚨 [Troubleshooting Hub](support/troubleshooting.md)
+### 🧭 [Samples ladder](../samples/README.md)
 
-Common issues and their solutions:
+S0 (console, 5 min) → S1 (CRUD) → S10 (multi-provider) → S14 (jobs/benchmarks), then the
+dogfood flagships.
 
-- **[Adapter & Data Connectivity](support/troubleshooting.md#adapter--data-connectivity)** - Database connectivity and provisioning failures
-- **[Boot & Auto-Registration](support/troubleshooting.md#boot--auto-registration)** - Startup discoveries and initialization problems
+### 🚨 [Troubleshooting](support/troubleshooting.md)
 
-### 🔬 [Deep Dive](guides/deep-dive/auto-provisioning-system.md)
+Start with the **boot report** — the console output at startup names every discovered module,
+adapter election, and boot phase; most registration/connectivity questions are answered there.
 
-Advanced architectural documentation:
+### 📚 [Reference](reference/index.md)
 
-- **[Auto-Provisioning System](guides/deep-dive/auto-provisioning-system.md)** - How schema provisioning works automatically
-- **[Bootstrap Lifecycle](guides/deep-dive/bootstrap-lifecycle.md)** - Multi-layer application initialization process
+Per-pillar reference: [Core](reference/core/index.md) · [Data](reference/data/index.md) ·
+[Web](reference/web/index.md) · [AI](reference/ai/index.md) ·
+[Cache](reference/data/cache.md) · [API docs](api/index.md)
 
-### 📚 [API Reference](api/index.md)
+### 🏗️ Architecture
 
-Complete API documentation for all Koan modules:
+- **[Framework principles](architecture/principles.md)** — the canon, with enforcement points
+- **[Architecture decisions](decisions/index.md)** — 280+ ADRs; supersession is explicit
+- **[Framework assessment & maturity model](assessment/00-overview.md)** — the framework's
+  published self-audit: what is settled, what is experimental, what is being cut
 
-- **[Core](reference/core/index.md)** - Foundational abstractions and configuration
-- **[Data](reference/data/index.md)** - Entity-first data access across providers
-- **[Web](reference/web/index.md)** - ASP.NET Core integration and controllers
-- **[AI](reference/ai/index.md)** - Chat, embeddings, RAG, and AI lifecycle (Models, Prompts, Agents, Eval, Training, Review, Compute, Orchestration)
-- **[Auto-Generated API Docs](api/index.md)** - Complete API reference from code comments
-
-### 🏗️ [Architecture](architecture/principles.md)
-
-Framework principles and design decisions:
-
-- **[Framework Principles](architecture/principles.md)** - Core architectural patterns
-- **[Architecture Decisions](decisions/index.md)** - Complete ADR system with 230+ decisions
-
-### 📂 [Case Studies](case-studies/s13-docmind/index.md)
-
-Scenario-first walkthroughs showing framework patterns in production samples:
-
-- **S18.Prism** — Personal Knowledge Intelligence dogfood (Mongo + Ollama + Weaviate, AI-powered Pulse feed, SPA frontend)
-
-## Framework Features
-
-### Zero Configuration
+## The shape of a Koan app
 
 ```csharp
+// Program.cs — complete.
 var builder = WebApplication.CreateBuilder(args);
-
-// This single line handles all the complexity:
-// Database setup, API generation, validation, error handling
 builder.Services.AddKoan();
-
 var app = builder.Build();
 app.Run();
 ```
 
-### Entity-First Development
-
 ```csharp
-public class Product : Entity<Product>
+public sealed class Product : Entity<Product>
 {
     public string Name { get; set; } = "";
     public decimal Price { get; set; }
-    public string Category { get; set; } = "";
 }
 
-// Full REST API auto-generated
-// GET/POST/PUT/DELETE /api/products
-// Validation, error handling, health checks included
+[Route("api/[controller]")]
+public sealed class ProductController : EntityController<Product> { }
+// → REST CRUD with pagination, GUID v7 ids, /api/health, zero-config SQLite
 ```
-
-### Provider Transparency
 
 ```csharp
-// Same code, different storage backends:
-var products = await Product.All();  // Works with SQLite, PostgreSQL, MongoDB, etc.
+var products = await Product.All();                 // same code on SQLite, Postgres, Mongo, …
+var cheap    = await Product.Query(p => p.Price < 10);
 ```
 
-## Current Status
+Capabilities are negotiated, not assumed:
 
-- **Version**: v0.6.3 (Early Development)
-- **License**: Apache 2.0
-- **Target Framework**: .NET 10.0
-- **Contributors**: 2 active developers
+```csharp
+if (Data<Product, string>.Capabilities.Has(DataCaps.Query.Linq)) { /* pushdown active */ }
+```
+
+## Current status
+
+- **Version**: pre-1.0, [NBGV](../version.json)-driven (0.17.x); in active consolidation
+  ("fewer but more meaningful parts")
+- **Settled core**: data pillar + connectors, web, cache, jobs, vector, security/trust —
+  see the [maturity model](assessment/03-maturity-model.md) for the full per-pillar grading
+- **License**: Apache 2.0 · **Target**: .NET 10
+- **Packages**: published as `Sylin.Koan.*`; until 1.0, build from source
 
 ## Contributing
 
-Ready to contribute? Check out our [Contributing Guide](../CONTRIBUTING.md) to get started.
+ADR-first workflow; keep the green ratchet green (`scripts/green-ratchet.ps1`). See
+[engineering docs](engineering/index.md) and [CONTRIBUTING](../CONTRIBUTING.md).
 
 ---
 
-**Talk to your code, don't fight it.**
+**Your entities are the app.**
