@@ -4,10 +4,10 @@ domain: mcp
 title: "MCP over HTTP + SSE How-To"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2025-11-09
-framework_version: v0.6.3
+last_updated: 2026-06-12
+framework_version: v0.17
 validation:
-  date_last_tested: 2025-11-09
+  date_last_tested: 2026-06-12
   status: verified
   scope: all-examples-tested
 related_guides:
@@ -40,7 +40,7 @@ MCP over HTTP+SSE lets AI agents and IDEs call your backend operations as if the
 - Tool discovery and capability endpoints
 
 **Inputs:**
-- Koan application with `builder.Services.AddKoan()` configured
+- Koan application with `builder.Services.AddKoan().AsProxiedApi()` configured
 - Entities decorated with `[McpEntity]` attributes
 - HTTP+SSE transport enabled in configuration
 - Optional: authentication provider (OAuth, API keys)
@@ -132,9 +132,9 @@ Before following this guide:
 
 2. **Koan packages:**
    ```xml
-   <PackageReference Include="Koan.Core" Version="0.6.3" />
-   <PackageReference Include="Koan.Web" Version="0.6.3" />
-   <PackageReference Include="Koan.Mcp" Version="0.6.3" />
+   <PackageReference Include="Koan.Core" Version="0.17.0" />
+   <PackageReference Include="Koan.Web" Version="0.17.0" />
+   <PackageReference Include="Koan.Mcp" Version="0.17.0" />
    ```
 
 3. **Testing tools (optional):**
@@ -169,8 +169,8 @@ dotnet add package Koan.Mcp
 
 ```csharp
 // Models/Todo.cs
-using Koan.Data;
 using Koan.Mcp;
+using Koan.Data.Core.Model;
 
 [McpEntity(Description = "Simple task management", AllowMutations = true)]
 public class Todo : Entity<Todo>
@@ -201,15 +201,25 @@ public class Todo : Entity<Todo>
 ### Step 4: Wire up Program.cs
 
 ```csharp
+using Koan.Core;
+using Koan.Core.Hosting.App;
 using Koan.Mcp.Extensions;
 using Koan.Web.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddKoan();
-builder.Services.AddKoanMcp(builder.Configuration);
+// Register Core + Web + MCP services
+builder.Services.AddKoan().AsProxiedApi();
+builder.Services.AddKoanWeb();
+builder.Services.AddKoanMcp();
 
 var app = builder.Build();
+
+// Set the global AppHost service locator so that dynamic scanning and entity resolving works
+AppHost.Current = app.Services;
+
+// Map the MCP HTTP/SSE endpoints (/mcp/sse, /mcp/rpc, etc.)
+app.MapKoanMcpEndpoints();
 
 app.Run();
 ```
@@ -224,25 +234,25 @@ dotnet run
 # Terminal 2: Open SSE stream
 curl -N http://localhost:5110/mcp/sse
 # event: connected
-# data: {"sessionId":"abc123...","timestamp":"2025-11-09T14:30:00Z"}
+# data: {"sessionId":"abc123...","timestamp":"2026-06-12T14:30:00Z"}
+# event: endpoint
+# data: /mcp/rpc?sessionId=abc123...
 
 # Terminal 3: List tools
 SESSION="abc123..."  # Use sessionId from Terminal 2
-curl -X POST http://localhost:5110/mcp/rpc \
+curl -X POST "http://localhost:5110/mcp/rpc?sessionId=$SESSION" \
   -H "Content-Type: application/json" \
-  -H "X-Mcp-Session: $SESSION" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 
 # Terminal 2 shows:
 # event: ack
 # data: {"id":1}
-# event: result
-# data: {"id":1,"result":{"tools":[{"name":"Todo.create","description":"Create a new Todo",...}]}}
+# event: message
+# data: {"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"Todo.create","description":"Create a new Todo",...}]}}
 
 # Terminal 3: Create a todo
-curl -X POST http://localhost:5110/mcp/rpc \
+curl -X POST "http://localhost:5110/mcp/rpc?sessionId=$SESSION" \
   -H "Content-Type: application/json" \
-  -H "X-Mcp-Session: $SESSION" \
   -d '{
     "jsonrpc":"2.0",
     "id":2,
@@ -254,8 +264,8 @@ curl -X POST http://localhost:5110/mcp/rpc \
   }'
 
 # Terminal 2 shows:
-# event: result
-# data: {"id":2,"result":{"content":[{"type":"text","text":"Created Todo with ID: 01JB..."}]}}
+# event: message
+# data: {"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"\"01JB...\""}]}}
 ```
 
 **What just happened?**
@@ -294,13 +304,13 @@ Data Provider (PostgreSQL, MongoDB, etc.)
 **Connection lifecycle:**
 ```
 1. Client → GET /mcp/sse
-2. Server → SSE stream opens, sends "connected" event with sessionId
-3. Client → POST /mcp/rpc with X-Mcp-Session header
-4. Server → Sends "ack" event (request received)
-5. Server → Sends "result" or "error" event (execution complete)
+2. Server → SSE stream opens, sends "connected" event with sessionId, then sends "endpoint" event with the POST target URI
+3. Client → POST /mcp/rpc?sessionId=... (or with X-Mcp-Session header)
+4. Server → Sends "ack" event (request acknowledged)
+5. Server → Sends "message" event (containing JSON-RPC response payload)
 6. Server → Sends periodic "heartbeat" events (keep connection alive)
 7. Client → Closes stream or times out
-8. Server → Cleans up session
+8. Server → Cleans up session (sends "end" event on clean close)
 ```
 
 ### JSON-RPC Request Format
@@ -326,11 +336,11 @@ Data Provider (PostgreSQL, MongoDB, etc.)
 event: ack
 data: {"id":1}
 
-event: result
-data: {"id":1,"result":{"content":[{"type":"text","text":"Created Todo"}]}}
+event: message
+data: {"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"Created Todo"}]}}
 
 event: heartbeat
-data: {"timestamp":"2025-11-09T14:35:00Z"}
+data: {"timestamp":"2026-06-12T14:35:00Z"}
 ```
 
 ### Recipe: MCP entity with custom operations
@@ -506,8 +516,8 @@ POST /mcp/rpc
 }
 
 // Response (SSE stream):
-event: result
-data: {"id":2,"result":{"content":[{"type":"text","text":"Found 7 high-value customers: ..."}]}}
+event: message
+data: {"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"Found 7 high-value customers: ..."}]}}
 ```
 
 ### Usage Scenarios
@@ -605,13 +615,14 @@ public class Post : Entity<Post>
 ```
 1. Client opens SSE: GET /mcp/sse
 2. Server creates session (ID: abc123, TTL: 30min)
-3. Server sends: event: connected, data: {"sessionId":"abc123"}
-4. Client stores sessionId
-5. Client sends RPC: POST /mcp/rpc with header X-Mcp-Session: abc123
-6. Server routes to session abc123's SSE stream
-7. Server sends: event: result (back to client via SSE)
-8. Heartbeats every 30s reset session TTL
-9. Client disconnects or idle timeout → session cleaned up
+3. Server sends: event: connected, data: {"sessionId":"abc123","timestamp":"..."}
+4. Server sends: event: endpoint, data: "/mcp/rpc?sessionId=abc123"
+5. Client stores sessionId and endpoint URL
+6. Client sends RPC: POST /mcp/rpc?sessionId=abc123 (or with X-Mcp-Session: abc123 header)
+7. Server routes request to session abc123's SSE stream
+8. Server sends: event: message (back to client via SSE containing the JSON-RPC response)
+9. Heartbeats every 30s reset session TTL
+10. Client disconnects or idle timeout → session cleaned up (sends event "end")
 ```
 
 ### Recipe: Session configuration
@@ -819,6 +830,19 @@ public async Task DrainConnections()
 
 ```csharp
 // Program.cs
+using Koan.Core;
+using Koan.Core.Hosting.App;
+using Koan.Mcp.Extensions;
+using Koan.Web.Extensions;
+using Microsoft.IdentityModel.Tokens;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Register Core + Web + MCP
+builder.Services.AddKoan().AsProxiedApi();
+builder.Services.AddKoanWeb();
+builder.Services.AddKoanMcp();
+
 builder.Services.AddAuthentication("Bearer")
     .AddJwtBearer("Bearer", options =>
     {
@@ -838,12 +862,16 @@ builder.Services.AddAuthorization(options =>
         policy.RequireClaim("scope", "todos:write"));
 });
 
-builder.Services.AddKoanMcp(builder.Configuration);
-
 var app = builder.Build();
+
+// Set the global AppHost service locator so that dynamic scanning and entity resolving works
+AppHost.Current = app.Services;
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Map MCP HTTP/SSE endpoints (/mcp/sse, /mcp/rpc, etc.)
+app.MapKoanMcpEndpoints();
 
 app.Run();
 ```
@@ -1037,7 +1065,7 @@ curl http://localhost:5110/mcp/capabilities | jq
 {
   "serverInfo": {
     "name": "koan-mcp-server",
-    "version": "0.6.3"
+    "version": "0.17.0"
   },
   "capabilities": {
     "tools": {
@@ -1181,10 +1209,10 @@ public class Report : Entity<Report>
 }
 
 // Client receives multiple SSE events:
-// event: result
-// data: {"id":1,"result":{"content":[{"type":"text","text":"Chunk 1"}]}}
-// event: result
-// data: {"id":1,"result":{"content":[{"type":"text","text":"Chunk 2"}]}}
+// event: message
+// data: {"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"Chunk 1"}]}}
+// event: message
+// data: {"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"Chunk 2"}]}}
 // ...
 ```
 
@@ -1476,8 +1504,8 @@ location /mcp/sse {
 
 **Symptoms:**
 ```
-event: error
-data: {"id":1,"error":{"code":-32601,"message":"Tool not found: Todo.customTool"}}
+event: message
+data: {"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"Tool not found: Todo.customTool"}}
 ```
 
 **Causes:**
