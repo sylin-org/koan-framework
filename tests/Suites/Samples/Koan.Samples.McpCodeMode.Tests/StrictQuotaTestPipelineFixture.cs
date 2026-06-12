@@ -1,4 +1,4 @@
-﻿using Koan.Testing;
+using Koan.Testing;
 using Koan.Mcp.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Mcp.Extensions;
@@ -12,6 +12,7 @@ using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Koan.Core; // for AddKoan extension
+using Microsoft.Extensions.Hosting;
 
 namespace Koan.Samples.McpCodeMode.Tests;
 
@@ -25,9 +26,16 @@ public class StrictQuotaTestPipelineFixture : KoanTestPipelineFixtureBase
 
     protected override void ConfigureTestServices(IServiceCollection services)
     {
-    services.AddKoanCore();
-    services.AddKoanWeb();
-    services.AddKoanMcp();
+        services.AddKoan().AsProxiedApi();
+        services.AddKoanWeb();
+        services.AddKoanMcp();
+
+        var stdioService = services.FirstOrDefault(d => d.ServiceType == typeof(IHostedService) && d.ImplementationType == typeof(Koan.Mcp.Hosting.StdioTransport));
+        if (stdioService != null)
+        {
+            services.Remove(stdioService);
+        }
+
         services.Configure<McpServerOptions>(o =>
         {
             o.Exposure = McpExposureMode.Full;

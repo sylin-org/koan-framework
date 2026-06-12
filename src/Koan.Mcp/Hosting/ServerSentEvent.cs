@@ -15,6 +15,9 @@ public readonly record struct ServerSentEvent(string Event, JToken Payload)
             ["timestamp"] = timestamp.ToString("O")
         });
 
+    public static ServerSentEvent Endpoint(string endpointUrl)
+        => new("endpoint", JValue.CreateString(endpointUrl));
+
     public static ServerSentEvent Heartbeat(DateTimeOffset timestamp)
         => new("heartbeat", new JObject
         {
@@ -40,8 +43,7 @@ public readonly record struct ServerSentEvent(string Event, JToken Payload)
     {
         if (message is null) throw new ArgumentNullException(nameof(message));
         var cloned = (JObject)message.DeepClone();
-        var eventName = cloned.ContainsKey("error") ? "error" : "result";
-        return new(eventName, cloned);
+        return new("message", cloned);
     }
 
     public string ToWireFormat()
@@ -52,7 +54,15 @@ public readonly record struct ServerSentEvent(string Event, JToken Payload)
 
     public SseEnvelope ToEnvelope()
     {
-        var json = Payload?.ToString(Formatting.None) ?? "null";
+        string json;
+        if (Payload is JValue jval && jval.Type == JTokenType.String)
+        {
+            json = jval.Value<string>() ?? "";
+        }
+        else
+        {
+            json = Payload?.ToString(Formatting.None) ?? "null";
+        }
         return new SseEnvelope(Event, json);
     }
 }

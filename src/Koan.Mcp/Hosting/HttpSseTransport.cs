@@ -100,6 +100,10 @@ public sealed class HttpSseTransport
         var connectedAt = _timeProvider.GetUtcNow();
         session.Enqueue(ServerSentEvent.Connected(session.Id, connectedAt));
 
+        var baseRoute = string.IsNullOrWhiteSpace(options.HttpSseRoute) ? "/mcp" : options.HttpSseRoute.TrimEnd('/');
+        var endpointUrl = $"{context.Request.PathBase}{baseRoute}/rpc?sessionId={session.Id}";
+        session.Enqueue(ServerSentEvent.Endpoint(endpointUrl));
+
         await using var bridge = new HttpSseRpcBridge(
             _server,
             _registry,

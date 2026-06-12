@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json.Linq;
 
 namespace Koan.Samples.McpCodeMode.Tests;
@@ -25,11 +25,7 @@ internal static class McpFixtureExtensions
             if (string.IsNullOrWhiteSpace(toolName)) throw new ArgumentException("toolName required for tools/call");
             var callParams = new Koan.Mcp.Hosting.McpRpcHandler.ToolsCallParams { Name = toolName, Arguments = arguments };
             var callResult = await handler.CallTool(callParams, ct);
-            if (callResult.Success && callResult.Result is not null)
-            {
-                return callResult.Result; // flattened success payload
-            }
-            return callResult; // full envelope on failure
+            return callResult;
         }
         throw new NotSupportedException($"Unsupported method: {method}");
     }

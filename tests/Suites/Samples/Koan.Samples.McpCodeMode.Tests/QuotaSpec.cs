@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace Koan.Samples.McpCodeMode.Tests;
@@ -27,7 +27,7 @@ public class QuotaSpec : IClassFixture<TestPipelineFixture>
         var code = @"function run() { SDK.Entities.Todo.upsert({ title: 'q1' }); SDK.Entities.Todo.upsert({ title: 'q2' }); SDK.Entities.Todo.upsert({ title: 'q3' }); SDK.Out.answer('done'); }";
         var result = await DirectCall("koan.code.execute", new { code, correlationId = "quota-maxsdk-1" });
         // If enforcement was triggered error object surfaces; otherwise success with text
-        var errorCode = result["errorCode"]?.Value<string>() ?? result["error_code"]?.Value<string>();
+        var errorCode = result["meta"]?["errorCode"]?.Value<string>();
         // Accept either success (unlimited) or sdk_calls_exceeded when configured
         if (errorCode != null)
         {
@@ -36,7 +36,8 @@ public class QuotaSpec : IClassFixture<TestPipelineFixture>
         else
         {
             // Success path: ensure no silent failure
-            (result["text"] != null).Should().BeTrue();
+            var text = result["content"]?[0]?["text"]?.Value<string>();
+            text.Should().NotBeNull();
         }
     }
 
@@ -46,7 +47,7 @@ public class QuotaSpec : IClassFixture<TestPipelineFixture>
         // Script deliberately omits SDK.Out.answer
         var code = @"function run() { const a = 1 + 1; }";
         var result = await DirectCall("koan.code.execute", new { code, correlationId = "quota-requireanswer-1" });
-        var errorCode = result["errorCode"]?.Value<string>();
+        var errorCode = result["meta"]?["errorCode"]?.Value<string>();
         // If RequireAnswer not enabled in fixture config, errorCode may be null => treat as skip-like pass
         if (errorCode != null)
         {
@@ -60,13 +61,10 @@ public class QuotaSpec : IClassFixture<TestPipelineFixture>
         var code = @"function run() { SDK.Entities.Todo.upsert({ title: 'diag1' }); SDK.Out.answer('ok'); }";
         var result = await DirectCall("koan.code.execute", new { code, correlationId = "quota-diagnostics-1" });
         // Expect success envelope; flattened result has text for success path
-        if (result["errorCode"] != null)
-        {
-            var ec = result["errorCode"]!.Value<string>();
-            ec.Should().BeNull("Expected success but got error");
-        }
-        // We cannot access diagnostics directly via flattened success (only text). Call via full tools/call pattern if required.
+        var errorCode = result["meta"]?["errorCode"]?.Value<string>();
+        errorCode.Should().BeNull("Expected success but got error");
         // For now ensure answer text present.
-        result["text"].Should().NotBeNull();
+        var text = result["content"]?[0]?["text"]?.Value<string>();
+        text.Should().NotBeNull();
     }
 }

@@ -34,7 +34,7 @@ public sealed class StreamJsonRpcTransportDispatcher : IMcpTransportDispatcher
         {
             JsonSerializerOptions = SerializerOptions
         };
-        using var handler = new HeaderDelimitedMessageHandler(output, input, formatter);
+        using var handler = new NewLineDelimitedMessageHandler(output, input, formatter);
         using var rpc = new JsonRpc(handler, target);
 
         var completionSource = new TaskCompletionSource<object?>();

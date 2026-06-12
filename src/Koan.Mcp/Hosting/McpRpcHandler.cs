@@ -82,7 +82,7 @@ public sealed class McpRpcHandler
     }
 
     [JsonRpcMethod("tools/call")]
-    public async Task<ToolsCallResult> CallTool(ToolsCallParams parameters, CancellationToken cancellationToken)
+    public async Task<CallToolResult> CallTool(ToolsCallParams parameters, CancellationToken cancellationToken)
     {
         if (parameters is null) throw new ArgumentNullException(nameof(parameters));
         _logger.LogDebug("MCP tools/call for {Tool} invoked.", parameters.Name);
@@ -90,17 +90,19 @@ public sealed class McpRpcHandler
         // Handle code execution tool
         if (parameters.Name == "koan.code.execute")
         {
-            return await ExecuteCode(parameters.Arguments, cancellationToken);
+            var res = await ExecuteCode(parameters.Arguments, cancellationToken);
+            return ToCallToolResult(res);
         }
         // Handle code validation tool
         if (parameters.Name == "koan.code.validate")
         {
-            return ExecuteCodeValidation(parameters.Arguments);
+            var res = ExecuteCodeValidation(parameters.Arguments);
+            return ToCallToolResult(res);
         }
 
         // Handle traditional entity tools
         var result = await _executor.Execute(parameters.Name, parameters.Arguments, cancellationToken);
-        return ToolsCallResult.FromExecution(parameters.Name, result);
+        return ToCallToolResult(parameters.Name, result);
     }
 
     [JsonRpcMethod("ping")]
@@ -389,25 +391,31 @@ public sealed class McpRpcHandler
     public sealed class ToolsListResponse
     {
         [JsonPropertyName("tools")]
+        [Newtonsoft.Json.JsonProperty("tools")]
         public IReadOnlyList<ToolDescriptor> Tools { get; init; } = [];
 
         [JsonPropertyName("next")]
+        [Newtonsoft.Json.JsonProperty("next")]
         public object? Next { get; init; }
     }
 
     public sealed class ToolDescriptor
     {
         [JsonPropertyName("name")]
+        [Newtonsoft.Json.JsonProperty("name")]
         public required string Name { get; init; }
 
         [JsonPropertyName("description")]
+        [Newtonsoft.Json.JsonProperty("description")]
         public string? Description { get; init; }
 
         [JsonPropertyName("input_schema")]
-    public required JObject InputSchema { get; init; }
+        [Newtonsoft.Json.JsonProperty("input_schema")]
+        public required JObject InputSchema { get; init; }
 
         [JsonPropertyName("metadata")]
-    public required JObject Metadata { get; init; }
+        [Newtonsoft.Json.JsonProperty("metadata")]
+        public required JObject Metadata { get; init; }
 
         public static ToolDescriptor From(McpEntityRegistration registration, McpToolDefinition tool)
         {
@@ -489,5 +497,170 @@ public sealed class McpRpcHandler
             }
             return arr;
         }
+    }
+
+    private static CallToolResult ToCallToolResult(ToolsCallResult result)
+    {
+        if (result.Success)
+        {
+            string text = "";
+            JObject? meta = null;
+
+            if (result.Result is JObject obj && obj.TryGetValue("text", out var textNode))
+            {
+                text = textNode.Value<string>() ?? "";
+                meta = new JObject
+                {
+                    ["logs"] = obj["logs"],
+                    ["diagnostics"] = obj["diagnostics"],
+                    ["headers"] = result.Headers,
+                    ["warnings"] = result.Warnings
+                };
+            }
+            else
+            {
+                text = result.Result?.ToString(Newtonsoft.Json.Formatting.None) ?? "";
+                meta = new JObject
+                {
+                    ["headers"] = result.Headers,
+                    ["warnings"] = result.Warnings,
+                    ["diagnostics"] = result.Diagnostics
+                };
+            }
+
+            return new CallToolResult
+            {
+                Content = new List<McpContent>
+                {
+                    new McpContent
+                    {
+                        Type = "text",
+                        Text = text
+                    }
+                },
+                Meta = meta
+            };
+        }
+        else
+        {
+            return new CallToolResult
+            {
+                IsError = true,
+                Content = new List<McpContent>
+                {
+                    new McpContent
+                    {
+                        Type = "text",
+                        Text = result.ErrorMessage ?? "Execution failed"
+                    }
+                },
+                Meta = new JObject
+                {
+                    ["errorCode"] = result.ErrorCode,
+                    ["headers"] = result.Headers,
+                    ["warnings"] = result.Warnings,
+                    ["diagnostics"] = result.Diagnostics
+                }
+            };
+        }
+    }
+
+    private static CallToolResult ToCallToolResult(string toolName, McpToolExecutionResult execution)
+    {
+        if (execution.Success)
+        {
+            return new CallToolResult
+            {
+                Content = new List<McpContent>
+                {
+                    new McpContent
+                    {
+                        Type = "text",
+                        Text = execution.Payload?.ToString(Newtonsoft.Json.Formatting.None) ?? ""
+                    }
+                },
+                Meta = new JObject
+                {
+                    ["shortCircuit"] = execution.ShortCircuit,
+                    ["headers"] = ToJsonObject(execution.Headers),
+                    ["warnings"] = ToJsonArray(execution.Warnings),
+                    ["diagnostics"] = execution.Diagnostics
+                }
+            };
+        }
+        else
+        {
+            var diagnostics = (execution.Diagnostics.DeepClone() as JObject) ?? new JObject();
+            diagnostics["tool"] = toolName;
+            diagnostics["error"] = execution.ErrorCode ?? CodeMode.Execution.CodeModeErrorCodes.ExecutionError;
+
+            return new CallToolResult
+            {
+                IsError = true,
+                Content = new List<McpContent>
+                {
+                    new McpContent
+                    {
+                        Type = "text",
+                        Text = execution.ErrorMessage ?? "Tool execution failed"
+                    }
+                },
+                Meta = new JObject
+                {
+                    ["errorCode"] = execution.ErrorCode ?? CodeMode.Execution.CodeModeErrorCodes.ExecutionError,
+                    ["headers"] = ToJsonObject(execution.Headers),
+                    ["warnings"] = ToJsonArray(execution.Warnings),
+                    ["diagnostics"] = diagnostics
+                }
+            };
+        }
+    }
+
+    private static JObject ToJsonObject(IReadOnlyDictionary<string, string> headers)
+    {
+        var obj = new JObject();
+        foreach (var kv in headers)
+        {
+            obj[kv.Key] = kv.Value;
+        }
+        return obj;
+    }
+
+    private static JArray ToJsonArray(IReadOnlyList<string> warnings)
+    {
+        var arr = new JArray();
+        foreach (var warning in warnings)
+        {
+            arr.Add(warning);
+        }
+        return arr;
+    }
+
+    public sealed class CallToolResult
+    {
+        [JsonPropertyName("content")]
+        [Newtonsoft.Json.JsonProperty("content")]
+        public List<McpContent> Content { get; init; } = new();
+
+        [JsonPropertyName("isError")]
+        [Newtonsoft.Json.JsonProperty("isError")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public bool IsError { get; set; }
+
+        [JsonPropertyName("meta")]
+        [Newtonsoft.Json.JsonProperty("meta")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public JObject? Meta { get; set; }
+    }
+
+    public sealed class McpContent
+    {
+        [JsonPropertyName("type")]
+        [Newtonsoft.Json.JsonProperty("type")]
+        public string Type { get; set; } = "text";
+
+        [JsonPropertyName("text")]
+        [Newtonsoft.Json.JsonProperty("text")]
+        public string Text { get; set; } = "";
     }
 }

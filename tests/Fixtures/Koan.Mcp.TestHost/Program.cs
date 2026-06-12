@@ -1,4 +1,4 @@
-﻿using Koan.Core;
+using Koan.Core;
 using Koan.Mcp;
 using Koan.Mcp.Extensions;
 using Koan.Mcp.Options;
@@ -22,7 +22,7 @@ var app = builder.Build();
 app.MapKoanMcpEndpoints();
 app.MapControllers();
 
-app.RunAsync();
+await app.RunAsync();
 
 namespace Koan.Mcp.TestHost
 {

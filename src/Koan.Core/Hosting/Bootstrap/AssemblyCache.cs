@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Linq;
 using System.Reflection;
 
 namespace Koan.Core.Hosting.Bootstrap;
@@ -10,8 +11,6 @@ namespace Koan.Core.Hosting.Bootstrap;
 public sealed class AssemblyCache
 {
     private readonly ConcurrentDictionary<string, Assembly> _assembliesByName = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Lazy<Assembly[]> _allAssemblies;
-    private readonly Lazy<Assembly[]> _koanAssemblies;
 
     /// <summary>
     /// Singleton instance for the current application domain.
@@ -20,10 +19,6 @@ public sealed class AssemblyCache
 
     private AssemblyCache()
     {
-        _allAssemblies = new Lazy<Assembly[]>(() => _assembliesByName.Values.ToArray());
-        _koanAssemblies = new Lazy<Assembly[]>(() => _assembliesByName.Values
-            .Where(a => a.GetName().Name?.StartsWith("Koan.", StringComparison.OrdinalIgnoreCase) == true)
-            .ToArray());
     }
 
     /// <summary>
@@ -41,13 +36,15 @@ public sealed class AssemblyCache
     /// Gets all cached assemblies. Use this instead of AppDomain.CurrentDomain.GetAssemblies().
     /// </summary>
     /// <returns>Array of all discovered assemblies</returns>
-    public Assembly[] GetAllAssemblies() => _allAssemblies.Value;
+    public Assembly[] GetAllAssemblies() => _assembliesByName.Values.ToArray();
 
     /// <summary>
     /// Gets all Koan framework assemblies (names starting with "Koan.").
     /// </summary>
     /// <returns>Array of Koan assemblies</returns>
-    public Assembly[] GetKoanAssemblies() => _koanAssemblies.Value;
+    public Assembly[] GetKoanAssemblies() => _assembliesByName.Values
+        .Where(a => a.GetName().Name?.StartsWith("Koan.", StringComparison.OrdinalIgnoreCase) == true)
+        .ToArray();
 
     /// <summary>
     /// Checks if a specific assembly name is loaded.
@@ -80,11 +77,7 @@ public sealed class AssemblyCache
     /// </summary>
     internal void InvalidateCache()
     {
-        if (_allAssemblies.IsValueCreated)
-        {
-            // We can't reset Lazy<T> values, but this is primarily for initialization
-            // In practice, assemblies are discovered once during startup
-        }
+        // No-op: Cache is dynamic now
     }
 
     /// <summary>
