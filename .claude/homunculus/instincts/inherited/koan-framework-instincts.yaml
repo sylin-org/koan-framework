@@ -1,0 +1,632 @@
+# Instincts generated from https://github.com/sylin-org/koan-framework
+# Generated: 2026-06-12T02:08:11.327Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: koan-framework-commit-conventional
+trigger: "when writing a commit message"
+confidence: 0.85
+domain: git
+source: repo-analysis
+source_repo: https://github.com/sylin-org/koan-framework
+---
+
+# Koan Framework Commit Conventional
+
+## Action
+
+Use conventional commit format with prefixes: feat, fix, test, docs, chore
+
+## Evidence
+
+- 100 commits analyzed
+- Detected conventional commit pattern
+- Examples: docs(workbooks): introduce operational workbooks (ARCH-0083), feat(web-auth): IKoanAuthFlowHandler — discoverable plug-in for the full cookie-auth lifecycle (WEB-0066)
+
+---
+id: koan-framework-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/sylin-org/koan-framework
+---
+
+# Koan Framework Commit Length
+
+## Action
+
+Write moderate-length commit messages (~72 characters)
+
+## Evidence
+
+- Average commit message length: 72 chars
+- Based on 100 commits
+
+---
+id: koan-framework-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/sylin-org/koan-framework
+---
+
+# Koan Framework Naming Files
+
+## Action
+
+Use PascalCase naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: PascalCase
+
+---
+id: koan-framework-import-relative
+trigger: "when importing modules"
+confidence: 0.75
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/sylin-org/koan-framework
+---
+
+# Koan Framework Import Relative
+
+## Action
+
+Use relative imports for project files
+
+## Evidence
+
+- Import analysis shows relative import pattern
+- Example: import { x } from '../lib/x'
+
+---
+id: koan-framework-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/sylin-org/koan-framework
+---
+
+# Koan Framework Export Style
+
+## Action
+
+Prefer named exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: named
+
+---
+id: koan-framework-test-separate
+trigger: "when writing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/sylin-org/koan-framework
+---
+
+# Koan Framework Test Separate
+
+## Action
+
+Place tests in the tests/ or __tests__/ directory, mirroring src structure
+
+## Evidence
+
+- Separate test directory pattern detected
+- Tests live in dedicated test folders
+
+---
+id: koan-framework-test-naming
+trigger: "when creating a test file"
+confidence: 0.85
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/sylin-org/koan-framework
+---
+
+# Koan Framework Test Naming
+
+## Action
+
+Name test files using the pattern: *Tests.cs
+
+## Evidence
+
+- File pattern: *Tests.cs
+- Consistent across test files
+
+---
+id: koan-framework-workflow-database-migration
+trigger: "when modifying the database schema or adding tables"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/sylin-org/koan-framework
+---
+
+# Koan Framework Workflow Database Migration
+
+## Action
+
+Follow the database-migration workflow:
+1. Create migration file
+2. Update schema definitions
+3. Generate/update types
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: 
+
+---
+id: koan-framework-workflow-feature-development
+trigger: "when implementing a new feature"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/sylin-org/koan-framework
+---
+
+# Koan Framework Workflow Feature Development
+
+## Action
+
+Follow the feature-development workflow:
+1. Add feature implementation
+2. Add tests for feature
+3. Update documentation
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~8x per month
+- Files: **/*.test.*, **/api/**
+
+---
+id: koan-framework-workflow-refactoring
+trigger: "when refactoring code"
+confidence: 0.7
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/sylin-org/koan-framework
+---
+
+# Koan Framework Workflow Refactoring
+
+## Action
+
+Follow the refactoring workflow:
+1. Ensure tests pass before refactor
+2. Refactor code structure
+3. Verify tests still pass
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~4x per month
+- Files: src/**/*
+
+---
+id: koan-framework-workflow-adapter-surface-matrix-expansion
+trigger: "when doing adapter surface matrix expansion"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/sylin-org/koan-framework
+---
+
+# Koan Framework Workflow Adapter Surface Matrix Expansion
+
+## Action
+
+Follow the adapter-surface-matrix-expansion workflow:
+1. Add or update test projects under tests/Suites/Web/AdapterSurface/ or tests/Suites/Data/VectorAdapterSurface/ for each adapter.
+2. Implement or update IAdapterTestFactory or IVectorAdapterTestFactory in the new test project.
+3. Wire up spec base classes (e.g., AdapterSurfaceSpecsBase, AdapterPartitionSpecsBase, AdapterTransferSpecsBase, VectorAdapterSurfaceSpecsBase, etc.) in the test project.
+4. Update shared test kit (TestKit) for new capabilities or spec bases as needed.
+5. Update README.md in the relevant test kit to document adapter status and instructions.
+6. Run the full matrix and update capability flags/skips as needed.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: tests/Suites/Web/AdapterSurface/Koan.Web.AdapterSurface.*.Tests/*, tests/Suites/Web/AdapterSurface/Koan.Web.AdapterSurface.TestKit/*, tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.*.Tests/*
+
+---
+id: koan-framework-workflow-data-layer-contract-migration
+trigger: "when doing data layer contract migration"
+confidence: 0.55
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/sylin-org/koan-framework
+---
+
+# Koan Framework Workflow Data Layer Contract Migration
+
+## Action
+
+Follow the data-layer-contract-migration workflow:
+1. Update or remove interfaces in src/Koan.Data.Abstractions/ (e.g., IDataRepositoryWithOptions, INamingProvider, ISchemaHealthContributor).
+2. Refactor all adapter implementations in src/Connectors/Data/* to match the new contract.
+3. Update RepositoryFacade, CachedRepository, and any decorators to match the new signatures.
+4. Update or remove related static caches or helpers (e.g., AggregateConfigs, EntitySchemaGuard, NamingComposer).
+5. Update all test projects and fakes/specs that referenced the old contracts.
+6. Validate with the adapter surface matrix to ensure zero regression.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~1x per month
+- Files: src/Koan.Data.Abstractions/*, src/Koan.Data.Core/*, src/Koan.Cache/Decorators/CachedRepository.cs
+
+---
+id: koan-framework-workflow-adapter-bugfix-driven-by-matrix
+trigger: "when doing adapter bugfix driven by matrix"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/sylin-org/koan-framework
+---
+
+# Koan Framework Workflow Adapter Bugfix Driven By Matrix
+
+## Action
+
+Follow the adapter-bugfix-driven-by-matrix workflow:
+1. Identify failing or skipped specs in the matrix and diagnose root cause.
+2. Update the affected adapter implementation (e.g., src/Connectors/Data/*/*Repository.cs or *AdapterFactory.cs).
+3. If needed, update shared abstractions or test kit to support the fix.
+4. Validate the fix by rerunning the full matrix and confirming all relevant specs pass.
+5. Document the fix in the adapter surface README or relevant ADR if architectural.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: src/Connectors/Data/*/*Repository.cs, src/Connectors/Data/*/*AdapterFactory.cs, src/Koan.Data.Abstractions/*
+
+---
+id: koan-framework-workflow-documenting-and-adding-workbooks
+trigger: "when doing documenting and adding workbooks"
+confidence: 0.55
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/sylin-org/koan-framework
+---
+
+# Koan Framework Workflow Documenting And Adding Workbooks
+
+## Action
+
+Follow the documenting-and-adding-workbooks workflow:
+1. Create a new workbook in docs/workbooks/ (e.g., adding-a-connector.md, versioning.md).
+2. Update docs/workbooks/README.md to index the new workbook.
+3. If needed, update or create a _template.md for contributors.
+4. Update any cross-references in guides, ADRs, or scripts to point to the new workbook.
+5. Update header comments in relevant scripts or workflows to reference the workbook.
+6. If replacing an old guide, stub the old file to redirect to the new location.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~1x per month
+- Files: docs/workbooks/*.md, docs/workbooks/README.md, docs/workbooks/_template.md
+
+---
+id: koan-framework-workflow-feature-development-with-adrs-and-tests
+trigger: "when doing feature development with adrs and tests"
+confidence: 0.55
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/sylin-org/koan-framework
+---
+
+# Koan Framework Workflow Feature Development With Adrs And Tests
+
+## Action
+
+Follow the feature-development-with-adrs-and-tests workflow:
+1. Draft an ADR in docs/decisions/ describing the feature, rationale, and migration path.
+2. Implement the feature in src/ (may span multiple submodules).
+3. Write or update tests in tests/Suites/* to cover the new feature end-to-end.
+4. Update or create documentation as needed.
+5. Validate via the relevant test suites or matrices.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~1x per month
+- Files: docs/decisions/*.md, src/*/*, tests/Suites/*/*
+
+---
+id: koan-framework-workflow-routine-version-bump-release
+trigger: "when doing routine version bump release"
+confidence: 0.55
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/sylin-org/koan-framework
+---
+
+# Koan Framework Workflow Routine Version Bump Release
+
+## Action
+
+Follow the routine-version-bump-release workflow:
+1. Update build/versions.props with the new version numbers for all packages.
+2. Commit with a chore(release): bump message.
+3. No code changes; purely mechanical.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~1x per month
+- Files: build/versions.props
+
+---
+id: koan-framework-instinct-naming-conventions
+trigger: "When creating new files, classes, functions, or constants in C# code"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: sylin-org/koan-framework
+---
+
+# Koan Framework Instinct Naming Conventions
+
+## Action
+
+Use PascalCase for files and classes, camelCase for functions, and SCREAMING_SNAKE_CASE for constants
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions
+- Files and classes like Koan.Web.Auth, Koan.Data.Abstractions
+
+---
+id: koan-framework-instinct-import-style
+trigger: "When importing modules in C# code"
+confidence: 0.85
+domain: code-style
+source: repo-analysis
+source_repo: sylin-org/koan-framework
+---
+
+# Koan Framework Instinct Import Style
+
+## Action
+
+Use relative import paths
+
+## Evidence
+
+- Pattern in codeStyle.importStyle: relative
+
+---
+id: koan-framework-instinct-export-style
+trigger: "When exporting modules or types in C# code"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: sylin-org/koan-framework
+---
+
+# Koan Framework Instinct Export Style
+
+## Action
+
+Use named exports
+
+## Evidence
+
+- Pattern in codeStyle.exportStyle: named
+
+---
+id: koan-framework-instinct-test-file-pattern
+trigger: "When creating new test files"
+confidence: 0.9
+domain: testing
+source: repo-analysis
+source_repo: sylin-org/koan-framework
+---
+
+# Koan Framework Instinct Test File Pattern
+
+## Action
+
+Name test files with *Tests.cs suffix
+
+## Evidence
+
+- Pattern in testing.filePattern: *Tests.cs
+- Files like Koan.Web.Auth.Tests.csproj
+
+---
+id: koan-framework-instinct-test-type
+trigger: "When writing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: sylin-org/koan-framework
+---
+
+# Koan Framework Instinct Test Type
+
+## Action
+
+Write unit tests as the primary test type
+
+## Evidence
+
+- Pattern in testing.testTypes: unit
+
+---
+id: koan-framework-instinct-git-commit-format
+trigger: "When making a git commit"
+confidence: 0.95
+domain: git
+source: repo-analysis
+source_repo: sylin-org/koan-framework
+---
+
+# Koan Framework Instinct Git Commit Format
+
+## Action
+
+Use conventional commit prefixes: feat, fix, test, docs, chore, refactor, followed by (scope): message
+
+## Evidence
+
+- Pattern in commits.prefixes
+- Examples like feat(web-auth): ..., fix(data): ...
+
+---
+id: koan-framework-instinct-git-commit-length
+trigger: "When writing a commit message"
+confidence: 0.8
+domain: git
+source: repo-analysis
+source_repo: sylin-org/koan-framework
+---
+
+# Koan Framework Instinct Git Commit Length
+
+## Action
+
+Keep commit message length around 72 characters
+
+## Evidence
+
+- Pattern in commits.averageLength: 72
+
+---
+id: koan-framework-instinct-adapter-surface-matrix-expansion
+trigger: "When a new data or vector adapter is added, or when new CRUD/partition/transfer specs are needed across all adapters"
+confidence: 0.98
+domain: workflow
+source: repo-analysis
+source_repo: sylin-org/koan-framework
+---
+
+# Koan Framework Instinct Adapter Surface Matrix Expansion
+
+## Action
+
+Expand the adapter surface matrix by adding/updating test projects, factories, spec bases, test kits, and documentation; run the full matrix and update capability flags/skips
+
+## Evidence
+
+- Workflow: adapter-surface-matrix-expansion
+- Files: tests/Suites/Web/AdapterSurface/Koan.Web.AdapterSurface.*.Tests/*, tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.*.Tests/*
+
+---
+id: koan-framework-instinct-data-layer-contract-migration
+trigger: "When a breaking change or simplification is needed in the data-layer contracts"
+confidence: 0.95
+domain: workflow
+source: repo-analysis
+source_repo: sylin-org/koan-framework
+---
+
+# Koan Framework Instinct Data Layer Contract Migration
+
+## Action
+
+Update or remove interfaces, refactor adapters, update facades/decorators, update caches/helpers, update tests, and validate with the adapter surface matrix
+
+## Evidence
+
+- Workflow: data-layer-contract-migration
+- Files: src/Koan.Data.Abstractions/*, src/Connectors/Data/*/*Repository.cs
+
+---
+id: koan-framework-instinct-adapter-bugfix-driven-by-matrix
+trigger: "When the adapter matrix exposes a bug or contract violation in a specific adapter"
+confidence: 0.92
+domain: workflow
+source: repo-analysis
+source_repo: sylin-org/koan-framework
+---
+
+# Koan Framework Instinct Adapter Bugfix Driven By Matrix
+
+## Action
+
+Diagnose the root cause, update the affected adapter, update shared abstractions/test kit if needed, rerun the matrix to confirm fix, document in README or ADR
+
+## Evidence
+
+- Workflow: adapter-bugfix-driven-by-matrix
+- Files: src/Connectors/Data/*/*Repository.cs, tests/Suites/Web/AdapterSurface/Koan.Web.AdapterSurface.*.Tests/*
+
+---
+id: koan-framework-instinct-documenting-and-adding-workbooks
+trigger: "When a new operational scenario, connector, or workflow needs documentation"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: sylin-org/koan-framework
+---
+
+# Koan Framework Instinct Documenting And Adding Workbooks
+
+## Action
+
+Add a new workbook in docs/workbooks/, update README and cross-references, update scripts/workflows as needed, stub old guides if replaced
+
+## Evidence
+
+- Workflow: documenting-and-adding-workbooks
+- Files: docs/workbooks/*.md, docs/workbooks/README.md
+
+---
+id: koan-framework-instinct-feature-development-with-adrs-and-tests
+trigger: "When a significant new feature or contract is added"
+confidence: 0.88
+domain: workflow
+source: repo-analysis
+source_repo: sylin-org/koan-framework
+---
+
+# Koan Framework Instinct Feature Development With Adrs And Tests
+
+## Action
+
+Draft an ADR, implement the feature in src/, write/update tests in tests/Suites/, update documentation, validate via test suites/matrices
+
+## Evidence
+
+- Workflow: feature-development-with-adrs-and-tests
+- Files: docs/decisions/*.md, src/*/*, tests/Suites/*/*
+
+---
+id: koan-framework-instinct-routine-version-bump-release
+trigger: "When preparing a new release (patch or minor)"
+confidence: 0.99
+domain: workflow
+source: repo-analysis
+source_repo: sylin-org/koan-framework
+---
+
+# Koan Framework Instinct Routine Version Bump Release
+
+## Action
+
+Update build/versions.props with new version numbers, commit with chore(release): bump message, no code changes
+
+## Evidence
+
+- Workflow: routine-version-bump-release
+- Files: build/versions.props
+
