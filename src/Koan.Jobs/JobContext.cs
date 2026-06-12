@@ -51,12 +51,12 @@ public sealed class JobContext
     /// <summary>Read-only orchestration snapshot for stateful decisions.</summary>
     public JobState State { get; }
 
-    // --- outcome the handler signalled (read by the orchestrator post-execute) ---
-    internal JobSignal Signal { get; private set; } = JobSignal.None;
-    internal DateTimeOffset? DeferUntil { get; private set; }
-    internal bool GateKeyOverrideSet { get; private set; }
-    internal string? GateKeyOverride { get; private set; }
-    internal string? NextAction { get; private set; }
+    // --- outcome the handler signalled (read by the orchestrator post-execute; public for test assertions) ---
+    public JobSignal Signal { get; private set; } = JobSignal.None;
+    public DateTimeOffset? DeferUntil { get; private set; }
+    public bool GateKeyOverrideSet { get; private set; }
+    public string? GateKeyOverride { get; private set; }
+    public string? NextAction { get; private set; }
 
     /// <summary>Report durable progress (persisted to the ledger; surfaced to dashboards).</summary>
     public Task Progress(double fraction, string? message = null)

@@ -114,14 +114,40 @@ public sealed class JobOrchestrator
         finally { lane.Release(); }
     }
 
-    private async Task ExecuteClaimedAsync(JobRecord rec, JobTypeBinding binding, ResolvedActionPolicy policy, CancellationToken workerCt)
+    /// <summary>Claim and execute exactly one ready job through the same path as <see cref="DrainAsync"/>, returning
+    /// its execution result. Returns null when nothing is ready or when the work-item could not be loaded.
+    /// Designed for in-process stage-handler integration testing via <c>JobStagePilot</c>.</summary>
+    public async Task<JobRunResult?> ExecuteNextAsync(CancellationToken ct = default)
+    {
+        var now = _clock.GetUtcNow();
+        var pools = await ResolvePoolContextsAsync(ct);
+        var rec = await _ledger.ClaimNext(_owner, now, now + _options.LeaseDuration, SaturatedLanes(), ct, pools);
+        if (rec is null) return null;
+
+        var binding = _registry.Require(rec.WorkType);
+        var policy = binding.ResolvePolicy(rec.Action, _options);
+        var sem = LaneSem(policy.Lane, policy.MaxConcurrency);
+        if (!sem.Wait(0)) await sem.WaitAsync(ct);
+        JobContext? ctx;
+        try
+        {
+            try { ctx = await ExecuteClaimedAsync(rec, binding, policy, ct); }
+            catch (Exception ex) { _logger.LogError(ex, "Unhandled error settling job {JobId}", rec.Id); ctx = null; }
+        }
+        finally { sem.Release(); }
+
+        return ctx is null ? null
+            : new JobRunResult(rec.Id, rec.WorkType, rec.Action, ctx.Signal, ctx.DeferUntil, ctx.NextAction, ctx.GateKeyOverride);
+    }
+
+    private async Task<JobContext?> ExecuteClaimedAsync(JobRecord rec, JobTypeBinding binding, ResolvedActionPolicy policy, CancellationToken workerCt)
     {
         object? workItem;
         try { workItem = await binding.Load(rec.WorkId, workerCt); }
-        catch (Exception ex) { await SettleFailureAsync(rec, binding, policy, ex); return; }
+        catch (Exception ex) { await SettleFailureAsync(rec, binding, policy, ex); return null; }
         // Type-level triggers (TriggerAsync) use an ephemeral singleton that is never persisted; re-create it here.
         workItem ??= rec.WorkId == JobCoordinator.SingletonWorkId ? binding.NewSingleton(rec.WorkId) : null;
-        if (workItem is null) { await SettleFailureAsync(rec, binding, policy, new InvalidOperationException($"Work-item {rec.WorkType}/{rec.WorkId} not found.")); return; }
+        if (workItem is null) { await SettleFailureAsync(rec, binding, policy, new InvalidOperationException($"Work-item {rec.WorkType}/{rec.WorkId} not found.")); return null; }
 
         var snapshot = Snapshot(workItem);   // for conditional auto-save (§17.1): only persist if the handler mutates it
 
@@ -161,6 +187,7 @@ public sealed class JobOrchestrator
         {
             _running.TryRemove(rec.Id, out _);
         }
+        return ctx;
     }
 
     // --- settle paths ---

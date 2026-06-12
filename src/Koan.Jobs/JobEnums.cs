@@ -32,8 +32,9 @@ public enum ClaimStrategy
     Ticket = 1,
 }
 
-/// <summary>The control signal a handler raised via <see cref="JobContext"/> verbs, read by the orchestrator post-execute.</summary>
-internal enum JobSignal
+/// <summary>The control signal a handler raised via <see cref="JobContext"/> verbs, read by the orchestrator post-execute.
+/// Exposed publicly so integration tests can assert the exact signal without querying the ledger.</summary>
+public enum JobSignal
 {
     None = 0,
     Reschedule = 1,

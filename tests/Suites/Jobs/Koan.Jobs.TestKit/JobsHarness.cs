@@ -125,6 +125,9 @@ public sealed class JobsHarness : IAsyncDisposable
         try { await Data<JobMetric, string>.Execute<object?>(ensure); } catch { }
     }
 
+    /// <summary>In-process stage-handler executor. Runs exactly one stage per call through the real orchestration path.</summary>
+    public JobStagePilot Pilot => new(this);
+
     public void Advance(TimeSpan by) => Clock.Advance(by);
     public Task Drain(CancellationToken ct = default) => Orchestrator.DrainAsync(ct);
     public Task TriggerDue(CancellationToken ct = default) => Scheduler.TriggerDueAsync(ct);

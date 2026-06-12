@@ -493,6 +493,82 @@ For schedules, timeouts, and deferrals, inject a `TimeProvider` (Koan uses the s
 
 **When to use it.** Always—assert your handler's logic and chain decisions in milliseconds.
 
+### Testing stage handlers in-process (JobStagePilot)
+
+When a job has multiple stages, `DrainAsync` runs all ready stages in one call. To assert the settle result and chain advancement of a **single stage** without triggering its successors, use `JobStagePilot` from `Koan.Jobs.TestKit`.
+
+`host.Pilot.RunStageAsync(workItem, action)` submits the work-item for that specific action and drives exactly one claim/settle cycle through the real production path. It returns a `StageRunResult`:
+
+| Field | What it holds |
+|---|---|
+| `result.Run.Signal` | The `JobSignal` the handler raised (`None`, `StopChain`, `ContinueWith`, `Reschedule`, `Backoff`) |
+| `result.Run.NextAction` | The action passed to `ctx.ContinueWith(...)`, if any |
+| `result.Run.DeferUntil` | The time the handler rescheduled to, if any |
+| `result.Settled` | The `JobRecord` after settle (inspect `Status`, `Attempt`, etc.) |
+| `result.Successor` | The next-stage `JobRecord` the chain appended, or null if stopped/rescheduled |
+
+**Sample — two-stage chain:**
+
+```csharp
+await using var host = await JobsHarness.StartInMemoryAsync();
+var pipeline = new Pipeline();
+
+var result = await host.Pilot.RunStageAsync(pipeline, Stage.Fetch);
+
+// Assert the control signal
+result.Run.Signal.Should().Be(JobSignal.None);   // default chain advance
+
+// Assert settle
+result.Settled.Status.Should().Be(JobStatus.Completed);
+
+// Assert chain advancement -- Parse was appended but NOT run yet
+result.Successor!.Action.Should().Be(Stage.Parse);
+result.Successor.Status.Should().Be(JobStatus.Queued);
+
+// Assert entity mutations (auto-save persisted the handler's writes)
+var saved = await Pipeline.Get(pipeline.Id);
+saved!.Fetched.Should().Be("raw");
+saved.Trail.Should().Equal(Stage.Fetch);   // Parse has NOT run
+```
+
+**Asserting explicit signals:**
+
+```csharp
+// StopChain -- no successor appended
+result.Run.Signal.Should().Be(JobSignal.StopChain);
+result.Successor.Should().BeNull();
+
+// ContinueWith -- branches to a named action
+result.Run.Signal.Should().Be(JobSignal.ContinueWith);
+result.Run.NextAction.Should().Be("MyBranchAction");
+result.Successor!.Action.Should().Be("MyBranchAction");
+
+// Reschedule -- same stage re-queued
+result.Run.Signal.Should().Be(JobSignal.Reschedule);
+result.Run.DeferUntil.Should().NotBeNull();
+result.Settled.Status.Should().Be(JobStatus.Queued);
+result.Successor.Should().BeNull();
+```
+
+**Real-storage pattern.** `JobStagePilot` works against any adapter. Pass your store settings to `JobsHarness.StartWithSettingsAsync`:
+
+```csharp
+await using var host = await JobsHarness.StartWithSettingsAsync(mongoSettings);
+var result = await host.Pilot.RunStageAsync(convergeJob, "Converge");
+```
+
+**Driving multiple stages sequentially.** Call `RunStageAsync` once per stage and assert intermediate state after each:
+
+```csharp
+var stage1 = await host.Pilot.RunStageAsync(pipeline, Stage.Fetch);
+stage1.Successor!.Action.Should().Be(Stage.Parse);
+
+// Reload the mutated entity and run the next stage
+var fetchedPipeline = await Pipeline.Get(pipeline.Id);
+var stage2 = await host.Pilot.RunStageAsync(fetchedPipeline!, Stage.Parse);
+stage2.Settled.Status.Should().Be(JobStatus.Completed);
+```
+
 ---
 
 ## 12. The `JobContext` at a glance
