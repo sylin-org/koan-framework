@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json;
 using Koan.Data.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -8,8 +9,9 @@ namespace Koan.Jobs;
 /// <inheritdoc/>
 public sealed class JobCoordinator : IJobCoordinator
 {
-    /// <summary>Stable id of the per-type singleton work-item used by type-level triggers and scheduled ticks.</summary>
-    internal const string SingletonWorkId = "__koan_job_singleton__";
+    /// <summary>Stable id used by type-level triggers and scheduled ticks. Not persisted to the consumer's entity
+    /// collection — the singleton is created in-memory at execution time by <see cref="JobTypeBinding.NewSingleton"/>.</summary>
+    public const string SingletonWorkId = "__koan_job_singleton__";
 
     private readonly IJobLedger _ledger;
     private readonly JobTypeRegistry _registry;
@@ -45,16 +47,22 @@ public sealed class JobCoordinator : IJobCoordinator
         var binding = _registry.Require(workItem.GetType().FullName!);
         var policy = binding.ResolvePolicy(action, _options);
         var workId = binding.GetId(workItem);
-        await binding.Save(workItem, ct);
-
         var now = _clock.GetUtcNow();
 
+        // Coalesce check BEFORE any entity save: a duplicate submit returns the existing handle without touching the store.
         var coalesceKey = binding.CoalesceKey(workItem, action);
         if (coalesceKey is not null)
         {
             var existing = await _ledger.FindActiveByCoalesceKey(binding.WorkType, coalesceKey, ct);
-            if (existing is not null) return Handle(existing.Id); // collapse concurrent / duplicate submit
+            if (existing is not null) return Handle(existing.Id); // collapse concurrent / duplicate submit — no save
         }
+
+        // Conditional save: persist only when the work-item is new or has changed since the last save.
+        // First-submit correctness: the entity must be in the store before its first JobRecord is appended.
+        var current = await binding.Load(workId, ct);
+        var incomingSnapshot = Snapshot(workItem);
+        if (current is null || incomingSnapshot is null || Snapshot(current) != incomingSnapshot)
+            await binding.Save(workItem, ct);
 
         var gateKey = await ResolveGateKey(binding, workItem, ct);
         var rec = JobRecordFactory.Create(binding, policy, workItem, workId, action, now, after, Correlation(), gateKey);
@@ -79,11 +87,17 @@ public sealed class JobCoordinator : IJobCoordinator
             var binding = _registry.Require(workItem.GetType().FullName!);
             var policy = binding.ResolvePolicy(action, _options);
             var workId = binding.GetId(workItem);
-            await binding.Save(workItem, ct);
 
+            // Coalesce check BEFORE any entity save.
             var coalesceKey = binding.CoalesceKey(workItem, action);
             if (coalesceKey is not null && await _ledger.FindActiveByCoalesceKey(binding.WorkType, coalesceKey, ct) is not null)
                 continue;
+
+            // Conditional save: persist only when new or changed.
+            var current = await binding.Load(workId, ct);
+            var incomingSnapshot = Snapshot(workItem);
+            if (current is null || incomingSnapshot is null || Snapshot(current) != incomingSnapshot)
+                await binding.Save(workItem, ct);
 
             var gateKey = await ResolveGateKey(binding, workItem, ct);
             batch.Add(JobRecordFactory.Create(binding, policy, workItem, workId, action, now, after, correlation, gateKey));
@@ -98,8 +112,26 @@ public sealed class JobCoordinator : IJobCoordinator
     public async Task<JobHandle> TriggerAsync(string workType, string action, CancellationToken ct)
     {
         var binding = _registry.Require(workType);
-        var workItem = await binding.Load(SingletonWorkId, ct) ?? binding.NewSingleton(SingletonWorkId);
-        return await SubmitAsync(workItem, action, null, ct);
+        var policy = binding.ResolvePolicy(action, _options);
+        var now = _clock.GetUtcNow();
+        // The singleton is ephemeral — it must NOT be persisted into the consumer's entity collection. The orchestrator
+        // creates a fresh instance via binding.NewSingleton at execution time (no store round-trip on the hot path).
+        var workItem = binding.NewSingleton(SingletonWorkId);
+
+        var coalesceKey = binding.CoalesceKey(workItem, action);
+        if (coalesceKey is not null)
+        {
+            var existing = await _ledger.FindActiveByCoalesceKey(binding.WorkType, coalesceKey, ct);
+            if (existing is not null) return Handle(existing.Id);
+        }
+
+        var gateKey = await ResolveGateKey(binding, workItem, ct);
+        var rec = JobRecordFactory.Create(binding, policy, workItem, SingletonWorkId, action, now, null, Correlation(), gateKey);
+        await _ledger.Append(rec, ct);
+
+        if (!EntityContext.InTransaction) _transport.Notify();
+        if (_options.Mode == JobMode.Inline && !EntityContext.InTransaction) await _orchestrator.DrainAsync(ct);
+        return Handle(rec.Id);
     }
 
     public async Task CancelWorkAsync(string workType, string workId, CancellationToken ct)
@@ -148,4 +180,10 @@ public sealed class JobCoordinator : IJobCoordinator
     });
 
     private static string? Correlation() => Activity.Current?.TraceId.ToString();
+
+    private static string? Snapshot(object workItem)
+    {
+        try { return JsonSerializer.Serialize(workItem, workItem.GetType()); }
+        catch { return null; }
+    }
 }
