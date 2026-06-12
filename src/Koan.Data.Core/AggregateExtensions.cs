@@ -38,7 +38,7 @@ public static class AggregateExtensions
     // Instance-level convenience: model.Upsert("partition") (generic key)
     /// <summary>
     /// Insert or update a model into a specific logical partition for the aggregate using its configured repository.
-    /// Routes storage to BaseName#&lt;partition&gt; via EntityContext and StorageNameRegistry.
+    /// Routes storage to BaseName#&lt;partition&gt; via EntityContext and the adapter factory's ResolveStorage.
     /// </summary>
     public static Task<TEntity> Upsert<TEntity, TKey>(this TEntity model, string partition, CancellationToken ct = default)
         where TEntity : class, IEntity<TKey>

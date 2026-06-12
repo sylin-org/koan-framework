@@ -4,7 +4,7 @@ using System.Security.Claims;
 using System.Threading;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Koan.Data.Abstractions;
+using Koan.Core.Capabilities;
 using Koan.Web.Endpoints;
 
 namespace Koan.Web.Hooks;
@@ -27,7 +27,7 @@ public sealed class HookContext<TEntity>
 
     public QueryOptions Options => Request.Options;
 
-    public IQueryCapabilities Capabilities => Request.Capabilities;
+    public CapabilitySet Capabilities => Request.Capabilities;
 
     public IDictionary<string, string> ResponseHeaders => Request.Headers;
 

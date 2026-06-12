@@ -1090,15 +1090,12 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
                 List<Models.ImportJob> active;
                 using (Koan.Data.Core.EntityContext.Partition("jobs-active"))
                 {
-                    active = (await Models.ImportJob.All(
-                        new DataQueryOptions { PageSize = 10, Sort = "-CreatedAt" },
-                        ct)).ToList();
+                    // DATA-0096: DataQueryOptions removed — FirstPage(size, sort) is the equivalent.
+                    active = (await Models.ImportJob.FirstPage(10, "-CreatedAt", ct)).ToList();
                 }
 
                 // Also get completed jobs from default partition
-                var completed = (await Models.ImportJob.All(
-                    new DataQueryOptions { PageSize = 10, Sort = "-CreatedAt" },
-                    ct)).ToList();
+                var completed = (await Models.ImportJob.FirstPage(10, "-CreatedAt", ct)).ToList();
 
                 var recentJobs = active.Concat(completed)
                     .OrderByDescending(j => j.CreatedAt)

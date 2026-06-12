@@ -40,9 +40,9 @@ Apps describe their topology in an AppHost project:
 ```csharp
 var builder = DistributedApplication.CreateBuilder(args);
 
-var mongo = builder.AddKoanMongo("mongo").AddDatabase("emporium");
+var mongo = builder.AddKoanMongo("mongo").AddDatabase("appdb");
 var auth  = builder.AddProject<Projects.Auth_Svc>("auth").WithReference(mongo);
-var emp   = builder.AddProject<Projects.Emporium_Svc>("emp").WithReference(mongo).WithReference(auth);
+var emp   = builder.AddProject<Projects.App_Svc>("emp").WithReference(mongo).WithReference(auth);
 
 builder.Build().Run();
 ```

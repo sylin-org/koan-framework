@@ -2,7 +2,7 @@
 
 Core primitives for Koan: configuration helpers, environment snapshot (KoanEnv), constants, and foundational abstractions.
 
-- Target framework: net9.0
+- Target framework: net10.0
 - License: Apache-2.0
 
 ## Install

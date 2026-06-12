@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -8,7 +8,9 @@ using Microsoft.OpenApi;
 namespace Koan.Web.OpenApi.Transformers;
 
 /// <summary>
-/// Mirrors Koan transformer media type registrations in OpenAPI when entity transformers are enabled.
+/// Mirrors Koan Terminal-stage transformer media-type registrations in OpenAPI. Pipeline-stage
+/// enrichers (<c>IEntityEnricher&lt;T&gt;</c>) do not change the wire shape and are deliberately
+/// excluded — they are not Accept-selectable variants.
 /// </summary>
 internal sealed class TransformerMediaTypesOperationTransformer : IOpenApiOperationTransformer
 {
@@ -17,9 +19,12 @@ internal sealed class TransformerMediaTypesOperationTransformer : IOpenApiOperat
         ArgumentNullException.ThrowIfNull(operation);
         ArgumentNullException.ThrowIfNull(context);
 
-        var attrType = Type.GetType("Koan.Web.Transformers.EnableEntityTransformersAttribute, Koan.Web.Transformers");
+        // Controllers opt into the transformer pipeline by implementing ITransformerActivationPredicate
+        // (WEB-0067). We look the interface up reflectively so the OpenAPI module stays loosely
+        // coupled to Koan.Web.Transformers.
+        var predicateType = Type.GetType("Koan.Web.Transformers.ITransformerActivationPredicate, Koan.Web.Transformers");
         var registryType = Type.GetType("Koan.Web.Transformers.ITransformerRegistry, Koan.Web.Transformers");
-        if (attrType is null || registryType is null)
+        if (predicateType is null || registryType is null)
         {
             return Task.CompletedTask;
         }
@@ -30,8 +35,9 @@ internal sealed class TransformerMediaTypesOperationTransformer : IOpenApiOperat
             return Task.CompletedTask;
         }
 
-        var hasAttribute = controllerMethod.DeclaringType?.GetCustomAttributes(attrType, inherit: true).Any() == true;
-        if (!hasAttribute)
+        var declaringType = controllerMethod.DeclaringType;
+        var optsIn = declaringType is not null && predicateType.IsAssignableFrom(declaringType);
+        if (!optsIn)
         {
             return Task.CompletedTask;
         }
@@ -66,13 +72,13 @@ internal sealed class TransformerMediaTypesOperationTransformer : IOpenApiOperat
             return;
         }
 
-        var getMethod = registryType.GetMethod("GetContentTypes")?.MakeGenericMethod(entityType);
+        var getMethod = registryType.GetMethod("GetContentTypes", new[] { typeof(Type) });
         if (getMethod is null)
         {
             return;
         }
 
-        if (getMethod.Invoke(registry, []) is IReadOnlyList<string> list && list.Count > 0)
+        if (getMethod.Invoke(registry, new object?[] { entityType }) is IReadOnlyList<string> list && list.Count > 0)
         {
             var responses = EnsureResponses(operation);
             if (!responses.TryGetValue("200", out var okResponse) || okResponse is not OpenApiResponse mutableResponse)
@@ -100,13 +106,13 @@ internal sealed class TransformerMediaTypesOperationTransformer : IOpenApiOperat
             return;
         }
 
-        var getMethod = registryType.GetMethod("GetContentTypes")?.MakeGenericMethod(entityType);
+        var getMethod = registryType.GetMethod("GetContentTypes", new[] { typeof(Type) });
         if (getMethod is null)
         {
             return;
         }
 
-        if (getMethod.Invoke(registry, []) is IReadOnlyList<string> list && list.Count > 0)
+        if (getMethod.Invoke(registry, new object?[] { entityType }) is IReadOnlyList<string> list && list.Count > 0)
         {
             operation.RequestBody ??= new OpenApiRequestBody { Required = true };
             if (operation.RequestBody is OpenApiRequestBody requestBody)

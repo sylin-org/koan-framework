@@ -3,467 +3,184 @@ type: ARCHITECTURE
 domain: framework
 title: "Koan Framework Architecture Principles"
 audience: [architects, developers, ai-agents]
-last_updated: 2026-03-23
-framework_version: v0.6.3
 status: current
-validation:
-    date_last_tested: 2026-03-23
-    status: verified
-    scope: docs/architecture/principles.md
 ---
 
 # Koan Framework Architecture Principles
 
-**Document Type**: ARCHITECTURE
-**Target Audience**: Architects, Senior Developers
-**Last Updated**: 2026-03-23
-**Framework Version**: v0.6.3
+The canon: what Koan believes, why, and where each belief is enforced in code. Every code block
+on this page reflects the current source. Principles marked **(consolidation era)** were adopted
+during the post-feasibility hardening and take precedence where older material conflicts.
 
----
+## Core philosophy
 
-## Core Philosophy
+### Entity-first development
+
+Entities own their persistence and their surfaces. No repositories, no DbContext, no service
+layer for CRUD.
+
+```csharp
+public sealed class Todo : Entity<Todo>
+{
+    public string Title { get; set; } = "";
+    public bool IsCompleted { get; set; }
+}
+
+var todo = await Todo.Get(id);                     // null when missing
+var open = await Todo.Query(t => !t.IsCompleted);  // pushed down when supported
+await new Todo { Title = "Ship" }.Save();
+await todo.Remove();
+```
+
+The same entity is the unit of *every* pillar: REST (`EntityController<T>`), caching
+(`[Cacheable]`), jobs (`IKoanJob<T>`), embeddings (`[Embedding]`), agent tools (`[McpEntity]`).
+One grammar, many capabilities — this is the framework's center of gravity, and its front-door
+facades are deliberately protected from churn.
 
 ### Reference = Intent
 
+Adding a package reference *is* the configuration. Each referenced module registers itself; the
+app's `Program.cs` stays at four lines:
+
 ```csharp
-// Adding a package reference enables functionality
+var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan();
+var app = builder.Build();
+app.Run();
 ```
 
-Modules auto-register via `IKoanAutoRegistrar`. No manual service configuration.
+Discovery is **not** runtime reflection magic: a Roslyn source generator emits a per-assembly
+registry at build time (`KoanRegistry`), loaded via module initializers with deterministic
+topological ordering (`[Before]`/`[After]`). It is AOT-friendly and inspectable.
 
-### Provider Transparency
+### Capability-graded provider transparency **(consolidation era — ARCH-0084)**
+
+Same entity code across SQLite, Postgres, SQL Server, MongoDB, Couchbase, Redis, JSON-file, and
+vector stores — but Koan does not pretend backends are identical. Every adapter **declares**
+capabilities, the framework **negotiates** them, and consumers can **query** them:
 
 ```csharp
-// Same code works across any storage backend
-public class Todo : Entity<Todo>
-{
-    public string Title { get; set; } = "";
-}
-
-var todos = await Todo.All(); // PostgreSQL, MongoDB, Vector DB, JSON file
+var caps = Data<Todo, string>.Capabilities;        // CapabilitySet
+if (caps.Has(DataCaps.Query.Linq)) { /* pushdown active */ }
 ```
 
-Storage backend becomes a deployment concern, not development concern.
+Where a capability is absent, behavior is graded honestly: native TTL retention only where the
+store supports it (with a universal purge backstop), compare-and-set claims only on adapters
+that implement them, pushdown or fail-loud — never silent emulation of guarantees the store
+cannot give.
 
-### Entity-First Development
+### Fail-loud is canon **(consolidation era — ARCH-0084 / DATA-0097)**
+
+An operation the provider cannot honor is a **hard, descriptive error**, never silent narrowing.
+A filter that cannot be pushed down to a vector store throws; an unsupported capability throws
+`CapabilityNotSupportedException`; resolution failures name the exact configuration keys to fix.
+(Known gap being closed: boot-time module failures historically logged nothing — the boot path
+is being aligned with this principle; see the assessment, Track F.)
+
+### Self-reporting infrastructure
+
+The application explains itself. At startup, the boot report names every discovered module, the
+adapter elections, and the boot phases; health contributors aggregate readiness; capability sets
+and well-known endpoints describe the running service; `[McpEntity]` extends the same
+self-description to agents.
 
 ```csharp
-// Static methods are first-class
-var todo = await Todo.Get(id);
-var todos = await Todo.Where(t => !t.IsCompleted);
-
-// Instance methods work consistently
-await todo.Save();
-await todo.Delete();
+KoanEnv.DumpSnapshot(logger);   // environment snapshot on demand
+if (KoanEnv.InContainer) { /* container-aware behavior */ }
 ```
 
-Entities handle their own persistence. No repository pattern needed.
+## Design principles
 
-## Design Principles
+### 1 · Fewer, more meaningful parts **(consolidation era)**
 
-### 1. Simplicity First
+The framework is measured in **developer-facing concepts**, not projects. A part earns its place
+only if a dogfood application reaches for it naturally, or removing it forces ceremony back into
+an app. Overlap is collapsed where ≥2 real usages prove it; speculative abstraction is resisted;
+scaffolding from the feasibility phase is cut, not lovingly refactored.
 
-**SoC, KISS, YAGNI, DRY applied consistently.**
+### 2 · Deterministic configuration, explicit hierarchy
+
+Provider defaults < `appsettings.json` < environment variables < code. Typed options via
+`AddKoanOptions<T>` are the runtime surface; `Configuration.Read(cfg, "Koan:Some:Key", default)`
+is sanctioned for boot-time/provenance paths where options aren't bound yet.
+
+```json
+{ "Koan": { "Data": { "Postgres": { "ConnectionString": "Host=postgres;Database=app" } } } }
+```
+
+Environment override: `Koan__Data__Postgres__ConnectionString=…`
+
+### 3 · Progressive complexity
+
+Level 1 is a four-line app with SQLite. Every additional capability is one package and at most
+one attribute. Concept count is budgeted and documented per step (see
+[getting started](../getting-started/overview.md)) — cognitive load is a tracked cost, not an
+accident.
+
+### 4 · Escape hatches preserve the grammar
+
+Custom controllers coexist with `EntityController<T>` (override the virtual actions or add
+routes); raw provider access exists via `Data<TEntity, TKey>.Execute<TResult>(sql)` and
+instruction execution; per-request behavior is scoped via `EntityContext`
+(e.g. `using (EntityContext.Partition("tenant-42")) { … }`). Hatches are explicit and scoped —
+they never replace the canonical path in documentation.
+
+### 5 · One canonical way per intent **(consolidation era)**
+
+Where history produced two ways, one is canon and the other is retired (visibly, via `[Obsolete]`
+and ADR supersession). Canonical picks of record: `KoanModule` for module authoring; `Save`
+(alias of upsert) and `Remove` as the entity verbs; `EntityContext` scoping over per-call
+partition parameters; Jobs (`[JobAction(Schedule=…)]`) for scheduling; the Jobs ledger for
+outbox semantics; SSE for server push; **Newtonsoft.Json as the application serializer**
+(predictable polymorphic handling; defaults: camelCase, nulls omitted).
+
+### 6 · Integration tests are canon (ARCH-0079)
+
+Every adapter, connector, coherence channel, and pillar core ships at least one integration spec
+that goes through real `AddKoan()` discovery (`KoanIntegrationHost`). Unit tests with fakes are
+insufficient: they structurally cannot reveal composition or shared-resource bugs. Cross-adapter
+*convergence oracles* (a shared spec battery run against every adapter, checked against a
+reference evaluator) guard provider parity.
+
+### 7 · Decisions are written, and supersession is explicit
+
+Architecture lives in `docs/decisions/` (280+ ADRs). A decision that replaces another marks its
+predecessor `Superseded`. Recent ADRs carry empirical probes and staged implementation ledgers —
+follow that bar. The framework also maintains a published self-assessment
+([docs/assessment](../assessment/00-overview.md)) grading each pillar's maturity; claims about
+the framework defer to it.
+
+## Anti-patterns (enforced in review and, increasingly, by analyzers)
 
 ```csharp
-// ✅ Simple controller - full CRUD API
-[Route("api/[controller]")]
-public class TodosController : EntityController<Todo> { }
+// ❌ Manual repository/service ceremony around entities
+public class TodoService { private readonly IRepository<Todo> _repo; /* … */ }
 
-// ❌ Avoid manual CRUD implementation
-public class TodosController : ControllerBase
-{
-    private readonly ITodoRepository _repository;
-    // ... boilerplate
-}
+// ❌ Manual registration of framework services (auto-registration owns this)
+services.AddScoped<IRelationshipMetadata, …>();
+
+// ❌ Provider-specific behavior without a capability check
+//    (use Data<T,K>.Capabilities.Has(...) and fail loud or branch)
+
+// ❌ Inventing APIs from memory — verify against source; docs snippets must compile
 ```
 
-Small modules, explicit composition, clear naming.
-
-### 2. Deterministic Configuration
-
-**Explicit config beats discovery. Fail fast on misconfig.**
-
-```csharp
-// Configuration hierarchy (higher overrides lower):
-// 1. Provider defaults
-// 2. appsettings.json
-// 3. Environment variables
-// 4. Code overrides
-
-var value = Configuration.Read(cfg, "Koan:SomeKey", defaultValue);
-```
-
-### 3. Progressive Complexity
-
-**Start simple, add complexity incrementally.**
-
-```csharp
-// Level 1: Basic entity
-public class User : Entity<User>
-{
-    public string Email { get; set; } = "";
-}
-
-// Level 2: Business logic
-public class User : Entity<User>
-{
-    public string Email { get; set; } = "";
-
-    public static Task<User[]> ActiveUsers() =>
-        Query().Where(u => u.IsActive);
-}
-
-// Level 3: Multi-provider
-[DataAdapter("redis")]
-public class UserSession : Entity<UserSession>
-{
-    public string UserId { get; set; } = "";
-    public DateTimeOffset ExpiresAt { get; set; }
-}
-```
-
-### 4. Escape Hatches Everywhere
-
-**Framework enhances but never constrains.**
-
-```csharp
-// Direct SQL when needed
-var users = await User.ExecuteSql("SELECT * FROM users WHERE custom_logic = true");
-
-// Custom controllers when needed
-public class CustomController : ControllerBase
-{
-    // Full control over HTTP handling
-}
-```
-
-## Architecture Patterns
-
-### Auto-Registration Pattern
-
-```csharp
-// Modules self-register
-public class DataAutoRegistrar : IKoanAutoRegistrar
-{
-    public string ModuleName => "Koan.Data";
-    public string? ModuleVersion => "v0.6.3";
-
-    public void Initialize(IServiceCollection services)
-    {
-        services.TryAddSingleton<IDataProviderRegistry, DataProviderRegistry>();
-        // Auto-discover providers
-    }
-}
-```
-
-**Boot reports show what got registered:**
-```
-[INFO] Koan:modules data→postgresql
-[INFO] Koan:modules web→controllers
-[INFO] Koan:modules ai→ollama
-```
-
-### Provider Pattern
-
-```csharp
-// Same interface, different implementations
-public interface IDataProvider
-{
-    string Name { get; }
-    bool CanServe(Type entityType);
-    Task<IDataAdapter<T>> GetAdapterAsync<T>() where T : IEntity;
-}
-
-// Election based on capability and configuration
-var provider = _registry.GetProvider(typeof(Todo));
-```
-
-### Capability Detection
-
-```csharp
-// Framework handles provider differences transparently
-var capabilities = Data<Todo, string>.QueryCaps;
-
-// Automatic fallback when provider lacks features
-if (capabilities.Capabilities.HasFlag(QueryCapabilities.LinqQueries))
-{
-    // Query pushed to database
-}
-else
-{
-    // Query executed in-memory
-}
-```
-
-## Container-Native Design
-
-### Environment Detection
-
-```csharp
-// Built-in environment awareness
-if (KoanEnv.IsDevelopment)
-{
-    // Development-only features
-}
-
-if (KoanEnv.InContainer)
-{
-    // Container-specific configuration
-}
-```
-
-### Health Checks
-
-```csharp
-// Automatic health endpoints
-// GET /api/health - overall status
-// GET /api/health/live - liveness probe
-// GET /api/health/ready - readiness probe
-
-public class DatabaseHealthContributor : IHealthContributor
-{
-    public string Name => "Database";
-    public bool IsCritical => true;
-
-    public async Task<HealthReport> CheckAsync(CancellationToken ct = default)
-    {
-        var isHealthy = await _connection.CanConnectAsync();
-        return new HealthReport(Name, isHealthy, isHealthy ? null : "Connection failed");
-    }
-}
-```
-
-### Configuration Resolution
-
-```csharp
-// Container-friendly configuration
-{
-  "Koan": {
-    "Data": {
-      "DefaultProvider": "Postgres",
-      "Postgres": {
-        "ConnectionString": "Host=postgres;Database=myapp"
-      }
-    }
-  }
-}
-
-// Environment variable override:
-// KOAN__DATA__POSTGRES__CONNECTIONSTRING=Host=prod-db;Database=myapp
-```
-
-## Cross-Cutting Concerns
-
-### Service Lifetimes
-
-```csharp
-// Singleton: Clients, factories, caches
-services.TryAddSingleton<IDataProviderRegistry, DataProviderRegistry>();
-
-// Scoped: HTTP request-scoped services
-services.TryAddScoped<IDataContext, DataContext>();
-
-// Transient: Stateless helpers
-services.TryAddTransient<IValidator<User>, UserValidator>();
-```
-
-### Error Handling
-
-```csharp
-// Domain exceptions
-public class EntityNotFoundException : KoanException
-{
-    public EntityNotFoundException(string entityType, string id)
-        : base($"{entityType} with ID '{id}' was not found") { }
-}
-
-// Consistent HTTP error responses
-[HttpGet("{id}")]
-public async Task<IActionResult> Get(string id)
-{
-    var entity = await Todo.Get(id);
-    return entity == null ? NotFound() : Ok(entity);
-}
-```
-
-### Security Defaults
-
-```csharp
-// Secure headers applied automatically
-// X-Frame-Options: DENY
-// X-Content-Type-Options: nosniff
-// Referrer-Policy: strict-origin-when-cross-origin
-
-[Authorize] // Multi-provider authentication
-public class SecureController : EntityController<SecureEntity> { }
-```
-
-## Performance Patterns
-
-### Streaming for Large Datasets
-
-```csharp
-// ❌ Memory issues with large datasets
-var allTodos = await Todo.All(); // Materializes everything
-
-// ✅ Stream large datasets
-await foreach (var todo in Todo.AllStream(batchSize: 1000))
-{
-    await ProcessTodo(todo);
-}
-```
-
-### Query Optimization
-
-```csharp
-// Pushdown-first: Operations pushed to database when possible
-var products = await Product.Query()
-    .Where(p => p.Category == "Electronics") // Pushed to DB
-    .OrderBy(p => p.Price)                   // Pushed to DB
-    .Take(50);                               // Pushed to DB
-
-// Automatic in-memory fallback when provider lacks capability
-```
-
-### Batch Operations
-
-```csharp
-// Efficient batch processing
-var batch = new List<Todo>();
-foreach (var item in items)
-{
-    batch.Add(new Todo { Title = item.Title });
-}
-await Todo.SaveBatch(batch);
-```
-
-## Observability
-
-### Boot Reports
-
-```csharp
-// Framework self-documents what's configured
-KoanEnv.DumpSnapshot(logger);
-
-// Output:
-// [INFO] Koan:discover postgresql: server=localhost... ✓
-// [INFO] Koan:modules data→postgresql
-// [INFO] Koan:modules web→controllers
-// [INFO] Koan:capabilities LinqQueries,Paging,Filtering
-```
-
-### Structured Logging
-
-```csharp
-// Consistent event IDs across framework
-_logger.LogInformation(Events.ProviderElected,
-    "Provider {Provider} elected for {EntityType}",
-    provider.Name, typeof(T).Name);
-```
-
-### Telemetry Integration
-
-```csharp
-// OpenTelemetry integration (opt-in)
-builder.Services.AddKoan(options =>
-{
-    options.EnableTelemetry = true;
-});
-```
-
-## Anti-Patterns
-
-### ❌ Manual Repository Pattern
-
-```csharp
-// Wrong: Bypassing framework entity patterns
-public class TodoService
-{
-    private readonly IRepository<Todo> _repo;
-
-    public async Task<Todo> GetAsync(string id) => await _repo.GetAsync(id);
-}
-```
-
-### ❌ Manual Service Registration
-
-```csharp
-// Wrong: Manual DI when framework provides auto-registration
-services.AddScoped<IUserRepository, UserRepository>();
-services.AddDbContext<MyContext>();
-```
-
-### ❌ Configuration Magic Values
-
-```csharp
-// Wrong: Hard-coded strings
-var connectionString = Configuration["ConnectionStrings:Default"];
-
-// Right: Typed options with constants
-var options = Configuration.GetSection(KoanDataOptions.SectionName)
-    .Get<KoanDataOptions>();
-```
-
-## Framework Evolution
-
-### Extensibility Points
-
-```csharp
-// Custom providers via standard interface
-public class CustomDataProvider : IDataProvider
-{
-    public string Name => "custom";
-    public bool CanServe(Type entityType) => /* logic */;
-    // Implementation...
-}
-
-// Custom health contributors
-public class CustomHealthCheck : IHealthContributor
-{
-    // Implementation...
-}
-```
-
-### Version Compatibility
-
-```csharp
-// Interfaces versioned for evolution
-public interface IDataProvider // v1
-public interface IDataProviderV2 : IDataProvider // v2 with additions
-
-// Feature flags for gradual rollout
-if (KoanEnv.Features.EnableExperimentalFeature)
-{
-    // New functionality
-}
-```
-
-## Strategic Direction
-
-### Container-Native Excellence
-
-Position as premier choice for containerized .NET applications with sophisticated orchestration capabilities.
-
-### Complex Scenario Simplification
-
-Make traditionally complex integrations (AI, OAuth, CQRS, event sourcing) accessible through sane defaults and minimal configuration.
-
-### Enterprise Developer Experience
-
-Target experienced teams willing to invest in framework-specific expertise for long-term productivity gains.
-
-### Operational Sophistication
-
-Emphasize BootReport observability and self-documenting systems as enterprise-grade operational benefits.
+## Strategic direction
+
+Koan positions as **the framework for agentic, data-driven .NET applications**: a small senior
+team (and its coding agents) ships sophisticated systems without scaffolding time.
+
+- **Agent-native by design**: one canonical way per intent, loud failures, shipped agent
+  knowledge (`.claude/skills/`, CLAUDE.md), and self-description of the running app (boot
+  report, capabilities, MCP).
+- **AI as a property of your data**: `[Embedding]` → background sync → semantic search as a
+  query. The flagship AI story is the data→AI seam, not model operations.
+- **Container-native, Aspire-friendly**: environment detection, health probes, and orchestration
+  via the .NET ecosystem's own tooling rather than a bespoke layer.
 
 ---
 
-**References**:
-- [ADR Index](../decisions/index.md) - Complete architectural decision history
-- [Provider Transparency Showcase](../guides/data-modeling.md) - Multi-provider examples
-- [Auto-Registration Patterns](../reference/core/index.md) - Implementation details
-
-**Last Validation**: 2026-03-25 by Framework Specialist
-**Framework Version Tested**: v0.6.3
+**References**: [ADR index](../decisions/index.md) ·
+[Framework assessment & maturity model](../assessment/00-overview.md) ·
+[Getting started](../getting-started/overview.md) ·
+[Framework utilities catalog](../guides/framework-utilities.md)

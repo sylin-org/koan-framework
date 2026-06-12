@@ -376,14 +376,16 @@ Different pagination rules per tenant:
 [Pagination(Mode = PaginationMode.On)]
 public class TenantAwareController : EntityController<Order>
 {
-    protected override async Task<QueryResult<Order>> ExecuteQuery(
-        object? query, DataQueryOptions options)
+    // BuildOptions is the query-shaping hook: override it to adjust paging/sort before the query runs.
+    protected override QueryOptions BuildOptions()
     {
-        // Adjust pagination based on tenant limits
-        var tenantLimits = await GetTenantLimits();
+        var options = base.BuildOptions();
+
+        // Clamp the requested page size to this tenant's limit.
+        var tenantLimits = GetTenantLimits();
         options.PageSize = Math.Min(options.PageSize, tenantLimits.MaxPageSize);
 
-        return await base.ExecuteQuery(query, options);
+        return options;
     }
 }
 ```

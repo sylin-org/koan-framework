@@ -5,9 +5,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using Koan.Core.Logging;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Core;
 using Koan.Data.Vector.Abstractions;
 using Koan.Data.Vector.Infrastructure;
+using Koan.Data.Vector.Querying;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -399,6 +401,9 @@ internal sealed class VectorWorkflowRegistry : IVectorWorkflowRegistry, VectorWo
             System.ArgumentNullException.ThrowIfNull(options);
             var repo = EnsureRepository();
             var normalized = NormalizeOptions(options);
+            // AI-0036 §9 / DATA-0097 P1: the workflow is the second read boundary — gate the filter
+            // (residual-is-error) here too, since this path does not go through VectorData.Search.
+            normalized = VectorFilterCoordinator.Gate(normalized, repo);
             var result = await repo.Search(normalized, ct);
             LogOperation("query",
                 ("topK", (object?)(normalized.TopK ?? DefaultTopK)),
@@ -420,7 +425,7 @@ internal sealed class VectorWorkflowRegistry : IVectorWorkflowRegistry, VectorWo
             var options = new VectorQueryOptions(
                 Query: vector,
                 TopK: topK,
-                Filter: filter,
+                Filter: VectorFilterReader.Read(filter),  // parse object?/JSON/dict -> typed Filter once
                 VectorName: vectorName,
                 SearchText: text,
                 Alpha: alpha);

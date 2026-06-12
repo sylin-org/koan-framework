@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.JsonPatch;
@@ -8,9 +9,12 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 
 using Microsoft.Extensions.Logging;
+using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
+using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Web.Filtering;
 using Koan.Web.Hooks;
@@ -61,7 +65,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             queryResult = await QueryCollection(request, context.Options, context.CancellationToken);
             total = queryResult.Total;
         }
-        catch (InvalidOperationException ex)
+        catch (Exception ex) when (ex is InvalidOperationException or FilterParseException or InvalidFilterFieldException or NotSupportedException)
         {
             var bad = new BadRequestObjectResult(new { error = ex.Message });
             return new EntityCollectionResult<TEntity>(context, [], 0, null, bad);
@@ -85,12 +89,10 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             return new EntityCollectionResult<TEntity>(context, [], queryResult.Total, null, tooLarge);
         }
 
+        // Sort is now applied by Data<T,K>.QueryWithCount (orchestrator) before the result reaches here.
+        // The orchestrator inspects RepositoryQueryResult.SortHandled and falls back to in-memory sort
+        // when the adapter cannot push it down — see DATA-0092.
         var list = queryResult.Items.ToList();
-
-        if (context.Options.Sort.Count > 0)
-        {
-            list = ApplySort(list, context.Options.Sort);
-        }
 
         var shouldPaginate = request.ApplyPagination;
 
@@ -174,21 +176,17 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         {
             (repositoryItems, total) = await QueryCollectionFromBody(repo, request, context.Options, context.CancellationToken);
         }
-        catch (InvalidOperationException ex)
+        catch (Exception ex) when (ex is InvalidOperationException or FilterParseException or InvalidFilterFieldException or NotSupportedException)
         {
             var bad = new BadRequestObjectResult(new { error = ex.Message });
             return new EntityCollectionResult<TEntity>(context, [], 0, null, bad);
         }
 
+        // Sort + pagination handled by orchestrator inside QueryCollectionFromBody (DATA-0092).
+        // The caller only sets headers — never paginates again, or we'd page-of-page (regression).
         var list = repositoryItems.ToList();
-        if (context.Options.Sort.Count > 0)
-        {
-            list = ApplySort(list, context.Options.Sort);
-        }
         if (context.Options.PageSize > 0)
         {
-            (list, total) = ApplyPagination(list, context.Options.Page, context.Options.PageSize, total);
-            context.Headers["Koan-InMemory-Paging"] = "true";
             context.Headers["X-Page"] = context.Options.Page.ToString();
             context.Headers["X-Page-Size"] = context.Options.PageSize.ToString();
             context.Headers["X-Total-Count"] = total.ToString();
@@ -326,8 +324,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             await _hookPipeline.AfterSave(hookContext, model);
         }
 
-        var writes = WriteCaps(repo);
-        context.Headers["Koan-Write-Capabilities"] = writes.Writes.ToString();
+        context.Headers["Koan-Write-Capabilities"] = WriteCapabilitiesHeader(repo);
         CopyHookHeaders(context, hookContext);
         return new EntityEndpointResult(context, new { upserted });
     }
@@ -366,8 +363,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     {
         var context = request.Context;
         var repo = _dataService.GetRepository<TEntity, TKey>();
-        var writes = WriteCaps(repo);
-        context.Headers["Koan-Write-Capabilities"] = writes.Writes.ToString();
+        context.Headers["Koan-Write-Capabilities"] = WriteCapabilitiesHeader(repo);
         using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var deleted = await Data<TEntity, TKey>.DeleteMany(request.Ids ?? [], context.CancellationToken);
         return new EntityEndpointResult(context, new { deleted });
@@ -381,8 +377,24 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         }
 
         using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
-        var removed = await Entity<TEntity, TKey>.Remove(request.Query!, request.Context.CancellationToken);
-        return new EntityEndpointResult(request.Context, new { deleted = removed });
+
+        // Parse the JSON filter DSL into the unified Filter AST. Works on every adapter (the
+        // coordinator pushes what it can and evaluates the rest in-memory) — never a silent match-all.
+        Filter filter;
+        try
+        {
+            filter = JsonFilterParser.Parse<TEntity>(request.Query);
+        }
+        catch (Exception ex) when (ex is FilterParseException or InvalidFilterFieldException)
+        {
+            return new EntityEndpointResult(request.Context, null, new BadRequestObjectResult(new { error = ex.Message }));
+        }
+
+        var items = await Data<TEntity, TKey>.All(QueryDefinition.All.Where(filter), request.Context.CancellationToken);
+        var ids = items.Select(e => e.Id).ToList();
+        if (ids.Count == 0) return new EntityEndpointResult(request.Context, new { deleted = 0 });
+        var removedByPredicate = await Data<TEntity, TKey>.DeleteMany(ids, request.Context.CancellationToken);
+        return new EntityEndpointResult(request.Context, new { deleted = removedByPredicate });
     }
 
     public async Task<EntityEndpointResult> DeleteAll(EntityDeleteAllRequest request)
@@ -455,11 +467,14 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         return new EntityModelResult<TEntity>(context, saved, payload);
     }
 
-    private static IQueryCapabilities Capabilities(IDataRepository<TEntity, TKey> repo)
-        => repo as IQueryCapabilities ?? new RepositoryCapabilities(QueryCapabilities.None);
+    // ARCH-0084: negotiate via the unified CapabilitySet (the adapter's IDescribesCapabilities declaration).
+    private static CapabilitySet Capabilities(IDataRepository<TEntity, TKey> repo)
+        => DataCaps.Describe(repo, repo.GetType().Name);
 
-    private static IWriteCapabilities WriteCaps(IDataRepository<TEntity, TKey> repo)
-        => repo as IWriteCapabilities ?? new RepoWriteCaps(WriteCapabilities.None);
+    // Renders the Koan-Write-Capabilities header as the declared write capability tokens (ARCH-0084).
+    private static string WriteCapabilitiesHeader(IDataRepository<TEntity, TKey> repo)
+        => string.Join(", ", DataCaps.Describe(repo, repo.GetType().Name).All
+            .Where(c => c.Id.StartsWith("write.", StringComparison.Ordinal)).Select(c => c.Id));
 
     private static void CopyHookHeaders(EntityRequestContext context, HookContext<TEntity> hookContext)
     {
@@ -480,72 +495,8 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         var items = source.Skip(skip).Take(pageSize).ToList();
         return (items, total);
     }
-    private static List<TEntity> ApplySort(List<TEntity> source, IReadOnlyList<SortSpec> sorts)
-    {
-        if (sorts is null || sorts.Count == 0) return source;
-
-        IOrderedEnumerable<TEntity>? ordered = null;
-        IEnumerable<TEntity> working = source;
-
-        foreach (var sort in sorts)
-        {
-            if (string.IsNullOrWhiteSpace(sort.Field))
-            {
-                continue;
-            }
-
-            var selector = CreateKeySelector(sort.Field);
-            if (selector is null)
-            {
-                continue;
-            }
-
-            ordered = ordered is null
-                ? (sort.Desc ? working.OrderByDescending(selector) : working.OrderBy(selector))
-                : (sort.Desc ? ordered.ThenByDescending(selector) : ordered.ThenBy(selector));
-        }
-
-        return ordered is null ? source : ordered.ToList();
-    }
-
-    private static Func<TEntity, object?>? CreateKeySelector(string field)
-    {
-        var segments = field.Split(".", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (segments.Length == 0)
-        {
-            return null;
-        }
-
-        var props = new PropertyInfo[segments.Length];
-        var currentType = typeof(TEntity);
-
-        for (var i = 0; i < segments.Length; i++)
-        {
-            var prop = currentType.GetProperty(segments[i], BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase);
-            if (prop is null)
-            {
-                return null;
-            }
-
-            props[i] = prop;
-            currentType = prop.PropertyType;
-        }
-
-        return entity =>
-        {
-            object? value = entity;
-            foreach (var prop in props)
-            {
-                if (value is null)
-                {
-                    return null;
-                }
-
-                value = prop.GetValue(value);
-            }
-            return value;
-        };
-    }
+    // In-memory sort moved to Koan.Data.Core.Sorting.InMemorySorter — orchestrator handles fallback.
+    // CreateKeySelector replaced by structured MemberPath walking. See DATA-0092.
 
 
     private sealed class RepositoryQueryResult
@@ -571,61 +522,47 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     {
         using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
 
-        object? queryPayload = null;
+        Filter? userFilter = null;
         if (!string.IsNullOrWhiteSpace(request.FilterJson))
         {
-            if (!JsonFilterBuilder.TryBuild<TEntity>(request.FilterJson!, out var predicate, out var error, new JsonFilterBuilder.BuildOptions { IgnoreCase = request.IgnoreCase }))
-            {
-                throw new InvalidOperationException(error ?? "Invalid filter");
-            }
-
-            queryPayload = predicate!;
-        }
-        else if (!string.IsNullOrWhiteSpace(options.Q))
-        {
-            queryPayload = options.Q;
+            userFilter = JsonFilterParser.Parse<TEntity>(request.FilterJson!, new FilterParseOptions { IgnoreCase = request.IgnoreCase });
         }
 
-        var dataOptions = BuildDataQueryOptions(request, options);
+        // WEB-0068: hook-contributed predicates AND-compose with the user's filter (all lowered to one
+        // Filter AST) so the adapter counts and pages against the already-filtered set. When any filter
+        // exists, free-text Q is dropped — Q reaches the raw provider surface only.
+        var composed = QueryFilterComposer.AndAll<TEntity>(userFilter, options.Predicates);
+        var queryDef = BuildQueryDefinition(request, options);
         var absoluteMax = request.AbsoluteMaxRecords > 0 ? request.AbsoluteMaxRecords : (int?)null;
 
-        var result = await Data<TEntity, TKey>.QueryWithCount(queryPayload, dataOptions, cancellationToken, absoluteMax);
+        if (composed is null && !string.IsNullOrWhiteSpace(options.Q))
+        {
+            var raw = await Data<TEntity, TKey>.QueryRaw(options.Q!, null, queryDef, cancellationToken);
+            return new RepositoryQueryResult(raw, raw.Count, false, false);
+        }
+        if (composed is not null && !string.IsNullOrWhiteSpace(options.Q))
+        {
+            _logger?.LogInformation(
+                "EntityEndpointService<{Entity}> dropped free-text Q because IRequestOptionsHook(s) contributed {Count} predicate(s). See WEB-0068.",
+                typeof(TEntity).Name,
+                options.Predicates.Count);
+        }
+
+        var result = await Data<TEntity, TKey>.QueryWithCount(queryDef.Where(composed), cancellationToken, absoluteMax);
 
         return new RepositoryQueryResult(result.Items, result.TotalCount, result.RepositoryHandledPagination, result.ExceededSafetyLimit);
     }
 
-    private static DataQueryOptions BuildDataQueryOptions(EntityCollectionRequest request, QueryOptions options)
+    private static QueryDefinition BuildQueryDefinition(EntityCollectionRequest request, QueryOptions options)
     {
-        var queryOptions = new DataQueryOptions();
-
+        var def = QueryDefinition.All;
         if (request.ApplyPagination && options.Page > 0 && options.PageSize > 0)
-        {
-            queryOptions = queryOptions.WithPagination(options.Page, options.PageSize);
-
-        }
-
+            def = def.WithPagination(options.Page, options.PageSize);
         if (!string.IsNullOrWhiteSpace(request.Set))
-        {
-            queryOptions = queryOptions.ForPartition(request.Set);
-        }
-
+            def = def.ForPartition(request.Set);
         if (options.Sort.Count > 0)
-        {
-            queryOptions = queryOptions.WithSort(ToSortString(options.Sort));
-        }
-
-        return queryOptions;
-    }
-
-    private static string? ToSortString(IReadOnlyList<SortSpec> sorts)
-    {
-        if (sorts.Count == 0)
-        {
-            return null;
-        }
-
-        return string.Join(",", sorts.Select(s => s.Desc ? $"-{s.Field}" : s.Field));
-
+            def = def.WithSort(options.Sort);
+        return def;
     }
 
     private async Task<(IReadOnlyList<TEntity> Items, long Total)> QueryCollectionFromBody(
@@ -635,48 +572,42 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         CancellationToken cancellationToken)
     {
         using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
-        if (!string.IsNullOrWhiteSpace(request.FilterJson) && repo is ILinqQueryRepository<TEntity, TKey> lrepo)
+
+        // Route body queries through the orchestrator (Data<T,K>.QueryWithCount) so the unified
+        // QueryDefinition contract handles split/residual/sort/paginate-after centrally.
+        var queryDef = QueryDefinition.All;
+        if (options.PageSize > 0 && options.Page > 0)
+            queryDef = queryDef.WithPagination(options.Page, options.PageSize);
+        if (!string.IsNullOrWhiteSpace(request.Set))
+            queryDef = queryDef.ForPartition(request.Set);
+        if (options.Sort.Count > 0)
+            queryDef = queryDef.WithSort(options.Sort);
+
+        Filter? userFilter = null;
+        if (!string.IsNullOrWhiteSpace(request.FilterJson))
         {
-            if (!JsonFilterBuilder.TryBuild<TEntity>(request.FilterJson!, out var predicate, out var error, new JsonFilterBuilder.BuildOptions { IgnoreCase = request.IgnoreCase }))
-            {
-                throw new InvalidOperationException(error ?? "Invalid filter");
-            }
-            var items = await lrepo.Query(predicate!, cancellationToken);
-            long total;
-            try
-            {
-                var countRequest = new CountRequest<TEntity> { Predicate = predicate };
-                var countResult = await repo.Count(countRequest, cancellationToken);
-                total = countResult.Value;
-            }
-            catch { total = items.Count; }
-            return (items.ToList(), total);
+            userFilter = JsonFilterParser.Parse<TEntity>(request.FilterJson!, new FilterParseOptions { IgnoreCase = request.IgnoreCase });
         }
 
-        if (!string.IsNullOrWhiteSpace(options.Q) && repo is IStringQueryRepository<TEntity, TKey> srepo)
+        // WEB-0068: same composition rule as the GET path — hook predicates AND with the user's
+        // filter (one Filter AST), free-text Q is dropped when any filter contributes.
+        var composed = QueryFilterComposer.AndAll<TEntity>(userFilter, options.Predicates);
+
+        if (composed is null && !string.IsNullOrWhiteSpace(options.Q))
         {
-            var items = await srepo.Query(options.Q!, cancellationToken);
-            long total;
-            try
-            {
-                var countRequest = new CountRequest<TEntity> { RawQuery = options.Q };
-                var countResult = await repo.Count(countRequest, cancellationToken);
-                total = countResult.Value;
-            }
-            catch { total = items.Count; }
-            return (items.ToList(), total);
+            var raw = await Data<TEntity, TKey>.QueryRaw(options.Q!, null, queryDef, cancellationToken);
+            return (raw, raw.Count);
+        }
+        if (composed is not null && !string.IsNullOrWhiteSpace(options.Q))
+        {
+            _logger?.LogInformation(
+                "EntityEndpointService<{Entity}> dropped free-text Q (body-query) because IRequestOptionsHook(s) contributed {Count} predicate(s). See WEB-0068.",
+                typeof(TEntity).Name,
+                options.Predicates.Count);
         }
 
-        var all = await repo.Query(null, cancellationToken);
-        long allTotal;
-        try
-        {
-            var countRequest = new CountRequest<TEntity>();
-            var countResult = await repo.Count(countRequest, cancellationToken);
-            allTotal = countResult.Value;
-        }
-        catch { allTotal = all.Count; }
-        return (all.ToList(), allTotal);
+        var result = await Koan.Data.Core.Data<TEntity, TKey>.QueryWithCount(queryDef.Where(composed), cancellationToken);
+        return (result.Items, result.TotalCount);
     }
 
     private static async Task<IReadOnlyList<object>> EnrichRelationships(IReadOnlyList<TEntity> list, CancellationToken cancellationToken)
@@ -817,15 +748,6 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         return new EntityModelResult<TEntity>(context, default, shortCircuit, shortCircuit);
     }
 
-    private sealed record RepositoryCapabilities(QueryCapabilities Value) : IQueryCapabilities
-    {
-        public QueryCapabilities Capabilities => Value;
-    }
-
-    private sealed record RepoWriteCaps(WriteCapabilities Value) : IWriteCapabilities
-    {
-        public WriteCapabilities Writes => Value;
-    }
 }
 
 

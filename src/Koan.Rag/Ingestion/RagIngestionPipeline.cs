@@ -266,9 +266,8 @@ internal sealed class RagIngestionPipeline : IRagIngestionPipeline
                 metadata.Name ?? typeof(TEntity).Name, newDirective)
             : metadata;
 
-        // Query all entities of this type
-        var entities = await Koan.Data.Core.Data<TEntity, string>
-            .All(options: null, ct: ct);
+        // Query all entities of this type (DATA-0096 removed the DataQueryOptions overload).
+        var entities = await Koan.Data.Core.Data<TEntity, string>.All(ct);
 
         var entityList = entities.ToList();
 

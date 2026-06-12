@@ -47,8 +47,9 @@ public static class IndexMetadata
             var properties = ordered.Select(t => t.prop).ToArray();
             // If any attribute in the group has Unique=true, treat as unique
             var unique = ordered.Any(t => t.attr.Unique);
+            var ttl = ordered.Any(t => t.attr.Ttl);
             var name = ordered.Select(t => t.attr.Name).FirstOrDefault(n => !string.IsNullOrWhiteSpace(n));
-            results.Add(new IndexSpec(name, properties, unique, IsPrimaryKey: false, IsImplicit: false));
+            results.Add(new IndexSpec(name, properties, unique, IsPrimaryKey: false, IsImplicit: false, Ttl: ttl));
         }
 
         // Class-level [Index(Fields=[...])]
@@ -66,7 +67,7 @@ public static class IndexMetadata
                 fields.Add(p);
             }
             if (fields.Count == 0) continue;
-            results.Add(new IndexSpec(idx.Name, fields, idx.Unique, IsPrimaryKey: false, IsImplicit: false));
+            results.Add(new IndexSpec(idx.Name, fields, idx.Unique, IsPrimaryKey: false, IsImplicit: false, Ttl: idx.Ttl));
         }
 
         return results;

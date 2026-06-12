@@ -56,7 +56,7 @@ public sealed class CouchbaseCrudSpec
                 var count = await Data<CouchbaseProduct, string>.Count(p => p.Category == "Hardware", partition);
                 count.Should().Be(2);
 
-                var removed = await CouchbaseProduct.Remove(saved.Id, new DataQueryOptions { Partition = partition });
+                var removed = await CouchbaseProduct.Remove(saved.Id, partition);
                 removed.Should().BeTrue();
 
                 var remaining = await CouchbaseProduct.All(partition);

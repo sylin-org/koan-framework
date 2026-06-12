@@ -1,0 +1,162 @@
+{
+  "area": "data-core",
+  "projects": [
+    {
+      "name": "Koan.Data.Abstractions",
+      "purpose": "Contract layer for the data pillar (csproj KoanPackageKind=Kernel): entity/repository interfaces, the ARCH-0084 DataCaps token catalog, the unified Filter AST + its parsers/evaluators/compilers (DATA-0096/0099), sorting contracts, instruction/patch models, storage annotations, and the naming contract set. ~3.2k LOC, net10.0.",
+      "keyTypes": [
+        "IEntity<TKey> / IDataRepository<TEntity,TKey> / IQueryRepository<,> / IRawQueryRepository<,>",
+        "DataCaps (Query/Write/Retention tokens, ARCH-0084)",
+        "Filter AST + FilterSupport + FilterSplitter (pushable/residual split)",
+        "LinqFilterCompiler / JsonFilterParser / InMemoryFilterEvaluator / DictionaryFilterEvaluator",
+        "IConditionalWriteRepository<,> (CAS, JOBS-0005 §20.3)",
+        "QueryDefinition / RepositoryQueryResult / CountResult",
+        "Instruction / DataInstructions / PatchModels",
+        "Annotations: IndexAttribute(Ttl), TimestampAttribute, Storage*/DataSource attributes"
+      ],
+      "dependsOn": [
+        "Koan.Core"
+      ],
+      "state": "active — ARCH-0084/DATA-0096/DATA-0100/JOBS-0005-§20 comment trail throughout; zero TODO/HACK markers. Carries three tombstone files (Vector.cs, VectorFactories.cs, VectorAdapterAttribute.cs = empty 'moved to Koan.Data.Vector.Abstractions' stubs). Notably it is a 'Kernel' contracts package that also ships ~1.5k LOC of filter *implementation* plus Newtonsoft + AspNetCore.JsonPatch package deps."
+    },
+    {
+      "name": "Koan.Data.Core",
+      "purpose": "The runtime heart (~8.7k LOC): Entity<TEntity,TKey> CRTP facade, Data<TEntity,TKey> single execution path (plan→adapter→finalize), DataService repo resolution + decorator chain, RepositoryFacade cross-cutting wrapper, EntityContext AsyncLocal ambient routing (source/adapter/partition/transaction/cache-behavior), GUID v7 identity, transactions, entity events, transfers, relationships, sorting, patch, storage optimization.",
+      "keyTypes": [
+        "Entity<TEntity,TKey> (948-line static-convenience facade, 77 public members)",
+        "Data<TEntity,TKey> (the ONE query path; FilterSupport read off DataCaps.Query.Filter detail)",
+        "EntityContext + ContextState (mutually-exclusive source/adapter, partition validation DATA-0077, transaction scope with rollback-on-dispose default)",
+        "RepositoryFacade<,> (ID ensure + [Timestamp] + capability forwarding + CAS/instruction bridge)",
+        "FilterPushdownCoordinator (sole owner of partial-pushdown: residual→sort→paginate-after ordering)",
+        "DataService + AdapterResolver + DataSourceRegistry (per (entity,key,adapter,source) repo cache; IDataRepositoryDecorator chain, ARCH-0076)",
+        "TransactionCoordinator + TxCaps; EntityEventExecutor/Registry (lifecycle hooks)",
+        "Transfers (Copy/Move/Mirror builders), EntityShapeGuard, PartitionNameValidator, IdentityEncoding (DATA-0098)"
+      ],
+      "dependsOn": [
+        "Koan.Data.Abstractions",
+        "Koan.Core",
+        "Koan.Core.Adapters",
+        "Koan.Cache.Abstractions"
+      ],
+      "state": "active and recently renovated — KoanModule boot (ARCH-0086), ARCH-0084 capability comments, DATA-0095→0100 trail; the most current code in the area. One genuine duplicate found: EntityMetadataProvider exists twice (global-namespace copy at the bottom of Model/Entity.cs AND Koan.Data.Core.Model copy in Model/EntityMetadataProvider.cs — ServiceCollectionExtensions.cs:63 wires the Model one)."
+    },
+    {
+      "name": "Koan.Data.Relational",
+      "purpose": "Shared toolkit for SQL connectors (~1.2k LOC): Filter-AST→parameterized-SQL translator parameterized by ILinqSqlDialect, schema orchestration (DDL policy/materialization), and the DATA-0100 comparable-encoding contract (canonical DateTimeOffset/TimeSpan/DateOnly/TimeOnly forms shared by write path and filter comparands).",
+      "keyTypes": [
+        "SqlFilterTranslator + ILinqSqlDialect + RelationalFilterSupport + RelationalCommandCache (live Linq/ generation)",
+        "IRelationalSchemaOrchestrator + RelationalMaterializationOptions + RelationalDdlPolicy (live Orchestration/ generation, used by Postgres/Sqlite/SqlServer connectors)",
+        "ComparableScalarEncoding (DATA-0100)",
+        "DEAD: Schema/ directory (IRelationalDialect, RelationalSchemaSynchronizer, RelationalModelBuilder, RelationalSchemaModel/Table/Column/Index, DbConnectionExtensions — zero external references)",
+        "DEAD: Infrastructure/Singleflight (compat shim forwarding to Koan.Core, no callers)"
+      ],
+      "dependsOn": [
+        "Koan.Data.Abstractions",
+        "Koan.Data.Core"
+      ],
+      "state": "active core riding with a dead legacy generation: Linq/, Orchestration/ and ComparableScalarEncoding are current (DATA-0100 era, consumed by 3 connectors + 2 connector test suites); the entire Schema/ folder (~9 files) is an earlier schema-sync generation no connector uses. README is stale — it documents the dead Schema contracts and a removed LinqWhereTranslator<TEntity>."
+    },
+    {
+      "name": "Koan.Data.Direct",
+      "purpose": "Raw ADO.NET escape hatch (~0.7k LOC): IDirectSession/IDirectTransaction implementation resolving connection strings from source/adapter config, with Execute/Query/Scalar, timeout/maxRows guards. The interfaces it implements live in Koan.Data.Core/Direct; IDataService.Direct() throws unless this assembly is referenced.",
+      "keyTypes": [
+        "DirectDataService / DirectSession / DirectTransaction (impls of Koan.Data.Core.Direct.IDirect*)",
+        "KoanDataDirectModule (ARCH-0086 KoanModule)",
+        "DirectOptions (lives in Koan.Data.Core, not here)"
+      ],
+      "dependsOn": [
+        "Koan.Data.Core"
+      ],
+      "state": "maintained-but-unconsumed: zero csproj consumers anywhere in src/samples/tests; the only test mentions are interface-compliance stubs in fake IDataService implementations; no sample uses .Direct(). Boot module was modernized to KoanModule, so it compiles and is kept current, but nothing dogfoods it."
+    },
+    {
+      "name": "Koan.Data.Cqrs",
+      "purpose": "Implicit CQRS (~0.9k LOC): on reference, TryDecorates every IDataRepository<,> with CqrsRepositoryDecorator (reads→read-repo, writes→write-repo + outbox append), config-driven profiles/routing, IOutboxStore contract with in-memory default, and an OutboxProcessor hosted service applying 1:1 projections.",
+      "keyTypes": [
+        "CqrsRepositoryDecorator<,> (internal)",
+        "ICqrsRouting / CqrsRouting / CqrsProfile / CqrsOptions",
+        "IOutboxStore / IOutboxStoreFactory / OutboxStoreSelector / InMemoryOutboxStore / LoggingOutboxStore",
+        "OutboxProcessor (KoanFluentServiceBase hosted service)",
+        "CqrsAttribute"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.Data.Abstractions",
+        "Koan.Data.Core"
+      ],
+      "state": "experimental/unconsumed: no samples, no tests, no consumers except its own Mongo outbox connector. It has been kept compiling through the ARCH-0084 and unified-IQueryRepository migrations (comments present), but its only ADR is DATA-0019 and it still uses old IKoanAutoRegistrar + raw TryDecorate ordering instead of the ARCH-0076 IDataRepositoryDecorator chain Cache uses. Registers a hosted service + global repository decoration on mere reference — heavyweight Reference=Intent for an unproven pillar."
+    },
+    {
+      "name": "Koan.Data.Cqrs.Outbox.Connector.Mongo (src/Connectors/Data/Cqrs/Outbox/Mongo)",
+      "purpose": "Mongo-backed IOutboxStore (~0.34k LOC): leased dequeue (Status+VisibleAt / LeaseUntil indexes), sparse-unique DedupKey index, auto-discovered with ProviderPriority over the in-memory default.",
+      "keyTypes": [
+        "MongoOutboxStore",
+        "MongoOutboxFactory / MongoOutboxRegistration / MongoOutboxOptions",
+        "MongoOutboxRecord"
+      ],
+      "dependsOn": [
+        "Koan.Data.Cqrs"
+      ],
+      "state": "stale-ish satellite: README says 'validated 2025-09-29' (~9 months ago), no tests, sole consumer of the unconsumed Cqrs pillar. Carries a SharpCompress package pin inherited from the Mongo connector rationale."
+    },
+    {
+      "name": "Koan.Data.Backup",
+      "purpose": "Streaming backup/restore (~5k LOC): entity discovery via AppDomain scan, per-entity ZIP archives streamed through Koan.Storage, optimized restore path (IRestoreOptimizedRepository), backup inventory + health check + maintenance hosted service, [EntityBackup] policy attributes, MyEntity.BackupTo()/RestoreFrom() statics and BackupAllEntities global.",
+      "keyTypes": [
+        "StreamingBackupService (IBackupService)",
+        "OptimizedRestoreService (IRestoreService) + IRestoreOptimizedRepository",
+        "EntityDiscoveryService (AppDomain.CurrentDomain.GetAssemblies scan)",
+        "BackupDiscoveryService + BackupInventory + BackupInventoryHealthCheck",
+        "BackupMaintenanceService (hosted)",
+        "EntityBackupExtensions / DataBackup statics",
+        "BackupManifest / BackupOptions / EntityBackupPolicy",
+        "EntityBackupAttribute / EntityBackupScopeAttribute"
+      ],
+      "dependsOn": [
+        "Koan.Data.Core",
+        "Koan.Data.Abstractions",
+        "Koan.Storage",
+        "Koan.Core"
+      ],
+      "state": "working-but-aging: single consumer (Koan.Web.Backup, which only the S5.Recs sample references); no dedicated test suite (only a Web.Admin /admin/backup smoke spec); still old-style IKoanAutoRegistrar (323 lines, not KoanModule); uses the exact AppDomain-scan pattern [KoanDiscoverable]/KoanRegistry replaced; README documents types that do not exist in the code (BackupPlan, BackupSession, IDataRestoreService) — clear code/doc drift since the 2025-09-29 'validated' stamp."
+    }
+  ],
+  "cohesion": "Two distinct rings. The inner ring (Abstractions → Core → Relational) is the framework's strongest pillar and hangs together exceptionally well: one capability vocabulary (DataCaps + FilterSupport detail, ARCH-0084), one filter AST with one pushdown owner (FilterSplitter in Abstractions + FilterPushdownCoordinator in Core — 'no adapter carries fallback logic'), one encoding contract (DATA-0100) shared by write path and comparand, one decorator chain (ARCH-0076), and a fresh ADR trail (DATA-0095→0100, ARCH-0084/0086) that the code visibly cites. The outer ring (Direct, Cqrs+Mongo-outbox, Backup) consists of three satellites of decreasing vitality that the renovation never pulled through: old registrar styles, stale or fictional READMEs, zero-to-one consumers, zero tests. Internal seams in the inner ring: (1) Entity.cs is a 948-line overload matrix (partition-string variants × LINQ/JSON/raw forms × count/stream/page) duplicating what EntityContext.Partition() scoping already expresses; (2) the naming subsystem is split across Abstractions/Naming (13 types: both an interface generation per DATA-0086 and older static resolvers StorageNameResolver/Generator/Selector) and Core/Naming (3 more); (3) the Direct feature is split mid-seam — interfaces and DirectOptions in Core, implementation in a separate unconsumed project, with IDataService.Direct() as a hard runtime coupling; (4) vector concerns half-moved out of Abstractions (three tombstone files left behind, VectorFilterReader still resident).",
+  "redundancies": [
+    "EntityMetadataProvider exists twice with identical body: global-namespace copy at the bottom of src/Koan.Data.Core/Model/Entity.cs (lines 944-947) and Koan.Data.Core.Model copy in src/Koan.Data.Core/Model/EntityMetadataProvider.cs; ServiceCollectionExtensions wires only the Model one — the other is a live trap for ambiguous references.",
+    "Two schema generations in Koan.Data.Relational: live Orchestration/ (IRelationalSchemaOrchestrator, used by Postgres/Sqlite/SqlServer) vs dead Schema/ (IRelationalDialect/RelationalSchemaSynchronizer/RelationalModelBuilder + model types — zero external references); README still advertises the dead one.",
+    "Four overlapping entry surfaces to the same execution path: Entity<T> statics, AggregateExtensions instance/collection extensions (Save/Upsert/Remove ×partition overloads), Data<TEntity,TKey> statics, and DataDirectAccess (a 37-line pure-forwarding wrapper over Data<,>). Deliberate layering, but DataDirectAccess and the partition-string overload matrix duplicate what EntityContext scoping provides.",
+    "Three different 'copy data elsewhere' mechanisms: Data.Core Transfers (Copy/Move/Mirror builders, DATA-0079), Data.Backup export/restore, and Cqrs read-side 1:1 mirroring via OutboxProcessor — each with its own batching, conflict, and progress logic.",
+    "Two outbox implementations in the codebase: Koan.Data.Cqrs IOutboxStore (+Mongo connector) and the newer transactional outbox built into Koan.Jobs' durable ledger (JOBS-0005) — the latter is tested and consumed, the former is not.",
+    "Two repository-decoration mechanisms: ARCH-0076 IDataRepositoryDecorator chain (used by Koan.Cache, applied in DataService.ApplyDecorators) vs raw services.TryDecorate (used by Koan.Data.Cqrs and by RepositoryFacade registration) — decorator ordering is only governed for one of them.",
+    "Two entity-discovery mechanisms: Backup's EntityDiscoveryService AppDomain.CurrentDomain.GetAssemblies() scan vs the framework's KoanRegistry/[KoanDiscoverable] (which exists precisely to replace such scans).",
+    "Naming: dual generations coexist in Abstractions/Naming — DATA-0086 interface pipeline (INamingProvider/IStorageNamingPolicy/IStorageNameResolver) alongside legacy statics (StorageNameResolver, StorageNameGenerator, StorageNameSelector, NamingUtils) plus Core/Naming overrides — ~16 types to answer 'what is this entity's table called'.",
+    "Relational Infrastructure/Singleflight is a do-nothing compatibility shim forwarding to Koan.Core.Infrastructure.Singleflight, with no callers."
+  ],
+  "deadOrExperimental": [
+    "DEAD: src/Koan.Data.Abstractions/Vector.cs, VectorFactories.cs, VectorAdapterAttribute.cs — empty tombstone files ('moved to Koan.Data.Vector.Abstractions').",
+    "DEAD: src/Koan.Data.Relational/Schema/* (entire directory, ~9 files / ~350 LOC) — superseded by Orchestration/, zero external references.",
+    "DEAD: src/Koan.Data.Relational/Infrastructure/Singleflight.cs — unused forwarding shim.",
+    "DEAD: duplicate global-namespace EntityMetadataProvider inside src/Koan.Data.Core/Model/Entity.cs.",
+    "EXPERIMENTAL/UNCONSUMED: Koan.Data.Cqrs — no samples, no tests, no consumers; kept compiling through migrations but architecturally pre-ARCH-0076/0086.",
+    "EXPERIMENTAL/UNCONSUMED: Koan.Data.Cqrs.Outbox.Connector.Mongo — satellite of the above, last validated 2025-09-29, untested.",
+    "UNCONSUMED: Koan.Data.Direct — modernized boot module but zero real callers in src/samples/tests.",
+    "AGING: Koan.Data.Backup — one consumer chain (Web.Backup→S5.Recs), no test suite, AppDomain scanning, README describes non-existent types."
+  ],
+  "consolidationCandidates": [
+    "Delete Koan.Data.Relational/Schema/* and Infrastructure/Singleflight.cs; rewrite the Relational README around the live surface (SqlFilterTranslator/ILinqSqlDialect, IRelationalSchemaOrchestrator, ComparableScalarEncoding). Zero-risk: nothing references the dead generation.",
+    "Delete the three vector tombstone files in Koan.Data.Abstractions; relocate VectorFilterReader next to the vector contracts in Koan.Data.Vector.Abstractions (its consumers — Koan.Data.Vector, Koan.AI.Agents — already sit above that layer) to finish the half-completed vector extraction.",
+    "Remove the duplicate global-namespace EntityMetadataProvider from Entity.cs (keep the Model-namespace one that ServiceCollectionExtensions wires).",
+    "Merge Koan.Data.Direct into Koan.Data.Core (or cut it): the interfaces, options, and the IDataService.Direct() hook already live in Core; the impl is 688 LOC with zero consumers. Per the redesign discipline (dogfood-driven collapses, ≥2 usages) it currently earns neither a project nor, arguably, existence — folding it removes a project and a mid-feature seam.",
+    "Decide Koan.Data.Cqrs + Mongo outbox: tombstone/cut is the honest default (zero consumers, zero tests, duplicate of the tested Jobs-ledger outbox). If implicit CQRS stays strategic, rebuild it on the modern primitives instead: IDataRepositoryDecorator for ordered decoration (ARCH-0076), KoanModule boot (ARCH-0086), and the Jobs durable ledger as the outbox. Either path eliminates the second outbox stack and the unordered TryDecorate.",
+    "Backup: (a) re-platform EntityDiscoveryService onto KoanRegistry/[KoanDiscoverable]; (b) migrate the 323-line IKoanAutoRegistrar to KoanModule; (c) converge the restore bulk path with the Transfers builders so 'copy data elsewhere' has one engine; (d) given Data.Backup's only consumer is Koan.Web.Backup, consider collapsing the pair into one Koan.Backup package; (e) fix the fictional README. Add at least one ARCH-0079-style integration spec — a 5k-LOC subsystem currently has zero direct tests.",
+    "Shrink Entity<T>'s 948-line surface by retiring the partition-string overload matrix in favor of EntityContext.Partition(...) scoping (the ambient mechanism already exists and is tested); same for AggregateExtensions' partition overloads. Cuts dozens of near-identical overloads without losing capability.",
+    "Collapse the naming stacks: finish DATA-0086 by making the interface pipeline the only resolver and deleting/internalizing the legacy statics (StorageNameResolver/Generator/Selector/NamingUtils) — ~16 public types → ~5.",
+    "Unify repository decoration on the ARCH-0076 IDataRepositoryDecorator chain (Cache already uses it); migrate RepositoryFacade and any future decorator off raw TryDecorate so ordering is governed in one place."
+  ],
+  "maturitySignals": {
+    "tests": "Inner ring is canon-grade: tests/Suites/Data/Core (Koan.Tests.Data.Core, ~5.9k LOC, 20+ specs covering routing/partitions (incl. PartitionNameValidation), transactions (7 specs incl. cross-adapter + vector coordination), transfers DSL, naming, concurrency, entity lifecycle/shape-guard); tests/Suites/Data/Koan.Data.Filtering.Tests (~filter AST, capability bridge/resolver, VectorFilterReader convergence) and Koan.Data.Convergence.Tests (capability-profiled repo); plus the AdapterSurface TestKit (FilterConvergence + TemporalConvergence oracles) executed by every connector suite (Mongo/Postgres/Sqlite/SqlServer/Couchbase/PGVector) — this is the cross-adapter oracle from the DATA-0096/0100 work. Relational is exercised indirectly via the Postgres/SqlServer/Sqlite connector suites that reference it. CAS (IConditionalWriteRepository) is implemented in 4 connectors and exercised via the Jobs suite rather than a dedicated data spec. Outer ring: ZERO tests for Cqrs, the Mongo outbox, and Direct; Backup has only one Web.Admin endpoint smoke spec.",
+    "docs": "Dense and current for the inner ring: ADRs DATA-0061…DATA-0100 (filter pipeline 0096, asymmetric convergence 0099, comparable encoding 0100, simplification 0095, sort 0092/0093, partitions 0094, identity encoding 0098) + ARCH-0084 (capabilities), ARCH-0076 (decorator order), ARCH-0086 (KoanModule); guides: data-modeling, entity-capabilities-howto, transactions-usage-guide, framework-utilities, docs/guides/data/ (streaming/pager), BACKUP-MIGRATION-GUIDE; every project ships README + TECHNICAL pairs. Quality is uneven at the edges: Backup's README documents types that don't exist (BackupPlan/BackupSession/IDataRestoreService), Relational's README documents the deleted generation (IRelationalDialect/LinqWhereTranslator), Cqrs's README is a 12-line stub, and the only Cqrs ADR is DATA-0019.",
+    "codeQuality": "Remarkably clean by marker count: zero TODO/HACK/FIXME/WIP/NotImplementedException across all seven projects; comments consistently cite ADRs (ARCH-0084/0086, DATA-0077/0095/0096/0100, JOBS-0005) which makes intent auditable. Modern idioms (records, AsyncLocal scoping, CRTP, capability tokens). Negatives: Entity.cs at 948 lines (over the 800 guideline) driven by an overload matrix, with a legacy-feel reflection MethodDelegateCache at its top; the duplicate EntityMetadataProvider; StartKoan()'s reflection-based secrets bootstrap; mixed boot-module generations (KoanModule in Core/Direct vs IKoanAutoRegistrar in Relational/Cqrs/Backup) — a faithful index of which projects the renovation has and hasn't reached."
+  }
+}

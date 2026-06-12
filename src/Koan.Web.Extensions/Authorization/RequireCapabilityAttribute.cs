@@ -3,41 +3,47 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.Extensions.DependencyInjection;
+using Koan.Web.Hooks;
 
 namespace Koan.Web.Extensions.Authorization;
 
 /// <summary>
-/// Attribute to enforce capability authorization on capability controller actions.
-/// It uses the per-app CapabilityAuthorizationOptions resolution.
+/// Enforces capability authorization on capability controller actions through the unified SEC-0002
+/// <see cref="IAuthorize"/> seam: the capability action + the controller's entity type become an
+/// <see cref="AuthorizeRequest"/>, which the <see cref="PolicyAuthorizationProvider"/> resolves via the
+/// WEB-0047 (Entity → Defaults → DefaultBehavior) logic. Truly async — no sync-over-async.
 /// </summary>
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = true, Inherited = true)]
 public sealed class RequireCapabilityAttribute : Attribute, IAsyncAuthorizationFilter
 {
     private readonly string _action;
+
     public RequireCapabilityAttribute(string capabilityAction)
     {
         _action = capabilityAction;
     }
 
-    public Task OnAuthorizationAsync(AuthorizationFilterContext context)
+    public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
     {
-        var authorizer = context.HttpContext.RequestServices.GetService<ICapabilityAuthorizer>();
-        var opts = context.HttpContext.RequestServices.GetService<CapabilityAuthorizationOptions>();
+        var authorize = context.HttpContext.RequestServices.GetService<IAuthorize>();
+        if (authorize is null)
+            return; // no authorization registered → allow by default (backward-compat)
 
-        if (authorizer is null || opts is null)
-        {
-            // No capability policy registered - allow by default for backward-compat.
-            return Task.CompletedTask;
-        }
-
-        // Discover the entity generic argument from the controller descriptor
+        // Discover the entity generic argument from the controller descriptor.
         var cad = context.ActionDescriptor as ControllerActionDescriptor;
         var ctrlType = cad?.ControllerTypeInfo?.AsType() ?? typeof(object);
         var entityType = ctrlType.IsConstructedGenericType ? ctrlType.GetGenericArguments()[0] : ctrlType;
 
-        var user = context.HttpContext.User;
-        var allowed = authorizer.IsAllowed(user, entityType, _action);
-        if (!allowed)
+        var decision = await authorize.AuthorizeAsync(new AuthorizeRequest
+        {
+            Subject = context.HttpContext.User,
+            Action = _action,
+            Resource = entityType,
+        });
+
+        // Capability gates never Challenge (the policy provider returns Allow/Forbid) — treat non-Allow as 403,
+        // preserving the original allow/deny semantics.
+        if (decision is not AuthorizeDecision.Allow)
         {
             context.Result = new ObjectResult(new ProblemDetails
             {
@@ -47,6 +53,5 @@ public sealed class RequireCapabilityAttribute : Attribute, IAsyncAuthorizationF
             })
             { StatusCode = StatusCodes.Status403Forbidden };
         }
-        return Task.CompletedTask;
     }
 }

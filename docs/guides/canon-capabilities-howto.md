@@ -65,8 +65,8 @@ Canon is about answering: "When five systems send different values for the same 
 - Identity unions handle split identities gracefully
 
 **See also:**
-- Canonical model: [CANON-0001: Canon Domain Model](../decisions/CANON-0001-canon-domain-model.md)
-- Pipeline phases: [CANON-0002: Pipeline Architecture](../decisions/CANON-0002-pipeline-architecture.md)
+- Canonical model: [ARCH-0058: Canon runtime architecture](../decisions/ARCH-0058-canon-runtime-architecture.md)
+- Pipeline phases: [ARCH-0058: Canon runtime architecture](../decisions/ARCH-0058-canon-runtime-architecture.md)
 
 ---
 
@@ -2327,7 +2327,7 @@ You've now built a foundation in Canon—aggregating multi-source data into gold
 
 **Questions or Issues?**
 - Check [Troubleshooting](#11-troubleshooting) section above
-- Review [CANON-0001](../decisions/CANON-0001-canon-domain-model.md) for architecture details
+- Review [ARCH-0058](../decisions/ARCH-0058-canon-runtime-architecture.md) for architecture details
 - See [entity-capabilities-howto.md](entity-capabilities-howto.md) for Entity<T> patterns
 
 Remember: Canon is about making conflict resolution explicit and auditable. When five systems disagree, your policies decide—and the audit trail proves it. Start with simple Latest-wins, graduate to SourceOfTruth for regulated fields, and let Canon handle the complexity of identity graphs and lineage tracking.

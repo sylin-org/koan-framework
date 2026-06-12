@@ -13,6 +13,9 @@
   <ItemGroup>
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\Koan.Web\Koan.Web.csproj" />
+    <!-- SEC-0001: the trust fabric is a lower-level pillar; Web.Auth depends on it one-way and calls
+         into it to attach the inbound bearer scheme alongside the cookie scheme. -->
+    <ProjectReference Include="..\Koan.Security.Trust\Koan.Security.Trust.csproj" />
   </ItemGroup>
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
@@ -20,7 +23,7 @@
     </AssemblyAttribute>
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.8" />
     <!-- System.Text.Json removed per framework policy -->
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>

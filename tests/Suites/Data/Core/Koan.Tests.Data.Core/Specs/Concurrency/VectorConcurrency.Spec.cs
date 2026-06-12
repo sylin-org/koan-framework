@@ -4,7 +4,7 @@ using Koan.Data.Core.Model;
 using Koan.Data.Core.Transactions;
 using Koan.Data.Vector;
 using Koan.Tests.Data.Core.Support;
-using FluentAssertions;
+using AwesomeAssertions;
 using static Koan.Tests.Data.Core.Specs.Concurrency.VectorConcurrencySpec;
 
 namespace Koan.Tests.Data.Core.Specs.Concurrency;

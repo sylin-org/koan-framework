@@ -2,7 +2,7 @@
 
 Data access core for Koan: common primitives, options, and helpers used by relational/document/vector providers and apps.
 
-- Target framework: net9.0
+- Target framework: net10.0
 - License: Apache-2.0
 
 ## Capabilities

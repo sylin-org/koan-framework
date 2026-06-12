@@ -77,28 +77,18 @@ public sealed class SqlServerAdapterFactory : IDataAdapterFactory
         return new SqlServerRepository<TEntity, TKey>(sp, sourceOpts, resolver);
     }
 
-    // INamingProvider implementation
-    public string RepositorySeparator => "#";
-
-    public string GetStorageName(Type entityType, IServiceProvider services)
+    public StorageNamingCapability GetNamingCapability(IServiceProvider services)
     {
         var opts = services.GetRequiredService<IOptions<SqlServerOptions>>().Value;
-        var convention = new StorageNameResolver.Convention(
-            opts.NamingStyle,
-            opts.Separator,
-            NameCasing.AsIs);
-
-        return StorageNameResolver.Resolve(entityType, convention);
-    }
-
-    public string GetConcretePartition(string partition)
-    {
-        // SQL Server: Remove hyphens from GUIDs, lowercase
-        if (Guid.TryParse(partition, out var guid))
-            return guid.ToString("N");  // N format = no hyphens, lowercase
-
-        // Named partitions: lowercase for SQL Server convention
-        return partition.ToLowerInvariant();
+        return new StorageNamingCapability
+        {
+            Style = opts.NamingStyle,
+            Separator = opts.Separator,
+            Casing = NameCasing.AsIs,
+            PartitionSeparator = '#',
+            Partition = new PartitionTokenPolicy { GuidFormat = "N", Lowercase = true },
+            MaxIdentifierBytes = 128, // SQL Server sysname limit
+        };
     }
 }
 

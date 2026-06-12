@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.Storage;
 using Koan.Storage.Abstractions;
 using Koan.Storage.Connector.Local;

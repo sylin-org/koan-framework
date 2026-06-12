@@ -75,28 +75,20 @@ public sealed class PostgresAdapterFactory : IDataAdapterFactory
         return new PostgresRepository<TEntity, TKey>(sp, sourceOpts, resolver);
     }
 
-    // INamingProvider implementation
-    public string RepositorySeparator => "#";
-
-    public string GetStorageName(Type entityType, IServiceProvider services)
+    public StorageNamingCapability GetNamingCapability(IServiceProvider services)
     {
         var opts = services.GetRequiredService<IOptions<PostgresOptions>>().Value;
-        var convention = new StorageNameResolver.Convention(
-            opts.NamingStyle,
-            opts.Separator,
-            NameCasing.AsIs);
-
-        return StorageNameResolver.Resolve(entityType, convention);
-    }
-
-    public string GetConcretePartition(string partition)
-    {
-        // Postgres: Remove hyphens from GUIDs, lowercase
-        if (Guid.TryParse(partition, out var guid))
-            return guid.ToString("N");  // N format = no hyphens, lowercase
-
-        // Named partitions: lowercase for Postgres convention
-        return partition.ToLowerInvariant();
+        return new StorageNamingCapability
+        {
+            Style = opts.NamingStyle,
+            Separator = opts.Separator,
+            Casing = NameCasing.AsIs,
+            PartitionSeparator = '#',
+            // Named partitions lowercased; GUIDs as 32-hex. PostgreSQL truncates identifiers at 63 bytes,
+            // so the framework hashes the composed name when it would overflow (preserving isolation).
+            Partition = new PartitionTokenPolicy { GuidFormat = "N", Lowercase = true },
+            MaxIdentifierBytes = 63,
+        };
     }
 }
 

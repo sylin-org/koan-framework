@@ -118,6 +118,18 @@ internal sealed class AiCategoryRouter
     {
         if (request is null) throw new ArgumentNullException(nameof(request));
 
+        // AI-0035: URL override path. Bypass source / member resolution when the caller has
+        // supplied a URL directly. The caller owns health, enable/disable, and capability
+        // tracking for ad-hoc targets; Koan acts as the HTTP+JSON executor.
+        if (!string.IsNullOrWhiteSpace(request.OverrideUrl))
+        {
+            return SynthesizeOverrideResolution(
+                url: request.OverrideUrl!,
+                provider: request.OverrideProvider,
+                category: AiCapability.Chat,
+                model: request.Model);
+        }
+
         var modelHint = request.Model;
 
         // Vision-aware routing: when request contains image content and no explicit model,
@@ -147,6 +159,17 @@ internal sealed class AiCategoryRouter
     public AiRouteResolution ResolveEmbeddings(AiEmbeddingsRequest request)
     {
         if (request is null) throw new ArgumentNullException(nameof(request));
+
+        // AI-0035: URL override path. Same semantics as the chat-side short-circuit.
+        if (!string.IsNullOrWhiteSpace(request.OverrideUrl))
+        {
+            return SynthesizeOverrideResolution(
+                url: request.OverrideUrl!,
+                provider: request.OverrideProvider,
+                category: AiCapability.Embed,
+                model: request.Model);
+        }
+
         return Resolve(AiCapability.Embed, null, request.Model);
     }
 
@@ -271,6 +294,51 @@ internal sealed class AiCategoryRouter
         }
 
         return adapter;
+    }
+
+    /// <summary>
+    /// AI-0035: synthesize a routing resolution for a caller-supplied URL override. Builds
+    /// transient <see cref="AiSourceDefinition"/> + <see cref="AiMemberDefinition"/> instances
+    /// that carry the URL through the same downstream path the registry-driven resolution uses;
+    /// the adapter receives the URL via <c>request.InternalConnectionString</c> without caring
+    /// whether the source was registered or synthesized.
+    /// </summary>
+    private AiRouteResolution SynthesizeOverrideResolution(
+        string url, string? provider, string category, string? model)
+    {
+        var providerKey = string.IsNullOrWhiteSpace(provider) ? "ollama" : provider!.Trim();
+
+        var adapter = _adapterRegistry.Get(providerKey)
+            ?? throw new InvalidOperationException(
+                $"AI-0035 URL override: no adapter registered for provider '{providerKey}'. " +
+                $"Available adapters: {string.Join(", ", _adapterRegistry.All.Select(a => a.Id))}");
+
+        var syntheticMember = new AiMemberDefinition
+        {
+            Name = $"{providerKey}::override",
+            ConnectionString = url,
+            Order = 0,
+            Origin = "url-override",
+            IsAutoDiscovered = false,
+            HealthState = MemberHealthState.Healthy,
+        };
+
+        var syntheticSource = new AiSourceDefinition
+        {
+            Name = $"override::{providerKey}",
+            Provider = providerKey,
+            Priority = 0,
+            Policy = "Fallback",
+            Members = new List<AiMemberDefinition> { syntheticMember },
+            Origin = "url-override",
+            IsAutoDiscovered = false,
+        };
+
+        _logger?.LogDebug(
+            "URL override resolved: provider={Provider} url={Url} adapter={AdapterId} model={Model}",
+            providerKey, url, adapter.Id, model);
+
+        return new AiRouteResolution(syntheticSource, syntheticMember, adapter, category, model);
     }
 
     private static string? DetermineEffectiveModel(

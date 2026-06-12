@@ -1,34 +1,31 @@
-# ────────────────────────────────────────────────────────────────────────────
-# Auto-release on merge to main (ARCH-0082)
+# ─────────────────────────────────────────────────────────────────────────────
+# Auto-release on merge to main (ARCH-0082, versioning per ARCH-0085)
 #
 # Required reading before debugging or re-running manually:
-#   docs/workbooks/nuget-publishing.md  (Failure → recovery section)
-#   docs/workbooks/versioning.md        (what determines which packages bump)
-# ────────────────────────────────────────────────────────────────────────────
+#   docs/workbooks/nuget-publishing.md  (Failure -> recovery section)
+#   docs/workbooks/versioning.md        (how per-package versions are computed)
+# ─────────────────────────────────────────────────────────────────────────────
 # What this does, in order, on every push to main:
 #   1. Builds the full solution (refuses to release a broken build).
-#   2. Runs scripts/versioning/Update-Versions.ps1 -AutoBumpKernel.
-#      Kernel bump is detected from kernel-folder conventional commits.
-#      Periphery bumps are detected per-folder.
-#      Also writes artifacts/bumped-packages.txt — the csproj paths to ship.
-#   3. If versions.props changed → commits it, tags release/v<kernel>, pushes both.
-#   4. Packs ONLY the bumped packages (not the whole solution) and pushes them
-#      to nuget.org. Always-on: requires only the NUGET_API_KEY repo secret.
+#   2. Packs every packable csproj under src/ with -p:PublicRelease=true.
+#      Nerdbank.GitVersioning (via each package's version.json + pathFilters)
+#      stamps each package with its own version (patch = git height of the
+#      package folder since its major.minor last changed). --skip-duplicate
+#      makes every push idempotent; packages whose version did not change are
+#      silently skipped by nuget.org.
+#   3. Creates a date-based release tag (release/YYYY-MM-DD[-N]).
+#   4. Pushes all nupkg and snupkg to nuget.org.
 #
 # What you do:
-#   - Open a PR dev → main, merge it. That's it.
+#   - Open a PR dev -> main, merge it. That is it.
 #
-# Loop protection: the workflow uses GITHUB_TOKEN for its commits/pushes.
-# GitHub Actions deliberately does NOT trigger workflows from GITHUB_TOKEN
-# pushes, so the version-bump commit doesn't re-fire this workflow.
+# To skip publishing for a specific merge: include "[skip release]" in the
+# merge commit subject. The job conditional short-circuits the entire job.
 #
-# How to opt OUT for a specific merge: include "[skip release]" in the merge
-# commit subject. The job conditional below short-circuits the work.
-#
-# Required secret: NUGET_API_KEY (Settings → Secrets and variables → Actions).
-# If absent, the workflow still tags + pushes versions.props but warns instead
-# of pushing to nuget.org — so a missing/rotated key doesn't break the release.
-# ────────────────────────────────────────────────────────────────────────────
+# Required secret: NUGET_API_KEY (Settings -> Secrets and variables -> Actions).
+# If absent, the tag still lands but packages are NOT pushed -- the workflow
+# warns instead of failing so the release record is preserved.
+# ─────────────────────────────────────────────────────────────────────────────
 
 name: Release on main
 
@@ -42,7 +39,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write   # needed to push the version-bump commit and the release tag
+  contents: write   # needed to push the release tag
 
 jobs:
   release:
@@ -50,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout (full history needed for git log / git tag)
+      - name: Checkout (full history for Nerdbank.GitVersioning)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -61,145 +58,80 @@ jobs:
         with:
           dotnet-version: '10.x'
 
-      - name: Configure git for the release commit
+      - name: Configure git for the release tag
         shell: pwsh
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Restore + build the solution (Release)
+      - name: Restore + build the solution (Release, PublicRelease)
         shell: pwsh
         run: |
-          # -c Release so the subsequent dotnet pack --no-build can use these outputs.
-          dotnet build Koan.sln -c Release --nologo "-p:NuGetAudit=false"
-          if ($LASTEXITCODE -ne 0) { throw "Build failed — refusing to release a broken main." }
+          dotnet build Koan.sln -c Release --nologo "-p:NuGetAudit=false" "-p:PublicRelease=true"
+          if ($LASTEXITCODE -ne 0) { throw "Build failed -- refusing to release a broken main." }
 
-      - name: Compute new versions
-        id: compute
+      - name: Pack all packable projects (PublicRelease=true)
         shell: pwsh
         run: |
-          pwsh scripts/versioning/Update-Versions.ps1 -AutoBumpKernel
-          if ($LASTEXITCODE -ne 0) { throw "Update-Versions.ps1 failed." }
-
-          # Surface the resolved kernel version for downstream steps.
-          $xml = [xml](Get-Content build/versions.props -Raw)
-          $kernel = $xml.SelectSingleNode('//KoanKernelVersion').InnerText.Trim()
-          "kernel-version=$kernel" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-
-          # Did anything change? (versions.props is the only file the script writes.)
-          $changed = (git status --porcelain build/versions.props) -ne $null
-          "has-changes=$($changed.ToString().ToLower())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-
-          Write-Host "Kernel version : $kernel"
-          Write-Host "Has changes    : $changed"
-
-      - name: Skip — nothing to release
-        if: steps.compute.outputs.has-changes != 'true'
-        shell: pwsh
-        run: |
-          Write-Host "No version changes detected. Nothing to release."
-          Write-Host "(This is normal for docs-only / tests-only merges.)"
-
-      - name: Refuse to create a duplicate tag
-        if: steps.compute.outputs.has-changes == 'true'
-        id: tag-check
-        shell: pwsh
-        run: |
-          $tag = "release/v${{ steps.compute.outputs.kernel-version }}"
-          $exists = git tag --list $tag
-          if ($exists) {
-            Write-Host "::warning::Tag $tag already exists. Skipping commit/tag/publish to avoid clobbering."
-            "skip=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          } else {
-            "skip=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-            "tag=$tag"   | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          }
-
-      - name: Commit and push version bump
-        if: steps.compute.outputs.has-changes == 'true' && steps.tag-check.outputs.skip == 'false'
-        shell: pwsh
-        run: |
-          git add build/versions.props
-          git commit -m "chore(release): bump versions [skip release]" -m "Auto-generated by .github/workflows/release-on-main.yml. See ARCH-0082."
-          git tag -a "${{ steps.tag-check.outputs.tag }}" -m "Koan kernel v${{ steps.compute.outputs.kernel-version }}"
-          git push origin main
-          git push origin "${{ steps.tag-check.outputs.tag }}"
-
-      - name: Pack only the bumped packages
-        if: |
-          steps.compute.outputs.has-changes == 'true' &&
-          steps.tag-check.outputs.skip == 'false'
-        shell: pwsh
-        run: |
-          # Update-Versions.ps1 wrote artifacts/bumped-packages.txt with the exact set
-          # of csproj paths whose versions changed (kernel = all 14 lockstep packages;
-          # periphery = only the folders with commits since the reference tag).
-          # We pack ONLY those — no point re-packing 95 packages that nuget.org will
-          # reject as duplicates.
-          $manifest = 'artifacts/bumped-packages.txt'
-          if (-not (Test-Path $manifest)) {
-            throw "Bumped-packages manifest missing at $manifest — Update-Versions.ps1 should have written it."
-          }
-          $csprojs = @(Get-Content $manifest | Where-Object { $_ })
-          if ($csprojs.Count -eq 0) {
-            Write-Host "Manifest is empty — nothing to pack. (Should not happen when has-changes=true.)"
-            exit 0
-          }
-
           New-Item -ItemType Directory -Path artifacts/nuget -Force | Out-Null
-          Write-Host "Packing $($csprojs.Count) bumped package(s) ..."
 
-          # Pack policy (lessons from the first run):
-          #   - `dotnet restore` per-csproj fixes NETSDK1004 for projects not in Koan.sln
-          #     (ZenGarden, PGVector — their obj/project.assets.json wouldn't otherwise exist).
-          #   - DROP `--no-build`: let pack do its own build per project. Slower (~2 min on
-          #     a 100-project release) but robust to "project x not built in solution"
-          #     situations.
-          #   - Don't throw on per-csproj failure. We publish whatever DID pack.
-          #     Source generators with NU5017/NU5019 quirks often still produce a usable
-          #     .nupkg before erroring — we capture it either way.
+          $csprojs = @(Get-ChildItem -Path src -Recurse -Filter *.csproj)
+          Write-Host "Packing $($csprojs.Count) candidate project(s) ..."
           $failed = @()
-          foreach ($csproj in $csprojs) {
-            Write-Host "  restore + pack: $csproj"
-            dotnet restore $csproj --nologo "-p:NuGetAudit=false" 2>&1 | Out-Null
-            dotnet pack $csproj -c Release --nologo `
-              -p:PackageOutputPath=$(Resolve-Path artifacts/nuget) `
-              "-p:NuGetAudit=false"
+
+          foreach ($c in $csprojs) {
+            # Explicit restore handles projects not included in Koan.sln.
+            dotnet restore $c.FullName --nologo "-p:NuGetAudit=false" 2>&1 | Out-Null
+            dotnet pack $c.FullName -c Release --nologo `
+              "-p:PublicRelease=true" `
+              "-p:NuGetAudit=false" `
+              -o artifacts/nuget
             if ($LASTEXITCODE -ne 0) {
-              $failed += $csproj
-              Write-Host "::warning::Pack returned non-zero for $csproj. Will check artifact and continue."
+              $failed += $c.Name
+              # Non-zero is normal for IsPackable=false projects and analyzer/generator
+              # quirks (NU5017/NU5019). Warn and continue -- we check the artifact count below.
+              Write-Host "::warning::Pack returned non-zero for $($c.Name). Continuing."
             }
           }
 
           $produced = @(Get-ChildItem artifacts/nuget/*.nupkg -File)
-          Write-Host ""
-          Write-Host "Pack summary: $($produced.Count) nupkg(s) produced of $($csprojs.Count) requested. $($failed.Count) csproj(s) returned non-zero (some still produced packages — verify in the publish step output)."
-          if ($produced.Count -eq 0) {
-            throw "Zero packages produced — nothing to publish. Check the per-pack errors above."
+          Write-Host "Pack summary: $($produced.Count) nupkg(s) produced; $($failed.Count) project(s) returned non-zero."
+          if ($produced.Count -eq 0) { throw "Zero packages produced -- check per-pack errors above." }
+
+      - name: Compute date-based release tag
+        id: tag
+        shell: pwsh
+        run: |
+          $base = "release/$(Get-Date -Format 'yyyy-MM-dd')"
+          $tag  = $base
+          $n    = 1
+          while (git tag --list $tag) {
+            $n++
+            $tag = "$base-$n"
           }
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Release tag: $tag"
+
+      - name: Create and push release tag
+        shell: pwsh
+        run: |
+          git tag -a "${{ steps.tag.outputs.tag }}" -m "Release ${{ steps.tag.outputs.tag }}"
+          git push origin "${{ steps.tag.outputs.tag }}"
 
       - name: Publish to NuGet
-        if: |
-          steps.compute.outputs.has-changes == 'true' &&
-          steps.tag-check.outputs.skip == 'false'
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         shell: pwsh
         run: |
-          # NUGET_API_KEY is mandatory on main — but warn-and-skip instead of failing
-          # so the tag/commit still land if the secret is rotated/missing. SREs can
-          # re-publish manually once the secret is back.
           if ([string]::IsNullOrEmpty($env:NUGET_API_KEY)) {
-            Write-Host "::warning::secrets.NUGET_API_KEY is empty."
-            Write-Host "::warning::Tag release/v${{ steps.compute.outputs.kernel-version }} is up; packages NOT published."
+            Write-Host "::warning::NUGET_API_KEY is empty."
+            Write-Host "::warning::Tag ${{ steps.tag.outputs.tag }} is up; packages NOT published."
             Write-Host "::warning::Set NUGET_API_KEY and re-run, or push manually from artifacts/nuget/."
             exit 0
           }
 
-          # Publish .nupkg files. dotnet nuget push does NOT auto-publish .snupkg
-          # symbol packages alongside — they need an explicit second pass.
-          $packages = @(Get-ChildItem artifacts/nuget/*.nupkg -File)
-          $symbols  = @(Get-ChildItem artifacts/nuget/*.snupkg -File)
+          $packages = @(Get-ChildItem artifacts/nuget/*.nupkg  -File)
+          $symbols  = @(Get-ChildItem artifacts/nuget/*.snupkg -File -ErrorAction SilentlyContinue)
           Write-Host "Publishing $($packages.Count) package(s) + $($symbols.Count) symbol(s) to nuget.org ..."
           $failed = @()
 
@@ -211,7 +143,7 @@ jobs:
               --skip-duplicate
             if ($LASTEXITCODE -ne 0) {
               $failed += $pkg.Name
-              Write-Host "::warning::Failed to publish $($pkg.Name) — continuing with remaining packages."
+              Write-Host "::warning::Failed to publish $($pkg.Name) -- continuing with remaining packages."
             }
           }
 
@@ -222,8 +154,8 @@ jobs:
               --api-key $env:NUGET_API_KEY `
               --skip-duplicate
             if ($LASTEXITCODE -ne 0) {
-              # Symbol push failure isn't fatal — main package is up; symbols can be re-pushed later.
-              Write-Host "::warning::Failed to publish symbols $($sym.Name) — main package is published; symbols can be retried."
+              # Symbol push failure is not fatal -- main package is up; symbols can be retried.
+              Write-Host "::warning::Failed to publish symbols $($sym.Name) -- main package is published; symbols can be retried."
             }
           }
 
@@ -235,9 +167,8 @@ jobs:
         if: always()
         shell: pwsh
         run: |
-          $hasChanges = '${{ steps.compute.outputs.has-changes }}'
-          $skip       = '${{ steps.tag-check.outputs.skip }}'
-          $kernel     = '${{ steps.compute.outputs.kernel-version }}'
+          $tag  = '${{ steps.tag.outputs.tag }}'
+          $pkgs = (Get-ChildItem artifacts/nuget/*.nupkg -File -ErrorAction SilentlyContinue).Count
 
           $summary = @"
           # Release on main
@@ -245,8 +176,7 @@ jobs:
           | Step | Result |
           | --- | --- |
           | Build | OK |
-          | Kernel version | $kernel |
-          | Version changes detected | $hasChanges |
-          | Tag created | $(if ($hasChanges -eq 'true' -and $skip -eq 'false') { "release/v$kernel" } else { '(skipped)' }) |
+          | Release tag | $tag |
+          | Packages produced | $pkgs |
           "@
           $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append

@@ -30,6 +30,23 @@ internal sealed class EntityInputTransformFormatter : InputFormatter
         return ImplementsIEntity(type);
     }
 
+    public override bool CanRead(InputFormatterContext context)
+    {
+        // Two-stage check. CanReadType keeps us out of non-entity targets (cheap reflection). The
+        // runtime check below consults the registry so we only claim the body when a Terminal
+        // transformer is actually registered for this (entity, content-type) pair. Without this,
+        // assemblies that pull in Koan.Web.Transformers solely for output enrichers (no input
+        // transformers) would still see this formatter claim every `IEntity<>` POST, ReadRequestBody
+        // would return NoValue, and `[FromBody]` would bind null — breaking standard JSON upserts.
+        if (!base.CanRead(context)) return false;
+        var modelType = context.ModelType;
+        var entityType = modelType.IsGenericType && modelType.GetGenericTypeDefinition() == typeof(IEnumerable<>)
+            ? modelType.GetGenericArguments()[0]
+            : modelType;
+        var contentType = context.HttpContext.Request.ContentType ?? string.Empty;
+        return _registry.ResolveForInput(entityType, contentType, context.HttpContext) is not null;
+    }
+
     private static bool ImplementsIEntity(Type type)
     {
         var current = type;
@@ -62,7 +79,7 @@ internal sealed class EntityInputTransformFormatter : InputFormatter
         else entityType = modelType;
 
         var contentType = http.Request.ContentType ?? "";
-        var selection = _registry.ResolveForInput(entityType, contentType);
+        var selection = _registry.ResolveForInput(entityType, contentType, http);
         if (selection is null)
         {
             return InputFormatterResult.NoValue();

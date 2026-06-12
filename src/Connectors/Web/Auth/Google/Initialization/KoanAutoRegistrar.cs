@@ -4,11 +4,16 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
+using Koan.Core.Ordering;
 using Koan.Web.Auth.Connector.Google.Providers;
 using Koan.Web.Auth.Providers;
 
 namespace Koan.Web.Auth.Connector.Google.Initialization;
 
+// CORE-0091: must Initialize after Koan.Web.Auth so the auth scheme
+// registration this connector contributes is read against the
+// AddAuthentication() builder Koan.Web.Auth has already created.
+[After(typeof(Koan.Web.Auth.Initialization.KoanAutoRegistrar))]
 public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 {
     public string ModuleName => "Koan.Web.Auth.Connector.Google";

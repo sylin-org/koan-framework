@@ -44,13 +44,18 @@ Framework knowledge is provided through **Agent Skills** in `.claude/skills/` th
 **Immediate red flags** that trigger `koan-entity-first` skill with anti-patterns:
 - Manual `IRepository<T>` interfaces
 - Injecting repositories into services
-- Manual service registration in Program.cs (except via `KoanAutoRegistrar`)
+- Manual service registration in Program.cs (except via `KoanModule` / `KoanAutoRegistrar`)
 - Custom ORM/DbContext usage instead of Entity<T>
 - Provider-specific code without capability detection
 
 ## Framework Utilities
 
 **Before writing new helper methods**, check if Koan Framework already provides them:
+
+### Bootstrap & Modules (ARCH-0086)
+- **KoanModule** (`Koan.Core`) — Boot-time module primitive. Extend it to author one self-describing unit: `Id`, `Register(services)` (DI), `Start(sp, ct)` (ordered one-time startup), `Report(...)` (provenance). It implements `IKoanAutoRegistrar`, so existing source-gen discovery + `[Before]`/`[After]` ordering apply unchanged. Preferred over hand-writing `IKoanInitializer` / `IKoanAutoRegistrar`.
+- **[KoanDiscoverable]** + **KoanRegistry.GetDiscoveredImplementors** (`Koan.Core`) — Mark an *interface* `[KoanDiscoverable]` and its implementers are auto-registered into `KoanRegistry` (build-time generator + runtime `RegistryManifestLoader`), queried with `KoanRegistry.GetDiscoveredImplementors(typeof(T))`. Replaces bespoke `AppDomain.GetAssemblies()` scans (which miss lazily-loaded assemblies). Used by the auth contributor / flow-handler pipelines.
+- **PartitionNameValidator** (`Koan.Data.Core`) — Enforced at `EntityContext.With(partition:)`: a partition name must be a GUID or contain only letters/digits/`-`/`.`/`_`, else `ArgumentException`. Prevents distinct partitions colliding after identifier sanitization (DATA-0077 §4).
 
 ### Orchestration & Discovery
 - **ConnectionStringParser** (`Koan.Core.Orchestration`) - Parse/build connection strings for Postgres, SQL Server, MongoDB, Redis, SQLite
@@ -78,6 +83,16 @@ Framework knowledge is provided through **Agent Skills** in `.claude/skills/` th
   - `Koan.Cache.Coherence.Messaging` — rides `Koan.Messaging.IMessageBus` (priority 150, preempts Redis pub/sub)
   - `Koan.Cache.Coherence.InMemory` — fallback channel for tests / single-process verification (priority `int.MinValue`)
 - **Singleflight** (`Koan.Core.Singleflight`) — Stampede-protection primitive lifted out of cache for cross-pillar reuse
+
+### Background Jobs (JOBS-0005)
+- **IKoanJob<TSelf>** (`Koan.Jobs`) — Entity-first jobs: `MyJob : Entity<MyJob>, IKoanJob<MyJob>` with `static Task Execute(MyJob, JobContext, CancellationToken)`. Auto-discovered (`[KoanDiscoverable]`) — no queues/workers/repositories to wire
+- **`.Job` / `.Jobs` accessors** (`Koan.Jobs`) — `myJob.Job.Submit(action)`, `MyJob.Jobs.Trigger(action)` / `.Cancel(id)` / `.Where(...)`, batch `list.Submit(action)` (C# 14 extension members — instance `Job`, static `Jobs`; no source generator)
+- **Job attributes** (`Koan.Jobs`) — `[JobAction(action, Timeout/MaxAttempts/OnFailure/Lane/MaxConcurrency/Schedule/Deadline/MaxReschedules)]`, `[JobChain(a,b,c)]` (linear auto-advance), `[JobIdempotent(keys)]` (coalesce duplicates), `[JobGate(member)]` (shared resource gate — `member` is a property *or* an async resolver method `Task<string?>(IServiceProvider, CancellationToken)` for runtime-derived keys, §18), `[JobPersistence(Auto|InMemory|DataStore)]` (per-type durability routing), `[ParallelSafe]` (opt out of per-entity serialization)
+- **JobContext** (`Koan.Jobs`) — handler control verbs: `ctx.Reschedule(after|until)` (defer without consuming a retry), `ctx.Backoff(after, key)` (set a cross-node resource gate), `ctx.ContinueWith(action)` / `ctx.StopChain`, `ctx.Progress(fraction, msg)`; read-only `ctx.State` for stateful backoff decisions
+- **Work-item write safety (ADR §17)** — **mutate the entity passed to `Execute`** (don't reload-and-save your own copy): the orchestrator auto-saves that reference only if it changed (`save-if-changed`), so an untouched reference is never written and a handler's own write is never clobbered. And a work-item id is its **ordering key** — jobs for the same `(WorkType, WorkId)` run **one at a time by default** (FIFO-group; `[ParallelSafe]` opts out). Different entities still parallelize fully
+- **Capability ladder** — in-memory → durable (`DataJobLedger` over `Entity<JobRecord>`; follows any data adapter) → distributed (competing consumers on the shared ledger) → `+bus` (`Koan.Jobs.Transport.Messaging`, cross-node push-dispatch). **Constant at-least-once + idempotent contract across all tiers**; the ledger is the single source of truth (claim = atomic CAS, never a move). Scheduling is initiator-driven (`Schedule` re-submits on a cadence: interval / cron via Cronos / `@boot` / `@continuous`); transactional outbox + retention are automatic on the durable tier (Completed/Cancelled past `ArchiveAfter` 7d, Failed/Dead past `FailedAfter` 30d, optional `RetainPerWorkType` cap) and ledger reads are indexed + pushed down. For bulk, window the source — a cursor-conveyor (`ctx.ContinueWith` self-loop) drains it through a handful of rows, not one per item; don't mint a job per row (JOBS-0005 §19)
+- **Scale tiers (JOBS-0005 §20)** — **`JobMetric`** + `JobsOptions.MetricsEnabled` (opt-in, default off): a worker-batched, node-sharded throughput rollup that **survives retention** — active counts come from the indexed ledger, this is the completed/failed *history*; read with `JobMetric.Summary(workType, from, to)`. **Contention-free claim**: on durable adapters the default `Optimistic` strategy now marks `Running` via the reusable **`IConditionalWriteRepository.ConditionalReplaceAsync(model, guard)`** (`DataCaps.Write.ConditionalReplace`, `Koan.Data.Abstractions`) — a compare-and-set / optimistic-concurrency primitive (SQLite/PG/SqlServer/Mongo, forwarded by `RepositoryFacade`) — so each ready job runs on exactly one node (no duplicate executions). **TTL retention**: **`[Index(Ttl = true)]`** (`DataCaps.Retention.TtlIndex`, `Koan.Data.Abstractions`) — Mongo expires terminal rows on a per-outcome `JobRecord.ExpireAt` via a native TTL index (`expireAfterSeconds=0`); relational adapters skip it and keep the periodic purge as the universal backstop (§20.4)
+- **Authoring guide**: [Background Jobs How-To](docs/guides/jobs-howto.md) · **ADR**: docs/decisions/JOBS-0005
 
 ### Entity Lifecycle
 - **[Timestamp]** (`Koan.Data.Abstractions`) — `[Timestamp]` set-once on creation, `[Timestamp(OnSave = true)]` set on every save

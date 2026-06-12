@@ -36,7 +36,7 @@ public sealed class RequestTranslator
 
     var args = arguments ?? new JObject();
         var builder = services.GetRequiredService<EntityRequestContextBuilder>();
-        var context = BuildContext(builder, args, cancellationToken);
+        var context = BuildContext(builder, registration.EntityType, args, cancellationToken);
 
         return tool.Operation switch
         {
@@ -211,7 +211,7 @@ public sealed class RequestTranslator
         return request;
     }
 
-    private static EntityRequestContext BuildContext(EntityRequestContextBuilder builder, JObject args, CancellationToken cancellationToken)
+    private static EntityRequestContext BuildContext(EntityRequestContextBuilder builder, Type entityType, JObject args, CancellationToken cancellationToken)
     {
         var options = new QueryOptions();
 
@@ -233,7 +233,8 @@ public sealed class RequestTranslator
         var sort = ReadString(args, "sort");
         if (!string.IsNullOrWhiteSpace(sort))
         {
-            options.Sort.Add(ParseSort(sort!));
+            // Accept the canonical URL grammar (comma-separated, +/- prefixes) — same as ?sort= on HTTP.
+            options.Sort.AddRange(Koan.Data.Core.Sorting.SortSpecParser.ParseStrict(entityType, sort));
         }
 
         if (args.TryGetValue("extras", StringComparison.OrdinalIgnoreCase, out var extrasNode) && extrasNode is JObject extrasObj)
@@ -293,19 +294,6 @@ public sealed class RequestTranslator
         }
 
         return dict;
-    }
-
-    private static SortSpec ParseSort(string sort)
-    {
-        var parts = sort.Split(':', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (parts.Length == 0)
-        {
-            return new SortSpec(sort, false);
-        }
-
-        var field = parts[0];
-        var desc = parts.Length > 1 && parts[1].Equals("desc", StringComparison.OrdinalIgnoreCase);
-        return new SortSpec(field, desc);
     }
 
     private static void SetProperty(object target, string propertyName, object? value)

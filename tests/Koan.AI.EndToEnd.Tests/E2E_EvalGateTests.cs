@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.AI.Contracts.Shared;
 using Koan.AI.Eval;
 using Koan.Core.AI;

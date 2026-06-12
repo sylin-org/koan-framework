@@ -23,6 +23,8 @@ public static class KoanAuthorizationServiceCollectionExtensions
             configurePolicies?.Invoke(options);
         });
 
+        // AddCapabilityAuthorization now also registers the unified IAuthorize seam + provider ladder (SEC-0002),
+        // so it is available whether an app calls AddKoanAuthorization or AddCapabilityAuthorization directly.
         services.AddCapabilityAuthorization(configureCapabilities ?? (_ => { }));
 
         if (developmentClaimsTransformer is not null)

@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using EmbeddingService = Koan.Context.Services.Embedding;
 using Koan.AI.Contracts;
 using Koan.AI.Contracts.Models;

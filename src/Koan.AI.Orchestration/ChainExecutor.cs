@@ -191,9 +191,14 @@ internal sealed class ChainExecutor : IChainExecutor
         // Generate embedding for the query
         var embedding = await Koan.AI.Client.Embed(queryText, ct);
 
+        // AI-0036 R1: honour the alpha the builder stored instead of silently dropping it. null =
+        // pure-vector (default, identical to prior behaviour); set = hybrid with the query as the
+        // lexical side (Search gates hybrid on a non-null text).
+        var hybridText = step.Alpha is null ? null : queryText;
+
         // Invoke Vector<T>.Search via reflection (entity type is runtime-determined)
         var results = await InvokeVectorSearch(
-            step.EntityType, embedding, step.TopK, ct);
+            step.EntityType, embedding, hybridText, step.Alpha, step.TopK, step.Filter, ct);
 
         // Store retrieved context and citations
         var contextParts = new List<string>();
@@ -209,6 +214,11 @@ internal sealed class ChainExecutor : IChainExecutor
         context.AddCitations(citations);
         context.SetVariable("retrieved", string.Join("\n\n---\n\n", contextParts));
         context.SetOutput(string.Join("\n\n---\n\n", contextParts));
+
+        // AI-0036 R1: honour the inline rerank flag the builder advertised (Retrieve(rerank: true)),
+        // instead of requiring a separate .Rerank() step. Reuses the existing rerank pass.
+        if (step.Rerank)
+            await ExecuteRerank(step, context, ct);
     }
 
     // ── Parse ──
@@ -442,7 +452,8 @@ internal sealed class ChainExecutor : IChainExecutor
     /// Returns (Id, Score, Metadata) tuples.
     /// </summary>
     private static async Task<List<(string Id, double Score, object? Metadata)>> InvokeVectorSearch(
-        Type entityType, float[] embedding, int topK, CancellationToken ct)
+        Type entityType, float[] embedding, string? text, double? alpha, int topK,
+        Koan.Data.Abstractions.Filtering.Filter? filter, CancellationToken ct)
     {
         var results = new List<(string Id, double Score, object? Metadata)>();
 
@@ -462,22 +473,25 @@ internal sealed class ChainExecutor : IChainExecutor
                 return results;
             }
 
-            // Call Search(float[], text: null, alpha: null, topK: topK, ...)
+            // AI-0036 §9 R4: forward a typed VectorRetrieveOptions instead of a positional array, so a
+            // knob can never be silently dropped. Search(float[], VectorRetrieveOptions, ct).
             var searchMethod = vectorType.GetMethod("Search", [
                 typeof(float[]),
-                typeof(string),
-                typeof(double?),
-                typeof(int?),
-                typeof(object),
-                typeof(string),
-                typeof(string),
+                typeof(Koan.Data.Vector.VectorRetrieveOptions),
                 typeof(CancellationToken)
             ]);
 
             if (searchMethod is null)
                 return results;
 
-            var task = searchMethod.Invoke(null, [embedding, null, null, topK, null, null, null, ct]);
+            var options = new Koan.Data.Vector.VectorRetrieveOptions
+            {
+                Text = text,
+                Alpha = alpha,
+                TopK = topK,
+                Filter = filter
+            };
+            var task = searchMethod.Invoke(null, [embedding, options, ct]);
             if (task is null)
                 return results;
 
@@ -505,14 +519,34 @@ internal sealed class ChainExecutor : IChainExecutor
                 results.Add((id, score, metadata));
             }
         }
+        catch (System.Reflection.TargetInvocationException tie) when (IsFilterError(tie.InnerException))
+        {
+            // AI-0036 P1-AI: a filter/capability error must NOT be flattened into silently-empty
+            // retrieval (that is the data-leak-shaped under-return this whole effort eliminates).
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(tie.InnerException!).Throw();
+        }
+        catch (Exception ex) when (IsFilterError(ex))
+        {
+            throw;
+        }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            // Retrieval failure is non-fatal — chain continues with empty retrieval
+            // A genuine retrieval-infrastructure hiccup is non-fatal — the chain continues with empty
+            // retrieval. Filter/capability errors are handled above and propagate.
             results.Clear();
         }
 
         return results;
     }
+
+    /// <summary>
+    /// Filter/capability errors are user-meaningful and must surface, never degrade to empty results.
+    /// </summary>
+    private static bool IsFilterError(Exception? ex) => ex is
+        Koan.Data.Vector.VectorFilterUnsupportedException or
+        Koan.Data.Abstractions.Filtering.FilterParseException or
+        Koan.Data.Abstractions.Filtering.InvalidFilterFieldException or
+        NotSupportedException;
 }
 
 /// <summary>

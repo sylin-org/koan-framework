@@ -22,8 +22,11 @@ public static class AggregateConfigs
         return cfg;
     }
 
-    // Testing/host reset: clear cached configs to avoid cross-root contamination
-    internal static void Reset() => Cache.Clear();
+    // Testing/host reset: clear cached configs to avoid cross-root contamination.
+    // Public because the AdapterSurface matrix needs to call it between test-class boundaries —
+    // each WebApplicationFactory<Program> creates its own ServiceProvider but the static cache
+    // pins references to the first one.
+    public static void Reset() => Cache.Clear();
 
     private static string? ResolveProvider(Type aggregateType)
     {

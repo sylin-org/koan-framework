@@ -9,10 +9,12 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Koan.Core;
+using Koan.Core.Capabilities;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Annotations;
+using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Core;
 using Koan.Web.Filtering;
@@ -372,25 +374,19 @@ public static class AddKoanGraphQlExtensions
         var allFactories = dataFactories.Concat(vectorFactories);
         var namingProvider = allFactories.FirstOrDefault(p => string.Equals(p.Provider, provider, StringComparison.OrdinalIgnoreCase));
 
-        string baseName;
         if (namingProvider != null)
         {
-            // Use adapter's naming provider
-            baseName = namingProvider.GetStorageName(entityType, sp);
-        }
-        else
-        {
-            // Fallback to default naming conventions
-            var diResolver = sp.GetService<IStorageNameResolver>() ?? new DefaultStorageNameResolver();
-            var fallback = sp.GetService<Microsoft.Extensions.Options.IOptions<Koan.Data.Core.Naming.NamingFallbackOptions>>()?.Value;
-            var convention = fallback is not null
-                ? new StorageNameResolver.Convention(fallback.Style, fallback.Separator, fallback.Casing)
-                : new StorageNameResolver.Convention(StorageNamingStyle.EntityType, ".", NameCasing.AsIs);
-            baseName = StorageNameResolver.Resolve(entityType, convention);
+            // Adapter owns naming — request with no partition so we get the unsuffixed base.
+            return namingProvider.ResolveStorage(entityType, partition: null, sp);
         }
 
-        // Ignore partition suffix for type/field names
-        return baseName.Split('#')[0].Split(namingProvider?.RepositorySeparator ?? "#")[0];
+        // Fallback to default naming conventions
+        var diResolver = sp.GetService<IStorageNameResolver>() ?? new DefaultStorageNameResolver();
+        var fallback = sp.GetService<Microsoft.Extensions.Options.IOptions<Koan.Data.Core.Naming.NamingFallbackOptions>>()?.Value;
+        var convention = fallback is not null
+            ? new StorageNameResolver.Convention(fallback.Style, fallback.Separator, fallback.Casing)
+            : new StorageNameResolver.Convention(StorageNamingStyle.EntityType, ".", NameCasing.AsIs);
+        return StorageNameResolver.Resolve(entityType, convention);
     }
 
     private static string ResolveStorageNameFactory(Type entityType)
@@ -493,9 +489,9 @@ public static class AddKoanGraphQlExtensions
         private readonly IServiceProvider _sp;
         public Resolvers(IServiceProvider sp) { _sp = sp; }
 
-        private static IQueryCapabilities Caps(IDataRepository<TEntity, string> repo)
-            => repo as IQueryCapabilities ?? new RepoCaps(QueryCapabilities.None);
-        private sealed record RepoCaps(QueryCapabilities Cap) : IQueryCapabilities { public QueryCapabilities Capabilities => Cap; }
+        // ARCH-0084: unified CapabilitySet (native IDescribesCapabilities, else legacy-marker bridge).
+        private static CapabilitySet Caps(IDataRepository<TEntity, string> repo)
+            => DataCaps.Describe(repo, repo.GetType().Name);
 
         private GraphQlHooksRunner<TEntity> GetRunner(HttpContext http) => new(http.RequestServices);
 
@@ -537,40 +533,29 @@ public static class AddKoanGraphQlExtensions
 
                 using (var _set = EntityContext.Partition(null!))
                 {
-                    if (!string.IsNullOrWhiteSpace(filterJson) && repo is ILinqQueryRepository<TEntity, string> lrepo)
+                    if (!string.IsNullOrWhiteSpace(filterJson))
                     {
-                        if (!JsonFilterBuilder.TryBuild<TEntity>(filterJson!, out var pr, out var error, new JsonFilterBuilder.BuildOptions { IgnoreCase = ignoreCase }))
-                            throw new GraphQLException(ErrorBuilder.New().SetMessage(error ?? "Invalid filter").SetCode("BAD_FILTER").Build());
-                        items = await lrepo.Query(pr!, ctx.RequestAborted);
-                        try
+                        Koan.Data.Abstractions.Filtering.Filter filter;
+                        try { filter = Koan.Data.Abstractions.Filtering.JsonFilterParser.Parse<TEntity>(filterJson!, new Koan.Data.Abstractions.Filtering.FilterParseOptions { IgnoreCase = ignoreCase }); }
+                        catch (Exception ex) when (ex is Koan.Data.Abstractions.Filtering.FilterParseException or Koan.Data.Abstractions.Filtering.InvalidFilterFieldException)
                         {
-                            var countRequest = new CountRequest<TEntity> { Predicate = pr };
-                            var countResult = await repo.Count(countRequest, ctx.RequestAborted);
-                            total = countResult.Value;
+                            throw new GraphQLException(ErrorBuilder.New().SetMessage(ex.Message).SetCode("BAD_FILTER").Build());
                         }
-                        catch { total = items.Count; }
+                        var result = await Data<TEntity, string>.QueryWithCount(Koan.Data.Abstractions.QueryDefinition.All.Where(filter), ctx.RequestAborted);
+                        items = result.Items;
+                        total = result.TotalCount;
                     }
-                    else if (!string.IsNullOrWhiteSpace(opts.Q) && repo is IStringQueryRepository<TEntity, string> srepo)
+                    else if (!string.IsNullOrWhiteSpace(opts.Q))
                     {
-                        items = await srepo.Query(opts.Q!, ctx.RequestAborted);
-                        try
-                        {
-                            var countRequest = new CountRequest<TEntity> { RawQuery = opts.Q };
-                            var countResult = await repo.Count(countRequest, ctx.RequestAborted);
-                            total = countResult.Value;
-                        }
-                        catch { total = items.Count; }
+                        try { items = await Data<TEntity, string>.QueryRaw(opts.Q!, null, null, ctx.RequestAborted); }
+                        catch (NotSupportedException) { throw new GraphQLException(ErrorBuilder.New().SetMessage("Adapter does not support raw string queries.").SetCode("BAD_FILTER").Build()); }
+                        total = items.Count;
                     }
                     else
                     {
-                        items = await repo.Query(null, ctx.RequestAborted);
-                        try
-                        {
-                            var countRequest = new CountRequest<TEntity>();
-                            var countResult = await repo.Count(countRequest, ctx.RequestAborted);
-                            total = countResult.Value;
-                        }
-                        catch { total = items.Count; }
+                        var result = await Data<TEntity, string>.QueryWithCount(Koan.Data.Abstractions.QueryDefinition.All, ctx.RequestAborted);
+                        items = result.Items;
+                        total = result.TotalCount;
                     }
                 }
 

@@ -4,12 +4,12 @@ domain: core
 title: "Framework Utilities Guide"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-03-26
+last_updated: 2026-06-05
 framework_version: v0.6.3
 validation:
   date_last_tested: 2026-03-26
   status: verified
-  scope: all-examples-tested
+  scope: all-examples-tested-except-background-jobs-section
 related_guides:
   - entity-capabilities-howto.md
   - data-modeling.md
@@ -32,6 +32,7 @@ related_guides:
 - [Configuration & Options](#configuration--options)
 - [Web API Utilities](#web-api-utilities)
 - [Data Access Helpers](#data-access-helpers)
+- [Background Jobs](#background-jobs)
 - [Common Patterns](#common-patterns)
 - [Provenance & Boot Reporting](#provenance--boot-reporting)
 
@@ -182,6 +183,79 @@ internal sealed class PostgresDiscoveryAdapter : ServiceDiscoveryAdapterBase
 - Creating new discovery adapters for data stores
 - Implementing autonomous service discovery
 - Supporting container, Aspire, and local development environments
+
+---
+
+## Bootstrap & Modules
+
+### KoanModule
+
+**Location:** `Koan.Core` (`KoanModule`; host `Koan.Core.Hosting.Modules.KoanModuleHost`)
+
+The boot-time module primitive (ARCH-0086). Extend it to author one self-describing unit instead of
+hand-writing the `IKoanInitializer` + `IKoanAutoRegistrar` pair. It **implements** `IKoanAutoRegistrar`, so
+the existing source-generated discovery (`KoanRegistry`) and topological ordering (`RegistrarOrdering` via
+`[Before]`/`[After]`) apply unchanged.
+
+#### Members
+- `string Id` (abstract) — canonical module id, e.g. `"data.postgres"`; surfaces as `ModuleName`.
+- `string? Version` (virtual) — defaults to the declaring assembly version.
+- `void Register(IServiceCollection services)` (virtual) — register DI services. Replaces `Initialize`.
+- `Task Start(IServiceProvider sp, CancellationToken ct)` (virtual) — one-time startup work, DI available,
+  ordered against other modules by `[Before]`/`[After]`, run by `KoanModuleHost`. Folds the "register a
+  bootstrap `IHostedService` for startup" idiom into one verb.
+- `void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)` (virtual) — publish
+  provenance. Named `Report` (not `Describe`) to disambiguate from per-provider capabilities
+  (`IDescribesCapabilities.Describe`, ARCH-0084).
+
+#### Usage Example
+
+```csharp
+public sealed class MyPillarModule : KoanModule
+{
+    public override string Id => "my.pillar";
+
+    public override void Register(IServiceCollection services)
+        => services.AddSingleton<IMyService, MyService>();
+
+    public override Task Start(IServiceProvider sp, CancellationToken ct)
+    {
+        // one-time startup work, DI available, ordered by [Before]/[After]
+        return Task.CompletedTask;
+    }
+}
+```
+
+#### When to Use
+New boot-time modules (a pillar, connector, or app-level wiring). Recurring periodic/pokable work stays on
+the `IKoanBackgroundService` family — `Start` models one-time ordered startup only. Code that registers
+services (e.g. recipes) or must run before the container is built belongs in `Register`, not `Start` (which
+receives an already-built `IServiceProvider`).
+
+### [KoanDiscoverable] + KoanRegistry.GetDiscoveredImplementors
+
+**Location:** `Koan.Core` (`KoanDiscoverableAttribute`; `Koan.Core.Hosting.Registry.KoanRegistry`)
+
+Mark an **interface** with `[KoanDiscoverable]` and every concrete implementer is auto-registered into the
+central `KoanRegistry` — at build time by the source generator and at runtime by `RegistryManifestLoader` —
+keyed by the interface `Type`. Query it with `KoanRegistry.GetDiscoveredImplementors(typeof(T))`. This
+replaces bespoke `AppDomain.CurrentDomain.GetAssemblies()` reflection scans, which miss lazily-loaded Koan
+assemblies and bypass the single discovery authority (ARCH-0086 §4).
+
+#### Usage Example
+
+```csharp
+[KoanDiscoverable]
+public interface IMyPlugin { /* ... */ }
+
+// elsewhere (e.g. inside a module/registrar), wire the discovered implementers:
+foreach (var type in KoanRegistry.GetDiscoveredImplementors(typeof(IMyPlugin)))
+    services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IMyPlugin), type));
+```
+
+#### When to Use
+Any "many implementers of one contract, discovered without explicit registration" surface — instead of
+hand-rolling an `AppDomain` assembly scan. Used by `IKoanAuthEventContributor` / `IKoanAuthFlowHandler`.
 
 ---
 
@@ -461,7 +535,7 @@ app.Run();
 
 **Location**: Throughout `Entity<T>` and `Entity<T, TKey>` classes
 **Pattern**: Static factory methods on entity classes
-**Guidance**: [Entity-First Development Skill](.claude/skills/koan-entity-first/SKILL.md)
+**Guidance**: [Entity-First Development guide](data-modeling.md)
 
 #### Common Patterns
 
@@ -489,6 +563,129 @@ await todo.Delete();
 - Avoiding manual repository injection
 - Following Koan's "Reference = Intent" pattern
 - Rapid prototyping and sample code
+
+### Conditional compare-and-set (optimistic concurrency)
+
+**Location:** `Koan.Data.Abstractions` (`IConditionalWriteRepository<TEntity,TKey>`, `DataCaps.Write.ConditionalReplace`)
+
+Atomically replace a row **iff the stored row still matches a guard** — a compare-and-set / optimistic-concurrency
+write. The guard is an ordinary LINQ predicate, lowered through the same filter translator as `Query`, so there is
+no new SQL surface. Declared by SQLite, Postgres, SqlServer, and Mongo (relational conditional `UPDATE … WHERE Id …
+AND <guard>`; Mongo single-document `ReplaceOne` — atomic, no transaction) and forwarded by `RepositoryFacade`.
+
+```csharp
+var repo = Data<Order, string>.As<IConditionalWriteRepository<Order, string>>();
+if (repo is not null && Data<Order, string>.Capabilities.Has(DataCaps.Write.ConditionalReplace))
+{
+    order.Status = OrderStatus.Shipped;
+    bool applied = await repo.ConditionalReplaceAsync(order, o => o.Status == OrderStatus.Paid);
+    // applied == false → someone changed it first (lost the race); re-read and retry.
+}
+```
+
+This is the primitive behind the jobs contention-free claim (JOBS-0005 §20.3). Probe the capability (or null-check
+the cast) and fall back where an adapter doesn't declare it.
+
+### PartitionNameValidator
+
+**Location:** `Koan.Data.Core` (`PartitionNameValidator`; enforced in `EntityContext.With`)
+
+Validates partition names so distinct partitions cannot collide after identifier sanitization. Adapters turn
+a partition into a storage identifier via `PartitionTokenPolicy`, which maps every disallowed character to the
+same `_` — a lossy mapping that would collapse `tenant/7`, `tenant 7`, and `tenant_7` onto one store.
+`EntityContext.With(partition:)` rejects exactly those names up front (`ArgumentException`) so the mapping stays
+injective.
+
+**Rule:** a partition name is valid iff it is a **GUID**, or every character (after trimming) is a letter,
+digit, or one of `-` `.` `_`. Whitespace-only is treated as "no partition" (not an error).
+
+```csharp
+using (EntityContext.Partition("tenant-7")) { /* ok */ }
+using (EntityContext.Partition("019a5aff-79cb-7815-8dae-3700a698f840")) { /* ok — GUID */ }
+using (EntityContext.Partition("tenant/7")) { /* throws ArgumentException — would collide with tenant_7 */ }
+```
+
+#### When to Use
+- You don't call it directly — it runs automatically on every `EntityContext.With(partition:)` /
+  `EntityContext.Partition(...)`. Catch `ArgumentException` if you route user-supplied partition values and want
+  to surface a friendly error; otherwise re-encode names to the allowed set before use. See DATA-0077 §4.
+
+---
+
+## Background Jobs
+
+**Location**: `src/Koan.Jobs` (+ optional `src/Koan.Jobs.Transport.Messaging`)
+**Pattern**: Entity-first pillar, auto-discovered (`[KoanDiscoverable]` / `KoanModule`)
+**ADR**: [JOBS-0005](../decisions/JOBS-0005-job-orchestrator-rebuild.md) · **Authoring guide**: [Background Jobs How-To](jobs-howto.md)
+
+**Purpose**: Durable, edge + level-triggered background work with a single orchestrator concern and a
+ledger-as-truth model. A job is a normal `Entity<T>` carrying its own behavior — no queues, workers, or
+repositories to wire. The same job code runs unchanged across tiers; the infrastructure you reference
+(a data adapter, multiple nodes, a message bus) decides durability and scale, never correctness.
+
+#### Entry points
+
+```csharp
+// Define: behavior co-located with the entity
+public sealed class SendEmail : Entity<SendEmail>, IKoanJob<SendEmail>
+{
+    public string To { get; set; } = "";
+    public static async Task Execute(SendEmail job, JobContext ctx, CancellationToken ct) { /* … */ }
+}
+
+// Submit / trigger / query via the .Job (instance) and .Jobs (static) accessors
+await email.Job.Submit();                 // edge trigger
+await SendEmail.Jobs.Trigger("reconcile"); // type-level singleton
+await mailbatch.Submit();                  // batch (IEnumerable<T>)
+```
+
+| Surface | What it does |
+|---|---|
+| `IKoanJob<TSelf>` + `static Execute(...)` | the job contract; auto-discovered |
+| `.Job` / `.Jobs` accessors | `Submit` / `Trigger` / `Cancel` / `Where` / `Status` (C# 14 extension members) |
+| `[JobAction(action, Timeout/MaxAttempts/OnFailure/Lane/MaxConcurrency/Schedule/Deadline/MaxReschedules)]` | per-action policy |
+| `[JobChain(a,b,c)]` | linear pipeline (auto-advance, one ledger entry per stage) |
+| `[JobIdempotent(keys)]` | collapse concurrent / duplicate submits |
+| `[JobGate(member)]` | shared resource gate for cooperative backoff; `member` is a property **or** an async resolver method `Task<string?>(IServiceProvider, CancellationToken)` for runtime-derived keys (§18) |
+| `[JobPersistence(Auto\|InMemory\|DataStore)]` | per-type durability routing (`RoutingJobLedger`) |
+| `[ParallelSafe]` | opt out of per-entity serialization (default: jobs for one entity run one at a time) |
+| `JobContext` verbs | `Reschedule(after\|until)` (defer, no retry consumed), `Backoff(after, key)` (cross-node gate), `ContinueWith` / `StopChain`, `Progress` |
+
+#### Work-item write safety (ADR §17)
+
+Two defaults make *an entity a consistency unit*, so handlers don't lose writes:
+
+- **Mutate the entity passed to `Execute`** — the orchestrator auto-saves *that* reference, but **only if it changed**. An untouched reference is never written; a handler that reloads-and-saves its own copy is never clobbered (it left the passed one clean). Don't reload a second copy and save it yourself.
+- **One job per entity at a time** — a work-item id is its ordering key (Kafka-partition / SQS-FIFO model): jobs for the same `(WorkType, WorkId)` are serialized by default; different entities parallelize fully. Opt out per type with `[ParallelSafe]` when the actions are provably independent.
+
+#### Capability ladder
+
+`in-memory → durable → distributed → +bus` — constant at-least-once + idempotent contract across all of them.
+
+- **In-memory** (no data adapter): fast, ephemeral; `InMemoryJobLedger`.
+- **Durable** (any data adapter — SQLite/Postgres/Mongo/SQL Server): `DataJobLedger` over `Entity<JobRecord>`;
+  transactional outbox (a `Submit` inside an ambient transaction enqueues on commit) and **retention** are automatic —
+  the sweep purges Completed/Cancelled past `ArchiveAfter` (7d) and Failed/Dead past `FailedAfter` (30d), with an
+  optional per-work-type count cap (`RetainPerWorkType`). On a TTL-capable store (Mongo) a native TTL index on the
+  per-outcome `ExpireAt` (`[Index(Ttl)]` / `DataCaps.Retention.TtlIndex`) expires terminal rows continuously between
+  sweeps; the sweep stays the universal backstop (§20.4). Ledger reads are pushed down (indexed claim/dashboard queries).
+- **Distributed** (several nodes on one store): competing consumers claim **contention-free** — on adapters that
+  support an atomic conditional claim (SQLite/Postgres/SqlServer/Mongo), the default `Optimistic` strategy marks
+  `Running` via a compare-and-set, so each ready job runs on **exactly one** node (no duplicate executions); `Ticket`
+  is the leaderless-election alternative. Resource gates are honored cross-node. (JOBS-0005 §20.3)
+- **+bus** (`Koan.Jobs.Transport.Messaging`): cross-node push-dispatch — a submit wakes every node immediately
+  instead of waiting out the poll interval. Latency upgrade only; the ledger stays the truth.
+
+> Scheduling is initiator-driven: a `Schedule` re-submits a fresh job on its cadence (interval / cron via Cronos /
+> `@boot` / `@continuous`) against the per-type singleton — never a parked job. See the how-to for the full model.
+
+> Bulk / high throughput: model the **window** as the work-item, not the row — a cursor-conveyor re-queues itself via
+> `ctx.ContinueWith` to drain a large source through a handful of ledger rows (not one per item). The sweep warns
+> (`JobPerRowWarnThreshold`) when a work-type's active set looks like job-per-row. See the how-to §8.1.
+
+> Observability: active counts come from the indexed ledger; opt into `JobsOptions.MetricsEnabled` for a
+> node-sharded `JobMetric` throughput rollup that **survives retention** — read it with
+> `JobMetric.Summary(workType, from, to)`. See the how-to §10. (JOBS-0005 §20.2)
 
 ---
 

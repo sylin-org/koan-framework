@@ -1,8 +1,16 @@
 # DATA-0056 - Vector Filter AST and Translators
 
-Status: Accepted
+Status: Superseded by [DATA-0096](DATA-0096-unified-filter-pipeline.md) (unified Filter AST) and [DATA-0097](DATA-0097-vector-pathway-parity.md) (vector pathway parity)
 
 Date: 2025-08-20
+
+> **Superseded.** The unified `Filter` AST was harvested from this `VectorFilter` design — they share
+> node shape and operator vocabulary — and the vector path has since collapsed onto it: every provider
+> translator is repointed to the unified `Filter` nodes, `VectorFilter*` and `VectorFilterOperator`
+> are retired, and each adapter is verified against a container-free translator conformance suite and
+> live containers (DATA-0097). This document is retained for historical context; the unified pipeline
+> ([DATA-0096](DATA-0096-unified-filter-pipeline.md)) and the vector pathway
+> ([DATA-0097](DATA-0097-vector-pathway-parity.md)) are authoritative for the vector filter path.
 
 Context
 

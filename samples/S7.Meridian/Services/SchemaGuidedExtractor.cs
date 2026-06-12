@@ -527,7 +527,7 @@ public sealed class SchemaGuidedExtractor : ISchemaGuidedExtractor
             var queryEmbedding = await Client.Embed(query, ct);
 
             // Search vector store with filter for this document only
-            var filter = Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Eq("sourceDocumentId", document.Id);
+            var filter = Koan.Data.Abstractions.Filtering.Filter.Eq("sourceDocumentId", document.Id);
 
             var results = await Vector<Passage>.Search(
                 vector: queryEmbedding,

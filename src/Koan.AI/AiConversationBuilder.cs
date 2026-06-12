@@ -23,6 +23,8 @@ public sealed class AiConversationBuilder
     private string? _profile;
     private string? _budget;
     private AiRouteHints? _route;
+    private string? _overrideUrl;
+    private string? _overrideProvider;
 
     internal AiConversationBuilder(IAiPipeline ai)
         => _ai = ai ?? throw new ArgumentNullException(nameof(ai));
@@ -144,6 +146,21 @@ public sealed class AiConversationBuilder
         return this;
     }
 
+    /// <summary>
+    /// AI-0035: Send this request directly to <paramref name="url"/>, bypassing Koan's source
+    /// and member registries. The caller is responsible for health, enable/disable, and
+    /// capability tracking when using this path; Koan acts as the HTTP+JSON executor.
+    /// </summary>
+    /// <param name="url">Endpoint URL of the inference server (e.g. <c>http://stone-indigo-nave:11434</c>).</param>
+    /// <param name="provider">Provider key used to resolve the adapter. Defaults to <c>"ollama"</c>.</param>
+    public AiConversationBuilder WithUrl(string url, string provider = "ollama")
+    {
+        if (string.IsNullOrWhiteSpace(url)) throw new ArgumentException("URL is required.", nameof(url));
+        _overrideUrl = url.Trim();
+        _overrideProvider = string.IsNullOrWhiteSpace(provider) ? "ollama" : provider.Trim();
+        return this;
+    }
+
     public AiConversationBuilder WithAugmentation(string name, bool enabled = true, Action<IDictionary<string, object?>>? configure = null)
     {
         if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Augmentation name is required.", nameof(name));
@@ -200,7 +217,9 @@ public sealed class AiConversationBuilder
             Context = context,
             Augmentations = _augmentations.Count > 0
                 ? new List<AiAugmentationInvocation>(_augmentations)
-                : new List<AiAugmentationInvocation>()
+                : new List<AiAugmentationInvocation>(),
+            OverrideUrl = _overrideUrl,
+            OverrideProvider = _overrideProvider,
         };
 
         return request;

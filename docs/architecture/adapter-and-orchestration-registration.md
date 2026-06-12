@@ -63,6 +63,12 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
 }
 ```
 
+> **Note (ARCH-0086):** new modules should extend **`KoanModule`** rather than implement `IKoanAutoRegistrar`
+> directly — `Id` + `Register(services)` + `Start(sp, ct)` (ordered one-time startup) + `Report(...)`. It *is* an
+> `IKoanAutoRegistrar`, so the discovery/ordering shown here is unchanged; the registrar form above still works
+> via the bridge. See [ARCH-0086](../decisions/ARCH-0086-koan-module.md) and the
+> [Framework Utilities Guide](../guides/framework-utilities.md#bootstrap--modules).
+
 #### Cache adapter convergence
 
 - Cache auto-registrars should delegate to `services.AddKoanCacheAdapter(<name>)` _and_ surface provider election (`report.AddProviderElection("CacheStore", …)`) so diagnostics stay in sync with the data layer.

@@ -2,7 +2,7 @@
 
 Authentication scaffolding and shared components for Koan Web.
 
-- Target framework: net9.0
+- Target framework: net10.0
 - License: Apache-2.0
 
 ## Capabilities

@@ -3,7 +3,7 @@
 **Status**: Accepted, 2026-05-15
 **Drivers**: Source-of-truth correctness for role assignments, unified extensibility surface
 **Deciders**: Koan Framework maintainers
-**Inputs**: `Koan.Web.Auth`, `Koan.Web.Auth.Roles`, downstream platform (gposingway emporium)
+**Inputs**: `Koan.Web.Auth`, `Koan.Web.Auth.Roles`, downstream platform (a downstream consumer)
 **Outputs**: New `IKoanAuthEventContributor` contract, removal of per-request role attribution pipeline
 **Supersedes**: WEB-0049 (role attribution layer & claims transformation)
 
@@ -47,7 +47,15 @@ owned by `Koan.Web.Auth`.
 
 ### `IKoanAuthEventContributor`
 
-Auto-discovered (assembly scan, no `services.AddX<>()` registration). Three lifecycle hooks:
+Auto-discovered (no `services.AddX<>()` registration). Three lifecycle hooks:
+
+> **Discovery (updated by ARCH-0086 stage b):** the contract is now marked `[KoanDiscoverable]` and its
+> implementers are resolved through the single `KoanRegistry` authority
+> (`KoanRegistry.GetDiscoveredImplementors(typeof(IKoanAuthEventContributor))`) — populated at build time by
+> the source generator and at runtime by `RegistryManifestLoader`. This replaced the original bespoke
+> `AppDomain.CurrentDomain.GetAssemblies()` reflection scan, which missed lazily-loaded Koan assemblies. See
+> ARCH-0086 §4 for the generalized `[KoanDiscoverable]` mechanism.
+
 
 ```csharp
 namespace Koan.Web.Auth.Contributors;

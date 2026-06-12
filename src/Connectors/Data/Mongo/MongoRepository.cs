@@ -6,34 +6,36 @@ using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Core.Adapters;
+using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Capabilities;
+using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
+using Koan.Data.Abstractions.Sorting;
 using Koan.Data.Core;
 using Koan.Data.Core.Configuration;
 using Koan.Data.Core.Extensions;
 using Koan.Data.Core.Optimization;
-using Koan.Data.Core.Schema;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using System.Collections.Frozen;
 
 namespace Koan.Data.Connector.Mongo;
 
 internal sealed class MongoRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
-    IDataRepositoryWithOptions<TEntity, TKey>,
-    ILinqQueryRepository<TEntity, TKey>,
-    IQueryCapabilities,
-    IWriteCapabilities,
+    IQueryRepository<TEntity, TKey>,
+    IDescribesCapabilities,
     IBulkUpsert<TKey>,
     IBulkDelete<TKey>,
+    IConditionalWriteRepository<TEntity, TKey>,
     IInstructionExecutor<TEntity>,
     IAdapterReadiness,
-    IAdapterReadinessConfiguration,
-    ISchemaHealthContributor<TEntity, TKey>
+    IAdapterReadinessConfiguration
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
@@ -42,8 +44,12 @@ internal sealed class MongoRepository<TEntity, TKey> :
     private readonly IServiceProvider _sp;
     private readonly ILogger? _logger;
     private readonly StorageOptimizationInfo _optimizationInfo;
-    private IMongoCollection<TEntity>? _collection;
-    private string _collectionName;
+    // Collections are resolved per-operation from the ambient partition and cached by their resolved name.
+    // A single shared mutable "current collection" field would race across concurrent partitions: this
+    // repository is process-wide-cached by DataService (a singleton) with a cache key that omits the
+    // partition, so concurrent flows under different partitions share one instance — a shared field would
+    // let one flow's write land in another partition's collection.
+    private readonly ConcurrentDictionary<string, IMongoCollection<TEntity>> _collections = new(StringComparer.Ordinal);
 
     private static readonly ConcurrentDictionary<string, bool> _healthyCache = new(StringComparer.Ordinal);
     private static readonly ConcurrentDictionary<string, bool> _indexCache = new(StringComparer.Ordinal);
@@ -61,12 +67,31 @@ internal sealed class MongoRepository<TEntity, TKey> :
         _ = nameResolver; // ensure resolver is materialized for convention overrides
         _logger = sp.GetService<ILogger<MongoRepository<TEntity, TKey>>>();
         _optimizationInfo = sp.GetStorageOptimization<TEntity, TKey>();
-        _collectionName = StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
     }
 
-    public QueryCapabilities Capabilities => QueryCapabilities.Linq;
-    public WriteCapabilities Writes => WriteCapabilities.BulkUpsert | WriteCapabilities.BulkDelete | WriteCapabilities.AtomicBatch | WriteCapabilities.FastRemove;
+    public void Describe(ICapabilities caps) => caps
+        .Add(DataCaps.Query.Linq)
+        .Add(DataCaps.Write.BulkUpsert).Add(DataCaps.Write.BulkDelete)
+        .Add(DataCaps.Write.AtomicBatch).Add(DataCaps.Write.FastRemove)
+        .Add(DataCaps.Write.ConditionalReplace)
+        .Add(DataCaps.Retention.TtlIndex)
+        .Add(DataCaps.Query.Filter, MongoFilterTranslator<TEntity>.Capabilities);
     public StorageOptimizationInfo OptimizationInfo => _optimizationInfo;
+
+
+    private MongoFilterTranslator<TEntity> Translator => new(MapFieldName);
+
+    /// <summary>Atomic CAS (JOBS-0005 §20.3): a single-document ReplaceOne whose filter is <c>_id == model.Id</c> AND
+    /// the lowered <paramref name="guard"/> — naturally atomic, no transaction. Modified = applied, 0 = lost.</summary>
+    public Task<bool> ConditionalReplaceAsync(TEntity model, Expression<Func<TEntity, bool>> guard, CancellationToken ct = default)
+        => ExecuteWithReadinessAsync(async () =>
+        {
+            var collection = await GetCollection(ct).ConfigureAwait(false);
+            var guardFilter = Translator.Translate(LinqFilterCompiler.Compile(guard), typeof(TEntity));
+            var filter = Builders<TEntity>.Filter.And(Builders<TEntity>.Filter.Eq(x => x.Id, model.Id), guardFilter);
+            var result = await collection.ReplaceOneAsync(filter, model, new ReplaceOptions { IsUpsert = false }, ct).ConfigureAwait(false);
+            return result.IsAcknowledged && result.ModifiedCount > 0;
+        }, ct);
 
     public AdapterReadinessState ReadinessState => _provider.ReadinessState;
     public bool IsReady => _provider.IsReady;
@@ -107,9 +132,9 @@ internal sealed class MongoRepository<TEntity, TKey> :
     internal Task<TResult> ExecuteWithinReadinessAsync<TResult>(Func<Task<TResult>> operation, CancellationToken ct)
         => ExecuteWithReadinessAsync(operation, ct);
 
-    public async Task EnsureHealthy(CancellationToken ct)
+    public async Task EnsureReady(CancellationToken ct = default)
     {
-        var collectionName = StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
+        var collectionName = AdapterNaming.GetOrCompute<TEntity, TKey>(_sp);
         var collectionKey = BuildCollectionKey();
         var schemaLock = GetSchemaLock(collectionKey);
 
@@ -127,10 +152,9 @@ internal sealed class MongoRepository<TEntity, TKey> :
                 await database.CreateCollectionAsync(collectionName, cancellationToken: ct).ConfigureAwait(false);
             }
 
-            _collection = database.GetCollection<TEntity>(collectionName);
-            _collectionName = collectionName;
+            var collection = _collections.GetOrAdd(collectionName, n => database.GetCollection<TEntity>(n));
 
-            await EnsureIndexes(_collection, ct).ConfigureAwait(false);
+            await EnsureIndexes(collection, ct).ConfigureAwait(false);
             _healthyCache[collectionKey] = true;
         }
         catch (Exception ex)
@@ -146,41 +170,25 @@ internal sealed class MongoRepository<TEntity, TKey> :
         }
     }
 
-    public void InvalidateHealth()
-    {
-        var collectionName = _collectionName;
-        var collectionKey = BuildCollectionKey();
-        _healthyCache.TryRemove(collectionKey, out _);
-
-        if (!string.IsNullOrWhiteSpace(collectionName))
-        {
-            _indexCache.TryRemove(BuildIndexKey(collectionName), out _);
-        }
-    }
-
     private async Task<IMongoCollection<TEntity>> GetCollection(CancellationToken ct)
     {
+        // Resolve the collection for THIS call's ambient partition into a local — never shared mutable state.
+        // Concurrent flows under different partitions each resolve their own name and get their own handle,
+        // so a write can never land in another partition's collection.
+        var name = AdapterNaming.GetOrCompute<TEntity, TKey>(_sp);
         var key = BuildCollectionKey();
         if (!_healthyCache.TryGetValue(key, out var healthy) || !healthy)
         {
-            await EnsureHealthy(ct).ConfigureAwait(false);
+            await EnsureReady(ct).ConfigureAwait(false);
         }
 
-        return await GetCollectionCore(ct).ConfigureAwait(false);
-    }
-
-    private async Task<IMongoCollection<TEntity>> GetCollectionCore(CancellationToken ct)
-    {
-        var desired = StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
-        if (_collection is not null && string.Equals(desired, _collectionName, StringComparison.Ordinal))
+        if (_collections.TryGetValue(name, out var cached))
         {
-            return _collection;
+            return cached;
         }
 
         var database = await _provider.GetDatabase(ct).ConfigureAwait(false);
-        _collection = database.GetCollection<TEntity>(desired);
-        _collectionName = desired;
-        return _collection;
+        return _collections.GetOrAdd(name, n => database.GetCollection<TEntity>(n));
     }
 
     private static SemaphoreSlim GetSchemaLock(string key)
@@ -214,7 +222,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
 
     private string BuildCollectionKey()
     {
-        var storage = StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
+        var storage = AdapterNaming.GetOrCompute<TEntity, TKey>(_sp);
         return $"{BuildServerKey()}|{storage}";
     }
 
@@ -251,11 +259,12 @@ internal sealed class MongoRepository<TEntity, TKey> :
                 ? idx.Name!
                 : $"ix_{string.Join("_", idx.Properties.Select(p => p.Name))}";
 
-            models.Add(new CreateIndexModel<TEntity>(keys, new CreateIndexOptions
-            {
-                Name = name,
-                Unique = idx.Unique
-            }));
+            var options = new CreateIndexOptions { Name = name, Unique = idx.Unique };
+            // §20.4 TTL: a single-field [Index(Ttl=true)] timestamp index makes Mongo expire each row once its value is
+            // in the past (expireAfterSeconds = 0). A null/absent value is never expired.
+            if (idx.Ttl && idx.Properties.Count == 1)
+                options.ExpireAfter = TimeSpan.Zero;
+            models.Add(new CreateIndexModel<TEntity>(keys, options));
         }
 
         return models;
@@ -344,61 +353,48 @@ internal sealed class MongoRepository<TEntity, TKey> :
             return (IReadOnlyList<TEntity?>)results;
         }, ct);
 
-    public Task<IReadOnlyList<TEntity>> Query(object? query, CancellationToken ct = default)
+    // ==================== Unified Query (IQueryRepository) ====================
+
+    public Task<RepositoryQueryResult<TEntity>> Query(QueryDefinition query, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
         {
             ct.ThrowIfCancellationRequested();
-            using var activity = MongoTelemetry.Activity.StartActivity("mongo.query.all");
+            using var activity = MongoTelemetry.Activity.StartActivity("mongo.query");
             activity?.SetTag("entity", typeof(TEntity).FullName);
             var collection = await GetCollection(ct).ConfigureAwait(false);
 
-            IFindFluent<TEntity, TEntity> cursor = query is Expression<Func<TEntity, bool>> predicate
-                ? FindWithPredicate(collection, predicate)
-                : collection.Find(Builders<TEntity>.Filter.Empty);
+            // Filter is guaranteed pushable per FilterSupport (the coordinator already split it).
+            var filter = BuildFilter(query.Filter);
+
+            // Sort pushdown: translate every spec; report exactly what we pushed.
+            var (sortDef, sortHandled) = BuildSort(query.Sort);
+
+            // Total count (cheap server-side) so the coordinator need not recount when there is no residual.
+            var totalCount = await collection.CountDocumentsAsync(filter, cancellationToken: ct).ConfigureAwait(false);
+
+            var cursor = collection.Find(filter);
+            if (sortDef is not null) cursor = cursor.Sort(sortDef);
+
+            var paginationHandled = false;
+            if (query.HasPagination)
+            {
+                var skip = (query.EffectivePage() - 1) * query.EffectivePageSize();
+                cursor = cursor.Skip(skip).Limit(query.EffectivePageSize());
+                paginationHandled = true;
+            }
 
             var results = await cursor.ToListAsync(ct).ConfigureAwait(false);
-            return (IReadOnlyList<TEntity>)results;
+            return new RepositoryQueryResult<TEntity>
+            {
+                Items = results,
+                TotalCount = totalCount,
+                IsEstimate = false,
+                SortHandled = sortHandled,
+                PaginationHandled = paginationHandled,
+            };
         }, ct);
 
-    public Task<IReadOnlyList<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
-        => ExecuteWithReadinessAsync(async () =>
-        {
-            ct.ThrowIfCancellationRequested();
-            var defaultPageSize = _options.CurrentValue.GetDefaultPageSize();
-            var collection = await GetCollection(ct).ConfigureAwait(false);
-
-            IFindFluent<TEntity, TEntity> cursor = query is Expression<Func<TEntity, bool>> predicate
-                ? FindWithPredicate(collection, predicate)
-                : collection.Find(Builders<TEntity>.Filter.Empty);
-
-            cursor = cursor.ApplyPaging(options, defaultPageSize,
-                (c, skip, take) => c.Skip(skip).Limit(take));
-
-            var results = await cursor.ToListAsync(ct).ConfigureAwait(false);
-            return (IReadOnlyList<TEntity>)results;
-        }, ct);
-
-    public Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-        => Query(predicate, null, ct);
-
-    public Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
-        => ExecuteWithReadinessAsync(async () =>
-        {
-            ct.ThrowIfCancellationRequested();
-            using var activity = MongoTelemetry.Activity.StartActivity("mongo.query.linq");
-            activity?.SetTag("entity", typeof(TEntity).FullName);
-            var defaultPageSize = _options.CurrentValue.GetDefaultPageSize();
-            var collection = await GetCollection(ct).ConfigureAwait(false);
-
-            var cursor = FindWithPredicate(collection, predicate)
-                .ApplyPaging(options, defaultPageSize,
-                    (c, skip, take) => c.Skip(skip).Limit(take));
-
-            var results = await cursor.ToListAsync(ct).ConfigureAwait(false);
-            return (IReadOnlyList<TEntity>)results;
-        }, ct);
-
-    public Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
+    public Task<CountResult> Count(QueryDefinition query, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
         {
             ct.ThrowIfCancellationRequested();
@@ -406,38 +402,39 @@ internal sealed class MongoRepository<TEntity, TKey> :
             activity?.SetTag("entity", typeof(TEntity).FullName);
             var collection = await GetCollection(ct).ConfigureAwait(false);
 
-            if (request.Strategy == CountStrategy.Fast && request.Predicate is null && request.RawQuery is null && request.ProviderQuery is null)
+            // Fast strategy on an unfiltered count uses Mongo's metadata estimate.
+            if (query.CountStrategy == CountStrategy.Fast && query.Filter is null)
             {
                 var estimate = await collection.EstimatedDocumentCountAsync(cancellationToken: ct).ConfigureAwait(false);
                 return CountResult.Estimate((long)estimate);
             }
 
-            if (request.Predicate is not null)
-            {
-                if (TryBuildGuidFilter(request.Predicate, out var optimizedFilter))
-                {
-                    var optimizedCount = await collection.CountDocumentsAsync(optimizedFilter, cancellationToken: ct).ConfigureAwait(false);
-                    return CountResult.Exact((long)optimizedCount);
-                }
-
-                var count = await collection.CountDocumentsAsync(request.Predicate, cancellationToken: ct).ConfigureAwait(false);
-                return CountResult.Exact((long)count);
-            }
-
-            if (request.ProviderQuery is FilterDefinition<TEntity> filter)
-            {
-                var count = await collection.CountDocumentsAsync(filter, cancellationToken: ct).ConfigureAwait(false);
-                return CountResult.Exact((long)count);
-            }
-
-            if (request.RawQuery is not null)
-            {
-                throw new NotSupportedException("Mongo adapter does not support string-based count queries. Use LINQ or provider filters.");
-            }
-
-            var total = await collection.CountDocumentsAsync(Builders<TEntity>.Filter.Empty, cancellationToken: ct).ConfigureAwait(false);
-            return CountResult.Exact((long)total);
+            var filter = BuildFilter(query.Filter);
+            var count = await collection.CountDocumentsAsync(filter, cancellationToken: ct).ConfigureAwait(false);
+            return CountResult.Exact((long)count);
         }, ct);
+
+    /// <summary>Translate the (already-pushable) filter; null filter is match-all.</summary>
+    private FilterDefinition<TEntity> BuildFilter(Filter? filter)
+        => filter is null ? Builders<TEntity>.Filter.Empty : Translator.Translate(filter, typeof(TEntity));
+
+    /// <summary>Translate sort specs into a Mongo sort definition, reporting which specs were pushed.</summary>
+    private (SortDefinition<TEntity>? Def, IReadOnlySet<SortSpec> Handled) BuildSort(IReadOnlyList<SortSpec> specs)
+    {
+        if (specs.Count == 0) return (null, RepositoryQueryResult<TEntity>.NoSortHandled);
+
+        var keys = Builders<TEntity>.Sort;
+        SortDefinition<TEntity>? def = null;
+        foreach (var spec in specs)
+        {
+            // Sort traverses the same field-name mapping as filters (camelCase + _id carve-out).
+            var name = string.Join('.', spec.Path.Members.Select((m, i)
+                => i == 0 ? MapFieldName(m.Name) : ToCamelCase(m.Name)));
+            var part = spec.Desc ? keys.Descending(name) : keys.Ascending(name);
+            def = def is null ? part : keys.Combine(def, part);
+        }
+        return (def, specs.ToFrozenSet());
+    }
 
     public Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
@@ -528,21 +525,24 @@ internal sealed class MongoRepository<TEntity, TKey> :
 
             // Resolve Optimized strategy based on provider capabilities
             var effectiveStrategy = strategy == RemoveStrategy.Optimized
-                ? (Writes.HasFlag(WriteCapabilities.FastRemove) ? RemoveStrategy.Fast : RemoveStrategy.Safe)
+                ? RemoveStrategy.Fast // this adapter declares write.fastRemove
                 : strategy;
 
             if (effectiveStrategy == RemoveStrategy.Fast)
             {
-                // Fast path: drop collection and recreate (loses indexes briefly)
+                // Fast path: drop collection and recreate (loses indexes briefly). Operate on the collection
+                // resolved for THIS call's partition — never a shared field.
                 var database = GetDatabase(collection);
+                var name = collection.CollectionNamespace.CollectionName;
                 var estimatedCount = await collection.EstimatedDocumentCountAsync(cancellationToken: ct).ConfigureAwait(false);
 
-                await database.DropCollectionAsync(_collectionName, ct).ConfigureAwait(false);
-                await database.CreateCollectionAsync(_collectionName, cancellationToken: ct).ConfigureAwait(false);
+                await database.DropCollectionAsync(name, ct).ConfigureAwait(false);
+                await database.CreateCollectionAsync(name, cancellationToken: ct).ConfigureAwait(false);
 
                 // Recreate collection reference and indexes
-                _collection = database.GetCollection<TEntity>(_collectionName);
-                await EnsureIndexes(_collection, ct).ConfigureAwait(false);
+                var recreated = database.GetCollection<TEntity>(name);
+                _collections[name] = recreated;
+                await EnsureIndexes(recreated, ct).ConfigureAwait(false);
 
                 return estimatedCount;
             }
@@ -564,20 +564,21 @@ internal sealed class MongoRepository<TEntity, TKey> :
                     {
                         var collection = await GetCollection(ct).ConfigureAwait(false);
                         var database = GetDatabase(collection);
+                        var name = collection.CollectionNamespace.CollectionName;
 
                         try
                         {
                             var existing = await database.ListCollectionNamesAsync(cancellationToken: ct).ConfigureAwait(false);
                             var names = await existing.ToListAsync(ct).ConfigureAwait(false);
-                            if (!names.Contains(_collectionName, StringComparer.Ordinal))
+                            if (!names.Contains(name, StringComparer.Ordinal))
                             {
-                                await database.CreateCollectionAsync(_collectionName, cancellationToken: ct).ConfigureAwait(false);
-                                _logger?.LogDebug("Mongo ensureCreated created collection {Name}", _collectionName);
+                                await database.CreateCollectionAsync(name, cancellationToken: ct).ConfigureAwait(false);
+                                _logger?.LogDebug("Mongo ensureCreated created collection {Name}", name);
                             }
                         }
                         catch (Exception ex)
                         {
-                            _logger?.LogWarning(ex, "Mongo ensureCreated encountered an error for collection {Name}", _collectionName);
+                            _logger?.LogWarning(ex, "Mongo ensureCreated encountered an error for collection {Name}", name);
                         }
 
                         object ok = true;
@@ -611,121 +612,6 @@ internal sealed class MongoRepository<TEntity, TKey> :
             }
 
             throw new InvalidOperationException("Unable to obtain Mongo database from collection.");
-        }
-    }
-
-    private IFindFluent<TEntity, TEntity> FindWithPredicate(IMongoCollection<TEntity> collection, Expression<Func<TEntity, bool>> predicate)
-    {
-        if (TryBuildGuidFilter(predicate, out var optimizedFilter))
-        {
-            return collection.Find(optimizedFilter);
-        }
-
-        return collection.Find(predicate);
-    }
-
-    private bool TryBuildGuidFilter(Expression<Func<TEntity, bool>> predicate, out FilterDefinition<TEntity> filter)
-    {
-        filter = Builders<TEntity>.Filter.Empty;
-        if (predicate is null || predicate.Parameters.Count == 0)
-        {
-            return false;
-        }
-
-        return TryBuildGuidFilter(predicate.Parameters[0], predicate.Body, out filter);
-    }
-
-    private bool TryBuildGuidFilter(ParameterExpression parameter, Expression expression, out FilterDefinition<TEntity> filter)
-    {
-        filter = Builders<TEntity>.Filter.Empty;
-        expression = StripConvert(expression);
-
-        if (expression is BinaryExpression binary)
-        {
-            switch (binary.NodeType)
-            {
-                case ExpressionType.Equal:
-                    if (TryExtractComparison(parameter, binary.Left, binary.Right, out var fieldName, out var value) ||
-                        TryExtractComparison(parameter, binary.Right, binary.Left, out fieldName, out value))
-                    {
-                        if (value is string str && Guid.TryParse(str, out var guid))
-                        {
-                            var elementName = MapFieldName(fieldName);
-                            filter = Builders<TEntity>.Filter.Eq(elementName, new BsonBinaryData(guid, GuidRepresentation.Standard));
-                            return true;
-                        }
-                    }
-                    break;
-                case ExpressionType.AndAlso:
-                    if (TryBuildGuidFilter(parameter, binary.Left, out var left) && TryBuildGuidFilter(parameter, binary.Right, out var right))
-                    {
-                        filter = Builders<TEntity>.Filter.And(left, right);
-                        return true;
-                    }
-                    break;
-                case ExpressionType.OrElse:
-                    if (TryBuildGuidFilter(parameter, binary.Left, out var leftOr) && TryBuildGuidFilter(parameter, binary.Right, out var rightOr))
-                    {
-                        filter = Builders<TEntity>.Filter.Or(leftOr, rightOr);
-                        return true;
-                    }
-                    break;
-            }
-        }
-
-        return false;
-    }
-
-    private bool TryExtractComparison(ParameterExpression parameter, Expression fieldExpression, Expression valueExpression, out string fieldName, out object? value)
-    {
-        fieldName = "";
-        value = null;
-
-        var candidate = StripConvert(fieldExpression) as MemberExpression;
-        if (candidate is null)
-        {
-            return false;
-        }
-
-        if (candidate.Expression is null)
-        {
-            return false;
-        }
-
-        var owner = StripConvert(candidate.Expression);
-        if (owner != parameter)
-        {
-            return false;
-        }
-
-        fieldName = candidate.Member.Name;
-        return TryEvaluateExpression(valueExpression, out value);
-    }
-
-    private static Expression StripConvert(Expression expression)
-    {
-        while (expression.NodeType is ExpressionType.Convert or ExpressionType.ConvertChecked)
-        {
-            expression = ((UnaryExpression)expression).Operand;
-        }
-
-        return expression;
-    }
-
-    private bool TryEvaluateExpression(Expression expression, out object? value)
-    {
-        expression = StripConvert(expression);
-
-        try
-        {
-            var lambda = Expression.Lambda(expression);
-            value = lambda.Compile().DynamicInvoke();
-            return true;
-        }
-        catch
-        {
-            value = null;
-            return false;
         }
     }
 

@@ -20,13 +20,12 @@ internal sealed class MongoConnectorFixture : IAsyncDisposable
     private readonly ServiceProvider _provider;
     private readonly IConfiguration _configuration;
 
-    private MongoConnectorFixture(ServiceProvider provider, IDataService data, IConfiguration configuration, string database, string collectionPrefix)
+    private MongoConnectorFixture(ServiceProvider provider, IDataService data, IConfiguration configuration, string database)
     {
         _provider = provider;
         Data = data;
         _configuration = configuration;
         Database = database;
-        CollectionPrefix = collectionPrefix;
     }
 
     public IServiceProvider Services => _provider;
@@ -36,8 +35,6 @@ internal sealed class MongoConnectorFixture : IAsyncDisposable
     public IConfiguration Configuration => _configuration;
 
     public string Database { get; }
-
-    public string CollectionPrefix { get; }
 
     public static ValueTask<MongoConnectorFixture> Create(TestContext ctx)
     {
@@ -58,18 +55,14 @@ internal sealed class MongoConnectorFixture : IAsyncDisposable
             database = $"koan_{ctx.ExecutionId:N}";
         }
 
-        var collectionPrefix = ctx.ExecutionId.ToString("N");
-
         var settings = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
         {
             ["Koan:Environment"] = "Test",
             ["Koan:Data:Sources:Default:Adapter"] = "mongo",
             ["Koan:Data:Sources:Default:ConnectionString"] = mongo.ConnectionString,
             ["Koan:Data:Sources:Default:Database"] = database,
-            ["Koan:Data:Sources:Default:Options:CollectionPrefix"] = collectionPrefix,
             ["Koan:Data:Mongo:ConnectionString"] = mongo.ConnectionString,
-            ["Koan:Data:Mongo:Database"] = database,
-            ["Koan:Data:Mongo:CollectionPrefix"] = collectionPrefix
+            ["Koan:Data:Mongo:Database"] = database
         };
 
         var configuration = new ConfigurationBuilder()
@@ -78,6 +71,7 @@ internal sealed class MongoConnectorFixture : IAsyncDisposable
 
         var services = new ServiceCollection();
         services.AddSingleton<IHostApplicationLifetime, NoopHostApplicationLifetime>();
+        services.AddSingleton<IHostEnvironment, TestHostEnvironment>();
         services.AddSingleton<IConfiguration>(configuration);
         services.AddLogging();
         services.AddKoan();
@@ -100,7 +94,7 @@ internal sealed class MongoConnectorFixture : IAsyncDisposable
         AppHost.Current = provider;
         var data = provider.GetRequiredService<IDataService>();
 
-    return ValueTask.FromResult(new MongoConnectorFixture(provider, data, configuration, database, collectionPrefix));
+    return ValueTask.FromResult(new MongoConnectorFixture(provider, data, configuration, database));
     }
 
     public void BindHost()
@@ -159,7 +153,7 @@ internal sealed class MongoConnectorFixture : IAsyncDisposable
     {
         try
         {
-            await asyncDisposable.Dispose().ConfigureAwait(false);
+            await asyncDisposable.DisposeAsync().ConfigureAwait(false);
         }
         catch
         {
@@ -176,6 +170,15 @@ internal sealed class MongoConnectorFixture : IAsyncDisposable
         public void StopApplication()
         {
         }
+    }
+
+    private sealed class TestHostEnvironment : IHostEnvironment
+    {
+        public string EnvironmentName { get; set; } = "Test";
+        public string ApplicationName { get; set; } = "Koan.Data.Connector.Mongo.Tests";
+        public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
+        public Microsoft.Extensions.FileProviders.IFileProvider ContentRootFileProvider { get; set; } =
+            new Microsoft.Extensions.FileProviders.PhysicalFileProvider(AppContext.BaseDirectory);
     }
 
     internal readonly struct EntityPartitionLease : IAsyncDisposable, IDisposable

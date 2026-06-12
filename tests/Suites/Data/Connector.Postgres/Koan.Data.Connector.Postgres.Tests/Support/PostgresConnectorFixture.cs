@@ -71,6 +71,7 @@ internal sealed class PostgresConnectorFixture : IAsyncDisposable
 
         var services = new ServiceCollection();
         services.AddSingleton<IHostApplicationLifetime, NoopHostApplicationLifetime>();
+        services.AddSingleton<IHostEnvironment, TestHostEnvironment>();
         services.AddSingleton<IConfiguration>(configuration);
         services.AddLogging();
     services.AddKoan();
@@ -149,7 +150,7 @@ internal sealed class PostgresConnectorFixture : IAsyncDisposable
     {
         try
         {
-            await asyncDisposable.Dispose().ConfigureAwait(false);
+            await asyncDisposable.DisposeAsync().ConfigureAwait(false);
         }
         catch
         {
@@ -166,6 +167,15 @@ internal sealed class PostgresConnectorFixture : IAsyncDisposable
         public void StopApplication()
         {
         }
+    }
+
+    private sealed class TestHostEnvironment : IHostEnvironment
+    {
+        public string EnvironmentName { get; set; } = "Test";
+        public string ApplicationName { get; set; } = "Koan.Data.Connector.Postgres.Tests";
+        public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
+        public Microsoft.Extensions.FileProviders.IFileProvider ContentRootFileProvider { get; set; } =
+            new Microsoft.Extensions.FileProviders.PhysicalFileProvider(AppContext.BaseDirectory);
     }
 
     internal readonly struct EntityPartitionLease : IAsyncDisposable, IDisposable

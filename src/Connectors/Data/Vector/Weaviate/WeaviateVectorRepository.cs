@@ -8,7 +8,9 @@ using Microsoft.Extensions.Options;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
+using Koan.Core.Capabilities;
 using Koan.Data.Vector.Abstractions;
+using Koan.Data.Vector.Abstractions.Capabilities;
 using Koan.Data.Vector.Abstractions.Configuration;
 using Koan.Data.Vector.Abstractions.Schema;
 using Newtonsoft.Json;
@@ -16,7 +18,7 @@ using Newtonsoft.Json.Linq;
 
 namespace Koan.Data.Vector.Connector.Weaviate;
 
-internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRepository<TEntity, TKey>, IVectorCapabilities, IInstructionExecutor<TEntity>
+internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRepository<TEntity, TKey>, IDescribesCapabilities, IInstructionExecutor<TEntity>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
@@ -28,7 +30,10 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
     private volatile bool _schemaEnsured;
     private volatile int _discoveredDimension = -1; // -1 means not discovered yet
 
-    public VectorCapabilities Capabilities => VectorCapabilities.Knn | VectorCapabilities.Filters | VectorCapabilities.BulkUpsert | VectorCapabilities.BulkDelete | VectorCapabilities.Hybrid | VectorCapabilities.NativeContinuation | VectorCapabilities.DynamicCollections;
+    public void Describe(ICapabilities caps) => caps
+        .Add(VectorCaps.Knn).Add(VectorCaps.Filters, WeaviateFilterTranslator.Caps).Add(VectorCaps.BulkUpsert).Add(VectorCaps.BulkDelete)
+        .Add(VectorCaps.Hybrid).Add(VectorCaps.NativeContinuation).Add(VectorCaps.DynamicCollections);
+
 
     public WeaviateVectorRepository(IHttpClientFactory httpFactory, IOptions<WeaviateOptions> options, IServiceProvider sp)
     {
@@ -47,9 +52,9 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
     {
         get
         {
-            // DATA-0086: Use vector-specific naming registry (VectorStorageNameRegistry)
-            // Automatically handles partitions via EntityContext and WeaviateAdapterFactory's INamingProvider
-            return VectorStorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
+            // DATA-0086: vector naming routes to WeaviateVectorAdapterFactory.ResolveStorage,
+            // which owns its own cache and applies partition composition.
+            return VectorAdapterNaming.GetOrCompute<TEntity, TKey>(_sp);
         }
     }
 
@@ -75,12 +80,14 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         {
             _schemaEnsured = true; return;
         }
-        // Create class with manual vectors
+        // Create class with manual vectors. indexNullState=true makes the IsNull operator usable
+        // (AI-0036 §9) — required for null-inclusive negation (Ne/Not match rows lacking the property).
         var body = new
         {
             @class = cls,
             vectorizer = "none",
             vectorIndexConfig = new { distance = _options.Metric },
+            invertedIndexConfig = new { indexNullState = true },
             properties = BuildSchemaProperties()
         };
         var bodyJson = JsonConvert.SerializeObject(body, Formatting.Indented);
@@ -112,6 +119,9 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
 
         // Wait for schema to be fully available
         await WaitForSchemaReady(cls, ct);
+        // Class freshly (re)created — drop any cached metadata-property ensures so they are re-added
+        // (with tokenization=field) against the new class (e.g. after a test reset dropped it).
+        _ensuredProps.TryRemove(cls, out var _removedPropCache);
         _schemaEnsured = true;
     }
 
@@ -185,12 +195,12 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         // Weaviate requires UUID ids; derive a deterministic UUID from the entity id (namespaced by class) for stable mapping
         var uuid = DeterministicGuidFromString(ClassName, id!.ToString()!);
 
-        // Build properties including searchText from metadata if available
+        // Persist the caller metadata as Weaviate properties so it is filterable (AI-0036 §9). Define
+        // each property EXPLICITLY (tokenization=field) before insert so exact Equal/NotEqual work —
+        // autoSchema would otherwise create text properties with "word" tokenization, breaking negation.
+        await EnsureMetadataProperties(metadata, ct);
         var properties = new Dictionary<string, object?> { ["docId"] = id!.ToString() };
-        if (metadata is IReadOnlyDictionary<string, object> metaDict && metaDict.TryGetValue("searchText", out var searchText))
-        {
-            properties["searchText"] = searchText;
-        }
+        AppendMetadataProperties(properties, metadata);
 
         // Persist minimal properties including original doc id for reverse lookup
         // POST object includes class in payload
@@ -286,6 +296,91 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         }
         return count;
     }
+
+    // Per-class set of metadata properties already created in the schema (cleared when the class is
+    // (re)created). Keyed by class name -> property name.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string,
+        System.Collections.Concurrent.ConcurrentDictionary<string, byte>> _ensuredProps = new();
+
+    /// <summary>
+    /// AI-0036 §9: define each caller-metadata property EXPLICITLY before insert with
+    /// <c>tokenization=field</c> (exact Equal/NotEqual) — autoSchema would otherwise create text
+    /// properties with "word" tokenization, breaking negation. Idempotent (422 = already exists);
+    /// cached per class to avoid redundant schema calls.
+    /// </summary>
+    private async Task EnsureMetadataProperties(object? metadata, CancellationToken ct)
+    {
+        if (metadata is not System.Collections.IDictionary dict) return;
+        var set = _ensuredProps.GetOrAdd(ClassName, _ => new(System.StringComparer.Ordinal));
+
+        foreach (System.Collections.DictionaryEntry e in dict)
+        {
+            var key = e.Key?.ToString();
+            if (string.IsNullOrEmpty(key) || string.Equals(key, "docId", System.StringComparison.Ordinal)) continue;
+            if (!IsValidWeaviateProperty(key)) continue;
+
+            var name = WeaviatePropertyName(key);
+            if (!set.TryAdd(name, 0)) continue; // already ensured for this class
+
+            var (dataType, isText) = WeaviateType(e.Value);
+            var prop = new Dictionary<string, object?> { ["name"] = name, ["dataType"] = new[] { dataType } };
+            if (isText) prop["tokenization"] = "field";
+
+            try
+            {
+                var resp = await _http.PostAsync(
+                    $"/v1/schema/{Uri.EscapeDataString(ClassName)}/properties",
+                    new StringContent(JsonConvert.SerializeObject(prop), System.Text.Encoding.UTF8, "application/json"), ct);
+                if (!resp.IsSuccessStatusCode && resp.StatusCode != HttpStatusCode.UnprocessableEntity)
+                {
+                    var body = await resp.Content.ReadAsStringAsync(ct);
+                    _logger?.LogDebug("Weaviate: add-property {Prop} on {Class} -> {Status} {Body}", name, ClassName, (int)resp.StatusCode, body);
+                }
+            }
+            catch (System.Exception ex)
+            {
+                _logger?.LogDebug(ex, "Weaviate: add-property {Prop} on {Class} failed (autoSchema fallback)", name, ClassName);
+            }
+        }
+    }
+
+    /// <summary>Maps a metadata value to a Weaviate dataType + whether it is a text type (needs tokenization).</summary>
+    private static (string DataType, bool IsText) WeaviateType(object? value) => value switch
+    {
+        bool => ("boolean", false),
+        sbyte or byte or short or ushort or int or uint or long or ulong => ("int", false),
+        float or double or decimal => ("number", false),
+        System.DateTime or System.DateTimeOffset => ("date", false),
+        string => ("text", true),
+        System.Collections.IEnumerable => ("text[]", true), // arrays stored as string elements
+        _ => ("text", true)
+    };
+
+    // AI-0036 §9: copy caller metadata into Weaviate object properties so it is filterable.
+    private static void AppendMetadataProperties(Dictionary<string, object?> properties, object? metadata)
+    {
+        if (metadata is not System.Collections.IDictionary dict) return;
+        foreach (System.Collections.DictionaryEntry e in dict)
+        {
+            var key = e.Key?.ToString();
+            if (string.IsNullOrEmpty(key) || string.Equals(key, "docId", StringComparison.Ordinal)) continue;
+            if (!IsValidWeaviateProperty(key)) continue; // Weaviate property names: [A-Za-z][_0-9A-Za-z]*
+            // Weaviate normalizes property names to camelCase (first letter lowercased); store under the
+            // same form the filter translator queries (WeaviatePropertyName) so they match.
+            properties[WeaviatePropertyName(key)] = e.Value;
+        }
+    }
+
+    private static bool IsValidWeaviateProperty(string name)
+    {
+        if (name.Length == 0 || !char.IsLetter(name[0])) return false;
+        foreach (var c in name) if (!(char.IsLetterOrDigit(c) || c == '_')) return false;
+        return true;
+    }
+
+    /// <summary>Weaviate lowercases the first letter of property names (GraphQL camelCase convention).</summary>
+    internal static string WeaviatePropertyName(string name)
+        => name.Length == 0 || char.IsLower(name[0]) ? name : char.ToLowerInvariant(name[0]) + name[1..];
 
     public async Task<float[]?> GetEmbedding(TKey id, CancellationToken ct = default)
     {

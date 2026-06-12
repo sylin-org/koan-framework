@@ -2,7 +2,7 @@
 
 PostgreSQL provider for Koan relational data with safe defaults and pushdowns.
 
-- Target framework: net9.0
+- Target framework: net10.0
 - License: Apache-2.0
 
 ## Capabilities

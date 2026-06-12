@@ -50,7 +50,7 @@ public abstract class MediaEntity<TEntity> : Koan.Storage.Model.StorageEntity<TE
     /// </param>
     /// <param name="contentType">
     /// MIME type. Stored on <see cref="Koan.Storage.Model.StorageEntity{TEntity}.ContentType"/> and
-    /// served by <c>MediaContentController{TEntity}</c> via the <c>Content-Type</c> header. When
+    /// served by the recipe-pipeline <c>MediaController</c> via the <c>Content-Type</c> header. When
     /// null, Koan infers from any extension in <paramref name="name"/>, falling back to
     /// <c>application/octet-stream</c>.
     /// </param>

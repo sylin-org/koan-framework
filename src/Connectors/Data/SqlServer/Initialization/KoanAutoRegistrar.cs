@@ -13,6 +13,7 @@ using Koan.Core.Provenance;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Connector.SqlServer.Discovery;
+using Koan.Data.Relational.Orchestration;
 using Microsoft.Extensions.Logging.Abstractions;
 using SqlServerItems = Koan.Data.Connector.SqlServer.Infrastructure.SqlServerProvenanceItems;
 using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
@@ -36,6 +37,11 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, SqlServerDiscoveryAdapter>());
 
         services.AddSingleton<IDataAdapterFactory, SqlServerAdapterFactory>();
+
+        // Register the relational schema orchestrator (required by SqlServerRepository).
+        // The explicit AddSqlServerAdapter() call wires this up; the auto-discovery path
+        // also needs it, or schema bootstrap fails. Mirrors Sqlite/Postgres.
+        services.AddRelationalOrchestration();
     }
 
     public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)

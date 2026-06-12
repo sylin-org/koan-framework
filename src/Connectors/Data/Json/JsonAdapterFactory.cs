@@ -43,18 +43,12 @@ public sealed class JsonAdapterFactory : IDataAdapterFactory
         return new JsonRepository<TEntity, TKey>(Microsoft.Extensions.Options.Options.Create(sourceOpts));
     }
 
-    // INamingProvider implementation
-    public string RepositorySeparator => "#";
-
-    public string GetStorageName(Type entityType, IServiceProvider services)
-    {
-        // JSON: Simple entity name as filename
-        return entityType.Name;
-    }
-
-    public string GetConcretePartition(string partition)
-    {
-        // JSON: Pass-through (used as subdirectory name)
-        return partition;
-    }
+    public StorageNamingCapability GetNamingCapability(IServiceProvider services)
+        => new()
+        {
+            Style = StorageNamingStyle.EntityType,
+            Casing = NameCasing.AsIs,
+            PartitionSeparator = '#',
+            Partition = PartitionTokenPolicy.Default,
+        };
 }

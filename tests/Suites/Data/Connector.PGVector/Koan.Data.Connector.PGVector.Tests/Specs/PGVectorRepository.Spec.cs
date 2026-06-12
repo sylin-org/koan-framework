@@ -1,7 +1,8 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using Xunit;
 using Koan.Data.Connector.PGVector.Tests.Support;
 using Koan.Data.Vector.Abstractions;
+using Koan.Data.Vector.Abstractions.Capabilities;
 
 namespace Koan.Data.Connector.PGVector.Tests.Specs;
 
@@ -262,15 +263,15 @@ public class PGVectorRepositorySpec : PGVectorTestBase
         // Arrange
         var repo = await CreateRepositoryAsync<Article>();
 
-        // Act
-        var capabilities = repo.Capabilities;
+        // Act — ARCH-0084: negotiate via the unified CapabilitySet (native IDescribesCapabilities).
+        var caps = VectorCaps.Describe(repo, repo.GetType().Name);
 
         // Assert
-        capabilities.Should().HaveFlag(VectorCapabilities.Knn);
-        capabilities.Should().HaveFlag(VectorCapabilities.Filters);
-        capabilities.Should().HaveFlag(VectorCapabilities.BulkUpsert);
-        capabilities.Should().HaveFlag(VectorCapabilities.BulkDelete);
-        capabilities.Should().HaveFlag(VectorCapabilities.DynamicCollections);
+        caps.Has(VectorCaps.Knn).Should().BeTrue();
+        caps.Has(VectorCaps.Filters).Should().BeTrue();
+        caps.Has(VectorCaps.BulkUpsert).Should().BeTrue();
+        caps.Has(VectorCaps.BulkDelete).Should().BeTrue();
+        caps.Has(VectorCaps.DynamicCollections).Should().BeTrue();
     }
 
     [Fact]

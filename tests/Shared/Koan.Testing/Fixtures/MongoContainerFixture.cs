@@ -25,6 +25,9 @@ public sealed class MongoContainerFixture : IAsyncDisposable, IInitializableFixt
     private TestcontainersContainer? _container;
     private string? _cliContainerId;
     private string? _dockerEndpoint;
+    // True when we connected to a persistent server we do NOT own (explicit env / local Mongo). Those create
+    // a per-run database that must be dropped on teardown — there is no container to discard. See DisposeAsync.
+    private bool _usedPersistentServer;
 
     public MongoContainerFixture(string dockerFixtureKey = DockerFixtureDefaultKey, string database = DefaultDatabase)
     {
@@ -57,6 +60,7 @@ public sealed class MongoContainerFixture : IAsyncDisposable, IInitializableFixt
         {
             ConnectionString = EnsureDatabase(explicitConnection!, Database);
             IsAvailable = true;
+            _usedPersistentServer = true;
             context.Diagnostics.Info("mongo.fixture.explicit", new { source = "env" });
             return;
         }
@@ -66,6 +70,7 @@ public sealed class MongoContainerFixture : IAsyncDisposable, IInitializableFixt
         {
             ConnectionString = EnsureDatabase(localhost, Database);
             IsAvailable = true;
+            _usedPersistentServer = true;
             context.Diagnostics.Info("mongo.fixture.local", new { host = "localhost", port = MongoPort });
             return;
         }
@@ -167,7 +172,40 @@ public sealed class MongoContainerFixture : IAsyncDisposable, IInitializableFixt
 
     public async ValueTask DisposeAsync()
     {
+        await DropPerRunDatabaseIfPersistent().ConfigureAwait(false);
         await DisposeContainerSilently().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// When the fixture connected to a persistent server it does NOT own (explicit env / local Mongo), it
+    /// created a per-run database there — drop it on teardown so runs don't accumulate <c>koan_tests_*</c>
+    /// databases. Container paths are discarded wholesale (no drop needed); the shared default database
+    /// (<see cref="DefaultDatabase"/>) is never dropped — it may hold a developer's own data. Best-effort:
+    /// a cleanup failure never fails the run.
+    /// </summary>
+    private async ValueTask DropPerRunDatabaseIfPersistent()
+    {
+        if (!_usedPersistentServer || string.IsNullOrWhiteSpace(ConnectionString))
+        {
+            return;
+        }
+
+        if (string.Equals(Database, DefaultDatabase, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        try
+        {
+            var settings = MongoClientSettings.FromUrl(new MongoUrl(ConnectionString));
+            settings.ServerSelectionTimeout = TimeSpan.FromSeconds(5);
+            var client = new MongoClient(settings);
+            await client.DropDatabaseAsync(Database).ConfigureAwait(false);
+        }
+        catch
+        {
+            // best-effort cleanup — never fail a run on teardown
+        }
     }
 
     private static bool TryGetExplicitConnectionString(out string? connectionString)

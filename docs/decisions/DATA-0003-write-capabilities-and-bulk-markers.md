@@ -8,6 +8,8 @@ date: 2025-08-16
 
 # 0003: Write capabilities and bulk markers
 
+> **Superseded by [ARCH-0084](ARCH-0084-unified-capability-model.md).** The flag-enum + marker-interface model described below was replaced by the unified `CapabilitySet` token model and the types were deleted in its stage-c. This ADR is retained as the historical record.
+
 ## Context
 We want providers to declare support for native bulk operations (upsert/delete) and optionally atomic batches. Controllers and domain helpers should remain simple and defer to the data layer to choose the optimal path based on provider capabilities.
 

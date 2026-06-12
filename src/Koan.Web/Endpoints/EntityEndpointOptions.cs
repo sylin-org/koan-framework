@@ -17,6 +17,12 @@ public sealed class EntityEndpointOptions
 
     public bool AllowRelationshipExpansion { get; set; } = true;
 
+    /// <summary>
+    /// When true, unresolvable sort fields are silently skipped (with a <c>Koan-Sort-Skipped</c> response header)
+    /// instead of producing a 400 Bad Request. Default false (strict) — see DATA-0092.
+    /// </summary>
+    public bool LenientSort { get; set; } = false;
+
     public bool IsShapeAllowed(string? shape)
     {
         if (string.IsNullOrWhiteSpace(shape)) return false;

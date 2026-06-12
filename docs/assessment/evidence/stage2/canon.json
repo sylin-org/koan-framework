@@ -1,0 +1,187 @@
+{
+  "canon": [
+    {
+      "principle": "Reference = Intent",
+      "statement": "Adding a package reference enables functionality; modules auto-register via IKoanAutoRegistrar — 'No manual service configuration.' Reaffirmed as load-bearing in the consolidation era: capability tokens must live in each pillar's own abstractions assembly so 'referencing Koan.Data.Vector is what should surface the vector tokens' (ARCH-0084 Forces #3), and 'Reference = Intent must keep working... zero per-app wiring' (ARCH-0086 Forces #4).",
+      "source": "docs/architecture/principles.md (Core Philosophy); README.md §2; docs/decisions/ARCH-0084 Forces; docs/decisions/ARCH-0086 Forces",
+      "era": "founding"
+    },
+    {
+      "principle": "Entity-first development",
+      "statement": "'Entities handle their own persistence. No repository pattern needed' — static Todo.Get(id)/Where(), instance todo.Save()/Delete(). Pitched as 'AR ergonomics... while neutralizing the common AR traps' (README) and 'entities own CRUD, orchestration offloaded' (comparison.md). The front-door facades (Entity<T>, Data<T,K>, Vector<T>, Job<T>, [Embedding]) are explicitly declared 'already coherent — do NOT churn' by the consolidation plan §3.",
+      "source": "docs/architecture/principles.md (Core Philosophy); README.md §1; docs/architecture/comparison.md; foundation-consolidation-plan.md §3",
+      "era": "founding"
+    },
+    {
+      "principle": "Provider transparency / multi-provider",
+      "statement": "'Same code works across any storage backend... Storage backend becomes a deployment concern, not development concern.' Comparison.md: 'Truly storage-agnostic: same Entity<> code across PostgreSQL, MongoDB, SQLite, JSON/Redis, and vector stores.' Enterprise framing: 'Vendor lock-in risk → Provider transparency across data, messaging, AI.'",
+      "source": "docs/architecture/principles.md; docs/architecture/comparison.md (Koan Differentials); docs/getting-started/enterprise-adoption.md §1",
+      "era": "founding"
+    },
+    {
+      "principle": "Simplicity first (SoC, KISS, YAGNI, DRY)",
+      "statement": "'SoC, KISS, YAGNI, DRY applied consistently... Small modules, explicit composition, clear naming.' One-line EntityController<Todo> vs manual CRUD boilerplate is the canonical illustration.",
+      "source": "docs/architecture/principles.md (Design Principle 1)",
+      "era": "founding"
+    },
+    {
+      "principle": "Deterministic configuration, fail fast",
+      "statement": "'Explicit config beats discovery. Fail fast on misconfig.' Four-layer hierarchy: provider defaults < appsettings < env vars < code overrides.",
+      "source": "docs/architecture/principles.md (Design Principle 2)",
+      "era": "founding"
+    },
+    {
+      "principle": "Progressive complexity",
+      "statement": "'Start simple, add complexity incrementally' (Level 1 entity → Level 2 business logic → Level 3 multi-provider). Overview.md: 'Everything starts minimal and grows by intent — add packages, not boilerplate'; 'Koan grows with your intent, not against it.'",
+      "source": "docs/architecture/principles.md (Design Principle 3); docs/getting-started/overview.md Stage 0 + closing line",
+      "era": "founding"
+    },
+    {
+      "principle": "Escape hatches everywhere",
+      "statement": "'Framework enhances but never constrains' — direct SQL when needed, custom controllers when needed; comparison.md scores Koan 'Direct SQL / custom controllers while preserving sets/caps.'",
+      "source": "docs/architecture/principles.md (Design Principle 4); docs/architecture/comparison.md row 'Escape hatches'",
+      "era": "founding"
+    },
+    {
+      "principle": "Container-native design",
+      "statement": "KoanEnv environment detection, automatic /api/health liveness/readiness, env-var config override; Strategic Direction: 'Position as premier choice for containerized .NET applications with sophisticated orchestration capabilities.'",
+      "source": "docs/architecture/principles.md (Container-Native Design + Strategic Direction)",
+      "era": "founding"
+    },
+    {
+      "principle": "Self-reporting infrastructure / boot reports",
+      "statement": "'Framework self-documents what's configured' (boot reports, KoanEnv.DumpSnapshot, structured event IDs); CLAUDE.md: 'Services describe their capabilities in structured boot reports'; Strategic Direction: 'Emphasize BootReport observability and self-documenting systems as enterprise-grade operational benefits.'",
+      "source": "docs/architecture/principles.md (Observability + Operational Sophistication); CLAUDE.md Core Principles",
+      "era": "founding"
+    },
+    {
+      "principle": "Small teams → sophisticated apps (the value proposition)",
+      "statement": "'The .NET framework that makes small teams capable of sophisticated solutions through intelligent automation, AI-native patterns, and elegant scaling' (README masthead); 'With Koan, enterprise ambition no longer demands enterprise headcount' (enterprise-adoption closing).",
+      "source": "README.md masthead; docs/getting-started/enterprise-adoption.md §6",
+      "era": "founding"
+    },
+    {
+      "principle": "AI-native, not bolt-on",
+      "statement": "'Semantic search, embeddings, and streaming pipelines are first-class, not bolt-ons' (README); 'Make traditionally complex integrations (AI, OAuth, CQRS, event sourcing) accessible through sane defaults' (principles.md Complex Scenario Simplification).",
+      "source": "README.md 'Why Choose Koan'; docs/architecture/principles.md (Strategic Direction)",
+      "era": "founding"
+    },
+    {
+      "principle": "Fewer but more meaningful parts / descaffold, don't consolidate",
+      "statement": "'The framework so far is a viability exercise — now harden it for v1... remove the development scaffolding and leave the parts that work. Consolidation and deletion are the same move seen from two sides.' For every part: 'is this load-bearing for the proven product, or scaffolding from the proof-of-viability phase?' Scaffolding → cut, 'do not lovingly refactor it.'",
+      "source": "docs/architecture/foundation-consolidation-plan.md §0–§1",
+      "era": "consolidation"
+    },
+    {
+      "principle": "Count developer-facing concepts (intents), not projects",
+      "statement": "'Drive down the ideas a developer must hold; internal plumbing may remain many small invisible parts.' Refined by the verified audit: the merge test is 'is this a distinct intent a developer would reference alone?' — keep tiny packages that are distinct intents (Json.Strict, Sse), merge internal seams.",
+      "source": "foundation-consolidation-plan.md §1 + §3a (Reframe)",
+      "era": "consolidation"
+    },
+    {
+      "principle": "Dogfood-driven collapse + green ratchet (the discipline)",
+      "statement": "'Collapse where ≥2 real usages prove the overlap. Resist the elegant abstraction no app needs (second-system effect).' 'Full solution + every dogfood sample + a doc-API lint, all green, or it doesn't merge.' 'A part earns its place only if a dogfood app reaches for it naturally or removing it forces ceremony back into an app.' Settled = 'a new dogfood app of a known shape can be built end-to-end without editing the framework.'",
+      "source": "foundation-consolidation-plan.md §1–§2",
+      "era": "consolidation"
+    },
+    {
+      "principle": "Unified capability model as the sole declaration→negotiation→report surface; fail-loud is canon",
+      "statement": "One Capability/CapabilitySet primitive replaces ~40 ad-hoc types; 'Fail-loud is canon (DATA-0097: an un-pushable filter node is a hard error, never silent narrowing). The unified model must preserve a single, loud not-supported path' (CapabilityNotSupportedException). Implemented and legacy deleted (Facet 1 COMPLETE).",
+      "source": "docs/decisions/ARCH-0084 (Forces #2, Decision); foundation-consolidation-plan.md §4.2 + §8",
+      "era": "consolidation"
+    },
+    {
+      "principle": "KoanModule: one boot-time authoring unit, built over working machinery, never big-bang",
+      "statement": "'One authoring surface (Id, DependsOn, Register, Start, Report)'; 'The machinery (source-gen discovery, topological ordering) works... replacing it is pure risk. Build over it'; migration is 'opportunistic and green-at-each', additive bridge keeps 85 registrars working. Notably evidence-corrected: 'capabilities are per-type/runtime (the provider), not per-assembly/boot (the module)' — the ADR explicitly corrects the plan's own sketch.",
+      "source": "docs/decisions/ARCH-0086 (Decision, Forces, granularity finding); CLAUDE.md (ARCH-0086 entry)",
+      "era": "consolidation"
+    },
+    {
+      "principle": "The premium-DX audience for internals is the adapter author",
+      "statement": "'The premium-DX audience is the adapter author, not the app developer (samples never touch these types). Optimize for clean declaration + clean negotiation + free self-report.' One file → 'discovery, ordering, negotiation, self-report, health, all free' (plan §4.5).",
+      "source": "ARCH-0084 Forces #1; foundation-consolidation-plan.md §4.5",
+      "era": "consolidation"
+    },
+    {
+      "principle": "Integration tests as canon (ARCH-0079)",
+      "statement": "'Every adapter, connector, coherence channel, and pillar core ships at least one integration spec that goes through real AddKoan() reflective discovery... Unit tests with fakes are insufficient — they structurally cannot reveal composition or shared-resource bugs.'",
+      "source": "CLAUDE.md Core Principles (ARCH-0079); tests/README.md",
+      "era": "consolidation"
+    }
+  ],
+  "tensions": [
+    {
+      "tension": "'Reference = Intent' vs an OTel-laden kernel: referencing Koan.Core (the mandatory base of every app, including console workers) expresses no telemetry intent, yet it hard-carries 5 OpenTelemetry packages including AspNetCore/Http/Runtime instrumentation and the OTLP exporter. By the consolidation plan's own §3a merge test ('a distinct intent a developer would reference alone'), observability is a distinct intent that should be its own package. principles.md compounds it by claiming telemetry is opt-in via AddKoan(options => options.EnableTelemetry = true) — AddKoan() takes no options lambda (src/Koan.Core/ServiceCollectionExtensions.cs:23) and the only EnableTelemetry in src is on TransactionOptions. Runtime activation is conditional (Observability/ServiceCollectionExtensions.cs disables in prod without OTLP endpoint), but the dependency weight is unconditional.",
+      "evidence": "src/Koan.Core/Koan.Core.csproj (OpenTelemetry.Extensions.Hosting, Exporter.OpenTelemetryProtocol, Instrumentation.AspNetCore/Http/Runtime 1.15.x); src/Koan.Core/Observability/ServiceCollectionExtensions.cs:15-32; principles.md 'Telemetry Integration (opt-in)' section",
+      "kind": "unfinished-migration"
+    },
+    {
+      "tension": "'Deterministic Configuration — fail fast on misconfig' (founding) AND 'fail-loud is canon' (ARCH-0084) vs the bootstrap silently swallowing every initializer exception: AppBootstrapper runs all module initializers inside catch { /* best-effort to avoid failing the host during bootstrap */ }, plus four more bare catch{} blocks in the same file (assembly refs, manifest reflection). A misbehaving module's DI registration vanishes without a trace — the exact 'silent narrowing' the capability model outlaws at query time is institutionalized at boot time. There is a real underlying conflict: Reference=Intent auto-boot wants resilience (one bad package shouldn't kill the host), fail-fast wants loudness — but the current blanket swallow resolves it maximally toward silence, contradicting both the principle doc and the consolidation-era canon.",
+      "evidence": "src/Koan.Core/Hosting/Bootstrap/AppBootstrapper.cs:60,72,92,95,112-123,238; principles.md Design Principle 2; ARCH-0084 Forces #2",
+      "kind": "inherent-to-vision"
+    },
+    {
+      "tension": "'Simplicity First — YAGNI applied consistently' vs 110 src projects, ~40 capability types, 7 registration interfaces, 85 auto-registrars, and ~25 zero-consumer experimental projects (Stage 1). The framework's own plan concedes breadth is 'the chief liability' and that much of it is 'scaffolding... it existed to prove a capability, not because a real product needs it as a distinct part' — e.g. the 8 Koan.AI.{Compute,Training,Agents,Eval,Review,Models,Prompt,Orchestration} sub-pillars with a single sample consumer. This is the acknowledged self-tension the consolidation era exists to repay; Facets 0–2 are done, Facet 4 (descaffold/cut) — the one that actually deletes the YAGNI violations — is not started.",
+      "evidence": "110 csproj under src/ (counted); foundation-consolidation-plan.md §0 ('breadth... is the chief liability'), §3 ranked targets, §3a deletion candidates; principles.md Design Principle 1",
+      "kind": "inherent-to-vision"
+    },
+    {
+      "tension": "'Escape Hatches Everywhere' vs the escape hatches as documented: principles.md's flagship example User.ExecuteSql(\"SELECT...\") exists nowhere in src (zero grep hits), and the dedicated escape-hatch package Koan.Data.Direct has zero consumers repo-wide — no project, sample, or test references it; only its own 7 files mention it (it even got a KoanModule conversion in ARCH-0086 pass 1 while remaining unconsumed). The real hatches exist under different names (custom controllers, IRawQueryRepository per DATA-0096), but the advertised surface is fictional and the packaged hatch fails the framework's own dogfood-earns-its-place rule ('a part earns its place only if a dogfood app reaches for it naturally').",
+      "evidence": "Grep 'ExecuteSql' → 0 hits in src; grep 'Data.Direct' across all csproj → 0 external references; principles.md Design Principle 4; foundation-consolidation-plan.md §1",
+      "kind": "doc-drift"
+    },
+    {
+      "tension": "The marketing front door sells features that do not exist or ride the condemned stack, while never mentioning the settled core. Flow.OnUpdate<Todo>(...) is showcased in README §4, overview.md Stage 3, AND enterprise-adoption.md's security/compliance example — zero matches in any .cs file in the repo. 'koan export compose' (README §5, enterprise-adoption pilot step 3) lives only in the ARCH-0077-condemned Orchestration CLI. modules-overview.md describes Koan.Jobs.Core as 'register jobs via DI (IJob implementations) and configure job runner' — the pre-JOBS-0005 world; the actual entity-first IKoanJob<TSelf> system is undocumented there. Meanwhile README says nothing about the capability model, the Jobs capability ladder, the Cache coherence system, or Security.Trust — the parts Stage 1 found settled.",
+      "evidence": "Grep 'Flow.OnUpdate|OnUpdate<' in **/*.cs → 0 files; README.md §4-5; docs/getting-started/overview.md Stage 3; enterprise-adoption.md §3; modules-overview.md §1 Jobs entry; ARCH-0077",
+      "kind": "doc-drift"
+    },
+    {
+      "tension": "A framework whose flagship operational claim is self-describing infrastructure cannot describe itself: README badge, principles.md, CLAUDE.md, and every doc front-matter say v0.6.3; real version is 0.17.x via NBGV; public NuGet is stale at 0.8.x; package IDs publish as Sylin.Koan.* but README/overview quickstarts instruct 'dotnet add package Koan.Core' (which fails on nuget.org) — only modules-overview.md §intro discloses the Sylin.Koan.* namespace. README's quickstart clone URLs point at github.com/koan-framework/* — a different org than sylin-org. module-ledger.md (the 'authoritative ledger') counts 65 modules vs 110 actual and contains duplicated, internally-contradictory sections (Koan.Storage/Web blocks repeated verbatim at lines 242-339 and 337-429).",
+      "evidence": "README.md badges + install commands + clone URLs; version.json/NBGV vs docs front-matter 'framework_version: v0.6.3'; docs/reference/modules-overview.md 'Sylin.Koan.*' tip; docs/architecture/module-ledger.md snapshot (65 modules, 2025-09-29) + duplicate blocks",
+      "kind": "doc-drift"
+    },
+    {
+      "tension": "principles.md — the document titled 'Architecture Principles' and linked from README as the 'Enterprise Architecture Guide' — illustrates the framework with substantially fictional APIs: IDataProvider/IDataProviderV2 (no such interface in src; the capability model is the actual surface per ARCH-0084), KoanEnv.Features.EnableExperimentalFeature (doesn't exist), Todo.SaveBatch (doesn't exist), AddKoan(options) (doesn't exist), capabilities.Has(DataCaps.Query.Linq) shown alongside the deleted-generation provider pattern. The canon document predates the consolidation and was never reconciled — violating the consolidation discipline's own rule that 'the facet's docs/guides are reconciled in the same breath (so docs never re-drift)' (plan §6.5), which was applied to capability guides but not to the philosophy doc itself.",
+      "evidence": "principles.md (Provider Pattern, Version Compatibility, Telemetry, Batch Operations sections) vs grep results (0 hits for IDataProvider/IDataProviderV2/KoanEnv.Features/SaveBatch in src); ARCH-0084; foundation-consolidation-plan.md §6",
+      "kind": "doc-drift"
+    },
+    {
+      "tension": "Provider transparency vs capability-graded divergence: 'same entity code works everywhere' is the promise, but the settled design deliberately makes behavior provider-dependent — TTL retention only on Mongo ([Index(Ttl=true)] skipped by relational adapters with periodic purge as backstop), conditional CAS claim only on SQLite/PG/SqlServer/Mongo, LINQ pushdown vs in-memory fallback, distributed transactions 'eventual consistency via Flow' (comparison.md scores itself 🟨 here). This is an honest, inherent tension the framework handles better than its competitors (fail-loud negotiation, capability ladder with constant at-least-once contract) — but the front-door docs state the promise without the grading, and only CLAUDE.md/ADRs state the grading.",
+      "evidence": "principles.md 'Storage backend becomes a deployment concern'; CLAUDE.md JOBS-0005 §20 entries (capability-graded TTL/CAS); comparison.md Distributed-transactions row; ARCH-0084 capability negotiation",
+      "kind": "inherent-to-vision"
+    },
+    {
+      "tension": "'Integration tests as canon — every adapter, connector, and pillar core ships an integration spec through real AddKoan()' (ARCH-0079, stated as universal) vs the ~25 zero-consumer experimental projects (AI verticals, Rag, Secrets, ServiceMesh, Recipe, Canon...) that have no such coverage and no consumers to drive it. The canon is real for the inner ring (per-connector *Capabilities.Spec.cs, convergence oracle, KoanIntegrationHost) and aspirational for the legacy/experimental strata — the rule's scope silently matches the redesign frontier, not the repo.",
+      "evidence": "CLAUDE.md ARCH-0079 statement; ARCH-0084 §3 (conformance net exists for data/vector connectors); Stage 1 finding of ~25 zero-consumer projects; tests/Suites coverage concentrated on inner-ring pillars",
+      "kind": "unfinished-migration"
+    },
+    {
+      "tension": "Founding 'No manual service configuration' vs the long-lived auto-vs-explicit split brain (~30 Add* extension methods beside 85 auto-registrars, plan §3 target #2). ARCH-0086's research substantially dissolved this — 'the Add* methods are mostly the registrar's own delegate... the good pattern, not duplication' — and healed the genuine split-brains (IKoanInitializer fold, auth off-registry AppDomain scan, GraphQl double-registration). Residual: 85 registrars remain on the legacy interface with conversion 'opportunistic', so two authoring surfaces coexist indefinitely by design.",
+      "evidence": "foundation-consolidation-plan.md §3 #2 + §3a; ARCH-0086 Context + Consequences ('Two surfaces coexist during migration'); principles.md Auto-Registration Pattern",
+      "kind": "unfinished-migration"
+    }
+  ],
+  "audience": "The docs name at least four distinct personas, and they pull apart. (1) README's masthead and 2-minute pitch targets the individual/indie developer and 'small teams' — 'Try it. Be delighted'; AR ergonomics, zero config, SQLite-out-of-the-box. (2) enterprise-adoption.md targets architecture governance in an organization: pilots with 'leadership sponsorship', steering teams, KPIs, 'a guild of Koan champions', compliance mapping, data-residency adapters — an apparatus that presumes an installed base. (3) principles.md Strategic Direction explicitly targets 'experienced teams willing to invest in framework-specific expertise for long-term productivity gains' — the opposite onboarding posture from README's instant delight. (4) The consolidation-era ADRs declare the real premium-DX audience to be the adapter author ('samples never touch these types', ARCH-0084 Forces #1). The personas are not inherently incompatible — Rails serves indie and enterprise — but here they conflict in practice: the README persona is blocked at step one (package IDs are Sylin.Koan.*, public NuGet stale at 0.8.x, quickstart clone URLs point to a nonexistent koan-framework org), the enterprise persona is offered governance theater for a framework with zero external consumers and a falsely-versioned doc set, and the only persona actually served today is the fifth, undocumented one: the sole implementor-consumer dogfooding toward v1 (foundation-consolidation-plan.md §0 states this candidly). The consolidation plan is the only document whose stated audience matches reality; the public-facing docs are written for audiences that cannot yet onboard.",
+  "visionDebt": [
+    "Flow event hooks: Flow.OnUpdate<T>(...) with UpdateResult.Continue() is showcased in README §4, overview.md Stage 3, and enterprise-adoption.md's compliance example — zero implementations or usages in any .cs file repo-wide. The entire 'event-driven architecture through simple patterns' pitch rides on it.",
+    "Opt-in telemetry API: AddKoan(options => options.EnableTelemetry = true) (principles.md) — AddKoan() has no options overload (src/Koan.Core/ServiceCollectionExtensions.cs:23); OTel packages are unconditional Koan.Core dependencies.",
+    "principles.md's framework-evolution story: IDataProvider/IDataProviderV2 versioned interfaces and KoanEnv.Features.EnableExperimentalFeature feature flags — none exist; the capability model (ARCH-0084) is the real mechanism and principles.md doesn't describe it.",
+    "Escape-hatch surface as documented: User.ExecuteSql(...) and Todo.SaveBatch(...) don't exist under those names; Koan.Data.Direct (DirectSession) has zero consumers including dogfood — failing the plan's own 'a part earns its place' test.",
+    "Onboarding path: 'dotnet add package Koan.Core' fails on nuget.org (IDs are Sylin.Koan.*, stale 0.8.x vs source 0.17.x); README clone targets github.com/koan-framework/{quickstart,enterprise-sample} — wrong org (sylin-org), presumably dead links. The '2 minutes to working API' promise is unexecutable by an outsider today.",
+    "'koan export compose' deployment-artifact generation (README §5, enterprise-adoption pilot step, overview Stage 4) rides the ARCH-0077-condemned Orchestration CLI stack; 'Orchestration: Docker, Podman, Aspire, CLI automation' (README tech stack) likewise.",
+    "Enterprise governance apparatus (enterprise-adoption.md): pilot KPIs, champions guild, architecture review checklists — pure aspiration with no external consumer, no public versioned release line, and doc front-matter frozen at v0.6.3 since early 2026.",
+    "modules-overview.md sells pillars Stage 1 found to be zero-consumer or pre-renovation as production guidance: Recipe ('accelerating solution delivery'), Canon ('canonical projections, lineage'), Secrets, ServiceMesh-adjacent Inbox connector; and its Jobs entry describes the pre-JOBS-0005 'IJob + job runner' world that no longer exists.",
+    "'70+ integrated modules' (README) vs module-ledger's 65 (stale, 2025-09, with duplicated sections) vs 110 actual src projects — no document states the true module count or the inner-ring/experimental distinction the consolidation plan operates on.",
+    "Semantic streaming pipeline claims partially: .Pipeline()/Tokenize/Embed DSL exists (Koan.Core/Koan.AI Pipeline*Extensions), but README's claim it stores 'documents (PostgreSQL) + vectors (Weaviate) in one .Save()' with 'full observability' oversells the pre-renovation Messaging/Flow strata it composes with."
+  ],
+  "undersold": [
+    "The unified capability model (ARCH-0084) — the framework's most distinctive settled achievement: one declare/negotiate/report primitive across 14 data+vector adapters, fail-loud CapabilityNotSupportedException, per-pillar token catalogs honoring Reference=Intent, /.well-known self-report. README mentions only a generic 'capability detection / fallback' table row; principles.md still shows the deleted generation.",
+    "Build-time source-generated discovery: ARCH-0086 reveals discovery is a Roslyn-generated [ModuleInitializer] registry (KoanRegistry) with topological [Before]/[After] ordering — AOT-friendly, deterministic, fast-boot — not runtime reflection magic. This directly answers the #1 enterprise objection to auto-registration frameworks, and no public-facing doc says it.",
+    "The Jobs pillar (JOBS-0005): entity-first IKoanJob<TSelf> with a capability ladder (in-memory → durable ledger → distributed competing-consumers → +bus) under a constant at-least-once + idempotent contract, contention-free CAS claim via a reusable IConditionalWriteRepository primitive, store-native TTL retention, cron/@boot/@continuous scheduling. Documented only in CLAUDE.md and the ADR; modules-overview.md actively misdescribes it.",
+    "Transparent entity caching (ARCH-0075/0078): [Cacheable(300)] L1/L2 with cross-node coherence channels, fresh-or-null read contract, opt-in-only SWR, per-request NoCache() — a principled answer to cache staleness that most frameworks fumble. Absent from README/overview entirely.",
+    "The engineering discipline itself: green ratchet (build + samples + doc-lint gate), cross-adapter filter convergence oracle that found real adapter bugs, ARCH-0079 integration-specs-through-real-AddKoan, and evidence-corrected ADRs (ARCH-0086 publicly reverses its own plan's premise on granularity findings). For an evaluator, this correctness culture is a stronger trust signal than any feature list, and it is invisible outside docs/decisions/.",
+    "Entity quality-of-life surface: GUID v7 auto-ids, [Timestamp]/[Timestamp(OnSave)], Copy/Move/Mirror cross-context transfer DSL, partition-name validation, [Index] — present in CLAUDE.md's utility catalog, absent from getting-started docs.",
+    "Security.Trust (fleet identity fabric direction) and the settled Web nucleus + EntityController payload-transformer/GraphQL/Swagger surface — Stage 1 found these settled or strategically coherent; the front door still sells the legacy Auth-flows stratum instead.",
+    "The honest multi-provider story: capability-graded behavior (TTL only where native, CAS where supported, pushdown-or-fail-loud) is a more credible pitch to senior engineers than the absolute 'same code works everywhere' claim the docs actually make — the framework undersells itself by overclaiming."
+  ]
+}

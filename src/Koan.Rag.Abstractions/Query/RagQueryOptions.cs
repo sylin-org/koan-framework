@@ -36,4 +36,12 @@ public sealed record RagQueryOptions
     /// Default: true.
     /// </summary>
     public bool IncludeCitations { get; init; } = true;
+
+    /// <summary>
+    /// Optional metadata filter scoping retrieval (AI-0036 P1-AI). The unified
+    /// <see cref="Koan.Data.Abstractions.Filtering.Filter"/> AST — build it with
+    /// <c>Filter.All(Filter.Eq("tenant", t), Filter.In("tag", tags))</c>. <c>null</c> = match-all
+    /// (today's behaviour). An unsupported operator/field fails loud at retrieval, never silently.
+    /// </summary>
+    public Koan.Data.Abstractions.Filtering.Filter? Filter { get; init; }
 }

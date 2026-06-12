@@ -1,20 +1,32 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <IsPackable>false</IsPackable>
     <RootNamespace>Koan.Media.Core.Tests</RootNamespace>
     <LangVersion>preview</LangVersion>
     <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!--
+      CS0618 globally suppressed in this test suite while MEDIA-0008
+      migrates ToBytesAsync()/MediaOutput.Bytes callers to the streaming
+      WriteToAsync path. The legacy tests intentionally exercise the
+      obsolete buffered surface — they're the regression net that proves
+      the shim still produces identical bytes. The new streaming surface
+      gets its own spec under Specs/Streaming.
+    -->
+    <NoWarn>$(NoWarn);NU1902;NU1903;CS0618</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="FluentAssertions" Version="6.11.0" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
-    <PackageReference Include="xunit" Version="2.6.2" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.6.2" />
-    <PackageReference Include="Koan.TestPipeline" Version="*" />
-    <PackageReference Include="Koan.Media.Core" Version="*" />
+    <PackageReference Include="AwesomeAssertions" Version="9.4.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.6.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.8" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\src\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Koan.Media.Abstractions\Koan.Media.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Koan.Media.Core\Koan.Media.Core.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Koan.Media.Web\Koan.Media.Web.csproj" />
   </ItemGroup>
 </Project>

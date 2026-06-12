@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Linq;
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.Samples.Meridian.Infrastructure;
 using Koan.Samples.Meridian.SeedData;
 using Xunit;

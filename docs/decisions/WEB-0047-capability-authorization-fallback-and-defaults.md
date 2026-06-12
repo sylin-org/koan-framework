@@ -2,10 +2,16 @@
 id: WEB-0047
 slug: capability-authorization-fallback-and-defaults
 domain: Web
-status: accepted
+status: superseded
 date: 2025-08-28
 title: Capability authorization - global allow/deny fallback and per-entity defaults
 ---
+
+> **Superseded by [SEC-0002](SEC-0002-unified-authorization-model.md) (2026-06-07).** The layered-fallback
+> *semantics* defined here — Entity → Defaults → DefaultBehavior, allow/deny-by-default, per-entity overrides —
+> remain canon; they are now evaluated by `PolicyAuthorizationProvider` within the unified `IAuthorize` seam.
+> The standalone `ICapabilityAuthorizer` engine described here is retired (verified bit-for-bit against
+> characterization specs before removal).
 
 ## Context
 

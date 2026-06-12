@@ -67,7 +67,7 @@ public sealed class MongoCrudSpec
                 var count = await Data<Person, string>.Count(p => p.Name != "Ada", partition);
                 count.Should().Be(2);
 
-                var removed = await Person.Remove(saved.Id, new DataQueryOptions { Partition = partition });
+                var removed = await Person.Remove(saved.Id, partition);
                 removed.Should().BeTrue();
 
                 var remaining = await Person.All(partition);

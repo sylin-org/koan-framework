@@ -93,9 +93,9 @@ var filtered = products
 
 ```csharp
 // Check provider capabilities
-var capabilities = Data<Product, string>.QueryCaps;
+var capabilities = Data<Product, string>.Capabilities;
 
-if (capabilities.Capabilities.HasFlag(QueryCapabilities.LinqQueries))
+if (capabilities.Has(DataCaps.Query.Linq))
 {
     // Complex query pushed to database
     var results = await Product.Query()
@@ -369,9 +369,9 @@ public class ReportService
 // ✅ Graceful degradation when provider lacks capability
 public async Task<Product[]> SearchProducts(string query)
 {
-    var capabilities = Data<Product, string>.QueryCaps;
+    var capabilities = Data<Product, string>.Capabilities;
 
-    if (capabilities.Capabilities.HasFlag(QueryCapabilities.FullTextSearch))
+    if (capabilities.Has(DataCaps.Query.String))
     {
         // Use provider's full-text search
         return await Product.Query($"SEARCH '{query}'");
@@ -434,7 +434,7 @@ public class PerformanceService
         var report = new PerformanceReport();
 
         // Check query capabilities per provider
-        report.DataCapabilities = Data<Product, string>.QueryCaps.Capabilities;
+        report.DataCapabilities = Data<Product, string>.Capabilities;
 
         // Monitor entity optimization status
         var optimizedTypes = StorageOptimization.GetOptimizedEntityTypes();

@@ -3,7 +3,7 @@ using Koan.Data.Core;
 using Koan.Data.Core.Model;
 using Koan.Data.Core.Transactions;
 using Koan.Tests.Data.Core.Support;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Koan.Tests.Data.Core.Specs.Transactions;
 
@@ -140,9 +140,9 @@ public sealed class TransactionBasicsSpec
     }
 
     [Fact]
-    public async Task Transaction_auto_commits_on_dispose()
+    public async Task Transaction_rolls_back_on_dispose_without_explicit_commit()
     {
-        await TestPipeline.For<TransactionBasicsSpec>(_output, nameof(Transaction_auto_commits_on_dispose))
+        await TestPipeline.For<TransactionBasicsSpec>(_output, nameof(Transaction_rolls_back_on_dispose_without_explicit_commit))
             .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
             .Arrange(static ctx =>
             {
@@ -156,29 +156,26 @@ public sealed class TransactionBasicsSpec
 
                 var entity = new TodoEntity
                 {
-                    Title = "Auto-commit test",
-                    Description = "Should be auto-committed on dispose"
+                    Title = "Implicit rollback test",
+                    Description = "Should be discarded on dispose without an explicit Commit"
                 };
 
                 using (var _ = EntityContext.Partition(partition))
                 {
-                    // Transaction without explicit commit/rollback - should auto-commit
-                    using (EntityContext.Transaction("auto-commit-test"))
+                    // Default contract (TransactionOptions.AutoCommitOnDispose = false, matching .NET
+                    // TransactionScope): leaving the using-block WITHOUT an explicit Commit() rolls back.
+                    using (EntityContext.Transaction("dispose-rollback-test"))
                     {
                         await entity.Save();
-                        // Dispose without commit/rollback - should auto-commit
+                        // No explicit Commit/Rollback — dispose rolls back.
                     }
 
-                    // After dispose - entity should be persisted due to auto-commit
                     var count = await TodoEntity.Count;
-                    count.Should().Be(1, "entity should be auto-committed on dispose");
+                    count.Should().Be(0, "pending work is discarded on dispose unless explicitly committed");
 
                     var retrieved = await TodoEntity.Get(entity.Id);
-                    retrieved.Should().NotBeNull();
-                    retrieved!.Title.Should().Be("Auto-commit test");
+                    retrieved.Should().BeNull("entity should not exist after rollback-on-dispose");
                 }
-
-                entity.Should().NotBeNull();
             })
             .Run();
     }

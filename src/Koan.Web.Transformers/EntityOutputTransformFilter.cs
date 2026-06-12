@@ -1,4 +1,6 @@
+using System;
 using System.Collections;
+using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 
@@ -7,57 +9,104 @@ namespace Koan.Web.Transformers;
 internal sealed class EntityOutputTransformFilter : IAsyncResultFilter
 {
     private readonly ITransformerRegistry _registry;
+
     public EntityOutputTransformFilter(ITransformerRegistry registry) => _registry = registry;
 
     public async Task OnResultExecutionAsync(ResultExecutingContext context, ResultExecutionDelegate next)
     {
-        // Only apply to controllers marked with EnableEntityTransformersAttribute and 2xx results
-        if (context.Controller.GetType().GetCustomAttributes(typeof(EnableEntityTransformersAttribute), inherit: true).Length == 0)
-        { await next(); return; }
-        if (context.Result is not ObjectResult or) { await next(); return; }
-        if (or.StatusCode is >= 300) { await next(); return; }
-        var entityType = or.Value?.GetType();
-        if (entityType is null) { await next(); return; }
-
-        // Handle IEnumerable<TEntity>
-        bool isEnumerable = false;
-        Type? itemType = null;
-        if (entityType != typeof(string) && typeof(System.Collections.IEnumerable).IsAssignableFrom(entityType))
+        // Controller-level opt-in: implementing ITransformerActivationPredicate enables the
+        // pipeline for the controller. Returning false skips the pipeline for the current request
+        // (e.g. ?raw=1, debugging surfaces, internal call paths).
+        if (context.Controller is not ITransformerActivationPredicate controllerGate
+            || !controllerGate.ShouldActivate(context.HttpContext))
         {
-            var ienum = entityType.GetInterfaces().FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEnumerable<>));
-            if (ienum is not null) { itemType = ienum.GetGenericArguments()[0]; isEnumerable = true; }
+            await next();
+            return;
         }
-        var targetType = isEnumerable ? itemType : entityType;
-        if (targetType is null) { await next(); return; }
 
-        // Resolve Accept header(s). If client didn't specify, don't transform.
+        if (context.Result is not ObjectResult or)
+        {
+            await next();
+            return;
+        }
+        if (or.StatusCode is >= 300)
+        {
+            await next();
+            return;
+        }
+        var valueType = or.Value?.GetType();
+        if (valueType is null)
+        {
+            await next();
+            return;
+        }
+
+        var (itemType, isCollection) = ResolveItemType(valueType);
+        if (itemType is null)
+        {
+            await next();
+            return;
+        }
+
         var accepts = context.HttpContext.Request.Headers["Accept"].ToString();
-        if (string.IsNullOrWhiteSpace(accepts)) { await next(); return; }
-        var acceptValues = accepts.Split(',').Select(s => s.Trim()).ToArray();
+        var acceptValues = string.IsNullOrWhiteSpace(accepts)
+            ? System.Array.Empty<string>()
+            : accepts.Split(',').Select(s => s.Trim()).ToArray();
 
-        var selection = _registry.ResolveForOutput(targetType, acceptValues);
-        if (selection is null) { await next(); return; }
-
-        object transformed;
-        if (isEnumerable)
+        var selection = _registry.ResolveOutput(itemType, acceptValues, context.HttpContext);
+        if (!selection.HasAny)
         {
-            if (or.Value is not IEnumerable enumerable)
-            {
-                await next();
-                return;
-            }
+            await next();
+            return;
+        }
 
-            transformed = await selection.Invoker.TransformMany(enumerable, context.HttpContext);
-        }
-        else
+        // Pipeline stage: apply each activated enricher in order. Each enricher receives the
+        // (possibly already enriched) value from the previous step.
+        var current = or.Value!;
+        foreach (var enricher in selection.Pipeline)
         {
-            transformed = await selection.Invoker.Transform(or.Value!, context.HttpContext);
+            current = isCollection
+                ? await enricher.Invoker.EnrichMany((IEnumerable)current, context.HttpContext)
+                : await enricher.Invoker.Enrich(current, context.HttpContext);
         }
-        // Set the negotiated content type so MVC doesn't re-serialize as JSON
-        var result = new ObjectResult(transformed) { StatusCode = or.StatusCode };
-        result.ContentTypes.Clear();
-        result.ContentTypes.Add(selection.ContentType);
-        context.Result = result;
+
+        if (selection.Terminal is { } terminal)
+        {
+            // Terminal stage: shape-changing. Set the negotiated content type so MVC doesn't fall
+            // back to JSON.
+            var terminalOutput = isCollection
+                ? await terminal.Invoker.TransformMany((IEnumerable)current, context.HttpContext)
+                : await terminal.Invoker.Transform(current, context.HttpContext);
+
+            var terminalResult = new ObjectResult(terminalOutput) { StatusCode = or.StatusCode };
+            terminalResult.ContentTypes.Clear();
+            terminalResult.ContentTypes.Add(terminal.ContentType);
+            context.Result = terminalResult;
+        }
+        else if (!ReferenceEquals(current, or.Value))
+        {
+            // Pipeline-only: forward the enriched value through MVC's default JSON serializer.
+            // We don't replace the result when nothing changed — keeps headers and content-type
+            // negotiation identical to the no-enricher path.
+            context.Result = new ObjectResult(current) { StatusCode = or.StatusCode };
+        }
+
         await next();
+    }
+
+    private static (Type? ItemType, bool IsCollection) ResolveItemType(Type valueType)
+    {
+        if (valueType == typeof(string))
+        {
+            return (null, false);
+        }
+        if (!typeof(IEnumerable).IsAssignableFrom(valueType))
+        {
+            return (valueType, false);
+        }
+
+        var ienum = valueType.GetInterfaces()
+            .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEnumerable<>));
+        return ienum is null ? (null, false) : (ienum.GetGenericArguments()[0], true);
     }
 }

@@ -7,8 +7,6 @@ using Microsoft.Extensions.Options;
 using Npgsql;
 using Testcontainers.PostgreSql;
 using Xunit;
-using Koan.Core.Bootstrap.Abstractions;
-using Koan.Core.Hosting.App;
 using Koan.Data.Abstractions;
 using Koan.Data.Vector.Abstractions;
 
@@ -32,8 +30,7 @@ public abstract class PGVectorTestBase : IAsyncLifetime
             .WithDatabase("test_db")
             .WithUsername("postgres")
             .WithPassword("test_password")
-            .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(5432))
-            .Build();
+            .Build(); // PostgreSqlBuilder applies a sensible default readiness wait strategy
 
         // Start container
         await _container.StartAsync();
@@ -81,26 +78,23 @@ public abstract class PGVectorTestBase : IAsyncLifetime
         // Add extension manager
         services.AddSingleton<PgVectorExtensionManager>();
 
-        // Add factory
+        // Add factory (resolves NpgsqlDataSource from options internally — no AppHost needed post-rebuild)
         services.AddSingleton<IVectorAdapterFactory, PGVectorAdapterFactory>();
-
-        // Add mock AppHost for naming registry
-        services.AddSingleton<IAppHost>(sp => new MockAppHost(sp));
 
         return services.BuildServiceProvider();
     }
 
-    protected async Task<PGVectorRepository<TEntity, string>> CreateRepositoryAsync<TEntity>()
+    protected async Task<IVectorSearchRepository<TEntity, string>> CreateRepositoryAsync<TEntity>()
         where TEntity : class, IEntity<string>
     {
         if (ServiceProvider == null)
             throw new InvalidOperationException("ServiceProvider not initialized");
 
-        var factory = ServiceProvider.GetRequiredService<IVectorAdapterFactory>() as PGVectorAdapterFactory;
-        var repository = factory!.Create<TEntity, string>(ServiceProvider) as PGVectorRepository<TEntity, string>;
+        var factory = ServiceProvider.GetRequiredService<IVectorAdapterFactory>();
+        var repository = factory.Create<TEntity, string>(ServiceProvider);
 
         // Ensure schema created
-        await repository!.VectorEnsureCreated();
+        await repository.VectorEnsureCreated();
 
         return repository;
     }
@@ -111,7 +105,7 @@ public abstract class PGVectorTestBase : IAsyncLifetime
             throw new InvalidOperationException("ConnectionString not initialized");
 
         var conn = new NpgsqlConnection(ConnectionString);
-        await conn.Open();
+        await conn.OpenAsync();
         return conn;
     }
 
@@ -171,18 +165,3 @@ public class Article : IEntity<string>
     public string Category { get; set; } = "";
 }
 
-/// <summary>
-/// Mock AppHost for testing (required by VectorStorageNameRegistry).
-/// </summary>
-internal class MockAppHost : IAppHost
-{
-    private readonly IServiceProvider _serviceProvider;
-
-    public MockAppHost(IServiceProvider serviceProvider)
-    {
-        _serviceProvider = serviceProvider;
-    }
-
-    public object? GetService(Type serviceType) => _serviceProvider.GetService(serviceType);
-    public IServiceProvider ServiceProvider => _serviceProvider;
-}

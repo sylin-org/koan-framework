@@ -1,0 +1,220 @@
+{
+  "clusters": [
+    {
+      "concept": "Data access entry surface",
+      "ways": [
+        "Entity<TEntity,TKey> statics (62 public statics: Get/All/Query/QueryRaw/Stream/Page/Count/Copy/Move/Mirror — src/Koan.Data.Core/Model/Entity.cs)",
+        "AggregateExtensions instance extensions with documented synonym pairs: Save IS an alias of Upsert (x4 overload families), Remove duplicates Delete, plus SaveReplacing (src/Koan.Data.Core/AggregateExtensions.cs)",
+        "Data<TEntity,TKey> static facade — the actual engine with 'the ONE execution path' (plan→adapter→finalize) that Entity<T> forwards to (src/Koan.Data.Core/Data.cs)",
+        "DataDirectAccess — 3 thin wrappers over Data<T,K> with ZERO consumers anywhere in the repo (src/Koan.Data.Core/Data.DirectAccess.cs)",
+        "IDataService.GetRepository — DI seam; framework's own EntityEndpointService injects IDataService AND calls Data<T,K> statics in the same file (src/Koan.Web/Endpoints/EntityEndpointService.cs:29,243)",
+        "Koan.Data.Direct (DirectDataService/DirectSession) — raw provider escape hatch, separate project",
+        "Partition addressing duplicated: string-partition overloads on Get/All/Save/Upsert vs EntityContext.Partition() scoping — verified the overloads internally wrap EntityContext.Partition (Data.cs:406-407), so it is sugar over one path"
+      ],
+      "canonical": "Entity<T> statics + instance .Save() (entity-first canon per CLAUDE.md and redesign); Data<T,K> as deliberate inner engine; IDataService as DI seam; EntityContext for ambient routing",
+      "verdict": "deliberate-layering",
+      "migrationCost": "delete-only"
+    },
+    {
+      "concept": "Bootstrap module authoring",
+      "ways": [
+        "IKoanInitializer raw interface (3 direct impls: RecipeInitializer, RecipeApplier, MongoOptimizationAutoRegistrar)",
+        "IKoanAutoRegistrar — 90 implementations across src (the de facto standard)",
+        "KoanModule (ARCH-0086) — 7 implementations (Jobs, Security.Trust, Data.Core, Data.Direct, Web.Transformers, Jobs.Transport.Messaging, GraphQl); implements IKoanAutoRegistrar so discovery/ordering unchanged",
+        "IKoanRecipe + RecipeApplier (Koan.Recipe.Abstractions) — a 4th ordered-registration mechanism with ShouldApply gating; exactly 1 implementation (ObservabilityRecipe), zero external consumers"
+      ],
+      "canonical": "KoanModule (ARCH-0086, declared 'preferred over hand-writing IKoanInitializer/IKoanAutoRegistrar' in CLAUDE.md)",
+      "verdict": "unfinished-migration",
+      "migrationCost": "mechanical"
+    },
+    {
+      "concept": "Bootstrap invocation",
+      "ways": [
+        "services.AddKoan() — host path: AddKoanCore() + AppBootstrapper.InitializeModules (src/Koan.Core/ServiceCollectionExtensions.cs:23)",
+        "services.AddKoanCore() — inner layer, callable directly",
+        "services.StartKoan() — non-host greenfield one-liner in Koan.Data.Core (builds its own ServiceProvider, sets AppHost.Current, reflectively invokes Secrets bootstrap); only 2 consumers: S0.ConsoleJsonRepo sample + S16.PantryPal test fixture",
+        "77 distinct public AddX/AddKoanX granular registration extension methods coexisting with auto-registration"
+      ],
+      "canonical": "AddKoan() (Reference = Intent); AddKoanCore as deliberate inner rung; StartKoan a legitimate non-host variant but oddly homed in Data.Core not Core",
+      "verdict": "deliberate-layering",
+      "migrationCost": "mechanical"
+    },
+    {
+      "concept": "Adapter service registration (manual vs auto)",
+      "ways": [
+        "Manual XRegistration static classes: PostgresRegistration.AddPostgresAdapter, MongoRegistration, SqliteRegistration, SqlServerRegistration, CouchbaseRegistration, JsonAdapterRegistration, InMemoryOutboxRegistration, DirectRegistration — each re-registers the same options/factory/health/orchestration services",
+        "KoanAutoRegistrar per connector (the 90-impl discovery path) — registers MORE than the manual path (discovery adapter, orchestration evaluator, Aspire resources); Postgres KoanAutoRegistrar.cs:51 comment admits the duplication: 'The explicit AddPostgresAdapter() registration call already does this'",
+        "Consumers of manual path are test fixtures (Postgres/Json/SqlServer fixtures, DataCoreRuntimeFixture) + archived S2 sample; live S1.Web has it commented out"
+      ],
+      "canonical": "KoanAutoRegistrar via AddKoan() (Reference = Intent is framework canon)",
+      "verdict": "drift",
+      "migrationCost": "mechanical"
+    },
+    {
+      "concept": "Vector data entry surface",
+      "ways": [
+        "Vector<TEntity> static facade — Save/SaveWithVector/Search/Delete/WithPartition (src/Koan.Data.Vector/Vector.cs)",
+        "VectorData<TEntity> — public static class Vector<T> forwards to; overlapping Save/SaveWithVector/UpsertMany/Search surface independently callable (src/Koan.Data.Vector/VectorData.cs)",
+        "VectorWorkflow<TEntity> + VectorProfiles (DATA-0084) — a parallel profile-routed system gated behind Koan:Data:Vector:EnableWorkflows=true; throws if flag off",
+        "EntityVectorExtensions instance extensions (entity.SaveVectorAsync) — route to VectorWorkflow, NOT to Vector<T>/VectorData<T>, so the instance-extension surface only works when workflows are enabled (src/Koan.Data.Vector/EntityVectorExtensions.cs:21)"
+      ],
+      "canonical": "Vector<T> facade (consistent with Data<T,K>/Entity<T> pattern); VectorData should be internal; workflows/profiles need a keep-or-kill decision",
+      "verdict": "drift",
+      "migrationCost": "design-needed"
+    },
+    {
+      "concept": "Vector index maintenance verbs",
+      "ways": [
+        "Clear/Rebuild/Stats via stringly Instruction mechanism — cast Repo to IInstructionExecutor<T>, execute Instruction(VectorInstructions.IndexClear etc.), throw InvalidOperationException if unsupported (Vector.cs:141-167)",
+        "Flush as a first-class typed verb on the repository interface (Vector.cs:152-153) — same destructive clear-the-index semantics as Clear, both on the same facade"
+      ],
+      "canonical": "First-class capability-graded verbs (Flush pattern; matches ARCH-0084 direction and the Gen-1 instruction cut)",
+      "verdict": "unfinished-migration",
+      "migrationCost": "mechanical"
+    },
+    {
+      "concept": "Authorization decision",
+      "ways": [
+        "IAuthorize/Authorizer seam + IAuthorizationProvider ladder (SEC-0002, Koan.Web.Extensions) — SEC-0002 §1 itself documents it collapsed FOUR mechanisms (ASP.NET IAuthorizationService, ICapabilityAuthorizer/WEB-0047, the speculative RbacAuthorizer seam, IAuthorizeHook)",
+        "IAuthorizeHook<TEntity> per-entity pipeline hook — still separate; SEC-0002 step 5 (folding it into the seam) explicitly DEFERRED with rationale ('legitimately separate per-entity pipeline extension point... pending a real driver')",
+        "Role contributors (Koan.Web.Auth.Roles) feed claims/role attribution — a requirement source, not a competing decider"
+      ],
+      "canonical": "IAuthorize (SEC-0002, Accepted 2026-06-07, steps 0-4 implemented; ICapabilityAuthorizer already retired)",
+      "verdict": "deliberate-layering",
+      "migrationCost": "design-needed"
+    },
+    {
+      "concept": "Auth lifecycle flow engine",
+      "ways": [
+        "IKoanAuthEventContributor (legacy, [KoanDiscoverable], WEB-0065) — the framework's OWN built-ins still implement it: RoleListFileContributor, AdminBootstrapContributor",
+        "IKoanAuthFlowHandler (new dispatcher pipeline, adds OnValidatePrincipal/OnChallenge/OnAccessDenied) — exactly 1 native implementation (JsonChallengeHandler)",
+        "LegacyAuthContributorAdapter bridge auto-wraps every legacy contributor 1:1 with a documented migration path ('implement IKoanAuthFlowHandler directly, then remove')"
+      ],
+      "canonical": "IKoanAuthFlowHandler (its own docs declare it subsumes the legacy contract)",
+      "verdict": "unfinished-migration",
+      "migrationCost": "mechanical"
+    },
+    {
+      "concept": "Realtime push channel",
+      "ways": [
+        "Koan.Web.Sse — SseEnvelope, MVC results, formatting; 3 real consumers (Koan.AI.Web, Koan.Mcp, Koan.Service.KoanContext)",
+        "Koan.WebSockets — WebSocketStreamAdapter/Factory; ZERO src consumers (only its own test project)"
+      ],
+      "canonical": "SSE (the only path anything actually uses)",
+      "verdict": "drift",
+      "migrationCost": "delete-only"
+    },
+    {
+      "concept": "Eventing / react-to-change",
+      "ways": [
+        "Entity<T>.Events lifecycle builder — in-process BeforeLoad/AfterUpsert/BeforeRemove interception, wired into every Entity static (EntityEventExecutor wraps Get/Save)",
+        "Messaging .Send()/.On<T>() — cross-process pub-sub; reflection-heavy pre-renovation core (MakeGenericMethod per send, MessagingExtensions.cs:82-140) but load-bearing: cache coherence + jobs transport ride it",
+        "Jobs (IKoanJob<TSelf>) — durable at-least-once background work with its own triggers"
+      ],
+      "canonical": "All three, by guarantee class: in-proc interception → Entity.Events; cross-process fan-out → Messaging; durable work → Jobs. No consumer-facing doc states this decision rule",
+      "verdict": "deliberate-layering",
+      "migrationCost": "design-needed"
+    },
+    {
+      "concept": "AI composition surface",
+      "ways": [
+        "Client (Koan.AI) statics — one-shot Chat/Embed/Ocr/Imagine/Transcribe + AiConversationBuilder fluent conversation",
+        "Chain.Create() ChainBuilder (Koan.AI.Orchestration, AI-0026) — typed immutable chains",
+        "Agent.Create() AgentBuilder (Koan.AI.Agents, AI-0031) — entity-aware autonomous agents layered above chains",
+        "TextPipeline/ImagePipeline/IAiPipelineStage (Koan.AI/Pipelines) — DEAD: zero consumers outside their own folder; referenced only by docs and the stale AI-0020 ADR",
+        "EntityAi (Koan.Data.AI) — entity-convention front door for the same chat/embed/ocr verbs"
+      ],
+      "canonical": "Client statics for one-shot, Chain for composition, Agent on top (ADR-backed ladder); pipelines are a dead fourth way",
+      "verdict": "deliberate-layering",
+      "migrationCost": "delete-only"
+    },
+    {
+      "concept": "RAG path",
+      "ways": [
+        "Koan.Rag + Koan.Rag.Abstractions — full pillar (Chunking/Corpus/Distillation/Graph/Ingestion/Retrieval/Workers); only consumer is the bootstrap integration test",
+        "Koan.Data.AI manual path — [Embedding] attribute + EntityAi.Embed + MediaAnalysisEmbeddingBridge + Vector<T>.Search; the path CLAUDE.md and skills actually document"
+      ],
+      "canonical": "Data.AI [Embedding] + Vector<T> path (live, documented, dogfooded)",
+      "verdict": "drift",
+      "migrationCost": "delete-only"
+    },
+    {
+      "concept": "Scheduling",
+      "ways": [
+        "Koan.Scheduling — IScheduledTask/IFixedDelay/ICronScheduled/SchedulingOrchestrator; README admits 'cron reserved for Phase 2' which never shipped; 3 consumers: Koan.Web (only for a /.well-known/scheduling endpoint), Koan.Service.KoanContext, S5.Recs",
+        "Jobs Schedule (JOBS-0005) — [JobAction(Schedule=...)] with interval / cron via Cronos / @boot / @continuous, initiator-driven re-submission; JOBS-0005 never even mentions Koan.Scheduling"
+      ],
+      "canonical": "Jobs Schedule (JOBS-0005 — newer, durable, distributed, actually has cron)",
+      "verdict": "unfinished-migration",
+      "migrationCost": "mechanical"
+    },
+    {
+      "concept": "Transactional outbox",
+      "ways": [
+        "Koan.Data.Cqrs IOutboxStore/OutboxProcessor/InMemoryOutboxStore + Mongo outbox connector — ZERO consumers (only its own Mongo connector references the csproj)",
+        "Jobs ledger transactional enlistment — DataJobLedger Append participates in the ambient EntityContext transaction (JobCoordinator.cs:63 'Transactional outbox: ...the work-item Save + the ledger Append enlist')"
+      ],
+      "canonical": "Jobs ledger (the integrated, tested, JOBS-0005 mechanism)",
+      "verdict": "drift",
+      "migrationCost": "delete-only"
+    },
+    {
+      "concept": "Copy data between stores",
+      "ways": [
+        "Entity<T>.Copy()/.Move()/.Mirror() transfer builders (src/Koan.Data.Core/Transfers) — tested (EntityTransferDsl.Spec, AdapterTransferSpecsBase)",
+        "EntityPartitionMoveExtensions.MoveToPartition (src/Koan.Data.Core/EntitySetMoveExtensions.cs) — a second move-data surface predating the builders",
+        "Koan.Data.Backup snapshot/restore (only consumer: Koan.Web.Backup) — archive-to-storage, conceptually distinct but overlapping bulk-copy machinery",
+        "CqrsRepositoryDecorator dual-write to read store + outbox — zero consumers"
+      ],
+      "canonical": "Entity<T>.Copy/Move/Mirror builders (CLAUDE.md-documented, tested)",
+      "verdict": "drift",
+      "migrationCost": "mechanical"
+    },
+    {
+      "concept": "Configuration access",
+      "ways": [
+        "Koan.Core Configuration.Read/ReadFirst/ReadFirstWithSource statics — 309 call sites; sanctioned for boot-time Describe/provenance where options aren't bound yet, but also used at runtime (e.g. orchestration evaluators re-parse connection strings)",
+        "AddKoanOptions<T> typed options (78 registrations) — the canonical runtime config surface",
+        "Per-connector Infrastructure.Constants.Configuration.Keys constant trees with Alt* key aliases duplicating every key 2-4 ways"
+      ],
+      "canonical": "AddKoanOptions<T> for runtime; Configuration.Read* legitimately scoped to boot/provenance — the boundary is real but unenforced",
+      "verdict": "deliberate-layering",
+      "migrationCost": "mechanical"
+    },
+    {
+      "concept": "Service identity attribute",
+      "ways": [
+        "Koan.Orchestration.Attributes.KoanServiceAttribute(ServiceKind, shortCode, name) — alive: every data/AI connector factory carries it",
+        "Koan.Web.Auth.Services.Attributes.KoanServiceAttribute(serviceId, ProvidedScopes) — consumers: its own registrar + one sample controller (S5.Recs)",
+        "Koan.ServiceMesh.Abstractions.KoanServiceAttribute(ServiceId, DisplayName) — zero-consumer experimental stratum (Translation service + S8.PolyglotShop sample)"
+      ],
+      "canonical": "Koan.Orchestration.Attributes version (the only one with framework-wide usage); three identically-named attributes with different shapes is a collision waiting for a consumer",
+      "verdict": "drift",
+      "migrationCost": "mechanical"
+    },
+    {
+      "concept": "Capability declaration",
+      "ways": [
+        "ARCH-0084 CapabilitySet via IDescribesCapabilities — 26 implementors (every data/vector adapter, facades, decorators); DataCaps/VectorCaps/TxCaps token model; 'the sole surface' per Facet 1",
+        "AI adapters: IReadOnlySet<string> Capabilities from AiCapability string constants + HasCapability(string) (IAiAdapter.cs:27)",
+        "AI structural declaration: 'Capability is declared structurally: adapters implement IChatAdapter/IEmbedAdapter/IOcrAdapter' (IAiAdapter.cs:9) — the same file declares BOTH mechanisms",
+        "AI config-level AiCapabilityConfig dictionaries on AiSourceDefinition/AiMemberDefinition — a third AI-side capability vocabulary"
+      ],
+      "canonical": "ARCH-0084 CapabilitySet (framework flagship); the AI pillar predates Facet 1 and never migrated",
+      "verdict": "unfinished-migration",
+      "migrationCost": "design-needed"
+    }
+  ],
+  "totalClusters": 18,
+  "observations": [
+    "Headline: 18 duplicate-concept clusters. 5 deliberate-layering, 7 drift, 6 unfinished-migration. Migration cost: 5 delete-only, 9 mechanical, 4 design-needed. The settled core (Data inner ring, Jobs, SEC-0002 auth) shows the collapse pattern WORKS — SEC-0002 §1 explicitly documents going 4-ways-to-1 and Data<T,K> documents 'the ONE execution path'. The drift lives almost entirely in pre-Facet-1 strata (AI capabilities, Messaging, Cqrs, Scheduling, Recipe, WebSockets).",
+    "Cheapest wins (pure deletion, zero consumers, verified by csproj/call-site grep): DataDirectAccess (0 call sites), Koan.WebSockets (0 src consumers), Koan.Data.Cqrs + its Mongo outbox connector (0 consumers), Koan.Rag (1 bootstrap-test consumer), Koan.Recipe.* (1 self-owned impl), TextPipeline/ImagePipeline (0 consumers). Removing these alone retires parts of 6 clusters.",
+    "The bootstrap authoring ratio is the single best longitudinal metric: 90 IKoanAutoRegistrar implementations vs 7 KoanModule subclasses (7.2% migrated). ARCH-0086 is additive-by-design so the interfaces stay, but the authoring-surface count should trend toward KoanModule; track 90:7 over time.",
+    "Self-admitted duplication exists in code comments: Postgres KoanAutoRegistrar.cs:51 ('The explicit AddPostgresAdapter() registration call already does this') — and the auto path already registers MORE than the manual path (discovery adapter, orchestration evaluator, Aspire), i.e. the two paths have already diverged, which is how dual registration becomes a correctness bug.",
+    "Framework dogfooding inconsistencies that will confuse consumers reading the source as documentation: EntityEndpointService injects IDataService AND calls Data<T,K> statics in the same class; Koan's own auth built-ins (RoleListFileContributor, AdminBootstrapContributor) still implement the legacy contributor interface their replacement deprecates; EntityVectorExtensions instance methods silently require the EnableWorkflows config flag while the static Vector<T> facade does not.",
+    "Verb synonyms are documented aliases, not accidents (Save 'alias for Upsert', Remove vs Delete), and partition-string overloads verifiably converge on EntityContext.Partition (Data.cs:406) — these are deliberate DX sugar over single paths, not parallel engines; the consumer-facing cost is API surface width (62 public statics on Entity<T>), not behavioral divergence.",
+    "Two pillar-level supersessions are complete in the new pillar but the old pillar still ships: Koan.Scheduling vs Jobs Schedule (JOBS-0005 has cron via Cronos; Scheduling's own README says cron is 'reserved for Phase 2'), and Cqrs outbox vs Jobs ledger transactional enlistment. Neither old pillar is marked obsolete anywhere; Koan.Web still hard-references Koan.Scheduling just to expose a /.well-known/scheduling endpoint.",
+    "The AI pillar is the largest un-migrated capability surface: one interface file (IAiAdapter.cs) simultaneously prescribes structural capability declaration AND string-set capability declaration, plus a third config-level AiCapabilityConfig vocabulary — three mechanisms in one subsystem while the rest of the framework standardized on ARCH-0084 CapabilitySet (26 implementors).",
+    "Three identically-named KoanServiceAttribute types in three namespaces (Orchestration / Web.Auth.Services / ServiceMesh) with incompatible constructors — currently harmless because their consumer sets don't intersect, but any app referencing two of the three pillars hits an ambiguous-type collision requiring alias gymnastics."
+  ]
+}

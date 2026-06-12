@@ -38,9 +38,8 @@ public class ImportWorker : BackgroundService
                 ImportJob? job;
                 using (EntityContext.Partition("jobs-active"))
                 {
-                    var jobs = await ImportJob.All(
-                        new DataQueryOptions { PageSize = 1, Sort = "CreatedAt" },
-                        stoppingToken);
+                    // DATA-0096: DataQueryOptions removed — FirstPage(size, sort) is the equivalent.
+                    var jobs = await ImportJob.FirstPage(1, "CreatedAt", stoppingToken);
                     job = jobs.FirstOrDefault();
                 }
 

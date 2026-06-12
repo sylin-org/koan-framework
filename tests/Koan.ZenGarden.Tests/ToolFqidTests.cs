@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.ZenGarden.Core;
 using Xunit;
 

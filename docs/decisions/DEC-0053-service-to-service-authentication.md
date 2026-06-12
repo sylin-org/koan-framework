@@ -1,9 +1,9 @@
 # DEC-0053: Service-to-Service Authentication
 
 **Date:** 2025-01-16
-**Status:** Implemented
+**Status:** Implemented (outbound only) — **Superseded by [SEC-0001](SEC-0001-fleet-identity-and-trust-fabric.md)** (2026-06-06), which completes the deferred inbound validation half, replaces the deterministic dev client secret / HS256 signing with asymmetric (ES256) signing, and generalizes service-to-service auth into a cross-channel fleet identity/trust fabric. The outbound `Koan.Web.Auth.Services` (`DelegatingHandler`) described here remains valid.
 **Decision Makers:** Development Team
-**Related:** [PROP-0052](../proposals/PROP-0052-service-authentication.md)
+**Related:** [PROP-0052](../proposals/PROP-0052-service-authentication.md) · superseded by [SEC-0001](SEC-0001-fleet-identity-and-trust-fabric.md)
 
 ## Context
 

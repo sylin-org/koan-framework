@@ -6,15 +6,20 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Koan.Core;
 using Koan.Core.Infrastructure;
+using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Annotations;
+using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
+using Koan.Data.Abstractions.Sorting;
 using Koan.Data.Core;
 using Koan.Data.Core.Optimization;
-using Koan.Data.Core.Schema;
+using Koan.Data.Relational;
 using Koan.Data.Relational.Linq;
 using Koan.Data.Relational.Orchestration;
+using System.Collections.Frozen;
 using System.Linq.Expressions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
@@ -24,22 +29,22 @@ namespace Koan.Data.Connector.SqlServer;
 internal sealed class SqlServerRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
     IOptimizedDataRepository<TEntity, TKey>,
-    ILinqQueryRepository<TEntity, TKey>,
-    IStringQueryRepository<TEntity, TKey>,
-    IDataRepositoryWithOptions<TEntity, TKey>,
-    ILinqQueryRepositoryWithOptions<TEntity, TKey>,
-    IStringQueryRepositoryWithOptions<TEntity, TKey>,
-    IQueryCapabilities,
-    IWriteCapabilities,
+    IQueryRepository<TEntity, TKey>,
+    IRawQueryRepository<TEntity, TKey>,
+    IDescribesCapabilities,
     IBulkUpsert<TKey>,
     IBulkDelete<TKey>,
-    IInstructionExecutor<TEntity>,
-    ISchemaHealthContributor<TEntity, TKey>
+    IConditionalWriteRepository<TEntity, TKey>,
+    IInstructionExecutor<TEntity>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
-    public QueryCapabilities Capabilities => QueryCapabilities.Linq | QueryCapabilities.String;
-    public WriteCapabilities Writes => WriteCapabilities.BulkUpsert | WriteCapabilities.BulkDelete | WriteCapabilities.AtomicBatch | WriteCapabilities.FastRemove;
+    public void Describe(ICapabilities caps) => caps
+        .Add(DataCaps.Query.Linq).Add(DataCaps.Query.String)
+        .Add(DataCaps.Write.BulkUpsert).Add(DataCaps.Write.BulkDelete)
+        .Add(DataCaps.Write.AtomicBatch).Add(DataCaps.Write.FastRemove)
+        .Add(DataCaps.Write.ConditionalReplace)
+        .Add(DataCaps.Query.Filter, RelationalFilterSupport.Default);
 
     // Storage optimization support
     private readonly StorageOptimizationInfo _optimizationInfo;
@@ -81,6 +86,10 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
             Formatting = options.JsonWriteIndented ? Formatting.Indented : Formatting.None,
             NullValueHandling = options.JsonIgnoreNullValues ? NullValueHandling.Ignore : NullValueHandling.Include
         };
+        // Comparable-encoding contract (DATA-0100): DateTimeOffset -> UTC-ISO text, TimeSpan -> ticks,
+        // DateOnly/TimeOnly -> fixed text, so stored values are order-preserving and match the filter
+        // comparand (which SqlFilterTranslator encodes identically).
+        ComparableScalarEncoding.Apply(_json);
 
         // Log optimization strategy for diagnostics
         if (_optimizationInfo.IsOptimized)
@@ -90,7 +99,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         }
     }
 
-    private string TableName => Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
+    private string TableName => Core.Configuration.AdapterNaming.GetOrCompute<TEntity, TKey>(_sp);
 
     /// <summary>
     /// Applies storage optimization to entity before writing to SQL Server.
@@ -194,7 +203,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         }, ct);
     }
 
-    public async Task EnsureHealthy(CancellationToken ct)
+    public async Task EnsureReady(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         await using var conn = new SqlConnection(_options.ConnectionString);
@@ -206,103 +215,28 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "SQL Server ensure healthy failed for {Table}", TableName);
+            _logger.LogWarning(ex, "SQL Server ensure ready failed for {Table}", TableName);
             throw;
         }
     }
 
-    public void InvalidateHealth()
-    {
-        var suffix = $"::{TableName}";
-        foreach (var key in _healthyCache.Keys)
-        {
-            if (key.EndsWith(suffix, StringComparison.Ordinal))
-            {
-                _healthyCache.TryRemove(key, out _);
-            }
-        }
-    }
-
-    private void EnsureTable(SqlConnection conn)
-    {
-        bool entityReadOnly = typeof(TEntity).GetCustomAttributes(typeof(ReadOnlyAttribute), inherit: true).Any();
-        bool allowDdl = IsDdlAllowed(entityReadOnly);
-        if (!allowDdl)
-        {
-            if (TableExists(conn)) return;
-            return;
-        }
-
-        using var cmd = conn.CreateCommand();
-        var safe = MakeSafeIdentifier(TableName);
-        cmd.CommandText = $@"IF OBJECT_ID(N'[dbo].[{TableName}]', N'U') IS NULL
-BEGIN
-    CREATE TABLE [dbo].[{TableName}] (
-    [Id] NVARCHAR(128) NOT NULL CONSTRAINT [PK_{safe}_Id] PRIMARY KEY,
-        [Json] NVARCHAR(MAX) NOT NULL
-    );
-END";
-        cmd.ExecuteNonQueryAsync();
-
-        var projections = ProjectionResolver.Get(typeof(TEntity));
-        foreach (var p in projections)
-        {
-            var col = p.ColumnName;
-            var path = "$." + p.Property.Name;
-            EnsureComputedColumn(conn, col, path);
-            if (p.IsIndexed) TryCreateIndex(conn, col);
-        }
-        var metaProp = typeof(TEntity).GetProperty("Meta", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.IgnoreCase);
-        if (metaProp is not null) EnsureComputedColumn(conn, "Meta", "$.Meta");
-    }
-
     private static string OrderByIdClause => "ORDER BY TRY_CONVERT(BIGINT, [Id]) ASC, [Id] ASC";
 
-    private static string MakeSafeIdentifier(string name)
-        => string.IsNullOrEmpty(name) ? name : System.Text.RegularExpressions.Regex.Replace(name, "[^A-Za-z0-9_]+", "_");
-
-    private void EnsureComputedColumn(SqlConnection conn, string column, string jsonPath)
-    {
-        if (ColumnExists(conn, column)) return;
-        try
-        {
-            using var add = conn.CreateCommand();
-            add.CommandText = $"ALTER TABLE [dbo].[{TableName}] ADD [{column}] AS JSON_VALUE([Json], '{jsonPath}')";
-            add.ExecuteNonQueryAsync();
-        }
-        catch { }
-    }
-
-    private void TryCreateIndex(SqlConnection conn, string column)
-    {
-        try
-        {
-            using var idx = conn.CreateCommand();
-            idx.CommandText = $@"IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_{TableName}_{column}' AND object_id = OBJECT_ID(N'[dbo].[{TableName}]'))
-CREATE INDEX [IX_{TableName}_{column}] ON [dbo].[{TableName}] ([{column}]);";
-            idx.ExecuteNonQueryAsync();
-        }
-        catch { }
-    }
-
-    private bool TableExists(SqlConnection conn)
+    // Schema creation (table + computed projection columns + indexes) is owned exclusively by the
+    // IRelationalSchemaOrchestrator async path (see EnsureOrchestrated / ExecuteAsync's EnsureCreated
+    // case). The legacy synchronous EnsureTable/EnsureComputedColumn/TryCreateIndex helpers that used
+    // to live here fired DDL via *un-awaited* ExecuteNonQueryAsync()/ExecuteScalarAsync() — disposing
+    // the command mid-flight, racing commands on a non-MARS connection, and (because an un-awaited Task
+    // is never null) reporting every column as already-present so computed columns were never created.
+    // They were dead (nothing called them) and have been removed. The only metadata probe still needed
+    // is TableExists, used by the Clear/SchemaClear instructions to honour "don't create on clear".
+    private static async Task<bool> TableExistsAsync(SqlConnection conn, string tableName, CancellationToken ct)
     {
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT 1 FROM sys.tables WHERE name = @n AND SCHEMA_NAME(schema_id) = 'dbo'";
-        cmd.Parameters.Add(new SqlParameter("@n", TableName));
-        try { var o = cmd.ExecuteScalarAsync(); return o != null; } catch { return false; }
-    }
-
-    private bool ColumnExists(SqlConnection conn, string column)
-    {
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = @"SELECT 1 FROM sys.columns c
-JOIN sys.tables t ON c.object_id = t.object_id
-JOIN sys.schemas s ON t.schema_id = s.schema_id
-WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
-        cmd.Parameters.Add(new SqlParameter("@t", TableName));
-        cmd.Parameters.Add(new SqlParameter("@c", column));
-        try { var o = cmd.ExecuteScalarAsync(); return o != null; } catch { return false; }
+        cmd.Parameters.Add(new SqlParameter("@n", tableName));
+        try { return await cmd.ExecuteScalarAsync(ct) is not null; }
+        catch { return false; }
     }
 
     private TEntity FromRow((string Id, string Json) row)
@@ -357,45 +291,72 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         return results;
     }
 
-    public async Task<IReadOnlyList<TEntity>> Query(object? query, CancellationToken ct = default)
+
+    // ==================== Unified Query (DATA-XXXX) ====================
+
+    public async Task<RepositoryQueryResult<TEntity>> Query(QueryDefinition query, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query:all");
+        using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query");
         act?.SetTag("entity", typeof(TEntity).FullName);
+
+        var (whereSql, parameters) = BuildWhere(query.Filter);
+        var (orderBy, sortHandled) = BuildOrderBy(query.Sort);
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append("SELECT [Id], [Json] FROM [dbo].[").Append(TableName).Append(']');
+        if (whereSql is not null) sb.Append(" WHERE ").Append(whereSql);
+        sb.Append(' ').Append(orderBy);
+
+        // Only push pagination when the sort was fully pushed down; otherwise the coordinator must finish the
+        // sort in memory first, which requires the full matching set (paginating here would window the wrong rows).
+        var sortFullyHandled = query.Sort is null || query.Sort.Count == 0 || sortHandled.Count == query.Sort.Count;
+        var paginationHandled = false;
+        if (query.HasPagination && sortFullyHandled)
+        {
+            var size = query.EffectivePageSize();
+            var offset = (query.EffectivePage() - 1) * size;
+            sb.Append(" OFFSET ").Append(offset).Append(" ROWS FETCH NEXT ").Append(size).Append(" ROWS ONLY");
+            paginationHandled = true;
+        }
+
         await using var conn = Open();
-        // When no query/options are provided, return all rows (not paginated)
-        var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT [Id], [Json] FROM [dbo].[{TableName}] {OrderByIdClause}");
-        return rows.Select(FromRow).ToList();
+        var dyn = ToDapper(parameters);
+        var rows = await conn.QueryAsync<(string Id, string Json)>(sb.ToString(), dyn);
+        var items = rows.Select(FromRow).ToList();
+
+        long? totalCount = paginationHandled
+            ? await CountCore(whereSql, parameters, ct)
+            : items.Count;
+
+        return new RepositoryQueryResult<TEntity>
+        {
+            Items = items,
+            TotalCount = totalCount,
+            IsEstimate = false,
+            SortHandled = sortHandled,
+            PaginationHandled = paginationHandled,
+        };
     }
 
-    public async Task<IReadOnlyList<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query:all+opts");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        var (offset, limit) = ComputeSkipTake(options);
-        await using var conn = Open();
-        var sql = $"SELECT [Id], [Json] FROM [dbo].[{TableName}] {OrderByIdClause} OFFSET {offset} ROWS FETCH NEXT {limit} ROWS ONLY";
-        var rows = await conn.QueryAsync<(string Id, string Json)>(sql);
-        return rows.Select(FromRow).ToList();
-    }
-
-    public async Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
+    public async Task<CountResult> Count(QueryDefinition query, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = SqlServerTelemetry.Activity.StartActivity("mssql.count");
         act?.SetTag("entity", typeof(TEntity).FullName);
-        await using var conn = Open();
 
-        // Fast count via sys.dm_db_partition_stats when no predicate and strategy allows it
-        if (request.Predicate is null && request.RawQuery is null && request.ProviderQuery is null)
+        var (whereSql, parameters) = BuildWhere(query.Filter);
+
+        // Fast count via sys.partitions when no filter and strategy allows it.
+        if (whereSql is null)
         {
-            var strategy = request.Options?.CountStrategy ?? CountStrategy.Optimized;
+            var strategy = query.CountStrategy ?? CountStrategy.Optimized;
             if (strategy == CountStrategy.Fast || strategy == CountStrategy.Optimized)
             {
                 try
                 {
-                    var estimate = await conn.ExecuteScalarAsync<long>(
+                    await using var statConn = Open();
+                    var estimate = await statConn.ExecuteScalarAsync<long>(
                         @"SELECT SUM(p.rows)
                           FROM sys.partitions p
                           INNER JOIN sys.tables t ON p.object_id = t.object_id
@@ -412,175 +373,152 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
             }
         }
 
-        // Exact count based on request type
-        if (request.Predicate is not null)
-        {
-            var translator = new LinqWhereTranslator<TEntity>(_dialect);
-            try
-            {
-                var (whereSql, parameters) = translator.Translate(request.Predicate);
-                whereSql = RewriteWhereForProjection(whereSql);
-                return await CountWhere(whereSql, parameters);
-            }
-            catch (NotSupportedException)
-            {
-                var all = await Query((object?)null, ct);
-                var count = (long)all.AsQueryable().Count(request.Predicate);
-                return CountResult.Exact(count);
-            }
-        }
-
-        if (request.RawQuery is not null)
-        {
-            var whereSql = RewriteWhereForProjection(request.RawQuery);
-            var count = await conn.ExecuteScalarAsync<long>($"SELECT COUNT(1) FROM [dbo].[{TableName}] WHERE " + whereSql);
-            return CountResult.Exact(count);
-        }
-
-        // No predicate - full table count
-        var totalCount = await conn.ExecuteScalarAsync<long>($"SELECT COUNT(1) FROM [dbo].[{TableName}]");
-        return CountResult.Exact(totalCount);
+        return CountResult.Exact(await CountCore(whereSql, parameters, ct));
     }
 
-    public async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query:linq");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        var translator = new LinqWhereTranslator<TEntity>(_dialect);
-        try
-        {
-            var (whereSql, parameters) = translator.Translate(predicate);
-            whereSql = RewriteWhereForProjection(whereSql);
-            await using var conn = Open();
-            var sql = $"SELECT [Id], [Json] FROM [dbo].[{TableName}] WHERE {whereSql} {OrderByIdClause} OFFSET 0 ROWS FETCH NEXT {_defaultPageSize} ROWS ONLY";
-            var dyn = new DynamicParameters();
-            for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
-            var rows = await conn.QueryAsync<(string Id, string Json)>(sql, dyn);
-            return rows.Select(FromRow).ToList();
-        }
-        catch (NotSupportedException)
-        {
-            var all = await Query((object?)null, ct);
-            return all.AsQueryable().Where(predicate).ToList();
-        }
-    }
-
-    public async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query:linq+opts");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        var translator = new LinqWhereTranslator<TEntity>(_dialect);
-        try
-        {
-            var (whereSql, parameters) = translator.Translate(predicate);
-            whereSql = RewriteWhereForProjection(whereSql);
-            var (offset, limit) = ComputeSkipTake(options);
-            await using var conn = Open();
-            var sql = $"SELECT [Id], [Json] FROM [dbo].[{TableName}] WHERE {whereSql} {OrderByIdClause} OFFSET {offset} ROWS FETCH NEXT {limit} ROWS ONLY";
-            var dyn = new DynamicParameters();
-            for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
-            var rows = await conn.QueryAsync<(string Id, string Json)>(sql, dyn);
-            return rows.Select(FromRow).ToList();
-        }
-        catch (NotSupportedException)
-        {
-            var all = await Query((object?)null, options, ct);
-            return all.AsQueryable().Where(predicate).ToList();
-        }
-    }
-
-    private async Task<CountResult> CountWhere(string whereSql, IReadOnlyList<object?> parameters)
+    private async Task<long> CountCore(string? whereSql, IReadOnlyList<object?> parameters, CancellationToken ct)
     {
         await using var conn = Open();
-        var sql = $"SELECT COUNT(1) FROM [dbo].[{TableName}] WHERE {whereSql}";
+        var sql = whereSql is null
+            ? $"SELECT COUNT(1) FROM [dbo].[{TableName}]"
+            : $"SELECT COUNT(1) FROM [dbo].[{TableName}] WHERE {whereSql}";
+        var dyn = ToDapper(parameters);
+        return await conn.ExecuteScalarAsync<long>(sql, dyn);
+    }
+
+    /// <summary>Translates the (fully-pushable) filter to a WHERE fragment; null filter -> no WHERE.</summary>
+    private (string? whereSql, IReadOnlyList<object?> parameters) BuildWhere(Filter? filter)
+    {
+        if (filter is null) return (null, Array.Empty<object?>());
+        var translator = new SqlFilterTranslator(_dialect, typeof(TEntity), ResolveColumnSql);
+        return translator.Translate(filter);
+    }
+
+    /// <summary>
+    /// Maps a flat property name to its SQL value expression. Scalar fields lower to a projected
+    /// column or <c>JSON_VALUE</c>; collection fields lower to the array node via <c>JSON_QUERY</c>
+    /// (so the dialect's OPENJSON helpers can iterate it). The entity is serialized camelCase into
+    /// <c>[Json]</c>, so JSON paths use the camelCase property name.
+    /// </summary>
+    private string ResolveColumnSql(FieldPath field, ResolvedField resolved)
+    {
+        var prop = field.Leaf;
+        if (string.Equals(prop, "Id", StringComparison.Ordinal)) return "[Id]";
+        if (string.Equals(prop, "Json", StringComparison.Ordinal)) return "[Json]";
+        var camel = CamelCase.GetPropertyName(prop, hasSpecifiedName: false);
+
+        if (resolved is not null && resolved.TargetsCollection)
+            return $"JSON_QUERY([Json], '$.{camel}')";
+
+        // Filter/sort against the source-of-truth [Json] via JSON_VALUE. Persisted computed projection
+        // columns are a SEPARATE indexing optimisation, never a correctness dependency: referencing one
+        // that was not materialised (entities with a Json materialisation shape never get them) is the
+        // "Invalid column name 'X'" bug. Mirrors the Postgres adapter's ResolveColumnSql, which learned the
+        // same lesson. (The optimiser can still match a computed-column index defined on the same
+        // JSON_VALUE expression, so the optimisation is preserved when the column does exist.)
+        var expr = $"JSON_VALUE([Json], '$.{camel}')";
+        // Comparable-encoding contract (DATA-0100): TimeSpan persists as Int64 ticks -> cast so it
+        // compares by duration. DateTimeOffset / DateOnly / TimeOnly persist as monotonic fixed-width
+        // UTC/ISO TEXT and compare correctly as nvarchar (no cast).
+        var leaf = Nullable.GetUnderlyingType(resolved?.ComparableType ?? typeof(object)) ?? resolved?.ComparableType;
+        return leaf == typeof(TimeSpan) ? $"CAST({expr} AS BIGINT)" : expr;
+    }
+
+    /// <summary>Builds an ORDER BY clause from the sort specs; falls back to a stable Id order.</summary>
+    private (string orderBy, IReadOnlySet<SortSpec> sortHandled) BuildOrderBy(IReadOnlyList<SortSpec> sort)
+    {
+        if (sort is null || sort.Count == 0)
+            return (OrderByIdClause, RepositoryQueryResult<TEntity>.NoSortHandled);
+
+        var parts = new List<string>(sort.Count);
+        var handled = new List<SortSpec>(sort.Count);
+        foreach (var spec in sort)
+        {
+            // Only a single-member (top-level scalar) path pushes down via JSON_VALUE. Deep / collection
+            // paths (e.g. an aggregate over a nested array like "Sightings.LastChangedAt") are left
+            // UNHANDLED so the coordinator finishes them with the in-memory sorter — a leaf-only JSON_VALUE
+            // would sort by the wrong (top-level, usually NULL) value while falsely claiming the sort applied.
+            if (spec.Path.Members.Count != 1)
+                continue;
+            var leaf = spec.Path.Members[0].Name;
+            // Resolve the leaf so ResolveColumnSql applies the comparable-encoding cast (TimeSpan ->
+            // BIGINT) to the ORDER BY column too, not only to filter predicates (DATA-0100). Fall back
+            // to the bare expression on an unresolvable path.
+            ResolvedField? rf = null;
+            try { rf = FieldPathResolver.Resolve(typeof(TEntity), FieldPath.Of(leaf)); } catch { /* leave null */ }
+            var col = ResolveColumnSql(FieldPath.Of(leaf), rf!);
+            parts.Add($"{col} {(spec.Desc ? "DESC" : "ASC")}");
+            handled.Add(spec);
+        }
+
+        if (parts.Count == 0)
+            return (OrderByIdClause, RepositoryQueryResult<TEntity>.NoSortHandled);
+        var orderBy = "ORDER BY " + string.Join(", ", parts);
+        return (orderBy, handled.ToFrozenSet());
+    }
+
+    private static DynamicParameters ToDapper(IReadOnlyList<object?> parameters)
+    {
         var dyn = new DynamicParameters();
         for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
-        var count = await conn.ExecuteScalarAsync<long>(sql, dyn);
+        return dyn;
+    }
+
+    // ==================== Conditional compare-and-set (IConditionalWriteRepository) ====================
+
+    /// <summary>Atomic CAS (JOBS-0005 §20.3): replace the row IFF the stored Json still matches <paramref name="guard"/>,
+    /// which lowers to the same JSON_VALUE WHERE the query path uses. One row affected = applied, zero = lost.</summary>
+    public async Task<bool> ConditionalReplaceAsync(TEntity model, Expression<Func<TEntity, bool>> guard, CancellationToken ct = default)
+    {
+        var (whereSql, parameters) = BuildWhere(LinqFilterCompiler.Compile(guard));
+        var dyn = ToDapper(parameters);
+        var (id, json) = ToRow(model);
+        dyn.Add("__id", id);
+        dyn.Add("__json", json);
+        var guardClause = whereSql is null ? string.Empty : $" AND ({whereSql})";
+        var sql = $"UPDATE [dbo].[{TableName}] SET [Json] = @__json WHERE [Id] = @__id{guardClause}";
+        await using var conn = Open();
+        var affected = await conn.ExecuteAsync(sql, dyn);
+        return affected > 0;
+    }
+
+    // ==================== Raw provider query (IRawQueryRepository) ====================
+
+    public async Task<RepositoryQueryResult<TEntity>> QueryRaw(string query, object? parameters, QueryDefinition shaping, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query:raw");
+        act?.SetTag("entity", typeof(TEntity).FullName);
+        await using var conn = Open();
+        if (IsFullSelect(query))
+        {
+            var rewritten = RewriteEntityToken(query);
+            var rows = await conn.QueryAsync(rewritten, parameters);
+            var items = MapRowsToEntities(rows);
+            return new RepositoryQueryResult<TEntity> { Items = items };
+        }
+        else
+        {
+            var whereSql = RewriteWhereForProjection(query);
+            var size = shaping.HasPagination ? shaping.EffectivePageSize() : _defaultPageSize;
+            var offset = shaping.HasPagination ? (shaping.EffectivePage() - 1) * size : 0;
+            var sql = $"SELECT [Id], [Json] FROM [dbo].[{TableName}] WHERE {whereSql} {OrderByIdClause} OFFSET {offset} ROWS FETCH NEXT {size} ROWS ONLY";
+            var rows = await conn.QueryAsync<(string Id, string Json)>(sql, parameters);
+            return new RepositoryQueryResult<TEntity>
+            {
+                Items = rows.Select(FromRow).ToList(),
+                PaginationHandled = shaping.HasPagination,
+            };
+        }
+    }
+
+    public async Task<CountResult> CountRaw(string query, object? parameters, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        await using var conn = Open();
+        var whereSql = RewriteWhereForProjection(query);
+        var count = await conn.ExecuteScalarAsync<long>($"SELECT COUNT(1) FROM [dbo].[{TableName}] WHERE {whereSql}", parameters);
         return CountResult.Exact(count);
-    }
-
-    public async Task<IReadOnlyList<TEntity>> Query(string sql, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query:string");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        await using var conn = Open();
-        if (IsFullSelect(sql))
-        {
-            var rewritten = RewriteEntityToken(sql);
-            var rows = await conn.QueryAsync(rewritten);
-            return MapRowsToEntities(rows);
-        }
-        else
-        {
-            var whereSql = RewriteWhereForProjection(sql);
-            var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT [Id], [Json] FROM [dbo].[{TableName}] WHERE " + whereSql + $" {OrderByIdClause} OFFSET 0 ROWS FETCH NEXT {_defaultPageSize} ROWS ONLY");
-            return rows.Select(FromRow).ToList();
-        }
-    }
-
-    public async Task<IReadOnlyList<TEntity>> Query(string sql, object? parameters, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query:string:param");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        await using var conn = Open();
-        if (IsFullSelect(sql))
-        {
-            var rewritten = RewriteEntityToken(sql);
-            var rows = await conn.QueryAsync(rewritten, parameters);
-            return MapRowsToEntities(rows);
-        }
-        else
-        {
-            var whereSql = RewriteWhereForProjection(sql);
-            var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT [Id], [Json] FROM [dbo].[{TableName}] WHERE " + whereSql + $" {OrderByIdClause} OFFSET 0 ROWS FETCH NEXT {_defaultPageSize} ROWS ONLY", parameters);
-            return rows.Select(FromRow).ToList();
-        }
-    }
-
-    public async Task<IReadOnlyList<TEntity>> Query(string sql, DataQueryOptions? options, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query:string+opts");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        await using var conn = Open();
-        if (IsFullSelect(sql))
-        {
-            var rewritten = RewriteEntityToken(sql);
-            var rows = await conn.QueryAsync(rewritten);
-            return MapRowsToEntities(rows);
-        }
-        else
-        {
-            var (offset, limit) = ComputeSkipTake(options);
-            var whereSql = RewriteWhereForProjection(sql);
-            var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT [Id], [Json] FROM [dbo].[{TableName}] WHERE " + whereSql + $" {OrderByIdClause} OFFSET {offset} ROWS FETCH NEXT {limit} ROWS ONLY");
-            return rows.Select(FromRow).ToList();
-        }
-    }
-
-    public async Task<IReadOnlyList<TEntity>> Query(string sql, object? parameters, DataQueryOptions? options, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query:string:param+opts");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        await using var conn = Open();
-        if (IsFullSelect(sql))
-        {
-            var rewritten = RewriteEntityToken(sql);
-            var rows = await conn.QueryAsync(rewritten, parameters);
-            return MapRowsToEntities(rows);
-        }
-        else
-        {
-            var (offset, limit) = ComputeSkipTake(options);
-            var whereSql = RewriteWhereForProjection(sql);
-            var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT [Id], [Json] FROM [dbo].[{TableName}] WHERE " + whereSql + $" {OrderByIdClause} OFFSET {offset} ROWS FETCH NEXT {limit} ROWS ONLY", parameters);
-            return rows.Select(FromRow).ToList();
-        }
     }
 
 
@@ -629,7 +567,7 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
 
         // Resolve Optimized strategy based on provider capabilities
         var effectiveStrategy = strategy == RemoveStrategy.Optimized
-            ? (Writes.HasFlag(WriteCapabilities.FastRemove) ? RemoveStrategy.Fast : RemoveStrategy.Safe)
+            ? RemoveStrategy.Fast // this adapter declares write.fastRemove
             : strategy;
 
         if (effectiveStrategy == RemoveStrategy.Fast)
@@ -648,8 +586,7 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         }
 
         // Safe path: DELETE (fires hooks if registered)
-        var countRequest = new CountRequest<TEntity>();
-        var countResult = await Count(countRequest, ct);
+        var countResult = await Count(QueryDefinition.All, ct);
         await conn.ExecuteAsync($"DELETE FROM [dbo].[{TableName}]", ct);
         return countResult.Value;
     }
@@ -720,6 +657,14 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         public string EscapeLike(string fragment)
             => fragment.Replace("[", "[[").Replace("%", "[%]").Replace("_", "[_]");
         public string Parameter(int index) => $"@p{index}";
+
+        // List<string> is stored as a JSON array inside [Json]. columnSql is a JSON_QUERY(...) array node;
+        // OPENJSON iterates its elements (value column).
+        public string JsonArrayContains(string columnSql, string parameter)
+            => $"EXISTS (SELECT 1 FROM OPENJSON({columnSql}) WHERE value = {parameter})";
+
+        public string JsonArrayLength(string columnSql)
+            => $"(SELECT COUNT(*) FROM OPENJSON({columnSql}))";
     }
 
     public async Task<TResult> ExecuteAsync<TResult>(Instruction instruction, CancellationToken ct = default)
@@ -756,14 +701,14 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
             case DataInstructions.Clear:
                 {
                     // Do not create the table when clearing; only delete if it exists so we honor DDL policy.
-                    if (!TableExists(conn)) { object res0 = 0; return (TResult)res0; }
+                    if (!await TableExistsAsync(conn, TableName, ct)) { object res0 = 0; return (TResult)res0; }
                     var del = await conn.ExecuteAsync($"DELETE FROM [dbo].[{TableName}]");
                     object res = del; return (TResult)res;
                 }
             case RelationalInstructions.SchemaClear:
                 {
                     // Schema clear should remove the table when present, but must not create it.
-                    if (!TableExists(conn)) { object res0 = 0; return (TResult)res0; }
+                    if (!await TableExistsAsync(conn, TableName, ct)) { object res0 = 0; return (TResult)res0; }
                     var drop = $"IF OBJECT_ID(N'[dbo].[{TableName}]', N'U') IS NOT NULL DROP TABLE [dbo].[{TableName}];";
                     var affected = await conn.ExecuteAsync(drop);
                     try { var key = $"{conn.DataSource}/{conn.Database}::{TableName}"; _healthyCache.TryRemove(key, out _); } catch { }
@@ -796,45 +741,6 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         }
     }
 
-    private object ValidateSchema(SqlConnection conn)
-    {
-        bool entityReadOnly = typeof(TEntity).GetCustomAttributes(typeof(ReadOnlyAttribute), inherit: true).Any();
-        bool ddlAllowed = IsDdlAllowed(entityReadOnly);
-        var table = TableName;
-        var exists = TableExists(conn);
-        var projections = ProjectionResolver.Get(typeof(TEntity));
-        var projectedColumns = projections.Select(p => p.ColumnName).Distinct(StringComparer.Ordinal).ToArray();
-        var missing = new List<string>();
-        if (exists)
-        {
-            var existing = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"SELECT c.name FROM sys.columns c JOIN sys.tables t ON c.object_id = t.object_id JOIN sys.schemas s ON t.schema_id = s.schema_id WHERE t.name = @t AND s.name = 'dbo'";
-            cmd.Parameters.Add(new SqlParameter("@t", table));
-            using var r = cmd.ExecuteReader();
-            while (r.Read()) existing.Add(r.GetString(0));
-            foreach (var col in projectedColumns) if (!existing.Contains(col)) missing.Add(col);
-        }
-
-        var mode = _options.SchemaMatching;
-        string state;
-        if (!exists) state = mode == SchemaMatchingMode.Strict ? "Unhealthy" : "Degraded";
-        else if (missing.Count > 0) state = mode == SchemaMatchingMode.Strict ? "Unhealthy" : "Degraded";
-        else state = "Healthy";
-        return new Dictionary<string, object?>
-        {
-            ["Provider"] = "sqlserver",
-            ["Table"] = table,
-            ["TableExists"] = exists,
-            ["ProjectedColumns"] = projectedColumns,
-            ["MissingColumns"] = missing.ToArray(),
-            ["Policy"] = _options.DdlPolicy.ToString(),
-            ["DdlAllowed"] = ddlAllowed,
-            ["MatchingMode"] = mode.ToString(),
-            ["State"] = state
-        };
-    }
-
     private static string GetSqlFromInstruction(Instruction instruction)
     {
         // Accept SQL from either payload (string or object with Sql/sql property) or parameters ("sql" key)
@@ -863,25 +769,6 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         if (string.IsNullOrWhiteSpace(sql)) return false;
         var s = sql.TrimStart();
         return s.StartsWith("select ", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private (int offset, int limit) ComputeSkipTake(DataQueryOptions? options)
-    {
-        // Check if pagination is active
-        var hasPagination = options?.HasPagination ?? false;
-
-        if (!hasPagination)
-        {
-            // No pagination - return full result set without applying default page size
-            return (0, int.MaxValue);
-        }
-
-        // Pagination is active - apply default fallback only. Per ADR no adapter-side cap.
-        var page = options?.Page is int p && p > 0 ? p : 1;
-        var sizeReq = options?.PageSize;
-        var size = sizeReq is int ps && ps > 0 ? ps : _defaultPageSize;
-        var offset = (page - 1) * size;
-        return (offset, size);
     }
 
     private string RewriteEntityToken(string sql)
@@ -927,8 +814,10 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
                     return column;
                 }
 
-                var json = BuildJsonAccessor(token);
-                return $"COALESCE({column}, {json})";
+                // Physical projection columns are an indexing optimisation, not a correctness dependency —
+                // always resolve against [Json] (see ResolveColumnSql). Referencing an unmaterialised column
+                // is the "Invalid column name" bug.
+                return BuildJsonAccessor(token);
             }
 
             return BuildJsonAccessor(token);
@@ -1034,21 +923,4 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         return list;
     }
 
-    private bool IsDdlAllowed(bool entityReadOnly)
-    {
-        if (_options.DdlPolicy != SchemaDdlPolicy.AutoCreate) return false;
-        if (entityReadOnly) return false;
-        bool prod = KoanEnv.IsProduction;
-        bool allowMagic = KoanEnv.AllowMagicInProduction || _options.AllowProductionDdl;
-        try
-        {
-            var cfg = _sp.GetService(typeof(IConfiguration)) as IConfiguration;
-            if (cfg is not null)
-            {
-                allowMagic = allowMagic || Configuration.Read(cfg, Constants.Configuration.Koan.AllowMagicInProduction, false);
-            }
-        }
-        catch { }
-        return !prod || allowMagic;
-    }
 }

@@ -1,6 +1,6 @@
 using System.Text;
 using ChunkerService = Koan.Context.Services.Chunker;
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.Context.Services;
 using Microsoft.Extensions.Logging;
 using Moq;

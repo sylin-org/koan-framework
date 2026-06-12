@@ -20,7 +20,7 @@
     <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
 
     <!-- Jobs Framework -->
-    <ProjectReference Include="..\..\src\Koan.Jobs.Core\Koan.Jobs.Core.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Jobs\Koan.Jobs.csproj" />
 
     <!-- Data Adapters - all providers we're benchmarking -->
     <ProjectReference Include="..\..\src\Connectors\Data\Sqlite\Koan.Data.Connector.Sqlite.csproj" />

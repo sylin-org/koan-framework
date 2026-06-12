@@ -1,4 +1,5 @@
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Filtering;
 
 namespace Koan.Data.Vector.Abstractions;
 

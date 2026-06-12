@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Reflection;
 using Koan.Data.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
@@ -6,39 +7,39 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Koan.Data.Core.Optimization;
 
 /// <summary>
-/// Extensions for accessing storage optimization metadata via AggregateBag.
+/// Extensions for accessing storage optimization metadata.
 /// </summary>
 public static class StorageOptimizationExtensions
 {
-    private const string OptimizationBagKey = "StorageOptimization";
+    // Optimization analysis is a pure function of (TEntity, TKey) types — no SP dependence —
+    // so a static cache by type pair is safe regardless of how many service providers exist.
+    private static readonly ConcurrentDictionary<(Type, Type), StorageOptimizationInfo> Cache = new();
 
     /// <summary>
-    /// Gets storage optimization info for an entity type.
-    /// Uses AggregateBag for efficient caching - analysis happens once per entity type.
+    /// Gets storage optimization info for an entity type. Analysis runs once per (TEntity, TKey).
     /// </summary>
     public static StorageOptimizationInfo GetStorageOptimization<TEntity, TKey>(this IServiceProvider serviceProvider)
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
-        var result = AggregateBags.GetOrAdd<TEntity, TKey, StorageOptimizationInfo>(
-            serviceProvider,
-            OptimizationBagKey,
-            () => AnalyzeEntityOptimization<TEntity, TKey>());
-
-        return result;
+        _ = serviceProvider; // signature preserved for source compatibility; analysis is SP-independent
+        return GetStorageOptimization(typeof(TEntity), typeof(TKey));
     }
+
+    /// <summary>
+    /// Type-based storage optimization lookup (DATA-0098). Identical analysis to the generic overload;
+    /// used by <see cref="IdentityEncoding"/> to resolve a parent reference's strategy from its runtime
+    /// <see cref="Type"/>. Cached per (entityType, keyType).
+    /// </summary>
+    public static StorageOptimizationInfo GetStorageOptimization(Type entityType, Type keyType)
+        => Cache.GetOrAdd((entityType, keyType), key => AnalyzeEntityOptimization(key.Item1, key.Item2));
 
     /// <summary>
     /// Analyzes an entity type for storage optimization at startup.
     /// Only string-keyed entities can be optimized.
     /// </summary>
-    private static StorageOptimizationInfo AnalyzeEntityOptimization<TEntity, TKey>()
-        where TEntity : class, IEntity<TKey>
-        where TKey : notnull
+    private static StorageOptimizationInfo AnalyzeEntityOptimization(Type entityType, Type keyType)
     {
-        var entityType = typeof(TEntity);
-        var keyType = typeof(TKey);
-
         // Only optimize string-keyed entities
         if (keyType != typeof(string))
         {
@@ -79,12 +80,11 @@ public static class StorageOptimizationExtensions
         }
 
 
-        // NEW: Smart detection for Entity<> vs Entity<,string> pattern
+        // Smart detection for Entity<> vs Entity<,string> pattern
         // Only optimize Entity<Model> (implicit string), NOT Entity<Model, string> (explicit string)
-        if (typeof(TKey) == typeof(string))
+        if (keyType == typeof(string))
         {
-            var result = AnalyzeStringKeyedEntity<TEntity>(idSpec.Prop.Name);
-            return result;
+            return AnalyzeStringKeyedEntity(entityType, idSpec.Prop.Name);
         }
 
         return StorageOptimizationInfo.None;
@@ -94,10 +94,8 @@ public static class StorageOptimizationExtensions
     /// Analyzes string-keyed entities to determine if they should be optimized.
     /// Only Entity&lt;Model&gt; (implicit string) gets optimization, not Entity&lt;Model, string&gt; (explicit string).
     /// </summary>
-    private static StorageOptimizationInfo AnalyzeStringKeyedEntity<TEntity>(string idPropertyName)
+    private static StorageOptimizationInfo AnalyzeStringKeyedEntity(Type entityType, string idPropertyName)
     {
-        var entityType = typeof(TEntity);
-
         // Walk up the inheritance chain to find Entity base classes
         var baseType = entityType.BaseType;
         int level = 0;

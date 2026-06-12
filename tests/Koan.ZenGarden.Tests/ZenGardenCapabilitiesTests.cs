@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.ZenGarden.Models;
 using Xunit;
 using Xunit.Abstractions;

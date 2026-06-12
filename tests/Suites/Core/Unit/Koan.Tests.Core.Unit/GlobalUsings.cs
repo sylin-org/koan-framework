@@ -1,4 +1,4 @@
-﻿global using FluentAssertions;
+﻿global using AwesomeAssertions;
 global using Koan.Testing.Pipeline;
 global using Koan.Testing.Contracts;
 global using Koan.Testing.Fixtures;

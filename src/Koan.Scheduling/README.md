@@ -2,7 +2,7 @@
 
 Lightweight in-process scheduling primitives for Koan apps.
 
-- Target framework: net9.0
+- Target framework: net10.0
 - License: Apache-2.0
 
 ## Capabilities

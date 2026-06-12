@@ -61,7 +61,7 @@ source: src/Koan.Web/
 
 ## Compatibility and migrations
 
-- Target frameworks: net9.0
+- Target frameworks: net10.0
 
 ## References
 

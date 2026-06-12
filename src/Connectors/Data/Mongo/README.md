@@ -2,7 +2,7 @@
 
 MongoDB provider for Koan document data with options binding and pushdown-friendly queries.
 
-- Target framework: net9.0
+- Target framework: net10.0
 - License: Apache-2.0
 
 ## Capabilities

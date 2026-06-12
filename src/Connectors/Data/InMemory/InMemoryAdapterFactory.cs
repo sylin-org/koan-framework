@@ -43,18 +43,12 @@ public sealed class InMemoryAdapterFactory : IDataAdapterFactory
         return "default";
     }
 
-    // INamingProvider implementation
-    public string RepositorySeparator => "#";
-
-    public string GetStorageName(Type entityType, IServiceProvider services)
-    {
-        // InMemory: Simple entity name
-        return entityType.Name;
-    }
-
-    public string GetConcretePartition(string partition)
-    {
-        // InMemory: Pass-through
-        return partition;
-    }
+    public StorageNamingCapability GetNamingCapability(IServiceProvider services)
+        => new()
+        {
+            Style = StorageNamingStyle.EntityType,
+            Casing = NameCasing.AsIs,
+            PartitionSeparator = '#',
+            Partition = PartitionTokenPolicy.Default,
+        };
 }

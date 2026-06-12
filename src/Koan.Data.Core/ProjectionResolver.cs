@@ -22,7 +22,9 @@ public static class ProjectionResolver
 
         var id = AggregateMetadata.GetIdSpec(aggregateType)?.Prop;
         var indexes = IndexMetadata.GetIndexes(aggregateType);
-        var indexedProps = new HashSet<PropertyInfo>(indexes.SelectMany(i => i.Properties));
+        // TTL indexes (§20.4) are honored only by TTL-capable stores (Mongo); a relational adapter must not build a
+        // redundant index on the expiry field, so a TTL-only property is not counted as "indexed" here.
+        var indexedProps = new HashSet<PropertyInfo>(indexes.Where(i => !i.Ttl).SelectMany(i => i.Properties));
 
         var list = new List<ProjectedProperty>();
         foreach (var p in props)

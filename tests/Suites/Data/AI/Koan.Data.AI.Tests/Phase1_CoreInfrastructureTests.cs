@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.Data.AI.Attributes;
 using Xunit;
 
@@ -88,7 +88,7 @@ public class Phase1_CoreInfrastructureTests
         text.Should().Contain("Test Title");
         text.Should().Contain("Test content here");
         text.Should().Contain("tag1, tag2");
-        text.Should().Contain("test-1", "Id property is included by AllStrings policy");
+        text.Should().NotContain("test-1", "Id is an identity/framework field, excluded from embedding text");
         text.Should().NotContain("should-not-appear", "InternalId has [EmbeddingIgnore]");
         text.Should().NotContain("42", "ViewCount is int, not string");
     }
@@ -304,7 +304,7 @@ public class Phase1_CoreInfrastructureTests
     }
 
     [Fact]
-    public void BuildEmbeddingText_AllPropertiesNull_OnlyIncludesId()
+    public void BuildEmbeddingText_AllContentPropertiesNull_ProducesEmptyText()
     {
         // Arrange
         var doc = new TestDocument
@@ -319,12 +319,12 @@ public class Phase1_CoreInfrastructureTests
         // Act
         var text = metadata.BuildEmbeddingText(doc);
 
-        // Assert
-        text.Should().Be("test-1", "when all other properties are null, only Id should be included");
+        // Assert — Id is excluded (identity field) and every content property is null, so nothing remains.
+        text.Should().BeEmpty("Id is excluded and all content properties are null");
     }
 
     [Fact]
-    public void BuildEmbeddingText_AllPropertiesWhitespace_OnlyIncludesId()
+    public void BuildEmbeddingText_AllContentPropertiesWhitespace_ProducesEmptyText()
     {
         // Arrange
         var doc = new TestDocument
@@ -339,8 +339,8 @@ public class Phase1_CoreInfrastructureTests
         // Act
         var text = metadata.BuildEmbeddingText(doc);
 
-        // Assert
-        text.Should().Be("test-1", "whitespace-only properties should be skipped, leaving only Id");
+        // Assert — whitespace-only content is skipped and Id is excluded, so nothing remains.
+        text.Should().BeEmpty("whitespace-only content properties are skipped and Id is excluded");
     }
 
     [Fact]
@@ -515,7 +515,7 @@ public class Phase1_CoreInfrastructureTests
 
         // Assert
         text.Should().Contain("text", "string properties should be included");
-        text.Should().Contain("test-id", "Id is a string property");
+        text.Should().NotContain("test-id", "Id is an identity field, excluded even under AllPublic policy");
         text.Should().NotContain("42", "non-string properties are not included in non-template mode");
         text.Should().NotContain("True", "non-string properties are not included in non-template mode");
     }
@@ -540,7 +540,7 @@ public class Phase1_CoreInfrastructureTests
         // Empty properties array is treated as "not specified" and falls back to AllStrings policy
         text.Should().Contain("Field 1 Value", "empty properties array falls back to AllStrings policy");
         text.Should().Contain("Field 2 Value", "empty properties array falls back to AllStrings policy");
-        text.Should().Contain("test-id", "Id is included by AllStrings policy");
+        text.Should().NotContain("test-id", "Id is excluded by the AllStrings fallback");
     }
 }
 

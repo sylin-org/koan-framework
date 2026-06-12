@@ -35,7 +35,7 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
         Response.Cookies.Append("Koan.auth.state", state, new CookieOptions { HttpOnly = true, Secure = secure, IsEssential = true, SameSite = SameSiteMode.Lax, Path = "/", Expires = DateTimeOffset.UtcNow.AddMinutes(5) });
         var allowed = authOptions.Value.ReturnUrl.AllowList ?? [];
         var def = authOptions.Value.ReturnUrl.DefaultPath ?? "/";
-        var ru = SanitizeReturnUrl(returnUrl, allowed, def);
+        var ru = ReturnUrlPolicy.Resolve(returnUrl, allowed, def).Url;
         Response.Cookies.Append("Koan.auth.return", ru, new CookieOptions { HttpOnly = true, Secure = secure, IsEssential = true, SameSite = SameSiteMode.Lax, Path = "/", Expires = DateTimeOffset.UtcNow.AddMinutes(5) });
 
         // Optional pass-through hints (e.g., prompt=login) for providers that support it
@@ -196,9 +196,13 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
         }
         catch { /* ignore */ }
 
-        var ru = Request.Cookies["Koan.auth.return"] ?? authOptions.Value.ReturnUrl.DefaultPath ?? "/";
+        var allowedReturn = authOptions.Value.ReturnUrl.AllowList ?? [];
+        var defReturn = authOptions.Value.ReturnUrl.DefaultPath ?? "/";
+        var storedReturn = Request.Cookies["Koan.auth.return"];
         Response.Cookies.Delete("Koan.auth.return", new CookieOptions { Path = "/" });
-        return LocalRedirect(ru);
+        // SEC-0001 §10: the stored URL already passed the allow-list at challenge time; re-resolve so an
+        // allow-listed *absolute* return uses Redirect — LocalRedirect would 500 on any non-local URL.
+        return RedirectToReturnUrl(storedReturn, allowedReturn, defReturn);
     }
 
     [HttpPost(AuthConstants.Routes.Logout)]
@@ -211,17 +215,16 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
     try { Response.Cookies.Append(Infrastructure.AuthConstants.Dev.TestProviderCookieUser, "", new CookieOptions { Expires = DateTimeOffset.UnixEpoch, Path = "/", SameSite = SameSiteMode.Lax, HttpOnly = false, Secure = Request.IsHttps }); } catch { /* ignore */ }
         var allowed = authOptions.Value.ReturnUrl.AllowList ?? [];
         var def = authOptions.Value.ReturnUrl.DefaultPath ?? "/";
-        var ru = SanitizeReturnUrl(returnUrl, allowed, def);
-        return LocalRedirect(ru);
+        return RedirectToReturnUrl(returnUrl, allowed, def);
     }
 
-    private static string SanitizeReturnUrl(string? candidate, string[] allowList, string fallback)
+    // SEC-0001 §10: single source of truth for the post-auth redirect. ReturnUrlPolicy decides BOTH the
+    // resolved URL (the allow-list is the security boundary) AND whether it is same-site; an allow-listed
+    // absolute URL must use Redirect, because LocalRedirect rejects any URL with a host/authority.
+    private IActionResult RedirectToReturnUrl(string? candidate, string[] allowList, string fallback)
     {
-        if (string.IsNullOrWhiteSpace(candidate)) return fallback;
-        // Allow same-site local paths only, or allow-list prefixes
-        if (Uri.TryCreate(candidate, UriKind.Relative, out _)) return candidate;
-        if (allowList != null && allowList.Any(p => candidate.StartsWith(p, StringComparison.OrdinalIgnoreCase))) return candidate;
-        return fallback;
+        var (url, isLocal) = ReturnUrlPolicy.Resolve(candidate, allowList, fallback);
+        return isLocal ? LocalRedirect(url) : Redirect(url);
     }
 
     // Browser-facing absolute URL builder: uses the incoming Host header (external port), suitable for redirects

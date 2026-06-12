@@ -16,7 +16,10 @@
   <ProjectReference Include="..\..\..\Koan.Data.Core\Koan.Data.Core.csproj" />
   <ProjectReference Include="..\..\..\Koan.Core\Koan.Core.csproj" />
   <ProjectReference Include="..\..\..\Koan.Orchestration.Abstractions\Koan.Orchestration.Abstractions.csproj" />
-    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.8" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Koan.Data.SearchEngine\Koan.Data.SearchEngine.csproj" />
   </ItemGroup>
 </Project>

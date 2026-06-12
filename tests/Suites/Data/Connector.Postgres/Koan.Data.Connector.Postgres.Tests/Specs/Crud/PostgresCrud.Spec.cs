@@ -74,7 +74,7 @@ public sealed class PostgresCrudSpec
                 var page = await Person.Page(1, 2);
                 page.Should().HaveCount(2);
 
-                var removed = await Person.Remove(saved.Id, new DataQueryOptions { Partition = partition });
+                var removed = await Person.Remove(saved.Id, partition);
                 removed.Should().BeTrue();
 
                 var remainingIds = filtered.Select(p => p.Id).Skip(1).ToArray();

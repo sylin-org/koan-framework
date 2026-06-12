@@ -208,12 +208,6 @@ public sealed class VectorWorkflowSpec
         public Task<IReadOnlyList<TestEntity?>> GetMany(IEnumerable<string> ids, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<TestEntity?>>([]);
 
-        public Task<IReadOnlyList<TestEntity>> Query(object? query, CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<TestEntity>>([]);
-
-        public Task<CountResult> Count(CountRequest<TestEntity> request, CancellationToken ct = default)
-            => Task.FromResult(new CountResult(0, false));
-
         public Task<TestEntity> Upsert(TestEntity model, CancellationToken ct = default)
         {
             LastUpsert = model;

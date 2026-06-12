@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Immutable;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using Microsoft.CodeAnalysis;
@@ -56,6 +57,7 @@ public sealed class RegistrySourceGenerator : IIncrementalGenerator
         ImmutableArray<BackgroundServiceInfo> BackgroundServices,
         ImmutableArray<string> ServiceDiscoveryAdapters,
         ImmutableArray<string> EmbeddingEntities,
+        ImmutableArray<DiscoverableInfo> DiscoveredImplementors,
         bool HasEmbeddingRegistry,
         bool HasRegistryInfrastructure)
     {
@@ -64,7 +66,8 @@ public sealed class RegistrySourceGenerator : IIncrementalGenerator
             AutoRegistrars.Length > 0 ||
             BackgroundServices.Length > 0 ||
             ServiceDiscoveryAdapters.Length > 0 ||
-            EmbeddingEntities.Length > 0;
+            EmbeddingEntities.Length > 0 ||
+            DiscoveredImplementors.Length > 0;
 
         internal static RegistryModel Create(Compilation compilation, ImmutableArray<INamedTypeSymbol> symbols)
         {
@@ -73,6 +76,7 @@ public sealed class RegistrySourceGenerator : IIncrementalGenerator
             var backgroundServices = ImmutableArray.CreateBuilder<BackgroundServiceInfo>();
             var serviceDiscoveryAdapters = ImmutableArray.CreateBuilder<string>();
             var embeddingEntities = ImmutableArray.CreateBuilder<string>();
+            var discoveredImplementors = ImmutableArray.CreateBuilder<DiscoverableInfo>();
 
             var initializerInterface = compilation.GetTypeByMetadataName("Koan.Core.IKoanInitializer");
             var autoRegistrarInterface = compilation.GetTypeByMetadataName("Koan.Core.IKoanAutoRegistrar");
@@ -82,6 +86,7 @@ public sealed class RegistrySourceGenerator : IIncrementalGenerator
             var startupInterface = compilation.GetTypeByMetadataName("Koan.Core.BackgroundServices.IKoanStartupService");
             var healthContributorInterface = compilation.GetTypeByMetadataName("Koan.Core.IHealthContributor");
             var serviceDiscoveryInterface = compilation.GetTypeByMetadataName("Koan.Core.Orchestration.Abstractions.IServiceDiscoveryAdapter");
+            var discoverableAttribute = compilation.GetTypeByMetadataName("Koan.Core.KoanDiscoverableAttribute");
             var backgroundAttribute = compilation.GetTypeByMetadataName("Koan.Core.BackgroundServices.KoanBackgroundServiceAttribute");
             var embeddingAttribute = compilation.GetTypeByMetadataName("Koan.Data.AI.Attributes.EmbeddingAttribute");
             var embeddingRegistry = compilation.GetTypeByMetadataName("Koan.Data.AI.EmbeddingRegistry");
@@ -95,6 +100,7 @@ public sealed class RegistrySourceGenerator : IIncrementalGenerator
                     ImmutableArray<BackgroundServiceInfo>.Empty,
                     ImmutableArray<string>.Empty,
                     ImmutableArray<string>.Empty,
+                    ImmutableArray<DiscoverableInfo>.Empty,
                     embeddingRegistry is not null,
                     HasRegistryInfrastructure: false);
             }
@@ -130,6 +136,17 @@ public sealed class RegistrySourceGenerator : IIncrementalGenerator
                 {
                     embeddingEntities.Add(displayName);
                 }
+
+                if (discoverableAttribute is not null)
+                {
+                    foreach (var iface in symbol.AllInterfaces)
+                    {
+                        if (FindAttribute(iface, discoverableAttribute) is null) continue;
+                        discoveredImplementors.Add(new DiscoverableInfo(
+                            iface.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+                            displayName));
+                    }
+                }
             }
 
             return new RegistryModel(
@@ -138,6 +155,7 @@ public sealed class RegistrySourceGenerator : IIncrementalGenerator
                 backgroundServices.ToImmutable(),
                 serviceDiscoveryAdapters.ToImmutable(),
                 embeddingEntities.ToImmutable(),
+                discoveredImplementors.ToImmutable(),
                 embeddingRegistry is not null,
                 HasRegistryInfrastructure: true);
         }
@@ -296,6 +314,8 @@ public sealed class RegistrySourceGenerator : IIncrementalGenerator
         }
     }
 
+    private readonly record struct DiscoverableInfo(string Contract, string Implementer);
+
     private readonly record struct BackgroundServiceInfo(
         string TypeName,
         bool Enabled,
@@ -380,6 +400,20 @@ public sealed class RegistrySourceGenerator : IIncrementalGenerator
                     sb.Append("            new global::Koan.Core.Hosting.Registry.KoanRegistry.ServiceDiscoveryAdapterDescriptor(typeof(").Append(typeName).AppendLine(")),");
                 }
                 sb.AppendLine("        });");
+            }
+
+            if (model.DiscoveredImplementors.Length > 0)
+            {
+                foreach (var group in model.DiscoveredImplementors.GroupBy(static d => d.Contract, StringComparer.Ordinal))
+                {
+                    sb.Append("        global::Koan.Core.Hosting.Registry.KoanRegistry.RegisterDiscoveredImplementors(typeof(").Append(group.Key).AppendLine("), new global::System.Type[]");
+                    sb.AppendLine("        {");
+                    foreach (var info in group)
+                    {
+                        sb.Append("            typeof(").Append(info.Implementer).AppendLine("),");
+                    }
+                    sb.AppendLine("        });");
+                }
             }
 
             if (model.EmbeddingEntities.Length > 0 && model.HasEmbeddingRegistry)

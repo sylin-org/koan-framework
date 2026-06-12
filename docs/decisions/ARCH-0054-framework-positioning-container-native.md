@@ -115,8 +115,8 @@ Does not affect:
 
 ## References
 
-- [Framework Strategic Assessment 2025](../architecture/framework-assessment-2025.md) - Comprehensive technical and market analysis
-- [PROP-0053](../proposals/PROP-0053-observability-over-escape-hatches.md) - Observability enhancement proposal
+- Framework Strategic Assessment 2025 _(assessment doc archived)_ - Comprehensive technical and market analysis
+- [PROP-0053](../archive/proposals/PROP-0053-observability-over-escape-hatches.md) - Observability enhancement proposal
 - ARCH-0053 - Koan.Canon pillar entity-first and auto-registrar patterns
 - DX-0038 - Auto-registration implementation decisions
 

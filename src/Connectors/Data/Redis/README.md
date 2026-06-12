@@ -2,7 +2,7 @@
 
 Redis provider for Koan data - key-value storage with options binding, health checks, and simple scanning.
 
-- Target framework: net9.0
+- Target framework: net10.0
 - License: Apache-2.0
 
 ## Capabilities

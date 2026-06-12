@@ -128,6 +128,13 @@ The helper:
   + manual registrations (partial), or mock-injection variants.
 - Returns an `IntegrationHost` wrapper that implements `IAsyncDisposable` (so `await using` works
   cleanly — `IHost` itself only declares `IDisposable`).
+- Runs as a neutral **`Test`** environment by default (override with `WithEnvironment(...)`). This is
+  load-bearing: a bare `HostBuilder` defaults `IHostEnvironment` to **Production**, which trips the
+  relational DDL guard (`IsDdlAllowed = DdlPolicy==AutoCreate && (!KoanEnv.IsProduction || AllowProductionDdl)`)
+  — so durable relational adapters (Postgres, SQL Server) silently refuse to auto-create tables and every
+  data op fails with `relation "…" does not exist`. `Test` is non-production (DDL allowed) without arming
+  `Development` self-orchestration heuristics. (SQLite is unaffected — its bridge always allows AutoCreate DDL,
+  which is exactly why a SQLite-only matrix can hide this.)
 
 ### Why bother
 
@@ -139,6 +146,7 @@ Three commits on `feat/koan-cache-pillar` proved the canon's value before it was
 | `CacheWriteOptions.GetEffectiveL1Ttl` not clamped to L2 | Redis SWR integration test | Unit assertions encoded the buggy behavior as "expected" |
 | Cross-pillar `IConnectionMultiplexer` registration race | Full-DI bootstrap smoke | Unit tests never compose adapter packages |
 | `StartupProbeService` aborts host startup on any infra adapter unavailability | Attempt to write per-pillar boot smokes against a project transitively referencing Redis | Unit tests never start real hosted services through `IHost.StartAsync` |
+| Durable Jobs entities never schema-created on Postgres / SQL Server (host defaulted to Production → DDL guard) | Jobs per-DB convergence matrix — the first integration suite to drive a DDL-gated adapter through `KoanIntegrationHost` | Unit tests and the SQLite tier never hit the production-DDL guard |
 
 Without the integration tests, these would have shipped. With them, they're caught at PR time.
 

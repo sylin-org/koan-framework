@@ -1,5 +1,5 @@
 using Koan.Data.AI.Telemetry;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Koan.Tests.AI.Unit.Specs.Telemetry;

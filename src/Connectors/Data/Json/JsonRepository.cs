@@ -1,24 +1,27 @@
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
+using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Capabilities;
+using Koan.Data.Abstractions.Filtering;
+using Koan.Data.Abstractions.Sorting;
+using Koan.Data.Core.Sorting;
 using System.Collections.Concurrent;
-using System.Linq.Expressions;
+using System.Collections.Frozen;
 
 namespace Koan.Data.Connector.Json;
 
 // Self-registration hook so the adapter is available with AddKoanDataCore()
 
 /// <summary>
-/// In-memory dictionary with JSON file persistence per aggregate.
-/// Supports LINQ queries and bulk upsert/delete.
+/// In-memory dictionary with JSON file persistence per aggregate. A "Full floor" adapter under
+/// the unified query contract (DATA-XXXX): declares <see cref="FilterSupport.Full"/> and
+/// evaluates the entire <see cref="Filter"/> via <see cref="InMemoryFilterEvaluator"/>.
 /// </summary>
 internal sealed class JsonRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
-    IDataRepositoryWithOptions<TEntity, TKey>,
-    ILinqQueryRepository<TEntity, TKey>,
-    ILinqQueryRepositoryWithOptions<TEntity, TKey>,
-    IQueryCapabilities,
-    IWriteCapabilities,
+    IQueryRepository<TEntity, TKey>,
+    IDescribesCapabilities,
     Abstractions.Instructions.IInstructionExecutor<TEntity>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
@@ -33,9 +36,11 @@ internal sealed class JsonRepository<TEntity, TKey> :
     // Maintain per-physical-name stores and file paths so different sets are isolated
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<TKey, TEntity>> _stores = new();
     private readonly ConcurrentDictionary<string, string> _files = new();
-    public QueryCapabilities Capabilities => QueryCapabilities.Linq; // supports LINQ predicate
-    // JSON adapter does not have native bulk APIs; honor semantics via fallbacks without advertising native bulk
-    public WriteCapabilities Writes => default;
+
+    // JSON adapter does not have native bulk APIs; honor semantics via fallbacks without advertising native bulk.
+    public void Describe(ICapabilities caps) => caps
+        .Add(DataCaps.Query.Linq) // supports LINQ predicate
+        .Add(DataCaps.Query.Filter, FilterSupport.Full);
 
     public JsonRepository(IOptions<JsonDataOptions> options)
     {
@@ -67,66 +72,59 @@ internal sealed class JsonRepository<TEntity, TKey> :
         return Task.FromResult((IReadOnlyList<TEntity?>)results);
     }
 
-    public Task<IReadOnlyList<TEntity>> Query(object? query, CancellationToken ct = default)
+    public Task<RepositoryQueryResult<TEntity>> Query(QueryDefinition query, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var store = ResolveStore();
-        // No options provided — apply default page size as a fallback (not a cap).
-        var pageSize = Math.Max(1, _options.Value.DefaultPageSize);
-        var result = store.Values.Take(pageSize).ToList();
-        return Task.FromResult((IReadOnlyList<TEntity>)result);
-    }
+        IEnumerable<TEntity> items = store.Values;
+        if (query.Filter is not null)
+            items = items.Where(InMemoryFilterEvaluator.Compile<TEntity>(query.Filter));
 
-    public Task<IReadOnlyList<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        var store = ResolveStore();
-        var items = store.Values.AsQueryable();
-        var size = options?.PageSize is int ps && ps > 0 ? ps : Math.Max(1, _options.Value.DefaultPageSize);
-        var page = options?.Page is int p && p > 1 ? p : 1;
-        var skip = (page - 1) * size;
-        var list = items.Skip(skip).Take(size).ToList();
-        return Task.FromResult((IReadOnlyList<TEntity>)list);
-    }
+        var filtered = items as IReadOnlyList<TEntity> ?? items.ToList();
+        var totalCount = (long)filtered.Count;
 
-    public Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        var store = ResolveStore();
-        var pageSize = Math.Max(1, _options.Value.DefaultPageSize);
-        var list = store.Values.AsQueryable().Where(predicate).Take(pageSize).ToList();
-        return Task.FromResult((IReadOnlyList<TEntity>)list);
-    }
-
-    public Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        var store = ResolveStore();
-        var items = store.Values.AsQueryable().Where(predicate);
-        var size = options?.PageSize is int ps && ps > 0 ? ps : Math.Max(1, _options.Value.DefaultPageSize);
-        var page = options?.Page is int p && p > 1 ? p : 1;
-        var skip = (page - 1) * size;
-        var list = items.Skip(skip).Take(size).ToList();
-        return Task.FromResult((IReadOnlyList<TEntity>)list);
-    }
-
-    public Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        var store = ResolveStore();
-        IQueryable<TEntity> items = store.Values.AsQueryable();
-
-        if (request.Predicate is not null)
+        var sortHandled = RepositoryQueryResult<TEntity>.NoSortHandled;
+        IEnumerable<TEntity> ordered;
+        if (query.HasSort)
         {
-            items = items.Where(request.Predicate);
+            ordered = InMemorySorter.Apply(filtered, query.Sort);
+            sortHandled = query.Sort.ToFrozenSet();
         }
-        else if (request.RawQuery is not null || request.ProviderQuery is not null)
+        else
         {
-            throw new NotSupportedException("JSON adapter only supports LINQ-based count queries.");
+            // Match the relational adapters (SqlServer/SQLite ORDER BY Id, Postgres ORDER BY ctid): an
+            // unsorted query falls back to a stable Id order so results — and any pagination over them —
+            // are deterministic instead of ConcurrentDictionary enumeration order. With GUID v7 ids this
+            // is also insertion order.
+            ordered = filtered.OrderBy(static e => e.Id, Comparer<TKey>.Default);
         }
 
-        var total = items.Count();
-        return Task.FromResult(new CountResult(total, false));
+        var paginationHandled = false;
+        if (query.HasPagination)
+        {
+            var skip = (query.EffectivePage() - 1) * query.EffectivePageSize();
+            ordered = ordered.Skip(skip).Take(query.EffectivePageSize());
+            paginationHandled = true;
+        }
+
+        var list = ordered as IReadOnlyList<TEntity> ?? ordered.ToList();
+        return Task.FromResult(new RepositoryQueryResult<TEntity>
+        {
+            Items = list,
+            TotalCount = totalCount,
+            IsEstimate = false,
+            SortHandled = sortHandled,
+            PaginationHandled = paginationHandled,
+        });
+    }
+
+    public Task<CountResult> Count(QueryDefinition query, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        IEnumerable<TEntity> items = ResolveStore().Values;
+        if (query.Filter is not null)
+            items = items.Where(InMemoryFilterEvaluator.Compile<TEntity>(query.Filter));
+        return Task.FromResult(new CountResult(items.LongCount(), false));
     }
 
     public Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
@@ -276,8 +274,8 @@ internal sealed class JsonRepository<TEntity, TKey> :
         var sp = Koan.Core.Hosting.App.AppHost.Current;
         if (sp is not null)
         {
-            // Delegate to central naming registry which is set-aware
-            return Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(sp);
+            // Delegate to adapter naming (factory owns the cache and partition composition).
+            return Core.Configuration.AdapterNaming.GetOrCompute<TEntity, TKey>(sp);
         }
         return typeof(TEntity).Name;
     }

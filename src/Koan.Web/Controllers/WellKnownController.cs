@@ -8,6 +8,7 @@ using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Observability;
 using Koan.Core.Observability.Health;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Capabilities;
 using Koan.Web.Infrastructure;
 using Koan.Web.Options;
 using System.Diagnostics;
@@ -121,16 +122,17 @@ public sealed class WellKnownController(
         {
             var provider = KoanWebHelpers.ResolveProvider(x.Type, sp);
 
-            QueryCapabilities q = QueryCapabilities.None;
-            WriteCapabilities w = WriteCapabilities.None;
+            string[] query = [], write = [];
 
             if (data is not null)
             {
                 try
                 {
                     var repo = KoanWebHelpers.GetRepository(sp, data, x.Type, x.KeyType);
-                    if (repo is IQueryCapabilities qc) q = qc.Capabilities;
-                    if (repo is IWriteCapabilities wc) w = wc.Writes;
+                    // ARCH-0084: self-report the declared capability tokens directly from the unified set.
+                    var caps = DataCaps.Describe(repo, repo.GetType().Name);
+                    query = caps.All.Where(c => c.Id.StartsWith("query.", StringComparison.Ordinal)).Select(c => c.Id).ToArray();
+                    write = caps.All.Where(c => c.Id.StartsWith("write.", StringComparison.Ordinal)).Select(c => c.Id).ToArray();
                 }
                 catch { }
             }
@@ -140,8 +142,8 @@ public sealed class WellKnownController(
                 type = x.Type.FullName,
                 key = KoanWebHelpers.ToKeyName(x.KeyType),
                 provider,
-                query = KoanWebHelpers.EnumFlags(q),
-                write = KoanWebHelpers.EnumFlags(w)
+                query,
+                write
             };
         }).ToArray();
 

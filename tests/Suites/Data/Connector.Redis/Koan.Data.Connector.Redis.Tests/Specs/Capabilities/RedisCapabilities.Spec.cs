@@ -1,5 +1,6 @@
 ﻿using System;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Core.Model;
 using Koan.Data.Connector.Redis.Tests.Support;
 
@@ -32,15 +33,16 @@ public sealed class RedisCapabilitiesSpec
                 fixture.BindHost();
 
                 var repository = fixture.Data.GetRepository<CapabilityProbe, string>();
-                repository.Should().BeAssignableTo<ILinqQueryRepository<CapabilityProbe, string>>();
-                repository.Should().BeAssignableTo<ILinqQueryRepositoryWithOptions<CapabilityProbe, string>>();
-                repository.Should().BeAssignableTo<IDataRepositoryWithOptions<CapabilityProbe, string>>();
+                repository.Should().BeAssignableTo<IQueryRepository<CapabilityProbe, string>>();
 
-                var queryCaps = repository.Should().BeAssignableTo<IQueryCapabilities>().Subject;
-                queryCaps.Capabilities.Should().Be(QueryCapabilities.Linq);
-
-                var writeCaps = repository.Should().BeAssignableTo<IWriteCapabilities>().Subject;
-                writeCaps.Writes.Should().Be(WriteCapabilities.FastRemove);
+                // ARCH-0084: negotiate via the unified CapabilitySet.
+                var caps = DataCaps.Describe(repository, repository.GetType().Name);
+                caps.Has(DataCaps.Query.Linq).Should().BeTrue();
+                caps.Has(DataCaps.Query.String).Should().BeFalse();
+                caps.Has(DataCaps.Write.FastRemove).Should().BeTrue();
+                caps.Has(DataCaps.Write.BulkUpsert).Should().BeFalse();
+                caps.Has(DataCaps.Write.BulkDelete).Should().BeFalse();
+                caps.Has(DataCaps.Write.AtomicBatch).Should().BeFalse();
 
                 await CapabilityProbe.Upsert(new CapabilityProbe { Name = "cap" });
                 var all = await CapabilityProbe.All();

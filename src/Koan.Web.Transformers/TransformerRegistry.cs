@@ -2,22 +2,27 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 
 namespace Koan.Web.Transformers;
 
 internal sealed class TransformerRegistry(IServiceProvider sp, IOptions<TransformerBindings> bindings) : ITransformerRegistry
 {
-    private sealed record Registration(string ContentType, IEntityTransformerInvoker Invoker, int Priority);
+    private sealed record TerminalRegistration(string ContentType, IEntityTransformerInvoker Invoker, int Priority, int RegistrationOrder);
+    private sealed record EnricherRegistration(Type EnricherType, IEntityEnricherInvoker Invoker, int Priority, int RegistrationOrder);
 
-    private readonly Dictionary<Type, List<Registration>> _map = new();
+    private readonly Dictionary<Type, List<TerminalRegistration>> _terminals = new();
+    private readonly Dictionary<Type, List<EnricherRegistration>> _enrichers = new();
     private readonly TransformerBindings _bindings = bindings.Value;
+    private int _terminalCounter;
+    private int _enricherCounter;
     private bool _initialized;
 
     private void EnsureInitialized()
     {
         if (_initialized) return;
-        // Execute deferred bindings to populate registry from DI
+        // Execute deferred bindings to populate the registry from DI.
         foreach (var action in _bindings.Bindings.ToList()) action(sp);
         _initialized = true;
     }
@@ -25,10 +30,10 @@ internal sealed class TransformerRegistry(IServiceProvider sp, IOptions<Transfor
     public void Register<TEntity, TShape>(IEntityTransformer<TEntity, TShape> transformer, string[] contentTypes, int priority = (int)TransformerPriority.Discovered)
     {
         var key = typeof(TEntity);
-        if (!_map.TryGetValue(key, out var list))
+        if (!_terminals.TryGetValue(key, out var list))
         {
-            list = new List<Registration>();
-            _map[key] = list;
+            list = new List<TerminalRegistration>();
+            _terminals[key] = list;
         }
 
         var invoker = new EntityTransformerInvoker<TEntity, TShape>(transformer);
@@ -44,22 +49,91 @@ internal sealed class TransformerRegistry(IServiceProvider sp, IOptions<Transfor
             var existingIndex = list.FindIndex(x => string.Equals(x.ContentType, normalized, StringComparison.OrdinalIgnoreCase));
             if (existingIndex >= 0)
             {
+                // Higher priority wins; equal priority keeps the earlier registration.
                 if (priority > list[existingIndex].Priority)
                 {
-                    list[existingIndex] = new Registration(normalized, invoker, priority);
+                    list[existingIndex] = new TerminalRegistration(normalized, invoker, priority, list[existingIndex].RegistrationOrder);
                 }
 
                 continue;
             }
 
-            list.Add(new Registration(normalized, invoker, priority));
+            list.Add(new TerminalRegistration(normalized, invoker, priority, _terminalCounter++));
         }
     }
 
-    public TransformerSelection? ResolveForOutput(Type entityType, IEnumerable<string> acceptTypes)
+    public void RegisterEnricher<TEntity>(IEntityEnricher<TEntity> enricher, int priority = (int)TransformerPriority.Discovered)
+    {
+        var key = typeof(TEntity);
+        if (!_enrichers.TryGetValue(key, out var list))
+        {
+            list = new List<EnricherRegistration>();
+            _enrichers[key] = list;
+        }
+
+        var enricherType = enricher.GetType();
+        var existingIndex = list.FindIndex(r => r.EnricherType == enricherType);
+        if (existingIndex >= 0)
+        {
+            // Higher priority wins (explicit DI overrides auto-discovery for the same type).
+            if (priority > list[existingIndex].Priority)
+            {
+                var prev = list[existingIndex];
+                list[existingIndex] = new EnricherRegistration(enricherType, new EntityEnricherInvoker<TEntity>(enricher), priority, prev.RegistrationOrder);
+            }
+            return;
+        }
+
+        var invoker = new EntityEnricherInvoker<TEntity>(enricher);
+        list.Add(new EnricherRegistration(enricherType, invoker, priority, _enricherCounter++));
+    }
+
+    public TransformerOutputSelection ResolveOutput(Type entityType, IEnumerable<string> acceptTypes, HttpContext context)
     {
         EnsureInitialized();
-        if (!_map.TryGetValue(entityType, out var list) || list.Count == 0)
+
+        var pipeline = ResolvePipeline(entityType, context);
+        var terminal = ResolveTerminal(entityType, acceptTypes, context);
+
+        if (pipeline.Count == 0 && terminal is null)
+        {
+            return TransformerOutputSelection.Empty;
+        }
+
+        return new TransformerOutputSelection(pipeline, terminal);
+    }
+
+    private IReadOnlyList<EnricherSelection> ResolvePipeline(Type entityType, HttpContext context)
+    {
+        if (!_enrichers.TryGetValue(entityType, out var list) || list.Count == 0)
+        {
+            return System.Array.Empty<EnricherSelection>();
+        }
+
+        // Highest priority first, then registration order. Predicate filtering happens after ordering
+        // so the final list is stable: an enricher with no predicate behaves identically to one whose
+        // predicate always returns true.
+        var ordered = list
+            .OrderByDescending(r => r.Priority)
+            .ThenBy(r => r.RegistrationOrder);
+
+        var activated = new List<EnricherSelection>(list.Count);
+        foreach (var registration in ordered)
+        {
+            if (!registration.Invoker.ShouldActivate(context))
+            {
+                continue;
+            }
+
+            activated.Add(new EnricherSelection(entityType, registration.Invoker));
+        }
+
+        return activated;
+    }
+
+    private TransformerSelection? ResolveTerminal(Type entityType, IEnumerable<string> acceptTypes, HttpContext context)
+    {
+        if (!_terminals.TryGetValue(entityType, out var list) || list.Count == 0)
         {
             return null;
         }
@@ -115,7 +189,7 @@ internal sealed class TransformerRegistry(IServiceProvider sp, IOptions<Transfor
             return null;
         }
 
-        Registration? bestRegistration = null;
+        TerminalRegistration? bestRegistration = null;
         double bestScore = double.MinValue;
         int bestPriority = int.MinValue;
         int bestOrder = int.MaxValue;
@@ -126,6 +200,13 @@ internal sealed class TransformerRegistry(IServiceProvider sp, IOptions<Transfor
 
             foreach (var registration in list)
             {
+                // Predicate filter: a Terminal transformer with an activation predicate is only a
+                // candidate when its predicate passes for the current request context.
+                if (!registration.Invoker.ShouldActivate(context))
+                {
+                    continue;
+                }
+
                 var segments = registration.ContentType.Split('/');
                 if (segments.Length != 2)
                 {
@@ -166,8 +247,8 @@ internal sealed class TransformerRegistry(IServiceProvider sp, IOptions<Transfor
         var hadExplicitMatch = TryScoreAgainst(explicitRanges);
         if (!hadExplicitMatch)
         {
-            // If only wildcard Accepts (e.g., */*), do NOT force a transformer; let MVC default (JSON) handle it.
-            // Only match wildcards if there was also at least one explicit media range.
+            // Pure */* Accept doesn't force a Terminal transformer — let MVC default JSON handle it.
+            // Enricher activation has already happened upstream of this branch.
             return null;
         }
 
@@ -176,10 +257,10 @@ internal sealed class TransformerRegistry(IServiceProvider sp, IOptions<Transfor
             : new TransformerSelection(entityType, bestRegistration.ContentType, bestRegistration.Invoker);
     }
 
-    public TransformerSelection? ResolveForInput(Type entityType, string contentType)
+    public TransformerSelection? ResolveForInput(Type entityType, string contentType, HttpContext context)
     {
         EnsureInitialized();
-        if (!_map.TryGetValue(entityType, out var list) || list.Count == 0)
+        if (!_terminals.TryGetValue(entityType, out var list) || list.Count == 0)
         {
             return null;
         }
@@ -192,6 +273,7 @@ internal sealed class TransformerRegistry(IServiceProvider sp, IOptions<Transfor
 
         var registration = list
             .Where(x => string.Equals(x.ContentType, normalized, StringComparison.OrdinalIgnoreCase))
+            .Where(x => x.Invoker.ShouldActivate(context))
             .OrderByDescending(x => x.Priority)
             .FirstOrDefault();
 
@@ -203,9 +285,9 @@ internal sealed class TransformerRegistry(IServiceProvider sp, IOptions<Transfor
     public IReadOnlyList<string> GetContentTypes(Type entityType)
     {
         EnsureInitialized();
-        if (!_map.TryGetValue(entityType, out var list) || list.Count == 0)
+        if (!_terminals.TryGetValue(entityType, out var list) || list.Count == 0)
         {
-            return [];
+            return System.Array.Empty<string>();
         }
 
         return list

@@ -27,7 +27,8 @@ public class SqlServerBatchAndBulkTests : IClassFixture<Support.SqlServerAutoFix
         }
 
         await repo.DeleteMany(items.Take(3).Select(i => i.Id).ToArray(), default);
-        var remaining = await repo.Query(null, default);
+        var remaining = (await ((IQueryRepository<Item, string>)repo)
+            .Query(QueryDefinition.All, default)).Items;
         remaining.Count.Should().Be(7);
 
         var batch = repo.CreateBatch();

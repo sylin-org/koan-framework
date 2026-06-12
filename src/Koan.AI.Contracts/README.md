@@ -2,7 +2,7 @@
 
 Contracts for Koan AI adapters and routing (models, options, adapters, router).
 
-- Target framework: net9.0
+- Target framework: net10.0
 - License: Apache-2.0
 
 ## Install

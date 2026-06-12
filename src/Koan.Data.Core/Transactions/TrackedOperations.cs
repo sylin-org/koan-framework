@@ -152,7 +152,11 @@ internal sealed class VectorSaveOperation<TEntity, TKey> : ITrackedOperation
         if (upsertMethod == null)
             throw new InvalidOperationException("UpsertAsync method not found on vector repository.");
 
-        var task = upsertMethod.Invoke(repo, new object[] { _id, _embedding, _metadata, ct }) as Task;
+        // The vector repository's Upsert takes float[] (see VectorData.Upsert, which calls
+        // vector.ToArray()). Reflection binds arguments by exact type, so the ReadOnlyMemory<float> field
+        // must be materialized to an array here too — otherwise Invoke throws "ReadOnlyMemory<float>
+        // cannot be converted to Single[]" and the whole transaction is reported non-atomic.
+        var task = upsertMethod.Invoke(repo, new object[] { _id, _embedding.ToArray(), _metadata, ct }) as Task;
         if (task != null)
             await task;
     }

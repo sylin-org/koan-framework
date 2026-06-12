@@ -163,8 +163,9 @@ await _bucket.WaitUntilReadyAsync(TimeSpan.FromSeconds(10));
 - Always use `Entity<T>` or `Entity<T, TKey>` statics; repository abstractions cause missing DI registrations.
 - Inspect provider election and capabilities:
   ```csharp
-  var caps = Data<Todo, string>.QueryCaps;
-  _logger.LogInformation("Provider {Provider} capabilities {Flags}", caps.ProviderName, caps.Capabilities);
+  var caps = Data<Todo, string>.Capabilities;
+  _logger.LogInformation("Provider {Provider} capabilities {Tokens}",
+      caps.Owner, string.Join(", ", caps.All.Select(c => c.Id)));
   ```
 - Explicitly set defaults when multiple adapters exist:
   ```json

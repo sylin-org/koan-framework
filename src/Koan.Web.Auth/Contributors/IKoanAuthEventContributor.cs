@@ -1,9 +1,11 @@
+using Koan.Core;
+
 namespace Koan.Web.Auth.Contributors;
 
 /// <summary>
-/// Pluggable hook into the platform auth lifecycle. Auto-discovered by reflection — implementations
-/// do not need to be registered with DI. Each event runs the full pipeline of contributors exactly
-/// once in <see cref="Priority"/> order.
+/// Pluggable hook into the platform auth lifecycle. Auto-discovered via <see cref="KoanDiscoverableAttribute"/>
+/// (registry-backed; no DI registration required) — implementations do not need to be registered with DI.
+/// Each event runs the full pipeline of contributors exactly once in <see cref="Priority"/> order.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -26,6 +28,7 @@ namespace Koan.Web.Auth.Contributors;
 /// only the events they care about.
 /// </para>
 /// </remarks>
+[KoanDiscoverable]
 public interface IKoanAuthEventContributor
 {
     /// <summary>Lower values run first. Default 0. Identity-mapping uses <see cref="int.MinValue"/>.</summary>

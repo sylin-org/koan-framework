@@ -48,29 +48,15 @@ public sealed class ElasticSearchVectorAdapterFactory : IVectorAdapterFactory
         return new ElasticSearchVectorRepository<TEntity, TKey>(httpFactory, options, sp);
     }
 
-    // INamingProvider implementation
-    public string RepositorySeparator => "-";  // Elasticsearch uses hyphens in index names
-
-    public string GetStorageName(Type entityType, IServiceProvider services)
-    {
-        var opts = services.GetService<IOptions<ElasticSearchOptions>>()?.Value;
-        var separator = opts?.IndexPrefix is not null ? "-" : "_";
-        var convention = new StorageNameResolver.Convention(
-            StorageNamingStyle.EntityType,
-            separator,
-            NameCasing.Lower);
-
-        return StorageNameResolver.Resolve(entityType, convention);
-    }
-
-    public string GetConcretePartition(string partition)
-    {
-        // Elasticsearch: Lowercase and sanitize for index names
-        if (Guid.TryParse(partition, out var guid))
-            return guid.ToString("N");  // Lowercase, no hyphens
-
-        // Named partitions: lowercase
-        return partition.ToLowerInvariant();
-    }
+    // Elasticsearch index names are lowercase; the partition uses '-'. (Names are EntityType, so the
+    // name separator is irrelevant; the optional IndexPrefix is applied by the repository.)
+    public StorageNamingCapability GetNamingCapability(IServiceProvider services)
+        => new()
+        {
+            Style = StorageNamingStyle.EntityType,
+            Casing = NameCasing.Lower,
+            PartitionSeparator = '-',
+            Partition = new PartitionTokenPolicy { GuidFormat = "N", Lowercase = true, AllowedExtraChars = "-._" },
+        };
 }
 

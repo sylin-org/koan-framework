@@ -14,6 +14,8 @@
       href: guides/building-apis.md
     - name: Data Modeling
       href: guides/data-modeling.md
+    - name: Media Recipes How-To
+      href: guides/media-recipes-howto.md
     - name: Canon Capabilities
       href: guides/canon-capabilities-howto.md
     - name: Patch Capabilities
@@ -97,6 +99,8 @@
       href: reference/flow/index.md
     - name: Storage
       href: reference/storage/index.md
+    - name: Media
+      href: reference/media/index.md
     - name: Canon
       href: reference/canon/index.md
     - name: Orchestration

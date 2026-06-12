@@ -32,14 +32,42 @@ public static class StorageNameResolver
         var naming = entityType.GetCustomAttribute<StorageNamingAttribute>()?.Style ?? defaults.Style;
         if (naming == StorageNamingStyle.FullNamespace)
         {
-            var full = entityType.FullName ?? (string.IsNullOrEmpty(entityType.Namespace)
-                ? entityType.Name
-                : entityType.Namespace + "." + entityType.Name);
-            var composed = ReplaceDot(full, defaults.Separator);
+            var composed = ReplaceDot(FullName(entityType), defaults.Separator);
             return NamingUtils.ApplyCase(composed, defaults.Casing);
         }
 
+        if (naming == StorageNamingStyle.HashedNamespace)
+        {
+            // {ClassName}_{hash(declaring-context)}. Readable class name + short stable hash of the
+            // namespace + declaring types, so distinct types that share a simple name stay distinct while
+            // the result stays short (identifier-limit-safe). The join is a fixed underscore — the
+            // Separator convention governs namespace-path joining, which this style doesn't have. No
+            // namespace key => just the class name.
+            var name = NamingUtils.ApplyCase(entityType.Name, defaults.Casing);
+            var nsKey = NamespaceKey(entityType);
+            return string.IsNullOrEmpty(nsKey) ? name : name + "_" + NamingUtils.ShortHash(nsKey);
+        }
+
         return NamingUtils.ApplyCase(entityType.Name, defaults.Casing);
+    }
+
+    private static string FullName(Type entityType)
+        => entityType.FullName ?? (string.IsNullOrEmpty(entityType.Namespace)
+            ? entityType.Name
+            : entityType.Namespace + "." + entityType.Name);
+
+    /// <summary>
+    /// The qualifying context that precedes the simple type name in <see cref="Type.FullName"/> — the
+    /// namespace plus any declaring types. Two same-named types in different namespaces/declaring contexts
+    /// produce different keys (and thus different hashes).
+    /// </summary>
+    private static string NamespaceKey(Type entityType)
+    {
+        var full = FullName(entityType);
+        var simple = entityType.Name;
+        if (full.Length > simple.Length && full.EndsWith(simple, StringComparison.Ordinal))
+            return full[..^simple.Length].TrimEnd('.', '+');
+        return entityType.Namespace ?? "";
     }
 
     private static string ReplaceDot(string input, string separator)

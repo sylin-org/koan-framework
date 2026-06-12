@@ -217,7 +217,9 @@ public static class Client
         var response = await Resolve().Embed(new AiEmbeddingsRequest
         {
             Input = new() { text },
-            Model = options.Model
+            Model = options.Model,
+            OverrideUrl = options.OverrideUrl,
+            OverrideProvider = options.OverrideProvider,
         }, ct);
         return response.Vectors.FirstOrDefault() ?? [];
     }

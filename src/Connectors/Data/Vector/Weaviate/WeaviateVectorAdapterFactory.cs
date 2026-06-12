@@ -48,54 +48,17 @@ public sealed class WeaviateVectorAdapterFactory : IVectorAdapterFactory
         return new WeaviateVectorRepository<TEntity, TKey>(httpFactory, options, sp);
     }
 
-    // INamingProvider implementation
-    public string RepositorySeparator => "_";  // GraphQL-compliant (NOT "#")
-
-    public string GetStorageName(Type entityType, IServiceProvider services)
-    {
-        // Weaviate class names: GraphQL-compliant (no dots)
-        var convention = new StorageNameResolver.Convention(
-            StorageNamingStyle.FullNamespace,
-            "_",  // Underscore separator (dots invalid in GraphQL)
-            NameCasing.AsIs);
-
-        return StorageNameResolver.Resolve(entityType, convention);
-    }
-
-    public string GetConcretePartition(string partition)
-    {
-        // Weaviate: Replace hyphens with underscores for GraphQL compatibility
-        if (Guid.TryParse(partition, out var guid))
-            return guid.ToString("D").Replace("-", "_");  // D format with hyphens → underscores
-
-        // Named partitions: sanitize for GraphQL identifiers
-        return SanitizeForGraphQL(partition);
-    }
-
-    private static string SanitizeForGraphQL(string partition)
-    {
-        var sanitized = new StringBuilder(partition.Length);
-        for (int i = 0; i < partition.Length; i++)
+    // Weaviate class names are GraphQL types: FullNamespace + '_' separator, and the partition uses '_'
+    // (GraphQL identifiers don't allow '#'). The partition token keeps only [A-Za-z0-9_] (the GUID "D"
+    // form's hyphens fold to '_'); the leading char is always a letter because the class name precedes it.
+    public StorageNamingCapability GetNamingCapability(IServiceProvider services)
+        => new()
         {
-            var c = partition[i];
-            if (i == 0)
-            {
-                // First char must be letter or underscore
-                if (char.IsLetter(c) || c == '_')
-                    sanitized.Append(c);
-                else
-                    sanitized.Append('_');
-            }
-            else
-            {
-                // Subsequent chars: alphanumeric or underscore
-                if (char.IsLetterOrDigit(c) || c == '_')
-                    sanitized.Append(c);
-                else
-                    sanitized.Append('_');
-            }
-        }
-        return sanitized.ToString();
-    }
+            Style = StorageNamingStyle.FullNamespace,
+            Separator = "_",
+            Casing = NameCasing.AsIs,
+            PartitionSeparator = '_',
+            Partition = new PartitionTokenPolicy { GuidFormat = "D", AllowedExtraChars = "_" },
+        };
 }
 

@@ -1,30 +1,16 @@
 <Project>
   <!--
-    ARCH-0082: resolve the package <Version> after the csproj has declared its
-    KoanPackageKind. Importing versions.props HERE (not in Directory.Build.props)
-    is critical — .props imports run BEFORE the csproj body, so $(KoanPackageKind)
-    would be empty and the conditional PropertyGroups in versions.props would
-    silently no-op. .targets imports run after the csproj body, so the kind is
-    set by then.
+    ARCH-0085: package versions are computed by Nerdbank.GitVersioning from each package's
+    version.json (operator-owned major.minor) + git commit height (automatic patch). nbgv sets
+    Version / AssemblyVersion / FileVersion directly — there is no version.props import and no
+    KoanPackageKind-based <Version> resolution any more (the old two-tier scheme, ARCH-0082, is
+    superseded). $(KoanPackageKind) survives only as informational metadata on the csprojs.
 
-    See docs/guides/versioning-workbook.md.
+    See docs/decisions/ARCH-0085-versioning-compatibility-and-automation.md.
   -->
-  <Import Project="$(MSBuildThisFileDirectory)build/versions.props"
-          Condition="Exists('$(MSBuildThisFileDirectory)build/versions.props')" />
 
-  <PropertyGroup Condition="'$(KoanPackageKind)' == 'Kernel' and '$(KoanKernelVersion)' != ''">
-    <Version>$(KoanKernelVersion)</Version>
-    <AssemblyVersion>$(KoanKernelVersion)</AssemblyVersion>
-    <FileVersion>$(KoanKernelVersion)</FileVersion>
-  </PropertyGroup>
-
-  <!--
-    For periphery packages, the per-package PropertyGroup in versions.props
-    (conditioned on MSBuildProjectName) sets <Version> directly. Mirror it onto
-    AssemblyVersion/FileVersion here so all three stay in sync.
-  -->
-  <PropertyGroup Condition="'$(KoanPackageKind)' == 'Periphery' and '$(Version)' != ''">
-    <AssemblyVersion Condition="'$(AssemblyVersion)' == ''">$(Version)</AssemblyVersion>
-    <FileVersion Condition="'$(FileVersion)' == ''">$(Version)</FileVersion>
-  </PropertyGroup>
+  <!-- ARCH-0085 §3: rewrite Koan→Koan ProjectReference dependency versions to bounded
+       compatibility ranges at pack time. See build/compat-ranges.targets. -->
+  <Import Project="$(MSBuildThisFileDirectory)build/compat-ranges.targets"
+          Condition="Exists('$(MSBuildThisFileDirectory)build/compat-ranges.targets')" />
 </Project>

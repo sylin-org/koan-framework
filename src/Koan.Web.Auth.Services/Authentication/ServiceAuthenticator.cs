@@ -1,253 +1,104 @@
-using System.Security.Cryptography;
-using System.Text;
 using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Koan.Core;
+using Koan.Security.Trust.Issuer;
 using Koan.Web.Auth.Services.Options;
 
 namespace Koan.Web.Auth.Services.Authentication;
 
+/// <summary>
+/// SEC-0001 Phase 2 (2i): acquires service-to-service tokens by minting a KSVID in-process from the trust
+/// <see cref="IIssuer"/>, replacing the previous HTTP client-credentials round-trip to the TestProvider that
+/// used a deterministic, publicly-derivable dev secret (<c>SHA256("koan-dev-secret-{clientId}")</c>). No
+/// secret to forge, no internal HTTP hop — and it no longer depends on the now-opt-in TestProvider.
+/// (The whole outbound is absorbed into Koan.Security.Trust in 2j; cross-process fleet tokens need the
+/// shared/fleet issuer from Phase 5 — the ephemeral dev issuer validates in-process only.)
+/// </summary>
 public sealed class ServiceAuthenticator : IServiceAuthenticator
 {
     private readonly ServiceAuthOptions _options;
     private readonly IMemoryCache _tokenCache;
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IIssuer _issuer;
     private readonly ILogger<ServiceAuthenticator> _logger;
     private readonly IHostEnvironment _hostEnvironment;
-    private readonly IConfiguration _configuration;
 
     public ServiceAuthenticator(
         IOptions<ServiceAuthOptions> options,
         IMemoryCache tokenCache,
-        IHttpClientFactory httpClientFactory,
+        IIssuer issuer,
         ILogger<ServiceAuthenticator> logger,
-        IHostEnvironment hostEnvironment,
-        IConfiguration configuration)
+        IHostEnvironment hostEnvironment)
     {
         _options = options.Value;
         _tokenCache = tokenCache;
-        _httpClientFactory = httpClientFactory;
+        _issuer = issuer;
         _logger = logger;
         _hostEnvironment = hostEnvironment;
-        _configuration = configuration;
     }
 
     public async Task<string> GetServiceToken(string targetService, string[]? scopes = null, CancellationToken ct = default)
-    {
-        var tokenInfo = await GetServiceTokenInfo(targetService, scopes, ct);
-        return tokenInfo.AccessToken;
-    }
+        => (await GetServiceTokenInfo(targetService, scopes, ct)).AccessToken;
 
-    public async Task<ServiceTokenInfo> GetServiceTokenInfo(string targetService, string[]? scopes = null, CancellationToken ct = default)
+    public Task<ServiceTokenInfo> GetServiceTokenInfo(string targetService, string[]? scopes = null, CancellationToken ct = default)
     {
         scopes ??= _options.DefaultScopes;
         var cacheKey = BuildCacheKey(targetService, scopes);
 
-        // Check cache first
-        if (_options.EnableTokenCaching && _tokenCache.TryGetValue(cacheKey, out ServiceTokenInfo? cachedToken) && cachedToken != null)
+        if (_options.EnableTokenCaching && _tokenCache.TryGetValue(cacheKey, out ServiceTokenInfo? cached) && cached != null)
         {
-            // Check if token is still valid with buffer
-            if (cachedToken.ExpiresAt > DateTimeOffset.UtcNow.Add(_options.TokenRefreshBuffer))
+            if (cached.ExpiresAt > DateTimeOffset.UtcNow.Add(_options.TokenRefreshBuffer))
             {
-                _logger.LogDebug("Using cached token for service {TargetService}", targetService);
-                return cachedToken;
+                _logger.LogDebug("Using cached service token for {TargetService}", targetService);
+                return Task.FromResult(cached);
             }
-
-            // Remove expired token
             _tokenCache.Remove(cacheKey);
         }
 
-        // Acquire new token
-        _logger.LogDebug("Acquiring new token for service {TargetService} with scopes {Scopes}",
-            targetService, string.Join(",", scopes));
+        var tokenInfo = MintToken(targetService, scopes);
 
-        var tokenInfo = await AcquireToken(targetService, scopes, ct);
-
-        // Cache the token
         if (_options.EnableTokenCaching)
-        {
-            var cacheExpiry = tokenInfo.ExpiresAt.Subtract(_options.TokenRefreshBuffer);
-            _tokenCache.Set(cacheKey, tokenInfo, cacheExpiry);
-        }
+            _tokenCache.Set(cacheKey, tokenInfo, tokenInfo.ExpiresAt.Subtract(_options.TokenRefreshBuffer));
 
-        return tokenInfo;
+        return Task.FromResult(tokenInfo);
     }
 
-    public async Task InvalidateToken(string targetService, CancellationToken ct = default)
+    public Task InvalidateToken(string targetService, CancellationToken ct = default)
     {
-        // Remove all cached tokens for this service
-        var cacheKeysToRemove = new List<string>();
-
-        // Note: IMemoryCache doesn't provide a way to enumerate keys, so we'd need to track them separately
-        // For now, this is a simplified implementation
-        _logger.LogDebug("Token invalidation requested for service {TargetService}", targetService);
-        await Task.CompletedTask;
+        // Cached tokens self-expire; explicit revocation lands with the epoch mechanism in Phase 3.
+        _logger.LogDebug("Service token invalidation requested for {TargetService}", targetService);
+        return Task.CompletedTask;
     }
 
-    private async Task<ServiceTokenInfo> AcquireToken(string targetService, string[] scopes, CancellationToken ct)
+    private ServiceTokenInfo MintToken(string targetService, string[] scopes)
     {
         var clientId = GetClientId();
-        var clientSecret = GetClientSecret(clientId);
-        var tokenEndpoint = ResolveTokenEndpoint();
-
-        var requestBody = new Dictionary<string, string>
+        var lifetime = TimeSpan.FromHours(1);
+        var token = _issuer.Issue(new TrustClaims
         {
-            ["grant_type"] = "client_credentials",
-            ["client_id"] = clientId,
-            ["client_secret"] = clientSecret,
-        };
+            Subject = clientId,
+            Permissions = scopes,
+            Extra = new Dictionary<string, IReadOnlyList<string>>
+            {
+                ["token_type"] = new[] { "service" },
+                ["target"] = new[] { targetService },
+            },
+        }, lifetime);
 
-        if (scopes.Length > 0)
-            requestBody["scope"] = string.Join(' ', scopes);
-
-        _logger.LogDebug("Requesting token from {TokenEndpoint} for client {ClientId}", tokenEndpoint, clientId);
-
-        using var httpClient = _httpClientFactory.CreateClient("KoanAuthInternal");
-        using var request = new HttpRequestMessage(HttpMethod.Post, tokenEndpoint)
-        {
-            Content = new FormUrlEncodedContent(requestBody)
-        };
-
-        using var response = await httpClient.SendAsync(request, ct);
-
-        if (!response.IsSuccessStatusCode)
-        {
-            var errorContent = await response.Content.ReadAsStringAsync(ct);
-            var errorMessage = $"Token acquisition failed for service {targetService}: {response.StatusCode} - {errorContent}";
-            _logger.LogError(errorMessage);
-            throw new ServiceAuthenticationException(targetService, scopes, errorMessage);
-        }
-
-        var json = await response.Content.ReadAsStringAsync(ct);
-        var tokenResponse = System.Text.Json.JsonSerializer.Deserialize<TokenResponse>(json);
-        if (tokenResponse == null || string.IsNullOrEmpty(tokenResponse.access_token))
-        {
-            var errorMessage = $"Invalid token response for service {targetService}";
-            _logger.LogError(errorMessage);
-            throw new ServiceAuthenticationException(targetService, scopes, errorMessage);
-        }
-
-        var expiresAt = DateTimeOffset.UtcNow.AddSeconds(tokenResponse.expires_in ?? 3600);
-        var grantedScopes = !string.IsNullOrEmpty(tokenResponse.scope)
-            ? tokenResponse.scope.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-            : scopes;
-
-        _logger.LogInformation("Successfully acquired token for service {TargetService}, expires at {ExpiresAt}",
-            targetService, expiresAt);
-
-        return new ServiceTokenInfo(tokenResponse.access_token, expiresAt, grantedScopes);
+        _logger.LogDebug("Minted in-process service KSVID for {ClientId} -> {TargetService}", clientId, targetService);
+        return new ServiceTokenInfo(token, DateTimeOffset.UtcNow.Add(lifetime), scopes);
     }
 
     private string GetClientId()
     {
-        if (!string.IsNullOrEmpty(_options.ClientId))
-            return _options.ClientId;
-
-        // Auto-generate client ID in development
+        if (!string.IsNullOrEmpty(_options.ClientId)) return _options.ClientId;
         if (_hostEnvironment.IsDevelopment())
-        {
-            var appName = _hostEnvironment.ApplicationName.ToLowerInvariant();
-            return $"{appName}-service";
-        }
-
-        throw new InvalidOperationException("ClientId must be configured in production environments");
-    }
-
-    private string GetClientSecret(string clientId)
-    {
-        if (!string.IsNullOrEmpty(_options.ClientSecret))
-            return _options.ClientSecret;
-
-        // Auto-generate deterministic secret in development
-        if (_hostEnvironment.IsDevelopment())
-        {
-            return GenerateDevClientSecret(clientId);
-        }
-
-        // Check environment variable
-        var envSecret = Environment.GetEnvironmentVariable($"KOAN_SERVICE_SECRET_{clientId.ToUpper()}");
-        if (!string.IsNullOrEmpty(envSecret))
-            return envSecret;
-
-        throw new InvalidOperationException($"ClientSecret must be configured for client {clientId} in production environments");
-    }
-
-    private string ResolveTokenEndpoint()
-    {
-        // In development with embedded TestProvider, use current application's internal endpoint
-        // In production, this would resolve the actual auth provider endpoint
-        string baseUrl;
-        if (_hostEnvironment.IsDevelopment())
-        {
-            // For embedded TestProvider, use the internal application URL
-            // Since TestProvider runs in the same process, use the internal port directly
-            baseUrl = GetCurrentApplicationInternalUrl();
-        }
-        else
-        {
-            // Production would use configured auth provider endpoint
-            baseUrl = "http://localhost:5007"; // Default TestProvider port
-        }
-
-        return $"{baseUrl.TrimEnd('/')}{_options.TokenEndpoint}";
-    }
-
-    private string GetCurrentApplicationInternalUrl()
-    {
-        // For embedded TestProvider, use the actual internal binding port
-        var urls = _configuration["ASPNETCORE_URLS"];
-        _logger.LogDebug("ASPNETCORE_URLS value: {Urls}", urls ?? "null");
-
-        if (!string.IsNullOrEmpty(urls))
-        {
-            // Parse the first URL to get the internal port
-            var firstUrl = urls.Split(';')[0].Trim();
-            _logger.LogDebug("First URL to parse: {FirstUrl}", firstUrl);
-
-            // Handle ASP.NET Core wildcard bindings like "http://+:5084"
-            if (firstUrl.Contains("://+:"))
-            {
-                var port = firstUrl.Split(':').Last();
-                var result = $"http://localhost:{port}";
-                _logger.LogDebug("Parsed wildcard binding to: {BaseUrl} (port={Port})", result, port);
-                return result;
-            }
-            else if (Uri.TryCreate(firstUrl, UriKind.Absolute, out var uri))
-            {
-                // For internal calls within the same process, use localhost with the actual binding port
-                var result = $"http://localhost:{uri.Port}";
-                _logger.LogDebug("Internal base URL: {BaseUrl} (port={Port})", result, uri.Port);
-                return result;
-            }
-            else
-            {
-                _logger.LogWarning("Failed to parse URL: {FirstUrl}", firstUrl);
-            }
-        }
-
-        // Fallback to default development port
-        _logger.LogDebug("Using fallback base URL: http://localhost:5000");
-        return "http://localhost:5000";
-    }
-
-    private static string GenerateDevClientSecret(string clientId)
-    {
-        // Generate a deterministic secret for development
-        var input = $"koan-dev-secret-{clientId}";
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(input));
-        return Convert.ToBase64String(bytes);
+            return $"{_hostEnvironment.ApplicationName.ToLowerInvariant()}-service";
+        throw new InvalidOperationException("ServiceAuth ClientId must be configured outside Development.");
     }
 
     private static string BuildCacheKey(string targetService, string[] scopes)
-    {
-        var scopeString = string.Join(",", scopes.OrderBy(s => s));
-        return $"service_token:{targetService}:{scopeString}";
-    }
-
-    private record TokenResponse(string access_token, string token_type, int? expires_in, string? scope);
+        => $"service_token:{targetService}:{string.Join(",", scopes.OrderBy(s => s))}";
 }
 
 public class ServiceAuthenticationException : Exception

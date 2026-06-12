@@ -77,34 +77,23 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory
         return new MongoRepository<TEntity, TKey>(clientProvider, optionsMonitor, resolver, sp);
     }
 
-    // INamingProvider implementation
-    public string RepositorySeparator => "#";
-
-    public string GetStorageName(Type entityType, IServiceProvider services)
+    public StorageNamingCapability GetNamingCapability(IServiceProvider services)
     {
         var opts = services.GetRequiredService<IOptions<MongoOptions>>().Value;
-
-        // Check adapter-level override FIRST (MongoOptions.CollectionName)
-        if (opts.CollectionName != null)
+        return new StorageNamingCapability
         {
-            var overrideName = opts.CollectionName(entityType);
-            if (!string.IsNullOrWhiteSpace(overrideName))
-                return overrideName;
-        }
-
-        // Fall back to convention
-        var convention = new StorageNameResolver.Convention(
-            opts.NamingStyle,
-            opts.Separator ?? ".",
-            NameCasing.AsIs);
-
-        return StorageNameResolver.Resolve(entityType, convention);
-    }
-
-    public string GetConcretePartition(string partition)
-    {
-        // MongoDB: Pass-through (accepts most UTF-8 strings)
-        return partition;
+            Style = opts.NamingStyle,
+            Separator = opts.Separator ?? ".",
+            Casing = NameCasing.AsIs,
+            PartitionSeparator = '#',
+            Partition = PartitionTokenPolicy.Default,
+            NameOverride = opts.CollectionName,
+            // MongoDB's namespace (db.collection) limit is 255 bytes; reserve for the max 64-byte database
+            // name + the '.' separator so the collection name alone is always valid. Without this, a very
+            // long partition suffix would produce an over-limit collection name (StorageNameGenerator only
+            // clamps when a limit is declared); with it, the overflow is hashed injectively instead.
+            MaxIdentifierBytes = 255 - 64 - 1,
+        };
     }
 }
 

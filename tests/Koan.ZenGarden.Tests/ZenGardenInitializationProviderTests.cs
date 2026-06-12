@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.ZenGarden.Core;
 using Koan.ZenGarden.Extensions;
 using Koan.ZenGarden.Models;

@@ -1,6 +1,6 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.Web.Json.Strict;
 using Koan.Web.Json.Strict.Infrastructure;
 using MinimalJsonOptions = Koan.Web.Json.Strict.Options.KoanMinimalJsonOptions;

@@ -79,7 +79,7 @@ source: src/Koan.Data.Core/
 
 ## Compatibility and migrations
 
-- Target frameworks: net9.0
+- Target frameworks: net10.0
 - Works with: Koan.Data.Connector.Sqlite, SqlServer, Postgres, Redis, Mongo, Vector providers
 
 ## References

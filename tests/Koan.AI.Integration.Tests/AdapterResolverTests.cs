@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.AI.Integration.Tests.Fixtures;
 using Koan.AI.Resolution;
 using Koan.Core.AI;

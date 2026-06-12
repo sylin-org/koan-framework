@@ -13,10 +13,11 @@ public sealed class TransactionOptions
     public TimeSpan DefaultTimeout { get; set; } = TimeSpan.FromMinutes(2);
 
     /// <summary>
-    /// Whether to automatically commit transaction on dispose (if not explicitly committed/rolled back).
-    /// Default: true (minimal cognitive load).
+    /// Whether to automatically COMMIT a transaction on dispose when it was not explicitly committed or
+    /// rolled back. Default: false — dispose rolls back (safe, matches .NET TransactionScope: work persists
+    /// only on an explicit Commit()). Set true to opt into auto-commit-on-dispose convenience.
     /// </summary>
-    public bool AutoCommitOnDispose { get; set; } = true;
+    public bool AutoCommitOnDispose { get; set; } = false;
 
     /// <summary>
     /// Enable telemetry spans and structured logging. Default: true.

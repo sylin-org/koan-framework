@@ -1,5 +1,6 @@
 ﻿using System;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Connector.Postgres.Tests.Support;
 
 namespace Koan.Data.Connector.Postgres.Tests.Specs.Capabilities;
@@ -33,16 +34,17 @@ public sealed class PostgresCapabilitiesSpec
                 fixture.BindHost();
 
                 var repo = fixture.Data.GetRepository<CapabilityProbe, string>();
-                repo.Should().BeAssignableTo<ILinqQueryRepository<CapabilityProbe, string>>();
-                repo.Should().BeAssignableTo<ILinqQueryRepositoryWithOptions<CapabilityProbe, string>>();
-                repo.Should().BeAssignableTo<IStringQueryRepository<CapabilityProbe, string>>();
-                repo.Should().BeAssignableTo<IStringQueryRepositoryWithOptions<CapabilityProbe, string>>();
+                repo.Should().BeAssignableTo<IQueryRepository<CapabilityProbe, string>>();
+                repo.Should().BeAssignableTo<IRawQueryRepository<CapabilityProbe, string>>();
 
-                var queryCaps = repo.Should().BeAssignableTo<IQueryCapabilities>().Subject;
-                queryCaps.Capabilities.Should().Be(QueryCapabilities.Linq | QueryCapabilities.String);
-
-                var writeCaps = repo.Should().BeAssignableTo<IWriteCapabilities>().Subject;
-                writeCaps.Writes.Should().Be(WriteCapabilities.AtomicBatch | WriteCapabilities.BulkDelete | WriteCapabilities.FastRemove);
+                // ARCH-0084: negotiate via the unified CapabilitySet.
+                var caps = DataCaps.Describe(repo, repo.GetType().Name);
+                caps.Has(DataCaps.Query.Linq).Should().BeTrue();
+                caps.Has(DataCaps.Query.String).Should().BeTrue();
+                caps.Has(DataCaps.Write.AtomicBatch).Should().BeTrue();
+                caps.Has(DataCaps.Write.BulkDelete).Should().BeTrue();
+                caps.Has(DataCaps.Write.FastRemove).Should().BeTrue();
+                caps.Has(DataCaps.Write.BulkUpsert).Should().BeFalse();
 
                 var partition = fixture.EnsurePartition(ctx);
                 await using var lease = fixture.LeasePartition(partition);

@@ -9,6 +9,12 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-    <PackageReference Include="Microsoft.AspNetCore.JsonPatch" Version="10.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.JsonPatch" Version="10.0.8" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- ARCH-0084: the unified capability primitive (Capability/CapabilitySet) lives in
+         Koan.Core.Capabilities; the data token catalog (DataCaps) references it. Acyclic —
+         Koan.Core's closure (Orchestration.Abstractions + MS packages) does not include this. -->
+    <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
   </ItemGroup>
 </Project>

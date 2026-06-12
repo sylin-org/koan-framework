@@ -366,6 +366,28 @@ public async Task MigrateWithZeroDowntime<TEntity>()
 }
 ```
 
+### Mixed-Space Safety (changing models)
+
+Vectors from different embedding models are **not comparable** — mixing them in one index returns
+plausible-but-wrong neighbours. The framework guards against this at the write boundary: writing a
+vector produced by a *different* model than the one a single-model index was built with throws
+`VectorModelMismatchException`, rather than silently creating a mixed-space index.
+
+Because of that guard, **switch models by re-indexing through `EmbeddingMigrator`**, not by ad-hoc
+re-embedding:
+
+```csharp
+// ✅ Correct: the migrator resets the model registry for the collection, so the whole index
+//    transitions to the new model in one by-design operation.
+await EmbeddingMigrator.ReEmbedAll<Article>(targetModel: "text-embedding-3-large");
+
+// ❌ Wrong: embedding a single entity with a new model and saving it into an index still built
+//    from the old model throws VectorModelMismatchException (the guard preventing a mixed-space index).
+```
+
+Legitimately multi-model indexes are tolerated with a warning; the vector health report surfaces the
+set of models present in each index.
+
 ### Monitoring
 
 ```csharp

@@ -6,14 +6,19 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 using Koan.Core;
 using Koan.Core.Infrastructure;
+using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Capabilities;
+using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
+using Koan.Data.Abstractions.Sorting;
 using Koan.Data.Core;
 using Koan.Data.Core.Optimization;
-using Koan.Data.Core.Schema;
+using Koan.Data.Relational;
 using Koan.Data.Relational.Linq;
 using Koan.Data.Relational.Orchestration;
+using System.Collections.Frozen;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Linq.Expressions;
@@ -26,21 +31,20 @@ internal sealed class PostgresRepository<
     TKey> :
     IDataRepository<TEntity, TKey>,
     IOptimizedDataRepository<TEntity, TKey>,
-    ILinqQueryRepository<TEntity, TKey>,
-    IStringQueryRepository<TEntity, TKey>,
-    IDataRepositoryWithOptions<TEntity, TKey>,
-    ILinqQueryRepositoryWithOptions<TEntity, TKey>,
-    IStringQueryRepositoryWithOptions<TEntity, TKey>,
-    IQueryCapabilities,
-    IWriteCapabilities,
+    IQueryRepository<TEntity, TKey>,
+    IRawQueryRepository<TEntity, TKey>,
+    IDescribesCapabilities,
     IBulkDelete<TKey>,
-    IInstructionExecutor<TEntity>,
-    ISchemaHealthContributor<TEntity, TKey>
+    IConditionalWriteRepository<TEntity, TKey>,
+    IInstructionExecutor<TEntity>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
-    public QueryCapabilities Capabilities => QueryCapabilities.Linq | QueryCapabilities.String;
-    public WriteCapabilities Writes => WriteCapabilities.AtomicBatch | WriteCapabilities.BulkDelete | WriteCapabilities.FastRemove;
+    public void Describe(ICapabilities caps) => caps
+        .Add(DataCaps.Query.Linq).Add(DataCaps.Query.String)
+        .Add(DataCaps.Write.AtomicBatch).Add(DataCaps.Write.BulkDelete).Add(DataCaps.Write.FastRemove)
+        .Add(DataCaps.Write.ConditionalReplace)
+        .Add(DataCaps.Query.Filter, RelationalFilterSupport.Default);
 
     // Storage optimization support
     private readonly StorageOptimizationInfo _optimizationInfo;
@@ -89,7 +93,7 @@ internal sealed class PostgresRepository<
         }
     }
 
-    private string TableName => Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
+    private string TableName => Core.Configuration.AdapterNaming.GetOrCompute<TEntity, TKey>(_sp);
     private string QualifiedTable => (_options.SearchPath is { Length: > 0 } sp ? $"\"{sp}\"." : "") + "\"" + TableName.Replace("\"", "\"\"") + "\"";
 
     /// <summary>
@@ -201,7 +205,7 @@ internal sealed class PostgresRepository<
         }, ct);
     }
 
-    public async Task EnsureHealthy(CancellationToken ct)
+    public async Task EnsureReady(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var table = TableName;
@@ -214,20 +218,8 @@ internal sealed class PostgresRepository<
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Postgres ensure healthy failed for {Table}", table);
+            _logger.LogWarning(ex, "Postgres ensure ready failed for {Table}", table);
             throw;
-        }
-    }
-
-    public void InvalidateHealth()
-    {
-        var suffix = $"::{TableName}";
-        foreach (var key in _healthyCache.Keys)
-        {
-            if (key.EndsWith(suffix, StringComparison.Ordinal))
-            {
-                _healthyCache.TryRemove(key, out _);
-            }
         }
     }
 
@@ -246,7 +238,7 @@ internal sealed class PostgresRepository<
             ""Id"" text PRIMARY KEY,
             ""Json"" jsonb NOT NULL
         );";
-        cmd.ExecuteNonQueryAsync();
+        cmd.ExecuteNonQuery();
 
         // Create expression indexes for projected properties if marked [Index]
         var projections = ProjectionResolver.Get(typeof(TEntity));
@@ -267,7 +259,7 @@ internal sealed class PostgresRepository<
             using var idx = conn.CreateCommand();
             // index on extracted text value for ordering/filtering
             idx.CommandText = $"CREATE INDEX IF NOT EXISTS \"{indexName}\" ON {QualifiedTable} ((\"Json\" #>> '{{{propPath}}}'))";
-            idx.ExecuteNonQueryAsync();
+            idx.ExecuteNonQuery();
         }
         catch { }
     }
@@ -279,7 +271,7 @@ internal sealed class PostgresRepository<
         cmd.CommandText = "SELECT 1 FROM information_schema.tables WHERE table_schema = @s AND table_name = @t";
         cmd.Parameters.AddWithValue("s", schema);
         cmd.Parameters.AddWithValue("t", table);
-        try { var o = cmd.ExecuteScalarAsync(); return o != null; } catch { return false; }
+        try { var o = cmd.ExecuteScalar(); return o is not null; } catch { return false; }
     }
 
     private (string schema, string table) ResolveSchemaAndTable()
@@ -289,12 +281,19 @@ internal sealed class PostgresRepository<
         return (schema, table);
     }
 
+    // Comparable-encoding contract (DATA-0100): canonical converters make DateTimeOffset (UTC-ISO text),
+    // TimeSpan (ticks), DateOnly/TimeOnly (fixed text) persist in an order-preserving form matching the
+    // filter comparand. Default (PascalCase) naming is preserved — ResolveColumnSql reads
+    // ("Json" #>> '{prop}') with the PascalCase property name.
+    private static readonly JsonSerializerSettings _json =
+        ComparableScalarEncoding.Apply(new JsonSerializerSettings());
+
     private static TEntity FromRow((string Id, string Json) row)
-        => JsonConvert.DeserializeObject<TEntity>(row.Json)!;
+        => JsonConvert.DeserializeObject<TEntity>(row.Json, _json)!;
 
     private (object Id, string Json) ToRowOptimized(TEntity e)
     {
-        var json = JsonConvert.SerializeObject(e);
+        var json = JsonConvert.SerializeObject(e, _json);
         var stringId = e.Id!.ToString()!;
         // Apply storage optimization before serialization
         OptimizeEntityForStorage(e, _optimizationInfo);
@@ -391,46 +390,73 @@ internal sealed class PostgresRepository<
         return results;
     }
 
-    public async Task<IReadOnlyList<TEntity>> Query(object? query, CancellationToken ct = default)
+
+    // ==================== Unified Query (DATA-XXXX) ====================
+
+    public async Task<RepositoryQueryResult<TEntity>> Query(QueryDefinition query, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        using var act = PgTelemetry.Activity.StartActivity("pg.query:all");
+        using var act = PgTelemetry.Activity.StartActivity("pg.query");
         act?.SetTag("entity", typeof(TEntity).FullName);
+
+        var (whereSql, parameters) = BuildWhere(query.Filter);
+        var (orderBy, sortHandled) = BuildOrderBy(query.Sort);
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append("SELECT \"Id\", \"Json\"::text FROM ").Append(QualifiedTable);
+        if (whereSql is not null) sb.Append(" WHERE ").Append(whereSql);
+        sb.Append(' ').Append(orderBy);
+
+        // Only push pagination when the sort was fully pushed down; otherwise the coordinator must finish the
+        // sort in memory first, which requires the full matching set (paginating here would window the wrong rows).
+        var sortFullyHandled = query.Sort is null || query.Sort.Count == 0 || sortHandled.Count == query.Sort.Count;
+        var paginationHandled = false;
+        if (query.HasPagination && sortFullyHandled)
+        {
+            var size = query.EffectivePageSize();
+            var offset = (query.EffectivePage() - 1) * size;
+            sb.Append(" LIMIT ").Append(size).Append(" OFFSET ").Append(offset);
+            paginationHandled = true;
+        }
+
         await using var conn = Open();
-        // DATA-0061: no-options should return full set
-    var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} ORDER BY ctid");
-        return rows.Select(FromRow).ToList();
+        var dyn = ToDapper(parameters);
+        var rows = await conn.QueryAsync<(string Id, string Json)>(sb.ToString(), dyn);
+        var items = rows.Select(FromRow).ToList();
+
+        long? totalCount = paginationHandled
+            ? await CountCore(whereSql, parameters, ct)
+            : items.Count;
+
+        return new RepositoryQueryResult<TEntity>
+        {
+            Items = items,
+            TotalCount = totalCount,
+            IsEstimate = false,
+            SortHandled = sortHandled,
+            PaginationHandled = paginationHandled,
+        };
     }
 
-    public async Task<IReadOnlyList<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = PgTelemetry.Activity.StartActivity("pg.query:all+opts");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        var (offset, limit) = ComputeSkipTake(options);
-        await using var conn = Open();
-    var sql = $"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} ORDER BY ctid LIMIT {limit} OFFSET {offset}";
-        var rows = await conn.QueryAsync<(string Id, string Json)>(sql);
-        return rows.Select(FromRow).ToList();
-    }
-
-    public async Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
+    public async Task<CountResult> Count(QueryDefinition query, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         using var act = PgTelemetry.Activity.StartActivity("pg.count");
         act?.SetTag("entity", typeof(TEntity).FullName);
-        await using var conn = Open();
 
-        // Fast count via pg_stat when no predicate and strategy allows it
-        if (request.Predicate is null && request.RawQuery is null && request.ProviderQuery is null)
+        var (whereSql, parameters) = BuildWhere(query.Filter);
+
+        // Fast count via pg_stat when no filter and strategy allows it.
+        if (whereSql is null)
         {
-            var strategy = request.Options?.CountStrategy ?? CountStrategy.Optimized;
+            var strategy = query.CountStrategy ?? CountStrategy.Optimized;
             if (strategy == CountStrategy.Fast || strategy == CountStrategy.Optimized)
             {
                 try
                 {
+                    await using var statConn = Open();
                     var (schema, table) = ResolveSchemaAndTable();
-                    var estimate = await conn.ExecuteScalarAsync<long>(
+                    var estimate = await statConn.ExecuteScalarAsync<long>(
                         @"SELECT n_live_tup FROM pg_stat_user_tables
                           WHERE schemaname = @schema AND relname = @table",
                         new { schema, table });
@@ -444,178 +470,157 @@ internal sealed class PostgresRepository<
             }
         }
 
-        // Exact count based on request type
-        if (request.Predicate is not null)
-        {
-            var translator = new LinqWhereTranslator<TEntity>(_dialect);
-            try
-            {
-                var (whereSql, parameters) = translator.Translate(request.Predicate);
-                whereSql = RewriteWhereForProjection(whereSql);
-                return await CountWhere(whereSql, parameters);
-            }
-            catch (NotSupportedException)
-            {
-                var compiled = request.Predicate.Compile();
-                var all = await Query((object?)null, ct);
-                var count = (long)all.Count(compiled);
-                return CountResult.Exact(count);
-            }
-        }
-
-        if (request.RawQuery is not null)
-        {
-            var whereSql = RewriteWhereForProjection(request.RawQuery);
-            var count = await conn.ExecuteScalarAsync<long>($"SELECT COUNT(1) FROM {QualifiedTable} WHERE " + whereSql);
-            return CountResult.Exact(count);
-        }
-
-        // No predicate - full table count
-        var totalCount = await conn.ExecuteScalarAsync<long>($"SELECT COUNT(1) FROM {QualifiedTable}");
-        return CountResult.Exact(totalCount);
+        return CountResult.Exact(await CountCore(whereSql, parameters, ct));
     }
 
-    private async Task<CountResult> CountWhere(string whereSql, IReadOnlyList<object?> parameters)
+    private async Task<long> CountCore(string? whereSql, IReadOnlyList<object?> parameters, CancellationToken ct)
     {
         await using var conn = Open();
-        var sql = $"SELECT COUNT(1) FROM {QualifiedTable} WHERE {whereSql}";
+        var sql = whereSql is null
+            ? $"SELECT COUNT(1) FROM {QualifiedTable}"
+            : $"SELECT COUNT(1) FROM {QualifiedTable} WHERE {whereSql}";
+        var dyn = ToDapper(parameters);
+        return await conn.ExecuteScalarAsync<long>(sql, dyn);
+    }
+
+    /// <summary>Translates the (fully-pushable) filter to a WHERE fragment; null filter -> no WHERE.</summary>
+    private (string? whereSql, IReadOnlyList<object?> parameters) BuildWhere(Filter? filter)
+    {
+        if (filter is null) return (null, Array.Empty<object?>());
+        var translator = new SqlFilterTranslator(_dialect, typeof(TEntity), ResolveColumnSql);
+        return translator.Translate(filter);
+    }
+
+    /// <summary>Maps a flat property name to its SQL value expression (projected column or jsonb extraction).</summary>
+    private string ResolveColumnSql(FieldPath field, ResolvedField resolved)
+    {
+        var prop = field.Leaf;
+        if (string.Equals(prop, "Id", StringComparison.Ordinal)) return "\"Id\"";
+        if (string.Equals(prop, "Json", StringComparison.Ordinal)) return "\"Json\"";
+        // Filter against the source-of-truth Json with a type-correct cast. Computed/physical columns
+        // are a SEPARATE indexing optimisation (expression indexes), never a correctness dependency:
+        // referencing one that was not materialised is the "column does not exist" bug, and #>> always
+        // yields text so numeric/bool comparisons otherwise fail with "operator does not exist: text > integer".
+        var text = $"(\"Json\" #>> '{{{prop}}}')";
+        return ApplyPgScalarCast(text, resolved);
+    }
+
+    // jsonb #>> yields text; cast to the comparand's SQL family so comparisons type-check. Collection
+    // fields keep text (the dialect casts the array node to jsonb itself). Unknown types stay text
+    // (string/Guid/DateTime compare losslessly as their canonical string form).
+    private static string ApplyPgScalarCast(string textExpr, ResolvedField? resolved)
+    {
+        var type = resolved?.ComparableType;
+        if (type is null || (resolved?.TargetsCollection ?? false)) return textExpr;
+        var t = Nullable.GetUnderlyingType(type) ?? type;
+        if (t.IsEnum) return $"({textExpr})::numeric";                  // enums stored as numbers (Newtonsoft default)
+        if (t == typeof(bool)) return $"({textExpr})::boolean";
+        if (t == typeof(int) || t == typeof(long) || t == typeof(short) || t == typeof(byte)
+            || t == typeof(sbyte) || t == typeof(uint) || t == typeof(ulong) || t == typeof(ushort)
+            || t == typeof(decimal) || t == typeof(double) || t == typeof(float))
+            return $"({textExpr})::numeric";
+        // Comparable-encoding contract (DATA-0100): TimeSpan persists as Int64 ticks (a JSON number) ->
+        // cast so it compares by duration. DateTimeOffset / DateOnly / TimeOnly persist as monotonic
+        // fixed-width UTC/ISO TEXT and compare correctly as-is (no cast).
+        if (t == typeof(TimeSpan)) return $"({textExpr})::numeric";
+        return textExpr;
+    }
+
+    /// <summary>Builds an ORDER BY clause from the sort specs; falls back to a stable ctid order.</summary>
+    private (string orderBy, IReadOnlySet<SortSpec> sortHandled) BuildOrderBy(IReadOnlyList<SortSpec> sort)
+    {
+        if (sort is null || sort.Count == 0)
+            return ("ORDER BY ctid", RepositoryQueryResult<TEntity>.NoSortHandled);
+
+        var parts = new List<string>(sort.Count);
+        var handled = new List<SortSpec>(sort.Count);
+        foreach (var spec in sort)
+        {
+            // Only a single-member (top-level scalar) path pushes down via jsonb extraction. Deep / collection
+            // paths (e.g. an aggregate over a nested array like "Sightings.LastChangedAt") are left UNHANDLED so
+            // the coordinator finishes them with the in-memory sorter — a leaf-only #>> would sort by the wrong
+            // (top-level, usually NULL) value while falsely claiming the sort applied.
+            if (spec.Path.Members.Count != 1)
+                continue;
+            var leaf = spec.Path.Members[0].Name;
+            // Resolve the leaf so ResolveColumnSql applies the comparable-encoding cast (TimeSpan ->
+            // numeric) to the ORDER BY column too, not only to filter predicates (DATA-0100). Fall back
+            // to the bare text expression on an unresolvable path.
+            ResolvedField? rf = null;
+            try { rf = FieldPathResolver.Resolve(typeof(TEntity), FieldPath.Of(leaf)); } catch { /* leave null */ }
+            var col = ResolveColumnSql(FieldPath.Of(leaf), rf!);
+            parts.Add($"{col} {(spec.Desc ? "DESC" : "ASC")}");
+            handled.Add(spec);
+        }
+
+        if (parts.Count == 0)
+            return ("ORDER BY ctid", RepositoryQueryResult<TEntity>.NoSortHandled);
+        var orderBy = "ORDER BY " + string.Join(", ", parts);
+        return (orderBy, handled.ToFrozenSet());
+    }
+
+    private static DynamicParameters ToDapper(IReadOnlyList<object?> parameters)
+    {
         var dyn = new DynamicParameters();
         for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
-        var count = await conn.ExecuteScalarAsync<long>(sql, dyn);
+        return dyn;
+    }
+
+    // ==================== Conditional compare-and-set (IConditionalWriteRepository) ====================
+
+    /// <summary>Atomic CAS (JOBS-0005 §20.3): replace the row IFF the stored Json still matches <paramref name="guard"/>,
+    /// which lowers to the same JSON-path WHERE the query path uses. One row affected = applied, zero = lost.</summary>
+    public async Task<bool> ConditionalReplaceAsync(TEntity model, Expression<Func<TEntity, bool>> guard, CancellationToken ct = default)
+    {
+        var (whereSql, parameters) = BuildWhere(LinqFilterCompiler.Compile(guard));
+        var dyn = ToDapper(parameters);
+        var (id, json) = ToRowOptimized(model);
+        dyn.Add("__id", id);
+        dyn.Add("__json", json);
+        var guardClause = whereSql is null ? string.Empty : $" AND ({whereSql})";
+        var sql = $"UPDATE {QualifiedTable} SET \"Json\" = CAST(@__json AS jsonb) WHERE \"Id\" = @__id{guardClause}";
+        await using var conn = Open();
+        var affected = await conn.ExecuteAsync(sql, dyn);
+        return affected > 0;
+    }
+
+    // ==================== Raw provider query (IRawQueryRepository) ====================
+
+    public async Task<RepositoryQueryResult<TEntity>> QueryRaw(string query, object? parameters, QueryDefinition shaping, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        using var act = PgTelemetry.Activity.StartActivity("pg.query:raw");
+        act?.SetTag("entity", typeof(TEntity).FullName);
+        await using var conn = Open();
+        if (IsFullSelect(query))
+        {
+            var rewritten = RewriteEntityToken(query);
+            var rows = await conn.QueryAsync(rewritten, parameters);
+            var items = MapRowsToEntities(rows);
+            return new RepositoryQueryResult<TEntity> { Items = items };
+        }
+        else
+        {
+            var whereSql = RewriteWhereForProjection(query);
+            var size = shaping.HasPagination ? shaping.EffectivePageSize() : _defaultPageSize;
+            var offset = shaping.HasPagination ? (shaping.EffectivePage() - 1) * size : 0;
+            var sql = $"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE {whereSql} ORDER BY ctid LIMIT {size} OFFSET {offset}";
+            var rows = await conn.QueryAsync<(string Id, string Json)>(sql, parameters);
+            return new RepositoryQueryResult<TEntity>
+            {
+                Items = rows.Select(FromRow).ToList(),
+                PaginationHandled = shaping.HasPagination,
+            };
+        }
+    }
+
+    public async Task<CountResult> CountRaw(string query, object? parameters, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        await using var conn = Open();
+        var whereSql = RewriteWhereForProjection(query);
+        var count = await conn.ExecuteScalarAsync<long>($"SELECT COUNT(1) FROM {QualifiedTable} WHERE {whereSql}", parameters);
         return CountResult.Exact(count);
-    }
-
-    public async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = PgTelemetry.Activity.StartActivity("pg.query:linq");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        var translator = new LinqWhereTranslator<TEntity>(_dialect);
-        try
-        {
-            var (whereSql, parameters) = translator.Translate(predicate);
-            whereSql = RewriteWhereForProjection(whereSql);
-            await using var conn = Open();
-            var sql = $"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE {whereSql} ORDER BY ctid";
-            var dyn = new DynamicParameters();
-            for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
-            var rows = await conn.QueryAsync<(string Id, string Json)>(sql, dyn);
-            return rows.Select(FromRow).ToList();
-        }
-        catch (NotSupportedException)
-        {
-            var compiled = predicate.Compile();
-            var all = await Query((object?)null, ct);
-            return all.Where(compiled).ToList();
-        }
-    }
-
-    public async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = PgTelemetry.Activity.StartActivity("pg.query:linq+opts");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        var translator = new LinqWhereTranslator<TEntity>(_dialect);
-        try
-        {
-            var (whereSql, parameters) = translator.Translate(predicate);
-            whereSql = RewriteWhereForProjection(whereSql);
-            var (offset, limit) = ComputeSkipTake(options);
-            await using var conn = Open();
-            var sql = $"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE {whereSql} ORDER BY ctid LIMIT {limit} OFFSET {offset}";
-            var dyn = new DynamicParameters();
-            for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
-            var rows = await conn.QueryAsync<(string Id, string Json)>(sql, dyn);
-            return rows.Select(FromRow).ToList();
-        }
-        catch (NotSupportedException)
-        {
-            var compiled = predicate.Compile();
-            var all = await Query((object?)null, options, ct);
-            return all.Where(compiled).ToList();
-        }
-    }
-
-    public async Task<IReadOnlyList<TEntity>> Query(string sql, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = PgTelemetry.Activity.StartActivity("pg.query:string");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        await using var conn = Open();
-        if (IsFullSelect(sql))
-        {
-            var rewritten = RewriteEntityToken(sql);
-            var rows = await conn.QueryAsync(rewritten);
-            return MapRowsToEntities(rows);
-        }
-        else
-        {
-            var whereSql = RewriteWhereForProjection(sql);
-            var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE " + whereSql + $" ORDER BY ctid LIMIT {_defaultPageSize} OFFSET 0");
-            return rows.Select(FromRow).ToList();
-        }
-    }
-
-    public async Task<IReadOnlyList<TEntity>> Query(string sql, object? parameters, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = PgTelemetry.Activity.StartActivity("pg.query:string:param");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        await using var conn = Open();
-        if (IsFullSelect(sql))
-        {
-            var rewritten = RewriteEntityToken(sql);
-            var rows = await conn.QueryAsync(rewritten, parameters);
-            return MapRowsToEntities(rows);
-        }
-        else
-        {
-            var whereSql = RewriteWhereForProjection(sql);
-            var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE " + whereSql + $" ORDER BY ctid LIMIT {_defaultPageSize} OFFSET 0", parameters);
-            return rows.Select(FromRow).ToList();
-        }
-    }
-
-    public async Task<IReadOnlyList<TEntity>> Query(string sql, DataQueryOptions? options, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = PgTelemetry.Activity.StartActivity("pg.query:string+opts");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        await using var conn = Open();
-        if (IsFullSelect(sql))
-        {
-            var rewritten = RewriteEntityToken(sql);
-            var rows = await conn.QueryAsync(rewritten);
-            return MapRowsToEntities(rows);
-        }
-        else
-        {
-            var (offset, limit) = ComputeSkipTake(options);
-            var whereSql = RewriteWhereForProjection(sql);
-            var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE " + whereSql + $" ORDER BY ctid LIMIT {limit} OFFSET {offset}");
-            return rows.Select(FromRow).ToList();
-        }
-    }
-
-    public async Task<IReadOnlyList<TEntity>> Query(string sql, object? parameters, DataQueryOptions? options, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = PgTelemetry.Activity.StartActivity("pg.query:string:param+opts");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        await using var conn = Open();
-        if (IsFullSelect(sql))
-        {
-            var rewritten = RewriteEntityToken(sql);
-            var rows = await conn.QueryAsync(rewritten, parameters);
-            return MapRowsToEntities(rows);
-        }
-        else
-        {
-            var (offset, limit) = ComputeSkipTake(options);
-            var whereSql = RewriteWhereForProjection(sql);
-            var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE " + whereSql + $" ORDER BY ctid LIMIT {limit} OFFSET {offset}", parameters);
-            return rows.Select(FromRow).ToList();
-        }
     }
 
 
@@ -671,7 +676,7 @@ internal sealed class PostgresRepository<
 
         // Resolve Optimized strategy based on provider capabilities
         var effectiveStrategy = strategy == RemoveStrategy.Optimized
-            ? (Writes.HasFlag(WriteCapabilities.FastRemove) ? RemoveStrategy.Fast : RemoveStrategy.Safe)
+            ? RemoveStrategy.Fast // this adapter declares write.fastRemove
             : strategy;
 
         if (effectiveStrategy == RemoveStrategy.Fast)
@@ -690,8 +695,7 @@ internal sealed class PostgresRepository<
         }
 
         // Safe path: DELETE (fires hooks if registered)
-        var countRequest = new CountRequest<TEntity>();
-        var countResult = await Count(countRequest, ct);
+        var countResult = await Count(QueryDefinition.All, ct);
         await conn.ExecuteAsync($"DELETE FROM {QualifiedTable}", ct);
         return countResult.Value;
     }
@@ -871,7 +875,7 @@ internal sealed class PostgresRepository<
             cmd.CommandText = "SELECT 1 FROM information_schema.tables WHERE table_schema = @s AND table_name = @t";
             cmd.Parameters.AddWithValue("@s", schema ?? (searchPath ?? "public"));
             cmd.Parameters.AddWithValue("@t", table);
-            return cmd.ExecuteScalarAsync() is not null;
+            return cmd.ExecuteScalar() is not null;
         }
         public bool ColumnExists(string schema, string table, string column)
         {
@@ -880,14 +884,14 @@ internal sealed class PostgresRepository<
             cmd.Parameters.AddWithValue("@s", schema ?? (searchPath ?? "public"));
             cmd.Parameters.AddWithValue("@t", table);
             cmd.Parameters.AddWithValue("@c", column);
-            return cmd.ExecuteScalarAsync() is not null;
+            return cmd.ExecuteScalar() is not null;
         }
         public void CreateTableIdJson(string schema, string table, string idColumn = "Id", string jsonColumn = "Json")
         {
             var sch = schema ?? (searchPath ?? "public");
             using var cmd = conn.CreateCommand();
             cmd.CommandText = $"CREATE TABLE IF NOT EXISTS \"{Qual(sch)}\".\"{Qual(table)}\" (\"{Qual(idColumn)}\" text PRIMARY KEY, \"{Qual(jsonColumn)}\" jsonb NOT NULL)";
-            cmd.ExecuteNonQueryAsync();
+            cmd.ExecuteNonQuery();
         }
         public void CreateTableWithColumns(string schema, string table, List<(string Name, Type ClrType, bool Nullable, bool IsComputed, string? JsonPath, bool IsIndexed)> columns)
         {
@@ -923,7 +927,7 @@ internal sealed class PostgresRepository<
             }
 
             cmd.CommandText = $"CREATE TABLE IF NOT EXISTS \"{Qual(sch)}\".\"{Qual(table)}\" ({defs});";
-            try { cmd.ExecuteNonQueryAsync(); } catch { }
+            try { cmd.ExecuteNonQuery(); } catch { }
 
             // Create indexes for indexed columns
             for (int i = 0; i < columns.Count; i++)
@@ -934,7 +938,7 @@ internal sealed class PostgresRepository<
                     var ix = $"IX_{table}_{c.Name}";
                     using var cmd2 = conn.CreateCommand();
                     cmd2.CommandText = $"CREATE INDEX IF NOT EXISTS \"{Qual(ix)}\" ON \"{Qual(sch)}\".\"{Qual(table)}\" (\"{Qual(c.Name)}\");";
-                    try { cmd2.ExecuteNonQueryAsync(); } catch { }
+                    try { cmd2.ExecuteNonQuery(); } catch { }
                 }
             }
         }
@@ -947,7 +951,7 @@ internal sealed class PostgresRepository<
             // @p like $.Prop -> use substring to strip '$.'; simple helper for tests
             var p = conn.CreateCommand();
             cmd.Parameters.AddWithValue("@p", jsonPath);
-            cmd.ExecuteNonQueryAsync();
+            cmd.ExecuteNonQuery();
         }
         public void AddPhysicalColumn(string schema, string table, string column, Type clrType, bool nullable)
         {
@@ -955,7 +959,7 @@ internal sealed class PostgresRepository<
             string pgType = clrType == typeof(int) ? "integer" : clrType == typeof(long) ? "bigint" : clrType == typeof(bool) ? "boolean" : clrType == typeof(DateTime) ? "timestamp with time zone" : "text";
             using var cmd = conn.CreateCommand();
             cmd.CommandText = $"ALTER TABLE \"{Qual(sch)}\".\"{Qual(table)}\" ADD COLUMN IF NOT EXISTS \"{Qual(column)}\" {pgType} {(nullable ? "" : "NOT NULL")}";
-            cmd.ExecuteNonQueryAsync();
+            cmd.ExecuteNonQuery();
         }
         public void CreateIndex(string schema, string table, string indexName, IReadOnlyList<string> columns, bool unique)
         {
@@ -963,7 +967,7 @@ internal sealed class PostgresRepository<
             var cols = string.Join(", ", columns.Select(c => "\"" + Qual(c) + "\""));
             using var cmd = conn.CreateCommand();
             cmd.CommandText = $"CREATE {(unique ? "UNIQUE " : "")}INDEX IF NOT EXISTS \"{Qual(indexName)}\" ON \"{Qual(sch)}\".\"{Qual(table)}\" ({cols})";
-            cmd.ExecuteNonQueryAsync();
+            cmd.ExecuteNonQuery();
         }
     }
 
@@ -973,25 +977,6 @@ internal sealed class PostgresRepository<
         public bool SupportsPersistedComputedColumns => true; // generated columns are stored
         public bool SupportsIndexesOnComputedColumns => true;
         public string ProviderName => "postgresql";
-    }
-
-    private (int offset, int limit) ComputeSkipTake(DataQueryOptions? options)
-    {
-        // Check if pagination is active
-        var hasPagination = options?.HasPagination ?? false;
-
-        if (!hasPagination)
-        {
-            // No pagination - return full result set without applying default page size
-            return (0, int.MaxValue);
-        }
-
-        // Pagination is active - apply default fallback only. Per ADR no adapter-side cap.
-        var page = options?.Page is int p && p > 0 ? p : 1;
-        var sizeReq = options?.PageSize;
-        var size = sizeReq is int ps && ps > 0 ? ps : _defaultPageSize;
-        var offset = (page - 1) * size;
-        return (offset, size);
     }
 
     private string RewriteEntityToken(string sql)
@@ -1088,7 +1073,7 @@ internal sealed class PostgresRepository<
                 {
                     try
                     {
-                        var ent = Newtonsoft.Json.JsonConvert.DeserializeObject<TEntity>(jsonStr!);
+                        var ent = Newtonsoft.Json.JsonConvert.DeserializeObject<TEntity>(jsonStr!, _json);
                         if (ent is not null) list.Add(ent);
                         continue;
                     }

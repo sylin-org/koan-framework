@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
 using Microsoft.Extensions.Logging;
 
@@ -150,7 +151,7 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
 
     public async Task Commit(CancellationToken ct = default)
     {
-        ThrowIfCompleted();
+        if (_isCompleted) return; // idempotent: a second Commit (or Commit after Rollback) is a no-op
 
         var stopwatch = Stopwatch.StartNew();
 
@@ -199,7 +200,7 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
 
     public async Task Rollback(CancellationToken ct = default)
     {
-        ThrowIfCompleted();
+        if (_isCompleted) return; // idempotent: a second Rollback (or Rollback after Commit) is a no-op
 
         try
         {
@@ -236,18 +237,13 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
         }
     }
 
-    public TransactionCapabilities GetCapabilities()
-    {
-        var adapters = _operationsByAdapter.Keys.ToArray();
-        var operationCount = _operationsByAdapter.Values.Sum(list => list.Count);
+    // ARCH-0084: capability flags as TxCaps tokens (only Local is supported today — best-effort
+    // coordination, no distributed atomicity / compensation); runtime state lives on the coordinator.
+    public CapabilitySet Capabilities { get; } = CapabilitySet.Build("transaction", c => c.Add(TxCaps.Local));
 
-        return new TransactionCapabilities(
-            SupportsLocalTransactions: true,  // All adapters support local via Direct API
-            SupportsDistributedTransactions: false,  // Best-effort coordination only
-            RequiresCompensation: false,  // Future: detect vector operations
-            Adapters: adapters,
-            TrackedOperationCount: operationCount);
-    }
+    public IReadOnlyList<string> Adapters => _operationsByAdapter.Keys.ToArray();
+
+    public int TrackedOperationCount => _operationsByAdapter.Values.Sum(list => list.Count);
 
     private async Task ExecuteOperations(CancellationToken ct)
     {

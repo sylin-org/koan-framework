@@ -24,8 +24,10 @@ public sealed class CouchbaseContainerFixture : IAsyncDisposable, IInitializable
     private const string DefaultBucket = "koan";
     private const string DockerFixtureDefaultKey = "docker";
     private const string RyukVariable = "TESTCONTAINERS_RYUK_DISABLED";
-    private const int CouchbaseRestPort = 8091;
-    private const int CouchbaseKvPort = 11210;
+    private const int CouchbaseRestPort = 8091;   // management / bootstrap
+    private const int CouchbaseViewsPort = 8092;  // views / capi (SDK probes during bootstrap)
+    private const int CouchbaseQueryPort = 8093;  // N1QL query service
+    private const int CouchbaseKvPort = 11210;    // key/value (data)
     private const string ImageName = "couchbase:community-7.6.1";
     private const string DefaultUsername = "Administrator";
     private const string DefaultPassword = "password";
@@ -91,10 +93,18 @@ public sealed class CouchbaseContainerFixture : IAsyncDisposable, IInitializable
 
         Environment.SetEnvironmentVariable(RyukVariable, "true");
 
+        // Couchbase advertises each node by its INTERNAL Docker IP in the cluster topology, which the SDK
+        // (running on the host) can't reach. We expose the SDK-facing services on random host ports, then
+        // publish those exact mapped ports back to Couchbase as the node's "external" alternate address
+        // (127.0.0.1:<mappedPort>). The SDK, connecting with ?network=external, then resolves every service
+        // to a reachable host port. (Random ports — not 1:1 — so nothing collides and it matches every other
+        // container fixture here.)
         var builder = new TestcontainersBuilder<TestcontainersContainer>()
             .WithImage(ImageName)
             .WithCleanUp(true)
             .WithPortBinding(CouchbaseRestPort, assignRandomHostPort: true)
+            .WithPortBinding(CouchbaseViewsPort, assignRandomHostPort: true)
+            .WithPortBinding(CouchbaseQueryPort, assignRandomHostPort: true)
             .WithPortBinding(CouchbaseKvPort, assignRandomHostPort: true)
             .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(CouchbaseRestPort));
 
@@ -114,6 +124,8 @@ public sealed class CouchbaseContainerFixture : IAsyncDisposable, IInitializable
 
             await container.StartAsync(context.Cancellation).ConfigureAwait(false);
             var mappedRestPort = container.GetMappedPublicPort(CouchbaseRestPort);
+            var mappedViewsPort = container.GetMappedPublicPort(CouchbaseViewsPort);
+            var mappedQueryPort = container.GetMappedPublicPort(CouchbaseQueryPort);
             var mappedKvPort = container.GetMappedPublicPort(CouchbaseKvPort);
 
             var restEndpoint = $"http://localhost:{mappedRestPort}";
@@ -122,11 +134,13 @@ public sealed class CouchbaseContainerFixture : IAsyncDisposable, IInitializable
                 throw new InvalidOperationException("Couchbase did not become ready in time.");
             }
 
-            await InitializeCluster(restEndpoint, context.Cancellation).ConfigureAwait(false);
+            await InitializeCluster(restEndpoint, mappedRestPort, mappedViewsPort, mappedQueryPort, mappedKvPort, context.Cancellation).ConfigureAwait(false);
             await CreateBucket(restEndpoint, Bucket, context.Cancellation).ConfigureAwait(false);
             await WaitForBucketReady(restEndpoint, Bucket, context.Cancellation).ConfigureAwait(false);
 
-            ConnectionString = $"couchbase://localhost:{mappedKvPort}";
+            // network=external → the SDK resolves nodes via the published 127.0.0.1:<mappedPort> alternate
+            // addresses instead of the unreachable internal Docker IP advertised in the default topology.
+            ConnectionString = $"couchbase://127.0.0.1:{mappedKvPort}?network=external";
             Username = DefaultUsername;
             Password = DefaultPassword;
             IsAvailable = true;
@@ -233,12 +247,12 @@ public sealed class CouchbaseContainerFixture : IAsyncDisposable, IInitializable
         return false;
     }
 
-    private static async Task InitializeCluster(string restEndpoint, CancellationToken cancellation)
+    private static async Task InitializeCluster(string restEndpoint, int mgmtPort, int viewsPort, int queryPort, int kvPort, CancellationToken cancellation)
     {
         using var http = new HttpClient { BaseAddress = new Uri(restEndpoint) };
         http.Timeout = TimeSpan.FromSeconds(30);
 
-        // Initialize cluster services (data only for community edition)
+        // Initialize cluster services (community edition: kv + n1ql + index).
         var setupPayload = new FormUrlEncodedContent(
         [
             new KeyValuePair<string, string>("services", "kv,n1ql,index"),
@@ -257,18 +271,41 @@ public sealed class CouchbaseContainerFixture : IAsyncDisposable, IInitializable
         var credResponse = await http.PostAsync("/settings/web", credPayload, cancellation).ConfigureAwait(false);
         credResponse.EnsureSuccessStatusCode();
 
+        http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+            "Basic",
+            Convert.ToBase64String(Encoding.ASCII.GetBytes($"{DefaultUsername}:{DefaultPassword}")));
+
+        // GSI storage mode. Couchbase Community Edition only supports forestdb, and it MUST be set before any
+        // index is created — otherwise CREATE PRIMARY INDEX fails with "Please Set Indexer Storage Mode
+        // Before Create Index" (which silently broke every N1QL-backed query).
+        var indexPayload = new FormUrlEncodedContent(
+        [
+            new KeyValuePair<string, string>("storageMode", "forestdb")
+        ]);
+        await http.PostAsync("/settings/indexes", indexPayload, cancellation).ConfigureAwait(false);
+
         // Set memory quota
         var quotaPayload = new FormUrlEncodedContent(
         [
             new KeyValuePair<string, string>("memoryQuota", "256"),
             new KeyValuePair<string, string>("indexMemoryQuota", "256")
         ]);
-
-        http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
-            "Basic",
-            Convert.ToBase64String(Encoding.ASCII.GetBytes($"{DefaultUsername}:{DefaultPassword}")));
-
         await http.PostAsync("/pools/default", quotaPayload, cancellation).ConfigureAwait(false);
+
+        // External alternate addresses. Couchbase advertises the node by its INTERNAL Docker IP (e.g.
+        // 172.17.0.x) in the cluster topology, which is unreachable from the host — so the SDK reads it and
+        // fails with "non-connected sockets" the moment it leaves the REST bootstrap. Publishing 127.0.0.1
+        // as the external address (with the 1:1-mapped standard ports) lets the SDK reach every service
+        // when it connects with ?network=external.
+        var altPayload = new FormUrlEncodedContent(
+        [
+            new KeyValuePair<string, string>("hostname", "127.0.0.1"),
+            new KeyValuePair<string, string>("mgmt", mgmtPort.ToString()),
+            new KeyValuePair<string, string>("capi", viewsPort.ToString()),
+            new KeyValuePair<string, string>("n1ql", queryPort.ToString()),
+            new KeyValuePair<string, string>("kv", kvPort.ToString())
+        ]);
+        await http.PutAsync("/node/controller/setupAlternateAddresses/external", altPayload, cancellation).ConfigureAwait(false);
     }
 
     private static async Task CreateBucket(string restEndpoint, string bucketName, CancellationToken cancellation)
@@ -348,8 +385,14 @@ public sealed class CouchbaseContainerFixture : IAsyncDisposable, IInitializable
 
     private async Task<(bool ok, string? connectionString, string? failureReason)> TryStartWithDockerCli(TestContext context)
     {
+        // Defensive: a prior run whose dispose never fired (e.g. the test host was killed) can leave
+        // koan-couchbase-* containers RUNNING. Several lingering Couchbase containers exhaust host memory and
+        // make this run's services fail to start (a fast ~7s failure). Force-remove any orphans first so each
+        // run starts on a clean slate.
+        await RemoveOrphanedCliContainers(context.Cancellation).ConfigureAwait(false);
+
         var containerName = $"koan-couchbase-{Guid.NewGuid():N}";
-        var runArgs = $"run --rm -d --name {containerName} -p 127.0.0.1::{CouchbaseRestPort} -p 127.0.0.1::{CouchbaseKvPort} {ImageName}";
+        var runArgs = $"run --rm -d --name {containerName} -p 127.0.0.1::{CouchbaseRestPort} -p 127.0.0.1::{CouchbaseViewsPort} -p 127.0.0.1::{CouchbaseQueryPort} -p 127.0.0.1::{CouchbaseKvPort} {ImageName}";
         var (runOk, runStdout, runStderr, runExitCode) = await RunDockerCommand(runArgs, context.Cancellation).ConfigureAwait(false);
 
         if (!runOk)
@@ -380,10 +423,14 @@ public sealed class CouchbaseContainerFixture : IAsyncDisposable, IInitializable
         var kvPort = ParseDockerPortOutput(portResult.stdout);
         var (restPortOk, restPortStdout, _, _) = await RunDockerCommand($"port {containerName} {CouchbaseRestPort}/tcp", context.Cancellation).ConfigureAwait(false);
         var restPort = restPortOk ? ParseDockerPortOutput(restPortStdout) : 0;
+        var (viewsPortOk, viewsPortStdout, _, _) = await RunDockerCommand($"port {containerName} {CouchbaseViewsPort}/tcp", context.Cancellation).ConfigureAwait(false);
+        var viewsPort = viewsPortOk ? ParseDockerPortOutput(viewsPortStdout) : 0;
+        var (queryPortOk, queryPortStdout, _, _) = await RunDockerCommand($"port {containerName} {CouchbaseQueryPort}/tcp", context.Cancellation).ConfigureAwait(false);
+        var queryPort = queryPortOk ? ParseDockerPortOutput(queryPortStdout) : 0;
 
-        if (kvPort == 0 || restPort == 0)
+        if (kvPort == 0 || restPort == 0 || viewsPort == 0 || queryPort == 0)
         {
-            context.Diagnostics.Warn("couchbase.fixture.dockercli.port.parse", new { kvPort, restPort });
+            context.Diagnostics.Warn("couchbase.fixture.dockercli.port.parse", new { kvPort, restPort, viewsPort, queryPort });
             await StopCliContainer().ConfigureAwait(false);
             return (false, null, "Unable to parse published Couchbase ports from docker CLI output");
         }
@@ -396,11 +443,11 @@ public sealed class CouchbaseContainerFixture : IAsyncDisposable, IInitializable
             return (false, null, $"Couchbase container did not respond on localhost:{restPort} within timeout");
         }
 
-        await InitializeCluster(restEndpoint, context.Cancellation).ConfigureAwait(false);
+        await InitializeCluster(restEndpoint, restPort, viewsPort, queryPort, kvPort, context.Cancellation).ConfigureAwait(false);
         await CreateBucket(restEndpoint, Bucket, context.Cancellation).ConfigureAwait(false);
         await WaitForBucketReady(restEndpoint, Bucket, context.Cancellation).ConfigureAwait(false);
 
-        var connection = $"couchbase://127.0.0.1:{kvPort}";
+        var connection = $"couchbase://127.0.0.1:{kvPort}?network=external";
         context.Diagnostics.Info("couchbase.fixture.dockercli.started", new { container = containerName, host = "localhost", kvPort, restPort });
         return (true, connection, null);
     }
@@ -477,6 +524,26 @@ public sealed class CouchbaseContainerFixture : IAsyncDisposable, IInitializable
         try { await RunDockerCommand($"rm -f {_cliContainerId}", CancellationToken.None).ConfigureAwait(false); }
         catch { }
         finally { _cliContainerId = null; }
+    }
+
+    /// <summary>
+    /// Force-remove any koan-couchbase-* containers left behind by a prior run whose dispose did not fire.
+    /// Best-effort: keeps the host from accumulating heavyweight Couchbase containers that would memory-starve
+    /// the next run. Safe under the serialized Couchbase suite — no live run shares this name prefix.
+    /// </summary>
+    private async Task RemoveOrphanedCliContainers(CancellationToken cancellation)
+    {
+        try
+        {
+            var (ok, stdout, _, _) = await RunDockerCommand("ps -aq --filter name=koan-couchbase-", cancellation).ConfigureAwait(false);
+            if (!ok || string.IsNullOrWhiteSpace(stdout)) return;
+            foreach (var id in stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                try { await RunDockerCommand($"rm -f {id}", cancellation).ConfigureAwait(false); }
+                catch { /* best effort */ }
+            }
+        }
+        catch { /* best effort */ }
     }
 
     private static int ParseDockerPortOutput(string output)

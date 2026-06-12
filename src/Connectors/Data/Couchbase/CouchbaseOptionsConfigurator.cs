@@ -103,6 +103,13 @@ internal sealed class CouchbaseOptionsConfigurator : AdapterOptionsConfigurator<
         options.DurabilityLevel = ReadProviderConfiguration(options.DurabilityLevel ?? "",
             Infrastructure.Constants.Configuration.Keys.DurabilityLevel) ?? options.DurabilityLevel;
 
+        var managementUrl = ReadProviderConfiguration(options.ManagementUrl ?? "",
+            Infrastructure.Constants.Configuration.Keys.ManagementUrl);
+        if (!string.IsNullOrWhiteSpace(managementUrl))
+        {
+            options.ManagementUrl = managementUrl;
+        }
+
         Logger?.LogInformation("Final Couchbase Configuration");
         Logger?.LogInformation("Connection: {ConnectionString}", options.ConnectionString);
         Logger?.LogInformation("Bucket: {Bucket}", options.Bucket);

@@ -1,4 +1,5 @@
 ﻿using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Capabilities;
 using Koan.Core;
 using Koan.Core.Observability.Health;
 using Microsoft.Extensions.DependencyInjection;
@@ -27,14 +28,13 @@ public class SqlServerCapabilitiesAndHealthTests : IClassFixture<Support.SqlServ
         var data = _fx.Data;
         var repo = data.GetRepository<TestEntity, string>();
 
-        var qc = (repo as IQueryCapabilities)!;
-        qc.Capabilities.Should().HaveFlag(QueryCapabilities.String);
-        qc.Capabilities.Should().HaveFlag(QueryCapabilities.Linq);
-
-        var wc = (repo as IWriteCapabilities)!;
-        wc.Writes.Should().HaveFlag(WriteCapabilities.AtomicBatch);
-        wc.Writes.Should().HaveFlag(WriteCapabilities.BulkDelete);
-        wc.Writes.Should().HaveFlag(WriteCapabilities.BulkUpsert);
+        // ARCH-0084: negotiate via the unified CapabilitySet.
+        var caps = DataCaps.Describe(repo, repo.GetType().Name);
+        caps.Has(DataCaps.Query.String).Should().BeTrue();
+        caps.Has(DataCaps.Query.Linq).Should().BeTrue();
+        caps.Has(DataCaps.Write.AtomicBatch).Should().BeTrue();
+        caps.Has(DataCaps.Write.BulkDelete).Should().BeTrue();
+        caps.Has(DataCaps.Write.BulkUpsert).Should().BeTrue();
     }
 
     public sealed record TestEntity(string Id) : IEntity<string>

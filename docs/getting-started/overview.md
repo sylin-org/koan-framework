@@ -1,219 +1,215 @@
 ---
 type: GUIDE
 domain: core
-title: "Koan Getting Started Hub"
+title: "Getting started with Koan"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2025-10-01
-framework_version: v0.6.3
-validation:
-  date_last_tested: 2025-10-01
-  status: verified
-  scope: docs/getting-started/overview.md
 nav: true
 ---
 
-# Koan Getting Started Hub
+# Getting started with Koan
 
-## Contract
+This is the golden path: zero to a working, explained application, one concept at a time.
+Every code block on this page compiles against the current source — if one doesn't, that is a
+bug; please report it.
 
-- **Inputs**: .NET 10 SDK+, a terminal or IDE, and basic familiarity with C# web projects.
-- **Outputs**: Running Koan service with REST CRUD, messaging hooks, AI integration options, and pointers for production rollout.
-- **Error Modes**: Missing Koan packages, disabled container runtime (for optional steps), or adapters lacking advertised capabilities.
-- **Success Criteria**: `dotnet run` serves `/api/todos`, events and Flow hooks execute, optional AI endpoints respond once a provider is configured, and you know the next docs to visit.
+> **Pre-1.0 note**: until 1.0, the recommended path is **building from source** (Path A below).
+> Published NuGet packages use the `Sylin.Koan.*` prefix and may lag the repo.
 
-### Edge Cases
+## The concept budget
 
-- **SDK drift** – mismatch between repo `global.json` and local SDK; run `dotnet --list-sdks` if builds fail.
-- **Rate-limited AI** – set provider batch sizes before running semantic search at scale.
-- **Vector support** – confirm the selected data adapter advertises semantic capabilities before calling `Entity.SemanticSearch`.
-- **Automation scope** – run Flow hooks inside long-lived hosts (`dotnet watch run` or a hosted service) to avoid prematurely cancelled work.
-- **Enterprise rollout** – coordinate security policies and environment configuration before deploying shared services.
+Hello-CRUD needs exactly **eight Koan concepts**. This page introduces them in order; nothing
+else is required:
 
----
+1. `Entity<T>` — your model, with a string `Id` (GUID v7, generated on first read)
+2. Entity statics & instance verbs — `Get` / `All` / `Query` / `Save()` / `Remove()`
+3. `EntityController<T>` — the REST surface over an entity
+4. `AddKoan()` — the single bootstrap call ("Reference = Intent": referenced packages register themselves)
+5. Provider election — the referenced data connector wins; zero-config defaults (SQLite → `./data/app.db`)
+6. The boot report — what the app prints at startup is the primary debugging surface
+7. Auto schema ("magic") — created in Development; gated by `Koan:AllowMagicInProduction` elsewhere
+8. Web defaults — controllers, `/api/health`, secure headers auto-wired; JSON is **camelCase,
+   nulls omitted** (Newtonsoft.Json — chosen for predictable polymorphic serialization)
 
-## Stage 0 – Understand Koan in One Glance
+## Path A — run it from the repo (60 seconds)
 
-Koan is a modular .NET framework built around pillars you compose as you grow:
+```bash
+git clone https://github.com/sylin-org/koan-framework
+cd koan-framework
+dotnet run --project samples/S1.Web
+```
 
-- **Core** provides auto-registration (`builder.Services.AddKoan()`), health endpoints, boot reports, configuration helpers, and observability.
-- **Data** delivers entity-first persistence across SQL, NoSQL, JSON, and vector stores with static helpers (`All`, `Query`, `AllStream`, `Page`).
-- **Web** supplies MVC controllers, payload transformers, OpenAPI, and GraphQL surfaces.
-- **AI** adds chat, embeddings, vector search, and RAG helpers.
-- **Flow** orchestrates intake ➜ standardize ➜ projection pipelines and the semantic pipeline DSL.
+Browse the printed URL; hit `/api/health`; read the boot report in the console — it lists every
+discovered module, the elected adapters, and the boot phases. Then read
+[samples/README.md](../../samples/README.md) for the learning ladder
+(S0 → S1 → S10 → S14).
 
-Everything starts minimal and grows by intent—add packages, not boilerplate.
+## Path B — from scratch
 
----
+```bash
+dotnet new web -n MyApp
+cd MyApp
+dotnet add package Sylin.Koan.Core
+dotnet add package Sylin.Koan.Web
+dotnet add package Sylin.Koan.Data.Connector.Sqlite
+```
 
-## Stage 1 – Launch the Service (≈5 minutes)
+**Program.cs — this is complete.** Resist the urge to add more; the web pipeline, controllers,
+health endpoints, and discovery are auto-wired when `Koan.Web` is referenced:
 
-1. **Initialize the project**
-   ```powershell
-   mkdir my-koan-app
-   cd my-koan-app
-   dotnet new web
-   dotnet add package Koan.Core Koan.Web Koan.Data.Connector.Sqlite
-   ```
-2. **Model the entity**
-   ```csharp
-   public class Todo : Entity<Todo>
-   {
-       public string Title { get; set; } = "";
-       public bool IsCompleted { get; set; }
-       public string Category { get; set; } = "General";
-   }
-   ```
-3. **Expose REST automatically**
-   ```csharp
-   [Route("api/[controller]")]
-   public class TodosController : EntityController<Todo> { }
-   ```
-4. **Keep `Program.cs` minimal**
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddKoan();
+var app = builder.Build();
+app.Run();
+```
 
-   ```csharp
-   var builder = WebApplication.CreateBuilder(args);
-   builder.Services.AddKoan();
+Model + API:
 
-   var app = builder.Build();
-   app.Run();
-   ```
+```csharp
+using Koan.Data.Core.Model;
+using Koan.Web.Controllers;
+using Microsoft.AspNetCore.Mvc;
 
-5. **Run and verify**
-   ```powershell
-   dotnet run
-   curl -X POST http://localhost:5000/api/todos -H "Content-Type: application/json" -d '{"title":"Experience Koan"}'
-   curl http://localhost:5000/api/todos
-   curl http://localhost:5000/api/health
-   ```
+public sealed class Todo : Entity<Todo>
+{
+    public string Title { get; set; } = "";
+    public bool IsCompleted { get; set; }
+}
 
-You now have REST CRUD, health checks, telemetry, and SQLite storage without configuration files.
+[Route("api/[controller]")]
+public sealed class TodoController : EntityController<Todo> { }
+```
 
----
+Run and verify:
 
-## Stage 2 – Expand the Pattern
+```bash
+dotnet run
+curl -X POST http://localhost:5000/api/todo -H "Content-Type: application/json" -d '{"title":"Experience Koan"}'
+curl http://localhost:5000/api/todo
+curl http://localhost:5000/api/health
+```
 
-### Messaging in Minutes
+Working with data (the verbs — note: `Query`, not `Where`; `Remove`, not `Delete`):
 
-- Add intent-driven events:
-  ```csharp
-  public class TodoCompleted : Entity<TodoCompleted>
-  {
-      public string TodoId { get; set; } = "";
-      public string Title { get; set; } = "";
-      public DateTime CompletedAt { get; set; } = DateTime.UtcNow;
-  }
-  ```
-- Emit events when state transitions:
-  ```csharp
-  public override async Task<ActionResult<Todo>> Put(string id, Todo todo)
-  {
-      var result = await base.Put(id, todo);
-      if (todo.IsCompleted)
-      {
-          await new TodoCompleted { TodoId = todo.Id, Title = todo.Title }.Send();
-      }
-      return result;
-  }
-  ```
-- Reference a messaging transport when ready:
-  ```powershell
-  dotnet add package Koan.Messaging.InMemory
-  ```
+```csharp
+var todo  = await Todo.Get(id);                      // null when missing
+var open  = await Todo.Query(t => !t.IsCompleted);   // pushed down when the adapter supports it
+var page  = await Todo.FirstPage(20);
+await new Todo { Title = "Ship it" }.Save();
+await todo.Remove();
+await foreach (var t in Todo.AllStream(batchSize: 1000)) { /* streaming, constant memory */ }
+```
 
-### AI When You Need It
+## Growing by intent (one package + one attribute each)
 
-- Install providers (Ollama local, or hosted equivalents):
-  ```powershell
-  dotnet add package Koan.AI.Ollama
-  ```
-- Inject `IAiPipeline` for chat + semantic search:
+Each step below is independent. New concepts per step are listed — that's the price you pay.
 
-  ```csharp
-  public class TodosController : EntityController<Todo>
-  {
-    private readonly IAiPipeline _ai;
-    public TodosController(IAiPipeline ai) => _ai = ai;
+### Swap the database (+1 concept: connection configuration)
 
-      [HttpPost("{id}/suggestions")]
-      public async Task<ActionResult<string>> GetSuggestions(string id)
-      {
-          var todo = await Todo.Get(id);
-          if (todo is null) return NotFound();
-      var suggestion = await _ai.PromptAsync(new AiChatRequest
-      {
-        Messages =
-        {
-          new AiMessage("user", $"What should I do after completing: {todo.Title}?")
-        }
-      });
-      return Ok(suggestion.Text);
-      }
+```bash
+dotnet add package Sylin.Koan.Data.Connector.Postgres
+```
 
-    [HttpGet("semantic-search")]
-    public async Task<ActionResult<IEnumerable<Todo>>> SemanticSearch([FromQuery] string query)
-      => Ok(await Todo.SemanticSearch(query));
-  }
-  ```
+```json
+{ "Koan": { "Data": { "Postgres": { "ConnectionString": "Host=localhost;Database=myapp" } } } }
+```
 
-- Skip the AI step when providers are unavailable; everything else still works.
+Same entities, same controllers. Capability differences are negotiated, not hidden:
 
----
+```csharp
+if (Data<Todo, string>.Capabilities.Has(DataCaps.Query.Linq)) { /* pushdown active */ }
+```
 
-## Stage 3 – Automate with Flow
+### Cache entities (+1 concept: `[Cacheable]`)
 
-- Enrich workflows with Flow hooks:
-  ```csharp
-  Flow.OnUpdate<Todo>(async (todo, previous) =>
-  {
-      if (todo.IsCompleted && !previous.IsCompleted)
-      {
-          await new TodoCompleted { TodoId = todo.Id, Title = todo.Title }.Send();
-      }
-      return UpdateResult.Continue();
-  });
-  ```
-- Promote long-running work into semantic pipelines:
-  ```csharp
-  await Todo.AllStream()
-      .Pipeline()
-      .ForEach(todo => todo.Status = "processing")
-      .Save()
-      .ExecuteAsync();
-  ```
-- Swap providers by intent:
-  ```powershell
-  dotnet add package Koan.Data.Connector.Postgres Koan.Data.Vector
-  ```
+```bash
+dotnet add package Sylin.Koan.Cache
+```
 
-Flow pipelines unify intake, AI enrichment, and messaging without bespoke orchestration.
+```csharp
+[Cacheable(300)]   // 5-minute TTL; L1/L2 layering and cross-node coherence by reference
+public sealed class Todo : Entity<Todo> { /* … */ }
+```
 
----
+Reads past TTL return fresh-or-null — stale data is opt-in, never a surprise.
 
-## Stage 4 – Harden for Production
+### Background jobs (+2 concepts: `IKoanJob<T>`, `JobContext`)
 
-- **Security**: Enable HTTPS, configure auth providers, and review policies in `docs/guides/authentication-setup.md`.
-- **Observability**: Wire OpenTelemetry or capture boot reports; see [Flow monitoring](../reference/flow/index.md#monitoring--diagnostics).
-- **Configuration**: Layer settings via `Configuration.Read` helpers and environment variables.
-- **Health & Resilience**: Add custom `IHealthContributor` checks, implement retry policies, and monitor Flow stage depth.
-- **Deployment**: Use `koan export compose --profile Local` or Aspire integration for service meshes.
+```bash
+dotnet add package Sylin.Koan.Jobs
+```
 
----
+```csharp
+public sealed class ImportJob : Entity<ImportJob>, IKoanJob<ImportJob>
+{
+    public string Source { get; set; } = "";
 
-## Stage 5 – Scale Adoption
+    public static async Task Execute(ImportJob job, JobContext ctx, CancellationToken ct)
+    {
+        // at-least-once, retried, schedulable (interval / cron / @boot), progress-reporting
+    }
+}
+```
 
-- Read [Enterprise Adoption Guide](./enterprise-adoption.md) for policy, governance, and rollout strategies.
-- Compare Koan with adjacent stacks in the [architecture comparison](../architecture/comparison.md).
-- Explore samples under `samples/` for end-to-end implementations (API, messaging, AI, Flow, automation).
-- Review ADRs like [DX-0041](../decisions/DX-0041-docs-pillar-consolidation.md) to understand documentation governance.
+Jobs ride the data pillar: in-memory by default, durable + distributed when a database connector
+is present. See the [jobs guide](../guides/jobs-howto.md).
 
----
+### Messaging (+1 concept: `.Send()`)
 
-## Reference Map
+```bash
+dotnet add package Sylin.Koan.Messaging.Connector.RabbitMq
+```
 
-- Pillars: [Core](../reference/core/index.md), [Data](../reference/data/index.md), [Web](../reference/web/index.md), [AI](../reference/ai/index.md), [Flow](../reference/flow/index.md), [Messaging](../reference/messaging/index.md).
-- Recipes & automation: [Flow Pillar Reference](../reference/flow/index.md#semantic-pipelines), [Semantic Pipelines Playbook](../guides/semantic-pipelines.md).
-- Troubleshooting: [Support Troubleshooting Hub](../support/troubleshooting.md).
-- Tooling: [ASPIRE Integration](../ASPIRE-INTEGRATION.md), Koan CLI (`scripts/` & `packaging/Koan-cli`).
+```csharp
+await new TodoCompleted { TodoId = todo.Id }.Send();
+```
 
-Keep iterating—Koan grows with your intent, not against it.
+### Semantic search (+2 concepts: `[Embedding]`, vector adapters)
+
+```bash
+dotnet add package Sylin.Koan.Data.AI
+dotnet add package Sylin.Koan.AI.Connector.Ollama
+dotnet add package Sylin.Koan.Data.Vector.Connector.Weaviate
+```
+
+```csharp
+[Embedding(Properties = new[] { nameof(Title) })]
+public sealed class Todo : Entity<Todo> { /* embeddings maintained by a background worker */ }
+```
+
+```csharp
+using static Koan.Data.AI.EntityEmbeddingExtensions;
+
+var related = await SemanticSearch<Todo>("groceries and meal planning", limit: 10);
+```
+
+### Agent tools (+1 concept: `[McpEntity]`)
+
+```bash
+dotnet add package Sylin.Koan.Mcp
+```
+
+```csharp
+[McpEntity]
+public sealed class Todo : Entity<Todo> { /* exposed to agents over MCP (HTTP/SSE) */ }
+```
+
+## When something goes wrong
+
+1. **Read the boot report first.** It names every module discovered, the adapter elections, and
+   the boot phases — most "why isn't X registered" questions are answered there.
+2. Resolution failures throw messages that name the exact configuration keys to set.
+3. [Troubleshooting hub](../support/troubleshooting.md) · [debugging guide patterns](../guides/README.md).
+
+## Where next
+
+- **Samples ladder**: [samples/README.md](../../samples/README.md) — S0 (console, 5 min) →
+  S1 (CRUD + relationships) → S10 (live multi-provider switching) → S14 (jobs + benchmarks),
+  then the dogfood flagships (S5 recommendations, S16 vision+MCP).
+- **Guides**: [building APIs](../guides/building-apis.md) ·
+  [data modeling](../guides/data-modeling.md) · [AI integration](../guides/ai-integration.md) ·
+  [auth setup](../guides/authentication-setup.md) · [jobs](../guides/jobs-howto.md).
+- **Why it's built this way**: [architecture principles](../architecture/principles.md) ·
+  [ADR index](../decisions/index.md).
+- **What's settled vs experimental**: [the framework's own assessment](../assessment/00-overview.md).

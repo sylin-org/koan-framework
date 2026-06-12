@@ -44,7 +44,7 @@
       <td><strong>Capability detection</strong></td>
       <td>🟨 Partial; translation exceptions</td>
       <td>🟥 Rare</td>
-      <td>🟦 <code>QueryCaps</code>/<code>WriteCaps</code> + graceful fallback</td>
+      <td>🟦 <code>Capabilities</code> (query + write tokens) + graceful fallback</td>
     </tr>
     <tr>
       <td><strong>N+1 avoidance</strong></td>

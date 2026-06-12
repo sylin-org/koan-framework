@@ -45,40 +45,16 @@ public sealed class MilvusVectorAdapterFactory : IVectorAdapterFactory
         return new MilvusVectorRepository<TEntity, TKey>(httpFactory, options, sp);
     }
 
-    // INamingProvider implementation
-    public string RepositorySeparator => "#";
-
-    public string GetStorageName(Type entityType, IServiceProvider services)
-    {
-        var convention = new StorageNameResolver.Convention(
-            StorageNamingStyle.EntityType,  // EntityType (not FullNamespace)
-            "_",
-            NameCasing.Lower);  // Lowercase
-
-        return StorageNameResolver.Resolve(entityType, convention);
-    }
-
-    public string GetConcretePartition(string partition)
-    {
-        // Milvus: Lowercase and sanitize
-        if (Guid.TryParse(partition, out var guid))
-            return guid.ToString("N");  // Lowercase, no hyphens
-
-        // Named partitions: lowercase and remove special characters
-        return SanitizeForMilvus(partition);
-    }
-
-    private static string SanitizeForMilvus(string partition)
-    {
-        var sanitized = new StringBuilder(partition.Length);
-        foreach (var c in partition.ToLowerInvariant())
+    // Milvus collection names accept only [A-Za-z0-9_] and reject '#', so the partition separator is '_'
+    // and the token keeps only [A-Za-z0-9_] (everything else → '_'); names are lowercased EntityType.
+    public StorageNamingCapability GetNamingCapability(IServiceProvider services)
+        => new()
         {
-            if (char.IsLetterOrDigit(c) || c == '_')
-                sanitized.Append(c);
-            else
-                sanitized.Append('_');
-        }
-        return sanitized.ToString();
-    }
+            Style = StorageNamingStyle.EntityType,
+            Separator = "_",
+            Casing = NameCasing.Lower,
+            PartitionSeparator = '_',
+            Partition = new PartitionTokenPolicy { GuidFormat = "N", Lowercase = true, AllowedExtraChars = "" },
+        };
 }
 

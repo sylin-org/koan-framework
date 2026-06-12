@@ -4,12 +4,23 @@ using System.Threading.Tasks;
 
 namespace Koan.Data.Abstractions;
 
+/// <summary>
+/// The write/CRUD surface every data adapter implements. Querying and counting live on the
+/// separate <see cref="IQueryRepository{TEntity, TKey}"/> contract (one method taking a
+/// <see cref="QueryDefinition"/>); raw provider queries live on the optional
+/// <see cref="IRawQueryRepository{TEntity, TKey}"/> escape hatch.
+/// </summary>
 public interface IDataRepository<TEntity, TKey> where TEntity : IEntity<TKey>
 {
+    /// <summary>
+    /// Idempotent. Ensures the backing store is provisioned and reachable. Called by the
+    /// repository facade before any data operation; adapters cache their own readiness state.
+    /// Default implementation is a no-op.
+    /// </summary>
+    Task EnsureReady(CancellationToken ct = default) => Task.CompletedTask;
+
     Task<TEntity?> Get(TKey id, CancellationToken ct = default);
     Task<IReadOnlyList<TEntity?>> GetMany(IEnumerable<TKey> ids, CancellationToken ct = default);
-    Task<IReadOnlyList<TEntity>> Query(object? query, CancellationToken ct = default);
-    Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default);
     Task<TEntity> Upsert(TEntity model, CancellationToken ct = default);
     Task<bool> Delete(TKey id, CancellationToken ct = default);
 

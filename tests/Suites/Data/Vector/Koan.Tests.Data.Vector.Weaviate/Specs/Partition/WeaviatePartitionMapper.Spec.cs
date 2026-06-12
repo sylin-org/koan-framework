@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.Context.Models;
 using Koan.Data.Vector.Connector.Weaviate.Partition;
 using Microsoft.Extensions.Logging;

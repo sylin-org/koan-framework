@@ -7,7 +7,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.AI.Connector.LMStudio;
 using Koan.AI.Connector.LMStudio.Options;
 using Koan.AI.Contracts.Models;

@@ -139,10 +139,10 @@ builder.AddKoanDiscoveredResources(); // Scans assemblies for IKoanAspireRegistr
 
 ## References
 
-- [Integration Analysis](../proposals/koan-aspire-integration-analysis.md)
-- [Technical Specification](../proposals/koan-aspire-technical-specification.md)
-- [Implementation Roadmap](../proposals/koan-aspire-implementation-roadmap.md)
-- [Architecture Review Framework](../proposals/koan-aspire-architecture-review.md)
+- [Integration Analysis](../archive/proposals/koan-aspire-integration-analysis.md)
+- [Technical Specification](../archive/proposals/koan-aspire-technical-specification.md)
+- [Implementation Roadmap](../archive/proposals/koan-aspire-implementation-roadmap.md)
+- [Architecture Review Framework](../archive/proposals/koan-aspire-architecture-review.md)
 - [Microsoft Learn - .NET Aspire Multi-Provider Support](https://learn.microsoft.com/en-us/dotnet/aspire/fundamentals/setup-tooling)
 
 ---

@@ -63,6 +63,10 @@ public static class EmbeddingMigrator
             "Starting re-embedding migration for {EntityType}: model={Model}, source={Source}, provider={Provider}",
             typeof(TEntity).Name, targetModel ?? "default", targetSource ?? "default", targetProvider ?? "default");
 
+        // W4 (AI-0036 P2): re-indexing the whole collection IS a by-design model transition — reset the
+        // model registry to the target so the batch writes below don't trip the mixed-space GuardWrite.
+        await VectorModelGuard.Reset<TEntity>(targetModel ?? metadata.Model, ct);
+
         var result = new MigrationResult
         {
             EntityType = typeof(TEntity).Name,
@@ -246,8 +250,13 @@ public static class EmbeddingMigrator
                     embedding = await Client.Embed(text, ct);
                 }
 
-                // Save to vector database
-                await VectorData<TEntity>.SaveWithVector(entity, embedding, null, ct);
+                // Save to vector database — stamp the TARGET model/source so migrated vectors are
+                // distinguishable from un-migrated ones (AI-0036 W3; this is the worst drop site —
+                // the migration's whole purpose is to change the producing model) + filterable facets (D1).
+                var provenance = VectorProvenance.Build(
+                    targetModel ?? metadata.Model, targetSource ?? metadata.Source, metadata.Version, targetProvider,
+                    merge: VectorFilterableMetadata.Extract(entity));
+                await VectorData<TEntity>.SaveWithVector(entity, embedding, provenance, ct);
 
                 // Update embedding state
                 var stateId = EmbeddingState<TEntity>.MakeId(entity.Id);

@@ -1,5 +1,5 @@
 ﻿using Xunit;
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using S13.DocMind;

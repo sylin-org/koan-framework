@@ -1,19 +1,26 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Capabilities;
+using Koan.Data.Abstractions.Filtering;
+using Koan.Data.Abstractions.Sorting;
+using Koan.Data.Core.Sorting;
 using StackExchange.Redis;
-using System.Linq.Expressions;
+using System.Collections.Frozen;
 using Newtonsoft.Json;
 
 namespace Koan.Data.Connector.Redis;
 
+/// <summary>
+/// Redis key/value store. A "Full floor" adapter under the unified query contract (DATA-XXXX):
+/// it scans the keyspace, materializes entities, and evaluates the entire <see cref="Filter"/>
+/// via <see cref="InMemoryFilterEvaluator"/> (declares <see cref="FilterSupport.Full"/>).
+/// </summary>
 internal sealed class RedisRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
-    IDataRepositoryWithOptions<TEntity, TKey>,
-    ILinqQueryRepository<TEntity, TKey>,
-    ILinqQueryRepositoryWithOptions<TEntity, TKey>,
-    IQueryCapabilities,
-    IWriteCapabilities,
+    IQueryRepository<TEntity, TKey>,
+    IDescribesCapabilities,
     Abstractions.Instructions.IInstructionExecutor<TEntity>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
@@ -25,15 +32,17 @@ internal sealed class RedisRepository<TEntity, TKey> :
     public RedisRepository(IOptions<RedisOptions> options, IConnectionMultiplexer muxer, ILoggerFactory? lf)
     { _options = options; _muxer = muxer; _logger = lf?.CreateLogger("Koan.Data.Connector.Redis"); }
 
-    public QueryCapabilities Capabilities => QueryCapabilities.Linq; // predicate filtering in-memory
-    public WriteCapabilities Writes => WriteCapabilities.FastRemove;
+    public void Describe(ICapabilities caps) => caps
+        .Add(DataCaps.Query.Linq)            // predicate filtering in-memory
+        .Add(DataCaps.Write.FastRemove)
+        .Add(DataCaps.Query.Filter, FilterSupport.Full);
 
     private string Keyspace()
     {
         var sp = Koan.Core.Hosting.App.AppHost.Current;
         if (sp is not null)
         {
-            return Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(sp);
+            return Core.Configuration.AdapterNaming.GetOrCompute<TEntity, TKey>(sp);
         }
         return typeof(TEntity).Name;
     }
@@ -71,54 +80,51 @@ internal sealed class RedisRepository<TEntity, TKey> :
         return results;
     }
 
-    public async Task<IReadOnlyList<TEntity>> Query(object? query, CancellationToken ct = default)
+    public async Task<RepositoryQueryResult<TEntity>> Query(QueryDefinition query, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        var pageSize = Math.Max(1, _options.Value.DefaultPageSize);
-        var (items, _) = await ScanAll(page: 1, size: pageSize, ct);
-        return items;
-    }
+        var (all, _) = await ScanAll(page: 1, size: int.MaxValue, ct);
+        IEnumerable<TEntity> items = all;
+        if (query.Filter is not null)
+            items = items.Where(InMemoryFilterEvaluator.Compile<TEntity>(query.Filter));
 
-    public async Task<IReadOnlyList<TEntity>> Query(object? query, DataQueryOptions? options, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        var page = options?.Page is int p && p > 1 ? p : 1;
-        var size = options?.PageSize is int ps && ps > 0 ? ps : Math.Max(1, _options.Value.DefaultPageSize);
-        var (items, _) = await ScanAll(page, size, ct);
-        return items;
-    }
+        var filtered = items as IReadOnlyList<TEntity> ?? items.ToList();
+        var totalCount = (long)filtered.Count;
 
-    public async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        var pageSize = Math.Max(1, _options.Value.DefaultPageSize);
-        var (items, _) = await ScanAll(page: 1, size: pageSize, ct);
-        return items.AsQueryable().Where(predicate).ToList();
-    }
-
-    public async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        var page = options?.Page is int p && p > 1 ? p : 1;
-        var size = options?.PageSize is int ps && ps > 0 ? ps : Math.Max(1, _options.Value.DefaultPageSize);
-        var (items, _) = await ScanAll(page, size, ct);
-        return items.AsQueryable().Where(predicate).ToList();
-    }
-
-    public async Task<CountResult> Count(CountRequest<TEntity> request, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-
-        // Redis has no metadata-based fast count, so always use exact count via scanning
-        if (request.Predicate is not null)
+        var sortHandled = RepositoryQueryResult<TEntity>.NoSortHandled;
+        IEnumerable<TEntity> ordered = filtered;
+        if (query.HasSort)
         {
-            var (items, _) = await ScanAll(page: 1, size: int.MaxValue, ct);
-            var count = (long)items.AsQueryable().Count(request.Predicate);
-            return CountResult.Exact(count);
+            ordered = InMemorySorter.Apply(filtered, query.Sort);
+            sortHandled = query.Sort.ToFrozenSet();
         }
 
-        var (_, total) = await ScanAll(page: 1, size: int.MaxValue, ct);
-        return CountResult.Exact((long)total);
+        var paginationHandled = false;
+        if (query.HasPagination)
+        {
+            var skip = (query.EffectivePage() - 1) * query.EffectivePageSize();
+            ordered = ordered.Skip(skip).Take(query.EffectivePageSize());
+            paginationHandled = true;
+        }
+
+        var list = ordered as IReadOnlyList<TEntity> ?? ordered.ToList();
+        return new RepositoryQueryResult<TEntity>
+        {
+            Items = list,
+            TotalCount = totalCount,
+            IsEstimate = false,
+            SortHandled = sortHandled,
+            PaginationHandled = paginationHandled,
+        };
+    }
+
+    public async Task<CountResult> Count(QueryDefinition query, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        var (all, total) = await ScanAll(page: 1, size: int.MaxValue, ct);
+        if (query.Filter is null) return CountResult.Exact(total);
+        var count = all.LongCount(InMemoryFilterEvaluator.Compile<TEntity>(query.Filter));
+        return CountResult.Exact(count);
     }
 
     public async Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
@@ -171,7 +177,7 @@ internal sealed class RedisRepository<TEntity, TKey> :
 
         // Resolve Optimized strategy based on provider capabilities
         var effectiveStrategy = strategy == RemoveStrategy.Optimized
-            ? (Writes.HasFlag(WriteCapabilities.FastRemove) ? RemoveStrategy.Fast : RemoveStrategy.Safe)
+            ? RemoveStrategy.Fast // this adapter declares write.fastRemove
             : strategy;
 
         if (effectiveStrategy == RemoveStrategy.Fast)

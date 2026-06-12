@@ -39,37 +39,55 @@ public sealed class CouchbaseAdapterFactory : IDataAdapterFactory
         return new CouchbaseRepository<TEntity, TKey>(provider, resolver, sp, options);
     }
 
-    // INamingProvider implementation
-    public string RepositorySeparator => "#";
-
-    public string GetStorageName(Type entityType, IServiceProvider services)
+    // Couchbase isolates a partition through a native scope (bucket.scope.collection), not a name suffix —
+    // CouchbaseClusterProvider.GetCollectionContext routes EntityContext.Current.Partition into the scope
+    // position via FormatScope. So the capability announces EncodePartitionInName = false: the framework
+    // generates just the collection name, and a fixed Collection / CollectionName callback overrides it.
+    public StorageNamingCapability GetNamingCapability(IServiceProvider services)
     {
         var options = services.GetRequiredService<IOptions<CouchbaseOptions>>().Value;
-
-        // Check adapter-level override FIRST
-        if (!string.IsNullOrWhiteSpace(options.Collection))
-            return options.Collection;
-
-        if (options.CollectionName != null)
+        return new StorageNamingCapability
         {
-            var overrideName = options.CollectionName(entityType);
-            if (!string.IsNullOrWhiteSpace(overrideName))
-                return overrideName;
-        }
-
-        // Fall back to convention
-        var convention = new StorageNameResolver.Convention(
-            options.NamingStyle,
-            options.Separator ?? ".",
-            NameCasing.AsIs);
-
-        return StorageNameResolver.Resolve(entityType, convention);
+            Style = options.NamingStyle,
+            // Couchbase collection names allow only [A-Za-z0-9_-%] — a '.' separator (the FullNamespace
+            // default) produces an invalid collection name and CreateCollectionAsync fails. Use '_'.
+            Separator = "_",
+            Casing = NameCasing.AsIs,
+            EncodePartitionInName = false,
+            NameOverride = entityType => !string.IsNullOrWhiteSpace(options.Collection)
+                ? options.Collection!.Trim()
+                : options.CollectionName?.Invoke(entityType),
+        };
     }
 
-    public string GetConcretePartition(string partition)
+    /// <summary>
+    /// Format a partition value as a Couchbase scope identifier (alphanumeric / underscore / hyphen /
+    /// percent, max 30 bytes). Used by CouchbaseClusterProvider when mapping EntityContext.Current.Partition
+    /// onto bucket.scope.collection.
+    /// </summary>
+    public static string FormatScope(string partition)
     {
-        // Couchbase: Pass-through (accepts most UTF-8 strings)
-        return partition;
+        if (string.IsNullOrEmpty(partition)) return partition;
+        var sb = new System.Text.StringBuilder(partition.Length);
+        var faithful = true;
+        foreach (var c in partition)
+        {
+            if (char.IsLetterOrDigit(c) || c == '_' || c == '-' || c == '%') sb.Append(c);
+            else { sb.Append('_'); faithful = false; }
+        }
+        var sanitized = sb.ToString();
+
+        const int maxScopeBytes = 30; // Couchbase scope/collection identifier limit
+        // Injective: return the sanitized form only when it FAITHFULLY represents the original — no character
+        // was replaced AND it fits the limit. Otherwise append a deterministic hash of the ORIGINAL so distinct
+        // partitions can never collapse onto one scope. Both lossy '_' replacement (e.g. "a.b" and "a_b" both
+        // sanitize to "a_b" — '.' passes the front-door validator but Couchbase scopes forbid it) and
+        // over-length truncation are collision sources; hashing the original closes both. (The previous code
+        // guarded only length, and hashed the sanitized form — which still collided distinct originals that
+        // sanitized alike.)
+        if (faithful && NamingUtils.ByteLength(sanitized) <= maxScopeBytes) return sanitized;
+        var hash = NamingUtils.ShortHash(partition, 8);
+        return NamingUtils.TrimToBytes(sanitized, maxScopeBytes - hash.Length - 1) + "_" + hash;
     }
 }
 

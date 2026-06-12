@@ -1,0 +1,309 @@
+{
+  "area": "periphery-services",
+  "projects": [
+    {
+      "name": "Koan.Canon.Core",
+      "purpose": "Former canonization engine (the Sora.Flow lineage). Directory now contains only untracked bin/obj build leftovers.",
+      "keyTypes": [],
+      "dependsOn": [],
+      "state": "tombstone — `git ls-files src/Koan.Canon.Core` returns nothing; no .csproj; only stale bin/obj. A matching orphan test project tests/Suites/Canon/Koan.Canon.Core.Tests still exists (refs only Koan.Core, NOT in Koan.sln, 6 spec files testing the deleted engine)."
+    },
+    {
+      "name": "Koan.Canon.Domain",
+      "purpose": "Domain primitives + runtime for the Canon (canonicalization) pillar: pipeline phases, contributors, lineage/metadata, aggregation policies, persistence contract. The 'new domain runtime' that replaced Canon.Core (ARCH-0056 rename Flow→Canon, ARCH-0058 runtime architecture).",
+      "keyTypes": [
+        "CanonEntity / CanonValueObject (Model)",
+        "ICanonRuntime / CanonRuntime / CanonRuntimeBuilder",
+        "CanonPipelineBuilder / ICanonPipelineContributor / CanonStageBehavior",
+        "CanonAttribute / AggregationKeyAttribute / AggregationPolicyAttribute",
+        "CanonMetadata / CanonLineage / CanonSourceAttribution",
+        "ICanonPersistence / DefaultCanonPersistence",
+        "ICanonAuditSink / CanonAuditEntry",
+        "AdaptiveBatchProcessor / CanonPerformanceMonitor (Optimization)"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.Data.Core"
+      ],
+      "state": "active — in sln; Unit + Integration test suites (tests/Suites/Canon, ~14 spec files, both in sln); sample S8.Canon; docs/guides/canon-capabilities-howto.md; ADR trail incl. CANON-IMPLEMENTATION-DELTA. Canon.Domain+Canon.Web = 6,280 LOC."
+    },
+    {
+      "name": "Koan.Canon.Web",
+      "purpose": "ASP.NET surface for Canon: generic per-model entity controllers, model catalog, and admin endpoints, auto-registered via KoanAutoRegistrar + GenericControllers.",
+      "keyTypes": [
+        "CanonEntitiesController<TModel> : EntityController<TModel>",
+        "CanonAdminController",
+        "CanonModelsController",
+        "ICanonModelCatalog / CanonModelCatalog / CanonModelDescriptor"
+      ],
+      "dependsOn": [
+        "Koan.Canon.Domain",
+        "Koan.Core",
+        "Koan.Web",
+        "Koan.Web.Extensions"
+      ],
+      "state": "active — exercised by samples/S8.Canon; in sln; small (4 controllers/catalog)."
+    },
+    {
+      "name": "Koan.Canon.Connector.Runtime.Dapr (src/Connectors/Canon/Runtime/Dapr)",
+      "purpose": "Apparently a planned/removed Dapr runtime connector for Canon.",
+      "keyTypes": [],
+      "dependsOn": [],
+      "state": "tombstone — directory contains ONLY untracked bin/obj (empty net10.0 output dir); zero tracked files, no .csproj."
+    },
+    {
+      "name": "Koan.Context (src/Koan.Context)",
+      "purpose": "Orphan directory holding a single stray 31KB file Services/IndexingService.cs in namespace Koan.Context.Services — the same root namespace as the Koan.Service.KoanContext service (RootNamespace=Koan.Context). A leftover from the service's earlier location.",
+      "keyTypes": [
+        "IndexingService (duplicate of the service's indexing logic)"
+      ],
+      "dependsOn": [],
+      "state": "tombstone/orphan — git-tracked but no .csproj, compiled by nothing; confirmed via git ls-files (1 file). Sibling fossil: src/Koan.Flow.Core contains only TECHNICAL.md (Flow→Canon rename leftover)."
+    },
+    {
+      "name": "Koan.Mcp",
+      "purpose": "Model Context Protocol host for Koan entities: attribute-driven tool projection from EntityController endpoints, JSON-RPC over stdio/HTTP+SSE/WebSocket, plus 'Code Mode' (Jint JS sandbox with generated TypeScript SDK).",
+      "keyTypes": [
+        "McpEntityAttribute / McpEntityRegistry / McpEntityRegistration",
+        "EndpointToolExecutor / RequestTranslator / ResponseTranslator",
+        "McpServer + StdioTransport / HttpSseTransport / WebSocketTransport",
+        "McpRpcHandler / StreamJsonRpcTransportDispatcher",
+        "SchemaBuilder (JSON schema from entity metadata)",
+        "JintCodeExecutor / KoanSdkBindings / TypeScriptSdkGenerator (CodeMode)",
+        "McpServerOptions / CodeModeOptions"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.Data.Core",
+        "Koan.Web",
+        "Koan.Web.Sse"
+      ],
+      "state": "active — 6,392 LOC; in sln; ADRs AI-0012/0013/0014; guides mcp-http-sse-howto + mcp-code-mode-preflight; consumers S16.PantryPal (+McpHost.Tests), Bootstrap integration suite, Koan.Mcp.TestHost fixture, McpCodeMode sample tests. Wrinkles: TWO ICodeExecutor interfaces (Koan.Mcp.CodeExecution vs Koan.Mcp.CodeMode.Execution — JintCodeExecutor implements both), TWO IKoanAutoRegistrar classes in Initialization/, TODO(S16) handshake capability detection in McpRpcHandler."
+    },
+    {
+      "name": "Koan.Recipe.Abstractions",
+      "purpose": "'Recipe' bootstrap concept (ARCH-0046): assembly-attribute-registered IKoanRecipe bundles applied at boot via a deferred IKoanInitializer.",
+      "keyTypes": [
+        "IKoanRecipe",
+        "KoanRecipeAttribute (assembly-level)",
+        "RecipeRegistry / RecipeApplier / RecipeInitializer",
+        "RecipeGates / RecipeCapabilities"
+      ],
+      "dependsOn": [
+        "Koan.Core"
+      ],
+      "state": "stale/vestigial — sole consumer in the entire repo is Koan.Recipe.Observability; zero IKoanRecipe/AddKoanRecipes usage in samples or tests; RecipeInitializer uses the AppDomain.CurrentDomain.GetAssemblies() scan that CLAUDE.md itself flags as the anti-pattern replaced by [KoanDiscoverable]; swallows exceptions silently. Mislabeled KoanPackageKind=Kernel."
+    },
+    {
+      "name": "Koan.Recipe.Observability",
+      "purpose": "The only recipe in existence: a 33-line ObservabilityRecipe that calls AddHealthChecks() in a try/catch and registers one resilient named HttpClient.",
+      "keyTypes": [
+        "ObservabilityRecipe"
+      ],
+      "dependsOn": [
+        "Koan.Recipe.Abstractions",
+        "Koan.Web"
+      ],
+      "state": "confirmed stub — single source file; comment 'Future: add OTEL via existing Koan diagnostics extension when available'; despite csproj description promising 'health checks + OTEL', no OTEL exists; no tests, no consumers."
+    },
+    {
+      "name": "Koan.Secrets.Abstractions",
+      "purpose": "Vault-agnostic secret contracts: provider/resolver interfaces, secret identity/value/metadata model, typed exception hierarchy.",
+      "keyTypes": [
+        "ISecretProvider / ISecretResolver",
+        "SecretId / SecretValue / SecretMetadata / SecretContentType",
+        "SecretNotFoundException / SecretProviderUnavailableException / SecretUnauthorizedException"
+      ],
+      "dependsOn": [],
+      "state": "dormant-complete — clean, finished surface (10 files) with README+TECHNICAL.md; but the whole Secrets vertical has ZERO test files and zero sample usage."
+    },
+    {
+      "name": "Koan.Secrets.Core",
+      "purpose": "Secrets runtime: chained resolver, env/configuration providers, and a configuration-source wrapper that resolves secret:// references; bootstrapped reflectively from Koan.Data.Core when the assembly is present (soft Reference=Intent).",
+      "keyTypes": [
+        "ChainSecretResolver",
+        "ConfigurationSecretProvider / EnvSecretProvider",
+        "SecretResolvingConfigurationSource / SecretResolvingConfigurationExtensions",
+        "SecretsBuilder / SecretsOptions",
+        "KoanAutoRegistrar"
+      ],
+      "dependsOn": [
+        "Koan.Secrets.Abstractions",
+        "Koan.Core"
+      ],
+      "state": "dormant/stale — wired into boot via reflection hook in src/Koan.Data.Core/ServiceCollectionExtensions.cs (TryInvokeSecretsBootstrap), but NO csproj in src/samples/tests references it, no tests anywhere mention Koan.Secrets, no sample exercises it. ADRs ARCH-0050/0051, SEC-0003 exist."
+    },
+    {
+      "name": "Koan.Secrets.Connector.Vault",
+      "purpose": "HashiCorp Vault provider for the secrets pillar: HTTP client wiring, options configurator, health checks, orchestration service descriptor for dev container provisioning.",
+      "keyTypes": [
+        "VaultSecretProvider",
+        "VaultOptions / VaultOptionsConfigurator",
+        "VaultService (orchestration descriptor)"
+      ],
+      "dependsOn": [
+        "Koan.Secrets.Abstractions",
+        "Koan.Core",
+        "Koan.Orchestration.Abstractions"
+      ],
+      "state": "stale — compiles, documented (README+TECHNICAL), but zero tests (violates the repo's own ARCH-0079 'integration tests as canon' rule for adapters) and zero consumers."
+    },
+    {
+      "name": "Koan.ServiceMesh",
+      "purpose": "UDP-multicast service discovery/announcement/heartbeat mesh plus HTTP service executor — the control plane for '[KoanService] capability services' (Translation is the only real service).",
+      "keyTypes": [
+        "KoanServiceMesh (impl)",
+        "KoanServiceMeshCoordinator (hosted service)",
+        "ServiceExecutor",
+        "ServicesAutoRegistrar",
+        "ServicesPillarManifest"
+      ],
+      "dependsOn": [
+        "Koan.ServiceMesh.Abstractions",
+        "Koan.Core"
+      ],
+      "state": "experimental — 1,176 LOC; TODOs for config hierarchy and deployment-mode detection; NO ADR mentions 'service mesh' in docs/decisions; zero tests; consumers: Koan.Service.Translation, Koan.Web.Admin (defensive GetService for a status surface), sample S8.PolyglotShop."
+    },
+    {
+      "name": "Koan.ServiceMesh.Abstractions",
+      "purpose": "Contracts for the mesh: discovery interface, service attribute, descriptor, instance model.",
+      "keyTypes": [
+        "IKoanServiceMesh",
+        "KoanServiceAttribute (ServiceId/Port/heartbeat/ContainerImage)",
+        "KoanServiceDescriptor / ServiceInstance",
+        "KoanCapabilityAttribute"
+      ],
+      "dependsOn": [],
+      "state": "experimental — 5 files, no deps, no tests. NAME COLLISION: three distinct KoanServiceAttribute types exist (here, Koan.Orchestration.Abstractions used by all data adapter factories, and Koan.Web.Auth.Services)."
+    },
+    {
+      "name": "Koan.ZenGarden",
+      "purpose": "Typed .NET client/runtime for the external Rust 'Zen Garden' infrastructure service (Moss stone registry, offerings, seed banks; re-homed to its own repo Jan 2026 per ARCHAEOLOGY). Provides offering/capability/storage event subscriptions, UDP discovery + endpoint rebinding, topology persistence, and AI model advisory.",
+      "keyTypes": [
+        "ZenGardenClient (single 119,907-byte file)",
+        "ZenGarden static facade (.On<TEvent>, .Offering.On, .Storage.On)",
+        "IZenGardenClient / ZenGardenOptions",
+        "GardenAwareEndpointManager",
+        "KoiHandler / KoiTopologySnapshot / DiscoveredStone (UDP topology)",
+        "StoneRosterStore / IStoneRosterStore (persistence)",
+        "ZenGardenModelAdvisor (AI model selection from topology)"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.ZenGarden.Core"
+      ],
+      "state": "active satellite-product bridge — 7,684 LOC (both projects); dedicated test project tests/Koan.ZenGarden.Tests (11 files, in sln, incl. container-resolution and connectivity tests); 14KB README + 23KB TECHNICAL; consumed by samples S18.Prism (case-studied) and S6.SnapVault, and by Koan.AI.Connector.ZenGarden."
+    },
+    {
+      "name": "Koan.ZenGarden.Core",
+      "purpose": "Dependency-free contracts that let mainline adapters speak ZenGarden: connection-intent URI parsing (DATA-0089), offering bindings, initialization-provider hook, tool FQIDs.",
+      "keyTypes": [
+        "ZenGardenConnectionIntent (TryParse/ForOffering)",
+        "IZenGardenOfferingBinding",
+        "IZenGardenInitializationProvider",
+        "ZenGardenOfferingResolution",
+        "ToolFqid"
+      ],
+      "dependsOn": [],
+      "state": "active — and structurally significant: core data/storage/AI connectors (Mongo, Weaviate, S3, Ollama) take hard ProjectReferences on this Periphery-kind package and register offering bindings in their KoanAutoRegistrars. A periphery product's contracts are load-bearing inside mainline adapters."
+    },
+    {
+      "name": "Koan.Service.KoanContext (src/Services/code-intelligence)",
+      "purpose": "Standalone AI code-intelligence web service ('semantic code search and context engine'): file discovery/monitoring, chunking, embedding (Ollama), Weaviate vector sync via outbox worker, MCP tools for agents, React/TS UI. The framework's flagship dogfood app.",
+      "keyTypes": [
+        "Program.cs (exe; AddKoan + rate limiting + MCP)",
+        "IndexingCoordinator / Indexer / IncrementalIndexingService / IndexingPlanner",
+        "Chunker / Embedding / Extraction / Discovery",
+        "VectorSyncWorker / SyncOperation (outbox)",
+        "Search / SearchPersona / RetrievalService surface",
+        "McpToolsController + 11 other controllers",
+        "Models: Project, Chunk, IndexedFile, Job"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.Data.Core",
+        "Koan.Data.Connector.Sqlite",
+        "Koan.Web",
+        "Koan.Web.Sse",
+        "Koan.Web.Connector.Swagger",
+        "Koan.Mcp",
+        "Koan.AI",
+        "Koan.Data.Vector",
+        "Koan.Data.Vector.Connector.Weaviate",
+        "Koan.AI.Connector.Ollama",
+        "Koan.Orchestration.Aspire",
+        "Koan.Scheduling"
+      ],
+      "state": "active-but-stalled satellite product — the repo's largest project (67 .cs files / 14,828 LOC + 60 tracked UI files), yet NOT in Koan.sln (grep 'Context' Koan.sln = 0 hits), and neither is its test suite tests/Suites/Context/Unit (which Compile-Removes 4 drifted specs incl. IndexingService.Spec and VectorSyncWorker.Spec). Docs contradict each other: koan-context-overview.md says 'Status: Production-Ready' while koan-context-honest-mvp-status.md says '74% complete, Grade C+' and ARCHAEOLOGY says 'UX 91% complete but backend-blocked, 74 tasks pending across 7 milestones'."
+    },
+    {
+      "name": "Koan.Service.Translation (+ .Container)",
+      "purpose": "AI-powered translation capability service: [KoanService]-decorated TranslationService over Koan.AI with a static Translation facade; Container project wraps it as a deployable web service with Ollama. Exists primarily as the ServiceMesh demonstrator.",
+      "keyTypes": [
+        "TranslationService ([KoanService(\"translation\", Port=8080, ContainerImage=...)] )",
+        "Translation (static facade)",
+        "TranslationOptions / TranslationResult",
+        "TranslationController (Container)"
+      ],
+      "dependsOn": [
+        "Koan.ServiceMesh.Abstractions",
+        "Koan.ServiceMesh",
+        "Koan.AI",
+        "(Container also: Koan.Core, Koan.Web, Koan.AI.Connector.Ollama)"
+      ],
+      "state": "experimental — 599 LOC core; hardcoded Confidence = 0.95/0.90 with TODOs; zero tests; the only [KoanService] (mesh flavor) in the repo."
+    },
+    {
+      "name": "Koan.Service.Inbox.Connector.Redis",
+      "purpose": "HTTP inbox micro-service backed by Redis (GET /v1/inbox/{key}, POST mark-processed) with optional RabbitMQ discovery announce, from the MESS-0025/ADR-0026 era messaging-inbox design.",
+      "keyTypes": [
+        "InboxController / HealthController",
+        "RedisInboxAnnouncementService",
+        "RedisInboxOptions",
+        "RedisInboxRoutes"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.Data.Connector.Redis"
+      ],
+      "state": "orphan/dead — its client counterpart HttpInboxStore no longer exists anywhere in src (0 grep hits); the only consumer is the ARCHIVED sample samples/archive/S15.RedisInbox; no tests; still ships in sln."
+    }
+  ],
+  "cohesion": "This is not a pillar — it is the repo's attic plus three genuine satellites, with at least five unrelated sub-clusters. (a) Canon (Domain+Web) is a real, tested, ADR-backed pillar but drags two tombstone directories (Canon.Core, Connectors/Canon/Runtime/Dapr) and an orphan test project from its Flow→Canon→runtime-rewrite history; src/Koan.Flow.Core (lone TECHNICAL.md) is a third fossil of the same lineage. (b) MCP is a real, well-consumed pillar (samples, fixtures, integration tests) with internal seams (duplicate ICodeExecutor namespaces, dual registrars). (c) ZenGarden is a bridge to an external Rust product, and it fractures the core/periphery boundary: ZenGarden.Core contracts are hard-referenced by mainline Mongo/Weaviate/S3/Ollama connectors, so a 'Periphery' package is load-bearing in the data plane. (d) Secrets is a complete vertical (abstractions/runtime/Vault) that is wired into boot via a reflection hook in Koan.Data.Core yet has zero tests and zero consumers — dormant infrastructure. (e) ServiceMesh + Translation + Inbox are the remains of a 'Koan capability services' experiment: no ADR, near-zero tests, one demo service, one dead service; ServiceMesh's UDP discovery conceptually competes with both ZenGarden's Koi/Moss discovery and Koan.Core.Orchestration's ServiceDiscoveryAdapterBase. (f) Recipe is a vestigial bootstrap idiom (assembly-attribute + AppDomain scan) superseded by KoanAutoRegistrar/KoanModule (ARCH-0086). (g) KoanContext is a product-sized application (largest project in the repo) that already lives OUTSIDE Koan.sln together with its tests — physically in the repo, organizationally already evicted.",
+  "redundancies": [
+    "Three distinct KoanServiceAttribute types: Koan.ServiceMesh.Abstractions (ServiceId/Port/heartbeat), Koan.Orchestration.Abstractions (ServiceKind/shortCode — used by every data adapter factory), Koan.Web.Auth.Services — same name, three meanings.",
+    "Three service-discovery stacks: ServiceMesh UDP multicast (Announce/Discover/Maintain), ZenGarden Koi/Moss UDP discovery + stone roster, and Koan.Core.Orchestration ServiceDiscoveryAdapterBase.",
+    "Two bootstrap idioms: Recipe (assembly-level KoanRecipeAttribute + RecipeRegistry + AppDomain.GetAssemblies scan) vs the canonical IKoanAutoRegistrar/KoanModule/[KoanDiscoverable] pipeline — Recipe uses exactly the scan pattern the project's own guidance deprecates.",
+    "Koan.Mcp contains two ICodeExecutor interfaces (Koan.Mcp.CodeExecution and Koan.Mcp.CodeMode.Execution); JintCodeExecutor implements both; plus two IKoanAutoRegistrar classes in the same Initialization folder.",
+    "src/Koan.Context/Services/IndexingService.cs (orphan, 31KB) duplicates indexing logic that lives in Koan.Service.KoanContext (same Koan.Context.Services namespace).",
+    "KoanContext service re-implements chunking/embedding/retrieval/vector-outbox as app-local services while Koan.Rag, Koan.Data.Vector and Koan.Data.AI exist as framework pillars — dogfood divergence rather than reuse.",
+    "Secrets resolution overlaps plain configuration providers: ConfigurationSecretProvider/EnvSecretProvider wrap what Microsoft.Extensions.Configuration already supplies, and the only integration point is a reflection hook in Koan.Data.Core."
+  ],
+  "deadOrExperimental": [
+    "DEAD (tombstone dirs, only untracked bin/obj): src/Koan.Canon.Core; src/Connectors/Canon/Runtime/Dapr",
+    "DEAD (tracked fossils): src/Koan.Context (single stray IndexingService.cs); src/Koan.Flow.Core (only TECHNICAL.md)",
+    "DEAD (orphan test project, not in sln): tests/Suites/Canon/Koan.Canon.Core.Tests — tests a deleted engine, references only Koan.Core",
+    "DEAD: Koan.Service.Inbox.Connector.Redis — client (HttpInboxStore) no longer exists in src; only consumer is archived sample S15",
+    "STUB: Koan.Recipe.Observability — 33 lines, 'Future: add OTEL' comment, advertises OTEL it doesn't have",
+    "VESTIGIAL: Koan.Recipe.Abstractions — one consumer (the stub), zero app usage, deprecated discovery pattern",
+    "EXPERIMENTAL: Koan.ServiceMesh + Koan.ServiceMesh.Abstractions (no ADR, no tests, TODOs in core paths); Koan.Service.Translation (+Container) (hardcoded confidence, no tests)",
+    "DORMANT: Koan.Secrets.Abstractions / Koan.Secrets.Core / Koan.Secrets.Connector.Vault — complete, documented, reflection-wired into boot, but zero tests and zero consumers anywhere in src/samples/tests",
+    "STALLED: Koan.Service.KoanContext — active code but outside the solution, with 4 unit specs Compile-Removed due to drift and contradictory status docs (74% honest vs 'Production-Ready')"
+  ],
+  "consolidationCandidates": [
+    "Delete the fossils in one sweep: src/Koan.Canon.Core, src/Connectors/Canon (whole tree), src/Koan.Context, src/Koan.Flow.Core (relocate its TECHNICAL.md into docs/ if historically valuable), and tests/Suites/Canon/Koan.Canon.Core.Tests — zero build impact, pure noise reduction (~5 phantom 'projects' off the count).",
+    "Cut Koan.Service.Inbox.Connector.Redis: its client API (HttpInboxStore) is already gone from src, its only sample is archived, MESS-0025 can be marked superseded. If durable inboxing matters, it now belongs to the Jobs/Messaging pillar (JOBS-0005 ledger), not a bespoke Redis HTTP service.",
+    "Cut the Recipe pillar (2 projects → 0): fold ObservabilityRecipe's ~10 useful lines (AddHealthChecks + resilient HttpClient) into Koan.Web defaults or a KoanModule, mark ARCH-0046 superseded by ARCH-0086 (KoanModule). Rationale: one consumer, zero usage, anti-pattern discovery mechanism — exactly the 'fewer concepts' target.",
+    "Decide ServiceMesh (3 projects → 1 or 0): either (a) promote it — write the missing ADR, add ARCH-0079-grade integration tests, and merge ServiceMesh.Abstractions (5 files) into Koan.ServiceMesh since a kernel/impl split is unjustified at 1.2k LOC; or (b) retire it and let ZenGarden/Orchestration discovery own the space. Either way resolve the triple KoanServiceAttribute name collision — at most one attribute deserves the name.",
+    "Re-home Koan.Service.KoanContext (and arguably Translation) out of the framework repo into a products/federation repo, following the Zen Garden precedent (re-homed Jan 2026): it is already outside Koan.sln, it is the largest codebase in the repo, and its app-local chunking/embedding/retrieval should be pressure-tested back into Koan.Rag/Koan.Data.AI as reusable pillar capability instead of private service code. Keep only what dogfooding feeds back into the framework.",
+    "ZenGarden boundary repair: keep Koan.ZenGarden.Core as the thin contract package mainline connectors depend on (or neutralize it into an offering/connection-intent contract under Koan.Core.Orchestration so core adapters stop referencing a product-branded periphery package), and decompose the 119KB single-file ZenGardenClient.cs (~7.7k LOC pillar largely in one class) — far beyond the repo's own 800-line file guidance.",
+    "Secrets: pick dogfood-or-demote. Dogfood = wire secret:// resolution into at least one sample + ARCH-0079 integration spec for Vault (Testcontainers), and replace the reflection hook in Koan.Data.Core with the KoanModule/[KoanDiscoverable] mechanism. Demote = move Vault connector out and leave only the configuration-source abstraction. Also merge Koan.Secrets.Abstractions into Koan.Secrets.Core if Vault is the only external provider (3 projects → 1-2).",
+    "Koan.Mcp internal cleanup (no project change): collapse Koan.Mcp.CodeExecution into CodeMode.Execution (single ICodeExecutor) and merge the two Initialization registrars — removes a public-surface ambiguity before MCP grows.",
+    "Canon naming/closure: with Canon.Core deleted, consider renaming Koan.Canon.Domain → Koan.Canon (the 'Domain' suffix only existed to disambiguate against the now-dead Core) and keep Canon.Web as the single web satellite."
+  ],
+  "maturitySignals": {
+    "tests": "Sharply bimodal. WELL-TESTED: Canon (tests/Suites/Canon Unit+Integration, ~14 specs, both in sln), ZenGarden (tests/Koan.ZenGarden.Tests, 11 files incl. container-resolution/connectivity, in sln), MCP (Bootstrap integration suite, Koan.Mcp.TestHost fixture, McpCodeMode sample tests, S16.PantryPal.McpHost.Tests). ZERO TESTS: entire Secrets vertical (no test file in the repo mentions Koan.Secrets — Vault connector violates the repo's own ARCH-0079 adapter rule), ServiceMesh (both projects), Recipe (both), Translation, Inbox. DRIFTED: KoanContext's tests/Suites/Context/Unit exists but is outside Koan.sln and Compile-Removes 4 specs (IndexingService, VectorSyncWorker, McpTools, GetReferences-adjacent) — tests that no longer compile against the code.",
+    "docs": "Uneven but often rich. Canon: ARCH-0056/0058, CANON-IMPLEMENTATION-DELTA, canon-capabilities-howto guide. MCP: AI-0012/0013/0014 ADRs + 2 guides + project README. Secrets: ARCH-0050/0051, SEC-0003, AI-0004, README+TECHNICAL per project (docs outlive usage). ZenGarden: DATA-0089 ADR, 14KB README + 23KB TECHNICAL, S18 case study, ARCHAEOLOGY narrative. KoanContext: 5 guides + several ADRs (ADR-0056, DATA-0087, WEB-0064, KOAN-CONTEXT-001) but mutually contradictory status claims ('Production-Ready' vs '74%, C+'). NO ADR AT ALL: ServiceMesh (the word 'service mesh' appears in no decision doc), Translation; Inbox has README/TECHNICAL only, referencing superseded ADR-0026.",
+    "codeQuality": "TODO density is low (6 TODOs area-wide: MCP handshake, ServiceMesh config/deployment-mode, KoanContext default model, Translation confidence x2). Structural issues dominate instead: a 119,907-byte single-file ZenGardenClient.cs and a 31KB orphan IndexingService.cs; duplicate ICodeExecutor interfaces and dual registrars in Koan.Mcp; a 3-way KoanServiceAttribute name collision; silent exception-swallowing in Recipe (RecipeInitializer catch{}, ObservabilityRecipe try/catch around AddHealthChecks); a reflection-string bootstrap from Koan.Data.Core into Koan.Secrets.Core; and KoanPackageKind labels that don't match reality (Recipe.Abstractions marked 'Kernel' with one stub consumer; ZenGarden.Core marked 'Periphery' while hard-referenced by mainline connectors). Naming is otherwise consistent and modern (net10.0, nullable enabled, per-project version.json everywhere)."
+  }
+}

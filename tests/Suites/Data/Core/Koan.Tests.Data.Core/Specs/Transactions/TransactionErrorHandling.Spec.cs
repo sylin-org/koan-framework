@@ -3,7 +3,7 @@ using Koan.Data.Core;
 using Koan.Data.Core.Model;
 using Koan.Data.Core.Transactions;
 using Koan.Tests.Data.Core.Support;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Koan.Tests.Data.Core.Specs.Transactions;
 
@@ -32,85 +32,9 @@ public sealed class TransactionErrorHandlingSpec
         return partition;
     }
 
-    [Fact]
-    public async Task Commit_without_transaction_throws_exception()
-    {
-        await TestPipeline.For<TransactionErrorHandlingSpec>(_output, nameof(Commit_without_transaction_throws_exception))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Assert(static async _ =>
-            {
-                InvalidOperationException? exception = null;
-
-                try
-                {
-                    // Attempt to commit without transaction
-                    await EntityContext.Commit();
-                }
-                catch (InvalidOperationException ex)
-                {
-                    exception = ex;
-                }
-
-                exception.Should().NotBeNull("commit without transaction should throw");
-                exception!.Message.Should().Contain("No active transaction");
-            })
-            .Run();
-    }
-
-    [Fact]
-    public async Task Rollback_without_transaction_throws_exception()
-    {
-        await TestPipeline.For<TransactionErrorHandlingSpec>(_output, nameof(Rollback_without_transaction_throws_exception))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Assert(static async _ =>
-            {
-                InvalidOperationException? exception = null;
-
-                try
-                {
-                    // Attempt to rollback without transaction
-                    await EntityContext.Rollback();
-                }
-                catch (InvalidOperationException ex)
-                {
-                    exception = ex;
-                }
-
-                exception.Should().NotBeNull("rollback without transaction should throw");
-                exception!.Message.Should().Contain("No active transaction");
-            })
-            .Run();
-    }
-
-    [Fact]
-    public async Task Double_commit_throws_exception()
-    {
-        await TestPipeline.For<TransactionErrorHandlingSpec>(_output, nameof(Double_commit_throws_exception))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Assert(static async _ =>
-            {
-                InvalidOperationException? exception = null;
-
-                try
-                {
-                    using (EntityContext.Transaction("double-commit-test"))
-                    {
-                        await EntityContext.Commit();
-
-                        // Attempt to commit again
-                        await EntityContext.Commit();
-                    }
-                }
-                catch (InvalidOperationException ex)
-                {
-                    exception = ex;
-                }
-
-                exception.Should().NotBeNull("double commit should throw");
-                exception!.Message.Should().Contain("already been completed");
-            })
-            .Run();
-    }
+    // NOTE: invalid-transition behavior (Commit/Rollback without an active transaction, double-commit,
+    // commit-after-rollback) is an idempotent NO-OP — see TransactionStateValidationSpec. The former
+    // "*_throws_exception" tests here were removed when that contract was settled (no-op, not throw).
 
     [Fact]
     public async Task Empty_transaction_commits_successfully()

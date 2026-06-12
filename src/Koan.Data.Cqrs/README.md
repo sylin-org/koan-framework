@@ -2,7 +2,7 @@
 
 CQRS and outbox helpers for Koan data repositories.
 
-- Target framework: net9.0
+- Target framework: net10.0
 - License: Apache-2.0
 
 ## Install

@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.AI.Contracts.Routing;
 using Koan.AI.Resolution;
 using Koan.Core.AI;

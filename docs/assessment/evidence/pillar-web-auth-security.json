@@ -1,0 +1,187 @@
+{
+  "area": "web-auth-security",
+  "projects": [
+    {
+      "name": "Koan.Web.Auth",
+      "purpose": "Central auth pillar: provider registry/election fed by IAuthProviderContributor defaults, a centralized hand-rolled challenge/callback/logout controller over a cookie scheme, /me + /auth/providers discovery endpoints, and the auth lifecycle extensibility pipeline (sign-in/sign-out/bootstrap/challenge events). Attaches Koan.Security.Trust's bearer scheme and dev-identity middleware into the web pipeline.",
+      "keyTypes": [
+        "AuthController (challenge/callback/logout)",
+        "IProviderRegistry/ProviderRegistry",
+        "IAuthProviderContributor",
+        "IKoanAuthFlowHandler + AuthFlowDispatcher",
+        "IKoanAuthEventContributor + AuthEventDispatcher (legacy gen, adapter-bridged)",
+        "AuthOptions/ProviderOptions",
+        "IAuthProviderElection/AuthProviderElection",
+        "MeController + ICurrentUserProjector"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.Web",
+        "Koan.Security.Trust"
+      ],
+      "state": "active but uneven — 3,368 LOC / 56 files; fresh SEC-0001/WEB-0065/0066/0069/CORE-0091 annotations and KoanRegistry-based discovery in new code, but carries substantial dead/partial surface: AuthenticationExtensions.AddKoanWebAuthAuthentication (154 LOC, ZERO callers — sole consumer of the Microsoft.AspNetCore.Authentication.OpenIdConnect package ref) duplicates the cookie wiring and is the only place real ASP.NET OIDC/OAuth handlers (with PKCE) are configured; the LIVE path (AuthController) returns 501 for OIDC callbacks ('OIDC callback is not yet implemented', AuthController.cs:153) and implements OAuth2 by hand without PKCE; SamlController is pure 501 stubs while 6 SAML fields ride ProviderOptions/merge/health code; default IUserStore/IExternalIdentityStore are in-memory"
+    },
+    {
+      "name": "Koan.Web.Auth.Roles",
+      "purpose": "Role attribution layer: Role/RoleAlias/RolePolicyBinding as Entity<T>, a REST admin API (/api/auth/roles) for CRUD + import/export, config-template seeding, and a one-shot FirstUser/ClaimMatch admin-elevation contributor.",
+      "keyTypes": [
+        "Role/RoleAlias/RolePolicyBinding (Entity<T>)",
+        "IRoleStore/IRoleAliasStore/IRolePolicyBindingStore",
+        "RolesAdminController",
+        "AdminBootstrapContributor (IKoanAuthEventContributor, Priority 100)",
+        "RoleBootstrapHostedService",
+        "IRoleBootstrapStateStore",
+        "RoleAttributionOptions"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.Data.Core",
+        "Koan.Web.Extensions",
+        "Koan.Web.Auth"
+      ],
+      "state": "ORPHAN — recently refactored (README documents the 0.7.0 WEB-0065 removal of its claims-transformation pipeline, so docs are current) but referenced by ZERO samples, ZERO tests, and ZERO other src projects; 861 LOC with no consumer anywhere in the repo"
+    },
+    {
+      "name": "Koan.Web.Auth.Services",
+      "purpose": "Service-to-service auth: [KoanService]/[CallsService] attribute-driven discovery, ServiceAuthenticator minting in-process KSVIDs via Trust's IIssuer (SEC-0001 2i, replacing the old HTTP client-credentials round-trip), bespoke container-aware endpoint discovery, and an authenticated typed HTTP client.",
+      "keyTypes": [
+        "IServiceAuthenticator/ServiceAuthenticator",
+        "IKoanServiceClient/KoanServiceClient",
+        "IServiceDiscovery/KoanServiceDiscovery",
+        "KoanServiceAttribute",
+        "CallsServiceAttribute",
+        "ServiceAuthenticationHandler",
+        "ServiceAuthOptions"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.Web.Auth"
+      ],
+      "state": "active-transitional — used by 3 live samples (S5.Recs, S8.PolyglotShop, g1c1.GardenCoop) and explicitly slated for absorption: its own registrar comment says 'The whole outbound is absorbed into Koan.Security.Trust in 2j'. Carries an empty stub method (RegisterServiceClient — body is only comments), a dev-notes ZERO-CONFIG-ANALYSIS.md in the project root, a bespoke KoanServiceDiscovery (hardcoded port table + reachability probing) overlapping Koan.Core.Orchestration's ServiceDiscoveryAdapterBase, and zero test coverage"
+    },
+    {
+      "name": "Koan.Security.Trust",
+      "purpose": "SEC-0001/SEC-0003 fleet identity & trust fabric (the new lower-level security pillar, ARCH-0086 KoanModule): IIssuer seam with SharedKeyIssuer (HS256 over SHA-256-derived key, alg-pinned validation), the opt-in 'Koan.bearer' inbound scheme, ambient Identity.Current/KoanIdentity, the ?_as= dev-persona middleware (default-anonymous), and a fail-closed boot guard that refuses Production/Staging on the well-known insecure default key.",
+      "keyTypes": [
+        "TrustModule (KoanModule)",
+        "IIssuer/SharedKeyIssuer",
+        "TrustClaims",
+        "TrustIssuerOptions (DefaultInsecureKey)",
+        "TrustPosture/TrustMode",
+        "KoanBearerDefaults + AddKoanBearer",
+        "Identity/KoanIdentity",
+        "KoanDevIdentityMiddleware"
+      ],
+      "dependsOn": [
+        "Koan.Core"
+      ],
+      "state": "active, newest, best-engineered project in the area (570 LOC / 12 files): every file cites its ADR section, increments 2b–2j tracked in comments, consumed one-way by Koan.Web.Auth and by Auth.Services' token minting; 5 unit-test files (~19 facts) + a 12-fact E2E integration spec via KoanIntegrationHost + 3 bootstrap-suite specs. Known deliberate gaps documented in code: asymmetric ES256 issuer (Rung 2) and revocation (Phase 3) not yet built — though IIssuer XML docs and the csproj description already say 'asymmetric/ES256' while only HS256 exists (doc-ahead-of-code drift)"
+    },
+    {
+      "name": "Koan.Web.Auth.Connector.Discord",
+      "purpose": "Config-defaults contributor for Discord OAuth2 (endpoints, scopes, icon, priority 150) + provenance reporting; no handler code.",
+      "keyTypes": [
+        "DiscordProviderContributor (IAuthProviderContributor)",
+        "KoanAutoRegistrar"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.Web.Auth"
+      ],
+      "state": "stale — 78 LOC; only consumer is the ARCHIVED sample samples/archive/S6.Auth; OAuth2 type means it would function via the central controller (no PKCE); ships two conflicting assembly-level AuthProviderDescriptor attributes (Properties/: 'OAuth, mdi:discord' vs AssemblyInfo: 'OAuth2, /icons/discord.svg') consumed by OrchestrationManifestGenerator"
+    },
+    {
+      "name": "Koan.Web.Auth.Connector.Google",
+      "purpose": "Config-defaults contributor for Google OIDC (authority accounts.google.com, openid/email/profile, priority 200) + provenance; no handler code.",
+      "keyTypes": [
+        "GoogleProviderContributor (IAuthProviderContributor)",
+        "KoanAutoRegistrar"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.Web.Auth"
+      ],
+      "state": "stale AND functionally broken end-to-end — declares Type=OIDC, but the live central AuthController's OIDC callback returns 501, so a Google sign-in cannot complete (the only code path that could complete it, AddKoanWebAuthAuthentication, has zero callers); only consumer is archived S6.Auth; same duplicate-descriptor bitrot (mdi:google vs /icons/google.svg)"
+    },
+    {
+      "name": "Koan.Web.Auth.Connector.Microsoft",
+      "purpose": "Config-defaults contributor for Microsoft Entra OIDC (login.microsoftonline.com/common/v2.0, priority 200) + provenance; no handler code.",
+      "keyTypes": [
+        "MicrosoftProviderContributor (IAuthProviderContributor)",
+        "KoanAutoRegistrar"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.Web.Auth"
+      ],
+      "state": "stale AND functionally broken end-to-end — same OIDC-501 dead end as Google; only consumer is archived S6.Auth; same duplicate-descriptor bitrot"
+    },
+    {
+      "name": "Koan.Web.Auth.Connector.Oidc",
+      "purpose": "Claimed generic OIDC adapter; in reality an empty shell — Initialize() is intentionally empty, only provenance reporting exists.",
+      "keyTypes": [
+        "KoanAutoRegistrar (empty Initialize)"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.Web.Auth"
+      ],
+      "state": "tombstone-grade — 47 LOC / 3 files, no behavior; csproj description promises 'handler wiring' that does not exist anywhere in the project; only consumer is archived S6.Auth"
+    },
+    {
+      "name": "Koan.Web.Auth.Connector.Test",
+      "purpose": "Full miniature OAuth2 IdP for development: authorize/token/userinfo controllers, embedded login HTML with persona selection, JwtTokenService, DevTokenStore, client-credentials support; contributes itself as the zero-config dev login (Development priority 25, opt-in elsewhere per SEC-0001 2h).",
+      "keyTypes": [
+        "TestProviderContributor",
+        "AuthorizeController/TokenController/UserInfoController",
+        "JwtTokenService",
+        "DevTokenStore",
+        "TestProviderOptions",
+        "KoanTestProviderStartupFilter"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.Web.Auth"
+      ],
+      "state": "active — 1,102 LOC / 17 files; the ONLY provider connector exercised anywhere: referenced by all live auth samples (S5.Recs, S8.PolyglotShop, g1c1.GardenCoop) and by Koan.Web.Auth.Tests (JwtTokenServiceTests); recently touched for SEC-0001 2h opt-in semantics; still carries the duplicate-descriptor bitrot with directly contradictory protocol values ('OIDC, mdi:flask' vs 'OAuth2, no icon')"
+    }
+  ],
+  "cohesion": "The area is mid-rotation around a new center of gravity. Koan.Security.Trust is the deliberately layered foundation (Web.Auth depends on it one-way; Auth.Services mints through its IIssuer; SEC-0001 phases are absorbing Services' outbound half 'in 2j') and is the only part that feels settled — ADR-driven, KoanModule-based, well-tested. Around it, Koan.Web.Auth contains two coexisting flow engines (the live hand-rolled AuthController vs the dead-but-more-correct ASP.NET handler wiring in AddKoanWebAuthAuthentication) and two coexisting extensibility generations (IKoanAuthEventContributor bridged into IKoanAuthFlowHandler via LegacyAuthContributorAdapter). Authorization is fractured across three homes: role stamping contributors in Web.Auth, role entities/admin API in the orphaned Roles project, and the IAuthorize/RequireCapability seam in Koan.Web.Extensions/Authorization (outside this area entirely — SEC-0002's 'unified authorization model' is not physically unified). SAML is a vestigial third protocol smeared as stubs and dead option fields across controller/options/merge/health code. The connectors expose the deepest seam: the live flow engine only completes OAuth2, so the OIDC connectors (Google, Microsoft) are config for a flow that 501s — provider defaults and flow capability have drifted apart with no test catching it.",
+  "redundancies": [
+    "Two complete auth-flow implementations in Koan.Web.Auth: hand-rolled AuthController challenge/callback (live; OAuth2-only, no PKCE, OIDC=501) vs AuthenticationExtensions.AddKoanWebAuthAuthentication registering real AddOpenIdConnect/AddOAuth handlers with PKCE (dead, zero callers) — including two near-identical cookie-scheme + CookieAuthenticationEvents registrations",
+    "ProviderOptions merge/overlay logic implemented three times: ProviderRegistry.Merge, KoanAutoRegistrar.MergeProviders, and the field-by-field 'copy with Enabled=false' production-gating block in ProviderRegistry.Compose",
+    "Two generations of auth extensibility surface (IKoanAuthEventContributor + IKoanAuthFlowHandler) kept alive via LegacyAuthContributorAdapter, with two dispatchers (AuthEventDispatcher, AuthFlowDispatcher) both registered",
+    "Two discovery mechanisms inside one project: ServiceCollectionExtensions uses KoanRegistry/[KoanDiscoverable] while KoanAutoRegistrar.Describe still does a bespoke AppDomain.CurrentDomain.GetAssemblies() scan with 4-way constructor probing (DiscoverContributorProviders)",
+    "Every connector ships two assembly-level AuthProviderDescriptor attributes for the same provider with conflicting protocol/icon values (Properties/AuthProviderDescriptor.cs vs AssemblyInfo.AuthProviders.cs), both fed to OrchestrationManifestGenerator",
+    "Koan.Web.Auth.Services duplicates platform utilities: bespoke KoanServiceDiscovery (hardcoded port map + HTTP probing) vs Koan.Core.Orchestration's ServiceDiscoveryAdapterBase/ConnectionStringParser; IMemoryCache token caching vs the Cache pillar; System.IdentityModel.Tokens.Jwt package duplicated with Trust",
+    "Two JWT issuers in the area: Trust's SharedKeyIssuer (KSVID) and the Test connector's JwtTokenService (dev IdP tokens) — intentional (different roles) but both hand-build JwtSecurityToken pipelines",
+    "Registrar/provenance boilerplate repeated verbatim across Discord/Google/Microsoft connectors (~50 of each ~77 LOC is identical scaffolding around ~25 LOC of actual provider defaults)"
+  ],
+  "deadOrExperimental": [
+    "AuthenticationExtensions.AddKoanWebAuthAuthentication (src/Koan.Web.Auth/Extensions/AuthenticationExtensions.cs, 154 LOC) — zero callers repo-wide; sole consumer of the OpenIdConnect package reference",
+    "SamlController — both endpoints return 501; plus 6 SAML-only ProviderOptions fields (EntityId, IdpMetadataUrl/Xml, SigningCertRef, DecryptionCertRef, AllowIdpInitiated) threaded through merge/health/gating code for a protocol never implemented (WEB-0043 aspiration)",
+    "AuthController OIDC callback — returns 501 'OIDC callback is not yet implemented' (src/Koan.Web.Auth/Controllers/AuthController.cs:153), stranding the Google/Microsoft connectors",
+    "Koan.Web.Auth.Connector.Oidc — empty Initialize(), provenance-only shell; csproj description promises nonexistent handler wiring",
+    "Koan.Web.Auth.Connector.{Google,Microsoft,Discord} — only referenced by the archived sample samples/archive/S6.Auth; Google/Microsoft cannot complete sign-in on the live path",
+    "Koan.Web.Auth.Roles — entire project has zero consumers (no sample, test, or src reference)",
+    "KoanAutoRegistrar.RegisterServiceClient in Koan.Web.Auth.Services — empty method body containing only intent comments",
+    "src/Koan.Web.Auth.Services/ZERO-CONFIG-ANALYSIS.md — before/after working-notes document living in the shipping project directory",
+    "Duplicate Properties/AuthProviderDescriptor.cs files in all 5 connectors (conflict with AssemblyInfo.AuthProviders.cs values)",
+    "Trust deferred-by-design (documented, not bitrot): asymmetric ES256 issuer (Rung 2 'Configured' TrustMode detected but unimplemented), Identity.Revoke (Phase 3) — though IIssuer/csproj docs already claim 'asymmetric/ES256'"
+  ],
+  "consolidationCandidates": [
+    "Pick ONE flow engine in Koan.Web.Auth: either delete AddKoanWebAuthAuthentication + the OpenIdConnect package ref (dead code), or — better — replace the hand-rolled AuthController OIDC/OAuth2 internals with the ASP.NET handlers it already configures, which simultaneously fixes the OIDC-501 dead end, adds PKCE, and deletes ~300 LOC of bespoke URL-building/token-exchange code",
+    "Excise SAML remnants (SamlController, the 6 SAML ProviderOptions fields, their merge/health branches) until WEB-0043's SAML half is actually scheduled — it is pure stub surface today",
+    "Collapse Discord/Google/Microsoft/Oidc connectors: each is ~25 LOC of provider defaults wrapped in ~50 LOC of identical scaffolding, consumed only by an archived sample, and 2 of 4 are broken on the live path. Either merge into one Koan.Web.Auth.Connectors.WellKnown package (a data table of defaults + one registrar) or tombstone until OIDC completes; either way delete the duplicate AuthProviderDescriptor files (keep one truthful attribute per assembly)",
+    "Finish the in-flight SEC-0001 2j absorption: fold Koan.Web.Auth.Services' outbound into Koan.Security.Trust (ServiceAuthenticator already only wraps IIssuer + IMemoryCache), replace bespoke KoanServiceDiscovery with Koan.Core.Orchestration discovery utilities, drop the duplicated System.IdentityModel.Tokens.Jwt dependency, and delete ZERO-CONFIG-ANALYSIS.md",
+    "Decide Koan.Web.Auth.Roles per the redesign discipline (dogfood-driven collapses, >=2 usages): zero consumers today — either fold the Role entities + RolesAdminController into Koan.Web.Auth (which already hosts the contributor contracts and RoleListFileContributor, and whose AuthLifecycleOptions already carries AdminBootstrapOptions that only Roles consumes) or cut it until a real consumer exists",
+    "Retire the legacy IKoanAuthEventContributor generation: migrate the two built-ins (RoleListFileContributor, AdminBootstrapContributor) to IKoanAuthFlowHandler, then delete LegacyAuthContributorAdapter + AuthEventDispatcher — one pipeline, one dispatcher",
+    "Deduplicate ProviderOptions merge logic into one helper (3 hand-maintained field-by-field copies will drift the next time a field is added — the SAML fields show this already happened); switch KoanAutoRegistrar.Describe's AppDomain scan to the same KoanRegistry path the runtime uses",
+    "Move tests/Koan.Web.Auth.Tests into tests/Suites/ and add the missing ARCH-0079 integration spec for the central AuthController flow against the Test connector — the OIDC-501/connector mismatch is exactly the composition bug class that canon rule exists to catch"
+  ],
+  "maturitySignals": {
+    "tests": "Sharply bimodal. Koan.Security.Trust: strong — tests/Suites/Security/Koan.Security.Trust.Tests (5 files: SharedKeyIssuer 4, TrustGuard 5, DevIdentityMiddleware 5, Identity 3, KoanBearerScheme 2 facts) plus Koan.Security.Trust.IntegrationTests/AuthEndToEndSpec (12 facts through real AddKoan/KoanIntegrationHost: bearer accept/reject, dev-identity personas, role gates) plus 3 auth specs in tests/Suites/Integration/Bootstrap. Koan.Web.Auth: partial unit-only — tests/Koan.Web.Auth.Tests (legacy location outside Suites/) covers AuthFlowDispatcher (9), ReturnUrlPolicy (6), JwtTokenService (2); NO integration test of the central challenge/callback flow (which is how OIDC-501 + broken Google/Microsoft connectors went unnoticed). Koan.Web.Auth.Roles, Koan.Web.Auth.Services, and the 4 OAuth connectors: zero coverage.",
+    "docs": "Exceptionally documented area by ADR count: WEB-0043/0044/0045/0049/0051/0065/0066/0069, SEC-0001 (346 lines)/SEC-0002/SEC-0003, DEC-0053; guides auth-howto.md (250), authentication-setup.md (432), authorization-howto.md (104); per-project README + TECHNICAL.md for Web.Auth/Roles/Services (Roles' README is current — documents its own 0.7.0 WEB-0065 refactor). Drift points: Oidc connector csproj describes 'handler wiring' that doesn't exist; Trust csproj/IIssuer docs say 'asymmetric ES256' while only HS256 SharedKeyIssuer exists; Services ships SAMPLES.md + a working-notes ZERO-CONFIG-ANALYSIS.md in-tree.",
+    "codeQuality": "Zero TODO/HACK/FIXME/NotImplementedException markers across all 9 projects — incomplete features surface as honest 501s or ADR-cited deferral comments instead, and newer code (Trust, flow pipeline, registrars) carries dense, accurate ADR cross-references (SEC-0001 §-level citations). Older code shows its age: AuthController is 372 lines with six catch { /* ignore */ } swallows and four overlapping absolute-URL-building heuristics; a 154-LOC dead public method retained; merge logic copy-pasted 3x; connectors carry contradictory duplicate assembly attributes; naming is consistent throughout (Koan.* conventions, KoanAutoRegistrar pattern). Net: high discipline in everything touched since SEC-0001, visible sediment in everything that wasn't."
+  }
+}

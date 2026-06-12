@@ -109,7 +109,7 @@ public sealed class PandocPdfRenderer : IPdfRenderer
         var builder = new StringBuilder();
         string? line;
 
-        while ((line = reader.ReadLineAsync()) != null)
+        while ((line = reader.ReadLine()) != null)
         {
             if (BlockedLatexTokens.Any(token => line.Contains(token, StringComparison.OrdinalIgnoreCase)))
             {

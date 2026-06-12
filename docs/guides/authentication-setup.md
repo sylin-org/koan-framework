@@ -5,17 +5,23 @@ title: "Authentication Setup with Koan"
 audience: [developers, security-engineers, ai-agents]
 status: current
 last_updated: 2025-11-09
-framework_version: v0.6.3
+framework_version: 0.17.x
 validation:
   date_last_tested: 2025-11-09
   status: verified
   scope: all-examples-tested
 related_guides:
+  - auth-howto.md
+  - authorization-howto.md
   - building-apis.md
   - entity-capabilities-howto.md
   - mcp-http-sse-howto.md
   - aspire-integration.md
 ---
+
+> **New to Koan auth?** Start with the progressive **[Authentication & Identity How-To](auth-howto.md)** (zero-config
+> dev identity → roles → real logins → service tokens → production). This page is the **provider/configuration
+> reference** it links back to.
 
 # Authentication Setup with Koan
 
@@ -37,9 +43,17 @@ dotnet add package Koan.Web.Auth
 builder.Services.AddKoan();
 ```
 
-Visit `http://localhost:5000/.well-known/auth/providers` to see the TestProvider ready to use.
+In Development you start out **anonymous** — your app renders its public interface, which is what you usually
+want to evaluate. To log in, Koan ships a built-in **test login page** (the TestProvider), available zero-config
+in Development: visit `/.well-known/auth/providers`, pick **Test (Local)**, and set your subject / roles / claims
+→ you're returned with a real signed session. For scripted testing, step into a transient persona per request
+with `?_as=<subject>&_roles=a,b` (no login page); omit `?_as` for anonymous. All of this is Development-only and
+**fails closed in Production**.
 
-Test login: Click any provider button, enter any email, you're logged in.
+Service-to-service auth also works zero-config: every Koan service self-mints bearer tokens with a default shared
+secret and trusts the others. The default is loudly insecure (`super-insecure-shared-secret-replace-asap`) and is
+**refused in Production/Staging** — set `Koan:Security:Trust:Key` to a real secret before deploying. See the
+progressive [Authentication & Identity How-To](auth-howto.md) for the full story.
 
 ## Google OAuth (2 Lines)
 

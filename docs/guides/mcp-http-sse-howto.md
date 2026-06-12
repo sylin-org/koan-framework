@@ -67,7 +67,7 @@ MCP over HTTP+SSE lets AI agents and IDEs call your backend operations as if the
 
 **See also:**
 - MCP specification: [Model Context Protocol](https://modelcontextprotocol.io)
-- Transport architecture: [MCP-0001: HTTP+SSE Transport](../decisions/MCP-0001-http-sse-transport.md)
+- Transport architecture: [MCP-0001: HTTP+SSE Transport](../archive/proposals/koan-mcp-http-sse-transport.md)
 
 ---
 
@@ -1639,7 +1639,7 @@ You've now mastered MCP over HTTP+SSE—from exposing entities as tools to handl
 
 **Questions or Issues?**
 - Check [Troubleshooting](#9-troubleshooting) section above
-- Review [MCP-0001](../decisions/MCP-0001-http-sse-transport.md) for architecture details
+- Review [MCP-0001](../archive/proposals/koan-mcp-http-sse-transport.md) for architecture details
 - See [Model Context Protocol](https://modelcontextprotocol.io) specification
 
 Remember: MCP makes your backend operations discoverable to AI agents. Design tool names and descriptions to be self-explanatory—agents call `tools/list` to learn what's possible, then compose tools into sophisticated workflows.

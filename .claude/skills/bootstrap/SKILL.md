@@ -110,6 +110,65 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 }
 ```
 
+### KoanModule — Preferred Authoring Surface (ARCH-0086)
+
+As of ARCH-0086, **extend `KoanModule`** instead of implementing `IKoanAutoRegistrar` directly. A `KoanModule`
+*is* an `IKoanAutoRegistrar` (discovered + ordered identically), but gives one self-describing surface plus a
+real, ordered startup lifecycle:
+
+```csharp
+// File: /Initialization/MyAppModule.cs
+using Koan.Core;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+
+namespace MyApp.Initialization;
+
+public sealed class MyAppModule : KoanModule
+{
+    public override string Id => "MyApp";
+
+    public override void Register(IServiceCollection services)            // was Initialize
+    {
+        services.AddScoped<ITodoService, TodoService>();
+        services.AddSingleton<ICacheService, RedisCacheService>();
+    }
+
+    public override Task Start(IServiceProvider sp, CancellationToken ct) // one-time, ordered startup
+    {
+        // Replaces the "register a bootstrap IHostedService in Initialize" idiom.
+        // DI is available; ordered against other modules by [Before]/[After].
+        return Task.CompletedTask;
+    }
+
+    public override void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env) // was Describe
+        => module.Describe(Version);
+}
+```
+
+- `Register` ⇐ `Initialize`, `Report` ⇐ `Describe`, plus a new `Start` for one-time ordered startup work.
+- Recurring periodic/pokable work stays on the `IKoanBackgroundService` family. Code that registers services
+  or must run before the container is built belongs in `Register`, not `Start`.
+- The raw `IKoanAutoRegistrar` above still works via the bridge — migration is opportunistic.
+
+#### Discovering "many implementers of one contract": `[KoanDiscoverable]`
+
+Don't hand-roll an `AppDomain` assembly scan to find plug-ins. Mark the **interface** `[KoanDiscoverable]` and
+read implementers from the registry:
+
+```csharp
+[KoanDiscoverable]
+public interface IMyPlugin { }
+
+// inside Register():
+foreach (var t in KoanRegistry.GetDiscoveredImplementors(typeof(IMyPlugin)))
+    services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IMyPlugin), t));
+```
+
+The source generator (build time) + `RegistryManifestLoader` (runtime) populate `KoanRegistry`, so discovery
+is fast and never misses lazily-loaded assemblies. (Used by `IKoanAuthEventContributor` / `IKoanAuthFlowHandler`.)
+
 ### Discovery Rules
 
 The framework automatically discovers `IKoanAutoRegistrar` implementations:

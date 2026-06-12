@@ -6,10 +6,11 @@ using Koan.Web.Controllers;
 namespace S2.Api.Controllers;
 
 [Route("api/items")]
-[Koan.Web.Transformers.EnableEntityTransformers]
 [KoanDataBehavior(MustPaginate = true, DefaultPageSize = 10, MaxPageSize = 200)]
-public sealed class ItemsController : EntityController<Item>
+public sealed class ItemsController : EntityController<Item>, Koan.Web.Transformers.ITransformerActivationPredicate
 {
+    public bool ShouldActivate(Microsoft.AspNetCore.Http.HttpContext context) => true;
+
     [HttpPost("seed/{count}")]
     public async Task<IActionResult> Seed([FromRoute] int count, CancellationToken ct)
     {

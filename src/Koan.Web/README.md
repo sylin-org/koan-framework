@@ -2,7 +2,7 @@
 
 ASP.NET Core integration for Koan: controller-first routing, health endpoints, well-known endpoints, and observability bootstrap.
 
-- Target framework: net9.0
+- Target framework: net10.0
 - License: Apache-2.0
 
 ## Capabilities

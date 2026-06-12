@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
@@ -12,14 +13,17 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Instructions;
+using Koan.Data.SearchEngine;
+using Koan.Core.Capabilities;
 using Koan.Data.Vector.Abstractions;
+using Koan.Data.Vector.Abstractions.Capabilities;
 using Koan.Data.Vector.Abstractions.Configuration;
 
 namespace Koan.Data.Connector.ElasticSearch;
 
 internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
     IVectorSearchRepository<TEntity, TKey>,
-    IVectorCapabilities,
+    IDescribesCapabilities,
     IInstructionExecutor<TEntity>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
@@ -28,7 +32,11 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
     private readonly ElasticSearchOptions _options;
     private readonly IServiceProvider _services;
     private readonly ILogger<ElasticSearchVectorRepository<TEntity, TKey>>? _logger;
-    private volatile bool _indexEnsured;
+    // Keyed by IndexName — one repo instance serves multiple partitions/storage names, so a
+    // single bool would short-circuit EnsureIndex after the first partition is created and
+    // every subsequent partition's writes would land in an auto-created index without
+    // dense_vector mapping. Per-IndexName tracking is the only correct shape.
+    private readonly ConcurrentDictionary<string, byte> _ensuredIndexes = new(StringComparer.Ordinal);
     private int _discoveredDimension = -1;
 
     public ElasticSearchVectorRepository(
@@ -43,11 +51,10 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
         ConfigureHttpClient();
     }
 
-    public VectorCapabilities Capabilities =>
-        VectorCapabilities.Knn |
-        VectorCapabilities.Filters |
-        VectorCapabilities.BulkUpsert |
-        VectorCapabilities.BulkDelete;
+    public void Describe(ICapabilities caps) => caps
+        .Add(VectorCaps.Knn).Add(VectorCaps.Filters, SearchEngineFilterTranslator.Caps)
+        .Add(VectorCaps.BulkUpsert).Add(VectorCaps.BulkDelete);
+
 
     public async Task VectorEnsureCreated(CancellationToken ct = default)
     {
@@ -428,16 +435,13 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
             ["_source"] = new JArray(_options.MetadataField, _options.IdField)
         };
 
-        var filter = ElasticSearchFilterTranslator.TranslateWhereClause(options.Filter);
+        var filter = SearchEngineFilterTranslator.TranslateWhereClause(options.Filter, _options.MetadataField, "Elasticsearch");
         if (filter is not null)
         {
-            request["query"] = new JObject
-            {
-                ["bool"] = new JObject
-                {
-                    ["filter"] = new JArray(filter)
-                }
-            };
+            // DATA-0097 F6: the filter must PRE-FILTER the kNN (knn.filter), not sit as a top-level
+            // query sibling — a sibling query is OR-combined with knn in ES 8.x, so the filter would
+            // not constrain the vector results (it returned the full top-K unfiltered).
+            ((JObject)request["knn"]!)["filter"] = filter;
         }
 
         if (options.Timeout is { } timeout)
@@ -446,6 +450,30 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
         }
 
         return request;
+    }
+
+    /// <summary>
+    /// Drop the underlying index entirely. Subsequent operations re-create it lazily with the
+    /// correct dense_vector mapping — cleaner than _delete_by_query, which leaves the (possibly
+    /// stale) mapping in place. Invalidates the per-IndexName ensured-cache so the next
+    /// EnsureIndex call hits the real probe path.
+    /// </summary>
+    public async Task Flush(CancellationToken ct = default)
+    {
+        using var activity = ElasticSearchTelemetry.Activity.StartActivity("vector.flush");
+
+        var indexName = IndexName;
+        var url = $"/{Uri.EscapeDataString(indexName)}";
+        var resp = await _http.DeleteAsync(url, ct);
+
+        // 404 means the index didn't exist; treat as a successful no-op flush.
+        if (!resp.IsSuccessStatusCode && resp.StatusCode != HttpStatusCode.NotFound)
+        {
+            var body = await resp.Content.ReadAsStringAsync(ct);
+            throw new InvalidOperationException($"Elasticsearch flush failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {body}");
+        }
+
+        _ensuredIndexes.TryRemove(indexName, out _);
     }
 
     private async Task Clear(CancellationToken ct)
@@ -496,7 +524,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
 
     private async Task EnsureIndexInitialized(CancellationToken ct)
     {
-        if (_indexEnsured)
+        if (_ensuredIndexes.ContainsKey(IndexName))
         {
             return;
         }
@@ -510,24 +538,25 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
 
     private async Task EnsureIndex(int dimension, CancellationToken ct)
     {
-        if (_indexEnsured)
+        var indexName = IndexName;
+        if (_ensuredIndexes.ContainsKey(indexName))
         {
             return;
         }
 
         using var _ = ElasticSearchTelemetry.Activity.StartActivity("vector.index.ensureCreated");
 
-        var url = $"/{Uri.EscapeDataString(IndexName)}";
+        var url = $"/{Uri.EscapeDataString(indexName)}";
         var probe = await _http.GetAsync(url, ct);
         if (probe.IsSuccessStatusCode)
         {
-            _indexEnsured = true;
+            _ensuredIndexes[indexName] = 0;
             return;
         }
 
         if (_options.DisableIndexAutoCreate)
         {
-            throw new InvalidOperationException($"Elasticsearch index '{IndexName}' does not exist and auto creation is disabled.");
+            throw new InvalidOperationException($"Elasticsearch index '{indexName}' does not exist and auto creation is disabled.");
         }
 
         var body = new JObject
@@ -564,7 +593,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
             throw new InvalidOperationException($"Elasticsearch index creation failed: {(int)create.StatusCode} {create.ReasonPhrase} {text}");
         }
 
-        _indexEnsured = true;
+        _ensuredIndexes[indexName] = 0;
     }
 
     private string IndexName
@@ -576,7 +605,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
                 return _options.IndexName!;
             }
 
-            var baseName = VectorStorageNameRegistry.GetOrCompute<TEntity, TKey>(_services);
+            var baseName = VectorAdapterNaming.GetOrCompute<TEntity, TKey>(_services);
             baseName = baseName.Replace('#', '-').Replace('.', '-').ToLowerInvariant();
             if (!string.IsNullOrEmpty(_options.IndexPrefix))
             {

@@ -1,5 +1,4 @@
 using System;
-using System.Reflection;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
@@ -9,13 +8,17 @@ using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Koan.Core;
+using Koan.Core.Hosting.Registry;
 using Koan.Core.Modules;
 using Koan.Web.Auth.Contributors;
 using Koan.Web.Auth.Domain;
+using Koan.Web.Auth.Flow;
+using Koan.Web.Auth.Flow.Builtin;
 using Koan.Web.Auth.Hosting;
 using Koan.Web.Auth.Infrastructure;
 using Koan.Web.Auth.Options;
 using Koan.Web.Auth.Providers;
+using Koan.Security.Trust.Inbound;
 
 namespace Koan.Web.Auth.Extensions;
 
@@ -26,6 +29,7 @@ public static class ServiceCollectionExtensions
         // Bind from configuration by section path at runtime (no IConfiguration required here)
         services.AddKoanOptions<AuthOptions>(AuthOptions.SectionPath);
         services.AddKoanOptions<AuthLifecycleOptions>(AuthLifecycleOptions.SectionPath);
+        services.AddKoanOptions<ChallengeOptions>(ChallengeOptions.SectionPath);
 
         services.AddHttpClient();
 
@@ -42,12 +46,22 @@ public static class ServiceCollectionExtensions
         // the projection (e.g. to redact email or omit custom claims) before this call lands.
         services.TryAddSingleton<ICurrentUserProjector, DefaultCurrentUserProjector>();
 
-        // Event-contributor pipeline (WEB-0065). Scan loaded assemblies for IKoanAuthEventContributor
-        // implementations and register them as scoped (so they can depend on per-request services such
-        // as DB sessions). AuthEventDispatcher composes the list in Priority order. Apps add a
-        // contributor by simply implementing the interface — no DI registration call required.
+        // Event-contributor pipeline (WEB-0065). Register every [KoanDiscoverable] IKoanAuthEventContributor
+        // (discovered via KoanRegistry — build-time generator + runtime fallback) as scoped, so they can
+        // depend on per-request services such as DB sessions. AuthEventDispatcher composes the list in
+        // Priority order. Apps add a contributor by simply implementing the interface — no DI call required.
         DiscoverAndRegisterAuthEventContributors(services);
         services.TryAddScoped<AuthEventDispatcher>();
+
+        // Flow-handler pipeline. Broadens the contributor surface to cover challenge / access-denied
+        // / validate-principal in addition to sign-in / sign-out / bootstrap. Built-ins
+        // (JsonChallengeHandler) live alongside app-provided handlers in the same auto-discovered
+        // list; legacy IKoanAuthEventContributor implementations participate via
+        // LegacyAuthContributorAdapter so existing code continues to work unchanged.
+        DiscoverAndRegisterAuthFlowHandlers(services);
+        services.AddScoped<IKoanAuthFlowHandler, JsonChallengeHandler>();
+        services.TryAddScoped<AuthFlowDispatcher>();
+
         services.AddHostedService<AuthBootstrapHostedService>();
 
         // Ensure a default cookie scheme is registered so the centralized challenge/callback can sign users in.
@@ -69,47 +83,81 @@ public static class ServiceCollectionExtensions
                 o.Cookie.Name = ".AspNetCore.Koan.cookie";
                 o.SlidingExpiration = true;
 
+                // Cookie event slots are framework-owned. Every slot fans out through
+                // AuthFlowDispatcher → every registered IKoanAuthFlowHandler (in Priority order),
+                // including LegacyAuthContributorAdapter shims for any IKoanAuthEventContributor
+                // implementations that have not yet been migrated. Applications must NOT overwrite
+                // these slots via a later PostConfigure — they would break the lifecycle pipeline.
                 o.Events = new CookieAuthenticationEvents
                 {
-                    OnRedirectToLogin = ctx =>
+                    OnRedirectToLogin = async ctx =>
                     {
-                        if (AuthenticationExtensions_WantsJson(ctx.Request))
-                        {
-                            ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                            return Task.CompletedTask;
-                        }
-                        var selection = ctx.HttpContext.RequestServices.GetService<IAuthProviderElection>()?.Current;
+                        var services = ctx.HttpContext.RequestServices;
+                        var dispatcher = services.GetService<AuthFlowDispatcher>();
+
+                        // Resolve a richer default redirect for interactive flows: a provider-aware
+                        // challenge URL (so the cookie middleware doesn't dump the user on a generic
+                        // /sign-in when a single provider is configured). Handlers see this as the
+                        // initial RedirectUri and can rewrite it freely.
+                        var defaultRedirect = ctx.RedirectUri;
+                        var selection = services.GetService<IAuthProviderElection>()?.Current;
                         if (selection is not null && selection.HasProvider && selection.SupportsInteractiveChallenge)
                         {
                             var returnUrl = ResolveReturnUrl(ctx);
-                            var challengeUrl = BuildChallengeUrl(selection.ChallengePath ?? "", returnUrl);
-                            ctx.Response.Redirect(challengeUrl);
-                            return Task.CompletedTask;
+                            defaultRedirect = BuildChallengeUrl(selection.ChallengePath ?? "", returnUrl);
                         }
-                        ctx.Response.Redirect(ctx.RedirectUri);
-                        return Task.CompletedTask;
-                    },
-                    OnRedirectToAccessDenied = ctx =>
-                    {
-                        if (AuthenticationExtensions_WantsJson(ctx.Request))
+
+                        var flowCtx = new AuthChallengeContext
                         {
-                            ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
-                            return Task.CompletedTask;
-                        }
-                        ctx.Response.Redirect(ctx.RedirectUri);
-                        return Task.CompletedTask;
+                            HttpContext = ctx.HttpContext,
+                            Services = services,
+                            DefaultRedirectUri = defaultRedirect,
+                            RedirectUri = defaultRedirect,
+                        };
+
+                        if (dispatcher is not null)
+                            await dispatcher.DispatchChallenge(flowCtx, ctx.HttpContext.RequestAborted);
+
+                        if (!flowCtx.ResponseHandled)
+                            ctx.Response.Redirect(flowCtx.RedirectUri);
                     },
-                    // OnSigningIn / OnSigningOut: framework owns these slots. They dispatch through
-                    // AuthEventDispatcher to every registered IKoanAuthEventContributor in Priority
-                    // order. Applications that previously assigned o.Events.OnSigningIn directly must
-                    // migrate that logic into a contributor (see WEB-0065 ADR). Overwriting these via
-                    // a later PostConfigure will break the lifecycle pipeline.
+                    OnRedirectToAccessDenied = async ctx =>
+                    {
+                        var services = ctx.HttpContext.RequestServices;
+                        var dispatcher = services.GetService<AuthFlowDispatcher>();
+
+                        var flowCtx = new AuthAccessDeniedContext
+                        {
+                            HttpContext = ctx.HttpContext,
+                            Services = services,
+                            DefaultRedirectUri = ctx.RedirectUri,
+                            RedirectUri = ctx.RedirectUri,
+                        };
+
+                        if (dispatcher is not null)
+                            await dispatcher.DispatchAccessDenied(flowCtx, ctx.HttpContext.RequestAborted);
+
+                        if (!flowCtx.ResponseHandled)
+                            ctx.Response.Redirect(flowCtx.RedirectUri);
+                    },
+                    OnValidatePrincipal = async ctx =>
+                    {
+                        var services = ctx.HttpContext.RequestServices;
+                        var dispatcher = services.GetService<AuthFlowDispatcher>();
+                        if (dispatcher is null) return;
+                        var validateCtx = new AuthValidatePrincipalContext
+                        {
+                            Inner = ctx,
+                            Services = services,
+                        };
+                        await dispatcher.DispatchValidatePrincipal(validateCtx, ctx.HttpContext.RequestAborted);
+                    },
                     OnSigningIn = async ctx =>
                     {
                         var principal = ctx.Principal;
                         if (principal?.Identity is not ClaimsIdentity identity) return;
 
-                        var dispatcher = ctx.HttpContext.RequestServices.GetService<AuthEventDispatcher>();
+                        var dispatcher = ctx.HttpContext.RequestServices.GetService<AuthFlowDispatcher>();
                         if (dispatcher is null) return;
 
                         var provider = ResolveProviderFromPath(ctx.HttpContext.Request.Path.Value);
@@ -124,15 +172,13 @@ public static class ServiceCollectionExtensions
 
                         if (signInCtx.RejectReason is not null)
                         {
-                            // Outer middleware can read the rejection marker from HttpContext.Items to
-                            // translate it into a redirect or distinct response.
                             ctx.HttpContext.Items[AuthLifecycleMarkers.SignInRejected] = signInCtx.RejectReason;
                             ctx.Principal = new ClaimsPrincipal(new ClaimsIdentity());
                         }
                     },
                     OnSigningOut = async ctx =>
                     {
-                        var dispatcher = ctx.HttpContext.RequestServices.GetService<AuthEventDispatcher>();
+                        var dispatcher = ctx.HttpContext.RequestServices.GetService<AuthFlowDispatcher>();
                         if (dispatcher is null) return;
                         var userId = ctx.HttpContext.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
                             ?? ctx.HttpContext.User?.FindFirst("sub")?.Value;
@@ -140,33 +186,47 @@ public static class ServiceCollectionExtensions
                         await dispatcher.DispatchSignOut(signOutCtx, ctx.HttpContext.RequestAborted);
                     }
                 };
-            });
+            })
+            // SEC-0001 §6.1/§11 (Phase 2, 2d): inbound bearer scheme alongside cookie. Additive and
+            // non-default — opt in per endpoint via [Authorize(AuthenticationSchemes="Koan.bearer")].
+            .AddKoanBearer();
         return services;
     }
 
     /// <summary>
-    /// Scan loaded assemblies for non-abstract <see cref="IKoanAuthEventContributor"/> types and
-    /// register each as a scoped service. Follows the same scan-tolerant pattern used elsewhere in
-    /// Koan (skips assemblies that fail <see cref="Assembly.GetTypes"/>, swallows individual type
-    /// failures). Idempotent: <see cref="ServiceCollectionDescriptorExtensions.TryAddEnumerable(IServiceCollection, ServiceDescriptor)"/>
-    /// ensures the same concrete type is not registered twice.
+    /// Register every discovered <see cref="IKoanAuthEventContributor"/> as a scoped service. Discovery
+    /// runs through <see cref="KoanRegistry.GetDiscoveredImplementors(Type)"/> — populated at build time by
+    /// the source generator and at runtime by <c>RegistryManifestLoader</c> from the <c>[KoanDiscoverable]</c>
+    /// marker on the interface — so this no longer scans <c>AppDomain</c> assemblies (which miss
+    /// lazily-loaded Koan assemblies). Idempotent via
+    /// <see cref="ServiceCollectionDescriptorExtensions.TryAddEnumerable(IServiceCollection, ServiceDescriptor)"/>.
     /// </summary>
     private static void DiscoverAndRegisterAuthEventContributors(IServiceCollection services)
     {
         var contract = typeof(IKoanAuthEventContributor);
-        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        foreach (var type in KoanRegistry.GetDiscoveredImplementors(contract))
         {
-            Type[] types;
-            try { types = assembly.GetTypes(); }
-            catch (ReflectionTypeLoadException ex) { types = ex.Types.Where(t => t is not null).Select(t => t!).ToArray(); }
-            catch { continue; }
+            // AuthFlowDispatcher consumes IEnumerable<IKoanAuthEventContributor> directly and wraps each
+            // instance in a LegacyAuthContributorAdapter at construction time, so no separate flow-handler
+            // registration is needed for legacy contributors.
+            services.TryAddEnumerable(ServiceDescriptor.Scoped(contract, type));
+        }
+    }
 
-            foreach (var type in types)
-            {
-                if (type.IsAbstract || type.IsInterface) continue;
-                if (!contract.IsAssignableFrom(type)) continue;
-                services.TryAddEnumerable(ServiceDescriptor.Scoped(contract, type));
-            }
+    /// <summary>
+    /// Register every discovered <see cref="IKoanAuthFlowHandler"/> as a scoped service, via the same
+    /// <c>[KoanDiscoverable]</c> registry path as <see cref="DiscoverAndRegisterAuthEventContributors"/>.
+    /// </summary>
+    private static void DiscoverAndRegisterAuthFlowHandlers(IServiceCollection services)
+    {
+        var contract = typeof(IKoanAuthFlowHandler);
+        foreach (var type in KoanRegistry.GetDiscoveredImplementors(contract))
+        {
+            // LegacyAuthContributorAdapter is a runtime wrapper instantiated by the dispatcher, not a
+            // discoverable handler — skip it so we don't surface a singleton no-op adapter through the
+            // registration (it implements IKoanAuthFlowHandler, so discovery would otherwise include it).
+            if (type == typeof(LegacyAuthContributorAdapter)) continue;
+            services.TryAddEnumerable(ServiceDescriptor.Scoped(contract, type));
         }
     }
 
@@ -177,20 +237,6 @@ public static class ServiceCollectionExtensions
         // programmatic SignInAsync) may not match — provider is null there, which is fine.
         var match = AuthLifecycleConstants.CallbackPathRegex.Match(path);
         return match.Success ? match.Groups[1].Value : null;
-    }
-
-    // Minimal copy of the WantsJson heuristic (kept internal to avoid API surfacing)
-    private static bool AuthenticationExtensions_WantsJson(HttpRequest req)
-    {
-        var accept = req.Headers["Accept"].ToString();
-        if (!string.IsNullOrWhiteSpace(accept) && accept.IndexOf("application/json", StringComparison.OrdinalIgnoreCase) >= 0)
-            return true;
-        var apiPath = req.Path.HasValue && (req.Path.StartsWithSegments("/api") || req.Path.StartsWithSegments("/.well-known") || string.Equals(req.Path.Value, "/me", StringComparison.OrdinalIgnoreCase));
-        if (apiPath) return true;
-        var xhr = req.Headers["X-Requested-With"].ToString();
-        if (!string.IsNullOrWhiteSpace(xhr) && string.Equals(xhr, "XMLHttpRequest", StringComparison.OrdinalIgnoreCase))
-            return true;
-        return false;
     }
 
     private static string? ResolveReturnUrl(RedirectContext<CookieAuthenticationOptions> context)

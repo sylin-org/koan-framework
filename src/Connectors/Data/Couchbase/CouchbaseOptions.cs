@@ -18,6 +18,14 @@ public sealed class CouchbaseOptions : IAdapterOptions
     public string ConnectionString { get; set; } = "auto";
 
     /// <summary>
+    /// Optional Couchbase management URL (HTTP/REST endpoint). When omitted, the cluster provider
+    /// derives one from <see cref="ConnectionString"/> by replacing the scheme and defaulting to
+    /// port 8091. Set this explicitly when the management port is exposed on a different host/port
+    /// than the KV port — e.g. Testcontainers maps both ports to independent random host ports.
+    /// </summary>
+    public string? ManagementUrl { get; set; }
+
+    /// <summary>
     /// Optional username for cluster authentication. When omitted, SDK defaults apply.
     /// </summary>
     public string? Username { get; set; }

@@ -2,7 +2,7 @@
 using System.Net.WebSockets;
 using System.Threading;
 using System.Threading.Tasks;
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.WebSockets;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;

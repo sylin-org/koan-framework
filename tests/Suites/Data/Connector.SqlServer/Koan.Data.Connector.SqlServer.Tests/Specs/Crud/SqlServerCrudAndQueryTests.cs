@@ -1,9 +1,10 @@
-﻿using System;
+using System;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Koan.Core.Hosting.App;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
@@ -20,7 +21,7 @@ public class SqlServerCrudAndQueryTests : IClassFixture<Support.SqlServerAutoFix
 	public async Task Upsert_query_count_and_paging()
 	{
 		using var partition = BeginPartition("crud-core");
-		var (available, repo, linqRepo) = await Prepare();
+		var (available, repo, queryRepo) = await Prepare();
 		if (!available)
 		{
 			return;
@@ -37,18 +38,18 @@ public class SqlServerCrudAndQueryTests : IClassFixture<Support.SqlServerAutoFix
 
 		await repo.UpsertMany(people, default);
 
-		var all = await repo.Query(null, default);
+		// Querying + counting live on IQueryRepository<T,K> via QueryDefinition; LINQ predicates lower
+		// into the unified Filter AST through LinqFilterCompiler (the entity-first DX path).
+		var age20 = LinqFilterCompiler.Compile<Person>(x => x.Age >= 20);
+
+		var all = (await queryRepo.Query(QueryDefinition.All, default)).Items;
 		all.Should().HaveCount(25);
 
-		var page = await linqRepo.Query(x => x.Age >= 20, default);
+		var page = (await queryRepo.Query(new QueryDefinition { Filter = age20, Page = 1, PageSize = 5 }, default)).Items;
 		page.Should().HaveCount(5);
 		page.First().Name.Should().Be("P-2");
 
-		var countResult = await repo.Count(new CountRequest<Person>
-		{
-			Predicate = x => x.Age >= 20
-		});
-
+		var countResult = await queryRepo.Count(new QueryDefinition { Filter = age20 });
 		countResult.IsEstimate.Should().BeFalse();
 		countResult.Value.Should().Be(15);
 
@@ -65,13 +66,9 @@ public class SqlServerCrudAndQueryTests : IClassFixture<Support.SqlServerAutoFix
 		await repo.Upsert(updated, default);
 		(await repo.Get("10", default))!.Name.Should().Be("Updated-10");
 
-		var countAfterUpdate = await repo.Count(new CountRequest<Person>
-		{
-			Predicate = x => x.Age >= 20
-		});
-
-	countAfterUpdate.IsEstimate.Should().BeFalse();
-	countAfterUpdate.Value.Should().Be(16);
+		var countAfterUpdate = await queryRepo.Count(new QueryDefinition { Filter = age20 });
+		countAfterUpdate.IsEstimate.Should().BeFalse();
+		countAfterUpdate.Value.Should().Be(16);
 
 		var removed = await repo.Delete("1", default);
 		removed.Should().BeTrue();
@@ -80,19 +77,15 @@ public class SqlServerCrudAndQueryTests : IClassFixture<Support.SqlServerAutoFix
 		var removedMany = await repo.DeleteMany(new[] { "2", "3" }, default);
 		removedMany.Should().Be(2);
 
-		var remaining = await repo.Query(null, default);
+		var remaining = (await queryRepo.Query(QueryDefinition.All, default)).Items;
 		remaining.Should().HaveCount(22);
 
-		var finalCount = await repo.Count(new CountRequest<Person>
-		{
-			Predicate = x => x.Age >= 20
-		});
-
+		var finalCount = await queryRepo.Count(new QueryDefinition { Filter = age20 });
 		finalCount.Value.Should().Be(14);
 		finalCount.IsEstimate.Should().BeFalse();
 	}
 
-	private async Task<(bool Available, IDataRepository<Person, string> Repo, ILinqQueryRepository<Person, string> LinqRepo)> Prepare()
+	private async Task<(bool Available, IDataRepository<Person, string> Repo, IQueryRepository<Person, string> QueryRepo)> Prepare()
 	{
 		if (_fx.SkipTests)
 		{
@@ -103,8 +96,8 @@ public class SqlServerCrudAndQueryTests : IClassFixture<Support.SqlServerAutoFix
 		await _fx.Data.Execute<Person, int>(new Instruction("data.clear"));
 
 		var repo = _fx.Data.GetRepository<Person, string>();
-		var linqRepo = Assert.IsAssignableFrom<ILinqQueryRepository<Person, string>>(repo);
-		return (true, repo, linqRepo);
+		var queryRepo = Assert.IsAssignableFrom<IQueryRepository<Person, string>>(repo);
+		return (true, repo, queryRepo);
 	}
 
 	private void EnsureAppHost()

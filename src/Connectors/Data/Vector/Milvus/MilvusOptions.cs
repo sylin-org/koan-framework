@@ -18,7 +18,14 @@ public sealed class MilvusOptions : IAdapterOptions
     public string MetadataFieldName { get; set; } = "metadata";
     public string Metric { get; set; } = "COSINE";
     public int DefaultTimeoutSeconds { get; set; } = 100;
-    public int? Dimension { get; set; } = null;
+
+    /// <summary>
+    /// Embedding dimension at collection-creation time. Defaults to 1536 — the size of OpenAI's
+    /// ada-002 / text-embedding-3-small, the most common production embedding. Users with
+    /// different embedding models override; the first Upsert also auto-discovers when this
+    /// is left at null.
+    /// </summary>
+    public int? Dimension { get; set; } = 1536;
     public bool AutoCreateCollection { get; set; } = true;
     public string ConsistencyLevel { get; set; } = "Bounded";
     public string? Token { get; set; } = null;

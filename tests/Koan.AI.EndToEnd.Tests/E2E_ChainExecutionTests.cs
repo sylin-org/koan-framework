@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using Koan.AI.Contracts.Models;
 using Koan.AI.Orchestration;
 using Koan.Core.AI;

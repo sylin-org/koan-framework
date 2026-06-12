@@ -2,16 +2,18 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Koan.Web.Auth.Contributors;
+using Koan.Web.Auth.Flow;
 
 namespace Koan.Web.Auth.Hosting;
 
 /// <summary>
-/// Fires <see cref="IKoanAuthEventContributor.OnBootstrap"/> on every registered contributor
-/// once during host startup. The dispatcher is resolved from a fresh service scope (it and its
-/// contributor dependencies are scoped) so the singleton hosted service never holds a captive
-/// scoped reference. Failures inside a single contributor are logged by the dispatcher and do
-/// not prevent the host from coming up; a wholesale dispatch failure is logged here and also
-/// non-fatal.
+/// Fires <c>OnBootstrap</c> on every registered <see cref="IKoanAuthFlowHandler"/> (including
+/// legacy <see cref="IKoanAuthEventContributor"/> instances projected through
+/// <c>LegacyAuthContributorAdapter</c>) once during host startup. The dispatcher is resolved
+/// from a fresh service scope (it and its handler dependencies are scoped) so the singleton
+/// hosted service never holds a captive scoped reference. Failures inside a single handler are
+/// logged by the dispatcher and do not prevent the host from coming up; a wholesale dispatch
+/// failure is logged here and also non-fatal.
 /// </summary>
 internal sealed class AuthBootstrapHostedService : IHostedService
 {
@@ -34,9 +36,9 @@ internal sealed class AuthBootstrapHostedService : IHostedService
         try
         {
             await using var scope = _rootServices.CreateAsyncScope();
-            var dispatcher = scope.ServiceProvider.GetRequiredService<AuthEventDispatcher>();
+            var dispatcher = scope.ServiceProvider.GetRequiredService<AuthFlowDispatcher>();
             _logger.LogDebug(
-                "Koan.Web.Auth: dispatching OnBootstrap to {Count} contributors",
+                "Koan.Web.Auth: dispatching OnBootstrap to {Count} handlers",
                 dispatcher.Count);
             var ctx = new AuthBootstrapContext(scope.ServiceProvider, _environment);
             await dispatcher.DispatchBootstrap(ctx, cancellationToken);

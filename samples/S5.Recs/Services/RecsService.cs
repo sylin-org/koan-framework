@@ -8,6 +8,7 @@ using Koan.AI.Contracts;
 using Koan.AI.Contracts.Models;
 using Koan.Core;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Core;
 using Koan.Data.Vector;
 using Koan.Data.Vector.Abstractions;
@@ -582,41 +583,44 @@ internal sealed class RecsService : IRecsService
     /// Builds VectorFilter for push-down filtering at the vector database layer.
     /// Handles all metadata-based filters except user library exclusion.
     /// </summary>
-    private async Task<Koan.Data.Abstractions.Vector.Filtering.VectorFilter?> BuildVectorFilter(
+    private async Task<Koan.Data.Abstractions.Filtering.Filter?> BuildVectorFilter(
         RecsQuery query,
         CancellationToken ct)
     {
-        var filters = new List<Koan.Data.Abstractions.Vector.Filtering.VectorFilter>();
+        // AI-0036 §9 / DATA-0097 P1: the unified Filter AST. Note "genres" is an array metadata key,
+        // so genre membership is the collection operator Has (array-contains-element) — NOT the string
+        // Contains (substring), which the legacy VectorFilter.Contains ambiguously meant here.
+        var filters = new List<Filter>();
 
         // MediaType filter
         if (!string.IsNullOrWhiteSpace(query.Filters?.MediaType))
         {
-            filters.Add(Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Eq("mediaTypeId", query.Filters.MediaType));
+            filters.Add(Filter.Eq("mediaTypeId", query.Filters.MediaType));
         }
 
         // Genre filter (must contain at least one of the specified genres)
         if (query.Filters?.Genres is { Length: > 0 })
         {
             var genreFilters = query.Filters.Genres
-                .Select(g => Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Contains("genres", g))
+                .Select(g => Filter.On(FieldPath.Of("genres"), FilterOperator.Has, FilterValue.Of(g)))
                 .ToArray();
-            filters.Add(Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Or(genreFilters));
+            filters.Add(Filter.Any(genreFilters));
         }
 
         // Episodes filter (≤ max)
         if (query.Filters?.EpisodesMax is int emax)
         {
-            filters.Add(Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Lte("episodes", emax));
+            filters.Add(Filter.On(FieldPath.Of("episodes"), FilterOperator.Lte, FilterValue.Of(emax)));
         }
 
         // Rating filter (range) - NOTE: Use RatingValue which matches the computed Rating property
         if (query.Filters?.RatingMin.HasValue == true)
         {
-            filters.Add(Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Gte("ratingValue", query.Filters.RatingMin.Value));
+            filters.Add(Filter.On(FieldPath.Of("ratingValue"), FilterOperator.Gte, FilterValue.Of(query.Filters.RatingMin.Value)));
         }
         if (query.Filters?.RatingMax.HasValue == true)
         {
-            filters.Add(Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Lte("ratingValue", query.Filters.RatingMax.Value));
+            filters.Add(Filter.On(FieldPath.Of("ratingValue"), FilterOperator.Lte, FilterValue.Of(query.Filters.RatingMax.Value)));
         }
 
         // Year filter (range) - NOTE: Year is computed property, filter on StartDateInt (numeric YYYYMMDD)
@@ -624,12 +628,12 @@ internal sealed class RecsService : IRecsService
         if (query.Filters?.YearMin.HasValue == true)
         {
             var startDateMin = query.Filters.YearMin.Value * 10000 + 101; // YYYY0101
-            filters.Add(Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Gte("startDateInt", startDateMin));
+            filters.Add(Filter.On(FieldPath.Of("startDateInt"), FilterOperator.Gte, FilterValue.Of(startDateMin)));
         }
         if (query.Filters?.YearMax.HasValue == true)
         {
             var startDateMax = query.Filters.YearMax.Value * 10000 + 1231; // YYYY1231
-            filters.Add(Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Lte("startDateInt", startDateMax));
+            filters.Add(Filter.On(FieldPath.Of("startDateInt"), FilterOperator.Lte, FilterValue.Of(startDateMax)));
         }
 
         // NOTE: Censored tag filtering moved to scoring phase (soft penalty instead of hard filter)
@@ -640,7 +644,7 @@ internal sealed class RecsService : IRecsService
             return null;
         if (filters.Count == 1)
             return filters[0];
-        return Koan.Data.Abstractions.Vector.Filtering.VectorFilter.And(filters.ToArray());
+        return Filter.All(filters.ToArray());
     }
 
     /// <summary>

@@ -1,0 +1,165 @@
+{
+  "area": "orchestration-devops",
+  "projects": [
+    {
+      "name": "Koan.Orchestration.Abstractions",
+      "purpose": "Contracts for the DevHost orchestration layer: service-metadata attributes ([KoanService], [KoanApp], legacy [ContainerDefaults]/[EndpointDefaults]/etc.), hosting-provider and artifact-exporter SPIs, and planner models (Plan/ServiceSpec/HealthSpec).",
+      "keyTypes": [
+        "KoanServiceAttribute",
+        "KoanAppAttribute",
+        "IHostingProvider",
+        "IArtifactExporter",
+        "Plan / ServiceSpec / HealthSpec",
+        "ServiceKind / DeploymentKind / Profile",
+        "OrchestrationServiceManifestAttribute",
+        "IServiceAdapter / IKoanService / IDevServiceDescriptor (zero implementors anywhere — dead markers)"
+      ],
+      "dependsOn": [],
+      "state": "Active but condemned: net10.0, marked KoanPackageKind=Kernel, ~584 LOC across 33 small files, referenced by Koan.Core itself, Koan.Core.Adapters, and ~20 connectors for [KoanService] metadata. ARCH-0077 (2026-05-15) explicitly schedules the attributes for obsolescence (0.9.0) and removal (1.0). Carries two attribute generations side by side (legacy ContainerDefaults/EndpointDefaults/AppEnvDefaults/HealthDefaults/ServiceId plus the unified KoanService that 'replaces' them — both still shipped). The marker interfaces IServiceAdapter/IKoanService/IDevServiceDescriptor have no implementors in the entire repo."
+    },
+    {
+      "name": "Koan.Orchestration.Aspire",
+      "purpose": "Aspire AppHost integration (IKoanAspireRegistrar + AddKoanDiscoveredResources reflection discovery) bundled with an unrelated 'SelfOrchestration' subsystem that has the app itself spawn dependency containers via the docker CLI at startup, keyed off KoanEnv.OrchestrationMode.",
+      "keyTypes": [
+        "IKoanAspireRegistrar",
+        "KoanAspireExtensions.AddKoanDiscoveredResources / AddKoanModule / UseKoanProviderSelection",
+        "KoanAutoRegistrar (orchestration-mode switch)",
+        "KoanSelfOrchestrationService (IHostedService)",
+        "KoanDependencyOrchestrator",
+        "DockerContainerManager (shells out to docker)",
+        "KoanAssemblyDiscovery (bespoke AppDomain.GetAssemblies scan)",
+        "SelfOrchestrationConfigurationProvider"
+      ],
+      "dependsOn": [
+        "Koan.Core"
+      ],
+      "state": "Experimental / partially adopted (~1,760 LOC). Only 2 of ~20 connectors (Postgres, Redis) implement IKoanAspireRegistrar; PGVector and Koan.Service.KoanContext carry csproj references with zero code usage (vestigial). The only AppHost sample lives in samples/archive/KoanAspireIntegration. TestHostEnvironment.cs (test scaffold) ships in production code. ARCH-0077 names Aspire as the strategic destination but under a different package shape (Koan.Aspire.Hosting.<Service>), so even this project is not the target architecture."
+    },
+    {
+      "name": "Koan.Orchestration.Cli",
+      "purpose": "dotnet-tool front-end (koan-orchestrate) exposing up/down/status/logs/doctor/export/inspect over the planner and providers; thin command classes delegating to a 745-line CommandRuntime.",
+      "keyTypes": [
+        "CliApplication",
+        "CommandRuntime (745 LOC monolith)",
+        "UpCliCommand / DownCliCommand / ExportCliCommand / InspectCliCommand / DoctorCliCommand / StatusCliCommand / LogsCliCommand",
+        "EndpointResolverBootstrapper"
+      ],
+      "dependsOn": [
+        "Koan.Orchestration.Cli.Core",
+        "Koan.Orchestration.Abstractions",
+        "Koan.Orchestration.Renderers.Connector.Compose",
+        "Koan.Orchestration.Connector.Docker",
+        "Koan.Orchestration.Connector.Podman"
+      ],
+      "state": "Maintained but condemned (ARCH-0077: obsolete at 0.9.0, delete at 1.0) and not dogfooded — every live sample (S5.Recs etc.) starts via hand-written docker/compose.yml + start.bat, never via the CLI. InternalsVisibleTo declares 'Koan.Orchestration.Cli.Tests' and 'Koan.Orchestration.Renderers.Connector.Compose.Tests' which no longer exist (tombstone evidence of deleted tests). README still documents net9.0 paths. scripts/cli-*.ps1 still build/publish it."
+    },
+    {
+      "name": "Koan.Orchestration.Cli.Core",
+      "purpose": "The planning brain: discovers a project's service dependencies by reading compiled DLL metadata (MetadataLoadContext, no execution), builds a deterministic Plan, allocates ports, applies overrides, formats endpoints.",
+      "keyTypes": [
+        "Planner (internal)",
+        "ProjectDependencyAnalyzer (872 LOC, MetadataLoadContext manifest reader)",
+        "PortAllocator (internal)",
+        "LaunchManifest (internal)",
+        "EndpointFormatter (internal)"
+      ],
+      "dependsOn": [
+        "Koan.Orchestration.Abstractions",
+        "Koan.Orchestration.Generators (analyzer ref)",
+        "Koan.Orchestration.Renderers.Connector.Compose",
+        "Koan.Orchestration.Connector.Docker",
+        "Koan.Orchestration.Connector.Podman"
+      ],
+      "state": "Active but condemned (ARCH-0077 lists its planning logic under 'what goes away'). Its csproj description claims it is 'consumable by tooling that builds on the same primitives', yet every top-level type is internal with InternalsVisibleTo only Koan.Orchestration.Cli — the Cli/Cli.Core split provides zero external reuse today. Also odd: it references the hosting connectors (Docker/Podman) even though planning shouldn't need engines."
+    },
+    {
+      "name": "Koan.Orchestration.Generators",
+      "purpose": "Single-file (815 LOC) Roslyn source generator that aggregates [KoanService]/[KoanApp] attributes into an assembly-level manifest + __KoanOrchestrationManifest.Json constant, plus Koan0049A–G hygiene diagnostics.",
+      "keyTypes": [
+        "OrchestrationManifestGenerator (legacy ISourceGenerator)",
+        "Koan0049A–G DiagnosticDescriptors",
+        "__KoanOrchestrationManifest (emitted)"
+      ],
+      "dependsOn": [],
+      "state": "Legacy and explicitly condemned: still on the deprecated ISourceGenerator API with RS1035/RS1042 suppressed and a long csproj apologia comment; ARCH-0077 declares the IIncrementalGenerator port not worth doing because the whole thing 'will likely be replaced wholesale'. ARCH-0077A already narrowed its analyzer injection to connectors + samples + Koan.Service.Translation via KoanRequiresOrchestrationGenerator after it blocked packing of unrelated projects. Koan0049A (KoanService must target IServiceAdapter) is Info-severity and violated by every annotated factory, since nothing implements IServiceAdapter."
+    },
+    {
+      "name": "Koan.Orchestration.Connector.Docker",
+      "purpose": "DockerProvider : IHostingProvider — docker compose up/down/logs/status, availability probing, live-port parsing (NDJSON + IPv6 tolerant); auto-registrar also writes engine provenance into the boot report.",
+      "keyTypes": [
+        "DockerProvider",
+        "KoanAutoRegistrar (registers IHostingProvider; runs `docker version` probe during boot Describe via GetAwaiter().GetResult())",
+        "JsonElementArrayHelper"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.Orchestration.Abstractions"
+      ],
+      "state": "Active and clean (~427 LOC, no TODO/HACK), good README/TECHNICAL. Sole runtime consumer is the CLI; its only in-app value is the boot-report engine provenance."
+    },
+    {
+      "name": "Koan.Orchestration.Connector.Podman",
+      "purpose": "PodmanProvider : IHostingProvider — Compose-parity sibling of the Docker provider for rootless/Podman-first setups.",
+      "keyTypes": [
+        "PodmanProvider",
+        "KoanAutoRegistrar"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.Orchestration.Abstractions"
+      ],
+      "state": "Active (~347 LOC), structurally ~80% duplicated from DockerProvider (process shelling, JSON ps parsing, port normalization). Same CLI-only consumption."
+    },
+    {
+      "name": "Koan.Orchestration.Renderers.Connector.Compose",
+      "purpose": "ComposeExporter : IArtifactExporter — renders a Plan into a docker-compose v2 manifest with network topology, per-image persistence-mount heuristics, healthcheck synthesis, and profile-driven volume strategy.",
+      "keyTypes": [
+        "ComposeExporter",
+        "KoanAutoRegistrar"
+      ],
+      "dependsOn": [
+        "Koan.Core",
+        "Koan.Orchestration.Abstractions"
+      ],
+      "state": "Active (~444 LOC), clean; consumed only by the CLI/Cli.Core. Mount heuristics hardcode service images (postgres, mongo, redis, weaviate, ollama) — knowledge that ARCH-0077 says belongs in per-service Aspire hosting packages."
+    }
+  ],
+  "cohesion": "This area is a dev-time product (a compose-generating CLI + build-time manifest generator) wearing pillar clothing — and the repo has already passed sentence on it: ARCH-0077 (2026-05-15) commits to retiring the whole bespoke layer (generator, planner, [KoanService] attributes, CLI, discovery adapters) in favor of .NET Aspire, with only the tactical ARCH-0077A scope-narrowing applied so far. Internally the legacy chain (Abstractions → Generators → Cli.Core → Cli, with Docker/Podman/Compose as plugins per ARCH-0047) hangs together well — clean SPI, parity providers, deterministic planner. The fractures are at the seams: (1) hierarchy inversion — Koan.Core (the kernel) and Koan.Core.Adapters take project references on Koan.Orchestration.Abstractions, the kernel depending on a condemned periphery package, solely for KoanServiceAttribute in ServiceDiscoveryAdapterBase plus Plan models; Koan.Core.Adapters even patches a missing type into the Koan.Orchestration namespace via MissingTypes.cs (an explicit hack file). (2) The Aspire project is two unrelated things in one box — Aspire AppHost registration AND a docker-CLI self-orchestration hosted service — and is itself not the ARCH-0077 target shape. (3) The area straddles two orchestration philosophies simultaneously (CLI-generates-compose vs app-self-orchestrates vs Aspire-AppHost), all three half-adopted, while live samples bypass all of them with hand-written compose files. (4) Zero test coverage despite the repo's own 'integration tests are canon' (ARCH-0079) rule.",
+  "redundancies": [
+    "Three unrelated KoanServiceAttribute types coexist: Koan.Orchestration.Attributes (container metadata), Koan.ServiceMesh.Abstractions (service mesh identity), Koan.Web.Auth.Services.Attributes (auth scopes) — three competing notions of 'a Koan service' under one attribute name.",
+    "Two attribute generations shipped side by side in Abstractions: unified [KoanService] explicitly 'replaces legacy ContainerDefaults/AppEnvDefaults/EndpointDefaults' per its own doc-comment, yet all five legacy attributes are still present and still parsed by the generator.",
+    "DockerProvider (Connectors/Orchestration/Docker) vs SelfOrchestration/DockerContainerManager (Koan.Orchestration.Aspire): two independent docker-CLI process-shelling implementations for container lifecycle, in different packages.",
+    "PodmanProvider duplicates ~80% of DockerProvider structure (availability probe, compose up/down, ps JSON parsing, port normalization) with no shared base.",
+    "KoanAssemblyDiscovery in the Aspire package re-implements AppDomain.GetAssemblies() Koan-assembly scanning that Koan.Core already provides (AssemblyCache / [KoanDiscoverable] registry — the exact bespoke-scan pattern CLAUDE.md says the registry replaced).",
+    "Three orchestration philosophies overlap: CLI-generated compose (.Koan/compose.yml), app self-orchestration (SelfOrchestration hosted service), and Aspire AppHost (IKoanAspireRegistrar) — plus hand-written compose in samples as the de-facto fourth.",
+    "Compose mount/healthcheck heuristics hardcode per-service knowledge (postgres, mongo, redis, weaviate, ollama images) that duplicates what each connector already declares via [KoanService] Volumes/HealthEndpoint.",
+    "Naming collision: Koan.AI.Orchestration (AI provider routing, different area) shares the 'Orchestration' pillar name with zero relation to this stack.",
+    "Per-connector DiscoveryAdapter classes (in data connectors, driven by ServiceDiscoveryAdapterBase in Koan.Core which consumes this area's attribute) are themselves listed by ARCH-0077 as redundant with Microsoft.Extensions.ServiceDiscovery."
+  ],
+  "deadOrExperimental": [
+    "IServiceAdapter, IKoanService, IDevServiceDescriptor (Abstractions): zero implementors in the entire repo — dead SPI markers; the generator diagnostic enforcing them (Koan0049A, Info) is violated by every [KoanService]-annotated factory.",
+    "Koan.Orchestration.Generators: legacy ISourceGenerator API with analyzer rules deliberately disabled; ARCH-0077 explicitly declines to modernize it because it is slated for wholesale replacement.",
+    "SelfOrchestration subsystem incl. TestHostEnvironment.cs (test scaffold shipped in the production Aspire package); experimental, not the ARCH-0077 target shape.",
+    "Vestigial project references: Koan.Data.Connector.PGVector and Koan.Service.KoanContext reference Koan.Orchestration.Aspire with no code usage.",
+    "Tombstone InternalsVisibleTo: 'Koan.Orchestration.Cli.Tests' and 'Koan.Orchestration.Renderers.Connector.Compose.Tests' assemblies no longer exist — orchestration tests were deleted, attributes left behind.",
+    "samples/archive/KoanAspireIntegration(+AppHost): the only Aspire AppHost consumer, already archived.",
+    "Koan.Core.Adapters/MissingTypes.cs: UnifiedServiceMetadata patched into the Koan.Orchestration namespace from a different assembly — self-described stopgap.",
+    "Checked-in CLI artifacts: samples/S5.Recs/inspect.json (and bin copies) — generated output committed to the repo.",
+    "docs/archive/proposals/koan-aspire-* (5 documents) — superseded by ARCH-0055/ARCH-0077."
+  ],
+  "consolidationCandidates": [
+    "Execute ARCH-0077 instead of carrying it: the retirement decision is 13 months of code-rot risk if left at 'Proposed'. Cutting Generators (815) + Cli.Core (1,680) + Cli (1,233) + legacy attributes removes ~3,700 LOC and an entire build-injection mechanism (KoanRequiresOrchestrationGenerator) with zero test coverage to preserve. This is the single largest pre-authorized cut in the area.",
+    "Merge Koan.Orchestration.Cli.Core into Koan.Orchestration.Cli for whatever bridge period remains: every Cli.Core type is internal and visible only to the Cli — the two-project split is pure packaging overhead with a false 'consumable by tooling' promise.",
+    "Break the kernel inversion: move the small attribute surface ServiceDiscoveryAdapterBase needs (KoanServiceAttribute or a slimmed service-identity record) into Koan.Core, and delete Koan.Core's + Koan.Core.Adapters' project references to Koan.Orchestration.Abstractions (incl. the MissingTypes.cs namespace patch). The kernel must not depend on a package scheduled for deletion.",
+    "Unify the three KoanServiceAttribute definitions (Orchestration / ServiceMesh.Abstractions / Web.Auth.Services) into one service-identity concept — this dovetails with the fleet-trust/ServiceMesh direction and removes a genuinely confusing triple.",
+    "Extract or cut SelfOrchestration from Koan.Orchestration.Aspire: it is not Aspire. Either delete it (apps that want auto-started dependencies are ARCH-0077's Aspire AppHost use case) or, if the 'app boots its own containers' DX is canon, make it its own honestly-named module reusing DockerProvider instead of a second docker-shelling implementation.",
+    "Delete dead surface in Abstractions now (no waiting on ARCH-0077 phases): IServiceAdapter/IKoanService/IDevServiceDescriptor markers, the five legacy attributes superseded by [KoanService], and diagnostic Koan0049A that enforces a contract nothing satisfies.",
+    "If the CLI survives the bridge: collapse Docker+Podman providers into one compose-engine connector with an engine-command abstraction (~80% shared code); if it doesn't, both go with it — their only in-app role (boot-report engine provenance, which sync-blocks on `docker version` during Describe) could move to a one-file probe in Koan.Core diagnostics.",
+    "Housekeeping cuts: remove vestigial Aspire refs from PGVector and Koan.Service.KoanContext csproj; delete tombstone InternalsVisibleTo entries; un-commit samples/S5.Recs/inspect.json; align docs/reference/orchestration (still advertises 'dotnet tool install Koan.CLI' vs actual tool name koan-orchestrate, and predates ARCH-0077 with no deprecation notice)."
+  ],
+  "maturitySignals": {
+    "tests": "Zero. No test project or test file anywhere in tests/ references any Koan.Orchestration namespace (the only 'Orchestration' test folder, tests/Suites/Core/Unit/.../Orchestration/ConnectionStringParserTests.cs, covers Koan.Core.Orchestration — a different subsystem). Tombstone InternalsVisibleTo attributes ('Koan.Orchestration.Cli.Tests', 'Koan.Orchestration.Renderers.Connector.Compose.Tests') prove tests once existed and were deleted. Directly violates the repo's own ARCH-0079 'integration tests are canon' rule — though ARCH-0077's retirement intent explains why nobody reinvested.",
+    "docs": "Paradoxically the best-documented area per LOC: every project has a README + TECHNICAL.md pair ('validated 2025-09-29'), there is a pillar REF page (docs/reference/orchestration), a founding ADR (ARCH-0047), an Aspire approval ADR (ARCH-0055), the retirement ADR (ARCH-0077), an Aspire guide + architecture doc, and 5 archived proposals. But content has drifted: the REF page instructs installing a nonexistent 'Koan.CLI' tool (actual: koan-orchestrate), the CLI README references net9.0 output paths on a net10.0 project, and none of the user-facing docs mention the ARCH-0077 deprecation.",
+    "codeQuality": "Zero TODO/HACK/FIXME/NotImplementedException across the whole area — superficially clean and consistently named. Real quality signals are structural instead: a legacy ISourceGenerator with its analyzer enforcement deliberately switched off and a long apologia comment; an all-internal 'shared core' library; a 745-line CommandRuntime monolith and an 872-line ProjectDependencyAnalyzer; dead marker interfaces; a namespace-patch file (MissingTypes.cs) in a different assembly; sync-over-async docker probing in boot Describe; test scaffolding (TestHostEnvironment) shipped in a production package; and two attribute generations coexisting. Verdict: well-groomed code on a condemned foundation — maintenance has been cosmetic since ARCH-0077."
+  }
+}

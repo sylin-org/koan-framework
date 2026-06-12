@@ -1,2 +1,11 @@
-﻿global using Xunit;
-global using FluentAssertions;
+global using Xunit;
+global using AwesomeAssertions;
+global using System;
+global using System.Collections.Generic;
+global using System.IO;
+global using System.Linq;
+global using System.Threading;
+global using System.Threading.Tasks;
+global using Koan.Media.Abstractions.Recipes;
+global using Koan.Media.Core.Pipeline;
+global using Koan.Media.Core.Recipes;

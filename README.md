@@ -1,328 +1,178 @@
 # Koan Framework
 
-**Try it. Be delighted. Build sophisticated apps with simple patterns.**
+**Model your domain as entities. Reference your intents. Koan composes the rest — storage, web,
+AI, jobs, caching — and tells you exactly what it did.**
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/sylin-org/koan-framework/blob/dev/LICENSE)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-10.0-purple.svg)](https://dotnet.microsoft.com/download)
-[![Framework Version](https://img.shields.io/badge/Version-v0.6.3-green.svg)](https://github.com/sylin-org/koan-framework/releases)
-[![GitHub Stars](https://img.shields.io/github/stars/sylin-org/koan-framework)](https://github.com/sylin-org/koan-framework/stargazers)
 
-> **The .NET framework that makes small teams capable of sophisticated solutions through intelligent automation, AI-native patterns, and elegant scaling.**
+Koan is a .NET 10 meta-framework for **agentic, data-driven web applications** — think
+*Rails for .NET*, built for the era where AI capability is part of the domain model and a lot of
+your code is written with coding agents. One grammar — `Entity<T>` — covers CRUD, REST, vector
+search, background jobs, caching, embeddings, and agent (MCP) tools.
+
+> **Status: pre-1.0, consolidation phase** (version via [NBGV](version.json), currently 0.17.x).
+> The core — entity/data pillar, web, cache, jobs, vector — is settled and integration-tested;
+> several outer pillars are experimental and being consolidated or cut. We audit ourselves:
+> see the [framework assessment](docs/assessment/00-overview.md) and the per-pillar
+> [maturity model](docs/assessment/03-maturity-model.md) for exactly what is settled and what
+> isn't. **Until 1.0, build from source** — published packages (`Sylin.Koan.*` on NuGet) lag the
+> repo.
 
 ---
 
-## From Simple to Sophisticated in Minutes
-
-**Koan keeps the AR ergonomics developers love** - entities with `Save()`, discoverable CRUD controllers - **while neutralizing the common AR traps** with set-scoped routing, capability-aware queries, batch ops, a shared endpoint service, and first-class event flows. You get AR’s "don't make me think" feel without painting yourself into a single-DB, fat-controller, N+1-ridden corner.
-
-### **1. Get started quickly**
+## 60 seconds to a running app
 
 ```bash
-# 2 minutes to working API
-dotnet new web -n MyApp && cd MyApp
-dotnet add package Koan.Core Koan.Web Koan.Data.Connector.Sqlite
+git clone https://github.com/sylin-org/koan-framework
+cd koan-framework
+dotnet run --project samples/S1.Web
+# → browse http://localhost:5044  ·  curl http://localhost:5044/api/health
+```
+
+You'll see the framework introduce itself before the first request — what got discovered, which
+adapters won, what capabilities they negotiated:
+
+```text
+┌─ [KOAN] Application ─────────────────────────────
+│  Name: S1.Web · Environment: Development
+│  Registry: initializers, auto-registrars, background services
+│  Inventory: Koan.Core, Koan.Data.Core, Koan.Web, Koan.Data.Connector.Sqlite, …
+└──────────────────────────────────────────────────
+[K:PHASE] warmup→registry→data→services→ready
+```
+*(abridged — run it to see the real thing)*
+
+That boot report is the framework's character in one screen: **the app explains itself.**
+
+## The whole framework in three beats
+
+### 1 · Model an entity → get an application
+
+```csharp
+// Program.cs — complete. Nothing else to wire.
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddKoan();
+var app = builder.Build();
+app.Run();
 ```
 
 ```csharp
-// Define your model
-public class Todo : Entity<Todo>
+public sealed class Todo : Entity<Todo>
 {
     public string Title { get; set; } = "";
     public bool IsCompleted { get; set; }
 }
 
-// Get full REST API
-[ApiController, Route("api/[controller]")]
-public class TodosController : EntityController<Todo> { }
+[Route("api/[controller]")]
+public sealed class TodoController : EntityController<Todo> { }
 ```
 
-```bash
-dotnet run
-# Full REST API with health checks
-# Auto-generated GUID v7 IDs
-# SQLite database (zero config)
-# Structured logging and telemetry
-```
+That's a full REST API: GET/POST/DELETE with pagination and querying, GUID v7 ids generated on
+first read, `/api/health`, structured logging, and zero-config SQLite (`./data/app.db`). Schema
+is created automatically in development. JSON defaults: camelCase, nulls omitted
+(Newtonsoft.Json — chosen for predictable polymorphic serialization).
 
-**Result:** Full REST API with enterprise features in under 2 minutes.
-
----
-
-### **2. Entity<> scales elegantly**
+Working with entities is direct — no repositories, no DbContext:
 
 ```csharp
-// Same pattern, growing capabilities
+var todo = await Todo.Get(id);                       // null if missing
+var open = await Todo.Query(t => !t.IsCompleted);    // pushed down to the store
+await new Todo { Title = "Try Koan" }.Save();
+await todo.Remove();
+await foreach (var t in Todo.AllStream(batchSize: 1000)) { /* streams, no materialization */ }
+```
 
-// Database operations
-var todo = new Todo { Title = "Try Koan Framework" };
-await todo.Save();                    // Simple and familiar
+### 2 · Reference an intent → gain a capability
 
-// Add messaging - same mental model
-public class TodoCompleted : Entity<TodoCompleted>
+Adding a package **is** the configuration. Each line below is one package reference and (at
+most) one attribute:
+
+```csharp
+// dotnet add package Sylin.Koan.Data.Connector.Postgres  → same entities, Postgres storage
+// dotnet add package Sylin.Koan.Cache                    → transparent L1/L2 caching:
+[Cacheable(300)]
+public sealed class Todo : Entity<Todo> { /* … */ }
+
+// dotnet add package Sylin.Koan.Messaging.Connector.RabbitMq → cross-process events:
+await new TodoCompleted { TodoId = todo.Id }.Send();
+
+// dotnet add package Sylin.Koan.Jobs → durable background work, jobs are entities too:
+public sealed class ImportJob : Entity<ImportJob>, IKoanJob<ImportJob>
 {
-    public string TodoId { get; set; } = "";
-    public DateTime CompletedAt { get; set; } = DateTime.UtcNow;
+    public string Source { get; set; } = "";
+    public static async Task Execute(ImportJob job, JobContext ctx, CancellationToken ct)
+    { /* runs on the ledger: at-least-once, retries, scheduling, progress */ }
 }
 
-// Reference = Intent (no configuration ceremony)
-// dotnet add package Koan.Messaging.Connector.RabbitMq
+// dotnet add package Sylin.Koan.Data.AI (+ an Ollama + vector connector)
+// → entities become semantically searchable:
+[Embedding(Properties = new[] { nameof(Title) })]
+public sealed class Todo : Entity<Todo> { /* embeddings maintained in the background */ }
 
-await new TodoCompleted { TodoId = todo.Id }.Send();  // Same pattern extends
+var related = await SemanticSearch<Todo>("groceries and meal planning");
+// using static Koan.Data.AI.EntityEmbeddingExtensions;
+
+// dotnet add package Sylin.Koan.Mcp → entities become agent tools over HTTP/SSE:
+[McpEntity]
+public sealed class Todo : Entity<Todo> { /* agents can now query and mutate Todos */ }
 ```
 
-**One pattern that scales from CRUD to enterprise event-driven architecture.**
-
----
-
-### **3. AI with native feel**
+Backends differ, and Koan refuses to pretend otherwise: every adapter declares its capabilities,
+the framework negotiates them, and an unsupported operation **fails loudly** instead of silently
+degrading.
 
 ```csharp
-// Reference = Intent
-// dotnet add package Koan.AI.Ollama
-
-// AI through familiar patterns
-var suggestions = await ai.Chat("What should I do after: " + todo.Title);
-
-// Semantic search feels like LINQ
-var related = await Todo.SemanticSearch("project planning tasks");
-
-// Vector operations through Entity<> patterns
-var similar = await Product.SemanticSearch("eco-friendly laptops");
-```
-
-**AI integration that feels natural, not forced. Provisioning, models, contexts - all handled automatically.**
-
----
-
-### **4. Semantic Streaming Pipelines**
-
-```csharp
-// Complex AI workflows made simple - process 10,000 documents in one pipeline
-
-await Document.AllStream()
-    .Pipeline()
-    .ForEach(doc => {
-        doc.ProcessedAt = DateTime.UtcNow;
-        doc.Status = "processing";
-    })
-    .Tokenize(doc => $"{doc.Title} {doc.Content}")     // AI tokenization
-    .Embed(new AiEmbedOptions { Model = "all-minilm" }) // Generate embeddings
-    .Branch(branch => branch
-        .OnSuccess(success => success
-            .Save()                                     // Clean, semantic - no type pollution
-            .Notify(doc => $"Document '{doc.Title}' processed successfully"))
-        .OnFailure(failure => failure
-            .Trace(env => $"Failed: {env.Error?.Message}")
-            .Notify(doc => $"Processing failed for '{doc.Title}'")))
-    .ExecuteAsync();
-
-// What just happened:
-// ✓ Streamed 10K+ documents without memory issues
-// ✓ Generated AI embeddings with automatic batching
-// ✓ Stored documents (PostgreSQL) + vectors (Weaviate) in one .Save()
-// ✓ Branched success/failure paths with notifications
-// ✓ Full observability and error handling
-// ✓ All with clean, readable, semantic code
-```
-
-```csharp
-// Event-driven architecture through simple patterns
-Flow.OnUpdate<Todo>(async (todo, previous) => {
-    if (todo.IsCompleted && !previous.IsCompleted) {
-        await new TodoCompleted { TodoId = todo.Id }.Send();
-        await new NotificationRequested {
-            UserId = todo.UserId,
-            Message = $"Task '{todo.Title}' completed!"
-        }.Send();
-    }
-    return UpdateResult.Continue();
-});
-```
-
-**Semantic pipelines turn complex AI + data workflows into readable, maintainable code. Enterprise-grade streaming, embedding generation, and multi-provider storage in natural .NET patterns.**
-
----
-
-### **5. Works with what you know**
-
-```csharp
-// Standard .NET patterns, enhanced
-public class TodosController : EntityController<Todo>
+if (Data<Todo, string>.Capabilities.Has(DataCaps.Query.Linq))
 {
-    // Override when needed, get defaults otherwise
-    public override async Task<ActionResult<Todo>> Post(Todo todo)
-    {
-        // Custom business logic
-        todo.CreatedBy = User.Identity.Name;
-        return await base.Post(todo);  // Leverage framework automation
-    }
+    // this query runs inside the database, not in memory
 }
 ```
 
-```bash
-# Docker Compose generated automatically
-koan export compose --profile Local
+### 3 · The app explains itself
 
-# Works with Aspire
-builder.AddKoan();
-builder.Services.AddKoanWeb();
+Beyond the boot report: capability sets are queryable at runtime, well-known endpoints describe
+the running service, health contributors aggregate readiness, and `[McpEntity]` exposes your
+domain to agents through the same endpoint service the REST controllers use. The framework's
+discovery isn't reflection magic at runtime — it's a **Roslyn source-generated registry**
+compiled into your assemblies: deterministic, ordered, AOT-friendly.
 
-# Standard .NET tooling works perfectly
-dotnet build, dotnet test, dotnet publish
-```
+## What's distinctive (and actually shipped)
 
-**Enhances your existing .NET workflow without replacing it.**
+- **One grammar everywhere** — the same `Entity<T>` is your table row, your REST resource, your
+  cache entry, your job, your embedding source, and your agent tool.
+- **Capability-graded multi-provider** — SQLite, Postgres, SQL Server, MongoDB, Couchbase,
+  Redis, JSON-file storage; Weaviate, Qdrant, Milvus, Elasticsearch, OpenSearch vectors — behind
+  one API that *negotiates* features (pushdown, bulk ops, CAS, TTL) rather than faking parity. A
+  cross-adapter convergence oracle tests that every adapter agrees with the reference semantics.
+- **Background jobs as entities** ([JOBS-0005](docs/decisions/JOBS-0005-jobs-pillar-rebuild.md))
+  — a capability ladder from in-memory to durable-ledger to distributed competing consumers,
+  with cron/`@boot` scheduling, idempotency, chains, and contention-free claims.
+- **Transparent entity caching** — `[Cacheable]` L1/L2 with cross-node coherence and a
+  principled fresh-or-null contract (stale reads are opt-in, never a surprise).
+- **AI as a property of your data** — `[Embedding]` keeps vectors in sync in the background;
+  semantic search is a query, not a subsystem you build.
+- **Decision-first engineering** — 280+ ADRs, integration-tests-as-canon, and a self-assessment
+  you can read. The architecture is auditable, not asserted.
 
----
+## Learn it
 
-## Why Choose Koan
+| Path | Where |
+|---|---|
+| **First 15 minutes** | [Getting started](docs/getting-started/overview.md) — the golden path, concept by concept |
+| **Run real apps** | [samples/](samples/README.md) — the ladder: S0 console → S1 CRUD → S10 multi-provider → S14 jobs/benchmarks, then the dogfood flagships |
+| **Do a task** | [Guides](docs/guides/README.md) — APIs, data modeling, auth, AI, media, jobs |
+| **Understand why** | [Architecture principles](docs/architecture/principles.md) · [ADRs](docs/decisions/index.md) |
+| **Check what's solid** | [Framework assessment & maturity model](docs/assessment/00-overview.md) |
+| **When stuck** | [Troubleshooting](docs/support/troubleshooting.md) |
 
-Koan gives you **Active Record ergonomics** with the **scalability of a Data Mapper**—and adds polyglot storage, flows, and semantic pipelines without ceremony.
+Requirements: **.NET 10 SDK**. Docker/Podman only for container-backed samples and integration
+tests. Coding agents: start at [CLAUDE.md](CLAUDE.md) and `.claude/skills/`.
 
-**Legend:** 🟩 Good · 🟨 Mixed/depends · 🟥 Weak
+## Contributing
 
-| Capability                          | EF  | AR  | Koan |
-| ----------------------------------- | --- | --- | ---- |
-| Time to first API                   | 🟨  | 🟩  | 🟩   |
-| Polyglot storage (SQL/NoSQL/Vector) | 🟨  | 🟥  | 🟩   |
-| Multi-tenant & view routing         | 🟨  | 🟥  | 🟩   |
-| Event-driven & projections          | 🟨  | 🟥  | 🟩   |
-| Semantic/Vector pipeline            | 🟥  | 🟥  | 🟩   |
-| Capability detection / fallback     | 🟨  | 🟥  | 🟩   |
-| Migrations & schema                 | 🟩  | 🟨  | 🟨   |
+Single-maintainer project in active consolidation ("fewer but more meaningful parts").
+Issues and discussions welcome; PRs should follow the ADR-first workflow and keep the green
+ratchet green (`scripts/green-ratchet.ps1`). See [docs/engineering](docs/engineering/index.md).
 
-**What this means in practice**
-
-- **Start simple, scale cleanly:** AR‑easy CRUD today; switch on Flow, sets, and vectors when complexity appears.
-- **One pattern, many backends:** Swap providers without rewriting your domain or controllers.
-- **AI‑native:** Semantic search, embeddings, and streaming pipelines are first‑class, not bolt‑ons.
-
-**Deep comparison:** [See the full, categorized matrix.](https://github.com/sylin-org/koan-framework/blob/dev/docs/architecture/comparison.md)
-
----
-
-## Quick Start Paths
-
-### **For Individual Developers**
-
-```bash
-# Try the quickstart
-git clone https://github.com/koan-framework/quickstart
-cd quickstart && dotnet run
-
-# Create your first app
-dotnet new web -n MyApp
-dotnet add package Koan.Core Koan.Web Koan.Data.Connector.Sqlite
-```
-
-### **For Teams & Architects**
-
-```bash
-# Explore enterprise patterns
-git clone https://github.com/koan-framework/enterprise-sample
-cd enterprise-sample && ./start.bat
-
-# See: AI integration, event sourcing, multi-provider data, container orchestration
-```
-
-### **For AI-First Projects**
-
-```bash
-# Start with AI-native patterns
-dotnet new web -n AiApp
-dotnet add package Koan.Core Koan.Web Koan.AI.Ollama Koan.Data.Vector
-
-# Get: Chat APIs, semantic search, embedding generation, streaming pipelines, MCP integration
-```
-
----
-
-## Technology Stack
-
-**70+ integrated modules spanning:**
-
-- **Data**: PostgreSQL, MongoDB, SQLite, Redis, Vector databases
-- **AI**: Ollama, OpenAI, Azure OpenAI, semantic search, embeddings
-- **Pipelines**: Semantic streaming, AI tokenization, cross-pillar integration
-- **Messaging**: RabbitMQ, Azure Service Bus, in-memory patterns
-- **Web**: Authentication (Google, Microsoft, Discord), GraphQL, transformers
-- **Orchestration**: Docker, Podman, Aspire, CLI automation
-- **Enterprise**: Secrets management, observability, backup, health monitoring
-
-**Integrated modules that work together seamlessly through semantic pipeline patterns.**
-
----
-
-## What Teams Are Building
-
-- **AI-native applications** with chat, embeddings, and semantic search
-- **Streaming data pipelines** processing millions of documents with AI enrichment
-- **Event-driven architectures** with sophisticated business logic
-- **Multi-tenant SaaS** with provider transparency across environments
-- **Content processing workflows** that combine AI, vector search, and notifications
-- **Rapid prototypes** that scale to production without rewrites
-- **Enterprise applications** with governance-friendly deployment artifacts
-
----
-
-## Community & Contribution
-
-**Community and contribution:**
-
-- **Star the repository** to show support
-- **Report issues** you encounter
-- **Suggest features** based on your needs
-- **Submit pull requests** for improvements
-- **Join discussions** about framework design
-
-Feedback and contributions help improve the framework.
-
----
-
-## Requirements & Getting Started
-
-- **.NET 10 SDK** or later
-- **Docker** or **Podman** (for container features)
-- **5 minutes** to get started
-
-### Install & Run
-
-```bash
-# Option 1: Try the quickstart
-git clone https://github.com/koan-framework/quickstart
-cd quickstart && dotnet run
-
-# Option 2: Start from scratch
-dotnet new web -n MyKoanApp
-dotnet add package Koan.Core Koan.Web Koan.Data.Connector.Sqlite
-# Add your Entity<> models and EntityController<> endpoints
-dotnet run
-```
-
-**Get a working application with enterprise features in under 2 minutes.**
-
----
-
-## Enterprise Support & Documentation
-
-- **[Complete Documentation](docs/index.md)** - Architecture, patterns, and guides
-- **[Quickstart Guide](docs/getting-started/quickstart.md)** - Get running immediately
-- **[Enterprise Architecture Guide](docs/architecture/principles.md)** - Strategic framework adoption
-- **[Troubleshooting Guide](docs/support/troubleshooting.md)** - Solutions to common challenges
-
-**For enterprise adoption support and architecture guidance, explore our comprehensive documentation.**
-
----
-
-## License
-
-Licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.
-
----
-
-**Koan Framework: Build sophisticated apps with simple patterns.**
-
-_A .NET framework that makes small teams capable of sophisticated solutions._
-
-
-
+Licensed under [Apache 2.0](LICENSE).

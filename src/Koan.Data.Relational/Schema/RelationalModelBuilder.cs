@@ -27,8 +27,8 @@ public static class RelationalModelBuilder
         var pkIndex = new RelationalIndex(null, new[] { idCol }, true, true);
         indexes.Add(pkIndex);
 
-        // Declared secondary indexes
-        foreach (var ix in IndexMetadata.GetIndexes(entityType).Where(i => !i.IsPrimaryKey))
+        // Declared secondary indexes (TTL indexes §20.4 are honored only by TTL-capable stores, never materialized here)
+        foreach (var ix in IndexMetadata.GetIndexes(entityType).Where(i => !i.IsPrimaryKey && !i.Ttl))
         {
             var ixCols = ix.Properties.Select(p => p == idSpec ? idCol : cols.First(c => c.SourceProperty == p)).ToList();
             indexes.Add(new RelationalIndex(ix.Name, ixCols, ix.Unique, false));

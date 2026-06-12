@@ -1,6 +1,6 @@
 ﻿using System;
 using Koan.Core.Modules.Pillars;
-using FluentAssertions;
+using AwesomeAssertions;
 using Xunit;
 
 namespace Koan.Core.Tests;
