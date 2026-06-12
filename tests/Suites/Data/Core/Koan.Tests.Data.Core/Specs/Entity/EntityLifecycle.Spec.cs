@@ -284,6 +284,176 @@ public sealed class EntityLifecycleSpec
             .Run();
     }
 
+    [Fact]
+    public async Task UpsertIfChanged_identical_write_skips_persist_and_events()
+    {
+        var afterUpsertCount = 0;
+
+        await TestPipeline.For<EntityLifecycleSpec>(_output, nameof(UpsertIfChanged_identical_write_skips_persist_and_events))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
+            .Arrange(ctx =>
+            {
+                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
+                ResetHooks(runtime);
+                EnsurePartition(ctx);
+
+                LifecycleEntity.Events
+                    .AfterUpsert(c =>
+                    {
+                        afterUpsertCount++;
+                        return ValueTask.CompletedTask;
+                    });
+
+                return ValueTask.CompletedTask;
+            })
+            .Assert(async ctx =>
+            {
+                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
+                var partitionName = EnsurePartition(ctx);
+                using var lease = runtime.UsePartition(partitionName);
+
+                var entity = new LifecycleEntity { Title = "Initial" };
+                var saved = await LifecycleEntity.Upsert(entity);
+                afterUpsertCount.Should().Be(1);
+
+                var sameData = new LifecycleEntity
+                {
+                    Id = saved.Id,
+                    Title = saved.Title,
+                    Revision = saved.Revision,
+                    IsPublished = saved.IsPublished
+                };
+
+                var written = await LifecycleEntity.UpsertIfChanged(sameData);
+                written.Should().BeFalse("identical data should not be persisted");
+                afterUpsertCount.Should().Be(1, "AfterUpsert must not fire when write is suppressed");
+            })
+            .Run();
+    }
+
+    [Fact]
+    public async Task UpsertIfChanged_changed_write_persists_and_fires_events()
+    {
+        var afterUpsertCount = 0;
+
+        await TestPipeline.For<EntityLifecycleSpec>(_output, nameof(UpsertIfChanged_changed_write_persists_and_fires_events))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
+            .Arrange(ctx =>
+            {
+                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
+                ResetHooks(runtime);
+                EnsurePartition(ctx);
+
+                LifecycleEntity.Events
+                    .AfterUpsert(c =>
+                    {
+                        afterUpsertCount++;
+                        return ValueTask.CompletedTask;
+                    });
+
+                return ValueTask.CompletedTask;
+            })
+            .Assert(async ctx =>
+            {
+                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
+                var partitionName = EnsurePartition(ctx);
+                using var lease = runtime.UsePartition(partitionName);
+
+                var entity = new LifecycleEntity { Title = "v1" };
+                var saved = await LifecycleEntity.Upsert(entity);
+                afterUpsertCount.Should().Be(1);
+
+                var updated = new LifecycleEntity
+                {
+                    Id = saved.Id,
+                    Title = "v2",
+                    Revision = saved.Revision,
+                    IsPublished = saved.IsPublished
+                };
+
+                var written = await LifecycleEntity.UpsertIfChanged(updated);
+                written.Should().BeTrue("changed data should be persisted");
+                afterUpsertCount.Should().Be(2, "AfterUpsert must fire for a real change");
+
+                var persisted = await LifecycleEntity.Get(saved.Id, lease.Partition);
+                persisted?.Title.Should().Be("v2");
+            })
+            .Run();
+    }
+
+    [Fact]
+    public async Task UpsertIfChanged_new_entity_always_writes()
+    {
+        await TestPipeline.For<EntityLifecycleSpec>(_output, nameof(UpsertIfChanged_new_entity_always_writes))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
+            .Arrange(static ctx =>
+            {
+                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
+                ResetHooks(runtime);
+                EnsurePartition(ctx);
+                return ValueTask.CompletedTask;
+            })
+            .Assert(async ctx =>
+            {
+                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
+                var partitionName = EnsurePartition(ctx);
+                using var lease = runtime.UsePartition(partitionName);
+
+                var entity = new LifecycleEntity { Title = "Brand New" };
+                var written = await LifecycleEntity.UpsertIfChanged(entity);
+                written.Should().BeTrue("a new entity with no prior always writes");
+
+                var all = await LifecycleEntity.All(lease.Partition);
+                all.Should().ContainSingle(e => e.Title == "Brand New");
+            })
+            .Run();
+    }
+
+    [Fact]
+    public async Task Upsert_is_unconditional_regardless_of_content()
+    {
+        var afterUpsertCount = 0;
+
+        await TestPipeline.For<EntityLifecycleSpec>(_output, nameof(Upsert_is_unconditional_regardless_of_content))
+            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
+            .Arrange(ctx =>
+            {
+                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
+                ResetHooks(runtime);
+                EnsurePartition(ctx);
+
+                LifecycleEntity.Events
+                    .AfterUpsert(c =>
+                    {
+                        afterUpsertCount++;
+                        return ValueTask.CompletedTask;
+                    });
+
+                return ValueTask.CompletedTask;
+            })
+            .Assert(async ctx =>
+            {
+                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
+                var partitionName = EnsurePartition(ctx);
+                using var lease = runtime.UsePartition(partitionName);
+
+                var entity = new LifecycleEntity { Title = "Stable" };
+                var saved = await LifecycleEntity.Upsert(entity);
+
+                var sameData = new LifecycleEntity
+                {
+                    Id = saved.Id,
+                    Title = saved.Title,
+                    Revision = saved.Revision,
+                    IsPublished = saved.IsPublished
+                };
+
+                await LifecycleEntity.Upsert(sameData);
+                afterUpsertCount.Should().Be(2, "plain Upsert always persists and fires events");
+            })
+            .Run();
+    }
+
     private sealed class LifecycleEntity : Entity<LifecycleEntity, string>
     {
         [Identifier]

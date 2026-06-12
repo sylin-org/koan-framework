@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Data.Abstractions;
@@ -119,6 +120,66 @@ internal static class EntityEventExecutor<TEntity, TKey>
         context.ValidateProtection();
 
         return context.Current;
+    }
+
+    public static async Task<bool> ExecuteUpsertIfChanged(
+        TEntity entity,
+        Func<TEntity, CancellationToken, Task<TEntity>> persist,
+        Func<CancellationToken, ValueTask<TEntity?>> priorLoader,
+        CancellationToken cancellationToken)
+    {
+        var priorEntity = await priorLoader(cancellationToken);
+
+        if (!EntityEventRegistry<TEntity, TKey>.HasUpsertPipeline)
+        {
+            var priorSnap = priorEntity is not null ? TrySnapshot(priorEntity) : null;
+            var currentSnap = TrySnapshot(entity);
+            if (priorEntity is not null
+                && priorSnap is not null
+                && currentSnap is not null
+                && string.Equals(currentSnap, priorSnap, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            await persist(entity, cancellationToken);
+            return true;
+        }
+
+        var state = new EntityEventOperationState();
+        var prior = new EntityEventPrior<TEntity>(_ => new ValueTask<TEntity?>(priorEntity));
+        var context = new EntityEventContext<TEntity>(entity, EntityEventOperation.Upsert, prior, state, cancellationToken);
+
+        await RunSetup(context);
+        context.CaptureProtectionSnapshot();
+
+        var before = await RunBefore(context, EntityEventOperation.Upsert);
+        if (before.IsCancelled)
+        {
+            throw new EntityEventCancelledException(EntityEventOperation.Upsert, before.Reason!, before.Code);
+        }
+
+        context.ValidateProtection();
+
+        var priorSnapshot = priorEntity is not null ? TrySnapshot(priorEntity) : null;
+        var currentSnapshot = TrySnapshot(context.Current);
+        var identical = priorEntity is not null
+            && priorSnapshot is not null
+            && currentSnapshot is not null
+            && string.Equals(currentSnapshot, priorSnapshot, StringComparison.Ordinal);
+
+        if (identical)
+        {
+            return false;
+        }
+
+        var persisted = await persist(context.Current, cancellationToken);
+        context.UpdateCurrent(persisted);
+
+        await RunAfter(context, EntityEventOperation.Upsert);
+        context.ValidateProtection();
+
+        return true;
     }
 
     public static async Task<int> ExecuteUpsertMany(
@@ -339,4 +400,10 @@ internal static class EntityEventExecutor<TEntity, TKey>
     }
 
     private static object? GetEntityKey(TEntity entity) => entity.Id;
+
+    private static string? TrySnapshot(TEntity entity)
+    {
+        try { return JsonSerializer.Serialize(entity, entity.GetType()); }
+        catch { return null; }
+    }
 }

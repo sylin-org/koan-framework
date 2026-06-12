@@ -1191,6 +1191,44 @@ var similar = await MediaItem.Query("vectorDistance < 0.15", ct);
 
 ---
 
+## Write-If-Changed Upserts
+
+**Concept:** By default, `Upsert` always writes to the store and fires `AfterUpsert`, even when the incoming data is byte-identical to what is already stored. This is correct for most scenarios. When you have event-driven consumers downstream, though, an unchanged re-crawl can trigger a full fan-out for every record. `UpsertIfChanged` is an opt-in alternative that suppresses the persist and `AfterUpsert` when the entity is byte-identical to the stored prior.
+
+**Semantics:**
+- `BeforeUpsert` always fires -- validation and normalization hooks still run.
+- If `BeforeUpsert` cancels, the operation throws `EntityEventCancelledException` (same as `Upsert`).
+- After `BeforeUpsert`, the current entity is serialized and compared against the loaded prior. If they are byte-identical, persist and `AfterUpsert` are skipped; the method returns `false`.
+- If the entity is new (no prior exists), or if the serialization fails for any reason, the write always proceeds (safe fallback).
+- The method returns `true` when written, `false` when skipped.
+
+**Recipe:**
+
+```csharp
+// opt in -- call instead of Upsert when skipping no-op writes matters
+var written = await Article.UpsertIfChanged(article);
+if (written)
+{
+    // downstream events were fired, cache was invalidated, etc.
+}
+
+// partition-aware variant
+var written = await Article.UpsertIfChanged(article, tenantPartition);
+```
+
+**When to use:**
+- Crawlers or sync pipelines that re-emit every record even when unchanged.
+- Event-driven consumers where `AfterUpsert` triggers expensive fan-out (cache invalidation, notifications, indexing).
+- High-frequency polling loops where most updates are no-ops.
+
+**When NOT to use:**
+- When `AfterUpsert` must always fire regardless of content (e.g., heartbeat updates, explicit re-triggers).
+- When the entity has fields the serializer cannot capture faithfully (custom converters, computed properties set externally). In that case, `Upsert` is the safe default.
+
+**Cost:** `UpsertIfChanged` always loads the prior from the store before running the pipeline. This is one extra read per call. On hot paths that almost always write, this overhead outweighs the savings -- prefer `Upsert` there.
+
+---
+
 ## Next Steps
 
 You've learned the fundamentals—from simple saves to production-scale streaming and transactions. Here's where to go next:

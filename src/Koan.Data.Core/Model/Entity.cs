@@ -235,6 +235,29 @@ namespace Koan.Data.Core.Model
                 ct);
         }
 
+        public static Task<bool> UpsertIfChanged(TEntity model, CancellationToken ct = default)
+        {
+            if (model is null) throw new ArgumentNullException(nameof(model));
+
+            return EntityEventExecutor<TEntity, TKey>.ExecuteUpsertIfChanged(
+                model,
+                (entity, token) => Data<TEntity, TKey>.Upsert(entity, token),
+                token => LoadPriorSnapshot(model, token),
+                ct);
+        }
+
+        public static Task<bool> UpsertIfChanged(TEntity model, string partition, CancellationToken ct = default)
+        {
+            if (model is null) throw new ArgumentNullException(nameof(model));
+            if (string.IsNullOrWhiteSpace(partition)) throw new ArgumentException("Partition must be provided.", nameof(partition));
+
+            return EntityEventExecutor<TEntity, TKey>.ExecuteUpsertIfChanged(
+                model,
+                (entity, token) => Data<TEntity, TKey>.Upsert(entity, partition, token),
+                token => LoadPriorSnapshot(model, token, partition),
+                ct);
+        }
+
         public static async Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default)
         {
             if (models is null) throw new ArgumentNullException(nameof(models));
