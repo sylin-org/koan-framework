@@ -17,7 +17,8 @@ public sealed class DistributedSpec
             host.Services.GetRequiredService<IOptions<JobsOptions>>(),
             host.Clock,
             NullLogger<JobOrchestrator>.Instance,
-            host.Services.GetRequiredService<IServiceScopeFactory>());
+            host.Services.GetRequiredService<IServiceScopeFactory>(),
+            Enumerable.Empty<IJobPoolResolver>());
 
     [Fact]
     public async Task competing_consumers_never_double_claim()

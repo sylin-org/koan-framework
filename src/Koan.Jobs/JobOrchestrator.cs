@@ -20,6 +20,7 @@ public sealed class JobOrchestrator
     private readonly TimeProvider _clock;
     private readonly ILogger<JobOrchestrator> _logger;
     private readonly IServiceScopeFactory _scopes;
+    private readonly IReadOnlyList<IJobPoolResolver> _poolResolvers;
 
     private readonly string _owner = Guid.CreateVersion7().ToString("N");
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _lanes = new(StringComparer.Ordinal);
@@ -28,7 +29,8 @@ public sealed class JobOrchestrator
 
     public JobOrchestrator(
         IJobLedger ledger, JobTypeRegistry registry, IOptions<JobsOptions> options,
-        TimeProvider clock, ILogger<JobOrchestrator> logger, IServiceScopeFactory scopes)
+        TimeProvider clock, ILogger<JobOrchestrator> logger, IServiceScopeFactory scopes,
+        IEnumerable<IJobPoolResolver> poolResolvers)
     {
         _ledger = ledger;
         _registry = registry;
@@ -36,6 +38,7 @@ public sealed class JobOrchestrator
         _clock = clock;
         _logger = logger;
         _scopes = scopes;
+        _poolResolvers = poolResolvers.ToList();
         _metrics = new JobMetricsRecorder(_options.MetricsEnabled, _owner, _clock);
     }
 
@@ -63,7 +66,8 @@ public sealed class JobOrchestrator
                 }
 
                 var now = _clock.GetUtcNow();
-                var rec = await _ledger.ClaimNext(_owner, now, now + _options.LeaseDuration, SaturatedLanes(), ct);
+                var pools = await ResolvePoolContextsAsync(ct);
+                var rec = await _ledger.ClaimNext(_owner, now, now + _options.LeaseDuration, SaturatedLanes(), ct, pools);
                 if (rec is not null)
                 {
                     var binding = _registry.Require(rec.WorkType);
@@ -349,6 +353,18 @@ public sealed class JobOrchestrator
     }
 
     // --- helpers ---
+
+    private async Task<IReadOnlyDictionary<string, PoolDispatchContext>?> ResolvePoolContextsAsync(CancellationToken ct)
+    {
+        if (_poolResolvers.Count == 0) return null;
+        var dict = new Dictionary<string, PoolDispatchContext>(_poolResolvers.Count, StringComparer.Ordinal);
+        foreach (var resolver in _poolResolvers)
+        {
+            var members = await resolver.GetMembersAsync(ct);
+            dict[resolver.PoolName] = new PoolDispatchContext(resolver.PoolName, members, resolver.CapacityPerMember);
+        }
+        return dict;
+    }
 
     private IReadOnlyCollection<string> SaturatedLanes()
     {

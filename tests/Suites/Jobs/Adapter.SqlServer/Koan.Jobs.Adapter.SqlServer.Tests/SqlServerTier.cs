@@ -1,5 +1,6 @@
 using Koan.Jobs;
 using Koan.Jobs.TestKit;
+using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.MsSql;
 using Xunit;
 
@@ -40,6 +41,6 @@ public sealed class SqlServerBehaviors : JobBehaviorSuite, IClassFixture<SqlServ
     private readonly SqlServerJobsFixture _fx;
     public SqlServerBehaviors(SqlServerJobsFixture fx) => _fx = fx;
 
-    protected override Task<JobsHarness> CreateHostAsync(Action<JobsOptions>? configure = null)
-        => JobsHarness.StartWithSettingsAsync(_fx.Settings, configure);
+    protected override Task<JobsHarness> CreateHostAsync(Action<JobsOptions>? configure = null, Action<IServiceCollection>? configureServices = null)
+        => JobsHarness.StartWithSettingsAsync(_fx.Settings, configure, configureServices);
 }

@@ -46,11 +46,11 @@ public sealed class JobsHarness : IAsyncDisposable
     public JobTypeRegistry Registry { get; }
 
     /// <summary>In-memory tier — uses whatever (non-durable) data adapter the consuming project references.</summary>
-    public static Task<JobsHarness> StartInMemoryAsync(Action<JobsOptions>? configure = null)
-        => StartCore(configure, null, null);
+    public static Task<JobsHarness> StartInMemoryAsync(Action<JobsOptions>? configure = null, Action<IServiceCollection>? configureServices = null)
+        => StartCore(configure, null, null, configureServices: configureServices);
 
     /// <summary>SQLite durable tier — a temp-file database (the consuming project references the SQLite connector).</summary>
-    public static Task<JobsHarness> StartSqliteAsync(Action<JobsOptions>? configure = null)
+    public static Task<JobsHarness> StartSqliteAsync(Action<JobsOptions>? configure = null, Action<IServiceCollection>? configureServices = null)
     {
         var dbPath = Path.Combine(Path.GetTempPath(), $"koan-jobs-{Guid.NewGuid():n}.db");
         var settings = new Dictionary<string, string?>(StringComparer.Ordinal)
@@ -59,16 +59,16 @@ public sealed class JobsHarness : IAsyncDisposable
             ["Koan:Data:Sources:Default:Adapter"] = "sqlite",
             ["Koan:Data:Sources:Default:ConnectionString"] = $"Data Source={dbPath}",
         };
-        return StartCore(configure, settings, dbPath);
+        return StartCore(configure, settings, dbPath, configureServices: configureServices);
     }
 
     /// <summary>Generic durable tier — caller supplies the data-source settings (Mongo/Postgres/SqlServer).</summary>
-    public static Task<JobsHarness> StartWithSettingsAsync(IReadOnlyDictionary<string, string?> settings, Action<JobsOptions>? configure = null)
-        => StartCore(configure, settings, null);
+    public static Task<JobsHarness> StartWithSettingsAsync(IReadOnlyDictionary<string, string?> settings, Action<JobsOptions>? configure = null, Action<IServiceCollection>? configureServices = null)
+        => StartCore(configure, settings, null, configureServices: configureServices);
 
     /// <summary>SQLite against a specific db file (for crash/restart tests). <paramref name="clearOnStart"/> false =
     /// reuse the existing data (a "reboot"); <paramref name="ownsDb"/> false = leave the file for the test to manage.</summary>
-    public static Task<JobsHarness> StartSqliteAtAsync(string dbPath, bool clearOnStart, bool ownsDb, Action<JobsOptions>? configure = null)
+    public static Task<JobsHarness> StartSqliteAtAsync(string dbPath, bool clearOnStart, bool ownsDb, Action<JobsOptions>? configure = null, Action<IServiceCollection>? configureServices = null)
     {
         var settings = new Dictionary<string, string?>(StringComparer.Ordinal)
         {
@@ -76,10 +76,10 @@ public sealed class JobsHarness : IAsyncDisposable
             ["Koan:Data:Sources:Default:Adapter"] = "sqlite",
             ["Koan:Data:Sources:Default:ConnectionString"] = $"Data Source={dbPath}",
         };
-        return StartCore(configure, settings, ownsDb ? dbPath : null, clearOnStart);
+        return StartCore(configure, settings, ownsDb ? dbPath : null, clearOnStart, configureServices);
     }
 
-    private static async Task<JobsHarness> StartCore(Action<JobsOptions>? configure, IReadOnlyDictionary<string, string?>? settings, string? dbPath, bool clearOnStart = true)
+    private static async Task<JobsHarness> StartCore(Action<JobsOptions>? configure, IReadOnlyDictionary<string, string?>? settings, string? dbPath, bool clearOnStart = true, Action<IServiceCollection>? configureServices = null)
     {
         var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-01-01T00:00:00Z"));
         var builder = KoanIntegrationHost.Configure();
@@ -95,6 +95,7 @@ public sealed class JobsHarness : IAsyncDisposable
                     o.RescheduleJitter = TimeSpan.Zero;
                     configure?.Invoke(o);
                 });
+                configureServices?.Invoke(s);
             })
             .Build();
         await host.StartAsync();

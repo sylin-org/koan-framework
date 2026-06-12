@@ -46,9 +46,10 @@ public sealed class RoutingJobLedger : IJobLedger
 
     // Disjoint job sets: claiming durable-then-volatile never double-claims; gates are mirrored so each honors all.
     public async Task<JobRecord?> ClaimNext(string owner, DateTimeOffset now, DateTimeOffset leaseUntil,
-        IReadOnlyCollection<string> saturatedLanes, CancellationToken ct)
-        => await _durable.ClaimNext(owner, now, leaseUntil, saturatedLanes, ct)
-           ?? await _inMemory.ClaimNext(owner, now, leaseUntil, saturatedLanes, ct);
+        IReadOnlyCollection<string> saturatedLanes, CancellationToken ct,
+        IReadOnlyDictionary<string, PoolDispatchContext>? pools = null)
+        => await _durable.ClaimNext(owner, now, leaseUntil, saturatedLanes, ct, pools)
+           ?? await _inMemory.ClaimNext(owner, now, leaseUntil, saturatedLanes, ct, pools);
 
     public Task Update(JobRecord record, CancellationToken ct) => For(record.WorkType).Update(record, ct);
 

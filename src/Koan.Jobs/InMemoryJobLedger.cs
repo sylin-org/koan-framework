@@ -42,7 +42,8 @@ public sealed class InMemoryJobLedger : IJobLedger
     }
 
     public Task<JobRecord?> ClaimNext(string owner, DateTimeOffset now, DateTimeOffset leaseUntil,
-        IReadOnlyCollection<string> saturatedLanes, CancellationToken ct)
+        IReadOnlyCollection<string> saturatedLanes, CancellationToken ct,
+        IReadOnlyDictionary<string, PoolDispatchContext>? pools = null)
     {
         lock (_gate)
         {
@@ -52,17 +53,58 @@ public sealed class InMemoryJobLedger : IJobLedger
                 .Where(r => r.Status == JobStatus.Running)
                 .Select(r => (r.WorkType, r.WorkId))
                 .ToHashSet();
-            var candidate = _records.Values
+
+            // Build member slot counts for pool dispatch (JOBS-0007): member key -> running count.
+            Dictionary<string, int>? memberSlots = null;
+            if (pools is { Count: > 0 })
+            {
+                memberSlots = new Dictionary<string, int>(StringComparer.Ordinal);
+                foreach (var ctx in pools.Values)
+                    foreach (var member in ctx.Members)
+                        memberSlots.TryAdd(member, 0);
+                foreach (var r in _records.Values)
+                    if (r.Status == JobStatus.Running && r.GateKey is not null && memberSlots.ContainsKey(r.GateKey))
+                        memberSlots[r.GateKey]++;
+            }
+
+            // Scan candidates in order; for pool jobs, elect the first member with open capacity.
+            string? electedMember = null;
+            JobRecord? candidate = null;
+            foreach (var r in _records.Values
                 .Where(r => r.Status == JobStatus.Queued
                             && r.VisibleAt <= now
                             && r.CancelRequestedAt is null
                             && !saturatedLanes.Contains(r.Lane)
-                            && !IsGated(r.GateKey, now)
                             && !(r.Exclusive && busy.Contains((r.WorkType, r.WorkId))))
                 .OrderBy(r => r.VisibleAt)
-                .ThenBy(r => r.FirstSubmittedAt)
-                .FirstOrDefault();
+                .ThenBy(r => r.FirstSubmittedAt))
+            {
+                if (r.PoolKey is not null)
+                {
+                    if (pools is null || !pools.TryGetValue(r.PoolKey, out var ctx)) continue;
+                    string? free = null;
+                    foreach (var member in ctx.Members)
+                    {
+                        if (memberSlots!.GetValueOrDefault(member) < ctx.CapacityPerMember)
+                        { free = member; break; }
+                    }
+                    if (free is null) continue;
+                    electedMember = free;
+                    candidate = r;
+                    break;
+                }
+                else if (!IsGated(r.GateKey, now))
+                {
+                    candidate = r;
+                    break;
+                }
+            }
+
             if (candidate is null) return Task.FromResult<JobRecord?>(null);
+
+            // Stamp elected pool member atomically with the claim transition.
+            if (electedMember is not null)
+                candidate.GateKey = electedMember;
 
             candidate.Attempt++;
             Transition(candidate, JobStatus.Running, now, $"claimed by {owner}");

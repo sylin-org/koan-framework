@@ -40,14 +40,22 @@ public sealed class DataJobLedger : IJobLedger
     }
 
     public async Task<JobRecord?> ClaimNext(string owner, DateTimeOffset now, DateTimeOffset leaseUntil,
-        IReadOnlyCollection<string> saturatedLanes, CancellationToken ct)
+        IReadOnlyCollection<string> saturatedLanes, CancellationToken ct,
+        IReadOnlyDictionary<string, PoolDispatchContext>? pools = null)
     {
         var candidates = await SelectCandidates(now, saturatedLanes, ct);
         if (candidates.Count == 0) return null;
 
+        // Build member slot counts once per claim attempt when pool jobs are in play (JOBS-0007).
+        var memberSlots = pools is { Count: > 0 } ? await BuildMemberSlotsAsync(pools, ct) : null;
+
         // Ticket strategy runs its own leaderless election; claim the FIFO head through it.
         if (_options.ClaimStrategy == ClaimStrategy.Ticket)
-            return await ClaimViaTicket(candidates[0], owner, now, leaseUntil, ct);
+        {
+            var (ticketTarget, ticketMember) = ElectTarget(candidates, pools, memberSlots);
+            if (ticketTarget is null) return null;
+            return await ClaimViaTicket(ticketTarget, owner, now, leaseUntil, ticketMember, ct);
+        }
 
         // §20.3 capability-graded claim. On a store with atomic conditional replace, mark Running via a compare-and-set
         // (apply IFF still Queued && unowned) — contention-free and single-execution: concurrent claimers can't both win,
@@ -57,14 +65,34 @@ public sealed class DataJobLedger : IJobLedger
             ? Data<JobRecord, string>.As<IConditionalWriteRepository<JobRecord, string>>()
             : null;
         if (cas is null)
-            return await ClaimOptimistic(candidates[0], owner, now, leaseUntil, ct);
+        {
+            var (optTarget, optMember) = ElectTarget(candidates, pools, memberSlots);
+            if (optTarget is null) return null;
+            if (optMember is not null) optTarget.GateKey = optMember;
+            return await ClaimOptimistic(optTarget, owner, now, leaseUntil, ct);
+        }
 
         foreach (var candidate in candidates)
         {
+            string? elected = null;
+            if (candidate.PoolKey is not null)
+            {
+                // Pool job: elect a free member; skip if none available or resolver is absent.
+                if (pools is null || !pools.TryGetValue(candidate.PoolKey, out var ctx)) continue;
+                foreach (var member in ctx.Members)
+                    if (memberSlots!.GetValueOrDefault(member) < ctx.CapacityPerMember) { elected = member; break; }
+                if (elected is null) continue;
+                candidate.GateKey = elected;
+            }
+
             Mark(candidate, owner, now, leaseUntil);
             if (await cas.ConditionalReplaceAsync(candidate, r => r.Status == JobStatus.Queued && r.Owner == null, ct))
                 return candidate;
-            // lost the race for this row — another worker claimed it; try the next runnable candidate.
+
+            // CAS loss on a pool job means our slot-count snapshot is stale; bail so the next drain iteration
+            // re-elects with fresh counts rather than racing on stale data.
+            if (elected is not null) return null;
+            // Non-pool CAS loss: another worker claimed this row; fall through to the next runnable candidate.
         }
         return null;
     }
@@ -164,6 +192,41 @@ public sealed class DataJobLedger : IJobLedger
 
     // --- claim internals ---
 
+    private static (JobRecord? target, string? electedMember) ElectTarget(
+        IReadOnlyList<JobRecord> candidates,
+        IReadOnlyDictionary<string, PoolDispatchContext>? pools,
+        Dictionary<string, int>? memberSlots)
+    {
+        foreach (var c in candidates)
+        {
+            if (c.PoolKey is not null)
+            {
+                if (pools is null || !pools.TryGetValue(c.PoolKey, out var ctx)) continue;
+                string? free = null;
+                foreach (var m in ctx.Members)
+                    if (memberSlots!.GetValueOrDefault(m) < ctx.CapacityPerMember) { free = m; break; }
+                if (free is null) continue;
+                return (c, free);
+            }
+            return (c, null);
+        }
+        return (null, null);
+    }
+
+    private static async Task<Dictionary<string, int>> BuildMemberSlotsAsync(
+        IReadOnlyDictionary<string, PoolDispatchContext> pools, CancellationToken ct)
+    {
+        var slots = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var ctx in pools.Values)
+            foreach (var m in ctx.Members)
+                slots.TryAdd(m, 0);
+        var running = await JobRecord.Query(r => r.Status == JobStatus.Running, ct);
+        foreach (var r in running)
+            if (r.GateKey is not null && slots.ContainsKey(r.GateKey))
+                slots[r.GateKey]++;
+        return slots;
+    }
+
     private async Task<IReadOnlyList<JobRecord>> SelectCandidates(DateTimeOffset now, IReadOnlyCollection<string> saturatedLanes, CancellationToken ct)
     {
         var gatedKeys = (await ActiveGates(now, ct)).Select(g => g.GateKey).ToHashSet(StringComparer.Ordinal);
@@ -193,7 +256,7 @@ public sealed class DataJobLedger : IJobLedger
         return candidate;
     }
 
-    private async Task<JobRecord?> ClaimViaTicket(JobRecord candidate, string owner, DateTimeOffset now, DateTimeOffset leaseUntil, CancellationToken ct)
+    private async Task<JobRecord?> ClaimViaTicket(JobRecord candidate, string owner, DateTimeOffset now, DateTimeOffset leaseUntil, string? electedMember, CancellationToken ct)
     {
         var ticket = new JobClaimTicket { JobId = candidate.Id, Owner = owner, CreatedAt = now };
         var ticketId = ticket.Id; // GUIDv7 — the bakery number
@@ -216,6 +279,10 @@ public sealed class DataJobLedger : IJobLedger
             await RemoveTicketsFor(candidate.Id, ct);
             return null;
         }
+
+        // Stamp the elected pool member onto the fresh record (pre-election stamp on `candidate` is not persisted).
+        if (electedMember is not null)
+            fresh.GateKey = electedMember;
 
         Mark(fresh, owner, now, leaseUntil);
         await JobRecord.Upsert(fresh, ct);

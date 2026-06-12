@@ -30,7 +30,8 @@ public sealed class JobTypeBinding
         IReadOnlyDictionary<string, JobActionAttribute> actions,
         PropertyInfo[] coalesceProps,
         PropertyInfo? gateProp,
-        Func<object, IServiceProvider, CancellationToken, Task<string?>>? gateResolver)
+        Func<object, IServiceProvider, CancellationToken, Task<string?>>? gateResolver,
+        string? poolName)
     {
         WorkType = workType;
         ClrType = clrType;
@@ -47,6 +48,7 @@ public sealed class JobTypeBinding
         _coalesceProps = coalesceProps;
         _gateProp = gateProp;
         _gateResolver = gateResolver;
+        PoolName = poolName;
     }
 
     /// <summary>Stable type key (the work-item type's full name); stored on each <see cref="JobRecord.WorkType"/>.</summary>
@@ -66,6 +68,11 @@ public sealed class JobTypeBinding
     /// <summary>True when the type opts out of per-entity serialization (<c>[ParallelSafe]</c>): its actions may
     /// run concurrently on one instance. Default false — jobs for the same instance are serialized (JOBS-0005 §17.2).</summary>
     public bool ParallelSafe { get; }
+
+    /// <summary>Pool name when the type carries <c>[JobPool]</c> (JOBS-0007). Null for non-pool jobs.
+    /// The gate key is NOT resolved at submit — it is stamped at claim time by the ledger using a
+    /// live <see cref="IJobPoolResolver"/>. Mutually exclusive with <c>[JobGate]</c>.</summary>
+    public string? PoolName { get; }
 
     /// <summary>The next stage after <paramref name="action"/> in the declared <c>[JobChain]</c>, or null (terminal / not chained).</summary>
     public string? NextInChain(string action)
@@ -144,6 +151,10 @@ internal static class JobTypeBinder
         var chain = clr.GetCustomAttribute<JobChainAttribute>(inherit: true)?.Stages ?? Array.Empty<string>();
         var idem = clr.GetCustomAttribute<JobIdempotentAttribute>(inherit: true);
         var gate = clr.GetCustomAttribute<JobGateAttribute>(inherit: true);
+        var pool = clr.GetCustomAttribute<JobPoolAttribute>(inherit: true);
+        if (gate is not null && pool is not null)
+            throw new InvalidOperationException(
+                $"{clr.Name} cannot have both [JobGate] and [JobPool]: use [JobPool] for runtime pools and [JobGate] for static resource keys.");
         var persist = clr.GetCustomAttribute<JobPersistenceAttribute>(inherit: true);
         var parallelSafe = clr.GetCustomAttribute<ParallelSafeAttribute>(inherit: true) is not null;
 
@@ -181,6 +192,6 @@ internal static class JobTypeBinder
         return new JobTypeBinding(
             clr.FullName!, clr, load, save, execute, getId, newSingleton, chain,
             persist?.Mode ?? JobPersistenceMode.Auto, persist?.Provider, parallelSafe,
-            actions, coalesceProps, gateProp, gateResolver);
+            actions, coalesceProps, gateProp, gateResolver, pool?.PoolName);
     }
 }

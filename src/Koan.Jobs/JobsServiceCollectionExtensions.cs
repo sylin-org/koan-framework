@@ -34,6 +34,15 @@ public static class JobsServiceCollectionExtensions
         return services;
     }
 
+    /// <summary>Register a custom pool resolver so the orchestrator knows how to dispatch pool jobs (JOBS-0007).
+    /// Multiple resolvers may be registered; each handles a distinct pool name.</summary>
+    public static IServiceCollection AddJobPoolResolver<T>(this IServiceCollection services)
+        where T : class, IJobPoolResolver
+    {
+        services.AddSingleton<IJobPoolResolver, T>();
+        return services;
+    }
+
     /// <summary>True when a durable data adapter (Mongo/Postgres/SqlServer/SQLite/…) is registered — i.e. anything
     /// other than the in-memory / JSON development adapters. Gates the durable-ledger election.</summary>
     private static bool HasDurableDataAdapter(IServiceProvider sp)

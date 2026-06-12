@@ -21,11 +21,13 @@ public interface IJobLedger
     /// <summary>
     /// Atomically claim the next ready job: <c>Status==Queued &amp;&amp; VisibleAt&lt;=now &amp;&amp; CancelRequestedAt==null</c>,
     /// whose lane is not in <paramref name="saturatedLanes"/> and whose <c>GateKey</c> is not under an active gate;
+    /// for pool jobs, elects a free member from <paramref name="pools"/> and stamps it as <c>GateKey</c>;
     /// CAS to <see cref="JobStatus.Running"/>, stamping <paramref name="owner"/> + <paramref name="leaseUntil"/>.
     /// Returns null if nothing is claimable. This is the hot path and must be atomic under contention.
     /// </summary>
     Task<JobRecord?> ClaimNext(string owner, DateTimeOffset now, DateTimeOffset leaseUntil,
-        IReadOnlyCollection<string> saturatedLanes, CancellationToken ct);
+        IReadOnlyCollection<string> saturatedLanes, CancellationToken ct,
+        IReadOnlyDictionary<string, PoolDispatchContext>? pools = null);
 
     /// <summary>Persist a transition (settle / advance / defer / cancel). The orchestrator is the only caller — single writer.</summary>
     Task Update(JobRecord record, CancellationToken ct);

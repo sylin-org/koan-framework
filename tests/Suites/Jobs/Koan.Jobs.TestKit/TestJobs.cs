@@ -448,6 +448,37 @@ public sealed class RemoteFetch : Entity<RemoteFetch>, IKoanJob<RemoteFetch>
     public static void Reset() { Ran.Clear(); Executed = 0; Throttled = null; }
 }
 
+/// <summary>Dispatch-time pool job (JOBS-0007): claims a slot from the registered <see cref="TestPoolResolver"/>
+/// at claim time, not at submit. GateKey is null at submit and stamped by the ledger on claim.</summary>
+[JobPool("test-ai-servers")]
+public sealed class PoolJob : Entity<PoolJob>, IKoanJob<PoolJob>
+{
+    public static int Executions;
+
+    public static Task Execute(PoolJob job, JobContext ctx, CancellationToken ct)
+    {
+        Interlocked.Increment(ref Executions);
+        return Task.CompletedTask;
+    }
+
+    public static void Reset() => Executions = 0;
+}
+
+/// <summary>Mutable pool resolver for JOBS-0007 tests: the test updates Members at runtime to simulate
+/// admin add/remove of AiServer rows without restarting the harness.</summary>
+public sealed class TestPoolResolver : IJobPoolResolver
+{
+    private volatile IReadOnlyList<string> _members;
+
+    public TestPoolResolver(IReadOnlyList<string> members) => _members = members;
+
+    public string PoolName => "test-ai-servers";
+    public int CapacityPerMember { get; set; } = 1;
+    public IReadOnlyList<string> Members { get => _members; set => _members = value; }
+
+    public Task<IReadOnlyList<string>> GetMembersAsync(CancellationToken ct) => Task.FromResult(_members);
+}
+
 /// <summary>Cursor-conveyor (JOBS-0005 §19.4): processes one window of a (fake) source, advances its own cursor, and
 /// re-queues ITSELF at the next window via <c>ctx.ContinueWith</c>. Bounded to ~1 active ledger row — it drains a large
 /// source without minting a row per item. Uses only existing verbs (ContinueWith + conditional auto-save §17.1).</summary>

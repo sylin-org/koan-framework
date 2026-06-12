@@ -1,5 +1,6 @@
 using AwesomeAssertions;
 using Koan.Jobs;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Koan.Jobs.TestKit;
@@ -12,7 +13,7 @@ namespace Koan.Jobs.TestKit;
 public abstract class JobBehaviorSuite
 {
     /// <summary>Build a harness for this tier (in-memory, SQLite, Mongo, …).</summary>
-    protected abstract Task<JobsHarness> CreateHostAsync(Action<JobsOptions>? configure = null);
+    protected abstract Task<JobsHarness> CreateHostAsync(Action<JobsOptions>? configure = null, Action<IServiceCollection>? configureServices = null);
 
     // --- discovery + edge ---
 
@@ -821,6 +822,121 @@ public abstract class JobBehaviorSuite
         var rec = await host.JobFor<GreetJob>(id);
         rec!.Status.Should().Be(JobStatus.Completed);
         rec.ExpireAt.Should().Be(rec.LastSettledAt!.Value + TimeSpan.FromDays(3));
+    }
+
+    // --- dispatch-time pool gates (JOBS-0007) ---
+
+    [Fact]
+    public async Task pool_job_is_dispatched_to_a_free_member()
+    {
+        PoolJob.Reset();
+        var resolver = new TestPoolResolver(new[] { "server-a", "server-b" });
+        await using var host = await CreateHostAsync(
+            configureServices: s => s.AddSingleton<IJobPoolResolver>(resolver));
+        var j = new PoolJob();
+        var id = j.Id;
+        await j.Job.Submit();
+        await host.Drain();
+        PoolJob.Executions.Should().Be(1);
+        (await host.StatusOf<PoolJob>(id)).Should().Be(JobStatus.Completed);
+        var rec = await host.JobFor<PoolJob>(id);
+        rec!.GateKey.Should().BeOneOf("server-a", "server-b");
+        rec.PoolKey.Should().Be("test-ai-servers");
+    }
+
+    [Fact]
+    public async Task pool_gatekey_is_null_at_submit_and_stamped_at_claim()
+    {
+        var resolver = new TestPoolResolver(new[] { "server-a" });
+        await using var host = await CreateHostAsync(
+            configureServices: s => s.AddSingleton<IJobPoolResolver>(resolver));
+        var j = new PoolJob();
+        var id = j.Id;
+        await j.Job.Submit();
+
+        var queued = await host.JobFor<PoolJob>(id);
+        queued!.GateKey.Should().BeNull("pool job GateKey is unresolved at submit");
+        queued.PoolKey.Should().Be("test-ai-servers");
+
+        await host.Drain();
+
+        var done = await host.JobFor<PoolJob>(id);
+        done!.GateKey.Should().NotBeNull("pool job GateKey is stamped at claim time");
+        done.GateKey.Should().Be("server-a");
+    }
+
+    [Fact]
+    public async Task pool_all_slots_full_blocks_claim()
+    {
+        var resolver = new TestPoolResolver(new[] { "server-a", "server-b" }) { CapacityPerMember = 1 };
+        await using var host = await CreateHostAsync(
+            configureServices: s => s.AddSingleton<IJobPoolResolver>(resolver));
+
+        var j = new PoolJob();
+        await j.Job.Submit();
+
+        var now = host.Clock.GetUtcNow();
+        var wt = typeof(PoolJob).FullName!;
+        await host.Ledger.AppendMany(new[]
+        {
+            new JobRecord { WorkType = wt, WorkId = "occupied-a", Action = "", Status = JobStatus.Running, Lane = "default", VisibleAt = now, FirstSubmittedAt = now, Exclusive = true, GateKey = "server-a", Owner = "other", LeaseUntil = now.AddMinutes(10) },
+            new JobRecord { WorkType = wt, WorkId = "occupied-b", Action = "", Status = JobStatus.Running, Lane = "default", VisibleAt = now, FirstSubmittedAt = now, Exclusive = true, GateKey = "server-b", Owner = "other", LeaseUntil = now.AddMinutes(10) },
+        }, default);
+
+        var pools = new Dictionary<string, PoolDispatchContext>
+        {
+            ["test-ai-servers"] = new PoolDispatchContext("test-ai-servers", new[] { "server-a", "server-b" }, 1),
+        };
+        var claimed = await host.Ledger.ClaimNext("owner", now, now.AddMinutes(5), Array.Empty<string>(), default, pools);
+        claimed.Should().BeNull("no slots are available when all pool members are at capacity");
+    }
+
+    [Fact]
+    public async Task pool_dynamic_member_update_unblocks_queued_jobs()
+    {
+        PoolJob.Reset();
+        var resolver = new TestPoolResolver(Array.Empty<string>());
+        await using var host = await CreateHostAsync(
+            configureServices: s => s.AddSingleton<IJobPoolResolver>(resolver));
+        var j = new PoolJob();
+        var id = j.Id;
+        await j.Job.Submit();
+
+        await host.Drain();
+        PoolJob.Executions.Should().Be(0, "empty pool: no member to dispatch to");
+        (await host.StatusOf<PoolJob>(id)).Should().Be(JobStatus.Queued);
+
+        resolver.Members = new[] { "server-a" };
+        await host.Drain();
+
+        PoolJob.Executions.Should().Be(1, "pool member added at runtime unblocks the queued job");
+        (await host.StatusOf<PoolJob>(id)).Should().Be(JobStatus.Completed);
+    }
+
+    [Fact]
+    public async Task pool_capacity_per_member_allows_multiple_concurrent_claims()
+    {
+        var resolver = new TestPoolResolver(new[] { "server-a" }) { CapacityPerMember = 2 };
+        await using var host = await CreateHostAsync(
+            configureServices: s => s.AddSingleton<IJobPoolResolver>(resolver));
+
+        var j1 = new PoolJob();
+        var j2 = new PoolJob();
+        await j1.Job.Submit();
+        await j2.Job.Submit();
+
+        var now = host.Clock.GetUtcNow();
+        var pools = new Dictionary<string, PoolDispatchContext>
+        {
+            ["test-ai-servers"] = new PoolDispatchContext("test-ai-servers", new[] { "server-a" }, 2),
+        };
+        var first  = await host.Ledger.ClaimNext("owner", now, now.AddMinutes(5), Array.Empty<string>(), default, pools);
+        var second = await host.Ledger.ClaimNext("owner", now, now.AddMinutes(5), Array.Empty<string>(), default, pools);
+
+        first.Should().NotBeNull();
+        second.Should().NotBeNull("capacity=2 allows two concurrent claims on the same member");
+        first!.GateKey.Should().Be("server-a");
+        second!.GateKey.Should().Be("server-a");
     }
 
     private static IReadOnlyCollection<JobRecord> Seed(string workType, int count, JobStatus status, DateTimeOffset baseTime, string idPrefix, bool visible = false)

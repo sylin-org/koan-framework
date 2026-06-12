@@ -80,3 +80,19 @@ public sealed class JobGateAttribute : Attribute
     public JobGateAttribute(string property) => Property = property;
     public string Property { get; }
 }
+
+/// <summary>
+/// Declares that this job requires a slot from a named runtime resource pool, resolved at claim/dispatch time
+/// (JOBS-0007). A registered <see cref="IJobPoolResolver"/> provides the current member list; the orchestrator
+/// picks the first member with open capacity and stamps its key as <see cref="JobRecord.GateKey"/> atomically
+/// with the claim. Pool membership changes dynamically (admin add/pause/remove) — a queued job is never
+/// permanently bound to a server chosen at submit. Cannot be combined with <see cref="JobGateAttribute"/>.
+/// </summary>
+[AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
+public sealed class JobPoolAttribute : Attribute
+{
+    public JobPoolAttribute(string poolName) => PoolName = poolName;
+
+    /// <summary>The pool name; must match <see cref="IJobPoolResolver.PoolName"/> on a registered resolver.</summary>
+    public string PoolName { get; }
+}

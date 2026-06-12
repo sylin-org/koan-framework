@@ -1,5 +1,6 @@
 using Koan.Jobs;
 using Koan.Jobs.TestKit;
+using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.MongoDb;
 using Xunit;
 
@@ -44,6 +45,6 @@ public sealed class MongoBehaviors : JobBehaviorSuite, IClassFixture<MongoJobsFi
     private readonly MongoJobsFixture _fx;
     public MongoBehaviors(MongoJobsFixture fx) => _fx = fx;
 
-    protected override Task<JobsHarness> CreateHostAsync(Action<JobsOptions>? configure = null)
-        => JobsHarness.StartWithSettingsAsync(_fx.Settings, configure);
+    protected override Task<JobsHarness> CreateHostAsync(Action<JobsOptions>? configure = null, Action<IServiceCollection>? configureServices = null)
+        => JobsHarness.StartWithSettingsAsync(_fx.Settings, configure, configureServices);
 }

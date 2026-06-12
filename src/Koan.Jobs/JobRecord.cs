@@ -60,8 +60,14 @@ public sealed class JobRecord : Entity<JobRecord>
     // --- coalesce / idempotency ---
     public string? CoalesceKey { get; set; }
 
-    // --- gate (cooperative backoff) ---
+    // --- gate (cooperative backoff / dispatch-time pool) ---
+    /// <summary>The resolved resource key for this job: set at submit for <c>[JobGate]</c> types; stamped at
+    /// claim time for <c>[JobPool]</c> types (the chosen pool member). Null means no gate constraint.</summary>
     public string? GateKey { get; set; }
+
+    /// <summary>Pool name for dispatch-time pool allocation (<c>[JobPool]</c>). Null for non-pool jobs. When set,
+    /// GateKey starts null at submit and is stamped with the chosen member key atomically at claim (JOBS-0007).</summary>
+    public string? PoolKey { get; set; }
 
     /// <summary>When true (default), this job holds its work-item exclusively: no other job for the same
     /// <c>(WorkType, WorkId)</c> may run concurrently. False for <c>[ParallelSafe]</c> types (JOBS-0005 §17.2).</summary>

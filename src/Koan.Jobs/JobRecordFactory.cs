@@ -21,7 +21,8 @@ internal static class JobRecordFactory
             FirstSubmittedAt = now,
             Lane = policy.Lane,
             CoalesceKey = binding.CoalesceKey(workItem, action),
-            GateKey = gateKey,                   // resolved by the caller (property value or async resolver — §18)
+            PoolKey = binding.PoolName,           // pool name stamped at submit; GateKey resolved at claim (JOBS-0007)
+            GateKey = binding.PoolName is not null ? null : gateKey,  // pool jobs: gate unset until claim-time election
             Exclusive = !binding.ParallelSafe,   // per-entity serialization unless the type opts out
             Deadline = now + policy.Deadline,
             CorrelationId = correlationId,
