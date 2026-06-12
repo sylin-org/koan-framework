@@ -61,6 +61,51 @@ public abstract class JobBehaviorSuite
         DedupeJob.Executions.Should().Be(2);
     }
 
+    [Fact]
+    public async Task coalesced_submit_does_not_save_work_item()
+    {
+        // A coalesced-away submit must not touch the entity store at all.
+        DedupeJob.Reset();
+        await using var host = await CreateHostAsync();
+
+        var first = new DedupeJob { Key = "k1" };
+        await first.Job.Submit();
+
+        // A distinct entity with the same coalesce key is absorbed — its row must never be written.
+        var second = new DedupeJob { Key = "k1" };
+        await second.Job.Submit();
+
+        (await DedupeJob.Get(second.Id)).Should().BeNull("a coalesced-away submit must not persist its work-item");
+
+        await host.Drain();
+        DedupeJob.Executions.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task trailing_submit_during_run_queues_a_follow_up_execution()
+    {
+        // With queued-only coalescing, a submit arriving while a job is Running queues a trailing execution
+        // rather than being silently absorbed. This gives the debounce / trailing-edge pattern.
+        DedupeJob.Reset();
+        await using var host = await CreateHostAsync();
+
+        var first = new DedupeJob { Key = "trail" };
+        await first.Job.Submit();
+
+        // Advance the job to Running state to simulate in-flight execution.
+        var now = host.Clock.GetUtcNow();
+        _ = await host.Ledger.ClaimNext(host.Orchestrator.Owner, now, now + TimeSpan.FromMinutes(1), Array.Empty<string>(), default);
+
+        // A submit arriving while the job is Running must queue a follow-up record, not be silently absorbed.
+        var second = new DedupeJob { Key = "trail" };
+        await second.Job.Submit();
+
+        var records = await host.Ledger.Query(new JobQuery(WorkType: typeof(DedupeJob).FullName!), default);
+        records.Should().HaveCount(2, "one Running + one Queued trailing-edge follow-up");
+        records.Should().ContainSingle(r => r.Status == JobStatus.Running);
+        records.Should().ContainSingle(r => r.Status == JobStatus.Queued, "trailing submit must create a follow-up record");
+    }
+
     // --- chain ---
 
     [Fact]
@@ -270,6 +315,31 @@ public abstract class JobBehaviorSuite
         WaitJob.Cancellations.Should().Be(1);
     }
 
+    [Fact]
+    public async Task cancel_at_settle_window_stops_chain()
+    {
+        // Regression: a cancel request landing between handler completion and the chain-record append must
+        // prevent the chain from advancing. The handler deliberately ignores the cancellation token to reproduce
+        // the settle-time window where Execute already returned but SettleSuccessAsync hasn't appended the next.
+        ChainCancelRaceJob.Reset();
+        var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        ChainCancelRaceJob.Unblock = tcs;
+        await using var host = await CreateHostAsync();
+
+        var j = new ChainCancelRaceJob();
+        var id = j.Id;
+        await j.Job.Submit("a");
+
+        var drain = host.Drain();
+        await Wait.Until(() => ChainCancelRaceJob.StepAExecutions == 1);  // handler has entered Execute
+        await host.Coordinator.CancelWorkAsync(typeof(ChainCancelRaceJob).FullName!, id, default);
+        tcs.SetResult();   // let the handler return (it ignores ct — models the settle-time race)
+        await drain;
+
+        (await ChainCancelRaceJob.Get(id))?.StepBRan.Should().BeFalse(
+            "a cancel landing in the settle window must stop the chain from advancing");
+    }
+
     // --- lanes ---
 
     [Fact]
@@ -283,6 +353,24 @@ public abstract class JobBehaviorSuite
         SlowJob.Peak.Should().BeLessThanOrEqualTo(2);
         var done = await host.Coordinator.WhereAsync(new JobQuery(WorkType: typeof(SlowJob).FullName!, Status: JobStatus.Completed), default);
         done.Should().HaveCount(6);
+    }
+
+    [Fact]
+    public async Task worker_concurrency_caps_total_in_flight()
+    {
+        ExclusiveJob.Reset();
+        await using var host = await CreateHostAsync(o =>
+        {
+            o.WorkerConcurrency = 2;
+            o.DefaultMaxConcurrency = 8;
+        });
+        // 8 distinct entities — no per-entity serialization constraint — only WorkerConcurrency limits throughput.
+        var jobs = Enumerable.Range(0, 8).Select(_ => new ExclusiveJob()).ToList();
+        await jobs.Submit(ExclusiveJob.ActionA);
+        await host.Drain();
+        ExclusiveJob.Peak.Should().BeLessThanOrEqualTo(2, "WorkerConcurrency caps total in-flight concurrency");
+        (await host.Coordinator.WhereAsync(new JobQuery(WorkType: typeof(ExclusiveJob).FullName!, Status: JobStatus.Completed), default))
+            .Should().HaveCount(8);
     }
 
     // --- scheduling (initiator submits on cadence) ---
@@ -413,6 +501,19 @@ public abstract class JobBehaviorSuite
         await SweepTick.Jobs.Trigger("sweep");
         await host.Drain();
         SweepTick.Executions.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task trigger_does_not_persist_scheduler_singleton()
+    {
+        // TriggerAsync must not write a __koan_job_singleton__ entity row into the consumer's collection.
+        TickJob.Reset();
+        await using var host = await CreateHostAsync();
+        await TickJob.Jobs.Trigger("sweep");
+        await host.Drain();
+        TickJob.Executions.Should().Be(1);
+        (await TickJob.Get(JobCoordinator.SingletonWorkId)).Should().BeNull(
+            "the scheduler singleton must not be persisted to the consumer's entity collection");
     }
 
     // --- archival ---

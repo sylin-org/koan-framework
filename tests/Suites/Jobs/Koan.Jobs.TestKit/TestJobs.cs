@@ -332,6 +332,30 @@ internal static class Probe
     }
 }
 
+/// <summary>Two-stage chain where step "a" can be held open by the test, ignoring the cancellation token, to
+/// simulate a cancel landing in the settle window after the handler has already returned successfully.</summary>
+[JobChain("a", "b")]
+public sealed class ChainCancelRaceJob : Entity<ChainCancelRaceJob>, IKoanJob<ChainCancelRaceJob>
+{
+    public bool StepBRan { get; set; }
+    public static int StepAExecutions;
+    public static TaskCompletionSource? Unblock;
+
+    public static async Task Execute(ChainCancelRaceJob job, JobContext ctx, CancellationToken ct)
+    {
+        if (ctx.Action == "a")
+        {
+            Interlocked.Increment(ref StepAExecutions);
+            // Deliberately ignore ct: the handler completes normally even when the linked token is cancelled,
+            // reproducing the settle-time window where the cancel marker is set AFTER Execute returns.
+            if (Unblock is not null) await Unblock.Task;
+        }
+        else job.StepBRan = true;
+    }
+
+    public static void Reset() { StepAExecutions = 0; Unblock = null; }
+}
+
 /// <summary>Conditional auto-save footgun (§17.1): the handler edits a SECOND copy and saves it, never touching
 /// the passed reference. Naive always-save would clobber this with the unmutated reference.</summary>
 public sealed class SelfSaveJob : Entity<SelfSaveJob>, IKoanJob<SelfSaveJob>
