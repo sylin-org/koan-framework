@@ -54,6 +54,14 @@ public sealed class JobOrchestrator
         {
             while (!ct.IsCancellationRequested)
             {
+                // Global cap: don't claim more work than this node can run concurrently.
+                if (_options.WorkerConcurrency > 0 && inflight.Count >= _options.WorkerConcurrency)
+                {
+                    await Task.WhenAny(inflight);
+                    inflight.RemoveAll(t => t.IsCompleted);
+                    continue;
+                }
+
                 var now = _clock.GetUtcNow();
                 var rec = await _ledger.ClaimNext(_owner, now, now + _options.LeaseDuration, SaturatedLanes(), ct);
                 if (rec is not null)
@@ -107,6 +115,8 @@ public sealed class JobOrchestrator
         object? workItem;
         try { workItem = await binding.Load(rec.WorkId, workerCt); }
         catch (Exception ex) { await SettleFailureAsync(rec, binding, policy, ex); return; }
+        // Type-level triggers (TriggerAsync) use an ephemeral singleton that is never persisted; re-create it here.
+        workItem ??= rec.WorkId == JobCoordinator.SingletonWorkId ? binding.NewSingleton(rec.WorkId) : null;
         if (workItem is null) { await SettleFailureAsync(rec, binding, policy, new InvalidOperationException($"Work-item {rec.WorkType}/{rec.WorkId} not found.")); return; }
 
         var snapshot = Snapshot(workItem);   // for conditional auto-save (§17.1): only persist if the handler mutates it
@@ -173,6 +183,12 @@ public sealed class JobOrchestrator
             _ => binding.NextInChain(rec.Action),
         };
 
+        // Settle-window cancel check: CancelWorkAsync writes CancelRequestedAt to the durable ledger while the
+        // handler runs, but the orchestrator's rec clone was loaded at claim time (before that write). Re-read
+        // BEFORE overwriting the record with Completed — otherwise our Update below erases the marker and the
+        // subsequent check sees a clean record every time.
+        var cancelledInSettleWindow = next is not null && await IsCancelMarkerSet(rec.Id);
+
         rec.Owner = null;
         rec.LeaseUntil = null;
         rec.LastError = null;
@@ -183,7 +199,7 @@ public sealed class JobOrchestrator
         await _ledger.Update(rec, CancellationToken.None);
         _metrics.Record(rec.WorkType, JobStatus.Completed, now);
 
-        if (next is not null)
+        if (next is not null && !cancelledInSettleWindow)
         {
             var nextPolicy = binding.ResolvePolicy(next, _options);
             // Chain stages inherit the gate key resolved at submit (the chain's gate pool is fixed — §18).
