@@ -33,8 +33,10 @@ public sealed class DataJobLedger : IJobLedger
 
     public async Task<JobRecord?> FindActiveByCoalesceKey(string workType, string coalesceKey, CancellationToken ct)
     {
-        var hits = await JobRecord.Query(r => r.WorkType == workType && r.CoalesceKey == coalesceKey, ct);
-        return hits.FirstOrDefault(r => !r.IsTerminal);
+        // Queued-only: a Running job does not block a new submit — the submit queues a trailing execution
+        // (at most 1 running + 1 queued per coalesce key, the debounce / trailing-edge pattern).
+        var hits = await JobRecord.Query(r => r.WorkType == workType && r.CoalesceKey == coalesceKey && r.Status == JobStatus.Queued, ct);
+        return hits.FirstOrDefault();
     }
 
     public async Task<JobRecord?> ClaimNext(string owner, DateTimeOffset now, DateTimeOffset leaseUntil,

@@ -33,8 +33,10 @@ public sealed class InMemoryJobLedger : IJobLedger
     {
         lock (_gate)
         {
+            // Queued-only: a Running job does not block a new submit — the submit queues a trailing execution
+            // (at most 1 running + 1 queued per coalesce key, the debounce / trailing-edge pattern).
             var hit = _records.Values.FirstOrDefault(r =>
-                !r.IsTerminal && r.WorkType == workType && r.CoalesceKey == coalesceKey);
+                r.Status == JobStatus.Queued && r.WorkType == workType && r.CoalesceKey == coalesceKey);
             return Task.FromResult(hit?.Clone());
         }
     }
