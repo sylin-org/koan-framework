@@ -76,6 +76,8 @@ starts by claiming a [PROGRESS.md](PROGRESS.md) row and ends with guards left be
 ## Files
 
 - [CHARTER.md](CHARTER.md) — the shared session contract (read first, every time).
+- [LAUNCH.md](LAUNCH.md) — the paste-ready session launcher template + the orchestrator's
+  validation gate (how a fresh session is kicked off and checked).
 - [PROGRESS.md](PROGRESS.md) — the live execution ledger (status, readiness, divergence,
   operator gates).
 - `E01`–`E16` — the prompts (this README's table).
