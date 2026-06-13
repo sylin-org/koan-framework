@@ -38,6 +38,7 @@ Framework knowledge is provided through **Agent Skills** in `.claude/skills/` th
 - **Multi-Provider Transparency**: Same entity code works across SQL, NoSQL, Vector, JSON stores
 - **Self-Reporting Infrastructure**: Services describe their capabilities in structured boot reports
 - **Integration Tests as Canon (ARCH-0079)**: Every adapter, connector, coherence channel, and pillar core ships at least one integration spec that goes through real `AddKoan()` reflective discovery using `KoanIntegrationHost`. Unit tests with fakes are insufficient — they structurally cannot reveal composition or shared-resource bugs. See [tests/README.md](tests/README.md#integration-tests-are-canon-arch-0079) for the canon pattern.
+- **Stack Canon (STACK-0001)**: Koan is the top layer of the three-repo Sylin stack (Koi → Zen Garden → Koan). The cross-repo decisions — layering law (names never flow down; no mainline compile-time sibling references), contract types per seam, trust topology, and the capacitation/enabler mission — are canon in [docs/decisions/STACK-0001-sylin-stack-canon.md](docs/decisions/STACK-0001-sylin-stack-canon.md) (identical copies in all three repos). Do not contradict it without an upstream architect decision.
 
 ### Critical Anti-Patterns to Detect
 

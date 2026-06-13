@@ -8,6 +8,14 @@ This index aggregates accepted and proposed decision records. Each ADR is:
 
 Refer to `toc.yml` for categorized navigation. Use the template (`AAAA-0000`) for new ADRs.
 
+## Cross-Repo Stack Canon (STACK)
+
+Decisions that bind all three Sylin sibling repos (Koi, Zen Garden, Koan). Authored once and copied verbatim into each repo's decision directory — edits must propagate to all three.
+
+| ID | Title | Status | Scope |
+|----|-------|--------|-------|
+| STACK-0001 | [The Sylin stack — layering, contracts, and trust topology](STACK-0001-sylin-stack-canon.md) | Accepted (2026-06-13) | Koi → Zen Garden → Koan layering law, contract types per seam, trust topology, mission canon (ten decisions) |
+
 ## AI Lifecycle Expansion (AI-0022 – AI-0030)
 
 Vision and capability expansion for Koan.AI: model catalog, compute fabric, prompt primitive, chain composition, media analysis, training, evaluation, and review queues.

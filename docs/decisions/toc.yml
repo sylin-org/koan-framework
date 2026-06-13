@@ -4,6 +4,10 @@
   items:
     - name: AAAA-0000 ADR authoring template
       href: AAAA-0000-template.md
+- name: Cross-Repo Canon (STACK)
+  items:
+    - name: STACK-0001 The Sylin stack — layering, contracts, and trust topology
+      href: STACK-0001-sylin-stack-canon.md
 - name: ADR Series
   items:
   - name: ADR-0050 Data access semantics - streaming and paging APIs
