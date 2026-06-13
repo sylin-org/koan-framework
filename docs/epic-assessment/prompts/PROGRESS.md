@@ -29,7 +29,7 @@ a prompt, log it under Divergence and either adapt within the prompt's intent or
 
 | ID | Phase | Repo(s) | Status | Date | Agent/model | Commit(s) | Notes |
 |---|---|---|---|---|---|---|---|
-| [E01](E01-stack-canon-adr.md) | A | all 3 | pending | | | | STACK-0001 canon ADR ×3; transcription, not design. Unblocks E06/E12. |
+| [E01](E01-stack-canon-adr.md) | A | all 3 | done | 2026-06-13 | claude-opus-4-8 | koan:bebecbac · zen:b5289b63 · koi:ba349fb | STACK-0001 ×3, byte-identical Decision block (sha256 95f2d4c2…); indexed + cross-linked in each repo's agent context. Transcription only. Unblocks E06/E12. |
 | [E02](E02-surface-ledger.md) | A | all 3 | pending | | | | `docs/SURFACES.md` + rotation contract ×3. |
 | [E03](E03-koi-publish-closure.md) | B | Koi | pending | | | | Publish crate closure (incl. koi-udp); loud-fail pipeline. **Operator gate: irreversible `cargo publish`.** Unblocks E04. |
 | [E04](E04-zen-published-deps.md) | B | Zen | pending | | | | Path deps → crates.io + `[patch.crates-io]` + clean-clone CI gate. Needs E03. |
@@ -82,7 +82,8 @@ the next agent learns the map was wrong without re-discovering it.
 
 | Date | ID | Finding | Action |
 |---|---|---|---|
-| | | | |
+| 2026-06-13 | E01 | KOI `docs/adr/` uses 3-digit, no-prefix filenames (`013-…`), which can't carry the DEFAULT-fixed ADR id `STACK-0001`. | Filed the KOI copy as `STACK-0001-sylin-stack-canon.md` (DEFAULT deviation, justified in-file): cross-repo grep-identity is the ADR's whole purpose; an opaque `014-` sequence would bury the shared id. |
+| 2026-06-13 | E01 | KOI has no `docs/adr/README`/index (the card's cited cross-link target does not exist). | Cross-linked from KOI `.agentic/CONTEXT.md` (the repo's actual agent-bootstrap surface, which already points at `docs/adr/`) instead of creating a new index file. |
 
 ## Operator gates
 
