@@ -30,7 +30,7 @@ a prompt, log it under Divergence and either adapt within the prompt's intent or
 | ID | Phase | Repo(s) | Status | Date | Agent/model | Commit(s) | Notes |
 |---|---|---|---|---|---|---|---|
 | [E01](E01-stack-canon-adr.md) | A | all 3 | done | 2026-06-13 | claude-opus-4-8 | koan:bebecbac · zen:b5289b63 · koi:ba349fb | STACK-0001 ×3, byte-identical Decision block (sha256 95f2d4c2…); indexed + cross-linked in each repo's agent context. Transcription only. Unblocks E06/E12. |
-| [E02](E02-surface-ledger.md) | A | all 3 | pending | | | | `docs/SURFACES.md` + rotation contract ×3. |
+| [E02](E02-surface-ledger.md) | A | all 3 | done | 2026-06-13 | claude-opus-4-8 | koan:`<this commit>` · zen:c7521f48 · koi:1b5ac99 | `docs/SURFACES.md` ×3 (koan 16 / zen 16 / koi 14 rows) + rotation contract + lint (koi `surfaces` ci.yml job, koan `surfaces.yml`; ZG none — no workflows). Honest: KOI proxy guard=none; dormant/parked rows `unknown since <date>`. |
 | [E03](E03-koi-publish-closure.md) | B | Koi | pending | | | | Publish crate closure (incl. koi-udp); loud-fail pipeline. **Operator gate: irreversible `cargo publish`.** Unblocks E04. |
 | [E04](E04-zen-published-deps.md) | B | Zen | pending | | | | Path deps → crates.io + `[patch.crates-io]` + clean-clone CI gate. Needs E03. |
 | [E05](E05-koi-programmatic-contract.md) | B | Koi | pending | | | | Token story THEN bind flag; networking/security page. Independent. |
@@ -84,6 +84,9 @@ the next agent learns the map was wrong without re-discovering it.
 |---|---|---|---|
 | 2026-06-13 | E01 | KOI `docs/adr/` uses 3-digit, no-prefix filenames (`013-…`), which can't carry the DEFAULT-fixed ADR id `STACK-0001`. | Filed the KOI copy as `STACK-0001-sylin-stack-canon.md` (DEFAULT deviation, justified in-file): cross-repo grep-identity is the ADR's whole purpose; an opaque `014-` sequence would bury the shared id. |
 | 2026-06-13 | E01 | KOI has no `docs/adr/README`/index (the card's cited cross-link target does not exist). | Cross-linked from KOI `.agentic/CONTEXT.md` (the repo's actual agent-bootstrap surface, which already points at `docs/adr/`) instead of creating a new index file. |
+| 2026-06-13 | E02 | ZEN has no `.github/workflows/` directory at all (only `.github/copilot-instructions.md`); the DEFAULT "CI lint where CI exists" has no host. | No lint added in ZEN; ledger marks tested surfaces guard `tests, unwired` and notes CI is absent — matches the card's own "ZG CI never ran" expectation. |
+| 2026-06-13 | E02 | KOAN general build/test CI is disabled by design (`ci.yml` + `validate-main-pr.yml` are noop placeholders; only `release-on-main.yml` runs, build-only). | Added a standalone single-purpose `.github/workflows/surfaces.yml` (push/PR to main+dev) rather than wiring the lint into a disabled placeholder or the sensitive release pipeline. Tested-surface guards marked `(local)` to reflect CI-build-only. |
+| 2026-06-13 | E02 | KOI working tree was clean at execution — the card-warned untracked `token.rs` in-flight work was not present in the tree. | Recorded the token/DAT-auth surface per the work-item note (exercised by `private downstream solution / in-flight`, guard none) WITHOUT inspecting or searching for anything (CHARTER rule 8). |
 
 ## Operator gates
 
