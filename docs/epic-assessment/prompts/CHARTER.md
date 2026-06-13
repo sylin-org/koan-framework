@@ -62,6 +62,10 @@ capacitated is the one most harmed by fictional docs and silent failures.
 
 ## Session protocol
 
+0. **Claim your work.** Open [PROGRESS.md](PROGRESS.md). Confirm your prompt's prerequisites
+   are actually `done` (verify in the repos, not just the table — it can lag). Set your row
+   to `in-progress` with today's date and your model id. If a prereq is not truly green,
+   stop and pick a runnable prompt instead (the Readiness section lists them).
 1. **Research first.** Read the prompt's Context block, then the cited files at the cited
    lines. Re-verify every load-bearing claim before acting on it — the repos move; line
    numbers drift; treat citations as starting points, not gospel.
@@ -77,6 +81,11 @@ capacitated is the one most harmed by fictional docs and silent failures.
    a test that fails if it regresses, a status endpoint that tells the truth, a CI step. Then
    update the repo's `docs/SURFACES.md` row (created by E02): surface, exercising solution,
    last-exercised date (today), guard.
+6a. **Close your row.** Update [PROGRESS.md](PROGRESS.md): set status (`done`/`blocked`/
+    `postponed`), link commit SHAs (repo-prefixed if cross-repo), one-line note. If you hit
+    a contradiction between the prompt and the repos, add a Divergence-log entry. If you
+    produced operator follow-up (a baseline, a manual verification), append an operator-gate
+    section with copy-paste commands.
 6. **Document.** Update the docs your change makes stale, in the repo you changed. Every
    code claim you write into docs must be verified against the code in the same session
    ("if it's in the docs, it compiles/runs").
@@ -87,8 +96,9 @@ capacitated is the one most harmed by fictional docs and silent failures.
 
 End every session with a summary containing: what changed (files + one line each), what was
 verified and HOW (commands + results), guards left behind, SURFACES.md rows updated,
-deviations from DEFAULT (with justification), and anything discovered that contradicts this
-charter or the prompt's Context block (report it — do not silently work around it).
+**your PROGRESS.md row closed (with commit SHAs)**, deviations from DEFAULT (with
+justification), and anything discovered that contradicts this charter or the prompt's
+Context block (report it — do not silently work around it).
 
 ## When blocked
 

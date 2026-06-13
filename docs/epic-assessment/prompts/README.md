@@ -7,11 +7,18 @@ file-level evidence, closes design decisions in DECIDED blocks, and references
 [CHARTER.md](CHARTER.md) for the shared contract (mission, canon, protocol, paths).
 
 **How to use**: paste one prompt file as the session's instruction. The agent reads
-CHARTER.md first, then executes. Run prompts in order within a phase; phases compose — each
-enablement is a prerequisite the next phase consumes (Koi publishes crates → Zen builds
-clean → Koi's API works for programs → certmesh issues real keys → moss verifies clients →
-Koan binds tokens to those certificates → the demo proves the chain → contracts freeze what
-the demo proved → agents get the whole thing as a discoverable, governed surface).
+CHARTER.md first, claims its row in [PROGRESS.md](PROGRESS.md), then executes. Run prompts in
+order within a phase; phases compose — each enablement is a prerequisite the next phase
+consumes (Koi publishes crates → Zen builds clean → Koi's API works for programs → certmesh
+issues real keys → moss verifies clients → Koan binds tokens to those certificates → the
+demo proves the chain → contracts freeze what the demo proved → agents get the whole thing
+as a discoverable, governed surface).
+
+**Tracking**: [PROGRESS.md](PROGRESS.md) is the live ledger — status per prompt, what is
+runnable right now (the Readiness section), the divergence log for when repo reality
+contradicts a prompt, and the operator gates (the irreversible/physical steps). Check it
+before picking work; update it when you finish. Start with **E01** as the calibration
+card.
 
 These prompts add **only the cross-repo seam work**. Per-repo maturation already has its own
 stashes — run those in parallel lanes as the operator chooses:
@@ -62,5 +69,13 @@ deepens when `KOAN` 07-P1.1 lands) · E13←{E05,E12; Koan governance deepens wi
 Every prompt has: **Repo(s) / Phase / Prereqs / Mission / Context (ground truth + evidence) /
 DECIDED / DEFAULT / Plan of record / Verification / Definition of done.** DECIDED is closed —
 the architect has ruled; deviating requires a new operator decision, not agent judgment.
-DEFAULT may be deviated from with a recorded one-paragraph justification. Every session ends
-with guards left behind and `docs/SURFACES.md` updated (E02 creates it).
+DEFAULT may be deviated from with a recorded one-paragraph justification. Every session
+starts by claiming a [PROGRESS.md](PROGRESS.md) row and ends with guards left behind,
+`docs/SURFACES.md` updated (E02 creates it), and the PROGRESS.md row closed.
+
+## Files
+
+- [CHARTER.md](CHARTER.md) — the shared session contract (read first, every time).
+- [PROGRESS.md](PROGRESS.md) — the live execution ledger (status, readiness, divergence,
+  operator gates).
+- `E01`–`E16` — the prompts (this README's table).
