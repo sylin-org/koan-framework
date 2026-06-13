@@ -939,6 +939,253 @@ public abstract class JobBehaviorSuite
         second!.GateKey.Should().Be("server-a");
     }
 
+    [Fact]
+    public async Task pool_job_admission_is_governed_by_pool_capacity_not_resource_gates()
+    {
+        // ARCH-0079 convergence: a [JobPool] row is admitted by pool-member capacity, not by [JobGate] resource gates
+        // (its GateKey is the elected member, not a backoff key). Both ledger tiers must agree — a gate that happens to
+        // name a pool member key must not block a pool job the pool can still serve.
+        PoolJob.Reset();
+        var resolver = new TestPoolResolver(new[] { "server-a" });
+        await using var host = await CreateHostAsync(
+            configureServices: s => s.AddSingleton<IJobPoolResolver>(resolver));
+        var now = host.Clock.GetUtcNow();
+        var poolWt = typeof(PoolJob).FullName!;
+
+        await host.Ledger.SetGate("server-a", now.AddMinutes(10), "unrelated gate on the member key", default);
+
+        // a queued pool job that (atypically) already carries a GateKey equal to the gated member key.
+        await host.Ledger.Append(new JobRecord
+        {
+            Id = $"{poolWt}:g0", WorkType = poolWt, WorkId = "g0", Action = "",
+            Status = JobStatus.Queued, PoolKey = "test-ai-servers", GateKey = "server-a", Exclusive = true,
+            VisibleAt = now, FirstSubmittedAt = now,
+        }, default);
+
+        var pools = new Dictionary<string, PoolDispatchContext>
+        {
+            ["test-ai-servers"] = new("test-ai-servers", new[] { "server-a" }, 1),
+        };
+        var claimed = await host.Ledger.ClaimNext("owner", now, now.AddMinutes(1), Array.Empty<string>(), default, pools);
+
+        claimed.Should().NotBeNull("a pool job is governed by pool capacity, not a resource gate on its member key");
+        claimed!.WorkId.Should().Be("g0");
+    }
+
+    // --- head-of-line starvation: the claim scan must page past unclaimable work (JOBS-0007 regression) ---
+    // A window's worth of unclaimable rows at the FIFO head (an exhausted pool, a saturated lane, gated keys, or a
+    // busy exclusive work-item) must not consume the durable ledger's bounded scan and strand runnable work queued
+    // behind it. These specs set a tiny ClaimScanBatch and seed MORE than one window of unclaimable rows ahead of the
+    // runnable work, so the windowed durable ledger reproduces the stall; the in-memory ledger (full scan) is already
+    // immune, which is exactly the convergence the fix restores.
+
+    [Fact]
+    public async Task exhausted_pool_does_not_starve_other_work_in_the_claim_scan()
+    {
+        // The live incident: a [JobPool] with zero available members backed up 1000+ unclaimable jobs at the oldest
+        // VisibleAt; runnable non-pool jobs behind them never got claimed and the whole pipeline stalled for ~18h.
+        PoolJob.Reset();
+        GreetJob.Reset();
+        var resolver = new TestPoolResolver(Array.Empty<string>());   // exhausted: no members
+        await using var host = await CreateHostAsync(
+            o => o.ClaimScanBatch = 3,
+            s => s.AddSingleton<IJobPoolResolver>(resolver));
+
+        var now = host.Clock.GetUtcNow();
+        var poolWt = typeof(PoolJob).FullName!;
+
+        // 8 unclaimable pool jobs hold the oldest VisibleAt — more than two claim-scan windows.
+        await host.Ledger.AppendMany(
+            Enumerable.Range(0, 8).Select(i => new JobRecord
+            {
+                Id = $"{poolWt}:stuck{i}", WorkType = poolWt, WorkId = $"stuck{i}", Action = "",
+                Status = JobStatus.Queued, PoolKey = "test-ai-servers", Exclusive = true,
+                VisibleAt = now.AddMinutes(-10).AddMilliseconds(i), FirstSubmittedAt = now.AddMinutes(-10).AddMilliseconds(i),
+            }).ToList(), default);
+
+        // 3 runnable non-pool jobs queued behind them (newer VisibleAt).
+        var greets = Enumerable.Range(0, 3).Select(i => new GreetJob { Name = $"n{i}" }).ToList();
+        foreach (var g in greets) await g.Job.Submit();
+
+        await host.Drain();
+
+        GreetJob.Executions.Should().Be(3, "runnable non-pool work must not be starved by an exhausted pool's backlog");
+        PoolJob.Executions.Should().Be(0, "the pool is exhausted — its jobs stay queued");
+        foreach (var g in greets)
+            (await host.StatusOf<GreetJob>(g.Id)).Should().Be(JobStatus.Completed);
+    }
+
+    [Fact]
+    public async Task saturated_lane_does_not_starve_claims_for_other_lanes()
+    {
+        await using var host = await CreateHostAsync(o => o.ClaimScanBatch = 3);
+        var now = host.Clock.GetUtcNow();
+        var wt = typeof(GreetJob).FullName!;
+
+        // 8 jobs on the saturated "slow" lane hold the oldest VisibleAt.
+        await host.Ledger.AppendMany(
+            Enumerable.Range(0, 8).Select(i => new JobRecord
+            {
+                Id = $"{wt}:slow{i}", WorkType = wt, WorkId = $"slow{i}", Action = "",
+                Status = JobStatus.Queued, Lane = "slow", Exclusive = true,
+                VisibleAt = now.AddMinutes(-10).AddMilliseconds(i), FirstSubmittedAt = now.AddMinutes(-10).AddMilliseconds(i),
+            }).ToList(), default);
+
+        // one job on a free lane, queued behind them.
+        await host.Ledger.Append(new JobRecord
+        {
+            Id = $"{wt}:free0", WorkType = wt, WorkId = "free0", Action = "",
+            Status = JobStatus.Queued, Lane = "default", Exclusive = true,
+            VisibleAt = now, FirstSubmittedAt = now,
+        }, default);
+
+        var claimed = await host.Ledger.ClaimNext("owner", now, now.AddMinutes(1), new[] { "slow" }, default);
+
+        claimed.Should().NotBeNull("a saturated lane must not block claims for other lanes");
+        claimed!.WorkId.Should().Be("free0");
+        claimed.Lane.Should().Be("default");
+    }
+
+    [Fact]
+    public async Task active_gate_does_not_starve_ungated_claims()
+    {
+        await using var host = await CreateHostAsync(o => o.ClaimScanBatch = 3);
+        var now = host.Clock.GetUtcNow();
+        var wt = typeof(GreetJob).FullName!;
+
+        await host.Ledger.SetGate("host:throttled", now.AddMinutes(10), "429", default);
+
+        // 8 gated jobs (under the active gate) hold the oldest VisibleAt.
+        await host.Ledger.AppendMany(
+            Enumerable.Range(0, 8).Select(i => new JobRecord
+            {
+                Id = $"{wt}:gated{i}", WorkType = wt, WorkId = $"gated{i}", Action = "",
+                Status = JobStatus.Queued, GateKey = "host:throttled", Exclusive = true,
+                VisibleAt = now.AddMinutes(-10).AddMilliseconds(i), FirstSubmittedAt = now.AddMinutes(-10).AddMilliseconds(i),
+            }).ToList(), default);
+
+        await host.Ledger.Append(new JobRecord
+        {
+            Id = $"{wt}:ungated0", WorkType = wt, WorkId = "ungated0", Action = "",
+            Status = JobStatus.Queued, Exclusive = true, VisibleAt = now, FirstSubmittedAt = now,
+        }, default);
+
+        var claimed = await host.Ledger.ClaimNext("owner", now, now.AddMinutes(1), Array.Empty<string>(), default);
+
+        claimed.Should().NotBeNull("an active gate must not block claims for ungated work");
+        claimed!.WorkId.Should().Be("ungated0");
+    }
+
+    [Fact]
+    public async Task busy_exclusive_work_item_does_not_starve_other_work_items()
+    {
+        // The exclusive/busy vector is a set of (WorkType, WorkId) TUPLES — it can't be a scalar store-side filter, so
+        // paging (not predicate-pushdown) is what keeps it from starving. One work-item runs; a backlog of its own
+        // queued duplicates must not block a different work-item behind them.
+        await using var host = await CreateHostAsync(o => o.ClaimScanBatch = 3);
+        var now = host.Clock.GetUtcNow();
+        var wt = typeof(GreetJob).FullName!;
+
+        await host.Ledger.Append(new JobRecord
+        {
+            Id = $"{wt}:hot:running", WorkType = wt, WorkId = "hot", Action = "",
+            Status = JobStatus.Running, Exclusive = true, Owner = "other", LeaseUntil = now.AddMinutes(10),
+            VisibleAt = now.AddMinutes(-20), FirstSubmittedAt = now.AddMinutes(-20),
+        }, default);
+
+        // 8 more exclusive jobs queued for the SAME (busy) work-item, oldest VisibleAt.
+        await host.Ledger.AppendMany(
+            Enumerable.Range(0, 8).Select(i => new JobRecord
+            {
+                Id = $"{wt}:hot:q{i}", WorkType = wt, WorkId = "hot", Action = "",
+                Status = JobStatus.Queued, Exclusive = true,
+                VisibleAt = now.AddMinutes(-10).AddMilliseconds(i), FirstSubmittedAt = now.AddMinutes(-10).AddMilliseconds(i),
+            }).ToList(), default);
+
+        // a different work-item, queued behind them.
+        await host.Ledger.Append(new JobRecord
+        {
+            Id = $"{wt}:cold:q0", WorkType = wt, WorkId = "cold", Action = "",
+            Status = JobStatus.Queued, Exclusive = true, VisibleAt = now, FirstSubmittedAt = now,
+        }, default);
+
+        var claimed = await host.Ledger.ClaimNext("owner", now, now.AddMinutes(1), Array.Empty<string>(), default);
+
+        claimed.Should().NotBeNull("a busy exclusive work-item must not block claims for other work-items");
+        claimed!.WorkId.Should().Be("cold");
+    }
+
+    [Fact]
+    public async Task claim_preserves_fifo_among_claimable_jobs_behind_an_unclaimable_head()
+    {
+        // Paging past the unclaimable head must not disturb FIFO order among the claimable jobs it reaches.
+        await using var host = await CreateHostAsync(
+            o => o.ClaimScanBatch = 3,
+            s => s.AddSingleton<IJobPoolResolver>(new TestPoolResolver(Array.Empty<string>())));
+        var now = host.Clock.GetUtcNow();
+        var poolWt = typeof(PoolJob).FullName!;
+        var wt = typeof(GreetJob).FullName!;
+
+        await host.Ledger.AppendMany(
+            Enumerable.Range(0, 8).Select(i => new JobRecord
+            {
+                Id = $"{poolWt}:stuck{i}", WorkType = poolWt, WorkId = $"stuck{i}", Action = "",
+                Status = JobStatus.Queued, PoolKey = "test-ai-servers", Exclusive = true,
+                VisibleAt = now.AddMinutes(-10).AddMilliseconds(i), FirstSubmittedAt = now.AddMinutes(-10).AddMilliseconds(i),
+            }).ToList(), default);
+
+        // claimable non-pool jobs in a known order: newer than the stuck head, but still visible (in the past).
+        await host.Ledger.AppendMany(
+            Enumerable.Range(0, 3).Select(i => new JobRecord
+            {
+                Id = $"{wt}:r{i}", WorkType = wt, WorkId = $"r{i}", Action = "",
+                Status = JobStatus.Queued, Exclusive = true,
+                VisibleAt = now.AddMinutes(-1).AddMilliseconds(i), FirstSubmittedAt = now.AddMinutes(-1).AddMilliseconds(i),
+            }).ToList(), default);
+
+        var pools = new Dictionary<string, PoolDispatchContext>
+        {
+            ["test-ai-servers"] = new("test-ai-servers", Array.Empty<string>(), 1),
+        };
+        var first  = await host.Ledger.ClaimNext("o", now, now.AddMinutes(1), Array.Empty<string>(), default, pools);
+        var second = await host.Ledger.ClaimNext("o", now, now.AddMinutes(1), Array.Empty<string>(), default, pools);
+
+        first!.WorkId.Should().Be("r0", "the FIFO head of the claimable set is claimed first");
+        second!.WorkId.Should().Be("r1");
+    }
+
+    [Fact]
+    public async Task exhausted_pool_backlog_larger_than_scan_window_returns_null_without_claiming()
+    {
+        // The paging scan must terminate at end-of-ready-set and return null when nothing is claimable — it must not
+        // hang, and it must not over-claim an unclaimable pool job.
+        PoolJob.Reset();
+        var resolver = new TestPoolResolver(Array.Empty<string>());
+        await using var host = await CreateHostAsync(
+            o => o.ClaimScanBatch = 3,
+            s => s.AddSingleton<IJobPoolResolver>(resolver));
+        var now = host.Clock.GetUtcNow();
+        var poolWt = typeof(PoolJob).FullName!;
+
+        await host.Ledger.AppendMany(
+            Enumerable.Range(0, 10).Select(i => new JobRecord
+            {
+                Id = $"{poolWt}:p{i}", WorkType = poolWt, WorkId = $"p{i}", Action = "",
+                Status = JobStatus.Queued, PoolKey = "test-ai-servers", Exclusive = true,
+                VisibleAt = now.AddMinutes(-5).AddMilliseconds(i), FirstSubmittedAt = now.AddMinutes(-5).AddMilliseconds(i),
+            }).ToList(), default);
+
+        var pools = new Dictionary<string, PoolDispatchContext>
+        {
+            ["test-ai-servers"] = new("test-ai-servers", Array.Empty<string>(), 1),
+        };
+        var claimed = await host.Ledger.ClaimNext("owner", now, now.AddMinutes(1), Array.Empty<string>(), default, pools);
+
+        claimed.Should().BeNull("no member is available — the scan reaches end-of-ready-set and returns null");
+        (await host.Ledger.Query(new JobQuery(WorkType: poolWt), default))
+            .Should().OnlyContain(r => r.Status == JobStatus.Queued, "nothing was claimed");
+    }
+
     private static IReadOnlyCollection<JobRecord> Seed(string workType, int count, JobStatus status, DateTimeOffset baseTime, string idPrefix, bool visible = false)
     {
         var list = new List<JobRecord>(count);

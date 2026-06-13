@@ -32,7 +32,7 @@ guessed "works".
 | Data connectors (10 under Connectors/Data) | AdapterSurface suites | 2026-06-11 | connector suites (local; 39/87 not in sln) | Redis FilterSupport.Full = full SCAN + client filter, risky at scale |
 | Web nucleus (EntityController to hook pipeline) | Web AdapterSurface x8 | 2026-06-11 | Web suites (local) | Load-bearing; MCP executes through it |
 | Cache (L1/L2 + coherence) | Cache CrossEngine oracle + KOAN0001 analyzer | 2026-06-11 | Cache suites + analyzer (local) | Reference pillar (ARCH-0075/0078) |
-| Jobs (JOBS-0005, 5-tier) | Jobs 5-tier TestKit | 2026-06-12 | Jobs TestKit (local) | Freshest, most disciplined pillar |
+| Jobs (JOBS-0005, 5-tier) | Jobs 5-tier TestKit | 2026-06-13 | Jobs TestKit (local) — incl. claim-scan starvation specs | Freshest, most disciplined pillar; JOBS-0007 head-of-line starvation fixed + guarded (2026-06-13) |
 | Vector and search | VectorAdapterSurface matrix | 2026-06-11 | Vector surface matrix (local) | PGVector does not compile (parked on a branch) |
 | AI core (Contracts to AI to Data.AI + Ollama/LMStudio + AI.Web) | 5 samples + 2 services + tests | 2026-06-11 | AI core tests (local) | Settled, consumed |
 | AI vertical (Agents/Compute/Eval/Training/Orchestration) | none | unknown since 2026-06-11 | none | Born 2026-05-16; Training/Eval only throw; ~0 consumers |

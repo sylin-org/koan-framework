@@ -43,11 +43,19 @@ public sealed class DataJobLedger : IJobLedger
         IReadOnlyCollection<string> saturatedLanes, CancellationToken ct,
         IReadOnlyDictionary<string, PoolDispatchContext>? pools = null)
     {
-        var candidates = await SelectCandidates(now, saturatedLanes, ct);
-        if (candidates.Count == 0) return null;
+        // One Running snapshot serves both the §17.2 exclusivity probe and the pool member-slot tally (JOBS-0007),
+        // and it is taken BEFORE candidate selection: knowing which pools currently have an open member lets the scan
+        // exclude an exhausted pool's queued jobs at selection time. Otherwise a backlog of unclaimable pool jobs at
+        // the FIFO head consumes the whole scan window and starves runnable work behind it (the head-of-line bug).
+        var running = await JobRecord.Query(r => r.Status == JobStatus.Running, ct);
+        var busy = running.Select(r => (r.WorkType, r.WorkId)).ToHashSet();
 
-        // Build member slot counts once per claim attempt when pool jobs are in play (JOBS-0007).
-        var memberSlots = pools is { Count: > 0 } ? await BuildMemberSlotsAsync(pools, ct) : null;
+        // Member slot counts (when pool jobs are in play) + the set of pools that currently have an open member.
+        var memberSlots = pools is { Count: > 0 } ? BuildMemberSlots(pools, running) : null;
+        var claimablePools = memberSlots is null ? null : ClaimablePools(pools!, memberSlots);
+
+        var candidates = await SelectCandidates(now, saturatedLanes, claimablePools, busy, ct);
+        if (candidates.Count == 0) return null;
 
         // Ticket strategy runs its own leaderless election; claim the FIFO head through it.
         if (_options.ClaimStrategy == ClaimStrategy.Ticket)
@@ -213,40 +221,87 @@ public sealed class DataJobLedger : IJobLedger
         return (null, null);
     }
 
-    private static async Task<Dictionary<string, int>> BuildMemberSlotsAsync(
-        IReadOnlyDictionary<string, PoolDispatchContext> pools, CancellationToken ct)
+    private static Dictionary<string, int> BuildMemberSlots(
+        IReadOnlyDictionary<string, PoolDispatchContext> pools, IReadOnlyList<JobRecord> running)
     {
         var slots = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var ctx in pools.Values)
             foreach (var m in ctx.Members)
                 slots.TryAdd(m, 0);
-        var running = await JobRecord.Query(r => r.Status == JobStatus.Running, ct);
         foreach (var r in running)
             if (r.GateKey is not null && slots.ContainsKey(r.GateKey))
                 slots[r.GateKey]++;
         return slots;
     }
 
-    private async Task<IReadOnlyList<JobRecord>> SelectCandidates(DateTimeOffset now, IReadOnlyCollection<string> saturatedLanes, CancellationToken ct)
+    /// <summary>Pool names that currently have at least one member with open capacity. A queued pool job is claimable
+    /// only if its <see cref="JobRecord.PoolKey"/> is in this set; excluding the rest at selection time keeps an
+    /// exhausted (or unresolvable) pool's backlog from consuming the claim-scan window (JOBS-0007 head-of-line bug).</summary>
+    private static HashSet<string> ClaimablePools(
+        IReadOnlyDictionary<string, PoolDispatchContext> pools, Dictionary<string, int> memberSlots)
+    {
+        var claimable = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var (name, ctx) in pools)
+            foreach (var m in ctx.Members)
+                if (memberSlots.GetValueOrDefault(m) < ctx.CapacityPerMember) { claimable.Add(name); break; }
+        return claimable;
+    }
+
+    private async Task<IReadOnlyList<JobRecord>> SelectCandidates(
+        DateTimeOffset now, IReadOnlyCollection<string> saturatedLanes,
+        HashSet<string>? claimablePools, HashSet<(string WorkType, string WorkId)> busy, CancellationToken ct)
     {
         var gatedKeys = (await ActiveGates(now, ct)).Select(g => g.GateKey).ToHashSet(StringComparer.Ordinal);
-        // §17.2 exclusivity probe — the Running set is bounded by in-flight concurrency, not the backlog, so this is a
-        // small, index-served query (Status prefix of ix_jobs_claim).
-        var busy = (await JobRecord.Query(r => r.Status == JobStatus.Running, ct))
-            .Select(r => (r.WorkType, r.WorkId))
-            .ToHashSet();
-        // The claim's heavy read (§19.3): predicate + (VisibleAt, FirstSubmittedAt) order + LIMIT ClaimScanBatch all
-        // pushed to the store (ix_jobs_claim) — O(batch), not O(backlog). The lane/gate/exclusive filter then runs over
-        // the small ordered window, returning the runnable candidates in FIFO order; the claim tries them in turn (a
-        // CAS-loss on the head falls through to the next), so a contended head doesn't waste the whole poll.
+
+        // The claim's heavy read (§19.3): the predicate + (VisibleAt, FirstSubmittedAt) order + LIMIT are pushed to the
+        // store (ix_jobs_claim) — O(batch), not O(backlog). The lane/pool/gate/exclusive filter then runs over the
+        // ordered window, returning runnable candidates in FIFO order; the claim tries them in turn (a CAS-loss on the
+        // head falls through to the next), so a contended head doesn't waste the whole poll.
+        //
+        // The scan PAGES FORWARD past a fully-unclaimable window. A window's worth of unclaimable rows at the FIFO head
+        // — an exhausted pool's backlog, a saturated lane, gated keys, or a busy exclusive work-item — must not consume
+        // the scan and strand runnable work queued behind it; before this it stalled the whole pipeline indefinitely
+        // with a healthy worker and no errors (JOBS-0007 head-of-line bug). We advance the page until a full batch of
+        // claimable candidates is gathered OR the store returns a short page (end of the ready set), converging with the
+        // in-memory ledger's full ordered scan. Each page stays O(batch) and index-served; deep paging only happens
+        // while a large backlog is genuinely unclaimable, the same condition the §19.4 active-row guardrail surfaces.
+        var batchSize = Math.Max(1, _options.ClaimScanBatch);
         var sort = SortBuilder<JobRecord>.Build(s => s.OrderBy(r => r.VisibleAt).ThenBy(r => r.FirstSubmittedAt));
-        var scan = QueryDefinition.All.WithSort(sort).WithPagination(1, Math.Max(1, _options.ClaimScanBatch));
-        var batch = await JobRecord.Query(
-            r => r.Status == JobStatus.Queued && r.VisibleAt <= now && r.CancelRequestedAt == null, scan, ct);
-        return batch.Where(r =>
-            !saturatedLanes.Contains(r.Lane)
-            && (r.GateKey is null || !gatedKeys.Contains(r.GateKey))
-            && !(r.Exclusive && busy.Contains((r.WorkType, r.WorkId)))).ToList();
+        var candidates = new List<JobRecord>(batchSize);
+        for (var page = 1; ; page++)
+        {
+            var scan = QueryDefinition.All.WithSort(sort).WithPagination(page, batchSize);
+            var window = await JobRecord.Query(
+                r => r.Status == JobStatus.Queued && r.VisibleAt <= now && r.CancelRequestedAt == null, scan, ct);
+            if (window.Count == 0) break;
+
+            foreach (var r in window)
+            {
+                if (!IsClaimable(r, saturatedLanes, claimablePools, gatedKeys, busy)) continue;
+                candidates.Add(r);
+                if (candidates.Count >= batchSize) return candidates;
+            }
+
+            if (window.Count < batchSize) break;   // short page → the ready set is exhausted
+        }
+        return candidates;
+    }
+
+    /// <summary>A queued row is claimable now iff its lane isn't saturated, it isn't an exclusive job whose work-item is
+    /// already running, and — pool-XOR-gate — a pool job's pool currently has an open member while a non-pool job's gate
+    /// (if any) isn't active. <paramref name="claimablePools"/> null means no pool has capacity (or no resolver), so
+    /// every pool job is currently unclaimable. The pool-XOR-gate split matches <see cref="InMemoryJobLedger"/> so the
+    /// tiers converge (ARCH-0079): a pool job's admission is governed by member capacity, not by resource gates — its
+    /// <see cref="JobRecord.GateKey"/> is the elected member (null while queued), not a cooperative-backoff key.</summary>
+    private static bool IsClaimable(JobRecord r,
+        IReadOnlyCollection<string> saturatedLanes, HashSet<string>? claimablePools,
+        HashSet<string> gatedKeys, HashSet<(string WorkType, string WorkId)> busy)
+    {
+        if (saturatedLanes.Contains(r.Lane)) return false;
+        if (r.Exclusive && busy.Contains((r.WorkType, r.WorkId))) return false;
+        if (r.PoolKey is not null)
+            return claimablePools is not null && claimablePools.Contains(r.PoolKey);
+        return r.GateKey is null || !gatedKeys.Contains(r.GateKey);
     }
 
     private static async Task<JobRecord?> ClaimOptimistic(JobRecord candidate, string owner, DateTimeOffset now, DateTimeOffset leaseUntil, CancellationToken ct)
