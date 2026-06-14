@@ -336,4 +336,3 @@ KOAN_SERVICE_ANALYTICS_SERVICE_URL=https://analytics-internal.company.com
 - [RFC 6750: OAuth 2.0 Bearer Token Usage](https://tools.ietf.org/html/rfc6750)
 - [RFC 7519: JSON Web Token (JWT)](https://tools.ietf.org/html/rfc7519)
 - [PROP-0052: Service Authentication Proposal](../proposals/PROP-0052-service-authentication.md)
-- [Zero-Configuration Analysis](../../src/Koan.Web.Auth.Services/ZERO-CONFIG-ANALYSIS.md) - Complete configuration elimination analysis
