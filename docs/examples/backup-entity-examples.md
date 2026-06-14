@@ -354,4 +354,4 @@ public class AuditLog : Entity<AuditLog>
 ---
 
 **Last Updated:** 2025-10-03
-**Related:** [BACKUP-MIGRATION-GUIDE.md](../guides/BACKUP-MIGRATION-GUIDE.md), [BACKUP-SYSTEM.md](../design/BACKUP-SYSTEM.md)
+**Related:** [BACKUP-MIGRATION-GUIDE.md](../guides/BACKUP-MIGRATION-GUIDE.md), [BACKUP-SYSTEM.md](../archive/design/BACKUP-SYSTEM.md)

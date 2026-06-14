@@ -151,7 +151,7 @@ Create a guild of "Koan champions" who review architecture proposals, run office
 
 - Start with the [Getting Started Hub](./overview.md) to ground teams in the basics and staged rollout plan.
 - Compare Koan to adjacent stacks using the [architecture comparison](../architecture/comparison.md).
-- Coordinate distributed deployments with the [ASPIRE integration guide](../ASPIRE-INTEGRATION.md).
+- Coordinate distributed deployments with the [ASPIRE integration guide](../guides/aspire-integration-reference.md).
 
 ---
 

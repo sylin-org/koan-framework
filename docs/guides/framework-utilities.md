@@ -870,10 +870,10 @@ See [ARCH-0068: Refactoring Strategy](../decisions/ARCH-0068-refactoring-strateg
 6. Add unit tests in appropriate test suite
 
 **Questions?**
-Refer to [REFACTORING-LEDGER.md](../refactoring/REFACTORING-LEDGER.md) for planned utilities or propose new ones via ADR.
+Refer to [REFACTORING-LEDGER.md](../archive/refactoring/REFACTORING-LEDGER.md) for planned utilities or propose new ones via ADR.
 
 ---
 
 **Last Updated**: 2026-03-26
 **Maintained By**: Koan Framework Core Team
-**Related**: [ARCH-0068](../decisions/ARCH-0068-refactoring-strategy-static-vs-di.md), [Refactoring Ledger](../refactoring/REFACTORING-LEDGER.md)
+**Related**: [ARCH-0068](../decisions/ARCH-0068-refactoring-strategy-static-vs-di.md), [Refactoring Ledger](../archive/refactoring/REFACTORING-LEDGER.md)

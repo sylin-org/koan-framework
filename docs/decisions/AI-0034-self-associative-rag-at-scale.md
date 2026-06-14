@@ -891,4 +891,4 @@ Phases 1-3 are the critical path. They deliver the core value proposition: load 
 
 ### Research
 
-- **Technical Whitepaper**: [docs/research/koan-rag-whitepaper.md](../research/koan-rag-whitepaper.md) — Comprehensive description of the system architecture with abstraction checkpoints for non-specialist audiences, research citations, cost models, and novel contributions.
+- **Technical Whitepaper**: [docs/archive/research/koan-rag-whitepaper.md](../archive/research/koan-rag-whitepaper.md) — Comprehensive description of the system architecture with abstraction checkpoints for non-specialist audiences, research citations, cost models, and novel contributions.

@@ -133,29 +133,29 @@
 - name: Implementation
   items:
     - name: Phase 1 Implementation Plan
-      href: implementation/phase1-implementation-plan.md
+      href: archive/implementation/phase1-implementation-plan.md
     - name: B2 WebSocketStream Progress
-      href: implementation/websockets/B2-websocketstream-progress.md
+      href: archive/implementation/websockets/B2-websocketstream-progress.md
 - name: Support
   href: support/troubleshooting.md
 - name: Proposals
   items:
     - name: Canonization Overhaul (2025)
-      href: proposals/PROP-canon-overhaul-2.md
+      href: archive/proposals/complete/PROP-canon-overhaul-2.md
     - name: Canon Aggregation Contract & Policies
-      href: proposals/PROP-canon-aggregation-contract.md
+      href: archive/proposals/complete/PROP-canon-aggregation-contract.md
     - name: Koan Admin Dashboard Refresh
-      href: proposals/PROP-koan-admin-dashboard.md
+      href: archive/proposals/PROP-koan-admin-dashboard.md
     - name: How to Enable OpenAPI & Swagger UI
-      href: proposals/how-to/openapi/how-to-enable-openapi-and-swagger-ui.md
+      href: archive/proposals/koan-dotnet10-opportunity-map/how-to/openapi/how-to-enable-openapi-and-swagger-ui.md
     - name: How to Adopt Koan SSE Streaming
-      href: proposals/how-to/sse/how-to-adopt-koan-sse-streaming.md
+      href: archive/proposals/koan-dotnet10-opportunity-map/how-to/sse/how-to-adopt-koan-sse-streaming.md
     - name: How to Enable Strict Minimal JSON
-      href: proposals/how-to/json/how-to-enable-strict-minimal-json.md
+      href: archive/proposals/koan-dotnet10-opportunity-map/how-to/json/how-to-enable-strict-minimal-json.md
     - name: How to Adopt Koan WebSocketStream Adapters
-      href: proposals/koan-dotnet10-opportunity-map/how-to/websockets/how-to-adopt-koan-websocketstream-adapters.md
+      href: archive/proposals/koan-dotnet10-opportunity-map/how-to/websockets/how-to-adopt-koan-websocketstream-adapters.md
 - name: Templates
-  href: templates/document-template.md
+  href: archive/templates/document-template.md
 - name: Archive
   href: archive/README.md
 - name: Contributing

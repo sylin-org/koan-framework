@@ -412,7 +412,7 @@ Per-recipe declarations. Schema mirrors the
 ## See Also
 
 - [Media Recipes How-To](../../guides/media-recipes-howto.md) — conceptual walkthrough
-- [Migration: Media v0.8 → v0.9](../../migration/v0.8-to-v0.9-media.md) — upgrade from `StreamTransformExtensions`
+- [Migration: Media v0.8 → v0.9](../../guides/v0.8-to-v0.9-media.md) — upgrade from `StreamTransformExtensions`
 - [MEDIA-0004 — Recipe pipeline](../../decisions/MEDIA-0004-recipe-pipeline.md) — design rationale
 - [MEDIA-0003 — Variant routing + canonical signature](../../decisions/MEDIA-0003-media-variant-routing-and-transforms.md) — addressing model
 - [MEDIA-0001 — Pillar baseline + storage integration](../../decisions/MEDIA-0001-media-pillar-baseline-and-storage-integration.md) — foundation

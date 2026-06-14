@@ -395,4 +395,4 @@ await EntityCacheExtensions.Cache<Todo, string>().FlushAll(ct);
 - [koan-cache-module.md](../../architecture/koan-cache-module.md) — full architecture
 - [ARCH-0075](../../decisions/ARCH-0075-koan-cache-pillar.md) — accepted ADR
 - [ARCH-0076](../../decisions/ARCH-0076-repository-decorator-order.md) — decorator priority canon
-- [implementation plan](../../proposals/caching_implementation_plan.md) — milestones M1–M11
+- [implementation plan](../../archive/proposals/caching_implementation_plan.md) — milestones M1–M11

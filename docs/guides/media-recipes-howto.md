@@ -848,4 +848,4 @@ the canonical stage order, why the override allowlist):
 
 Migrating from the legacy `StreamTransformExtensions` (Koan.Media
 v0.8 and earlier)? See
-[Migration: Media v0.8 → v0.9](../migration/v0.8-to-v0.9-media.md).
+[Migration: Media v0.8 → v0.9](v0.8-to-v0.9-media.md).

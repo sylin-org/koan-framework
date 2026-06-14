@@ -19,7 +19,7 @@ related_guides:
 
 # Aspire Integration
 
-This guide summarizes practical steps to run Koan apps under .NET Aspire, consolidating the long-form content in ASPIRE-INTEGRATION.md.
+This guide summarizes practical steps to run Koan apps under .NET Aspire, consolidating the long-form content in [aspire-integration-reference.md](aspire-integration-reference.md).
 
 ## Contract
 

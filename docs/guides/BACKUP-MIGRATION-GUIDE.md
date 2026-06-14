@@ -349,7 +349,7 @@ await restoreService.RestoreAllEntitiesAsync(backupName, new GlobalRestoreOption
 ## Support
 
 For questions or issues:
-- Review [BACKUP-SYSTEM.md](../design/BACKUP-SYSTEM.md) for design details
+- Review [BACKUP-SYSTEM.md](../archive/design/BACKUP-SYSTEM.md) for design details
 - Check [ADR-XXXX-koan-backup-reboot.md](../decisions/ADR-XXXX-koan-backup-reboot.md) for technical rationale
 - File issues at [GitHub Issues](https://github.com/anthropics/koan-framework/issues)
 

@@ -393,7 +393,7 @@ docs/decisions/
 - All `README.md` and `TECHNICAL.md` files in Canon packages (deleted, superseded by spec)
 
 ### Active Documentation
-- [SPEC-canon-runtime.md](../specifications/SPEC-canon-runtime.md) - Authoritative specification
+- [SPEC-canon-runtime.md](../archive/specifications/SPEC-canon-runtime.md) - Authoritative specification
 - [canon-runtime-migration.md](../architecture/canon-runtime-migration.md) - Migration tracking
 
 ### Related ADRs

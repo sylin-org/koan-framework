@@ -318,6 +318,6 @@ taskkill /F /IM node.exe /T >nul 2>&1
 
 ## References
 
-- [KOAN-CONTEXT-MASTER-IMPLEMENTATION-GUIDE.md](../proposals/KOAN-CONTEXT-MASTER-IMPLEMENTATION-GUIDE.md)
+- [KOAN-CONTEXT-MASTER-IMPLEMENTATION-GUIDE.md](../archive/proposals/KOAN-CONTEXT-MASTER-IMPLEMENTATION-GUIDE.md)
 - [Vite Build Documentation](https://vitejs.dev/guide/build.html)
 - [React Router BrowserRouter](https://reactrouter.com/en/main/router-components/browser-router)

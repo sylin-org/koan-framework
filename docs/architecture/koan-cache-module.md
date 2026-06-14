@@ -17,7 +17,7 @@ validation:
 **Status:** initial release · v0.7.0
 **ADR:** [ARCH-0075](../decisions/ARCH-0075-koan-cache-pillar.md) · [ARCH-0076](../decisions/ARCH-0076-repository-decorator-order.md)
 **Reference doc:** [cache.md](../reference/data/cache.md)
-**Implementation plan:** [caching_implementation_plan.md](../proposals/caching_implementation_plan.md)
+**Implementation plan:** [caching_implementation_plan.md](../archive/proposals/caching_implementation_plan.md)
 
 The cache pillar is built around **four orthogonal concerns**: Storage, Coherence, Topology, Policy. Each has its own contract and package boundary. The composition lives in `Koan.Cache`; the rest are pluggable.
 
@@ -329,4 +329,4 @@ Metrics list and span tag list in [cache.md §production hardening](../reference
 - [cache.md](../reference/data/cache.md) — five-minute integration + reference
 - [ARCH-0075](../decisions/ARCH-0075-koan-cache-pillar.md) — pillar architecture (Accepted)
 - [ARCH-0076](../decisions/ARCH-0076-repository-decorator-order.md) — decorator priority canon (Accepted)
-- [implementation plan](../proposals/caching_implementation_plan.md) — milestone history
+- [implementation plan](../archive/proposals/caching_implementation_plan.md) — milestone history

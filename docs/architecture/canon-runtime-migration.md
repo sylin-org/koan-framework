@@ -98,5 +98,5 @@
 ## References
 
 - [Koan.Canon.Domain Technical Notes](../../src/Koan.Canon.Domain/TECHNICAL.md)
-- [Canonization Overhaul Proposal](../proposals/PROP-canon-overhaul-2.md)
+- [Canonization Overhaul Proposal](../archive/proposals/complete/PROP-canon-overhaul-2.md)
 - [Architecture Principles](principles.md)
