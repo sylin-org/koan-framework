@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using Koan.Admin.Contracts;
 using Koan.Admin.Services;
 using Koan.Core;
-using Koan.ServiceMesh.Abstractions;
 using Koan.Web.Admin.Contracts;
 using Koan.Web.Admin.Infrastructure;
 using Microsoft.AspNetCore.Authorization;
@@ -144,40 +143,6 @@ public sealed class KoanAdminStatusController : ControllerBase
 
         var health = await _manifest.GetHealth(cancellationToken);
         return Ok(health);
-    }
-
-    [HttpGet("service-mesh")]
-    [Produces("application/json")]
-    public async Task<ActionResult<KoanAdminServiceMeshSurface>> GetServiceMesh(CancellationToken cancellationToken)
-    {
-        var snapshot = _features.Current;
-        if (!snapshot.Enabled || !snapshot.WebEnabled)
-        {
-            return NotFound();
-        }
-
-        // Check if service mesh is registered
-        var serviceMesh = _serviceProvider.GetService<IKoanServiceMesh>();
-        if (serviceMesh == null)
-        {
-            return Ok(KoanAdminServiceMeshSurface.Empty);
-        }
-
-        try
-        {
-            var surface = await KoanAdminServiceMeshSurfaceFactory.Capture(
-                serviceMesh,
-                _serviceProvider,
-                cancellationToken
-            );
-
-            return Ok(surface);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to capture service mesh surface");
-            return StatusCode(500, KoanAdminServiceMeshSurface.Empty);
-        }
     }
 
     private static KoanAdminConfigurationSummary BuildConfigurationSummaries(IReadOnlyList<KoanAdminModuleSurface> modules)
