@@ -53,7 +53,7 @@ Below is a capability map that layers packages from foundational primitives thro
 | Core runtime            | Configuration, environment, boot diagnostics, adapter auto-registration | `Koan.Core`, `Koan.Core.Adapters`, `Koan.Diagnostics.Tool`                                                                                                                   | –                       |
 | Data & storage          | Entity-first persistence, provider adapters, backups, object storage    | `Koan.Data.Core`, `Koan.Data.Abstractions`, `Koan.Data.*` providers, `Koan.Storage`, `Koan.Data.Backup`                                                                      | Core runtime            |
 | Web & surface area      | MVC controllers, response transformers, auth, diagnostics               | `Koan.Web`, `Koan.Web.Extensions`, `Koan.Web.Transformers`, `Koan.Web.Auth.*`, `Koan.Web.Connector.Swagger`, `Koan.Web.Connector.GraphQl`, `Koan.Web.Backup`                                     | Core runtime + Data     |
-| Messaging & async       | Inbox/outbox patterns, background coordination, scheduling              | `Koan.Messaging.Core`, `Koan.Messaging.Abstractions`, `Koan.Messaging.Connector.RabbitMq`, `Koan.Service.Inbox.Connector.Redis`, `Koan.Messaging.Inbox.*`, `Koan.Data.Cqrs.*`, `Koan.Scheduling` | Core + Data             |
+| Messaging & async       | Inbox/outbox patterns, background coordination, scheduling              | `Koan.Messaging.Core`, `Koan.Messaging.Abstractions`, `Koan.Messaging.Connector.RabbitMq`, `Koan.Service.Inbox.Connector.Redis`, `Koan.Messaging.Inbox.*`, `Koan.Scheduling` | Core + Data             |
 | AI, media & search      | Prompt routing, embeddings, media pipelines                             | `Koan.AI`, `Koan.AI.Contracts`, `Koan.AI.Connector.Ollama`, `Koan.Media.Abstractions`, `Koan.Media.Core`, `Koan.Media.Web`, `Koan.Data.Vector.*`                              | Core + Data             |
 | Secrets & configuration | Unified secret resolution and config overlays                           | `Koan.Secrets.Abstractions`, `Koan.Secrets.Core`, `Koan.Secrets.Connector.Vault`                                                                                                       | Core runtime            |
 | Recipes & orchestration | Intent-driven operational wiring, container orchestration               | `Koan.Recipe.Abstractions`, `Koan.Recipe.Observability`, `Koan.Orchestration.*`, `Koan.Orchestration.Cli`                                                                    | Core + Secrets + Data   |
@@ -84,7 +84,7 @@ The remainder of this document drills into each layer and highlights first-class
 - Relational: `Koan.Data.Connector.Postgres`, `Koan.Data.Connector.SqlServer`, `Koan.Data.Connector.Sqlite`, `Koan.Data.Relational` (shared tooling)
 - Document & key/value: `Koan.Data.Connector.Mongo`, `Koan.Data.Connector.Redis`, `Koan.Data.Connector.Couchbase`, `Koan.Data.Connector.Json`
 - Search & vector: `Koan.Data.Vector`, `Koan.Data.Vector.Abstractions`, `Koan.Data.Vector.Connector.Weaviate`, `Koan.Data.Vector.Connector.Milvus`, `Koan.Data.Connector.OpenSearch`, `Koan.Data.Connector.ElasticSearch`
-- Direct and composition helpers: `Koan.Data.Direct` for low-level commands, `Koan.Data.Cqrs`/`Koan.Data.Cqrs.Outbox.Connector.Mongo` for projections and outbox patterns.
+- Direct and composition helpers: `Koan.Data.Direct` for low-level commands. _(The former `Koan.Data.Cqrs` / `Koan.Data.Cqrs.Outbox.Connector.Mongo` outbox helpers were removed 2026-06 — superseded by the Jobs ledger outbox, JOBS-0005.)_
 
 **Adjacencies**:
 
@@ -113,13 +113,13 @@ The remainder of this document drills into each layer and highlights first-class
 
 ## 4. Messaging, async, and scheduling
 
-**Packages**: `Koan.Messaging.Abstractions`, `Koan.Messaging.Core`, `Koan.Messaging.Connector.RabbitMq`, `Koan.Messaging.Inbox.Connector.Http`, `Koan.Messaging.Inbox.Connector.InMemory`, `Koan.Service.Inbox.Connector.Redis`, `Koan.Scheduling`, `Koan.Data.Cqrs`, `Koan.Data.Cqrs.Outbox.Connector.Mongo`
+**Packages**: `Koan.Messaging.Abstractions`, `Koan.Messaging.Core`, `Koan.Messaging.Connector.RabbitMq`, `Koan.Messaging.Inbox.Connector.Http`, `Koan.Messaging.Inbox.Connector.InMemory`, `Koan.Service.Inbox.Connector.Redis`, `Koan.Scheduling`
 
 - `Koan.Messaging.Core` implements bus orchestration, retry policies, and diagnostics for message pipelines. Abstractions keeps contracts separate for consumers.
 - Provider packages like `Koan.Messaging.Connector.RabbitMq` plug into `Koan.Core.Adapters` to auto-register connections and health checks.
 - Inbox helpers (`Koan.Messaging.Inbox.*`, `Koan.Service.Inbox.Connector.Redis`) give you exactly-once semantics and idempotent reprocessing surfaces.
 - `Koan.Scheduling` introduces cron/interval-based job orchestration anchored in Koan’s background worker infrastructure.
-- CQRS support (`Koan.Data.Cqrs.*`) ties messaging back into the data plane with projection tasks and outbox helpers.
+- ~~CQRS support (`Koan.Data.Cqrs.*`) ties messaging back into the data plane with projection tasks and outbox helpers.~~ _(Removed 2026-06 — superseded by the Jobs ledger outbox, JOBS-0005.)_
 
 **Developer benefit**: Compose event-driven flows while reusing entity statics, add reliable inbox/outbox boundaries without custom plumbing, and co-ordinate background processing with predictable options and diagnostics.
 

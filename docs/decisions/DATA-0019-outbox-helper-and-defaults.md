@@ -2,12 +2,14 @@
 id: DATA-0019
 slug: DATA-0019-outbox-helper-and-defaults
 domain: DATA
-status: Accepted
+status: Superseded
 date: 2025-08-17
 title: Outbox helper conventions and defaults
 ---
  
 # 0019: Outbox helper conventions and defaults
+
+> **Superseded by JOBS-0005** (2026-06): the `Koan.Data.Cqrs` outbox helper and its Mongo connector were removed (zero consumers/tests). The transactional outbox is now the Jobs durable ledger (JOBS-0005).
  
 
 ## Context

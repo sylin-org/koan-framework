@@ -99,11 +99,9 @@ Use this reference when you plan a Koan solution and need to understand which mo
 - **How to use**: reference the package, obtain `DirectSession` via DI, run parameterized commands.
 - **When to use**: surgically executing SQL for maintenance or migration tasks without leaving Koan.
 
-### Koan.Data.Cqrs
+### ~~Koan.Data.Cqrs~~ _(removed 2026-06)_
 
-- **Purpose**: CQRS outbox/inbox helpers.
-- **How to use**: add package; configure outbox options; use with messaging connectors.
-- **When to use**: ensuring reliable event publication or inbox processing.
+- ~~**Purpose**: CQRS outbox/inbox helpers.~~ Removed 2026-06 — zero consumers/tests; superseded by the Jobs ledger outbox (JOBS-0005). See DATA-0019 (Superseded).
 
 ### Koan.Data.Backup & Koan.Web.Backup
 
