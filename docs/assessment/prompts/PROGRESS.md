@@ -35,7 +35,7 @@ Preamble for these cards: the `[PREAMBLE]` block in `../06-prompt-stash.md`.
 | B2 | T2 | B1 | pending | | | | CI PR gate |
 | B3 | T3 | B1, B2 | pending | | | | NBGV-native release; nuspec metadata fix |
 | A1 | T1 | — | done | 2026-06-13 | opus-4.8 | c3a13de8 | 30 ADRs marked; docs-lint 0 errors. Drift: FLOW banner reworded truthfully (Flow→Canon mid-flight, not removed); DATA-0019 skipped (card mislabels Outbox as Cqrs; no CQRS ADR exists) |
-| A2 | T2 | — | pending | | | | front-door drift sweep (ghost APIs, version pins) |
+| A2 | T2 | — | done | 2026-06-14 | opus-4.8 | 8bcc0bb6 | ghost APIs (Flow/.Embed/koan-CLI/Describe(BootReport)) + 0.6.3 pins removed across 6 docs; docs-lint clean. Ran parallel w/ H5+H7 |
 | A3 | T1 | — | done | 2026-06-13 | opus-4.8 | ad13b65c | 11 tracked litter + 103 *.lscache (card said ~9) + stale Cache/Unit; build green; ran parallel w/ A1; fixed 1 cross-card link (DEC-0053) |
 | C0 | T1 | — | pending | | | | wave 0: debris/tombstone directories |
 | C1 | T2 | B1 | pending | | | | cut Koan.Data.Cqrs (+ Mongo outbox) |
@@ -86,9 +86,9 @@ Preamble for these cards: the `[PREAMBLE]` block in `../06-prompt-stash.md`.
 | H2 | T2 | A2 | pending | | | | snippet lint to 100% + wire into ratchet/gate |
 | H3 | T2 | — | pending | | | | docs IA collapse (27 → core dirs) |
 | H4 | T3→T1 | — | pending | | | | pillar map cards (first card frontier, rest template) |
-| H5 | T2 | — | pending | | | | glossary |
+| H5 | T2 | — | done | 2026-06-14 | opus-4.8 | 6b3894ec | glossary (19 terms, each type-anchored); caught 'set'→'partition' drift + BootReport-not-a-type; fixed pre-existing index.md broken link |
 | H6 | T2 | H2 | pending | | | | verb alias sweep (docs only) |
-| H7 | T2 | A2 | pending | | | | llms.txt |
+| H7 | T2 | A2 | done | 2026-06-14 | opus-4.8 | f28792f9 | /llms.txt (111 lines), verbatim snippets from overview.md; README pointer; ran parallel w/ A2+H5 |
 | H8 | T2 | H2 | pending | | | | skills refresh + koan-jobs skill |
 | H9 | T2 | F1 | pending | | | | boot report: surface failures + provenance |
 | S3 | T3 | — | pending | | | | AI pillar consolidation (19 → ~8) — mini-plan + ADR |
@@ -119,6 +119,8 @@ New cards surfaced while running other cards (not in the original 06/07 stash). 
 |---|---|---|---|---|---|---|---|
 | X-KoanContext | T3 | — | pending | | | | **park / re-home** `src/Services/code-intelligence/Koan.Service.KoanContext` out of the framework repo. 14.8k LOC, net10.0, the repo's largest project, **never in Koan.sln**, zero in-repo consumers; breaks are its own mid-refactor debris (`IndexProject`→`IndexProjectAsync` delegate rename), not framework drift. Canon already recommends eviction (`pillar-periphery-services.json:298`, Zen Garden precedent). Triaged 2026-06-13. Move it + `tests/Suites/Context/**`; keep its docs/ADRs as the trail. |
 | X-FluentAssertions | T2 | — | pending | | | | finish the FluentAssertions v6→v7 migration left behind on excluded test projects: `S16.PantryPal.Tests` (`BeGreaterOrEqualTo`→`BeGreaterThanOrEqualTo`, `HaveCountGreaterOrEqualTo`→`HaveCountGreaterThanOrEqualTo`, + a CS1997 async `DisposeAsync`); audit the other excluded husks for the same rot; re-add to sln once green. |
+| X-snippet-lint-fix | T2 | — | pending | | | | fix `scripts/validate-code-examples.ps1` — it crashes at line 219 (PowerShell SwitchParameter bug) in ALL modes, reproduced on untouched files, so it validates nothing. **Blocks H2** (snippet lint to 100%) and degrades the docs gate to link-check only. |
+| X-semantic-pipelines-retire | T2 | — | pending | | | | retire/rewrite `docs/guides/semantic-pipelines.md` — it is wholesale deleted-Flow-pillar prose. A2 did the named ghost fixes + flipped `status: draft`, but the guide needs a real rewrite against the current pipeline API or archival. |
 
 ## Divergence log
 
@@ -133,6 +135,7 @@ date · prompt ID · what was found · what was done instead.
 | 2026-06-13 | A1 | Card prescribes the banner "Flow pillar removed from the codebase" and names "DATA-0019 (Cqrs)". Reality: Flow is **mid-migration to Canon** (`Koan.Canon.Domain`/`.Web` still in the sln; `Koan.Flow.Core`/`Koan.Canon.Core` dirs exist) — not removed; and `DATA-0019` is the **Outbox** ADR, there is **no CQRS ADR**, while `src/Koan.Data.Cqrs` still exists. | FLOW banners reworded to the truthful "superseded by the Koan.Canon rebuild"; DATA-0019 skipped (both act-conditions unmet). Upstream gap flagged: the CQRS decision has no ADR. |
 | 2026-06-13 | A3 | Card estimated "~9" `*.csproj.lscache`; actual **103** (one per project). Deleting `ZERO-CONFIG-ANALYSIS.md` orphaned an inbound link at `docs/decisions/DEC-0053:339` — a **cross-card artifact** (A3 deletes; the link lives in A1's lane). | Deleted all 103 (gitignored). Orchestrator repaired the DEC-0053 link during integration (folded into A3 commit `ad13b65c`). Confirms: concurrent cards can create artifacts neither owns — the integrator resolves them. |
 | 2026-06-14 | F1 | First code-adding card under the strengthened test-adequacy gate. The implementation was faithful and its 2 initial ARCH-0079 specs were mutation-proof — but the gate's **coverage critic** found the **manifest-invoker fail-loud path** (the one whose failure "can silently no-op the ENTIRE framework") and the **MODULES-FAILED render** were UNTESTED. A careful agent still missed the most dangerous path. | Remediated: +5 specs (manifest fail-fast/lenient, render +/-, KoanBootException field/message, clean-boot guard) + a minimal null-by-default internal test seam (the source-gen loader swallows everything, so the branch is otherwise unreachable). Orchestrator **independently mutation-checked** every new spec (revert→fail, restore→pass). F1 passes only AFTER remediation. Lesson: comprehensive integration tests are not automatic — the coverage-critic + mutation-check gate is what makes "wrote tests" mean "tested the dangerous paths". |
+| 2026-06-14 | wave-2 docs (A2/H5/H7, parallel) | (a) `scripts/validate-code-examples.ps1` is **broken** (SwitchParameter crash, line 219) in all modes — snippet-lint validates nothing. (b) `set` drifted → folded into `partition` (DATA-0077); `BootReport` is no longer a type (rendered provenance). (c) A2's heading rename broke an inbound deep link from out-of-lane `docs/examples/entity-pattern-recipes.md:40` (A2 left a backward-compat anchor shim). (d) `semantic-pipelines.md` is wholesale deleted-Flow prose. | 3 cards ran in parallel cleanly (disjoint lanes); glossary anchors `set`→partition + BootReport→renderer; orchestrator fixed the pre-existing `index.md → reference/index.md` broken link at integration. New cards filed: X-snippet-lint-fix (blocks H2), X-semantic-pipelines-retire. `DataSetContext.With(set)` ghost in comparison.md deferred. |
 
 ## Operator gates
 
