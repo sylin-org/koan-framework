@@ -287,6 +287,18 @@ public static class AppBootstrapper
 
     private static Action<Assembly>? _manifestLoader;
 
+    /// <summary>
+    /// Test-only seam (InternalsVisibleTo: Koan.Tests.Integration.Bootstrap). Replaces ONLY the inner
+    /// per-assembly loader invocation (the <c>RegistryManifestLoader.PopulateFromAssembly</c> call) while
+    /// leaving the production fail-loud wrapper in <see cref="RunManifestLoader"/> — the unwrap,
+    /// <see cref="RecordFailure"/>, phase-string, and <see cref="KoanBootException"/> throw — fully in force.
+    /// This is the smallest possible seam to reach the TIER B branch: that branch is otherwise unreachable
+    /// because <c>PopulateFromAssembly</c> is source-generated per assembly and swallows every reflection
+    /// failure internally, so nothing a test can plant makes the real loader throw. Always <c>null</c> in
+    /// production — the default path (real reflected loader) is byte-for-byte unchanged.
+    /// </summary>
+    internal static Action<Assembly>? ManifestLoaderInvocationOverrideForTests;
+
     private static void InvokeManifestLoader(Assembly assembly)
     {
         _manifestLoader ??= CreateManifestInvoker();
@@ -301,34 +313,45 @@ public static class AppBootstrapper
             if (loaderType is null) return null;
             var method = loaderType.GetMethod("PopulateFromAssembly", BindingFlags.Public | BindingFlags.Static);
             if (method is null) return null;
-            return asm =>
-            {
-                // TIER B (fail-fast.json): a failure of the manifest-invoker itself can silently no-op
-                // the ENTIRE framework (nothing is ever discovered, AddKoan() does nothing). Per-type
-                // and ReflectionTypeLoadException leniency already lives INSIDE PopulateFromAssembly, so
-                // an exception escaping to here is a framework bug — fail loud unless KOAN_BOOT_LENIENT=1.
-                try { method.Invoke(null, new object?[] { asm }); }
-                catch (Exception ex)
-                {
-                    var actual = (ex as TargetInvocationException)?.InnerException ?? ex;
-                    var phase = $"manifest-invoker(scanning '{asm.GetName().Name}')";
-                    var asmName = loaderType.Assembly.GetName();
-                    RecordFailure(loaderType, asmName.Name ?? "<unknown>", phase, actual);
-                    if (!IsLenientBoot())
-                    {
-                        throw new KoanBootException(
-                            loaderType,
-                            asmName.Name ?? "<unknown>",
-                            asmName.Version?.ToString() ?? "unknown",
-                            phase,
-                            actual);
-                    }
-                }
-            };
+            return asm => RunManifestLoader(loaderType, inner => method.Invoke(null, new object?[] { inner }), asm);
         }
         catch
         {
             return null;
+        }
+    }
+
+    /// <summary>
+    /// The TIER B (fail-fast.json) manifest-invoker wrapper. <paramref name="invokeLoader"/> is the inner
+    /// per-assembly loader call — normally the reflected <c>RegistryManifestLoader.PopulateFromAssembly</c>,
+    /// but replaced by <see cref="ManifestLoaderInvocationOverrideForTests"/> when a spec needs to force the
+    /// otherwise-unreachable escaping-exception branch. The unwrap / record / fail-loud policy below is the
+    /// production behaviour under test and is identical regardless of which inner loader ran.
+    /// </summary>
+    private static void RunManifestLoader(Type loaderType, Action<Assembly> invokeLoader, Assembly asm)
+    {
+        var effectiveLoader = ManifestLoaderInvocationOverrideForTests ?? invokeLoader;
+
+        // TIER B (fail-fast.json): a failure of the manifest-invoker itself can silently no-op
+        // the ENTIRE framework (nothing is ever discovered, AddKoan() does nothing). Per-type
+        // and ReflectionTypeLoadException leniency already lives INSIDE PopulateFromAssembly, so
+        // an exception escaping to here is a framework bug — fail loud unless KOAN_BOOT_LENIENT=1.
+        try { effectiveLoader(asm); }
+        catch (Exception ex)
+        {
+            var actual = (ex as TargetInvocationException)?.InnerException ?? ex;
+            var phase = $"manifest-invoker(scanning '{asm.GetName().Name}')";
+            var asmName = loaderType.Assembly.GetName();
+            RecordFailure(loaderType, asmName.Name ?? "<unknown>", phase, actual);
+            if (!IsLenientBoot())
+            {
+                throw new KoanBootException(
+                    loaderType,
+                    asmName.Name ?? "<unknown>",
+                    asmName.Version?.ToString() ?? "unknown",
+                    phase,
+                    actual);
+            }
         }
     }
 }

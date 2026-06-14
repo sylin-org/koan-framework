@@ -62,8 +62,38 @@ public sealed class FailLoudBootSpec
         ex.Phase.Should().Be("initializer");
         ex.InnerException.Should().BeOfType<ThrowingBootInitializer.BootBoomException>();
 
+        // (g) The other diagnostic fields carry the provenance an operator needs: which assembly declared
+        // the broken module, its version, and — crucially — how to recover (the lenient-boot escape hatch).
+        var declaringAssembly = typeof(ThrowingBootInitializer).Assembly.GetName();
+        ex.Assembly.Should().Be(declaringAssembly.Name);
+        ex.Version.Should().NotBeNullOrWhiteSpace();
+        ex.Version.Should().NotBe("unknown");
+        ex.Message.Should().Contain(declaringAssembly.Name);
+        ex.Message.Should().Contain("KOAN_BOOT_LENIENT=1");
+
         // The fake actually ran (guards against a vacuous pass where discovery never reached it).
         ThrowingBootInitializer.WasInvoked.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Clean_boot_records_no_module_failures()
+    {
+        // (l) Pins the no-false-positive direction: a normal boot (the throwing fake left DISARMED) must
+        // leave the MODULES-FAILED channel empty — the fail-loud machinery must not invent failures.
+        Environment.SetEnvironmentVariable(LenientEnvVar, null);
+        ThrowingBootInitializer.ResetForTest();
+        // Intentionally NOT armed: ThrowingBootInitializer stays dormant for this boot.
+
+        await using var host = await KoanIntegrationHost.Configure()
+            .ConfigureServices(services => services.AddKoan())
+            .StartAsync();
+
+        host.Services.Should().NotBeNull();
+        ThrowingBootInitializer.WasInvoked.Should().BeFalse();
+
+        var summary = AppBootstrapper.RegistrySummary;
+        summary.Should().NotBeNull();
+        summary!.Value.ModuleFailures.Count.Should().Be(0);
     }
 
     [Fact]
