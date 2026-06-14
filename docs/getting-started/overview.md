@@ -213,3 +213,5 @@ public sealed class Todo : Entity<Todo> { /* exposed to agents over MCP (HTTP/SS
 - **Why it's built this way**: [architecture principles](../architecture/principles.md) ·
   [ADR index](../decisions/index.md).
 - **What's settled vs experimental**: [the framework's own assessment](../assessment/00-overview.md).
+- **The vocabulary**: [glossary](../reference/glossary.md) — every term defined and pinned to
+  the type that defines it (entity, partition, adapter, pushdown, boot report, lane, coherence).

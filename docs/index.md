@@ -39,11 +39,14 @@ dogfood flagships.
 Start with the **boot report** — the console output at startup names every discovered module,
 adapter election, and boot phase; most registration/connectivity questions are answered there.
 
-### 📚 [Reference](reference/index.md)
+### 📚 Reference
 
 Per-pillar reference: [Core](reference/core/index.md) · [Data](reference/data/index.md) ·
 [Web](reference/web/index.md) · [AI](reference/ai/index.md) ·
 [Cache](reference/data/cache.md) · [API docs](api/index.md)
+
+New to the vocabulary? The [glossary](reference/glossary.md) defines every term — entity,
+partition, adapter, pushdown, boot report, lane, coherence — pinned to the type that defines it.
 
 ### 🏗️ Architecture
 
