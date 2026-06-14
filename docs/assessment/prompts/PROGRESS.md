@@ -84,7 +84,7 @@ Preamble for these cards: the `[PREAMBLE]` block in `../06-prompt-stash.md`.
 | G2 | T1/T2 | — | pending | | | | cut the kernel's dead strata (FluentApi etc.) |
 | H1 | T3 | A1, A2 | pending | | | | dotnet new templates (koan-web / koan-console) |
 | H2 | T2 | A2 | pending | | | | snippet lint to 100% + wire into ratchet/gate |
-| H3 | T2 | — | pending | | | | docs IA collapse (27 → core dirs) |
+| H3 | T2 | — | done | 2026-06-14 | opus-4.8 | ff4f363b | archived 15 stale dirs (142 renames, history kept) + repointed 22 links; docs-lint Errors:0. Kept epic-assessment/+examples/ (active) → 13 top dirs not 11 |
 | H4 | T3→T1 | — | pending | | | | pillar map cards (first card frontier, rest template) |
 | H5 | T2 | — | done | 2026-06-14 | opus-4.8 | 6b3894ec | glossary (19 terms, each type-anchored); caught 'set'→'partition' drift + BootReport-not-a-type; fixed pre-existing index.md broken link |
 | H6 | T2 | H2 | pending | | | | verb alias sweep (docs only) |
