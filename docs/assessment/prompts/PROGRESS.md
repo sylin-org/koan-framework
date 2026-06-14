@@ -38,7 +38,7 @@ Preamble for these cards: the `[PREAMBLE]` block in `../06-prompt-stash.md`.
 | A2 | T2 | — | done | 2026-06-14 | opus-4.8 | 8bcc0bb6 | ghost APIs (Flow/.Embed/koan-CLI/Describe(BootReport)) + 0.6.3 pins removed across 6 docs; docs-lint clean. Ran parallel w/ H5+H7 |
 | A3 | T1 | — | done | 2026-06-13 | opus-4.8 | ad13b65c | 11 tracked litter + 103 *.lscache (card said ~9) + stale Cache/Unit; build green; ran parallel w/ A1; fixed 1 cross-card link (DEC-0053) |
 | C0 | T1 | — | pending | | | | wave 0: debris/tombstone directories |
-| C1 | T2 | B1 | pending | | | | cut Koan.Data.Cqrs (+ Mongo outbox) |
+| C1 | T2 | B1 | done | 2026-06-14 | opus-4.8 | 825e6fd0 | cut Koan.Data.Cqrs + Mongo outbox (zero consumers → JOBS-0005); DATA-0019 superseded; build + bootstrap 24/24 green; ran on dev alongside user's Mcp work |
 | C2 | T2 | B1 | done | 2026-06-13 | opus-4.8 | ffef0899 | cut Koan.WebSockets (197→195); 0 src consumers, absent from ledgers/nuspec; build + bootstrap integration 17/17 green |
 | C3 | T2 | B1 | done | 2026-06-13 | opus-4.8 | 035dc891 | cut Koan.Web.Json.Strict (195→193); STJ island, 0 consumers, absent from ledgers/nuspec; build + bootstrap integration 17/17 green |
 | C4 | T2 | B1 | pending | | | | attic-tag Koan.Web.Connector.GraphQl |
