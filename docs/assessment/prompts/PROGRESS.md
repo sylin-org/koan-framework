@@ -54,7 +54,7 @@ Preamble for these cards: the `[PREAMBLE]` block in `../06-prompt-stash.md`.
 | C17 | T2 | B1 | blocked | 2026-06-14 | opus-4.8 | (external-consumer gate) | **BLOCKED — Koan.Scheduling is consumed by an external downstream repo** (PackageReference + packed). The migrate-to-Jobs cut would break the consumer. Hold pending the consumer migrating off IScheduledTask (or keep Scheduling). |
 | C19 | T2 | B1 | pending | | | | execute MEDIA-0008's overdue deletion |
 | C20a | T2 | B1 | pending | | | | merge Swagger connector into Koan.Web.OpenApi |
-| C20b | T2 | B1 | pending | | | | merge Koan.Admin into Koan.Web.Admin |
+| C20b | T2 | B1 | done | 2026-06-14 | opus-4.8 | 31898d9e | merged Koan.Admin (dead console-UI split, EnableConsoleUi never implemented) into Koan.Web.Admin (24 files, namespaces folded); not consumed downstream; build green, sln 182→181 |
 | C20c | T2 | B1 | pending | | | | fold Koan.Web.Transformers into Koan.Web (preserve opt-in) |
 | D1 | T3 | — | pending | | | | break the kernel inversion (Core → Orchestration.Abstractions) |
 | D2 | T2 | — | pending | | | | delete orchestration stack's dead surface |
