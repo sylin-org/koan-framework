@@ -44,14 +44,14 @@ Preamble for these cards: the `[PREAMBLE]` block in `../06-prompt-stash.md`.
 | C4 | T2 | B1 | pending | | | | attic-tag Koan.Web.Connector.GraphQl |
 | C5 | T2 | B1 | reverted | 2026-06-14 | opus-4.8 | 7780672f → 35318300 | **REVERTED** — Koan.Recipe.Observability is consumed by an external downstream repo (PackageReference + packed from source); the cut would break it. Restored the Recipe pillar + undid the Koan.Web fold. The only externally-broken cut. |
 | C6 | T2 | B1 | done | 2026-06-14 | opus-4.8 | 54576324 | cut Inbox-Redis connector (dead client API, only archived consumer); MESS-0025/0026 already retired; build green, sln 288→284 |
-| C7 | T2 | B1 | pending | | | | park Koan.Secrets.* + Vault connector |
+| C7 | T2 | B1 | blocked | 2026-06-14 | opus-4.8 | (external-consumer gate) | **BLOCKED — Koan.Secrets.Core is consumed by an external downstream repo** (PackageReference + packed). Do not park Secrets.Core. Abstractions/Vault may be separable, but hold the whole card pending the consumer's call. |
 | C8 | T2 | B1 | pending | | | | cut Koan.ServiceMesh + Translation service |
 | C9 | T2 | B1 | obsolete | 2026-06-14 | opus-4.8 | (aborted, no change) | **DO NOT PARK** — Koan.Tagging has ACTIVE external consumers (a downstream repo). The card's "zero consumers" is IN-REPO only; external consumers are invisible to the precheck grep. Aborted before any file moved; Koan.Tagging intact in src/ + sln. |
 | C10 | T2 | B1 | pending | | | | park Koan.Rag + Abstractions (before/with S3) |
 | C11 | T2 | B1 | pending | | | | cut Koan.AI dead pipeline surface (not the project) |
 | C13 | T2 | B1 | pending | | | | cut PGVector connector + vector filter surface |
 | C14 | T2 | B1 | done | 2026-06-14 | opus-4.8 | 99c1ef70 | removed legacy ResilientStorageDecorator + Resilient flag (kept StorageFallbackMode + default/Replicated path untouched); external audit clean (downstream uses Koan.Storage, not Resilient); build green. Done directly by orchestrator (agent rate-limited) |
-| C17 | T2 | B1 | pending | | | | scheduling cut (Koan.Scheduling → jobs) |
+| C17 | T2 | B1 | blocked | 2026-06-14 | opus-4.8 | (external-consumer gate) | **BLOCKED — Koan.Scheduling is consumed by an external downstream repo** (PackageReference + packed). The migrate-to-Jobs cut would break the consumer. Hold pending the consumer migrating off IScheduledTask (or keep Scheduling). |
 | C19 | T2 | B1 | pending | | | | execute MEDIA-0008's overdue deletion |
 | C20a | T2 | B1 | pending | | | | merge Swagger connector into Koan.Web.OpenApi |
 | C20b | T2 | B1 | pending | | | | merge Koan.Admin into Koan.Web.Admin |
