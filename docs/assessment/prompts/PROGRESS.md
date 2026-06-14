@@ -45,7 +45,7 @@ Preamble for these cards: the `[PREAMBLE]` block in `../06-prompt-stash.md`.
 | C5 | T2 | B1 | reverted | 2026-06-14 | opus-4.8 | 7780672f → 35318300 | **REVERTED** — Koan.Recipe.Observability is consumed by an external downstream repo (PackageReference + packed from source); the cut would break it. Restored the Recipe pillar + undid the Koan.Web fold. The only externally-broken cut. |
 | C6 | T2 | B1 | done | 2026-06-14 | opus-4.8 | 54576324 | cut Inbox-Redis connector (dead client API, only archived consumer); MESS-0025/0026 already retired; build green, sln 288→284 |
 | C7 | T2 | B1 | blocked | 2026-06-14 | opus-4.8 | (external-consumer gate) | **BLOCKED — Koan.Secrets.Core is consumed by an external downstream repo** (PackageReference + packed). Do not park Secrets.Core. Abstractions/Vault may be separable, but hold the whole card pending the consumer's call. |
-| C8 | T2 | B1 | pending | | | | cut Koan.ServiceMesh + Translation service |
+| C8 | T2 | B1 | done | 2026-06-14 | opus-4.8 | f7d8a499 | cut ServiceMesh + .Abstractions + Translation (4 projects) + excised Web.Admin defensive surface; S8 atticked; not consumed downstream; build green, zero refs |
 | C9 | T2 | B1 | obsolete | 2026-06-14 | opus-4.8 | (aborted, no change) | **DO NOT PARK** — Koan.Tagging has ACTIVE external consumers (a downstream repo). The card's "zero consumers" is IN-REPO only; external consumers are invisible to the precheck grep. Aborted before any file moved; Koan.Tagging intact in src/ + sln. |
 | C10 | T2 | B1 | pending | | | | park Koan.Rag + Abstractions (before/with S3) |
 | C11 | T2 | B1 | pending | | | | cut Koan.AI dead pipeline surface (not the project) |
