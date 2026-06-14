@@ -56,9 +56,6 @@
     <!-- Jobs pillar (JobsPillarBootstrapSpec) -->
     <ProjectReference Include="..\..\..\..\..\src\Koan.Jobs\Koan.Jobs.csproj" />
 
-    <!-- Rag pillar (RagPillarBootstrapSpec) -->
-    <ProjectReference Include="..\..\..\..\..\src\Koan.Rag\Koan.Rag.csproj" />
-
     <!-- Canon pillar (CanonPillarBootstrapSpec) — Canon Web registrar is the only entry point -->
     <ProjectReference Include="..\..\..\..\..\src\Koan.Canon.Web\Koan.Canon.Web.csproj" />
   </ItemGroup>
