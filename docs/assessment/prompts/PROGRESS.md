@@ -42,7 +42,7 @@ Preamble for these cards: the `[PREAMBLE]` block in `../06-prompt-stash.md`.
 | C2 | T2 | B1 | done | 2026-06-13 | opus-4.8 | ffef0899 | cut Koan.WebSockets (197→195); 0 src consumers, absent from ledgers/nuspec; build + bootstrap integration 17/17 green |
 | C3 | T2 | B1 | done | 2026-06-13 | opus-4.8 | 035dc891 | cut Koan.Web.Json.Strict (195→193); STJ island, 0 consumers, absent from ledgers/nuspec; build + bootstrap integration 17/17 green |
 | C4 | T2 | B1 | pending | | | | attic-tag Koan.Web.Connector.GraphQl |
-| C5 | T2 | B1 | pending | | | | cut Koan.Recipe.Abstractions + Observability (port ~10 lines first) |
+| C5 | T2 | B1 | done | 2026-06-14 | opus-4.8 | 7780672f | ported ObservabilityRecipe (health-checks + resilient HttpClient) into Koan.Web registrar, cut Recipe pillar; build green, Web.Extensions 13/13. ⚠ tripwire: folded baseline now always-on, no explicit assertion |
 | C6 | T2 | B1 | pending | | | | cut Koan.Service.Inbox.Connector.Redis |
 | C7 | T2 | B1 | pending | | | | park Koan.Secrets.* + Vault connector |
 | C8 | T2 | B1 | pending | | | | cut Koan.ServiceMesh + Translation service |
