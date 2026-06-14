@@ -36,12 +36,5 @@ public sealed class StorageOptions
         /// Absent = unlimited cache (no eviction, full local mirror).
         /// </summary>
         public LocalCacheOptions? LocalCache { get; init; }
-
-        /// <summary>
-        /// When true, wraps the resolved provider with <see cref="ResilientStorageDecorator"/>
-        /// for write-behind caching during primary unavailability.
-        /// Legacy — superseded by <see cref="Mode"/> = <see cref="StorageMode.Replicated"/>.
-        /// </summary>
-        public bool Resilient { get; init; }
     }
 }

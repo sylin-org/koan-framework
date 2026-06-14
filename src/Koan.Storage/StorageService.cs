@@ -14,7 +14,6 @@ public sealed class StorageService : IStorageService
     private readonly ILogger<StorageService> _logger;
     private readonly IReadOnlyDictionary<string, IStorageProvider> _providers;
     private readonly IOptionsMonitor<StorageOptions> _options;
-    private readonly ConcurrentDictionary<string, ResilientStorageDecorator> _resilientDecorators = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, ReplicatedStorageProvider> _replicatedProviders = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Well-known provider name patterns considered "local".</summary>
@@ -289,14 +288,13 @@ public sealed class StorageService : IStorageService
     /// - Explicit provider name → direct lookup
     /// - Absent provider + Mode → auto-detect from registered providers
     /// - Replicated mode → compose ReplicatedStorageProvider
-    /// - Legacy Resilient flag → ResilientStorageDecorator
     /// </summary>
     private IStorageProvider ResolveProvider(string profileName, StorageOptions.StorageProfile profile)
     {
         // Determine effective mode
         var mode = profile.Mode;
 
-        // If provider is explicit, use legacy path (with resilient/replicated wrapping)
+        // If provider is explicit, use legacy path (with replicated wrapping)
         if (!string.IsNullOrWhiteSpace(profile.Provider))
         {
             if (!_providers.TryGetValue(profile.Provider, out var named))
@@ -308,7 +306,7 @@ public sealed class StorageService : IStorageService
                 return ComposeReplicated(profileName, profile, named);
             }
 
-            return MaybeWrapResilient(profileName, profile, named);
+            return named;
         }
 
         // No explicit provider — auto-detect from registered providers
@@ -483,19 +481,6 @@ public sealed class StorageService : IStorageService
                 return true;
         }
         return false;
-    }
-
-    private IStorageProvider MaybeWrapResilient(string profileName, StorageOptions.StorageProfile profile, IStorageProvider provider)
-    {
-        if (!profile.Resilient)
-            return provider;
-
-        return _resilientDecorators.GetOrAdd(profileName, _ =>
-        {
-            var walBasePath = Path.Combine(".Koan", "storage-wal");
-            _logger.LogInformation("Storage profile '{Profile}' using resilient decorator with WAL at {WalPath}", profileName, walBasePath);
-            return new ResilientStorageDecorator(provider, _logger, walBasePath);
-        });
     }
 
     private void ValidateConfiguration(StorageOptions opts)
