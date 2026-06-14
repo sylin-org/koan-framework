@@ -12,7 +12,7 @@ evidence, never a verdict** — every claim is independently re-derived.
 - **Orchestrator** — re-runs verification from scratch, runs the integration boundary, spawns
   the adversarial review, decides PASS / BLOCK / STOP, and handles all version control.
 
-## The gate (three layers — all must hold for PASS)
+## The gate (four layers — all must hold for PASS)
 
 ### 1. Mechanical (hard, fully automated — non-negotiable)
 - [ ] `dotnet build Koan.sln` green (scoped suite build during work; **full-sln green at the gate**).
@@ -33,7 +33,22 @@ evidence, never a verdict** — every claim is independently re-derived.
 - [ ] ARCH-0079: any new adapter/connector/pillar core ships ≥1 real-`AddKoan()` integration spec.
 - [ ] Concept budget respected — no new public types beyond what the card scopes.
 
-### 3. Architecture / DDD (adversarial review panel + human sign-off)
+### 3. Test adequacy (code-modifying cards — independently enforced)
+
+Applies to any card that **adds or changes runtime behavior**. Pure cut / sln / docs / dependency-pin
+cards are exempt — their bar is "existing suites + the ARCH-0079 integration boundary stay green"
+(layer 1). For everything else:
+- [ ] New/changed behavior ships an **ARCH-0079 integration spec** through real `AddKoan()` via
+      `KoanIntegrationHost` — not a fake/mock-only unit test. Container-dependent specs skip cleanly.
+- [ ] Unit tests cover each logic branch the card names.
+- [ ] **Mutation check (the orchestrator runs this, not the card author):** revert the card's
+      *production* change while keeping its new tests, rebuild, and confirm the new test(s) **FAIL**.
+      A test that still passes with the behavior removed proves nothing → BLOCK until fixed.
+- [ ] **Coverage critic:** a reviewer agent prompted to find what is *untested* (failure modes, the
+      negative path, edge cases) — not to bless — signs off, or its gaps are addressed / explicitly waived.
+- [ ] Tests live in the card's named `tests/Suites/<area>` and run there green.
+
+### 4. Architecture / DDD (adversarial review panel + human sign-off)
 - [ ] Aggregate boundaries and ubiquitous language respected; seams clean.
 - [ ] "Fewer but more meaningful parts" — the change reduces concept count or sharpens a seam, not the reverse.
 - [ ] Reviewed by ≥2 role-diverse agents (clean-arch/DDD · Koan-principles · security where relevant),
