@@ -1,8 +1,9 @@
-# C9 · Park Koan.Tagging
+# C9 · Migrate Koan.Tagging → agyo-tools (Agyo.Tagging)
 
 > **Source**: docs/assessment/06-prompt-stash.md · Track C — the cut waves · **Tier**: T2 · **Depends on**: B1
 > Self-contained session prompt — paste this entire file into a fresh session.
 > Update [PROGRESS.md](../PROGRESS.md): set your row `in-progress` when you start; `done`/`blocked` when you finish.
+> **Reorg (2026-06-14)**: migrate (was ABORTED — consumed downstream) — clean lift to agyo, not park — see docs/assessment/08-agyo-reorganization.md + agyo-tools docs/decisions/AGYO-0001.
 
 ---
 
@@ -38,26 +39,47 @@ directory). Rules for this session — they override your defaults:
 
 ## Task
 
-_Instantiated from CUT-TEMPLATE · row C9._
+_Reclassified by 08-agyo-reorganization (was: CUT-TEMPLATE park · row C9). Now a MIGRATE card — clean lift, no split, no seam._
 
 ```text
-TASK: park the project(s) Koan.Tagging.
-JUSTIFICATION (verify, then cite in your summary): Good quality but zero in-repo consumers and an EXTERNAL downstream consumer — park to /attic (do NOT delete), keep its tests with it.
-PRECHECKS (all must hold, else STOP):
-1. grep each project name across **/*.csproj — inbound ProjectReferences must match none (own tests).
-2. grep the key public type names across src/ samples/ tests/ — no live consumers beyond none (own tests).
-3. Confirm packaging/Koan.nuspec + Koan.App.nuspec do NOT list the package (verified clean for
-   all rows below as of 2026-06-10).
-STEPS:
-1. <MODE=cut>: remove project(s) + their test projects; remove from Koan.sln; delete the source
-   directories. <MODE=park>: git mv to /attic (create if absent), remove from Koan.sln, add an
-   attic/README.md line explaining why. <MODE=attic-tag>: create branch attic/<name> containing
-   the project, then cut from dev.
-2. Remove the project's lines from docs: modules-overview.md, module-ledger.md, capability-map.md
-   (grep the project name under docs/ and clean each hit; for big docs add a "removed/parked
-   2026-06" strike-through note instead of rewriting).
-3. remove the dangling "ADR-0018" citation in its XML docs.
-4. Mark/annotate the ADR named in the JUSTIFICATION above if one is listed.
-VERIFY: dotnet build Koan.sln green; dotnet test Koan.sln (non-container) green.
-DONE WHEN: project gone/parked, docs swept, build+tests green, summary cites all precheck greps.
+TASK: migrate Koan.Tagging from the Koan framework to agyo-tools as Sylin.Agyo.Tagging.
+JUSTIFICATION (08-agyo-reorganization): a distinct app-level helper (TagSet value type with
+  public/private scopes + open-ended categories, plus a Tag entity for managed synonym
+  registries) that is well-engineered, consumed, and has zero core coupling — it is NOT part of
+  the data·web·cache·jobs·mcp·auth·storage core, so it does not belong in Koan; but it IS used by
+  the downstream consumer, so it must not be deleted. The original "park to /attic" was the false
+  cut/attic binary; with agyo-tools it is a clean wholesale lift. Touches only Koan PUBLIC
+  packages (Sylin.Koan.Data.Core for Entity<Tag> + [Index]) — no internals.
+SOURCE: Koan working tree src/Koan.Tagging (7 src files + the 4-spec unit suite at
+  tests/Suites/Tagging/Unit/Koan.Tests.Tagging.Unit; ~290 LOC).
+ENTRY CRITERION (already verified in 08): touches only Koan PUBLIC packages, no internals /
+  InternalsVisibleTo. The sole inbound ref is ProjectReference -> Koan.Data.Core.
+STEPS (the proven WebSockets/C2 pattern):
+  1. In agyo-tools (F:/Replica/NAS/Files/repo/github/sylin-org/agyo-tools): recover src/Koan.Tagging
+     into src/Tagging/; rebrand ONLY the token Koan.Tagging -> Agyo.Tagging (namespaces +
+     assembly + root namespace). Koan.Data.Core stays as-is (consumed via package, name never
+     flows down). Drop the per-project version.json.
+  2. Write Agyo.Tagging.csproj: swap the ProjectReference ..\Koan.Data.Core\Koan.Data.Core.csproj
+     for PackageReference Sylin.Koan.Data.Core (version from
+     agyo-tools/local-feed). No third-party refs to carry (the csproj declares none beyond the
+     framework ref). Keep the existing PackageTags/Description.
+  3. PER-CAPABILITY WORK: none — clean lift, no seam to decouple, no KoanModule to re-express.
+     Cleanups on the way (doc drift, do these during the lift): strike the `TagScopeJsonConverter`
+     <see cref> in TagScope.cs (and any README mention) — that type does not exist; remove the
+     dangling "ADR-0018" citation in Tag.cs XML docs.
+  4. dotnet build + dotnet pack -> Sylin.Agyo.Tagging; dotnet sln Agyo.sln add src/Tagging;
+     add/refresh the Tagging row in agyo docs/SURFACES.md.
+  5. TEST-CANON (AGYO-0001): port the 4-spec unit suite (TagCategorySpec, TagScopeSpec, TagSetSpec,
+     TagSlugSpec) into agyo, rebranded; it already ships tested in Koan — keep that coverage.
+  6. TRANSITION SAFETY (consumer-facing): do NOT remove Koan.Tagging from Koan until agyo publishes
+     Sylin.Agyo.Tagging AND the downstream consumer re-points off Sylin.Koan.Tagging. Keep Koan
+     publishing the old Sylin.Koan.Tagging package until then (the cutover must be non-breaking).
+KOAN-SIDE (after the consumer re-points — NOT in this card's first pass): remove Koan.Tagging +
+  its test suite from Koan.sln; delete the source directories; sweep docs modules-overview.md /
+  module-ledger.md / capability-map.md (grep the project name under docs/ and clean each hit; big
+  docs get a "migrated to agyo-tools 2026-06" strike-through note). No seam stays in Koan.
+VERIFY: agyo dotnet build + dotnet pack green (Sylin.Agyo.Tagging produced against local-feed);
+  Koan dotnet build Koan.sln + dotnet test Koan.sln (non-container) green after any Koan-side removal.
+DONE WHEN: capability lives in agyo as Sylin.Agyo.Tagging, layering clean (only Sylin.Koan.*
+  PackageReferences — Sylin.Koan.Data.Core), both repos green, downstream consumer re-pointed.
 ```

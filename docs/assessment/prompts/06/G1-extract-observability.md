@@ -1,6 +1,7 @@
 # G1 · Extract Koan.Observability
 
 > **Source**: docs/assessment/06-prompt-stash.md · Track G — Koan.Core diet · **Tier**: T3 · **Depends on**: —
+> **Reorg (2026-06-14)**: Koan-internal extract — see relationship note. — see docs/assessment/08-agyo-reorganization.md + agyo-tools docs/decisions/AGYO-0001.
 > Self-contained session prompt — paste this entire file into a fresh session.
 > Update [PROGRESS.md](../PROGRESS.md): set your row `in-progress` when you start; `done`/`blocked` when you finish.
 
@@ -37,6 +38,8 @@ directory). Rules for this session — they override your defaults:
 ---
 
 ## Task
+
+> **Reorg note.** This card extracts the Koan.Core OTel wiring into Sylin.Koan.Observability — a Koan-INTERNAL diet move, NOT an agyo move (OTel primitives stay in the framework). Relationship: the separately-migrated Recipe observability BUNDLE (card C5, -> Sylin.Agyo.Observability) MAY consume Sylin.Koan.Observability for its OTel piece once this card lands. Keep G1 as a Koan card; it is the upstream of the agyo observability bundle, not a duplicate.
 
 ```text
 FRONTIER TASK: Move the OTel wiring (src/Koan.Core/Observability/ServiceCollectionExtensions +

@@ -64,6 +64,17 @@ cards are exempt — their bar is "existing suites + the ARCH-0079 integration b
 - **migration / fold** — exactly one wiring unit remains; call sites updated to the canonical path;
   the deleted path has zero remaining refs (grep). Hot-path cards (singleflight, dispatch): keying
   + semantics preserved, called out explicitly.
+- **migrate → agyo-tools** (the reorg cards — see [08-agyo-reorganization.md](../08-agyo-reorganization.md)) —
+  the acceptance is the *migration*, not a cut. Mechanical layer runs in **both repos**: the capability
+  builds + packs in agyo-tools as `Sylin.Agyo.<X>` (`dotnet build Agyo.sln` + `dotnet pack` green), and
+  `dotnet build Koan.sln` stays green after any Koan-side removal. Plus: (a) **layering clean** — the agyo
+  csproj has ONLY `Sylin.Koan.*` `PackageReference`s (zero Koan `ProjectReference`, no Koan→agyo edge); the
+  rebrand touched only the `Koan.<X>` self-token (`Koan.Core`/`Koan.AI`/… preserved); the produced nuspec's
+  `<id>` is `Sylin.Agyo.<X>` and its deps are `Sylin.Koan.*`. (b) **transition safety** for consumer-facing
+  rows (C5/C7/C9/C17) — nothing removed from Koan until agyo publishes and the downstream re-points. (c)
+  **ARCH-0079** — ships ≥1 agyo integration spec, or the test debt is logged in agyo `docs/SURFACES.md`
+  (AGYO-0001 test-canon). (d) Koan-side removal sweeps the 3 doc ledgers and **keeps any seam named in 08**
+  (e.g. the C7 Secrets reflection probe in `Koan.Data.Core`).
 - **docs / litter** — link integrity (`docs-lint`); every snippet compiles; deletions cite
   pre-deletion evidence (`git log --follow` for tracked files).
 

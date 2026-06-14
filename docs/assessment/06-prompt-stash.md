@@ -175,6 +175,17 @@ DONE WHEN: files gone, build green, summary lists deletions with the pre-deletio
 
 ## Track C — the cut waves
 
+> **REORG (2026-06-14) — removal → reorganization.** These cut/park cards were written as a
+> cut-or-keep removal stash. An independent re-evaluation
+> ([08-agyo-reorganization.md](08-agyo-reorganization.md) · agyo-tools `AGYO-0001`) found that of
+> the 11 removal targets **0 are core-Koan** but **9 carry preservable capability** — so the
+> disposition is now three-way: **migrate to agyo-tools** (the "PowerToys for Koan" sibling repo;
+> rebrand `Koan.X`→`Agyo.X`, publish `Sylin.Agyo.X`, depend on `Sylin.Koan.*` public packages —
+> never the reverse, STACK-0001), **split** (delete part / migrate part), or **confirmed delete**.
+> The per-card disposition map is below the CUT-TEMPLATE table; executable detail is in the
+> per-card files under [`prompts/06/`](prompts/06/). The proven migration pattern is card **C2**
+> (WebSockets → `Sylin.Agyo.WebSockets`, already shipped this session).
+
 ### C0 · Wave 0: debris directories 〔T1〕
 
 ```text
@@ -216,6 +227,29 @@ VERIFY: dotnet build Koan.sln green; dotnet test Koan.sln (non-container) green.
 DONE WHEN: project gone/parked, docs swept, build+tests green, summary cites all precheck greps.
 ```
 
+### MIGRATE-TEMPLATE 〔T2/T3〕 — for the rows the reorg routes to agyo-tools
+
+```text
+TASK: migrate <capability> from the Koan framework to agyo-tools as Sylin.Agyo.<X>.
+JUSTIFICATION (08-agyo-reorganization): useful opt-in helper, not core identity; consumed/valuable;
+  touches only Koan PUBLIC packages (the entry criterion — already verified in 08).
+SOURCE: <working tree path | attic/<dir> | git ref + path>.
+STEPS (the proven WebSockets/C2 pattern):
+1. In agyo-tools: recover source into src/<dir>/; rebrand ONLY the token Koan.<X> → Agyo.<X>
+   (Koan.Core/Koan.AI/… stay — consumed via package); drop the per-project version.json.
+2. Write Agyo.<X>.csproj: ProjectReference → PackageReference Sylin.Koan.* (versions from
+   agyo-tools/local-feed); keep third-party refs.
+3. PER-CAPABILITY WORK: none | decouple | finish | re-express as KoanModule (per the row).
+4. dotnet build + dotnet pack → Sylin.Agyo.<X>; `dotnet sln Agyo.sln add`; update agyo docs/SURFACES.md.
+5. TEST-CANON (AGYO-0001): port/author ≥1 spec.
+6. TRANSITION SAFETY (consumer-facing rows only): do NOT remove from Koan until agyo publishes and
+   the downstream consumer re-points; keep Koan publishing the old package until then.
+7. KOAN-SIDE (after transition, or now if not consumer-facing): remove from Koan.sln; sweep
+   modules-overview / module-ledger / capability-map; keep any seam noted in 08 (e.g. C7 Secrets probe).
+VERIFY: agyo build+pack green (Sylin.Agyo.<X>); Koan build green after any removal.
+DONE WHEN: capability lives in agyo as Sylin.Agyo.<X>, layering clean (only Sylin.Koan.* PackageRefs), both repos green.
+```
+
 | Instance | MODE | PROJECTS | EXPECTED-REFS | WHY / EXTRA |
 |---|---|---|---|---|
 | C1 | cut | Koan.Data.Cqrs + src/Connectors/Data/Cqrs (Mongo outbox) | only each other | Zero consumers/tests; superseded by Jobs ledger outbox (JOBS-0005). EXTRA: mark DATA-0019 superseded. |
@@ -232,10 +266,25 @@ DONE WHEN: project gone/parked, docs swept, build+tests green, summary cites all
 | C13 | cut | src/Connectors/Data/Vector/PGVector + its orphan test project | none in sln | Does not compile (csproj's own comment); out of sln; fix parked on branch trusting-mccarthy. Tag attic/pgvector first. EXTRA: then delete IVectorFilterTranslator<TNative> + VectorEmbeddingAttribute from Koan.Data.Vector.Abstractions (their only implementor/consumer was PGVector — verify with grep). |
 | C14 | cut | Koan.Storage ResilientStorageDecorator (file-level) | StorageService composition only | Self-described "Legacy — superseded by Mode=Replicated"; zero tests. Read StorageService.cs first; remove the decorator + its StorageFallbackMode/Resilient option branch; keep Replicated mode untouched. |
 
+**Reorg disposition (per [08-agyo-reorganization.md](08-agyo-reorganization.md)) — overrides the MODE column above for these rows:**
+- **→ agyo (MIGRATE-TEMPLATE):** C2 WebSockets · C4 GraphQl · C7 Secrets · C9 Tagging · C10 Rag · C13 PGVector (+finish) · C17 Scheduling.
+- **→ split:** C5 — delete `Koan.Recipe.Abstractions` (superseded idiom), migrate the Observability bundle as a `KoanModule` (do NOT fold into `Koan.Web`); C8 — delete `Koan.ServiceMesh` (stays cut), migrate the Translation library decoupled from the mesh.
+- **→ confirmed delete (no agyo value):** C1 Cqrs · C3 Json.Strict · C6 Inbox-Redis · C11 AI-pipeline · C14 Storage-decorator · C19 Media-cache.
+- Consumer-facing migrations (**C5, C7, C9, C17**) move under **transition safety**: agyo publishes `Sylin.Agyo.*` + the downstream re-points *before* Koan removes anything.
+
 > **Not in the table (need frontier judgment, see T3 section)**: AI vertical collapse (C-AI),
 > Web.Auth.Roles fold, auth connector collapse, Data.Direct fold, Vector facade merge.
 
 ### C17 · Scheduling cut 〔T2 — full verified recipe exists〕
+
+> **Reorg → migrate, not cut.** Koan.Scheduling is consumed downstream and preserved as
+> `Sylin.Agyo.Scheduling` (08-agyo-reorganization). The recipe below still applies on the **Koan
+> side** (de-bloat: drop Koan.Web's hard-ref + the dead `/.well-known/scheduling`; clean the
+> `KoanServiceActions/KoanServiceEvents` Scheduling groups in Koan.Core), but instead of deleting
+> the project, **move it to agyo** (MIGRATE-TEMPLATE) under transition safety, and decide there
+> whether to finish the cron/locks vaporware or document it as the minimal alternative to Koan.Jobs.
+> The two in-repo consumers (S5BootstrapTask, KoanContext JobMaintenanceTask) still migrate to
+> `[JobAction(Schedule="@boot")]+[JobIdempotent]`.
 
 ```text
 TASK: Cut Koan.Scheduling per the adversarially-verified recipe in
@@ -250,6 +299,10 @@ src/ samples/ tests/ = 0 hits (docs hits get the A1-style banner treatment).
 ```
 
 ### C19 · Execute MEDIA-0008's overdue deletion 〔T2〕
+
+> **Reorg → confirmed delete (not an agyo candidate).** The `[Obsolete]` output-cache family is a
+> strictly-inferior predecessor of storage-backed derivations (MEDIA-0007) — nothing to preserve.
+> Proceed with the deletion below.
 
 ```text
 TASK: Delete the obsolete media output-cache family that MEDIA-0008 scheduled for removal:
@@ -686,7 +739,7 @@ decision; bundle as one "auth+data surface trim" ADR session after E5.
 | sln gap / CI off / release untested | B1 / B2 / B3 |
 | ADR status lies · stale docs · litter | A1 / A2 / A3 |
 | Debris dirs & ghost samples | C0 |
-| Zero-consumer cuts/parks | CUT-TEMPLATE C1–C14 |
+| Zero-consumer cuts/parks (reorg: migrate/split/delete → agyo) | CUT-TEMPLATE + MIGRATE-TEMPLATE C1–C14 |
 | Scheduling / MEDIA-0008 / web halo | C17 / C19 / C20a-c |
 | Kernel inversion · orch. dead surface | D1 / D2 |
 | Dual registration · V1 discovery · singleflight · health dupes | E1 / E2 / E3 / E4 |

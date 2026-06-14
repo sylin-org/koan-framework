@@ -3,6 +3,7 @@
 > **Source**: docs/assessment/06-prompt-stash.md · Track C — the cut waves · **Tier**: T2 · **Depends on**: B1
 > Self-contained session prompt — paste this entire file into a fresh session.
 > Update [PROGRESS.md](../PROGRESS.md): set your row `in-progress` when you start; `done`/`blocked` when you finish.
+> **Reorg (2026-06-14)**: confirmed DELETE — not an agyo candidate (superseded by Mode=Replicated — and it needs an external circuit driver (GardenAwareEndpointManager) absent from any Sylin repo; shipping it to agyo would re-introduce a competing outage-resilience path). — see docs/assessment/08-agyo-reorganization.md + agyo-tools docs/decisions/AGYO-0001.
 
 ---
 
@@ -37,6 +38,8 @@ directory). Rules for this session — they override your defaults:
 ---
 
 ## Task
+
+> **Reorg disposition: confirmed DELETE (08-agyo-reorganization).** Not an agyo candidate — it is a strictly-inferior predecessor of a live core capability (Mode=Replicated — and it needs an external circuit driver (GardenAwareEndpointManager) absent from any Sylin repo; shipping it to agyo would re-introduce a competing outage-resilience path), with no distinct app-building value. Nothing to preserve. Proceed with the cut below.
 
 _Instantiated from CUT-TEMPLATE · row C14._
 

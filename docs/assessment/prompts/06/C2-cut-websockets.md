@@ -1,6 +1,7 @@
-# C2 · Cut Koan.WebSockets
+# C2 · Migrate Koan.WebSockets → agyo-tools (Agyo.WebSockets)
 
 > **Source**: docs/assessment/06-prompt-stash.md · Track C — the cut waves · **Tier**: T2 · **Depends on**: B1
+> **Reorg (2026-06-14)**: DONE — migrated to agyo this session (Sylin.Agyo.WebSockets.0.1.2, build+pack green); Koan-side already cut (ffef0899) — see docs/assessment/08-agyo-reorganization.md + agyo-tools docs/decisions/AGYO-0001.
 > Self-contained session prompt — paste this entire file into a fresh session.
 > Update [PROGRESS.md](../PROGRESS.md): set your row `in-progress` when you start; `done`/`blocked` when you finish.
 
@@ -38,26 +39,41 @@ directory). Rules for this session — they override your defaults:
 
 ## Task
 
-_Instantiated from CUT-TEMPLATE · row C2._
+_Reclassified MIGRATE/SPLIT (08-agyo-reorganization) · row C2 — was CUT-TEMPLATE._
 
 ```text
-TASK: cut the project(s) Koan.WebSockets.
-JUSTIFICATION (verify, then cite in your summary): Zero src consumers; SSE won every realtime use.
-PRECHECKS (all must hold, else STOP):
-1. grep each project name across **/*.csproj — inbound ProjectReferences must match none (own tests only).
-2. grep the key public type names across src/ samples/ tests/ — no live consumers beyond none (own tests only).
-3. Confirm packaging/Koan.nuspec + Koan.App.nuspec do NOT list the package (verified clean for
-   all rows below as of 2026-06-10).
-STEPS:
-1. <MODE=cut>: remove project(s) + their test projects; remove from Koan.sln; delete the source
-   directories. <MODE=park>: git mv to /attic (create if absent), remove from Koan.sln, add an
-   attic/README.md line explaining why. <MODE=attic-tag>: create branch attic/<name> containing
-   the project, then cut from dev.
-2. Remove the project's lines from docs: modules-overview.md, module-ledger.md, capability-map.md
-   (grep the project name under docs/ and clean each hit; for big docs add a "removed/parked
-   2026-06" strike-through note instead of rewriting).
-3. delete tests/Koan.WebSockets.Tests.
-4. Mark/annotate the ADR named in the JUSTIFICATION above if one is listed.
-VERIFY: dotnet build Koan.sln green; dotnet test Koan.sln (non-container) green.
-DONE WHEN: project gone/parked, docs swept, build+tests green, summary cites all precheck greps.
+STATUS: complete (see PROGRESS.md / commit ffef0899) — this card is now the CANONICAL RECORD
+and the REFERENCE PATTERN for every other migrate/split row. Nothing to execute; read it to
+replay the proven WebSockets migration on the next capability.
+
+TASK: migrate Koan.WebSockets from the Koan framework to agyo-tools as Sylin.Agyo.WebSockets.
+JUSTIFICATION (08-agyo-reorganization): a useful opt-in helper, not framework core — a thin shim
+  over the .NET 10 BCL WebSocketStream that exposes bidirectional duplex streaming as a Stream
+  (distinct from SSE, which is server-to-client only). Zero src consumers and SSE won every
+  realtime use inside Koan (the original cut justification), so it does not belong in core — but
+  it is genuinely valuable to Koan-built apps and touches only Koan PUBLIC packages, so it is
+  migrated (kept as an opt-in package), not deleted.
+SOURCE: Koan git ref ffef0899~1 (the commit-before-cut) — already recovered into agyo-tools.
+ENTRY CRITERION (already verified in 08): touches only Koan PUBLIC packages (Sylin.Koan.Core +
+  the AspNetCore framework reference); no Koan internals, no InternalsVisibleTo.
+STEPS (the proven WebSockets/C2 pattern — already executed this session):
+  1. In agyo-tools (F:/Replica/NAS/Files/repo/github/sylin-org/agyo-tools): recovered source into
+     src/WebSockets/; rebranded ONLY the token Koan.WebSockets -> Agyo.WebSockets (namespaces +
+     assembly); Koan.Core stays (consumed via package); dropped the per-project version.json.
+  2. Wrote src/WebSockets/Agyo.WebSockets.csproj: ProjectReference -> PackageReference
+     Sylin.Koan.Core (Version 0.17.3, from local-feed); kept the third-party / framework refs
+     (<FrameworkReference Include="Microsoft.AspNetCore.App" />). net10.0, no version.json.
+  3. PER-CAPABILITY WORK: none — it is a thin shim over the .NET 10 BCL WebSocketStream; the
+     rebrand + reference-swap is the whole job, nothing to decouple or re-express.
+  4. dotnet build + dotnet pack -> Sylin.Agyo.WebSockets.0.1.2.nupkg
+     (artifacts/nuget/Sylin.Agyo.WebSockets.0.1.2.nupkg, build+pack green); added to Agyo.sln;
+     updated agyo docs/SURFACES.md row.
+  5. TEST-CANON (AGYO-0001): NOT YET satisfied — it builds and packs but its 5 unit tests still
+     need porting from the Koan-side suite. Ships untested today; port them to satisfy AGYO-0001.
+KOAN-SIDE: already removed (consumer-facing? NO — zero src consumers, so it was cut immediately
+  with no transition window). Koan-side cut landed in ffef0899; sweep of modules-overview.md /
+  module-ledger.md / capability-map.md done with the cut.
+VERIFY: agyo build+pack green (Sylin.Agyo.WebSockets.0.1.2); Koan build green after the removal.
+DONE WHEN: capability lives in agyo as Sylin.Agyo.WebSockets, layering clean (only Sylin.Koan.*
+  PackageReferences), both repos green. (Remaining: port the 5 unit tests for AGYO-0001.)
 ```
