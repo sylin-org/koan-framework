@@ -50,7 +50,7 @@ Preamble for these cards: the `[PREAMBLE]` block in `../06-prompt-stash.md`.
 | C10 | T2 | B1 | pending | | | | park Koan.Rag + Abstractions (before/with S3) |
 | C11 | T2 | B1 | pending | | | | cut Koan.AI dead pipeline surface (not the project) |
 | C13 | T2 | B1 | pending | | | | cut PGVector connector + vector filter surface |
-| C14 | T2 | B1 | pending | | | | cut Storage ResilientStorageDecorator (file-level) |
+| C14 | T2 | B1 | done | 2026-06-14 | opus-4.8 | 99c1ef70 | removed legacy ResilientStorageDecorator + Resilient flag (kept StorageFallbackMode + default/Replicated path untouched); external audit clean (downstream uses Koan.Storage, not Resilient); build green. Done directly by orchestrator (agent rate-limited) |
 | C17 | T2 | B1 | pending | | | | scheduling cut (Koan.Scheduling → jobs) |
 | C19 | T2 | B1 | pending | | | | execute MEDIA-0008's overdue deletion |
 | C20a | T2 | B1 | pending | | | | merge Swagger connector into Koan.Web.OpenApi |
