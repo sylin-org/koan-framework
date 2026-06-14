@@ -77,18 +77,18 @@
       <td>🟦 Very low</td>
       <td>🟩 Low start; one pattern scales (Entities → REST/GraphQL/agents)</td>
     </tr>
-    <tr><th colspan="4" style="text-align:left;">4) Eventing, Views &amp; AI/Vector (Semantic Pipeline)</th></tr>
+    <tr><th colspan="4" style="text-align:left;">4) Eventing, Views &amp; AI/Vector</th></tr>
     <tr>
       <td><strong>Event-driven flows</strong></td>
       <td>🟧 Needs mediator/outbox</td>
       <td>🟥 Ad hoc</td>
-      <td>🟦 Flow: staged sets, canonical/lineage projections, monitors</td>
+      <td>🟨 Messaging pillar + entity lifecycle hooks (<code>IModelHook&lt;T&gt;</code>); the staged-projection pillar is not currently shipped</td>
     </tr>
     <tr>
       <td><strong>Read models / CQRS</strong></td>
       <td>🟩 Common</td>
       <td>🟥 Rare</td>
-      <td>🟩 View sets (canonical/lineage) via controllers</td>
+      <td>🟨 Hand-rolled via partitioned sets + custom controllers; no built-in canonical/lineage view pillar today</td>
     </tr>
     <tr>
       <td><strong>Vector / semantic search</strong></td>
@@ -126,7 +126,7 @@
       <td><strong>Distributed transactions</strong></td>
       <td>🟧 Strong inside one RDBMS</td>
       <td>🟥 Very limited</td>
-      <td>🟨 Across heterogeneous stores → eventual consistency via Flow</td>
+      <td>🟨 Across heterogeneous stores → eventual consistency via messaging</td>
     </tr>
   </tbody>
 </table>
@@ -135,9 +135,8 @@
 
 ## Koan Differentials (The Why)
 
-- **Truly storage-agnostic:** same `Entity<>` code across PostgreSQL, MongoDB, SQLite, JSON/Redis, and vector stores; switch via **sets** without rewiring controllers.
-- **Semantic pipeline built-in:** embeddings, semantic search, and streaming pipelines are first-class—not bolt-ons.
-- **Flow for projections:** canonical/lineage views, staged sets, monitors → CQRS/eventing without ceremony.
+- **Truly storage-agnostic:** same `Entity<>` code across PostgreSQL, MongoDB, SQLite, JSON/Redis, and vector stores; switch via **partitions** without rewiring controllers.
+- **Semantic features built-in:** embeddings (`[Embedding]`, `EntityAi.Embed`), semantic search (`EntityEmbeddingExtensions.SemanticSearch<T>`), and vector persistence (`VectorData<T>.SaveWithVector`) are first-class—not bolt-ons.
 - **Low cognitive load:** AR ergonomics (“one pattern”) from CRUD → events → AI/vector; “Reference = Intent”.
 - **Zero-boilerplate APIs:** `EntityController<T>` provides CRUD/bulk/pagination/filters; orchestration centralized and reused by REST/GraphQL/agents.
 

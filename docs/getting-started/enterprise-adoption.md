@@ -4,10 +4,7 @@ domain: core
 title: "Enterprise Adoption Guide"
 audience: [architects, developers, ai-agents]
 last_updated: 2025-02-14
-framework_version: v0.6.3
 status: current
-validation:
-  date_last_tested: 2025-02-14
 nav: true
 ---
 
@@ -47,8 +44,8 @@ Koan lets small teams ship sophisticated, AI-native services with governance int
 ### Pilot (2–4 weeks)
 
 1. **Bootstrap** a service with REST, messaging, and AI in the first sprint.
-2. **Instrument** Flow hooks to prove event-driven automation.
-3. **Generate** deployment assets (`koan export compose`) and review with ops.
+2. **Instrument** entity lifecycle hooks (`IModelHook<T>`) to prove event-driven automation.
+3. **Review** the generated boot report and Compose profiles with ops before promoting.
 4. **Measure** velocity vs. baseline and share outcomes with steering teams.
 
 ### Greenfield Build
@@ -60,7 +57,7 @@ Koan lets small teams ship sophisticated, AI-native services with governance int
 ### Brownfield Enhancement
 
 - Stand up Koan sidecars that publish and consume events alongside existing services.
-- Translate legacy payloads into Koan entities, then leverage AI or Flow without disturbing the upstream system.
+- Translate legacy payloads into Koan entities, then leverage AI or lifecycle hooks without disturbing the upstream system.
 - Incrementally retire legacy endpoints as Koan controllers take over.
 
 ---
@@ -71,27 +68,55 @@ Koan lets small teams ship sophisticated, AI-native services with governance int
 
 - Entities inherit from `Entity<T>` and controllers from `EntityController<T>` unless a justified exception is documented.
 - Dependencies are declared via Koan packages; manual DI registrations are limited to app-specific services.
-- Flow handlers cover mission-critical automation paths and log structured audit events.
+- Lifecycle hooks cover mission-critical automation paths and log structured audit events.
 - Health endpoints (`/api/health/*`) are exposed and monitored.
 
 ### Security & Compliance
 
+Audit sensitive changes with a web lifecycle hook (`IModelHook<T>` in `Koan.Web.Hooks`); the hook is auto-discovered once registered and fires around every entity write:
+
 ```csharp
-Flow.OnUpdate<CustomerRecord>(async (record, previous) =>
+using Koan.Data.Core;
+using Koan.Web.Hooks;
+
+public sealed class CustomerRecord : Entity<CustomerRecord>
 {
-    if (record.Ssn != previous.Ssn)
+    public string Ssn { get; set; } = "";
+    public string UpdatedBy { get; set; } = "";
+}
+
+public sealed class AuditEvent : Entity<AuditEvent>
+{
+    public string Actor { get; set; } = "";
+    public string Action { get; set; } = "";
+    public string Resource { get; set; } = "";
+    public DateTime OccurredAt { get; set; }
+}
+
+public sealed class CustomerAuditHook : IModelHook<CustomerRecord>
+{
+    public int Order => 0;
+
+    public Task OnBeforeFetch(HookContext<CustomerRecord> ctx, string id) => Task.CompletedTask;
+    public Task OnAfterFetch(HookContext<CustomerRecord> ctx, CustomerRecord? model) => Task.CompletedTask;
+    public Task OnBeforeSave(HookContext<CustomerRecord> ctx, CustomerRecord model) => Task.CompletedTask;
+
+    public async Task OnAfterSave(HookContext<CustomerRecord> ctx, CustomerRecord model)
     {
         await new AuditEvent
         {
-            Actor = record.UpdatedBy,
+            Actor = model.UpdatedBy,
             Action = "SensitiveFieldChanged",
-            Resource = record.Id,
+            Resource = model.Id,
             OccurredAt = DateTime.UtcNow
-        }.Send();
+        }.Save(ctx.Ct);
     }
 
-    return UpdateResult.Continue();
-});
+    public Task OnBeforeDelete(HookContext<CustomerRecord> ctx, CustomerRecord model) => Task.CompletedTask;
+    public Task OnAfterDelete(HookContext<CustomerRecord> ctx, CustomerRecord model) => Task.CompletedTask;
+    public Task OnBeforePatch(HookContext<CustomerRecord> ctx, string id, object patch) => Task.CompletedTask;
+    public Task OnAfterPatch(HookContext<CustomerRecord> ctx, CustomerRecord model) => Task.CompletedTask;
+}
 ```
 
 - Map Koan health endpoints into your existing uptime SLA monitors.
@@ -105,7 +130,7 @@ Flow.OnUpdate<CustomerRecord>(async (record, previous) =>
 | Week | Focus                        | Outcomes                                                    |
 | ---- | ---------------------------- | ----------------------------------------------------------- |
 | 1    | Entity pattern & controllers | CRUD API live, health checks wired                          |
-| 2    | Messaging + Flow             | Event automation logging in lower environments              |
+| 2    | Messaging + lifecycle hooks  | Event automation logging in lower environments              |
 | 3    | AI & vector                  | Semantic search or chat endpoint validated                  |
 | 4    | Production hardening         | Compose export reviewed, observability dashboards baselined |
 
@@ -117,7 +142,7 @@ Create a guild of "Koan champions" who review architecture proposals, run office
 
 - **Velocity**: Time from ticket to prod should drop; target <1 week for standard features.
 - **Operational Burden**: Track incidents tied to misconfiguration—expect a decline after adopting generated artifacts.
-- **Adoption Health**: Count services using Koan Flow, AI, and multi-provider features to measure maturity.
+- **Adoption Health**: Count services using messaging, AI, and multi-provider features to measure maturity.
 - **Developer Sentiment**: Quarterly survey on onboarding time and satisfaction with the framework.
 
 ---

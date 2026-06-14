@@ -3,13 +3,8 @@ type: GUIDE
 domain: flow
 title: "Semantic Pipelines Playbook"
 audience: [developers, architects, ai-agents]
-status: current
+status: draft
 last_updated: 2025-11-09
-framework_version: v0.6.3
-validation:
-  date_last_tested: 2025-11-09
-  status: verified
-  scope: all-examples-tested
 related_guides:
   - ai-vector-howto.md
   - ai-integration.md
@@ -28,7 +23,7 @@ related_guides:
 
 ### Edge Cases
 
-- **Rate limits** – coordinate `AiEmbedOptions.Batch` with provider quotas to avoid throttling.
+- **Rate limits** – coordinate the source stream `batchSize` with provider quotas to avoid throttling.
 - **Mixed content** – branch on MIME type or payload size before running expensive AI steps.
 - **Legacy records** – backfill embeddings via Flow events or background jobs so search stays consistent.
 - **Cancellation** – always thread the `CancellationToken` through `.ExecuteAsync(ct)` for long-running jobs.
@@ -70,9 +65,9 @@ Use this checklist while building or refactoring a pipeline. Deep dives live in 
 
 ## 3. Layer in AI Steps
 
-- Call `.Tokenize(...)` before `.Embed(...)` when prompts require normalization or truncation.
-- Set `AiEmbedOptions.Batch` to balance throughput and rate limits; monitor provider quotas.
-- Persist embeddings with `.Save()` so entity + vector writes remain atomic.
+- Use `.Tokenize(selector, AiTokenizeOptions)` — this stage calls the embedding provider and stages the vector on the envelope (there is no separate `.Embed` stage). Pass `AiTokenizeOptions { Model = ... }` to pin the embedding model.
+- Control throughput with the source stream `batchSize` (e.g. `Entity.AllStream(batchSize: 50)`) and monitor provider quotas; there is no `AiEmbedOptions.Batch`.
+- Persist embeddings with `.SaveWithVectors()` so entity + vector writes happen together.
 
 🧭 Reference: [Pipeline quick start](../reference/flow/index.md#pipeline-quick-start)
 

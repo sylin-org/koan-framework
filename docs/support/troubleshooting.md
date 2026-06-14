@@ -5,11 +5,6 @@ title: "Koan Troubleshooting Hub"
 audience: [developers, support-engineers, ai-agents]
 status: current
 last_updated: 2025-09-28
-framework_version: v0.6.3
-validation:
-  date_last_tested: 2025-09-28
-  status: verified
-  scope: docs/support/troubleshooting.md
 ---
 
 # Koan Troubleshooting Hub
@@ -17,8 +12,8 @@ validation:
 ## Contract
 
 - **Inputs**: Running (or attempting to run) a Koan service, access to application logs, and optional container/host tooling.
-- **Outputs**: Diagnosed root cause and next action plan covering boot, adapters, AI, Flow, and web layers.
-- **Error Modes**: Skipped auto-registration, adapters remaining unhealthy, AI providers refusing connections, Flow pipelines parking records, or health checks reporting failures.
+- **Outputs**: Diagnosed root cause and next action plan covering boot, adapters, AI, and web layers.
+- **Error Modes**: Skipped auto-registration, adapters remaining unhealthy, AI providers refusing connections, or health checks reporting failures.
 - **Success Criteria**: Service boots with expected modules, adapters report healthy, pipelines process data, AI features respond, and health endpoints return `200`.
 
 ### Edge Cases
@@ -26,7 +21,6 @@ validation:
 - **Delayed infrastructure** – some adapters (Couchbase, Postgres) take >30s to warm up; configure health checks and waits accordingly.
 - **Rate-limited AI providers** – throttle embedding/chat calls with batch options to avoid 429 responses.
 - **Vector mismatch** – embeddings with incorrect dimensions silently fail searches; verify provider + model alignment.
-- **Flow replays** – repeated requeues without idempotency cause duplicates; persist replay checkpoints.
 - **Production overrides** – disabling defaults (HTTPS, auth, telemetry) without replacements leads to compliance gaps; ensure compensating controls exist.
 
 ---
@@ -36,8 +30,7 @@ validation:
 1. **Confirm boot completed** – run `curl http://localhost:5000/api/health/ready`; if unhealthy, inspect logs for `Koan:modules` output and DI errors.
 2. **Inspect adapter state** – for containerized stacks `docker compose ps` and `docker logs <service> --tail 50`; look for `StartupProbe` / `Healthy` markers.
 3. **Verify configuration** – dump active configuration for suspect sections using `Configuration.Read` logging or `dotnet user-secrets list` (development).
-4. **Check Flow backlog** – query `StageRecord<T>` counts or use Flow dashboards to ensure stages aren’t stuck in `failed`.
-5. **Run smoke call** – `curl http://localhost:5000/api/todos` (or domain equivalent) and `curl http://localhost:5000/.well-known/auth/providers` to validate HTTP + auth surfaces.
+4. **Run smoke call** – `curl http://localhost:5000/api/todos` (or domain equivalent) and `curl http://localhost:5000/.well-known/auth/providers` to validate HTTP + auth surfaces.
 
 When an item fails, jump to the matching section below.
 
@@ -280,7 +273,7 @@ public sealed class DatabaseHealthCheck : IHealthContributor
   doc.ContentEmbedding = vector;
   await doc.Save();
   ```
-- Batch heavy workloads with `AiEmbedOptions.Batch` to manage rate limits.
+- For heavy workloads stream the source with `Entity.AllStream(...)` and a `.Pipeline()` so embedding work is processed in batches and rate limits stay manageable.
 
 ### Cost & Rate Limits
 
@@ -302,54 +295,30 @@ Set provider budgets and retry envelopes:
 
 ---
 
-## Flow & Pipeline Health
+## AI Pipeline Health
 
-### Stage Diagnostics
-
-- Count backlog per stage:
-  ```csharp
-  var failed = await StageRecord<Device>.CountAsync(r => r.Stage == "failed");
-  var intake = await StageRecord<Device>.CountAsync(r => r.Stage == "intake");
-  ```
-- Inspect parked records (e.g., `NO_KEYS`) and correct aggregation attributes:
-  ```csharp
-  [AggregationKey("inventory.serial")]
-  public string SerialNumber { get; set; } = "";
-  ```
-
-### Reprocessing & Replays
-
-```csharp
-var failedRecords = await StageRecord<Device>.Query()
-    .Where(r => r.Stage == "failed")
-    .ToArrayAsync();
-
-foreach (var record in failedRecords)
-{
-    await record.Requeue();
-}
-```
+###### Flow Pipeline Health
+<!-- Legacy anchor preserved for inbound deep links (section renamed from the removed Flow pillar). -->
 
 ### Semantic Pipeline Failures
 
-Wrap pipeline segments with telemetry and branching:
+Stream the source, embed with `.Tokenize(...)` (the tokenize stage calls the embedding provider and stages the vector), then persist with `.SaveWithVectors()` or branch on success/failure. Use `.Tap(...)` for diagnostics and `.Mutate(...)` to record failure state:
 
 ```csharp
-await Document.AllStream()
+await Document.AllStream(batchSize: 50)
     .Pipeline()
-    .Trace(env => $"Processing {env.Entity.Id}")
-    .Tokenize(doc => doc.Content)
-    .Embed(new AiEmbedOptions { Model = "all-minilm", Batch = 50 })
+    .Tap(env => logger.LogInformation("Processing {Id}", env.Entity.Id))
+    .Tokenize(doc => doc.Content, new AiTokenizeOptions { Model = "all-minilm" })
     .Branch(branch => branch
-        .OnSuccess(success => success.Save())
+        .OnSuccess(success => success.SaveWithVectors())
         .OnFailure(failure => failure
-            .Trace(env => $"Failed: {env.Error?.Message}")
-            .ForEach(doc => doc.Status = "failed")
-            .Save()))
+            .Tap(env => logger.LogWarning("Failed: {Error}", env.Error?.Message))
+            .Mutate(env => env.Entity.Status = "failed")
+            .Do((env, ct) => env.Entity.Save(ct))))
     .ExecuteAsync();
 ```
 
-If failures persist, log envelope errors and inspect provider capability mismatches.
+If failures persist, log envelope errors (`env.Error`) and inspect provider capability mismatches.
 
 ---
 

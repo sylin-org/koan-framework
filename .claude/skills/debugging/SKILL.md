@@ -44,15 +44,16 @@ System.InvalidOperationException: Unable to resolve service for type 'ITodoServi
 public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 {
     public string ModuleName => "MyApp";
+    public string? ModuleVersion => typeof(KoanAutoRegistrar).Assembly.GetName().Version?.ToString();
 
     public void Initialize(IServiceCollection services)
     {
         services.AddScoped<ITodoService, TodoService>();
     }
 
-    public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, "1.0.0");
+        module.Describe(ModuleVersion);
     }
 }
 ```

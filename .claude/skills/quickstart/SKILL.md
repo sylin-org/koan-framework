@@ -16,10 +16,10 @@ description: Zero to first Koan app in under 10 minutes (S0 + S1 patterns)
 ```bash
 dotnet new web -n MyKoanApp
 cd MyKoanApp
-dotnet add package Koan.Core --version 0.6.3
-dotnet add package Koan.Data.Core --version 0.6.3
-dotnet add package Koan.Data.Connector.Json --version 0.6.3
-dotnet add package Koan.Web --version 0.6.3
+dotnet add package Koan.Core
+dotnet add package Koan.Data.Core
+dotnet add package Koan.Data.Connector.Json
+dotnet add package Koan.Web
 ```
 
 ### Step 2: Minimal Program.cs (1 min)
