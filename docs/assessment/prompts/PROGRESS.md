@@ -111,6 +111,15 @@ Preamble for these cards: the `[SESSION-PREAMBLE]` block in `../07-strategic-pro
 | P5.1 | T3 | 06 B2 | pending | | | | sovereign / scales-down deployment (AOT) |
 | P5.2 | T3 | P1.2, P3.1, 06 H1 | pending | | | | the wedge demo — agent transcript |
 
+## Cards discovered during pilot execution
+
+New cards surfaced while running other cards (not in the original 06/07 stash). Same columns.
+
+| ID | Tier | Deps | Status | Date | Agent/model | Commits | Notes |
+|---|---|---|---|---|---|---|---|
+| X-KoanContext | T3 | — | pending | | | | **park / re-home** `src/Services/code-intelligence/Koan.Service.KoanContext` out of the framework repo. 14.8k LOC, net10.0, the repo's largest project, **never in Koan.sln**, zero in-repo consumers; breaks are its own mid-refactor debris (`IndexProject`→`IndexProjectAsync` delegate rename), not framework drift. Canon already recommends eviction (`pillar-periphery-services.json:298`, Zen Garden precedent). Triaged 2026-06-13. Move it + `tests/Suites/Context/**`; keep its docs/ADRs as the trail. |
+| X-FluentAssertions | T2 | — | pending | | | | finish the FluentAssertions v6→v7 migration left behind on excluded test projects: `S16.PantryPal.Tests` (`BeGreaterOrEqualTo`→`BeGreaterThanOrEqualTo`, `HaveCountGreaterOrEqualTo`→`HaveCountGreaterThanOrEqualTo`, + a CS1997 async `DisposeAsync`); audit the other excluded husks for the same rot; re-add to sln once green. |
+
 ## Divergence log
 
 When a pre-flight fails or repo reality contradicts a card, record it here:
@@ -119,6 +128,8 @@ date · prompt ID · what was found · what was done instead.
 | Date | ID | Finding | Action |
 |---|---|---|---|
 | 2026-06-13 | B1 | The card named only 5 husks to exclude. In reality 38 test projects were missing from the sln, and **13 more break the build** beyond the card's list: (a) 3 net8.0 husks referencing nonexistent `Koan.TestPipeline`/`Koan.*` NuGet packages — `Koan.Storage.Core.Tests`, `Koan.Web.Admin.Tests`; (b) 2 net8.0 sample-test husks that fail restore (`Koan.Samples.DocMind.Tests` refs a *missing* `samples/S13.DocMind/API/...csproj`; `Koan.Samples.PantryPal.Tests` is net8.0 vs net10.0 `Koan.Testing`); (c) 3 MCP/PantryPal projects fail NU1903 (transitive MessagePack 2.5.192 CVE — the 7e8a44f0 pin only covers projects that ProjectReference `Koan.Orchestration.Aspire`, which these don't): `Koan.Mcp.TestHost`, `Koan.Samples.McpCodeMode.Tests`, `S16.PantryPal.Tests`; (d) 4 projects fail **compilation** against current APIs — `Koan.Web.Sort.Tests` (CS7022 dup entrypoint), `Koan.Storage.Connector.Local.Tests` (stale `StorageProfile`/`StorageOptions`/caps), `S7.Meridian.Tests` (stale `IEmbeddingCache`/`CachedEmbedding`/`IDocumentStorage.Delete`), and a **production** project `src/Services/code-intelligence/Koan.Service.KoanContext` (does not compile; was dragged in transitively by `Koan.Tests.Context.Unit`). | Added the 25 buildable live test projects (+2 transitive prod refs `Koan.Cache.Analyzers`, `Koan.Data.Connector.PGVector`). Per STOP condition, did NOT fix-forward any broken project; excluded all 13 breakers (and orphaned transitive pull-ins `samples/S7.Meridian`, `Koan.Service.KoanContext`). Build green; `--list-tests` exit 0. These 13 are husk/rot candidates for the C-series cut cards — they fell out of the sln precisely because they don't build. |
+| 2026-06-13 | B1·CVE | (B1 follow-up, per architect decision) `StreamJsonRpc 2.22.23 → MessagePack 2.5.192` is a **second** CVE-2026-48109 root not covered by `7e8a44f0`'s Aspire-only pin: 12 NU1903 warnings fleet-wide + 3 unbuildable MCP test projects. | Pinned MessagePack 2.5.301 in `Koan.Mcp` (the sole direct StreamJsonRpc referencer) → NU1903 = 0; recovered `Koan.Mcp.TestHost` + `Koan.Samples.McpCodeMode.Tests` into the sln (195→197). Commits `b8530a30`, `28bb32ba`. Also fixed the malformed XML comment that broke `dev`'s build (`dcc1477c`). |
+| 2026-06-13 | S16.PantryPal.Tests | The CVE pin recovered 2 of B1's 3 MCP breakers, but this one has rot **beyond** the CVE: stale FluentAssertions v6 API + a CS1997 async `DisposeAsync` bug. | Left excluded from the sln; logged as card **X-FluentAssertions**. Not fix-forwarded — separate concern from the CVE. |
 
 ## Operator gates
 
