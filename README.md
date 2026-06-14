@@ -165,6 +165,7 @@ compiled into your assemblies: deterministic, ordered, AOT-friendly.
 | **Understand why** | [Architecture principles](docs/architecture/principles.md) · [ADRs](docs/decisions/index.md) |
 | **Check what's solid** | [Framework assessment & maturity model](docs/assessment/00-overview.md) |
 | **When stuck** | [Troubleshooting](docs/support/troubleshooting.md) |
+| **Coding agents** | [llms.txt](llms.txt) — the framework in one file: three beats, the 8 concepts, anti-patterns, the canonical way |
 
 Requirements: **.NET 10 SDK**. Docker/Podman only for container-backed samples and integration
 tests. Coding agents: start at [CLAUDE.md](CLAUDE.md) and `.claude/skills/`.

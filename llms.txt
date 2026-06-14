@@ -1,0 +1,111 @@
+# Koan Framework
+
+> A .NET 10 meta-framework for agentic, data-driven web applications — "Rails for .NET"
+> for the era where AI capability is part of the domain model. One grammar — `Entity<T>` —
+> covers CRUD, REST, vector search, background jobs, caching, embeddings, and agent (MCP) tools.
+
+> Status: pre-1.0, consolidation phase (version via NBGV, currently 0.17.x). The core —
+> entity/data pillar, web, cache, jobs, vector — is settled and integration-tested; several
+> outer pillars are experimental. Until 1.0, build from source — published packages
+> (`Sylin.Koan.*` on NuGet) lag the repo.
+
+## The whole framework in three beats
+
+### 1 · Model an entity → get an application
+
+The entire bootstrap. The web pipeline, controllers, health endpoints, and discovery are
+auto-wired when `Koan.Web` is referenced — "Reference = Intent".
+
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddKoan();
+var app = builder.Build();
+app.Run();
+```
+
+Model + API:
+
+```csharp
+using Koan.Data.Core.Model;
+using Koan.Web.Controllers;
+using Microsoft.AspNetCore.Mvc;
+
+public sealed class Todo : Entity<Todo>
+{
+    public string Title { get; set; } = "";
+    public bool IsCompleted { get; set; }
+}
+
+[Route("api/[controller]")]
+public sealed class TodoController : EntityController<Todo> { }
+```
+
+That's a full REST API: GET/POST/DELETE with pagination and querying, GUID v7 ids generated
+on first read, `/api/health`, structured logging, and zero-config SQLite (`./data/app.db`).
+Schema is created automatically in development.
+
+Working with data (the verbs — note: `Query`, not `Where`; `Remove`, not `Delete`):
+
+```csharp
+var todo  = await Todo.Get(id);                      // null when missing
+var open  = await Todo.Query(t => !t.IsCompleted);   // pushed down when the adapter supports it
+var page  = await Todo.FirstPage(20);
+await new Todo { Title = "Ship it" }.Save();
+await todo.Remove();
+await foreach (var t in Todo.AllStream(batchSize: 1000)) { /* streaming, constant memory */ }
+```
+
+### 2 · Reference an intent → gain a capability
+
+Adding a package reference (plus, at most, one attribute) is the configuration. Same entities,
+same controllers — Postgres storage, transparent `[Cacheable]` L1/L2, durable `IKoanJob<T>`
+background work, `[Embedding]` semantic search, `[McpEntity]` agent tools. Backends differ and
+Koan refuses to pretend otherwise: every adapter declares its capabilities, the framework
+negotiates them, and an unsupported operation fails loudly instead of silently degrading.
+
+### 3 · The app explains itself
+
+The boot report printed at startup names every discovered module, the elected adapters, and the
+boot phases — it is the primary debugging surface. Capability sets are queryable at runtime;
+well-known endpoints describe the running service. Discovery is a Roslyn source-generated
+registry compiled into your assemblies: deterministic, ordered, AOT-friendly — not runtime
+reflection magic.
+
+## The concept budget (8 concepts)
+
+Hello-CRUD needs exactly eight Koan concepts; nothing else is required:
+
+1. `Entity<T>` — your model, with a string `Id` (GUID v7, generated on first read)
+2. Entity statics & instance verbs — `Get` / `All` / `Query` / `Save()` / `Remove()`
+3. `EntityController<T>` — the REST surface over an entity
+4. `AddKoan()` — the single bootstrap call ("Reference = Intent": referenced packages register themselves)
+5. Provider election — the referenced data connector wins; zero-config defaults (SQLite → `./data/app.db`)
+6. The boot report — what the app prints at startup is the primary debugging surface
+7. Auto schema ("magic") — created in Development; gated by `Koan:AllowMagicInProduction` elsewhere
+8. Web defaults — controllers, `/api/health`, secure headers auto-wired; JSON is camelCase, nulls omitted (Newtonsoft.Json)
+
+## Anti-patterns (immediate red flags)
+
+These trigger the `koan-entity-first` skill — do not write them:
+
+- Manual `IRepository<T>` interfaces
+- Injecting repositories into services
+- Manual service registration in Program.cs (except via `KoanModule` / `KoanAutoRegistrar`)
+- Custom ORM/DbContext usage instead of Entity<T>
+- Provider-specific code without capability detection
+
+## The canonical way
+
+| Concern | Canonical way |
+|---|---|
+| Bootstrap | `KoanModule` (module primitive) + `AddKoan()` — never manual `Add*()` where a registrar exists |
+| Serializer | Newtonsoft.Json, camelCase, nulls omitted |
+| Scheduling / background work | `Koan.Jobs` (`IKoanJob<T>` + `JobContext`) |
+| Realtime | SSE |
+
+## Pointers
+
+- `CLAUDE.md` — agent entry point: pattern → skill table, core principles, framework utilities
+- `.claude/skills/` — on-demand framework knowledge (entity-first, bootstrap, api-building, …)
+- `docs/getting-started/overview.md` — the golden path, concept by concept (source of the snippets above)
+- `docs/assessment/00-overview.md` — the framework's own assessment: what is settled vs experimental
