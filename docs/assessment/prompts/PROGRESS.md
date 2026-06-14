@@ -39,8 +39,8 @@ Preamble for these cards: the `[PREAMBLE]` block in `../06-prompt-stash.md`.
 | A3 | T1 | — | done | 2026-06-13 | opus-4.8 | ad13b65c | 11 tracked litter + 103 *.lscache (card said ~9) + stale Cache/Unit; build green; ran parallel w/ A1; fixed 1 cross-card link (DEC-0053) |
 | C0 | T1 | — | pending | | | | wave 0: debris/tombstone directories |
 | C1 | T2 | B1 | pending | | | | cut Koan.Data.Cqrs (+ Mongo outbox) |
-| C2 | T2 | B1 | pending | | | | cut Koan.WebSockets |
-| C3 | T2 | B1 | pending | | | | cut Koan.Web.Json.Strict |
+| C2 | T2 | B1 | done | 2026-06-13 | opus-4.8 | ffef0899 | cut Koan.WebSockets (197→195); 0 src consumers, absent from ledgers/nuspec; build + bootstrap integration 17/17 green |
+| C3 | T2 | B1 | done | 2026-06-13 | opus-4.8 | 035dc891 | cut Koan.Web.Json.Strict (195→193); STJ island, 0 consumers, absent from ledgers/nuspec; build + bootstrap integration 17/17 green |
 | C4 | T2 | B1 | pending | | | | attic-tag Koan.Web.Connector.GraphQl |
 | C5 | T2 | B1 | pending | | | | cut Koan.Recipe.Abstractions + Observability (port ~10 lines first) |
 | C6 | T2 | B1 | pending | | | | cut Koan.Service.Inbox.Connector.Redis |
