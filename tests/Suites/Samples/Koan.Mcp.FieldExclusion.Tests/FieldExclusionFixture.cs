@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Core;
@@ -11,6 +12,7 @@ using Koan.Web.Controllers;
 using Koan.Web.Extensions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -32,6 +34,15 @@ public class FieldExclusionFixture : KoanTestPipelineFixtureBase
         services.AddKoan().AsProxiedApi();
         services.AddKoanMcp();
         services.AddKoanWeb();
+
+        // Drop the StdioTransport hosted service: it reads from stdin, which is dead in the test host,
+        // and its background loop throws on shutdown ("test host process crashed" after all tests pass).
+        // Mirrors TestPipelineFixture / StrictQuotaTestPipelineFixture in the McpCodeMode suite.
+        var stdioService = services.FirstOrDefault(d => d.ServiceType == typeof(IHostedService) && d.ImplementationType == typeof(StdioTransport));
+        if (stdioService != null)
+        {
+            services.Remove(stdioService);
+        }
 
         services.Configure<McpServerOptions>(o =>
         {
