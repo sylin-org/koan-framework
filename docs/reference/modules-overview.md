@@ -186,9 +186,9 @@ Use this reference when you plan a Koan solution and need to understand which mo
 - **How to use**: add package when customizing serialization or response shaping.
 - **When to use**: API gateway scenarios, custom content negotiation.
 
-### Web Connectors (GraphQL, Swagger, Auth)
+### Web Connectors (Swagger, Auth)
 
-- **Purpose**: plug-in support for GraphQL servers, Swagger docs, external auth providers.
+- **Purpose**: plug-in support for Swagger docs and external auth providers. _(The GraphQL connector `Koan.Web.Connector.GraphQl` was attic'd 2026-06 — recoverable at git tag `attic/koan-web-graphql`.)_
 - **How to use**: reference connector, configure in `Program.cs`.
 - **When to use**: bridging Koan web stack with specific UI technologies or documentation pipelines.
 
@@ -272,7 +272,7 @@ For quick lookup, connectors live under `src/Connectors`. Use this table to iden
 | Orchestration | `Koan.Orchestration.Connector.*` | Docker, Podman, renderers        |
 | Secrets       | `Koan.Secrets.Connector.*`       | Vault, cloud secret stores       |
 | Storage       | `Koan.Storage.Connector.*`       | Local, S3-compatible storage     |
-| Web           | `Koan.Web.Connector.*`           | GraphQL, Swagger, Auth providers |
+| Web           | `Koan.Web.Connector.*`           | Swagger, Auth providers          |
 
 Every connector package auto-registers via `IKoanAutoRegistrar` once referenced.
 

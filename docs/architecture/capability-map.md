@@ -52,7 +52,7 @@ Below is a capability map that layers packages from foundational primitives thro
 | ----------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
 | Core runtime            | Configuration, environment, boot diagnostics, adapter auto-registration | `Koan.Core`, `Koan.Core.Adapters`, `Koan.Diagnostics.Tool`                                                                                                                   | –                       |
 | Data & storage          | Entity-first persistence, provider adapters, backups, object storage    | `Koan.Data.Core`, `Koan.Data.Abstractions`, `Koan.Data.*` providers, `Koan.Storage`, `Koan.Data.Backup`                                                                      | Core runtime            |
-| Web & surface area      | MVC controllers, response transformers, auth, diagnostics               | `Koan.Web`, `Koan.Web.Extensions`, `Koan.Web.Transformers`, `Koan.Web.Auth.*`, `Koan.Web.Connector.Swagger`, `Koan.Web.Connector.GraphQl`, `Koan.Web.Backup`                                     | Core runtime + Data     |
+| Web & surface area      | MVC controllers, response transformers, auth, diagnostics               | `Koan.Web`, `Koan.Web.Extensions`, `Koan.Web.Transformers`, `Koan.Web.Auth.*`, `Koan.Web.Connector.Swagger`, `Koan.Web.Backup`                                     | Core runtime + Data     |
 | Messaging & async       | Inbox/outbox patterns, background coordination, scheduling              | `Koan.Messaging.Core`, `Koan.Messaging.Abstractions`, `Koan.Messaging.Connector.RabbitMq`, `Koan.Messaging.Inbox.*`, `Koan.Scheduling` | Core + Data             |
 | AI, media & search      | Prompt routing, embeddings, media pipelines                             | `Koan.AI`, `Koan.AI.Contracts`, `Koan.AI.Connector.Ollama`, `Koan.Media.Abstractions`, `Koan.Media.Core`, `Koan.Media.Web`, `Koan.Data.Vector.*`                              | Core + Data             |
 | Secrets & configuration | Unified secret resolution and config overlays                           | `Koan.Secrets.Abstractions`, `Koan.Secrets.Core`, `Koan.Secrets.Connector.Vault`                                                                                                       | Core runtime            |
@@ -97,11 +97,11 @@ The remainder of this document drills into each layer and highlights first-class
 
 ## 3. Web surfaces & APIs
 
-**Packages**: `Koan.Web`, `Koan.Web.Extensions`, `Koan.Web.Transformers`, `Koan.Web.Connector.Swagger`, `Koan.Web.Connector.GraphQl`, `Koan.Web.Backup`, `Koan.Web.Diagnostics`
+**Packages**: `Koan.Web`, `Koan.Web.Extensions`, `Koan.Web.Transformers`, `Koan.Web.Connector.Swagger`, `Koan.Web.Backup`, `Koan.Web.Diagnostics`
 
 - `Koan.Web` enforces controller-first APIs using `EntityController<T>` and configures health/OpenAPI endpoints.
 - `Koan.Web.Extensions` offers middleware shortcuts (error handling, JSON options), while `Koan.Web.Transformers` shapes responses to match API contracts.
-- `Koan.Web.Connector.Swagger` integrates OpenAPI generation with the controller ecosystem; `Koan.Web.Connector.GraphQl` activates GraphQL endpoints backed by entities.
+- `Koan.Web.Connector.Swagger` integrates OpenAPI generation with the controller ecosystem. _(`Koan.Web.Connector.GraphQl` attic'd 2026-06 — recoverable at git tag `attic/koan-web-graphql`.)_
 - `Koan.Web.Backup` surfaces backup/restore operations via HTTP for high-trust maintenance scenarios.
 - `Koan.Web.Diagnostics` plugs diagnostic dashboards into the pipeline when needed.
 

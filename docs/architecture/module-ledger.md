@@ -248,7 +248,7 @@ validation:
 ### Koan.Web
 
 - Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core, Koan.Scheduling
-- Depended by: Koan.Canon.Web, Koan.Mcp, Koan.Media.Core, Koan.Recipe.Observability, Koan.Web.Backup, Koan.Web.Extensions, Koan.Web.Connector.GraphQl, Koan.Web.Connector.Swagger, Koan.Web.Transformers
+- Depended by: Koan.Canon.Web, Koan.Mcp, Koan.Media.Core, Koan.Recipe.Observability, Koan.Web.Backup, Koan.Web.Extensions, Koan.Web.Connector.Swagger, Koan.Web.Transformers <!-- Koan.Web.Connector.GraphQl attic'd 2026-06 -->
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Web.Auth
@@ -311,11 +311,13 @@ validation:
 - Depended by: Koan.Canon.Web, Koan.Web.Auth.Roles
 - Documentation: README ✅ · TECHNICAL ❌
 
-### Koan.Web.Connector.GraphQl
+### ~~Koan.Web.Connector.GraphQl~~
 
-- Depends on: Koan.Core, Koan.Data.Core, Koan.Web
-- Depended by: –
-- Documentation: README ✅ · TECHNICAL ✅
+> **Removed (attic'd) 2026-06** — connector cut from `dev` (sole consumer was archived sample S4; HotChocolate CVE-treadmill maintenance burden). Recoverable at git tag `attic/koan-web-graphql`. See WEB-0041/WEB-0042.
+
+- ~~Depends on: Koan.Core, Koan.Data.Core, Koan.Web~~
+- ~~Depended by: –~~
+- ~~Documentation: README ✅ · TECHNICAL ✅~~
 
 ### Koan.Web.Connector.Swagger
 
@@ -341,7 +343,7 @@ validation:
 ### Koan.Web
 
 - Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core, Koan.Scheduling
-- Depended by: Koan.Canon.Web, Koan.Mcp, Koan.Media.Core, Koan.Recipe.Observability, Koan.Web.Backup, Koan.Web.Extensions, Koan.Web.Connector.GraphQl, Koan.Web.Connector.Swagger, Koan.Web.Transformers
+- Depended by: Koan.Canon.Web, Koan.Mcp, Koan.Media.Core, Koan.Recipe.Observability, Koan.Web.Backup, Koan.Web.Extensions, Koan.Web.Connector.Swagger, Koan.Web.Transformers <!-- Koan.Web.Connector.GraphQl attic'd 2026-06 -->
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Web.Auth
@@ -404,11 +406,13 @@ validation:
 - Depended by: Koan.Canon.Web, Koan.Web.Auth.Roles
 - Documentation: README ✅ · TECHNICAL ❌
 
-### Koan.Web.Connector.GraphQl
+### ~~Koan.Web.Connector.GraphQl~~
 
-- Depends on: Koan.Core, Koan.Data.Core, Koan.Web
-- Depended by: –
-- Documentation: README ✅ · TECHNICAL ✅
+> **Removed (attic'd) 2026-06** — connector cut from `dev` (sole consumer was archived sample S4; HotChocolate CVE-treadmill maintenance burden). Recoverable at git tag `attic/koan-web-graphql`. See WEB-0041/WEB-0042.
+
+- ~~Depends on: Koan.Core, Koan.Data.Core, Koan.Web~~
+- ~~Depended by: –~~
+- ~~Documentation: README ✅ · TECHNICAL ✅~~
 
 ### Koan.Web.Connector.Swagger
 

@@ -2,12 +2,14 @@
 id: WEB-0042
 slug: WEB-0042-graphql-naming-and-discovery
 domain: WEB
-status: Accepted
+status: Superseded
 date: 2025-08-19
 title: GraphQL naming & discovery policy - storage-based names, IEntity-only, collision handling
 ---
 
 # ADR 0042: GraphQL naming & discovery policy - storage-based names, IEntity-only, collision handling
+
+> **Connector attic'd 2026-06** — `Koan.Web.Connector.GraphQl` was cut from `dev` (sole consumer was archived sample S4; HotChocolate CVE-treadmill maintenance burden). The code is recoverable at git tag `attic/koan-web-graphql`. This ADR is retained as historical record; the decision is no longer in force.
 
 ## Context
 
