@@ -41,7 +41,7 @@ Preamble for these cards: the `[PREAMBLE]` block in `../06-prompt-stash.md`.
 | C1 | T2 | B1 | done | 2026-06-14 | opus-4.8 | 825e6fd0 | cut Koan.Data.Cqrs + Mongo outbox (zero consumers → JOBS-0005); DATA-0019 superseded; build + bootstrap 24/24 green; ran on dev alongside user's Mcp work |
 | C2 | T2 | B1 | done | 2026-06-13 | opus-4.8 | ffef0899 | cut Koan.WebSockets (197→195); 0 src consumers, absent from ledgers/nuspec; build + bootstrap integration 17/17 green |
 | C3 | T2 | B1 | done | 2026-06-13 | opus-4.8 | 035dc891 | cut Koan.Web.Json.Strict (195→193); STJ island, 0 consumers, absent from ledgers/nuspec; build + bootstrap integration 17/17 green |
-| C4 | T2 | B1 | pending | | | | attic-tag Koan.Web.Connector.GraphQl |
+| C4 | T2 | B1 | done | 2026-06-14 | opus-4.8 | 5c2d7498 | attic-tagged + cut GraphQl connector (archived S4 sole consumer; HotChocolate CVE treadmill); WEB-0041/0042 superseded; tag attic/koan-web-graphql; not consumed; build green |
 | C5 | T2 | B1 | reverted | 2026-06-14 | opus-4.8 | 7780672f → 35318300 | **REVERTED** — Koan.Recipe.Observability is consumed by an external downstream repo (PackageReference + packed from source); the cut would break it. Restored the Recipe pillar + undid the Koan.Web fold. The only externally-broken cut. |
 | C6 | T2 | B1 | done | 2026-06-14 | opus-4.8 | 54576324 | cut Inbox-Redis connector (dead client API, only archived consumer); MESS-0025/0026 already retired; build green, sln 288→284 |
 | C7 | T2 | B1 | blocked | 2026-06-14 | opus-4.8 | (external-consumer gate) | **BLOCKED — Koan.Secrets.Core is consumed by an external downstream repo** (PackageReference + packed). Do not park Secrets.Core. Abstractions/Vault may be separable, but hold the whole card pending the consumer's call. |
