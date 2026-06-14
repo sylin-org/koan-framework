@@ -1,5 +1,7 @@
 # DATA-0060 - Vector module split and clean separation (Koan.Data.Vector)
 
+> **Related: see DATA-0085 (Isolate Vector Workflows into Koan.Data.Vector).** Both ADRs cover the same decision domain — splitting vector functionality out of `Koan.Data.Core` into a dedicated `Koan.Data.Vector` module; read them together.
+
 Status: Accepted
 
 ## Context

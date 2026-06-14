@@ -1,8 +1,12 @@
 ---
 title: OPS-0050 - Scheduling core and Bootstrap unification (readiness-gated, auto-registered)
-status: Accepted
+status: Superseded
 date: 2025-08-21
 ---
+
+# OPS-0050 - Scheduling core and Bootstrap unification
+
+> **Status: Superseded by JOBS-0005.** Phases 2–3 — cron, locks, windows, bootstrap runner — were never implemented; scheduling is now owned by the Job Orchestrator rebuild.
 
 ## Context
 

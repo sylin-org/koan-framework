@@ -2,11 +2,13 @@
 id: MESS-0025
 slug: MESS-0025-inbox-contract-and-client
 domain: MESS
-status: Accepted
+status: Retired
 title: Inbox contract, client behavior, and provider discovery
 ---
 
 # 0025 - Inbox contract, client behavior, and provider discovery
+
+> **Status: Retired.** Describes a prior messaging generation; the inbox/alias/provisioning features no longer exist in code.
 
 Context
 

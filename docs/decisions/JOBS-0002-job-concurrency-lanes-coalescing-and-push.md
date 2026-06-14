@@ -1,6 +1,8 @@
 # JOBS-0002: Job Concurrency Lanes, Coalescing, and Push
 
-**Status**: Accepted
+> **Status: Superseded by JOBS-0005.** The Job Orchestrator rebuild folds lanes, coalescing, and push into a single durable state machine, discarding the `Koan.Jobs.Core` worker described here.
+
+**Status**: Superseded by JOBS-0005
 **Date**: 2026-05-28
 **Deciders**: Enterprise Architect
 **Scope**: Koan.Jobs.Core — execution worker, builder surface, options

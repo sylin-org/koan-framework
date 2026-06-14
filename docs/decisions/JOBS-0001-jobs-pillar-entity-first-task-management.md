@@ -1,6 +1,8 @@
 # JOBS-0001: Jobs Pillar — Entity-First Task Management
 
-**Status**: Accepted
+> **Status: Superseded by JOBS-0005.** The Job Orchestrator rebuild is a greenfield replacement that discards the original `Koan.Jobs.Core` module described here.
+
+**Status**: Superseded by JOBS-0005
 **Date**: 2026-03-25
 **Deciders**: Enterprise Architect
 **Scope**: New pillar — Koan.Jobs.Core, Koan.Scheduling integration

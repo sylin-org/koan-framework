@@ -1,5 +1,7 @@
 ﻿# ADR: Messaging Topology, System Primitives, and Zero-Config Developer Experience
 
+> **Status: Retired.** Describes a prior messaging generation; the inbox/alias/provisioning features no longer exist in code.
+
 ## Context
 
 Koan.Canon and Koan.Messaging previously required some manual configuration and entity-centric modeling for messaging primitives. System-level primitives (Command, Announcement) were not first-class, and developers often needed to configure queues, exchanges, or bindings to get the stack working. This led to friction, risk of misconfiguration, and a suboptimal developer experience.

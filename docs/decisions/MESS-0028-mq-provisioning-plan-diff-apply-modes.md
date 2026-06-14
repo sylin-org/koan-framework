@@ -2,12 +2,14 @@
 id: MESS-0028
 slug: MESS-0028-mq-provisioning-plan-diff-apply-modes
 domain: MESS
-status: Accepted
+status: Retired
 date: 2025-08-24
 title: MQ provisioning - plan/diff/apply architecture and modes
 ---
 
 # 0028 - MQ provisioning: plan/diff/apply and modes
+
+> **Status: Retired.** Describes a prior messaging generation; the inbox/alias/provisioning features no longer exist in code.
 
 ## Context
 

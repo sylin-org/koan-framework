@@ -1,5 +1,7 @@
 ﻿# WEB-0060: Flow Messaging Refactor
 
+> **Status: Retired.** Describes the original Flow pillar generation, superseded by the Koan.Canon rebuild.
+
 ## Objective
 
 Implement clean Flow messaging architecture at the Koan.Messaging/Koan.Canon framework level for improved developer experience and maintainability.

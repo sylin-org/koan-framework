@@ -2,11 +2,13 @@
 id: MESS-0021
 slug: MESS-0021-messaging-capabilities-and-negotiation
 domain: MESS
-status: Accepted
+status: Retired
 title: Messaging capabilities and framework negotiation
 ---
 
 # 0021 - Messaging capabilities and framework negotiation
+
+> **Status: Retired.** Describes a prior messaging generation; the inbox/alias/provisioning features no longer exist in code.
 
 Context
 

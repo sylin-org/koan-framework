@@ -2,10 +2,14 @@
 id: WEB-0050
 slug: s8-flow-iot-sample-and-sse-monitor
 domain: Web
-status: draft
+status: Retired
 date: 2025-08-30
 title: S8 Flow IoT sample with multi-key aggregation, namespaced tags, and SSE monitor
 ---
+
+# WEB-0050 - S8 Flow IoT sample with multi-key aggregation, namespaced tags, and SSE monitor
+
+> **Status: Retired.** Describes the original Flow pillar generation, superseded by the Koan.Canon rebuild.
 
 ## Context
 

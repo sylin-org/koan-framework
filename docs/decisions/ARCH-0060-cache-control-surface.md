@@ -8,6 +8,8 @@ date: 2025-10-07
 title: Cache Control Surface Helpers and Entity Policy Integration
 ---
 
+> **Status: Reaffirmed by ARCH-0075 (Koan.Cache Pillar).** This control surface survived the cache pillar rebuild and remains accepted.
+
 > **Contract**
 >
 > - **Inputs:** Koan.Cache client abstractions, cache policy registry metadata, Entity<TEntity> lifecycles, and developer requests for targeted cache invalidation diagnostics.

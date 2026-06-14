@@ -2,11 +2,13 @@
 id: MESS-0024
 slug: MESS-0024-batch-semantics-and-aliasing
 domain: MESS
-status: Accepted
+status: Retired
 title: Batch semantics, handlers, and aliasing
 ---
 
 # 0024 - Batch semantics, handlers, and aliasing
+
+> **Status: Retired.** Describes a prior messaging generation; the inbox/alias/provisioning features no longer exist in code.
 
 Context
 

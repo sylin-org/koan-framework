@@ -2,10 +2,14 @@
 id: FLOW-0106
 slug: adapter-auto-scan-and-minimal-boot
 domain: Flow
-status: accepted
+status: Retired
 date: 2025-09-02
 title: Flow adapter auto-scan and minimal boot (Core host binder + adapter auto-registration)
 ---
+
+# FLOW-0106 - Flow adapter auto-scan and minimal boot
+
+> **Status: Retired.** Describes the original Flow pillar generation, superseded by the Koan.Canon rebuild.
 
 ## Contract (at a glance)
 

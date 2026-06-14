@@ -2,11 +2,13 @@
 id: MESS-0026
 slug: MESS-0026-discovery-over-mq-policy
 domain: MESS
-status: Accepted
+status: Retired
 title: Optional discovery-over-MQ (ping/announce) policy and gating
 ---
 
 # 0026 - Optional discovery-over-MQ (ping/announce) policy and gating
+
+> **Status: Retired.** Describes a prior messaging generation; the inbox/alias/provisioning features no longer exist in code.
 
 Context
 

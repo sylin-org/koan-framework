@@ -2,15 +2,17 @@
 id: ARCH-0046
 slug: ARCH-0046-recipes-intention-driven-bootstrap-and-layered-config
 domain: ARCH
-status: Accepted
+status: Superseded
 date: 2025-08-26
 ---
 
 # ARCH-0046: Integration Recipes - intention-driven bootstrap and layered configuration
 
+> **Status: Superseded by ARCH-0086 (KoanModule).** The boot-time registration, bootstrap, and self-report story is now owned by the unified `KoanModule` primitive.
+
 Date: 2025-08-26
 
-Status: Accepted
+Status: Superseded by ARCH-0086
 
 ## Context
 

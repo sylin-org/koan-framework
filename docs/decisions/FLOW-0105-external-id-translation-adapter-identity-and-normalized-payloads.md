@@ -1,6 +1,6 @@
 ﻿---
 title: "FLOW-0105: External ID translation, adapter identity, and normalized payload ingestion"
-status: Accepted
+status: Retired
 date: 2025-09-01
 related:
   - ARCH-0040-config-and-constants-naming.md
@@ -9,6 +9,8 @@ related:
 ---
 
 # FLOW-0105 - External ID translation, adapter identity, and normalized payload ingestion
+
+> **Status: Retired.** Describes the original Flow pillar generation, superseded by the Koan.Canon rebuild.
 
 Contract (at a glance)
 
