@@ -2,8 +2,10 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using Newtonsoft.Json.Linq;
 using System.Threading;
+using Koan.Mcp;
 using Koan.Web.Attributes;
 using Koan.Web.Endpoints;
 using Koan.Web.Hooks;
@@ -20,8 +22,12 @@ public sealed class RequestTranslator
 {
     private static readonly JsonSerializerSettings SerializerSettings = new()
     {
-        NullValueHandling = NullValueHandling.Ignore
+        NullValueHandling = NullValueHandling.Ignore,
+        // Honor [McpIgnore] (input-excluded) so caller payloads cannot set hidden fields (mass-assignment guard).
+        ContractResolver = McpContractResolver.Instance
     };
+
+    private static readonly JsonSerializer EntitySerializer = JsonSerializer.Create(SerializerSettings);
 
     public RequestTranslation Translate(
         IServiceProvider services,
@@ -205,6 +211,7 @@ public sealed class RequestTranslator
         var idNode = TryGet(args, "id") ?? throw new JsonException("Missing required 'id' parameter.");
         SetProperty(request, nameof(EntityPatchRequest<object, object>.Id), ConvertValue(idNode, registration.KeyType));
         var patchNode = TryGet(args, "patch") ?? throw new JsonException("Missing required 'patch' payload.");
+        RejectInputExcludedPatchTargets(patchNode, registration.EntityType);
         SetProperty(request, nameof(EntityPatchRequest<object, object>.Patch), ConvertPatchDocument(patchNode, registration.EntityType));
         SetProperty(request, nameof(EntityPatchRequest<object, object>.Set), ReadString(args, "set"));
         SetProperty(request, nameof(EntityPatchRequest<object, object>.Accept), ReadString(args, "accept"));
@@ -336,14 +343,14 @@ public sealed class RequestTranslator
 
     private static object ConvertEntity(JToken node, Type entityType)
     {
-        try { return node.ToObject(entityType) ?? throw new JsonException($"Unable to deserialize payload as {entityType.Name}."); }
+        try { return node.ToObject(entityType, EntitySerializer) ?? throw new JsonException($"Unable to deserialize payload as {entityType.Name}."); }
         catch (Exception ex) { throw new JsonException($"Unable to deserialize payload as {entityType.Name}: {ex.Message}"); }
     }
 
     private static object ConvertEntityCollection(JToken node, Type entityType)
     {
         var listType = typeof(List<>).MakeGenericType(entityType);
-        try { return node.ToObject(listType) ?? throw new JsonException($"Unable to deserialize collection payload as {entityType.Name} list."); }
+        try { return node.ToObject(listType, EntitySerializer) ?? throw new JsonException($"Unable to deserialize collection payload as {entityType.Name} list."); }
         catch (Exception ex) { throw new JsonException($"Unable to deserialize collection payload as {entityType.Name} list: {ex.Message}"); }
     }
 
@@ -367,6 +374,38 @@ public sealed class RequestTranslator
         }
 
         return list;
+    }
+
+    private static void RejectInputExcludedPatchTargets(JToken patchNode, Type entityType)
+    {
+        if (patchNode is not JArray operations) return;
+
+        foreach (var operation in operations)
+        {
+            var path = operation?["path"]?.Value<string>();
+            if (string.IsNullOrWhiteSpace(path)) continue;
+
+            // JSON Pointer: "/segment/..." — only the first segment maps to a top-level entity property.
+            var segment = path!.TrimStart('/').Split('/')[0];
+            if (string.IsNullOrWhiteSpace(segment)) continue;
+
+            var property = FindPropertyByName(entityType, segment);
+            if (property is not null && McpFieldPolicy.IsExcludedFromInput(property))
+            {
+                throw new JsonException($"Property '{segment}' cannot be modified via MCP.");
+            }
+        }
+    }
+
+    private static PropertyInfo? FindPropertyByName(Type entityType, string name)
+    {
+        foreach (var property in entityType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            if (string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase)) return property;
+            if (string.Equals(McpFieldPolicy.ResolveWireName(property), name, StringComparison.OrdinalIgnoreCase)) return property;
+        }
+
+        return null;
     }
 
     private static object ConvertPatchDocument(JToken node, Type entityType)

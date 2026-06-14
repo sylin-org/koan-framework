@@ -293,6 +293,10 @@ public sealed class McpEntityRegistry
             merged.EnabledTransports = transports;
         }
 
+        // Carry the attribute's exposure mode forward — the fresh merged attribute would otherwise drop it,
+        // silently downgrading a configured [McpEntity(Exposure = ...)] to the default when any override exists.
+        merged.Exposure = attribute.ExposureMode;
+
         return merged;
     }
 

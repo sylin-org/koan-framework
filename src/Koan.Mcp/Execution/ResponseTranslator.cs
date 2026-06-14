@@ -12,7 +12,9 @@ public sealed class ResponseTranslator
 {
     private static readonly JsonSerializerSettings SerializerSettings = new()
     {
-        NullValueHandling = NullValueHandling.Ignore
+        NullValueHandling = NullValueHandling.Ignore,
+        // Honor [McpIgnore] on results so internal/PII fields never leak (Tools + Code Mode share this path).
+        ContractResolver = McpContractResolver.Instance
     };
 
     public McpToolExecutionResult Translate(McpEntityRegistration registration, McpToolDefinition tool, EntityEndpointResult result)

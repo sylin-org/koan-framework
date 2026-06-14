@@ -4,12 +4,13 @@ domain: mcp
 title: "MCP over HTTP + SSE How-To"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-06-12
+last_updated: 2026-06-14
 framework_version: v0.17
 validation:
   date_last_tested: 2026-06-12
   status: verified
   scope: all-examples-tested
+  notes: "Section 3 'Hiding internal / PII fields' ([McpIgnore]) is covered by tests/Suites/Samples/Koan.Mcp.FieldExclusion.Tests (added 2026-06-14)."
 related_guides:
   - entity-capabilities-howto.md
   - patch-capabilities-howto.md
@@ -434,6 +435,52 @@ public class Metric : Entity<Metric>
 // - Metric.list(skip?, take?)
 // - Metric.query(filter)
 ```
+
+### Recipe: Hiding internal / PII fields (`[McpIgnore]`)
+
+`[McpEntity]` exposes **every public property** of the entity: the auto-generated input schema lists them all, and tool results (and Code Mode results) serialize the raw entity. If your aggregate carries internal bookkeeping or PII — owner ids, provenance, per-source snapshots — those fields leak to any MCP client. `AllowMutations = false` only removes *write* tools; it does **not** stop the read result from returning every field.
+
+Mark a property with `[McpIgnore]` to scope it out. The attribute is honored consistently across all three surfaces: the input schema, tool results (Tools **and** Code Mode), and input deserialization.
+
+```csharp
+using Koan.Mcp;
+
+[McpEntity(Description = "Public catalog", AllowMutations = false)]
+public class Work : Entity<Work>
+{
+    public string Title { get; set; } = "";
+    public string Summary { get; set; } = "";
+
+    [McpIgnore]                                  // hidden from schema AND results, and never settable
+    public List<string> ClaimedByUserIds { get; set; } = new();   // PII
+
+    [McpIgnore]
+    public Dictionary<string, object> FieldProvenance { get; set; } = new();   // internal bookkeeping
+
+    [McpIgnore(McpFieldDirection.Input)]         // server-owned: still returned, but callers cannot set it
+    public string? SourceSightingId { get; set; }
+
+    [McpIgnore(McpFieldDirection.Output)]        // accepted on write, but never echoed back
+    public string? ImportToken { get; set; }
+}
+```
+
+**Direction control** — `McpFieldDirection` selects where the property is excluded:
+
+| Annotation | Input schema | Tool / Code Mode result | Settable by caller |
+|------------|--------------|-------------------------|--------------------|
+| `[McpIgnore]` (`Both`, default) | omitted | omitted | no |
+| `[McpIgnore(McpFieldDirection.Output)]` | present | omitted | yes |
+| `[McpIgnore(McpFieldDirection.Input)]` | omitted | present | no |
+| *(no attribute)* | present | present | yes |
+
+Exclusion also blocks the field on JSON-Patch (`patch`) tools: a patch operation whose path targets an input-excluded property is rejected before it runs.
+
+**Why a dedicated attribute and not `[JsonIgnore]`?** Newtonsoft is Koan's canonical serializer for *both* the wire and persistence, so a `[Newtonsoft.Json.JsonIgnore]` would also drop the field from the data store. A `[System.Text.Json.Serialization.JsonIgnore]` is silently ignored by the Newtonsoft-based MCP serializer and would leak. `[McpIgnore]` is MCP-local: it changes nothing about how the entity is stored or how REST serializes it.
+
+> **Note:** `[McpIgnore]` is a static, per-type decision (it is baked into the cached tool schema). It is **not** a per-caller / role-based filter — every MCP client sees the same shape. To vary visibility by caller, combine an entity-level scope (`RequiredScopes`) with a request-options hook that filters rows/fields, or expose a separate read-model entity.
+
+> Default-deny posture: `[McpIgnore]` is a denylist (everything is exposed unless annotated), which matches Koan's expose-by-convention model. For a public surface, audit new properties as they are added — a freshly added field is exposed until someone marks it.
 
 ### Recipe: Custom tools
 
@@ -1646,6 +1693,7 @@ You've now mastered MCP over HTTP+SSE—from exposing entities as tools to handl
 - ✅ Require authentication (`RequireAuthentication: true`)
 - ✅ Configure CORS for browser clients
 - ✅ Set per-entity authorization (scopes, roles)
+- ✅ Mark internal / PII fields with `[McpIgnore]` — `[McpEntity]` exposes every public property in results by default (see [Hiding internal / PII fields](#recipe-hiding-internal--pii-fields-mcpignore))
 - ✅ Implement rate limiting
 - ✅ Monitor session count and memory usage
 

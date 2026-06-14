@@ -317,12 +317,17 @@ public sealed class SchemaBuilder
         foreach (var property in entityType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
             if (property.GetGetMethod() is null) continue;
+            // [McpIgnore] (input-excluded) drops the property from the upsert/patch input schema and the
+            // Code Mode entity interface (which is derived from this schema).
+            if (McpFieldPolicy.IsExcludedFromInput(property)) continue;
             var propSchema = CreateSchemaForProperty(property, operation, missingDescriptions);
             if (propSchema is null) continue;
-            props[property.Name] = propSchema;
+            // Honor a Newtonsoft [JsonProperty] rename so the advertised name matches the actual wire name.
+            var wireName = McpFieldPolicy.ResolveWireName(property);
+            props[wireName] = propSchema;
             if (IsRequired(property))
             {
-                required.Add(property.Name);
+                required.Add(wireName);
             }
         }
 

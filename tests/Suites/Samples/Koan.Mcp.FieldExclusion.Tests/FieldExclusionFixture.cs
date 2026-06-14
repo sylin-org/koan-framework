@@ -1,0 +1,83 @@
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using Koan.Core;
+using Koan.Mcp;
+using Koan.Mcp.Extensions;
+using Koan.Mcp.Hosting;
+using Koan.Mcp.Options;
+using Koan.Testing;
+using Koan.Web.Controllers;
+using Koan.Web.Extensions;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+
+namespace Koan.Mcp.FieldExclusion.Tests;
+
+/// <summary>
+/// Boots a real Koan + MCP + Web pipeline (AddKoan() reflective discovery, per ARCH-0079) hosting the
+/// <see cref="CatalogItem"/> entity, and exposes helpers to drive MCP tools directly through the RPC handler.
+/// </summary>
+public class FieldExclusionFixture : KoanTestPipelineFixtureBase
+{
+    public FieldExclusionFixture() : base(typeof(FieldExclusionFixture)) { }
+
+    /// <summary>Public accessor for the booted service provider (base exposes it as protected).</summary>
+    public IServiceProvider ServiceProvider => Services;
+
+    protected override void ConfigureTestServices(IServiceCollection services)
+    {
+        services.AddKoan().AsProxiedApi();
+        services.AddKoanMcp();
+        services.AddKoanWeb();
+
+        services.Configure<McpServerOptions>(o =>
+        {
+            o.Exposure = McpExposureMode.Full;
+            o.EnableHttpSseTransport = true;
+        });
+
+        services.AddKoanControllersFrom<CatalogItemsController>();
+    }
+
+    protected override void ConfigureApp(IApplicationBuilder app)
+    {
+        app.UseRouting();
+        app.UseEndpoints(endpoints =>
+        {
+            endpoints.MapKoanMcpEndpoints();
+            endpoints.MapControllers();
+        });
+    }
+
+    /// <summary>Invokes an MCP tool through the real handler and returns the serialized CallToolResult.</summary>
+    public async Task<JToken> CallToolAsync(string toolName, JObject? arguments, CancellationToken ct = default)
+    {
+        using var scope = Services.CreateScope();
+        var server = scope.ServiceProvider.GetRequiredService<McpServer>();
+        var handler = server.CreateHandler();
+        var callParams = new McpRpcHandler.ToolsCallParams { Name = toolName, Arguments = arguments };
+        var result = await handler.CallTool(callParams, ct);
+        return JToken.Parse(JsonConvert.SerializeObject(result));
+    }
+
+    /// <summary>Returns the input schema (JObject) for a tool, read straight from the registry.</summary>
+    public JObject GetToolInputSchema(string toolName)
+    {
+        var registry = Services.GetRequiredService<McpEntityRegistry>();
+        foreach (var registration in registry.Registrations)
+        {
+            foreach (var tool in registration.Tools)
+            {
+                if (string.Equals(tool.Name, toolName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return tool.InputSchema;
+                }
+            }
+        }
+
+        throw new InvalidOperationException($"Tool '{toolName}' was not discovered.");
+    }
+}
