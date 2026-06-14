@@ -17,7 +17,7 @@
          staying on the 2.5.x line keeps it API-compatible with what Aspire.Hosting expects. This is the single
          chokepoint: every other framework project that references an Aspire.Hosting.* package (the Postgres / PGVector
          / Redis connectors) also ProjectReferences THIS project, so the 2.5.301 floor propagates to all of them and
-         their consumers (verified: `dotnet list package --vulnerable` is clean on each). Remove once Aspire.Hosting's
+         their consumers (verified clean per the `dotnet list package` vulnerability scan on each). Remove once Aspire.Hosting's
          own transitive MessagePack floor is >= 2.5.301. -->
     <PackageReference Include="MessagePack" Version="2.5.301" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.8" />
