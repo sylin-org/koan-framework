@@ -1,13 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Koan.Admin.Contracts;
+using Koan.Web.Admin.Contracts;
 using Koan.Core;
 using Koan.Core.Observability.Health;
 using Koan.Core.Provenance;
 using Microsoft.Extensions.Logging;
 
-namespace Koan.Admin.Services;
+namespace Koan.Web.Admin.Services;
 
 internal sealed class KoanAdminManifestService : IKoanAdminManifestService
 {

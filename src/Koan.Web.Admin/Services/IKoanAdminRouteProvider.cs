@@ -1,6 +1,6 @@
-using Koan.Admin.Contracts;
+using Koan.Web.Admin.Contracts;
 
-namespace Koan.Admin.Services;
+namespace Koan.Web.Admin.Services;
 
 public interface IKoanAdminRouteProvider
 {

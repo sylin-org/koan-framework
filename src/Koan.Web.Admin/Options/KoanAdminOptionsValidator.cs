@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
-using Koan.Admin.Infrastructure;
+using Koan.Web.Admin.Infrastructure;
 using Microsoft.Extensions.Options;
 
-namespace Koan.Admin.Options;
+namespace Koan.Web.Admin.Options;
 
 internal sealed class KoanAdminOptionsValidator : IValidateOptions<KoanAdminOptions>
 {

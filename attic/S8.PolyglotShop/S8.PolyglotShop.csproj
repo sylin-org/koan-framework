@@ -27,7 +27,6 @@
     <ProjectReference Include="..\..\src\Connectors\Web\Swagger\Koan.Web.Connector.Swagger.csproj" />
 
     <ProjectReference Include="..\..\src\Koan.Web.Extensions\Koan.Web.Extensions.csproj" />
-    <ProjectReference Include="..\..\src\Koan.Admin\Koan.Admin.csproj" />
     <ProjectReference Include="..\..\src\Koan.Web.Admin\Koan.Web.Admin.csproj" />
 
     <ProjectReference Include="..\..\src\Connectors\Web\Auth\Test\Koan.Web.Auth.Connector.Test.csproj" />

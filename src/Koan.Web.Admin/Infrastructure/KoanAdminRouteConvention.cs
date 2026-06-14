@@ -1,6 +1,6 @@
 using System;
-using Koan.Admin.Contracts;
-using Koan.Admin.Services;
+using Koan.Web.Admin.Contracts;
+using Koan.Web.Admin.Services;
 using Microsoft.AspNetCore.Mvc.ApplicationModels;
 
 namespace Koan.Web.Admin.Infrastructure;

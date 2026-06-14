@@ -1,9 +1,9 @@
 using System;
-using Koan.Admin.Contracts;
-using Koan.Admin.Options;
+using Koan.Web.Admin.Contracts;
+using Koan.Web.Admin.Options;
 using Microsoft.Extensions.Options;
 
-namespace Koan.Admin.Services;
+namespace Koan.Web.Admin.Services;
 
 internal sealed class KoanAdminFeatureManager : IKoanAdminFeatureManager, IDisposable
 {

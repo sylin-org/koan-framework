@@ -1,9 +1,9 @@
-using Koan.Admin.Contracts;
-using Koan.Admin.Infrastructure;
-using Koan.Admin.Options;
+using Koan.Web.Admin.Contracts;
+using Koan.Web.Admin.Infrastructure;
+using Koan.Web.Admin.Options;
 using Microsoft.Extensions.Options;
 
-namespace Koan.Admin.Services;
+namespace Koan.Web.Admin.Services;
 
 internal sealed class KoanAdminRouteProvider : IKoanAdminRouteProvider, IDisposable
 {

@@ -4,8 +4,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Koan.Admin.Infrastructure;
-using Koan.Admin.Options;
+using Koan.Web.Admin.Infrastructure;
+using Koan.Web.Admin.Options;
 using Koan.Core;
 
 namespace Koan.Web.Admin.Hosting;

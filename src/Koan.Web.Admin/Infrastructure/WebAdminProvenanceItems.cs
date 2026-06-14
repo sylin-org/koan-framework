@@ -8,7 +8,7 @@ internal static class WebAdminProvenanceItems
     private static readonly IReadOnlyCollection<string> Consumers = new[]
     {
         "Koan.Web.Admin",
-        "Koan.Admin.RouteProvider"
+        "Koan.Web.Admin.RouteProvider"
     };
 
     internal static readonly ProvenanceItem AdminUiUrl = new(

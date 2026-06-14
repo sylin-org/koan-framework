@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Koan.Admin.Contracts;
 using Koan.Core;
 using Koan.Core.Observability.Health;
 
@@ -19,8 +18,8 @@ public sealed record KoanAdminStatusResponse(
 {
     public static KoanAdminStatusResponse Disabled()
         => new(KoanEnv.CurrentSnapshot, new KoanAdminFeatureSnapshot(false, false, false, false, false, false, false,
-            new KoanAdminRouteMap(Koan.Admin.Infrastructure.KoanAdminDefaults.Prefix, "", ""),
-            Koan.Admin.Infrastructure.KoanAdminDefaults.Prefix, KoanEnv.IsDevelopment),
+            new KoanAdminRouteMap(Koan.Web.Admin.Infrastructure.KoanAdminDefaults.Prefix, "", ""),
+            Koan.Web.Admin.Infrastructure.KoanAdminDefaults.Prefix, KoanEnv.IsDevelopment),
             KoanAdminRuntimeSurface.Empty,
             new KoanAdminManifestSummary(DateTimeOffset.UtcNow, [], HealthStatus.Unknown, 0),
             KoanAdminHealthDocument.Empty,

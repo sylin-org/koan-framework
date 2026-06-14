@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
-using Koan.Admin.Infrastructure;
+using Koan.Web.Admin.Infrastructure;
 
-namespace Koan.Admin.Options;
+namespace Koan.Web.Admin.Options;
 
 public sealed class KoanAdminAuthorizationOptions
 {

@@ -14,7 +14,6 @@
     <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />
   <ProjectReference Include="..\..\src\\Connectors\\Data\\Json\Koan.Data.Connector.Json.csproj" />
   <ProjectReference Include="..\..\src\Koan.Web.Extensions\Koan.Web.Extensions.csproj" />
-  <ProjectReference Include="..\..\src\Koan.Admin\Koan.Admin.csproj" />
   <ProjectReference Include="..\..\src\Koan.Web.Admin\Koan.Web.Admin.csproj" />
   <ProjectReference Include="..\..\src\Koan.Cache\Koan.Cache.csproj" />
 

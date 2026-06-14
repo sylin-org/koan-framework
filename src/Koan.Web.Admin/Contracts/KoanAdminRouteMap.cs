@@ -1,4 +1,4 @@
-namespace Koan.Admin.Contracts;
+namespace Koan.Web.Admin.Contracts;
 
 public sealed record KoanAdminRouteMap(string Prefix, string RootTemplate, string ApiTemplate)
 {

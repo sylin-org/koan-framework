@@ -8,7 +8,6 @@
     <PackageTags>$(CommonPackageTags);admin;dashboard;diagnostics;launchkit</PackageTags>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Koan.Admin\Koan.Admin.csproj" />
     <ProjectReference Include="..\Koan.Web\Koan.Web.csproj" />
   </ItemGroup>
   <ItemGroup>

@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Koan.Admin.Contracts;
+namespace Koan.Web.Admin.Contracts;
 
 public sealed record KoanAdminLaunchKitRequest(
     string? Profile,

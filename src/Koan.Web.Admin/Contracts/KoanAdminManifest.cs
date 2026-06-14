@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text.Json.Serialization;
 using Koan.Core.Observability.Health;
 
-namespace Koan.Admin.Contracts;
+namespace Koan.Web.Admin.Contracts;
 
 public sealed record KoanAdminManifest(
     DateTimeOffset GeneratedAtUtc,

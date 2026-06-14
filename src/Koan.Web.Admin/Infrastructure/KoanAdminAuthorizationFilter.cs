@@ -1,6 +1,6 @@
 using System.Net;
-using Koan.Admin.Options;
-using Koan.Admin.Services;
+using Koan.Web.Admin.Options;
+using Koan.Web.Admin.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;

@@ -1,7 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
-using Koan.Admin.Contracts;
-using Koan.Admin.Services;
+using Koan.Web.Admin.Contracts;
+using Koan.Web.Admin.Services;
 using Koan.Web.Admin.Infrastructure;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;

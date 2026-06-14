@@ -1,4 +1,4 @@
-namespace Koan.Admin.Infrastructure;
+namespace Koan.Web.Admin.Infrastructure;
 
 public static class KoanAdminDefaults
 {

@@ -5,13 +5,13 @@ using System.IO.Compression;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
-using Koan.Admin.Contracts;
-using Koan.Admin.Options;
+using Koan.Web.Admin.Contracts;
+using Koan.Web.Admin.Options;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace Koan.Admin.Services;
+namespace Koan.Web.Admin.Services;
 
 internal sealed class KoanAdminLaunchKitService(
     IKoanAdminManifestService manifestService,

@@ -1,7 +1,7 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 
-namespace Koan.Admin.Options;
+namespace Koan.Web.Admin.Options;
 
 public sealed class KoanAdminGenerateOptions
 {

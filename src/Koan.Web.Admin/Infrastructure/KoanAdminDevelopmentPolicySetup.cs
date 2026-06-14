@@ -1,8 +1,8 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
-using Koan.Admin.Infrastructure;
-using Koan.Admin.Options;
+using Koan.Web.Admin.Infrastructure;
+using Koan.Web.Admin.Options;
 
 namespace Koan.Web.Admin.Infrastructure;
 

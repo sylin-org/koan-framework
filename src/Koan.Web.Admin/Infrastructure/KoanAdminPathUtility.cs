@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace Koan.Admin.Infrastructure;
+namespace Koan.Web.Admin.Infrastructure;
 
 internal static class KoanAdminPathUtility
 {

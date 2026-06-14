@@ -1,5 +1,5 @@
 ﻿using System.Collections.Generic;
-using Koan.Admin.Contracts;
+using Koan.Web.Admin.Contracts;
 
 namespace Koan.Web.Admin.Contracts;
 

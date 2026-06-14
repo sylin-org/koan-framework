@@ -1,6 +1,6 @@
-using Koan.Admin.Options;
+using Koan.Web.Admin.Options;
 
-namespace Koan.Admin.Infrastructure;
+namespace Koan.Web.Admin.Infrastructure;
 
 public static class ConfigurationConstants
 {

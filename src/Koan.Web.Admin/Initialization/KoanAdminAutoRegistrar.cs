@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Koan.Admin.Extensions;
-using Koan.Admin.Infrastructure;
-using Koan.Admin.Options;
-using Koan.Admin.Services;
+using Koan.Web.Admin.Extensions;
+using Koan.Web.Admin.Infrastructure;
+using Koan.Web.Admin.Options;
+using Koan.Web.Admin.Services;
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
 using Microsoft.Extensions.Configuration;
@@ -12,11 +12,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using static Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
 
-namespace Koan.Admin.Initialization;
+namespace Koan.Web.Admin.Initialization;
 
 public sealed class KoanAdminAutoRegistrar : IKoanAutoRegistrar
 {
-    public string ModuleName => "Koan.Admin";
+    public string ModuleName => "Koan.Web.Admin";
     public string? ModuleVersion => typeof(KoanAdminAutoRegistrar).Assembly.GetName().Version?.ToString();
 
     public void Initialize(IServiceCollection services)

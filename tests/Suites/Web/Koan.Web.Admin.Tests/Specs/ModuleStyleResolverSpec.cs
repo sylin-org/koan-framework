@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using AwesomeAssertions;
-using Koan.Admin.Contracts;
+using Koan.Web.Admin.Contracts;
 using Koan.Core.Modules.Pillars;
 using Koan.Web.Admin.Infrastructure;
 using Xunit;

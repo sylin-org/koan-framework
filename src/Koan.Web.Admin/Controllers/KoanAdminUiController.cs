@@ -1,4 +1,4 @@
-using Koan.Admin.Services;
+using Koan.Web.Admin.Services;
 using Koan.Web.Admin.Infrastructure;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

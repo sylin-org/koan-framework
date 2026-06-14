@@ -1,9 +1,9 @@
 ﻿using System.Collections.Generic;
 using System.Globalization;
-using Koan.Admin.Options;
+using Koan.Web.Admin.Options;
 using Koan.Core.Hosting.Bootstrap;
 
-namespace Koan.Admin.Infrastructure;
+namespace Koan.Web.Admin.Infrastructure;
 
 internal static class AdminProvenanceItems
 {
@@ -12,14 +12,14 @@ internal static class AdminProvenanceItems
     private static readonly KoanAdminLoggingOptions LoggingDefaults = Defaults.Logging;
     private static readonly KoanAdminGenerateOptions GenerateDefaults = Defaults.Generate;
 
-    private static readonly IReadOnlyCollection<string> FeatureManagerConsumers = new[] { "Koan.Admin.FeatureManager" };
-    private static readonly IReadOnlyCollection<string> FeatureManagerAndWebConsumers = new[] { "Koan.Admin.FeatureManager", "Koan.Web.Admin" };
-    private static readonly IReadOnlyCollection<string> RouteProviderConsumers = new[] { "Koan.Admin.RouteProvider" };
-    private static readonly IReadOnlyCollection<string> RouteAndWebConsumers = new[] { "Koan.Admin.RouteProvider", "Koan.Web.Admin" };
-    private static readonly IReadOnlyCollection<string> LaunchKitConsumers = new[] { "Koan.Admin.LaunchKitService" };
-    private static readonly IReadOnlyCollection<string> ManifestConsumers = new[] { "Koan.Admin.ManifestService" };
+    private static readonly IReadOnlyCollection<string> FeatureManagerConsumers = new[] { "Koan.Web.Admin.FeatureManager" };
+    private static readonly IReadOnlyCollection<string> FeatureManagerAndWebConsumers = new[] { "Koan.Web.Admin.FeatureManager", "Koan.Web.Admin" };
+    private static readonly IReadOnlyCollection<string> RouteProviderConsumers = new[] { "Koan.Web.Admin.RouteProvider" };
+    private static readonly IReadOnlyCollection<string> RouteAndWebConsumers = new[] { "Koan.Web.Admin.RouteProvider", "Koan.Web.Admin" };
+    private static readonly IReadOnlyCollection<string> LaunchKitConsumers = new[] { "Koan.Web.Admin.LaunchKitService" };
+    private static readonly IReadOnlyCollection<string> ManifestConsumers = new[] { "Koan.Web.Admin.ManifestService" };
     private static readonly IReadOnlyCollection<string> AuthorizationConsumers = new[] { "Koan.Web.Admin.Authorization" };
-    private static readonly IReadOnlyCollection<string> LoggingConsumers = new[] { "Koan.Admin.Logging" };
+    private static readonly IReadOnlyCollection<string> LoggingConsumers = new[] { "Koan.Web.Admin.Logging" };
 
     internal static readonly ProvenanceItem Enabled = new(
         ConfigurationConstants.Admin.Section + ":" + ConfigurationConstants.Admin.Keys.Enabled,

@@ -1,9 +1,8 @@
-using Koan.Admin.Infrastructure;
-using Koan.Admin.Options;
+using Koan.Web.Admin.Infrastructure;
+using Koan.Web.Admin.Options;
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Web.Admin.Extensions;
-using Koan.Web.Admin.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -36,7 +35,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // Report full URLs for admin endpoints if enabled
         if (enabledOption && webOption)
         {
-            // Construct routes based on prefix (matching Koan.Admin's default structure)
+            // Construct routes based on prefix (matching the admin core's default structure)
             var prefix = (prefixOption ?? KoanAdminDefaults.Prefix).Trim('/');
             var rootPath = $"{prefix}/admin/";
             var apiPath = $"{prefix}/admin/api";

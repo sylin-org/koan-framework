@@ -1,4 +1,4 @@
-using Koan.Admin.Services;
+using Koan.Web.Admin.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 

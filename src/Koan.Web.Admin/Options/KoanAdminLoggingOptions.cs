@@ -1,4 +1,4 @@
-namespace Koan.Admin.Options;
+namespace Koan.Web.Admin.Options;
 
 public sealed class KoanAdminLoggingOptions
 {

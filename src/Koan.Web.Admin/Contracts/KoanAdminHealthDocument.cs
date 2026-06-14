@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Koan.Core.Observability.Health;
 
-namespace Koan.Admin.Contracts;
+namespace Koan.Web.Admin.Contracts;
 
 public sealed record KoanAdminHealthDocument(
     HealthStatus Overall,
