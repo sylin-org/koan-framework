@@ -11,13 +11,43 @@ namespace Koan.Core.Hosting.Bootstrap;
 // Greenfield bootstrapper: wires up IKoanInitializer instances already registered or discoverable via DI.
 public static class AppBootstrapper
 {
+    /// <summary>
+    /// Degraded-boot opt-out (fail-fast.json). When <c>KOAN_BOOT_LENIENT=1</c>, a broken module no
+    /// longer crashes the host — it is still written to <see cref="Console.Error"/> and recorded in
+    /// the registry summary's MODULES-FAILED channel, but boot continues. Read here (env var) because
+    /// <c>InitializeModules</c> runs on <c>IServiceCollection</c> before any <c>IConfiguration</c>
+    /// exists — the same constraint that gates <c>KOAN_VERBOSE_ASSEMBLIES</c>.
+    /// </summary>
+    private const string LenientBootEnvVar = "KOAN_BOOT_LENIENT";
+
     private static RegistrySummarySnapshot? _registrySummary;
 
+    // Boot-time module failures (TIER B) accumulated across the manifest-invoker swallow and the
+    // initializer loop, surfaced via RegistrySummarySnapshot → boot report MODULES-FAILED block.
+    [ThreadStatic]
+    private static List<ModuleFailure>? _bootFailures;
+
     internal static RegistrySummarySnapshot? RegistrySummary => _registrySummary;
+
+    private static bool IsLenientBoot()
+        => string.Equals(Environment.GetEnvironmentVariable(LenientBootEnvVar), "1", StringComparison.OrdinalIgnoreCase);
+
+    private static void RecordFailure(Type module, string assembly, string phase, Exception ex)
+    {
+        // Console.Error is the only diagnostic channel available at InitializeModules time
+        // (no ILogger yet) — precedent: EmitAssemblySummary writes to Console. Mirrors
+        // KoanBackgroundServiceOrchestrator's unconditional LogError on startup failure.
+        Console.Error.WriteLine($"[KOAN] BOOT-FAILED module={module.FullName ?? module.Name} assembly={assembly} phase={phase}");
+        Console.Error.WriteLine(ex.ToString());
+        (_bootFailures ??= new List<ModuleFailure>())
+            .Add(new ModuleFailure(module.FullName ?? module.Name, assembly, phase, ex.Message));
+    }
 
     public static void InitializeModules(IServiceCollection services)
     {
         KoanStartupTimeline.Mark(KoanStartupStage.BootstrapStart);
+        _bootFailures = new List<ModuleFailure>();
+        var lenientBoot = IsLenientBoot();
 
         // Build a closure of loaded + referenced assemblies and populate AssemblyCache
         var set = new Dictionary<string, Assembly>(StringComparer.OrdinalIgnoreCase);
@@ -25,6 +55,11 @@ public static class AppBootstrapper
         var verboseAssemblies = string.Equals(Environment.GetEnvironmentVariable("KOAN_VERBOSE_ASSEMBLIES"), "1", StringComparison.OrdinalIgnoreCase);
         var assemblyLog = new List<(Assembly Assembly, string LoadContext)>();
         var discoveredAssemblies = new List<Assembly>();
+        // TIER A (fail-fast.json): assembly-closure load failures stay LENIENT — Assembly.Load of
+        // referenced names routinely fails for legitimate reasons (ref-only/trimmed/platform-specific
+        // assemblies; Spring @ConditionalOnClass / ReflectionTypeLoadException precedent) — but are now
+        // COUNTED and surfaced in the KOAN_VERBOSE_ASSEMBLIES output instead of vanishing entirely.
+        var lenientAssemblySkips = 0;
 
         bool AddAsm(Assembly a, bool isDiscovery = false)
         {
@@ -57,7 +92,7 @@ public static class AppBootstrapper
             foreach (var asm in current)
             {
                 AssemblyName[] refs;
-                try { refs = asm.GetReferencedAssemblies(); } catch { continue; }
+                try { refs = asm.GetReferencedAssemblies(); } catch { lenientAssemblySkips++; continue; }
                 foreach (var rn in refs)
                 {
                     if (set.ContainsKey(rn.Name!)) continue;
@@ -69,7 +104,7 @@ public static class AppBootstrapper
                             changed = true;
                         }
                     }
-                    catch { /* skip */ }
+                    catch { lenientAssemblySkips++; /* TIER A: skip absent reference, counted */ }
                 }
             }
         }
@@ -89,24 +124,32 @@ public static class AppBootstrapper
                         AddAsm(asm, isDiscovery: true);
                     }
                 }
-                catch { /* ignore bad files */ }
+                catch { lenientAssemblySkips++; /* TIER A: ignore bad file, counted */ }
             }
         }
-        catch { /* ignore */ }
+        catch { lenientAssemblySkips++; /* TIER A: ignore base-dir scan failure, counted */ }
 
-        EmitAssemblySummary(assemblyLog, discoveredAssemblies, verboseAssemblies);
+        EmitAssemblySummary(assemblyLog, discoveredAssemblies, verboseAssemblies, lenientAssemblySkips);
 
         var initializerTypes = KoanRegistry.GetInitializerTypes();
         var autoRegistrarTypes = KoanRegistry.GetAutoRegistrarTypes();
         var backgroundServices = KoanRegistry.GetBackgroundServices();
         var serviceDiscoveryAdapters = KoanRegistry.GetServiceDiscoveryAdapters();
 
-        var registrySummary = BuildRegistrySummary(initializerTypes, autoRegistrarTypes, backgroundServices, serviceDiscoveryAdapters);
-        _registrySummary = registrySummary;
+        // Publish an early snapshot (no failures yet) so a fail-fast crash still leaves the registry
+        // summary populated for any best-effort boot-report rendering up the stack.
+        _registrySummary = BuildRegistrySummary(initializerTypes, autoRegistrarTypes, backgroundServices, serviceDiscoveryAdapters);
 
         // CORE-0003: Always run initializers for every ServiceCollection.
         // Initializers are responsible for their own idempotency (AppDomain-scoped guards for static state).
         // Source-generated registries track eligible types deterministically.
+        //
+        // TIER B (fail-fast.json refinedRecommendation): an exception escaping initializer construction
+        // or Initialize() is NO LONGER swallowed. It is written to Console.Error, recorded into the
+        // registry summary (MODULES-FAILED channel), and rethrown wrapped in KoanBootException — unless
+        // KOAN_BOOT_LENIENT=1, in which case the host boots degraded with the failure left visible in the
+        // boot report. Mirrors KoanBackgroundServiceOrchestrator.FailFastOnStartupFailure=true (the policy
+        // the framework already ships for startup services) and .NET 6's BackgroundService StopHost move.
         foreach (var initializerType in initializerTypes)
         {
             try
@@ -117,11 +160,26 @@ public static class AppBootstrapper
                     init.Initialize(services);
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // best-effort to avoid failing the host during bootstrap
+                var asmName = initializerType.Assembly.GetName();
+                RecordFailure(initializerType, asmName.Name ?? "<unknown>", "initializer", ex);
+                if (!lenientBoot)
+                {
+                    throw new KoanBootException(
+                        initializerType,
+                        asmName.Name ?? "<unknown>",
+                        asmName.Version?.ToString() ?? "unknown",
+                        "initializer",
+                        ex);
+                }
             }
         }
+
+        // Re-publish the registry summary now that the failures list is fully populated so the boot
+        // report (AppRuntime → KoanConsoleBlocks) can render a MODULES-FAILED block in lenient mode.
+        var registrySummary = BuildRegistrySummary(initializerTypes, autoRegistrarTypes, backgroundServices, serviceDiscoveryAdapters);
+        _registrySummary = registrySummary;
 
         KoanStartupTimeline.Mark(KoanStartupStage.DataReady);
     }
@@ -129,7 +187,8 @@ public static class AppBootstrapper
     private static void EmitAssemblySummary(
         List<(Assembly Assembly, string LoadContext)> assemblyLog,
         List<Assembly> discoveredAssemblies,
-        bool verboseAssemblies)
+        bool verboseAssemblies,
+        int lenientAssemblySkips)
     {
         static string Classify(Assembly asm)
         {
@@ -171,6 +230,9 @@ public static class AppBootstrapper
 
         if (verboseAssemblies)
         {
+            // TIER A counts (fail-fast.json): absent/unloadable references skipped during closure are
+            // no longer silent — surface them here alongside the assembly listing.
+            Console.WriteLine($"ASSEMBLIES|lenientSkips={lenientAssemblySkips}");
             foreach (var entry in assemblyLog.OrderBy(a => a.Assembly.GetName().Name, StringComparer.OrdinalIgnoreCase))
             {
                 var name = entry.Assembly.GetName();
@@ -206,6 +268,12 @@ public static class AppBootstrapper
         var startupServices = backgroundServices.Count(b => b.IsStartup);
         var periodicServices = backgroundServices.Count(b => b.IsPeriodic);
 
+        // Snapshot the accumulated boot failures (MODULES-FAILED channel) so the boot report can
+        // render them — the partial mechanism fail-fast.json identified as "just isn't wired".
+        IReadOnlyList<ModuleFailure> failures = _bootFailures is { Count: > 0 }
+            ? _bootFailures.ToArray()
+            : Array.Empty<ModuleFailure>();
+
         return new RegistrySummarySnapshot(
             initializerTypes.Count,
             initializerBreakdown,
@@ -213,7 +281,8 @@ public static class AppBootstrapper
             backgroundServices.Count,
             startupServices,
             periodicServices,
-            serviceDiscoveryAdapters.Count);
+            serviceDiscoveryAdapters.Count,
+            failures);
     }
 
     private static Action<Assembly>? _manifestLoader;
@@ -234,8 +303,27 @@ public static class AppBootstrapper
             if (method is null) return null;
             return asm =>
             {
+                // TIER B (fail-fast.json): a failure of the manifest-invoker itself can silently no-op
+                // the ENTIRE framework (nothing is ever discovered, AddKoan() does nothing). Per-type
+                // and ReflectionTypeLoadException leniency already lives INSIDE PopulateFromAssembly, so
+                // an exception escaping to here is a framework bug — fail loud unless KOAN_BOOT_LENIENT=1.
                 try { method.Invoke(null, new object?[] { asm }); }
-                catch { /* swallow manifest reflection errors */ }
+                catch (Exception ex)
+                {
+                    var actual = (ex as TargetInvocationException)?.InnerException ?? ex;
+                    var phase = $"manifest-invoker(scanning '{asm.GetName().Name}')";
+                    var asmName = loaderType.Assembly.GetName();
+                    RecordFailure(loaderType, asmName.Name ?? "<unknown>", phase, actual);
+                    if (!IsLenientBoot())
+                    {
+                        throw new KoanBootException(
+                            loaderType,
+                            asmName.Name ?? "<unknown>",
+                            asmName.Version?.ToString() ?? "unknown",
+                            phase,
+                            actual);
+                    }
+                }
             };
         }
         catch
@@ -252,4 +340,13 @@ internal readonly record struct RegistrySummarySnapshot(
     int BackgroundServices,
     int StartupBackgroundServices,
     int PeriodicBackgroundServices,
-    int ServiceDiscoveryAdapters);
+    int ServiceDiscoveryAdapters,
+    IReadOnlyList<ModuleFailure> ModuleFailures);
+
+/// <summary>
+/// A boot-time module failure recorded into the registry summary so the boot report can render a
+/// MODULES-FAILED block (Track F · fail-fast.json). Populated in BOTH fail-fast and lenient modes —
+/// in fail-fast the host also throws <see cref="KoanBootException"/>; in lenient mode the recorded
+/// entry is the only visibility the operator gets.
+/// </summary>
+internal readonly record struct ModuleFailure(string Module, string Assembly, string Phase, string Error);
