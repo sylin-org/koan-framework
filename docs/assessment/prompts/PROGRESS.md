@@ -49,7 +49,7 @@ Preamble for these cards: the `[PREAMBLE]` block in `../06-prompt-stash.md`.
 | C9 | T2 | B1 | obsolete | 2026-06-14 | opus-4.8 | (aborted, no change) | **DO NOT PARK** — Koan.Tagging has ACTIVE external consumers (a downstream repo). The card's "zero consumers" is IN-REPO only; external consumers are invisible to the precheck grep. Aborted before any file moved; Koan.Tagging intact in src/ + sln. |
 | C10 | T2 | B1 | pending | | | | park Koan.Rag + Abstractions (before/with S3) |
 | C11 | T2 | B1 | pending | | | | cut Koan.AI dead pipeline surface (not the project) |
-| C13 | T2 | B1 | pending | | | | cut PGVector connector + vector filter surface |
+| C13 | T2 | B1 | done | 2026-06-14 | opus-4.8 | 3f3c1f68 | cut PGVector (didn't compile) + orphan test + dead IVectorFilterTranslator/VectorEmbeddingAttribute; unwound B1's transitive sln-add; tagged attic/pgvector; not consumed; build green, sln 279→277 |
 | C14 | T2 | B1 | done | 2026-06-14 | opus-4.8 | 99c1ef70 | removed legacy ResilientStorageDecorator + Resilient flag (kept StorageFallbackMode + default/Replicated path untouched); external audit clean (downstream uses Koan.Storage, not Resilient); build green. Done directly by orchestrator (agent rate-limited) |
 | C17 | T2 | B1 | blocked | 2026-06-14 | opus-4.8 | (external-consumer gate) | **BLOCKED — Koan.Scheduling is consumed by an external downstream repo** (PackageReference + packed). The migrate-to-Jobs cut would break the consumer. Hold pending the consumer migrating off IScheduledTask (or keep Scheduling). |
 | C19 | T2 | B1 | pending | | | | execute MEDIA-0008's overdue deletion |
