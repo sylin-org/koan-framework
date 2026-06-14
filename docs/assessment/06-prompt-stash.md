@@ -13,6 +13,11 @@ Tier legend — **T1** = small model, autonomous · **T2** = small model, recipe
 **Dependency order**: B1 → (A*, C0, CUT waves in any order) → E-series → D/G → H-series.
 F1 early (it improves every later session's error visibility). T3 items anytime.
 
+> **▶ Execution artifacts** — this stash is split into one self-contained file per session under
+> [`prompts/06/`](prompts/) and tracked in [`prompts/PROGRESS.md`](prompts/PROGRESS.md). This file
+> stays the canonical source for the coverage map, tier legend, and dependency order; the split
+> cards are derived. Edit a recipe here, then regenerate or hand-patch its card.
+
 ---
 
 ## [PREAMBLE] — paste at the top of EVERY session

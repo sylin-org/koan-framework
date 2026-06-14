@@ -16,6 +16,11 @@ The green ratchet (build + tests) is the only backward contract.
 > them. This file stays excluded from the snippet-compile lint; a session may treat its own
 > card's shape as the spec, never as evidence of an existing API.
 
+> **▶ Execution artifacts** — this stash is split into one self-contained file per session under
+> [`prompts/07/`](prompts/) and tracked in [`prompts/PROGRESS.md`](prompts/PROGRESS.md). This file
+> stays the canonical source for the maturity ladder, gates, and target shapes; the split cards
+> are derived. Edit a card here, then regenerate or hand-patch its file.
+
 ---
 
 ## The maturity ladder — why this order
