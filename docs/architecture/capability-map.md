@@ -56,7 +56,7 @@ Below is a capability map that layers packages from foundational primitives thro
 | Messaging & async       | Inbox/outbox patterns, background coordination, scheduling              | `Koan.Messaging.Core`, `Koan.Messaging.Abstractions`, `Koan.Messaging.Connector.RabbitMq`, `Koan.Service.Inbox.Connector.Redis`, `Koan.Messaging.Inbox.*`, `Koan.Scheduling` | Core + Data             |
 | AI, media & search      | Prompt routing, embeddings, media pipelines                             | `Koan.AI`, `Koan.AI.Contracts`, `Koan.AI.Connector.Ollama`, `Koan.Media.Abstractions`, `Koan.Media.Core`, `Koan.Media.Web`, `Koan.Data.Vector.*`                              | Core + Data             |
 | Secrets & configuration | Unified secret resolution and config overlays                           | `Koan.Secrets.Abstractions`, `Koan.Secrets.Core`, `Koan.Secrets.Connector.Vault`                                                                                                       | Core runtime            |
-| Recipes & orchestration | Intent-driven operational wiring, container orchestration               | `Koan.Recipe.Abstractions`, `Koan.Recipe.Observability`, `Koan.Orchestration.*`, `Koan.Orchestration.Cli`                                                                    | Core + Secrets + Data   |
+| Orchestration           | Container orchestration, manifest generation                            | `Koan.Orchestration.*`, `Koan.Orchestration.Cli`                                                                    | Core + Secrets + Data   |
 | Domain pipelines        | Canonical data flows, Dapr runtime, MCP integration                     | `Koan.Canon.*`, `Koan.Mcp`                                                                                                                                                   | Core + Data + Messaging |
 
 The remainder of this document drills into each layer and highlights first-class helpers and developer outcomes.
@@ -151,15 +151,15 @@ The remainder of this document drills into each layer and highlights first-class
 
 ---
 
-## 7. Recipes, orchestration, and operational layers
+## 7. Orchestration and operational layers
 
-**Packages**: `Koan.Recipe.Abstractions`, `Koan.Recipe.Observability`, `Koan.Orchestration.Abstractions`, `Koan.Orchestration.Cli`, `Koan.Orchestration.Generators`, `Koan.Orchestration.Connector.Docker`, `Koan.Orchestration.Connector.Podman`, `Koan.Orchestration.Renderers.Connector.Compose`, `Koan.Orchestration.Aspire`
+**Packages**: `Koan.Orchestration.Abstractions`, `Koan.Orchestration.Cli`, `Koan.Orchestration.Generators`, `Koan.Orchestration.Connector.Docker`, `Koan.Orchestration.Connector.Podman`, `Koan.Orchestration.Renderers.Connector.Compose`, `Koan.Orchestration.Aspire`
 
-- Recipes encode opt-in operational bundles. `Koan.Recipe.Observability`, for example, wires OpenTelemetry, health checks, and resilient HTTP policies in one call.
+- ~~Recipes encode opt-in operational bundles. `Koan.Recipe.Observability`, for example, wires OpenTelemetry, health checks, and resilient HTTP policies in one call.~~ _(removed 2026-06: the Recipe pillar — `Koan.Recipe.Abstractions` / `Koan.Recipe.Observability` — was cut per ARCH-0086; its observability baseline (health checks + resilient HttpClient) now folds into `Koan.Web`'s auto-registrar.)_
 - The orchestration toolchain reads manifests generated at build time (`Koan.Orchestration.Generators`) to plan container stacks, export Compose manifests, and run local clusters.
 - Providers (`Docker`, `Podman`) and renderers (`Compose`) are modular; the CLI selects what is available, and `Koan.Orchestration.Aspire` integrates with .NET Aspire when required.
 
-**Developer benefit**: Move from source to runnable local/CI stack with a single CLI command, export artifacts for ops teams, and apply best-practice wiring (telemetry, retries) consistently via recipes.
+**Developer benefit**: Move from source to runnable local/CI stack with a single CLI command, export artifacts for ops teams, and apply best-practice wiring (telemetry, retries) consistently via `Koan.Web`'s observability baseline.
 
 ---
 
@@ -181,7 +181,7 @@ The remainder of this document drills into each layer and highlights first-class
 1. **Start with Core + Web + Data**: Most services begin by referencing `Koan.Core`, `Koan.Data.Core`, `Koan.Web`, and a storage provider (e.g., `Koan.Data.Connector.Postgres`). This combination yields CRUD-ready APIs with no custom scaffolding.
 2. **Add async & scheduling** when you need eventual consistency or background work. `Koan.Messaging.*` and `Koan.Scheduling` reuse the data abstractions for persistence and the core runtime for configuration and logging.
 3. **Introduce AI or media** to augment your domain. Use the same entity-first approach to persist metadata while AI adapters handle external intelligence.
-4. **Secure & operationalise** by layering secrets (`Koan.Secrets.*`), recipes (`Koan.Recipe.*`), and orchestration (`Koan.Orchestration.*`). These modules read the same configuration sources and emit manifest metadata consumed by the CLI.
+4. **Secure & operationalise** by layering secrets (`Koan.Secrets.*`) and orchestration (`Koan.Orchestration.*`). These modules read the same configuration sources and emit manifest metadata consumed by the CLI.
 5. **scale the domain** with Canon or Flow once you need canonical projections, multi-stage pipelines, or Dapr-hosted workers.
 
 The map is intentionally composable: everything hinges on the core runtime’s auto-registration, and every module exposes typed options and constants to align with Koan’s engineering guardrails.
@@ -191,7 +191,7 @@ The map is intentionally composable: everything hinges on the core runtime’s a
 ## Suggested adoption path for new teams
 
 1. **Bootstrap**: `Koan.Core`, `Koan.Web`, `Koan.Data.Core`, plus one data provider (`Koan.Data.Connector.Postgres` or `Koan.Data.Connector.Mongo`). Use entity statics and controllers to ship value quickly.
-2. **Observability & resilience**: Reference `Koan.Recipe.Observability` and run the CLI’s `doctor` command to confirm telemetry endpoints, or export Compose manifests for local stacks.
+2. **Observability & resilience**: Reference `Koan.Web` (its auto-registrar wires the health-check + resilient-HttpClient baseline) and run the CLI’s `doctor` command to confirm telemetry endpoints, or export Compose manifests for local stacks.
 3. **Security posture**: Add `Koan.Secrets.Core` (and a provider like Vault) before production, ensuring configuration remains declarative.
 4. **Extended capabilities**: Pull in `Koan.Messaging.*`, `Koan.Scheduling`, and `Koan.Storage` as your domain evolves. Each package maintains a README/TECHNICAL pair for deep dives.
 5. **Advanced scenarios**: When AI, media, or canonical pipelines become relevant, reference the specialised packages—the runtime will announce new capabilities in the boot report.

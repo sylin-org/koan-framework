@@ -252,15 +252,7 @@ Use this reference when you plan a Koan solution and need to understand which mo
 - **How to use**: reference package when your app exposes MCP-compatible endpoints.
 - **When to use**: bridging Koan apps with MCP clients/tools.
 
-## 11. Recipes & Observability
-
-### Koan.Recipe.Abstractions / Koan.Recipe.Observability
-
-- **Purpose**: reusable “recipes” (composable patterns) and observability instrumentation.
-- **How to use**: reference in solution templates or shared libraries; tie into monitoring pipelines.
-- **When to use**: accelerating solution delivery or standardizing logging/metrics across teams.
-
-## 12. Connector Index
+## 11. Connector Index
 
 For quick lookup, connectors live under `src/Connectors`. Use this table to identify package prefixes:
 
@@ -281,7 +273,7 @@ Every connector package auto-registers via `IKoanAutoRegistrar` once referenced.
 1. **Start with core** (`Koan.Core`, `Koan.Data.Core`) to get entity-first APIs.
 2. **Add pillars** needed for your workload (Data Vector, Flow, Jobs, AI, Web, Messaging).
 3. **Select connectors** that match infrastructure targets (database, broker, storage).
-4. **Incorporate tooling** (Orchestration, Recipes) to support deployment and observability.
+4. **Incorporate tooling** (Orchestration) to support deployment and observability.
 5. **Validate** using BootReport and health checks before shipping.
 
 This reference should help you assemble the right Koan stack for each solution while understanding when each module shines.

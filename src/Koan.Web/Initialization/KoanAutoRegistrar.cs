@@ -24,6 +24,18 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
         // Ensure MVC discovers controllers from this assembly
         services.AddKoanControllersFrom<Controllers.HealthController>();
+
+        // Observability baseline (folded in from the retired observability recipe pillar · ARCH-0086).
+        // Health checks baseline (if HealthChecks is available via Koan.Web)
+        try
+        {
+            services.AddHealthChecks();
+        }
+        catch { /* AddHealthChecks unavailable; ignore */ }
+
+        // Simple resilient HttpClient for outbound probes (example)
+        services.AddHttpClient("Koan-observability")
+            .AddStandardResilienceHandler(); // .NET 9 built-in resilience handler
     }
 
     public void Describe(global::Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)

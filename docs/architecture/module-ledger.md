@@ -197,18 +197,6 @@ validation:
 - Depended by: Koan.Orchestration.Cli
 - Documentation: README ✅ · TECHNICAL ✅
 
-### Koan.Recipe.Abstractions
-
-- Depends on: Koan.Core
-- Depended by: Koan.Recipe.Observability
-- Documentation: README ✅ · TECHNICAL ❌
-
-### Koan.Recipe.Observability
-
-- Depends on: Koan.Recipe.Abstractions, Koan.Web
-- Depended by: –
-- Documentation: README ✅ · TECHNICAL ❌
-
 ### Koan.Scheduling
 
 - Depends on: Koan.Core
@@ -254,7 +242,7 @@ validation:
 ### Koan.Web
 
 - Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core, Koan.Scheduling
-- Depended by: Koan.Canon.Web, Koan.Mcp, Koan.Media.Core, Koan.Recipe.Observability, Koan.Web.Backup, Koan.Web.Extensions, Koan.Web.Connector.GraphQl, Koan.Web.Connector.Swagger, Koan.Web.Transformers
+- Depended by: Koan.Canon.Web, Koan.Mcp, Koan.Media.Core, Koan.Web.Backup, Koan.Web.Extensions, Koan.Web.Connector.GraphQl, Koan.Web.Connector.Swagger, Koan.Web.Transformers
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Web.Auth
@@ -347,7 +335,7 @@ validation:
 ### Koan.Web
 
 - Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core, Koan.Scheduling
-- Depended by: Koan.Canon.Web, Koan.Mcp, Koan.Media.Core, Koan.Recipe.Observability, Koan.Web.Backup, Koan.Web.Extensions, Koan.Web.Connector.GraphQl, Koan.Web.Connector.Swagger, Koan.Web.Transformers
+- Depended by: Koan.Canon.Web, Koan.Mcp, Koan.Media.Core, Koan.Web.Backup, Koan.Web.Extensions, Koan.Web.Connector.GraphQl, Koan.Web.Connector.Swagger, Koan.Web.Transformers
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Web.Auth
