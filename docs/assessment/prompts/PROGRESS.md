@@ -31,7 +31,7 @@ Preamble for these cards: the `[PREAMBLE]` block in `../06-prompt-stash.md`.
 
 | ID | Tier | Deps | Status | Date | Agent/model | Commits | Notes |
 |---|---|---|---|---|---|---|---|
-| B1 | T2 | — (first) | pending | | | | sln truth — add all test projects to Koan.sln |
+| B1 | T2 | — (first) | done | 2026-06-13 | opus-4.8 | (uncommitted) | sln truth — added 25 buildable test projects (168→195 incl. 2 transitive prod refs); EXCLUDED 13 broken/husk projects beyond the card's 5 (see Divergence log) — build green, `--list-tests` enumerates 2922 tests / 71 assemblies |
 | B2 | T2 | B1 | pending | | | | CI PR gate |
 | B3 | T3 | B1, B2 | pending | | | | NBGV-native release; nuspec metadata fix |
 | A1 | T1 | — | pending | | | | ADR status sweep (mark superseded/retired) |
@@ -118,7 +118,7 @@ date · prompt ID · what was found · what was done instead.
 
 | Date | ID | Finding | Action |
 |---|---|---|---|
-| | | | |
+| 2026-06-13 | B1 | The card named only 5 husks to exclude. In reality 38 test projects were missing from the sln, and **13 more break the build** beyond the card's list: (a) 3 net8.0 husks referencing nonexistent `Koan.TestPipeline`/`Koan.*` NuGet packages — `Koan.Storage.Core.Tests`, `Koan.Web.Admin.Tests`; (b) 2 net8.0 sample-test husks that fail restore (`Koan.Samples.DocMind.Tests` refs a *missing* `samples/S13.DocMind/API/...csproj`; `Koan.Samples.PantryPal.Tests` is net8.0 vs net10.0 `Koan.Testing`); (c) 3 MCP/PantryPal projects fail NU1903 (transitive MessagePack 2.5.192 CVE — the 7e8a44f0 pin only covers projects that ProjectReference `Koan.Orchestration.Aspire`, which these don't): `Koan.Mcp.TestHost`, `Koan.Samples.McpCodeMode.Tests`, `S16.PantryPal.Tests`; (d) 4 projects fail **compilation** against current APIs — `Koan.Web.Sort.Tests` (CS7022 dup entrypoint), `Koan.Storage.Connector.Local.Tests` (stale `StorageProfile`/`StorageOptions`/caps), `S7.Meridian.Tests` (stale `IEmbeddingCache`/`CachedEmbedding`/`IDocumentStorage.Delete`), and a **production** project `src/Services/code-intelligence/Koan.Service.KoanContext` (does not compile; was dragged in transitively by `Koan.Tests.Context.Unit`). | Added the 25 buildable live test projects (+2 transitive prod refs `Koan.Cache.Analyzers`, `Koan.Data.Connector.PGVector`). Per STOP condition, did NOT fix-forward any broken project; excluded all 13 breakers (and orphaned transitive pull-ins `samples/S7.Meridian`, `Koan.Service.KoanContext`). Build green; `--list-tests` exit 0. These 13 are husk/rot candidates for the C-series cut cards — they fell out of the sln precisely because they don't build. |
 
 ## Operator gates
 
