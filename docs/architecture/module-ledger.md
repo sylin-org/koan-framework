@@ -221,12 +221,6 @@ validation:
 - Depended by: –
 - Documentation: README ✅ · TECHNICAL ✅
 
-### Koan.Service.Inbox.Connector.Redis
-
-- Depends on: –
-- Depended by: –
-- Documentation: README ✅ · TECHNICAL ✅
-
 ### Koan.Storage
 
 - Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core

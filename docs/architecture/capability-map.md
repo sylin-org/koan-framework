@@ -53,7 +53,7 @@ Below is a capability map that layers packages from foundational primitives thro
 | Core runtime            | Configuration, environment, boot diagnostics, adapter auto-registration | `Koan.Core`, `Koan.Core.Adapters`, `Koan.Diagnostics.Tool`                                                                                                                   | –                       |
 | Data & storage          | Entity-first persistence, provider adapters, backups, object storage    | `Koan.Data.Core`, `Koan.Data.Abstractions`, `Koan.Data.*` providers, `Koan.Storage`, `Koan.Data.Backup`                                                                      | Core runtime            |
 | Web & surface area      | MVC controllers, response transformers, auth, diagnostics               | `Koan.Web`, `Koan.Web.Extensions`, `Koan.Web.Transformers`, `Koan.Web.Auth.*`, `Koan.Web.Connector.Swagger`, `Koan.Web.Connector.GraphQl`, `Koan.Web.Backup`                                     | Core runtime + Data     |
-| Messaging & async       | Inbox/outbox patterns, background coordination, scheduling              | `Koan.Messaging.Core`, `Koan.Messaging.Abstractions`, `Koan.Messaging.Connector.RabbitMq`, `Koan.Service.Inbox.Connector.Redis`, `Koan.Messaging.Inbox.*`, `Koan.Scheduling` | Core + Data             |
+| Messaging & async       | Inbox/outbox patterns, background coordination, scheduling              | `Koan.Messaging.Core`, `Koan.Messaging.Abstractions`, `Koan.Messaging.Connector.RabbitMq`, `Koan.Messaging.Inbox.*`, `Koan.Scheduling` | Core + Data             |
 | AI, media & search      | Prompt routing, embeddings, media pipelines                             | `Koan.AI`, `Koan.AI.Contracts`, `Koan.AI.Connector.Ollama`, `Koan.Media.Abstractions`, `Koan.Media.Core`, `Koan.Media.Web`, `Koan.Data.Vector.*`                              | Core + Data             |
 | Secrets & configuration | Unified secret resolution and config overlays                           | `Koan.Secrets.Abstractions`, `Koan.Secrets.Core`, `Koan.Secrets.Connector.Vault`                                                                                                       | Core runtime            |
 | Orchestration           | Container orchestration, manifest generation                            | `Koan.Orchestration.*`, `Koan.Orchestration.Cli`                                                                    | Core + Secrets + Data   |
@@ -113,11 +113,11 @@ The remainder of this document drills into each layer and highlights first-class
 
 ## 4. Messaging, async, and scheduling
 
-**Packages**: `Koan.Messaging.Abstractions`, `Koan.Messaging.Core`, `Koan.Messaging.Connector.RabbitMq`, `Koan.Messaging.Inbox.Connector.Http`, `Koan.Messaging.Inbox.Connector.InMemory`, `Koan.Service.Inbox.Connector.Redis`, `Koan.Scheduling`
+**Packages**: `Koan.Messaging.Abstractions`, `Koan.Messaging.Core`, `Koan.Messaging.Connector.RabbitMq`, `Koan.Messaging.Inbox.Connector.Http`, `Koan.Messaging.Inbox.Connector.InMemory`, `Koan.Scheduling`
 
 - `Koan.Messaging.Core` implements bus orchestration, retry policies, and diagnostics for message pipelines. Abstractions keeps contracts separate for consumers.
 - Provider packages like `Koan.Messaging.Connector.RabbitMq` plug into `Koan.Core.Adapters` to auto-register connections and health checks.
-- Inbox helpers (`Koan.Messaging.Inbox.*`, `Koan.Service.Inbox.Connector.Redis`) give you exactly-once semantics and idempotent reprocessing surfaces.
+- Inbox helpers (`Koan.Messaging.Inbox.*`) give you exactly-once semantics and idempotent reprocessing surfaces. _(The `Koan.Service.Inbox.Connector.Redis` microservice was removed 2026-06 — its client API (`HttpInboxStore`) no longer existed in src and its only consumer was the archived S15 sample; MESS-0025/MESS-0026 are Retired.)_
 - `Koan.Scheduling` introduces cron/interval-based job orchestration anchored in Koan’s background worker infrastructure.
 - ~~CQRS support (`Koan.Data.Cqrs.*`) ties messaging back into the data plane with projection tasks and outbox helpers.~~ _(Removed 2026-06 — superseded by the Jobs ledger outbox, JOBS-0005.)_
 

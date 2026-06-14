@@ -162,7 +162,7 @@ Use this reference when you plan a Koan solution and need to understand which mo
 - **Koan.Flow.Core** (pipelines) – see section 1.
 - **Koan.Jobs.Core** (durable jobs) – see section 1.
 - **Koan.Canon.Core/Web** (canonical pipelines) – use for advanced transformation chains.
-- **Connectors**: e.g., `Connectors/Service/Inbox` for inbox processing.
+- **Connectors**: e.g., `Connectors/Data/Mongo` for data provider integration. _(The former `Connectors/Service/Inbox` Redis inbox microservice was removed 2026-06 — its client API (`HttpInboxStore`) no longer existed in src and its only consumer was the archived S15 sample.)_
 
 **Scenario**: S5.Recs uses Flow for embedding enrichment, Jobs for scheduled crawls, and Canon to maintain projection lineage.
 
