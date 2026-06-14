@@ -234,6 +234,15 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
         var hookContext = _hookPipeline.CreateContext(context);
 
+        // WEB-0068: IRequestOptionsHook predicates are read-visibility filters. The collection/query
+        // paths AND-compose them into the adapter query; the keyed read must apply the same predicates
+        // against the fetched row, or a row hidden from every listing stays reachable by id — a
+        // row-level visibility bypass. BuildOptions runs the hooks; PassesRequestPredicates enforces them.
+        if (!await _hookPipeline.BuildOptions(hookContext, context.Options))
+        {
+            return ModelShortCircuit(context, hookContext);
+        }
+
         if (!await _hookPipeline.BeforeModelFetch(hookContext, request.Id?.ToString() ?? ""))
         {
             return ModelShortCircuit(context, hookContext);
@@ -242,8 +251,10 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var model = await Data<TEntity, TKey>.Get(request.Id!, context.CancellationToken);
         await _hookPipeline.AfterModelFetch(hookContext, model);
-        if (model is null)
+        if (model is null || !PassesRequestPredicates(model, context.Options.Predicates))
         {
+            // A predicate-filtered row returns the same NotFound as a missing row so existence is not
+            // revealed to a caller the visibility hook excludes.
             CopyHookHeaders(context, hookContext);
             return new EntityModelResult<TEntity>(context, null, null, new NotFoundResult());
         }
@@ -465,6 +476,24 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         var payload = emit.replaced ? emit.payload : saved;
         CopyHookHeaders(context, hookContext);
         return new EntityModelResult<TEntity>(context, saved, payload);
+    }
+
+    // WEB-0068: evaluate hook-contributed read-visibility predicates against a single fetched model.
+    // Each predicate is the Expression<Func<TEntity, bool>> the developer wrote, compiled and invoked
+    // here — the ground truth of intent for a security gate. Mirrors QueryFilterComposer's type guard
+    // so a mistyped predicate fails the same way on the keyed-read path as on the collection path.
+    private static bool PassesRequestPredicates(TEntity model, IReadOnlyList<LambdaExpression> predicates)
+    {
+        if (predicates.Count == 0) return true;
+        foreach (var predicate in predicates)
+        {
+            var typed = predicate as Expression<Func<TEntity, bool>>
+                ?? throw new InvalidOperationException(
+                    $"QueryOptions.Predicates entry was {predicate?.GetType().FullName ?? "null"}, expected " +
+                    $"Expression<Func<{typeof(TEntity).FullName}, bool>>. Use QueryOptions.AddPredicate<TEntity>(...).");
+            if (!typed.Compile().Invoke(model)) return false;
+        }
+        return true;
     }
 
     // ARCH-0084: negotiate via the unified CapabilitySet (the adapter's IDescribesCapabilities declaration).

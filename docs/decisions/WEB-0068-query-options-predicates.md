@@ -256,3 +256,56 @@ auto-registration. Order honours `IOrderedHook.Order` as today.
   `[StringQueryable]`-marked properties) once a real downstream case appears.
 - Cover predicate AND-composition, hook+`?filter=` interaction, pagination correctness with
   hooks, and the `Q`-drop-with-warning path in the adapter surface test suite.
+
+## Amendment 2026-06-14: keyed get-by-id honors the same predicates
+
+The original decision scoped composition to the *collection* read paths (`QueryCollection`,
+`QueryCollectionFromBody`). The keyed `GetById` path was left fetching by id with a raw
+`Data<TEntity, TKey>.Get(id)` and never ran `BuildOptions`, so `QueryOptions.Predicates` was empty
+and never applied. That is a **row-level visibility bypass**: a row a hook filters out of every
+listing (multi-tenant scope, published-only, soft-delete) is still returned by id. The first
+real-world hit was a public read-only MCP surface where `get-by-id` returned Suppressed/Draft rows
+the collection tool correctly hid (MCP routes get-by-id through `IEntityEndpointService.GetById`).
+
+**Resolution.** `EntityEndpointService.GetById` now runs `BuildOptions` (so `IRequestOptionsHook`
+contributions populate) and evaluates every contributed predicate against the fetched model
+(`PassesRequestPredicates`). A row that fails any predicate returns the same `NotFound` as a missing
+row — existence is never revealed to a caller the hook excludes. The relationship-expansion branch
+(`?with=all`) is gated before it runs, so it is not a second bypass.
+
+Predicates are evaluated by **compiling the `Expression<Func<TEntity, bool>>` the developer wrote and
+invoking it** against the single in-memory model, rather than lowering to the `Filter` AST the
+collection path pushes down. For a security gate the literal predicate is the ground truth of intent
+and avoids any lowering-divergence between the keyed and collection paths failing *open*. The
+type-mismatch guard mirrors `QueryFilterComposer` so a mistyped predicate fails identically on both
+paths.
+
+**Scope boundary (deliberate).** `IRequestOptionsHook` is a *read-options* hook; this gate applies to
+the read paths (`GetCollection`, `Query`, `GetById`). It does **not** extend to the write paths
+(`Delete`, `Patch`, `Upsert`), which read a row internally before mutating it. Governing *write*
+authorization by read-visibility predicates would be a semantic expansion that surprises apps which
+hide a row from listings yet still allow its owner to mutate it via a separate auth path. Write
+authorization remains the job of `IAuthorizeHook` / `IModelHook`. Apps that intentionally want
+any-status get-by-id simply register no visibility hook (or use an admin context that contributes no
+predicate) — the gate is a no-op when `Predicates` is empty, so non-protected entities are unaffected.
+
+Coverage: `GetByIdVisibilitySpecs` in the adapter-surface InMemory suite (anonymous/owner/admin
+matrix, hidden-never-surfaces, owner-vs-other draft, `?with=all` gating).
+
+### GraphQL connector parity
+
+The GraphQL connector (`Koan.Web.Connector.GraphQl`) hand-rolls its entity resolvers instead of
+routing through `IEntityEndpointService`, and never implemented WEB-0068: its `GetById` did not run
+`BuildOptions` at all, and its collection `GetItems` ran `BuildOptions` but then discarded
+`opts.Predicates` when building the query — so the connector leaked hidden rows on **both** read
+paths. Both are now fixed to mirror `EntityEndpointService`: `GetItems` AND-composes predicates via
+`QueryFilterComposer.AndAll` (exposed to the connector via `InternalsVisibleTo`), and `GetById` runs
+`BuildOptions` then gates with the same `PassesRequestPredicates` logic, returning `null` (GraphQL's
+not-found) for a filtered row.
+
+Status caveat (honesty rule): the GraphQL connector currently has **no integration test project**
+(`unknown since 2026-06-14` — the `Koan.Web.Connector.GraphQl.Tests` / `S4.Web.IntegrationTests`
+references in `InternalsVisibleTo` point at projects that no longer exist). The fix mirrors the
+tested REST/MCP logic, but a GraphQL ARCH-0079 harness is an outstanding follow-up. The durable fix
+is to route the GraphQL resolvers through `IEntityEndpointService` so they stop drifting from the
+canonical read pipeline.

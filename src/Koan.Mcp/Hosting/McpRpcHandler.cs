@@ -49,8 +49,10 @@ public sealed class McpRpcHandler
         var exposureMode = ResolveExposureMode();
         var toolsList = new List<ToolDescriptor>();
 
-        // Add code execution tool if enabled
-        if ((exposureMode == McpExposureMode.Code || exposureMode == McpExposureMode.Full) && _codeExecutor != null)
+        // Add code execution tool if enabled. CodeModeOptions.Enabled is the kill switch honored by
+        // the capabilities/SDK endpoints (EndpointRouteBuilderExtensions) — list and invoke must agree
+        // with it, or a disabled-but-Full host advertises a tool the RPC path then refuses.
+        if ((exposureMode == McpExposureMode.Code || exposureMode == McpExposureMode.Full) && IsCodeModeEnabled())
         {
             var codeModeTool = CreateCodeExecutionTool();
             toolsList.Add(codeModeTool);
@@ -138,6 +140,51 @@ public sealed class McpRpcHandler
         // dynamically; then return McpExposureMode.Auto here and handle mapping in caller.
         return McpExposureMode.Full;
     }
+
+    // CodeModeOptions.Enabled is the functional kill switch for code mode (AI-0014). It defaults to
+    // true, and a misconfigured/partial host without the options registered fails closed. This is the
+    // discovery-side gate (tools/list); the invoke-side gate is TryDenyCodeExecution, which also
+    // enforces the resolved exposure mode — keep the two in sync when adding a new condition.
+    private bool IsCodeModeEnabled()
+        => _codeExecutor != null
+           && (_services.GetService<IOptions<CodeModeOptions>>()?.Value.Enabled ?? false);
+
+    // Defense-in-depth gate for the RPC invoke-by-name path. Hiding koan.code.execute /
+    // koan.code.validate from tools/list is not a security control on its own — a client can still
+    // call them by name. Both the disabled kill switch and the active exposure mode are enforced here
+    // so the invoke path cannot run sandboxed JavaScript that discovery would never have surfaced.
+    private bool TryDenyCodeExecution(out ToolsCallResult denial)
+    {
+        var enabled = _services.GetService<IOptions<CodeModeOptions>>()?.Value.Enabled ?? false;
+        if (!enabled)
+        {
+            denial = CodeModeDisabled("Code mode is disabled (Koan:Mcp:CodeMode:Enabled=false).");
+            return true;
+        }
+
+        var exposureMode = ResolveExposureMode();
+        if (exposureMode != McpExposureMode.Code && exposureMode != McpExposureMode.Full)
+        {
+            denial = CodeModeDisabled($"Code execution is not exposed under exposure mode '{exposureMode}'.");
+            return true;
+        }
+
+        if (_codeExecutor == null)
+        {
+            denial = CodeModeDisabled("Code execution is not available (ICodeExecutor not registered).");
+            return true;
+        }
+
+        denial = null!;
+        return false;
+    }
+
+    private static ToolsCallResult CodeModeDisabled(string message) => new()
+    {
+        Success = false,
+        ErrorCode = CodeModeErrorCodes.CodeModeDisabled,
+        ErrorMessage = message
+    };
 
     private ToolDescriptor CreateCodeExecutionTool()
     {
@@ -231,6 +278,7 @@ public sealed class McpRpcHandler
 
     private ToolsCallResult ExecuteCodeValidation(JObject? arguments)
     {
+        if (TryDenyCodeExecution(out var denial)) return denial;
         if (_codeExecutor is not JintCodeExecutor jint)
         {
             return new ToolsCallResult
@@ -266,15 +314,7 @@ public sealed class McpRpcHandler
 
     private async Task<ToolsCallResult> ExecuteCode(JObject? arguments, CancellationToken cancellationToken)
     {
-        if (_codeExecutor == null)
-        {
-            return new ToolsCallResult
-            {
-                Success = false,
-                ErrorCode = "code_mode_disabled",
-                ErrorMessage = "Code execution is not available (ICodeExecutor not registered)"
-            };
-        }
+        if (TryDenyCodeExecution(out var denial)) return denial;
 
         // Extract code from arguments
         if (arguments == null || !arguments.TryGetValue("code", StringComparison.OrdinalIgnoreCase, out var codeNode))
@@ -306,8 +346,9 @@ public sealed class McpRpcHandler
             // Build execution request from arguments
             var request = BuildExecutionRequest(arguments!, code);
 
-            // Execute code via unified executor (bindings are created internally in implementation; we keep existing for side-effects if needed in future)
-            var result = await _codeExecutor.Execute(request, cancellationToken);
+            // Execute code via unified executor (bindings are created internally in implementation; we keep existing for side-effects if needed in future).
+            // TryDenyCodeExecution above guarantees _codeExecutor is non-null on this path.
+            var result = await _codeExecutor!.Execute(request, cancellationToken);
 
             if (result.Success)
             {

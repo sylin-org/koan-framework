@@ -21,6 +21,7 @@ using Koan.Web.Filtering;
 using Koan.Web.Hooks;
 using Koan.Web.Infrastructure;
 using System.Diagnostics;
+using System.Linq.Expressions;
 using System.Reflection;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -493,6 +494,24 @@ public static class AddKoanGraphQlExtensions
         private static CapabilitySet Caps(IDataRepository<TEntity, string> repo)
             => DataCaps.Describe(repo, repo.GetType().Name);
 
+        // WEB-0068: evaluate hook-contributed read-visibility predicates against a single fetched model on
+        // the keyed (get-by-id) path, mirroring Koan.Web.EntityEndpointService.PassesRequestPredicates.
+        // Each predicate is the Expression<Func<TEntity,bool>> the hook contributed; a row that fails any
+        // is treated as not found so a hidden row is never reachable by id.
+        private static bool PassesRequestPredicates(TEntity model, IReadOnlyList<LambdaExpression> predicates)
+        {
+            if (predicates.Count == 0) return true;
+            foreach (var predicate in predicates)
+            {
+                var typed = predicate as Expression<Func<TEntity, bool>>
+                    ?? throw new InvalidOperationException(
+                        $"QueryOptions.Predicates entry was {predicate?.GetType().FullName ?? "null"}, expected " +
+                        $"Expression<Func<{typeof(TEntity).FullName}, bool>>. Use QueryOptions.AddPredicate<TEntity>(...).");
+                if (!typed.Compile().Invoke(model)) return false;
+            }
+            return true;
+        }
+
         private GraphQlHooksRunner<TEntity> GetRunner(HttpContext http) => new(http.RequestServices);
 
         private static QueryOptions BuildOptions(HttpContext http, string? q, int page, int size)
@@ -533,19 +552,22 @@ public static class AddKoanGraphQlExtensions
 
                 using (var _set = EntityContext.Partition(null!))
                 {
+                    Koan.Data.Abstractions.Filtering.Filter? userFilter = null;
                     if (!string.IsNullOrWhiteSpace(filterJson))
                     {
-                        Koan.Data.Abstractions.Filtering.Filter filter;
-                        try { filter = Koan.Data.Abstractions.Filtering.JsonFilterParser.Parse<TEntity>(filterJson!, new Koan.Data.Abstractions.Filtering.FilterParseOptions { IgnoreCase = ignoreCase }); }
+                        try { userFilter = Koan.Data.Abstractions.Filtering.JsonFilterParser.Parse<TEntity>(filterJson!, new Koan.Data.Abstractions.Filtering.FilterParseOptions { IgnoreCase = ignoreCase }); }
                         catch (Exception ex) when (ex is Koan.Data.Abstractions.Filtering.FilterParseException or Koan.Data.Abstractions.Filtering.InvalidFilterFieldException)
                         {
                             throw new GraphQLException(ErrorBuilder.New().SetMessage(ex.Message).SetCode("BAD_FILTER").Build());
                         }
-                        var result = await Data<TEntity, string>.QueryWithCount(Koan.Data.Abstractions.QueryDefinition.All.Where(filter), ctx.RequestAborted);
-                        items = result.Items;
-                        total = result.TotalCount;
                     }
-                    else if (!string.IsNullOrWhiteSpace(opts.Q))
+
+                    // WEB-0068: AND-compose hook-contributed visibility predicates with the user's filter so the
+                    // adapter counts and returns the already-filtered set. Free-text Q reaches the raw provider
+                    // surface only when no predicate contributes — it can't compose with the predicate path.
+                    var composed = QueryFilterComposer.AndAll<TEntity>(userFilter, opts.Predicates);
+
+                    if (composed is null && !string.IsNullOrWhiteSpace(opts.Q))
                     {
                         try { items = await Data<TEntity, string>.QueryRaw(opts.Q!, null, null, ctx.RequestAborted); }
                         catch (NotSupportedException) { throw new GraphQLException(ErrorBuilder.New().SetMessage("Adapter does not support raw string queries.").SetCode("BAD_FILTER").Build()); }
@@ -553,7 +575,7 @@ public static class AddKoanGraphQlExtensions
                     }
                     else
                     {
-                        var result = await Data<TEntity, string>.QueryWithCount(Koan.Data.Abstractions.QueryDefinition.All, ctx.RequestAborted);
+                        var result = await Data<TEntity, string>.QueryWithCount(Koan.Data.Abstractions.QueryDefinition.All.Where(composed), ctx.RequestAborted);
                         items = result.Items;
                         total = result.TotalCount;
                     }
@@ -600,10 +622,15 @@ public static class AddKoanGraphQlExtensions
                 if (auth is AuthorizeDecision.Forbid fbd) throw new GraphQLException(ErrorBuilder.New().SetMessage(fbd.Reason ?? "Forbidden").SetCode("FORBIDDEN").Build());
                 if (auth is AuthorizeDecision.Challenge) throw new GraphQLException(ErrorBuilder.New().SetMessage("Unauthorized").SetCode("UNAUTHORIZED").Build());
 
+                // WEB-0068: run BuildOptions so IRequestOptionsHook contributions populate opts.Predicates,
+                // then gate the fetched row against them. Without this, a row a visibility hook hides from
+                // the collection query stays reachable by id — the same row-level bypass fixed on the REST/MCP path.
+                if (!await runner.BuildOptions(hctx, opts)) return default;
+
                 if (!await runner.BeforeModelFetch(hctx, id)) return default;
                 var model = await Data<TEntity, string>.Get(id, ctx.RequestAborted);
                 await runner.AfterModelFetch(hctx, model);
-                if (model is null) return default;
+                if (model is null || !PassesRequestPredicates(model, opts.Predicates)) return default;
 
                 var emit = await runner.EmitModel(hctx, model);
                 return emit.replaced ? (TEntity)emit.payload : model;
