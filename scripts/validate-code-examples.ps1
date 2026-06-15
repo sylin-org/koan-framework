@@ -76,6 +76,61 @@ function Extract-CodeBlocks {
     return $blocks
 }
 
+# Curated using set that a real Koan app would have on hand. Every entry MUST resolve to a real
+# namespace in the temp project's referenced assemblies (Koan.Core/Data.Core/Data.Abstractions/Web/AI
+# + Microsoft.AspNetCore.App) — a using for a non-existent namespace is itself a CS0246 that would fail
+# every snippet. This removes the false-failure class where a correct snippet just lacked a using
+# (EntityContext, DI, the host builder) that the doc reader obviously has. It does NOT mask genuine
+# staleness: a removed pillar (e.g. the old Koan.Flow) has no namespace here, so its references still fail.
+$script:RichUsings = @(
+    'using System;'
+    'using System.Collections.Generic;'
+    'using System.Linq;'
+    'using System.Threading;'
+    'using System.Threading.Tasks;'
+    'using Microsoft.AspNetCore.Builder;'
+    'using Microsoft.AspNetCore.Http;'
+    'using Microsoft.AspNetCore.Mvc;'
+    'using Microsoft.Extensions.Configuration;'
+    'using Microsoft.Extensions.DependencyInjection;'
+    'using Microsoft.Extensions.Hosting;'
+    'using Microsoft.Extensions.Logging;'
+    'using Koan.Core;'
+    'using Koan.Data;'
+    'using Koan.Data.Abstractions;'
+    'using Koan.Data.Core;'
+    'using Koan.Web;'
+)
+
+# Pull the snippet's own leading using-directives out of the body so they can sit at file scope
+# (a using inside a wrapper method/class is a compile error) and be deduped against the rich set.
+function Split-Usings {
+    param([string]$Code)
+    $usings = New-Object System.Collections.Generic.List[string]
+    $bodyLines = New-Object System.Collections.Generic.List[string]
+    foreach ($line in ($Code -split "`r?`n")) {
+        if ($line -match '^\s*(global\s+)?using\s+(static\s+)?[\w\.]+\s*(=\s*[\w\.<>,\s]+)?;\s*$') {
+            $usings.Add(($line.Trim())) | Out-Null
+        } else {
+            $bodyLines.Add($line) | Out-Null
+        }
+    }
+    return [PSCustomObject]@{ Usings = $usings; Body = ($bodyLines -join "`n") }
+}
+
+# top-level (host entrypoint) | declaration (its own namespace/type) | fragment (statements).
+function Get-BlockKind {
+    param([string]$Code)
+    if ($Code -match '\bWebApplication\s*\.\s*Create' -or $Code -match '\bHost\s*\.\s*CreateApplicationBuilder\b') {
+        return 'toplevel'
+    }
+    if ($Code -match '(?m)^\s*namespace\s+\w' -or
+        $Code -match '(?m)^\s*(\[[^\]]*\]\s*)*((public|internal|sealed|abstract|static|partial|file)\s+)*(class|record|struct|interface|enum)\s+\w') {
+        return 'declaration'
+    }
+    return 'fragment'
+}
+
 function Test-CodeBlock {
     param(
         [PSCustomObject]$Block,
@@ -86,19 +141,43 @@ function Test-CodeBlock {
         # Create a test file
         $testFile = Join-Path $TempProjectDir "TestCode$([System.IO.Path]::GetRandomFileName().Replace('.', '')).cs"
 
-        # Wrap the code in a class if it's not already wrapped
-        $wrappedCode = $Block.Code
+        $split = Split-Usings -Code $Block.Code
+        $kind = Get-BlockKind -Code $Block.Code
+        $body = $split.Body
 
-        if (-not ($wrappedCode -match 'namespace\s+|class\s+|public\s+class\s+')) {
-            $wrappedCode = @"
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using Koan.Core;
-using Koan.Data;
-using Koan.Data.Abstractions;
-using Koan.Web;
+        # Dedup the curated set with the snippet's own usings (preserve order, rich first).
+        $allUsings = [System.Collections.Generic.List[string]]::new()
+        foreach ($u in $script:RichUsings) { if (-not $allUsings.Contains($u)) { $allUsings.Add($u) | Out-Null } }
+        foreach ($u in $split.Usings) { if (-not $allUsings.Contains($u)) { $allUsings.Add($u) | Out-Null } }
+        $usingBlock = ($allUsings -join "`n")
+
+        switch ($kind) {
+            'declaration' {
+                # Body already declares its own namespace/types; just give it the usings.
+                $wrappedCode = "$usingBlock`n`n$body"
+            }
+            'toplevel' {
+                # Host-entrypoint snippet: wrap in Main(args) so `args` + the builder/app locals resolve
+                # (a method body, not true top-level statements, so it composes in the Library temp project).
+                $wrappedCode = @"
+$usingBlock
+
+namespace CodeValidation
+{
+    public static class Program_$([System.IO.Path]::GetRandomFileName().Replace('.', ''))
+    {
+        public static async Task Main(string[] args)
+        {
+$body
+        }
+    }
+}
+"@
+            }
+            default {
+                # Statement fragment.
+                $wrappedCode = @"
+$usingBlock
 
 namespace CodeValidation
 {
@@ -106,11 +185,12 @@ namespace CodeValidation
     {
         public async Task TestMethod()
         {
-$($Block.Code)
+$body
         }
     }
 }
 "@
+            }
         }
 
         Set-Content -Path $testFile -Value $wrappedCode -Encoding UTF8
