@@ -10,7 +10,7 @@
     <ProjectReference Include="..\..\src\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />
     <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
-    <ProjectReference Include="..\..\src\Connectors\Web\Swagger\Koan.Web.Connector.Swagger.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web.OpenApi\Koan.Web.OpenApi.csproj" />
     <ProjectReference Include="..\..\src\Connectors\Service\Inbox\Redis\Koan.Service.Inbox.Connector.Redis.csproj" />
     <ProjectReference Include="..\..\src\Connectors\Messaging\RabbitMq\Koan.Messaging.Connector.RabbitMq.csproj" />
   </ItemGroup>

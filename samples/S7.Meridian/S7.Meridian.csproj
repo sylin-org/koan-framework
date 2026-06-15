@@ -25,7 +25,7 @@
     <ProjectReference Include="..\..\src\Connectors\Storage\Local\Koan.Storage.Connector.Local.csproj" />
 
     <!-- Web -->
-    <ProjectReference Include="..\..\src\Connectors\Web\Swagger\Koan.Web.Connector.Swagger.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web.OpenApi\Koan.Web.OpenApi.csproj" />
 
     <!-- AI -->
     <ProjectReference Include="..\..\src\Koan.AI\Koan.AI.csproj" />

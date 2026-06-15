@@ -14,6 +14,6 @@
     <ProjectReference Include="..\..\src\Koan.Canon.Domain\Koan.Canon.Domain.csproj" />
     <ProjectReference Include="..\..\src\Koan.Canon.Web\Koan.Canon.Web.csproj" />
     <ProjectReference Include="..\..\src\Connectors\Data\Json\Koan.Data.Connector.Json.csproj" />
-    <ProjectReference Include="..\..\src\Connectors\Web\Swagger\Koan.Web.Connector.Swagger.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web.OpenApi\Koan.Web.OpenApi.csproj" />
   </ItemGroup>
 </Project>

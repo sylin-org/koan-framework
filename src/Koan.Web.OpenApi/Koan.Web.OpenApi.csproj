@@ -10,6 +10,7 @@
   <ItemGroup>
   <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.8" />
   <PackageReference Include="Microsoft.OpenApi" Version="2.7.6" />
+  <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="6.6.2" />
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\Koan.Web\Koan.Web.csproj" />
   </ItemGroup>

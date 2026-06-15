@@ -34,7 +34,12 @@ internal sealed class KoanSwaggerStartupFilter : IStartupFilter
                 var opts = GetOptions(cfg);
 
                 bool enabled;
-                if (opts.Enabled.HasValue)
+                var enableUi = cfg.Read<bool?>($"{KoanOpenApiOptions.ConfigurationSection}:EnableUi");
+                if (enableUi.HasValue)
+                {
+                    enabled = enableUi.Value;
+                }
+                else if (opts.Enabled.HasValue)
                 {
                     enabled = opts.Enabled.Value;
                 }

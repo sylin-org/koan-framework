@@ -26,6 +26,12 @@ public sealed class KoanOpenApiOptions
     public bool? Enabled { get; set; }
 
     /// <summary>
+    /// When set, toggles the Swagger UI on/off. Null = default true outside Production
+    /// (off in Production unless explicitly enabled). Config key: Koan:OpenApi:EnableUi.
+    /// </summary>
+    public bool? EnableUi { get; set; }
+
+    /// <summary>
     /// Route pattern used when mapping <c>MapOpenApi</c>.
     /// </summary>
     public string RoutePattern { get; set; } = DefaultRoutePattern;

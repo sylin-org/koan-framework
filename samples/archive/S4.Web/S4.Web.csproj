@@ -12,7 +12,7 @@
     <ProjectReference Include="..\..\src\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />
   <ProjectReference Include="..\..\src\\Connectors\\Web\\GraphQl\Koan.Web.Connector.GraphQl.csproj" />
-    <ProjectReference Include="..\..\src\\Connectors\\Web\\Swagger\Koan.Web.Connector.Swagger.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web.OpenApi\Koan.Web.OpenApi.csproj" />
     <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\..\src\\Connectors\\Data\\Mongo\Koan.Data.Connector.Mongo.csproj" />
   <ProjectReference Include="..\..\src\Koan.Web.Extensions\Koan.Web.Extensions.csproj" />

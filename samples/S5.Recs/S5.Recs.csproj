@@ -11,7 +11,7 @@
     <ProjectReference Include="..\..\src\Koan.Core.Adapters\Koan.Core.Adapters.csproj" />
     <ProjectReference Include="..\..\src\Koan.Web.Admin\Koan.Web.Admin.csproj" />
     <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />
-    <ProjectReference Include="..\..\src\Connectors\Web\Swagger\Koan.Web.Connector.Swagger.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web.OpenApi\Koan.Web.OpenApi.csproj" />
     <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\..\src\Koan.Data.AI\Koan.Data.AI.csproj" />
     <ProjectReference Include="..\..\src\Koan.Data.Vector.Abstractions\Koan.Data.Vector.Abstractions.csproj" />
