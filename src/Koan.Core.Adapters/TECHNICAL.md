@@ -1,67 +1,139 @@
-﻿---
+---
 uid: reference.modules.koan.core.adapters
 title: Koan.Core.Adapters – Technical Reference
-description: Adapter foundation, capability registry, and readiness lifecycle shared across Koan modules.
+description: Readiness pipeline, options binding, and boot-report helpers shared across Koan adapters.
 since: 0.6.3
 packages: [Sylin.Koan.Core.Adapters]
 source: src/Koan.Core.Adapters/
-validation:
-  date: 2025-09-29
-  status: verified
 ---
 
 ## Contract
 
-- Provide the base abstractions (`IKoanAdapter`, `BaseKoanAdapter`) that unify adapter configuration, health, and capability negotiation.
-- Expose readiness orchestration so adapters initialize deterministically and surface health/report metadata to the boot report.
-- Supply orchestration-aware bridges (e.g., `OrchestrationRuntimeBridge`) so adapters can integrate with Koan CLI/recipes without bespoke wiring.
+`Koan.Core.Adapters` is infrastructure, not an adapter base class. It supplies three reusable
+concerns so each adapter (data, AI, cache, messaging) does not re-implement them:
 
-## Core abstractions
+1. a **readiness pipeline** that initializes adapters on startup and gates operations until
+   they are ready;
+2. **options binding** helpers for adapter configuration; and
+3. **boot-report (provenance)** helpers for consistent self-reporting.
 
-| Component                                           | Responsibility                                                                                                                                                                    |
-| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `IKoanAdapter`                                      | Contract for adapter identification, service type, bootstrap metadata, initialization, capability checks, and health status.                                                      |
-| `BaseKoanAdapter`                                   | Partial implementation that injects `ILogger`/`IConfiguration`, provides option & connection helpers, wraps health checks, and routes capability probes to `AdapterCapabilities`. |
-| `AdapterCapabilities` DSL                           | Fluent API for declaring supported operations across categories (`Health`, `Configuration`, `Security`, `Messaging`, `Orchestration`, `Data`).                                    |
-| `BootstrapReport` helpers                           | Convenience APIs to push adapter metadata into the Koan boot report.                                                                                                              |
-| `OrchestrationRuntimeBridge` / `OrchestrationAware` | Provide no-op adapters with orchestration awareness hooks for CLI/recipe integration.                                                                                             |
+There is no `IKoanAdapter` / `BaseKoanAdapter` type and no capability DSL in this project.
+Adapters declare their own provider types and capabilities elsewhere.
 
 ## Readiness pipeline
 
-- Auto-registered services (`Initialization/KoanAutoRegistrar`) wire the readiness infrastructure when the package is referenced.
-- `AdapterInitializationService` enumerates registered adapters (`IKoanAdapter`) on application start, invoking `InitializeAsync` and applying retry logic via `DefaultRetryPolicyProvider`.
-- `AdapterReadinessMonitor` continually checks adapter health based on `AdaptersReadinessOptions` and emits `ReadinessStateChangedEventArgs` when state transitions occur.
-- `AdaptersReadinessOptions` (bound from `Koan:Adapters:Readiness`) governs default retry policies, initialization timeouts, and monitoring toggles.
-- `AdapterReadinessStateManager` tracks per-adapter state (`Hold`, `Ready`, `Faulted`) and exposes `IAdapterReadiness` for components that depend on adapter availability.
+### State and policy
 
-## Configuration helpers
+| Type                    | Responsibility                                                                                  |
+| ----------------------- | ----------------------------------------------------------------------------------------------- |
+| `AdapterReadinessState` | `Initializing`, `Ready`, `Degraded`, `Failed`.                                                  |
+| `ReadinessPolicy`       | `Immediate` (fail fast if not ready), `Hold` (wait up to timeout), `Degrade` (proceed anyway).  |
+| `ReadinessStateManager` | Thread-safe state holder; `TransitionTo(...)`, `IsReady` (Ready **or** Degraded), `Wait(timeout, ct)` backed by a `TaskCompletionSource`, and a `StateChanged` event. |
+| `ReadinessStateChangedEventArgs` | Carries previous/current state and a UTC timestamp.                                     |
 
-- `AddKoanOptions<AdaptersReadinessOptions>` binds readiness policies; defaults are reported through the boot report.
-- `BaseKoanAdapter.GetOptions<T>` automatically reads `Koan:Services:{AdapterId}` (with legacy fallbacks) and materializes strongly-typed option classes.
-- `BaseKoanAdapter.GetConnectionString` resolves connection strings across modern and legacy configuration paths, falling back to null when absent.
-- `BaseKoanAdapter.IsEnabled` evaluates multi-pattern `Enabled` switches, defaulting to true if unspecified.
+### Interfaces
 
-## Capability negotiation
+- `IAdapterReadiness` — what an adapter exposes: `ReadinessState`, `IsReady`,
+  `ReadinessTimeout`, `IsReadyAsync(ct)`, `WaitForReadiness(timeout?, ct)`, the
+  `ReadinessStateChanged` event, and the underlying `StateManager`.
+- `IAdapterReadinessConfiguration` — `Policy`, `Timeout`, `EnableReadinessGating`.
+- `IAsyncAdapterInitializer` — `InitializeAsync(ct)`; implemented by adapters that need async
+  startup work.
 
-- `AdapterCapabilities` collects features via `Supports(...)` and is surfaced through `IKoanAdapter.Capabilities`.
-- `BaseKoanAdapter.SupportsCapability<TEnum>` fans out across known capability enums, allowing Koan subsystems to reason about adapter behavior without explicit type checks.
-- Implementers override `Describe(AdapterCapabilities caps)` (see README sample) to populate categories such as `query:vector`, `index:create`, etc.
+### Hosted services
 
-## Orchestration integration
+- `AdapterInitializationService` (`IHostedService`) enumerates every registered
+  `IAsyncAdapterInitializer` on `StartAsync`, groups them into ordered **waves** via any
+  registered `IAdapterInitializationOrder` policies (lowest `Priority` first; the unordered
+  remainder runs last), and runs each wave with `Task.WhenAll`. Each initializer runs under a
+  retry/timeout policy from `IRetryPolicyProvider`. An initializer that throws is logged and
+  skipped — it does not abort host startup.
+- `AdapterReadinessMonitor` (`IHostedService`) subscribes to each `IAdapterReadiness`'s
+  `StateManager.StateChanged` and pushes a health entry (`adapter:{TypeName}`) to the
+  `IHealthAggregator`, mapping `Ready`→Healthy, `Degraded`→Degraded, `Failed`→Unhealthy. It is
+  a no-op when `EnableMonitoring` is false or no aggregator is present.
 
-- `OrchestrationRuntimeBridge` connects adapters to orchestrators (Docker, Podman, Aspire) by publishing capability metadata for container scaffolding.
-- `AdapterCapabilities.WithOrchestration()` marks features used by the Koan CLI when generating Compose/apphost artifacts.
-- `OrchestrationAware` base class provides convenience methods for adapters needing to emit orchestration-specific state.
+### Retry / timeout
+
+- `IRetryPolicyProvider.GetPolicy(adapterType)` → `IAdapterInitializationRetryPolicy`.
+- `DefaultRetryPolicyProvider` / `DefaultAdapterInitializationRetryPolicy` apply
+  `AdaptersReadinessOptions.InitializationTimeout` as a linked-token cancellation deadline and
+  log a timeout when it elapses.
+
+### Operation gating
+
+`AdapterReadinessExtensions`:
+
+- `WithReadinessAsync<T>(this object adapter, Func<Task<T>> op, ct)` — if the adapter is an
+  `IAdapterReadiness` (and gating is enabled), applies its `ReadinessPolicy`: `Immediate`
+  throws `AdapterNotReadyException` when not ready, `Hold` awaits `WaitForReadiness(timeout)`,
+  `Degrade` proceeds. Non-readiness adapters pass through.
+- `WithReadinessAsync<T, TEntity>(...)` — same gating, plus **schema auto-provisioning**: on a
+  schema-not-found style failure it issues `DataInstructions.EnsureCreated` via
+  `IInstructionExecutor<TEntity>` (when the adapter implements it) and retries the operation
+  once.
+- `WithReadiness(this object adapter, Func<Task> op, ct)` — void overload.
+- `AdapterNotReadyException : InvalidOperationException` — exposes `AdapterType` and
+  `CurrentState`.
+
+## Options binding
+
+- `IAdapterOptions` — `Readiness` (an `IAdapterReadinessConfiguration`) and `DefaultPageSize`.
+  Page-size *capping* is intentionally excluded; `DefaultPageSize` is a fallback for callers
+  that omit a size, not an enforced cap (output-layer limits live in `Koan.Web`).
+- `AdapterReadinessConfiguration` — concrete options (`Policy = Hold`, `Timeout = 30s`,
+  `EnableReadinessGating = true` by default).
+- `AdaptersReadinessOptions` — module defaults bound from `Koan:Adapters:Readiness`:
+  `DefaultPolicy` (`Hold`), `DefaultTimeout` (`30s`), `InitializationTimeout` (`5m`),
+  `EnableMonitoring` (`true`).
+- `AdapterOptionsConfigurator<TOptions> : IConfigureOptions<TOptions>` — abstract base that, on
+  `Configure`, calls `ConfigureProviderSpecific(options)` then applies shared readiness and
+  paging keys. Key resolution prefers a per-provider key
+  (`Koan:Data:{Provider}:Readiness:*`, `Koan:Data:{Provider}:DefaultPageSize`) and falls back
+  to the shared key (`Koan:Data:Readiness:*`, `Koan:Data:DefaultPageSize`). `ProviderName` is
+  supplied by the subclass.
+
+Configuration keys are centralized in the internal `Infrastructure.ConfigurationConstants`
+(`Koan:Data:*`, `Koan:Services:*`, `Koan:AI:*`, `Koan:Cache:*`, `Koan:Adapters:Readiness`).
+
+## Boot reporting
+
+`AdapterBootReporting` provides `ProvenanceModuleWriter` extension methods so adapters report
+consistently:
+
+- `ReportAdapterConfiguration<TOptions>(moduleName, moduleVersion, options, reportProviderSpecific?)`
+  — writes `DefaultPageSize` and the three readiness settings, then invokes an optional
+  provider-specific callback.
+- `ReportConnectionString(moduleName, connectionString, settingName?)` — redacts secrets via
+  `Redaction.DeIdentify`.
+- `ReportStorageTargets(moduleName, database?, container?, scope?)` and
+  `ReportPerformanceSettings(moduleName, queryTimeout?, connectionTimeout?, retryCount?)`.
+- `ResolveConnectionString(configuration, IServiceDiscoveryAdapter, parameters, fallback, healthCheckTimeout?)`
+  — runs autonomous discovery and falls back to the supplied delegate on failure.
+- `ConfigureForBootReport<TOptions>(...)` / `ConfigureForBootReportWithConfigurator<TOptions, TConfigurator>(...)`
+  — materialize a configured options instance for reporting without a running host.
+
+`BootstrapReport` is a record (`AdapterId`, `DisplayName`, `ServiceType`, `BootstrapState`,
+optional `Message` / `Duration` / `Metadata`) with `Success` / `Failed` / `Skipped` factories
+and fluent `WithMetadata(...)`. `BootstrapState` is `Success` / `Failed` / `Skipped`.
+
+## Orchestration awareness
+
+- `OrchestrationAwareAttribute` — a marker attribute for orchestration-aware methods/classes.
+- `UnifiedServiceMetadata` (in `Koan.Orchestration`) — `ServiceKind`, `IsOrchestrationAware`,
+  and a `Capabilities` list with a case-insensitive `HasCapability(...)`.
 
 ## Auto-registration
 
-- `Koan.Core.Adapters.Initialization.KoanAutoRegistrar` adds readiness hosted services, default retry policy providers, and adapter options. It also writes readiness configuration to the boot report (`Adapters.Readiness:*`).
-- Registration is idempotent: `TryAddEnumerable` ensures multiple references do not duplicate hosted services.
-- Logger scaffolding records initialization progress in debug logs.
+`Koan.Core.Adapters.Initialization.KoanAutoRegistrar` (module name
+`Koan.Core.Adapters.Readiness`) wires the package on reference:
 
-## Validation notes
+- `services.AddKoanOptions<AdaptersReadinessOptions>(SectionPath)`;
+- `services.TryAddSingleton<IRetryPolicyProvider, DefaultRetryPolicyProvider>()`;
+- `services.TryAddEnumerable(...)` for `AdapterInitializationService` and
+  `AdapterReadinessMonitor` as `IHostedService` (idempotent across multiple references);
+- `Describe(...)` reads the four readiness settings with source tracking and publishes them to
+  the boot report via `ProvenanceModuleWriter` / `AdaptersReadinessProvenanceItems`.
 
-- Code reviewed: `BaseKoanAdapter.cs`, `AdapterCapabilities.cs`, readiness services under `Readiness/`, and `Initialization/KoanAutoRegistrar.cs` (2025-09-29).
-- Confirmed configuration helpers respect legacy keys and avoid null dereferences.
-- Verified readiness services register via hosted services and integrate with `AdaptersReadinessOptions`.
-- Doc build validated through `docs:build` task (2025-09-29).
+Adapters register their own `IAsyncAdapterInitializer` and `IConfigureOptions<TOptions>` in
+their own registrars; this package only provides the shared infrastructure they bind to.
