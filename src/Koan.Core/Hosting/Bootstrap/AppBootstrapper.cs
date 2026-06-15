@@ -184,12 +184,19 @@ public static class AppBootstrapper
         KoanStartupTimeline.Mark(KoanStartupStage.DataReady);
     }
 
-    private static void EmitAssemblySummary(
+    // internal (not private) so AssemblySummaryVerboseGateSpec can pin the KOAN_VERBOSE_ASSEMBLIES gate
+    // directly (InternalsVisibleTo: Koan.Tests.Integration.Bootstrap) without booting a full host.
+    internal static void EmitAssemblySummary(
         List<(Assembly Assembly, string LoadContext)> assemblyLog,
         List<Assembly> discoveredAssemblies,
         bool verboseAssemblies,
         int lenientAssemblySkips)
     {
+        // The raw ASSEMBLIES|… lines and the assembly-scan JSON payload are machine-oriented diagnostics.
+        // Keep stdout human by default — the module inventory already appears in the KoanConsoleBlocks boot
+        // report — and surface this whole block only under KOAN_VERBOSE_ASSEMBLIES (H9).
+        if (!verboseAssemblies) return;
+
         static string Classify(Assembly asm)
         {
             var name = asm.GetName().Name ?? "";
@@ -228,16 +235,13 @@ public static class AppBootstrapper
         };
         Console.WriteLine(JsonSerializer.Serialize(payload));
 
-        if (verboseAssemblies)
+        // TIER A counts (fail-fast.json): absent/unloadable references skipped during closure are
+        // no longer silent — surface them here alongside the assembly listing.
+        Console.WriteLine($"ASSEMBLIES|lenientSkips={lenientAssemblySkips}");
+        foreach (var entry in assemblyLog.OrderBy(a => a.Assembly.GetName().Name, StringComparer.OrdinalIgnoreCase))
         {
-            // TIER A counts (fail-fast.json): absent/unloadable references skipped during closure are
-            // no longer silent — surface them here alongside the assembly listing.
-            Console.WriteLine($"ASSEMBLIES|lenientSkips={lenientAssemblySkips}");
-            foreach (var entry in assemblyLog.OrderBy(a => a.Assembly.GetName().Name, StringComparer.OrdinalIgnoreCase))
-            {
-                var name = entry.Assembly.GetName();
-                Console.WriteLine($"ASSEMBLY|{name.Name} {name.Version} :: {entry.Assembly.Location} :: ALC={entry.LoadContext}");
-            }
+            var name = entry.Assembly.GetName();
+            Console.WriteLine($"ASSEMBLY|{name.Name} {name.Version} :: {entry.Assembly.Location} :: ALC={entry.LoadContext}");
         }
     }
 

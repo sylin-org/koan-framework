@@ -63,6 +63,14 @@ internal sealed class AppRuntime : IAppRuntime
                 // intentionally best-effort
             }
 
+            // StartupProbeService seeds the health snapshot on a background task that runs AFTER the host
+            // starts, so at boot-report time the snapshot is typically empty even when probes ARE registered.
+            // Capture how many contributors are registered so the report can honestly say "pending" rather
+            // than fabricate an overall verdict the probes have not yet produced (H9 health-line race fix).
+            var registeredProbes = 0;
+            try { registeredProbes = _sp.GetService<IHealthRegistry>()?.All.Count ?? 0; }
+            catch { /* best-effort */ }
+
             var hostDescription = DescribeHost();
             var startupBlock = KoanConsoleBlocks.BuildStartupOverviewBlock(
                 snapshot,
@@ -70,7 +78,8 @@ internal sealed class AppRuntime : IAppRuntime
                 modulePairs,
                 runtimeVersion,
                 AppBootstrapper.RegistrySummary,
-                healthSnapshot);
+                healthSnapshot,
+                registeredProbes);
 
             KoanStartupTimeline.Mark(KoanStartupStage.ConfigReady);
             var timeline = KoanStartupTimeline.GetSummary();

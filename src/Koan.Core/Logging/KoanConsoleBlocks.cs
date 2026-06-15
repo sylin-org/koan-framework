@@ -19,7 +19,8 @@ internal static class KoanConsoleBlocks
         IReadOnlyList<(string Name, string Version)> modules,
         string runtimeVersion,
         RegistrySummarySnapshot? registry,
-        HealthSnapshot? health)
+        HealthSnapshot? health,
+        int registeredProbes = 0)
     {
         var identity = snapshot.Application;
         var uniqueModules = DeduplicateModules(modules);
@@ -94,7 +95,7 @@ internal static class KoanConsoleBlocks
             .AddLine(FormatKeyValue("Process", $"Started {snapshot.ProcessStart:o}"))
             .AddLine(FormatKeyValue("Uptime", FormatUptime(snapshot.ProcessStart)))
             .AddLine(FormatKeyValue("Machine", Environment.MachineName))
-            .AddLine(FormatKeyValue("Health", FormatInventoryHealth(health)));
+            .AddLine(FormatKeyValue("Health", FormatInventoryHealth(health, registeredProbes)));
 
         return builder.Build();
     }
@@ -252,11 +253,18 @@ internal static class KoanConsoleBlocks
         return string.Join(' ', segments);
     }
 
-    private static string FormatInventoryHealth(HealthSnapshot? health)
+    private static string FormatInventoryHealth(HealthSnapshot? health, int registeredProbes)
     {
-        if (health is null)
+        // Boot-report race (H9): this block renders synchronously during host startup, BEFORE
+        // StartupProbeService's background task has pushed any samples. An empty snapshot at this instant
+        // is not a verdict — printing overall=Unknown (or a fabricated overall=Healthy from the empty
+        // aggregate) would be a race. Report "pending" when probes are registered but have not reported
+        // yet, and "none registered" when there is genuinely nothing to probe.
+        if (health is null || health.Components.Count == 0)
         {
-            return "probes=0 overall=Unknown";
+            return registeredProbes > 0
+                ? $"probes pending (registered={registeredProbes})"
+                : "probes=0 (none registered)";
         }
 
         var total = health.Components.Count;
