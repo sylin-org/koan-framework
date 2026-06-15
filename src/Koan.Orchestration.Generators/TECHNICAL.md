@@ -24,7 +24,6 @@ validation:
    - Assembly-level attributes `AuthProviderDescriptorAttribute` and `OrchestrationServiceManifestAttribute`.
    - Classes implementing `IKoanManifest` or decorated with `KoanAppAttribute` (used to emit app metadata).
 2. **Diagnostics** – As symbols are processed, the generator reports diagnostics when rules are violated:
-   - `Koan0049A` – `[KoanService]` must live on a class implementing `IServiceAdapter`.
    - `Koan0049B` – Invalid short code (length/character constraints).
    - `Koan0049C` – Reserved short code identifiers.
    - `Koan0049D` – Poorly formatted `qualifiedCode` values.

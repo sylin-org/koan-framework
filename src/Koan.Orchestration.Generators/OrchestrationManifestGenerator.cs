@@ -23,14 +23,6 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
     public void Initialize(GeneratorInitializationContext context) { }
 
     // Diagnostics (ARCH-0049 enforcement)
-    private static readonly DiagnosticDescriptor DxSvcOnClassOnly = new(
-        id: "Koan0049A",
-        title: "[KoanService] must be applied to a class that implements IServiceAdapter",
-        messageFormat: "Type '{{0}}' must implement Koan.Orchestration.Abstractions.IServiceAdapter to use [KoanService]",
-        category: "Usage",
-    defaultSeverity: DiagnosticSeverity.Info,
-        isEnabledByDefault: true);
-
     private static readonly DiagnosticDescriptor DxShortCodeInvalid = new(
         id: "Koan0049B",
         title: "Invalid shortCode for [KoanService]",
@@ -260,16 +252,6 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
                                     sid ??= a.ConstructorArguments[1].Value?.ToString();
                                     svcName ??= a.ConstructorArguments[2].Value?.ToString();
                                 }
-                                // Validate [KoanService] placement: class must implement IServiceAdapter
-                                try
-                                {
-                                    var implementsAdapter = sym.AllInterfaces.Any(i => i.ToDisplayString() == "Koan.Orchestration.Abstractions.IServiceAdapter");
-                                    if (!implementsAdapter)
-                                    {
-                                        context.ReportDiagnostic(Diagnostic.Create(DxSvcOnClassOnly, decl.Identifier.GetLocation(), sym.Name));
-                                    }
-                                }
-                                catch { }
                                 foreach (var na in a.NamedArguments)
                                 {
                                     switch (na.Key)

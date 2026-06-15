@@ -21,7 +21,7 @@ Annotate your adapters with `KoanServiceAttribute` (and related metadata attribu
 ```csharp
 [KoanService(ServiceKind.Database, "postgres", "Postgres")
 ContainerDefaults("postgres", Ports = new[] { 5432 }, Tag = "16.4")]
-public sealed class PostgresAdapter : IServiceAdapter { /* ... */ }
+public sealed class PostgresAdapter { /* ... */ }
 ```
 
 - Add the package as an analyzer reference (`PrivateAssets=all`) to avoid leaking it to consumers.
@@ -35,7 +35,6 @@ public sealed class PostgresAdapter : IServiceAdapter { /* ... */ }
 
 ## Diagnostics
 
-- `Koan0049A` – `[KoanService]` must target an `IServiceAdapter` implementation.
 - `Koan0049B/C` – short code validation (format + reserved names).
 - `Koan0049D` – malformed `qualifiedCode`.
 - `Koan0049E` – missing container image for container deployments.

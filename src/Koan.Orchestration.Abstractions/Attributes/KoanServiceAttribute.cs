@@ -4,7 +4,6 @@ namespace Koan.Orchestration.Attributes;
 
 /// <summary>
 /// Unified declaration of a service adapter's identity and defaults.
-/// Apply to classes implementing IServiceAdapter.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
 public sealed class KoanServiceAttribute : Attribute
