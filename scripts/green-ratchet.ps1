@@ -12,11 +12,12 @@
                     cleanly when infra is absent. Skip with -SkipTests.
     B.  Docs lint   scripts/docs-lint.ps1    — links / front-matter / anchors / terms.
                     Errors are fatal; warnings are not.
-    C.  Doc code    scripts/validate-code-examples.ps1 — compiles C# blocks in the
-                    INSTRUCTIONAL docs a change touches (diff-scoped vs -Base). Decision /
-                    design / proposal / archive docs are out of scope by design. Use
-                    -FullDocs for the manual full-surface sweep. A `<!-- validate:skip -->`
-                    marker before a fence exempts an intentionally non-compiling snippet.
+    C.  Doc code    scripts/validate-code-examples.ps1 — compiles the C# blocks in the
+                    INSTRUCTIONAL docs a change touches (diff-scoped vs -Base) that are
+                    marked `<!-- validate -->` (OPT-IN: a block is compiled only when an
+                    author asserts it is a complete, self-contained example; everything else
+                    is prose-grade). Decision/design/proposal/archive docs are out of scope.
+                    Use -FullDocs for the full-surface sweep.
 
   Exit code is 0 (GREEN) only when every run leg passes; otherwise 1 (RED).
 

@@ -49,6 +49,7 @@ That boot report is the framework's character in one screen: **the app explains 
 
 ### 1 · Model an entity → get an application
 
+<!-- validate -->
 ```csharp
 // Program.cs — complete. Nothing else to wire.
 var builder = WebApplication.CreateBuilder(args);
@@ -57,6 +58,7 @@ var app = builder.Build();
 app.Run();
 ```
 
+<!-- validate -->
 ```csharp
 public sealed class Todo : Entity<Todo>
 {

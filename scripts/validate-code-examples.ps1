@@ -12,8 +12,13 @@ param(
 )
 
 # Leg C of the green ratchet (docs/architecture/foundation-consolidation-plan.md).
-# Only INSTRUCTIONAL docs are compile-validated. Decision/design/proposal/archive docs
-# legitimately contain aspirational or historical code, so they are out of scope by design.
+# Only INSTRUCTIONAL docs are in scope; decision/design/proposal/archive docs legitimately contain
+# aspirational or historical code and are out of scope by design.
+#
+# OPT-IN model: within those docs, a C# block is compiled ONLY if it is marked `<!-- validate -->`
+# (a complete, self-contained example the author asserts must compile). Everything else is prose-grade
+# and is not compiled — documentation is teaching material, mostly fragments, so "compile every block"
+# is the wrong default. The marked set is the gate's real signal: those examples must never go stale.
 $script:InstructionalRoots = @(
     'docs/guides', 'docs/how-to', 'docs/reference', 'docs/getting-started',
     'docs/examples', 'docs/workbooks', 'docs/patterns', 'docs/api'
@@ -59,11 +64,15 @@ function Extract-CodeBlocks {
 
     foreach ($match in $matches) {
         $code = $match.Groups[1].Value.Trim()
-        # Opt-out: a `<!-- validate:skip -->` marker in the ~120 chars before the fence
-        # exempts an intentionally non-compiling snippet (pseudo-code, partial illustration).
+        # OPT-IN (documentation is prose-first): a C# block is compile-validated ONLY when an author marks
+        # it a complete, self-contained example with `<!-- validate -->` on the line(s) just before the
+        # fence. Unmarked blocks are illustrative by default — fragments, partial snippets, multi-pillar
+        # montages, snippets that reference types defined in prose — and are NOT compiled. Trying to compile
+        # every teaching fragment as a standalone program is a category error (it is what made the old gate
+        # validate nothing reliably). Legacy `<!-- validate:skip -->` markers are now redundant and ignored.
         $preStart = [Math]::Max(0, $match.Index - 120)
         $preceding = $content.Substring($preStart, $match.Index - $preStart)
-        if ($preceding -match '<!--\s*validate:skip\s*-->') { continue }
+        if ($preceding -notmatch '<!--\s*validate\s*-->') { continue }
         if ($code -and $code.Length -gt 10) { # Skip trivial examples
             $blocks += [PSCustomObject]@{
                 File = $FilePath
@@ -96,10 +105,14 @@ $script:RichUsings = @(
     'using Microsoft.Extensions.Hosting;'
     'using Microsoft.Extensions.Logging;'
     'using Koan.Core;'
+    'using Koan.Core.Capabilities;'
     'using Koan.Data;'
     'using Koan.Data.Abstractions;'
+    'using Koan.Data.Abstractions.Capabilities;'
     'using Koan.Data.Core;'
+    'using Koan.Data.Core.Model;'   # Entity<T>/Entity<T,TKey> — the base class nearly every entity example uses
     'using Koan.Web;'
+    'using Koan.Web.Controllers;'   # EntityController<T> — the documented REST base controller
 )
 
 # Pull the snippet's own leading using-directives out of the body so they can sit at file scope

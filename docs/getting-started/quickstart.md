@@ -43,6 +43,7 @@ dotnet add package Sylin.Koan.Data.Connector.Sqlite
 > Package IDs are prefixed `Sylin.` on NuGet; code namespaces are plain `Koan.*`.
 > `dotnet add package` takes one package per invocation.
 
+<!-- validate -->
 ```csharp
 // Program.cs — complete.
 var builder = WebApplication.CreateBuilder(args);
@@ -51,6 +52,7 @@ var app = builder.Build();
 app.Run();
 ```
 
+<!-- validate -->
 ```csharp
 using Koan.Data.Core.Model;
 using Koan.Web.Controllers;
