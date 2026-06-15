@@ -79,7 +79,9 @@ public sealed class ReplicatedStorageProvider : IStorageProvider, IStatOperation
         long size = 0;
         if (content.CanSeek)
         {
-            try { size = content.Length; } catch { /* best-effort */ }
+            // NotSupportedException only: Length is an optional stream capability; a cache
+            // Head below recovers the real size. Any other failure is a real I/O error.
+            try { size = content.Length; } catch (NotSupportedException) { /* recovered via cache Head */ }
         }
 
         if (size == 0 && _cache is IStatOperations cacheStat)
@@ -217,9 +219,12 @@ public sealed class ReplicatedStorageProvider : IStorageProvider, IStatOperation
             if (await _cache.Exists(container, key, ct))
                 return true;
         }
-        catch
+        catch (Exception ex)
         {
-            // Ignore cache errors, try durable
+            // Cache existence check failed — degrade to durable (the authoritative store).
+            // Kept broad on purpose: any cache fault must fall through to durable, but no
+            // longer silently so a flaky cache provider is diagnosable.
+            _logger.LogDebug(ex, "Replicated: cache Exists check failed for {Key}, falling back to durable", key);
         }
 
         // Fall back to durable
@@ -242,9 +247,11 @@ public sealed class ReplicatedStorageProvider : IStorageProvider, IStatOperation
                     return stat;
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // fall through
+                // Cache Head failed — fall through to durable. Kept broad on purpose so any
+                // cache fault still degrades to durable, but no longer silently.
+                _logger.LogDebug(ex, "Replicated: cache Head failed for {Key}, falling back to durable", key);
             }
         }
 
@@ -541,9 +548,12 @@ public sealed class ReplicatedStorageProvider : IStorageProvider, IStatOperation
         {
             return await _cache.OpenRead(container, key, ct);
         }
-        catch
+        catch (Exception ex)
         {
-            // Fallback: return the buffered copy
+            // Re-open of the just-written cache entry failed; return the buffered copy so
+            // the caller still gets the data. Kept broad on purpose; logged so a cache that
+            // fails immediately after Write is diagnosable.
+            _logger.LogDebug(ex, "Replicated: re-open after pull-through Write failed for {Key}, returning buffered copy", key);
             ms.Position = 0;
             return ms;
         }
@@ -612,9 +622,14 @@ public sealed class ReplicatedStorageProvider : IStorageProvider, IStatOperation
             // Expected on cancellation
         }
 
-        // Final persist
+        // Final persist (best-effort: Dispose must never throw)
         try { _manifest.Save(_manifestPath).GetAwaiter().GetResult(); }
-        catch { /* best effort on shutdown */ }
+        catch (Exception ex)
+        {
+            // Kept broad on purpose — Dispose must not throw — but logged so a lost final
+            // manifest persist on shutdown is diagnosable.
+            _logger.LogDebug(ex, "Replicated: final manifest persist on dispose failed (best-effort)");
+        }
 
         _cts.Dispose();
 

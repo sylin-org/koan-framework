@@ -50,7 +50,9 @@ public sealed class StorageService : IStorageService
         if (content.CanSeek)
         {
             long originalPos = 0;
-            try { originalPos = content.Position; } catch { originalPos = 0; }
+            // NotSupportedException only: a stream may expose CanSeek=true yet not back Position
+            // (capability probe). Any other failure is a real I/O error and must surface.
+            try { originalPos = content.Position; } catch (NotSupportedException) { originalPos = 0; }
 
             using (var sha = SHA256.Create())
             {
@@ -75,8 +77,9 @@ public sealed class StorageService : IStorageService
             if (content.CanSeek)
                 content.Seek(originalPos, SeekOrigin.Begin);
 
-            // Determine size if available
-            try { size = content.Length - originalPos; } catch { size = 0; }
+            // Determine size if available. NotSupportedException only: length is a stream
+            // capability that may be absent; a best-effort stat below recovers the real size.
+            try { size = content.Length - originalPos; } catch (NotSupportedException) { size = 0; }
 
             await provider.Write(resolvedContainer, key, content, contentType, ct);
         }
@@ -166,10 +169,18 @@ public sealed class StorageService : IStorageService
         {
             using var s = await provider.OpenRead(resolvedContainer, key, ct);
             long? len = null;
-            try { len = s.CanSeek ? s.Length : null; } catch { }
+            // NotSupportedException only: length is an optional stream capability — leave it null.
+            try { len = s.CanSeek ? s.Length : null; } catch (NotSupportedException) { }
             return new ObjectStat(len, null, null, null);
         }
-        catch { return null; }
+        catch (Exception ex)
+        {
+            // Best-effort stat fallback: the object could not be opened to infer length.
+            // Treat as un-stat-able (return null) rather than failing the caller, but no
+            // longer silently — record so a misbehaving provider is diagnosable.
+            _logger.LogDebug(ex, "Storage: best-effort Head fallback could not stat '{Container}/{Key}' on provider '{Provider}'; returning null", resolvedContainer, key, provider.Name);
+            return null;
+        }
     }
 
     public async Task<StorageObject> TransferToProfile(string sourceProfile, string sourceContainer, string key, string targetProfile, string? targetContainer = null, bool deleteSource = false, CancellationToken ct = default)
