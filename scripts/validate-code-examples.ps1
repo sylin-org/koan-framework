@@ -214,22 +214,27 @@ try {
         Write-Host "Scope: full instructional sweep -> $($candidates.Count) doc(s)"
     }
 
-    $files = @()
+    # NOTE: do NOT name these locals $full / $files. PowerShell variable names are
+    # case-insensitive, so $full aliases the typed [switch]$Full parameter (string -> bool
+    # coercion throws a MetadataError) and $files aliases the typed [string[]]$Files
+    # parameter (Get-Item FileInfo objects get flattened to strings, so .FullName is empty).
+    # Either collision silently kills the sweep, degrading the gate to "validate nothing".
+    $scopedFiles = @()
     foreach ($c in $candidates) {
-        $full = Join-Path $repoRootPath $c
-        if (Test-Path $full) { $files += Get-Item $full }
+        $fullPath = Join-Path $repoRootPath $c
+        if (Test-Path $fullPath) { $scopedFiles += Get-Item $fullPath }
     }
 
-    if ($files.Count -eq 0) {
+    if ($scopedFiles.Count -eq 0) {
         Write-Success "No instructional docs in scope to validate."
         exit 0
     }
 
-    Write-Host "Found $($files.Count) documentation file(s) in scope"
+    Write-Host "Found $($scopedFiles.Count) documentation file(s) in scope"
 
     # Extract all code blocks
     $allBlocks = @()
-    foreach ($file in $files) {
+    foreach ($file in $scopedFiles) {
         if ($Verbose) {
             Write-Host "Processing: $($file.FullName)" -ForegroundColor DarkGray
         }
