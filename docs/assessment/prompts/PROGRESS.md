@@ -79,7 +79,7 @@ Preamble for these cards: the `[PREAMBLE]` block in `../06-prompt-stash.md`.
 | E5 | T3 | — | pending | | | | auth flow engine swap (OIDC-501 + PKCE + spec) |
 | E6 | T3 | — | pending | | | | ES/OS shared core consolidation |
 | E7 | T2 | — | done | 2026-06-15 | opus-4.8 (wave) | 0983d31e | deleted dead surface (IMessageBusSelector / IQueuedMessage / the SendToQueueAsync reflection fallback / zero-registration MessagingTransformers; kept MessagingInterceptors); replaced the per-send reflection with a cached typed-delegate dispatch. **Found + fixed a latent bug**: the old reflection targeted `GetMethod("Send")` which NO proxy exposes (only `SendAsync<T>`), so the non-queued send path always threw — rewrite targets the real SendAsync (the broken path was never test-exercised). Build green; Cache.Coherence.Messaging 14/14; Jobs.Transport 1/1; S3.Mq sample builds. |
-| E8a | T2 | — | pending | | | | Postgres BulkUpsert capability token |
+| E8a | T2 | — | done | 2026-06-15 | opus-4.8 | 5bbec1df | declared `DataCaps.Write.BulkUpsert` + the `IBulkUpsert<TKey>` marker (a no-method marker — DATA-0003/ARCH-0084). `UpsertMany` at `:634` already does `INSERT … ON CONFLICT (Id) DO UPDATE` in a tx → equivalent to Sqlite (:39/:48) / SqlServer (:35/:44). Spec flipped `BeFalse`→`BeTrue`. **Adversarial check clean:** no other surface asserts Postgres caps; Web AdapterSurface already exercised `/bulk` (default `SupportsBulkUpsert=>true`). Build green; Postgres suite 8/8 (caps + FilterConvergence, Testcontainers). |
 | E8b | T3 | — | pending | | | | Couchbase CAS + FastRemove (or ADR note) |
 | E8c | T3 | — | pending | | | | Redis-as-data capability decision |
 | E9 | T2 | — | pending | | | | EntityContext With(...) doc/code contradiction (docs half) |
