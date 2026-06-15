@@ -519,6 +519,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Mcp.FieldExclusion.Tes
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Mcp.CustomTools.Tests", "tests\Suites\Samples\Koan.Mcp.CustomTools.Tests\Koan.Mcp.CustomTools.Tests.csproj", "{DB1AE4A9-2A9F-4D04-9C62-6569ABD73B80}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S16.PantryPal.Tests", "tests\S16.PantryPal.Tests\S16.PantryPal.Tests.csproj", "{DB426433-79A3-4CBD-A879-90A09DA24254}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -2591,6 +2593,18 @@ Global
 		{DB1AE4A9-2A9F-4D04-9C62-6569ABD73B80}.Release|x64.Build.0 = Release|Any CPU
 		{DB1AE4A9-2A9F-4D04-9C62-6569ABD73B80}.Release|x86.ActiveCfg = Release|Any CPU
 		{DB1AE4A9-2A9F-4D04-9C62-6569ABD73B80}.Release|x86.Build.0 = Release|Any CPU
+		{DB426433-79A3-4CBD-A879-90A09DA24254}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DB426433-79A3-4CBD-A879-90A09DA24254}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DB426433-79A3-4CBD-A879-90A09DA24254}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{DB426433-79A3-4CBD-A879-90A09DA24254}.Debug|x64.Build.0 = Debug|Any CPU
+		{DB426433-79A3-4CBD-A879-90A09DA24254}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{DB426433-79A3-4CBD-A879-90A09DA24254}.Debug|x86.Build.0 = Debug|Any CPU
+		{DB426433-79A3-4CBD-A879-90A09DA24254}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DB426433-79A3-4CBD-A879-90A09DA24254}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DB426433-79A3-4CBD-A879-90A09DA24254}.Release|x64.ActiveCfg = Release|Any CPU
+		{DB426433-79A3-4CBD-A879-90A09DA24254}.Release|x64.Build.0 = Release|Any CPU
+		{DB426433-79A3-4CBD-A879-90A09DA24254}.Release|x86.ActiveCfg = Release|Any CPU
+		{DB426433-79A3-4CBD-A879-90A09DA24254}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

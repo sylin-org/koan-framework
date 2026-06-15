@@ -31,7 +31,7 @@ public class PantrySearchServiceTests
         var svc = new PantrySearchService();
         var (items, degraded) = await svc.Search("milk", 10, CancellationToken.None);
         items.Should().OnlyContain(i => (i.Name ?? "").Contains("Milk", StringComparison.OrdinalIgnoreCase));
-        items.Should().HaveCountGreaterOrEqualTo(2);
+        items.Should().HaveCountGreaterThanOrEqualTo(2);
         degraded.Should().BeTrue(); // lexical fallback likely (unless vectors available)
     }
 

@@ -21,8 +21,8 @@ public class PantryInsightsServiceTests
         var svc = new PantryInsightsService();
         var stats = await svc.GetStats();
 
-        stats.TotalItems.Should().BeGreaterOrEqualTo(3);
-        stats.Expired.Should().BeGreaterOrEqualTo(1);
+        stats.TotalItems.Should().BeGreaterThanOrEqualTo(3);
+        stats.Expired.Should().BeGreaterThanOrEqualTo(1);
         stats.ByCategory.Select(c => c.Category).Should().Contain(new []{"dairy","produce","bakery"});
     }
 }
