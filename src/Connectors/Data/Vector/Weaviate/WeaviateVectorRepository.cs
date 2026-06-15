@@ -558,10 +558,15 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         var args = string.IsNullOrEmpty(whereClause)
             ? $"({searchClause}, limit: {topK}{afterClause})"
             : $"({searchClause}, limit: {topK}, where: {whereClause}{afterClause})";
+        // Request the stored metadata properties so each match carries them back (provenance round-trip,
+        // parity with PGVector). The ensured-property set is the source of truth for what was written.
+        var metaFields = _ensuredProps.TryGetValue(ClassName, out var ensured) && !ensured.IsEmpty
+            ? " " + string.Join(" ", ensured.Keys)
+            : "";
         var gql = new
         {
-            // Request docId alongside _additional so we can map back to original ids
-            query = $"query {{ Get {{ {ClassName} {args} {{ docId _additional {{ id distance }} }} }} }}"
+            // Request docId + metadata props alongside _additional so we can map back to original ids.
+            query = $"query {{ Get {{ {ClassName} {args} {{ docId{metaFields} _additional {{ id distance }} }} }} }}"
         };
         var req = new StringContent(JsonConvert.SerializeObject(gql), System.Text.Encoding.UTF8, "application/json");
         var resp = await _http.PostAsync("/v1/graphql", req, ct);
@@ -914,7 +919,26 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
 
                 TKey id = (TKey)Convert.ChangeType(idStr, typeof(TKey));
                 var score = 1.0 - distance;
-                list.Add(new VectorMatch<TKey>(id, score, null));
+
+                // Surface the returned object properties (except _additional) as match metadata so callers
+                // can read stored fields / provenance — parity with the PGVector adapter.
+                Dictionary<string, object>? metadata = null;
+                foreach (var p in item.Properties())
+                {
+                    if (string.Equals(p.Name, "_additional", StringComparison.Ordinal)) continue;
+                    object? value = p.Value switch
+                    {
+                        JValue jv => jv.Value,
+                        JArray ja => ja.Select(t => (t as JValue)?.Value ?? t.ToString()).ToArray(),
+                        _ => p.Value.ToString()
+                    };
+                    if (value is not null)
+                    {
+                        metadata ??= new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+                        metadata[p.Name] = value;
+                    }
+                }
+                list.Add(new VectorMatch<TKey>(id, score, metadata));
 
                 if (uuid != null)
                 {
