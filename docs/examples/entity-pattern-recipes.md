@@ -35,7 +35,7 @@ validation:
 | Scenario                 | Start here                                                                                     | Combine with                                                                    |
 | ------------------------ | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | CRUD service with paging | [Stage 1 – CRUD Backbone](../guides/data-modeling.md#stage-1--crud-backbone)                   | [API Delivery Playbook](../guides/building-apis.md)                             |
-| Event-driven projections | [Stage 2 – Event-Driven Messaging](../guides/data-modeling.md#stage-2--event-driven-messaging) | [Semantic Pipelines Playbook](../guides/semantic-pipelines.md)                  |
+| Event-driven projections | [Stage 2 – Event-Driven Messaging](../guides/data-modeling.md#stage-2--event-driven-messaging) | [AI & Vector How-To](../guides/ai-vector-howto.md)                              |
 | AI-assisted workflows    | [Stage 3 – AI-Enriched Domain](../guides/data-modeling.md#stage-3--ai-enriched-domain)         | [AI Integration Playbook](../guides/ai-integration.md)                          |
 | Governance / audit       | [Soft Delete with Guardrails](../guides/data-modeling.md#soft-delete-with-guardrails)          | [Koan Troubleshooting Hub](../support/troubleshooting.md#flow--pipeline-health) |
 

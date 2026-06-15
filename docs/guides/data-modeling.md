@@ -328,7 +328,7 @@ public class Product : Entity<Product>
 
 ## Next Steps
 
-- Automate enrichment with the [Semantic Pipelines Playbook](./semantic-pipelines.md).
+- Automate enrichment with the [AI & Vector How-To](./ai-vector-howto.md).
 - Publish APIs with the [API Delivery Playbook](./building-apis.md).
 - Expose diagnostics and runbooks inside the [Koan Troubleshooting Hub](../support/troubleshooting.md).
 

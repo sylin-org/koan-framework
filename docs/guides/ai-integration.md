@@ -39,7 +39,7 @@ related_guides:
 ## How to Use This Playbook
 
 - 📌 Canonical reference: [AI Pillar Reference](../reference/ai/index.md)
-- 🌊 Flow automation: [Semantic Pipelines Playbook](./semantic-pipelines.md)
+- 🌊 Batch enrichment: [AI & Vector How-To](./ai-vector-howto.md)
 - 🗂️ Data storage: [Data Modeling Playbook](./data-modeling.md)
 - 🔐 Access surfaces: [API Delivery Playbook](./building-apis.md)
 
@@ -226,7 +226,7 @@ public class DocumentIndex : Entity<DocumentIndex>
 
 - Combine AI outputs with Messaging to trigger downstream automations.
 - Add moderation and safety filters before returning generated content.
-- Explore agentic workflows by orchestrating multi-step prompts via the [Semantic Pipelines Playbook](./semantic-pipelines.md).
+- Explore agentic workflows by orchestrating multi-step prompts via the [AI & Vector How-To](./ai-vector-howto.md).
 
 ---
 

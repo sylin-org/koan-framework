@@ -13,7 +13,7 @@ validation:
 related_guides:
   - performance.md
   - garden-cooperative-journal.md
-  - semantic-pipelines.md
+  - ai-vector-howto.md
 ---
 
 # GardenCoop NativeAOT Adoption Guide

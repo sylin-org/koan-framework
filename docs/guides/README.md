@@ -103,11 +103,11 @@ _For contributors_: How application initialization actually works
 - Capability gates (`[RequireCapability]`), named policies, and custom PDP/ReBAC providers
 - "Coarse in the token, fine at the resource"
 
-### [Semantic Pipelines](semantic-pipelines.md)
+### [AI & Vector Search](ai-vector-howto.md)
 
-- Streaming data processing with AI enrichments
-- Background orchestration patterns
-- Observability guidance for long-running jobs
+- Streaming data processing with AI enrichments (`AllStream` → `Tokenize` → `SaveWithVectors`)
+- Batch-processing pipeline patterns and branching
+- Observability guidance for long-running enrichment jobs
 
 ### [Performance Optimization](performance.md)
 

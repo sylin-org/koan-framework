@@ -12,6 +12,13 @@ related_guides:
   - data-modeling.md
 ---
 
+> **⚠️ Archived 2026-06-15 (X-semantic-pipelines-retire).** This Flow-era playbook is superseded by
+> the current, tested **[AI & Vector How-To](../../guides/ai-vector-howto.md)** — specifically its
+> *Flow Integration – Batch Processing* section, which documents the live
+> `Entity.AllStream(...).Tokenize(...).Branch(...).SaveWithVectors()` pipeline DSL. The text below
+> references the removed Flow pillar and the deleted `FlowInterceptors` / `FlowEvent` APIs and is
+> retained for history only. Consistent with DX-0041 (docs consolidation).
+
 # Semantic Pipelines Playbook
 
 ## Contract
