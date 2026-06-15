@@ -109,15 +109,31 @@ public static class EntityContext
         _current.Value?.TransactionCoordinator;
 
     /// <summary>
-    /// Set routing context. Replaces any previous context (does not merge).
+    /// Push a routing context for the lifetime of the returned scope. The new context is built
+    /// <b>inherit-unless-overridden</b>, not wholesale-replaced: each dimension whose argument is left
+    /// null adopts the ambient (previous) context's value for that dimension; a non-null argument
+    /// overrides it. Omitting an argument therefore <b>preserves</b> the inherited value — it does not
+    /// clear it — so a nested scope can change one axis (e.g. add a partition) while the rest carry over.
+    ///
+    /// <para>Mutual exclusion of source and adapter is enforced on the <b>effective</b> (post-inheritance)
+    /// values: because the two inherit independently, naming an <paramref name="adapter"/> while a source
+    /// is inherited from the ambient context — or a <paramref name="source"/> while an adapter is
+    /// inherited — throws <see cref="InvalidOperationException"/>. Switch routing axes from a scope that
+    /// does not inherit the other, or override both explicitly.</para>
+    ///
+    /// <para>Transaction carry-over is gated by <paramref name="preserveTransaction"/> (default true) and
+    /// is independent of the other dimensions: when true and no new <paramref name="transaction"/> is
+    /// named, the ambient transaction and its coordinator carry into the scope; when false they are
+    /// dropped. Disposing the returned scope restores the previous context.</para>
     /// </summary>
-    /// <param name="source">Named source configuration</param>
-    /// <param name="adapter">Adapter override</param>
-    /// <param name="partition">Storage partition suffix</param>
-    /// <param name="transaction">Transaction name for coordination</param>
+    /// <param name="source">Named source configuration; null inherits the ambient source.</param>
+    /// <param name="adapter">Adapter override; null inherits the ambient adapter.</param>
+    /// <param name="partition">Storage partition suffix; null inherits the ambient partition.</param>
+    /// <param name="transaction">Transaction name for coordination; null inherits the ambient transaction when <paramref name="preserveTransaction"/> is true.</param>
+    /// <param name="cacheBehavior">Per-request cache behavior override; null inherits the ambient behavior.</param>
     /// <param name="preserveTransaction">When true, retain the ambient transaction if one exists and no new transaction is specified.</param>
     /// <returns>Disposable that restores previous context on disposal</returns>
-    /// <exception cref="InvalidOperationException">Thrown when both source and adapter are specified, or when nesting transactions</exception>
+    /// <exception cref="InvalidOperationException">Thrown when source and adapter are both set on the effective context (directly or via inheritance), or when starting a transaction inside an existing one</exception>
     /// <exception cref="ArgumentException">Thrown when partition name is invalid</exception>
     public static IDisposable With(
         string? source = null,
