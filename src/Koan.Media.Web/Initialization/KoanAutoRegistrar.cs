@@ -1,6 +1,5 @@
 using Koan.Core;
 using Koan.Media.Abstractions.Recipes;
-using Koan.Media.Web.Caching;
 using Koan.Media.Web.Controllers;
 using Koan.Media.Web.Options;
 using Koan.Media.Web.Routing;
@@ -37,10 +36,7 @@ namespace Koan.Media.Web.Initialization;
 /// bytes live.</para>
 ///
 /// <para>Per MEDIA-0007, derivations are persisted by the
-/// <see cref="IMediaSource"/> directly. The legacy
-/// <see cref="IMediaOutputCache"/> is only registered when
-/// <c>Koan:Media:Web:OutputCache:Enabled</c> is true — a deliberate opt-in
-/// because the abstraction will be deleted in MEDIA-0008.</para>
+/// <see cref="IMediaSource"/> directly.</para>
 /// </summary>
 public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 {
@@ -63,29 +59,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // (e.g. an in-process logo store for brand assets that aren't
         // regular MediaEntity rows).
         services.TryAddSingleton<IOverlayResolver, DefaultOverlayResolver>();
-
-        // Legacy persistent render-output cache — MEDIA-0007 demotes this to
-        // an opt-in shim. Only register when the host explicitly enables it
-        // AND configures a path. Hosts on the storage-backed path get nothing
-        // here; the controller probes IMediaSource.OpenDerivationAsync first
-        // and only consults the cache when it is also resolved.
-#pragma warning disable CS0618
-        services.TryAddSingleton<IMediaOutputCache>(sp =>
-        {
-            var opts = sp.GetRequiredService<IOptions<MediaWebOptions>>().Value.OutputCache;
-            if (!opts.Enabled || string.IsNullOrWhiteSpace(opts.Path))
-            {
-                return NullMediaOutputCache.Instance;
-            }
-
-            var env = sp.GetRequiredService<IHostEnvironment>();
-            var root = Path.IsPathRooted(opts.Path)
-                ? opts.Path
-                : Path.Combine(env.ContentRootPath, opts.Path);
-            var logger = sp.GetRequiredService<ILogger<FileSystemMediaOutputCache>>();
-            return new FileSystemMediaOutputCache(root, logger);
-        });
-#pragma warning restore CS0618
 
         // Orphan-derivation sweep — MEDIA-0007 §d. Always register the
         // singleton so callers can resolve it for manual sweeps; the hosted

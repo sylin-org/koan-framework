@@ -339,36 +339,6 @@ Options under `Koan:Media:Web:Storage`:
 | `RoutePrefix` | `/media` | Controller base path. |
 | `DefaultCacheControl` | `public, max-age=3600, stale-while-revalidate=86400` | Variant cache header. |
 | `ImmutableCacheControl` | `public, immutable, max-age=31536000` | Reserved for content-addressable URLs. |
-| `OutputCache` | disabled | Persistent render cache; skips the pipeline on repeat requests. See below. |
-
-### `Koan:Media:Web:OutputCache` (MediaOutputCacheOptions)
-
-Persistent cache of rendered recipe output. Disabled by default; when
-enabled, `MediaController` serves a stored render and skips the
-resize/re-encode pipeline on a repeat request.
-
-| Key | Default | Description |
-|---|---|---|
-| `Enabled` | `false` | Turn the render cache on. |
-| `Path` | `null` | Cache directory. Relative paths resolve under `ContentRootPath`; the cache no-ops when empty. |
-
-Behavior:
-
-- **Key** is `(media id, recipe fingerprint)` — the same content-identity
-  the `ETag` carries. A recipe edit bumps the fingerprint, so the key
-  rotates and old entries orphan rather than serve stale.
-- **Read-through / write-through.** A hit returns the stored bytes with
-  `X-Koan-Media-FromCache: hit`; a miss renders, then persists
-  write-through before responding.
-- The default implementation is filesystem-backed: one file per render
-  (`{shard}/{id}-{fingerprint}.{ext}`, the format slug as the extension so
-  the content type round-trips without a sidecar), written via temp-file +
-  atomic rename, with all IO best-effort so a cache fault never faults a
-  response. It performs **no eviction** — reclaim space by deleting the
-  directory (orphans accrue only on recipe edits / removed sources).
-- `IMediaOutputCache` is a public, swappable service. Register your own
-  (for example, a storage-profile backing) before `AddKoan()` to replace
-  the filesystem default.
 
 ### `Koan:Media:Web:Storage` (StorageMediaOptions)
 

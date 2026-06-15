@@ -2,7 +2,6 @@ using System.Text.Json.Nodes;
 using Koan.Media.Abstractions.Recipes;
 using Koan.Media.Core.Pipeline;
 using Koan.Media.Core.Recipes;
-using Koan.Media.Web.Caching;
 using Koan.Media.Web.Infrastructure;
 using Koan.Media.Web.Negotiation;
 using Koan.Media.Web.Options;
@@ -31,10 +30,8 @@ namespace Koan.Media.Web.Controllers;
 /// <para>Per MEDIA-0007, derivations are persisted through the registered
 /// <see cref="IMediaSource"/> directly — the same storage namespace as the
 /// originals, with lineage stamped on <c>SourceMediaId</c>/<c>DerivationKey</c>/
-/// <c>RelationshipType</c>/<c>Tags["recipe-version"]</c>. The legacy
-/// <see cref="IMediaOutputCache"/> is still consulted while it is being phased
-/// out (deletion scheduled in MEDIA-0008); when the source does not persist
-/// derivations and no cache is registered, every request renders from scratch.
+/// <c>RelationshipType</c>/<c>Tags["recipe-version"]</c>. When the source does
+/// not persist derivations, every request renders from scratch.
 /// </para>
 /// </summary>
 [ApiController]
@@ -47,9 +44,6 @@ public sealed class MediaController : ControllerBase
     private readonly MediaWebOptions _options;
     private readonly ILogger<MediaController> _logger;
     private readonly IServiceProvider _services;
-#pragma warning disable CS0618 // IMediaOutputCache is obsolete; retained for the MEDIA-0007 transition window.
-    private readonly IMediaOutputCache? _legacyCache;
-#pragma warning restore CS0618
 
     public MediaController(
         IMediaRecipeRegistry registry,
@@ -58,10 +52,7 @@ public sealed class MediaController : ControllerBase
         ILogger<MediaController> logger,
         IServiceProvider services,
         IOverlayResolver? overlayResolver = null,
-        Koan.Media.Core.Fonts.KoanFontRegistry? fonts = null,
-#pragma warning disable CS0618
-        IMediaOutputCache? outputCache = null)
-#pragma warning restore CS0618
+        Koan.Media.Core.Fonts.KoanFontRegistry? fonts = null)
     {
         _registry = registry;
         _source = source;
@@ -69,7 +60,6 @@ public sealed class MediaController : ControllerBase
         _options = options.Value;
         _logger = logger;
         _services = services;
-        _legacyCache = outputCache;
         // Lazy-apply any AddKoanFont() registrations queued before AddKoan() ran
         if (fonts is not null)
         {
@@ -291,33 +281,13 @@ public sealed class MediaController : ControllerBase
                 return File(derivation.Bytes, derivation.ContentType);
             }
 
-            // 5c) Legacy IMediaOutputCache probe. Retained for one release while
-            // hosts migrate to the storage-backed derivation surface. Removed in
-            // MEDIA-0008.
-#pragma warning disable CS0618
-            if (_legacyCache is not null)
-            {
-                var cacheHit = await _legacyCache.TryGetAsync(id, fingerprint, ct).ConfigureAwait(false);
-                if (cacheHit is not null)
-                {
-                    Response.Headers[HeaderNames.ETag] = etag;
-                    Response.Headers[HttpHeaderNames.CacheControl] = _options.DefaultCacheControl;
-                    ApplyDiagnostics(seedRecipe, effectiveRecipe, fingerprint,
-                        sourceFormat: null, output: null,
-                        ignored: parseResult.IgnoredParams, fromCache: "hit");
-                    return File(cacheHit.Bytes, cacheHit.ContentType);
-                }
-            }
-#pragma warning restore CS0618
-
             // 6) Run pipeline. Per MEDIA-0008 the encoder writes through
             // the pipeline's streaming terminal — WriteToAsync — instead
             // of materialising a full byte buffer. Storage write-through
-            // and the legacy cache shim still consume bytes today (their
-            // contracts predate MEDIA-0008), so we tee the encode through
-            // a MemoryStream when either is active and reuse the captured
-            // buffer for the response body. The streaming win is realised
-            // immediately at the encoder boundary; the controller-level
+            // still consumes bytes today (its contract predates MEDIA-0008),
+            // so we tee the encode through a MemoryStream and reuse the
+            // captured buffer for the response body. The streaming win is
+            // realised immediately at the encoder boundary; the controller-level
             // tee will be replaced with a temp-file/Stream contract in a
             // follow-up ADR once IMediaSource.TryStoreDerivationAsync
             // accepts a writer instead of a MediaOutput.
@@ -354,8 +324,8 @@ public sealed class MediaController : ControllerBase
             }
 
             // Promote the captured bytes onto the MediaOutput so the
-            // storage write-through and legacy cache shim — both of which
-            // still consume MediaOutput.Bytes — see the populated buffer.
+            // storage write-through — which still consumes MediaOutput.Bytes
+            // — sees the populated buffer.
 #pragma warning disable CS0618 // MediaOutput.Bytes obsolete on the streaming path; required for MEDIA-0007 storage write-through until its contract migrates to a writer.
             var bufferedOutput = output with
             {
@@ -382,14 +352,6 @@ public sealed class MediaController : ControllerBase
                 _logger.LogWarning(ex,
                     "Derivation write-through failed for {Id}/{Fingerprint}", id, fingerprint);
             }
-
-            // 6c) Legacy cache write-through (transition window only).
-#pragma warning disable CS0618
-            if (_legacyCache is not null)
-            {
-                await _legacyCache.SetAsync(id, fingerprint, bufferedOutput, ct).ConfigureAwait(false);
-            }
-#pragma warning restore CS0618
 
             // 7) Build response
             Response.Headers[HeaderNames.ETag] = etag;

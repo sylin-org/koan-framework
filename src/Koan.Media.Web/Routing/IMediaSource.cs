@@ -31,7 +31,7 @@ public interface IMediaSource
     /// tuple, or when this source kind does not persist derivations.
     ///
     /// <para>Default implementation returns null, preserving the legacy
-    /// behavior where derivations were served by <c>IMediaOutputCache</c>
+    /// behavior where derivations were served by the legacy output cache
     /// rather than the storage layer.</para>
     /// </summary>
     Task<MediaDerivationHandle?> OpenDerivationAsync(

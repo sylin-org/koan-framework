@@ -52,20 +52,6 @@ public sealed class MediaWebOptions
     public string ImmutableCacheControl { get; set; } = "public, immutable, max-age=31536000";
 
     /// <summary>
-    /// Persistent render-output cache. Disabled by default; set
-    /// <c>Koan:Media:Web:OutputCache:Enabled</c> + <c>:Path</c> to memoize
-    /// rendered variants on disk and skip the pipeline on repeat requests.
-    ///
-    /// <para><strong>Obsolete — see MEDIA-0007.</strong> Derivations now live in
-    /// storage via <c>IMediaSource.TryStoreDerivationAsync</c>; this block is
-    /// retained for one release while hosts migrate. Removed in MEDIA-0008.</para>
-    /// </summary>
-    [Obsolete("Use IMediaSource.TryStoreDerivationAsync; see MEDIA-0007. Removed in MEDIA-0008.", error: false)]
-#pragma warning disable CS0618
-    public MediaOutputCacheOptions OutputCache { get; set; } = new();
-#pragma warning restore CS0618
-
-    /// <summary>
     /// Configuration for the <see cref="Sweep.MediaDerivationSweepService"/>.
     /// Disabled by default; enable to schedule orphan-derivation cleanup.
     /// </summary>

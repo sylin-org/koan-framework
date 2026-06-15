@@ -622,22 +622,12 @@ dives:
 | `X-Koan-Media-FromCache` | `hit` / `miss` / `stale-fallback` |
 | `X-Koan-Media-IgnoredParams` | Unknown params (relaxed mode) |
 
-**Skip the pipeline on repeat requests.** Enable the persistent render
-cache so a rendered variant is stored on first request and replayed
-without re-running the resize/encode pipeline:
-
-```jsonc
-// appsettings.json
-"Koan": { "Media": { "Web": {
-  "OutputCache": { "Enabled": true, "Path": "media-cache" }
-} } }
-```
-
-A hit returns `X-Koan-Media-FromCache: hit`. The key is
+**Repeat requests skip the pipeline automatically.** Per MEDIA-0007,
+derivations are persisted through the registered media source on first
+render and served from storage on a repeat request (`X-Koan-Media-FromCache:
+hit`) without re-running the resize/encode pipeline. The key is
 `(media id, recipe fingerprint)`, so a recipe edit rotates the key
-automatically — no manual invalidation. See the
-[reference](../reference/media/index.md#koanmediaweboutputcache-mediaoutputcacheoptions)
-for the keying, eviction, and `IMediaOutputCache` override.
+automatically — no manual invalidation.
 
 **Usage Scenarios**
 
