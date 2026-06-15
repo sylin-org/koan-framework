@@ -281,9 +281,9 @@ src/
 
 ## Cross-cutting
 
-### `Koan.Core.Singleflight` (extracted M2)
+### `Koan.Core.Concurrency.KeyedLeaseGate` (extracted M2)
 
-The per-key semaphore primitive that prevents cache stampedes. Lifted out of `Koan.Cache` so other pillars can use it without taking a cache dependency. Used today by `CacheClient.GetOrAddAsync`; equally applicable to AI embedding computations, heavy DB queries, file ops.
+The per-key semaphore (serialize-with-lease-timeout) gate that prevents cache stampedes — renamed from the misnamed `SingleflightRegistry` (ARCH-0087/E3: it serializes-and-re-runs per caller with a lease timeout; it does **not** coalesce). Lifted out of `Koan.Cache` so other pillars can use it without taking a cache dependency. Used today by `CacheClient.GetOrAddAsync`; equally applicable to AI embedding computations, heavy DB queries, file ops. Distinct from the static `Koan.Core.Infrastructure.Singleflight` coalescer (one shared execution per key, no timeout).
 
 ### `EntityContext.CacheBehavior` (M6, in `Koan.Data.Core`)
 

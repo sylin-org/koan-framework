@@ -2,17 +2,17 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using AwesomeAssertions;
-using Koan.Core.Singleflight;
+using Koan.Core.Concurrency;
 using Xunit;
 
 namespace Koan.Core.Tests;
 
-public sealed class SingleflightRegistrySpec
+public sealed class KeyedLeaseGateSpec
 {
     [Fact]
     public async Task RunAsync_enforces_exclusive_access_for_same_key()
     {
-        var registry = new SingleflightRegistry();
+        var registry = new KeyedLeaseGate();
         var firstEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseFirst = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var secondStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -59,7 +59,7 @@ public sealed class SingleflightRegistrySpec
     [Fact]
     public async Task RunAsync_timeout_when_lock_not_acquired_within_window()
     {
-        var registry = new SingleflightRegistry();
+        var registry = new KeyedLeaseGate();
         var firstEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseFirst = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -91,7 +91,7 @@ public sealed class SingleflightRegistrySpec
     [Fact]
     public async Task RunAsync_distinct_keys_run_concurrently()
     {
-        var registry = new SingleflightRegistry();
+        var registry = new KeyedLeaseGate();
         var aEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var bEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -121,7 +121,7 @@ public sealed class SingleflightRegistrySpec
     [Fact]
     public async Task RunAsync_releases_gate_when_action_throws()
     {
-        var registry = new SingleflightRegistry();
+        var registry = new KeyedLeaseGate();
 
         var bang = async () => await registry.RunAsync<int>(
             "boom",

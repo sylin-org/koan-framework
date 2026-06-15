@@ -17,7 +17,7 @@ using Koan.Cache.Serialization;
 using Koan.Cache.Stores;
 using Koan.Cache.Topology;
 using Koan.Core.Modules;
-using Koan.Core.Singleflight;
+using Koan.Core.Concurrency;
 using Koan.Data.Core.Decorators;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
@@ -54,7 +54,7 @@ public static class CacheServiceCollectionExtensions
         }
 
         // Cross-cutting primitives
-        services.AddKoanSingleflight();
+        services.AddKoanKeyedLeaseGate();
         services.TryAddSingleton<ICacheScopeAccessor, CacheScopeAccessor>();
         services.TryAddSingleton<CacheInstrumentation>();
 

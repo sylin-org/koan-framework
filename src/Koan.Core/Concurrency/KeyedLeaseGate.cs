@@ -3,13 +3,14 @@ using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Koan.Core.Singleflight;
+namespace Koan.Core.Concurrency;
 
 /// <summary>
-/// Per-key semaphore singleflight implementation with refcounted gate cleanup.
-/// Thread-safe; lives as a singleton in DI.
+/// Per-key <see cref="SemaphoreSlim"/> serialize-and-lease-timeout gate with refcounted gate
+/// cleanup. Thread-safe; lives as a singleton in DI. See <see cref="IKeyedLeaseGate"/> for the
+/// distinction from the in-flight coalescer <see cref="Koan.Core.Infrastructure.Singleflight"/>.
 /// </summary>
-internal sealed class SingleflightRegistry : ISingleflightRegistry
+internal sealed class KeyedLeaseGate : IKeyedLeaseGate
 {
     private sealed class Gate
     {
@@ -35,7 +36,7 @@ internal sealed class SingleflightRegistry : ISingleflightRegistry
             var effective = timeout <= TimeSpan.Zero ? TimeSpan.FromSeconds(5) : timeout;
             if (!await gate.Semaphore.WaitAsync(effective, ct).ConfigureAwait(false))
             {
-                throw new TimeoutException($"Failed to acquire singleflight lock for key '{key}' within {timeout}.");
+                throw new TimeoutException($"Failed to acquire keyed lease for key '{key}' within {timeout}.");
             }
 
             try

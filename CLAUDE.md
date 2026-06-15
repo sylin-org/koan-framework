@@ -84,7 +84,7 @@ Framework knowledge is provided through **Agent Skills** in `.claude/skills/` th
   - `Koan.Cache.Adapter.Redis` — L2 + `RedisCoherenceChannel` (priority 100 + 100)
   - `Koan.Cache.Coherence.Messaging` — rides `Koan.Messaging.IMessageBus` (priority 150, preempts Redis pub/sub)
   - `Koan.Cache.Coherence.InMemory` — fallback channel for tests / single-process verification (priority `int.MinValue`)
-- **Singleflight** (`Koan.Core.Singleflight`) — Stampede-protection primitive lifted out of cache for cross-pillar reuse
+- **KeyedLeaseGate** (`Koan.Core.Concurrency`) — DI per-key serialize-with-lease-timeout gate for stampede protection (renamed from the misnamed `SingleflightRegistry`, ARCH-0087/E3); distinct from the static **Singleflight** coalescer (`Koan.Core.Infrastructure` — one shared execution per key, no timeout)
 
 ### Background Jobs (JOBS-0005)
 - **IKoanJob<TSelf>** (`Koan.Jobs`) — Entity-first jobs: `MyJob : Entity<MyJob>, IKoanJob<MyJob>` with `static Task Execute(MyJob, JobContext, CancellationToken)`. Auto-discovered (`[KoanDiscoverable]`) — no queues/workers/repositories to wire

@@ -3,9 +3,20 @@ using System.Collections.Concurrent;
 namespace Koan.Core.Infrastructure;
 
 /// <summary>
-/// Singleflight deduplication for in-flight asynchronous operations keyed by string.
-/// Useful to ensure only one expensive operation runs per key at a time, with other callers awaiting the same task.
+/// In-flight <b>coalescer</b>: deduplicates concurrent asynchronous operations keyed by string so
+/// that exactly one execution runs per key and every concurrent caller of that key awaits and shares
+/// the <i>same</i> result. There is no lease timeout — callers wait as long as the shared execution
+/// takes.
 /// </summary>
+/// <remarks>
+/// This is a distinct primitive from the per-key serialize-and-lease gate
+/// <see cref="Koan.Core.Concurrency.IKeyedLeaseGate"/>. The coalescer collapses identical work into
+/// one shared execution (use it when the result is fungible across callers, e.g. one-time schema
+/// ensure, cache fill of an identical value). The gate instead admits callers one-at-a-time per key,
+/// runs each caller's <i>own</i> action, and fails with a <see cref="TimeoutException"/> when the
+/// lease cannot be acquired within a bounded window (use it when each caller must do its own work but
+/// only one may proceed per key at a time). They are not interchangeable — keep both.
+/// </remarks>
 public static class Singleflight
 {
     private static readonly ConcurrentDictionary<string, Lazy<Task>> _inflight = new(StringComparer.Ordinal);

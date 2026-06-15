@@ -14,7 +14,7 @@ using Koan.Cache.Options;
 using Koan.Cache.Scope;
 using Koan.Cache.Stores.Internal;
 using Koan.Cache.Topology;
-using Koan.Core.Singleflight;
+using Koan.Core.Concurrency;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -30,7 +30,7 @@ internal sealed class CacheClient : ICacheClient
 
     private readonly LayeredCache _layered;
     private readonly IReadOnlyList<ICacheSerializer> _serializers;
-    private readonly ISingleflightRegistry _singleflight;
+    private readonly IKeyedLeaseGate _singleflight;
     private readonly ICacheScopeAccessor _scopeAccessor;
     private readonly CacheInstrumentation _instrumentation;
     private readonly CoherenceCoordinator _coherence;
@@ -41,7 +41,7 @@ internal sealed class CacheClient : ICacheClient
     public CacheClient(
         LayeredCache layered,
         IEnumerable<ICacheSerializer> serializers,
-        ISingleflightRegistry singleflight,
+        IKeyedLeaseGate singleflight,
         ICacheScopeAccessor scopeAccessor,
         CacheInstrumentation instrumentation,
         CoherenceCoordinator coherence,
