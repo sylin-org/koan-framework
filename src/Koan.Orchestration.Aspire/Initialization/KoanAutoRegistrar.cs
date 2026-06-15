@@ -71,6 +71,10 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     }
 
 
+    // ARCH-0077 (D2 item 3): RETAINED, not dead surface. This subsystem is LIVE and Development-default —
+    // KoanEnv selects OrchestrationMode.SelfOrchestrating in dev, so this auto-starts dependency containers.
+    // It is exactly what .NET Aspire replaces; remove it with the ARCH-0077 migration, not as dead surface.
+    // See docs/assessment/prompts/PROGRESS.md (D2).
     private void RegisterSelfOrchestrationServices(IServiceCollection services)
     {
         // Core self-orchestration services
