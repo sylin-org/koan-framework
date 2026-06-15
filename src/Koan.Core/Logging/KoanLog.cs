@@ -156,8 +156,18 @@ public static class KoanLog
     public static void HostError(ILogger? logger, string action, string? outcome = null, params (string Key, object? Value)[] context)
         => StageError(logger, KoanLogStage.Host, action, outcome, context);
 
+    /// <summary>
+    /// Test-only seam (InternalsVisibleTo). When set, every <see cref="Write"/> call is mirrored here BEFORE
+    /// the logger dispatch and REGARDLESS of whether a logger is resolved — so a test can deterministically
+    /// observe a KoanLog emission without depending on the process-global factory attach + the per-scope
+    /// logger cache (which a prior host boot may already have populated, defeating a factory-attach capture).
+    /// Always <c>null</c> in production (one static null-check on this diagnostic path).
+    /// </summary>
+    internal static Action<KoanLogStage, LogLevel, string, string?, (string Key, object? Value)[]>? TestSink;
+
     internal static void Write(ILogger? logger, KoanLogStage stage, LogLevel level, string action, string? outcome, (string Key, object? Value)[] context)
     {
+        TestSink?.Invoke(stage, level, action, outcome, context);
         if (logger is null) return;
         logger.LogKoanStage(stage, level, action, outcome, context);
     }
