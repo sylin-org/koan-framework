@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Koan.Core;
 using Koan.Core.Extensions;
@@ -101,7 +103,15 @@ public sealed class WellKnownController(
                     query = caps.All.Where(c => c.Id.StartsWith("query.", StringComparison.Ordinal)).Select(c => c.Id).ToArray();
                     write = caps.All.Where(c => c.Id.StartsWith("write.", StringComparison.Ordinal)).Select(c => c.Id).ToArray();
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    // Degradable diagnostics: one aggregate's capability self-report failed (repo resolution /
+                    // Describe). Report empty tokens for it rather than failing the whole /aggregates endpoint.
+                    // Broad by design — ANY per-aggregate self-report fault must degrade this one item, never
+                    // fail the endpoint (e.g. MakeGenericMethod ArgumentException, or a custom adapter throw).
+                    sp.GetService<ILoggerFactory>()?.CreateLogger<WellKnownController>()
+                        .LogDebug(ex, "Capability self-report failed for {AggregateType}; reporting empty query/write tokens.", x.Type.FullName);
+                }
             }
 
             return new

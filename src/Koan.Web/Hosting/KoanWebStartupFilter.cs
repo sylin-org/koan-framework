@@ -29,6 +29,9 @@ internal sealed class KoanWebStartupFilter(IOptions<KoanWebOptions> options, IOp
                 app.Properties[appliedKey] = true;
                 // Greenfield boot: set AppHost, initialize env, run runtime
                 Koan.Core.Hosting.App.AppHost.Current = app.ApplicationServices;
+                // KoanEnv.TryInitialize is itself best-effort and swallows its own failures (KoanEnv.cs),
+                // so this guard is belt-and-suspenders against an unexpected throw during env snapshot init;
+                // env not being initialized here is non-fatal — downstream callers re-try TryInitialize.
                 try { Koan.Core.KoanEnv.TryInitialize(app.ApplicationServices); } catch { }
                 var rt = app.ApplicationServices.GetService(typeof(Koan.Core.Hosting.Runtime.IAppRuntime)) as Koan.Core.Hosting.Runtime.IAppRuntime;
                 rt?.Discover();
