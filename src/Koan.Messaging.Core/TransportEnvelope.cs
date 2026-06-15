@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 namespace Koan.Messaging
 {
     /// <summary>
-    /// Generic transport envelope for strongly-typed Flow messaging.
+    /// Generic transport envelope for strongly-typed messaging payloads.
     /// </summary>
     public class TransportEnvelope<T>
     {

@@ -1,31 +1,15 @@
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Koan.Core.Hosting.App;
-using Koan.Messaging.Contracts;
 
 namespace Koan.Messaging
 {
-    public static class MessagingTransformers
-    {
-        private static readonly ConcurrentDictionary<string, Func<object, object>> _registry = new();
-
-        public static void Register(string descriptor, Func<object, object> transformer)
-            => _registry[descriptor] = transformer;
-
-        public static object Transform(string descriptor, object payload)
-            => _registry.TryGetValue(descriptor, out var fn) ? fn(payload) : payload;
-
-        public static Func<object, object>? GetTransformer(string descriptor)
-            => _registry.TryGetValue(descriptor, out var fn) ? fn : null;
-    }
-
     public static class MessagingInterceptors
     {
     private static readonly ConcurrentDictionary<Type, Func<object, object>> _typeRegistry = new();
@@ -76,64 +60,59 @@ namespace Koan.Messaging
     public static class MessagingExtensions
     {
         /// <summary>
+        /// The open generic <see cref="IMessageProxy.SendAsync{T}(T, CancellationToken)"/> method,
+        /// specialized per concrete runtime type and cached as a compiled typed delegate. This
+        /// preserves the original reflection semantics — <c>SendAsync</c> is dispatched on the
+        /// concrete runtime type of the (possibly interceptor-substituted) payload, never on the
+        /// static <c>T</c> — while eliminating per-send reflection allocations.
+        /// </summary>
+        private static readonly MethodInfo SendAsyncOpenMethod =
+            typeof(IMessageProxy).GetMethod(nameof(IMessageProxy.SendAsync))
+            ?? throw new InvalidOperationException("IMessageProxy.SendAsync<T> not found.");
+
+        private static readonly ConcurrentDictionary<Type, Func<IMessageProxy, object, CancellationToken, Task>> _sendDispatchers = new();
+
+        /// <summary>
         /// Send a message through the Koan messaging system.
         /// Automatically buffers during startup, then routes to live provider.
         /// </summary>
-        public static async Task Send<T>(this T message, string descriptor = default!, CancellationToken cancellationToken = default) where T : class
+        public static Task Send<T>(this T message, CancellationToken cancellationToken = default) where T : class
         {
             if (message == null)
                 throw new ArgumentNullException(nameof(message));
 
-            // If descriptor is provided, transform; else send as-is
-            var transformed = descriptor != null ? MessagingTransformers.Transform(descriptor, message) : message;
-
-            var intercepted = MessagingInterceptors.Intercept(transformed);
+            var intercepted = MessagingInterceptors.Intercept(message);
             var proxy = ResolveMessageProxy();
 
-            // NEW: Check for queue-specific routing
-            if (intercepted is IQueuedMessage queuedMessage)
-            {
-                // Route to specific queue
-                await SendToQueue(proxy, queuedMessage.QueueName, queuedMessage.Payload, cancellationToken);
-            }
-            else
-            {
-                // Default behavior: type-based routing
-                var concreteType = intercepted.GetType();
-                var sendAsyncMethod = proxy.GetType().GetMethod("Send");
-                if (sendAsyncMethod == null)
-                    throw new InvalidOperationException($"Send method not found for type {concreteType.Name}");
-                var genericSendAsync = sendAsyncMethod.MakeGenericMethod(concreteType);
-                await (Task)genericSendAsync!.Invoke(proxy, new object[] { intercepted, cancellationToken })!;
-            }
+            // Dispatch SendAsync specialized on the concrete runtime type (identical to the prior
+            // MakeGenericMethod(intercepted.GetType()) reflection), via a per-type cached delegate.
+            var dispatcher = _sendDispatchers.GetOrAdd(intercepted.GetType(), BuildSendDispatcher);
+            return dispatcher(proxy, intercepted, cancellationToken);
         }
 
         /// <summary>
-        /// Sends a message to a specific queue using the provider's queue-specific routing.
+        /// Builds (once per concrete type) a compiled delegate that invokes
+        /// <c>proxy.SendAsync&lt;concreteType&gt;((concreteType)payload, ct)</c>. Equivalent to the
+        /// former <c>MakeGenericMethod(concreteType).Invoke(...)</c> but allocation-free per send.
         /// </summary>
-        private static async Task SendToQueue(object proxy, string queueName, object payload, CancellationToken cancellationToken)
+        private static Func<IMessageProxy, object, CancellationToken, Task> BuildSendDispatcher(Type concreteType)
         {
-            // Try to find SendToQueueAsync method on the provider
-            var sendToQueueMethod = proxy.GetType().GetMethod("SendToQueueAsync");
-            if (sendToQueueMethod != null)
-            {
-                // Provider supports queue-specific routing
-                var payloadType = payload.GetType();
-                var genericSendToQueue = sendToQueueMethod.MakeGenericMethod(payloadType);
-                await (Task)genericSendToQueue!.Invoke(proxy, new object[] { queueName, payload, cancellationToken })!;
-            }
-            else
-            {
-                // Fallback to regular SendAsync (for providers that don't support queue routing yet)
-                var concreteType = payload.GetType();
-                var sendAsyncMethod = proxy.GetType().GetMethod("Send");
-                if (sendAsyncMethod == null)
-                    throw new InvalidOperationException($"Neither SendToQueueAsync nor SendAsync method found on provider {proxy.GetType().Name}");
-                var genericSendAsync = sendAsyncMethod.MakeGenericMethod(concreteType);
-                await (Task)genericSendAsync!.Invoke(proxy, new object[] { payload, cancellationToken })!;
-            }
+            var proxyParam = Expression.Parameter(typeof(IMessageProxy), "proxy");
+            var payloadParam = Expression.Parameter(typeof(object), "payload");
+            var ctParam = Expression.Parameter(typeof(CancellationToken), "ct");
+
+            var typedSendAsync = SendAsyncOpenMethod.MakeGenericMethod(concreteType);
+            var call = Expression.Call(
+                proxyParam,
+                typedSendAsync,
+                Expression.Convert(payloadParam, concreteType),
+                ctParam);
+
+            return Expression
+                .Lambda<Func<IMessageProxy, object, CancellationToken, Task>>(call, proxyParam, payloadParam, ctParam)
+                .Compile();
         }
-        
+
         /// <summary>
         /// Register a message handler using fluent syntax via <c>services.On&lt;T&gt;(handler)</c>.
         /// </summary>
