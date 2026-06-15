@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -27,6 +28,8 @@ public sealed class StdioTransport : BackgroundService
     private int _toolCount;
     private CancellationTokenSource? _sessionCts;
     private Task? _sessionTask;
+    private Stream? _input;
+    private Stream? _output;
 
     public StdioTransport(
         McpServer server,
@@ -78,8 +81,12 @@ public sealed class StdioTransport : BackgroundService
 
         Console.SetOut(Console.Error);
 
-        using var input = Console.OpenStandardInput();
-        using var output = Console.OpenStandardOutput();
+        // Hoist the std streams to fields (NOT `using`) so StopAsync can dispose stdin to unblock a pending
+        // read. A console/pipe read does not honor a CancellationToken, so cancellation alone cannot end the
+        // session — closing the input stream is what breaks the blocking ReadFile during shutdown. They are
+        // disposed in the finally below.
+        var input = _input = Console.OpenStandardInput();
+        var output = _output = Console.OpenStandardOutput();
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
 
         _sessionCts = linkedCts;
@@ -102,9 +109,19 @@ public sealed class StdioTransport : BackgroundService
         {
             await runTask;
         }
+        catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException or IOException)
+        {
+            // Expected when StopAsync disposes stdin to unblock the read during shutdown.
+            transportLogger.LogDebug(ex, "STDIO session ended during shutdown.");
+        }
         finally
         {
             _sessionTask = null;
+            // Release the std streams (no longer scoped by `using`, so StopAsync can close stdin early).
+            try { input.Dispose(); } catch { /* best-effort */ }
+            try { output.Dispose(); } catch { /* best-effort */ }
+            _input = null;
+            _output = null;
             var cts = Interlocked.Exchange(ref _sessionCts, null);
             if (cts is not null)
             {
@@ -139,7 +156,10 @@ public sealed class StdioTransport : BackgroundService
 
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
-        var timeout = _optionsMonitor.CurrentValue.Transport.ShutdownTimeout;
+        var configured = _optionsMonitor.CurrentValue.Transport.ShutdownTimeout;
+        // Never block host shutdown indefinitely: the session can be parked in an uncancellable stdin read,
+        // so always bound the wait (default 5s when unconfigured).
+        var timeout = configured > TimeSpan.Zero ? configured : TimeSpan.FromSeconds(5);
         var sessionTask = _sessionTask;
         var cts = _sessionCts;
 
@@ -155,25 +175,20 @@ public sealed class StdioTransport : BackgroundService
             }
         }
 
-        if (sessionTask is not null)
+        // Cancellation cannot interrupt a synchronous console ReadFile; disposing stdin closes the OS handle
+        // and forces the blocking read to return, which is what actually lets the session unwind.
+        try { _input?.Dispose(); } catch { /* best-effort */ }
+
+        if (sessionTask is not null && !sessionTask.IsCompleted)
         {
-            if (timeout > TimeSpan.Zero && !sessionTask.IsCompleted)
+            var completed = await Task.WhenAny(sessionTask, Task.Delay(timeout, CancellationToken.None));
+            if (completed == sessionTask)
             {
-                var delayTask = Task.Delay(timeout, cancellationToken);
-                var completed = await Task.WhenAny(sessionTask, delayTask);
-                if (completed == sessionTask)
-                {
-                    await sessionTask;
-                }
-                else
-                {
-                    _logger.LogWarning("STDIO transport did not shut down within {Timeout}.", timeout);
-                    cancellationToken.ThrowIfCancellationRequested();
-                }
+                try { await sessionTask; } catch { /* session faulted during shutdown */ }
             }
             else
             {
-                await sessionTask;
+                _logger.LogWarning("STDIO transport did not shut down within {Timeout}; abandoning the session.", timeout);
             }
         }
 

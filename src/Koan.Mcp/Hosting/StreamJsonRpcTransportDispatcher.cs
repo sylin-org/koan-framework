@@ -37,7 +37,11 @@ public sealed class StreamJsonRpcTransportDispatcher : IMcpTransportDispatcher
         using var handler = new NewLineDelimitedMessageHandler(output, input, formatter);
         using var rpc = new JsonRpc(handler, target);
 
-        var completionSource = new TaskCompletionSource<object?>();
+        // RunContinuationsAsynchronously is load-bearing: TrySetResult/TrySetCanceled below can be raised
+        // from inside JsonRpc.Dispose() (the Disconnected event), and we must NOT let the await-continuation
+        // (which disposes the handler with a blocking wait) run inline on the disposing/cancelling thread —
+        // that re-entrancy deadlocks shutdown. Schedule continuations off-thread instead.
+        var completionSource = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
         rpc.Disconnected += (_, args) =>
         {
             _logger.LogInformation("MCP JSON-RPC disconnected: {Reason}", args.Reason);
@@ -48,12 +52,23 @@ public sealed class StreamJsonRpcTransportDispatcher : IMcpTransportDispatcher
 
         using var registration = cancellationToken.Register(() =>
         {
-            _logger.LogInformation("Cancellation requested for MCP transport; disposing JSON-RPC instance.");
-            rpc.Dispose();
+            // Only SIGNAL cancellation here. Do not call rpc.Dispose() synchronously: Dispose() blocks
+            // waiting for the read loop to drain, and that read loop can be parked in an uncancellable
+            // console-stdin ReadFile — disposing on the cancellation thread would deadlock the canceller.
+            // The `using` blocks below dispose rpc/handler in an orderly fashion once the read is unblocked
+            // (the stdio transport closes stdin on stop to break the blocking read).
+            _logger.LogInformation("Cancellation requested for MCP transport; ending session.");
             completionSource.TrySetCanceled(cancellationToken);
         });
 
-        await completionSource.Task;
+        try
+        {
+            await completionSource.Task;
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected on shutdown; fall through to orderly disposal of the `using` instances.
+        }
     }
 }
 
