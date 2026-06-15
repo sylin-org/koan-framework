@@ -9,6 +9,14 @@ implemented: 2025-11-13
 
 # ADR: Entity-First AI Integration and Transaction Coordination
 
+> **Partially superseded (C11, 2026-06-15).** The fluent **pipeline-class surface** introduced
+> here — `Ai.FromText()` / `TextPipeline` / `ImagePipeline` / `PipelineContext` / `IAiPipelineStage`
+> / `StorageResult` (`src/Koan.AI/Pipelines/**`) — shipped inert (internal ctors, no entry point,
+> `ImagePipeline.ToImage` throws) and was deleted as superseded by the live `EntityAi` API
+> (`Embed`/`Chat`/`Ocr`). The entity-first embedding-on-save and transaction-coordination decisions
+> below remain in force, as does the separate stream DSL (`AllStream().Tokenize().SaveWithVectors()`,
+> `PipelineAiExtensions` over `Koan.Core` `PipelineBuilder<T>`) — which is unrelated to the cut surface.
+
 **Contract**
 
 - **Inputs:** Entity classes with `[Embedding]` attributes, active `EntityContext` with transaction coordinators, AI pipeline configuration from `Koan:Ai:*`, entity lifecycle events (BeforeUpsert, AfterUpsert).
