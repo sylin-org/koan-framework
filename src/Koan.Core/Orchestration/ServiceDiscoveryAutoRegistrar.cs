@@ -23,12 +23,12 @@ public class ServiceDiscoveryAutoRegistrar : IKoanAutoRegistrar
         // Register the service discovery coordinator as singleton
         services.TryAddSingleton<IServiceDiscoveryCoordinator, ServiceDiscoveryCoordinator>();
 
-        // Register OrchestrationAwareServiceDiscoveryV2 to delegate to coordinator
+        // Register OrchestrationAwareServiceDiscovery to delegate to coordinator
         services.TryAddScoped<IOrchestrationAwareServiceDiscovery>(provider =>
-            new OrchestrationAwareServiceDiscoveryV2(
+            new OrchestrationAwareServiceDiscovery(
                 provider.GetRequiredService<IServiceDiscoveryCoordinator>(),
                 provider.GetRequiredService<IConfiguration>(),
-                provider.GetRequiredService<ILogger<OrchestrationAwareServiceDiscoveryV2>>()));
+                provider.GetRequiredService<ILogger<OrchestrationAwareServiceDiscovery>>()));
 
         // Auto-register all IServiceDiscoveryAdapter implementations discovered at compile time
         var adapters = KoanRegistry.GetServiceDiscoveryAdapters();

@@ -9,7 +9,11 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Koan.Core;
 using Koan.Core.Orchestration;
+using Koan.Core.Orchestration.Abstractions;
+using Koan.Messaging.Connector.RabbitMq.Discovery;
 
 namespace Koan.Messaging.Connector.RabbitMq;
 
@@ -20,12 +24,17 @@ public class RabbitMqProvider : IMessagingProvider
 {
     private readonly ILogger<RabbitMqProvider>? _logger;
     private readonly IConfiguration? _configuration;
+    private readonly IServiceDiscoveryCoordinator? _serviceDiscovery;
     private string? _workingConnectionString;
 
-    public RabbitMqProvider(ILogger<RabbitMqProvider>? logger = null, IConfiguration? configuration = null)
+    public RabbitMqProvider(
+        ILogger<RabbitMqProvider>? logger = null,
+        IConfiguration? configuration = null,
+        IServiceDiscoveryCoordinator? serviceDiscovery = null)
     {
         _logger = logger;
         _configuration = configuration;
+        _serviceDiscovery = serviceDiscovery;
     }
 
     public string Name => "RabbitMQ";
@@ -72,55 +81,41 @@ public class RabbitMqProvider : IMessagingProvider
     {
         try
         {
-            // Use centralized orchestration-aware service discovery
-            var serviceDiscovery = new OrchestrationAwareServiceDiscovery(_configuration);
-
-            // Create RabbitMQ-specific discovery options
-            var discoveryOptions = ServiceDiscoveryExtensions.ForRabbitMQ();
-
-            // Add legacy environment variable support for backward compatibility
-            var envCandidates = GetLegacyEnvironmentCandidates();
-            if (envCandidates.Length > 0)
+            // ARCH-0087: resolve through the canonical adapter/coordinator path.
+            // The RabbitMqDiscoveryAdapter owns all RabbitMQ-specific discovery knowledge
+            // (host/port/scheme from its [KoanService] descriptor, legacy env vars, AMQP health check).
+            var context = new DiscoveryContext
             {
-                discoveryOptions = discoveryOptions with
-                {
-                    AdditionalCandidates = envCandidates
-                };
-            }
+                OrchestrationMode = KoanEnv.OrchestrationMode,
+                Configuration = _configuration!,
+                // ARCH-0087: discovery returns the candidate; CanConnect's own TryConnect is the live check
+                // (V1 parity — avoids a redundant double-connect on the runtime path).
+                RequireHealthValidation = false
+            };
 
-            // Discover RabbitMQ service
-            var result = await serviceDiscovery.DiscoverService("rabbitmq", discoveryOptions, cancellationToken);
+            // Canonical path: the DI-registered coordinator routes to the registered adapter.
+            // No-DI fallback (e.g. provider constructed by hand): exercise the same adapter directly.
+            var result = _serviceDiscovery != null
+                ? await _serviceDiscovery.DiscoverService("rabbitmq", context, cancellationToken)
+                : await new RabbitMqDiscoveryAdapter(_configuration!, NullLogger<RabbitMqDiscoveryAdapter>.Instance)
+                    .Discover(context, cancellationToken);
 
             _logger?.LogDebug("[RabbitMQ] Orchestration-aware discovery result: {Method} -> {ConnectionString}",
                 result.DiscoveryMethod, MaskConnectionString(result.ServiceUrl));
 
-            return result.ServiceUrl;
+            if (result.IsSuccessful && !string.IsNullOrWhiteSpace(result.ServiceUrl))
+            {
+                return result.ServiceUrl;
+            }
+
+            _logger?.LogWarning("[RabbitMQ] Orchestration-aware discovery returned no candidate, falling back to localhost");
+            return "amqp://guest:guest@localhost:5672";
         }
         catch (Exception ex)
         {
             _logger?.LogWarning(ex, "[RabbitMQ] Orchestration-aware discovery failed, falling back to localhost");
             return "amqp://guest:guest@localhost:5672";
         }
-    }
-
-    private string[] GetLegacyEnvironmentCandidates()
-    {
-        var candidates = new List<string>();
-
-        // Check legacy environment variables for backward compatibility
-        var envUrl = Environment.GetEnvironmentVariable("RABBITMQ_URL");
-        if (!string.IsNullOrWhiteSpace(envUrl))
-        {
-            candidates.Add(envUrl);
-        }
-
-        var koanEnvUrl = Environment.GetEnvironmentVariable("Koan_RABBITMQ_URL");
-        if (!string.IsNullOrWhiteSpace(koanEnvUrl))
-        {
-            candidates.Add(koanEnvUrl);
-        }
-
-        return candidates.ToArray();
     }
 
     private async Task<bool> TryConnect(string connectionString, CancellationToken cancellationToken)

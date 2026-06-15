@@ -1,32 +1,65 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Koan.Core.Orchestration.Abstractions;
 
 namespace Koan.Core.Orchestration;
 
 /// <summary>
-/// Enhanced orchestration-aware service discovery that unifies connection string resolution
-/// and service URL discovery with intelligent health checking and fallback logic.
+/// Orchestration-aware service discovery that delegates to the adapter-based coordinator.
+/// Implements <see cref="IOrchestrationAwareServiceDiscovery"/> with ZERO provider-specific
+/// knowledge — pure delegation to the registered <see cref="IServiceDiscoveryAdapter"/> set.
+/// (ARCH-0087: V1 retired and the V2 suffix dropped — this is now the sole implementation.)
 /// </summary>
 public sealed class OrchestrationAwareServiceDiscovery : IOrchestrationAwareServiceDiscovery
 {
-    private readonly IConfiguration? _configuration;
-    private readonly ILogger<OrchestrationAwareServiceDiscovery>? _logger;
-    private readonly IOrchestrationAwareConnectionResolver _connectionResolver;
+    private readonly IServiceDiscoveryCoordinator _coordinator;
+    private readonly IConfiguration _configuration;
+    private readonly ILogger<OrchestrationAwareServiceDiscovery> _logger;
 
     public OrchestrationMode CurrentMode => KoanEnv.OrchestrationMode;
 
     public OrchestrationAwareServiceDiscovery(
-        IConfiguration? configuration = null,
-        ILogger<OrchestrationAwareServiceDiscovery>? logger = null)
+        IServiceDiscoveryCoordinator coordinator,
+        IConfiguration configuration,
+        ILogger<OrchestrationAwareServiceDiscovery> logger)
     {
+        _coordinator = coordinator;
         _configuration = configuration;
         _logger = logger;
-        _connectionResolver = new OrchestrationAwareConnectionResolver(configuration);
     }
 
     public string ResolveConnectionString(string serviceName, OrchestrationConnectionHints hints)
     {
-        return _connectionResolver.ResolveConnectionString(serviceName, hints);
+        // Legacy method - delegate to new adapter system
+        var context = new DiscoveryContext
+        {
+            OrchestrationMode = CurrentMode,
+            Configuration = _configuration,
+            RequireHealthValidation = false, // Legacy method didn't require health checks
+            Parameters = ExtractParametersFromHints(hints)
+        };
+
+        try
+        {
+            // "Adapter, discover yourself"
+            var result = _coordinator.DiscoverService(serviceName, context).GetAwaiter().GetResult();
+
+            if (result.IsSuccessful)
+            {
+                _logger.LogDebug("Resolved {ServiceName} connection via adapter: {ServiceUrl}", serviceName, result.ServiceUrl);
+                return result.ServiceUrl;
+            }
+            else
+            {
+                _logger.LogWarning("Adapter discovery failed for {ServiceName}, falling back to hints: {Error}", serviceName, result.ErrorMessage);
+                return FallbackToHints(hints);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Exception during adapter discovery for {ServiceName}, falling back to hints", serviceName);
+            return FallbackToHints(hints);
+        }
     }
 
     public async Task<ServiceDiscoveryResult> DiscoverService(
@@ -34,312 +67,80 @@ public sealed class OrchestrationAwareServiceDiscovery : IOrchestrationAwareServ
         ServiceDiscoveryOptions discovery,
         CancellationToken cancellationToken = default)
     {
-        _logger?.LogDebug("Starting service discovery for {ServiceName}", serviceName);
-
-        // Phase 1: Check for Aspire service discovery (highest priority)
-        var aspireResult = await TryAspireDiscovery(serviceName, discovery, cancellationToken);
-        if (aspireResult != null) return aspireResult;
-
-        // Phase 2: Check for explicit configuration
-        var explicitResult = await TryExplicitConfiguration(serviceName, discovery, cancellationToken);
-        if (explicitResult != null) return explicitResult;
-
-        // Phase 3: Check environment variables
-        var envResult = await TryEnvironmentVariables(serviceName, discovery, cancellationToken);
-        if (envResult != null) return envResult;
-
-        // Phase 4: Orchestration-aware discovery with health checking
-        var orchestrationResult = await TryOrchestrationAwareDiscovery(serviceName, discovery, cancellationToken);
-        if (orchestrationResult != null) return orchestrationResult;
-
-        // Phase 5: Final fallback
-        return CreateFallbackResult(serviceName, discovery);
-    }
-
-    private async Task<ServiceDiscoveryResult?> TryAspireDiscovery(
-        string serviceName,
-        ServiceDiscoveryOptions discovery,
-        CancellationToken cancellationToken)
-    {
-        if (_configuration == null || CurrentMode != OrchestrationMode.AspireAppHost)
-            return null;
-
-        var aspireUrl = _configuration.GetConnectionString(serviceName);
-        if (string.IsNullOrEmpty(aspireUrl)) return null;
-
-        _logger?.LogDebug("Found Aspire service discovery for {ServiceName}: {Url}", serviceName, aspireUrl);
-
-        var isHealthy = await CheckServiceHealth(aspireUrl, discovery.HealthCheck, cancellationToken);
-
-        return new ServiceDiscoveryResult
+        // Convert legacy options to new context
+        var context = new DiscoveryContext
         {
-            ServiceUrl = aspireUrl,
-            DiscoveryMethod = ServiceDiscoveryMethod.AspireServiceDiscovery,
-            IsHealthy = isHealthy,
-            Metadata = new Dictionary<string, object>
-            {
-                ["source"] = "aspire",
-                ["orchestrationMode"] = CurrentMode.ToString()
-            }
+            OrchestrationMode = CurrentMode,
+            Configuration = _configuration,
+            RequireHealthValidation = discovery.HealthCheck?.Required ?? true,
+            HealthCheckTimeout = discovery.HealthCheck?.Timeout ?? TimeSpan.FromSeconds(5),
+            Parameters = ExtractParametersFromOptions(discovery)
         };
-    }
-
-    private async Task<ServiceDiscoveryResult?> TryExplicitConfiguration(
-        string serviceName,
-        ServiceDiscoveryOptions discovery,
-        CancellationToken cancellationToken)
-    {
-        if (_configuration == null || discovery.ExplicitConfigurationSections == null)
-            return null;
-
-        foreach (var section in discovery.ExplicitConfigurationSections)
-        {
-            var explicitUrl = Configuration.ReadFirst(_configuration, "",
-                $"{section}:{serviceName}:BaseUrl",
-                $"{section}:{serviceName}:Url",
-                $"{section}:BaseUrl",
-                $"ConnectionStrings:{serviceName}");
-
-            if (!string.IsNullOrWhiteSpace(explicitUrl))
-            {
-                _logger?.LogDebug("Found explicit configuration for {ServiceName}: {Url}", serviceName, explicitUrl);
-
-                var isHealthy = await CheckServiceHealth(explicitUrl, discovery.HealthCheck, cancellationToken);
-
-                return new ServiceDiscoveryResult
-                {
-                    ServiceUrl = explicitUrl,
-                    DiscoveryMethod = ServiceDiscoveryMethod.ExplicitConfiguration,
-                    IsHealthy = isHealthy,
-                    Metadata = new Dictionary<string, object>
-                    {
-                        ["source"] = "explicit_config",
-                        ["section"] = section
-                    }
-                };
-            }
-        }
-
-        return null;
-    }
-
-    private async Task<ServiceDiscoveryResult?> TryEnvironmentVariables(
-        string serviceName,
-        ServiceDiscoveryOptions discovery,
-        CancellationToken cancellationToken)
-    {
-        var candidates = new List<string>();
-
-        // Check service-specific environment variables
-        var serviceEnvVars = new[]
-        {
-            $"KOAN_{serviceName.ToUpperInvariant()}_URL",
-            $"KOAN_{serviceName.ToUpperInvariant()}_BASE_URL",
-            $"{serviceName.ToUpperInvariant()}_URL",
-            $"{serviceName.ToUpperInvariant()}_BASE_URL"
-        };
-
-        foreach (var envVar in serviceEnvVars)
-        {
-            var envValue = Environment.GetEnvironmentVariable(envVar);
-            if (!string.IsNullOrWhiteSpace(envValue))
-            {
-                candidates.AddRange(envValue.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
-                    .Select(s => s.Trim()));
-            }
-        }
-
-        // Add additional candidates from discovery options
-        if (discovery.AdditionalCandidates != null)
-        {
-            candidates.AddRange(discovery.AdditionalCandidates);
-        }
-
-        foreach (var candidate in candidates.Where(c => !string.IsNullOrWhiteSpace(c)))
-        {
-            _logger?.LogDebug("Testing environment candidate for {ServiceName}: {Url}", serviceName, candidate);
-
-            var isHealthy = await CheckServiceHealth(candidate, discovery.HealthCheck, cancellationToken);
-            if (isHealthy || discovery.HealthCheck?.Required != true)
-            {
-                return new ServiceDiscoveryResult
-                {
-                    ServiceUrl = candidate,
-                    DiscoveryMethod = ServiceDiscoveryMethod.EnvironmentVariable,
-                    IsHealthy = isHealthy,
-                    Metadata = new Dictionary<string, object>
-                    {
-                        ["source"] = "environment_variable"
-                    }
-                };
-            }
-        }
-
-        return null;
-    }
-
-    private async Task<ServiceDiscoveryResult?> TryOrchestrationAwareDiscovery(
-        string serviceName,
-        ServiceDiscoveryOptions discovery,
-        CancellationToken cancellationToken)
-    {
-        _logger?.LogDebug("Starting orchestration-aware discovery for {ServiceName} in {Mode} mode",
-            serviceName, CurrentMode);
-
-        var candidates = GenerateOrchestrationCandidates(serviceName, discovery.UrlHints);
-
-        foreach (var candidate in candidates)
-        {
-            _logger?.LogDebug("Testing orchestration candidate for {ServiceName}: {Url}", serviceName, candidate);
-
-            var isHealthy = await CheckServiceHealth(candidate, discovery.HealthCheck, cancellationToken);
-            if (isHealthy || discovery.HealthCheck?.Required != true)
-            {
-                _logger?.LogInformation("Discovered {ServiceName} via orchestration-aware discovery: {Url}",
-                    serviceName, candidate);
-
-                return new ServiceDiscoveryResult
-                {
-                    ServiceUrl = candidate,
-                    DiscoveryMethod = ServiceDiscoveryMethod.OrchestrationAwareDiscovery,
-                    IsHealthy = isHealthy,
-                    Metadata = new Dictionary<string, object>
-                    {
-                        ["source"] = "orchestration_aware",
-                        ["orchestrationMode"] = CurrentMode.ToString()
-                    }
-                };
-            }
-        }
-
-        return null;
-    }
-
-    private IEnumerable<string> GenerateOrchestrationCandidates(string serviceName, OrchestrationConnectionHints hints)
-    {
-        var candidates = new List<string>();
-
-        switch (CurrentMode)
-        {
-            case OrchestrationMode.SelfOrchestrating:
-                if (!string.IsNullOrWhiteSpace(hints.SelfOrchestrated))
-                    candidates.Add(hints.SelfOrchestrated);
-                else
-                    candidates.Add($"http://localhost:{hints.DefaultPort}");
-                break;
-
-            case OrchestrationMode.DockerCompose:
-                if (!string.IsNullOrWhiteSpace(hints.DockerCompose))
-                    candidates.Add(hints.DockerCompose);
-                else
-                    candidates.Add($"http://{hints.ServiceName ?? serviceName}:{hints.DefaultPort}");
-                break;
-
-            case OrchestrationMode.Kubernetes:
-                if (!string.IsNullOrWhiteSpace(hints.Kubernetes))
-                    candidates.Add(hints.Kubernetes);
-                else
-                    candidates.Add($"http://{hints.ServiceName ?? serviceName}.default.svc.cluster.local:{hints.DefaultPort}");
-                break;
-
-            case OrchestrationMode.Standalone:
-                // In standalone mode, we expect explicit configuration
-                // But provide some common defaults as last resort
-                candidates.Add($"http://localhost:{hints.DefaultPort}");
-                break;
-
-            case OrchestrationMode.AspireAppHost:
-                // Aspire should provide via service discovery, but fallback to localhost
-                candidates.Add($"http://localhost:{hints.DefaultPort}");
-                break;
-        }
-
-        return candidates.Where(c => !string.IsNullOrWhiteSpace(c));
-    }
-
-    private ServiceDiscoveryResult CreateFallbackResult(string serviceName, ServiceDiscoveryOptions discovery)
-    {
-        var fallbackUrl = discovery.UrlHints.SelfOrchestrated ??
-                         $"http://localhost:{discovery.UrlHints.DefaultPort}";
-
-        _logger?.LogWarning("No healthy service found for {ServiceName}, using fallback: {Url}",
-            serviceName, fallbackUrl);
-
-        return new ServiceDiscoveryResult
-        {
-            ServiceUrl = fallbackUrl,
-            DiscoveryMethod = ServiceDiscoveryMethod.DefaultFallback,
-            IsHealthy = false,
-            Metadata = new Dictionary<string, object>
-            {
-                ["source"] = "fallback",
-                ["warning"] = "Service discovery failed, using fallback configuration"
-            }
-        };
-    }
-
-    private async Task<bool> CheckServiceHealth(
-        string serviceUrl,
-        HealthCheckOptions? healthCheck,
-        CancellationToken cancellationToken)
-    {
-        if (healthCheck == null) return true;
 
         try
         {
-            // Use custom health check if provided
-            if (healthCheck.CustomHealthCheck != null)
-            {
-                return await healthCheck.CustomHealthCheck(serviceUrl, cancellationToken);
-            }
+            // "Adapter, discover yourself"
+            var adapterResult = await _coordinator.DiscoverService(serviceName, context, cancellationToken);
 
-            // Default HTTP health check
-            if (!string.IsNullOrWhiteSpace(healthCheck.HealthCheckPath))
+            if (adapterResult.IsSuccessful)
             {
-                return await DefaultHttpHealthCheck(serviceUrl, healthCheck, cancellationToken);
+                // Convert internal result to legacy result format
+                return adapterResult.ToServiceDiscoveryResult();
             }
-
-            // If no health check path specified, assume service is healthy
-            return true;
+            else
+            {
+                _logger.LogWarning("Adapter discovery failed for {ServiceName}: {Error}", serviceName, adapterResult.ErrorMessage);
+                throw new InvalidOperationException($"Service discovery failed for '{serviceName}': {adapterResult.ErrorMessage}");
+            }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not InvalidOperationException)
         {
-            _logger?.LogDebug(ex, "Health check failed for {ServiceUrl}", serviceUrl);
-            return false;
+            _logger.LogError(ex, "Exception during adapter discovery for {ServiceName}", serviceName);
+            throw new InvalidOperationException($"Service discovery failed for '{serviceName}': {ex.Message}", ex);
         }
     }
 
-    private async Task<bool> DefaultHttpHealthCheck(
-        string serviceUrl,
-        HealthCheckOptions healthCheck,
-        CancellationToken cancellationToken)
+    /// <summary>Extract parameters from legacy hints (no provider-specific knowledge)</summary>
+    private IDictionary<string, object>? ExtractParametersFromHints(OrchestrationConnectionHints hints)
     {
-        try
-        {
-            using var httpClient = new HttpClient { Timeout = healthCheck.Timeout };
-            var healthUrl = CombineUrl(serviceUrl, healthCheck.HealthCheckPath!);
+        var parameters = new Dictionary<string, object>();
 
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(healthCheck.Timeout);
+        // Extract generic parameters that adapters can use
+        if (!string.IsNullOrWhiteSpace(hints.ServiceName))
+            parameters["serviceName"] = hints.ServiceName;
 
-            var response = await httpClient.GetAsync(healthUrl, cts.Token);
-            var isHealthy = response.IsSuccessStatusCode;
+        if (hints.DefaultPort > 0)
+            parameters["defaultPort"] = hints.DefaultPort;
 
-            _logger?.LogDebug("Health check for {ServiceUrl}: {Status}",
-                serviceUrl, isHealthy ? "healthy" : $"unhealthy ({response.StatusCode})");
-
-            return isHealthy;
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogDebug(ex, "HTTP health check failed for {ServiceUrl}", serviceUrl);
-            return false;
-        }
+        return parameters.Count > 0 ? parameters : null;
     }
 
-    private static string CombineUrl(string baseUrl, string path)
+    /// <summary>Extract parameters from legacy options (no provider-specific knowledge)</summary>
+    private IDictionary<string, object>? ExtractParametersFromOptions(ServiceDiscoveryOptions options)
     {
-        var uri = new Uri(baseUrl.TrimEnd('/'));
-        return new Uri(uri, path.TrimStart('/')).ToString();
+        var parameters = new Dictionary<string, object>();
+
+        // Pass through additional candidates for adapters to use
+        if (options.AdditionalCandidates?.Length > 0)
+            parameters["additionalCandidates"] = options.AdditionalCandidates;
+
+        // Pass through explicit config sections for adapters to check
+        if (options.ExplicitConfigurationSections?.Length > 0)
+            parameters["explicitConfigSections"] = options.ExplicitConfigurationSections;
+
+        return parameters.Count > 0 ? parameters : null;
+    }
+
+    /// <summary>Fallback to legacy hints when adapter discovery fails</summary>
+    private string FallbackToHints(OrchestrationConnectionHints hints)
+    {
+        // Use existing hint resolution logic as fallback
+        return CurrentMode switch
+        {
+            OrchestrationMode.DockerCompose or OrchestrationMode.Kubernetes => hints.DockerCompose ?? hints.SelfOrchestrated ?? "localhost",
+            OrchestrationMode.AspireAppHost => hints.AspireManaged ?? hints.DockerCompose ?? "localhost",
+            OrchestrationMode.SelfOrchestrating => hints.SelfOrchestrated ?? "localhost",
+            _ => hints.External ?? hints.SelfOrchestrated ?? "localhost"
+        };
     }
 }

@@ -115,16 +115,6 @@ public static class ServiceDiscoveryExtensions
     }
 
     /// <summary>
-    /// Create service discovery options for RabbitMQ message broker.
-    /// </summary>
-    public static ServiceDiscoveryOptions ForRabbitMQ(
-        string? username = null,
-        string? password = null)
-    {
-        return ForDatabase("rabbitmq", 5672, username: username, password: password);
-    }
-
-    /// <summary>
     /// Create service discovery options for HashiCorp Vault.
     /// </summary>
     public static ServiceDiscoveryOptions ForVault()

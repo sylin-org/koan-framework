@@ -2,9 +2,12 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging.Abstractions;
 using Koan.Core;
 using Koan.Core.Orchestration;
+using Koan.Core.Orchestration.Abstractions;
 using Koan.Messaging;
+using Koan.Messaging.Connector.RabbitMq.Discovery;
 using Koan.Messaging.Connector.RabbitMq.Orchestration;
 using Koan.Core.Hosting.Bootstrap;
 
@@ -27,6 +30,9 @@ public class KoanAutoRegistrar : IKoanAutoRegistrar
         // Register orchestration evaluator for dependency management
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanOrchestrationEvaluator, RabbitMqOrchestrationEvaluator>());
 
+        // Register the autonomous service-discovery adapter (ARCH-0087)
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, RabbitMqDiscoveryAdapter>());
+
         // Add core messaging if not already added
         services.AddKoanMessaging();
     }
@@ -34,27 +40,24 @@ public class KoanAutoRegistrar : IKoanAutoRegistrar
     public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         module.Describe(ModuleVersion);
-        // Use centralized orchestration-aware service discovery
-        var serviceDiscovery = new OrchestrationAwareServiceDiscovery(cfg);
 
         try
         {
-            // Create RabbitMQ-specific discovery options
-            var discoveryOptions = ServiceDiscoveryExtensions.ForRabbitMQ();
-
-            // Add legacy environment variable support
-            var envCandidates = GetLegacyEnvironmentCandidates();
-            if (envCandidates.Length > 0)
+            // ARCH-0087: the Describe() boot report has no IServiceProvider, so construct the
+            // autonomous discovery adapter directly (same resolution logic as the runtime path).
+            var adapter = new RabbitMqDiscoveryAdapter(cfg, NullLogger<RabbitMqDiscoveryAdapter>.Instance);
+            var context = new DiscoveryContext
             {
-                discoveryOptions = discoveryOptions with
-                {
-                    AdditionalCandidates = envCandidates
-                };
-            }
+                OrchestrationMode = KoanEnv.OrchestrationMode,
+                Configuration = cfg,
+                // ARCH-0087: boot report resolves the candidate only — NO blocking live AMQP connect here
+                // (V1 did none; a real connect would stall boot up to HealthCheckTimeout if the broker is
+                // unreachable). The adapter's AMQP health check stays available for opt-in callers.
+                RequireHealthValidation = false
+            };
 
             // Discover RabbitMQ service
-            var discoveryTask = serviceDiscovery.DiscoverService("rabbitmq", discoveryOptions);
-            var result = discoveryTask.GetAwaiter().GetResult();
+            var result = adapter.Discover(context).GetAwaiter().GetResult();
 
             var method = $"orchestration-{result.DiscoveryMethod}";
             var endpoint = Koan.Core.Redaction.DeIdentify(result.ServiceUrl ?? "");
@@ -86,26 +89,6 @@ public class KoanAutoRegistrar : IKoanAutoRegistrar
         module.AddSetting("Configuration", "Orchestration-aware service discovery enabled");
     }
     
-    private static string[] GetLegacyEnvironmentCandidates()
-    {
-        var candidates = new List<string>();
-
-        // Check legacy environment variables for backward compatibility
-        var envUrl = Environment.GetEnvironmentVariable("RABBITMQ_URL");
-        if (!string.IsNullOrWhiteSpace(envUrl))
-        {
-            candidates.Add(envUrl);
-        }
-
-        var koanEnvUrl = Environment.GetEnvironmentVariable("Koan_RABBITMQ_URL");
-        if (!string.IsNullOrWhiteSpace(koanEnvUrl))
-        {
-            candidates.Add(koanEnvUrl);
-        }
-
-        return candidates.ToArray();
-    }
-
     private static string[] DiscoverAvailableMessagingProviders()
     {
         // Scan loaded assemblies for other messaging providers
