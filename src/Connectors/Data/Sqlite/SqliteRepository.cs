@@ -86,7 +86,12 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             _healthyCache.TryRemove(key, out _);
             _visibilityCache.TryRemove(key, out _);
         }
-        catch { }
+        catch (Exception ex)
+        {
+            // Degradable: failing to evict the schema-health cache only forces an extra re-validate
+            // next call; it cannot corrupt data. Log so a recurring failure is visible.
+            KoanLog.DataDebug(_logger, "invalidate_health", "failed", ("table", table), ("error", ex.Message));
+        }
     }
 
     // Storage optimization support
@@ -140,16 +145,24 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                 if (!string.IsNullOrWhiteSpace(dataSource))
                 {
                     var fullPath = dataSource;
-                    try { fullPath = Path.GetFullPath(dataSource); } catch { }
+                    // Degradable: if the data source can't be canonicalized (e.g. ":memory:" or an
+                    // unusual path), keep the raw value — GetDirectoryName below simply yields no dir.
+                    try { fullPath = Path.GetFullPath(dataSource); }
+                    catch (Exception ex) when (ex is ArgumentException or PathTooLongException or NotSupportedException or System.Security.SecurityException)
+                    {
+                        KoanLog.DataDebug(_logger, "resolve_path", "fullpath-failed", ("dataSource", dataSource), ("error", ex.Message));
+                    }
                     directory = Path.GetDirectoryName(fullPath);
                 }
 
                 info = (dataSource, directory);
                 _connectionInfoCache[cs] = info;
             }
-            catch
+            catch (ArgumentException ex)
             {
-                // Cache empty info to avoid repeated failures
+                // Malformed connection string: cache empty info so we don't reparse on every call. The
+                // subsequent conn.Open() surfaces the real error to the caller — warn so the cause is visible.
+                KoanLog.DataWarning(_logger, "resolve_connection", "parse-failed", ("connectionString", Redaction.DeIdentify(cs)), ("error", ex.Message));
                 info = ("", null);
                 _connectionInfoCache[cs] = info;
             }
@@ -158,7 +171,12 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         // Create directory if needed (only on first access or if it doesn't exist)
         if (!string.IsNullOrWhiteSpace(info.directory))
         {
-            try { Directory.CreateDirectory(info.directory); } catch { /* non-fatal */ }
+            try { Directory.CreateDirectory(info.directory); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+            {
+                // Non-fatal: conn.Open() below produces the actionable error if the directory is truly needed.
+                KoanLog.DataDebug(_logger, "ensure_directory", "create-failed", ("directory", info.directory), ("error", ex.Message));
+            }
         }
 
         var conn = new SqliteConnection(cs);
@@ -182,15 +200,22 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                 if (!string.IsNullOrWhiteSpace(dataSource))
                 {
                     var fullPath = dataSource;
-                    try { fullPath = Path.GetFullPath(dataSource); } catch { }
+                    // Degradable: keep the raw data source when it can't be canonicalized.
+                    try { fullPath = Path.GetFullPath(dataSource); }
+                    catch (Exception ex) when (ex is ArgumentException or PathTooLongException or NotSupportedException or System.Security.SecurityException)
+                    {
+                        KoanLog.DataDebug(_logger, "resolve_path", "fullpath-failed", ("dataSource", dataSource), ("error", ex.Message));
+                    }
                     directory = Path.GetDirectoryName(fullPath);
                 }
 
                 info = (dataSource, directory);
                 _connectionInfoCache[cs] = info;
             }
-            catch
+            catch (ArgumentException ex)
             {
+                // Malformed connection string: cache empty info; the pool's conn.Open() surfaces the real error.
+                KoanLog.DataWarning(_logger, "resolve_connection", "parse-failed", ("connectionString", Redaction.DeIdentify(cs)), ("error", ex.Message));
                 info = ("", null);
                 _connectionInfoCache[cs] = info;
             }
@@ -198,7 +223,12 @@ internal sealed class SqliteRepository<TEntity, TKey> :
 
         if (!string.IsNullOrWhiteSpace(info.directory))
         {
-            try { Directory.CreateDirectory(info.directory); } catch { }
+            try { Directory.CreateDirectory(info.directory); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+            {
+                // Non-fatal: the pooled conn.Open() produces the actionable error if the directory is truly needed.
+                KoanLog.DataDebug(_logger, "ensure_directory", "create-failed", ("directory", info.directory), ("error", ex.Message));
+            }
         }
 
         // Rent connection from pool - eliminates connection creation overhead
@@ -239,12 +269,21 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                         break;
                     }
                 }
-                catch { }
+                catch (SqliteException)
+                {
+                    // Degradable: a transient PRAGMA/probe error mid-poll just means "not visible yet";
+                    // the loop retries with backoff. A persistent failure is surfaced by the actual query.
+                }
                 Thread.Sleep(delay);
                 delay = Math.Min(200, delay * 2);
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            // Degradable: this is only a visibility warm-up barrier. If it fails the connection is still
+            // returned; the real query path has its own no-such-table ensure-and-retry (IsNoSuchTableForEntity).
+            KoanLog.DataDebug(_logger, "visibility_barrier", "failed", ("table", TableName), ("error", ex.Message));
+        }
         return pooledConn; // Return wrapper, not raw connection
     }
 
@@ -299,7 +338,13 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                 // update the table exists flag after creating
                 vTableExists = ddl.TableExists("", table);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                // DDL fallback failed. Don't throw here: the FailOnMismatch gate below (or the query-path
+                // no-such-table retry) is the authoritative decision. But surface the cause — a silently
+                // failed CREATE TABLE was previously invisible.
+                KoanLog.DataWarning(_logger, LogActions.Ensure, "fallback-create-failed", ("table", table), ("error", ex.Message));
+            }
         }
         // If FailOnMismatch, escalate when unhealthy/degraded
         if (_relOptions.FailOnMismatch)
@@ -349,7 +394,13 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     Thread.Sleep(20);
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                // Degradable: this only waits for just-created columns to become visible. The query path
+                // re-ensures on a no-such-table error, so an early exit here is recoverable. Broad by design —
+                // a mid-poll connection-state fault (disposed/invalid-op) is equally recoverable here.
+                KoanLog.DataDebug(_logger, LogActions.Ensure, "column-wait-failed", ("table", table), ("error", ex.Message));
+            }
             _healthyCache[cacheKey] = true; return;
         }
         if (vTableExists && string.Equals(vState, "Healthy", StringComparison.OrdinalIgnoreCase))
@@ -612,7 +663,10 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             // INTEGER) to the ORDER BY column too, not only to filter predicates (DATA-0100). Fall back
             // to the bare expression on an unresolvable path.
             ResolvedField? rf = null;
-            try { rf = FieldPathResolver.Resolve(typeof(TEntity), FieldPath.Of(leaf)); } catch { /* leave null */ }
+            // Degradable: an unresolvable leaf (e.g. a JSON-only path with no CLR projection) just means
+            // no comparable-encoding cast — ResolveColumnSql falls back to the bare json_extract expression.
+            try { rf = FieldPathResolver.Resolve(typeof(TEntity), FieldPath.Of(leaf)); }
+            catch (InvalidFilterFieldException) { /* leave null — bare expression is correct for sort */ }
             var col = ResolveColumnSql(FieldPath.Of(leaf), rf!);
             parts.Add($"{col} {(spec.Desc ? "DESC" : "ASC")}");
         }
@@ -933,7 +987,13 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                             Thread.Sleep(30);
                             missing = required.Where(c => !ddl.ColumnExists("", TableName, c)).ToArray();
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            // Degradable: the re-probe is only a race-mitigation; on failure keep the first
+                            // 'missing' snapshot and let the validation report reflect it. Broad by design — a
+                            // mid-poll connection-state fault is equally tolerable on this race-mitigation path.
+                            KoanLog.DataDebug(_logger, "validate", "recheck-failed", ("table", TableName), ("error", ex.Message));
+                        }
                     }
                     // Debug: print ColumnExists outcome per required column (debug only)
 #if DEBUG
@@ -952,7 +1012,11 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                             }
                         }
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        // Diagnostics-only (DEBUG): never let the debug print loop disturb validation.
+                        System.Diagnostics.Debug.WriteLine($"[VALIDATE] ColumnExists diagnostic loop error: {ex.Message}");
+                    }
 #endif
                     report["TableExists"] = tableExists;
                     report["MissingColumns"] = missing;
@@ -1004,9 +1068,19 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                 {
                     // Remove the table if present; do not create it.
                     var drop = $"DROP TABLE IF EXISTS \"{TableName}\";";
-                    try { await conn.ExecuteAsync(drop); } catch { }
+                    try { await conn.ExecuteAsync(drop); }
+                    catch (SqliteException ex)
+                    {
+                        // Correctness path: SchemaClear's contract is to drop the table. A failed DROP must
+                        // not be silently reported as success — surface it (log-error; behavior preserved).
+                        KoanLog.DataError(_logger, "schema_clear", "drop-failed", ("table", TableName), ("code", ex.SqliteErrorCode), ("error", ex.Message));
+                    }
                     // Invalidate health cache so a subsequent operation will re-ensure the schema
-                    try { InvalidateHealth(conn, TableName); } catch { }
+                    try { InvalidateHealth(conn, TableName); }
+                    catch (Exception ex)
+                    {
+                        KoanLog.DataDebug(_logger, "schema_clear", "invalidate-failed", ("table", TableName), ("error", ex.Message));
+                    }
                     object res = 0; return (TResult)res;
                 }
             case DataInstructions.Clear:
@@ -1045,7 +1119,12 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
                     sql = MaybeRewriteInsertForProjection(sql);
                     // Ensure table exists if targeting this entity table
-                    try { EnsureOrchestrated(conn); } catch { }
+                    // Degradable: this is a best-effort pre-ensure; the no-such-table retry below re-ensures.
+                    try { EnsureOrchestrated(conn); }
+                    catch (Exception ex)
+                    {
+                        KoanLog.DataDebug(_logger, "sql_nonquery", "pre-ensure-failed", ("table", TableName), ("error", ex.Message));
+                    }
                     var p = GetParamsFromInstruction(instruction);
                     try
                     {
@@ -1068,7 +1147,12 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
                     var p = GetParamsFromInstruction(instruction);
                     // Best-effort ensure for entity table
-                    try { EnsureOrchestrated(conn); } catch { }
+                    // Degradable: best-effort pre-ensure; the no-such-table retry below re-ensures.
+                    try { EnsureOrchestrated(conn); }
+                    catch (Exception ex)
+                    {
+                        KoanLog.DataDebug(_logger, "sql_query", "pre-ensure-failed", ("table", TableName), ("error", ex.Message));
+                    }
                     try
                     {
                         var rows = await conn.QueryAsync(sql, p);
@@ -1189,7 +1273,12 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     }
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                // Degradable: per-column ensure is best-effort shape repair; each column already has its own
+                // typed catch above. This outer guard only catches an enumeration-level fault.
+                System.Diagnostics.Debug.WriteLine($"[DDL] Error ensuring columns for {tname}: {ex.Message}");
+            }
             // Wait for table and required columns to be visible to other connections.
             try
             {
@@ -1206,7 +1295,10 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                             break;
                         }
                     }
-                    catch { }
+                    catch (SqliteException)
+                    {
+                        // Degradable: a transient probe error mid-poll means "not visible yet"; loop retries.
+                    }
                     Thread.Sleep(delay);
                     delay = Math.Min(200, delay * 2);
                 }
@@ -1215,7 +1307,11 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     System.Diagnostics.Debug.WriteLine($"[DDL] Timeout waiting for table '{tname}' and columns to become visible ({required.Length} columns)");
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                // Degradable: visibility wait is a cross-connection settle barrier; the query path re-ensures.
+                System.Diagnostics.Debug.WriteLine($"[DDL] Visibility wait failed for {tname}: {ex.Message}");
+            }
         }
         public bool TableExists(string schema, string table)
         {
@@ -1329,10 +1425,13 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     conn.Open();
                     return new PooledConnection(conn, this);
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Connection is bad, dispose and create new
-                    try { conn.Dispose(); } catch { }
+                    // Benign recovery: a stale pooled connection that won't reopen is discarded and a fresh
+                    // one is created below — recovery is correct for any reopen failure.
+                    System.Diagnostics.Debug.WriteLine($"[POOL] Discarding stale connection: {ex.Message}");
+                    // Disposing an already-bad connection can itself fault; that's non-actionable here.
+                    try { conn.Dispose(); } catch (Exception disposeEx) { System.Diagnostics.Debug.WriteLine($"[POOL] Dispose of bad connection failed: {disposeEx.Message}"); }
                 }
             }
 
@@ -1354,8 +1453,9 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                 }
                 else
                 {
-                    // Connection is closed, dispose it
-                    try { conn.Dispose(); } catch { }
+                    // Connection is closed, dispose it. A dispose fault on an already-closed connection is
+                    // non-actionable (the slot is freed in finally regardless).
+                    try { conn.Dispose(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[POOL] Dispose of closed connection failed: {ex.Message}"); }
                 }
             }
             finally
@@ -1459,14 +1559,23 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             var ent2 = Activator.CreateInstance<TEntity>();
             if (idProp is not null && dict.TryGetValue("Id", out var idv) && idv is not null)
             {
-                // TKey may not be string; attempt change type if needed
+                // TKey may not be string; attempt change type if needed.
+                // Benign conversion fallback: when the raw id can't be coerced to TKey, set it verbatim.
                 try { idProp.SetValue(ent2, (TKey)Convert.ChangeType(idv, typeof(TKey))); }
-                catch { idProp.SetValue(ent2, idv); }
+                catch (Exception ex) when (ex is InvalidCastException or FormatException or OverflowException or ArgumentException)
+                {
+                    idProp.SetValue(ent2, idv);
+                }
             }
             var titleProp = t.GetProperty("Title", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.IgnoreCase);
             if (titleProp is not null && dict.TryGetValue("Title", out var tv))
             {
-                try { titleProp.SetValue(ent2, tv?.ToString()); } catch { }
+                // Degradable: 'Title' is an optional convenience column in the rare non-Json raw-row path.
+                try { titleProp.SetValue(ent2, tv?.ToString()); }
+                catch (Exception ex) when (ex is ArgumentException or System.Reflection.TargetException or System.Reflection.TargetInvocationException)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[MAP] Failed to set Title on {t.Name}: {ex.Message}");
+                }
             }
             var metaProp = t.GetProperty("Meta", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.IgnoreCase);
             if (metaProp is not null && dict.TryGetValue("Meta", out var mv))
@@ -1479,7 +1588,11 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                         if (obj is not null) metaProp.SetValue(ent2, obj);
                     }
                 }
-                catch { /* ignore */ }
+                catch (Exception ex) when (ex is JsonException or ArgumentException or System.Reflection.TargetException or System.Reflection.TargetInvocationException)
+                {
+                    // Degradable: 'Meta' is an optional column; malformed/incompatible JSON leaves it unset.
+                    System.Diagnostics.Debug.WriteLine($"[MAP] Failed to set Meta on {t.Name}: {ex.Message}");
+                }
             }
             list.Add(ent2);
         }
@@ -1533,7 +1646,13 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         if (value is null) return default!;
         var t = typeof(TResult);
         if (t.IsAssignableFrom(value.GetType())) return (TResult)value;
-        try { return (TResult)Convert.ChangeType(value, t); } catch { return default!; }
+        // Benign coercion fallback: an unconvertible scalar (e.g. NULL-ish or shape mismatch) yields default.
+        try { return (TResult)Convert.ChangeType(value, t); }
+        catch (Exception ex) when (ex is InvalidCastException or FormatException or OverflowException or ArgumentException)
+        {
+            System.Diagnostics.Debug.WriteLine($"[SCALAR] Cannot coerce '{value}' to {t.Name}: {ex.Message}");
+            return default!;
+        }
     }
 
     private static IReadOnlyList<Dictionary<string, object?>> MapDynamicRows(IEnumerable<dynamic> rows)
