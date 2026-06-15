@@ -63,7 +63,10 @@ internal sealed class JsonConnectorFixture : IAsyncDisposable
         services.AddLogging();
         services.AddKoan();
         services.AddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
-        services.AddJsonAdapter(o => o.DirectoryPath = root);
+        // JSON adapter is auto-registered by AddKoan() (Reference = Intent via its
+        // KoanAutoRegistrar). DirectoryPath is supplied through configuration
+        // (Koan:Data:Json:DirectoryPath set above), which JsonDataOptionsConfigurator
+        // resolves — so no eager AddJsonAdapter() call is required.
 
         var provider = services.BuildServiceProvider(new ServiceProviderOptions
         {

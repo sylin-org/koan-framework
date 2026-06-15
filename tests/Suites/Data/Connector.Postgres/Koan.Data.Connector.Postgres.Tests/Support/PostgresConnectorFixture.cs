@@ -75,7 +75,6 @@ internal sealed class PostgresConnectorFixture : IAsyncDisposable
         services.AddSingleton<IConfiguration>(configuration);
         services.AddLogging();
     services.AddKoan();
-    services.AddPostgresAdapter();
 
         var provider = services.BuildServiceProvider(new ServiceProviderOptions
         {

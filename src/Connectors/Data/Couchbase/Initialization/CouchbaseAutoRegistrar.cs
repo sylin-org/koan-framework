@@ -31,6 +31,8 @@ public sealed class CouchbaseAutoRegistrar : IKoanAutoRegistrar
         services.AddKoanOptions<CouchbaseOptions>();
         services.AddSingleton<IConfigureOptions<CouchbaseOptions>, CouchbaseOptionsConfigurator>();
         services.AddSingleton<CouchbaseClusterProvider>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IAsyncAdapterInitializer, CouchbaseClusterProvider>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IAdapterReadiness, CouchbaseClusterProvider>());
         services.AddSingleton<IDataAdapterFactory, CouchbaseAdapterFactory>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, CouchbaseHealthContributor>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanOrchestrationEvaluator, CouchbaseOrchestrationEvaluator>());

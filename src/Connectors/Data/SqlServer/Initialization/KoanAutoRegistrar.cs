@@ -32,15 +32,22 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, SqlServerHealthContributor>());
 
+        // Bridge SQL Server provider options into the relational materialization pipeline.
+        // Carried from the former manual SqlServerRegistration so the auto path is complete.
+        services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<RelationalMaterializationOptions>, SqlServerToRelationalBridgeConfigurator>());
+
         // Register SQL Server discovery adapter (maintains "Reference = Intent")
         // Adding Koan.Data.Connector.SqlServer automatically enables SQL Server discovery capabilities
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, SqlServerDiscoveryAdapter>());
 
         services.AddSingleton<IDataAdapterFactory, SqlServerAdapterFactory>();
 
+        // Connection factory for Koan.Data.Direct relational sessions (DATA-0053).
+        // Carried from the former manual SqlServerRegistration so the auto path is complete.
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<Koan.Data.Core.Configuration.IDataProviderConnectionFactory, SqlServerConnectionFactory>());
+
         // Register the relational schema orchestrator (required by SqlServerRepository).
-        // The explicit AddSqlServerAdapter() call wires this up; the auto-discovery path
-        // also needs it, or schema bootstrap fails. Mirrors Sqlite/Postgres.
+        // The auto-discovery path needs it, or schema bootstrap fails. Mirrors Sqlite/Postgres.
         services.AddRelationalOrchestration();
     }
 

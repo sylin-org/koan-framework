@@ -47,9 +47,12 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
 
         services.AddSingleton<IDataAdapterFactory, PostgresAdapterFactory>();
 
+        // Connection factory for Koan.Data.Direct relational sessions (DATA-0053).
+        // Carried from the former manual PostgresRegistration so the auto path is complete.
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<Koan.Data.Core.Configuration.IDataProviderConnectionFactory, PostgresConnectionFactory>());
+
         // Register the relational schema orchestrator (required by PostgresRepository.EnsureOrchestrated).
-        // The explicit AddPostgresAdapter() registration call already does this; the auto-discovery
-        // path also needs it, or schema bootstrap fails with "No service for type
+        // The auto-discovery path needs it, or schema bootstrap fails with "No service for type
         // IRelationalSchemaOrchestrator has been registered." Mirrors what Sqlite and SqlServer do.
         services.AddRelationalOrchestration();
     }

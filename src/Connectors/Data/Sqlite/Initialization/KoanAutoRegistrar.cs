@@ -45,6 +45,10 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
         services.AddSingleton<IDataAdapterFactory, SqliteAdapterFactory>();
 
+        // Connection factory for Koan.Data.Direct relational sessions (DATA-0053).
+        // Carried from the former manual SqliteRegistration so the auto path is complete.
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<Koan.Data.Core.Configuration.IDataProviderConnectionFactory, SqliteConnectionFactory>());
+
         Log.BootDebug(LogActions.Init, "services-registered", ("module", ModuleName));
     }
 

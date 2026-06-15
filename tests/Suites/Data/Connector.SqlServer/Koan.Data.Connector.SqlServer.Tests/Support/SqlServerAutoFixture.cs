@@ -91,10 +91,11 @@ public sealed class SqlServerAutoFixture : IRelationalTestFixture<Specs.Count.Sq
 
         var services = new ServiceCollection();
         services.AddSingleton<IConfiguration>(cfg);
-        services.AddKoanCore();
-        services.AddKoanDataCore();
-        services.AddSqlServerAdapter();
-    services.AddSingleton<IHostApplicationLifetime, TestHostApplicationLifetime>();
+        services.AddSingleton<IHostApplicationLifetime, TestHostApplicationLifetime>();
+        // Rely on reflective AddKoan() discovery to invoke the SqlServer registrar (E1 fold):
+        // AddKoan() = AddKoanCore() + AppBootstrapper.InitializeModules, which runs every
+        // IKoanAutoRegistrar.Initialize (Koan.Data.Core + Koan.Data.Connector.SqlServer).
+        services.AddKoan();
         ServiceProvider = services.BuildServiceProvider();
     AppHost.Current = ServiceProvider;
         Data = ServiceProvider.GetRequiredService<IDataService>();

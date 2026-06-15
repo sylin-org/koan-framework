@@ -3,7 +3,6 @@ using Koan.Core.Hosting.App;
 using Koan.Core.Hosting.Runtime;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Connector.Json;
-using Koan.Data.Connector.Sqlite;
 using Koan.Data.Core.Transactions;
 using Koan.Data.Vector;
 using Microsoft.Extensions.Configuration;
@@ -70,12 +69,15 @@ internal sealed class DataCoreRuntimeFixture : IAsyncDisposable
         services.AddSingleton<IConfiguration>(configuration);
         services.AddKoan();
         services.AddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
-        services.AddJsonAdapter(o => o.DirectoryPath = root);
+        // JSON adapter is auto-registered by AddKoan() (Reference = Intent via its
+        // KoanAutoRegistrar). DirectoryPath is supplied through configuration
+        // (Koan:Data:Json:DirectoryPath set above), which JsonDataOptionsConfigurator
+        // resolves — so no eager AddJsonAdapter() call is required.
         services.AddKoanTransactions();
-        if (includeSqlite)
-        {
-            services.AddSqliteAdapter(o => o.ConnectionString = $"Data Source={sqlitePath}");
-        }
+        // SQLite adapter is auto-registered by AddKoan() (Reference = Intent via its
+        // KoanAutoRegistrar). The connection string is supplied through configuration
+        // (Koan:Data:Sqlite:ConnectionString set above), which SqliteOptionsConfigurator
+        // resolves — so no eager AddSqliteAdapter() call is required.
 
         // Register fake vector service for testing
         var vectorService = new FakeVectorService();
