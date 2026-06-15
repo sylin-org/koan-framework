@@ -34,6 +34,7 @@ internal sealed class PostgresRepository<
     IQueryRepository<TEntity, TKey>,
     IRawQueryRepository<TEntity, TKey>,
     IDescribesCapabilities,
+    IBulkUpsert<TKey>,
     IBulkDelete<TKey>,
     IConditionalWriteRepository<TEntity, TKey>,
     IInstructionExecutor<TEntity>
@@ -42,7 +43,7 @@ internal sealed class PostgresRepository<
 {
     public void Describe(ICapabilities caps) => caps
         .Add(DataCaps.Query.Linq).Add(DataCaps.Query.String)
-        .Add(DataCaps.Write.AtomicBatch).Add(DataCaps.Write.BulkDelete).Add(DataCaps.Write.FastRemove)
+        .Add(DataCaps.Write.BulkUpsert).Add(DataCaps.Write.AtomicBatch).Add(DataCaps.Write.BulkDelete).Add(DataCaps.Write.FastRemove)
         .Add(DataCaps.Write.ConditionalReplace)
         .Add(DataCaps.Query.Filter, RelationalFilterSupport.Default);
 

@@ -44,7 +44,7 @@ public sealed class PostgresCapabilitiesSpec
                 caps.Has(DataCaps.Write.AtomicBatch).Should().BeTrue();
                 caps.Has(DataCaps.Write.BulkDelete).Should().BeTrue();
                 caps.Has(DataCaps.Write.FastRemove).Should().BeTrue();
-                caps.Has(DataCaps.Write.BulkUpsert).Should().BeFalse();
+                caps.Has(DataCaps.Write.BulkUpsert).Should().BeTrue();
 
                 var partition = fixture.EnsurePartition(ctx);
                 await using var lease = fixture.LeasePartition(partition);
