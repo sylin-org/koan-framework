@@ -61,11 +61,10 @@ Use this reference when you plan a Koan solution and need to understand which mo
 - **How to use**: reference package, register jobs via DI (`IJob` implementations) and configure job runner.
 - **When to use**: durable operations (long transfers, nightly maintenance) that require retry/checkpoint semantics.
 
-### Koan.Scheduling
+### ~~Koan.Scheduling~~ — migrated to agyo-tools 2026-06
 
-- **Purpose**: cron/interval scheduling helpers shared across Jobs and Flow.
-- **How to use**: add the package when you need human-friendly schedules (`EveryDayAt`, `CronExpression`).
-- **When to use**: recurring tasks – e.g., nightly archive or hourly analytics refresh.
+- **Purpose**: cron/interval scheduling helpers (lightweight in-proc).
+- **Status**: **Migrated to the `agyo-tools` sibling repo** as `Sylin.Agyo.Scheduling` (it was an opt-in helper, not core). For durable recurring work, prefer the Jobs ledger (`[JobAction(Schedule = ...)]`, JOBS-0005). See [`docs/assessment/08-agyo-reorganization.md`](../assessment/08-agyo-reorganization.md).
 
 ### Koan.Messaging.Core
 
@@ -188,7 +187,7 @@ Use this reference when you plan a Koan solution and need to understand which mo
 
 ### Web Connectors (Swagger, Auth)
 
-- **Purpose**: plug-in support for Swagger docs and external auth providers. _(The GraphQL connector `Koan.Web.Connector.GraphQl` was attic'd 2026-06 — recoverable at git tag `attic/koan-web-graphql`.)_
+- **Purpose**: plug-in support for Swagger docs and external auth providers. _(The GraphQL connector `Koan.Web.Connector.GraphQl` migrated to agyo-tools 2026-06 as `Sylin.Agyo.Web.GraphQl` — the HotChocolate CVE-treadmill belongs on agyo's cadence, not Koan's release train. See [`docs/assessment/08-agyo-reorganization.md`](../assessment/08-agyo-reorganization.md).)_
 - **How to use**: reference connector, configure in `Program.cs`.
 - **When to use**: bridging Koan web stack with specific UI technologies or documentation pipelines.
 
@@ -220,16 +219,18 @@ Use this reference when you plan a Koan solution and need to understand which mo
 
 ## 9. Secrets & Storage
 
-### Koan.Secrets.Abstractions / Koan.Secrets.Core
+> **Secrets migrated to agyo-tools 2026-06.** The whole secrets stack now ships from the `agyo-tools` sibling repo as `Sylin.Agyo.Secrets.*` (it was consumed-but-peripheral, not core). Koan retains only a fail-soft reflection probe (`TryInvokeSecretsBootstrap` in `Koan.Data.Core`) that no-ops when the assembly is absent. See [`docs/assessment/08-agyo-reorganization.md`](../assessment/08-agyo-reorganization.md).
+
+### ~~Koan.Secrets.Abstractions / Koan.Secrets.Core~~ → `Sylin.Agyo.Secrets.*`
 
 - **Purpose**: secrets resolution pipeline, providers, caching.
-- **How to use**: reference both packages; configure secret sources.
+- **How to use**: reference `Sylin.Agyo.Secrets.Abstractions` + `Sylin.Agyo.Secrets.Core` from agyo-tools; configure secret sources.
 - **When to use**: centralizing secret retrieval (Vault, KMS, etc.).
 
-### Secrets Connectors (Vault)
+### ~~Secrets Connectors (Vault)~~ → `Sylin.Agyo.Secrets.Connector.Vault`
 
 - **Purpose**: provider-specific secret fetch.
-- **How to use**: reference connector, set `Koan:Secrets` configuration.
+- **How to use**: reference the agyo-tools connector, set `Koan:Secrets` configuration.
 - **When to use**: retrieving secrets from Hashicorp Vault or similar stores.
 
 ### Koan.Storage & Storage Connectors (Local, etc.)
@@ -252,13 +253,15 @@ Use this reference when you plan a Koan solution and need to understand which mo
 - **How to use**: reference package when your app exposes MCP-compatible endpoints.
 - **When to use**: bridging Koan apps with MCP clients/tools.
 
-## 11. Recipes & Observability
+## 11. Observability (recipes removed 2026-06)
 
-### Koan.Recipe.Abstractions / Koan.Recipe.Observability
+> **`Koan.Recipe.Abstractions` was deleted** — superseded by the ARCH-0086 `KoanModule` primitive (its AppDomain-scan bootstrap idiom is no longer needed; it did **not** migrate). The **observability bundle migrated to agyo-tools** as `Sylin.Agyo.Observability`, re-homed as a `KoanModule` rather than an `IKoanRecipe`. See [`docs/assessment/08-agyo-reorganization.md`](../assessment/08-agyo-reorganization.md).
 
-- **Purpose**: reusable “recipes” (composable patterns) and observability instrumentation.
-- **How to use**: reference in solution templates or shared libraries; tie into monitoring pipelines.
-- **When to use**: accelerating solution delivery or standardizing logging/metrics across teams.
+### ~~Koan.Recipe.Abstractions~~ (deleted) / ~~Koan.Recipe.Observability~~ → `Sylin.Agyo.Observability`
+
+- **Purpose**: observability instrumentation (health checks, resilient HTTP, optional OpenTelemetry).
+- **How to use**: reference `Sylin.Agyo.Observability` from agyo-tools; it self-wires as a `KoanModule`.
+- **When to use**: standardizing logging/metrics/health across services. _(Authoring composable bootstrap bundles is now the job of `KoanModule` in `Koan.Core`, not a recipe abstraction.)_
 
 ## 12. Connector Index
 
@@ -270,7 +273,7 @@ For quick lookup, connectors live under `src/Connectors`. Use this table to iden
 | AI            | `Koan.AI.Connector.*`            | LLM / AI runtimes                |
 | Messaging     | `Koan.Messaging.Connector.*`     | Brokers like RabbitMQ            |
 | Orchestration | `Koan.Orchestration.Connector.*` | Docker, Podman, renderers        |
-| Secrets       | `Koan.Secrets.Connector.*`       | Vault, cloud secret stores       |
+| Secrets       | `Sylin.Agyo.Secrets.Connector.*` | Vault, cloud secret stores _(moved to agyo-tools 2026-06)_ |
 | Storage       | `Koan.Storage.Connector.*`       | Local, S3-compatible storage     |
 | Web           | `Koan.Web.Connector.*`           | Swagger, Auth providers          |
 

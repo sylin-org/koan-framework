@@ -22,12 +22,6 @@ public static class KoanServiceEvents
         public const string Completed = "TranslationCompleted";
         public const string Failed = "TranslationFailed"; // shares name but different semantic domain than Messaging.Failed
     }
-    public static class Scheduling
-    {
-        public const string TaskExecuted = "TaskExecuted";
-        public const string TaskFailed = "TaskFailed";
-        public const string TaskTimeout = "TaskTimeout";
-    }
     public static class Outbox
     {
         public const string Processed = "OutboxProcessed";

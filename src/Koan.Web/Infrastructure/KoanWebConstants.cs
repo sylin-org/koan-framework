@@ -56,7 +56,6 @@ public static class KoanWebConstants
         public const string WellKnownBase = ".well-known/Koan";
         public const string WellKnownObservability = "observability"; // relative to WellKnownBase
         public const string WellKnownAggregates = "aggregates";       // relative to WellKnownBase
-        public const string WellKnownScheduling = "scheduling";       // relative to WellKnownBase
     }
 
     public static class Defaults

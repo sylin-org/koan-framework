@@ -21,12 +21,6 @@ public static class KoanServiceActions
         public const string TriggerProcessing = "canon-trigger-processing";
     }
 
-    public static class Scheduling
-    {
-        public const string TriggerTask = "trigger-task";
-        public const string ListTasks = "list-tasks";
-    }
-
     public static class Health
     {
         public const string ForceProbe = "force-probe";

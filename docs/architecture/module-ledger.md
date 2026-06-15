@@ -39,6 +39,8 @@ validation:
 - Cross-reference: see [`Koan Capability Map`](capability-map.md) for layered adoption and pairing guidance.
 
 > Data source: `artifacts/module-inventory.md` (generated 2025-09-29).
+>
+> **2026-06 agyo-tools migration:** Tagging, Secrets (Abstractions/Core/Connector.Vault), Scheduling, Recipe.Observability, Rag (Abstractions/impl), WebSockets, Web.Connector.GraphQl, Data.Connector.PGVector, and Service.Translation moved out of Koan into the `agyo-tools` sibling repo as `Sylin.Agyo.*` packages (they were never core: STACK-0001 layering — agyo depends on Koan, never the reverse). `Koan.Recipe.Abstractions` was **deleted** (superseded by the ARCH-0086 `KoanModule`), not migrated. Entries below that carry a `~~strikethrough~~` reflect this. The counts/hubs above predate the migration and will resettle on the next `scripts/module-inventory.ps1` run. See [`docs/assessment/08-agyo-reorganization.md`](../assessment/08-agyo-reorganization.md).
 
 ### Koan.AI
 
@@ -158,7 +160,7 @@ validation:
 ### Koan.Orchestration.Abstractions
 
 - Depends on: –
-- Depended by: Koan.AI.Connector.Ollama, Koan.Core, Koan.Core.Adapters, Koan.Data.Connector.Couchbase, Koan.Data.Connector.ElasticSearch, Koan.Data.Vector.Connector.Milvus, Koan.Data.Connector.Mongo, Koan.Data.Connector.OpenSearch, Koan.Data.Connector.Postgres, Koan.Data.Connector.Redis, Koan.Data.Connector.SqlServer, Koan.Data.Vector.Connector.Weaviate, Koan.Orchestration.Cli, Koan.Orchestration.Connector.Docker, Koan.Orchestration.Connector.Podman, Koan.Orchestration.Renderers.Connector.Compose, Koan.Secrets.Connector.Vault
+- Depended by: Koan.AI.Connector.Ollama, Koan.Core, Koan.Core.Adapters, Koan.Data.Connector.Couchbase, Koan.Data.Connector.ElasticSearch, Koan.Data.Vector.Connector.Milvus, Koan.Data.Connector.Mongo, Koan.Data.Connector.OpenSearch, Koan.Data.Connector.Postgres, Koan.Data.Connector.Redis, Koan.Data.Connector.SqlServer, Koan.Data.Vector.Connector.Weaviate, Koan.Orchestration.Cli, Koan.Orchestration.Connector.Docker, Koan.Orchestration.Connector.Podman, Koan.Orchestration.Renderers.Connector.Compose <!-- Koan.Secrets.Connector.Vault migrated to agyo-tools 2026-06 -->
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Orchestration.Aspire
@@ -197,41 +199,53 @@ validation:
 - Depended by: Koan.Orchestration.Cli
 - Documentation: README ✅ · TECHNICAL ✅
 
-### Koan.Recipe.Abstractions
+### ~~Koan.Recipe.Abstractions~~
 
-- Depends on: Koan.Core
-- Depended by: Koan.Recipe.Observability
-- Documentation: README ✅ · TECHNICAL ❌
+> **Deleted 2026-06** — superseded by ARCH-0086 `KoanModule` (the AppDomain-scan bootstrap idiom it provided is no longer needed). Did **not** migrate. See [`docs/assessment/08-agyo-reorganization.md`](../assessment/08-agyo-reorganization.md).
 
-### Koan.Recipe.Observability
+- ~~Depends on: Koan.Core~~
+- ~~Depended by: Koan.Recipe.Observability~~
+- ~~Documentation: README ✅ · TECHNICAL ❌~~
 
-- Depends on: Koan.Recipe.Abstractions, Koan.Web
-- Depended by: –
-- Documentation: README ✅ · TECHNICAL ❌
+### ~~Koan.Recipe.Observability~~
 
-### Koan.Scheduling
+> **Migrated to agyo-tools 2026-06** as `Sylin.Agyo.Observability` (re-homed as a `KoanModule`, not an `IKoanRecipe`). See [`docs/assessment/08-agyo-reorganization.md`](../assessment/08-agyo-reorganization.md).
 
-- Depends on: Koan.Core
-- Depended by: Koan.Web
-- Documentation: README ✅ · TECHNICAL ✅
+- ~~Depends on: Koan.Recipe.Abstractions, Koan.Web~~
+- ~~Depended by: –~~
+- ~~Documentation: README ✅ · TECHNICAL ❌~~
 
-### Koan.Secrets.Abstractions
+### ~~Koan.Scheduling~~
 
-- Depends on: –
-- Depended by: Koan.Secrets.Core, Koan.Secrets.Connector.Vault
-- Documentation: README ✅ · TECHNICAL ✅
+> **Migrated to agyo-tools 2026-06** as `Sylin.Agyo.Scheduling`. `Koan.Web` no longer hard-references it (the 1-second poll loop and `/.well-known/Koan/scheduling` endpoint left with it). See [`docs/assessment/08-agyo-reorganization.md`](../assessment/08-agyo-reorganization.md).
 
-### Koan.Secrets.Core
+- ~~Depends on: Koan.Core~~
+- ~~Depended by: Koan.Web~~
+- ~~Documentation: README ✅ · TECHNICAL ✅~~
 
-- Depends on: Koan.Core, Koan.Secrets.Abstractions
-- Depended by: –
-- Documentation: README ✅ · TECHNICAL ✅
+### ~~Koan.Secrets.Abstractions~~
 
-### Koan.Secrets.Connector.Vault
+> **Migrated to agyo-tools 2026-06** as `Sylin.Agyo.Secrets.Abstractions`. The fail-soft reflection probe (`TryInvokeSecretsBootstrap`) stays in `Koan.Data.Core` and no-ops when the assembly is absent. See [`docs/assessment/08-agyo-reorganization.md`](../assessment/08-agyo-reorganization.md).
 
-- Depends on: Koan.Core, Koan.Orchestration.Abstractions, Koan.Secrets.Abstractions
-- Depended by: –
-- Documentation: README ✅ · TECHNICAL ✅
+- ~~Depends on: –~~
+- ~~Depended by: Koan.Secrets.Core, Koan.Secrets.Connector.Vault~~
+- ~~Documentation: README ✅ · TECHNICAL ✅~~
+
+### ~~Koan.Secrets.Core~~
+
+> **Migrated to agyo-tools 2026-06** as `Sylin.Agyo.Secrets.Core`. See [`docs/assessment/08-agyo-reorganization.md`](../assessment/08-agyo-reorganization.md).
+
+- ~~Depends on: Koan.Core, Koan.Secrets.Abstractions~~
+- ~~Depended by: –~~
+- ~~Documentation: README ✅ · TECHNICAL ✅~~
+
+### ~~Koan.Secrets.Connector.Vault~~
+
+> **Migrated to agyo-tools 2026-06** as `Sylin.Agyo.Secrets.Connector.Vault`. See [`docs/assessment/08-agyo-reorganization.md`](../assessment/08-agyo-reorganization.md).
+
+- ~~Depends on: Koan.Core, Koan.Orchestration.Abstractions, Koan.Secrets.Abstractions~~
+- ~~Depended by: –~~
+- ~~Documentation: README ✅ · TECHNICAL ✅~~
 
 ### Koan.Storage
 
@@ -247,8 +261,8 @@ validation:
 
 ### Koan.Web
 
-- Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core, Koan.Scheduling
-- Depended by: Koan.Canon.Web, Koan.Mcp, Koan.Media.Core, Koan.Recipe.Observability, Koan.Web.Backup, Koan.Web.Extensions, Koan.Web.Connector.Swagger, Koan.Web.Transformers <!-- Koan.Web.Connector.GraphQl attic'd 2026-06 -->
+- Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core <!-- Koan.Scheduling migrated to agyo-tools 2026-06 -->
+- Depended by: Koan.Canon.Web, Koan.Mcp, Koan.Media.Core, Koan.Web.Backup, Koan.Web.Extensions, Koan.Web.Connector.Swagger, Koan.Web.Transformers <!-- Koan.Web.Connector.GraphQl + Koan.Recipe.Observability migrated to agyo-tools 2026-06 -->
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Web.Auth
@@ -313,102 +327,7 @@ validation:
 
 ### ~~Koan.Web.Connector.GraphQl~~
 
-> **Removed (attic'd) 2026-06** — connector cut from `dev` (sole consumer was archived sample S4; HotChocolate CVE-treadmill maintenance burden). Recoverable at git tag `attic/koan-web-graphql`. See WEB-0041/WEB-0042.
-
-- ~~Depends on: Koan.Core, Koan.Data.Core, Koan.Web~~
-- ~~Depended by: –~~
-- ~~Documentation: README ✅ · TECHNICAL ✅~~
-
-### Koan.Web.Connector.Swagger
-
-- Depends on: Koan.Web
-- Depended by: –
-- Documentation: README ✅ · TECHNICAL ✅
-
-### Koan.Web.Transformers
-
-- Depends on: Koan.Core, Koan.Web
-- Depended by: –
-- Documentation: README ✅ · TECHNICAL ✅
-- Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core
-- Depended by: Koan.Data.Backup, Koan.Media.Abstractions, Koan.Media.Core, Koan.Media.Web, Koan.Storage.Connector.Local
-- Documentation: README ✅ · TECHNICAL ✅
-
-### Koan.Storage.Connector.Local
-
-- Depends on: Koan.Storage
-- Depended by: –
-- Documentation: README ✅ · TECHNICAL ✅
-
-### Koan.Web
-
-- Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core, Koan.Scheduling
-- Depended by: Koan.Canon.Web, Koan.Mcp, Koan.Media.Core, Koan.Recipe.Observability, Koan.Web.Backup, Koan.Web.Extensions, Koan.Web.Connector.Swagger, Koan.Web.Transformers <!-- Koan.Web.Connector.GraphQl attic'd 2026-06 -->
-- Documentation: README ✅ · TECHNICAL ✅
-
-### Koan.Web.Auth
-
-- Depends on: Koan.Core
-- Depended by: Koan.Web.Auth.Connector.Discord, Koan.Web.Auth.Connector.Google, Koan.Web.Auth.Connector.Microsoft, Koan.Web.Auth.Connector.Oidc, Koan.Web.Auth.Services, Koan.Web.Auth.Connector.Test
-- Documentation: README ✅ · TECHNICAL ✅
-
-### Koan.Web.Auth.Connector.Discord
-
-- Depends on: Koan.Core, Koan.Web.Auth
-- Depended by: –
-- Documentation: README ✅ · TECHNICAL ✅
-
-### Koan.Web.Auth.Connector.Google
-
-- Depends on: Koan.Core, Koan.Web.Auth
-- Depended by: –
-- Documentation: README ✅ · TECHNICAL ✅
-
-### Koan.Web.Auth.Connector.Microsoft
-
-- Depends on: Koan.Core, Koan.Web.Auth
-- Depended by: –
-- Documentation: README ✅ · TECHNICAL ✅
-
-### Koan.Web.Auth.Connector.Oidc
-
-- Depends on: Koan.Core, Koan.Web.Auth
-- Depended by: –
-- Documentation: README ✅ · TECHNICAL ✅
-
-### Koan.Web.Auth.Roles
-
-- Depends on: Koan.Core, Koan.Data.Core, Koan.Web.Extensions
-- Depended by: –
-- Documentation: README ✅ · TECHNICAL ✅
-
-### Koan.Web.Auth.Services
-
-- Depends on: Koan.Core, Koan.Web.Auth, Koan.Web.Auth.Connector.Test
-- Depended by: –
-- Documentation: README ✅ · TECHNICAL ✅
-
-### Koan.Web.Auth.Connector.Test
-
-- Depends on: Koan.Core, Koan.Web.Auth
-- Depended by: Koan.Web.Auth.Services
-- Documentation: README ✅ · TECHNICAL ✅
-
-### Koan.Web.Backup
-
-- Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Backup, Koan.Data.Core, Koan.Web
-- Depended by: –
-- Documentation: README ✅ · TECHNICAL ❌
-
-### Koan.Web.Extensions
-
-- Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core, Koan.Web
-- Depended by: Koan.Canon.Web, Koan.Web.Auth.Roles
-- Documentation: README ✅ · TECHNICAL ❌
-
-### ~~Koan.Web.Connector.GraphQl~~
-
-> **Removed (attic'd) 2026-06** — connector cut from `dev` (sole consumer was archived sample S4; HotChocolate CVE-treadmill maintenance burden). Recoverable at git tag `attic/koan-web-graphql`. See WEB-0041/WEB-0042.
+> **Migrated to agyo-tools 2026-06** as `Sylin.Agyo.Web.GraphQl` — resurrected from git tag `attic/koan-web-graphql` (the HotChocolate CVE-treadmill belongs on agyo's cadence, not Koan's release train). The WEB-0068 hook pipeline it rides stays public, so no seam remains in Koan. See [`docs/assessment/08-agyo-reorganization.md`](../assessment/08-agyo-reorganization.md); original cut WEB-0041/WEB-0042.
 
 - ~~Depends on: Koan.Core, Koan.Data.Core, Koan.Web~~
 - ~~Depended by: –~~

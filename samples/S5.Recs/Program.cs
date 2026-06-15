@@ -32,14 +32,8 @@ builder.Services.AddSingleton<IRecommendationSettingsProvider, RecommendationSet
 builder.Services.AddSingleton<IRawCacheService, RawCacheService>();
 // Tag catalog options (censor list)
 builder.Services.AddKoanOptions<S5.Recs.Options.TagCatalogOptions>(builder.Configuration, "S5:Recs:Tags");
-// Scheduling: tasks are auto-discovered and registered by Koan.Scheduling's auto-registrar
-// Scheduling defaults for S5: don't gate readiness; ensure bootstrap runs on startup
-builder.Services.AddKoanOptions<Koan.Scheduling.SchedulingOptions>(builder.Configuration, "Koan:Scheduling", opts =>
-{
-    opts.ReadinessGate = false;
-    if (!opts.Jobs.ContainsKey("s5:bootstrap"))
-        opts.Jobs["s5:bootstrap"] = new Koan.Scheduling.SchedulingOptions.JobOptions { OnStartup = true };
-});
+// Bootstrap: S5BootstrapTask is an entity-first Koan.Jobs job ([JobAction(Schedule="@boot")]),
+// auto-discovered by Koan.Jobs — no manual registration or scheduling options needed.
 
 // Discover and register all IMediaProvider implementations in this assembly
 var providerInterface = typeof(S5.Recs.Providers.IMediaProvider);

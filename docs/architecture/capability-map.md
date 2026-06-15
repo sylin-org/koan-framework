@@ -17,7 +17,7 @@ validation:
 ## Contract
 
 - **Scope**: Provide a guided tour of first-class Koan modules under `src/`, how they compose, and when to reach for each package.
-- **Inputs**: `AddKoan()` bootstrap pipeline, auto-registrars, entity-first models, controller-first web stack, orchestration CLI, data/AI/messaging adapters, recipes, and secrets modules.
+- **Inputs**: `AddKoan()` bootstrap pipeline, auto-registrars, entity-first models, controller-first web stack, orchestration CLI, and data/AI/messaging adapters. _(Recipes and secrets moved to agyo-tools 2026-06 — see migration note below.)_
 - **Outputs**: A layered understanding of Koan’s capabilities, pointing to modules and helpers developers can adopt incrementally.
 - **Failure modes**: Referencing modules without aligning with their guardrails (e.g., bypassing entity statics), misordered adoption (e.g., using a provider without the underlying abstractions), or missing supporting infrastructure (container engine, telemetry endpoint).
 - **Success criteria**: New contributors can map Koan’s surface area, know which package unlocks what behavior, and understand how layers enhance one another.
@@ -26,7 +26,7 @@ validation:
 
 - **Adapters without options**: Data or messaging providers assume options are bound; missing configuration is caught at startup when `ValidateOnStart` is enabled.
 - **Inline endpoints**: Adding `Koan.Web` but bypassing controller-first patterns will break engineering guardrails and fail docs/tests.
-- **Secrets & recipes**: Pulling in `Koan.Secrets.*` without a backing provider keeps references unresolved; enable the appropriate recipe or local configuration.
+- **Secrets (now agyo-tools)**: Pulling in `Sylin.Agyo.Secrets.*` without a backing provider keeps references unresolved; configure a provider (e.g. Vault) or local configuration. _(These packages live in the `agyo-tools` sibling repo as of 2026-06.)_
 - **Orchestration without engine**: `Koan.Orchestration.Cli` detects Docker/Podman; ensure at least one engine is available or run in export-only mode.
 - **Large result sets**: Always couple data providers with paging or streaming helpers (`Entity.Page`, `Entity.AllStream`) to avoid memory pressure.
 
@@ -53,10 +53,9 @@ Below is a capability map that layers packages from foundational primitives thro
 | Core runtime            | Configuration, environment, boot diagnostics, adapter auto-registration | `Koan.Core`, `Koan.Core.Adapters`, `Koan.Diagnostics.Tool`                                                                                                                   | –                       |
 | Data & storage          | Entity-first persistence, provider adapters, backups, object storage    | `Koan.Data.Core`, `Koan.Data.Abstractions`, `Koan.Data.*` providers, `Koan.Storage`, `Koan.Data.Backup`                                                                      | Core runtime            |
 | Web & surface area      | MVC controllers, response transformers, auth, diagnostics               | `Koan.Web`, `Koan.Web.Extensions`, `Koan.Web.Transformers`, `Koan.Web.Auth.*`, `Koan.Web.Connector.Swagger`, `Koan.Web.Backup`                                     | Core runtime + Data     |
-| Messaging & async       | Inbox/outbox patterns, background coordination, scheduling              | `Koan.Messaging.Core`, `Koan.Messaging.Abstractions`, `Koan.Messaging.Connector.RabbitMq`, `Koan.Messaging.Inbox.*`, `Koan.Scheduling` | Core + Data             |
+| Messaging & async       | Inbox/outbox patterns, background coordination                          | `Koan.Messaging.Core`, `Koan.Messaging.Abstractions`, `Koan.Messaging.Connector.RabbitMq`, `Koan.Messaging.Inbox.*` _(scheduling moved to agyo-tools as `Sylin.Agyo.Scheduling`, 2026-06)_ | Core + Data             |
 | AI, media & search      | Prompt routing, embeddings, media pipelines                             | `Koan.AI`, `Koan.AI.Contracts`, `Koan.AI.Connector.Ollama`, `Koan.Media.Abstractions`, `Koan.Media.Core`, `Koan.Media.Web`, `Koan.Data.Vector.*`                              | Core + Data             |
-| Secrets & configuration | Unified secret resolution and config overlays                           | `Koan.Secrets.Abstractions`, `Koan.Secrets.Core`, `Koan.Secrets.Connector.Vault`                                                                                                       | Core runtime            |
-| Recipes & orchestration | Intent-driven operational wiring, container orchestration               | `Koan.Recipe.Abstractions`, `Koan.Recipe.Observability`, `Koan.Orchestration.*`, `Koan.Orchestration.Cli`                                                                    | Core + Secrets + Data   |
+| Orchestration           | Container orchestration, manifest generation                            | `Koan.Orchestration.*`, `Koan.Orchestration.Cli` _(secrets, recipes/observability moved to agyo-tools as `Sylin.Agyo.*`, 2026-06; `Koan.Recipe.Abstractions` deleted)_       | Core + Data             |
 | Domain pipelines        | Canonical data flows, Dapr runtime, MCP integration                     | `Koan.Canon.*`, `Koan.Mcp`                                                                                                                                                   | Core + Data + Messaging |
 
 The remainder of this document drills into each layer and highlights first-class helpers and developer outcomes.
@@ -101,7 +100,7 @@ The remainder of this document drills into each layer and highlights first-class
 
 - `Koan.Web` enforces controller-first APIs using `EntityController<T>` and configures health/OpenAPI endpoints.
 - `Koan.Web.Extensions` offers middleware shortcuts (error handling, JSON options), while `Koan.Web.Transformers` shapes responses to match API contracts.
-- `Koan.Web.Connector.Swagger` integrates OpenAPI generation with the controller ecosystem. _(`Koan.Web.Connector.GraphQl` attic'd 2026-06 — recoverable at git tag `attic/koan-web-graphql`.)_
+- `Koan.Web.Connector.Swagger` integrates OpenAPI generation with the controller ecosystem. _(`Koan.Web.Connector.GraphQl` migrated to agyo-tools 2026-06 as `Sylin.Agyo.Web.GraphQl` — the HotChocolate CVE-treadmill belongs on agyo's cadence. See [`docs/assessment/08-agyo-reorganization.md`](../assessment/08-agyo-reorganization.md).)_
 - `Koan.Web.Backup` surfaces backup/restore operations via HTTP for high-trust maintenance scenarios.
 - `Koan.Web.Diagnostics` plugs diagnostic dashboards into the pipeline when needed.
 
@@ -111,14 +110,14 @@ The remainder of this document drills into each layer and highlights first-class
 
 ---
 
-## 4. Messaging, async, and scheduling
+## 4. Messaging and async
 
-**Packages**: `Koan.Messaging.Abstractions`, `Koan.Messaging.Core`, `Koan.Messaging.Connector.RabbitMq`, `Koan.Messaging.Inbox.Connector.Http`, `Koan.Messaging.Inbox.Connector.InMemory`, `Koan.Scheduling`
+**Packages**: `Koan.Messaging.Abstractions`, `Koan.Messaging.Core`, `Koan.Messaging.Connector.RabbitMq`, `Koan.Messaging.Inbox.Connector.Http`, `Koan.Messaging.Inbox.Connector.InMemory`
 
 - `Koan.Messaging.Core` implements bus orchestration, retry policies, and diagnostics for message pipelines. Abstractions keeps contracts separate for consumers.
 - Provider packages like `Koan.Messaging.Connector.RabbitMq` plug into `Koan.Core.Adapters` to auto-register connections and health checks.
 - Inbox helpers (`Koan.Messaging.Inbox.*`) give you exactly-once semantics and idempotent reprocessing surfaces. _(The `Koan.Service.Inbox.Connector.Redis` microservice was removed 2026-06 — its client API (`HttpInboxStore`) no longer existed in src and its only consumer was the archived S15 sample; MESS-0025/MESS-0026 are Retired.)_
-- `Koan.Scheduling` introduces cron/interval-based job orchestration anchored in Koan’s background worker infrastructure.
+- _(Cron/interval scheduling — formerly `Koan.Scheduling` — **migrated to agyo-tools 2026-06** as `Sylin.Agyo.Scheduling`; it was an opt-in in-proc helper, not core. For durable recurring work use the Jobs ledger (`[JobAction(Schedule = ...)]`, JOBS-0005). See [`docs/assessment/08-agyo-reorganization.md`](../assessment/08-agyo-reorganization.md).)_
 - ~~CQRS support (`Koan.Data.Cqrs.*`) ties messaging back into the data plane with projection tasks and outbox helpers.~~ _(Removed 2026-06 — superseded by the Jobs ledger outbox, JOBS-0005.)_
 
 **Developer benefit**: Compose event-driven flows while reusing entity statics, add reliable inbox/outbox boundaries without custom plumbing, and co-ordinate background processing with predictable options and diagnostics.
@@ -141,25 +140,29 @@ The remainder of this document drills into each layer and highlights first-class
 
 ## 6. Secrets, configuration, and security posture
 
-**Packages**: `Koan.Secrets.Abstractions`, `Koan.Secrets.Core`, `Koan.Secrets.Connector.Vault`
+> **Migrated to agyo-tools 2026-06.** The secrets stack — formerly `Koan.Secrets.Abstractions` / `Koan.Secrets.Core` / `Koan.Secrets.Connector.Vault` — now ships from the `agyo-tools` sibling repo as `Sylin.Agyo.Secrets.*`. It was a consumed-but-peripheral helper, not core (STACK-0001 layering). Koan keeps only a fail-soft reflection probe (`TryInvokeSecretsBootstrap` in `Koan.Data.Core`) that resolves when the assembly is present downstream and no-ops when absent. See [`docs/assessment/08-agyo-reorganization.md`](../assessment/08-agyo-reorganization.md).
+
+**Packages** (now `Sylin.Agyo.Secrets.*` in agyo-tools): `Secrets.Abstractions`, `Secrets.Core`, `Secrets.Connector.Vault`
 
 - Core library augments configuration with secret references (`secret://scope/name`) resolved lazily, ensuring rotation-friendly behavior.
 - Provider packages (Vault today) extend the resolver chain; additional providers can be dropped in later with zero code changes.
-- Works hand-in-hand with recipes and orchestrators to propagate secret references into generated manifests or container exports.
+- Works hand-in-hand with orchestrators to propagate secret references into generated manifests or container exports.
 
 **Developer benefit**: One abstraction for secrets across dev/prod, consistent logging/redaction, and declarative references inside standard configuration files.
 
 ---
 
-## 7. Recipes, orchestration, and operational layers
+## 7. Orchestration and operational layers
 
-**Packages**: `Koan.Recipe.Abstractions`, `Koan.Recipe.Observability`, `Koan.Orchestration.Abstractions`, `Koan.Orchestration.Cli`, `Koan.Orchestration.Generators`, `Koan.Orchestration.Connector.Docker`, `Koan.Orchestration.Connector.Podman`, `Koan.Orchestration.Renderers.Connector.Compose`, `Koan.Orchestration.Aspire`
+> **Recipes left Koan 2026-06.** `Koan.Recipe.Abstractions` was **deleted** — superseded by the ARCH-0086 `KoanModule` primitive (its AppDomain-scan bootstrap idiom is no longer needed). The observability bundle — formerly `Koan.Recipe.Observability` — **migrated to agyo-tools** as `Sylin.Agyo.Observability`, re-homed as a `KoanModule` rather than an `IKoanRecipe`. The orchestration toolchain below stays in Koan core. See [`docs/assessment/08-agyo-reorganization.md`](../assessment/08-agyo-reorganization.md).
 
-- Recipes encode opt-in operational bundles. `Koan.Recipe.Observability`, for example, wires OpenTelemetry, health checks, and resilient HTTP policies in one call.
+**Packages**: `Koan.Orchestration.Abstractions`, `Koan.Orchestration.Cli`, `Koan.Orchestration.Generators`, `Koan.Orchestration.Connector.Docker`, `Koan.Orchestration.Connector.Podman`, `Koan.Orchestration.Renderers.Connector.Compose`, `Koan.Orchestration.Aspire`
+
+- Operational bundles (health checks, resilient HTTP, optional OpenTelemetry) are now an opt-in `KoanModule` shipped from agyo-tools (`Sylin.Agyo.Observability`).
 - The orchestration toolchain reads manifests generated at build time (`Koan.Orchestration.Generators`) to plan container stacks, export Compose manifests, and run local clusters.
 - Providers (`Docker`, `Podman`) and renderers (`Compose`) are modular; the CLI selects what is available, and `Koan.Orchestration.Aspire` integrates with .NET Aspire when required.
 
-**Developer benefit**: Move from source to runnable local/CI stack with a single CLI command, export artifacts for ops teams, and apply best-practice wiring (telemetry, retries) consistently via recipes.
+**Developer benefit**: Move from source to runnable local/CI stack with a single CLI command, export artifacts for ops teams, and (via the agyo-tools observability module) apply best-practice wiring (telemetry, retries) consistently.
 
 ---
 
@@ -179,9 +182,9 @@ The remainder of this document drills into each layer and highlights first-class
 ## 9. How the capabilities work together
 
 1. **Start with Core + Web + Data**: Most services begin by referencing `Koan.Core`, `Koan.Data.Core`, `Koan.Web`, and a storage provider (e.g., `Koan.Data.Connector.Postgres`). This combination yields CRUD-ready APIs with no custom scaffolding.
-2. **Add async & scheduling** when you need eventual consistency or background work. `Koan.Messaging.*` and `Koan.Scheduling` reuse the data abstractions for persistence and the core runtime for configuration and logging.
+2. **Add async & background work** when you need eventual consistency. `Koan.Messaging.*` and the Jobs ledger (JOBS-0005) reuse the data abstractions for persistence and the core runtime for configuration and logging. _(For lightweight in-proc cron/interval scheduling, reach for `Sylin.Agyo.Scheduling` from agyo-tools.)_
 3. **Introduce AI or media** to augment your domain. Use the same entity-first approach to persist metadata while AI adapters handle external intelligence.
-4. **Secure & operationalise** by layering secrets (`Koan.Secrets.*`), recipes (`Koan.Recipe.*`), and orchestration (`Koan.Orchestration.*`). These modules read the same configuration sources and emit manifest metadata consumed by the CLI.
+4. **Secure & operationalise** by layering orchestration (`Koan.Orchestration.*`), plus the agyo-tools helpers where needed — secrets (`Sylin.Agyo.Secrets.*`) and the observability module (`Sylin.Agyo.Observability`). These read the same configuration sources and emit manifest metadata consumed by the CLI.
 5. **scale the domain** with Canon or Flow once you need canonical projections, multi-stage pipelines, or Dapr-hosted workers.
 
 The map is intentionally composable: everything hinges on the core runtime’s auto-registration, and every module exposes typed options and constants to align with Koan’s engineering guardrails.
@@ -191,9 +194,9 @@ The map is intentionally composable: everything hinges on the core runtime’s a
 ## Suggested adoption path for new teams
 
 1. **Bootstrap**: `Koan.Core`, `Koan.Web`, `Koan.Data.Core`, plus one data provider (`Koan.Data.Connector.Postgres` or `Koan.Data.Connector.Mongo`). Use entity statics and controllers to ship value quickly.
-2. **Observability & resilience**: Reference `Koan.Recipe.Observability` and run the CLI’s `doctor` command to confirm telemetry endpoints, or export Compose manifests for local stacks.
-3. **Security posture**: Add `Koan.Secrets.Core` (and a provider like Vault) before production, ensuring configuration remains declarative.
-4. **Extended capabilities**: Pull in `Koan.Messaging.*`, `Koan.Scheduling`, and `Koan.Storage` as your domain evolves. Each package maintains a README/TECHNICAL pair for deep dives.
+2. **Observability & resilience**: Reference `Sylin.Agyo.Observability` (from agyo-tools) and run the CLI’s `doctor` command to confirm telemetry endpoints, or export Compose manifests for local stacks.
+3. **Security posture**: Add `Sylin.Agyo.Secrets.Core` (and a provider like Vault) from agyo-tools before production, ensuring configuration remains declarative.
+4. **Extended capabilities**: Pull in `Koan.Messaging.*`, the Jobs ledger (`Koan.Jobs`), and `Koan.Storage` as your domain evolves (and `Sylin.Agyo.Scheduling` for in-proc schedules). Each package maintains a README/TECHNICAL pair for deep dives.
 5. **Advanced scenarios**: When AI, media, or canonical pipelines become relevant, reference the specialised packages—the runtime will announce new capabilities in the boot report.
 
 ---

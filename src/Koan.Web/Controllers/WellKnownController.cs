@@ -71,39 +71,6 @@ public sealed class WellKnownController(
         return Ok(payload);
     }
 
-    [HttpGet(KoanWebConstants.Routes.WellKnownScheduling)]
-    public IActionResult Scheduling([FromServices] Koan.Core.Observability.Health.IHealthAggregator aggregator, [FromServices] IOptions<Scheduling.SchedulingOptions>? sched)
-    {
-        if (!CanExposeObservability()) return NotFound();
-
-        var snap = aggregator.GetSnapshot();
-        var tasks = snap.Components
-            .Where(c => c.Component.StartsWith("scheduling:task:", StringComparison.OrdinalIgnoreCase))
-            .Select(c => new
-            {
-                id = c.Facts?.TryGetValue("id", out var id) == true ? id : c.Component.Split(':').Last(),
-                state = c.Facts?.TryGetValue("state", out var st) == true ? st : c.Status.ToString().ToLowerInvariant(),
-                critical = c.Facts?.TryGetValue("critical", out var cr) == true && string.Equals(cr, "true", StringComparison.OrdinalIgnoreCase),
-                running = c.Facts?.TryGetValue("running", out var rn) == true ? rn : "0",
-                success = c.Facts?.TryGetValue("success", out var sc) == true ? sc : "0",
-                fail = c.Facts?.TryGetValue("fail", out var fl) == true ? fl : "0",
-                lastError = c.Facts?.TryGetValue("lastError", out var le) == true ? le : null
-            })
-            .OrderBy(t => t.id)
-            .ToArray();
-
-        var payload = new
-        {
-            enabled = sched?.Value?.Enabled ?? false,
-            readinessGate = sched?.Value?.ReadinessGate ?? true,
-            tasks,
-            links = new[] { new { rel = "observability", href = $"/{KoanWebConstants.Routes.WellKnownBase}/{KoanWebConstants.Routes.WellKnownObservability}" } }
-        };
-
-        Response.Headers.CacheControl = KoanWebConstants.Policies.NoStore;
-        return Ok(payload);
-    }
-
     [HttpGet("aggregates")]
     public IActionResult Aggregates()
     {

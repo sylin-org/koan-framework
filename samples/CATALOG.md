@@ -274,7 +274,7 @@ Use this table to find samples demonstrating specific framework capabilities.
 - Multi-channel delivery (email, SMS, push, webhooks)
 - RabbitMQ queue-based routing
 - Redis Inbox for idempotency
-- Scheduled delivery with Koan.Scheduling
+- Scheduled delivery with the Jobs ledger (`[JobAction(Schedule = ...)]`, JOBS-0005) — or `Sylin.Agyo.Scheduling` for lightweight in-proc schedules _(Koan.Scheduling migrated to agyo-tools 2026-06)_
 - Retry with exponential backoff
 - Dead letter queue for failures
 - Batch campaigns (10k+ notifications)

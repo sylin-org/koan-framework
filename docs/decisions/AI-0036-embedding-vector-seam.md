@@ -80,7 +80,7 @@ query path, and neither let the store or a migration audit answer "which model i
 |---|-------------|----------|-------|--------------|
 | **R1** | `Chain.Retrieve<T>` — [ChainExecutor.cs:196](../../src/Koan.AI.Orchestration/ChainExecutor.cs#L196), [:480](../../src/Koan.AI.Orchestration/ChainExecutor.cs#L480) | `topK` | `alpha`, `rerank` (**both advertised** at [ChainBuilder.cs:51](../../src/Koan.AI.Orchestration/ChainBuilder.cs#L51)), `text`, `filter` | **silent** — DX accepts knobs it ignores |
 | **R2** | agent `{type}_search` — [EntityToolGenerator.cs:389](../../src/Koan.AI.Agents/EntityToolGenerator.cs#L389) | `text`, `topK` | `alpha`, `filter` | **missing capability** — no slot exposed |
-| **R3** | RAG pillar — [RagRetrievalPipeline.cs:65](../../src/Koan.Rag/Retrieval/RagRetrievalPipeline.cs#L65) | `text`, `alpha`, `topK` | `filter` | **missing capability** — no filter param |
+| **R3** | RAG pillar — `RagRetrievalPipeline.cs:65` _(Koan.Rag migrated to agyo-tools 2026-06 as `Sylin.Agyo.Rag`; see [08-agyo-reorganization](../assessment/08-agyo-reorganization.md))_ | `text`, `alpha`, `topK` | `filter` | **missing capability** — no filter param |
 
 - **R4 — no shared contract.** Three forwarders, three different subsets, **`filter` lost by all
   three**. The store's read surface (fail-loud and filter-capable) had no single typed options object

@@ -17,6 +17,5 @@
     <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
-    <ProjectReference Include="..\Koan.Scheduling\Koan.Scheduling.csproj" />
   </ItemGroup>
 </Project>

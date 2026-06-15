@@ -40,7 +40,6 @@ public static class ServiceCollectionScanExtensions
     /// // Inside an IKoanAutoRegistrar.Initialize(services) implementation:
     /// services.AddAllOf&lt;IPackageSource&gt;(typeof(KoanAutoRegistrar).Assembly);
     /// services.AddAllOf&lt;IDownloadProxy&gt;(typeof(KoanAutoRegistrar).Assembly);
-    /// services.AddAllOf&lt;IScheduledTask&gt;(typeof(KoanAutoRegistrar).Assembly);
     /// </code>
     /// </example>
     public static IServiceCollection AddAllOf<TService>(

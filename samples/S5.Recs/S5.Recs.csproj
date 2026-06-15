@@ -23,7 +23,7 @@
     <ProjectReference Include="..\..\src\Koan.AI.Contracts\Koan.AI.Contracts.csproj" />
     <ProjectReference Include="..\..\src\Koan.AI.Web\Koan.AI.Web.csproj" />
     <ProjectReference Include="..\..\src\Connectors\AI\Ollama\Koan.AI.Connector.Ollama.csproj" />
-    <ProjectReference Include="..\..\src\Koan.Scheduling\Koan.Scheduling.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Jobs\Koan.Jobs.csproj" />
     <!-- Auth core and dev TestProvider for Development login/testing -->
     <ProjectReference Include="..\..\src\Koan.Web.Auth\Koan.Web.Auth.csproj" />
     <ProjectReference Include="..\..\src\Connectors\Web\Auth\Test\Koan.Web.Auth.Connector.Test.csproj" />
