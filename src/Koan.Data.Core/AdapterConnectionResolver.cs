@@ -1,4 +1,5 @@
 using System;
+using Koan.Core.Logging;
 using Koan.Data.Core.Infrastructure;
 using Microsoft.Extensions.Configuration;
 
@@ -9,6 +10,8 @@ namespace Koan.Data.Core;
 /// </summary>
 public static class AdapterConnectionResolver
 {
+    private static readonly KoanLog.KoanLogScope Log = KoanLog.For(typeof(AdapterConnectionResolver));
+
     /// <summary>
     /// Resolve connection string for adapter and source combination.
     ///
@@ -77,9 +80,14 @@ public static class AdapterConnectionResolver
             {
                 return (T)Convert.ChangeType(value, typeof(T));
             }
-            catch
+            catch (Exception ex) when (ex is InvalidCastException or FormatException or OverflowException or ArgumentException)
             {
-                // Fall through to config resolution
+                // Malformed value in the source definition: warn (do not silently
+                // accept), then fall through to config resolution.
+                Log.ConfigWarning("adapter-setting.coerce", "malformed-value",
+                    ("provider", providerId), ("source", source), ("setting", settingKey),
+                    ("origin", "source-definition"), ("targetType", typeof(T).Name),
+                    ("value", value), ("reason", ex.Message));
             }
         }
 
@@ -92,9 +100,14 @@ public static class AdapterConnectionResolver
             {
                 return (T)Convert.ChangeType(sourceValue, typeof(T));
             }
-            catch
+            catch (Exception ex) when (ex is InvalidCastException or FormatException or OverflowException or ArgumentException)
             {
-                // Fall through to adapter default
+                // Malformed value at the source-specific config key (likely a typo'd
+                // setting): warn, then fall through to the adapter default.
+                Log.ConfigWarning("adapter-setting.coerce", "malformed-value",
+                    ("provider", providerId), ("source", source), ("setting", settingKey),
+                    ("origin", "config-source"), ("key", sourceKey), ("targetType", typeof(T).Name),
+                    ("value", sourceValue), ("reason", ex.Message));
             }
         }
 
@@ -107,9 +120,14 @@ public static class AdapterConnectionResolver
             {
                 return (T)Convert.ChangeType(adapterValue, typeof(T));
             }
-            catch
+            catch (Exception ex) when (ex is InvalidCastException or FormatException or OverflowException or ArgumentException)
             {
-                // Fall through to default value
+                // Malformed value at the adapter default config key (likely a typo'd
+                // setting): warn, then fall through to the supplied default value.
+                Log.ConfigWarning("adapter-setting.coerce", "malformed-value",
+                    ("provider", providerId), ("source", source), ("setting", settingKey),
+                    ("origin", "config-adapter"), ("key", adapterKey), ("targetType", typeof(T).Name),
+                    ("value", adapterValue), ("reason", ex.Message));
             }
         }
 
