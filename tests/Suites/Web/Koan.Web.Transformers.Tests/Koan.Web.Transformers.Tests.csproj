@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\src\Koan.Web.Transformers\Koan.Web.Transformers.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Koan.Web\Koan.Web.csproj" />
   </ItemGroup>
 
   <ItemGroup>
