@@ -69,13 +69,12 @@ public static class ServiceCollectionExtensions
 
         // Best-effort early initialization when provider is built later
 
-        // Legacy health registry removed in greenfield; aggregator is the single source of truth
-        // Health Aggregator (push-first)
-        // Note: Fully qualify Options type to avoid collision with Koan.Core.HealthAggregatorOptions.
+        // Health Aggregator (push-first) is the single source of truth for readiness.
         services.AddKoanOptions<Koan.Core.Observability.Health.HealthAggregatorOptions>(Infrastructure.ConfigurationConstants.Health.AggregatorSection);
         services.AddSingleton(sp => sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<Koan.Core.Observability.Health.HealthAggregatorOptions>>().Value);
         services.AddSingleton<Koan.Core.Observability.Health.IHealthAggregator, Koan.Core.Observability.Health.HealthAggregator>();
-        // Bridge legacy contributors (registered by adapters) into aggregator
+        // IHealthContributor is the public pull-check seam (implemented by adapters). The registry +
+        // bridge fan those contributors into the push-first aggregator on probe.
         services.AddSingleton<IHealthRegistry, HealthRegistry>();
         services.AddHostedService<HealthContributorsBridge>();
         services.AddHostedService<HealthProbeScheduler>();

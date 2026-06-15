@@ -51,41 +51,6 @@ internal sealed class HealthContributorsBridge : IHostedService
         }
     }
 
-    private async Task RunContributor(IHealthContributor c, CancellationToken ct)
-    {
-        try
-        {
-            var report = await c.Check(ct);
-            var status = report.State switch
-            {
-                HealthState.Healthy => HealthStatus.Healthy,
-                HealthState.Degraded => HealthStatus.Degraded,
-                HealthState.Unhealthy => HealthStatus.Unhealthy,
-                _ => HealthStatus.Unknown
-            };
-
-            IReadOnlyDictionary<string, string>? facts = null;
-            if (report.Data is not null && report.Data.Count > 0)
-            {
-                var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                foreach (var kv in report.Data)
-                {
-                    if (kv.Value is null) continue;
-                    dict[kv.Key] = kv.Value?.ToString() ?? "";
-                }
-                facts = dict;
-            }
-
-            var enriched = facts is null ? new Dictionary<string, string>() : new Dictionary<string, string>(facts);
-            enriched["critical"] = c.IsCritical ? "true" : "false";
-            _agg.Push(c.Name, status, report.Description, ttl: null, facts: enriched);
-        }
-        catch
-        {
-            _agg.Push(c.Name, HealthStatus.Unhealthy, "exception during health check");
-        }
-    }
-
     private void RunContributorSync(IHealthContributor c, CancellationToken ct)
     {
         try
