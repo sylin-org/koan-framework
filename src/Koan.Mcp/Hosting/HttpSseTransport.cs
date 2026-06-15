@@ -21,6 +21,7 @@ public sealed class HttpSseTransport
     private readonly HttpSseSessionManager _sessions;
     private readonly McpServer _server;
     private readonly McpEntityRegistry _registry;
+    private readonly Koan.Mcp.CustomTools.McpCustomToolRegistry _customTools;
     private readonly IOptionsMonitor<McpServerOptions> _options;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<HttpSseTransport> _logger;
@@ -30,6 +31,7 @@ public sealed class HttpSseTransport
         HttpSseSessionManager sessions,
         McpServer server,
         McpEntityRegistry registry,
+        Koan.Mcp.CustomTools.McpCustomToolRegistry customTools,
         IOptionsMonitor<McpServerOptions> options,
         TimeProvider timeProvider,
         ILogger<HttpSseTransport> logger,
@@ -38,6 +40,7 @@ public sealed class HttpSseTransport
         _sessions = sessions ?? throw new ArgumentNullException(nameof(sessions));
         _server = server ?? throw new ArgumentNullException(nameof(server));
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
+        _customTools = customTools ?? throw new ArgumentNullException(nameof(customTools));
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _timeProvider = timeProvider ?? TimeProvider.System;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -107,6 +110,7 @@ public sealed class HttpSseTransport
         await using var bridge = new HttpSseRpcBridge(
             _server,
             _registry,
+            _customTools,
             _options,
             session,
             _loggerFactory.CreateLogger<HttpSseRpcBridge>());

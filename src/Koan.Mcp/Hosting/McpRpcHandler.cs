@@ -25,6 +25,8 @@ public sealed class McpRpcHandler
     private readonly IServiceProvider _services;
     private readonly IOptions<McpServerOptions> _serverOptions;
     private readonly Koan.Mcp.CodeExecution.ICodeExecutor? _codeExecutor;
+    private readonly Koan.Mcp.CustomTools.McpCustomToolRegistry? _customTools;
+    private readonly Koan.Mcp.CustomTools.McpCustomToolInvoker? _customInvoker;
 
     public McpRpcHandler(
         McpEntityRegistry registry,
@@ -41,6 +43,10 @@ public sealed class McpRpcHandler
 
         // Code executor is optional - may not be available if code mode is disabled
     _codeExecutor = services.GetService<Koan.Mcp.CodeExecution.ICodeExecutor>();
+
+        // Custom [McpTool] verbs are optional (registered by AddKoanMcp).
+        _customTools = services.GetService<Koan.Mcp.CustomTools.McpCustomToolRegistry>();
+        _customInvoker = services.GetService<Koan.Mcp.CustomTools.McpCustomToolInvoker>();
     }
 
     [JsonRpcMethod("tools/list")]
@@ -61,12 +67,17 @@ public sealed class McpRpcHandler
             toolsList.Add(validateTool);
         }
 
-        // Add entity tools if enabled
+        // Add entity tools + custom [McpTool] verbs if enabled
         if (exposureMode == McpExposureMode.Tools || exposureMode == McpExposureMode.Full)
         {
             var entityTools = _registry.Registrations
                 .SelectMany(registration => registration.Tools.Select(tool => ToolDescriptor.From(registration, tool)));
             toolsList.AddRange(entityTools);
+
+            if (_customTools is not null)
+            {
+                toolsList.AddRange(_customTools.Tools.Select(ToolDescriptor.FromCustom));
+            }
         }
 
         var response = new ToolsListResponse
@@ -102,9 +113,40 @@ public sealed class McpRpcHandler
             return ToCallToolResult(res);
         }
 
+        // Handle custom [McpTool] verbs
+        if (_customTools is not null && _customInvoker is not null && _customTools.TryGet(parameters.Name, out var customTool))
+        {
+            try
+            {
+                var token = await _customInvoker.Invoke(customTool, parameters.Arguments, _services, cancellationToken);
+                return BuildCustomResult(token);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Custom MCP tool '{Tool}' failed.", parameters.Name);
+                return new CallToolResult
+                {
+                    IsError = true,
+                    Content = new List<McpContent> { new McpContent { Type = "text", Text = ex.Message } }
+                };
+            }
+        }
+
         // Handle traditional entity tools
         var result = await _executor.Execute(parameters.Name, parameters.Arguments, cancellationToken);
         return ToCallToolResult(parameters.Name, result);
+    }
+
+    private static CallToolResult BuildCustomResult(JToken result)
+    {
+        var text = result.Type == JTokenType.String
+            ? result.Value<string>() ?? string.Empty
+            : result.ToString(Newtonsoft.Json.Formatting.None);
+
+        return new CallToolResult
+        {
+            Content = new List<McpContent> { new McpContent { Type = "text", Text = text } }
+        };
     }
 
     [JsonRpcMethod("ping")]
@@ -465,6 +507,24 @@ public sealed class McpRpcHandler
                 ["entity"] = registration.DisplayName,
                 ["operation"] = tool.Operation.ToString(),
                 ["returnsCollection"] = tool.ReturnsCollection,
+                ["isMutation"] = tool.IsMutation,
+                ["requiredScopes"] = new JArray(tool.RequiredScopes.Select(scope => JValue.CreateString(scope)))
+            };
+
+            return new ToolDescriptor
+            {
+                Name = tool.Name,
+                Description = tool.Description,
+                InputSchema = tool.InputSchema,
+                Metadata = metadata
+            };
+        }
+
+        public static ToolDescriptor FromCustom(Koan.Mcp.CustomTools.McpCustomTool tool)
+        {
+            var metadata = new JObject
+            {
+                ["custom"] = true,
                 ["isMutation"] = tool.IsMutation,
                 ["requiredScopes"] = new JArray(tool.RequiredScopes.Select(scope => JValue.CreateString(scope)))
             };

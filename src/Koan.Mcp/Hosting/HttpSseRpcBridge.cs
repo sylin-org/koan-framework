@@ -29,6 +29,7 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
 
     private readonly McpServer _server;
     private readonly McpEntityRegistry _registry;
+    private readonly Koan.Mcp.CustomTools.McpCustomToolRegistry _customTools;
     private readonly IOptionsMonitor<McpServerOptions> _options;
     private readonly HttpSseSession _session;
     private readonly ILogger<HttpSseRpcBridge> _logger;
@@ -40,12 +41,14 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
     public HttpSseRpcBridge(
         McpServer server,
         McpEntityRegistry registry,
+        Koan.Mcp.CustomTools.McpCustomToolRegistry customTools,
         IOptionsMonitor<McpServerOptions> options,
         HttpSseSession session,
         ILogger<HttpSseRpcBridge> logger)
     {
         _server = server ?? throw new ArgumentNullException(nameof(server));
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
+        _customTools = customTools ?? throw new ArgumentNullException(nameof(customTools));
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _session = session ?? throw new ArgumentNullException(nameof(session));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -138,7 +141,7 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
     {
         var response = await _handler.ListTools(cancellationToken);
         var filtered = response.Tools
-            .Where(tool => _registry.TryGetTool(tool.Name, out var registration, out var definition) && HasAccess(registration, definition))
+            .Where(IsToolVisible)
             .ToArray();
 
         if (filtered.Length != response.Tools.Count)
@@ -180,13 +183,18 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
             return;
         }
 
-        if (!_registry.TryGetTool(toolName, out var registration, out var tool))
+        var isEntityTool = _registry.TryGetTool(toolName, out var registration, out var tool);
+        Koan.Mcp.CustomTools.McpCustomTool? customTool = null;
+        var isCustomTool = !isEntityTool && _customTools.TryGet(toolName, out customTool);
+
+        if (!isEntityTool && !isCustomTool)
         {
             _session.Enqueue(ServerSentEvent.FromJsonRpc(CreateError(envelope.Id, -32601, $"Tool '{toolName}' is not registered.")));
             return;
         }
 
-        if (!HasAccess(registration, tool))
+        var permitted = isEntityTool ? HasAccess(registration, tool) : HasAccessCustom(customTool!);
+        if (!permitted)
         {
             _session.Enqueue(ServerSentEvent.FromJsonRpc(CreateError(envelope.Id, -32604, "Forbidden.")));
             return;
@@ -220,6 +228,32 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
         };
 
         _session.Enqueue(ServerSentEvent.FromJsonRpc(response));
+    }
+
+    private bool IsToolVisible(McpRpcHandler.ToolDescriptor tool)
+    {
+        if (_registry.TryGetTool(tool.Name, out var registration, out var definition))
+        {
+            return HasAccess(registration, definition);
+        }
+
+        if (_customTools.TryGet(tool.Name, out var custom))
+        {
+            return HasAccessCustom(custom);
+        }
+
+        return false;
+    }
+
+    private bool HasAccessCustom(Koan.Mcp.CustomTools.McpCustomTool tool)
+    {
+        var options = _options.CurrentValue;
+        if (options.RequireAuthentication && _session.User?.Identity?.IsAuthenticated != true)
+        {
+            return false;
+        }
+
+        return tool.RequiredScopes.Count == 0 || UserHasScopes(tool.RequiredScopes);
     }
 
     private bool HasAccess(McpEntityRegistration registration, McpToolDefinition tool)

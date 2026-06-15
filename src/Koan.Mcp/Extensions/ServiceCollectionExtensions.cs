@@ -34,6 +34,8 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<DescriptorMapper>();
         services.TryAddSingleton<TimeProvider>(_ => TimeProvider.System);
         services.TryAddSingleton<McpEntityRegistry>();
+        services.TryAddSingleton<Koan.Mcp.CustomTools.McpCustomToolRegistry>();
+        services.TryAddSingleton<Koan.Mcp.CustomTools.McpCustomToolInvoker>();
         services.TryAddSingleton<RequestTranslator>();
         services.TryAddSingleton<ResponseTranslator>();
         services.TryAddSingleton<EndpointToolExecutor>();
