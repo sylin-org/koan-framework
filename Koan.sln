@@ -523,6 +523,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S16.PantryPal.Tests", "test
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Storage.Core.Tests", "tests\Suites\Storage\Koan.Storage.Core.Tests\Koan.Storage.Core.Tests.csproj", "{CF6E3C9D-6E5C-4BD3-822F-52EA8F08E28B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Web.WellKnown.Tests", "tests\Suites\Web\Koan.Web.WellKnown.Tests\Koan.Web.WellKnown.Tests.csproj", "{4B259212-1902-438D-977A-5512C92D530B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -2619,6 +2621,18 @@ Global
 		{CF6E3C9D-6E5C-4BD3-822F-52EA8F08E28B}.Release|x64.Build.0 = Release|Any CPU
 		{CF6E3C9D-6E5C-4BD3-822F-52EA8F08E28B}.Release|x86.ActiveCfg = Release|Any CPU
 		{CF6E3C9D-6E5C-4BD3-822F-52EA8F08E28B}.Release|x86.Build.0 = Release|Any CPU
+		{4B259212-1902-438D-977A-5512C92D530B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4B259212-1902-438D-977A-5512C92D530B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4B259212-1902-438D-977A-5512C92D530B}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{4B259212-1902-438D-977A-5512C92D530B}.Debug|x64.Build.0 = Debug|Any CPU
+		{4B259212-1902-438D-977A-5512C92D530B}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{4B259212-1902-438D-977A-5512C92D530B}.Debug|x86.Build.0 = Debug|Any CPU
+		{4B259212-1902-438D-977A-5512C92D530B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4B259212-1902-438D-977A-5512C92D530B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4B259212-1902-438D-977A-5512C92D530B}.Release|x64.ActiveCfg = Release|Any CPU
+		{4B259212-1902-438D-977A-5512C92D530B}.Release|x64.Build.0 = Release|Any CPU
+		{4B259212-1902-438D-977A-5512C92D530B}.Release|x86.ActiveCfg = Release|Any CPU
+		{4B259212-1902-438D-977A-5512C92D530B}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
