@@ -119,6 +119,72 @@ Preserve `/auth/{provider}/challenge|callback|logout`. Newtonsoft canonical (no 
 EXCEPT the deliberate `IKoanAuthEventContributor` removal. Never stage `src/Koan.Jobs/**`. Persona separation.
 The cookie scheme constant is `AuthenticationExtensions.CookieScheme = "Koan.cookie"`.
 
+## Progress (2026-06-17, this session)
+- **Chunk 1 DONE** (`1540fe05`) — SAML excise + merge dedup.
+- **Chunk 2 DONE** (`244681c2`) — event-contributor pipeline retired. Migrated `RoleListFileContributor` +
+  `AdminBootstrapContributor` to `IKoanAuthFlowHandler` (signatures were identical; `OnSignIn` verbatim,
+  Priority preserved); deleted `IKoanAuthEventContributor` + `AuthEventDispatcher` + `LegacyAuthContributorAdapter`;
+  dropped `AuthFlowDispatcher`'s `legacyContributors` ctor param + `DiscoverAndRegisterAuthEventContributors`.
+  Verified: full sln 0 err; `AuthFlowDispatcherTests` (18) + `AuthDiscoverableContributorSpec`/`AuthPillarBootstrapSpec` (3) green.
+- **Chunks 3–5 (engine swap + OIDC IdP + e2e) — designed below, NOT started.** Atomic + security-critical.
+
+## Chunk 3 grounded design — dynamic handler registration (the hard part, SOLVED)
+**Why not a `BuildServiceProvider()` at `AddKoanWebAuth` time:** Koan.Web.Auth's registrar is only
+`[After(Koan.Web)]` — there is NO ordering guarantee relative to the auth CONNECTORS (Test/Google/etc. register
+their `IAuthProviderContributor` in their own registrars). A temp provider at registration could miss contributed
+providers (e.g. `test`). **Decision: defer to the existing `KoanWebAuthStartupFilter` (`IStartupFilter`, already
+registered in `KoanAutoRegistrar.Initialize` line ~37)**, where the container is built and ALL contributors resolve.
+
+**Why the swap (not just completing the hand-rolled AuthController OIDC):** hand-rolling OIDC `id_token` validation
+(signature/issuer/audience/nonce) is itself security-risky; the ASP.NET `OpenIdConnectHandler` does it correctly +
+maintained. The swap is the right call DESPITE the registration cost.
+
+**The registration recipe (replicates what `AddOAuth`/`AddOpenIdConnect` do, split across registration + startup):**
+1. At `AddKoanWebAuth` (registration), on the existing `AddAuthentication().AddCookie(...)` builder, register the
+   handler INFRA once (these are the easy-to-miss critical pieces):
+   - `services.AddTransient<OAuthHandler<OAuthOptions>>()` and `services.AddTransient<OpenIdConnectHandler>()`.
+   - `services.TryAddEnumerable(ServiceDescriptor.Singleton<IPostConfigureOptions<OAuthOptions>, OAuthPostConfigureOptions<OAuthOptions, OAuthHandler<OAuthOptions>>>())`.
+   - `services.TryAddEnumerable(ServiceDescriptor.Singleton<IPostConfigureOptions<OpenIdConnectOptions>, OpenIdConnectPostConfigureOptions>())`
+     (this one depends on `IDataProtectionProvider` — already present via Koan.Web).
+   - A dynamic `IConfigureNamedOptions<OAuthOptions>` + `IConfigureNamedOptions<OpenIdConnectOptions>` (singletons,
+     resolve `IProviderRegistry` lazily). Their `Configure(name, options)` looks up provider `name` in
+     `IProviderRegistry.EffectiveProviders`; if found + matching type, set endpoints/Authority/ClientId/ClientSecret/
+     CallbackPath (`/auth/{name}/callback`)/Scopes, `SignInScheme = CookieScheme`, **`UsePkce = true`** (OAuthOptions
+     gained `UsePkce` in .NET 9; OIDC has it), and the **parity hooks** (below).
+2. At STARTUP, inside `KoanWebAuthStartupFilter` (resolve `IProviderRegistry` + `IAuthenticationSchemeProvider`):
+   for each effective provider, `await schemeProvider.AddScheme(new AuthenticationScheme(id, displayName,
+   type == oidc ? typeof(OpenIdConnectHandler) : typeof(OAuthHandler<OAuthOptions>)))`. Skip if already present.
+
+**Parity hooks (finding 1 — MUST port; see top of brief):**
+- OAuth `OAuthEvents.OnCreatingTicket`: after the existing sub/name/avatar mapping, also fetch userinfo →
+  `UserInfoMapper.Map(jobject)` → add `ClaimTypes.Role` / `"Koan.permission"` / extra claims; then the external-identity
+  link (`IExternalIdentityStore.Link`, best-effort). `UserInfoMapper` is `internal` in `Koan.Web.Auth.Infrastructure`
+  — accessible from `AddKoanWebAuth` (same assembly).
+- OIDC: `o.GetClaimsFromUserInfoEndpoint = true` + `OpenIdConnectEvents.OnUserInformationReceived` (Newtonsoft `JObject`
+  from `e.User`) → same `UserInfoMapper.Map` + identity link.
+- Note: `IExternalIdentityStore` is resolvable from `ctx.HttpContext.RequestServices` inside the events.
+
+**AuthController rewrite (chunk 3 tail):** `Challenge` → resolve returnUrl via `ReturnUrlPolicy.Resolve(...)`, then
+`return Challenge(new AuthenticationProperties { RedirectUri = resolved }, provider)`. DELETE the hand-rolled
+authorize-URL building, the `Koan.auth.state`/`Koan.auth.return` cookies, the entire `Callback` action (the handler
+middleware owns `/auth/{provider}/callback` — both CallbackPaths are `/auth/{id}/callback`), and the `BuildAbsolute*`
+helpers (~300 LOC). Keep `Logout`. The cookie's existing `OnSigningIn` flow-dispatch (ServiceCollectionExtensions
+lines ~155-178) still fires the contributors (RoleListFile/AdminBootstrap) — preserved automatically.
+
+**Chunk-3 safeguard (commit it green before chunk 4):** `tests/Suites/Security/Koan.Security.Trust.IntegrationTests`
+`AuthEndToEndSpec` (via `AuthE2EFixture`, full `AddKoan()`) exercises the Test provider OAuth2 challenge→callback —
+VERIFY it's a real round-trip; if it stays green through the swap, the OAuth2 engine swap is proven. (Confirm before relying.)
+
+## Chunk 4 grounded — Test provider OIDC IdP (building blocks already exist)
+The Test connector ALREADY has: `Infrastructure/JwtTokenService.cs` (reuse/extend for RS256 `id_token` signing),
+`AuthorizeController` (PKCE S256 already; just echo `nonce`), `TokenController` (add `id_token` to the response when
+`scope` contains `openid`), `DevTokenStore` (the code/claims store — extend `IssueCode`/`TryRedeemCode` to carry `nonce`).
+Add: discovery `/.well-known/openid-configuration` + a JWKS endpoint (RSA public key from `JwtTokenService`) + register a
+contributed `test-oidc` provider (Type=oidc, Authority=test IdP base) in `TestProviderContributor.GetDefaults()` alongside
+`test`. Check `JwtTokenService` for an existing RSA signing key to expose via JWKS.
+
+## Chunk 5 grounded — see the "Chunk 5" section above (WebApplicationFactory; model on Koan.Web.WellKnown.Tests).
+
 ## Why a delegated one-shot failed before
 A delegated full-impl agent 529'd (transient API overload) ~7 min in after only 2 partial edits (a broken
 state, reverted). Do this yourself in build-verified, individually-committed chunks (the order above), with the
