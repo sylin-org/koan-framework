@@ -1,9 +1,10 @@
 # E5 implementation brief — auth flow engine swap (re-derived 2026-06-17)
 
 > Companion to the card [`E5-auth-flow-engine-swap.md`](E5-auth-flow-engine-swap.md). This is the
-> empirical design from a 5-part re-derivation. **Status: PARTIAL** — the SAML/merge cleanup landed in
-> commit `1540fe05` (full `Koan.sln` 0 err). What remains is below. The line refs are as of `1540fe05`;
-> the repo drifts — re-grep before trusting any line number.
+> empirical design from a 5-part re-derivation. **Status: ✅ DONE** — chunk 1 `1540fe05`, chunk 2 `244681c2`,
+> ADR `WEB-0071` `4d021ea9`, chunks 3–5 (engine swap + OIDC IdP + e2e) `f71cdbe4`. Architecture chosen via a
+> research+adversarial-decision workflow → **Option A** (see WEB-0071 + the E5 Divergence-log row for the
+> traps + the three e2e-surfaced bugs). The design below is the historical record (line refs as of `1540fe05`).
 
 ## Architect decisions (binding)
 - **Full OIDC round-trip**: extend the Test provider into a minimal OIDC IdP so the e2e spec does a real
