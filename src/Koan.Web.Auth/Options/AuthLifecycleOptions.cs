@@ -1,7 +1,7 @@
 namespace Koan.Web.Auth.Options;
 
 /// <summary>
-/// Options consumed by the framework's built-in <see cref="Contributors.IKoanAuthEventContributor"/>
+/// Options consumed by the framework's built-in <see cref="Flow.IKoanAuthFlowHandler"/>
 /// implementations. Bound from configuration section <c>Koan:Web:Auth:Lifecycle</c>.
 /// </summary>
 public sealed class AuthLifecycleOptions

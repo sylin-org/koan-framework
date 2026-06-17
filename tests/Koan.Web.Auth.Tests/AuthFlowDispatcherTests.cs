@@ -83,30 +83,6 @@ public sealed class AuthFlowDispatcherTests
     }
 
     [Fact]
-    public async Task LegacyAuthContributorAdapter_projects_old_contributors_into_the_new_pipeline()
-    {
-        var trace = new List<string>();
-        var legacy = new RecordingLegacyContributor("legacy", priority: 0, trace);
-        var modern = new RecordingHandler("modern", priority: -10, trace);
-
-        var dispatcher = new AuthFlowDispatcher(
-            new IKoanAuthFlowHandler[] { modern },
-            new IKoanAuthEventContributor[] { legacy },
-            NullLogger<AuthFlowDispatcher>.Instance);
-
-        var ctx = new AuthSignInContext
-        {
-            Provider = "test",
-            Identity = new System.Security.Claims.ClaimsIdentity("test"),
-            Services = NewHttpContext().RequestServices,
-            HttpContext = NewHttpContext(),
-        };
-        await dispatcher.DispatchSignIn(ctx, CancellationToken.None);
-
-        trace.Should().Equal("modern", "legacy");
-    }
-
-    [Fact]
     public async Task JsonChallengeHandler_sets_401_for_accept_json_requests()
     {
         var http = NewHttpContext();
@@ -199,7 +175,7 @@ public sealed class AuthFlowDispatcherTests
     // ─── helpers ──────────────────────────────────────────────────────────────
 
     private static AuthFlowDispatcher NewDispatcher(params IKoanAuthFlowHandler[] handlers)
-        => new(handlers, Array.Empty<IKoanAuthEventContributor>(), NullLogger<AuthFlowDispatcher>.Instance);
+        => new(handlers, NullLogger<AuthFlowDispatcher>.Instance);
 
     private static AuthChallengeContext NewChallengeCtx()
     {
@@ -267,15 +243,6 @@ public sealed class AuthFlowDispatcherTests
         public int Priority { get; }
         public Task OnChallenge(AuthChallengeContext ctx, CancellationToken ct)
             => throw new InvalidOperationException($"{_name} blew up");
-    }
-
-    private sealed class RecordingLegacyContributor : IKoanAuthEventContributor
-    {
-        private readonly string _name;
-        private readonly List<string> _trace;
-        public RecordingLegacyContributor(string name, int priority, List<string> trace) { _name = name; Priority = priority; _trace = trace; }
-        public int Priority { get; }
-        public Task OnSignIn(AuthSignInContext ctx, CancellationToken ct) { _trace.Add(_name); return Task.CompletedTask; }
     }
 
     private sealed class TestOptionsMonitor<T> : IOptionsMonitor<T>

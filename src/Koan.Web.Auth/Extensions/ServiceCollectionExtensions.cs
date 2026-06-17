@@ -46,18 +46,12 @@ public static class ServiceCollectionExtensions
         // the projection (e.g. to redact email or omit custom claims) before this call lands.
         services.TryAddSingleton<ICurrentUserProjector, DefaultCurrentUserProjector>();
 
-        // Event-contributor pipeline (WEB-0065). Register every [KoanDiscoverable] IKoanAuthEventContributor
+        // Flow-handler pipeline (WEB-0065/0066). Register every [KoanDiscoverable] IKoanAuthFlowHandler
         // (discovered via KoanRegistry — build-time generator + runtime fallback) as scoped, so they can
-        // depend on per-request services such as DB sessions. AuthEventDispatcher composes the list in
-        // Priority order. Apps add a contributor by simply implementing the interface — no DI call required.
-        DiscoverAndRegisterAuthEventContributors(services);
-        services.TryAddScoped<AuthEventDispatcher>();
-
-        // Flow-handler pipeline. Broadens the contributor surface to cover challenge / access-denied
-        // / validate-principal in addition to sign-in / sign-out / bootstrap. Built-ins
-        // (JsonChallengeHandler) live alongside app-provided handlers in the same auto-discovered
-        // list; legacy IKoanAuthEventContributor implementations participate via
-        // LegacyAuthContributorAdapter so existing code continues to work unchanged.
+        // depend on per-request services such as DB sessions. AuthFlowDispatcher composes the list in
+        // Priority order and covers the full lifecycle (sign-in / sign-out / bootstrap / validate-principal
+        // / challenge / access-denied). Built-ins (JsonChallengeHandler) live alongside app-provided
+        // handlers; apps add a handler by simply implementing the interface — no DI call required.
         DiscoverAndRegisterAuthFlowHandlers(services);
         services.AddScoped<IKoanAuthFlowHandler, JsonChallengeHandler>();
         services.TryAddScoped<AuthFlowDispatcher>();
@@ -84,10 +78,9 @@ public static class ServiceCollectionExtensions
                 o.SlidingExpiration = true;
 
                 // Cookie event slots are framework-owned. Every slot fans out through
-                // AuthFlowDispatcher → every registered IKoanAuthFlowHandler (in Priority order),
-                // including LegacyAuthContributorAdapter shims for any IKoanAuthEventContributor
-                // implementations that have not yet been migrated. Applications must NOT overwrite
-                // these slots via a later PostConfigure — they would break the lifecycle pipeline.
+                // AuthFlowDispatcher → every registered IKoanAuthFlowHandler (in Priority order).
+                // Applications must NOT overwrite these slots via a later PostConfigure — they would
+                // break the lifecycle pipeline.
                 o.Events = new CookieAuthenticationEvents
                 {
                     OnRedirectToLogin = async ctx =>
@@ -194,38 +187,18 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Register every discovered <see cref="IKoanAuthEventContributor"/> as a scoped service. Discovery
-    /// runs through <see cref="KoanRegistry.GetDiscoveredImplementors(Type)"/> — populated at build time by
-    /// the source generator and at runtime by <c>RegistryManifestLoader</c> from the <c>[KoanDiscoverable]</c>
+    /// Register every discovered <see cref="IKoanAuthFlowHandler"/> as a scoped service. Discovery runs
+    /// through <see cref="KoanRegistry.GetDiscoveredImplementors(Type)"/> — populated at build time by the
+    /// source generator and at runtime by <c>RegistryManifestLoader</c> from the <c>[KoanDiscoverable]</c>
     /// marker on the interface — so this no longer scans <c>AppDomain</c> assemblies (which miss
     /// lazily-loaded Koan assemblies). Idempotent via
     /// <see cref="ServiceCollectionDescriptorExtensions.TryAddEnumerable(IServiceCollection, ServiceDescriptor)"/>.
-    /// </summary>
-    private static void DiscoverAndRegisterAuthEventContributors(IServiceCollection services)
-    {
-        var contract = typeof(IKoanAuthEventContributor);
-        foreach (var type in KoanRegistry.GetDiscoveredImplementors(contract))
-        {
-            // AuthFlowDispatcher consumes IEnumerable<IKoanAuthEventContributor> directly and wraps each
-            // instance in a LegacyAuthContributorAdapter at construction time, so no separate flow-handler
-            // registration is needed for legacy contributors.
-            services.TryAddEnumerable(ServiceDescriptor.Scoped(contract, type));
-        }
-    }
-
-    /// <summary>
-    /// Register every discovered <see cref="IKoanAuthFlowHandler"/> as a scoped service, via the same
-    /// <c>[KoanDiscoverable]</c> registry path as <see cref="DiscoverAndRegisterAuthEventContributors"/>.
     /// </summary>
     private static void DiscoverAndRegisterAuthFlowHandlers(IServiceCollection services)
     {
         var contract = typeof(IKoanAuthFlowHandler);
         foreach (var type in KoanRegistry.GetDiscoveredImplementors(contract))
         {
-            // LegacyAuthContributorAdapter is a runtime wrapper instantiated by the dispatcher, not a
-            // discoverable handler — skip it so we don't surface a singleton no-op adapter through the
-            // registration (it implements IKoanAuthFlowHandler, so discovery would otherwise include it).
-            if (type == typeof(LegacyAuthContributorAdapter)) continue;
             services.TryAddEnumerable(ServiceDescriptor.Scoped(contract, type));
         }
     }

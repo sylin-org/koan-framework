@@ -10,12 +10,9 @@ namespace Koan.Web.Auth.Flow;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Single, shared dispatcher across every flow event. Maintains the same contract the older
-/// <see cref="AuthEventDispatcher"/> implemented for sign-in / sign-out / bootstrap; legacy
-/// <see cref="IKoanAuthEventContributor"/> implementations participate via
-/// <c>LegacyAuthContributorAdapter</c>, which projects each contributor as a flow handler at the
-/// same priority. The legacy <see cref="AuthEventDispatcher"/> remains registered for backwards
-/// compatibility but delegates here.
+/// Single, shared dispatcher across every flow event (sign-in / sign-out / bootstrap /
+/// validate-principal / challenge / access-denied), running each registered
+/// <see cref="IKoanAuthFlowHandler"/> in <see cref="IKoanAuthFlowHandler.Priority"/> order.
 /// </para>
 /// <para>
 /// Short-circuit policy varies per event:
@@ -40,22 +37,11 @@ public sealed class AuthFlowDispatcher
 
     public AuthFlowDispatcher(
         IEnumerable<IKoanAuthFlowHandler> handlers,
-        IEnumerable<IKoanAuthEventContributor> legacyContributors,
         ILogger<AuthFlowDispatcher> logger)
     {
-        // Adapt every legacy IKoanAuthEventContributor into a flow handler at construction time so
-        // the two registration paths converge into a single sorted pipeline. The adapter is cheap
-        // (a single reference), and scoped + scoped means lifetimes line up. Skip any contributor
-        // that's already exposed as a flow handler directly — apps that migrated keep one entry,
-        // not two.
-        var adaptedLegacy = legacyContributors
-            .Where(c => handlers.All(h => !ReferenceEquals(h, c)))
-            .Select(c => (IKoanAuthFlowHandler)new LegacyAuthContributorAdapter(c));
-
         // Stable sort: primary key is Priority; tie-break by full type name so two handlers at the
         // same priority run in deterministic order across processes / restarts.
         _handlers = handlers
-            .Concat(adaptedLegacy)
             .OrderBy(h => h.Priority)
             .ThenBy(h => h.GetType().FullName, StringComparer.Ordinal)
             .ToArray();

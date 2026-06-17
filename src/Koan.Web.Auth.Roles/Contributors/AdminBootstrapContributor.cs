@@ -2,13 +2,14 @@ using System.Security.Claims;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Koan.Web.Auth.Contributors;
+using Koan.Web.Auth.Flow;
 using Koan.Web.Auth.Options;
 using Koan.Web.Auth.Roles.Contracts;
 
 namespace Koan.Web.Auth.Roles.Contributors;
 
 /// <summary>
-/// Built-in <see cref="IKoanAuthEventContributor"/> that performs one-shot admin elevation on
+/// Built-in <see cref="IKoanAuthFlowHandler"/> that performs one-shot admin elevation on
 /// sign-in according to <see cref="AuthLifecycleOptions.AdminBootstrapOptions"/>. Replaces the
 /// previous in-line bootstrap path in <c>DefaultRoleAttributionService.TryApplyBootstrap</c>.
 /// </summary>
@@ -33,7 +34,7 @@ namespace Koan.Web.Auth.Roles.Contributors;
 /// contributor, this contributor is a no-op for that sign-in.
 /// </para>
 /// </remarks>
-public sealed class AdminBootstrapContributor : IKoanAuthEventContributor
+public sealed class AdminBootstrapContributor : IKoanAuthFlowHandler
 {
     public int Priority => 100;
 

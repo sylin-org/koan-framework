@@ -29,8 +29,8 @@ public static class ServiceCollectionExtensions
         // AdminBootstrapContributor (see WEB-0065).
         services.AddHostedService<Koan.Web.Auth.Roles.Hosting.RoleBootstrapHostedService>();
 
-        // AdminBootstrapContributor is auto-discovered by Koan.Web.Auth's contributor scan when
-        // this assembly is loaded — no explicit DI registration here.
+        // AdminBootstrapContributor is auto-discovered as an IKoanAuthFlowHandler by Koan.Web.Auth's
+        // flow-handler scan when this assembly is loaded — no explicit DI registration here.
 
         return services;
     }

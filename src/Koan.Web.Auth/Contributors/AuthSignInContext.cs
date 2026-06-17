@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Http;
 namespace Koan.Web.Auth.Contributors;
 
 /// <summary>
-/// Context passed to <see cref="IKoanAuthEventContributor.OnSignIn"/>. Carries the mutable
+/// Context passed to <see cref="Flow.IKoanAuthFlowHandler.OnSignIn"/>. Carries the mutable
 /// <see cref="ClaimsIdentity"/> being baked into the auth cookie, the originating provider, and
 /// a per-request <see cref="IServiceProvider"/>.
 /// </summary>

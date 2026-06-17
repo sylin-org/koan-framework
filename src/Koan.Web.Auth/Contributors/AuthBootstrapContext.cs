@@ -3,7 +3,7 @@ using Microsoft.Extensions.Hosting;
 namespace Koan.Web.Auth.Contributors;
 
 /// <summary>
-/// Context passed to <see cref="IKoanAuthEventContributor.OnBootstrap"/>. Provides the host
+/// Context passed to <see cref="Flow.IKoanAuthFlowHandler.OnBootstrap"/>. Provides the host
 /// service provider and environment for one-time set-wide reconciliation work at startup.
 /// </summary>
 /// <remarks>

@@ -3,12 +3,13 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Koan.Web.Auth.Flow;
 using Koan.Web.Auth.Options;
 
 namespace Koan.Web.Auth.Contributors.Builtin;
 
 /// <summary>
-/// Built-in <see cref="IKoanAuthEventContributor"/> that applies an email-keyed allow/revoke role
+/// Built-in <see cref="IKoanAuthFlowHandler"/> that applies an email-keyed allow/revoke role
 /// list (loaded from a JSON file on disk) to the principal during sign-in. Replaces the previous
 /// per-request <c>RoleListContributor</c> in the Roles module — semantics are unchanged for the
 /// file shape; what changed is the trigger (sign-in event rather than every claims transformation).
@@ -28,7 +29,7 @@ namespace Koan.Web.Auth.Contributors.Builtin;
 /// poll interval at most. Multiple concurrent sign-ins share a single parse.
 /// </para>
 /// </remarks>
-public sealed class RoleListFileContributor : IKoanAuthEventContributor
+public sealed class RoleListFileContributor : IKoanAuthFlowHandler
 {
     public int Priority => 50;
 
