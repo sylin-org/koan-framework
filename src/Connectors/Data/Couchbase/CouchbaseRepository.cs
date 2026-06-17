@@ -3,6 +3,7 @@ using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -39,6 +40,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
     IDescribesCapabilities,
     IBulkUpsert<TKey>,
     IBulkDelete<TKey>,
+    IConditionalWriteRepository<TEntity, TKey>,
     IInstructionExecutor<TEntity>,
     IAdapterReadiness,
     IAdapterReadinessConfiguration
@@ -89,6 +91,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
     public void Describe(ICapabilities caps) => caps
         .Add(DataCaps.Query.String).Add(DataCaps.Query.Linq)
         .Add(DataCaps.Write.BulkUpsert).Add(DataCaps.Write.BulkDelete).Add(DataCaps.Write.AtomicBatch)
+        .Add(DataCaps.Write.ConditionalReplace)   // native CAS (DATA-0102)
         .Add(DataCaps.Query.Filter, CouchbaseN1qlFilterTranslator.Capabilities);
     public StorageOptimizationInfo OptimizationInfo => _optimizationInfo;
 
@@ -444,6 +447,53 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
 
             _logger?.LogDebug("Couchbase upsert {Entity} id={Id}", typeof(TEntity).Name, key);
             return model;
+        }, ct);
+
+    /// <summary>
+    /// Atomic CAS (JOBS-0005 §20.3 / DATA-0102): Get the document (capturing its CAS), evaluate the
+    /// <paramref name="guard"/> against the current content, then Replace under that CAS. Returns
+    /// <c>true</c> if applied; <c>false</c> if the guard no longer held, the document is gone, or another
+    /// writer won the race (a CAS mismatch between our read and the guarded replace). Uses Couchbase's
+    /// native version CAS — no transaction needed.
+    /// </summary>
+    public Task<bool> ConditionalReplaceAsync(TEntity model, Expression<Func<TEntity, bool>> guard, CancellationToken ct = default)
+        => ExecuteWithReadinessAsync(async () =>
+        {
+            ct.ThrowIfCancellationRequested();
+            using var act = CouchbaseTelemetry.Activity.StartActivity("couchbase.conditional-replace");
+            act?.SetTag("entity", typeof(TEntity).FullName);
+            var ctx = await ResolveCollection(ct);
+            // Prepare BEFORE deriving the key so the key matches how Upsert stored the document
+            // (PrepareEntityForStorage may reformat a GUID id to dashless "N" form).
+            PrepareEntityForStorage(model);
+            var key = GetKey(model.Id);
+            var predicate = guard.Compile();
+            try
+            {
+                var existing = await ctx.Collection.GetAsync(key, new GetOptions().CancellationToken(ct));
+                // The guard is evaluated against the document's PRE-update state. If it no longer holds,
+                // the claim is already lost — do not write.
+                if (existing.ContentAs<TEntity>() is not { } current || !predicate(current))
+                {
+                    return false;
+                }
+
+                var options = new ReplaceOptions().Cas(existing.Cas).CancellationToken(ct);
+                if (_kvDurability is { } durability)
+                {
+                    options.Durability(durability);
+                }
+                await ctx.Collection.ReplaceAsync(key, model, options);
+                return true;
+            }
+            catch (DocumentNotFoundException)
+            {
+                return false; // nothing to replace
+            }
+            catch (global::Couchbase.Core.Exceptions.CasMismatchException)
+            {
+                return false; // another writer mutated the document between our read and the CAS-guarded replace
+            }
         }, ct);
 
     public Task<bool> Delete(TKey id, CancellationToken ct = default)
