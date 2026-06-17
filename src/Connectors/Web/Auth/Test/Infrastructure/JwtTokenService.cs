@@ -35,6 +35,43 @@ public sealed class JwtTokenService
     /// <summary>Key id (<c>kid</c>) of the current signing key — for JWKS publication / rotation.</summary>
     public string KeyId => _signingKey.KeyId!;
 
+    /// <summary>
+    /// OIDC <c>id_token</c> (ES256) with iss/aud/sub/nonce — validated by the maintained OpenIdConnectHandler
+    /// against the JWKS endpoint. The dev <c>test-oidc</c> provider's signed-token half (WEB-0071 / E5 chunk 4).
+    /// </summary>
+    public string CreateIdToken(UserProfile profile, string issuer, string audience, string? nonce, TimeSpan ttl)
+    {
+        var tokenHandler = new JwtSecurityTokenHandler();
+        var claims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, profile.Email),
+            new(JwtRegisteredClaimNames.Name, profile.Username),
+            new(JwtRegisteredClaimNames.Email, profile.Email),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+        };
+        if (!string.IsNullOrWhiteSpace(nonce)) claims.Add(new Claim("nonce", nonce!));
+
+        var descriptor = new SecurityTokenDescriptor
+        {
+            Subject = new ClaimsIdentity(claims),
+            Expires = DateTime.UtcNow.Add(ttl),
+            IssuedAt = DateTime.UtcNow,
+            Issuer = issuer,
+            Audience = audience,
+            SigningCredentials = new SigningCredentials(_signingKey, Algorithm)
+        };
+        return tokenHandler.WriteToken(tokenHandler.CreateToken(descriptor));
+    }
+
+    /// <summary>The public half of the signing key as a JWK, for the OIDC JWKS endpoint.</summary>
+    public JsonWebKey GetPublicJwk()
+    {
+        var jwk = JsonWebKeyConverter.ConvertFromECDsaSecurityKey(_signingKey);
+        jwk.Use = "sig";
+        jwk.Alg = Algorithm; // ES256
+        return jwk;
+    }
+
     public string CreateToken(UserProfile profile, DevTokenStore.ClaimEnvelope env, TestProviderOptions options)
     {
         var tokenHandler = new JwtSecurityTokenHandler();

@@ -35,6 +35,17 @@ public static class TestProviderEndpointExtensions
             pattern: $"{prefix}/userinfo",
             defaults: new { controller = "UserInfo", action = "UserInfo" });
 
+        // OIDC IdP surface for the dev test-oidc provider (WEB-0071 / E5 chunk 4).
+        endpoints.MapControllerRoute(
+            name: "Koan.TestProvider.OidcDiscovery",
+            pattern: $"{prefix}/.well-known/openid-configuration",
+            defaults: new { controller = "OidcDiscovery", action = "Discovery" });
+
+        endpoints.MapControllerRoute(
+            name: "Koan.TestProvider.Jwks",
+            pattern: $"{prefix}/jwks",
+            defaults: new { controller = "OidcDiscovery", action = "Jwks" });
+
         return endpoints;
     }
 }

@@ -9,7 +9,7 @@ using System.Text;
 
 namespace Koan.Web.Auth.Connector.Test.Controllers;
 
-public sealed class TokenController(IOptionsSnapshot<TestProviderOptions> opts, DevTokenStore store, IHostEnvironment env, ILogger<TokenController> logger) : ControllerBase
+public sealed class TokenController(IOptionsSnapshot<TestProviderOptions> opts, DevTokenStore store, JwtTokenService jwt, IHostEnvironment env, ILogger<TokenController> logger) : ControllerBase
 {
     public sealed record TokenRequest(string grant_type, string? code, string? redirect_uri, string client_id, string? client_secret, string? code_verifier, string? scope);
 
@@ -30,7 +30,7 @@ public sealed class TokenController(IOptionsSnapshot<TestProviderOptions> opts, 
         if (string.IsNullOrWhiteSpace(req.code) || string.IsNullOrWhiteSpace(req.redirect_uri) || string.IsNullOrWhiteSpace(req.client_id)) return BadRequest(new { error = "invalid_request" });
         if (!string.Equals(req.client_id, o.ClientId, StringComparison.Ordinal) || !string.Equals(req.client_secret ?? "", o.ClientSecret, StringComparison.Ordinal)) return Unauthorized();
 
-        if (!store.TryRedeemCode(req.code, out var profile, out var challenge, out var envx)) { logger.LogDebug("TestProvider token: invalid_grant for code {Code}", req.code); return BadRequest(new { error = "invalid_grant" }); }
+        if (!store.TryRedeemCode(req.code, out var profile, out var challenge, out var envx, out var nonce, out var isOpenId)) { logger.LogDebug("TestProvider token: invalid_grant for code {Code}", req.code); return BadRequest(new { error = "invalid_grant" }); }
         // Enforce PKCE S256 when a challenge is present
         if (!string.IsNullOrWhiteSpace(challenge))
         {
@@ -46,6 +46,14 @@ public sealed class TokenController(IOptionsSnapshot<TestProviderOptions> opts, 
         }
         var token = store.IssueToken(profile, TimeSpan.FromHours(1), envx);
         logger.LogDebug("TestProvider token: issued access token for {Email}", profile.Email);
+        if (isOpenId)
+        {
+            // OIDC: also mint a signed id_token (iss derived from the request so it matches the discovery issuer).
+            var routeBase = string.IsNullOrWhiteSpace(o.RouteBase) ? "/.testoauth" : o.RouteBase.TrimEnd('/');
+            var issuer = $"{Request.Scheme}://{Request.Host}{routeBase}";
+            var idToken = jwt.CreateIdToken(profile, issuer, req.client_id, nonce, TimeSpan.FromHours(1));
+            return Ok(new { access_token = token, token_type = "Bearer", expires_in = 3600, id_token = idToken });
+        }
         return Ok(new { access_token = token, token_type = "Bearer", expires_in = 3600 });
     }
 

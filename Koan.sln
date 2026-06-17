@@ -529,6 +529,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Observability", "src\K
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Observability.Tests", "tests\Suites\Observability\Koan.Observability.Tests\Koan.Observability.Tests.csproj", "{8B2D165C-1055-4B28-872F-E35FE7D12605}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Web.Auth.Integration.Tests", "tests\Suites\Auth\Koan.Web.Auth.Integration.Tests\Koan.Web.Auth.Integration.Tests.csproj", "{0CA7E857-F21C-48B6-8D49-27C943B34D60}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -2661,6 +2663,18 @@ Global
 		{8B2D165C-1055-4B28-872F-E35FE7D12605}.Release|x64.Build.0 = Release|Any CPU
 		{8B2D165C-1055-4B28-872F-E35FE7D12605}.Release|x86.ActiveCfg = Release|Any CPU
 		{8B2D165C-1055-4B28-872F-E35FE7D12605}.Release|x86.Build.0 = Release|Any CPU
+		{0CA7E857-F21C-48B6-8D49-27C943B34D60}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0CA7E857-F21C-48B6-8D49-27C943B34D60}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0CA7E857-F21C-48B6-8D49-27C943B34D60}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{0CA7E857-F21C-48B6-8D49-27C943B34D60}.Debug|x64.Build.0 = Debug|Any CPU
+		{0CA7E857-F21C-48B6-8D49-27C943B34D60}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{0CA7E857-F21C-48B6-8D49-27C943B34D60}.Debug|x86.Build.0 = Debug|Any CPU
+		{0CA7E857-F21C-48B6-8D49-27C943B34D60}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0CA7E857-F21C-48B6-8D49-27C943B34D60}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0CA7E857-F21C-48B6-8D49-27C943B34D60}.Release|x64.ActiveCfg = Release|Any CPU
+		{0CA7E857-F21C-48B6-8D49-27C943B34D60}.Release|x64.Build.0 = Release|Any CPU
+		{0CA7E857-F21C-48B6-8D49-27C943B34D60}.Release|x86.ActiveCfg = Release|Any CPU
+		{0CA7E857-F21C-48B6-8D49-27C943B34D60}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

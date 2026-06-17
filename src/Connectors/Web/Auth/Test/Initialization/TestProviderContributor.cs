@@ -30,6 +30,19 @@ internal sealed class TestProviderContributor(IConfiguration cfg, IHostEnvironme
                 Scopes = new[] { "identify", "email" },
                 Enabled = true,
                 Priority = env.IsDevelopment() ? 25 : -100
+            },
+            ["test-oidc"] = new Koan.Web.Auth.Options.ProviderOptions
+            {
+                Type = Koan.Web.Auth.Infrastructure.AuthConstants.Protocols.Oidc,
+                DisplayName = "Test OIDC (Local)",
+                Icon = "/icons/test.svg",
+                // Relative base; the scheme seeder (WEB-0071) resolves it to the in-network absolute Authority.
+                Authority = "/.testoauth",
+                ClientId = o.ClientId,
+                ClientSecret = o.ClientSecret,
+                Scopes = new[] { "openid", "profile", "email" },
+                Enabled = true,
+                Priority = env.IsDevelopment() ? 26 : -100
             }
         };
     }

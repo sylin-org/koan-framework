@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Web.Auth.Hosting;
 
@@ -13,6 +14,13 @@ internal sealed class KoanWebAuthStartupFilter : IStartupFilter
             if (!app.Properties.ContainsKey(appliedKey))
             {
                 app.Properties[appliedKey] = true;
+                // WEB-0071: seed a maintained OAuth2/OIDC handler scheme per effective provider (config +
+                // contributor defaults + ownerless config ids) here — post-build, full DI — so the auth
+                // middleware below sees them. IProviderRegistry is scoped, so we read it from our own scope.
+                using (var scope = app.ApplicationServices.CreateScope())
+                {
+                    AuthSchemeSeeder.Seed(scope.ServiceProvider);
+                }
                 // Ensure auth/authorization middleware are present early in pipeline.
                 app.UseAuthentication();
                 // SEC-0001 §4 Rung 0 — the zero-config dev identity now injects via the IPostAuthenticationContributor

@@ -20,7 +20,8 @@ public sealed class UserInfoController(DevTokenStore store, IHostEnvironment env
     var roles = envx.Roles.Count > 0 ? envx.Roles.ToArray() : [];
     var perms = envx.Permissions.Count > 0 ? envx.Permissions.ToArray() : [];
     var claims = envx.Claims.Count > 0 ? envx.Claims.ToDictionary(k => k.Key, v => v.Value.Count == 1 ? (object)v.Value[0] : (object)v.Value.ToArray()) : new Dictionary<string, object>();
-    return Ok(new { id = profile.Email, username = profile.Username, email = profile.Email, roles, permissions = perms, claims });
+    // 'sub' is required by OIDC userinfo (the handler validates it matches the id_token sub); 'id' kept for oauth2 parity.
+    return Ok(new { sub = profile.Email, id = profile.Email, username = profile.Username, email = profile.Email, roles, permissions = perms, claims });
     }
 }
 
