@@ -40,6 +40,7 @@ public sealed class RedisCapabilitiesSpec
                 caps.Has(DataCaps.Query.Linq).Should().BeTrue();
                 caps.Has(DataCaps.Query.String).Should().BeFalse();
                 caps.Has(DataCaps.Write.FastRemove).Should().BeTrue();
+                caps.Has(DataCaps.Retention.TtlIndex).Should().BeTrue(); // DATA-0101 native key TTL
                 caps.Has(DataCaps.Write.BulkUpsert).Should().BeFalse();
                 caps.Has(DataCaps.Write.BulkDelete).Should().BeFalse();
                 caps.Has(DataCaps.Write.AtomicBatch).Should().BeFalse();

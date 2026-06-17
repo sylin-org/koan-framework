@@ -29,7 +29,7 @@ guessed "works".
 | Surface | Exercised by | Last exercised | Guard | Notes |
 |---|---|---|---|---|
 | Data inner ring (Abstractions/Core/Relational + filter pipeline) | Data suites (FilterConvergence oracle, DATA-0100) | 2026-06-11 | Data suites (local) | Strongest pillar; canon-grade tests |
-| Data connectors (10 under Connectors/Data) | AdapterSurface suites | 2026-06-11 | connector suites (local; 39/87 not in sln) | Redis FilterSupport.Full = full SCAN + client filter, risky at scale |
+| Data connectors (10 under Connectors/Data) | AdapterSurface suites | 2026-06-11 | connector suites (local; 39/87 not in sln) | Redis FilterSupport.Full is correct (in-memory-eval adapter, ARCH-0084) — scan-backed cost is documented, not a lie; native key TTL added (DATA-0101; Redis caps+TTL specs 2026-06-17) |
 | Web nucleus (EntityController to hook pipeline) | Web AdapterSurface x8 | 2026-06-11 | Web suites (local) | Load-bearing; MCP executes through it |
 | Cache (L1/L2 + coherence) | Cache CrossEngine oracle + KOAN0001 analyzer | 2026-06-11 | Cache suites + analyzer (local) | Reference pillar (ARCH-0075/0078) |
 | Jobs (JOBS-0005, 5-tier) | Jobs 5-tier TestKit | 2026-06-13 | Jobs TestKit (local) — incl. claim-scan starvation specs | Freshest, most disciplined pillar; JOBS-0007 head-of-line starvation fixed + guarded (2026-06-13) |

@@ -8,14 +8,20 @@ using Koan.Data.Abstractions.Sorting;
 using Koan.Data.Core.Sorting;
 using StackExchange.Redis;
 using System.Collections.Frozen;
+using System.Reflection;
 using Newtonsoft.Json;
 
 namespace Koan.Data.Connector.Redis;
 
 /// <summary>
-/// Redis key/value store. A "Full floor" adapter under the unified query contract (DATA-XXXX):
-/// it scans the keyspace, materializes entities, and evaluates the entire <see cref="Filter"/>
-/// via <see cref="InMemoryFilterEvaluator"/> (declares <see cref="FilterSupport.Full"/>).
+/// Redis key/value store. A "Full floor" adapter under the unified query contract: like the in-memory
+/// reference adapter (DATA-0081), it scans the keyspace, materializes entities, and evaluates the entire
+/// <see cref="Filter"/> via <see cref="InMemoryFilterEvaluator"/> — so it correctly declares
+/// <see cref="FilterSupport.Full"/>. Under ARCH-0084 <c>Full</c> is operator-correctness ("I honour every
+/// operator faithfully"), not pushdown efficiency; the full-keyspace scan is a documented cost at scale,
+/// not a capability lie (DATA-0101). Honours native TTL: a single-property <c>[Index(Ttl = true)]</c>
+/// timestamp expires its key via <c>EXPIREAT</c> (<see cref="DataCaps.Retention"/>.TtlIndex, mirroring
+/// Mongo's <c>expireAfterSeconds = 0</c>; DATA-0101).
 /// </summary>
 internal sealed class RedisRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
@@ -35,7 +41,50 @@ internal sealed class RedisRepository<TEntity, TKey> :
     public void Describe(ICapabilities caps) => caps
         .Add(DataCaps.Query.Linq)            // predicate filtering in-memory
         .Add(DataCaps.Write.FastRemove)
+        .Add(DataCaps.Retention.TtlIndex)    // native key TTL via [Index(Ttl = true)] -> EXPIREAT (DATA-0101)
         .Add(DataCaps.Query.Filter, FilterSupport.Full);
+
+    // DATA-0101 native TTL. A single-property [Index(Ttl = true)] timestamp drives store-native key expiry
+    // (EXPIREAT). Resolved once per closed entity type; null when the entity declares no TTL index, so
+    // non-TTL entities keep the single-round-trip SET/MSET write path with zero hot-path cost.
+    private static readonly PropertyInfo? TtlProperty = ResolveTtlProperty();
+
+    private static PropertyInfo? ResolveTtlProperty()
+    {
+        foreach (var idx in Koan.Data.Core.IndexMetadata.GetIndexes(typeof(TEntity)))
+            if (idx.Ttl && idx.Properties.Count == 1)
+                return idx.Properties[0];
+        return null;
+    }
+
+    // The absolute UTC instant at which the entity's key should expire, or null to persist indefinitely
+    // (a null/absent TTL value is never expired — mirrors Mongo's TTL-index semantics).
+    private static DateTime? ReadExpiry(TEntity model)
+        => TtlProperty!.GetValue(model) switch
+        {
+            DateTimeOffset dto => dto.UtcDateTime,
+            DateTime dt => dt.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(dt, DateTimeKind.Utc) : dt.ToUniversalTime(),
+            _ => null
+        };
+
+    // Atomic single-key write honoring TTL. `SET ... PX` is one round-trip — no SET-then-EXPIRE crash-leak
+    // window (where a key could persist with no TTL if the process died between the two commands). A future
+    // [Index(Ttl)] instant becomes the key's expiry; a past instant removes the key (already expired); a
+    // null/absent value (or a non-TTL type) writes a persistent key, and SET clears any prior TTL (DATA-0101).
+    private static async Task WriteWithTtlAsync(IDatabase db, RedisKey key, RedisValue json, TEntity model)
+    {
+        if (TtlProperty is null || ReadExpiry(model) is not { } expireAt)
+        {
+            await db.StringSetAsync(key, json);
+            return;
+        }
+
+        var ttl = expireAt - DateTime.UtcNow;
+        if (ttl > TimeSpan.Zero)
+            await db.StringSetAsync(key, json, ttl);  // atomic SET PX
+        else
+            await db.KeyDeleteAsync(key);             // already expired -> no live key
+    }
 
     private string Keyspace()
     {
@@ -130,9 +179,7 @@ internal sealed class RedisRepository<TEntity, TKey> :
     public async Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        var key = $"{Keyspace()}:{model.Id}";
-    var json = JsonConvert.SerializeObject(model);
-        await Db().StringSetAsync(key, json);
+        await WriteWithTtlAsync(Db(), $"{Keyspace()}:{model.Id}", JsonConvert.SerializeObject(model), model);
         return model;
     }
 
@@ -146,9 +193,22 @@ internal sealed class RedisRepository<TEntity, TKey> :
     public async Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-    var arr = models as TEntity[] ?? models.ToArray();
-    var entries = arr.Select(e => new KeyValuePair<RedisKey, RedisValue>($"{Keyspace()}:{e.Id}", Newtonsoft.Json.JsonConvert.SerializeObject(e))).ToArray();
-        await Db().StringSetAsync(entries);
+        var arr = models as TEntity[] ?? models.ToArray();
+        var keyspace = Keyspace();
+        var db = Db();
+        if (TtlProperty is null)
+        {
+            // Fast path for non-TTL types (the common case): one atomic MSET.
+            var entries = arr.Select(e => new KeyValuePair<RedisKey, RedisValue>($"{keyspace}:{e.Id}", JsonConvert.SerializeObject(e))).ToArray();
+            await db.StringSetAsync(entries);
+            return arr.Length;
+        }
+
+        // TTL type: MSET cannot carry per-key TTL, so write each key with an atomic SET PX (DATA-0101).
+        // Return value is "rows upserted" (matches Mongo) — an already-past expiry still counts as upserted,
+        // it is simply expired immediately, exactly as Mongo's expireAfterSeconds=0 expires it shortly after.
+        foreach (var e in arr)
+            await WriteWithTtlAsync(db, $"{keyspace}:{e.Id}", JsonConvert.SerializeObject(e), e);
         return arr.Length;
     }
 
