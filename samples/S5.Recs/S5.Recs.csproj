@@ -8,6 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Observability\Koan.Observability.csproj" />
     <ProjectReference Include="..\..\src\Koan.Core.Adapters\Koan.Core.Adapters.csproj" />
     <ProjectReference Include="..\..\src\Koan.Web.Admin\Koan.Web.Admin.csproj" />
     <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />

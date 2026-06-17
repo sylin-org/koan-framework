@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <KoanPackageKind>Periphery</KoanPackageKind>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Description>OpenTelemetry wiring for Koan (Reference = Intent): referencing this package enables traces + metrics + OTLP export at boot. Health and probe primitives stay in Koan.Core.</Description>
+    <PackageTags>$(CommonPackageTags);observability;opentelemetry;otel;tracing;metrics</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- OTel SDK bumped 1.13 -> 1.15 to clear 4 advisories on the OTLP
+         exporter (CVE-2026-40891, CVE-2026-40182, CVE-2026-42191) and the
+         baggage/B3/Jaeger header parser (CVE-2026-40894). Keep all OTel
+         packages on the matching 1.15.x line to avoid SDK version skew. -->
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.15.3" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.2" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.15.1" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.1" />
+  </ItemGroup>
+</Project>

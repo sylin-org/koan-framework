@@ -8,8 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Configure Koan framework with web API support
 builder.Services.AddKoan();
 
-// Enable observability (telemetry, metrics, logging)
-builder.Services.AddKoanObservability();
+// Telemetry is enabled by referencing Koan.Observability (Reference=Intent, ARCH-0088).
 
 // Swagger/OpenAPI is auto-registered via Koan.Web.Connector.Swagger
 // Canon runtime and Customer pipeline are auto-registered via S8.Canon.Initialization.KoanAutoRegistrar

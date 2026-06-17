@@ -14,6 +14,9 @@
     <ProjectReference Include="..\..\..\Koan.Orchestration.Abstractions\Koan.Orchestration.Abstractions.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <!-- IHttpClientFactory. Previously free-rode on Microsoft.Extensions.Http leaked transitively through
+         Koan.Core's OTel packages; declared explicitly now that OTel moved to Koan.Observability (ARCH-0088). -->
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.8" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
 </Project>

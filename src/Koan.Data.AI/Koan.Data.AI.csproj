@@ -24,4 +24,11 @@
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- HealthChecks (IHealthCheck + services.AddHealthChecks()) for the AI health checks. Previously
+         free-rode on Microsoft.AspNetCore.App leaked transitively through Koan.Core's OTel packages;
+         declared explicitly now that OTel moved to Koan.Observability (ARCH-0088). -->
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="10.0.8" />
+  </ItemGroup>
+
 </Project>

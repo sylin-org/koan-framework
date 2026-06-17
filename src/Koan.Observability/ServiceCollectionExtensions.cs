@@ -1,4 +1,5 @@
 using System.IO;
+using System.Linq;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -12,10 +13,23 @@ namespace Koan.Core.Observability;
 
 public static class ServiceCollectionExtensions
 {
+    /// <summary>
+    /// Wire OpenTelemetry (traces + metrics + OTLP export) from <see cref="ObservabilityOptions"/>
+    /// (config section <c>Koan:Observability</c>). Idempotent: the Reference=Intent auto-registrar and a
+    /// manual call build the pipeline exactly once. Pipeline-affecting settings should be supplied via
+    /// configuration — when the package is referenced, the pipeline is built at boot, so a post-boot
+    /// <paramref name="configure"/> updates the options seen by readers but does not rebuild the
+    /// already-wired pipeline (ARCH-0088).
+    /// </summary>
     public static IServiceCollection AddKoanObservability(this IServiceCollection services, Action<ObservabilityOptions>? configure = null)
     {
         services.AddKoanOptions<ObservabilityOptions>(Infrastructure.Constants.Configuration.Observability.Section);
         if (configure is not null) services.Configure(configure);
+
+        // Build the OTel pipeline exactly once: the auto-registrar (Reference=Intent) and a manual call would
+        // otherwise stack WithTracing/WithMetrics — doubling span emission and OTLP export (ARCH-0088).
+        if (services.Any(d => d.ServiceType == typeof(KoanObservabilityMarker))) return services;
+        services.AddSingleton<KoanObservabilityMarker>();
 
         using var tmp = services.BuildServiceProvider();
         var cfg = tmp.GetService<IConfiguration>();
@@ -93,4 +107,8 @@ public static class ServiceCollectionExtensions
 
         return services;
     }
+
+    // Sentinel marking that the OTel pipeline has been wired, so a second AddKoanObservability call is a
+    // no-op (idempotency — see the method remarks). Never resolved; presence in the collection is the signal.
+    private sealed class KoanObservabilityMarker { }
 }

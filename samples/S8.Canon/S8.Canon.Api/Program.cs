@@ -9,7 +9,7 @@ using Microsoft.Extensions.Hosting;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddKoan();
-builder.Services.AddKoanObservability();
+// Telemetry is enabled by referencing Koan.Observability (Reference=Intent, ARCH-0088).
 
 var app = builder.Build();
 

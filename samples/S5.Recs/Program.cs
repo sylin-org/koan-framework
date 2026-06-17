@@ -15,7 +15,7 @@ builder.Services.AddKoan()
 // Explicitly register parent relationship metadata service
 builder.Services.AddSingleton<Koan.Data.Core.Relationships.IRelationshipMetadata, Koan.Data.Core.Relationships.RelationshipMetadataService>();
 
-builder.Services.AddKoanObservability();
+// Telemetry is enabled by referencing Koan.Observability (Reference=Intent, ARCH-0088).
 // Ensure local data folders exist for offline/bootstrap flows
 Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(builder.Environment.ContentRootPath, S5.Recs.Infrastructure.Constants.Paths.OfflineData))!);
 Directory.CreateDirectory(Path.Combine(builder.Environment.ContentRootPath, S5.Recs.Infrastructure.Constants.Paths.SeedCache));

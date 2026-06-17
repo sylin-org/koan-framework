@@ -20,4 +20,10 @@
     <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.8" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- This project maps real ASP.NET Core endpoints (IEndpointRouteBuilder / Builder/Http/Routing) and
+         HealthChecks. It previously free-rode on Microsoft.AspNetCore.App leaked transitively through
+         Koan.Core's OTel packages; declared explicitly now that OTel moved out (ARCH-0088). -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
 </Project>

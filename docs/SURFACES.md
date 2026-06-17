@@ -32,6 +32,7 @@ guessed "works".
 | Data connectors (10 under Connectors/Data) | AdapterSurface suites | 2026-06-11 | connector suites (local; 39/87 not in sln) | Redis FilterSupport.Full is correct (in-memory-eval adapter, ARCH-0084) — scan-backed cost is documented, not a lie; native key TTL added (DATA-0101; Redis caps+TTL specs 2026-06-17) |
 | Web nucleus (EntityController to hook pipeline) | Web AdapterSurface x8 | 2026-06-11 | Web suites (local) | Load-bearing; MCP executes through it |
 | Cache (L1/L2 + coherence) | Cache CrossEngine oracle + KOAN0001 analyzer | 2026-06-11 | Cache suites + analyzer (local) | Reference pillar (ARCH-0075/0078) |
+| Observability (OTel Reference=Intent) | Koan.Observability.Tests | 2026-06-17 | ObservabilityReferenceIntentSpec (local, mutation-checked) | Extracted from Koan.Core into an opt-in leaf package (ARCH-0088); registrar wires OTel on reference. OTel no longer hard-pulled by any framework package |
 | Jobs (JOBS-0005, 5-tier) | Jobs 5-tier TestKit | 2026-06-13 | Jobs TestKit (local) — incl. claim-scan starvation specs | Freshest, most disciplined pillar; JOBS-0007 head-of-line starvation fixed + guarded (2026-06-13) |
 | Vector and search | VectorAdapterSurface matrix | 2026-06-11 | Vector surface matrix (local) | PGVector does not compile (parked on a branch) |
 | AI core (Contracts to AI to Data.AI + Ollama/LMStudio + AI.Web) | 5 samples + 2 services + tests | 2026-06-11 | AI core tests (local) | Settled, consumed |
