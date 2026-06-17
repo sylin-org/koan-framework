@@ -59,7 +59,7 @@ internal sealed class ProviderRegistry : IProviderRegistry
                 result[id] = user;
                 continue;
             }
-            result[id] = Merge(existing, user);
+            result[id] = ProviderOptions.Merge(existing, user);
         }
 
         // Production gating: if in Production, disable providers that come only from defaults/contributors
@@ -77,72 +77,12 @@ internal sealed class ProviderRegistry : IProviderRegistry
             {
                 if (!explicitIds.Contains(id))
                 {
-                    var p = result[id];
-                    result[id] = new ProviderOptions
-                    {
-                        // copy with Enabled=false
-                        Type = p.Type,
-                        DisplayName = p.DisplayName,
-                        Icon = p.Icon,
-                        Enabled = false,
-                        Priority = p.Priority,
-                        Authority = p.Authority,
-                        ClientId = p.ClientId,
-                        ClientSecret = p.ClientSecret,
-                        SecretRef = p.SecretRef,
-                        Scopes = p.Scopes,
-                        CallbackPath = p.CallbackPath,
-                        AuthorizationEndpoint = p.AuthorizationEndpoint,
-                        TokenEndpoint = p.TokenEndpoint,
-                        UserInfoEndpoint = p.UserInfoEndpoint,
-                        EntityId = p.EntityId,
-                        IdpMetadataUrl = p.IdpMetadataUrl,
-                        IdpMetadataXml = p.IdpMetadataXml,
-                        SigningCertRef = p.SigningCertRef,
-                        DecryptionCertRef = p.DecryptionCertRef,
-                        AllowIdpInitiated = p.AllowIdpInitiated,
-                        ClockSkewSeconds = p.ClockSkewSeconds
-                    };
+                    result[id] = ProviderOptions.WithEnabled(result[id], false);
                 }
             }
         }
 
         return result;
-    }
-
-    private static ProviderOptions Merge(ProviderOptions a, ProviderOptions b)
-    {
-        return new ProviderOptions
-        {
-            // Common
-            Type = b.Type ?? a.Type,
-            DisplayName = b.DisplayName ?? a.DisplayName,
-            Icon = b.Icon ?? a.Icon,
-            Enabled = b.Enabled && a.Enabled,
-            Priority = b.Priority ?? a.Priority,
-
-            // OIDC
-            Authority = b.Authority ?? a.Authority,
-            ClientId = b.ClientId ?? a.ClientId,
-            ClientSecret = b.ClientSecret ?? a.ClientSecret,
-            SecretRef = b.SecretRef ?? a.SecretRef,
-            Scopes = b.Scopes ?? a.Scopes,
-            CallbackPath = b.CallbackPath ?? a.CallbackPath,
-
-            // OAuth2
-            AuthorizationEndpoint = b.AuthorizationEndpoint ?? a.AuthorizationEndpoint,
-            TokenEndpoint = b.TokenEndpoint ?? a.TokenEndpoint,
-            UserInfoEndpoint = b.UserInfoEndpoint ?? a.UserInfoEndpoint,
-
-            // SAML
-            EntityId = b.EntityId ?? a.EntityId,
-            IdpMetadataUrl = b.IdpMetadataUrl ?? a.IdpMetadataUrl,
-            IdpMetadataXml = b.IdpMetadataXml ?? a.IdpMetadataXml,
-            SigningCertRef = b.SigningCertRef ?? a.SigningCertRef,
-            DecryptionCertRef = b.DecryptionCertRef ?? a.DecryptionCertRef,
-            AllowIdpInitiated = b.AllowIdpInitiated || a.AllowIdpInitiated,
-            ClockSkewSeconds = b.ClockSkewSeconds != 120 ? b.ClockSkewSeconds : a.ClockSkewSeconds
-        };
     }
 
     private static string InferTypeFromId(string id) => AuthConstants.Protocols.Oidc; // conservative fallback
@@ -165,12 +105,6 @@ internal sealed class ProviderRegistry : IProviderRegistry
                   && !string.IsNullOrWhiteSpace(cfg.TokenEndpoint)
                   && !string.IsNullOrWhiteSpace(cfg.ClientId)
                   && (!string.IsNullOrWhiteSpace(cfg.ClientSecret) || !string.IsNullOrWhiteSpace(cfg.SecretRef));
-            return ok ? "Healthy" : (cfg.Enabled ? "Unhealthy" : "Unknown");
-        }
-        if (p == AuthConstants.Protocols.Saml)
-        {
-            var ok = !string.IsNullOrWhiteSpace(cfg.EntityId)
-                  && (!string.IsNullOrWhiteSpace(cfg.IdpMetadataUrl) || !string.IsNullOrWhiteSpace(cfg.IdpMetadataXml));
             return ok ? "Healthy" : (cfg.Enabled ? "Unhealthy" : "Unknown");
         }
         return cfg.Enabled ? "Unhealthy" : "Unknown"; // unknown protocol and enabled → suspect

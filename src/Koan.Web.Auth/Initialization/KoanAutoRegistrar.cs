@@ -251,32 +251,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     }
 
     private static Options.ProviderOptions MergeProviders(Options.ProviderOptions baseline, Options.ProviderOptions overlay)
-    {
-        return new Options.ProviderOptions
-        {
-            Type = overlay.Type ?? baseline.Type,
-            DisplayName = overlay.DisplayName ?? baseline.DisplayName,
-            Icon = overlay.Icon ?? baseline.Icon,
-            Enabled = overlay.Enabled && baseline.Enabled,
-            Priority = overlay.Priority ?? baseline.Priority,
-            Authority = overlay.Authority ?? baseline.Authority,
-            ClientId = overlay.ClientId ?? baseline.ClientId,
-            ClientSecret = overlay.ClientSecret ?? baseline.ClientSecret,
-            SecretRef = overlay.SecretRef ?? baseline.SecretRef,
-            Scopes = overlay.Scopes ?? baseline.Scopes,
-            CallbackPath = overlay.CallbackPath ?? baseline.CallbackPath,
-            AuthorizationEndpoint = overlay.AuthorizationEndpoint ?? baseline.AuthorizationEndpoint,
-            TokenEndpoint = overlay.TokenEndpoint ?? baseline.TokenEndpoint,
-            UserInfoEndpoint = overlay.UserInfoEndpoint ?? baseline.UserInfoEndpoint,
-            EntityId = overlay.EntityId ?? baseline.EntityId,
-            IdpMetadataUrl = overlay.IdpMetadataUrl ?? baseline.IdpMetadataUrl,
-            IdpMetadataXml = overlay.IdpMetadataXml ?? baseline.IdpMetadataXml,
-            SigningCertRef = overlay.SigningCertRef ?? baseline.SigningCertRef,
-            DecryptionCertRef = overlay.DecryptionCertRef ?? baseline.DecryptionCertRef,
-            AllowIdpInitiated = overlay.AllowIdpInitiated || baseline.AllowIdpInitiated,
-            ClockSkewSeconds = overlay.ClockSkewSeconds != 120 ? overlay.ClockSkewSeconds : baseline.ClockSkewSeconds
-        };
-    }
+        => Options.ProviderOptions.Merge(baseline, overlay);
 
     private static string FormatProvider(string id, Options.ProviderOptions options)
     {

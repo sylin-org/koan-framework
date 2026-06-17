@@ -9,7 +9,7 @@ internal static class ProviderDescriptorFactory
         string? challenge = protocol is AuthConstants.Protocols.Oidc or AuthConstants.Protocols.OAuth2
             ? $"/auth/{id}/challenge"
             : null;
-        string? metadata = protocol == AuthConstants.Protocols.Saml ? $"/auth/{id}/saml/metadata" : null;
+        string? metadata = null; // SAML excised (E5); MetadataUrl retained on the DTO for wire-compat, always null
         return new ProviderDescriptor
         {
             Id = id,

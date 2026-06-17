@@ -15,8 +15,6 @@ public static class AuthConstants
         public const string Challenge = "/auth/{provider}/challenge";
         public const string Callback = "/auth/{provider}/callback";
         public const string Logout = "/auth/logout";
-        public const string SamlMetadata = "/auth/{provider}/saml/metadata";
-        public const string SamlAcs = "/auth/{provider}/saml/acs";
         public const string Me = "/me";
         public const string Connections = "/me/connections";
         public const string ConnectionsProviders = "/me/connections/providers";
