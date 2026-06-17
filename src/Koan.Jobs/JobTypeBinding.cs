@@ -102,6 +102,17 @@ public sealed class JobTypeBinding
     public IEnumerable<ResolvedActionPolicy> ScheduledActions(JobsOptions o)
         => _actions.Values.Where(a => !string.IsNullOrWhiteSpace(a.Schedule)).Select(a => ResolvePolicy(a.Action, o));
 
+    /// <summary>The distinct lanes this type's work can land in — every declared action, every chain stage, and the
+    /// default single-action lane. Used to enumerate the lane universe for the JOBS-0008 lane-fair claim (lanes derive
+    /// from <c>[JobAction]</c>, so the registry is the authoritative lane set — no discovery scan).</summary>
+    public IEnumerable<string> Lanes(JobsOptions o)
+    {
+        var actions = new HashSet<string>(_actions.Keys, StringComparer.Ordinal);
+        foreach (var stage in Chain) actions.Add(stage);
+        actions.Add("");   // the default single-action lane (action token "")
+        return actions.Select(a => ResolvePolicy(a, o).Lane).Distinct(StringComparer.Ordinal);
+    }
+
     /// <summary>Compute the coalesce/idempotency key for a work-item + action, or null if the type has no <c>[JobIdempotent]</c>.</summary>
     public string? CoalesceKey(object workItem, string action)
     {

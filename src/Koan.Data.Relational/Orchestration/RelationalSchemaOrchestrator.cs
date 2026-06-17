@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
 using Koan.Data.Core;
 using System.Collections.Concurrent;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Reflection;
 using Koan.Data.Core.Optimization;
 
@@ -169,15 +170,32 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
                 {
                     System.Diagnostics.Debug.WriteLine($"[ORCH] Column {col.Name} already exists");
                 }
-                if (col.IsIndexed && features.SupportsIndexesOnComputedColumns)
-                {
-                    var ixName = $"IX_{table}_{col.Name}";
-                    System.Diagnostics.Debug.WriteLine($"[ORCH] Creating index: {ixName} on {col.Name}");
-                    ddl.CreateIndex(schema, table, ixName, new[] { col.Name }, unique: false);
-                }
             }
         }
+
+        // JOBS-0008: create the declared indexes (per-column AND composite [Index] groups) for both freshly-created and
+        // pre-existing tables. Previously per-column indexes were created only when ALTERing an existing table, so a
+        // freshly-created table had NO secondary indexes — every filtered/ordered query full-scanned. This is what made
+        // the per-lane claim seek slow on relational (no composite (Lane,Status,VisibleAt,FirstSubmittedAt) index).
+        // CREATE INDEX IF NOT EXISTS makes it idempotent; each is best-effort so a non-indexable column degrades to a
+        // scan, never a failure.
+        EnsureIndexes(ddl, features, schema, table, entity);
         return Task.CompletedTask;
+    }
+
+    private static void EnsureIndexes(IRelationalDdlExecutor ddl, IRelationalStoreFeatures features, string schema, string table, Type entity)
+    {
+        if (!features.SupportsIndexesOnComputedColumns) return;
+        foreach (var idx in IndexMetadata.GetIndexes(entity))
+        {
+            if (idx.IsPrimaryKey || idx.Ttl || idx.Properties.Count == 0) continue;   // PK is implicit; TTL is Mongo-only
+            var cols = idx.Properties
+                .Select(p => p.GetCustomAttribute<ColumnAttribute>(inherit: true)?.Name ?? p.Name)
+                .ToArray();
+            var name = !string.IsNullOrWhiteSpace(idx.Name) ? idx.Name! : $"IX_{table}_{string.Join("_", cols)}";
+            try { ddl.CreateIndex(schema, table, name, cols, unique: idx.Unique); }
+            catch { /* best-effort: a missing index degrades to a scan, never a failure */ }
+        }
     }
 
     private (string schema, string table) ResolveTable(Type entity)

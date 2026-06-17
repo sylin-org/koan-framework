@@ -229,7 +229,12 @@ internal sealed class MongoRepository<TEntity, TKey> :
     private string BuildIndexKey(string collectionName)
         => $"{BuildServerKey()}|{collectionName}|{typeof(TEntity).FullName}";
 
-    private static IReadOnlyList<CreateIndexModel<TEntity>> BuildIndexModels()
+    // Instance (not static): index key field names must traverse the SAME element-name mapping as filters/sorts
+    // (MapFieldName → camelCase + the _id carve-out). The string overload Ascending(string) takes a LITERAL field
+    // name and does NOT apply the registered CamelCaseElementNameConvention, so building keys from the raw PascalCase
+    // property name produced an index on fields the documents don't have (e.g. "VisibleAt" vs stored "visibleAt"),
+    // leaving every [Index] uncovered → a blocking in-memory sort at scale. Map the name here (JOBS-0008 follow-up).
+    private IReadOnlyList<CreateIndexModel<TEntity>> BuildIndexModels()
     {
         var models = new List<CreateIndexModel<TEntity>>();
 
@@ -246,7 +251,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
             IndexKeysDefinition<TEntity>? keys = null;
             foreach (var property in idx.Properties)
             {
-                var field = keysBuilder.Ascending(property.Name);
+                var field = keysBuilder.Ascending(MapFieldName(property.Name));
                 keys = keys is null ? field : keysBuilder.Combine(keys, field);
             }
 

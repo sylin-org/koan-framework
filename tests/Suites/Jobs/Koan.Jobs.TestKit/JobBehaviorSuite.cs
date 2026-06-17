@@ -1,4 +1,6 @@
 using AwesomeAssertions;
+using Koan.Core;
+using Koan.Core.Observability.Health;
 using Koan.Jobs;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -1044,6 +1046,175 @@ public abstract class JobBehaviorSuite
         claimed.Should().NotBeNull("a saturated lane must not block claims for other lanes");
         claimed!.WorkId.Should().Be("free0");
         claimed.Lane.Should().Be("default");
+    }
+
+    // --- cross-lane fairness (JOBS-0008): a perpetually-fed / older upstream lane must not monopolize the claim budget
+    // and starve a downstream lane. Under the old global (VisibleAt, FirstSubmittedAt) order the oldest-N claims were
+    // ALL the upstream lane's (a downstream chain job is stamped VisibleAt=now on each advance, so it is structurally
+    // newer and never entered the oldest-N window). Weighted fair queuing per lane makes each lane's share guaranteed.
+    // Runs on every tier — in-memory full-scan and durable per-lane indexed seek converge on the same selection.
+
+    [Fact]
+    public async Task fed_lane_does_not_starve_a_backlog_lane()
+    {
+        await using var host = await CreateHostAsync();
+        var now = host.Clock.GetUtcNow();
+        var crawlWt = typeof(CrawlJob).FullName!;
+        var trWt = typeof(TranslationJob).FullName!;
+
+        // upstream "crawl": 10 jobs holding the OLDEST VisibleAt (a continuously-fed head stage is always older).
+        await host.Ledger.AppendMany(
+            Enumerable.Range(0, 10).Select(i => new JobRecord
+            {
+                Id = $"{crawlWt}:crawl{i}", WorkType = crawlWt, WorkId = $"crawl{i}", Action = CrawlJob.Crawl,
+                Status = JobStatus.Queued, Lane = "crawl", Exclusive = true,
+                VisibleAt = now.AddMinutes(-10).AddMilliseconds(i), FirstSubmittedAt = now.AddMinutes(-10).AddMilliseconds(i),
+            }).ToList(), default);
+
+        // downstream "translation": 5 jobs with NEWER VisibleAt (produced later in the pipeline).
+        await host.Ledger.AppendMany(
+            Enumerable.Range(0, 5).Select(i => new JobRecord
+            {
+                Id = $"{trWt}:tr{i}", WorkType = trWt, WorkId = $"tr{i}", Action = TranslationJob.Translate,
+                Status = JobStatus.Queued, Lane = "translation", Exclusive = true,
+                VisibleAt = now.AddMinutes(-1).AddMilliseconds(i), FirstSubmittedAt = now.AddMinutes(-1).AddMilliseconds(i),
+            }).ToList(), default);
+
+        var lanes = new List<string>();
+        for (var i = 0; i < 6; i++)
+        {
+            var claimed = await host.Ledger.ClaimNext("owner", now, now.AddMinutes(1), Array.Empty<string>(), default);
+            if (claimed is null) break;
+            lanes.Add(claimed.Lane);
+        }
+
+        lanes.Count(l => l == "translation").Should().BeGreaterThan(0,
+            "a downstream lane must get a fair share of the claim budget, not be starved by an older upstream lane");
+    }
+
+    [Fact]
+    public async Task lane_weights_give_the_heavier_lane_a_larger_share()
+    {
+        await using var host = await CreateHostAsync(o =>
+        {
+            o.LaneWeights["crawl"] = 3;          // crawl gets ~3x translation's dispatch share
+            o.LaneWeights["translation"] = 1;
+        });
+        var now = host.Clock.GetUtcNow();
+        var crawlWt = typeof(CrawlJob).FullName!;
+        var trWt = typeof(TranslationJob).FullName!;
+
+        await host.Ledger.AppendMany(
+            Enumerable.Range(0, 20).Select(i => new JobRecord
+            {
+                Id = $"{crawlWt}:c{i}", WorkType = crawlWt, WorkId = $"c{i}", Action = CrawlJob.Crawl,
+                Status = JobStatus.Queued, Lane = "crawl", Exclusive = true,
+                VisibleAt = now.AddMinutes(-5).AddMilliseconds(i), FirstSubmittedAt = now.AddMinutes(-5).AddMilliseconds(i),
+            }).ToList(), default);
+        await host.Ledger.AppendMany(
+            Enumerable.Range(0, 20).Select(i => new JobRecord
+            {
+                Id = $"{trWt}:t{i}", WorkType = trWt, WorkId = $"t{i}", Action = TranslationJob.Translate,
+                Status = JobStatus.Queued, Lane = "translation", Exclusive = true,
+                VisibleAt = now.AddMinutes(-5).AddMilliseconds(i), FirstSubmittedAt = now.AddMinutes(-5).AddMilliseconds(i),
+            }).ToList(), default);
+
+        int crawl = 0, tr = 0;
+        for (var i = 0; i < 8; i++)
+        {
+            var claimed = await host.Ledger.ClaimNext("owner", now, now.AddMinutes(1), Array.Empty<string>(), default);
+            if (claimed is null) break;
+            if (claimed.Lane == "crawl") crawl++; else if (claimed.Lane == "translation") tr++;
+        }
+
+        crawl.Should().BeGreaterThan(tr, "the higher-weighted lane gets the larger share (no strict priority — translation still runs)");
+        tr.Should().BeGreaterThan(0, "weighting is proportional, not strict priority — the lighter lane is never starved");
+    }
+
+    // --- self-reporting (JOBS-0008): the Jobs pillar now ships an IHealthContributor so a stalled/starved lane is a
+    // first-class signal (per-lane depth + oldest-queued-age), not an inference hours later. Resolved + Check()ed
+    // directly (the same path StartupProbeService uses) so we assert on HealthReport.State, not the async aggregator.
+
+    private static IHealthContributor JobsHealth(JobsHarness host)
+        => host.Services.GetServices<IHealthContributor>().Single(c => c.Name == "Koan.Jobs");
+
+    [Fact]
+    public async Task jobs_health_reports_queued_and_running_facts()
+    {
+        await using var host = await CreateHostAsync();
+        var now = host.Clock.GetUtcNow();
+        var wt = typeof(CrawlJob).FullName!;
+        await host.Ledger.AppendMany(Enumerable.Range(0, 3).Select(i => new JobRecord
+        {
+            Id = $"{wt}:q{i}", WorkType = wt, WorkId = $"q{i}", Action = CrawlJob.Crawl,
+            Status = JobStatus.Queued, Lane = "crawl", VisibleAt = now.AddMinutes(-1), FirstSubmittedAt = now.AddMinutes(-1),
+        }).ToList(), default);
+        await host.Ledger.AppendMany(Enumerable.Range(0, 2).Select(i => new JobRecord
+        {
+            Id = $"{wt}:r{i}", WorkType = wt, WorkId = $"r{i}", Action = CrawlJob.Crawl,
+            Status = JobStatus.Running, Lane = "crawl", Owner = "n", LeaseUntil = now.AddMinutes(1),
+            VisibleAt = now.AddMinutes(-2), FirstSubmittedAt = now.AddMinutes(-2),
+        }).ToList(), default);
+
+        var r = await JobsHealth(host).Check();
+
+        r.State.Should().Be(HealthState.Healthy);
+        r.Data!["queued"].Should().Be(3L);
+        r.Data!["running"].Should().Be(2L);
+    }
+
+    [Fact]
+    public async Task jobs_health_flips_degraded_when_oldest_queued_age_exceeds_budget()
+    {
+        await using var host = await CreateHostAsync(o => o.QueueAgeWarning = TimeSpan.FromMinutes(5));
+        var now = host.Clock.GetUtcNow();
+        var wt = typeof(CrawlJob).FullName!;
+        await host.Ledger.Append(new JobRecord
+        {
+            Id = $"{wt}:old", WorkType = wt, WorkId = "old", Action = CrawlJob.Crawl,
+            Status = JobStatus.Queued, Lane = "crawl", VisibleAt = now.AddMinutes(-10), FirstSubmittedAt = now.AddMinutes(-10),
+        }, default);
+
+        var r = await JobsHealth(host).Check();
+
+        r.State.Should().Be(HealthState.Degraded, "an oldest queued job past the budget is the starvation tripwire");
+        r.Description.Should().Contain("budget");
+    }
+
+    [Fact]
+    public async Task jobs_health_stays_healthy_when_budget_disabled_even_with_old_queued_work()
+    {
+        await using var host = await CreateHostAsync();   // QueueAgeWarning default = Zero (off)
+        var now = host.Clock.GetUtcNow();
+        var wt = typeof(CrawlJob).FullName!;
+        await host.Ledger.Append(new JobRecord
+        {
+            Id = $"{wt}:old", WorkType = wt, WorkId = "old", Action = CrawlJob.Crawl,
+            Status = JobStatus.Queued, Lane = "crawl", VisibleAt = now.AddMinutes(-30), FirstSubmittedAt = now.AddMinutes(-30),
+        }, default);
+
+        var r = await JobsHealth(host).Check();
+
+        r.State.Should().Be(HealthState.Healthy, "the budget is opt-in — facts are always published, but no Degraded without one");
+        r.Data!["oldestQueuedAgeSeconds"].Should().Be(1800L);
+    }
+
+    [Fact]
+    public async Task jobs_health_counts_lapsed_lease_reclaim_backlog()
+    {
+        await using var host = await CreateHostAsync();
+        var now = host.Clock.GetUtcNow();
+        var wt = typeof(CrawlJob).FullName!;
+        await host.Ledger.Append(new JobRecord
+        {
+            Id = $"{wt}:stuck", WorkType = wt, WorkId = "stuck", Action = CrawlJob.Crawl,
+            Status = JobStatus.Running, Lane = "crawl", Owner = "dead-node", LeaseUntil = now.AddMinutes(-1),
+            VisibleAt = now.AddMinutes(-5), FirstSubmittedAt = now.AddMinutes(-5),
+        }, default);
+
+        var r = await JobsHealth(host).Check();
+
+        r.Data!["reclaimBacklog"].Should().Be(1L);
     }
 
     [Fact]

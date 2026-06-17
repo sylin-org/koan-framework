@@ -66,4 +66,8 @@ public interface IJobLedger
     /// <summary>Count active (non-terminal) rows for a work-type — the cheap pushed probe behind the §19.4
     /// job-per-row guardrail.</summary>
     Task<long> CountActive(string workType, CancellationToken ct);
+
+    /// <summary>A cheap, bounded global health snapshot (JOBS-0008): a few pushed-down COUNTs + one LIMIT-1 oldest-due
+    /// seek — index-served and O(1) in lanes, never a per-lane fan-out. Powers the <c>JobsHealthContributor</c>.</summary>
+    Task<JobsHealthSnapshot> HealthSnapshot(DateTimeOffset now, CancellationToken ct);
 }

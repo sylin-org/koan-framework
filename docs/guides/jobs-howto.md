@@ -200,6 +200,7 @@ public sealed class PresetPackage : Entity<PresetPackage>, IKoanJob<PresetPackag
 - **`MaxAttempts`** — failed runs retry with exponential backoff; once exhausted the job is **Failed**.
 - **`OnFailure`** — `Abort` (default) stops a chain on failure; `Continue` proceeds to the next stage anyway.
 - **`Lane` / `MaxConcurrency`** — a lane is a concurrency pool. By default each action is its own lane, so a slow `Fetch` never starves `Publish`. Set `Lane` to share a pool, `MaxConcurrency` to cap it.
+  - **Cross-lane fairness (JOBS-0008).** The worker multiplexes claims **fairly across all non-empty lanes** (weighted fair queuing): a perpetually-fed or older lane can no longer monopolize dispatch and starve another lane — including a downstream pipeline stage whose jobs are *newer* than a deep upstream backlog. You don't configure anything to get this; equal-share fairness is the default. To bias the split, give a lane a relative weight: `AddKoanJobs(o => o.LaneWeights["translation"] = 3)` gives `translation` ~3× the dispatch share of a weight-1 lane. Weights are *relative*, never strict priority — a low-weight lane is throttled, never starved.
 
 **One entity, one job at a time.** Independently of lanes, Koan serializes jobs by work-item id: two different actions on the *same* entity (say `FetchPreview` and `DriftCheck` on one `Package`) never run concurrently—the entity is processed in order, like a FIFO group keyed by its id. Different entities still run fully in parallel. If a type's actions are genuinely independent and you want them to overlap on one instance, opt out with `[ParallelSafe]` on the class—an assertion that they don't conflict.
 
@@ -433,6 +434,8 @@ builder.Services.AddKoanJobs(o => o.ClaimStrategy = ClaimStrategy.Ticket);
 
 **When to use which.** Single service → defaults. Multiple replicas pulling the same queue → `Ticket`. A torrent of fire-and-forget pings you don't want cluttering the store → `[JobPersistence(InMemory)]`.
 
+**Lane fairness is per node.** Each worker fairly multiplexes the lanes *it* claims (§4), so no lane starves on any node. Lane weights are honored per node too — so across many nodes the global split tracks the weights when feed is balanced across them, and stays approximate (but never starving) under node-asymmetric feed. Exact global weight proportions are deliberately *not* bought with per-claim cross-node coordination; see ADR JOBS-0008.
+
 **Push dispatch (lower latency).** Out of the box a worker wakes the instant *it* submits a job and otherwise polls at `PollInterval`. Reference **`Koan.Jobs.Transport.Messaging`** and a submit on *any* node fans a lightweight "job ready" wake across the bus, so every node claims new work immediately instead of waiting out its poll interval. It's purely a latency upgrade—the ledger is still the truth, so a dropped signal costs at most one poll interval and never correctness.
 
 **Transactional submit (outbox).** On the durable tier, a `Submit` inside an ambient transaction is part of that transaction—the job is enqueued **on commit** and **discarded on rollback**. So a job submitted as a side effect of saving an entity can never be "saved but never enqueued," and a rolled-back save never leaves a stray job:
@@ -472,6 +475,8 @@ IReadOnlyDictionary<string, long> byOutcome =
 ```
 
 Off by default (the zero-config path stays write-free); the flush cadence is `MetricsFlushInterval` and the rollup itself is trimmed by `MetricsRetention`.
+
+**Health signal (always on).** The Jobs pillar publishes an `IHealthContributor` (`Koan.Jobs`) to the standard `/health` surface: queued/running depth, reclaim backlog, and the **oldest-queued-age** — the cheap global signal that makes a stalled or starved queue self-evident instead of something you infer hours later. Set `o.QueueAgeWarning = TimeSpan.FromMinutes(5)` to flip the contributor to **Degraded** when the oldest job has waited past the budget (off by default — the facts are always published for scraping, the Degraded *signal* is opt-in).
 
 ---
 
@@ -618,7 +623,9 @@ ctx.Reschedule(5.Minutes());  ctx.Backoff(retryAfter);  // (TimeSpan helpers are
 
 // Tune — AddKoanJobs(o => …)
 o.ArchiveAfter;  o.FailedAfter;  o.RetainPerWorkType;   // retention: completed/failed windows + per-type cap (§10)
-o.ClaimStrategy;  o.ClaimScanBatch;                     // claim: contention strategy + bounded scan window (§10)
+o.ClaimStrategy;  o.ClaimScanBatch;                     // claim: contention strategy + bounded per-lane seek window (§10)
+o.LaneWeights["translation"] = 3;                       // lane-fair dispatch: relative per-lane weight (default 1 = equal share, §4)
+o.QueueAgeWarning = TimeSpan.FromMinutes(5);            // health: oldest-queued-age tripwire → /health Degraded (default off, §10)
 o.JobPerRowWarnThreshold;                               // warn when a work-type looks like job-per-row (§8.1)
 ```
 

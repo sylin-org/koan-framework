@@ -1,3 +1,4 @@
+using Koan.Core;
 using Koan.Data.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -20,10 +21,10 @@ public static class JobsServiceCollectionExtensions
         // RoutingJobLedger so [JobPersistence(InMemory)] types stay volatile while Auto/DataStore types persist.
         services.TryAddSingleton<IJobLedger>(sp => HasDurableDataAdapter(sp)
             ? new RoutingJobLedger(
-                new InMemoryJobLedger(),
-                new DataJobLedger(sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<IOptions<JobsOptions>>()),
+                new InMemoryJobLedger(sp.GetRequiredService<IOptions<JobsOptions>>()),
+                new DataJobLedger(sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<IOptions<JobsOptions>>(), sp.GetRequiredService<JobTypeRegistry>()),
                 sp.GetRequiredService<JobTypeRegistry>())
-            : new InMemoryJobLedger());
+            : new InMemoryJobLedger(sp.GetRequiredService<IOptions<JobsOptions>>()));
         services.TryAddSingleton(_ => JobTypeRegistry.FromDiscovery());
         // Push-dispatch seam: in-process by default; Koan.Jobs.Transport.Messaging preempts it for cross-node wake.
         services.TryAddSingleton<IJobTransport, InProcessJobTransport>();
@@ -31,6 +32,9 @@ public static class JobsServiceCollectionExtensions
         services.TryAddSingleton<JobScheduler>();
         services.TryAddSingleton<IJobCoordinator, JobCoordinator>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, JobWorkerService>());
+        // Self-reporting (JOBS-0008): per-lane queue depth / oldest-queued-age / reclaim backlog → /health, so a stalled
+        // or starved lane is a first-class signal instead of an inference. Mirrors how the data connectors register theirs.
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, JobsHealthContributor>());
         return services;
     }
 

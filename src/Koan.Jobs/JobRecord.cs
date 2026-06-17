@@ -25,8 +25,10 @@ public sealed class JobRecord : Entity<JobRecord>
     public string Action { get; set; } = "";
 
     // JOBS-0005 §19.3: the claim loop's full sort key — Status prefix, then the (VisibleAt, FirstSubmittedAt) order.
+    // JOBS-0008: also the (Lane, Status, VisibleAt, FirstSubmittedAt) index serving the per-lane head seek.
     [Index(Group = "ix_jobs_claim", Order = 0)]
     [Index(Group = "ix_jobs_wt_status", Order = 1)]
+    [Index(Group = "ix_jobs_lane_claim", Order = 1)]
     public JobStatus Status { get; set; } = JobStatus.Created;
 
     /// <summary>Failure-and-retry count (distinct from <see cref="Reschedules"/>).</summary>
@@ -37,9 +39,11 @@ public sealed class JobRecord : Entity<JobRecord>
 
     /// <summary>Ready to claim when <c>VisibleAt &lt;= now</c> (future for delayed/deferred jobs).</summary>
     [Index(Group = "ix_jobs_claim", Order = 1)]
+    [Index(Group = "ix_jobs_lane_claim", Order = 2)]
     public DateTimeOffset VisibleAt { get; set; }
 
     [Index(Group = "ix_jobs_claim", Order = 2)]
+    [Index(Group = "ix_jobs_lane_claim", Order = 3)]
     public DateTimeOffset FirstSubmittedAt { get; set; }
     public DateTimeOffset? LastSettledAt { get; set; }
 
@@ -50,7 +54,8 @@ public sealed class JobRecord : Entity<JobRecord>
     [Index(Group = "ix_jobs_ttl", Ttl = true)]
     public DateTimeOffset? ExpireAt { get; set; }
 
-    /// <summary>Concurrency lane (defaults to the action name).</summary>
+    /// <summary>Concurrency lane (defaults to the action name). The leading key of the JOBS-0008 per-lane head index.</summary>
+    [Index(Group = "ix_jobs_lane_claim", Order = 0)]
     public string Lane { get; set; } = "";
 
     // --- lease (claim ownership) ---

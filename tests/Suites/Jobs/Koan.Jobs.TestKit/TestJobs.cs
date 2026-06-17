@@ -322,6 +322,28 @@ public sealed class NightlyJob : Entity<NightlyJob>, IKoanJob<NightlyJob>
     public static void Reset() => Executions = 0;
 }
 
+/// <summary>Upstream pipeline lane (JOBS-0008 fairness specs): declares Lane="crawl" so the durable tier enumerates it.</summary>
+[JobAction(Crawl, Lane = "crawl")]
+public sealed class CrawlJob : Entity<CrawlJob>, IKoanJob<CrawlJob>
+{
+    public const string Crawl = nameof(Crawl);
+    public static int Executions;
+    public static Task Execute(CrawlJob job, JobContext ctx, CancellationToken ct)
+    { Interlocked.Increment(ref Executions); return Task.CompletedTask; }
+    public static void Reset() => Executions = 0;
+}
+
+/// <summary>Downstream pipeline lane (JOBS-0008 fairness specs): declares Lane="translation".</summary>
+[JobAction(Translate, Lane = "translation")]
+public sealed class TranslationJob : Entity<TranslationJob>, IKoanJob<TranslationJob>
+{
+    public const string Translate = nameof(Translate);
+    public static int Executions;
+    public static Task Execute(TranslationJob job, JobContext ctx, CancellationToken ct)
+    { Interlocked.Increment(ref Executions); return Task.CompletedTask; }
+    public static void Reset() => Executions = 0;
+}
+
 internal static class Probe
 {
     public static void Max(ref int target, int value)

@@ -99,6 +99,18 @@ public sealed class RoutingJobLedger : IJobLedger
     public Task<long> CountActive(string workType, CancellationToken ct)
         => For(workType).CountActive(workType, ct);
 
+    // Merge the two tiers' snapshots: sum the counts, take the max oldest-age.
+    public async Task<JobsHealthSnapshot> HealthSnapshot(DateTimeOffset now, CancellationToken ct)
+    {
+        var d = await _durable.HealthSnapshot(now, ct);
+        var m = await _inMemory.HealthSnapshot(now, ct);
+        return new JobsHealthSnapshot(
+            d.Queued + m.Queued,
+            d.Running + m.Running,
+            d.ReclaimBacklog + m.ReclaimBacklog,
+            d.OldestQueuedAge >= m.OldestQueuedAge ? d.OldestQueuedAge : m.OldestQueuedAge);
+    }
+
     private static IReadOnlyList<JobRecord> Concat(IReadOnlyList<JobRecord> a, IReadOnlyList<JobRecord> b)
     {
         if (a.Count == 0) return b;

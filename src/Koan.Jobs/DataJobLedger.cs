@@ -17,11 +17,22 @@ public sealed class DataJobLedger : IJobLedger
 {
     private readonly TimeProvider _clock;
     private readonly JobsOptions _options;
+    private readonly JobTypeRegistry _registry;
+    // JOBS-0008: per-node WFQ virtual time held in-process (contention-free). Deliberately NOT a durable shared row:
+    // a per-claim CAS on a shared per-lane cursor is a write-contention hotspot on the dispatch hot path (SQLite
+    // surfaces it as 'database is locked'; every store pays it as serialization). Per-node WFQ is starvation-free
+    // GLOBALLY — every node fairly multiplexes the lanes it claims — which is the requirement. Exact global weight
+    // proportions under skewed multi-node feed are out of scope here; if ever needed, use node-sharded batched state
+    // (the JobMetric pattern), never a per-claim shared write.
+    private readonly Dictionary<string, double> _virtual = new(StringComparer.Ordinal);
+    private readonly Func<string, double> _weight;
 
-    public DataJobLedger(TimeProvider clock, IOptions<JobsOptions> options)
+    public DataJobLedger(TimeProvider clock, IOptions<JobsOptions> options, JobTypeRegistry registry)
     {
         _clock = clock;
         _options = options.Value;
+        _registry = registry;
+        _weight = lane => _options.LaneWeights.GetValueOrDefault(lane, 1.0);
     }
 
     public Task Append(JobRecord record, CancellationToken ct) => JobRecord.Upsert(record, ct);
@@ -43,49 +54,78 @@ public sealed class DataJobLedger : IJobLedger
         IReadOnlyCollection<string> saturatedLanes, CancellationToken ct,
         IReadOnlyDictionary<string, PoolDispatchContext>? pools = null)
     {
-        // One Running snapshot serves both the §17.2 exclusivity probe and the pool member-slot tally (JOBS-0007),
-        // and it is taken BEFORE candidate selection: knowing which pools currently have an open member lets the scan
-        // exclude an exhausted pool's queued jobs at selection time. Otherwise a backlog of unclaimable pool jobs at
-        // the FIFO head consumes the whole scan window and starves runnable work behind it (the head-of-line bug).
+        // One Running snapshot serves both the §17.2 exclusivity probe and the pool member-slot tally (JOBS-0007).
         var running = await JobRecord.Query(r => r.Status == JobStatus.Running, ct);
         var busy = running.Select(r => (r.WorkType, r.WorkId)).ToHashSet();
-
-        // Member slot counts (when pool jobs are in play) + the set of pools that currently have an open member.
         var memberSlots = pools is { Count: > 0 } ? BuildMemberSlots(pools, running) : null;
         var claimablePools = memberSlots is null ? null : ClaimablePools(pools!, memberSlots);
+        var gatedKeys = (await ActiveGates(now, ct)).Select(g => g.GateKey).ToHashSet(StringComparer.Ordinal);
 
-        var candidates = await SelectCandidates(now, saturatedLanes, claimablePools, busy, ct);
-        if (candidates.Count == 0) return null;
+        // JOBS-0008 lane-fair claim: hydrate each (non-saturated) lane's oldest claimable head — an O(batch) indexed
+        // seek per lane (ix_jobs_lane_claim) — then claim in fairness order (weighted fair queuing over per-lane
+        // virtual time). The lane universe is the declared lanes (lanes derive from [JobAction]). This replaces the
+        // global (VisibleAt, FirstSubmittedAt) scan that let an older / perpetually-fed lane monopolize dispatch, and
+        // subsumes the JOBS-0007 forward-paging head-of-line fix: an unclaimable head is paged past WITHIN its own
+        // lane's seek, so it can never strand another lane's runnable work.
+        // One ordered window read seeds the near-head lanes' heads directly (no per-lane probe) and reveals the lanes
+        // present near the head. Lanes whose work is buried beyond the window (a downstream lane behind a deep upstream
+        // backlog) come from the declared lane set; each is gated by a cheap Lane-index existence check so an empty lane
+        // costs one indexed probe — never an ordered scan over the backlog.
+        var batchSize = Math.Max(1, _options.ClaimScanBatch);
+        var sort = SortBuilder<JobRecord>.Build(s => s.OrderBy(r => r.VisibleAt).ThenBy(r => r.FirstSubmittedAt));
+        var window = await JobRecord.Query(
+            r => r.Status == JobStatus.Queued && r.VisibleAt <= now && r.CancelRequestedAt == null,
+            QueryDefinition.All.WithSort(sort).WithPagination(1, batchSize), ct);
 
-        // Ticket strategy runs its own leaderless election; claim the FIFO head through it.
-        if (_options.ClaimStrategy == ClaimStrategy.Ticket)
+        var heads = new Dictionary<string, JobRecord>(StringComparer.Ordinal);
+        var windowLanes = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var r in window)
         {
-            var (ticketTarget, ticketMember) = ElectTarget(candidates, pools, memberSlots);
-            if (ticketTarget is null) return null;
-            return await ClaimViaTicket(ticketTarget, owner, now, leaseUntil, ticketMember, ct);
+            windowLanes.Add(r.Lane);
+            if (saturatedLanes.Contains(r.Lane) || heads.ContainsKey(r.Lane)) continue;
+            if (IsClaimable(r, saturatedLanes, claimablePools, gatedKeys, busy)) heads[r.Lane] = r;
         }
 
-        // §20.3 capability-graded claim. On a store with atomic conditional replace, mark Running via a compare-and-set
-        // (apply IFF still Queued && unowned) — contention-free and single-execution: concurrent claimers can't both win,
-        // and a CAS-loss just falls through to the next runnable candidate. Adapters without the capability fall back to
-        // the last-write-wins optimistic mark (idempotency remains the backstop there).
+        // (a) Window lanes whose window rows were all unclaimable (gated/pool/busy): probe deeper. Bounded by the few
+        //     lanes actually present in the window.
+        foreach (var lane in windowLanes)
+        {
+            if (heads.ContainsKey(lane) || saturatedLanes.Contains(lane)) continue;
+            var head = await HydrateLaneHead(lane, now, saturatedLanes, claimablePools, gatedKeys, busy, ct);
+            if (head is not null) heads[lane] = head;
+        }
+
+        // (b) Buried declared lanes (absent from the window — a downstream lane behind a deep upstream backlog): probe
+        //     ONLY when a single guard confirms queued work exists outside the window's lanes. A deep single-lane
+        //     backlog short-circuits here to ZERO per-lane probes, so the claim stays O(window) instead of O(declared
+        //     lanes); when buried work does exist the per-lane seek (index-served on Mongo / a relational composite
+        //     index) finds it. JOBS-0008.
+        var buried = _registry.All.SelectMany(b => b.Lanes(_options))
+            .Where(l => !windowLanes.Contains(l) && !saturatedLanes.Contains(l))
+            .Distinct(StringComparer.Ordinal).ToList();
+        if (buried.Count > 0 && await BuriedWorkExists(windowLanes, now, ct))
+            foreach (var lane in buried)
+            {
+                if (heads.ContainsKey(lane)) continue;
+                var head = await HydrateLaneHead(lane, now, saturatedLanes, claimablePools, gatedKeys, busy, ct);
+                if (head is not null) heads[lane] = head;
+            }
+
+        if (heads.Count == 0) return null;
+
+        // §20.3 capability-graded claim, tried in lane-fair order (WFQ over the per-node virtual time): a CAS-loss on
+        // the fairest lane's head falls through to the next-fairest lane rather than wasting the poll.
         var cas = Data<JobRecord, string>.Capabilities.Has(DataCaps.Write.ConditionalReplace)
             ? Data<JobRecord, string>.As<IConditionalWriteRepository<JobRecord, string>>()
             : null;
-        if (cas is null)
+        foreach (var lane in LaneFairSelector.Order(heads.Keys, _virtual))
         {
-            var (optTarget, optMember) = ElectTarget(candidates, pools, memberSlots);
-            if (optTarget is null) return null;
-            if (optMember is not null) optTarget.GateKey = optMember;
-            return await ClaimOptimistic(optTarget, owner, now, leaseUntil, ct);
-        }
+            var candidate = heads[lane];
 
-        foreach (var candidate in candidates)
-        {
+            // Pool job: elect a free member and stamp it; skip the lane if none is free (the snapshot may be stale).
             string? elected = null;
             if (candidate.PoolKey is not null)
             {
-                // Pool job: elect a free member; skip if none available or resolver is absent.
                 if (pools is null || !pools.TryGetValue(candidate.PoolKey, out var ctx)) continue;
                 foreach (var member in ctx.Members)
                     if (memberSlots!.GetValueOrDefault(member) < ctx.CapacityPerMember) { elected = member; break; }
@@ -93,14 +133,27 @@ public sealed class DataJobLedger : IJobLedger
                 candidate.GateKey = elected;
             }
 
-            Mark(candidate, owner, now, leaseUntil);
-            if (await cas.ConditionalReplaceAsync(candidate, r => r.Status == JobStatus.Queued && r.Owner == null, ct))
-                return candidate;
+            JobRecord? claimed;
+            if (_options.ClaimStrategy == ClaimStrategy.Ticket)
+            {
+                claimed = await ClaimViaTicket(candidate, owner, now, leaseUntil, elected, ct);
+            }
+            else if (cas is null)
+            {
+                claimed = await ClaimOptimistic(candidate, owner, now, leaseUntil, ct);   // GateKey already stamped above
+            }
+            else
+            {
+                Mark(candidate, owner, now, leaseUntil);
+                claimed = await cas.ConditionalReplaceAsync(candidate, r => r.Status == JobStatus.Queued && r.Owner == null, ct)
+                    ? candidate : null;
+            }
 
-            // CAS loss on a pool job means our slot-count snapshot is stale; bail so the next drain iteration
-            // re-elects with fresh counts rather than racing on stale data.
+            if (claimed is not null) { _virtual[lane] = LaneFairSelector.Charged(_virtual.GetValueOrDefault(lane), _weight(lane)); return claimed; }
+
+            // CAS / ticket loss on a pool job means our slot snapshot is stale — bail so the next drain iteration
+            // re-elects with fresh counts; a non-pool loss just falls through to the next-fairest lane.
             if (elected is not null) return null;
-            // Non-pool CAS loss: another worker claimed this row; fall through to the next runnable candidate.
         }
         return null;
     }
@@ -198,28 +251,29 @@ public sealed class DataJobLedger : IJobLedger
             JobLedgerPredicates.ActiveOf(workType),
             QueryDefinition.All.WithPagination(1, 1), ct)).TotalCount;
 
-    // --- claim internals ---
-
-    private static (JobRecord? target, string? electedMember) ElectTarget(
-        IReadOnlyList<JobRecord> candidates,
-        IReadOnlyDictionary<string, PoolDispatchContext>? pools,
-        Dictionary<string, int>? memberSlots)
+    public async Task<JobsHealthSnapshot> HealthSnapshot(DateTimeOffset now, CancellationToken ct)
     {
-        foreach (var c in candidates)
+        // Cheap + index-served: pushed COUNTs over the single-column Status index + one LIMIT-1 ordered oldest-due seek.
+        // No per-lane fan-out — a health probe must not become a scan-storm over the backlog it is meant to observe.
+        var queued = (await JobRecord.QueryWithCount(r => r.Status == JobStatus.Queued, QueryDefinition.All.WithPagination(1, 1), ct)).TotalCount;
+        var running = (await JobRecord.QueryWithCount(r => r.Status == JobStatus.Running, QueryDefinition.All.WithPagination(1, 1), ct)).TotalCount;
+        var reclaim = (await JobRecord.QueryWithCount(
+            r => r.Status == JobStatus.Running && r.LeaseUntil != null && r.LeaseUntil < now,
+            QueryDefinition.All.WithPagination(1, 1), ct)).TotalCount;
+
+        var age = TimeSpan.Zero;
+        if (queued > 0)
         {
-            if (c.PoolKey is not null)
-            {
-                if (pools is null || !pools.TryGetValue(c.PoolKey, out var ctx)) continue;
-                string? free = null;
-                foreach (var m in ctx.Members)
-                    if (memberSlots!.GetValueOrDefault(m) < ctx.CapacityPerMember) { free = m; break; }
-                if (free is null) continue;
-                return (c, free);
-            }
-            return (c, null);
+            var oldestSort = SortBuilder<JobRecord>.Build(s => s.OrderBy(r => r.VisibleAt).ThenBy(r => r.FirstSubmittedAt));
+            var head = await JobRecord.Query(
+                r => r.Status == JobStatus.Queued && r.VisibleAt <= now,
+                QueryDefinition.All.WithSort(oldestSort).WithPagination(1, 1), ct);
+            if (head.Count > 0) { var d = now - head[0].VisibleAt; if (d > TimeSpan.Zero) age = d; }
         }
-        return (null, null);
+        return new JobsHealthSnapshot(queued, running, reclaim, age);
     }
+
+    // --- claim internals ---
 
     private static Dictionary<string, int> BuildMemberSlots(
         IReadOnlyDictionary<string, PoolDispatchContext> pools, IReadOnlyList<JobRecord> running)
@@ -247,44 +301,35 @@ public sealed class DataJobLedger : IJobLedger
         return claimable;
     }
 
-    private async Task<IReadOnlyList<JobRecord>> SelectCandidates(
-        DateTimeOffset now, IReadOnlyCollection<string> saturatedLanes,
-        HashSet<string>? claimablePools, HashSet<(string WorkType, string WorkId)> busy, CancellationToken ct)
-    {
-        var gatedKeys = (await ActiveGates(now, ct)).Select(g => g.GateKey).ToHashSet(StringComparer.Ordinal);
+    /// <summary>One bounded guard (JOBS-0008): does any claimable queued row exist in a lane NOT already covered by the
+    /// window read? If not, there are no buried lanes to probe and the per-lane fan-out is skipped entirely (the deep
+    /// single-lane backlog case). One LIMIT-1 read, not one-per-declared-lane.</summary>
+    private static async Task<bool> BuriedWorkExists(HashSet<string> windowLanes, DateTimeOffset now, CancellationToken ct)
+        => (await JobRecord.Query(
+            r => r.Status == JobStatus.Queued && r.VisibleAt <= now && r.CancelRequestedAt == null && !windowLanes.Contains(r.Lane),
+            QueryDefinition.All.WithPagination(1, 1), ct)).Count > 0;
 
-        // The claim's heavy read (§19.3): the predicate + (VisibleAt, FirstSubmittedAt) order + LIMIT are pushed to the
-        // store (ix_jobs_claim) — O(batch), not O(backlog). The lane/pool/gate/exclusive filter then runs over the
-        // ordered window, returning runnable candidates in FIFO order; the claim tries them in turn (a CAS-loss on the
-        // head falls through to the next), so a contended head doesn't waste the whole poll.
-        //
-        // The scan PAGES FORWARD past a fully-unclaimable window. A window's worth of unclaimable rows at the FIFO head
-        // — an exhausted pool's backlog, a saturated lane, gated keys, or a busy exclusive work-item — must not consume
-        // the scan and strand runnable work queued behind it; before this it stalled the whole pipeline indefinitely
-        // with a healthy worker and no errors (JOBS-0007 head-of-line bug). We advance the page until a full batch of
-        // claimable candidates is gathered OR the store returns a short page (end of the ready set), converging with the
-        // in-memory ledger's full ordered scan. Each page stays O(batch) and index-served; deep paging only happens
-        // while a large backlog is genuinely unclaimable, the same condition the §19.4 active-row guardrail surfaces.
+    /// <summary>The per-lane head seek (ix_jobs_lane_claim): the oldest claimable Queued+due row in <paramref name="lane"/>.
+    /// Pages forward past this lane's own unclaimable head (gated / pool-exhausted / busy-exclusive) to its oldest
+    /// claimable row — O(batch) and index-served, never O(backlog). Returns null when the lane has no claimable work.</summary>
+    private async Task<JobRecord?> HydrateLaneHead(
+        string lane, DateTimeOffset now, IReadOnlyCollection<string> saturatedLanes,
+        HashSet<string>? claimablePools, HashSet<string> gatedKeys,
+        HashSet<(string WorkType, string WorkId)> busy, CancellationToken ct)
+    {
         var batchSize = Math.Max(1, _options.ClaimScanBatch);
         var sort = SortBuilder<JobRecord>.Build(s => s.OrderBy(r => r.VisibleAt).ThenBy(r => r.FirstSubmittedAt));
-        var candidates = new List<JobRecord>(batchSize);
         for (var page = 1; ; page++)
         {
             var scan = QueryDefinition.All.WithSort(sort).WithPagination(page, batchSize);
             var window = await JobRecord.Query(
-                r => r.Status == JobStatus.Queued && r.VisibleAt <= now && r.CancelRequestedAt == null, scan, ct);
-            if (window.Count == 0) break;
-
+                r => r.Status == JobStatus.Queued && r.Lane == lane && r.VisibleAt <= now && r.CancelRequestedAt == null,
+                scan, ct);
+            if (window.Count == 0) return null;
             foreach (var r in window)
-            {
-                if (!IsClaimable(r, saturatedLanes, claimablePools, gatedKeys, busy)) continue;
-                candidates.Add(r);
-                if (candidates.Count >= batchSize) return candidates;
-            }
-
-            if (window.Count < batchSize) break;   // short page → the ready set is exhausted
+                if (IsClaimable(r, saturatedLanes, claimablePools, gatedKeys, busy)) return r;
+            if (window.Count < batchSize) return null;   // short page → this lane's ready set is exhausted
         }
-        return candidates;
     }
 
     /// <summary>A queued row is claimable now iff its lane isn't saturated, it isn't an exclusive job whose work-item is
