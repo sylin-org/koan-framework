@@ -60,10 +60,10 @@ Every skill conforms — exemplars: **koan-caching**, **koan-jobs**.
 
 | Skill | Status | When to use |
 |-------|--------|-------------|
-| **koan-data-modeling** | ⟳ (absorbs relationships) | Aggregates, lifecycle (`Events`), value objects, `[Parent]`/`Relatives()` |
-| **koan-multi-provider** | ⟳ | Provider transparency, capability detection (`CapabilitySet`/`DataCaps`), context routing |
-| **koan-performance** | ⟳ | Streaming, pagination (`QueryDefinition`), count strategies, bulk operations |
-| **koan-relationships** | ⟳ (retiring → data-modeling) | Entity navigation, batch loading |
+| **koan-data-modeling** | ✅ (absorbed relationships) | Aggregates, lifecycle (`Events`), value objects, `[Parent]`/`Relatives()` |
+| **koan-multi-provider** | ✅ | Provider transparency, capability detection (`CapabilitySet`/`DataCaps`), context routing |
+| **koan-performance** | ✅ | Streaming, pagination (`QueryDefinition`), count strategies, bulk operations |
+| **koan-relationships** | ⟳ (retiring → data-modeling; dir removed in Phase 6) | Entity navigation, batch loading |
 
 ### New pillars (card-first; planned under H10)
 

@@ -1,282 +1,126 @@
 ---
 name: koan-multi-provider
-description: Provider transparency, capability detection, context routing (partition/source/adapter)
+description: Provider transparency, capability detection (CapabilitySet / DataCaps), context routing — partition, source, adapter (DATA-0077)
+pillar: data
+card: docs/reference/cards/data.md
+status: current
+last_validated: 2026-06-18
 ---
 
 # Koan Multi-Provider Transparency
 
-## Core Principle
+## Trigger this skill when you see
 
-**Same entity code works across SQL, NoSQL, Vector, JSON stores.** Koan Framework provides complete provider transparency with automatic capability detection and graceful fallbacks.
+- The same `Entity<T>` code targeting more than one store (SQL / document / JSON / vector)
+- `EntityContext.Partition(...)` / `.Source(...)` / `.Adapter(...)`, or `[DataAdapter("...")]`
+- `Data<T, K>.Capabilities`, `CapabilitySet.Has(...)`, `DataCaps.Query.Linq` / `DataCaps.Write.FastRemove`
+- `Todo.SupportsFastRemove` / `RemoveAll(RemoveStrategy.Fast)`
+- A vector entity with `[Embedding]` routed to Weaviate / Qdrant / Milvus
+- "provider transparency", "capability detection", "multi-tenant partition", "read replica", "switch databases"
 
-## Revolutionary Approach
+## Core principle
 
-Write code once, run on any data provider:
-- **PostgreSQL** - Relational with JSON support
-- **MongoDB** - Document database
-- **SQLite** - Embedded relational
-- **Redis** - Key-value cache
-- **JSON** - File-based development
-- **Weaviate/Milvus** - Vector databases
-- **InMemory** - Testing
+**Write entity code once; the provider is a deployment detail.** The adapter is chosen by package reference + config (Reference = Intent), and the [ARCH-0084](../../../docs/decisions/ARCH-0084-unified-capability-model.md) capability model decides *per call* whether a query is pushed down or evaluated in-memory — no adapter carries fallback logic. Routing is **ambient and scoped** via `EntityContext`; `Source` and `Adapter` are **mutually exclusive** ([DATA-0077](../../../docs/decisions/DATA-0077-entity-context-source-adapter-partition-routing.md)) — passing both is a hard `InvalidOperationException`, not a silent override.
 
-No code changes needed to switch providers. Just change configuration.
-
-## Provider Capability Detection
-
+<!-- validate -->
 ```csharp
-// Check what current provider supports
-var capabilities = Data<Todo, string>.QueryCaps;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using Koan.Core.Capabilities;
+using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Capabilities;
+using Koan.Data.AI.Attributes;
+using Koan.Data.Core;
+using Koan.Data.Core.Model;
 
-if (capabilities.Capabilities.HasFlag(QueryCapabilities.LinqQueries))
+public sealed class Todo : Entity<Todo>
 {
-    // Provider supports server-side LINQ (Postgres, Mongo, SQL Server)
-    var filtered = await Todo.Query(t => t.Priority > 3 && !t.Completed);
-}
-else
-{
-    // Provider requires client-side filtering (JSON, InMemory)
-    var all = await Todo.All();
-    var filtered = all.Where(t => t.Priority > 3 && !t.Completed).ToList();
-}
-
-// Check fast removal support
-if (Todo.SupportsFastRemove)
-{
-    // Provider supports TRUNCATE/DROP (Postgres, SQL Server, Mongo)
-    await Todo.RemoveAll(RemoveStrategy.Fast);
-}
-```
-
-## Context Routing
-
-### Partition (Logical Suffix)
-
-Partitions provide logical data isolation within same provider:
-
-```csharp
-// Default partition
-var todo = new Todo { Title = "Active task" };
-await todo.Save(); // Stored as Todo
-
-// Archive partition
-using (EntityContext.Partition("archive"))
-{
-    var archived = new Todo { Title = "Archived task" };
-    await archived.Save(); // Stored as Todo#archive
+    public string Title { get; set; } = "";
+    public bool Done { get; set; }
 }
 
-// Tenant isolation
-using (EntityContext.Partition($"tenant-{tenantId}"))
+[DataAdapter("weaviate")]                                  // pin one entity to a provider
+[Embedding(Template = "{Title}")]                          // class-level; routed to the vector store
+public sealed class Memo : Entity<Memo>
 {
-    var tenantTodos = await Todo.All(); // Only this tenant's data
-}
-```
-
-**Use Cases:**
-- Multi-tenant isolation
-- Archival storage
-- Test data separation
-- Environment segmentation
-
-### Source (Named Configuration)
-
-Sources route to different provider configurations:
-
-```csharp
-// appsettings.json
-{
-  "Koan": {
-    "Data": {
-      "Sources": {
-        "Default": {
-          "Adapter": "postgres",
-          "ConnectionString": "Host=localhost;Database=main"
-        },
-        "Analytics": {
-          "Adapter": "postgres",
-          "ConnectionString": "Host=readonly-replica;Database=analytics"
-        },
-        "Cache": {
-          "Adapter": "redis",
-          "ConnectionString": "localhost:6379"
-        }
-      }
-    }
-  }
+    public string Title { get; set; } = "";
 }
 
-// Route to analytics read-replica
-using (EntityContext.Source("analytics"))
+public sealed class TodoService
 {
-    var stats = await Todo.Count; // Reads from replica
-}
-
-// Route to cache
-using (EntityContext.Source("cache"))
-{
-    var frequent = await FrequentQuery.Get(id); // From Redis
-}
-```
-
-**Use Cases:**
-- Read replicas
-- Analytics databases
-- Cache layers
-- Regional data centers
-
-### Adapter (Explicit Provider Override)
-
-Adapters explicitly select provider regardless of configuration:
-
-```csharp
-// Force MongoDB
-using (EntityContext.Adapter("mongodb"))
-{
-    var todos = await Todo.All(); // Always uses MongoDB
-}
-
-// Force JSON for testing
-using (EntityContext.Adapter("json"))
-{
-    await todo.Save(); // Writes to JSON file
-}
-```
-
-**Use Cases:**
-- Provider-specific features
-- Migration testing
-- Development overrides
-- Provider comparison
-
-### CRITICAL RULE: Source XOR Adapter
-
-**NEVER combine Source and Adapter** (ADR DATA-0077):
-
-```csharp
-// ❌ WRONG: Conflicting context
-using (EntityContext.Source("analytics"))
-using (EntityContext.Adapter("mongodb"))
-{
-    // Which wins? Undefined behavior!
-}
-
-// ✅ CORRECT: Use one or the other
-using (EntityContext.Source("analytics"))
-{
-    // Routes via named source configuration
-}
-
-// OR
-
-using (EntityContext.Adapter("mongodb"))
-{
-    // Explicit provider override
-}
-```
-
-## Context Nesting
-
-Contexts nest and replace previous values:
-
-```csharp
-// Outer context
-using (EntityContext.Source("analytics"))
-{
-    var count1 = await Todo.Count; // analytics source
-
-    // Inner context replaces outer
-    using (EntityContext.Partition("archive"))
+    // Capability detection — same code, store-aware behaviour (ARCH-0084 CapabilitySet)
+    public async Task<IReadOnlyList<Todo>> Open(CancellationToken ct = default)
     {
-        var count2 = await Todo.Count; // analytics + archive partition
+        var caps = Data<Todo, string>.Capabilities;        // CapabilitySet for the elected adapter
+        if (caps.Has(DataCaps.Query.Linq))
+            return await Todo.Query(t => !t.Done, ct);      // pushed down to the store
+        return await Todo.Query("{\"Done\":false}", ct);   // JSON filter DSL ($in/$gt/... Mongo-flavoured)
     }
 
-    var count3 = await Todo.Count; // back to analytics (no partition)
-}
-```
-
-## Provider-Specific Configuration
-
-### Forcing Specific Provider
-
-Use `[DataAdapter]` attribute to pin entity to provider:
-
-```csharp
-// Always use MongoDB for this entity
-[DataAdapter("mongodb")]
-public class FlexibleDocument : Entity<FlexibleDocument>
-{
-    public Dictionary<string, object> Properties { get; set; } = new();
-}
-
-// Always use vector database
-[DataAdapter("weaviate")]
-public class MediaEmbedding : Entity<MediaEmbedding>
-{
-    [VectorField]
-    public float[] Embedding { get; set; } = Array.Empty<float>();
-}
-```
-
-## Capability Fallback Patterns
-
-```csharp
-public async Task<List<Todo>> SearchWithFallback(string searchTerm)
-{
-    var caps = Data<Todo, string>.QueryCaps;
-
-    if (caps.Capabilities.HasFlag(QueryCapabilities.FullTextSearch))
+    public async Task<IReadOnlyList<Todo>> FromReplica(CancellationToken ct = default)
     {
-        // Provider supports full-text search
-        return await Todo.Query($"CONTAINS(Title, '{searchTerm}')");
+        using (EntityContext.Source("analytics"))           // named config in appsettings
+            return await Todo.Query(t => !t.Done, ct);
     }
-    else
+
+    public async Task Migrate(CancellationToken ct = default)
     {
-        // Fallback to client-side filtering
-        var all = await Todo.All();
-        return all.Where(t => t.Title.Contains(searchTerm,
-            StringComparison.OrdinalIgnoreCase)).ToList();
+        using (EntityContext.Adapter("mongo"))              // explicit provider override (NOT with Source)
+        using (EntityContext.Partition($"tenant-42"))       // logical isolation within the provider
+            await new Todo { Title = "seed" }.Save(ct);
     }
+
+    public async Task<long> Purge(CancellationToken ct = default)
+        => Todo.SupportsFastRemove                           // capability probe
+            ? await Todo.RemoveAll(RemoveStrategy.Fast, ct)  // TRUNCATE/drop path when supported
+            : await Todo.RemoveAll(ct);                      // safe per-row fallback
 }
 ```
 
-## Provider Comparison Matrix
+## Reference = Intent activation
 
-| Provider | LINQ Queries | Transactions | Fast Remove | Vector Search | JSON Fields |
-|----------|--------------|--------------|-------------|---------------|-------------|
-| **PostgreSQL** | ✅ | ✅ | ✅ | ✅ (pgvector) | ✅ |
-| **SQL Server** | ✅ | ✅ | ✅ | ❌ | ✅ (limited) |
-| **MongoDB** | ✅ | ✅ | ✅ | ❌ | ✅ (native) |
-| **SQLite** | ✅ | ✅ | ✅ | ❌ | ✅ (json1) |
-| **Redis** | ❌ | ❌ | ✅ | ❌ | ✅ |
-| **JSON** | ❌ | ❌ | ❌ | ❌ | ✅ (native) |
-| **InMemory** | ❌ | ❌ | ❌ | ❌ | ✅ |
-| **Weaviate** | ❌ | ❌ | ❌ | ✅ | ✅ |
-| **Milvus** | ❌ | ❌ | ❌ | ✅ | ✅ |
+| Add this reference | Effect |
+|---|---|
+| `Koan.Data.Core` (alone) | In-memory adapter backs every entity — zero config. |
+| `+ Koan.Data.Sqlite` / `.Postgres` / `.Mongo` / `.SqlServer` / `.Json` | That provider backs every entity; same code, no rewrite. |
+| `+ a vector connector` (`Koan.Data.Vector.Connector.Weaviate` / `.Qdrant` / `.Milvus`) | Vector store available for `[Embedding]` entities. |
+| `[DataAdapter("name")]` on an entity | Routes just that entity when several providers are referenced. |
 
-## When This Skill Applies
+## Context routing (DATA-0077)
 
-Invoke this skill when:
-- ✅ Working with multiple data providers
-- ✅ Switching between providers
-- ✅ Implementing multi-tenant isolation
-- ✅ Routing to read replicas
-- ✅ Writing capability-aware code
-- ✅ Debugging provider-specific issues
+| Scope | Means | Use for |
+|---|---|---|
+| `EntityContext.Partition("p")` | Logical suffix within one provider (e.g. `Todo#p`) | Multi-tenant isolation, archival, test data separation. |
+| `EntityContext.Source("name")` | A **named configuration** (its own adapter + connection string) | Read replicas, analytics DBs, regional stores. |
+| `EntityContext.Adapter("mongo")` | Explicit provider override | Migration, provider comparison, dev overrides. |
 
-## Reference Documentation
+Scopes nest and replace inner-most-wins; dispose restores the outer value. `Partition` composes with **either** `Source` or `Adapter`. **`Source` + `Adapter` together throws** — a `Source` already names its adapter, so specifying both is contradictory (DATA-0077).
 
-- **Full Guide:** `docs/guides/entity-capabilities-howto.md` § Context Routing
-- **ADR:** DATA-0077 (Source XOR Adapter rule)
-- **Sample:** `samples/S10.DevPortal/` (Multi-provider showcase)
-- **Sample:** `samples/S14.AdapterBench/` (Provider performance comparison)
+## Anti-patterns to flag
 
-## Framework Compliance
+| If you see | Suggest |
+|---|---|
+| `Data<Todo,string>.QueryCaps` / `QueryCapabilities` / `EntityCaps` | `Data<Todo,string>.Capabilities` → `CapabilitySet` (ARCH-0084 removed the enums). |
+| `caps.Capabilities.HasFlag(QueryCapabilities.LinqQueries)` | `caps.Has(DataCaps.Query.Linq)` — token negotiation, no `[Flags]` enum. |
+| `caps.Capabilities.HasFlag(QueryCapabilities.FullTextSearch)` | No such token. Use `DataCaps.Query.Linq` + the JSON filter DSL, or a vector store for semantic search. |
+| `Todo.Query("CONTAINS(Title, '...')")` (SQL text in the string overload) | The `string` overload is the **JSON filter DSL** (`{"Tags":{"$in":["x"]}}`); use `Todo.QueryRaw(...)` for provider-native. |
+| `[VectorField] float[] Embedding` on a property | Class-level `[Embedding]` (`Koan.Data.AI.Attributes`) — Koan composes & stores the vector; no hand-held float array. |
+| `EntityContext.Source("x")` nested inside `EntityContext.Adapter("y")` | Pick one. Both set is a hard `InvalidOperationException` (DATA-0077), never "undefined behaviour". |
+| `[DataAdapter("pgvector")]` | pgvector is removed — route to `weaviate` / `qdrant` / `milvus`. |
 
-Multi-provider patterns are fundamental to Koan Framework:
-- ✅ Write provider-agnostic code
-- ✅ Use capability detection
-- ✅ Implement graceful fallbacks
-- ✅ Follow Source XOR Adapter rule
-- ❌ Never write provider-specific code without capability checks
-- ❌ Never hard-code provider assumptions
+## Escape hatches
+
+- **Probe a typed capability**: `Data<T,K>.As<IConditionalWriteRepository<T,K>>()` returns `null` when the adapter lacks it — the cast *is* the probe; branch on null to a fallback.
+- **Raw provider query**: `Todo.QueryRaw(providerQuery, parameters, ct)` for native SQL/N1QL; `IDataService.Direct(adapter: "sqlite")` for raw SQL with source-XOR-adapter + transactions (`.Begin()`).
+- **Pin durability per entity**: `[DataAdapter("name")]` overrides the elected provider for one entity even when several adapters are referenced.
+- **Inspect the election**: the boot report lists each adapter, its priority, and the elected default — the source of truth when "wrong provider chosen" surfaces.
+
+## See also
+
+- [Reference card: data.md](../../../docs/reference/cards/data.md) — one-screen pillar map
+- [Entity capabilities how-to](../../../docs/guides/entity-capabilities-howto.md) — capability tokens, query pushdown, counts
+- [DATA-0077 — context routing (partition / source / adapter)](../../../docs/decisions/DATA-0077-entity-context-source-adapter-partition-routing.md)
+- [ARCH-0084 — unified capability model (`CapabilitySet` / `DataCaps`)](../../../docs/decisions/ARCH-0084-unified-capability-model.md)
+- [`samples/S1.Web`](../../../samples/S1.Web/README.md) — `Entity<Todo>` over a single provider
+- [`samples/S10.DevPortal`](../../../samples/S10.DevPortal/README.md) — multi-provider showcase
