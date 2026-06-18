@@ -26,18 +26,6 @@ public sealed class VectorErrorInjectionSpec
         _output = output ?? throw new ArgumentNullException(nameof(output));
     }
 
-    private static string EnsurePartition(TestContext ctx)
-    {
-        const string Key = "partition";
-        if (!ctx.TryGetItem<string>(Key, out var partition))
-        {
-            partition = $"vector-error-{ctx.ExecutionId:n}";
-            ctx.SetItem(Key, partition);
-        }
-
-        return partition;
-    }
-
     /// <summary>
     /// CRITICAL TEST: VectorCoordinationException with deterministic error injection.
     /// Previously "inconclusive" because real vector DBs might accept invalid dimensions.
@@ -46,66 +34,55 @@ public sealed class VectorErrorInjectionSpec
     [Fact]
     public async Task SaveWithVector_vector_upsert_failure_throws_coordination_exception_with_entity_saved()
     {
-        await TestPipeline.For<VectorErrorInjectionSpec>(_output, nameof(SaveWithVector_vector_upsert_failure_throws_coordination_exception_with_entity_saved))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Arrange(static ctx =>
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
+
+        var partition = $"vector-error-{Guid.CreateVersion7():n}";
+
+        // Configure fake repository to reject invalid dimensions (DETERMINISTIC)
+        var fakeRepo = runtime.VectorService.GetFakeRepository<TodoEntity, string>();
+        fakeRepo.RequiredEmbeddingDimension = 1536;
+
+        var entity = new TodoEntity
+        {
+            Title = "VectorCoordinationException Test",
+            Description = "Deterministic failure scenario"
+        };
+
+        // Invalid embedding dimensions (expected: 1536, provided: 384)
+        var invalidEmbedding = GenerateTestEmbedding(384);
+
+        VectorCoordinationException? caughtException = null;
+
+        using (var _ = EntityContext.Partition(partition))
+        {
+            try
             {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                var partition = EnsurePartition(ctx);
-                ctx.SetItem("partition", partition);
-
-                // Configure fake repository to reject invalid dimensions (DETERMINISTIC)
-                var fakeRepo = runtime.VectorService.GetFakeRepository<TodoEntity, string>();
-                fakeRepo.RequiredEmbeddingDimension = 1536;
-            })
-            .Assert(static async ctx =>
+                await VectorData<TodoEntity>.SaveWithVector(entity, invalidEmbedding, null);
+            }
+            catch (VectorCoordinationException ex)
             {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                var partition = ctx.GetRequiredItem<string>("partition");
+                caughtException = ex;
+            }
+        }
 
-                var entity = new TodoEntity
-                {
-                    Title = "VectorCoordinationException Test",
-                    Description = "Deterministic failure scenario"
-                };
+        // Assertions (NO MORE "inconclusive" escapes!)
+        caughtException.Should().NotBeNull("vector upsert should fail with invalid dimensions");
+        caughtException!.EntitySaved.Should().BeTrue("entity save should succeed before vector save");
+        caughtException.VectorSaved.Should().BeFalse("vector save should fail");
+        caughtException.InnerException.Should().NotBeNull("should contain original ArgumentException");
+        caughtException.InnerException.Should().BeOfType<ArgumentException>("dimension validation throws ArgumentException");
 
-                // Invalid embedding dimensions (expected: 1536, provided: 384)
-                var invalidEmbedding = GenerateTestEmbedding(384);
+        // Verify entity was actually saved (orphaned entity scenario)
+        using (var _ = EntityContext.Partition(partition))
+        {
+            var savedEntity = await TodoEntity.Get(entity.Id);
+            savedEntity.Should().NotBeNull("entity should be persisted even though vector failed");
+            savedEntity!.Title.Should().Be("VectorCoordinationException Test");
+        }
 
-                VectorCoordinationException? caughtException = null;
-
-                using (var _ = EntityContext.Partition(partition))
-                {
-                    try
-                    {
-                        await VectorData<TodoEntity>.SaveWithVector(entity, invalidEmbedding, null);
-                    }
-                    catch (VectorCoordinationException ex)
-                    {
-                        caughtException = ex;
-                    }
-                }
-
-                // Assertions (NO MORE "inconclusive" escapes!)
-                caughtException.Should().NotBeNull("vector upsert should fail with invalid dimensions");
-                caughtException!.EntitySaved.Should().BeTrue("entity save should succeed before vector save");
-                caughtException.VectorSaved.Should().BeFalse("vector save should fail");
-                caughtException.InnerException.Should().NotBeNull("should contain original ArgumentException");
-                caughtException.InnerException.Should().BeOfType<ArgumentException>("dimension validation throws ArgumentException");
-
-                // Verify entity was actually saved (orphaned entity scenario)
-                using (var _ = EntityContext.Partition(partition))
-                {
-                    var savedEntity = await TodoEntity.Get(entity.Id);
-                    savedEntity.Should().NotBeNull("entity should be persisted even though vector failed");
-                    savedEntity!.Title.Should().Be("VectorCoordinationException Test");
-                }
-
-                // Verify vector was NOT saved
-                var fakeRepo = runtime.VectorService.GetFakeRepository<TodoEntity, string>();
-                fakeRepo.ContainsVector(entity.Id).Should().BeFalse("vector should not be persisted");
-            })
-            .Run();
+        // Verify vector was NOT saved
+        var fakeRepoAfter = runtime.VectorService.GetFakeRepository<TodoEntity, string>();
+        fakeRepoAfter.ContainsVector(entity.Id).Should().BeFalse("vector should not be persisted");
     }
 
     /// <summary>
@@ -114,46 +91,35 @@ public sealed class VectorErrorInjectionSpec
     [Fact]
     public async Task SaveWithVector_custom_vector_exception_wrapped_in_coordination_exception()
     {
-        await TestPipeline.For<VectorErrorInjectionSpec>(_output, nameof(SaveWithVector_custom_vector_exception_wrapped_in_coordination_exception))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Arrange(static ctx =>
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
+
+        var partition = $"vector-error-{Guid.CreateVersion7():n}";
+
+        // Configure fake repository to throw custom exception
+        var fakeRepo = runtime.VectorService.GetFakeRepository<TodoEntity, string>();
+        fakeRepo.ThrowOnUpsert = true;
+        fakeRepo.CustomException = new InvalidOperationException("Vector database quota exceeded");
+
+        var entity = new TodoEntity { Title = "Custom Exception Test" };
+        var embedding = GenerateTestEmbedding(1536);
+
+        VectorCoordinationException? caughtException = null;
+
+        using (var _ = EntityContext.Partition(partition))
+        {
+            try
             {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                var partition = EnsurePartition(ctx);
-                ctx.SetItem("partition", partition);
-
-                // Configure fake repository to throw custom exception
-                var fakeRepo = runtime.VectorService.GetFakeRepository<TodoEntity, string>();
-                fakeRepo.ThrowOnUpsert = true;
-                fakeRepo.CustomException = new InvalidOperationException("Vector database quota exceeded");
-            })
-            .Assert(static async ctx =>
+                await VectorData<TodoEntity>.SaveWithVector(entity, embedding, null);
+            }
+            catch (VectorCoordinationException ex)
             {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                var partition = ctx.GetRequiredItem<string>("partition");
+                caughtException = ex;
+            }
+        }
 
-                var entity = new TodoEntity { Title = "Custom Exception Test" };
-                var embedding = GenerateTestEmbedding(1536);
-
-                VectorCoordinationException? caughtException = null;
-
-                using (var _ = EntityContext.Partition(partition))
-                {
-                    try
-                    {
-                        await VectorData<TodoEntity>.SaveWithVector(entity, embedding, null);
-                    }
-                    catch (VectorCoordinationException ex)
-                    {
-                        caughtException = ex;
-                    }
-                }
-
-                caughtException.Should().NotBeNull();
-                caughtException!.InnerException.Should().BeOfType<InvalidOperationException>();
-                caughtException.InnerException!.Message.Should().Contain("quota exceeded");
-            })
-            .Run();
+        caughtException.Should().NotBeNull();
+        caughtException!.InnerException.Should().BeOfType<InvalidOperationException>();
+        caughtException.InnerException!.Message.Should().Contain("quota exceeded");
     }
 
     /// <summary>
@@ -162,37 +128,26 @@ public sealed class VectorErrorInjectionSpec
     [Fact]
     public async Task Vector_save_failure_outside_coordination_throws_unwrapped_exception()
     {
-        await TestPipeline.For<VectorErrorInjectionSpec>(_output, nameof(Vector_save_failure_outside_coordination_throws_unwrapped_exception))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Arrange(static ctx =>
-            {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                var partition = EnsurePartition(ctx);
-                ctx.SetItem("partition", partition);
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
 
-                var fakeRepo = runtime.VectorService.GetFakeRepository<TodoEntity, string>();
-                fakeRepo.RequiredEmbeddingDimension = 1536;
-            })
-            .Assert(static async ctx =>
-            {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                var partition = ctx.GetRequiredItem<string>("partition");
+        var partition = $"vector-error-{Guid.CreateVersion7():n}";
 
-                var entity = new TodoEntity { Title = "Direct Vector.Save Test" };
-                var invalidEmbedding = GenerateTestEmbedding(128);
+        var fakeRepo = runtime.VectorService.GetFakeRepository<TodoEntity, string>();
+        fakeRepo.RequiredEmbeddingDimension = 1536;
 
-                using (var _ = EntityContext.Partition(partition))
-                {
-                    await entity.Save(); // Save entity separately
+        var entity = new TodoEntity { Title = "Direct Vector.Save Test" };
+        var invalidEmbedding = GenerateTestEmbedding(128);
 
-                    // Direct Vector.Save should throw ArgumentException (NOT VectorCoordinationException)
-                    var act = async () => await Vector<TodoEntity>.Save(entity.Id, invalidEmbedding);
+        using (var _ = EntityContext.Partition(partition))
+        {
+            await entity.Save(); // Save entity separately
 
-                    await act.Should().ThrowAsync<ArgumentException>()
-                        .WithMessage("*Invalid embedding dimension*");
-                }
-            })
-            .Run();
+            // Direct Vector.Save should throw ArgumentException (NOT VectorCoordinationException)
+            var act = async () => await Vector<TodoEntity>.Save(entity.Id, invalidEmbedding);
+
+            await act.Should().ThrowAsync<ArgumentException>()
+                .WithMessage("*Invalid embedding dimension*");
+        }
     }
 
     /// <summary>
@@ -201,32 +156,22 @@ public sealed class VectorErrorInjectionSpec
     [Fact]
     public async Task Vector_delete_failure_propagates_exception()
     {
-        await TestPipeline.For<VectorErrorInjectionSpec>(_output, nameof(Vector_delete_failure_propagates_exception))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Arrange(static ctx =>
-            {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                var partition = EnsurePartition(ctx);
-                ctx.SetItem("partition", partition);
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
 
-                // Configure repository to fail on delete
-                var fakeRepo = runtime.VectorService.GetFakeRepository<TodoEntity, string>();
-                fakeRepo.ThrowOnDelete = true;
-                fakeRepo.CustomException = new InvalidOperationException("Vector delete operation not permitted");
-            })
-            .Assert(static async ctx =>
-            {
-                var partition = ctx.GetRequiredItem<string>("partition");
+        var partition = $"vector-error-{Guid.CreateVersion7():n}";
 
-                using (var _ = EntityContext.Partition(partition))
-                {
-                    var act = async () => await Vector<TodoEntity>.Delete("test-id-123");
+        // Configure repository to fail on delete
+        var fakeRepo = runtime.VectorService.GetFakeRepository<TodoEntity, string>();
+        fakeRepo.ThrowOnDelete = true;
+        fakeRepo.CustomException = new InvalidOperationException("Vector delete operation not permitted");
 
-                    await act.Should().ThrowAsync<InvalidOperationException>()
-                        .WithMessage("*not permitted*");
-                }
-            })
-            .Run();
+        using (var _ = EntityContext.Partition(partition))
+        {
+            var act = async () => await Vector<TodoEntity>.Delete("test-id-123");
+
+            await act.Should().ThrowAsync<InvalidOperationException>()
+                .WithMessage("*not permitted*");
+        }
     }
 
     /// <summary>
@@ -235,51 +180,40 @@ public sealed class VectorErrorInjectionSpec
     [Fact]
     public async Task Transaction_rollback_after_vector_error_discards_entity_and_vector()
     {
-        await TestPipeline.For<VectorErrorInjectionSpec>(_output, nameof(Transaction_rollback_after_vector_error_discards_entity_and_vector))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Arrange(static ctx =>
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
+
+        var partition = $"vector-error-{Guid.CreateVersion7():n}";
+
+        var fakeRepo = runtime.VectorService.GetFakeRepository<TodoEntity, string>();
+        fakeRepo.RequiredEmbeddingDimension = 1536;
+
+        var entity = new TodoEntity { Title = "Rollback Test" };
+        var invalidEmbedding = GenerateTestEmbedding(64); // Wrong dimension
+
+        using (var _ = EntityContext.Partition(partition))
+        {
+            using (EntityContext.Transaction("rollback-on-error"))
             {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                var partition = EnsurePartition(ctx);
-                ctx.SetItem("partition", partition);
+                await entity.Save();
 
-                var fakeRepo = runtime.VectorService.GetFakeRepository<TodoEntity, string>();
-                fakeRepo.RequiredEmbeddingDimension = 1536;
-            })
-            .Assert(static async ctx =>
-            {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                var partition = ctx.GetRequiredItem<string>("partition");
-
-                var entity = new TodoEntity { Title = "Rollback Test" };
-                var invalidEmbedding = GenerateTestEmbedding(64); // Wrong dimension
-
-                using (var _ = EntityContext.Partition(partition))
+                try
                 {
-                    using (EntityContext.Transaction("rollback-on-error"))
-                    {
-                        await entity.Save();
-
-                        try
-                        {
-                            await Vector<TodoEntity>.Save(entity.Id, invalidEmbedding);
-                        }
-                        catch (ArgumentException)
-                        {
-                            // Expected error - rollback transaction
-                            await EntityContext.Rollback();
-                        }
-                    }
-
-                    // Both entity and vector should be discarded
-                    var savedEntity = await TodoEntity.Get(entity.Id);
-                    savedEntity.Should().BeNull("entity should be rolled back");
-
-                    var fakeRepo = runtime.VectorService.GetFakeRepository<TodoEntity, string>();
-                    fakeRepo.ContainsVector(entity.Id).Should().BeFalse("vector should be rolled back");
+                    await Vector<TodoEntity>.Save(entity.Id, invalidEmbedding);
                 }
-            })
-            .Run();
+                catch (ArgumentException)
+                {
+                    // Expected error - rollback transaction
+                    await EntityContext.Rollback();
+                }
+            }
+
+            // Both entity and vector should be discarded
+            var savedEntity = await TodoEntity.Get(entity.Id);
+            savedEntity.Should().BeNull("entity should be rolled back");
+
+            var fakeRepoAfter = runtime.VectorService.GetFakeRepository<TodoEntity, string>();
+            fakeRepoAfter.ContainsVector(entity.Id).Should().BeFalse("vector should be rolled back");
+        }
     }
 
     /// <summary>
@@ -288,33 +222,23 @@ public sealed class VectorErrorInjectionSpec
     [Fact]
     public async Task Vector_search_failure_throws_configured_exception()
     {
-        await TestPipeline.For<VectorErrorInjectionSpec>(_output, nameof(Vector_search_failure_throws_configured_exception))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Arrange(static ctx =>
-            {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                var partition = EnsurePartition(ctx);
-                ctx.SetItem("partition", partition);
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
 
-                var fakeRepo = runtime.VectorService.GetFakeRepository<TodoEntity, string>();
-                fakeRepo.ThrowOnSearch = true;
-                fakeRepo.CustomException = new TimeoutException("Vector search timeout");
-            })
-            .Assert(static async ctx =>
-            {
-                var partition = ctx.GetRequiredItem<string>("partition");
+        var partition = $"vector-error-{Guid.CreateVersion7():n}";
 
-                using (var _ = EntityContext.Partition(partition))
-                {
-                    var queryVector = GenerateTestEmbedding(1536);
+        var fakeRepo = runtime.VectorService.GetFakeRepository<TodoEntity, string>();
+        fakeRepo.ThrowOnSearch = true;
+        fakeRepo.CustomException = new TimeoutException("Vector search timeout");
 
-                    var act = async () => await Vector<TodoEntity>.Search(queryVector, topK: 10);
+        using (var _ = EntityContext.Partition(partition))
+        {
+            var queryVector = GenerateTestEmbedding(1536);
 
-                    await act.Should().ThrowAsync<TimeoutException>()
-                        .WithMessage("*timeout*");
-                }
-            })
-            .Run();
+            var act = async () => await Vector<TodoEntity>.Search(queryVector, topK: 10);
+
+            await act.Should().ThrowAsync<TimeoutException>()
+                .WithMessage("*timeout*");
+        }
     }
 
     /// <summary>
@@ -323,62 +247,51 @@ public sealed class VectorErrorInjectionSpec
     [Fact]
     public async Task Transaction_with_mixed_operations_one_vector_failure_rolls_back_all()
     {
-        await TestPipeline.For<VectorErrorInjectionSpec>(_output, nameof(Transaction_with_mixed_operations_one_vector_failure_rolls_back_all))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Arrange(static ctx =>
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
+
+        var partition = $"vector-error-{Guid.CreateVersion7():n}";
+
+        var fakeRepo = runtime.VectorService.GetFakeRepository<TodoEntity, string>();
+        fakeRepo.RequiredEmbeddingDimension = 1536;
+
+        var entity1 = new TodoEntity { Title = "Entity 1" };
+        var entity2 = new TodoEntity { Title = "Entity 2" };
+        var entity3 = new TodoEntity { Title = "Entity 3" };
+
+        var validEmbedding1 = GenerateTestEmbedding(1536);
+        var invalidEmbedding = GenerateTestEmbedding(256); // Wrong dimension
+        var validEmbedding2 = GenerateTestEmbedding(1536);
+
+        using (var _ = EntityContext.Partition(partition))
+        {
+            using (EntityContext.Transaction("multi-op-tx"))
             {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                var partition = EnsurePartition(ctx);
-                ctx.SetItem("partition", partition);
+                await entity1.Save();
+                await Vector<TodoEntity>.Save(entity1.Id, validEmbedding1);
 
-                var fakeRepo = runtime.VectorService.GetFakeRepository<TodoEntity, string>();
-                fakeRepo.RequiredEmbeddingDimension = 1536;
-            })
-            .Assert(static async ctx =>
-            {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                var partition = ctx.GetRequiredItem<string>("partition");
+                await entity2.Save();
 
-                var entity1 = new TodoEntity { Title = "Entity 1" };
-                var entity2 = new TodoEntity { Title = "Entity 2" };
-                var entity3 = new TodoEntity { Title = "Entity 3" };
-
-                var validEmbedding1 = GenerateTestEmbedding(1536);
-                var invalidEmbedding = GenerateTestEmbedding(256); // Wrong dimension
-                var validEmbedding2 = GenerateTestEmbedding(1536);
-
-                using (var _ = EntityContext.Partition(partition))
+                try
                 {
-                    using (EntityContext.Transaction("multi-op-tx"))
-                    {
-                        await entity1.Save();
-                        await Vector<TodoEntity>.Save(entity1.Id, validEmbedding1);
-
-                        await entity2.Save();
-
-                        try
-                        {
-                            // This should fail
-                            await Vector<TodoEntity>.Save(entity2.Id, invalidEmbedding);
-                        }
-                        catch (ArgumentException)
-                        {
-                            // Expected - rollback
-                            await EntityContext.Rollback();
-                        }
-
-                        // entity3 operations never execute due to rollback
-                    }
-
-                    // Verify ALL operations were rolled back
-                    var count = await TodoEntity.Count;
-                    count.Should().Be(0, "all entity saves should be rolled back");
-
-                    var fakeRepo = runtime.VectorService.GetFakeRepository<TodoEntity, string>();
-                    fakeRepo.VectorCount.Should().Be(0, "all vector saves should be rolled back");
+                    // This should fail
+                    await Vector<TodoEntity>.Save(entity2.Id, invalidEmbedding);
                 }
-            })
-            .Run();
+                catch (ArgumentException)
+                {
+                    // Expected - rollback
+                    await EntityContext.Rollback();
+                }
+
+                // entity3 operations never execute due to rollback
+            }
+
+            // Verify ALL operations were rolled back
+            var count = await TodoEntity.Count;
+            count.Should().Be(0, "all entity saves should be rolled back");
+
+            var fakeRepoAfter = runtime.VectorService.GetFakeRepository<TodoEntity, string>();
+            fakeRepoAfter.VectorCount.Should().Be(0, "all vector saves should be rolled back");
+        }
     }
 
     /// <summary>
@@ -387,36 +300,26 @@ public sealed class VectorErrorInjectionSpec
     [Fact]
     public async Task FakeVectorRepository_tracks_all_operations_for_inspection()
     {
-        await TestPipeline.For<VectorErrorInjectionSpec>(_output, nameof(FakeVectorRepository_tracks_all_operations_for_inspection))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Arrange(static ctx =>
-            {
-                var partition = EnsurePartition(ctx);
-                ctx.SetItem("partition", partition);
-            })
-            .Assert(static async ctx =>
-            {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                var partition = ctx.GetRequiredItem<string>("partition");
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
 
-                var entity = new TodoEntity { Title = "Operations Tracking Test" };
-                var embedding = GenerateTestEmbedding(1536);
+        var partition = $"vector-error-{Guid.CreateVersion7():n}";
 
-                using (var _ = EntityContext.Partition(partition))
-                {
-                    await entity.Save();
-                    await Vector<TodoEntity>.Save(entity.Id, embedding);
-                }
+        var entity = new TodoEntity { Title = "Operations Tracking Test" };
+        var embedding = GenerateTestEmbedding(1536);
 
-                // Inspect operations log
-                var fakeRepo = runtime.VectorService.GetFakeRepository<TodoEntity, string>();
-                fakeRepo.Operations.Should().HaveCount(1, "one upsert operation should be tracked");
+        using (var _ = EntityContext.Partition(partition))
+        {
+            await entity.Save();
+            await Vector<TodoEntity>.Save(entity.Id, embedding);
+        }
 
-                var op = fakeRepo.Operations[0];
-                op.Id.Should().Be(entity.Id);
-                op.Embedding.Should().HaveCount(1536);
-            })
-            .Run();
+        // Inspect operations log
+        var fakeRepo = runtime.VectorService.GetFakeRepository<TodoEntity, string>();
+        fakeRepo.Operations.Should().HaveCount(1, "one upsert operation should be tracked");
+
+        var op = fakeRepo.Operations[0];
+        op.Id.Should().Be(entity.Id);
+        op.Embedding.Should().HaveCount(1536);
     }
 
     #region Helper Methods

@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -6,93 +6,75 @@ using System.Threading.Tasks;
 using Koan.AI;
 using Koan.AI.Contracts;
 using Koan.AI.Contracts.Models;
-using Xunit.Abstractions;
 
 namespace Koan.Tests.AI.Unit.Specs.Conversation;
 
 public sealed class AiConversationBuilderSpec
 {
-    private readonly ITestOutputHelper _output;
-
-    public AiConversationBuilderSpec(ITestOutputHelper output)
+    [Fact]
+    public void Build_populates_context_and_augmentations()
     {
-        _output = output;
+        var fake = new FakePipeline();
+        var builder = new AiConversationBuilder(fake)
+            .WithSystem("system prompt")
+            .WithUser("hello world")
+            .WithProfile("support")
+            .WithBudget("standard")
+            .WithContextTag("tenant", "acme")
+            .WithGroundingReference("doc-42")
+            .WithModel("glm-1")
+            .WithRouteAdapter("ollama:test")
+            .WithRoutePolicy("wrw")
+            .WithAugmentation("rag", configure: p => p["dataset"] = "kb")
+            .WithAugmentation("moderation", enabled: false)
+            .ConfigureOptions(o => o with { Temperature = 0.2, Profile = "support" });
+
+        var request = builder.Build();
+
+        request.Messages.Select(m => m.Role).Should().Contain(new[] { "system", "user" });
+        request.Model.Should().Be("glm-1");
+        request.Route.Should().NotBeNull();
+        request.Route!.AdapterId.Should().Be("ollama:test");
+        request.Route.Policy.Should().Be("wrw");
+        request.Context.Should().NotBeNull();
+        request.Context!.Profile.Should().Be("support");
+        request.Context.Budget.Should().Be("standard");
+        request.Context.Tags.Should().ContainKey("tenant").WhoseValue.Should().Be("acme");
+        request.Context.GroundingReferences.Should().Contain("doc-42");
+        request.Augmentations.Should().HaveCount(2);
+        request.Augmentations.First().Parameters.Should().ContainKey("dataset");
+        request.Options.Should().NotBeNull();
+        request.Options!.Temperature.Should().Be(0.2);
+        request.Options.Profile.Should().Be("support");
     }
 
     [Fact]
-    public Task Build_populates_context_and_augmentations()
-        => TestPipeline.For<AiConversationBuilderSpec>(_output, nameof(Build_populates_context_and_augmentations))
-            .Assert(_ =>
-            {
-                var fake = new FakePipeline();
-                var builder = new AiConversationBuilder(fake)
-                    .WithSystem("system prompt")
-                    .WithUser("hello world")
-                    .WithProfile("support")
-                    .WithBudget("standard")
-                    .WithContextTag("tenant", "acme")
-                    .WithGroundingReference("doc-42")
-                    .WithModel("glm-1")
-                    .WithRouteAdapter("ollama:test")
-                    .WithRoutePolicy("wrw")
-                    .WithAugmentation("rag", configure: p => p["dataset"] = "kb")
-                    .WithAugmentation("moderation", enabled: false)
-                    .ConfigureOptions(o => o with { Temperature = 0.2, Profile = "support" });
+    public async Task SendAsync_delegates_to_underlying_ai()
+    {
+        var fake = new FakePipeline();
+        var builder = new AiConversationBuilder(fake)
+            .WithUser("ping");
 
-                var request = builder.Build();
+        var response = await builder.Send(CancellationToken.None);
 
-                request.Messages.Select(m => m.Role).Should().Contain(new[] { "system", "user" });
-                request.Model.Should().Be("glm-1");
-                request.Route.Should().NotBeNull();
-                request.Route!.AdapterId.Should().Be("ollama:test");
-                request.Route.Policy.Should().Be("wrw");
-                request.Context.Should().NotBeNull();
-                request.Context!.Profile.Should().Be("support");
-                request.Context.Budget.Should().Be("standard");
-                request.Context.Tags.Should().ContainKey("tenant").WhoseValue.Should().Be("acme");
-                request.Context.GroundingReferences.Should().Contain("doc-42");
-                request.Augmentations.Should().HaveCount(2);
-                request.Augmentations.First().Parameters.Should().ContainKey("dataset");
-                request.Options.Should().NotBeNull();
-                request.Options!.Temperature.Should().Be(0.2);
-                request.Options.Profile.Should().Be("support");
-                return ValueTask.CompletedTask;
-            })
-            .Run();
+        response.Text.Should().Be("ok");
+        fake.LastRequest.Should().NotBeNull();
+        fake.LastRequest!.Messages.Should().ContainSingle(m => m.Role == "user" && m.Content == "ping");
+    }
 
     [Fact]
-    public Task SendAsync_delegates_to_underlying_ai()
-        => TestPipeline.For<AiConversationBuilderSpec>(_output, nameof(SendAsync_delegates_to_underlying_ai))
-            .Assert(async _ =>
-            {
-                var fake = new FakePipeline();
-                var builder = new AiConversationBuilder(fake)
-                    .WithUser("ping");
+    public async Task AskAsync_appends_user_turn_before_sending()
+    {
+        var fake = new FakePipeline();
+        var builder = new AiConversationBuilder(fake)
+            .WithSystem("sys");
 
-                var response = await builder.Send(CancellationToken.None);
+        await builder.Ask("hello", CancellationToken.None);
 
-                response.Text.Should().Be("ok");
-                fake.LastRequest.Should().NotBeNull();
-                fake.LastRequest!.Messages.Should().ContainSingle(m => m.Role == "user" && m.Content == "ping");
-            })
-            .Run();
-
-    [Fact]
-    public Task AskAsync_appends_user_turn_before_sending()
-        => TestPipeline.For<AiConversationBuilderSpec>(_output, nameof(AskAsync_appends_user_turn_before_sending))
-            .Assert(async _ =>
-            {
-                var fake = new FakePipeline();
-                var builder = new AiConversationBuilder(fake)
-                    .WithSystem("sys");
-
-                await builder.Ask("hello", CancellationToken.None);
-
-                fake.LastRequest.Should().NotBeNull();
-                fake.LastRequest!.Messages.Should().Contain(m => m.Role == "system");
-                fake.LastRequest!.Messages.Should().Contain(m => m.Role == "user" && m.Content == "hello");
-            })
-            .Run();
+        fake.LastRequest.Should().NotBeNull();
+        fake.LastRequest!.Messages.Should().Contain(m => m.Role == "system");
+        fake.LastRequest!.Messages.Should().Contain(m => m.Role == "user" && m.Content == "hello");
+    }
 
     private sealed class FakePipeline : IAiPipeline
     {

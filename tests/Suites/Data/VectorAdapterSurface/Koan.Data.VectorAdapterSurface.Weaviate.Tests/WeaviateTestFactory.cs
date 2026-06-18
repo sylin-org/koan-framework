@@ -44,7 +44,7 @@ public sealed class WeaviateTestFactory : IVectorAdapterTestFactory
     public bool SupportsDynamicCollections   => true;
     public bool SupportsScoreNormalization   => true;  // cosine
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         if (_initialized) return;
         _initialized = true;
@@ -95,7 +95,7 @@ public sealed class WeaviateTestFactory : IVectorAdapterTestFactory
         }
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         _adminHttp?.Dispose();
         if (_sp is not null) await _sp.DisposeAsync();

@@ -24,7 +24,7 @@ public sealed class OpenGraphCardRendererSpec : IAsyncLifetime
     private IServiceProvider? _previousAppHost;
     private string _shellPath = default!;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         SocialCards.Reset();
 
@@ -44,7 +44,7 @@ public sealed class OpenGraphCardRendererSpec : IAsyncLifetime
         AppHost.Current = _host.Services;
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         AppHost.Current = _previousAppHost!;
         SocialCards.Reset();

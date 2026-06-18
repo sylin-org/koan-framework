@@ -1,5 +1,8 @@
+using Koan.Testing.Containers;
 using Xunit;
 
-// Specs bind the ambient static AppHost.Current (fixture.BindHost) and seed a shared SQLite store, so
-// they must not run in parallel — mirrors the Mongo/Postgres/SqlServer connector suites.
+// ARCH-0091: one SQLite store shared across the whole assembly (a unique temp-file database created once
+// before any test, deleted after all). Tests run sequentially within the process because the static
+// Entity<T> API resolves through the process-global AppHost.Current; engines parallelize across processes.
 [assembly: CollectionBehavior(DisableTestParallelization = true)]
+[assembly: AssemblyFixture(typeof(SqliteFixture))]

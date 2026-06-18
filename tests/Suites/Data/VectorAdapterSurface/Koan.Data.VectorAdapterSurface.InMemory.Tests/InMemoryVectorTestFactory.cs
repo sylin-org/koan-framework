@@ -53,12 +53,12 @@ public sealed class InMemoryVectorTestFactory : IVectorAdapterTestFactory
         return services.BuildServiceProvider();
     }
 
-    public Task InitializeAsync() { _ = Services; return Task.CompletedTask; }
+    public ValueTask InitializeAsync() { _ = Services; return ValueTask.CompletedTask; }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _sp?.Dispose();
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     public Task ResetAsync(CancellationToken ct = default)

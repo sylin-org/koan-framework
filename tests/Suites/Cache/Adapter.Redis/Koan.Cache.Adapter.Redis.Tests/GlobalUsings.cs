@@ -1,9 +1,8 @@
-﻿global using AwesomeAssertions;
+global using AwesomeAssertions;
 global using Koan.Cache.Abstractions;
 global using Koan.Cache.Abstractions.Primitives;
 global using Koan.Cache.Abstractions.Stores;
-global using Koan.Testing.Extensions;
-global using Koan.Testing.Pipeline;
+global using Koan.Testing.Containers;
 global using Microsoft.Extensions.Configuration;
 global using Microsoft.Extensions.DependencyInjection;
 global using Microsoft.Extensions.Hosting;

@@ -1,89 +1,47 @@
-﻿using System;
-using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Instructions;
-using Koan.Data.Core;
-using Koan.Data.Core.Model;
-using Koan.Data.Connector.Mongo.Tests.Support;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Data.Connector.Mongo.Tests.Specs.Instructions;
 
-public sealed class MongoInstructionsSpec
+public sealed class MongoInstructionsSpec(MongoFixture fixture, ITestOutputHelper output)
+    : KoanDataSpec<MongoFixture>(fixture, output)
 {
-    private readonly ITestOutputHelper _output;
-
-    public MongoInstructionsSpec(ITestOutputHelper output)
-    {
-        _output = output ?? throw new ArgumentNullException(nameof(output));
-    }
-
     [Fact]
     public async Task Instruction_clear_returns_deleted_count()
     {
-        var databaseName = $"koan_tests_{Guid.NewGuid():N}";
+        RequireBackingStore();
+        await using var host = await BootAsync();
+        var data = host.Services.GetRequiredService<IDataService>();
+        var partition = NewPartition("clear");
+        using var lease = Lease(partition);
 
-        await TestPipeline.For<MongoInstructionsSpec>(_output, nameof(Instruction_clear_returns_deleted_count))
-            .RequireDocker()
-            .UsingMongoContainer(database: databaseName)
-            .Using<MongoConnectorFixture>("fixture", static ctx => MongoConnectorFixture.Create(ctx))
-            .Arrange(static async ctx =>
-            {
-                var fixture = ctx.GetRequiredItem<MongoConnectorFixture>("fixture");
-                await fixture.ResetAsync<InstructionProbe, string>();
-            })
-            .Assert(async ctx =>
-            {
-                var fixture = ctx.GetRequiredItem<MongoConnectorFixture>("fixture");
-                fixture.BindHost();
+        await InstructionProbe.Upsert(new InstructionProbe { Name = "item" });
 
-                var partition = fixture.EnsurePartition(ctx);
+        var before = await InstructionProbe.Count.Exact();
+        before.Should().Be(1);
 
-                await using var lease = fixture.LeasePartition(partition);
+        var cleared = await data.Execute<InstructionProbe, string, int>(new Instruction(DataInstructions.Clear));
 
-                await InstructionProbe.Upsert(new InstructionProbe { Name = "item" });
+        var after = await InstructionProbe.Count.Exact();
+        cleared.Should().BeInRange(0, (int)before);
+        after.Should().Be(0);
 
-                var before = await InstructionProbe.Count.Exact();
-                before.Should().Be(1);
-
-                var cleared = await fixture.Data.Execute<InstructionProbe, string, int>(new Instruction(DataInstructions.Clear));
-
-                var after = await InstructionProbe.Count.Exact();
-                cleared.Should().BeInRange(0, (int)before);
-                after.Should().Be(0);
-
-                var remaining = await InstructionProbe.All(partition);
-                remaining.Should().BeEmpty();
-            })
-            .Run();
+        var remaining = await InstructionProbe.All(partition);
+        remaining.Should().BeEmpty();
     }
 
     [Fact]
     public async Task Instruction_ensure_created_is_idempotent()
     {
-        var databaseName = $"koan_tests_{Guid.NewGuid():N}";
+        RequireBackingStore();
+        await using var host = await BootAsync();
+        var data = host.Services.GetRequiredService<IDataService>();
 
-        await TestPipeline.For<MongoInstructionsSpec>(_output, nameof(Instruction_ensure_created_is_idempotent))
-            .RequireDocker()
-            .UsingMongoContainer(database: databaseName)
-            .Using<MongoConnectorFixture>("fixture", static ctx => MongoConnectorFixture.Create(ctx))
-            .Arrange(static async ctx =>
-            {
-                var fixture = ctx.GetRequiredItem<MongoConnectorFixture>("fixture");
-                await fixture.ResetAsync<InstructionProbe, string>();
-            })
-            .Assert(async ctx =>
-            {
-                var fixture = ctx.GetRequiredItem<MongoConnectorFixture>("fixture");
-                fixture.BindHost();
+        var first = await data.Execute<InstructionProbe, string, bool>(new Instruction(DataInstructions.EnsureCreated));
+        first.Should().BeTrue();
 
-                var partition = fixture.EnsurePartition(ctx);
-
-                var first = await fixture.Data.Execute<InstructionProbe, string, bool>(new Instruction(DataInstructions.EnsureCreated));
-                first.Should().BeTrue();
-
-                var second = await fixture.Data.Execute<InstructionProbe, string, bool>(new Instruction(DataInstructions.EnsureCreated));
-                second.Should().BeTrue();
-            })
-            .Run();
+        var second = await data.Execute<InstructionProbe, string, bool>(new Instruction(DataInstructions.EnsureCreated));
+        second.Should().BeTrue();
     }
 
     private sealed class InstructionProbe : Entity<InstructionProbe>

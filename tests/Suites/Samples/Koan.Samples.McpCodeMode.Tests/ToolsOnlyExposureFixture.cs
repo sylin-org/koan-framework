@@ -1,4 +1,3 @@
-using Koan.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Mcp.Extensions;
 using Koan.Web.Extensions;
@@ -16,7 +15,7 @@ namespace Koan.Samples.McpCodeMode.Tests;
 /// tools/list; the RPC invoke-by-name path must still refuse it, proving the gate is the exposure
 /// mode itself and not merely the listing filter (the originally-reported bypass).
 /// </summary>
-public class ToolsOnlyExposureFixture : KoanTestPipelineFixtureBase
+public class ToolsOnlyExposureFixture : TestHostFixtureBase
 {
     public ToolsOnlyExposureFixture() : base(typeof(Program)) { }
 

@@ -2,6 +2,11 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <IsPackable>false</IsPackable>
+    <!-- ARCH-0091: this is a SHARED test-helper LIBRARY (base specs + fixtures consumed by the
+         per-engine Koan.Web.AdapterSurface.* suites), not a runnable test assembly. Without this,
+         `dotnet test Koan.sln` launches it as a test host and aborts (its deps.json references
+         AwesomeAssertions' lib/net8.0 asset, which a non-test-host runtime layout can't resolve). -->
+    <IsTestProject>false</IsTestProject>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <NoWarn>$(NoWarn);NU1902;NU1903</NoWarn>

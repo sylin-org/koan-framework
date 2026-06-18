@@ -2,30 +2,28 @@ using System;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
-using Koan.Core.Hosting.App;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Filtering;
-using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Data.Connector.SqlServer.Tests.Specs.Crud;
 
-public class SqlServerCrudAndQueryTests : IClassFixture<Support.SqlServerAutoFixture>
+public sealed class SqlServerCrudAndQueryTests(SqlServerFixture fixture, ITestOutputHelper output)
+	: KoanDataSpec<SqlServerFixture>(fixture, output)
 {
-	private readonly Support.SqlServerAutoFixture _fx;
-
-	public SqlServerCrudAndQueryTests(Support.SqlServerAutoFixture fx) => _fx = fx;
-
 	[Fact]
 	public async Task Upsert_query_count_and_paging()
 	{
-		using var partition = BeginPartition("crud-core");
-		var (available, repo, queryRepo) = await Prepare();
-		if (!available)
-		{
-			return;
-		}
+		RequireBackingStore();
+		await using var host = await BootAsync();
+		var data = host.Services.GetRequiredService<IDataService>();
+		var partition = NewPartition("crud-core");
+		using var lease = Lease(partition);
+
+		var repo = data.GetRepository<Person, string>();
+		var queryRepo = Assert.IsAssignableFrom<IQueryRepository<Person, string>>(repo);
 
 		var people = Enumerable.Range(1, 25)
 			.Select(i => new Person
@@ -83,35 +81,6 @@ public class SqlServerCrudAndQueryTests : IClassFixture<Support.SqlServerAutoFix
 		var finalCount = await queryRepo.Count(new QueryDefinition { Filter = age20 });
 		finalCount.Value.Should().Be(14);
 		finalCount.IsEstimate.Should().BeFalse();
-	}
-
-	private async Task<(bool Available, IDataRepository<Person, string> Repo, IQueryRepository<Person, string> QueryRepo)> Prepare()
-	{
-		if (_fx.SkipTests)
-		{
-			return (false, default!, default!);
-		}
-
-		EnsureAppHost();
-		await _fx.Data.Execute<Person, int>(new Instruction("data.clear"));
-
-		var repo = _fx.Data.GetRepository<Person, string>();
-		var queryRepo = Assert.IsAssignableFrom<IQueryRepository<Person, string>>(repo);
-		return (true, repo, queryRepo);
-	}
-
-	private void EnsureAppHost()
-	{
-		if (!ReferenceEquals(AppHost.Current, _fx.ServiceProvider))
-		{
-			AppHost.Current = _fx.ServiceProvider;
-		}
-	}
-
-	private static IDisposable BeginPartition(string prefix)
-	{
-		var token = Guid.NewGuid().ToString("N")[..8];
-		return EntityContext.Partition($"sql-{prefix}-{token}");
 	}
 
 	public class Person : Entity<Person>

@@ -1,5 +1,4 @@
 using Koan.Data.AdapterSurface.TestKit;
-using Koan.Data.Connector.Couchbase.Tests.Support;
 
 namespace Koan.Data.Connector.Couchbase.Tests.Specs.Filtering;
 
@@ -12,34 +11,23 @@ namespace Koan.Data.Connector.Couchbase.Tests.Specs.Filtering;
 /// a convergence test there would be tautological.
 ///
 /// Runs every filter in the corpus through the real Couchbase cluster and the in-memory floor and asserts
-/// identical id-sets. Skips (RequireDocker) when no Docker/Couchbase is reachable.
+/// identical id-sets. Skips when no Docker/Couchbase is reachable.
 /// </summary>
-public sealed class CouchbaseFilterConvergenceSpec
+public sealed class CouchbaseFilterConvergenceSpec(CouchbaseFixture fixture, ITestOutputHelper output)
+    : KoanDataSpec<CouchbaseFixture>(fixture, output)
 {
-    private readonly ITestOutputHelper _output;
-
-    public CouchbaseFilterConvergenceSpec(ITestOutputHelper output) => _output = output;
-
     [Fact(DisplayName = "Couchbase: every filter converges with the in-memory oracle")]
     [Trait("Category", "Integration")]
     public async Task Adapter_converges_with_oracle_across_the_corpus()
     {
-        await TestPipeline.For<CouchbaseFilterConvergenceSpec>(_output, nameof(Adapter_converges_with_oracle_across_the_corpus))
-            .RequireDocker()
-            .UsingCouchbaseContainer()
-            .Using<CouchbaseConnectorFixture>("fixture", static ctx => CouchbaseConnectorFixture.Create(ctx))
-            .Assert(async ctx =>
-            {
-                var fixture = ctx.GetRequiredItem<CouchbaseConnectorFixture>("fixture");
-                fixture.BindHost();
+        RequireBackingStore();
+        await using var host = await BootAsync();
 
-                // ConvergenceWidget is a partition-agnostic entity; Couchbase scopes by the ambient
-                // partition, so establish a lease before clearing/seeding the corpus.
-                var partition = fixture.EnsurePartition(ctx);
-                await using var lease = fixture.LeasePartition(partition);
+        // ConvergenceWidget is a partition-agnostic entity; Couchbase scopes by the ambient
+        // partition, so establish a lease before clearing/seeding the corpus.
+        var partition = NewPartition("convergence");
+        using var lease = Lease(partition);
 
-                await FilterConvergence.AssertConvergesAsync();
-            })
-            .Run();
+        await FilterConvergence.AssertConvergesAsync();
     }
 }

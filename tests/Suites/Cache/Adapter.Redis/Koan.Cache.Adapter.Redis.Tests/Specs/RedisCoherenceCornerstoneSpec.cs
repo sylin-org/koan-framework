@@ -1,15 +1,7 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
-using AwesomeAssertions;
-using Koan.Cache.Abstractions;
-using Koan.Cache.Abstractions.Primitives;
-using Koan.Cache.Abstractions.Stores;
 using Koan.Cache.Adapter.Redis.Tests.Support;
-using Koan.Testing.Extensions;
-using Koan.Testing.Pipeline;
-using Microsoft.Extensions.DependencyInjection;
-using Xunit;
-using Xunit.Abstractions;
 
 namespace Koan.Cache.Adapter.Redis.Tests.Specs;
 
@@ -35,116 +27,99 @@ namespace Koan.Cache.Adapter.Redis.Tests.Specs;
 /// </list>
 /// </para>
 /// </remarks>
-public sealed class RedisCoherenceCornerstoneSpec
+public sealed class RedisCoherenceCornerstoneSpec(RedisFixture fixture, ITestOutputHelper output)
 {
-    private readonly ITestOutputHelper _output;
+    private readonly ITestOutputHelper _output = output;
 
-    public RedisCoherenceCornerstoneSpec(ITestOutputHelper output)
+    [Fact]
+    public async Task Write_on_A_invalidates_L1_on_B_via_redis_pubsub()
     {
-        _output = output;
+        Assert.SkipWhen(!fixture.IsAvailable, fixture.Reason ?? "Redis unavailable");
+        var ct = TestContext.Current.CancellationToken;
+
+        var token = Guid.CreateVersion7().ToString("N");
+        var keyPrefix = $"cache:{token}:";
+        var tagPrefix = $"cache:tag:{token}:";
+        var channel = $"koan-cache-{token}";
+
+        await using var nodeA = await RedisCacheNode.Start(fixture.ConnectionString!, keyPrefix, tagPrefix, channel, ct);
+        await using var nodeB = await RedisCacheNode.Start(fixture.ConnectionString!, keyPrefix, tagPrefix, channel, ct);
+
+        var clientA = nodeA.Provider.GetRequiredService<ICacheClient>();
+        var clientB = nodeB.Provider.GetRequiredService<ICacheClient>();
+
+        var key = new CacheKey($"coherence-{token}");
+
+        // 1. A writes v1 (write-through L1+L2, broadcasts EvictKey).
+        await clientA.CreateEntry<string>(key)
+            .WithAbsoluteTtl(TimeSpan.FromMinutes(5))
+            .Set("v1", ct);
+
+        // 2. B reads → L1 miss → L2 hit → populates B's L1 with "v1".
+        var read1 = await clientB.CreateEntry<string>(key).Get(ct);
+        read1.Should().Be("v1");
+
+        // 3. A overwrites with v2 — broadcasts EvictKey via real Redis pub/sub.
+        await clientA.CreateEntry<string>(key)
+            .WithAbsoluteTtl(TimeSpan.FromMinutes(5))
+            .Set("v2", ct);
+
+        // 4. Poll B's read until it sees v2 (eventually consistent within seconds).
+        //    Reading too fast would still return v1 from B's L1 because the
+        //    coordinator's OnReceived handler runs asynchronously after publish.
+        var read2 = await PollUntil(
+            () => clientB.CreateEntry<string>(key).Get(ct),
+            value => value == "v2",
+            TimeSpan.FromSeconds(5),
+            ct);
+
+        read2.Should().Be("v2");
     }
 
     [Fact]
-    public Task Write_on_A_invalidates_L1_on_B_via_redis_pubsub()
-        => TestPipeline.For<RedisCoherenceCornerstoneSpec>(_output, nameof(Write_on_A_invalidates_L1_on_B_via_redis_pubsub))
-            .RequireDocker()
-            .UsingRedisContainer()
-            .Act(async ctx =>
-            {
-                var redis = ctx.GetRedisFixture();
-                if (!redis.IsAvailable || string.IsNullOrWhiteSpace(redis.ConnectionString))
-                    throw new InvalidOperationException($"Redis unavailable: {redis.UnavailableReason ?? "unspecified"}");
+    public async Task Tag_flush_on_A_invalidates_tagged_keys_on_B()
+    {
+        Assert.SkipWhen(!fixture.IsAvailable, fixture.Reason ?? "Redis unavailable");
+        var ct = TestContext.Current.CancellationToken;
 
-                var token = ctx.ExecutionId.ToString("N");
-                var keyPrefix = $"cache:{token}:";
-                var tagPrefix = $"cache:tag:{token}:";
-                var channel = $"koan-cache-{token}";
+        var token = Guid.CreateVersion7().ToString("N");
+        var keyPrefix = $"cache:{token}:";
+        var tagPrefix = $"cache:tag:{token}:";
+        var channel = $"koan-cache-{token}-tags";
+        var tag = $"product:{token}";
 
-                await using var nodeA = await RedisCacheNode.Start(redis.ConnectionString!, keyPrefix, tagPrefix, channel, ctx.Cancellation);
-                await using var nodeB = await RedisCacheNode.Start(redis.ConnectionString!, keyPrefix, tagPrefix, channel, ctx.Cancellation);
+        await using var nodeA = await RedisCacheNode.Start(fixture.ConnectionString!, keyPrefix, tagPrefix, channel, ct);
+        await using var nodeB = await RedisCacheNode.Start(fixture.ConnectionString!, keyPrefix, tagPrefix, channel, ct);
 
-                var clientA = nodeA.Provider.GetRequiredService<ICacheClient>();
-                var clientB = nodeB.Provider.GetRequiredService<ICacheClient>();
+        var clientA = nodeA.Provider.GetRequiredService<ICacheClient>();
+        var clientB = nodeB.Provider.GetRequiredService<ICacheClient>();
 
-                var key = new CacheKey($"coherence-{token}");
+        var key1 = new CacheKey($"prod-1-{token}");
+        var key2 = new CacheKey($"prod-2-{token}");
 
-                // 1. A writes v1 (write-through L1+L2, broadcasts EvictKey).
-                await clientA.CreateEntry<string>(key)
-                    .WithAbsoluteTtl(TimeSpan.FromMinutes(5))
-                    .Set("v1", ctx.Cancellation);
+        // A writes two tagged entries.
+        await clientA.CreateEntry<string>(key1).WithTags(tag).Set("alpha", ct);
+        await clientA.CreateEntry<string>(key2).WithTags(tag).Set("beta", ct);
 
-                // 2. B reads → L1 miss → L2 hit → populates B's L1 with "v1".
-                var read1 = await clientB.CreateEntry<string>(key).Get(ctx.Cancellation);
-                read1.Should().Be("v1");
+        // B populates its L1 by reading both.
+        (await clientB.CreateEntry<string>(key1).Get(ct)).Should().Be("alpha");
+        (await clientB.CreateEntry<string>(key2).Get(ct)).Should().Be("beta");
 
-                // 3. A overwrites with v2 — broadcasts EvictKey via real Redis pub/sub.
-                await clientA.CreateEntry<string>(key)
-                    .WithAbsoluteTtl(TimeSpan.FromMinutes(5))
-                    .Set("v2", ctx.Cancellation);
+        // A flushes the tag — broadcasts EvictByTag via Redis pub/sub.
+        var removed = await clientA.FlushTags(new[] { tag }, ct);
+        removed.Should().Be(2);
 
-                // 4. Poll B's read until it sees v2 (eventually consistent within seconds).
-                //    Reading too fast would still return v1 from B's L1 because the
-                //    coordinator's OnReceived handler runs asynchronously after publish.
-                var read2 = await PollUntil(
-                    () => clientB.CreateEntry<string>(key).Get(ctx.Cancellation),
-                    value => value == "v2",
-                    TimeSpan.FromSeconds(5),
-                    ctx.Cancellation);
+        // Poll B's reads until both keys return null (broadcast propagated, L1 evicted,
+        // L2 already flushed by A → both layers empty).
+        var read1AfterFlush = await PollUntil(
+            () => clientB.CreateEntry<string>(key1).Get(ct),
+            value => value is null,
+            TimeSpan.FromSeconds(5),
+            ct);
+        read1AfterFlush.Should().BeNull();
 
-                read2.Should().Be("v2");
-            })
-            .Run();
-
-    [Fact]
-    public Task Tag_flush_on_A_invalidates_tagged_keys_on_B()
-        => TestPipeline.For<RedisCoherenceCornerstoneSpec>(_output, nameof(Tag_flush_on_A_invalidates_tagged_keys_on_B))
-            .RequireDocker()
-            .UsingRedisContainer()
-            .Act(async ctx =>
-            {
-                var redis = ctx.GetRedisFixture();
-                if (!redis.IsAvailable || string.IsNullOrWhiteSpace(redis.ConnectionString))
-                    throw new InvalidOperationException($"Redis unavailable: {redis.UnavailableReason ?? "unspecified"}");
-
-                var token = ctx.ExecutionId.ToString("N");
-                var keyPrefix = $"cache:{token}:";
-                var tagPrefix = $"cache:tag:{token}:";
-                var channel = $"koan-cache-{token}-tags";
-                var tag = $"product:{token}";
-
-                await using var nodeA = await RedisCacheNode.Start(redis.ConnectionString!, keyPrefix, tagPrefix, channel, ctx.Cancellation);
-                await using var nodeB = await RedisCacheNode.Start(redis.ConnectionString!, keyPrefix, tagPrefix, channel, ctx.Cancellation);
-
-                var clientA = nodeA.Provider.GetRequiredService<ICacheClient>();
-                var clientB = nodeB.Provider.GetRequiredService<ICacheClient>();
-
-                var key1 = new CacheKey($"prod-1-{token}");
-                var key2 = new CacheKey($"prod-2-{token}");
-
-                // A writes two tagged entries.
-                await clientA.CreateEntry<string>(key1).WithTags(tag).Set("alpha", ctx.Cancellation);
-                await clientA.CreateEntry<string>(key2).WithTags(tag).Set("beta", ctx.Cancellation);
-
-                // B populates its L1 by reading both.
-                (await clientB.CreateEntry<string>(key1).Get(ctx.Cancellation)).Should().Be("alpha");
-                (await clientB.CreateEntry<string>(key2).Get(ctx.Cancellation)).Should().Be("beta");
-
-                // A flushes the tag — broadcasts EvictByTag via Redis pub/sub.
-                var removed = await clientA.FlushTags(new[] { tag }, ctx.Cancellation);
-                removed.Should().Be(2);
-
-                // Poll B's reads until both keys return null (broadcast propagated, L1 evicted,
-                // L2 already flushed by A → both layers empty).
-                var read1AfterFlush = await PollUntil(
-                    () => clientB.CreateEntry<string>(key1).Get(ctx.Cancellation),
-                    value => value is null,
-                    TimeSpan.FromSeconds(5),
-                    ctx.Cancellation);
-                read1AfterFlush.Should().BeNull();
-
-                (await clientB.CreateEntry<string>(key2).Get(ctx.Cancellation)).Should().BeNull();
-            })
-            .Run();
+        (await clientB.CreateEntry<string>(key2).Get(ct)).Should().BeNull();
+    }
 
     /// <summary>
     /// Poll an async value-producer until the predicate is satisfied or the deadline expires.
@@ -155,7 +130,7 @@ public sealed class RedisCoherenceCornerstoneSpec
         Func<ValueTask<T>> produce,
         Func<T, bool> predicate,
         TimeSpan timeout,
-        System.Threading.CancellationToken ct)
+        CancellationToken ct)
     {
         var deadline = DateTimeOffset.UtcNow + timeout;
         T last = default!;

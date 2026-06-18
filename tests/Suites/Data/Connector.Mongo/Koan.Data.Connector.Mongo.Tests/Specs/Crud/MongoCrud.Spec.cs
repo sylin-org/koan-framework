@@ -1,79 +1,53 @@
-﻿using System;
+using System;
 using System.Linq;
 using Koan.Data.Abstractions.Annotations;
-using Koan.Data.Abstractions;
-using Koan.Data.Core;
-using Koan.Data.Core.Model;
-using Koan.Data.Connector.Mongo.Tests.Support;
 
 namespace Koan.Data.Connector.Mongo.Tests.Specs.Crud;
 
-public sealed class MongoCrudSpec
+public sealed class MongoCrudSpec(MongoFixture fixture, ITestOutputHelper output)
+    : KoanDataSpec<MongoFixture>(fixture, output)
 {
-    private readonly ITestOutputHelper _output;
-
-    public MongoCrudSpec(ITestOutputHelper output)
-    {
-        _output = output;
-    }
-
     [Fact]
     public async Task Upsert_query_count_and_remove_flow()
     {
-        var databaseName = $"koan_tests_{Guid.NewGuid():N}";
+        RequireBackingStore();
+        await using var host = await BootAsync();
+        var partition = NewPartition("crud");
+        using var lease = Lease(partition);
 
-        await TestPipeline.For<MongoCrudSpec>(_output, nameof(Upsert_query_count_and_remove_flow))
-            .RequireDocker()
-            .UsingMongoContainer(database: databaseName)
-            .Using<MongoConnectorFixture>("fixture", static ctx => MongoConnectorFixture.Create(ctx))
-            .Arrange(static async ctx =>
-            {
-                var fixture = ctx.GetRequiredItem<MongoConnectorFixture>("fixture");
-                await fixture.ResetAsync<Person, string>();
-            })
-            .Assert(async ctx =>
-            {
-                var fixture = ctx.GetRequiredItem<MongoConnectorFixture>("fixture");
-                fixture.BindHost();
-                var partition = fixture.EnsurePartition(ctx);
+        var saved = await Person.Upsert(new Person { Name = "Ada", Age = 34 });
+        saved.Id.Should().NotBeNullOrWhiteSpace();
+        var originalTimestamp = saved.LastUpdated;
 
-                await using var lease = fixture.LeasePartition(partition);
+        await Person.UpsertMany(new[]
+        {
+            new Person { Name = "Grace", Age = 47 },
+            new Person { Name = "Bob", Age = 42 }
+        });
 
-                var saved = await Person.Upsert(new Person { Name = "Ada", Age = 34 });
-                saved.Id.Should().NotBeNullOrWhiteSpace();
-                var originalTimestamp = saved.LastUpdated;
+        var all = await Person.All(partition);
+        all.Should().HaveCount(3);
 
-                await Person.UpsertMany(new[]
-                {
-                    new Person { Name = "Grace", Age = 47 },
-                    new Person { Name = "Bob", Age = 42 }
-                });
+        var filtered = await Data<Person, string>.Query(p => p.Name != "Ada", partition);
+        filtered.Should().HaveCount(2);
 
-                var all = await Person.All(partition);
-                all.Should().HaveCount(3);
+        var updated = filtered.First();
+        updated.Name = "Bobby";
+        await Person.Upsert(updated);
 
-                var filtered = await Data<Person, string>.Query(p => p.Name != "Ada", partition);
-                filtered.Should().HaveCount(2);
+        var fetched = await Person.Get(updated.Id);
+        fetched.Should().NotBeNull();
+        fetched!.Name.Should().Be("Bobby");
+        fetched.LastUpdated.Should().NotBe(originalTimestamp);
 
-                var updated = filtered.First();
-                updated.Name = "Bobby";
-                await Person.Upsert(updated);
+        var count = await Data<Person, string>.Count(p => p.Name != "Ada", partition);
+        count.Should().Be(2);
 
-                var fetched = await Person.Get(updated.Id);
-                fetched.Should().NotBeNull();
-                fetched!.Name.Should().Be("Bobby");
-                fetched.LastUpdated.Should().NotBe(originalTimestamp);
+        var removed = await Person.Remove(saved.Id, partition);
+        removed.Should().BeTrue();
 
-                var count = await Data<Person, string>.Count(p => p.Name != "Ada", partition);
-                count.Should().Be(2);
-
-                var removed = await Person.Remove(saved.Id, partition);
-                removed.Should().BeTrue();
-
-                var remaining = await Person.All(partition);
-                remaining.Should().HaveCount(2);
-            })
-            .Run();
+        var remaining = await Person.All(partition);
+        remaining.Should().HaveCount(2);
     }
 
     private sealed class Person : Entity<Person>

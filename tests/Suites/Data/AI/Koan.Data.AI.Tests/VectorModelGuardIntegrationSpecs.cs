@@ -25,7 +25,7 @@ public sealed class VectorModelGuardIntegrationSpecs : IAsyncLifetime
 {
     private IntegrationHost? _host;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         _host = await KoanIntegrationHost.Configure()
             .WithSetting("Koan:Environment", "Test")
@@ -39,7 +39,7 @@ public sealed class VectorModelGuardIntegrationSpecs : IAsyncLifetime
             .StartAsync();
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         if (_host is not null) await _host.DisposeAsync();
     }

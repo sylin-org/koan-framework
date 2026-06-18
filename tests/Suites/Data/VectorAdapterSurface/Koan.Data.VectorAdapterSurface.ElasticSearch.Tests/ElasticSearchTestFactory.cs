@@ -39,7 +39,7 @@ public sealed class ElasticSearchTestFactory : IVectorAdapterTestFactory
     public bool SupportsDynamicCollections   => true;
     public bool SupportsScoreNormalization   => false;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         if (_initialized) return;
         _initialized = true;
@@ -84,7 +84,7 @@ public sealed class ElasticSearchTestFactory : IVectorAdapterTestFactory
         }
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         _adminHttp?.Dispose();
         if (_sp is not null) await _sp.DisposeAsync();

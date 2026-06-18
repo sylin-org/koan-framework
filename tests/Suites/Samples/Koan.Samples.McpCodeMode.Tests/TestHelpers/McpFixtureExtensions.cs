@@ -5,7 +5,7 @@ namespace Koan.Samples.McpCodeMode.Tests;
 
 internal static class McpFixtureExtensions
 {
-    public static async Task<object?> InvokeRpc(this Koan.Testing.KoanTestPipelineFixtureBase fixture, string method, string id, string? toolName = null, JObject? arguments = null, CancellationToken ct = default)
+    public static async Task<object?> InvokeRpc(this TestHostFixtureBase fixture, string method, string id, string? toolName = null, JObject? arguments = null, CancellationToken ct = default)
     {
         // Access protected Services via reflection since extension method lacks subclass access
     const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public;

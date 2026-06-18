@@ -1,4 +1,3 @@
-using Koan.Testing;
 using Koan.Mcp.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Mcp.Extensions;
@@ -20,7 +19,7 @@ namespace Koan.Samples.McpCodeMode.Tests;
 /// Specialized fixture with deterministic CodeMode quota configuration.
 /// MaxSdkCalls=2, RequireAnswer=true to enforce both error paths predictably.
 /// </summary>
-public class StrictQuotaTestPipelineFixture : KoanTestPipelineFixtureBase
+public class StrictQuotaTestPipelineFixture : TestHostFixtureBase
 {
     public StrictQuotaTestPipelineFixture() : base(typeof(Program)) { }
 

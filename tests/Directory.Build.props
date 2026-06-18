@@ -4,6 +4,11 @@
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <IsPackable>false</IsPackable>
+    <!-- ARCH-0091: xUnit v3 analyzer xUnit1051 ("thread TestContext.Current.CancellationToken")
+         is advisory; threading a token through Koan's static Entity<T> API on every call across the
+         spec suite is impractical and the prior harness never propagated cancellation either.
+         Suppressed tree-wide so it does not trip TreatWarningsAsErrors. (No-op on the v2 projects.) -->
+    <NoWarn>$(NoWarn);xUnit1051</NoWarn>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(OS)' == 'Windows_NT'">

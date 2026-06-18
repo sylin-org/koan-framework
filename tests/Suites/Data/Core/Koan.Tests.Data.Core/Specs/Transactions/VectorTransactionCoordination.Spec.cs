@@ -24,18 +24,6 @@ public sealed class VectorTransactionCoordinationSpec
         _output = output ?? throw new ArgumentNullException(nameof(output));
     }
 
-    private static string EnsurePartition(TestContext ctx)
-    {
-        const string Key = "partition";
-        if (!ctx.TryGetItem<string>(Key, out var partition))
-        {
-            partition = $"vector-tx-{ctx.ExecutionId:n}";
-            ctx.SetItem(Key, partition);
-        }
-
-        return partition;
-    }
-
     /// <summary>
     /// Test #1: TrackVectorSave_WithActiveTransaction_DefersExecution
     /// Validates that Vector.Save() defers execution when transaction is active.
@@ -43,56 +31,46 @@ public sealed class VectorTransactionCoordinationSpec
     [Fact]
     public async Task Vector_save_within_transaction_defers_execution()
     {
-        await TestPipeline.For<VectorTransactionCoordinationSpec>(_output, nameof(Vector_save_within_transaction_defers_execution))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Arrange(static ctx =>
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
+
+        var partition = $"vector-tx-{Guid.CreateVersion7():n}";
+
+        if (!Vector<TodoEntity>.IsAvailable)
+        {
+            _output.WriteLine("Vector database not available - skipping test");
+            return;
+        }
+
+        var entity = new TodoEntity
+        {
+            Title = "Vector Transaction Test",
+            Description = "Testing deferred vector execution"
+        };
+
+        var embedding = GenerateTestEmbedding(1536);
+
+        using (var _ = EntityContext.Partition(partition))
+        {
+            // Save entity first (outside transaction for setup)
+            await entity.Save();
+
+            // Inside transaction - vector save should be deferred
+            using (EntityContext.Transaction("test-vector-tx"))
             {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                var partition = EnsurePartition(ctx);
-                ctx.SetItem("partition", partition);
-            })
-            .Assert(static async ctx =>
-            {
-                var partition = ctx.GetRequiredItem<string>("partition");
+                await Vector<TodoEntity>.Save(entity.Id, embedding);
 
-                if (!Vector<TodoEntity>.IsAvailable)
-                {
-                    ctx.Diagnostics.Info("Vector database not available - skipping test");
-                    return;
-                }
+                // Vector should NOT be queryable yet
+                var vectorExists = await TryGetVector(entity.Id);
+                vectorExists.Should().BeFalse("vector should not be persisted during transaction");
 
-                var entity = new TodoEntity
-                {
-                    Title = "Vector Transaction Test",
-                    Description = "Testing deferred vector execution"
-                };
+                // Commit
+                await EntityContext.Commit();
+            }
 
-                var embedding = GenerateTestEmbedding(1536);
-
-                using (var _ = EntityContext.Partition(partition))
-                {
-                    // Save entity first (outside transaction for setup)
-                    await entity.Save();
-
-                    // Inside transaction - vector save should be deferred
-                    using (EntityContext.Transaction("test-vector-tx"))
-                    {
-                        await Vector<TodoEntity>.Save(entity.Id, embedding);
-
-                        // Vector should NOT be queryable yet
-                        var vectorExists = await TryGetVector(entity.Id);
-                        vectorExists.Should().BeFalse("vector should not be persisted during transaction");
-
-                        // Commit
-                        await EntityContext.Commit();
-                    }
-
-                    // After commit - vector should exist
-                    var vectorExistsAfterCommit = await TryGetVector(entity.Id);
-                    vectorExistsAfterCommit.Should().BeTrue("vector should be persisted after commit");
-                }
-            })
-            .Run();
+            // After commit - vector should exist
+            var vectorExistsAfterCommit = await TryGetVector(entity.Id);
+            vectorExistsAfterCommit.Should().BeTrue("vector should be persisted after commit");
+        }
     }
 
     /// <summary>
@@ -102,50 +80,41 @@ public sealed class VectorTransactionCoordinationSpec
     [Fact]
     public async Task Transaction_rollback_discards_vector_operations()
     {
-        await TestPipeline.For<VectorTransactionCoordinationSpec>(_output, nameof(Transaction_rollback_discards_vector_operations))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Arrange(static ctx =>
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
+
+        var partition = $"vector-tx-{Guid.CreateVersion7():n}";
+
+        if (!Vector<TodoEntity>.IsAvailable)
+        {
+            _output.WriteLine("Vector database not available - skipping test");
+            return;
+        }
+
+        var entity = new TodoEntity
+        {
+            Title = "Rollback Test",
+            Description = "Testing vector rollback"
+        };
+
+        var embedding = GenerateTestEmbedding(1536);
+
+        using (var _ = EntityContext.Partition(partition))
+        {
+            await entity.Save(); // Save entity first
+
+            // Transaction with intentional rollback
+            using (EntityContext.Transaction("rollback-test"))
             {
-                var partition = EnsurePartition(ctx);
-                ctx.SetItem("partition", partition);
-            })
-            .Assert(static async ctx =>
-            {
-                var partition = ctx.GetRequiredItem<string>("partition");
+                await Vector<TodoEntity>.Save(entity.Id, embedding);
 
-                if (!Vector<TodoEntity>.IsAvailable)
-                {
-                    ctx.Diagnostics.Info("Vector database not available - skipping test");
-                    return;
-                }
+                // Rollback explicitly
+                await EntityContext.Rollback();
+            }
 
-                var entity = new TodoEntity
-                {
-                    Title = "Rollback Test",
-                    Description = "Testing vector rollback"
-                };
-
-                var embedding = GenerateTestEmbedding(1536);
-
-                using (var _ = EntityContext.Partition(partition))
-                {
-                    await entity.Save(); // Save entity first
-
-                    // Transaction with intentional rollback
-                    using (EntityContext.Transaction("rollback-test"))
-                    {
-                        await Vector<TodoEntity>.Save(entity.Id, embedding);
-
-                        // Rollback explicitly
-                        await EntityContext.Rollback();
-                    }
-
-                    // Vector should NOT exist after rollback
-                    var vectorExists = await TryGetVector(entity.Id);
-                    vectorExists.Should().BeFalse("vector should be discarded after rollback");
-                }
-            })
-            .Run();
+            // Vector should NOT exist after rollback
+            var vectorExists = await TryGetVector(entity.Id);
+            vectorExists.Should().BeFalse("vector should be discarded after rollback");
+        }
     }
 
     /// <summary>
@@ -155,60 +124,51 @@ public sealed class VectorTransactionCoordinationSpec
     [Fact]
     public async Task Transaction_commits_mixed_entity_and_vector_operations_atomically()
     {
-        await TestPipeline.For<VectorTransactionCoordinationSpec>(_output, nameof(Transaction_commits_mixed_entity_and_vector_operations_atomically))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Arrange(static ctx =>
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
+
+        var partition = $"vector-tx-{Guid.CreateVersion7():n}";
+
+        if (!Vector<TodoEntity>.IsAvailable)
+        {
+            _output.WriteLine("Vector database not available - skipping test");
+            return;
+        }
+
+        var entity1 = new TodoEntity { Title = "Entity 1", Description = "First entity" };
+        var entity2 = new TodoEntity { Title = "Entity 2", Description = "Second entity" };
+        var entity3 = new TodoEntity { Title = "Entity 3", Description = "Third entity" };
+
+        var embedding1 = GenerateTestEmbedding(1536);
+        var embedding2 = GenerateTestEmbedding(1536);
+
+        using (var _ = EntityContext.Partition(partition))
+        {
+            using (EntityContext.Transaction("mixed-ops-tx"))
             {
-                var partition = EnsurePartition(ctx);
-                ctx.SetItem("partition", partition);
-            })
-            .Assert(static async ctx =>
-            {
-                var partition = ctx.GetRequiredItem<string>("partition");
+                // Mix of entity and vector operations
+                await entity1.Save();
+                await entity2.Save();
+                await Vector<TodoEntity>.Save(entity1.Id, embedding1);
+                await entity3.Save();
+                await Vector<TodoEntity>.Save(entity2.Id, embedding2);
 
-                if (!Vector<TodoEntity>.IsAvailable)
-                {
-                    ctx.Diagnostics.Info("Vector database not available - skipping test");
-                    return;
-                }
+                // Nothing persisted yet
+                var entityCount = await TodoEntity.Count;
+                entityCount.Should().Be(0, "entities should not be persisted during transaction");
 
-                var entity1 = new TodoEntity { Title = "Entity 1", Description = "First entity" };
-                var entity2 = new TodoEntity { Title = "Entity 2", Description = "Second entity" };
-                var entity3 = new TodoEntity { Title = "Entity 3", Description = "Third entity" };
+                await EntityContext.Commit();
+            }
 
-                var embedding1 = GenerateTestEmbedding(1536);
-                var embedding2 = GenerateTestEmbedding(1536);
+            // All operations should be committed
+            var finalEntityCount = await TodoEntity.Count;
+            finalEntityCount.Should().Be(3, "all entities should be persisted after commit");
 
-                using (var _ = EntityContext.Partition(partition))
-                {
-                    using (EntityContext.Transaction("mixed-ops-tx"))
-                    {
-                        // Mix of entity and vector operations
-                        await entity1.Save();
-                        await entity2.Save();
-                        await Vector<TodoEntity>.Save(entity1.Id, embedding1);
-                        await entity3.Save();
-                        await Vector<TodoEntity>.Save(entity2.Id, embedding2);
+            var vector1Exists = await TryGetVector(entity1.Id);
+            var vector2Exists = await TryGetVector(entity2.Id);
 
-                        // Nothing persisted yet
-                        var entityCount = await TodoEntity.Count;
-                        entityCount.Should().Be(0, "entities should not be persisted during transaction");
-
-                        await EntityContext.Commit();
-                    }
-
-                    // All operations should be committed
-                    var finalEntityCount = await TodoEntity.Count;
-                    finalEntityCount.Should().Be(3, "all entities should be persisted after commit");
-
-                    var vector1Exists = await TryGetVector(entity1.Id);
-                    var vector2Exists = await TryGetVector(entity2.Id);
-
-                    vector1Exists.Should().BeTrue("vector1 should be persisted");
-                    vector2Exists.Should().BeTrue("vector2 should be persisted");
-                }
-            })
-            .Run();
+            vector1Exists.Should().BeTrue("vector1 should be persisted");
+            vector2Exists.Should().BeTrue("vector2 should be persisted");
+        }
     }
 
     /// <summary>
@@ -218,32 +178,23 @@ public sealed class VectorTransactionCoordinationSpec
     [Fact]
     public async Task Nested_transactions_throw_not_supported_exception()
     {
-        await TestPipeline.For<VectorTransactionCoordinationSpec>(_output, nameof(Nested_transactions_throw_not_supported_exception))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Arrange(static ctx =>
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
+
+        var partition = $"vector-tx-{Guid.CreateVersion7():n}";
+
+        using (var _ = EntityContext.Partition(partition))
+        {
+            using (EntityContext.Transaction("outer-tx"))
             {
-                var partition = EnsurePartition(ctx);
-                ctx.SetItem("partition", partition);
-            })
-            .Assert(static async ctx =>
-            {
-                var partition = ctx.GetRequiredItem<string>("partition");
+                // Attempt to start nested transaction
+                var act = () => EntityContext.Transaction("inner-tx");
 
-                using (var _ = EntityContext.Partition(partition))
-                {
-                    using (EntityContext.Transaction("outer-tx"))
-                    {
-                        // Attempt to start nested transaction
-                        var act = () => EntityContext.Transaction("inner-tx");
+                act.Should().Throw<InvalidOperationException>()
+                    .WithMessage("*nested transactions are not supported*");
 
-                        act.Should().Throw<InvalidOperationException>()
-                            .WithMessage("*nested transactions are not supported*");
-
-                        await EntityContext.Rollback();
-                    }
-                }
-            })
-            .Run();
+                await EntityContext.Rollback();
+            }
+        }
     }
 
     /// <summary>
@@ -252,39 +203,30 @@ public sealed class VectorTransactionCoordinationSpec
     [Fact]
     public async Task Vector_save_without_transaction_executes_immediately()
     {
-        await TestPipeline.For<VectorTransactionCoordinationSpec>(_output, nameof(Vector_save_without_transaction_executes_immediately))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Arrange(static ctx =>
-            {
-                var partition = EnsurePartition(ctx);
-                ctx.SetItem("partition", partition);
-            })
-            .Assert(static async ctx =>
-            {
-                var partition = ctx.GetRequiredItem<string>("partition");
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
 
-                if (!Vector<TodoEntity>.IsAvailable)
-                {
-                    ctx.Diagnostics.Info("Vector database not available - skipping test");
-                    return;
-                }
+        var partition = $"vector-tx-{Guid.CreateVersion7():n}";
 
-                var entity = new TodoEntity { Title = "Immediate Test", Description = "No transaction" };
-                var embedding = GenerateTestEmbedding(1536);
+        if (!Vector<TodoEntity>.IsAvailable)
+        {
+            _output.WriteLine("Vector database not available - skipping test");
+            return;
+        }
 
-                using (var _ = EntityContext.Partition(partition))
-                {
-                    await entity.Save();
+        var entity = new TodoEntity { Title = "Immediate Test", Description = "No transaction" };
+        var embedding = GenerateTestEmbedding(1536);
 
-                    // No transaction - should execute immediately
-                    await Vector<TodoEntity>.Save(entity.Id, embedding);
+        using (var _ = EntityContext.Partition(partition))
+        {
+            await entity.Save();
 
-                    // Vector should be queryable immediately
-                    var vectorExists = await TryGetVector(entity.Id);
-                    vectorExists.Should().BeTrue("vector should be persisted immediately without transaction");
-                }
-            })
-            .Run();
+            // No transaction - should execute immediately
+            await Vector<TodoEntity>.Save(entity.Id, embedding);
+
+            // Vector should be queryable immediately
+            var vectorExists = await TryGetVector(entity.Id);
+            vectorExists.Should().BeTrue("vector should be persisted immediately without transaction");
+        }
     }
 
     /// <summary>
@@ -293,54 +235,45 @@ public sealed class VectorTransactionCoordinationSpec
     [Fact]
     public async Task Transaction_defers_vector_delete_operations()
     {
-        await TestPipeline.For<VectorTransactionCoordinationSpec>(_output, nameof(Transaction_defers_vector_delete_operations))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Arrange(static ctx =>
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
+
+        var partition = $"vector-tx-{Guid.CreateVersion7():n}";
+
+        if (!Vector<TodoEntity>.IsAvailable)
+        {
+            _output.WriteLine("Vector database not available - skipping test");
+            return;
+        }
+
+        var entity = new TodoEntity { Title = "Delete Test", Description = "Vector deletion" };
+        var embedding = GenerateTestEmbedding(1536);
+
+        using (var _ = EntityContext.Partition(partition))
+        {
+            // Setup: Create entity and vector outside transaction
+            await entity.Save();
+            await Vector<TodoEntity>.Save(entity.Id, embedding);
+
+            // Verify vector exists
+            var vectorExistsBefore = await TryGetVector(entity.Id);
+            vectorExistsBefore.Should().BeTrue("vector should exist before delete");
+
+            // Delete inside transaction - should be deferred
+            using (EntityContext.Transaction("delete-tx"))
             {
-                var partition = EnsurePartition(ctx);
-                ctx.SetItem("partition", partition);
-            })
-            .Assert(static async ctx =>
-            {
-                var partition = ctx.GetRequiredItem<string>("partition");
+                await Vector<TodoEntity>.Delete(entity.Id);
 
-                if (!Vector<TodoEntity>.IsAvailable)
-                {
-                    ctx.Diagnostics.Info("Vector database not available - skipping test");
-                    return;
-                }
+                // Vector should still exist during transaction
+                var vectorExistsDuring = await TryGetVector(entity.Id);
+                vectorExistsDuring.Should().BeTrue("vector should still exist during transaction");
 
-                var entity = new TodoEntity { Title = "Delete Test", Description = "Vector deletion" };
-                var embedding = GenerateTestEmbedding(1536);
+                await EntityContext.Commit();
+            }
 
-                using (var _ = EntityContext.Partition(partition))
-                {
-                    // Setup: Create entity and vector outside transaction
-                    await entity.Save();
-                    await Vector<TodoEntity>.Save(entity.Id, embedding);
-
-                    // Verify vector exists
-                    var vectorExistsBefore = await TryGetVector(entity.Id);
-                    vectorExistsBefore.Should().BeTrue("vector should exist before delete");
-
-                    // Delete inside transaction - should be deferred
-                    using (EntityContext.Transaction("delete-tx"))
-                    {
-                        await Vector<TodoEntity>.Delete(entity.Id);
-
-                        // Vector should still exist during transaction
-                        var vectorExistsDuring = await TryGetVector(entity.Id);
-                        vectorExistsDuring.Should().BeTrue("vector should still exist during transaction");
-
-                        await EntityContext.Commit();
-                    }
-
-                    // Vector should be deleted after commit
-                    var vectorExistsAfter = await TryGetVector(entity.Id);
-                    vectorExistsAfter.Should().BeFalse("vector should be deleted after commit");
-                }
-            })
-            .Run();
+            // Vector should be deleted after commit
+            var vectorExistsAfter = await TryGetVector(entity.Id);
+            vectorExistsAfter.Should().BeFalse("vector should be deleted after commit");
+        }
     }
 
     #region Helper Methods

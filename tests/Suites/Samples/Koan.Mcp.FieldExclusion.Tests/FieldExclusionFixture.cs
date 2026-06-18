@@ -7,7 +7,6 @@ using Koan.Mcp;
 using Koan.Mcp.Extensions;
 using Koan.Mcp.Hosting;
 using Koan.Mcp.Options;
-using Koan.Testing;
 using Koan.Web.Controllers;
 using Koan.Web.Extensions;
 using Microsoft.AspNetCore.Builder;
@@ -22,7 +21,7 @@ namespace Koan.Mcp.FieldExclusion.Tests;
 /// Boots a real Koan + MCP + Web pipeline (AddKoan() reflective discovery, per ARCH-0079) hosting the
 /// <see cref="CatalogItem"/> entity, and exposes helpers to drive MCP tools directly through the RPC handler.
 /// </summary>
-public class FieldExclusionFixture : KoanTestPipelineFixtureBase
+public class FieldExclusionFixture : TestHostFixtureBase
 {
     public FieldExclusionFixture() : base(typeof(FieldExclusionFixture)) { }
 

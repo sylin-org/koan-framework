@@ -1,55 +1,37 @@
-﻿using System;
-using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Capabilities;
-using Koan.Data.Core.Model;
-using Koan.Data.Connector.Redis.Tests.Support;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Data.Connector.Redis.Tests.Specs.Capabilities;
 
-public sealed class RedisCapabilitiesSpec
+public sealed class RedisCapabilitiesSpec(RedisFixture fixture, ITestOutputHelper output)
+    : KoanDataSpec<RedisFixture>(fixture, output)
 {
-    private readonly ITestOutputHelper _output;
-
-    public RedisCapabilitiesSpec(ITestOutputHelper output)
-    {
-        _output = output ?? throw new ArgumentNullException(nameof(output));
-    }
-
     [Fact]
     public async Task Repository_reports_linq_and_fast_remove_capabilities()
     {
-        await TestPipeline.For<RedisCapabilitiesSpec>(_output, nameof(Repository_reports_linq_and_fast_remove_capabilities))
-            .RequireDocker()
-            .UsingRedisContainer()
-            .Using<RedisConnectorFixture>("fixture", static ctx => RedisConnectorFixture.Create(ctx))
-            .Arrange(static async ctx =>
-            {
-                var fixture = ctx.GetRequiredItem<RedisConnectorFixture>("fixture");
-                await fixture.ResetAsync<CapabilityProbe, string>();
-            })
-            .Assert(async ctx =>
-            {
-                var fixture = ctx.GetRequiredItem<RedisConnectorFixture>("fixture");
-                fixture.BindHost();
+        RequireBackingStore();
+        await using var host = await BootAsync();
+        var data = host.Services.GetRequiredService<IDataService>();
 
-                var repository = fixture.Data.GetRepository<CapabilityProbe, string>();
-                repository.Should().BeAssignableTo<IQueryRepository<CapabilityProbe, string>>();
+        var repository = data.GetRepository<CapabilityProbe, string>();
+        repository.Should().BeAssignableTo<IQueryRepository<CapabilityProbe, string>>();
 
-                // ARCH-0084: negotiate via the unified CapabilitySet.
-                var caps = DataCaps.Describe(repository, repository.GetType().Name);
-                caps.Has(DataCaps.Query.Linq).Should().BeTrue();
-                caps.Has(DataCaps.Query.String).Should().BeFalse();
-                caps.Has(DataCaps.Write.FastRemove).Should().BeTrue();
-                caps.Has(DataCaps.Retention.TtlIndex).Should().BeTrue(); // DATA-0101 native key TTL
-                caps.Has(DataCaps.Write.BulkUpsert).Should().BeFalse();
-                caps.Has(DataCaps.Write.BulkDelete).Should().BeFalse();
-                caps.Has(DataCaps.Write.AtomicBatch).Should().BeFalse();
+        // ARCH-0084: negotiate via the unified CapabilitySet.
+        var caps = DataCaps.Describe(repository, repository.GetType().Name);
+        caps.Has(DataCaps.Query.Linq).Should().BeTrue();
+        caps.Has(DataCaps.Query.String).Should().BeFalse();
+        caps.Has(DataCaps.Write.FastRemove).Should().BeTrue();
+        caps.Has(DataCaps.Retention.TtlIndex).Should().BeTrue(); // DATA-0101 native key TTL
+        caps.Has(DataCaps.Write.BulkUpsert).Should().BeFalse();
+        caps.Has(DataCaps.Write.BulkDelete).Should().BeFalse();
+        caps.Has(DataCaps.Write.AtomicBatch).Should().BeFalse();
 
-                await CapabilityProbe.Upsert(new CapabilityProbe { Name = "cap" });
-                var all = await CapabilityProbe.All();
-                all.Should().ContainSingle(p => p.Name == "cap");
-            })
-            .Run();
+        var partition = NewPartition();
+        using var lease = Lease(partition);
+
+        await CapabilityProbe.Upsert(new CapabilityProbe { Name = "cap" });
+        var all = await CapabilityProbe.All();
+        all.Should().ContainSingle(p => p.Name == "cap");
     }
 
     private sealed class CapabilityProbe : Entity<CapabilityProbe>

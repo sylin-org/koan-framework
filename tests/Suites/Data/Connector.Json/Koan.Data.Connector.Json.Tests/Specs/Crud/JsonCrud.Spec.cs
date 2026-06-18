@@ -1,92 +1,68 @@
-﻿using System;
+using System;
 using System.Linq;
 using Koan.Data.Abstractions.Annotations;
-using Koan.Data.Abstractions;
-using Koan.Data.Core;
-using Koan.Data.Core.Model;
-using Koan.Data.Connector.Json.Tests.Support;
 
 namespace Koan.Data.Connector.Json.Tests.Specs.Crud;
 
-public sealed class JsonCrudSpec
+public sealed class JsonCrudSpec(JsonFixture fixture, ITestOutputHelper output)
+    : KoanDataSpec<JsonFixture>(fixture, output)
 {
-    private readonly ITestOutputHelper _output;
-
-    public JsonCrudSpec(ITestOutputHelper output)
-    {
-        _output = output ?? throw new ArgumentNullException(nameof(output));
-    }
-
     [Fact]
     public async Task Upsert_query_count_and_remove_flow()
     {
-        await TestPipeline.For<JsonCrudSpec>(_output, nameof(Upsert_query_count_and_remove_flow))
-            .Using<JsonConnectorFixture>("fixture", static ctx => JsonConnectorFixture.Create(ctx))
-            .Arrange(static async ctx =>
-            {
-                var fixture = ctx.GetRequiredItem<JsonConnectorFixture>("fixture");
-                await fixture.ResetAsync<Person, string>();
-            })
-            .Assert(async ctx =>
-            {
-                var fixture = ctx.GetRequiredItem<JsonConnectorFixture>("fixture");
-                fixture.BindHost();
+        RequireBackingStore();
+        await using var host = await BootAsync();
+        var partition = NewPartition("crud");
+        using var lease = Lease(partition);
 
-                var partitionRoot = fixture.EnsurePartition(ctx);
-                var partition = $"{partitionRoot}-crud";
+        var saved = await Person.Upsert(new Person { Name = "Ada", Age = 34 });
+        saved.Id.Should().NotBeNullOrWhiteSpace();
+        var originalTimestamp = saved.LastUpdated;
 
-                await using var lease = fixture.LeasePartition(partition);
+        await Person.UpsertMany(new[]
+        {
+            new Person { Name = "Grace", Age = 47 },
+            new Person { Name = "Bob", Age = 42 },
+            new Person { Name = "Edsger", Age = 59 }
+        });
 
-                var saved = await Person.Upsert(new Person { Name = "Ada", Age = 34 });
-                saved.Id.Should().NotBeNullOrWhiteSpace();
-                var originalTimestamp = saved.LastUpdated;
+        var all = await Person.All(partition);
+        all.Should().HaveCount(4);
 
-                await Person.UpsertMany(new[]
-                {
-                    new Person { Name = "Grace", Age = 47 },
-                    new Person { Name = "Bob", Age = 42 },
-                    new Person { Name = "Edsger", Age = 59 }
-                });
+        var filtered = await Data<Person, string>.Query(p => p.Age >= 40, partition);
+        filtered.Should().HaveCount(3);
 
-                var all = await Person.All(partition);
-                all.Should().HaveCount(4);
+        var updated = filtered.First(p => p.Name == "Bob");
+        updated.Name = "Bobby";
+        updated.Age = 43;
+        await Person.Upsert(updated);
 
-                var filtered = await Data<Person, string>.Query(p => p.Age >= 40, partition);
-                filtered.Should().HaveCount(3);
+        var fetched = await Person.Get(updated.Id);
+        fetched.Should().NotBeNull();
+        fetched!.Name.Should().Be("Bobby");
+        fetched.LastUpdated.Should().BeOnOrAfter(originalTimestamp);
 
-                var updated = filtered.First(p => p.Name == "Bob");
-                updated.Name = "Bobby";
-                updated.Age = 43;
-                await Person.Upsert(updated);
+        var count = await Data<Person, string>.Count(p => p.Age >= 40, partition);
+        count.Should().Be(3);
 
-                var fetched = await Person.Get(updated.Id);
-                fetched.Should().NotBeNull();
-                fetched!.Name.Should().Be("Bobby");
-                fetched.LastUpdated.Should().BeOnOrAfter(originalTimestamp);
+        var page = await Person.Page(1, 2);
+        page.Should().HaveCount(2);
 
-                var count = await Data<Person, string>.Count(p => p.Age >= 40, partition);
-                count.Should().Be(3);
+        var removed = await Person.Remove(saved.Id, partition);
+        removed.Should().BeTrue();
 
-                var page = await Person.Page(1, 2);
-                page.Should().HaveCount(2);
+        // Remove every over-40 person except Grace. Select by a stable attribute rather than by
+        // position in the query result: the unified query contract guarantees a *deterministic*
+        // order for an unsorted query, not necessarily insertion order, so position-based slicing is
+        // not a safe assumption. (filtered still holds the in-memory objects, so Bob now reads as
+        // "Bobby" after the update above.)
+        var remainingIds = filtered.Where(p => p.Name != "Grace").Select(p => p.Id).ToArray();
+        var removedMany = await Person.Remove(remainingIds);
+        removedMany.Should().Be(2);
 
-                var removed = await Person.Remove(saved.Id, partition);
-                removed.Should().BeTrue();
-
-                // Remove every over-40 person except Grace. Select by a stable attribute rather than by
-                // position in the query result: the unified query contract guarantees a *deterministic*
-                // order for an unsorted query, not necessarily insertion order, so position-based slicing is
-                // not a safe assumption. (filtered still holds the in-memory objects, so Bob now reads as
-                // "Bobby" after the update above.)
-                var remainingIds = filtered.Where(p => p.Name != "Grace").Select(p => p.Id).ToArray();
-                var removedMany = await Person.Remove(remainingIds);
-                removedMany.Should().Be(2);
-
-                var remaining = await Person.All(partition);
-                remaining.Should().HaveCount(1);
-                remaining[0].Name.Should().Be("Grace");
-            })
-            .Run();
+        var remaining = await Person.All(partition);
+        remaining.Should().HaveCount(1);
+        remaining[0].Name.Should().Be("Grace");
     }
 
     private sealed class Person : Entity<Person>

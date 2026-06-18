@@ -1,93 +1,90 @@
-﻿namespace Koan.Tests.Canon.Unit.Specs.Runtime;
+using System.Threading;
+
+namespace Koan.Tests.Canon.Unit.Specs.Runtime;
 
 public sealed class CanonRuntimeSpec
 {
-    private const string PersistenceKey = "canon:persistence";
-    private const string RuntimeKey = "canon:runtime";
-    private const string ResultKey = "canon:result";
-    private const string StageResultKey = "canon:stage-result";
-    private const string StageCorrelationKey = "canon:stage-correlation";
-    private const string EmailKey = "canon:email";
-
-    private readonly ITestOutputHelper _output;
-
-    public CanonRuntimeSpec(ITestOutputHelper output)
+    [Fact]
+    public async Task Canonize_persists_entity_and_records_index()
     {
-        _output = output;
+        var (persistence, runtime) = BuildRuntime();
+
+        var email = $"canon-{Guid.CreateVersion7():N}@example.com";
+
+        var entity = new ContactCanon
+        {
+            Email = email,
+            PhoneNumber = "555-0100",
+            DisplayName = "Ada Lovelace"
+        };
+
+        var options = CanonizationOptions.Default
+            .WithOrigin("unit-spec")
+            .WithTag("tracking", "enabled");
+
+        var result = await runtime.Canonize(entity, options, CancellationToken.None);
+
+        var entityType = typeof(ContactCanon).FullName ?? typeof(ContactCanon).Name;
+        var indexKey = $"Email={email}";
+
+        result.Outcome.Should().Be(CanonizationOutcome.Canonized);
+        result.DistributionSkipped.Should().BeTrue();
+        result.Canonical.DisplayName.Should().Be("ADA LOVELACE");
+        result.Metadata.CanonicalId.Should().NotBeNullOrWhiteSpace();
+        result.Metadata.Tags.Should().ContainKey("processed").WhoseValue.Should().Be("true");
+        result.Metadata.Tags.Should().ContainKey("tracking").WhoseValue.Should().Be("enabled");
+        result.Events.Should().NotBeEmpty();
+        result.Events.Select(evt => evt.Phase).Should().Contain(CanonPipelinePhase.Aggregation);
+
+        persistence.CanonicalEntities.OfType<ContactCanon>()
+            .Should().ContainSingle(c => c.Id == result.Canonical.Id);
+
+        var index = persistence.FindIndex(entityType, indexKey);
+        index.Should().NotBeNull();
+        index!.CanonicalId.Should().Be(result.Canonical.Id);
+        index.Attributes.Should().ContainKey("arrivalToken").WhoseValue.Should().Be(result.Canonical.Id);
     }
 
     [Fact]
-    public Task Canonize_persists_entity_and_records_index()
-        => TestPipeline.For<CanonRuntimeSpec>(_output, nameof(Canonize_persists_entity_and_records_index))
-            .Arrange(ctx =>
-            {
-                var (persistence, runtime) = BuildRuntime();
-                ctx.SetItem(PersistenceKey, persistence);
-                ctx.SetItem(RuntimeKey, runtime);
-            })
-            .Act(ctx => new ValueTask(ExecuteCanonize(ctx)))
-            .Assert(ctx =>
-            {
-                var result = ctx.GetRequiredItem<CanonizationResult<ContactCanon>>(ResultKey);
-                var persistence = ctx.GetRequiredItem<InMemoryCanonPersistence>(PersistenceKey);
-                var email = ctx.GetRequiredItem<string>(EmailKey);
-                var entityType = typeof(ContactCanon).FullName ?? typeof(ContactCanon).Name;
-                var indexKey = $"Email={email}";
+    public async Task Stage_only_requests_create_stage_record()
+    {
+        var (persistence, runtime) = BuildRuntime();
 
-                result.Outcome.Should().Be(CanonizationOutcome.Canonized);
-                result.DistributionSkipped.Should().BeTrue();
-                result.Canonical.DisplayName.Should().Be("ADA LOVELACE");
-                result.Metadata.CanonicalId.Should().NotBeNullOrWhiteSpace();
-                result.Metadata.Tags.Should().ContainKey("processed").WhoseValue.Should().Be("true");
-                result.Metadata.Tags.Should().ContainKey("tracking").WhoseValue.Should().Be("enabled");
-                result.Events.Should().NotBeEmpty();
-                result.Events.Select(evt => evt.Phase).Should().Contain(CanonPipelinePhase.Aggregation);
+        var email = $"stage-{Guid.CreateVersion7():N}@example.com";
+        var correlation = $"corr-{Guid.CreateVersion7():N}";
 
-                persistence.CanonicalEntities.OfType<ContactCanon>()
-                    .Should().ContainSingle(c => c.Id == result.Canonical.Id);
+        var entity = new ContactCanon
+        {
+            Email = email,
+            PhoneNumber = "555-0200",
+            DisplayName = "Grace Hopper"
+        };
 
-                var index = persistence.FindIndex(entityType, indexKey);
-                index.Should().NotBeNull();
-                index!.CanonicalId.Should().Be(result.Canonical.Id);
-                index.Attributes.Should().ContainKey("arrivalToken").WhoseValue.Should().Be(result.Canonical.Id);
-            })
-            .Run();
+        var options = CanonizationOptions.Default
+            .WithStageBehavior(CanonStageBehavior.StageOnly)
+            .WithOrigin("queue")
+            .WithTag("tracking", "stage-only");
+        options = options with { CorrelationId = correlation };
 
-    [Fact]
-    public Task Stage_only_requests_create_stage_record()
-        => TestPipeline.For<CanonRuntimeSpec>(_output, nameof(Stage_only_requests_create_stage_record))
-            .Arrange(ctx =>
-            {
-                var (persistence, runtime) = BuildRuntime();
-                ctx.SetItem(PersistenceKey, persistence);
-                ctx.SetItem(RuntimeKey, runtime);
-            })
-            .Act(ctx => new ValueTask(ExecuteStageOnly(ctx)))
-            .Assert(ctx =>
-            {
-                var result = ctx.GetRequiredItem<CanonizationResult<ContactCanon>>(StageResultKey);
-                var persistence = ctx.GetRequiredItem<InMemoryCanonPersistence>(PersistenceKey);
-                var email = ctx.GetRequiredItem<string>(EmailKey);
-                var correlation = ctx.GetRequiredItem<string>(StageCorrelationKey);
+        var result = await runtime.Canonize(entity, options, CancellationToken.None);
 
-                result.Outcome.Should().Be(CanonizationOutcome.Parked);
-                result.DistributionSkipped.Should().BeTrue();
-                result.Events.Should().ContainSingle(evt => evt.Phase == CanonPipelinePhase.Intake);
-                result.Metadata.Tags.Should().ContainKey("tracking").WhoseValue.Should().Be("stage-only");
+        result.Outcome.Should().Be(CanonizationOutcome.Parked);
+        result.DistributionSkipped.Should().BeTrue();
+        result.Events.Should().ContainSingle(evt => evt.Phase == CanonPipelinePhase.Intake);
+        result.Metadata.Tags.Should().ContainKey("tracking").WhoseValue.Should().Be("stage-only");
 
-                persistence.CanonicalEntities.Should().BeEmpty();
+        persistence.CanonicalEntities.Should().BeEmpty();
 
-                var stages = persistence.StageRecords.OfType<CanonStage<ContactCanon>>().ToArray();
-                stages.Should().HaveCount(1);
+        var stages = persistence.StageRecords.OfType<CanonStage<ContactCanon>>().ToArray();
+        stages.Should().HaveCount(1);
 
-                var stage = stages[0];
-                stage.Status.Should().Be(CanonStageStatus.Pending);
-                stage.CorrelationId.Should().Be(correlation);
-                stage.Payload.Should().NotBeNull();
-                stage.Payload!.Email.Should().Be(email);
-                stage.Metadata.Should().ContainKey("runtime:stage-behavior").WhoseValue.Should().Be(CanonStageBehavior.StageOnly.ToString());
-            })
-            .Run();
+        var stage = stages[0];
+        stage.Status.Should().Be(CanonStageStatus.Pending);
+        stage.CorrelationId.Should().Be(correlation);
+        stage.Payload.Should().NotBeNull();
+        stage.Payload!.Email.Should().Be(email);
+        stage.Metadata.Should().ContainKey("runtime:stage-behavior").WhoseValue.Should().Be(CanonStageBehavior.StageOnly.ToString());
+    }
 
     private static (InMemoryCanonPersistence Persistence, CanonRuntime Runtime) BuildRuntime()
     {
@@ -106,52 +103,6 @@ public sealed class CanonRuntimeSpec
             });
         });
         return (persistence, builder.Build());
-    }
-
-    private async Task ExecuteCanonize(TestContext ctx)
-    {
-        var runtime = ctx.GetRequiredItem<ICanonRuntime>(RuntimeKey);
-        var email = $"canon-{ctx.ExecutionId:N}@example.com";
-        ctx.SetItem(EmailKey, email);
-
-        var entity = new ContactCanon
-        {
-            Email = email,
-            PhoneNumber = "555-0100",
-            DisplayName = "Ada Lovelace"
-        };
-
-        var options = CanonizationOptions.Default
-            .WithOrigin("unit-spec")
-            .WithTag("tracking", "enabled");
-
-        var result = await runtime.Canonize(entity, options, ctx.Cancellation).ConfigureAwait(false);
-        ctx.SetItem(ResultKey, result);
-    }
-
-    private async Task ExecuteStageOnly(TestContext ctx)
-    {
-        var runtime = ctx.GetRequiredItem<ICanonRuntime>(RuntimeKey);
-        var email = $"stage-{ctx.ExecutionId:N}@example.com";
-        ctx.SetItem(EmailKey, email);
-        var correlation = $"corr-{ctx.ExecutionId:N}";
-
-        var entity = new ContactCanon
-        {
-            Email = email,
-            PhoneNumber = "555-0200",
-            DisplayName = "Grace Hopper"
-        };
-
-        var options = CanonizationOptions.Default
-            .WithStageBehavior(CanonStageBehavior.StageOnly)
-            .WithOrigin("queue")
-            .WithTag("tracking", "stage-only");
-        options = options with { CorrelationId = correlation };
-
-        var result = await runtime.Canonize(entity, options, ctx.Cancellation).ConfigureAwait(false);
-        ctx.SetItem(StageResultKey, result);
-        ctx.SetItem(StageCorrelationKey, correlation);
     }
 
     private sealed class InMemoryCanonPersistence : ICanonPersistence
