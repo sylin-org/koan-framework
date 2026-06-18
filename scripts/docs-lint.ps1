@@ -140,7 +140,7 @@ foreach ($file in $files) {
 $issues = New-Object System.Collections.Generic.List[object]
 
 $allowedTypes = @("REF", "GUIDE", "ARCH", "DEV", "SUPPORT", "ARCHITECTURE", "REFERENCE", "ENGINEERING", "DESIGN", "SPEC")
-$allowedDomains = @("core", "data", "web", "ai", "flow", "messaging", "storage", "media", "orchestration", "scheduling", "jobs", "mcp", "framework", "architecture", "engineering", "performance", "troubleshooting", "platform", "canon")
+$allowedDomains = @("core", "data", "web", "ai", "flow", "messaging", "storage", "media", "orchestration", "scheduling", "jobs", "mcp", "observability", "framework", "architecture", "engineering", "performance", "troubleshooting", "platform", "canon")
 $allowedStatuses = @("current", "draft", "deprecated")
 $allowedAudience = @("developers", "architects", "ai-agents", "maintainers", "support-engineers", "security-engineers", "technical-leads", "ai-engineers")
 
