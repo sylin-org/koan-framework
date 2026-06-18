@@ -12,4 +12,4 @@ dotnet add package Sylin.Koan.AI
 ```
 
 ## Links
-- AI contracts: https://github.com/sylin-labs/Koan-framework/blob/dev/src/Koan.AI.Contracts
+- AI contracts: https://github.com/sylin-org/Koan-framework/blob/dev/src/Koan.AI.Contracts

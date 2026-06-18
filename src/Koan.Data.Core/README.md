@@ -38,4 +38,4 @@ See TECHNICAL.md for contracts, options, and extension points.
 - Data access patterns: `/docs/guides/data/all-query-streaming-and-pager.md`
 - Decision: `/docs/decisions/DATA-0061-data-access-pagination-and-streaming.md`
 - Engineering guardrails: `/docs/engineering/index.md`
-- Repo: https://github.com/sylin-labs/Koan-framework
+- Repo: https://github.com/sylin-org/Koan-framework

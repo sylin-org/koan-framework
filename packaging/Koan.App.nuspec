@@ -7,8 +7,8 @@
     <authors>Sylin Labs</authors>
     <owners>Sylin Labs</owners>
   <license type="expression">Apache-2.0</license>
-    <projectUrl>https://github.com/sylin-labs/Koan-framework</projectUrl>
-  <repository type="git" url="https://github.com/sylin-labs/Koan-framework.git" />
+    <projectUrl>https://github.com/sylin-org/Koan-framework</projectUrl>
+  <repository type="git" url="https://github.com/sylin-org/Koan-framework.git" />
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
   <description>Meta-package for Koan apps: includes Sylin.Koan and Sylin.Koan.Web for ASP.NET Core scenarios.</description>
   <readme>README.md</readme>
@@ -17,7 +17,7 @@
       <packageType name="Dependency" />
     </packageTypes>
     <dependencies>
-      <group targetFramework="net9.0">
+      <group targetFramework="net10.0">
         <dependency id="Sylin.Koan" version="$depVersionRange$" />
         <dependency id="Sylin.Koan.Web" version="$depVersionRange$" />
       </group>

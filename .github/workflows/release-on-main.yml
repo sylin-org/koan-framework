@@ -7,14 +7,16 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # What this does, in order, on every push to main:
 #   1. Builds the full solution (refuses to release a broken build).
-#   2. Packs every packable csproj under src/ with -p:PublicRelease=true.
+#   2. Runs the test suite (refuses to release if tests fail; container specs self-skip
+#      without Docker, but GitHub's ubuntu runner ships Docker so they run here).
+#   3. Packs every packable csproj under src/ with -p:PublicRelease=true.
 #      Nerdbank.GitVersioning (via each package's version.json + pathFilters)
 #      stamps each package with its own version (patch = git height of the
 #      package folder since its major.minor last changed). --skip-duplicate
 #      makes every push idempotent; packages whose version did not change are
 #      silently skipped by nuget.org.
-#   3. Creates a date-based release tag (release/YYYY-MM-DD[-N]).
-#   4. Pushes all nupkg and snupkg to nuget.org.
+#   4. Creates a date-based release tag (release/YYYY-MM-DD[-N]).
+#   5. Pushes all nupkg and snupkg to nuget.org.
 #
 # What you do:
 #   - Open a PR dev -> main, merge it. That is it.
@@ -69,6 +71,12 @@ jobs:
         run: |
           dotnet build Koan.sln -c Release --nologo "-p:NuGetAudit=false" "-p:PublicRelease=true"
           if ($LASTEXITCODE -ne 0) { throw "Build failed -- refusing to release a broken main." }
+
+      - name: Test the solution (release gate -- refuse to publish a failing main)
+        shell: pwsh
+        run: |
+          dotnet test Koan.sln -c Release --no-build --nologo
+          if ($LASTEXITCODE -ne 0) { throw "Tests failed -- refusing to release a broken main." }
 
       - name: Pack all packable projects (PublicRelease=true)
         shell: pwsh

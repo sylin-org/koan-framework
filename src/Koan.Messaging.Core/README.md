@@ -12,7 +12,7 @@ dotnet add package Sylin.Koan.Messaging.Core
 ```
 
 ## Links
-- Messaging reference: https://github.com/sylin-labs/Koan-framework/tree/dev/docs/reference
+- Messaging reference: https://github.com/sylin-org/Koan-framework/tree/dev/docs/reference
 
 ## Usage
 

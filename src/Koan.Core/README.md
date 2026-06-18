@@ -16,5 +16,5 @@ dotnet add package Sylin.Koan.Core
 - Environment: use `KoanEnv.Current` for machine/env metadata
 
 ## Links
-- Repo: https://github.com/sylin-labs/Koan-framework
-- Docs: https://github.com/sylin-labs/Koan-framework/tree/dev/docs
+- Repo: https://github.com/sylin-org/Koan-framework
+- Docs: https://github.com/sylin-org/Koan-framework/tree/dev/docs
