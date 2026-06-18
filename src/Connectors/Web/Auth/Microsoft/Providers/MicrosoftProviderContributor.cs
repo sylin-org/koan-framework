@@ -8,20 +8,7 @@ namespace Koan.Web.Auth.Connector.Microsoft.Providers;
 internal sealed class MicrosoftProviderContributor : IAuthProviderContributor
 {
     public IReadOnlyDictionary<string, ProviderOptions> GetDefaults()
-    {
-        return new Dictionary<string, ProviderOptions>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["microsoft"] = new ProviderOptions
-            {
-                Type = AuthConstants.Protocols.Oidc,
-                DisplayName = "Microsoft",
-                Icon = "/icons/microsoft.svg",
-                Authority = "https://login.microsoftonline.com/common/v2.0",
-                Scopes = new[] { "openid", "email", "profile" },
-                Enabled = true,
-                Priority = 200
-            }
-        };
-    }
+        => AuthProviderDefaults.Oidc("microsoft", "Microsoft", "/icons/microsoft.svg",
+            "https://login.microsoftonline.com/common/v2.0", new[] { "openid", "email", "profile" }, priority: 200);
 }
 

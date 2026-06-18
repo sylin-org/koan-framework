@@ -7,22 +7,8 @@ namespace Koan.Web.Auth.Connector.Discord.Providers;
 internal sealed class DiscordProviderContributor : IAuthProviderContributor
 {
     public IReadOnlyDictionary<string, ProviderOptions> GetDefaults()
-    {
-        return new Dictionary<string, ProviderOptions>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["discord"] = new ProviderOptions
-            {
-                Type = AuthConstants.Protocols.OAuth2,
-                DisplayName = "Discord",
-                Icon = "/icons/discord.svg",
-                AuthorizationEndpoint = "https://discord.com/api/oauth2/authorize",
-                TokenEndpoint = "https://discord.com/api/oauth2/token",
-                UserInfoEndpoint = "https://discord.com/api/users/@me",
-                Scopes = new[] { "identify", "email" },
-                Enabled = true,
-                Priority = 150
-            }
-        };
-    }
+        => AuthProviderDefaults.OAuth2("discord", "Discord", "/icons/discord.svg",
+            "https://discord.com/api/oauth2/authorize", "https://discord.com/api/oauth2/token", "https://discord.com/api/users/@me",
+            new[] { "identify", "email" }, priority: 150);
 }
 

@@ -8,20 +8,7 @@ namespace Koan.Web.Auth.Connector.Google.Providers;
 internal sealed class GoogleProviderContributor : IAuthProviderContributor
 {
     public IReadOnlyDictionary<string, ProviderOptions> GetDefaults()
-    {
-        return new Dictionary<string, ProviderOptions>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["google"] = new ProviderOptions
-            {
-                Type = AuthConstants.Protocols.Oidc,
-                DisplayName = "Google",
-                Icon = "/icons/google.svg",
-                Authority = "https://accounts.google.com",
-                Scopes = new[] { "openid", "email", "profile" },
-                Enabled = true,
-                Priority = 200
-            }
-        };
-    }
+        => AuthProviderDefaults.Oidc("google", "Google", "/icons/google.svg",
+            "https://accounts.google.com", new[] { "openid", "email", "profile" }, priority: 200);
 }
 
