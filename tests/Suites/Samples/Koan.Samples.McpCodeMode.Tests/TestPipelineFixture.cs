@@ -1,4 +1,3 @@
-using Koan.Testing;
 using Koan.Mcp.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Mcp.Extensions;
@@ -21,7 +20,7 @@ using Microsoft.Extensions.Hosting;
 
 namespace Koan.Samples.McpCodeMode.Tests;
 
-public class TestPipelineFixture : KoanTestPipelineFixtureBase
+public class TestPipelineFixture : TestHostFixtureBase
 {
     public TestPipelineFixture() : base(typeof(Program)) { }
 

@@ -1,4 +1,3 @@
-using Koan.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Mcp.Extensions;
 using Koan.Web.Extensions;
@@ -16,7 +15,7 @@ namespace Koan.Samples.McpCodeMode.Tests;
 /// tools/list AND refuse koan.code.execute / koan.code.validate when called by name — discovery
 /// hiding is not a security control on its own. Entity tools stay exposed (Full).
 /// </summary>
-public class CodeModeDisabledFixture : KoanTestPipelineFixtureBase
+public class CodeModeDisabledFixture : TestHostFixtureBase
 {
     public CodeModeDisabledFixture() : base(typeof(Program)) { }
 

@@ -80,7 +80,7 @@ public class CodeModeGatingSpec :
         resp["meta"]?["errorCode"]?.Value<string>().Should().Be("code_mode_disabled");
     }
 
-    private static async Task<List<string?>> ListToolNames(Koan.Testing.KoanTestPipelineFixtureBase fx)
+    private static async Task<List<string?>> ListToolNames(TestHostFixtureBase fx)
     {
         var listObj = await fx.InvokeRpc("tools/list", Guid.NewGuid().ToString("n"));
         var root = JToken.FromObject(listObj!);
@@ -88,7 +88,7 @@ public class CodeModeGatingSpec :
         return tools.Select(t => t["name"]?.Value<string>()).ToList();
     }
 
-    private static async Task<JToken> Call(Koan.Testing.KoanTestPipelineFixtureBase fx, string name, object args)
+    private static async Task<JToken> Call(TestHostFixtureBase fx, string name, object args)
     {
         var argObj = JObject.FromObject(args);
         var resultObj = await fx.InvokeRpc("tools/call", Guid.NewGuid().ToString("n"), name, argObj);
