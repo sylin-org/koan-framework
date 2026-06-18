@@ -1,0 +1,52 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# PR gate (B2) — build + test + docs verification on pull requests.
+#
+# Until now the only active CI was release-on-main.yml (build-only, on merge) and
+# surfaces.yml (ledger lint); ci.yml / validate-main-pr.yml are disabled noop
+# placeholders, so nothing built or tested PRs. This gate runs the SAME canonical
+# merge check developers run locally — scripts/green-ratchet.ps1 — so "green in CI"
+# and "green on my machine" are one definition that cannot drift:
+#   A.  build      dotnet build Koan.sln                  (framework + dogfood samples)
+#   A'. test       dotnet test  Koan.sln --no-build       (container-gated specs self-skip)
+#   B.  docs-lint  scripts/docs-lint.ps1                  (links / front-matter / anchors)
+#   C.  doc-code   scripts/validate-code-examples.ps1     (diff-scoped, opt-in <!-- validate --> blocks)
+#
+# Release config matches what release-on-main.yml ships. Doc-code diffs against the
+# PR's target branch so only docs the PR actually touched are validated.
+#
+# Does NOT touch release-on-main.yml (that is B3's scope).
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: PR gate
+
+on:
+  pull_request:
+    branches: [main, dev]
+
+# One gate run per PR; a newer push cancels the older in-flight run.
+concurrency:
+  group: pr-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout (full history so doc-code can diff vs the base branch)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET (per global.json)
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Green ratchet (build + test + docs-lint + doc-code)
+        shell: pwsh
+        run: |
+          ./scripts/green-ratchet.ps1 -Configuration Release -Base "origin/${{ github.event.pull_request.base.ref }}"
