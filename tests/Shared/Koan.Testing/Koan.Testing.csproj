@@ -20,4 +20,10 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- ARCH-0091: the ARCH-0079 reflective host (KoanIntegrationHost) moved to the xUnit-free
+         Koan.Testing.Hosting project. Re-expose it transitively so existing consumers — including
+         the fenced xUnit-v2 Koan.Jobs.TestKit — keep resolving Koan.Testing.Integration.* unchanged. -->
+    <ProjectReference Include="..\Koan.Testing.Hosting\Koan.Testing.Hosting.csproj" />
+  </ItemGroup>
 </Project>

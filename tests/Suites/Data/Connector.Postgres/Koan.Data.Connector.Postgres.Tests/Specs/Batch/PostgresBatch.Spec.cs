@@ -1,58 +1,33 @@
-﻿using System;
-using Koan.Data.Connector.Postgres.Tests.Support;
-
 namespace Koan.Data.Connector.Postgres.Tests.Specs.Batch;
 
-public sealed class PostgresBatchSpec
+public sealed class PostgresBatchSpec(PostgresFixture fixture, ITestOutputHelper output)
+    : KoanDataSpec<PostgresFixture>(fixture, output)
 {
-    private readonly ITestOutputHelper _output;
-
-    public PostgresBatchSpec(ITestOutputHelper output)
-    {
-        _output = output ?? throw new ArgumentNullException(nameof(output));
-    }
-
     [Fact]
     public async Task Batch_operations_apply_atomically()
     {
-        var databaseName = $"koan_tests_{Guid.NewGuid():N}";
+        RequireBackingStore();
+        await using var host = await BootAsync();
+        var partition = NewPartition("batch");
+        using var lease = Lease(partition);
 
-        await TestPipeline.For<PostgresBatchSpec>(_output, nameof(Batch_operations_apply_atomically))
-            .RequireDocker()
-            .UsingPostgresContainer(database: databaseName)
-            .Using<PostgresConnectorFixture>("fixture", static ctx => PostgresConnectorFixture.Create(ctx))
-            .Arrange(static async ctx =>
-            {
-                var fixture = ctx.GetRequiredItem<PostgresConnectorFixture>("fixture");
-                await fixture.ResetAsync<InventoryItem, string>();
-            })
-            .Assert(async ctx =>
-            {
-                var fixture = ctx.GetRequiredItem<PostgresConnectorFixture>("fixture");
-                fixture.BindHost();
+        var toUpdate = await InventoryItem.Upsert(new InventoryItem { Name = "Widget", Quantity = 5 });
+        var toDelete = await InventoryItem.Upsert(new InventoryItem { Name = "Spare", Quantity = 3 });
 
-                var partition = fixture.EnsurePartition(ctx);
-                await using var lease = fixture.LeasePartition(partition);
+        var batch = InventoryItem.Batch();
+        batch.Add(new InventoryItem { Name = "New", Quantity = 7 });
+        batch.Update(toUpdate.Id, item => item.Quantity = 11);
+        batch.Delete(toDelete.Id);
 
-                var toUpdate = await InventoryItem.Upsert(new InventoryItem { Name = "Widget", Quantity = 5 });
-                var toDelete = await InventoryItem.Upsert(new InventoryItem { Name = "Spare", Quantity = 3 });
+        var result = await batch.Save();
+        result.Added.Should().Be(1);
+        result.Updated.Should().Be(1);
+        result.Deleted.Should().Be(1);
 
-                var batch = InventoryItem.Batch();
-                batch.Add(new InventoryItem { Name = "New", Quantity = 7 });
-                batch.Update(toUpdate.Id, item => item.Quantity = 11);
-                batch.Delete(toDelete.Id);
-
-                var result = await batch.Save();
-                result.Added.Should().Be(1);
-                result.Updated.Should().Be(1);
-                result.Deleted.Should().Be(1);
-
-                var remaining = await InventoryItem.All(partition);
-                remaining.Should().HaveCount(2);
-                remaining.Should().ContainSingle(item => item.Name == "Widget" && item.Quantity == 11);
-                remaining.Should().ContainSingle(item => item.Name == "New" && item.Quantity == 7);
-            })
-            .Run();
+        var remaining = await InventoryItem.All(partition);
+        remaining.Should().HaveCount(2);
+        remaining.Should().ContainSingle(item => item.Name == "Widget" && item.Quantity == 11);
+        remaining.Should().ContainSingle(item => item.Name == "New" && item.Quantity == 7);
     }
 
     private sealed class InventoryItem : Entity<InventoryItem>

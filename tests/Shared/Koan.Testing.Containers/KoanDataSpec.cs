@@ -1,0 +1,85 @@
+using System;
+using System.Threading.Tasks;
+using Koan.Core;
+using Koan.Core.Hosting.App;
+using Koan.Data.Core;
+using Koan.Testing.Integration;
+using Xunit;
+
+namespace Koan.Testing.Containers;
+
+/// <summary>
+/// ARCH-0091 base for engine integration specs. Injects the assembly-shared container fixture
+/// (<typeparamref name="TFixture"/>) and provides the three things every connector spec needs:
+/// a Docker-absent skip guard, a real reflective <c>AddKoan()</c> boot bound to the ambient host
+/// (ARCH-0079), and a per-call isolation partition lease (ARCH-0091 Decision 4).
+/// </summary>
+/// <remarks>
+/// Specs run sequentially within an engine assembly because <see cref="AppHost.Current"/> is a
+/// process-global ambient (the repo's established pattern for ambient-host suites); engines
+/// parallelize across processes (each test project is its own xUnit v3 executable).
+/// </remarks>
+public abstract class KoanDataSpec<TFixture> where TFixture : KoanContainerFixture
+{
+    protected TFixture Fixture { get; }
+    protected ITestOutputHelper Output { get; }
+
+    protected KoanDataSpec(TFixture fixture, ITestOutputHelper output)
+    {
+        Fixture = fixture ?? throw new ArgumentNullException(nameof(fixture));
+        Output = output ?? throw new ArgumentNullException(nameof(output));
+    }
+
+    /// <summary>Skip the test (native v3 dynamic skip) when the backing store is unavailable.</summary>
+    protected void RequireBackingStore()
+    {
+        if (!Fixture.IsAvailable)
+        {
+            Assert.Skip(Fixture.Reason ?? $"{Fixture.Engine} backing store unavailable");
+        }
+    }
+
+    /// <summary>
+    /// Boot a real Koan host over the fixture's settings via the ARCH-0079 reflective host and bind
+    /// it as the ambient <see cref="AppHost.Current"/> so the static <c>Entity&lt;T&gt;</c> API resolves.
+    /// Disposing (via <c>await using</c>) stops the host and clears the ambient binding.
+    /// </summary>
+    protected async Task<BoundHost> BootAsync()
+    {
+        var host = await KoanIntegrationHost.Configure()
+            .WithSettings(Fixture.Settings)
+            .ConfigureServices(s => s.AddKoan())
+            .StartAsync()
+            .ConfigureAwait(false);
+        AppHost.Current = host.Services;
+        return new BoundHost(host);
+    }
+
+    /// <summary>A fresh, unique partition name for this spec (engine-prefixed, GUID v7) for data isolation.</summary>
+    protected string NewPartition(string? label = null)
+    {
+        var suffix = label is null ? string.Empty : $"-{label}";
+        return $"{Fixture.Engine}-{Guid.CreateVersion7():n}{suffix}";
+    }
+
+    /// <summary>Lease a partition as the ambient scope so the static <c>Entity&lt;T&gt;</c> API targets it.</summary>
+    protected static IDisposable Lease(string partition) => EntityContext.Partition(partition);
+
+    /// <summary>A reflective Koan host bound as <see cref="AppHost.Current"/>; clears the binding on dispose.</summary>
+    protected sealed class BoundHost : IAsyncDisposable
+    {
+        private readonly IntegrationHost _host;
+        internal BoundHost(IntegrationHost host) => _host = host;
+
+        public IServiceProvider Services => _host.Services;
+
+        public async ValueTask DisposeAsync()
+        {
+            if (ReferenceEquals(AppHost.Current, _host.Services))
+            {
+                AppHost.Current = null;
+            }
+            await _host.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+}

@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    ARCH-0091: the xUnit v3 container-fixture library. Thin IAsyncLifetime fixtures over the
+    official Testcontainers 4.x module builders, shared per engine assembly via
+    [assembly: AssemblyFixture(...)]. Replaces the bespoke tests/Shared/Koan.Testing container
+    harness (TestPipeline/TestContext/FixtureRegistry/DockerDaemonFixture/dead DotNet.Testcontainers).
+    Couples to Koan.Core/Koan.Data.Core (test-only) so the shared KoanDataSpec base can boot the
+    ARCH-0079 reflective host + lease an isolation partition for every engine in one place.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit.v3.extensibility.core" Version="3.2.2" />
+    <PackageReference Include="xunit.v3.assert" Version="3.2.2" />
+    <!-- Engine modules are added here as each engine is rolled out (ARCH-0091 staged rollout). -->
+    <PackageReference Include="Testcontainers.PostgreSql" Version="4.11.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Testing.Hosting\Koan.Testing.Hosting.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
+  </ItemGroup>
+</Project>

@@ -27,6 +27,11 @@ namespace Koan.Testing.Integration;
 /// suites adopt this helper directly; the canon (ARCH-0079) mandates new adapters use it
 /// instead of inventing their own host wiring.
 /// </para>
+/// <para>
+/// <b>Project placement (ARCH-0091):</b> this type lives in the xUnit-agnostic
+/// <c>Koan.Testing.Hosting</c> project (no xUnit dependency) so it can be referenced by both
+/// xUnit v2 and v3 consumers across the test-suite's framework migration.
+/// </para>
 /// </remarks>
 public static class KoanIntegrationHost
 {
