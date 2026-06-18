@@ -20,18 +20,6 @@ public sealed class TransactionErrorHandlingSpec
         _output = output ?? throw new ArgumentNullException(nameof(output));
     }
 
-    private static string EnsurePartition(TestContext ctx)
-    {
-        const string Key = "partition";
-        if (!ctx.TryGetItem<string>(Key, out var partition))
-        {
-            partition = $"tx-error-handling-{ctx.ExecutionId:n}";
-            ctx.SetItem(Key, partition);
-        }
-
-        return partition;
-    }
-
     // NOTE: invalid-transition behavior (Commit/Rollback without an active transaction, double-commit,
     // commit-after-rollback) is an idempotent NO-OP — see TransactionStateValidationSpec. The former
     // "*_throws_exception" tests here were removed when that contract was settled (no-op, not throw).
@@ -39,215 +27,176 @@ public sealed class TransactionErrorHandlingSpec
     [Fact]
     public async Task Empty_transaction_commits_successfully()
     {
-        await TestPipeline.For<TransactionErrorHandlingSpec>(_output, nameof(Empty_transaction_commits_successfully))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Assert(static async _ =>
-            {
-                var success = false;
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
 
-                // Transaction with no operations
-                using (EntityContext.Transaction("empty-transaction"))
-                {
-                    await EntityContext.Commit();
-                    success = true;
-                }
+        var success = false;
 
-                success.Should().BeTrue("empty transaction should commit successfully");
-            })
-            .Run();
+        // Transaction with no operations
+        using (EntityContext.Transaction("empty-transaction"))
+        {
+            await EntityContext.Commit();
+            success = true;
+        }
+
+        success.Should().BeTrue("empty transaction should commit successfully");
     }
 
     [Fact]
     public async Task Transaction_with_same_entity_saved_multiple_times()
     {
-        await TestPipeline.For<TransactionErrorHandlingSpec>(_output, nameof(Transaction_with_same_entity_saved_multiple_times))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Arrange(static ctx =>
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
+
+        var partition = $"tx-error-handling-{Guid.CreateVersion7():n}";
+
+        var entity = new TodoEntity { Title = "Original", Description = "Version 1" };
+
+        using (EntityContext.Partition(partition))
+        {
+            using (EntityContext.Transaction("multiple-saves"))
             {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                var partition = EnsurePartition(ctx);
-                ctx.SetItem("partition", partition);
-            })
-            .Assert(static async ctx =>
-            {
-                var partition = ctx.GetRequiredItem<string>("partition");
+                await entity.Save();
 
-                var entity = new TodoEntity { Title = "Original", Description = "Version 1" };
+                entity.Description = "Version 2";
+                await entity.Save();
 
-                using (EntityContext.Partition(partition))
-                {
-                    using (EntityContext.Transaction("multiple-saves"))
-                    {
-                        await entity.Save();
+                entity.Description = "Version 3";
+                await entity.Save();
 
-                        entity.Description = "Version 2";
-                        await entity.Save();
+                await EntityContext.Commit();
+            }
 
-                        entity.Description = "Version 3";
-                        await entity.Save();
+            // Verify final version was persisted
+            var retrieved = await TodoEntity.Get(entity.Id);
+            retrieved.Should().NotBeNull();
+            retrieved!.Description.Should().Be("Version 3", "last save should win");
+        }
 
-                        await EntityContext.Commit();
-                    }
-
-                    // Verify final version was persisted
-                    var retrieved = await TodoEntity.Get(entity.Id);
-                    retrieved.Should().NotBeNull();
-                    retrieved!.Description.Should().Be("Version 3", "last save should win");
-                }
-
-                entity.Should().NotBeNull();
-            })
-            .Run();
+        entity.Should().NotBeNull();
     }
 
     [Fact]
     public async Task Transaction_context_restored_after_exception()
     {
-        await TestPipeline.For<TransactionErrorHandlingSpec>(_output, nameof(Transaction_context_restored_after_exception))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Assert(static async _ =>
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
+
+        var beforeTransaction = EntityContext.InTransaction;
+
+        try
+        {
+            using (EntityContext.Transaction("exception-test"))
             {
-                var beforeTransaction = EntityContext.InTransaction;
+                // Throw exception inside transaction
+                throw new InvalidOperationException("Simulated error");
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            // Expected
+        }
 
-                try
-                {
-                    using (EntityContext.Transaction("exception-test"))
-                    {
-                        // Throw exception inside transaction
-                        throw new InvalidOperationException("Simulated error");
-                    }
-                }
-                catch (InvalidOperationException)
-                {
-                    // Expected
-                }
+        var afterTransaction = EntityContext.InTransaction;
 
-                var afterTransaction = EntityContext.InTransaction;
+        beforeTransaction.Should().BeFalse();
+        afterTransaction.Should().BeFalse("context should be restored after exception");
 
-                beforeTransaction.Should().BeFalse();
-                afterTransaction.Should().BeFalse("context should be restored after exception");
-
-                await Task.CompletedTask;
-            })
-            .Run();
+        await Task.CompletedTask;
     }
 
     [Fact]
     public async Task Transaction_with_partition_routing()
     {
-        await TestPipeline.For<TransactionErrorHandlingSpec>(_output, nameof(Transaction_with_partition_routing))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Arrange(static ctx =>
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
+
+        var executionId = Guid.CreateVersion7().ToString("n");
+        var partition1 = $"partition-1-{executionId}";
+        var partition2 = $"partition-2-{executionId}";
+
+        var entity1 = new TodoEntity { Title = "Partition 1", Description = "In partition 1" };
+        var entity2 = new TodoEntity { Title = "Partition 2", Description = "In partition 2" };
+
+        // Transaction across multiple partitions
+        using (EntityContext.Transaction("multi-partition"))
+        {
+            using (EntityContext.Partition(partition1))
             {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                var partition1 = $"partition-1-{ctx.ExecutionId:n}";
-                var partition2 = $"partition-2-{ctx.ExecutionId:n}";
-                ctx.SetItem("partition1", partition1);
-                ctx.SetItem("partition2", partition2);
-            })
-            .Assert(static async ctx =>
+                await entity1.Save();
+            }
+
+            using (EntityContext.Partition(partition2))
             {
-                var partition1 = ctx.GetRequiredItem<string>("partition1");
-                var partition2 = ctx.GetRequiredItem<string>("partition2");
+                await entity2.Save();
+            }
 
-                var entity1 = new TodoEntity { Title = "Partition 1", Description = "In partition 1" };
-                var entity2 = new TodoEntity { Title = "Partition 2", Description = "In partition 2" };
+            await EntityContext.Commit();
+        }
 
-                // Transaction across multiple partitions
-                using (EntityContext.Transaction("multi-partition"))
-                {
-                    using (EntityContext.Partition(partition1))
-                    {
-                        await entity1.Save();
-                    }
+        // Verify entities in respective partitions
+        using (EntityContext.Partition(partition1))
+        {
+            var retrieved1 = await TodoEntity.Get(entity1.Id);
+            retrieved1.Should().NotBeNull("entity should be in partition 1");
 
-                    using (EntityContext.Partition(partition2))
-                    {
-                        await entity2.Save();
-                    }
+            var count1 = await TodoEntity.Count;
+            count1.Should().Be(1);
+        }
 
-                    await EntityContext.Commit();
-                }
+        using (EntityContext.Partition(partition2))
+        {
+            var retrieved2 = await TodoEntity.Get(entity2.Id);
+            retrieved2.Should().NotBeNull("entity should be in partition 2");
 
-                // Verify entities in respective partitions
-                using (EntityContext.Partition(partition1))
-                {
-                    var retrieved1 = await TodoEntity.Get(entity1.Id);
-                    retrieved1.Should().NotBeNull("entity should be in partition 1");
+            var count2 = await TodoEntity.Count;
+            count2.Should().Be(1);
+        }
 
-                    var count1 = await TodoEntity.Count;
-                    count1.Should().Be(1);
-                }
-
-                using (EntityContext.Partition(partition2))
-                {
-                    var retrieved2 = await TodoEntity.Get(entity2.Id);
-                    retrieved2.Should().NotBeNull("entity should be in partition 2");
-
-                    var count2 = await TodoEntity.Count;
-                    count2.Should().Be(1);
-                }
-
-                entity1.Should().NotBeNull();
-                entity2.Should().NotBeNull();
-            })
-            .Run();
+        entity1.Should().NotBeNull();
+        entity2.Should().NotBeNull();
     }
 
     [Fact]
     public async Task Transaction_with_adapter_and_partition_routing()
     {
-        await TestPipeline.For<TransactionErrorHandlingSpec>(_output, nameof(Transaction_with_adapter_and_partition_routing))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Arrange(static ctx =>
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
+
+        var partition = $"tx-error-handling-{Guid.CreateVersion7():n}";
+
+        var entity1 = new TodoEntity { Title = "SQLite + Partition", Description = "Default adapter with partition" };
+        var entity2 = new TodoEntity { Title = "JSON + Partition", Description = "JSON adapter with partition" };
+
+        // Transaction with adapter AND partition routing
+        using (EntityContext.Transaction("adapter-partition"))
+        {
+            // Default adapter with partition
+            using (EntityContext.Partition(partition))
             {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                var partition = EnsurePartition(ctx);
-                ctx.SetItem("partition", partition);
-            })
-            .Assert(static async ctx =>
+                await entity1.Save();
+            }
+
+            // JSON adapter with partition
+            using (EntityContext.Adapter("json"))
+            using (EntityContext.Partition(partition))
             {
-                var partition = ctx.GetRequiredItem<string>("partition");
+                await entity2.Save();
+            }
 
-                var entity1 = new TodoEntity { Title = "SQLite + Partition", Description = "Default adapter with partition" };
-                var entity2 = new TodoEntity { Title = "JSON + Partition", Description = "JSON adapter with partition" };
+            await EntityContext.Commit();
+        }
 
-                // Transaction with adapter AND partition routing
-                using (EntityContext.Transaction("adapter-partition"))
-                {
-                    // Default adapter with partition
-                    using (EntityContext.Partition(partition))
-                    {
-                        await entity1.Save();
-                    }
+        // Verify entities
+        using (EntityContext.Partition(partition))
+        {
+            var retrieved1 = await TodoEntity.Get(entity1.Id);
+            retrieved1.Should().NotBeNull();
+        }
 
-                    // JSON adapter with partition
-                    using (EntityContext.Adapter("json"))
-                    using (EntityContext.Partition(partition))
-                    {
-                        await entity2.Save();
-                    }
+        using (EntityContext.Adapter("json"))
+        using (EntityContext.Partition(partition))
+        {
+            var retrieved2 = await TodoEntity.Get(entity2.Id);
+            retrieved2.Should().NotBeNull();
+        }
 
-                    await EntityContext.Commit();
-                }
-
-                // Verify entities
-                using (EntityContext.Partition(partition))
-                {
-                    var retrieved1 = await TodoEntity.Get(entity1.Id);
-                    retrieved1.Should().NotBeNull();
-                }
-
-                using (EntityContext.Adapter("json"))
-                using (EntityContext.Partition(partition))
-                {
-                    var retrieved2 = await TodoEntity.Get(entity2.Id);
-                    retrieved2.Should().NotBeNull();
-                }
-
-                entity1.Should().NotBeNull();
-                entity2.Should().NotBeNull();
-            })
-            .Run();
+        entity1.Should().NotBeNull();
+        entity2.Should().NotBeNull();
     }
 }

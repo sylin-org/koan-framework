@@ -20,323 +20,261 @@ public sealed class CrossAdapterTransactionsSpec
         _output = output ?? throw new ArgumentNullException(nameof(output));
     }
 
-    private static string EnsurePartition(TestContext ctx)
-    {
-        const string Key = "partition";
-        if (!ctx.TryGetItem<string>(Key, out var partition))
-        {
-            partition = $"cross-adapter-tx-{ctx.ExecutionId:n}";
-            ctx.SetItem(Key, partition);
-        }
-
-        return partition;
-    }
-
     [Fact]
     public async Task Transaction_coordinates_saves_across_multiple_adapters()
     {
-        await TestPipeline.For<CrossAdapterTransactionsSpec>(_output, nameof(Transaction_coordinates_saves_across_multiple_adapters))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Arrange(static ctx =>
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
+
+        var partition = $"cross-adapter-tx-{Guid.CreateVersion7():n}";
+
+        var entitySqlite = new TodoEntity
+        {
+            Title = "SQLite Entity",
+            Description = "Saved to SQLite adapter"
+        };
+
+        var entityJson = new TodoEntity
+        {
+            Title = "JSON Entity",
+            Description = "Saved to JSON adapter"
+        };
+
+        // Transaction coordinating across SQLite and JSON adapters
+        using (EntityContext.Transaction("cross-adapter-test"))
+        {
+            // Save to default adapter (SQLite)
+            using (EntityContext.Partition(partition))
             {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                var partition = EnsurePartition(ctx);
-                ctx.SetItem("partition", partition);
-            })
-            .Assert(static async ctx =>
+                await entitySqlite.Save();
+            }
+
+            // Save to JSON adapter
+            using (EntityContext.Adapter("json"))
+            using (EntityContext.Partition(partition))
             {
-                var partition = ctx.GetRequiredItem<string>("partition");
+                await entityJson.Save();
+            }
 
-                var entitySqlite = new TodoEntity
-                {
-                    Title = "SQLite Entity",
-                    Description = "Saved to SQLite adapter"
-                };
+            // Commit both
+            await EntityContext.Commit();
+        }
 
-                var entityJson = new TodoEntity
-                {
-                    Title = "JSON Entity",
-                    Description = "Saved to JSON adapter"
-                };
+        // Verify both were persisted
+        using (EntityContext.Partition(partition))
+        {
+            var retrievedSqlite = await TodoEntity.Get(entitySqlite.Id);
+            retrievedSqlite.Should().NotBeNull("SQLite entity should be persisted");
+        }
 
-                // Transaction coordinating across SQLite and JSON adapters
-                using (EntityContext.Transaction("cross-adapter-test"))
-                {
-                    // Save to default adapter (SQLite)
-                    using (EntityContext.Partition(partition))
-                    {
-                        await entitySqlite.Save();
-                    }
+        using (EntityContext.Adapter("json"))
+        using (EntityContext.Partition(partition))
+        {
+            var retrievedJson = await TodoEntity.Get(entityJson.Id);
+            retrievedJson.Should().NotBeNull("JSON entity should be persisted");
+        }
 
-                    // Save to JSON adapter
-                    using (EntityContext.Adapter("json"))
-                    using (EntityContext.Partition(partition))
-                    {
-                        await entityJson.Save();
-                    }
-
-                    // Commit both
-                    await EntityContext.Commit();
-                }
-
-                // Verify both were persisted
-                using (EntityContext.Partition(partition))
-                {
-                    var retrievedSqlite = await TodoEntity.Get(entitySqlite.Id);
-                    retrievedSqlite.Should().NotBeNull("SQLite entity should be persisted");
-                }
-
-                using (EntityContext.Adapter("json"))
-                using (EntityContext.Partition(partition))
-                {
-                    var retrievedJson = await TodoEntity.Get(entityJson.Id);
-                    retrievedJson.Should().NotBeNull("JSON entity should be persisted");
-                }
-
-                entitySqlite.Should().NotBeNull();
-                entityJson.Should().NotBeNull();
-            })
-            .Run();
+        entitySqlite.Should().NotBeNull();
+        entityJson.Should().NotBeNull();
     }
 
     [Fact]
     public async Task Transaction_rollback_discards_changes_across_all_adapters()
     {
-        await TestPipeline.For<CrossAdapterTransactionsSpec>(_output, nameof(Transaction_rollback_discards_changes_across_all_adapters))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Arrange(static ctx =>
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
+
+        var partition = $"cross-adapter-tx-{Guid.CreateVersion7():n}";
+
+        var entity1 = new TodoEntity
+        {
+            Title = "SQLite - Should Rollback",
+            Description = "This should not persist"
+        };
+
+        var entity2 = new TodoEntity
+        {
+            Title = "JSON - Should Rollback",
+            Description = "This should also not persist"
+        };
+
+        // Transaction with rollback
+        using (EntityContext.Transaction("cross-adapter-rollback"))
+        {
+            // Track operations in SQLite
+            using (EntityContext.Partition(partition))
             {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                var partition = EnsurePartition(ctx);
-                ctx.SetItem("partition", partition);
-            })
-            .Assert(static async ctx =>
+                await entity1.Save();
+            }
+
+            // Track operations in JSON
+            using (EntityContext.Adapter("json"))
+            using (EntityContext.Partition(partition))
             {
-                var partition = ctx.GetRequiredItem<string>("partition");
+                await entity2.Save();
+            }
 
-                var entity1 = new TodoEntity
-                {
-                    Title = "SQLite - Should Rollback",
-                    Description = "This should not persist"
-                };
+            // Rollback - discard all tracked operations
+            await EntityContext.Rollback();
+        }
 
-                var entity2 = new TodoEntity
-                {
-                    Title = "JSON - Should Rollback",
-                    Description = "This should also not persist"
-                };
+        // Verify neither was persisted
+        using (EntityContext.Partition(partition))
+        {
+            var retrieved1 = await TodoEntity.Get(entity1.Id);
+            retrieved1.Should().BeNull("SQLite entity should not persist after rollback");
+        }
 
-                // Transaction with rollback
-                using (EntityContext.Transaction("cross-adapter-rollback"))
-                {
-                    // Track operations in SQLite
-                    using (EntityContext.Partition(partition))
-                    {
-                        await entity1.Save();
-                    }
+        using (EntityContext.Adapter("json"))
+        using (EntityContext.Partition(partition))
+        {
+            var retrieved2 = await TodoEntity.Get(entity2.Id);
+            retrieved2.Should().BeNull("JSON entity should not persist after rollback");
+        }
 
-                    // Track operations in JSON
-                    using (EntityContext.Adapter("json"))
-                    using (EntityContext.Partition(partition))
-                    {
-                        await entity2.Save();
-                    }
-
-                    // Rollback - discard all tracked operations
-                    await EntityContext.Rollback();
-                }
-
-                // Verify neither was persisted
-                using (EntityContext.Partition(partition))
-                {
-                    var retrieved1 = await TodoEntity.Get(entity1.Id);
-                    retrieved1.Should().BeNull("SQLite entity should not persist after rollback");
-                }
-
-                using (EntityContext.Adapter("json"))
-                using (EntityContext.Partition(partition))
-                {
-                    var retrieved2 = await TodoEntity.Get(entity2.Id);
-                    retrieved2.Should().BeNull("JSON entity should not persist after rollback");
-                }
-
-                entity1.Should().NotBeNull();
-                entity2.Should().NotBeNull();
-            })
-            .Run();
+        entity1.Should().NotBeNull();
+        entity2.Should().NotBeNull();
     }
 
     [Fact]
     public async Task Transaction_groups_operations_by_adapter()
     {
-        await TestPipeline.For<CrossAdapterTransactionsSpec>(_output, nameof(Transaction_groups_operations_by_adapter))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Arrange(static ctx =>
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
+
+        var partition = $"cross-adapter-tx-{Guid.CreateVersion7():n}";
+
+        var entities = Enumerable.Range(1, 10).Select(i => new TodoEntity
+        {
+            Title = $"Entity {i}",
+            Description = $"Batch entity {i}"
+        }).ToList();
+
+        // Transaction with multiple operations on same adapter
+        using (EntityContext.Transaction("grouped-operations"))
+        {
+            using (EntityContext.Partition(partition))
             {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                var partition = EnsurePartition(ctx);
-                ctx.SetItem("partition", partition);
-            })
-            .Assert(static async ctx =>
+                // All these operations should be grouped together for the default adapter
+                foreach (var entity in entities)
+                {
+                    await entity.Save();
+                }
+            }
+
+            await EntityContext.Commit();
+        }
+
+        // Verify all were persisted
+        using (EntityContext.Partition(partition))
+        {
+            var count = await TodoEntity.Count;
+            count.Should().Be(10, "all entities should be persisted");
+
+            foreach (var entity in entities)
             {
-                var partition = ctx.GetRequiredItem<string>("partition");
+                var retrieved = await TodoEntity.Get(entity.Id);
+                retrieved.Should().NotBeNull();
+            }
+        }
 
-                var entities = Enumerable.Range(1, 10).Select(i => new TodoEntity
-                {
-                    Title = $"Entity {i}",
-                    Description = $"Batch entity {i}"
-                }).ToList();
-
-                // Transaction with multiple operations on same adapter
-                using (EntityContext.Transaction("grouped-operations"))
-                {
-                    using (EntityContext.Partition(partition))
-                    {
-                        // All these operations should be grouped together for the default adapter
-                        foreach (var entity in entities)
-                        {
-                            await entity.Save();
-                        }
-                    }
-
-                    await EntityContext.Commit();
-                }
-
-                // Verify all were persisted
-                using (EntityContext.Partition(partition))
-                {
-                    var count = await TodoEntity.Count;
-                    count.Should().Be(10, "all entities should be persisted");
-
-                    foreach (var entity in entities)
-                    {
-                        var retrieved = await TodoEntity.Get(entity.Id);
-                        retrieved.Should().NotBeNull();
-                    }
-                }
-
-                entities.Should().HaveCount(10);
-            })
-            .Run();
+        entities.Should().HaveCount(10);
     }
 
     [Fact]
     public async Task Transaction_capabilities_reflect_involved_adapters()
     {
-        await TestPipeline.For<CrossAdapterTransactionsSpec>(_output, nameof(Transaction_capabilities_reflect_involved_adapters))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Arrange(static ctx =>
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
+
+        var partition = $"cross-adapter-tx-{Guid.CreateVersion7():n}";
+
+        string[] adapters = [];
+        var trackedCount = 0;
+        var supportsLocal = false;
+        var supportsDistributed = true;
+
+        using (EntityContext.Transaction("capabilities-test"))
+        {
+            // Track operations across adapters
+            using (EntityContext.Partition(partition))
             {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                var partition = EnsurePartition(ctx);
-                ctx.SetItem("partition", partition);
-            })
-            .Assert(static async ctx =>
+                await new TodoEntity { Title = "SQLite" }.Save();
+            }
+
+            using (EntityContext.Adapter("json"))
+            using (EntityContext.Partition(partition))
             {
-                var partition = ctx.GetRequiredItem<string>("partition");
+                await new TodoEntity { Title = "JSON" }.Save();
+            }
 
-                string[] adapters = [];
-                var trackedCount = 0;
-                var supportsLocal = false;
-                var supportsDistributed = true;
+            // ARCH-0084: snapshot the live transaction state before commit (state lives on the coordinator).
+            var tx = EntityContext.CurrentTransaction!;
+            adapters = tx.Adapters.ToArray();
+            trackedCount = tx.TrackedOperationCount;
+            supportsLocal = tx.Capabilities.Has(TxCaps.Local);
+            supportsDistributed = tx.Capabilities.Has(TxCaps.Distributed);
 
-                using (EntityContext.Transaction("capabilities-test"))
-                {
-                    // Track operations across adapters
-                    using (EntityContext.Partition(partition))
-                    {
-                        await new TodoEntity { Title = "SQLite" }.Save();
-                    }
+            await EntityContext.Commit();
+        }
 
-                    using (EntityContext.Adapter("json"))
-                    using (EntityContext.Partition(partition))
-                    {
-                        await new TodoEntity { Title = "JSON" }.Save();
-                    }
-
-                    // ARCH-0084: snapshot the live transaction state before commit (state lives on the coordinator).
-                    var tx = EntityContext.CurrentTransaction!;
-                    adapters = tx.Adapters.ToArray();
-                    trackedCount = tx.TrackedOperationCount;
-                    supportsLocal = tx.Capabilities.Has(TxCaps.Local);
-                    supportsDistributed = tx.Capabilities.Has(TxCaps.Distributed);
-
-                    await EntityContext.Commit();
-                }
-
-                adapters.Should().Contain(a => a == "Default" || a == "json");
-                trackedCount.Should().Be(2);
-                supportsLocal.Should().BeTrue();
-                supportsDistributed.Should().BeFalse("best-effort atomicity only");
-            })
-            .Run();
+        adapters.Should().Contain(a => a == "Default" || a == "json");
+        trackedCount.Should().Be(2);
+        supportsLocal.Should().BeTrue();
+        supportsDistributed.Should().BeFalse("best-effort atomicity only");
     }
 
     [Fact]
     public async Task Transaction_with_mixed_saves_and_deletes()
     {
-        await TestPipeline.For<CrossAdapterTransactionsSpec>(_output, nameof(Transaction_with_mixed_saves_and_deletes))
-            .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.Create(ctx))
-            .Arrange(static ctx =>
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
+
+        var partition = $"cross-adapter-tx-{Guid.CreateVersion7():n}";
+
+        // Create entities outside transaction
+        var entityToUpdate = new TodoEntity { Title = "To Update", Description = "Original" };
+        var entityToDelete = new TodoEntity { Title = "To Delete", Description = "Will be removed" };
+
+        using (EntityContext.Partition(partition))
+        {
+            await entityToUpdate.Save();
+            await entityToDelete.Save();
+        }
+
+        // Transaction with mixed operations
+        var newEntity = new TodoEntity { Title = "New Entity", Description = "Created in transaction" };
+
+        using (EntityContext.Transaction("mixed-operations"))
+        {
+            using (EntityContext.Partition(partition))
             {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                var partition = EnsurePartition(ctx);
-                ctx.SetItem("partition", partition);
-            })
-            .Assert(static async ctx =>
-            {
-                var partition = ctx.GetRequiredItem<string>("partition");
+                // Update existing entity
+                entityToUpdate.Description = "Updated in transaction";
+                await entityToUpdate.Save();
 
-                // Create entities outside transaction
-                var entityToUpdate = new TodoEntity { Title = "To Update", Description = "Original" };
-                var entityToDelete = new TodoEntity { Title = "To Delete", Description = "Will be removed" };
+                // Delete entity
+                await entityToDelete.Remove();
 
-                using (EntityContext.Partition(partition))
-                {
-                    await entityToUpdate.Save();
-                    await entityToDelete.Save();
-                }
+                // Create new entity
+                await newEntity.Save();
+            }
 
-                // Transaction with mixed operations
-                var newEntity = new TodoEntity { Title = "New Entity", Description = "Created in transaction" };
+            await EntityContext.Commit();
+        }
 
-                using (EntityContext.Transaction("mixed-operations"))
-                {
-                    using (EntityContext.Partition(partition))
-                    {
-                        // Update existing entity
-                        entityToUpdate.Description = "Updated in transaction";
-                        await entityToUpdate.Save();
+        // Verify operations
+        using (EntityContext.Partition(partition))
+        {
+            var updated = await TodoEntity.Get(entityToUpdate.Id);
+            updated.Should().NotBeNull();
+            updated!.Description.Should().Be("Updated in transaction");
 
-                        // Delete entity
-                        await entityToDelete.Remove();
+            var deleted = await TodoEntity.Get(entityToDelete.Id);
+            deleted.Should().BeNull("entity should be deleted");
 
-                        // Create new entity
-                        await newEntity.Save();
-                    }
+            var created = await TodoEntity.Get(newEntity.Id);
+            created.Should().NotBeNull();
+            created!.Title.Should().Be("New Entity");
+        }
 
-                    await EntityContext.Commit();
-                }
-
-                // Verify operations
-                using (EntityContext.Partition(partition))
-                {
-                    var updated = await TodoEntity.Get(entityToUpdate.Id);
-                    updated.Should().NotBeNull();
-                    updated!.Description.Should().Be("Updated in transaction");
-
-                    var deleted = await TodoEntity.Get(entityToDelete.Id);
-                    deleted.Should().BeNull("entity should be deleted");
-
-                    var created = await TodoEntity.Get(newEntity.Id);
-                    created.Should().NotBeNull();
-                    created!.Title.Should().Be("New Entity");
-                }
-
-                entityToUpdate.Should().NotBeNull();
-                entityToDelete.Should().NotBeNull();
-                newEntity.Should().NotBeNull();
-            })
-            .Run();
+        entityToUpdate.Should().NotBeNull();
+        entityToDelete.Should().NotBeNull();
+        newEntity.Should().NotBeNull();
     }
 }

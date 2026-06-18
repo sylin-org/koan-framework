@@ -22,72 +22,61 @@ public sealed class DirectDataAccessSpec
     [Fact]
     public async Task Direct_is_registered_by_default_and_executes_sql()
     {
-        await TestPipeline.For<DirectDataAccessSpec>(_output, nameof(Direct_is_registered_by_default_and_executes_sql))
-            .Using<DataCoreRuntimeFixture>("runtime", static ctx => DataCoreRuntimeFixture.Create(ctx, includeSqlite: true))
-            .Assert(static async ctx =>
-            {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync(includeSqlite: true);
 
-                // The fold's behavioral delta: Direct is wired by default via AddKoanDataCore() —
-                // no separate AddKoanDataDirect() package/registration is required.
-                runtime.Services.GetService<IDirectDataService>().Should().NotBeNull();
+        // The fold's behavioral delta: Direct is wired by default via AddKoanDataCore() —
+        // no separate AddKoanDataDirect() package/registration is required.
+        runtime.Services.GetService<IDirectDataService>().Should().NotBeNull();
 
-                var data = runtime.Services.GetRequiredService<IDataService>();
-                var session = data.Direct(adapter: "sqlite")
-                    .WithConnectionString($"Data Source={runtime.SqlitePath}");
+        var data = runtime.Services.GetRequiredService<IDataService>();
+        var session = data.Direct(adapter: "sqlite")
+            .WithConnectionString($"Data Source={runtime.SqlitePath}");
 
-                await session.Execute("CREATE TABLE IF NOT EXISTS direct_probe (id INTEGER PRIMARY KEY, name TEXT)");
-                var inserted = await session.Execute(
-                    "INSERT INTO direct_probe (name) VALUES (@name)",
-                    new { name = "folded" });
-                inserted.Should().Be(1);
+        await session.Execute("CREATE TABLE IF NOT EXISTS direct_probe (id INTEGER PRIMARY KEY, name TEXT)");
+        var inserted = await session.Execute(
+            "INSERT INTO direct_probe (name) VALUES (@name)",
+            new { name = "folded" });
+        inserted.Should().Be(1);
 
-                var count = await session.Scalar<long>("SELECT COUNT(*) FROM direct_probe");
-                count.Should().Be(1);
+        var count = await session.Scalar<long>("SELECT COUNT(*) FROM direct_probe");
+        count.Should().Be(1);
 
-                var rows = await session.Query<ProbeRow>("SELECT id, name FROM direct_probe");
-                rows.Should().ContainSingle();
-                rows[0].Name.Should().Be("folded");
-            })
-            .Run();
+        var rows = await session.Query<ProbeRow>("SELECT id, name FROM direct_probe");
+        rows.Should().ContainSingle();
+        rows[0].Name.Should().Be("folded");
     }
 
     [Fact]
     public async Task Direct_transaction_commits_and_rolls_back()
     {
-        await TestPipeline.For<DirectDataAccessSpec>(_output, nameof(Direct_transaction_commits_and_rolls_back))
-            .Using<DataCoreRuntimeFixture>("runtime", static ctx => DataCoreRuntimeFixture.Create(ctx, includeSqlite: true))
-            .Assert(static async ctx =>
-            {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                var data = runtime.Services.GetRequiredService<IDataService>();
-                var connectionString = $"Data Source={runtime.SqlitePath}";
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync(includeSqlite: true);
 
-                var setup = data.Direct(adapter: "sqlite").WithConnectionString(connectionString);
-                await setup.Execute("CREATE TABLE IF NOT EXISTS direct_tx (id INTEGER PRIMARY KEY, name TEXT)");
+        var data = runtime.Services.GetRequiredService<IDataService>();
+        var connectionString = $"Data Source={runtime.SqlitePath}";
 
-                // Committed work is durable.
-                await using (var tx = data.Direct(adapter: "sqlite").WithConnectionString(connectionString).Begin())
-                {
-                    await tx.Execute("INSERT INTO direct_tx (name) VALUES (@name)", new { name = "committed" });
-                    await tx.Commit();
-                }
+        var setup = data.Direct(adapter: "sqlite").WithConnectionString(connectionString);
+        await setup.Execute("CREATE TABLE IF NOT EXISTS direct_tx (id INTEGER PRIMARY KEY, name TEXT)");
 
-                // Rolled-back work is discarded.
-                await using (var tx = data.Direct(adapter: "sqlite").WithConnectionString(connectionString).Begin())
-                {
-                    await tx.Execute("INSERT INTO direct_tx (name) VALUES (@name)", new { name = "discarded" });
-                    await tx.Rollback();
-                }
+        // Committed work is durable.
+        await using (var tx = data.Direct(adapter: "sqlite").WithConnectionString(connectionString).Begin())
+        {
+            await tx.Execute("INSERT INTO direct_tx (name) VALUES (@name)", new { name = "committed" });
+            await tx.Commit();
+        }
 
-                var count = await setup.Scalar<long>("SELECT COUNT(*) FROM direct_tx");
-                count.Should().Be(1);
+        // Rolled-back work is discarded.
+        await using (var tx = data.Direct(adapter: "sqlite").WithConnectionString(connectionString).Begin())
+        {
+            await tx.Execute("INSERT INTO direct_tx (name) VALUES (@name)", new { name = "discarded" });
+            await tx.Rollback();
+        }
 
-                var rows = await setup.Query<ProbeRow>("SELECT id, name FROM direct_tx");
-                rows.Should().ContainSingle();
-                rows[0].Name.Should().Be("committed");
-            })
-            .Run();
+        var count = await setup.Scalar<long>("SELECT COUNT(*) FROM direct_tx");
+        count.Should().Be(1);
+
+        var rows = await setup.Query<ProbeRow>("SELECT id, name FROM direct_tx");
+        rows.Should().ContainSingle();
+        rows[0].Name.Should().Be("committed");
     }
 
     private sealed class ProbeRow
