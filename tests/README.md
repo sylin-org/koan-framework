@@ -1,65 +1,107 @@
-﻿# Koan Test Platform
+# Koan Test Platform
 
-This directory hosts the greenfield Koan testing platform. It replaces the legacy `tests.old` tree and
-provides an opinionated, parallel-friendly structure for every suite.
+This directory hosts the Koan testing platform. Suites are organized by Koan runtime module and run
+under **xUnit v3** with **Testcontainers 4.x** module fixtures (ARCH-0091), booting real Koan through
+`AddKoan()` reflective discovery (ARCH-0079).
 
 ## Contract
 
 - **Suites** live under `Suites/<Domain>/<Scope>/` and map 1:1 with Koan runtime modules.
-- **Shared assets** (fixtures, pipelines, diagnostics) live in `Shared/` and are consumed by
-  every suite via project references.
-- **Seed packs** in `SeedPacks/` deliver deterministic data for scenarios and are versioned
-  alongside the specs that rely on them.
-- All specs execute through the `TestPipeline` facade to guarantee Arrange/Act/Assert semantics
-  and consistent diagnostics output.
+- **Shared assets** live in `Shared/` and are consumed by suites via project references:
+  - `Koan.Testing.Hosting/` — the xUnit-agnostic ARCH-0079 reflective host (`KoanIntegrationHost`,
+    namespace `Koan.Testing.Integration`). Carries no xUnit dependency, so it is referenced by both
+    the xUnit-v2 fenced Jobs projects and the xUnit-v3 suites without an assembly collision.
+  - `Koan.Testing.Containers/` — the xUnit-v3 Testcontainers fixtures (`KoanContainerFixture` + the
+    per-engine fixtures) and the `KoanDataSpec<TFixture>` spec base.
+  - `Koan.Testing/` — **retired.** The bespoke `TestPipeline`/`TestContext` DSL was removed in
+    ARCH-0091; the project survives only as a thin shim that re-exposes `Koan.Testing.Hosting` so the
+    fenced xUnit-v2 `Koan.Jobs.TestKit` keeps compiling. Do not add anything to it.
+- **Seed packs** in `SeedPacks/` deliver deterministic data and are content-copied into every test
+  project via `tests/Directory.Build.props`.
 
-## Layout
+## xUnit v3 conventions
 
-```
-/tests
-  Directory.Build.props           # Test-wide MSBuild defaults and temp output isolation
-  README.md                       # You are here
-  SeedPacks/                      # Deterministic data packs (JSON or NDJSON)
-  Shared/
-    Koan.Testing/                 # Test harness library and pipeline primitives
-      Infrastructure/             # External runtime helpers (Docker probes, etc.)
-  Suites/
-    Core/
-      Unit/
-        Koan.Tests.Core.Unit/
-    Data/
-      Core/
-        Koan.Tests.Data.Core/
-      Connector.SqlServer/
-        Koan.Data.Connector.SqlServer.Tests/
-    Canon/
-      Unit/
-        Koan.Tests.Canon.Unit/
-      Integration/
-        Koan.Tests.Canon.Integration/
-    AI/
-      Unit/
-        Koan.Tests.AI.Unit/
-    Cache/
-      Abstractions/                # Unit (primitives, contracts)
-      Topology/                    # Unit (resolver, layered orchestration)
-      Coherence.InMemory/          # Unit + cornerstone
-      Coherence.Messaging/         # Unit
-      Web/                         # Unit + middleware TestServer
-      Adapter.Redis/               # Integration (Testcontainers)
-      Adapter.Sqlite/              # Integration (temp file)
-    Integration/
-      Bootstrap/                   # Boot-smoke: full AddKoan() reflective discovery
-        Koan.Tests.Integration.Bootstrap/
+Every suite is xUnit v3 in VSTest-compatible mode (so `dotnet test` keeps working). A project opts in
+with:
+
+```xml
+<PropertyGroup>
+  <!-- ARCH-0091: xUnit v3 runs as a self-executing test assembly (VSTest-compatible keeps `dotnet test`). -->
+  <OutputType>Exe</OutputType>
+</PropertyGroup>
+<ItemGroup>
+  <PackageReference Include="xunit.v3" Version="3.2.2" />
+  <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
+    <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    <PrivateAssets>all</PrivateAssets>
+  </PackageReference>
+  <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.6.0" />
+</ItemGroup>
 ```
 
-## Adding a Suite
+Differences from the old xUnit v2 DSL that every spec must respect:
 
-1. Create `Suites/<Domain>/<Scope>/<ProjectName>/` and run `dotnet new xunit` if you need a blank start.
-2. Reference `Shared/Koan.Testing/Koan.Testing.csproj` for the pipeline, fixtures, and diagnostics.
-3. Describe suite requirements in `testsuite.yaml` and keep specs under `Specs/<Feature>/`.
-4. Use the `TestPipeline` facade for every scenario to keep Arrange/Act/Assert explicit and
-   automatically register fixtures via `WithFixture`.
+- **Serialize the assembly.** Koan binds the process-global `AppHost.Current`, so concurrent boots
+  would race on it. Add `[assembly: CollectionBehavior(DisableTestParallelization = true)]` (in
+  `AssemblyInfo.cs` or `GlobalUsings.cs`).
+- **`IAsyncLifetime` returns `ValueTask`** (not `Task`) — both `InitializeAsync` and `DisposeAsync`.
+- **Native skips** — use `Assert.Skip(reason)` / `Assert.SkipWhen(cond, reason)` /
+  `Assert.SkipUnless(cond, reason)`. `SkippableFact` and the `Xunit.Abstractions` namespace are gone;
+  `ITestOutputHelper` now lives in the `Xunit` namespace.
+- **Ambient cancellation** — use `TestContext.Current.CancellationToken` instead of threading a token
+  through fixtures.
+
+## Container fixtures (`Koan.Testing.Containers`)
+
+`KoanContainerFixture` is the base for Docker-backed fixtures (built on Testcontainers 4.x official
+module builders). Concrete fixtures: `RedisFixture`, `PostgresFixture`, `MongoFixture`,
+`SqlServerFixture`, `CouchbaseFixture`, plus the daemon-free `SqliteFixture`, `JsonFixture`, and
+`InMemoryFixture`. Each exposes:
+
+- `string Engine` — the engine name (e.g. `redis`).
+- `bool IsAvailable` / `string? Reason` — set during init. If Docker is absent, misconfigured, or the
+  image pull fails, the fixture comes up **unavailable** with a `Reason` instead of throwing — specs
+  then `Assert.SkipWhen(!fixture.IsAvailable, fixture.Reason)`.
+- `string ConnectionString` — the live endpoint.
+- `IReadOnlyDictionary<string,string?> Settings` / `SettingsForBoot()` — canonical config keys to feed
+  into `KoanIntegrationHost`.
+
+Consume a fixture as a class fixture (one container per test class):
+
+```csharp
+public sealed class MyRedisSpec(RedisFixture redis, ITestOutputHelper output) : IClassFixture<RedisFixture>
+{
+    [Fact]
+    public async Task Roundtrips()
+    {
+        Assert.SkipWhen(!redis.IsAvailable, redis.Reason ?? "Redis unavailable");
+        var ct = TestContext.Current.CancellationToken;
+
+        await using var host = await KoanIntegrationHost.Configure()
+            .WithSettings(redis.SettingsForBoot())
+            .ConfigureServices(s => s.AddKoan())
+            .StartAsync(ct);
+        // ...
+    }
+}
+```
+
+For data-adapter suites, derive from `KoanDataSpec<TFixture>` instead of hand-wiring the host:
+
+- `RequireBackingStore()` — `Assert.Skip`s when the fixture is unavailable.
+- `BootAsync()` — returns a `BoundHost` (an `await using` host booted with the fixture's settings via
+  `KoanIntegrationHost` + `AddKoan()`).
+- `NewPartition(label)` + `Lease(partition)` — mint and enter a per-execution `EntityContext.Partition`
+  so parallel-by-class suites never collide on shared backing stores.
+
+## Adding a suite
+
+1. Create `Suites/<Domain>/<Scope>/<ProjectName>/` (mirror the `src/` path of the module under test).
+2. Reference `Shared/Koan.Testing.Hosting` (for `KoanIntegrationHost`) and, when you need a real
+   backing store, `Shared/Koan.Testing.Containers` (for the fixtures + `KoanDataSpec`). Do **not**
+   reference the retired `Koan.Testing` shim.
+3. Adopt the xUnit-v3 csproj shape above and add the `DisableTestParallelization` assembly attribute.
+4. Keep specs under `Specs/<Feature>/`.
 
 ## Running suites
 
@@ -70,33 +112,8 @@ dotnet test Koan.sln
 For targeted validation, invoke an individual suite project:
 
 ```pwsh
-
-    ### Sample Suite Coverage (as of 2025-10-07)
-
-    - **MCP Sample Suite**: `Koan.Samples.McpService.Tests` (S12.MedTrials.McpService)
-      - Initial health check test for `/health` endpoint.
-    - **DocMind Sample Suite**: `Koan.Samples.DocMind.Tests` (S13.DocMind)
-      - Initial health check test for `/health` endpoint.
-    - **PantryPal/Recipes Sample Suite**: `Koan.Samples.PantryPal.Tests` (S16.PantryPal)
-      - Initial health check test for `/health` endpoint.
-
-    Next: Add scenario/integration tests for each sample suite covering endpoints, flows, and sample-specific behaviors.
 dotnet test tests/Suites/Data/Core/Koan.Tests.Data.Core/Koan.Tests.Data.Core.csproj
 ```
-
-## Infrastructure helpers
-
-- `Infrastructure/DockerEnvironment.cs` performs cross-platform probing for the Docker daemon and
-  honors `DOCKER_HOST` overrides, CLI contexts, and named pipe/socket fallbacks.
-- `Fixtures/DockerDaemonFixture` caches probe results, disables Ryuk for Testcontainers-powered suites,
-  and exposes availability metadata so specs can decide whether to skip or fall back without duplicating logic.
-- `Fixtures/RedisContainerFixture` / `PostgresContainerFixture` / `MongoContainerFixture` /
-  `WeaviateContainerFixture` / `OpenSearchContainerFixture` / `ElasticSearchContainerFixture` /
-  `CouchbaseContainerFixture` — all follow the same pattern: env-var override → local TCP ping →
-  Testcontainers Docker daemon → Docker CLI fallback. Each has a matching
-  `TestPipeline<Name>Extensions.Using<Name>Container()` and `TestContext<Name>Extensions.Get<Name>Fixture()`.
-- `Pipeline/TestPipelineDockerExtensions` wires the daemon fixture into a pipeline run and surfaces
-  diagnostics whenever Docker is unavailable.
 
 ## Integration tests are canon (ARCH-0079)
 
@@ -154,14 +171,15 @@ Without the integration tests, these would have shipped. With them, they're caug
 
 1. Create `tests/Suites/<Domain>/<Adapter>/Koan.<Domain>.<Adapter>.Tests/` (mirrors the adapter
    project's path under `src/`).
-2. Reference `tests/Shared/Koan.Testing/Koan.Testing.csproj` plus the adapter's project + its
-   pillar core.
-3. Use `KoanIntegrationHost.Configure().ConfigureServices(s => s.AddKoan()).StartAsync(ct)` to
-   build the host. Don't invoke `new KoanAutoRegistrar().Initialize(services)` manually — that
-   bypasses the reflective-discovery path that production apps actually use.
-4. For adapters that need real infrastructure, request a container via the pipeline's
-   `.RequireDocker().UsingXxxContainer()` chain. The container fixture is shared across the test
-   class via the `TestPipeline` machinery.
+2. Reference `tests/Shared/Koan.Testing.Hosting` and `tests/Shared/Koan.Testing.Containers`, plus the
+   adapter's project + its pillar core.
+3. Use `KoanIntegrationHost.Configure().ConfigureServices(s => s.AddKoan()).StartAsync(ct)` to build
+   the host (or derive from `KoanDataSpec<TFixture>` and call `BootAsync()`). Don't invoke
+   `new KoanAutoRegistrar().Initialize(services)` manually — that bypasses the reflective-discovery
+   path that production apps actually use.
+4. For adapters that need real infrastructure, take the matching `KoanContainerFixture` as an
+   `IClassFixture<T>` and gate the body with `Assert.SkipWhen(!fixture.IsAvailable, fixture.Reason)`.
+   The container starts once per test class and is torn down on dispose.
 
 ### Exemptions
 
@@ -169,8 +187,3 @@ The canon's only standing exemption is orchestration adapters (Docker, Podman, C
 renderers) — the adapter under test IS the container runtime, so Testcontainers is recursive.
 Each must instead ship an alternative integration test (e.g., filesystem fixture asserting the
 shape of a generated Compose file). Other exemptions require an ADR amendment.
-
-## Legacy Tree
-
-The retired codebase lives in `../tests.old`. Borrow fixtures or specs as you migrate components,
-then delete the unused legacy projects when the suite is stable.
