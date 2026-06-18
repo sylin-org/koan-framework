@@ -1,7 +1,9 @@
+using Koan.Testing.Containers;
 using Xunit;
 
-// Couchbase is a heavyweight container (a full server per test). Running specs in parallel spins up
-// multiple Couchbase containers at once, which memory-starves the host and makes their services fail to
-// start (a fast ~7s failure), and lets one spec's orphan-cleanup tear down another's live container.
-// Serialize the suite, matching every other Koan.Data connector suite.
+// ARCH-0091: one Couchbase container shared across the whole assembly (started once before any test,
+// disposed after all). Couchbase is a heavyweight container (a full server node), so an assembly-shared
+// fixture is doubly important. Tests run sequentially within the process because the static Entity<T> API
+// resolves through the process-global AppHost.Current; engines parallelize across processes.
 [assembly: CollectionBehavior(DisableTestParallelization = true)]
+[assembly: AssemblyFixture(typeof(CouchbaseFixture))]

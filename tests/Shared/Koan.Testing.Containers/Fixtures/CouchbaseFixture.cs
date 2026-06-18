@@ -1,5 +1,9 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text;
 using System.Threading.Tasks;
 using Testcontainers.Couchbase;
 
@@ -17,6 +21,7 @@ public sealed class CouchbaseFixture : KoanContainerFixture
 {
     private const string AdminUser = "Administrator";
     private const string AdminPassword = "password";
+    private const int ManagementPort = 8091;
 
     private CouchbaseContainer? _container;
     private string _bucket = "";
@@ -32,7 +37,29 @@ public sealed class CouchbaseFixture : KoanContainerFixture
         _container = new CouchbaseBuilder("couchbase:community-7.6.1").Build();
         await _container.StartAsync().ConfigureAwait(false);
         _bucket = _container.Buckets.First().Name;
+
+        // Couchbase Community Edition only supports the 'forestdb' GSI storage mode, and it MUST be set before
+        // any index is created — otherwise the adapter's CREATE PRIMARY INDEX fails with "Please Set Indexer
+        // Storage Mode Before Create Index". The official Testcontainers module targets Enterprise defaults and
+        // does not set it, so we set it here (the old hand-rolled fixture did the same during cluster init).
+        await SetGsiStorageModeForestDbAsync().ConfigureAwait(false);
+
         return _container.GetConnectionString();
+    }
+
+    private async Task SetGsiStorageModeForestDbAsync()
+    {
+        var host = _container!.Hostname;
+        var port = _container.GetMappedPublicPort(ManagementPort);
+        using var http = new HttpClient { BaseAddress = new Uri($"http://{host}:{port}") };
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Basic", Convert.ToBase64String(Encoding.ASCII.GetBytes($"{AdminUser}:{AdminPassword}")));
+        using var body = new FormUrlEncodedContent(new[]
+        {
+            new KeyValuePair<string, string>("storageMode", "forestdb"),
+        });
+        var response = await http.PostAsync("/settings/indexes", body).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
     }
 
     protected override ValueTask StopContainerAsync()
