@@ -53,6 +53,7 @@ public sealed class MilvusTestFactory : IVectorAdapterTestFactory
     public bool SupportsBulkOperations       => true;
     public bool SupportsFlush                => true;  // adapter overrides: drops the collection
     public bool SupportsExportAll            => false;
+    public bool SupportsIndexStats           => false; // not implemented in MilvusVectorRepository
     public bool SupportsHybridSearch         => false;
     public bool SupportsMetadataFilters      => true;  // metadata["key"] JSON-field access via MilvusFilterTranslator (live-verified)
     public bool SupportsContinuationToken    => false;
@@ -64,7 +65,7 @@ public sealed class MilvusTestFactory : IVectorAdapterTestFactory
     public bool SupportsDeleteImmediatelyVisibleToSearch => false;
     public bool SupportsScoreNormalization   => true;  // cosine
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         if (_initialized) return;
         _initialized = true;
@@ -153,7 +154,7 @@ public sealed class MilvusTestFactory : IVectorAdapterTestFactory
         }
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         _adminHttp?.Dispose();
         if (_sp is not null) await _sp.DisposeAsync();

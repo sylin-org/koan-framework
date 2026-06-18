@@ -45,6 +45,7 @@ public sealed class QdrantTestFactory : IVectorAdapterTestFactory
     public bool SupportsBulkOperations       => true;
     public bool SupportsFlush                => true;  // adapter overrides: drops the collection
     public bool SupportsExportAll            => true;  // /points/scroll pagination
+    public bool SupportsIndexStats           => false; // QdrantVectorRepository exposes no count instruction
     public bool SupportsHybridSearch         => false;
     public bool SupportsMetadataFilters      => true;  // must/should/must_not via QdrantFilterTranslator
     public bool SupportsContinuationToken    => false; // search doesn't paginate (scroll is a separate endpoint)
@@ -54,7 +55,7 @@ public sealed class QdrantTestFactory : IVectorAdapterTestFactory
     public bool SupportsDeleteImmediatelyVisibleToSearch => true;
     public bool SupportsScoreNormalization   => true;  // cosine
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         if (_initialized) return;
         _initialized = true;
@@ -99,7 +100,7 @@ public sealed class QdrantTestFactory : IVectorAdapterTestFactory
         }
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         _adminHttp?.Dispose();
         if (_sp is not null) await _sp.DisposeAsync();

@@ -24,7 +24,7 @@ namespace Koan.Data.VectorAdapterSurface.Qdrant.Tests;
 /// reflects what was requested — proves the plumbing, not just the side effects.
 /// </para>
 /// </summary>
-public class QdrantQuantizationSpecs : IClassFixture<QdrantTestFactory>, IAsyncLifetime
+public class QdrantQuantizationSpecs : IAsyncLifetime
 {
     private readonly QdrantTestFactory _factory;
     private HttpClient? _admin;
@@ -34,7 +34,7 @@ public class QdrantQuantizationSpecs : IClassFixture<QdrantTestFactory>, IAsyncL
         _factory = factory;
     }
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         if (!_factory.IsAvailable) return;
         Koan.Data.Core.AggregateConfigs.Reset();
@@ -45,15 +45,15 @@ public class QdrantQuantizationSpecs : IClassFixture<QdrantTestFactory>, IAsyncL
         }
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _admin?.Dispose();
         _admin = null;
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     private void SkipIfUnavailable()
-        => Skip.If(!_factory.IsAvailable, $"[{nameof(QdrantTestFactory)}] {_factory.UnavailableReason ?? "Adapter infrastructure unavailable"}");
+        => Assert.SkipWhen(!_factory.IsAvailable, $"[{nameof(QdrantTestFactory)}] {_factory.UnavailableReason ?? "Adapter infrastructure unavailable"}");
 
     private float[] Embed(string category, int seed) => EmbeddingFactory.ForCategory(category, seed, _factory.EmbeddingDimension);
 
@@ -61,7 +61,7 @@ public class QdrantQuantizationSpecs : IClassFixture<QdrantTestFactory>, IAsyncL
     // Default (lean) profile — scalar quantization + on-disk originals
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task DefaultProfile_isScalarQuantizationWithOnDiskOriginals()
     {
         SkipIfUnavailable();
@@ -94,7 +94,7 @@ public class QdrantQuantizationSpecs : IClassFixture<QdrantTestFactory>, IAsyncL
     // Per-mode plumbing — each request shape lands intact in Qdrant
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task None_disablesQuantization_collectionHasNoQuantizationConfig()
     {
         SkipIfUnavailable();
@@ -123,7 +123,7 @@ public class QdrantQuantizationSpecs : IClassFixture<QdrantTestFactory>, IAsyncL
             .GetProperty("default").GetProperty("on_disk").GetBoolean().Should().BeFalse();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Scalar_explicitConfig_landsWithCorrectQuantileAndAlwaysRam()
     {
         SkipIfUnavailable();
@@ -152,7 +152,7 @@ public class QdrantQuantizationSpecs : IClassFixture<QdrantTestFactory>, IAsyncL
         scalar.GetProperty("always_ram").GetBoolean().Should().BeFalse();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Binary_quantization_landsAsBinaryBlock()
     {
         SkipIfUnavailable();
@@ -187,7 +187,7 @@ public class QdrantQuantizationSpecs : IClassFixture<QdrantTestFactory>, IAsyncL
     // Contract conformance — upsert/search round-trip under each mode
     // ============================================================================================
 
-    [SkippableTheory]
+    [Theory]
     [InlineData("None")]
     [InlineData("Scalar")]
     [InlineData("Binary")]
@@ -211,7 +211,7 @@ public class QdrantQuantizationSpecs : IClassFixture<QdrantTestFactory>, IAsyncL
         hits.Matches[0].Id.Should().Be("v1");
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task UnknownQuantizationType_throwsAtCollectionCreate()
     {
         SkipIfUnavailable();

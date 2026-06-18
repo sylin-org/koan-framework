@@ -186,9 +186,10 @@ public abstract class VectorSemanticSpecsBase<TFactory> : IAsyncLifetime
     [Fact]
     public async Task Stats_returnsStoredVectorCount()
     {
-        // Stats rides the same capability surface as ExportAll for the search-engine connectors:
-        // the IndexStats instruction is implemented once in the shared base (GetCount over _count).
-        Assert.SkipWhen(!Factory.SupportsExportAll, "Adapter does not implement the IndexStats instruction.");
+        // Stats is the vector.index.stats instruction (count of stored vectors). It is gated on its own
+        // capability — ES/OS (shared base), Weaviate, and the in-memory reference implement it; Qdrant and
+        // Milvus do not expose it through the instruction surface (distinct from ExportAll, which they can do).
+        Assert.SkipWhen(!Factory.SupportsIndexStats, "Adapter does not implement the IndexStats instruction.");
         SkipIfUnavailable();
 
         await Vector<TodoVector>.Save("v1", Embed("alpha", 1));
