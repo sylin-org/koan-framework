@@ -5,9 +5,9 @@ using System.Data.Common;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Koan.Data.Direct;
+namespace Koan.Data.Core.Direct;
 
-internal sealed class DirectTransaction(DbConnection conn, DbTransaction tx, TimeSpan timeout, int maxRows) : Koan.Data.Core.Direct.IDirectTransaction
+internal sealed class DirectTransaction(DbConnection conn, DbTransaction tx, TimeSpan timeout, int maxRows) : IDirectTransaction
 {
     public async Task<int> Execute(string sql, object? parameters = null, CancellationToken ct = default)
     {

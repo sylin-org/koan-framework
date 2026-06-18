@@ -1,7 +1,7 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 
-namespace Koan.Data.Direct;
+namespace Koan.Data.Core.Direct;
 
 internal static class JsonSettings
 {

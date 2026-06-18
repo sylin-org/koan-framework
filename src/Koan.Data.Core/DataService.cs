@@ -59,7 +59,7 @@ public sealed class DataService(IServiceProvider sp) : IDataService
     public Direct.IDirectSession Direct(string? source = null, string? adapter = null)
     {
         var svc = sp.GetService<Direct.IDirectDataService>()
-            ?? throw new InvalidOperationException("IDirectDataService not registered. AddKoanDataDirect() required.");
+            ?? throw new InvalidOperationException("IDirectDataService not registered. It is registered by default via AddKoanDataCore() (ARCH-0090 §1) — ensure Koan data core is initialized.");
         return svc.Direct(source, adapter);
     }
 

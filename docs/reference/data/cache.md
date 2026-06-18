@@ -190,9 +190,9 @@ using (EntityContext.WithCacheBehavior(CacheBehavior.ReadOnly))
 
 ---
 
-## Out-of-band evict — `Koan.Data.Direct` and batch jobs
+## Out-of-band evict — Direct SQL and batch jobs
 
-When code mutates state outside `Entity<T>.Upsert/Delete` (raw SQL via `Koan.Data.Direct`, batch jobs, external workers), the cache decorator never sees the change. Use the canonical evict surface:
+When code mutates state outside `Entity<T>.Upsert/Delete` (raw SQL via `IDataService.Direct(...)`, batch jobs, external workers), the cache decorator never sees the change. Use the canonical evict surface:
 
 ```csharp
 // Canonical key constructor — eliminates stringly-typed concatenation

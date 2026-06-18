@@ -1,11 +1,11 @@
 using Microsoft.Extensions.Configuration;
 using System;
 
-namespace Koan.Data.Direct;
+namespace Koan.Data.Core.Direct;
 
-public sealed class DirectDataService(IServiceProvider sp, IConfiguration config) : Koan.Data.Core.Direct.IDirectDataService
+internal sealed class DirectDataService(IServiceProvider sp, IConfiguration config) : IDirectDataService
 {
-    public Koan.Data.Core.Direct.IDirectSession Direct(string? source = null, string? adapter = null)
+    public IDirectSession Direct(string? source = null, string? adapter = null)
     {
         // Validate source XOR adapter constraint
         if (!string.IsNullOrWhiteSpace(source) && !string.IsNullOrWhiteSpace(adapter))

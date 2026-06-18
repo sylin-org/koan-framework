@@ -77,7 +77,7 @@ Framework knowledge is provided through **Agent Skills** in `.claude/skills/` th
 - **LayeredCache** (`Koan.Cache.Topology`) — Composition-based L1/L2 orchestrator. Verbs: `Read`/`Write`/`Evict`/`Touch`/`EnumerateByTag`. `ApplyRemoteInvalidation` is L1-only (architectural invariant)
 - **CoherenceCoordinator** (`Koan.Cache.Coherence`) — `IHostedService` routing `ICacheCoherenceChannel` messages → `LayeredCache.ApplyRemoteInvalidation`. Origin filter prevents echo. Honors `CoherenceMode.AutoDetect`/`Required`/`Disabled`
 - **CacheKey.For<T>(id, partition)** (`Koan.Cache.Abstractions.Primitives`) — Canonical entity key builder; eliminates stringly-typed concatenation
-- **EntityCacheExtensions** (`Koan.Cache`) — `entity.Uncache()`, `EntityCache<T,K>.Flush(id)`, `.FlushAll()` for out-of-band evict from `Koan.Data.Direct` / batch jobs
+- **EntityCacheExtensions** (`Koan.Cache`) — `entity.Uncache()`, `EntityCache<T,K>.Flush(id)`, `.FlushAll()` for out-of-band evict from Direct SQL (`IDataService.Direct(...)`, in `Koan.Data.Core`) / batch jobs
 - **EntityContext.CacheBehavior** (`Koan.Data.Core`) — Per-request opt-out: `NoCache()`, `RefreshCache()`, `WithCacheBehavior(...)`. Writes always invalidate regardless
 - **Reference = Intent adapters**:
   - `Koan.Cache.Adapter.Sqlite` — persistent L1 (priority 50, preempts Memory)

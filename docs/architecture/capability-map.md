@@ -83,7 +83,7 @@ The remainder of this document drills into each layer and highlights first-class
 - Relational: `Koan.Data.Connector.Postgres`, `Koan.Data.Connector.SqlServer`, `Koan.Data.Connector.Sqlite`, `Koan.Data.Relational` (shared tooling)
 - Document & key/value: `Koan.Data.Connector.Mongo`, `Koan.Data.Connector.Redis`, `Koan.Data.Connector.Couchbase`, `Koan.Data.Connector.Json`
 - Search & vector: `Koan.Data.Vector`, `Koan.Data.Vector.Abstractions`, `Koan.Data.Vector.Connector.Weaviate`, `Koan.Data.Vector.Connector.Milvus`, `Koan.Data.Connector.OpenSearch`, `Koan.Data.Connector.ElasticSearch`
-- Direct and composition helpers: `Koan.Data.Direct` for low-level commands. _(The former `Koan.Data.Cqrs` / `Koan.Data.Cqrs.Outbox.Connector.Mongo` outbox helpers were removed 2026-06 — superseded by the Jobs ledger outbox, JOBS-0005.)_
+- Direct and composition helpers: `IDataService.Direct(...)` in `Koan.Data.Core` for low-level commands (folded in from the former `Koan.Data.Direct` package 2026-06, ARCH-0090 §1). _(The former `Koan.Data.Cqrs` / `Koan.Data.Cqrs.Outbox.Connector.Mongo` outbox helpers were removed 2026-06 — superseded by the Jobs ledger outbox, JOBS-0005.)_
 
 **Adjacencies**:
 

@@ -53,6 +53,9 @@ public static class ServiceCollectionExtensions
         });
 
         services.AddSingleton<IDataService, DataService>();
+        // Direct data access (DATA-0053 / ARCH-0090 §1): folded in from the former Koan.Data.Direct package.
+        // Registered by default so DataService.Direct(...) works out-of-box — no separate AddKoanDataDirect().
+        services.AddSingleton<Direct.IDirectDataService, Direct.DirectDataService>();
         // EntitySchemaGuard + ISchemaHealthContributor were removed in DATA-0095 Phase 1c.1.
         // Adapters now implement IDataRepository.EnsureReady directly; the facade calls it.
         services.AddSingleton<IDataDiagnostics, DataDiagnostics>();

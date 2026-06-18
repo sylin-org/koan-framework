@@ -92,11 +92,12 @@ Use this reference when you plan a Koan solution and need to understand which mo
 - **How to use**: pair with SQL connectors (Postgres, SqlServer, Sqlite). Enables advanced indexing rules.
 - **When to use**: when targeting relational databases and you need schema diagnostics.
 
-### Koan.Data.Direct
+### Direct data access (in `Koan.Data.Core`)
 
-- **Purpose**: low-level command execution (`DirectSession`) for raw SQL.
-- **How to use**: reference the package, obtain `DirectSession` via DI, run parameterized commands.
+- **Purpose**: low-level command execution (`IDirectSession`) for raw SQL.
+- **How to use**: call `IDataService.Direct(source: ... | adapter: ...)` (or the `.Direct()` entity helper) and run parameterized commands. Registered by default — no separate package.
 - **When to use**: surgically executing SQL for maintenance or migration tasks without leaving Koan.
+- **History**: folded in from the former standalone `Sylin.Koan.Data.Direct` package in 2026-06 (ARCH-0090 §1). The package id and `AddKoanDataDirect()` no longer exist; `.Direct(...)` call sites are unchanged.
 
 ### ~~Koan.Data.Cqrs~~ _(removed 2026-06)_
 

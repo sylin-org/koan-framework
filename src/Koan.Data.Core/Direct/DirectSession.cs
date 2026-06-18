@@ -1,9 +1,3 @@
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Newtonsoft.Json;
-using Koan.Data.Abstractions.Instructions;
-using Koan.Data.Core;
-using Koan.Data.Core.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Data.Common;
@@ -11,10 +5,15 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Newtonsoft.Json;
+using Koan.Data.Abstractions.Instructions;
+using Koan.Data.Core.Configuration;
 
-namespace Koan.Data.Direct;
+namespace Koan.Data.Core.Direct;
 
-internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, string? source, string? adapter) : Koan.Data.Core.Direct.IDirectSession
+internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, string? source, string? adapter) : IDirectSession
 {
     private readonly IServiceProvider _sp = sp;
     private readonly IConfiguration _cfg = cfg;
@@ -22,23 +21,23 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
     private readonly string? _adapter = adapter;
     private string? _connectionString;
     private TimeSpan _timeout = TimeSpan.FromSeconds(
-        (sp.GetService<Microsoft.Extensions.Options.IOptions<Core.Options.DirectOptions>>()?.Value?.TimeoutSeconds) ?? 30);
-    private int _maxRows = sp.GetService<Microsoft.Extensions.Options.IOptions<Core.Options.DirectOptions>>()?.Value?.MaxRows ?? 10_000;
+        (sp.GetService<Microsoft.Extensions.Options.IOptions<Options.DirectOptions>>()?.Value?.TimeoutSeconds) ?? 30);
+    private int _maxRows = sp.GetService<Microsoft.Extensions.Options.IOptions<Options.DirectOptions>>()?.Value?.MaxRows ?? 10_000;
 
-    public Koan.Data.Core.Direct.IDirectSession WithConnectionString(string value)
+    public IDirectSession WithConnectionString(string value)
     {
         _connectionString = value; return this;
     }
-    public Koan.Data.Core.Direct.IDirectSession WithTimeout(TimeSpan timeout)
+    public IDirectSession WithTimeout(TimeSpan timeout)
     {
         _timeout = timeout; return this;
     }
-    public Koan.Data.Core.Direct.IDirectSession WithMaxRows(int maxRows)
+    public IDirectSession WithMaxRows(int maxRows)
     {
         _maxRows = maxRows > 0 ? maxRows : _maxRows; return this;
     }
 
-    public Koan.Data.Core.Direct.IDirectTransaction Begin(CancellationToken ct = default)
+    public IDirectTransaction Begin(CancellationToken ct = default)
     {
         var (provider, connStr) = Resolve();
         var conn = CreateConnection(_sp, provider, connStr);
@@ -203,7 +202,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
             if (!string.IsNullOrWhiteSpace(byResolver))
                 return (providerHint, byResolver!);
 
-            var named = _cfg[$"ConnectionStrings:{value}"] ?? _cfg[Infrastructure.ConfigurationConstants.Keys.SourceConnectionString(value)];
+            var named = _cfg[$"ConnectionStrings:{value}"] ?? _cfg[ConfigurationConstants.Keys.SourceConnectionString(value)];
             if (!string.IsNullOrWhiteSpace(named))
                 return (providerHint, named!);
 
@@ -219,7 +218,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
             }
 
             // Fallback: Try config-based resolution for backward compatibility
-            var byCfg = _cfg[$"ConnectionStrings:{_source}"] ?? _cfg[Infrastructure.ConfigurationConstants.Keys.SourceConnectionString(_source)];
+            var byCfg = _cfg[$"ConnectionStrings:{_source}"] ?? _cfg[ConfigurationConstants.Keys.SourceConnectionString(_source)];
             if (!string.IsNullOrWhiteSpace(byCfg))
                 return (_source, byCfg!);
 
@@ -235,7 +234,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
                 return (_adapter, byResolver!);
 
             // Try adapter-specific config path
-            var adapterCfg = _cfg[Infrastructure.ConfigurationConstants.Keys.AdapterConnectionString(_adapter)];
+            var adapterCfg = _cfg[ConfigurationConstants.Keys.AdapterConnectionString(_adapter)];
             if (!string.IsNullOrWhiteSpace(adapterCfg))
                 return (_adapter, adapterCfg!);
 

@@ -1,8 +1,8 @@
-namespace Koan.Data.Direct.Infrastructure;
+namespace Koan.Data.Core.Direct;
 
 /// <summary>
-/// Centralized configuration key constants for the Koan.Data.Direct module.
-/// Eliminates magic "Koan:" string literals across Direct data access configuration.
+/// Centralized configuration key constants for direct data access.
+/// Eliminates magic "Koan:" string literals across Direct connection-string resolution.
 /// </summary>
 internal static class ConfigurationConstants
 {
