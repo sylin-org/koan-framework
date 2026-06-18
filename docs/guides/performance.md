@@ -33,7 +33,7 @@ related_guides:
 ```csharp
 // ✅ Small datasets - materialize everything
 var todos = await Todo.All();
-var active = await Todo.Where(t => !t.IsCompleted);
+var active = await Todo.Query(t => !t.IsCompleted);
 
 // ✅ Large datasets - stream in batches
 await foreach (var todo in Todo.AllStream(batchSize: 1000))
@@ -105,7 +105,7 @@ if (capabilities.Has(DataCaps.Query.Linq))
 else
 {
     // Simplified query or in-memory fallback
-    var products = await Product.Where(p => p.Category == targetCategory);
+    var products = await Product.Query(p => p.Category == targetCategory);
 }
 ```
 
@@ -379,7 +379,7 @@ public async Task<Product[]> SearchProducts(string query)
     else
     {
         // Fallback to simple string matching
-        return await Product.Where(p => p.Name.Contains(query));
+        return await Product.Query(p => p.Name.Contains(query));
     }
 }
 ```
@@ -484,7 +484,7 @@ var allUsers = await User.All();
 var activeUsers = allUsers.Where(u => u.IsActive).ToArray();
 
 // Right: Filter at database level
-var activeUsers = await User.Where(u => u.IsActive);
+var activeUsers = await User.Query(u => u.IsActive);
 ```
 
 ### ❌ N+1 Query Problems
@@ -500,7 +500,7 @@ foreach (var order in orders)
 // Right: Batch loading or include patterns
 var orders = await Order.All();
 var userIds = orders.Select(o => o.UserId).Distinct();
-var users = await User.Where(u => userIds.Contains(u.Id));
+var users = await User.Query(u => userIds.Contains(u.Id));
 var userLookup = users.ToDictionary(u => u.Id);
 ```
 

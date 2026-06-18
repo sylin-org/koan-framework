@@ -198,7 +198,7 @@ Basic search works for exact matches:
 
 ```csharp
 // Keyword search (SQL LIKE)
-var results = await Media.Where(m =>
+var results = await Media.Query(m =>
     m.Title.Contains(query) ||
     m.Synopsis.Contains(query)
 );
@@ -222,7 +222,7 @@ var synonyms = new Dictionary<string, string[]> {
 
 // Expand query
 var expandedQuery = ExpandWithSynonyms(query, synonyms);
-var results = await Media.Where(m => m.Synopsis.Contains(expandedQuery));
+var results = await Media.Query(m => m.Synopsis.Contains(expandedQuery));
 ```
 
 Manual curation becomes impossible at scale. Language barriers remain (Japanese/Korean titles need separate dictionaries). Context disappears ("bank" means financial institution or river edge?). Matching stays binary (synonym matches or doesn't).
@@ -422,7 +422,7 @@ Both semantic understanding and exact title matching are required. Combining the
 ```csharp
 // Run both searches
 var semanticResults = await Vector<Media>.Search(vector, topK: 50);
-var keywordResults = await Media.Where(m => m.Title.Contains(query)).Take(50);
+var keywordResults = await Media.Query(m => m.Title.Contains(query)).Take(50);
 
 // Merge manually
 var combined = semanticResults.Concat(keywordResults).Distinct().Take(20);
@@ -434,7 +434,7 @@ Two separate queries add latency. Manual merge logic complicates ranking. Fetchi
 
 ```csharp
 // First narrow down by keyword
-var candidates = await Media.Where(m =>
+var candidates = await Media.Query(m =>
     m.Title.Contains(query) ||
     m.Synopsis.Contains(query)
 ).Take(1000);
@@ -1202,7 +1202,7 @@ const filtered = applyFilters(library, { genre, rating, status });
 **Backend:**
 
 ```csharp
-var entries = await LibraryEntry.Where(e => e.UserId == userId);
+var entries = await LibraryEntry.Query(e => e.UserId == userId);
 var media = await Task.WhenAll(entries.Select(e => Media.Get(e.MediaId)));
 ```
 
@@ -1371,7 +1371,7 @@ public async Task<(IReadOnlyList<Recommendation>, bool degraded)> QueryAsync(...
     }
 
     // Fallback: Database query
-    var dbResults = await Media.Where(m =>
+    var dbResults = await Media.Query(m =>
         m.Title.Contains(text) || m.Synopsis.Contains(text)
     ).Take(topK);
 

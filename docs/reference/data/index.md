@@ -69,8 +69,8 @@ var widget = await Product.Get(product.Id);
 widget.Price = 15.00m;
 await widget.Save();
 
-// Delete
-await widget.Delete();
+// Remove
+await widget.Remove();
 ```
 
 All default columns (`Id`, `Created`, `Modified`, etc.) are managed automatically by the adapter.
@@ -182,7 +182,7 @@ public class Order : Entity<Order>
 
   public async Task RecalculateTotal()
   {
-    var items = await OrderItem.Where(i => i.OrderId == Id);
+    var items = await OrderItem.Query(i => i.OrderId == Id);
     Total = items.Sum(i => i.Price * i.Quantity);
     await Save();
   }

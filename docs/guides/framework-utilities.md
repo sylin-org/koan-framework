@@ -554,8 +554,8 @@ var todo = await Todo.Get(id);
 todo.Title = "Buy organic milk";
 await todo.Save();
 
-// Delete
-await todo.Delete();
+// Remove
+await todo.Remove();
 ```
 
 #### When to Use

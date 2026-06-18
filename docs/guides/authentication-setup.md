@@ -90,7 +90,7 @@ public class OrdersController : EntityController<Order>
     public Task<Order[]> GetMyOrders()
     {
         var userEmail = User.FindFirst(ClaimTypes.Email)?.Value;
-        return Order.Where(o => o.CustomerEmail == userEmail);
+        return Order.Query(o => o.CustomerEmail == userEmail);
     }
 
     [HttpPost]
@@ -308,7 +308,7 @@ public class User : Entity<User>
     }
 
     public Task<UserProvider[]> GetLinkedProviders() =>
-        UserProvider.Where(up => up.UserId == Id);
+        UserProvider.Query(up => up.UserId == Id);
 }
 ```
 
