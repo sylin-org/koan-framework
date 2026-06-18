@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Sylin Labs",
+  "classifications": [ "Koan", "Console" ],
+  "identity": "Sylin.Koan.Console.CSharp",
+  "name": "Koan Console App",
+  "description": "A minimal Koan console app — StartKoan() + one Entity<T> with Save / Get / Query over Sqlite. Ready to run.",
+  "shortName": "koan-console",
+  "defaultName": "KoanConsoleApp",
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
+  "sourceName": "KoanConsoleApp",
+  "preferNameDirectory": true,
+  "primaryOutputs": [
+    { "path": "KoanConsoleApp.csproj" }
+  ]
+}

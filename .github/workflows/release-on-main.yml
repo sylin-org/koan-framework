@@ -14,7 +14,9 @@
 #      stamps each package with its own version (patch = git height of the
 #      package folder since its major.minor last changed). --skip-duplicate
 #      makes every push idempotent; packages whose version did not change are
-#      silently skipped by nuget.org.
+#      silently skipped by nuget.org. Also packs the two meta-package nuspecs
+#      (Sylin.Koan, Sylin.Koan.App) and the `dotnet new` template pack
+#      (Sylin.Koan.Templates) into the same artifacts/nuget folder.
 #   4. Creates a date-based release tag (release/YYYY-MM-DD[-N]).
 #   5. Pushes all nupkg and snupkg to nuget.org.
 #
@@ -59,6 +61,9 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.x'
+
+      - name: Setup NuGet (for the meta-package nuspecs)
+        uses: NuGet/setup-nuget@v2
 
       - name: Configure git for the release tag
         shell: pwsh
@@ -105,6 +110,27 @@ jobs:
           $produced = @(Get-ChildItem artifacts/nuget/*.nupkg -File)
           Write-Host "Pack summary: $($produced.Count) nupkg(s) produced; $($failed.Count) project(s) returned non-zero."
           if ($produced.Count -eq 0) { throw "Zero packages produced -- check per-pack errors above." }
+
+      - name: Pack meta-packages + templates
+        shell: pwsh
+        run: |
+          # Version the meta-package nuspecs from a freshly-packed leaf so they match the src packages exactly.
+          $core = Get-ChildItem artifacts/nuget/*.nupkg | Where-Object { $_.Name -match '^Sylin\.Koan\.Core\.\d' } | Select-Object -First 1
+          if (-not $core) { throw "Sylin.Koan.Core nupkg not found -- cannot version the meta-packages." }
+          $ver = $core.Name -replace '^Sylin\.Koan\.Core\.','' -replace '\.nupkg$',''
+          # major==0 -> the next MINOR is the breaking ceiling (build/compat-ranges.targets convention).
+          $mv = [version]($ver -replace '-.*$','')
+          $range = "[$ver, 0.$($mv.Minor + 1).0)"
+          Write-Host "Meta-packages: version=$ver depVersionRange=$range"
+
+          nuget pack packaging/Koan.nuspec     -Version $ver -Properties "depVersionRange=$range" -OutputDirectory artifacts/nuget
+          if ($LASTEXITCODE -ne 0) { throw "Sylin.Koan meta-package pack failed." }
+          nuget pack packaging/Koan.App.nuspec -Version $ver -Properties "depVersionRange=$range" -OutputDirectory artifacts/nuget
+          if ($LASTEXITCODE -ne 0) { throw "Sylin.Koan.App meta-package pack failed." }
+
+          # The `dotnet new` template pack (koan-web + koan-console). NBGV versions it like the rest.
+          dotnet pack templates/Sylin.Koan.Templates.csproj -c Release --nologo "-p:PublicRelease=true" -o artifacts/nuget
+          if ($LASTEXITCODE -ne 0) { throw "Sylin.Koan.Templates pack failed." }
 
       - name: Compute date-based release tag
         id: tag

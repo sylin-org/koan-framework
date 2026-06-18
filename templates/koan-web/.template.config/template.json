@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Sylin Labs",
+  "classifications": [ "Koan", "Web", "WebAPI", "API" ],
+  "identity": "Sylin.Koan.Web.CSharp",
+  "name": "Koan Web API",
+  "description": "A minimal Koan web API — the canonical 4-line Program.cs, one Entity<T> + EntityController, Sqlite, full REST auto-mapped. Ready to run.",
+  "shortName": "koan-web",
+  "defaultName": "KoanWebApp",
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
+  "sourceName": "KoanWebApp",
+  "preferNameDirectory": true,
+  "primaryOutputs": [
+    { "path": "KoanWebApp.csproj" }
+  ]
+}

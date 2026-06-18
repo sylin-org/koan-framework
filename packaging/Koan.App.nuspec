@@ -12,7 +12,7 @@
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
   <description>Meta-package for Koan apps: includes Sylin.Koan and Sylin.Koan.Web for ASP.NET Core scenarios.</description>
   <readme>README.md</readme>
-  <icon>icon.png</icon>
+  <icon>icon.jpg</icon>
     <packageTypes>
       <packageType name="Dependency" />
     </packageTypes>
@@ -26,6 +26,6 @@
   </metadata>
   <files>
     <file src="README.md" target="/" />
-    <file src="icon.png" target="/" />
+    <file src="../resources/image/0_2.jpg" target="icon.jpg" />
   </files>
 </package>

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Sylin.Koan = core + data + JSON; we add Sqlite as the store. Reference = Intent. -->
+    <PackageReference Include="Sylin.Koan" Version="0.17.*" />
+    <PackageReference Include="Sylin.Koan.Data.Connector.Sqlite" Version="0.17.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- StartKoan() reads appsettings.json from the working directory; copy it next to the app. -->
+    <Content Include="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

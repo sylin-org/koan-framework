@@ -1,0 +1,10 @@
+<Project>
+  <!-- Intentionally EMPTY (does not import the repo-root Directory.Build.props).
+
+       The template pack is a content-only NuGet (PackageType=Template) whose "projects" under
+       koan-web/ and koan-console/ are template SOURCES copied verbatim by `dotnet new`, never
+       built here. Inheriting the framework's root build props (SourceLink, analyzers, the
+       compat-ranges pack rewrite, GenerateDocumentationFile, icon/readme machinery) conflicts
+       with content-only packing (NU5017). Stopping the inheritance chain here keeps the pack
+       self-contained; Sylin.Koan.Templates.csproj declares its own metadata + NBGV versioning. -->
+</Project>
