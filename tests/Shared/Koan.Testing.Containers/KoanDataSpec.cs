@@ -47,7 +47,7 @@ public abstract class KoanDataSpec<TFixture> where TFixture : KoanContainerFixtu
     protected async Task<BoundHost> BootAsync()
     {
         var host = await KoanIntegrationHost.Configure()
-            .WithSettings(Fixture.Settings)
+            .WithSettings(Fixture.SettingsForBoot())
             .ConfigureServices(s => s.AddKoan())
             .StartAsync()
             .ConfigureAwait(false);

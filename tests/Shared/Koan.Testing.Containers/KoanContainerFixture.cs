@@ -15,6 +15,9 @@ namespace Koan.Testing.Containers;
 /// <remarks>
 /// Shared once per engine assembly via <c>[assembly: AssemblyFixture(typeof(TFixture))]</c>; the
 /// container starts in <see cref="InitializeAsync"/> before any test and disposes after all.
+/// Dockerless file/in-memory adapters (JSON, SQLite, in-memory) reuse this base unchanged: their
+/// <see cref="StartContainerAsync"/> resolves a temp path instead of a container and never throws,
+/// so <see cref="IsAvailable"/> is always true (the Docker-absent skip branch is simply never hit).
 /// Native Docker-host auto-discovery (Testcontainers 4.x) makes the old Docker.DotNet probe and the
 /// MissingMethodException→docker-run CLI fallback obsolete: an absent daemon simply throws from
 /// <see cref="StartContainerAsync"/>, which is caught here and surfaced as
@@ -40,6 +43,15 @@ public abstract class KoanContainerFixture : IAsyncLifetime
     /// <summary>Koan configuration to feed <c>KoanIntegrationHost</c> (adapter + connection string + engine extras).</summary>
     public IReadOnlyDictionary<string, string?> Settings { get; private set; } =
         new Dictionary<string, string?>();
+
+    /// <summary>
+    /// The settings handed to <c>KoanIntegrationHost</c> for a SINGLE boot. Defaults to the shared
+    /// <see cref="Settings"/> — container fixtures reuse one backing store across every boot, isolating
+    /// per test by partition. File-based dockerless fixtures override this to provision a fresh per-boot
+    /// location so a spec that asserts over the WHOLE on-disk store (not just its partition) sees only its
+    /// own data — restoring the legacy one-store-per-test isolation at zero cost (no container to restart).
+    /// </summary>
+    public virtual IReadOnlyDictionary<string, string?> SettingsForBoot() => Settings;
 
     /// <summary>Build + start the module container and return its connection string. Throws if Docker is absent.</summary>
     protected abstract Task<string> StartContainerAsync();
@@ -85,8 +97,14 @@ public abstract class KoanContainerFixture : IAsyncLifetime
         {
             ["Koan:Environment"] = "Test",
             ["Koan:Data:Sources:Default:Adapter"] = Adapter,
-            ["Koan:Data:Sources:Default:ConnectionString"] = ConnectionString,
         };
+        // Dockerless file adapters (e.g. JSON) key off an engine-specific path supplied via
+        // ExtraSettings, not a source connection string — omit the empty value so their config
+        // matches the legacy support fixtures exactly.
+        if (!string.IsNullOrEmpty(ConnectionString))
+        {
+            settings["Koan:Data:Sources:Default:ConnectionString"] = ConnectionString;
+        }
         foreach (var kvp in ExtraSettings(ConnectionString))
         {
             settings[kvp.Key] = kvp.Value;
