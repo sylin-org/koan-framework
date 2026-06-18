@@ -27,6 +27,7 @@ Framework knowledge is provided through **Agent Skills** in `.claude/skills/` th
 | Performance issues, large datasets | `koan-performance` |
 | Vector database migration | `koan-vector-migration` |
 | `[Cacheable]`, L1/L2, cache coherence, TTL, `EntityContext.NoCache()` | `koan-caching` |
+| Background jobs, `IKoanJob<T>`, `.Job`/`.Jobs`, scheduled/retried work, queues, conveyors | `koan-jobs` |
 | MCP server development | `koan-mcp-integration` |
 
 **Full Skills Catalog**: `.claude/skills/README.md` (descriptions, learning paths, examples)

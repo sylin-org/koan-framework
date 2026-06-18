@@ -28,6 +28,7 @@ Agent Skills are filesystem-based capability packages that:
 | **koan-data-modeling** | Aggregate boundaries, relationships, lifecycle hooks, value objects | Designing domain models, complex entities, business logic encapsulation |
 | **koan-api-building** | EntityController<T>, custom routes, payload transformers, auth policies | Building REST APIs, custom endpoints, authentication, API design |
 | **koan-ai-integration** | Chat endpoints, embeddings, RAG, vector search, category routing, entity-aware AI, media analysis | Integrating AI features, semantic search, chat interfaces, embeddings |
+| **koan-jobs** | Entity-first background jobs (`IKoanJob<T>`), `.Job`/`.Jobs` accessors, the ledger-is-the-queue capability ladder, `JobContext` steering, conveyors | Background/scheduled/retried work, draining large feeds, moving work off the request thread |
 
 ### Tier 3: Developer Journey Skills (Progressive Complexity)
 
@@ -55,6 +56,7 @@ Skills load automatically based on conversation patterns:
 - **API development** triggers `koan-api-building`
 - **Error troubleshooting** triggers `koan-debugging`
 - **AI features** triggers `koan-ai-integration`
+- **Background jobs** (`IKoanJob<T>`, scheduled/retried work, queues) triggers `koan-jobs`
 
 ### Explicit Invocation
 
@@ -125,8 +127,8 @@ Skills act as **intelligent indexes** into the full documentation, loading exact
 
 ## Framework Version
 
-**Aligned with:** Koan Framework v0.6.3
-**Last Updated:** 2026-03-23
+**Aligned with:** Koan Framework v0.17.x (NBGV-versioned — see `version.json`; do not pin a patch here)
+**Last Updated:** 2026-06-18
 
 ## Migration Notes
 

@@ -15,11 +15,11 @@ Adding a package reference **automatically enables functionality**:
 
 ```xml
 <!-- Add MongoDB connector -->
-<PackageReference Include="Koan.Data.Connector.Mongo" Version="0.6.3" />
+<PackageReference Include="Koan.Data.Connector.Mongo" />
 <!-- Now MongoDB is discovered, configured, and available automatically -->
 
 <!-- Add AI capabilities -->
-<PackageReference Include="Koan.AI" Version="0.6.3" />
+<PackageReference Include="Koan.AI" />
 <!-- Now AI services are auto-registered and ready to use -->
 ```
 
