@@ -17,7 +17,11 @@
                     marked `<!-- validate -->` (OPT-IN: a block is compiled only when an
                     author asserts it is a complete, self-contained example; everything else
                     is prose-grade). Decision/design/proposal/archive docs are out of scope.
-                    Use -FullDocs for the full-surface sweep.
+                    Use -FullDocs for the full-surface sweep. As of DX-0048 the
+                    .claude/skills/ canonical-pattern blocks are in scope here too.
+    D.  Skills lint scripts/skills-lint.ps1  — the DX-0048 skill contract: dir==name,
+                    frontmatter (name/description), no version pins; link/card resolution
+                    is a warning until the H10 overhaul completes (then -Strict).
 
   Exit code is 0 (GREEN) only when every run leg passes; otherwise 1 (RED).
 
@@ -72,6 +76,9 @@ try {
     else {
         Invoke-Leg 'C. doc-code (diff)' { & "$root/scripts/validate-code-examples.ps1" -Base $Base }
     }
+
+    # D. Skills lint (DX-0048) — skill contract: dir==name, frontmatter, version pins, link/card resolution.
+    Invoke-Leg 'D. skills-lint' { & "$root/scripts/skills-lint.ps1" }
 
     Write-Host "`n=== [ratchet] summary ===" -ForegroundColor Cyan
     $failed = @()

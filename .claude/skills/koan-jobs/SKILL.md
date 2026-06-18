@@ -19,6 +19,7 @@ description: Entity-first background jobs, IKoanJob<TSelf>, .Job/.Jobs accessors
 
 **The ledger is the queue.** A job is an `Entity<T>` that implements `IKoanJob<T>` and provides one `static Execute`. The type is auto-discovered (`[KoanDiscoverable]`), so there are **no** queues, workers, or repositories to wire — adding `Koan.Jobs` and writing the entity is the whole 90% case (Reference = Intent).
 
+<!-- validate -->
 ```csharp
 using Koan.Data.Core.Model;
 using Koan.Jobs;
@@ -30,20 +31,25 @@ public sealed class ThumbnailJob : Entity<ThumbnailJob>, IKoanJob<ThumbnailJob>
 
     public static async Task Execute(ThumbnailJob job, JobContext ctx, CancellationToken ct)
     {
-        job.ThumbUrl = await Thumbs.Make(job.SourceUrl, ct);   // do the work, mutate the entity
+        job.ThumbUrl = job.SourceUrl + ".thumb";   // do the work, then mutate the entity you were given
+        await Task.CompletedTask;                  // Koan save-if-changes that reference for you
     }
 }
+```
 
-// Submit from anywhere — a controller, a service, a startup task:
-await new ThumbnailJob { SourceUrl = url }.Job.Submit();
-var status = await thumb.Job.Status();                         // latest JobStatus for this work-item
+Submit from anywhere — a controller, a service, a startup task:
+
+```csharp
+var job = new ThumbnailJob { SourceUrl = "https://example/cat.png" };
+await job.Job.Submit();                  // enqueue this work-item
+var status = await job.Job.Status();     // latest JobStatus for this work-item
 ```
 
 Koan persists the entity, claims the job on a worker, runs `Execute`, and — if you changed it — saves the reference it handed you. When `Execute` returns, the job is **Completed**.
 
 ## The capability ladder (Reference = Intent)
 
-The same handler code runs on every tier — the contract is constant **at-least-once + idempotent**. You move up the ladder by adding references and infrastructure, never by rewriting jobs ([JOBS-0005](../../docs/decisions/JOBS-0005-job-orchestrator-rebuild.md)).
+The same handler code runs on every tier — the contract is constant **at-least-once + idempotent**. You move up the ladder by adding references and infrastructure, never by rewriting jobs ([JOBS-0005](../../../docs/decisions/JOBS-0005-job-orchestrator-rebuild.md)).
 
 | Add this | Effect |
 |---|---|
@@ -52,7 +58,7 @@ The same handler code runs on every tier — the contract is constant **at-least
 | `+ multiple nodes on the shared ledger` | **Distributed** — competing consumers; the claim is an atomic compare-and-set, so each ready job runs on exactly one node. |
 | `+ Koan.Jobs.Transport.Messaging` | Cross-node **push-dispatch** over `Koan.Messaging` — no claim-latency polling. |
 
-Lane-fair dispatch keeps a busy lane (e.g. crawl) from starving a quiet downstream one (e.g. translation); each non-empty lane gets a guaranteed share ([JOBS-0008](../../docs/decisions/JOBS-0008-lane-fair-dispatch.md)).
+Lane-fair dispatch keeps a busy lane (e.g. crawl) from starving a quiet downstream one (e.g. translation); each non-empty lane gets a guaranteed share ([JOBS-0008](../../../docs/decisions/JOBS-0008-lane-fair-dispatch.md)).
 
 ## Attributes you'll declare
 
@@ -155,7 +161,7 @@ o.QueueAgeWarning = TimeSpan.FromMinutes(5);          // oldest-queued-age tripw
 
 ## See also
 
-- [Background Jobs how-to](../../docs/guides/jobs-howto.md) — the authoritative walkthrough (durability tiers, testing, full `JobContext`)
-- [Reference card: jobs.md](../../docs/reference/cards/jobs.md) — one-screen pillar map
-- [JOBS-0005 — job orchestrator rebuild](../../docs/decisions/JOBS-0005-job-orchestrator-rebuild.md) — the ledger model + capability ladder
-- [JOBS-0008 — lane-fair dispatch](../../docs/decisions/JOBS-0008-lane-fair-dispatch.md) — fairness across lanes
+- [Background Jobs how-to](../../../docs/guides/jobs-howto.md) — the authoritative walkthrough (durability tiers, testing, full `JobContext`)
+- [Reference card: jobs.md](../../../docs/reference/cards/jobs.md) — one-screen pillar map
+- [JOBS-0005 — job orchestrator rebuild](../../../docs/decisions/JOBS-0005-job-orchestrator-rebuild.md) — the ledger model + capability ladder
+- [JOBS-0008 — lane-fair dispatch](../../../docs/decisions/JOBS-0008-lane-fair-dispatch.md) — fairness across lanes

@@ -21,7 +21,8 @@ param(
 # is the wrong default. The marked set is the gate's real signal: those examples must never go stale.
 $script:InstructionalRoots = @(
     'docs/guides', 'docs/how-to', 'docs/reference', 'docs/getting-started',
-    'docs/examples', 'docs/workbooks', 'docs/patterns', 'docs/api'
+    'docs/examples', 'docs/workbooks', 'docs/patterns', 'docs/api',
+    '.claude/skills'   # DX-0048: each skill's canonical pattern is a `<!-- validate -->` block.
 )
 function Test-Instructional {
     param([string]$RelativePath)
@@ -252,6 +253,17 @@ function Create-TestProject {
     <ProjectReference Include="..\..\src\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />
     <ProjectReference Include="..\..\src\Koan.AI\Koan.AI.csproj" />
+    <!-- DX-0048: pillar refs so each skill's canonical pattern compiles under the gate. -->
+    <ProjectReference Include="..\..\src\Koan.Jobs\Koan.Jobs.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Cache\Koan.Cache.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.Vector\Koan.Data.Vector.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.AI\Koan.Data.AI.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Storage\Koan.Storage.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Messaging.Core\Koan.Messaging.Core.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web.Auth\Koan.Web.Auth.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Observability\Koan.Observability.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Media.Core\Koan.Media.Core.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Mcp\Koan.Mcp.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -304,6 +316,14 @@ try {
             }
         }
         if (Test-Path $ReadmePath) { $candidates.Add('README.md') | Out-Null }
+        # DX-0048: skill canonical-pattern blocks are in scope for the full sweep too.
+        $skillsRoot = Join-Path $repoRootPath '.claude/skills'
+        if (Test-Path $skillsRoot) {
+            Get-ChildItem -Path $skillsRoot -Recurse -Filter '*.md' | ForEach-Object {
+                $rel = [System.IO.Path]::GetRelativePath($repoRootPath, $_.FullName)
+                if (Test-Instructional $rel) { $candidates.Add(($rel -replace '\\', '/')) | Out-Null }
+            }
+        }
         Write-Host "Scope: full instructional sweep -> $($candidates.Count) doc(s)"
     }
 

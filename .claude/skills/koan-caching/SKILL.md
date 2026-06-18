@@ -145,7 +145,8 @@ await Cache.Tags($"tenant:{tenantId}").Flush(ct);                 // bulk invali
 
 ## See also
 
-- [Reference: cache.md](../../docs/reference/data/cache.md)
-- [Architecture: koan-cache-module.md](../../docs/architecture/koan-cache-module.md)
-- [ADR-0075 — pillar architecture](../../docs/decisions/ARCH-0075-koan-cache-pillar.md)
-- [ADR-0076 — decorator order](../../docs/decisions/ARCH-0076-repository-decorator-order.md)
+- [Reference card: cache.md](../../../docs/reference/cards/cache.md)
+- [Reference: cache.md](../../../docs/reference/data/cache.md)
+- [Architecture: koan-cache-module.md](../../../docs/architecture/koan-cache-module.md)
+- [ADR-0075 — pillar architecture](../../../docs/decisions/ARCH-0075-koan-cache-pillar.md)
+- [ADR-0076 — decorator order](../../../docs/decisions/ARCH-0076-repository-decorator-order.md)
