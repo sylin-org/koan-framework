@@ -57,21 +57,11 @@ public static class VectorData<TEntity>
 
         var context = Koan.Data.Core.EntityContext.Current;
 
-        // Transaction takes precedence over the workflow path: inside a transaction BOTH operations must
-        // defer and execute atomically on commit. The workflow path (below) persists the vector directly,
-        // so routing to it here would leak the vector during the transaction (entity defers via Save, but
-        // the vector would not).
+        // Inside a transaction BOTH operations must defer and execute atomically on commit.
         if (context?.TransactionCoordinator != null)
         {
             await entity.Save(ct);                       // defers via Data<TEntity, string>
             await Save(entity, vector, metadata, ct);    // defers via the transaction-aware Save above
-            return;
-        }
-
-        if (VectorWorkflow<TEntity>.IsAvailable())
-        {
-            var payload = NormalizeMetadata(metadata);
-            await VectorWorkflow<TEntity>.Save(entity, vector.ToArray(), payload, null, ct);
             return;
         }
 
@@ -133,18 +123,6 @@ public static class VectorData<TEntity>
         System.ArgumentNullException.ThrowIfNull(items);
         var list = items as IList<VectorEntity> ?? items.ToList();
 
-        if (VectorWorkflow<TEntity>.IsAvailable())
-        {
-            if (list.Count == 0)
-            {
-                return new BatchResult(0, 0, 0);
-            }
-
-            var mapped = list.Select(x => (x.Entity, x.Vector.ToArray(), (object?)NormalizeMetadata(x.Metadata))).ToList();
-            var result = await VectorWorkflow<TEntity>.SaveMany(mapped, null, ct);
-            return new BatchResult(result.Documents, 0, 0);
-        }
-
         if (list.Count == 0)
         {
             return new BatchResult(0, 0, 0);
@@ -184,8 +162,7 @@ public static class VectorData<TEntity>
     public static Task<VectorQueryResult<string>> Search(VectorQueryOptions options, CancellationToken ct = default)
     {
         var repo = Repo;
-        // AI-0036 §9 / DATA-0097 P1: validate + split the filter (residual-is-error) before the repo
-        // sees it. This is one of the two read boundaries (the other is the workflow registry).
+        // AI-0036 §9 / DATA-0097 P1: validate + split the filter (residual-is-error) before the repo sees it.
         var gated = Querying.VectorFilterCoordinator.Gate(options, repo);
         return repo.Search(gated, ct);
     }

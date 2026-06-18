@@ -14,8 +14,6 @@ public static class ServiceCollectionVectorExtensions
     {
         services.TryAddSingleton<IVectorService, VectorService>();
         services.AddKoanOptions<VectorDefaultsOptions>(Constants.Configuration.DefaultsSection);
-        services.AddKoanOptions<VectorWorkflowOptions>(Constants.Configuration.WorkflowsSection);
-        services.TryAddSingleton<IVectorWorkflowRegistry, VectorWorkflowRegistry>();
         services.TryAddSingleton<VectorSchemaRegistry>();
         return services;
     }
