@@ -1,90 +1,59 @@
-﻿using System;
 using System.IO;
 using System.Linq;
-using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Instructions;
-using Koan.Data.Core;
-using Koan.Data.Core.Model;
-using Koan.Data.Connector.Json.Tests.Support;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Data.Connector.Json.Tests.Specs.Instructions;
 
-public sealed class JsonInstructionsSpec
+public sealed class JsonInstructionsSpec(JsonFixture fixture, ITestOutputHelper output)
+    : KoanDataSpec<JsonFixture>(fixture, output)
 {
-    private readonly ITestOutputHelper _output;
-
-    public JsonInstructionsSpec(ITestOutputHelper output)
-    {
-        _output = output ?? throw new ArgumentNullException(nameof(output));
-    }
-
     [Fact]
     public async Task Instruction_ensure_created_is_idempotent_and_prepares_storage_directory()
     {
-        await TestPipeline.For<JsonInstructionsSpec>(_output, nameof(Instruction_ensure_created_is_idempotent_and_prepares_storage_directory))
-            .Using<JsonConnectorFixture>("fixture", static ctx => JsonConnectorFixture.Create(ctx))
-            .Arrange(static async ctx =>
-            {
-                var fixture = ctx.GetRequiredItem<JsonConnectorFixture>("fixture");
-                await fixture.ResetAsync<InstructionProbe, string>();
-            })
-            .Assert(async ctx =>
-            {
-                var fixture = ctx.GetRequiredItem<JsonConnectorFixture>("fixture");
-                fixture.BindHost();
+        RequireBackingStore();
+        await using var host = await BootAsync();
+        var data = host.Services.GetRequiredService<IDataService>();
 
-                var first = await fixture.Data.Execute<InstructionProbe, string, bool>(new Instruction(DataInstructions.EnsureCreated));
-                var second = await fixture.Data.Execute<InstructionProbe, string, bool>(new Instruction(DataInstructions.EnsureCreated));
+        var first = await data.Execute<InstructionProbe, string, bool>(new Instruction(DataInstructions.EnsureCreated));
+        var second = await data.Execute<InstructionProbe, string, bool>(new Instruction(DataInstructions.EnsureCreated));
 
-                first.Should().BeTrue();
-                second.Should().BeTrue();
-                Directory.Exists(fixture.RootPath).Should().BeTrue();
-            })
-            .Run();
+        first.Should().BeTrue();
+        second.Should().BeTrue();
+        Directory.Exists(Fixture.RootPath).Should().BeTrue();
     }
 
     [Fact]
     public async Task Instruction_clear_returns_deleted_count_and_truncates_store()
     {
-        await TestPipeline.For<JsonInstructionsSpec>(_output, nameof(Instruction_clear_returns_deleted_count_and_truncates_store))
-            .Using<JsonConnectorFixture>("fixture", static ctx => JsonConnectorFixture.Create(ctx))
-            .Arrange(static async ctx =>
-            {
-                var fixture = ctx.GetRequiredItem<JsonConnectorFixture>("fixture");
-                await fixture.ResetAsync<InstructionProbe, string>();
-            })
-            .Assert(async ctx =>
-            {
-                var fixture = ctx.GetRequiredItem<JsonConnectorFixture>("fixture");
-                fixture.BindHost();
-                var partition = fixture.EnsurePartition(ctx);
+        RequireBackingStore();
+        await using var host = await BootAsync();
+        var data = host.Services.GetRequiredService<IDataService>();
+        var partition = NewPartition("clear");
+        using var lease = Lease(partition);
 
-                await using var lease = fixture.LeasePartition(partition);
+        await InstructionProbe.Upsert(new InstructionProbe { Name = "seed" });
+        await InstructionProbe.Upsert(new InstructionProbe { Name = "seed-2" });
 
-                await InstructionProbe.Upsert(new InstructionProbe { Name = "seed" });
-                await InstructionProbe.Upsert(new InstructionProbe { Name = "seed-2" });
+        var countBefore = await InstructionProbe.Count.Exact();
+        countBefore.Should().Be(2);
 
-                var countBefore = await InstructionProbe.Count.Exact();
-                countBefore.Should().Be(2);
+        var cleared = await data.Execute<InstructionProbe, string, int>(new Instruction(DataInstructions.Clear));
+        cleared.Should().Be(2);
 
-                var cleared = await fixture.Data.Execute<InstructionProbe, string, int>(new Instruction(DataInstructions.Clear));
-                cleared.Should().Be(2);
+        var remaining = await InstructionProbe.All(partition);
+        remaining.Should().BeEmpty();
 
-                var remaining = await InstructionProbe.All(partition);
-                remaining.Should().BeEmpty();
+        var jsonFiles = Directory.Exists(Fixture.RootPath)
+            ? Directory.EnumerateFiles(Fixture.RootPath, "*.json", SearchOption.AllDirectories).ToArray()
+            : [];
 
-                var jsonFiles = Directory.Exists(fixture.RootPath)
-                    ? Directory.EnumerateFiles(fixture.RootPath, "*.json", SearchOption.AllDirectories).ToArray()
-                    : [];
-
-                jsonFiles.Should().NotBeEmpty();
-                foreach (var path in jsonFiles)
-                {
-                    var contents = await File.ReadAllTextAsync(path);
-                    contents.Trim().Should().Be("[]");
-                }
-            })
-            .Run();
+        jsonFiles.Should().NotBeEmpty();
+        foreach (var path in jsonFiles)
+        {
+            var contents = await File.ReadAllTextAsync(path);
+            contents.Trim().Should().Be("[]");
+        }
     }
 
     private sealed class InstructionProbe : Entity<InstructionProbe>
