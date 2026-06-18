@@ -18,6 +18,10 @@
     <PackageReference Include="xunit.v3.assert" Version="3.2.2" />
     <!-- Engine modules are added here as each engine is rolled out (ARCH-0091 staged rollout). -->
     <PackageReference Include="Testcontainers.PostgreSql" Version="4.11.0" />
+    <PackageReference Include="Testcontainers.MongoDb" Version="4.11.0" />
+    <PackageReference Include="Testcontainers.Redis" Version="4.11.0" />
+    <PackageReference Include="Testcontainers.MsSql" Version="4.11.0" />
+    <PackageReference Include="Testcontainers.Couchbase" Version="4.11.0" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Testing.Hosting\Koan.Testing.Hosting.csproj" />
