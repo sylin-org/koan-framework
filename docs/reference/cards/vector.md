@@ -1,0 +1,71 @@
+---
+type: REF
+domain: data
+title: "Vector — pillar map"
+audience: [developers, ai-agents]
+status: current
+last_updated: 2026-06-18
+framework_version: v0.17.0
+validation:
+  date_last_tested: 2026-06-18
+  status: verified
+  scope: docs/reference/cards/vector.md
+---
+
+# Vector — pillar map
+
+> One-screen map of the Vector pillar — semantic / KNN search over entity embeddings. Full detail: [ai-vector-howto.md](../../guides/ai-vector-howto.md).
+
+**What it does** — Stores and searches embedding vectors behind one facade, `Vector<TEntity>`. The same `Vector<Media>.Search(...)` code runs on any vector store; the adapter is chosen by **package reference** — add `Koan.Data.Vector.Connector.Weaviate` (or `…Milvus` / `…Qdrant`; ElasticSearch / OpenSearch ship vector support in their general `Koan.Data.Connector.ElasticSearch` / `Koan.Data.Connector.OpenSearch` packages) and it activates (Reference = Intent). Pair an entity with `[Embedding]` so the text-to-vector step is automatic, then search by vector. `Vector<T>` is the user-facing facade; `VectorData<T>` is the persistence engine it delegates into — distinct layers, not twins.
+
+## The one canonical pattern
+
+Mark the entity with `[Embedding]` (the text that gets vectorized), then search by a query vector. The facade verbs are **Save / Search** (`Search` is the canonical read; metadata filters push down to the store when the adapter can).
+
+```csharp
+[Embedding(Properties = new[] { nameof(Title), nameof(Synopsis) })]
+public sealed class Media : Entity<Media>
+{
+    public string Title { get; set; } = "";
+    public string Synopsis { get; set; } = "";
+}
+
+await media.Save();                                  // entity + embedding (Embedding queues vectorization)
+
+var hits = await Vector<Media>.Search(
+    vector: queryVector,                             // float[] — the query embedding
+    text: "cozy sci-fi",                             // optional → hybrid BM25 + vector
+    topK: 20,                                        // how many matches
+    filter: vectorFilter);                           // optional metadata filter (pushed down)
+
+foreach (var m in hits.Matches) { /* m.Id, m.Score */ }
+```
+
+`Vector<T>` is pinned to `IEntity<string>` keys. Scope a query to a partition with `Vector<Media>.WithPartition("tenant-123")`; inspect adapter support with `Vector<Media>.GetCapabilities()`.
+
+## ≤5 attributes you'll use
+
+| Attribute | What it does |
+|---|---|
+| `[Embedding(Properties=…)]` · `[Embedding(Template="{Title}\n{Body}")]` | Mark the text that gets embedded; `Properties`, `Template`, or `Policy` chooses the source (`Koan.Data.AI`). |
+| `[EmbeddingIgnore]` | Exclude a property from `Policy`-based auto-discovery embedding. |
+| `[EmbedStorage(Partition=…, Source=…)]` | Override where async `EmbedJob` work-items are stored. |
+| `[VectorAdapter("weaviate")]` | Route this entity to a specific vector provider when more than one is referenced. |
+
+## The escape hatch
+
+Drop to the raw repository — `IVectorSearchRepository<TEntity, TKey>` — for direct upsert/search/export without the facade or the embedding pipeline:
+
+```csharp
+var repo = sp.GetRequiredService<IVectorService>()
+             .TryGetRepository<Media, string>();
+await repo!.Upsert(id, embedding, metadata);
+var result = await repo.Search(new VectorQueryOptions(Query: queryVector, TopK: 20));
+await foreach (var batch in repo.ExportAll()) { /* provider migration */ }
+```
+
+The repository exposes `Upsert` / `Delete` / `Search` / `Flush` / `ExportAll` and the `TKey`-generic key the facade hides. The connector is present only when you reference that adapter (Reference = Intent). The shared Lucene-DSL translator behind the ElasticSearch / OpenSearch connectors is documented in [DATA-0103](../../decisions/DATA-0103-search-engine-shared-core.md).
+
+## The sample that shows it
+
+[`samples/S5.Recs`](../../../samples/S5.Recs/README.md) — AnimeRadar: `[Embedding]` on `Media` plus hybrid `Vector<Media>.Search(...)` (semantic + keyword, alpha-weighted, filter push-down) over Weaviate with Ollama embeddings.
