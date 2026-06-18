@@ -49,7 +49,7 @@ Treat each section as a readiness checklist before shipping a model.
 
 ## 1. Define the Aggregate Boundary
 
-1. Model required fields first; Koan supplies identifiers and timestamps automatically.
+1. Model required fields first; Koan supplies identifiers automatically. For created/updated timestamps, declare `DateTimeOffset` properties marked `[Timestamp]` (creation stamp) or `[Timestamp(OnSave = true)]` (updated on every save).
 2. Add defaults to avoid null checks inside controllers.
 3. Publish starter query helpers on the entity itself.
 
@@ -59,8 +59,11 @@ public class Todo : Entity<Todo>
     public string Title { get; set; } = "";
     public bool IsCompleted { get; set; }
 
-    public static Task<Todo[]> Recent(int days = 7, CancellationToken ct = default) =>
-        Query().Where(t => t.Created > DateTimeOffset.UtcNow.AddDays(-days)).ToArrayAsync(ct);
+    [Timestamp]
+    public DateTimeOffset Created { get; set; }
+
+    public static Task<IReadOnlyList<Todo>> Recent(int days = 7, CancellationToken ct = default) =>
+        Query(t => t.Created > DateTimeOffset.UtcNow.AddDays(-days), ct);
 }
 ```
 
@@ -75,14 +78,19 @@ public class Todo : Entity<Todo>
 ```csharp
 public class Order : Entity<Order>
 {
+    [Parent(typeof(User))]
     public string UserId { get; set; } = "";
+
+    [Timestamp]
+    public DateTimeOffset Created { get; set; }
+
     public Task<User?> GetUser(CancellationToken ct = default) => User.Get(UserId, ct);
 }
 
 public class User : Entity<User>
 {
-    public Task<Order[]> GetRecentOrders(CancellationToken ct = default) =>
-        Order.Query().Where(o => o.UserId == Id && o.Created > DateTimeOffset.UtcNow.AddDays(-30)).ToArrayAsync(ct);
+    public Task<IReadOnlyList<Order>> GetRecentOrders(CancellationToken ct = default) =>
+        Order.Query(o => o.UserId == Id && o.Created > DateTimeOffset.UtcNow.AddDays(-30), ct);
 }
 ```
 
@@ -134,22 +142,26 @@ public class Product : Entity<Product>
 
 ## 5. Apply Lifecycle Policies
 
-- Start each lifecycle module with `ProtectAll()` and opt-in only the properties you intend to mutate.
-- Use `BeforeUpsert`/`BeforeDelete` for guardrails, `AfterLoad` for hydration.
-- Keep hook classes static to avoid double registration.
+- Register hooks at startup against the entity's static `Events` facade.
+- Use a `Setup` handler to `ProtectAll()` and opt-in only the properties you intend to mutate via `AllowMutation(...)`.
+- Use `BeforeUpsert`/`BeforeRemove` for guardrails (return `ctx.Proceed()` or `ctx.Cancel(...)`), `AfterLoad` for hydration.
 
 ```csharp
 public static class ProductLifecycle
 {
-    public static void Configure(EntityLifecycleBuilder<Product> pipeline)
+    public static void Configure()
     {
-        pipeline.ProtectAll()
-                .Allow(p => p.Price, p => p.Description)
-                .BeforeUpsert(async (ctx, next) =>
-                {
-                    if (ctx.Entity.Price < 0) throw new InvalidOperationException("Price cannot be negative.");
-                    await next();
-                });
+        Product.Events.Setup(ctx =>
+        {
+            ctx.ProtectAll();
+            ctx.AllowMutation(nameof(Product.Price));
+            ctx.AllowMutation(nameof(Product.Description));
+        });
+
+        Product.Events.BeforeUpsert(ctx =>
+            ctx.Current.Price < 0
+                ? ctx.Cancel("Price cannot be negative.", "product.negative_price")
+                : ctx.Proceed());
     }
 }
 ```
@@ -167,7 +179,7 @@ public static class ProductLifecycle
 ## 7. Wire Configuration and Capabilities
 
 - Declare the default adapter in configuration and scope overrides with `[DataAdapter("alias")]`.
-- Inspect `EntityCaps<T>` or `Data<T, string>.Capabilities` before enabling transactions, vectors, or sharding.
+- Inspect `Data<T, string>.Capabilities` (a `CapabilitySet`) before enabling transactions, vectors, or sharding.
 - Capture environment-specific overrides in deployment manifests or `launchSettings.json`.
 
 ---
@@ -199,8 +211,8 @@ public class InventoryItem : Entity<InventoryItem>
     public string Sku { get; set; } = "";
     public int Quantity { get; set; }
 
-    public static Task<InventoryItem?> BySku(string sku, CancellationToken ct = default) =>
-        Query().Where(i => i.Sku == sku).FirstOrDefaultAsync(ct);
+    public static async Task<InventoryItem?> BySku(string sku, CancellationToken ct = default) =>
+        (await Query(i => i.Sku == sku, ct)).FirstOrDefault();
 }
 ```
 
@@ -243,16 +255,16 @@ public static class ProductEvents
 
 ```csharp
 [DataAdapter("weaviate")]
+[Embedding(Template = "{Description}")]
 public class ProductSearch : Entity<ProductSearch>
 {
     public string ProductId { get; set; } = "";
     public string Description { get; set; } = "";
 
-    [VectorField]
     public float[] DescriptionEmbedding { get; set; } = [];
 
-    public static Task<ProductSearch[]> SimilarTo(string query, CancellationToken ct = default) =>
-        Vector<ProductSearch>.SearchAsync(query, ct);
+    public static Task<VectorQueryResult<string>> SimilarTo(float[] queryVector, CancellationToken ct = default) =>
+        Vector<ProductSearch>.Search(queryVector, ct: ct);
 }
 ```
 
@@ -285,8 +297,8 @@ public class KnowledgeArticle : Entity<KnowledgeArticle>
         await Save();
     }
 
-    public static Task<KnowledgeArticle[]> Active(CancellationToken ct = default) =>
-        Query().Where(a => !a.IsDeleted).ToArrayAsync(ct);
+    public static Task<IReadOnlyList<KnowledgeArticle>> Active(CancellationToken ct = default) =>
+        Query(a => !a.IsDeleted, ct);
 }
 ```
 

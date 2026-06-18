@@ -101,7 +101,7 @@ public class ProductsController : EntityController<Product>
 
 ## 4. Shape Payloads
 
-- Implement `IPayloadTransformer<T>` for canonical API responses.
+- Implement `IEntityTransformer<TEntity, TShape>` for canonical API responses.
 - Use transformers to add hypermedia links, computed fields, or redactions.
 - Register transformers once; the entity endpoint service reuses them across surfaces (REST, GraphQL, MCP).
 
@@ -131,10 +131,10 @@ public class OrdersController : EntityController<Order>
 
     [HttpPost]
     [Authorize(Policy = "CanCreateOrders")]
-    public override Task<IActionResult> Post([FromBody] Order entity)
+    public override Task<IActionResult> Upsert([FromBody] Order entity, CancellationToken ct)
     {
         entity.CustomerEmail = User.FindFirst(ClaimTypes.Email)?.Value ?? string.Empty;
-        return base.Post(entity);
+        return base.Upsert(entity, ct);
     }
 }
 ```

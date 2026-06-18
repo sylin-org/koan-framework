@@ -481,14 +481,16 @@ public async Task UpdateUserPreferences(string userId, string mediaId, int ratin
 
 **Recipe**
 
-- `Koan.AI` includes built-in `EmbeddingCache` abstraction
+- `EmbeddingCache` is a **sample-app pattern** (S7.Meridian), not a framework type — copy/adapt it into your project; Koan.AI ships no caching abstraction
 - Storage backend (file system, Redis, database)
 - SHA512 content hashing for deterministic keys
 
 **Sample**
 
 ```csharp
-using Koan.AI.Caching;
+// IEmbeddingCache / EmbeddingCache are defined in the S7.Meridian sample, not in Koan.AI.
+// Port this class into your app (or wire your own cache) — Koan ships no caching abstraction.
+using Koan.Samples.Meridian.Services;
 
 public class EmbeddingService
 {
@@ -895,14 +897,14 @@ var japaneseResults = await Vector<Media>.Search(vector: japaneseQuery, topK: 10
 // Export vectors from Weaviate to migrate to different provider
 var vectorRepo = serviceProvider.GetRequiredService<IVectorSearchRepository<Media, string>>();
 
-await foreach (var batch in vectorRepo.ExportAllAsync(batchSize: 100, ct))
+await foreach (var batch in vectorRepo.ExportAll(batchSize: 100, ct))
 {
     // batch.Id - Entity identifier
     // batch.Embedding - float[] vector
     // batch.Metadata - Optional metadata
 
     // Import to new provider
-    await newProviderRepo.UpsertAsync(batch.Id, batch.Embedding, batch.Metadata, ct);
+    await newProviderRepo.Upsert(batch.Id, batch.Embedding, batch.Metadata, ct);
 }
 ```
 
