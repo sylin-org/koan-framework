@@ -2,9 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Koan.Data.Core;
-using Koan.Data.Core.Model;
-using Koan.Data.Connector.Mongo.Tests.Support;
 
 namespace Koan.Data.Connector.Mongo.Tests.Specs.Partition;
 
@@ -16,72 +13,51 @@ namespace Koan.Data.Connector.Mongo.Tests.Specs.Partition;
 /// fields without synchronization, concurrent flows under different partitions race and a write lands in the
 /// wrong partition's collection.
 /// </summary>
-public sealed class MongoPartitionConcurrencySpec
+public sealed class MongoPartitionConcurrencySpec(MongoFixture fixture, ITestOutputHelper output)
+    : KoanDataSpec<MongoFixture>(fixture, output)
 {
-    private readonly ITestOutputHelper _output;
-
-    public MongoPartitionConcurrencySpec(ITestOutputHelper output)
-    {
-        _output = output;
-    }
-
     [Fact]
     public async Task Concurrent_cross_partition_saves_do_not_leak_across_collections()
     {
-        var databaseName = $"koan_tests_{Guid.NewGuid():N}";
+        RequireBackingStore();
+        await using var host = await BootAsync();
 
-        await TestPipeline.For<MongoPartitionConcurrencySpec>(_output, nameof(Concurrent_cross_partition_saves_do_not_leak_across_collections))
-            .RequireDocker()
-            .UsingMongoContainer(database: databaseName)
-            .Using<MongoConnectorFixture>("fixture", static ctx => MongoConnectorFixture.Create(ctx))
-            .Arrange(static async ctx =>
+        var basePart = NewPartition("concurrency");
+        var partitions = Enumerable.Range(0, 4).Select(i => $"{basePart}-p{i}").ToArray();
+        const int perPartition = 100;
+
+        // Interleave concurrent saves across partitions; every flow shares the one cached repo instance.
+        var tasks = new List<Task>();
+        foreach (var partition in partitions)
+        {
+            for (var i = 0; i < perPartition; i++)
             {
-                var fixture = ctx.GetRequiredItem<MongoConnectorFixture>("fixture");
-                await fixture.ResetAsync<ConcurrentTenant, string>();
-            })
-            .Assert(async ctx =>
-            {
-                var fixture = ctx.GetRequiredItem<MongoConnectorFixture>("fixture");
-                fixture.BindHost();
-
-                var basePart = fixture.EnsurePartition(ctx);
-                var partitions = Enumerable.Range(0, 4).Select(i => $"{basePart}-p{i}").ToArray();
-                const int perPartition = 100;
-
-                // Interleave concurrent saves across partitions; every flow shares the one cached repo instance.
-                var tasks = new List<Task>();
-                foreach (var partition in partitions)
+                var p = partition;
+                var idx = i;
+                tasks.Add(Task.Run(async () =>
                 {
-                    for (var i = 0; i < perPartition; i++)
+                    using (EntityContext.Partition(p))
                     {
-                        var p = partition;
-                        var idx = i;
-                        tasks.Add(Task.Run(async () =>
-                        {
-                            using (EntityContext.Partition(p))
-                            {
-                                await ConcurrentTenant.Upsert(new ConcurrentTenant { Name = $"{p}#{idx}" });
-                            }
-                        }));
+                        await ConcurrentTenant.Upsert(new ConcurrentTenant { Name = $"{p}#{idx}" });
                     }
-                }
+                }));
+            }
+        }
 
-                await Task.WhenAll(tasks);
+        await Task.WhenAll(tasks);
 
-                // Each partition collection must hold EXACTLY its own writes — zero cross-contamination.
-                foreach (var partition in partitions)
-                {
-                    var rows = await ConcurrentTenant.All(partition);
-                    rows.Should().OnlyContain(
-                        r => r.Name.StartsWith(partition + "#", StringComparison.Ordinal),
-                        $"partition '{partition}' must not contain docs written under a different partition");
-                    rows.Should().HaveCount(perPartition,
-                        $"partition '{partition}' should hold exactly its {perPartition} concurrent writes");
-                }
+        // Each partition collection must hold EXACTLY its own writes — zero cross-contamination.
+        foreach (var partition in partitions)
+        {
+            var rows = await ConcurrentTenant.All(partition);
+            rows.Should().OnlyContain(
+                r => r.Name.StartsWith(partition + "#", StringComparison.Ordinal),
+                $"partition '{partition}' must not contain docs written under a different partition");
+            rows.Should().HaveCount(perPartition,
+                $"partition '{partition}' should hold exactly its {perPartition} concurrent writes");
+        }
 
-                (await ConcurrentTenant.All()).Should().BeEmpty("the default (un-partitioned) scope received no writes");
-            })
-            .Run();
+        (await ConcurrentTenant.All()).Should().BeEmpty("the default (un-partitioned) scope received no writes");
     }
 
     private sealed class ConcurrentTenant : Entity<ConcurrentTenant>
