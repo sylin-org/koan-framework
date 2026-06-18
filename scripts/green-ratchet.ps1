@@ -19,9 +19,9 @@
                     is prose-grade). Decision/design/proposal/archive docs are out of scope.
                     Use -FullDocs for the full-surface sweep. As of DX-0048 the
                     .claude/skills/ canonical-pattern blocks are in scope here too.
-    D.  Skills lint scripts/skills-lint.ps1  — the DX-0048 skill contract: dir==name,
-                    frontmatter (name/description), no version pins; link/card resolution
-                    is a warning until the H10 overhaul completes (then -Strict).
+    D.  Skills lint scripts/skills-lint.ps1 -Strict — the DX-0048 skill contract:
+                    dir==name, frontmatter (name/description), no version pins, and
+                    link/card resolution + catalog parity (now fatal — H10 complete).
 
   Exit code is 0 (GREEN) only when every run leg passes; otherwise 1 (RED).
 
@@ -78,7 +78,8 @@ try {
     }
 
     # D. Skills lint (DX-0048) — skill contract: dir==name, frontmatter, version pins, link/card resolution.
-    Invoke-Leg 'D. skills-lint' { & "$root/scripts/skills-lint.ps1" }
+    # -Strict (H10 complete): link/card resolution + catalog parity are now fatal, not warnings.
+    Invoke-Leg 'D. skills-lint' { & "$root/scripts/skills-lint.ps1" -Strict }
 
     Write-Host "`n=== [ratchet] summary ===" -ForegroundColor Cyan
     $failed = @()

@@ -16,18 +16,23 @@ Framework knowledge is provided through **Agent Skills** in `.claude/skills/` th
 | When You See | Invoke Skill |
 |--------------|--------------|
 | Entity work, CRUD, data access, repositories | `koan-entity-first` |
-| Project setup, Program.cs, initialization | `koan-bootstrap` |
-| Multiple providers, switching databases | `koan-multi-provider` |
-| Errors, boot failures, debugging | `koan-debugging` |
-| REST APIs, controllers, authentication | `koan-api-building` |
-| AI features, embeddings, vector search | `koan-ai-integration` |
-| Data modeling, relationships, validation | `koan-data-modeling` |
+| Project setup, Program.cs, initialization, `KoanModule` | `koan-bootstrap` |
+| Multiple providers, switching databases, capability detection | `koan-multi-provider` |
+| Errors, boot failures, capability mismatches, debugging | `koan-debugging` |
+| REST APIs, `EntityController<T>`, custom routes, transformers | `koan-web` |
+| Authentication, OAuth2/OIDC, `[Authorize]`, roles, trust | `koan-auth` |
+| AI features, embeddings, chat, `EntityAi`, `[MediaAnalysis]` | `koan-ai` |
+| Data modeling, aggregates, `[Parent]` relationships, lifecycle events | `koan-data-modeling` |
 | New projects, learning Koan basics | `koan-quickstart` |
-| Complex relationships, N+1 queries | `koan-relationships` |
-| Performance issues, large datasets | `koan-performance` |
-| Vector database migration | `koan-vector-migration` |
+| Performance, streaming, pagination, N+1, large datasets | `koan-performance` |
+| Vector search, `[Embedding]`, embeddings, vector migration | `koan-vector` |
 | `[Cacheable]`, L1/L2, cache coherence, TTL, `EntityContext.NoCache()` | `koan-caching` |
-| Background jobs, `IKoanJob<T>`, `.Job`/`.Jobs`, scheduled/retried work, queues, conveyors | `koan-jobs` |
+| Background jobs, `IKoanJob<T>`, `.Job`/`.Jobs`, scheduled/retried work, conveyors | `koan-jobs` |
+| Blob storage, `StorageEntity<T>`, `[StorageBinding]`, file upload/streaming | `koan-storage` |
+| Messaging, `myMsg.Send()`, `On<T>` handlers, event-driven | `koan-messaging` |
+| Media, `MediaEntity<T>`, transforms, `[MediaRecipe]`, OCR/describe | `koan-media` |
+| Orchestration, `[KoanService]`, compose/devops, Aspire, `start.bat` | `koan-orchestration` |
+| Observability, OpenTelemetry, traces/metrics, health | `koan-observability` |
 | MCP server development | `koan-mcp-integration` |
 
 **Full Skills Catalog**: `.claude/skills/README.md` (descriptions, learning paths, examples)
