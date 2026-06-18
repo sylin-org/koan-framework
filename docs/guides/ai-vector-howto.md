@@ -88,7 +88,7 @@ With that in place, you can leverage AI embeddings and vector search as describe
 
 **Concepts**
 
-- `Ai.Embed(text)` generates vector embeddings from text using configured AI provider
+- `Koan.AI.Client.Embed(text)` generates vector embeddings from text using configured AI provider
 - Embeddings are `float[]` arrays representing semantic meaning in high-dimensional space
 - Provider-agnostic API - swap models by changing configuration
 - Manual embeddings (`vectorizer: "none"`) give you full control
@@ -96,7 +96,7 @@ With that in place, you can leverage AI embeddings and vector search as describe
 **Recipe**
 
 - Packages listed in prerequisites
-- AI provider configured in `Koan:AI:Providers`
+- AI provider configured under `Koan:Ai` (e.g. `Koan:Ai:Embed:Source`/`Model`)
 - No special entity setup required
 
 **Sample**
@@ -106,7 +106,7 @@ using Koan.AI;
 
 // Generate embedding from text
 var text = "A heartwarming story about friendship and courage";
-var embedding = await Ai.Embed(text, ct);
+var embedding = await Koan.AI.Client.Embed(text, ct);
 
 Console.WriteLine($"Generated {embedding.Length}-dimensional vector");
 // Output: Generated 384-dimensional vector
@@ -122,7 +122,7 @@ Console.WriteLine($"Generated {embedding.Length}-dimensional vector");
 
 ```csharp
 // Use specific model for domain-specific embeddings
-var embedding = await Ai.Embed(
+var embedding = await Koan.AI.Client.Embed(
     text,
     new AiOptions { Model = "nomic-embed-text:latest" },
     ct
@@ -161,7 +161,7 @@ public class Media : Entity<Media>
 // Generate embedding
 var media = await Media.Get(mediaId);
 var embeddingText = $"{media.Title}\n\n{media.Synopsis}\n\nGenres: {string.Join(", ", media.Genres)}";
-var embedding = await Ai.Embed(embeddingText, ct);
+var embedding = await Koan.AI.Client.Embed(embeddingText, ct);
 
 // Store with metadata
 await Vector<Media>.Save(
@@ -217,7 +217,7 @@ Console.WriteLine($"Indexed {count} items");
 ```csharp
 // User searches for conceptual match
 var query = "heartwarming slice of life anime";
-var queryEmbedding = await Ai.Embed(query, ct);
+var queryEmbedding = await Koan.AI.Client.Embed(query, ct);
 
 // Semantic search
 var results = await Vector<Media>.Search(
@@ -276,7 +276,7 @@ if (capabilities.Has(VectorCaps.Knn))
 ```csharp
 // User searches for exact title
 var query = "Watashi no Kokoro wa Oji-san de Aru";
-var queryEmbedding = await Ai.Embed(query, ct);
+var queryEmbedding = await Koan.AI.Client.Embed(query, ct);
 
 // Hybrid search: semantic + keyword
 var results = await Vector<Media>.Search(
@@ -328,7 +328,7 @@ var balancedResults = await Vector<Media>.Search(
 var embeddingText = BuildEmbeddingText(media);  // Title + synopsis + genres
 var searchText = BuildSearchText(media);        // Just titles and synonyms
 
-var embedding = await Ai.Embed(embeddingText, ct);
+var embedding = await Koan.AI.Client.Embed(embeddingText, ct);
 
 await Vector<Media>.Save(
     id: media.Id,
@@ -387,7 +387,7 @@ var profile = await UserProfile.Get(userId);
 var userPrefVector = profile?.PrefVector;
 
 // Generate search intent vector
-var searchVector = await Ai.Embed("magic school anime", ct);
+var searchVector = await Koan.AI.Client.Embed("magic school anime", ct);
 
 // Blend: 66% search intent, 34% user preferences
 var blended = BlendVectors(searchVector, userPrefVector, weight: 0.66);
@@ -443,7 +443,7 @@ public async Task UpdateUserPreferences(string userId, string mediaId, int ratin
 
     // Generate embedding for rated media
     var mediaText = $"{media.Title}\n\n{media.Synopsis}";
-    var mediaVector = await Ai.Embed(mediaText);
+    var mediaVector = await Koan.AI.Client.Embed(mediaText);
 
     const double LEARNING_RATE = 0.3;
     var target = (rating - 1) / 4.0;  // Normalize 1-5 rating to 0-1
@@ -510,7 +510,7 @@ public class EmbeddingService
         }
 
         // Cache miss - generate new embedding
-        var embedding = await Ai.Embed(text, ct);
+        var embedding = await Koan.AI.Client.Embed(text, ct);
 
         // Store in cache
         await _cache.SetAsync(contentHash, MODEL_ID, embedding, "Media", ct);
@@ -546,7 +546,7 @@ foreach (var media in mediaItems)
     else
     {
         // Cache miss - generate and store
-        var embedding = await Ai.Embed(embeddingText, ct);
+        var embedding = await Koan.AI.Client.Embed(embeddingText, ct);
         await _cache.SetAsync(contentHash, modelId, embedding, typeof(Media).Name, ct);
         await Vector<Media>.Save(media.Id, embedding, BuildMetadata(media));
         cacheMisses++;
@@ -719,7 +719,7 @@ public async Task ReindexWithNewModel(string newModelId, CancellationToken ct)
             else
             {
                 // Generate with new model
-                embedding = await Ai.Embed(
+                embedding = await Koan.AI.Client.Embed(
                     embeddingText,
                     new AiOptions { Model = newModelId },
                     ct
@@ -825,7 +825,7 @@ public async Task<List<Media>> Search(string query, double alpha, int topK)
     {
         try
         {
-            var embedding = await Ai.Embed(query);
+            var embedding = await Koan.AI.Client.Embed(query);
             var results = await Vector<Media>.Search(
                 vector: embedding,
                 text: query,
@@ -857,8 +857,8 @@ public async Task<List<Media>> Search(string query, double alpha, int topK)
 
 ```csharp
 // Search with multiple semantic dimensions
-var titleEmbedding = await Ai.Embed(media.Title);
-var synopsisEmbedding = await Ai.Embed(media.Synopsis);
+var titleEmbedding = await Koan.AI.Client.Embed(media.Title);
+var synopsisEmbedding = await Koan.AI.Client.Embed(media.Synopsis);
 
 // Store multiple vectors per entity (if provider supports it)
 if (Vector<Media>.GetCapabilities().Has(VectorCaps.MultiVectorPerEntity))
@@ -881,8 +881,8 @@ if (Vector<Media>.GetCapabilities().Has(VectorCaps.MultiVectorPerEntity))
 
 ```csharp
 // Multilingual embeddings work across languages
-var englishQuery = await Ai.Embed("cute magical girls");
-var japaneseQuery = await Ai.Embed("かわいい魔法少女");
+var englishQuery = await Koan.AI.Client.Embed("cute magical girls");
+var japaneseQuery = await Koan.AI.Client.Embed("かわいい魔法少女");
 
 // Both queries find similar results semantically
 var englishResults = await Vector<Media>.Search(vector: englishQuery, topK: 10);

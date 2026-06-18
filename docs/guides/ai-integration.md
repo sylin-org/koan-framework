@@ -56,25 +56,10 @@ Follow each step as you introduce or review AI surfaces in your service.
 ```json
 {
   "Koan": {
-    "AI": {
-      "Providers": {
-        "Primary": {
-          "Type": "OpenAI",
-          "ApiKey": "{OPENAI_API_KEY}",
-          "Model": "gpt-4"
-        },
-        "Fallback": {
-          "Type": "Azure",
-          "Endpoint": "{AZURE_ENDPOINT}",
-          "ApiKey": "{AZURE_API_KEY}",
-          "Model": "gpt-4o"
-        }
-      },
-      "Budget": {
-        "MaxTokensPerRequest": 2000,
-        "MaxRequestsPerMinute": 60,
-        "MaxCostPerDay": 50.0,
-        "AlertThreshold": 0.8
+    "Ai": {
+      "Ollama": {
+        "BaseUrl": "http://localhost:11434",
+        "DefaultModel": "llama3"
       }
     }
   }
@@ -85,24 +70,24 @@ Follow each step as you introduce or review AI surfaces in your service.
 
 ## 2. Build Chat Surfaces
 
-- Use `IAi.ChatAsync` for synchronous responses.
+- Use `IAiPipeline.Prompt` (or the static `Koan.AI.Client.Chat`) for synchronous responses.
 - Introduce system prompts to anchor persona and guardrails.
-- Log `AiChatResponse.Usage` for chargeback or quota tracking.
+- Read `AiChatResponse.Text` for the generated content.
 
 ```csharp
 [Route("api/[controller]")]
 public class SummariesController : ControllerBase
 {
-    private readonly IAi _ai;
+    private readonly IAiPipeline _ai;
 
-    public SummariesController(IAi ai) => _ai = ai;
+    public SummariesController(IAiPipeline ai) => _ai = ai;
 
     [HttpPost]
     public async Task<IActionResult> Post([FromBody] SummaryRequest request, CancellationToken ct)
     {
-        var response = await _ai.ChatAsync(new AiChatRequest
+        var response = await _ai.Prompt(new AiChatRequest
         {
-            Model = request.Model ?? "gpt-4",
+            Model = request.Model,
             Messages =
             [
                 new() { Role = AiMessageRole.System, Content = "Summarize the user content in three bullet points." },
@@ -112,8 +97,7 @@ public class SummariesController : ControllerBase
 
         return Ok(new
         {
-            Summary = response.Choices?.FirstOrDefault()?.Message?.Content,
-            response.Usage
+            Summary = response.Text
         });
     }
 }
@@ -133,17 +117,9 @@ public async Task Stream([FromQuery] string prompt, CancellationToken ct)
 {
     Response.Headers.Append("Content-Type", "text/event-stream");
 
-    await foreach (var chunk in _ai.ChatStreamAsync(new AiChatRequest
+    await foreach (var token in Koan.AI.Client.Stream(prompt, ct))
     {
-        Model = "gpt-4o-mini",
-        Messages =
-        [
-            new() { Role = AiMessageRole.System, Content = "Stream markdown back to the caller." },
-            new() { Role = AiMessageRole.User, Content = prompt }
-        ]
-    }, ct))
-    {
-        await Response.WriteAsync($"data: {chunk.Delta}\n\n", ct);
+        await Response.WriteAsync($"data: {token}\n\n", ct);
         await Response.Body.FlushAsync(ct);
     }
 }
@@ -153,19 +129,17 @@ public async Task Stream([FromQuery] string prompt, CancellationToken ct)
 
 ## 4. Persist Embeddings
 
-- Annotate vector fields with `[VectorField]` to enable provider-backed search.
+- Annotate the entity with class-level `[Embedding]` so its text content feeds provider-backed embeddings.
 - Generate embeddings during writes or from Flow pipelines.
-- Validate dimension counts before saving to avoid runtime errors.
+- Keep embedding dimensionality consistent across models; re-index when swapping providers.
 
 ```csharp
 [DataAdapter("vector-store")]
+[Embedding]
 public class DocumentIndex : Entity<DocumentIndex>
 {
     public string DocumentId { get; set; } = "";
     public string Content { get; set; } = "";
-
-    [VectorField]
-    public float[] Embedding { get; set; } = [];
 }
 ```
 
@@ -197,7 +171,7 @@ public class DocumentIndex : Entity<DocumentIndex>
 
 ## 8. Control Cost & Tokens
 
-- Run `IAi.TokenizeAsync` against large prompts to stay within provider limits.
+- Trim or summarize large prompts client-side to stay within provider limits.
 - Trim or summarize conversation history once thresholds are exceeded.
 - Surface alerts when the configured budget crosses the warning threshold.
 

@@ -507,42 +507,45 @@ await Todo.Batch()
 ```csharp
 public static class TodoLifecycle
 {
-    public static void Configure(EntityLifecycleBuilder<Todo> builder)
+    // Call this once at startup (e.g. from your KoanAutoRegistrar or Program.cs)
+    public static void Register()
     {
-        builder
-            // Protect all properties by default
-            .ProtectAll()
+        // Setup runs first; declare property protection here
+        Todo.Events.Setup(ctx =>
+        {
+            ctx.ProtectAll();                  // Protect all properties by default
+            ctx.AllowMutation(nameof(Todo.Title));     // Allow specific properties to change
+            ctx.AllowMutation(nameof(Todo.Completed));
+            ctx.AllowMutation(nameof(Todo.DueDate));
+        });
 
-            // Allow specific properties to change
-            .Allow(t => t.Title, t => t.Completed, t => t.DueDate)
+        // Validation before save — return ctx.Cancel(...) to reject, ctx.Proceed() to continue
+        Todo.Events.BeforeUpsert(ctx =>
+        {
+            if (string.IsNullOrWhiteSpace(ctx.Current.Title))
+                return ctx.Cancel("Todo must have a title");
 
-            // Validation before save
-            .BeforeUpsert(async (ctx, next) =>
-            {
-                if (string.IsNullOrWhiteSpace(ctx.Entity.Title))
-                    throw new InvalidOperationException("Todo must have a title");
+            if (ctx.Current.Title.Length > 200)
+                return ctx.Cancel("Title too long (max 200 chars)");
 
-                if (ctx.Entity.Title.Length > 200)
-                    throw new InvalidOperationException("Title too long (max 200 chars)");
+            return ctx.Proceed();
+        });
 
-                await next();  // Continue to next hook or save
-            })
-
-            // Auto-format after load
-            .AfterLoad(ctx =>
-            {
-                // Trim whitespace
-                if (ctx.Entity.Title != null)
-                    ctx.Entity.Title = ctx.Entity.Title.Trim();
-            });
+        // Auto-format after load
+        Todo.Events.AfterLoad(ctx =>
+        {
+            // Trim whitespace
+            if (ctx.Current.Title != null)
+                ctx.Current.Title = ctx.Current.Title.Trim();
+        });
     }
 }
 ```
 
 **How hooks work:**
-1. `ProtectAll()` prevents accidental property mutations
-2. `Allow()` whitelists safe-to-change properties
-3. `BeforeUpsert` runs validation before save
+1. `ctx.ProtectAll()` (inside `Setup`) prevents accidental property mutations
+2. `ctx.AllowMutation(name)` whitelists safe-to-change properties
+3. `BeforeUpsert` runs validation before save (return `ctx.Cancel(reason)` to reject)
 4. `AfterLoad` formats data after fetching from database
 
 **Usage Scenarios**
@@ -652,16 +655,16 @@ public async Task PurgeArchivedLogs(CancellationToken ct)
 ```csharp
 public static class OrderLifecycle
 {
-    public static void Configure(EntityLifecycleBuilder<Order> builder) =>
-        builder.BeforeDelete(async (ctx, next) =>
+    public static void Register() =>
+        Order.Events.BeforeRemove(async ctx =>
         {
             // Log deletion for compliance
-            await AuditLog.RecordDeletion(ctx.Entity.Id, ctx.Entity.CustomerId);
-            await next();
+            await AuditLog.RecordDeletion(ctx.Current.Id, ctx.Current.CustomerId);
+            return ctx.Proceed();
         });
 }
 
-// ❌ Optimized bypasses BeforeDelete hook on Postgres!
+// ❌ Optimized bypasses BeforeRemove hook on Postgres!
 await Order.RemoveAll(ct);
 
 // ✅ Safe guarantees hook fires
@@ -1071,7 +1074,7 @@ await Flow.Pipeline("generate-embeddings")
     .Do(async (rec, ct) =>
     {
         // Generate embedding
-        rec.Embedding = await Ai.Embed(rec.Content, ct);
+        rec.Embedding = await Koan.AI.Client.Embed(rec.Content, ct);
         await rec.Save(ct);
     })
     .RunAsync(ct);
@@ -1128,7 +1131,7 @@ public class MediaItem : Entity<MediaItem>
 
 // Generate and store embedding
 var media = await MediaItem.Get(mediaId, ct);
-media.Embedding = await Ai.Embed($"{media.Title}\n\n{media.Description}", ct);
+media.Embedding = await Koan.AI.Client.Embed($"{media.Title}\n\n{media.Description}", ct);
 await media.Save(ct);
 
 // Semantic search
@@ -1163,7 +1166,7 @@ var similar = await MediaItem.Query("vectorDistance < 0.15", ct);
 
 **Cause:** Default `Optimized` strategy uses `Fast` on capable providers
 **Solution:** Use explicit `RemoveStrategy.Safe` when hooks required
-**Prevention:** Audit lifecycle hooks—if BeforeDelete does important work, always use Safe
+**Prevention:** Audit lifecycle hooks—if BeforeRemove does important work, always use Safe
 
 ### Symptom: Transaction doesn't rollback across adapters
 

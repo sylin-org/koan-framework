@@ -76,10 +76,13 @@ await Todo.AllStream(batchSize: 100)
 
 ```csharp
 // ✅ Pushed to database - fast
-var products = await Product.Query()
-    .Where(p => p.Category == "Electronics")  // Pushed down
-    .OrderBy(p => p.Price)                    // Pushed down
-    .Take(50);                                // Pushed down
+var products = await Product.FirstPage(
+    size: 50,                                          // Pushed down (limit)
+    sort: s => s.OrderBy(p => p.Price));               // Pushed down (sort)
+// Filter pushdown via the predicate overload:
+var electronics = await Product.Query(
+    p => p.Category == "Electronics",                  // Pushed down (filter)
+    sort: s => s.OrderBy(p => p.Price));               // Pushed down (sort)
 
 // ❌ In-memory processing - slow
 var products = await Product.All();           // Load everything
@@ -97,10 +100,9 @@ var capabilities = Data<Product, string>.Capabilities;
 
 if (capabilities.Has(DataCaps.Query.Linq))
 {
-    // Complex query pushed to database
-    var results = await Product.Query()
-        .Where(p => p.Tags.Contains("featured"))
-        .GroupBy(p => p.Category);
+    // Complex query pushed to database (filter via predicate; aggregate in-memory)
+    var featured = await Product.Query(p => p.Tags.Contains("featured"));
+    var results = featured.GroupBy(p => p.Category);
 }
 else
 {
@@ -217,12 +219,11 @@ public static async IAsyncEnumerable<T> GetEntitiesAsync<T>(
 
     while (!ct.IsCancellationRequested)
     {
-        var batch = await T.Query()
-            .Skip(offset)
-            .Take(batchSize)
-            .ToArrayAsync(ct);
+        var batch = await T.All(
+            new QueryDefinition().WithPagination(offset / batchSize + 1, batchSize),
+            ct);
 
-        if (!batch.Any()) yield break;
+        if (batch.Count == 0) yield break;
 
         foreach (var entity in batch)
             yield return entity;
@@ -275,9 +276,9 @@ public async Task<Product[]> SearchProducts(string query, CancellationToken ct =
     using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
     cts.CancelAfter(TimeSpan.FromSeconds(30)); // 30 second timeout
 
-    return await Product.Query()
-        .Where(p => p.Name.Contains(query))
-        .ToArrayAsync(cts.Token);
+    return (await Product.Query(
+        p => p.Name.Contains(query),
+        cts.Token)).ToArray();
 }
 ```
 
@@ -324,11 +325,9 @@ public class CategoryService
         if (_cache.TryGetValue(cacheKey, out Product[]? cached))
             return cached;
 
-        var products = await Product.Query()
-            .Where(p => p.Category == category && p.IsFeatured)
-            .OrderByDescending(p => p.Rating)
-            .Take(20)
-            .ToArrayAsync();
+        var products = (await Product.Query(
+            p => p.Category == category && p.IsFeatured,
+            sort: s => s.OrderByDescending(p => p.Rating))).Take(20).ToArray();
 
         _cache.Set(cacheKey, products, TimeSpan.FromMinutes(10));
         return products;
@@ -350,8 +349,8 @@ public class ReportService
         var users = await User.All();
 
         // Complex aggregations - SQL providers preferred
-        var revenue = await Order.Query()
-            .Where(o => o.Created > DateTime.UtcNow.AddDays(-30))
+        var recentOrders = await Order.Query(o => o.Created > DateTime.UtcNow.AddDays(-30));
+        var revenue = recentOrders
             .GroupBy(o => o.Created.Date)
             .Select(g => new { Date = g.Key, Total = g.Sum(o => o.Total) });
 
