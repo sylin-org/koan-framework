@@ -54,7 +54,7 @@ Every skill conforms — exemplars: **koan-caching**, **koan-jobs**.
 | **koan-vector** | vector.md | ✅ | Vector search (`Vector<T>.Search`), `[Embedding]`, provider-migration export |
 | **koan-ai** | ai-data.md | ✅ | `EntityAi.Embed/Chat/Ocr`, `[Embedding]`, `[MediaAnalysis]`, `Client` facade |
 | **koan-mcp-integration** → koan-mcp | mcp.md | ⟳ (deferred) | `[McpEntity]`/`[McpTool]`, MCP server, Code Mode |
-| **koan-auth** | auth.md | ＋ | OAuth2/OIDC, `[Authorize]`, roles, trust |
+| **koan-auth** | auth.md | ✅ | OAuth2/OIDC connectors, `[Authorize]`/roles, `Can*` gates, Security.Trust bearer |
 
 ### Data facets (anchored to data.md)
 
@@ -65,10 +65,15 @@ Every skill conforms — exemplars: **koan-caching**, **koan-jobs**.
 | **koan-performance** | ✅ | Streaming, pagination (`QueryDefinition`), count strategies, bulk operations |
 | **koan-relationships** | ⟳ (retiring → data-modeling; dir removed in Phase 6) | Entity navigation, batch loading |
 
-### New pillars (card-first; planned under H10)
+### New pillars (card-anchored; added under H10)
 
-`koan-storage` ＋ · `koan-messaging` ＋ · `koan-media` ＋ · `koan-orchestration` ＋ · `koan-observability` ＋
-— each gets a new H4-style card first, then the skill.
+| Skill | Card | Status | When to use |
+|-------|------|--------|-------------|
+| **koan-storage** | storage.md | ✅ | `StorageEntity<T>` + `[StorageBinding]`, profiles, streaming, `MoveTo`/`CopyTo` tiering |
+| **koan-messaging** | messaging.md | ✅ | `myMsg.Send()` buffered-until-live, `services.On<T>()`, Reference=Intent transports |
+| **koan-media** | media.md | ✅ | `MediaEntity<T>`, content-addressed `Store`, `[MediaRecipe]` transforms, `[MediaAnalysis]` |
+| **koan-orchestration** | orchestration.md | ✅ | `[KoanService]` descriptors, DevHost CLI, `OrchestrationMode` self-orchestration, Aspire |
+| **koan-observability** | observability.md | ✅ | opt-in OTel leaf (ARCH-0088), traces/metrics, `IHealthContributor` self-reporting |
 
 ## Automatic activation
 
