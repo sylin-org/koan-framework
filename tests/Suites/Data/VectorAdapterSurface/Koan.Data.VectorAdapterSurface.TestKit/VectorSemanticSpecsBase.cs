@@ -11,7 +11,7 @@ namespace Koan.Data.VectorAdapterSurface.TestKit;
 /// than the raw API surface. Adapters that don't support a scenario flag it off via the
 /// capability interface and the spec skips green.
 /// </summary>
-public abstract class VectorSemanticSpecsBase<TFactory> : IClassFixture<TFactory>, IAsyncLifetime
+public abstract class VectorSemanticSpecsBase<TFactory> : IAsyncLifetime
     where TFactory : class, IVectorAdapterTestFactory
 {
     protected readonly TFactory Factory;
@@ -19,7 +19,7 @@ public abstract class VectorSemanticSpecsBase<TFactory> : IClassFixture<TFactory
 
     protected VectorSemanticSpecsBase(TFactory factory) { Factory = factory; }
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         if (!Factory.IsAvailable) return;
         Koan.Data.Core.AggregateConfigs.Reset();
@@ -28,19 +28,19 @@ public abstract class VectorSemanticSpecsBase<TFactory> : IClassFixture<TFactory
         try { await Vector<TodoVector>.EnsureCreated(); } catch { }
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _scope?.Dispose();
         _scope = null;
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     protected void SkipIfUnavailable()
-        => Skip.If(!Factory.IsAvailable, $"[{typeof(TFactory).Name}] {Factory.UnavailableReason ?? "Adapter infrastructure unavailable"}");
+        => Assert.SkipWhen(!Factory.IsAvailable, $"[{typeof(TFactory).Name}] {Factory.UnavailableReason ?? "Adapter infrastructure unavailable"}");
 
     protected float[] Embed(string category, int seed) => EmbeddingFactory.ForCategory(category, seed, Factory.EmbeddingDimension);
 
-    [SkippableFact]
+    [Fact]
     public async Task DocumentSimilarity_findsRelatedContent()
     {
         SkipIfUnavailable();
@@ -59,7 +59,7 @@ public abstract class VectorSemanticSpecsBase<TFactory> : IClassFixture<TFactory
         topThree.Should().AllSatisfy(id => id.Should().StartWith("tech-"));
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Recommendation_findsSimilarItemsByVector()
     {
         SkipIfUnavailable();
@@ -79,7 +79,7 @@ public abstract class VectorSemanticSpecsBase<TFactory> : IClassFixture<TFactory
         ids.Should().Contain(id => id.StartsWith("electronics-"));
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task DuplicateDetection_findsNearDuplicates()
     {
         SkipIfUnavailable();
@@ -96,10 +96,10 @@ public abstract class VectorSemanticSpecsBase<TFactory> : IClassFixture<TFactory
         topTwo.Should().Contain("dup-b");
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task HybridSearch_combinesVectorAndKeyword()
     {
-        Skip.If(!Factory.SupportsHybridSearch, "Adapter does not support hybrid search (Alpha + SearchText).");
+        Assert.SkipWhen(!Factory.SupportsHybridSearch, "Adapter does not support hybrid search (Alpha + SearchText).");
         SkipIfUnavailable();
 
         // Save with embeddings; the adapter must also index 'Title' as text for BM25.
@@ -116,7 +116,7 @@ public abstract class VectorSemanticSpecsBase<TFactory> : IClassFixture<TFactory
         hits.Should().NotBeNull();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task CapabilitySurface_matchesAdvertisedFlags()
     {
         SkipIfUnavailable();
@@ -140,10 +140,10 @@ public abstract class VectorSemanticSpecsBase<TFactory> : IClassFixture<TFactory
     // implementation instead of the throwing default-interface-method it previously hit.
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task ExportAll_streamsAllStoredVectors()
     {
-        Skip.If(!Factory.SupportsExportAll, "Adapter does not implement ExportAll.");
+        Assert.SkipWhen(!Factory.SupportsExportAll, "Adapter does not implement ExportAll.");
         SkipIfUnavailable();
 
         await Vector<TodoVector>.Save("v1", Embed("alpha", 1));
@@ -164,10 +164,10 @@ public abstract class VectorSemanticSpecsBase<TFactory> : IClassFixture<TFactory
         exported.Should().Contain(new[] { "v1", "v2", "v3" });
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task ExportAll_onMissingIndex_returnsEmpty()
     {
-        Skip.If(!Factory.SupportsExportAll, "Adapter does not implement ExportAll.");
+        Assert.SkipWhen(!Factory.SupportsExportAll, "Adapter does not implement ExportAll.");
         SkipIfUnavailable();
 
         await Vector<TodoVector>.Flush();
@@ -183,12 +183,12 @@ public abstract class VectorSemanticSpecsBase<TFactory> : IClassFixture<TFactory
         exported.Should().BeEmpty();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Stats_returnsStoredVectorCount()
     {
         // Stats rides the same capability surface as ExportAll for the search-engine connectors:
         // the IndexStats instruction is implemented once in the shared base (GetCount over _count).
-        Skip.If(!Factory.SupportsExportAll, "Adapter does not implement the IndexStats instruction.");
+        Assert.SkipWhen(!Factory.SupportsExportAll, "Adapter does not implement the IndexStats instruction.");
         SkipIfUnavailable();
 
         await Vector<TodoVector>.Save("v1", Embed("alpha", 1));

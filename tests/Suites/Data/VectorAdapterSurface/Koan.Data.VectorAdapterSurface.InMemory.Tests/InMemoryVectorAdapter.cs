@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Vector.Abstractions;
 using Koan.Data.Vector.Abstractions.Capabilities;
@@ -46,7 +47,7 @@ public sealed class InMemoryVectorAdapterFactory : IVectorAdapterFactory
 /// store dictionary is shared with the factory; the repository's job is to look up the right
 /// bucket each time and operate on it.
 /// </summary>
-internal sealed class InMemoryVectorRepository<TEntity, TKey> : IVectorSearchRepository<TEntity, TKey>, IDescribesCapabilities
+internal sealed class InMemoryVectorRepository<TEntity, TKey> : IVectorSearchRepository<TEntity, TKey>, IDescribesCapabilities, IInstructionExecutor<TEntity>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
@@ -230,6 +231,29 @@ internal sealed class InMemoryVectorRepository<TEntity, TKey> : IVectorSearchRep
         await Task.Yield();
         foreach (var kvp in Bucket())
             yield return new VectorExportBatch<TKey>(ParseKey(kvp.Key), kvp.Value.Embedding, kvp.Value.Metadata);
+    }
+
+    // The vector-index instruction surface — the in-memory reference honors the same IndexStats /
+    // EnsureCreated / Clear / Rebuild instructions the search-engine connectors implement (Stats rides
+    // the ExportAll capability the factory advertises: an enumerable store can always count its entries).
+    public Task<TResult> ExecuteAsync<TResult>(Instruction instruction, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(instruction);
+        switch (instruction.Name)
+        {
+            case VectorInstructions.IndexStats:
+                return Task.FromResult((TResult)(object)Bucket().Count);
+            case VectorInstructions.IndexRebuild:
+                return Task.FromResult((TResult)(object)true); // no persisted index to rebuild
+            case VectorInstructions.IndexClear:
+                Bucket().Clear();
+                return Task.FromResult(default(TResult)!);
+            case VectorInstructions.IndexEnsureCreated:
+                _ = Bucket();
+                return Task.FromResult(default(TResult)!);
+            default:
+                throw new NotSupportedException($"Instruction '{instruction.Name}' is not supported by the in-memory vector reference.");
+        }
     }
 
     private static string Key(TKey id) => id?.ToString() ?? throw new ArgumentNullException(nameof(id));

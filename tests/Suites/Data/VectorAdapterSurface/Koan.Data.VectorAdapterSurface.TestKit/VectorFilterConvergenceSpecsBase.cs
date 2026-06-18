@@ -15,7 +15,7 @@ namespace Koan.Data.VectorAdapterSurface.TestKit;
 /// never silently mis-return. So supported operators converge with the oracle; unsupported operators
 /// hard-error; nothing silently under/over-returns. Skips green when the container is unavailable.
 /// </summary>
-public abstract class VectorFilterConvergenceSpecsBase<TFactory> : IClassFixture<TFactory>, IAsyncLifetime
+public abstract class VectorFilterConvergenceSpecsBase<TFactory> : IAsyncLifetime
     where TFactory : class, IVectorAdapterTestFactory
 {
     protected readonly TFactory Factory;
@@ -33,7 +33,7 @@ public abstract class VectorFilterConvergenceSpecsBase<TFactory> : IClassFixture
         ("e", new() {                            ["Priority"] = 4L, ["Tags"] = new[] { "z" } }),
     };
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         if (!Factory.IsAvailable) return;
         Koan.Data.Core.AggregateConfigs.Reset();
@@ -46,11 +46,11 @@ public abstract class VectorFilterConvergenceSpecsBase<TFactory> : IClassFixture
             await Vector<TodoVector>.Save(id, Embed("seed", i++), meta);
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _scope?.Dispose();
         _scope = null;
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     protected float[] Embed(string category, int seed) => EmbeddingFactory.ForCategory(category, seed, Factory.EmbeddingDimension);
@@ -80,11 +80,11 @@ public abstract class VectorFilterConvergenceSpecsBase<TFactory> : IClassFixture
         ("Not", Filter.Negate(Filter.Eq("Category", "legal"))),
     };
 
-    [SkippableFact]
+    [Fact]
     public async Task Filters_converge_with_oracle_or_hard_error()
     {
-        Skip.IfNot(Factory.SupportsMetadataFilters, "Adapter does not advertise metadata filters.");
-        Skip.If(!Factory.IsAvailable, $"[{typeof(TFactory).Name}] {Factory.UnavailableReason ?? "infrastructure unavailable"}");
+        Assert.SkipUnless(Factory.SupportsMetadataFilters, "Adapter does not advertise metadata filters.");
+        Assert.SkipWhen(!Factory.IsAvailable, $"[{typeof(TFactory).Name}] {Factory.UnavailableReason ?? "infrastructure unavailable"}");
 
         var query = Embed("seed", 0);
         var supported = 0;

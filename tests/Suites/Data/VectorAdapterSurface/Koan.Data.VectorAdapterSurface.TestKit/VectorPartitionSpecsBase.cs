@@ -12,7 +12,7 @@ namespace Koan.Data.VectorAdapterSurface.TestKit;
 /// the only way to verify isolation is exercising real partition-scoped reads/writes through
 /// <c>Vector&lt;T&gt;.WithPartition</c> against each adapter.
 /// </summary>
-public abstract class VectorPartitionSpecsBase<TFactory> : IClassFixture<TFactory>, IAsyncLifetime
+public abstract class VectorPartitionSpecsBase<TFactory> : IAsyncLifetime
     where TFactory : class, IVectorAdapterTestFactory
 {
     protected readonly TFactory Factory;
@@ -23,7 +23,7 @@ public abstract class VectorPartitionSpecsBase<TFactory> : IClassFixture<TFactor
 
     protected VectorPartitionSpecsBase(TFactory factory) { Factory = factory; }
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         if (!Factory.IsAvailable) return;
         Koan.Data.Core.AggregateConfigs.Reset();
@@ -42,22 +42,22 @@ public abstract class VectorPartitionSpecsBase<TFactory> : IClassFixture<TFactor
         }
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _scope?.Dispose();
         _scope = null;
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     protected void SkipIfUnsupported()
     {
-        Skip.If(!Factory.IsAvailable, $"[{typeof(TFactory).Name}] {Factory.UnavailableReason ?? "Adapter infrastructure unavailable"}");
-        Skip.If(!Factory.SupportsPartitionIsolation, "Adapter does not support partition isolation.");
+        Assert.SkipWhen(!Factory.IsAvailable, $"[{typeof(TFactory).Name}] {Factory.UnavailableReason ?? "Adapter infrastructure unavailable"}");
+        Assert.SkipWhen(!Factory.SupportsPartitionIsolation, "Adapter does not support partition isolation.");
     }
 
     protected float[] Embed(string category, int seed) => EmbeddingFactory.ForCategory(category, seed, Factory.EmbeddingDimension);
 
-    [SkippableFact]
+    [Fact]
     public async Task Upsert_inPartitionA_isInvisibleFromPartitionB()
     {
         SkipIfUnsupported();
@@ -74,7 +74,7 @@ public abstract class VectorPartitionSpecsBase<TFactory> : IClassFixture<TFactor
         }
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Search_inPartitionA_neverReturnsPartitionBResults()
     {
         SkipIfUnsupported();
@@ -97,7 +97,7 @@ public abstract class VectorPartitionSpecsBase<TFactory> : IClassFixture<TFactor
         }
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Delete_inPartitionA_doesNotAffectPartitionB()
     {
         SkipIfUnsupported();
@@ -123,10 +123,10 @@ public abstract class VectorPartitionSpecsBase<TFactory> : IClassFixture<TFactor
         }
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Flush_inPartitionA_doesNotAffectPartitionB()
     {
-        Skip.If(!Factory.SupportsFlush, "Adapter does not implement Flush.");
+        Assert.SkipWhen(!Factory.SupportsFlush, "Adapter does not implement Flush.");
         SkipIfUnsupported();
 
         using (Vector<TodoVector>.WithPartition("alpha"))
@@ -156,7 +156,7 @@ public abstract class VectorPartitionSpecsBase<TFactory> : IClassFixture<TFactor
         }
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task ConcurrentWrites_acrossPartitions_remainIsolated()
     {
         SkipIfUnsupported();
