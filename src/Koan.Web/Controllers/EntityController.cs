@@ -287,61 +287,77 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         string? filterJson = null;
         string? set = null;
         bool ignoreCase = false;
+
+        // X-entitycontroller-query-parse: parse the body explicitly and fail loud on bad input (GET-parity).
+        // The previous bare catch swallowed JObject.Parse + (int) cast failures and ran the query with
+        // DEFAULTS — silently dropping the filter and returning unfiltered results (200). A non-object body
+        // now 400s, page/size mirror the GET-list path (non-coercible -> ignored; negative page rejected),
+        // and coercion no longer throws.
+        JObject jobj;
         try
         {
-            var jobj = JObject.Parse(JsonConvert.SerializeObject(body));
-            if (jobj.TryGetValue("filter", out var f)) filterJson = f.ToString(Formatting.None);
-            if (jobj.TryGetValue("page", out var p) && (p.Type == JTokenType.Integer || p.Type == JTokenType.String)) options.Page = (int)p;
-            if (jobj.TryGetValue("size", out var s) && (s.Type == JTokenType.Integer || s.Type == JTokenType.String)) options.PageSize = (int)s;
-            if (jobj.TryGetValue("set", out var st) && st.Type == JTokenType.String) set = st.ToString();
-            // ADR-0093: body sort field. Accepts string array of URL-grammar specs (e.g. ["-createdAt", "+title"]).
-            // Body sort overrides any ?sort= query-string value to keep the schema unambiguous.
-            if (jobj.TryGetValue("sort", out var sortNode))
+            if (JToken.Parse(JsonConvert.SerializeObject(body)) is not JObject parsed)
             {
-                IEnumerable<string>? rawSpecs = null;
-                if (sortNode.Type == JTokenType.Array)
-                {
-                    rawSpecs = sortNode.Children<JToken>()
-                        .Where(t => t.Type == JTokenType.String)
-                        .Select(t => t.Value<string>()!)
-                        .Where(s => !string.IsNullOrWhiteSpace(s));
-                }
-                else if (sortNode.Type == JTokenType.String)
-                {
-                    var raw = sortNode.Value<string>();
-                    if (!string.IsNullOrWhiteSpace(raw)) rawSpecs = new[] { raw };
-                }
+                return BadRequest(new { error = "Request body must be a JSON object." });
+            }
+            jobj = parsed;
+        }
+        catch (JsonException)
+        {
+            return BadRequest(new { error = "Invalid request body." });
+        }
 
-                if (rawSpecs is not null)
+        if (jobj.TryGetValue("filter", out var f)) filterJson = f.ToString(Formatting.None);
+        if (jobj.TryGetValue("page", out var pageToken) && TryCoerceQueryInt(pageToken, out var pageValue))
+        {
+            if (pageValue < 0) return BadRequest(new { error = "page must be >= 0" });
+            options.Page = pageValue;
+        }
+        if (jobj.TryGetValue("size", out var sizeToken) && TryCoerceQueryInt(sizeToken, out var sizeValue))
+        {
+            options.PageSize = sizeValue;
+        }
+        if (jobj.TryGetValue("set", out var st) && st.Type == JTokenType.String) set = st.ToString();
+        // ADR-0093: body sort field. Accepts string array of URL-grammar specs (e.g. ["-createdAt", "+title"]).
+        // Body sort overrides any ?sort= query-string value to keep the schema unambiguous.
+        if (jobj.TryGetValue("sort", out var sortNode))
+        {
+            IEnumerable<string>? rawSpecs = null;
+            if (sortNode.Type == JTokenType.Array)
+            {
+                rawSpecs = sortNode.Children<JToken>()
+                    .Where(t => t.Type == JTokenType.String)
+                    .Select(t => t.Value<string>()!)
+                    .Where(s => !string.IsNullOrWhiteSpace(s));
+            }
+            else if (sortNode.Type == JTokenType.String)
+            {
+                var raw = sortNode.Value<string>();
+                if (!string.IsNullOrWhiteSpace(raw)) rawSpecs = new[] { raw };
+            }
+
+            if (rawSpecs is not null)
+            {
+                try
                 {
-                    try
+                    var collected = new List<SortSpec>();
+                    foreach (var spec in rawSpecs)
                     {
-                        var collected = new List<SortSpec>();
-                        foreach (var spec in rawSpecs)
-                        {
-                            collected.AddRange(Koan.Data.Core.Sorting.SortSpecParser.ParseStrict<TEntity>(spec));
-                        }
-                        options.Sort.Clear();
-                        options.Sort.AddRange(collected);
+                        collected.AddRange(Koan.Data.Core.Sorting.SortSpecParser.ParseStrict<TEntity>(spec));
                     }
-                    catch (Koan.Data.Abstractions.Sorting.InvalidSortFieldException ex)
-                    {
-                        return BadRequest(new { error = ex.Message, field = ex.Field });
-                    }
+                    options.Sort.Clear();
+                    options.Sort.AddRange(collected);
+                }
+                catch (Koan.Data.Abstractions.Sorting.InvalidSortFieldException ex)
+                {
+                    return BadRequest(new { error = ex.Message, field = ex.Field });
                 }
             }
-            if (jobj.TryGetValue("", out var opt) && opt.Type == JTokenType.Object)
-            {
-                var o = (JObject)opt;
-                if (o.TryGetValue("ignoreCase", out var ic) && ic.Type == JTokenType.Boolean && (bool)ic) ignoreCase = true;
-            }
         }
-        catch (Koan.Data.Abstractions.Sorting.InvalidSortFieldException)
+        if (jobj.TryGetValue("", out var opt) && opt.Type == JTokenType.Object)
         {
-            throw;  // already handled above; this catch prevents the bare catch from swallowing it
-        }
-        catch
-        {
+            var o = (JObject)opt;
+            if (o.TryGetValue("ignoreCase", out var ic) && ic.Type == JTokenType.Boolean && (bool)ic) ignoreCase = true;
         }
 
         var request = new EntityQueryRequest
@@ -360,6 +376,29 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             return ResolveShortCircuit(result);
         }
         return PrepareResponse(result.Payload ?? result.Items);
+    }
+
+    // Coerce a JSON token to an int for paging without throwing (GET-parity: non-coercible -> ignored,
+    // out-of-range integers treated as absent rather than overflowing).
+    private static bool TryCoerceQueryInt(JToken token, out int value)
+    {
+        value = 0;
+        switch (token.Type)
+        {
+            case JTokenType.Integer:
+                var l = token.Value<long>();
+                if (l < int.MinValue || l > int.MaxValue) return false;
+                value = (int)l;
+                return true;
+            case JTokenType.String:
+                return int.TryParse(
+                    token.Value<string>(),
+                    System.Globalization.NumberStyles.Integer,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out value);
+            default:
+                return false;
+        }
     }
 
     [HttpGet("new")]

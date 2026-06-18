@@ -7,6 +7,10 @@
     <!-- Pre-existing vulnerability warnings in transitive deps. -->
     <NoWarn>$(NoWarn);NU1902;NU1903</NoWarn>
     <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1902;NU1903</WarningsNotAsErrors>
+    <!-- SDK.Web top-level Program + Microsoft.NET.Test.Sdk's generated Main both qualify as entry
+         points (CS7022). Tests run via the VSTest adapter, not the assembly Main, so the duplicate is
+         harmless — keep the top-level Program (WebApplicationFactory<Program>) and drop the SDK's Main. -->
+    <GenerateProgramFile>false</GenerateProgramFile>
   </PropertyGroup>
 
   <ItemGroup>
