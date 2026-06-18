@@ -1,22 +1,21 @@
-﻿using Koan.Data.Abstractions;
+using Koan.Data.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Data.Connector.SqlServer.Tests.Specs.Batch;
 
-public class SqlServerBatchAndBulkTests : IClassFixture<Support.SqlServerAutoFixture>
+public sealed class SqlServerBatchAndBulkTests(SqlServerFixture fixture, ITestOutputHelper output)
+    : KoanDataSpec<SqlServerFixture>(fixture, output)
 {
-    private readonly Support.SqlServerAutoFixture _fx;
-
-    public SqlServerBatchAndBulkTests(Support.SqlServerAutoFixture fx) => _fx = fx;
-
     [Fact]
     public async Task Bulk_upsert_and_delete_and_batch()
     {
-        if (_fx.SkipTests)
-        {
-            return;
-        }
+        RequireBackingStore();
+        await using var host = await BootAsync();
+        var data = host.Services.GetRequiredService<IDataService>();
+        var partition = NewPartition("batch");
+        using var lease = Lease(partition);
 
-        var repo = _fx.Data.GetRepository<Item, string>();
+        var repo = data.GetRepository<Item, string>();
 
         var items = Enumerable.Range(1, 10).Select(i => new Item(i.ToString()) { Name = $"I-{i}" }).ToArray();
         await repo.UpsertMany(items, default);

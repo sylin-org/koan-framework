@@ -1,7 +1,8 @@
+using Koan.Testing.Containers;
 using Xunit;
 
-// These are integration specs: every class sets the global AppHost.Current to its own fixture's
-// ServiceProvider and shares a single SQL Server / LocalDB instance. Running classes in parallel stomps
-// that global (AdapterNaming.GetOrCompute resolves against a half-swapped provider) and races on shared
-// tables. Serialize the whole assembly, matching every other Koan.Data connector suite.
+// ARCH-0091: one SQL Server container shared across the whole assembly (started once before any test,
+// disposed after all). Tests run sequentially within the process because the static Entity<T> API
+// resolves through the process-global AppHost.Current; engines parallelize across processes.
 [assembly: CollectionBehavior(DisableTestParallelization = true)]
+[assembly: AssemblyFixture(typeof(SqlServerFixture))]

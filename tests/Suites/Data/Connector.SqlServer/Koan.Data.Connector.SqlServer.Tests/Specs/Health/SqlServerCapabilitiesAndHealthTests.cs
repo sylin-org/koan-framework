@@ -1,4 +1,6 @@
-﻿using Koan.Data.Abstractions;
+using System.Collections.Generic;
+using System.Linq;
+using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Capabilities;
 using Koan.Core;
 using Koan.Core.Observability.Health;
@@ -6,26 +8,21 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Data.Connector.SqlServer.Tests.Specs.Health;
 
-public class SqlServerCapabilitiesAndHealthTests : IClassFixture<Support.SqlServerAutoFixture>
+public sealed class SqlServerCapabilitiesAndHealthTests(SqlServerFixture fixture, ITestOutputHelper output)
+    : KoanDataSpec<SqlServerFixture>(fixture, output)
 {
-    private readonly Support.SqlServerAutoFixture _fx;
-
-    public SqlServerCapabilitiesAndHealthTests(Support.SqlServerAutoFixture fx) => _fx = fx;
-
     [Fact]
     public async Task Capabilities_and_health_are_reported()
     {
-        if (_fx.SkipTests)
-        {
-            return;
-        }
+        RequireBackingStore();
+        await using var host = await BootAsync();
 
-        var contributors = _fx.ServiceProvider.GetRequiredService<IEnumerable<IHealthContributor>>();
+        var contributors = host.Services.GetRequiredService<IEnumerable<IHealthContributor>>();
         var sql = contributors.First(c => c.Name == "data:sqlserver");
         var report = await sql.Check(default);
         report.State.Should().Be(HealthState.Healthy);
 
-        var data = _fx.Data;
+        var data = host.Services.GetRequiredService<IDataService>();
         var repo = data.GetRepository<TestEntity, string>();
 
         // ARCH-0084: negotiate via the unified CapabilitySet.
