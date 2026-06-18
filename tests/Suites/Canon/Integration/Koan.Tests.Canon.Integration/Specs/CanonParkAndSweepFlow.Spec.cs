@@ -1,12 +1,7 @@
-﻿namespace Koan.Tests.Canon.Integration.Specs;
+namespace Koan.Tests.Canon.Integration.Specs;
 
 public sealed class CanonParkAndSweepFlowSpec
 {
-    private const string ServicesKey = "services";
-    private const string RuntimeKey = "runtime";
-    private const string HarnessKey = "harness";
-    private const string ResultKey = "result";
-    private const string ParkedSnapshotKey = "parked:before-purge";
     private static readonly TimeSpan ParkedTtl = TimeSpan.FromSeconds(2);
 
     private readonly ITestOutputHelper _output;
@@ -17,67 +12,58 @@ public sealed class CanonParkAndSweepFlowSpec
     }
 
     [Fact]
-    public Task Park_and_sweep_parks_keyless_stage_and_purges_after_ttl()
-        => TestPipeline.For<CanonParkAndSweepFlowSpec>(_output, nameof(Park_and_sweep_parks_keyless_stage_and_purges_after_ttl))
-            .UsingServiceProvider(ServicesKey, ConfigureServices)
-            .Arrange(ctx =>
-            {
-                using var scope = ctx.CreateServiceScope(ServicesKey);
-                ctx.SetItem(RuntimeKey, scope.ServiceProvider.GetRequiredService<ICanonRuntime>());
-                ctx.SetItem(HarnessKey, scope.ServiceProvider.GetRequiredService<ParkAndSweepHarness>());
-            })
-            .Act(async ctx =>
-            {
-                var runtime = ctx.GetRequiredItem<ICanonRuntime>(RuntimeKey);
+    public async Task Park_and_sweep_parks_keyless_stage_and_purges_after_ttl()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        ConfigureServices(services);
+        await using var sp = services.BuildServiceProvider();
 
-                var inbound = new KeylessCanon
-                {
-                    Dummy = null,
-                    DisplayName = "Keyless"
-                };
+        ICanonRuntime runtime;
+        ParkAndSweepHarness harness;
+        using (var scope = sp.CreateScope())
+        {
+            runtime = scope.ServiceProvider.GetRequiredService<ICanonRuntime>();
+            harness = scope.ServiceProvider.GetRequiredService<ParkAndSweepHarness>();
+        }
 
-                var options = CanonizationOptions.Default
-                    .WithStageBehavior(CanonStageBehavior.StageOnly)
-                    .WithOrigin("ingest")
-                    .WithTag("tenant", "acme");
+        var inbound = new KeylessCanon
+        {
+            Dummy = null,
+            DisplayName = "Keyless"
+        };
 
-                var result = await runtime.Canonize(inbound, options, ctx.Cancellation).ConfigureAwait(false);
-                ctx.SetItem(ResultKey, result);
+        var options = CanonizationOptions.Default
+            .WithStageBehavior(CanonStageBehavior.StageOnly)
+            .WithOrigin("ingest")
+            .WithTag("tenant", "acme");
 
-                var harness = ctx.GetRequiredItem<ParkAndSweepHarness>(HarnessKey);
-                await RunParkAndSweep(harness, DateTimeOffset.UtcNow).ConfigureAwait(false);
+        var result = await runtime.Canonize(inbound, options, CancellationToken.None);
 
-                ctx.SetItem(ParkedSnapshotKey, harness.Parked.ToArray());
+        await RunParkAndSweep(harness, DateTimeOffset.UtcNow);
 
-                harness.PurgeExpiredParked(ParkedTtl, DateTimeOffset.UtcNow.AddSeconds(3));
-            })
-            .Assert(ctx =>
-            {
-                var harness = ctx.GetRequiredItem<ParkAndSweepHarness>(HarnessKey);
-                var result = ctx.GetRequiredItem<CanonizationResult<KeylessCanon>>(ResultKey);
-                var parkedBefore = ctx.GetRequiredItem<ParkAndSweepHarness.ParkedRecord[]>(ParkedSnapshotKey);
+        var parkedBefore = harness.Parked.ToArray();
 
-                result.Outcome.Should().Be(CanonizationOutcome.Parked);
-                result.Events.Should().ContainSingle(evt => evt.Phase == CanonPipelinePhase.Intake);
+        harness.PurgeExpiredParked(ParkedTtl, DateTimeOffset.UtcNow.AddSeconds(3));
 
-                var stageEvent = result.Events.Single();
-                var stageId = stageEvent.Detail?.Replace("stage:", "");
+        result.Outcome.Should().Be(CanonizationOutcome.Parked);
+        result.Events.Should().ContainSingle(evt => evt.Phase == CanonPipelinePhase.Intake);
 
-                harness.StageRecords.Should().BeEmpty();
+        var stageEvent = result.Events.Single();
+        var stageId = stageEvent.Detail?.Replace("stage:", "");
 
-                harness.Rejections.Should().ContainSingle(rejection => rejection.ReasonCode == ParkAndSweepHarness.NoKeysReasonCode);
+        harness.StageRecords.Should().BeEmpty();
 
-                parkedBefore.Should().ContainSingle(record => record.ReasonCode == ParkAndSweepHarness.NoKeysReasonCode && record.StageId == stageId);
+        harness.Rejections.Should().ContainSingle(rejection => rejection.ReasonCode == ParkAndSweepHarness.NoKeysReasonCode);
 
-                harness.Parked.Should().BeEmpty();
+        parkedBefore.Should().ContainSingle(record => record.ReasonCode == ParkAndSweepHarness.NoKeysReasonCode && record.StageId == stageId);
 
-                harness.Rejections.Should().ContainSingle();
+        harness.Parked.Should().BeEmpty();
 
-                return ValueTask.CompletedTask;
-            })
-            .Run();
+        harness.Rejections.Should().ContainSingle();
+    }
 
-    private static void ConfigureServices(TestContext ctx, IServiceCollection services)
+    private static void ConfigureServices(IServiceCollection services)
     {
         services.AddLogging();
         services.AddSingleton<ParkAndSweepHarness>();

@@ -1,9 +1,7 @@
-﻿namespace Koan.Tests.Canon.Integration.Specs;
+namespace Koan.Tests.Canon.Integration.Specs;
 
 public sealed class CanonRuntimeFlowSpec
 {
-    private const string ServicesKey = "services";
-
     private readonly ITestOutputHelper _output;
 
     public CanonRuntimeFlowSpec(ITestOutputHelper output)
@@ -12,144 +10,128 @@ public sealed class CanonRuntimeFlowSpec
     }
 
     [Fact]
-    public Task Canonization_pipeline_persists_canonical_and_indexes()
-        => TestPipeline.For<CanonRuntimeFlowSpec>(_output, nameof(Canonization_pipeline_persists_canonical_and_indexes))
-            .UsingServiceProvider(ServicesKey, ConfigureServices)
-            .Arrange(ctx =>
-            {
-                using var scope = ctx.CreateServiceScope(ServicesKey);
-                var runtime = scope.ServiceProvider.GetRequiredService<ICanonRuntime>();
-                var persistence = scope.ServiceProvider.GetRequiredService<ICanonPersistence>() as InMemoryCanonPersistence
-                    ?? throw new InvalidOperationException("In-memory persistence not registered");
-                ctx.SetItem("runtime", runtime);
-                ctx.SetItem("persistence", persistence);
-            })
-            .Act(ctx => ExecuteCanonization(ctx, CanonStageBehavior.Immediate, "integration"))
-            .Assert(ctx =>
-            {
-                var result = ctx.GetRequiredItem<CanonizationResult<ContactCanon>>("result");
-                var persistence = ctx.GetRequiredItem<ICanonPersistence>("persistence") as InMemoryCanonPersistence;
-                persistence.Should().NotBeNull();
+    public async Task Canonization_pipeline_persists_canonical_and_indexes()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        ConfigureServices(services);
+        await using var sp = services.BuildServiceProvider();
 
-                result.Outcome.Should().Be(CanonizationOutcome.Canonized);
-                result.Metadata.Tags.Should().ContainKey("source").WhoseValue.Should().Be("integration");
-                result.Canonical.DisplayName.Should().Be("ALPHA");
-                result.Canonical.Email.Should().Contain("integration");
+        using var scope = sp.CreateScope();
+        var runtime = scope.ServiceProvider.GetRequiredService<ICanonRuntime>();
+        var persistence = scope.ServiceProvider.GetRequiredService<ICanonPersistence>() as InMemoryCanonPersistence
+            ?? throw new InvalidOperationException("In-memory persistence not registered");
 
-                var stored = persistence!.GetCanonical(result.Canonical.Id);
-                stored.Should().NotBeNull();
-                stored!.DisplayName.Should().Be("ALPHA");
+        var executionId = Guid.CreateVersion7();
+        var result = await ExecuteCanonization(runtime, executionId, CanonStageBehavior.Immediate, "integration");
 
-                var indexKey = $"Email={result.Canonical.Email}";
-                var index = persistence.GetIndex(typeof(ContactCanon), indexKey);
-                index.Should().NotBeNull();
-                index!.CanonicalId.Should().Be(result.Canonical.Id);
-            })
-            .Run();
+        result.Outcome.Should().Be(CanonizationOutcome.Canonized);
+        result.Metadata.Tags.Should().ContainKey("source").WhoseValue.Should().Be("integration");
+        result.Canonical.DisplayName.Should().Be("ALPHA");
+        result.Canonical.Email.Should().Contain("integration");
+
+        var stored = persistence!.GetCanonical(result.Canonical.Id);
+        stored.Should().NotBeNull();
+        stored!.DisplayName.Should().Be("ALPHA");
+
+        var indexKey = $"Email={result.Canonical.Email}";
+        var index = persistence.GetIndex(typeof(ContactCanon), indexKey);
+        index.Should().NotBeNull();
+        index!.CanonicalId.Should().Be(result.Canonical.Id);
+    }
 
     [Fact]
-    public Task Stage_only_requests_create_stage_entries_without_persisting_canonical()
-        => TestPipeline.For<CanonRuntimeFlowSpec>(_output, nameof(Stage_only_requests_create_stage_entries_without_persisting_canonical))
-            .UsingServiceProvider(ServicesKey, ConfigureServices)
-            .Arrange(ctx =>
-            {
-                using var scope = ctx.CreateServiceScope(ServicesKey);
-                var runtime = scope.ServiceProvider.GetRequiredService<ICanonRuntime>();
-                var persistence = scope.ServiceProvider.GetRequiredService<ICanonPersistence>() as InMemoryCanonPersistence
-                    ?? throw new InvalidOperationException("In-memory persistence not registered");
-                ctx.SetItem("runtime", runtime);
-                ctx.SetItem("persistence", persistence);
-            })
-            .Act(ctx => ExecuteCanonization(ctx, CanonStageBehavior.StageOnly, "queue"))
-            .Assert(ctx =>
-            {
-                var result = ctx.GetRequiredItem<CanonizationResult<ContactCanon>>("result");
-                var persistence = ctx.GetRequiredItem<InMemoryCanonPersistence>("persistence");
+    public async Task Stage_only_requests_create_stage_entries_without_persisting_canonical()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        ConfigureServices(services);
+        await using var sp = services.BuildServiceProvider();
 
-                result.Outcome.Should().Be(CanonizationOutcome.Parked);
-                result.Events.Should().ContainSingle(evt => evt.Phase == CanonPipelinePhase.Intake);
-                persistence.StageRecords.Should().HaveCount(1);
-                persistence.CanonicalEntries.Should().BeEmpty();
-            })
-            .Run();
+        using var scope = sp.CreateScope();
+        var runtime = scope.ServiceProvider.GetRequiredService<ICanonRuntime>();
+        var persistence = scope.ServiceProvider.GetRequiredService<ICanonPersistence>() as InMemoryCanonPersistence
+            ?? throw new InvalidOperationException("In-memory persistence not registered");
+
+        var executionId = Guid.CreateVersion7();
+        var result = await ExecuteCanonization(runtime, executionId, CanonStageBehavior.StageOnly, "queue");
+
+        result.Outcome.Should().Be(CanonizationOutcome.Parked);
+        result.Events.Should().ContainSingle(evt => evt.Phase == CanonPipelinePhase.Intake);
+        persistence.StageRecords.Should().HaveCount(1);
+        persistence.CanonicalEntries.Should().BeEmpty();
+    }
 
     [Fact]
-    public Task Stage_only_requests_forward_tags_to_stage_metadata()
-        => TestPipeline.For<CanonRuntimeFlowSpec>(_output, nameof(Stage_only_requests_forward_tags_to_stage_metadata))
-            .UsingServiceProvider(ServicesKey, ConfigureServices)
-            .Arrange(ctx =>
-            {
-                using var scope = ctx.CreateServiceScope(ServicesKey);
-                var runtime = scope.ServiceProvider.GetRequiredService<ICanonRuntime>();
-                var persistence = scope.ServiceProvider.GetRequiredService<ICanonPersistence>() as InMemoryCanonPersistence
-                    ?? throw new InvalidOperationException("In-memory persistence not registered");
-                ctx.SetItem("runtime", runtime);
-                ctx.SetItem("persistence", persistence);
-            })
-            .Act(ctx =>
-            {
-                var overrideOptions = CanonizationOptions.Default.WithTag("tenant", "acme");
-                return ExecuteCanonization(ctx, CanonStageBehavior.StageOnly, "tagged", overrideOptions);
-            })
-            .Assert(ctx =>
-            {
-                var persistence = ctx.GetRequiredItem<InMemoryCanonPersistence>("persistence");
-                persistence.StageRecords.Should().NotBeEmpty();
-                var stage = persistence.StageRecords.Last();
-                var nonNullStage = stage ?? throw new InvalidOperationException("Expected stage record.");
-                Dictionary<string, string?> metadata = nonNullStage.Metadata!;
-                if (!metadata.TryGetValue("tenant", out var tenantRaw))
-                {
-                    throw new InvalidOperationException("Expected tenant metadata.");
-                }
+    public async Task Stage_only_requests_forward_tags_to_stage_metadata()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        ConfigureServices(services);
+        await using var sp = services.BuildServiceProvider();
 
-                string tenant = tenantRaw ?? throw new InvalidOperationException("Expected tenant metadata.");
-                tenant.Should().Be("acme");
+        using var scope = sp.CreateScope();
+        var runtime = scope.ServiceProvider.GetRequiredService<ICanonRuntime>();
+        var persistence = scope.ServiceProvider.GetRequiredService<ICanonPersistence>() as InMemoryCanonPersistence
+            ?? throw new InvalidOperationException("In-memory persistence not registered");
 
-                if (!metadata.TryGetValue("runtime:stage-behavior", out var behaviorRaw))
-                {
-                    throw new InvalidOperationException("Expected stage behavior metadata.");
-                }
+        var executionId = Guid.CreateVersion7();
+        var overrideOptions = CanonizationOptions.Default.WithTag("tenant", "acme");
+        await ExecuteCanonization(runtime, executionId, CanonStageBehavior.StageOnly, "tagged", overrideOptions);
 
-                string behavior = behaviorRaw ?? throw new InvalidOperationException("Expected stage behavior metadata.");
-                behavior.Should().Be(CanonStageBehavior.StageOnly.ToString());
-                return ValueTask.CompletedTask;
-            })
-            .Run();
+        persistence.StageRecords.Should().NotBeEmpty();
+        var stage = persistence.StageRecords.Last();
+        var nonNullStage = stage ?? throw new InvalidOperationException("Expected stage record.");
+        Dictionary<string, string?> metadata = nonNullStage.Metadata!;
+        if (!metadata.TryGetValue("tenant", out var tenantRaw))
+        {
+            throw new InvalidOperationException("Expected tenant metadata.");
+        }
+
+        string tenant = tenantRaw ?? throw new InvalidOperationException("Expected tenant metadata.");
+        tenant.Should().Be("acme");
+
+        if (!metadata.TryGetValue("runtime:stage-behavior", out var behaviorRaw))
+        {
+            throw new InvalidOperationException("Expected stage behavior metadata.");
+        }
+
+        string behavior = behaviorRaw ?? throw new InvalidOperationException("Expected stage behavior metadata.");
+        behavior.Should().Be(CanonStageBehavior.StageOnly.ToString());
+    }
 
     [Fact]
-    public Task Replay_returns_canonization_records_in_phase_order()
-        => TestPipeline.For<CanonRuntimeFlowSpec>(_output, nameof(Replay_returns_canonization_records_in_phase_order))
-            .UsingServiceProvider(ServicesKey, ConfigureServices)
-            .Arrange(ctx =>
-            {
-                using var scope = ctx.CreateServiceScope(ServicesKey);
-                var runtime = scope.ServiceProvider.GetRequiredService<ICanonRuntime>();
-                ctx.SetItem("runtime", runtime);
-            })
-            .Act(async ctx =>
-            {
-                await ExecuteCanonization(ctx, CanonStageBehavior.Immediate, "replay-1").ConfigureAwait(false);
-                await ExecuteCanonization(ctx, CanonStageBehavior.Immediate, "replay-2").ConfigureAwait(false);
-            })
-            .Assert(async ctx =>
-            {
-                var runtime = ctx.GetRequiredItem<ICanonRuntime>("runtime");
-                var records = new List<CanonizationRecord>();
-                await foreach (var record in runtime.Replay(cancellationToken: ctx.Cancellation))
-                {
-                    records.Add(record);
-                }
+    public async Task Replay_returns_canonization_records_in_phase_order()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        ConfigureServices(services);
+        await using var sp = services.BuildServiceProvider();
 
-                records.Should().NotBeEmpty();
-                records.Should().BeInAscendingOrder(r => r.OccurredAt);
-                records.Should().AllSatisfy(record => record.Event.Should().NotBeNull());
-                var phases = records.Select(r => r.Event!.Phase).ToList();
-                phases.Should().OnlyContain(phase => Enum.IsDefined(typeof(CanonPipelinePhase), phase));
-            })
-            .Run();
+        ICanonRuntime runtime;
+        using (var scope = sp.CreateScope())
+        {
+            runtime = scope.ServiceProvider.GetRequiredService<ICanonRuntime>();
+        }
 
-    private static void ConfigureServices(TestContext ctx, IServiceCollection services)
+        var executionId = Guid.CreateVersion7();
+        await ExecuteCanonization(runtime, executionId, CanonStageBehavior.Immediate, "replay-1");
+        await ExecuteCanonization(runtime, executionId, CanonStageBehavior.Immediate, "replay-2");
+
+        var records = new List<CanonizationRecord>();
+        await foreach (var record in runtime.Replay(cancellationToken: CancellationToken.None))
+        {
+            records.Add(record);
+        }
+
+        records.Should().NotBeEmpty();
+        records.Should().BeInAscendingOrder(r => r.OccurredAt);
+        records.Should().AllSatisfy(record => record.Event.Should().NotBeNull());
+        var phases = records.Select(r => r.Event!.Phase).ToList();
+        phases.Should().OnlyContain(phase => Enum.IsDefined(typeof(CanonPipelinePhase), phase));
+    }
+
+    private static void ConfigureServices(IServiceCollection services)
     {
         services.AddLogging();
         services.AddSingleton<ICanonAuditSink, NoopAuditSink>();
@@ -174,10 +156,9 @@ public sealed class CanonRuntimeFlowSpec
         });
     }
 
-    private static async ValueTask ExecuteCanonization(TestContext ctx, CanonStageBehavior behavior, string origin, CanonizationOptions? overrideOptions = null)
+    private static async ValueTask<CanonizationResult<ContactCanon>> ExecuteCanonization(ICanonRuntime runtime, Guid executionId, CanonStageBehavior behavior, string origin, CanonizationOptions? overrideOptions = null)
     {
-        var runtime = ctx.GetRequiredItem<ICanonRuntime>("runtime");
-        var email = $"{origin}-{ctx.ExecutionId:N}@example.com";
+        var email = $"{origin}-{executionId:N}@example.com";
 
         var entity = new ContactCanon
         {
@@ -195,8 +176,7 @@ public sealed class CanonRuntimeFlowSpec
             options = CanonizationOptions.Merge(overrideOptions, options);
         }
 
-        var result = await runtime.Canonize(entity, options, ctx.Cancellation).ConfigureAwait(false);
-        ctx.SetItem("result", result);
+        return await runtime.Canonize(entity, options, CancellationToken.None).ConfigureAwait(false);
     }
 
     private sealed class InMemoryCanonPersistence : ICanonPersistence
