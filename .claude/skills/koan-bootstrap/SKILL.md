@@ -1,470 +1,155 @@
 ---
 name: koan-bootstrap
-description: Auto-registration via KoanAutoRegistrar, minimal Program.cs, "Reference = Intent" pattern
+description: Project setup and boot — minimal Program.cs (AddKoan), Reference = Intent auto-registration, KoanModule (ARCH-0086) and IKoanAutoRegistrar, ProvenanceModuleWriter boot reports, KoanEnv/Configuration helpers
+pillar: core
+status: current
+last_validated: 2026-06-18
 ---
 
 # Koan Bootstrap & Auto-Registration
 
-## Core Principle
+## Trigger this skill when you see
 
-**`services.AddKoan()` is the ONLY line needed in Program.cs.** The framework discovers and registers everything through auto-registration. No manual service registration. No manual configuration. Just add package references and everything wires up automatically.
+- A `Program.cs` / `Startup` / project-setup question, or `builder.Services.AddKoan()`
+- `KoanModule`, `IKoanAutoRegistrar`, `IKoanInitializer`, `[KoanDiscoverable]`, `KoanRegistry`
+- `Describe(...)` / `Report(...)` boot reports, `ProvenanceModuleWriter`, `BootReport` (removed type)
+- `KoanEnv.IsDevelopment` / `IsProduction` / `InContainer` / `DumpSnapshot`
+- `Configuration.Read(...)` / `Configuration.ReadFirst(...)`
+- Manual `services.AddScoped/AddSingleton/AddHostedService` in `Program.cs`, `AddDbContext`, `AddControllers`
+- "Reference = Intent", "auto-registration", "module not discovered", "boot failure", "service not found"
+- Talk of `[Before]` / `[After]` module ordering, or registering app-specific services
 
-## Revolutionary "Reference = Intent" Pattern
+## Core principle
 
-Adding a package reference **automatically enables functionality**:
+**`services.AddKoan()` is the only wiring line.** Framework modules self-register by being referenced (Reference = Intent). For *your* services, author one **`KoanModule`** (ARCH-0086) — a single self-describing unit (id + DI + ordered startup + provenance) that is auto-discovered and ordered, never hand-registered. It implements `IKoanAutoRegistrar`, so existing discovery applies unchanged.
 
-```xml
-<!-- Add MongoDB connector -->
-<PackageReference Include="Koan.Data.Connector.Mongo" />
-<!-- Now MongoDB is discovered, configured, and available automatically -->
-
-<!-- Add AI capabilities -->
-<PackageReference Include="Koan.AI" />
-<!-- Now AI services are auto-registered and ready to use -->
-```
-
-No manual registration in Program.cs. The framework handles everything.
-
-## Minimal Program.cs Template
-
+<!-- validate -->
 ```csharp
 using Koan.Core;
-
-var builder = WebApplication.CreateBuilder(args);
-
-// ONE LINE - framework handles all dependencies
-builder.Services.AddKoan();
-
-var app = builder.Build();
-
-// Middleware auto-configured by framework
-app.Run();
-```
-
-**That's it.** 8 lines total. No manual service registration. No manual middleware configuration. The framework discovers:
-- Data adapters
-- AI providers
-- Authentication providers
-- Entity controllers
-- Background services
-- Message queues
-- Everything else
-
-## When This Skill Applies
-
-Invoke this skill when:
-- ✅ Setting up new projects
-- ✅ Debugging initialization issues
-- ✅ Adding framework modules
-- ✅ Troubleshooting boot failures
-- ✅ Creating application-specific services
-- ✅ Understanding assembly discovery
-
-## KoanAutoRegistrar Pattern
-
-### What It Is
-
-`KoanAutoRegistrar` is how you register **application-specific services** (not framework services - those auto-register). Create one per application/module.
-
-### When to Create One
-
-Create `KoanAutoRegistrar` when you have:
-- Application-specific business logic services
-- Custom background workers
-- Domain-specific infrastructure
-- Third-party service integrations
-
-### Template
-
-```csharp
-// File: /Initialization/KoanAutoRegistrar.cs
-using Koan.Core;
-using Microsoft.Extensions.DependencyInjection;
+using Koan.Core.Hosting.Bootstrap;     // AddNote / AddSetting extensions on ProvenanceModuleWriter
+using Koan.Core.Provenance;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
 namespace MyApp.Initialization;
 
-public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
-{
-    public string ModuleName => "MyApp";
-
-    public string? ModuleVersion =>
-        typeof(KoanAutoRegistrar).Assembly.GetName().Version?.ToString();
-
-    public void Initialize(IServiceCollection services)
-    {
-        // Register application-specific services here
-        services.AddScoped<ITodoService, TodoService>();
-        services.AddScoped<IEmailService, EmailService>();
-        services.AddSingleton<ICacheService, RedisCacheService>();
-        services.AddHostedService<BackgroundCleanupWorker>();
-    }
-
-    public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
-    {
-        module.Describe(ModuleVersion, "Application services");
-        module.AddNote("Application services registered");
-        module.AddNote($"Environment: {env.EnvironmentName}");
-    }
-}
-```
-
-### KoanModule — Preferred Authoring Surface (ARCH-0086)
-
-As of ARCH-0086, **extend `KoanModule`** instead of implementing `IKoanAutoRegistrar` directly. A `KoanModule`
-*is* an `IKoanAutoRegistrar` (discovered + ordered identically), but gives one self-describing surface plus a
-real, ordered startup lifecycle:
-
-```csharp
-// File: /Initialization/MyAppModule.cs
-using Koan.Core;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
-
-namespace MyApp.Initialization;
-
+// One self-describing unit: id + DI + ordered startup + provenance. Auto-discovered (source-gen),
+// ordered by [Before]/[After]. No registration call anywhere — referencing the assembly is the intent.
 public sealed class MyAppModule : KoanModule
 {
     public override string Id => "MyApp";
 
-    public override void Register(IServiceCollection services)            // was Initialize
+    public override void Register(IServiceCollection services)          // DI wiring (was Initialize)
     {
         services.AddScoped<ITodoService, TodoService>();
-        services.AddSingleton<ICacheService, RedisCacheService>();
+        if (KoanEnv.IsProduction)
+            services.AddSingleton<IEmailService, SmtpEmailService>();
     }
 
-    public override Task Start(IServiceProvider sp, CancellationToken ct) // one-time, ordered startup
+    public override Task Start(IServiceProvider sp, CancellationToken ct) // one-time ordered startup
+        => Task.CompletedTask;
+
+    public override void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        // Replaces the "register a bootstrap IHostedService in Initialize" idiom.
-        // DI is available; ordered against other modules by [Before]/[After].
-        return Task.CompletedTask;
+        module.Describe(Version, "Application services");
+        module.AddSetting("Environment", env.EnvironmentName);
+
+        // Multi-key fallback: setting -> env var -> default.
+        var apiKey = Configuration.ReadFirst(cfg, "dev-key", "App:ApiKey", "APP_API_KEY");
+        module.AddNote($"ApiKey source resolved (default={apiKey == "dev-key"})");
+
+        if (!cfg.GetSection("Email:Smtp").Exists())
+            module.SetStatus("degraded", "Email configuration missing — notifications disabled");
     }
-
-    public override void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env) // was Describe
-        => module.Describe(Version);
 }
+
+public interface ITodoService { }
+public sealed class TodoService : ITodoService { }
+public interface IEmailService { }
+public sealed class SmtpEmailService : IEmailService { }
 ```
 
-- `Register` ⇐ `Initialize`, `Report` ⇐ `Describe`, plus a new `Start` for one-time ordered startup work.
-- Recurring periodic/pokable work stays on the `IKoanBackgroundService` family. Code that registers services
-  or must run before the container is built belongs in `Register`, not `Start`.
-- The raw `IKoanAutoRegistrar` above still works via the bridge — migration is opportunistic.
-
-#### Discovering "many implementers of one contract": `[KoanDiscoverable]`
-
-Don't hand-roll an `AppDomain` assembly scan to find plug-ins. Mark the **interface** `[KoanDiscoverable]` and
-read implementers from the registry:
+The whole `Program.cs` stays minimal — `AddKoan()` discovers and runs `MyAppModule` for you:
 
 ```csharp
-[KoanDiscoverable]
-public interface IMyPlugin { }
+using Koan.Core;
 
-// inside Register():
-foreach (var t in KoanRegistry.GetDiscoveredImplementors(typeof(IMyPlugin)))
-    services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IMyPlugin), t));
-```
-
-The source generator (build time) + `RegistryManifestLoader` (runtime) populate `KoanRegistry`, so discovery
-is fast and never misses lazily-loaded assemblies. (Used by `IKoanAuthEventContributor` / `IKoanAuthFlowHandler`.)
-
-### Discovery Rules
-
-The framework automatically discovers `IKoanAutoRegistrar` implementations:
-
-1. **Assembly Scanning**: Scans all loaded assemblies at startup
-2. **Interface Detection**: Finds types implementing `IKoanAutoRegistrar`
-3. **Instantiation**: Creates instance and calls `Initialize()`
-4. **Boot Reporting**: Calls `Describe()` to populate boot report
-
-**You don't call it.** The framework finds and executes it automatically.
-
-## What NOT to Do
-
-### ❌ WRONG: Manual Service Registration in Program.cs
-
-```csharp
 var builder = WebApplication.CreateBuilder(args);
-
-// ❌ DON'T DO THIS - breaks auto-registration pattern
-builder.Services.AddScoped<ITodoRepository, TodoRepository>();
-builder.Services.AddDbContext<MyDbContext>();
-builder.Services.AddScoped<ITodoService, TodoService>();
-
-builder.Services.AddKoan(); // Too late, order matters
-```
-
-**Why wrong?**
-- Breaks "Reference = Intent" pattern
-- Creates registration order dependencies
-- Duplicates framework auto-registration
-- Makes Program.cs grow uncontrollably
-
-### ✅ CORRECT: Use KoanAutoRegistrar
-
-```csharp
-// Program.cs stays minimal
-var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddKoan();
+builder.Services.AddKoan();                 // discovers every module + adapter by reference
 var app = builder.Build();
-app.Run();
-
-// Application services in KoanAutoRegistrar
-public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
-{
-    public void Initialize(IServiceCollection services)
-    {
-        services.AddScoped<ITodoService, TodoService>();
-    }
-}
+app.Run();                                  // middleware auto-configured by referenced packages
 ```
 
-### ❌ WRONG: Multiple AddKoan() Calls
+## Reference = Intent activation
+
+Adding a package reference *is* the registration — there is no matching `Add*()` call to write.
+
+| Add this reference | Effect |
+|---|---|
+| `Koan.Core` + `services.AddKoan()` | Boot, discovery, provenance — the only mandatory line |
+| `+ Koan.Data.Connector.Mongo` (or Postgres/Sqlite/Redis…) | Data adapter discovered, configured, elected by capability |
+| `+ Koan.Web` | Controllers + middleware auto-wired |
+| `+ Koan.AI` / `Koan.Jobs` / `Koan.Cache` | Pillar self-registers; no `AddKoanAI()` / `AddKoanJobs()` needed to *enable* it |
+| Your assembly with a `KoanModule` / `IKoanAutoRegistrar` | Discovered + ordered automatically |
+
+## Authoring choices
+
+- **`KoanModule` (preferred, ARCH-0086)** — `Id`, `Register(services)`, `Start(sp, ct)` (one-time ordered startup, DI available), `Report(module, cfg, env)`. `Start` folds the "register a bootstrap `IHostedService` inside `Initialize`" idiom into one verb. Recurring/pokable work stays on the `IKoanBackgroundService` family.
+- **Raw `IKoanAutoRegistrar`** — `ModuleName`, `ModuleVersion`, `Initialize(services)`, `Describe(ProvenanceModuleWriter, IConfiguration, IHostEnvironment)`. Still works (the module bridges to it); migrate opportunistically.
+- **Many implementers of one contract** — mark the *interface* `[KoanDiscoverable]` and read `KoanRegistry.GetDiscoveredImplementors(typeof(IMyPlugin))`. Never hand-roll an `AppDomain.GetAssemblies()` scan (it misses lazily-loaded assemblies).
+
+## Boot report: ProvenanceModuleWriter
+
+`Report`/`Describe` receives a `ProvenanceModuleWriter`. There is **no `BootReport` type** and **no `AddModule`/`AddWarning`**.
+
+| Member | Purpose |
+|---|---|
+| `module.Describe(version, description?)` | Set module identity (instance, fluent) |
+| `module.SetStatus(status, detail?)` | Operational status: `"ok"` / `"degraded"` / `"error"` (this is how you flag non-fatal config issues) |
+| `module.AddSetting(key, value)` | Structured setting entry (extension; `Koan.Core.Hosting.Bootstrap`) |
+| `module.AddNote(message)` | Plain note (extension; same namespace) |
+| `module.SetSetting(key, b => …)` / `module.SetNote(key, b => …)` | Builder forms with source/secret/state tracking |
+| `module.AddTool(name, route, description?)` | Register an exposed tool/endpoint |
+
+## Environment & configuration helpers
 
 ```csharp
-// ❌ DON'T DO THIS
-builder.Services.AddKoan();
-builder.Services.AddKoanData();    // Redundant
-builder.Services.AddKoanWeb();     // Redundant
-builder.Services.AddKoanAI();      // Redundant
+if (KoanEnv.IsDevelopment) { /* dev seed */ }
+if (KoanEnv.InContainer)   { /* container tuning */ }
+KoanEnv.DumpSnapshot(logger);                          // boot snapshot to a logger
+
+var key = Configuration.Read(cfg, "App:ApiKey", "dev-key");                // single key + default
+var any = Configuration.ReadFirst(cfg, "dev-key", "App:ApiKey", "APP_API_KEY"); // first non-null across keys
 ```
 
-**Why wrong?** `AddKoan()` already discovers and registers ALL Koan modules automatically.
+Use `KoanEnv.EnvironmentName` (not a fictional `CurrentEnvironment`). For multi-key fallbacks use `ReadFirst` — `Read` takes exactly one key plus a default.
 
-### ✅ CORRECT: Single AddKoan()
+## Anti-patterns to flag
 
-```csharp
-builder.Services.AddKoan(); // Discovers and registers everything
-```
+| If you see | Suggest |
+|---|---|
+| `services.AddScoped<IFooRepo, FooRepo>()` for data access | `Entity<T>` static facade — no repository to register (Reference = Intent) |
+| `AddDbContext` / `AddControllers` / `AddHostedService` in `Program.cs` | Move into a `KoanModule.Register`; controllers/middleware auto-wire via `Koan.Web` |
+| `AddKoan()` followed by `AddKoanData()` / `AddKoanWeb()` / `AddKoanAI()` | Single `AddKoan()` already discovers every module |
+| `Describe(BootReport report)` / `report.AddModule(...)` / `report.AddWarning(...)` | `Report/Describe(ProvenanceModuleWriter, ...)`; `module.Describe(...)` + `module.SetStatus("degraded", detail)` |
+| `Configuration.Read(cfg, default, "A", "B")` (multi-key) | `Configuration.ReadFirst(cfg, default, "A", "B")` — `Read` is single-key |
+| `KoanEnv.CurrentEnvironment` | `KoanEnv.EnvironmentName` |
+| Hand-rolled `AppDomain.GetAssemblies()` plug-in scan | `[KoanDiscoverable]` on the interface + `KoanRegistry.GetDiscoveredImplementors(...)` |
+| Implementing `IKoanAutoRegistrar` for new app modules | Extend `KoanModule` (ARCH-0086) — id + DI + `Start` + `Report` in one unit |
 
-## Boot Report & Diagnostics
+## Escape hatches
 
-### Viewing Boot Report
+- **Need ordering vs another module?** Annotate the module with `[Before(typeof(OtherModule))]` / `[After(...)]` — discovery topologically sorts; never sequence by hand in `Program.cs`.
+- **Conditional registration** — branch on `KoanEnv.*` or `cfg.GetValue<bool>(...)` inside `Register`. (Reading config there needs a built provider; prefer feature flags resolved at use-site.)
+- **Truly framework-foreign service** that must run before the container is built — that work belongs in `Register`, not `Start`.
+- **Raw `IKoanAutoRegistrar`** remains supported when you can't take the `KoanModule` base (e.g. an existing class hierarchy).
 
-```csharp
-// In Development environment
-if (KoanEnv.IsDevelopment)
-{
-    var logger = app.Services.GetRequiredService<ILogger<Program>>();
-    KoanEnv.DumpSnapshot(logger);
-}
-```
+## See also
 
-**Output shows:**
-```
-[INFO] Koan:discover postgresql: server=localhost;database=myapp... OK
-[INFO] Koan:modules data→postgresql
-[INFO] Koan:modules web→controllers
-[INFO] Koan:modules ai→openai
-[INFO] Koan:modules MyApp v1.0.0
-```
-
-### Boot Report Structure
-
-The `Describe` method receives a `ProvenanceModuleWriter` — a fluent writer with the following API:
-
-| Method | Purpose |
-|--------|---------|
-| `module.Describe(version, description)` | Set module version and description text |
-| `module.AddNote(message)` | Append a plain-text note (extension method) |
-| `module.SetStatus(status, detail)` | Set operational status ("ok", "degraded", "error") |
-| `module.ClearStatus()` | Reset status to default |
-| `module.SetSetting(key, builder)` | Add a structured setting entry with source tracking |
-| `module.SetNote(key, builder)` | Add a structured note entry |
-| `module.AddTool(name, route, description)` | Register an exposed tool/endpoint in the report |
-
-```csharp
-public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
-{
-    // Set version and description
-    module.Describe(ModuleVersion, "Application services");
-
-    // Add informational notes
-    module.AddNote("Services registered: TodoService, EmailService");
-    module.AddNote($"Data source: {cfg["Koan:Data:Sources:Default:Adapter"]}");
-
-    // Add a structured setting with source information
-    module.SetSetting("Environment", b => b.Value(env.EnvironmentName));
-
-    // Report degraded status when optional config is missing
-    if (!cfg.GetSection("Email:Smtp").Exists())
-    {
-        module.SetStatus("degraded", "Email configuration missing — notifications disabled");
-    }
-}
-```
-
-> **Note:** There is no `AddWarning()` or `AddModule()`. Use `SetStatus("degraded", detail)` to signal
-> non-fatal configuration issues. The module identity is set via `module.Describe(version, description)`.
-
-
-## Environment Detection
-
-Use `KoanEnv` for environment-aware logic:
-
-```csharp
-public void Initialize(IServiceCollection services)
-{
-    // Development-only services
-    if (KoanEnv.IsDevelopment)
-    {
-        services.AddScoped<ISeedService, DevelopmentSeedService>();
-    }
-
-    // Production-only services
-    if (KoanEnv.IsProduction)
-    {
-        services.AddSingleton<IEmailService, SendGridEmailService>();
-    }
-
-    // Container-specific configuration
-    if (KoanEnv.InContainer)
-    {
-        services.AddSingleton<IHealthCheckService, ContainerHealthCheck>();
-    }
-
-    // Dangerous operations gated by flag
-    if (KoanEnv.AllowMagicInProduction)
-    {
-        services.AddScoped<IAdminService, AdminService>();
-    }
-}
-```
-
-## Configuration Reading
-
-Use framework configuration helpers:
-
-```csharp
-public void Initialize(IServiceCollection services)
-{
-    var sp = services.BuildServiceProvider();
-    var cfg = sp.GetRequiredService<IConfiguration>();
-
-    // Read with fallback chain: setting → env var → default
-    var apiKey = Configuration.Read(
-        cfg,
-        defaultValue: "dev-key",
-        "App:ApiKey",           // Config path
-        "APP_API_KEY"           // Environment variable
-    );
-
-    services.AddSingleton(new ExternalApiClient(apiKey));
-}
-```
-
-## Debugging Bootstrap Issues
-
-### Symptom: Service Not Found
-
-```
-System.InvalidOperationException: Unable to resolve service for type 'ITodoService'
-```
-
-**Cause:** `KoanAutoRegistrar` not discovered or not registering service
-
-**Solution:**
-1. Verify file exists at `/Initialization/KoanAutoRegistrar.cs`
-2. Verify class implements `IKoanAutoRegistrar`
-3. Verify class is `public` and not `internal`
-4. Check boot logs for module registration
-
-### Symptom: Provider Not Available
-
-```
-[ERROR] Koan:discover mongodb: connection failed
-[INFO] Koan:modules data→json (fallback)
-```
-
-**Cause:** Provider package referenced but connection failed
-
-**Solution:**
-1. Verify connection string in `appsettings.json`
-2. Check service is running (Docker, local install)
-3. Verify network connectivity
-4. Check boot report for detailed error
-
-### Symptom: Assembly Not Loaded
-
-```
-[WARNING] Koan:modules MyModule not discovered
-```
-
-**Cause:** Assembly not referenced or not loaded at startup
-
-**Solution:**
-1. Verify `<ProjectReference>` or `<PackageReference>` exists
-2. Check assembly is copied to output directory
-3. Add explicit assembly reference if needed:
-   ```csharp
-   var assembly = Assembly.Load("MyModule");
-   ```
-
-## Bundled Templates
-
-- `templates/Program.cs.template` - Minimal Program.cs
-- `templates/KoanAutoRegistrar.cs.template` - Complete registrar template
-- `templates/KoanAutoRegistrar-with-options.cs.template` - Registrar with configuration options
-- `templates/appsettings.json.template` - Koan configuration structure
-
-## Reference Documentation
-
-- **Full Guide:** `docs/guides/deep-dive/bootstrap-lifecycle.md`
-- **Troubleshooting:** `docs/guides/troubleshooting/bootstrap-failures.md`
-- **Auto-Provisioning:** `docs/guides/deep-dive/auto-provisioning-system.md`
-- **Sample:** `samples/S0.ConsoleJsonRepo/Program.cs` (Minimal 20-line bootstrap)
-- **Sample:** `samples/S1.Web/Program.cs` (Web bootstrap with lifecycle)
-
-## Advanced: Module Loading Order
-
-Modules load in this order:
-
-1. **Core** - Foundation services
-2. **Data** - Repository abstractions
-3. **Adapters** - Concrete providers (Mongo, Postgres, etc.)
-4. **Domain** - Entity registrations
-5. **Web** - Controllers, middleware
-6. **Application** - Your `KoanAutoRegistrar`
-
-Dependencies are resolved automatically. You never need to specify order manually.
-
-## Advanced: Conditional Registration
-
-```csharp
-public void Initialize(IServiceCollection services)
-{
-    var sp = services.BuildServiceProvider();
-    var cfg = sp.GetRequiredService<IConfiguration>();
-
-    // Feature flags
-    if (cfg.GetValue<bool>("Features:EmailNotifications"))
-    {
-        services.AddScoped<INotificationService, EmailNotificationService>();
-    }
-    else
-    {
-        services.AddScoped<INotificationService, NoOpNotificationService>();
-    }
-
-    // Provider-specific services
-    var dataProvider = cfg["Koan:Data:Sources:Default:Adapter"];
-    if (dataProvider == "mongodb")
-    {
-        services.AddSingleton<IMongoIndexManager, MongoIndexManager>();
-    }
-}
-```
-
-## Framework Compliance
-
-Bootstrap patterns are **mandatory** in Koan Framework:
-
-- ✅ Use `AddKoan()` for all framework registration
-- ✅ Use `KoanAutoRegistrar` for application services
-- ✅ Keep Program.cs minimal (under 20 lines)
-- ❌ Never manually register framework services
-- ❌ Never duplicate framework configuration
-- ❌ Never call `AddDbContext`, `AddControllers`, etc. manually
-
-The framework handles everything through auto-discovery.
+- [Reference card: data.md](../../../docs/reference/cards/data.md) — pillar map (Entity facade the bootstrap exposes)
+- [Bootstrap lifecycle deep-dive](../../../docs/guides/deep-dive/bootstrap-lifecycle.md) — discovery, ordering, provenance
+- [Framework utilities guide](../../../docs/guides/framework-utilities.md) — `Configuration`, `KoanEnv`, options helpers
+- [Sample: S0.ConsoleJsonRepo/Program.cs](../../../samples/S0.ConsoleJsonRepo/Program.cs) — minimal bootstrap
+- [Sample: S8.Canon registrar](../../../samples/S8.Canon/Initialization/KoanAutoRegistrar.cs) — canonical `Describe` with `ProvenanceModuleWriter`
+- [ARCH-0086 — KoanModule](../../../docs/decisions/ARCH-0086-koan-module.md) — the module primitive

@@ -1,415 +1,149 @@
 ---
 name: koan-debugging
-description: Framework-specific troubleshooting, boot report analysis, common error patterns
+description: Framework-specific troubleshooting — boot report analysis, provider elections, auto-registration failures, capability-mismatch errors, container/env diagnostics. Trigger on "service not found", "module not discovered", "provider does not support LINQ", wrong adapter elected, GUID/id not generated, boot fails.
+pillar: Core
+status: current
+last_validated: 2026-06-18
 ---
 
 # Koan Framework Debugging
 
-## Core Principle
+## Trigger this skill when you see
 
-**Framework-specific debugging focuses on boot reports, provider elections, and auto-registration patterns** rather than generic .NET troubleshooting.
+- `InvalidOperationException: Unable to resolve service for type '...'` (DI miss) or `[WARNING] Koan:modules ... not found`
+- `NotSupportedException: ... does not support LINQ` / capability-mismatch errors
+- A wrong provider elected — `data→json (expected: mongodb)` / `(fallback)` in the boot report
+- Boot failures, container start-up exceptions, `Unable to connect to database`
+- Questions about reading the **boot report**, provider elections, or `KoanEnv` environment detection
+- N+1 query floods, `OutOfMemoryException` from `.All()`, or other framework-shaped perf symptoms
+- References to `KoanAutoRegistrar`, `ProvenanceModuleWriter`, `Data<T,K>.Capabilities`, `KoanEnv`
 
-## Quick Diagnostics
+## Core principle
+
+**Debug Koan from the boot report and the capability set, not from generic .NET intuition.** Most "it doesn't work" failures are a missing reference (Reference = Intent didn't fire), a non-discoverable registrar, a fallback election, or a provider that lacks a capability you assumed. Probe — never assume — the provider's `CapabilitySet` (ARCH-0084) and branch on what it actually advertises.
+
+<!-- validate -->
+```csharp
+using Koan.Core;
+using Koan.Data.Abstractions.Capabilities;
+using Koan.Data.Core;
+using Microsoft.Extensions.Logging;
+
+public static class DiagnoseProvider
+{
+    // Capability-aware branch: probe the provider's CapabilitySet (ARCH-0084),
+    // never assume a feature. Falls back to in-memory filtering when the
+    // adapter can't push the predicate down.
+    public static async Task<IReadOnlyList<Todo>> CompletedTodos(ILogger logger)
+    {
+        logger.LogInformation("Environment: {Env}", KoanEnv.EnvironmentName);
+        if (KoanEnv.IsDevelopment) KoanEnv.DumpSnapshot(logger);
+
+        var caps = Data<Todo, string>.Capabilities;          // unified CapabilitySet
+        if (caps.Has(DataCaps.Query.Linq))
+            return await Todo.Query(t => t.Done);            // pushed down to the store
+
+        var all = await Todo.All();                          // in-memory fallback
+        return all.Where(t => t.Done).ToList();
+    }
+}
+
+public sealed class Todo : Entity<Todo>
+{
+    public string Title { get; set; } = "";
+    public bool Done { get; set; }
+}
+```
+
+`Data<T,K>.Capabilities` is the single source of truth. `QueryCaps` / the `[Flags] QueryCapabilities` enum / `.HasFlag(...)` were removed by ARCH-0084 — capabilities are now tokens you test with `caps.Has(DataCaps.Query.Linq)` (and `DataCaps.Write.FastRemove`, surfaced as `Todo.SupportsFastRemove`).
+
+## Reading the boot report (your first move)
 
 ```bash
-# Check boot logs for framework initialization
-docker logs koan-app --tail 20 --follow | grep "Koan:"
-
-# Expected success patterns:
-[INFO] Koan:discover postgresql: server=localhost... OK
-[INFO] Koan:modules data→postgresql
-[INFO] Koan:modules web→controllers
-[INFO] Koan:modules ai→openai
-[INFO] Koan:modules MyApp v1.0.0
+docker logs koan-app --tail 40 | grep "Koan:"        # or KoanEnv.DumpSnapshot(logger) in Development
 ```
 
-## Debugging Categories
-
-### 1. Bootstrap and Initialization Issues
-
-**Symptom:** Service not found in DI container
 ```
-System.InvalidOperationException: Unable to resolve service for type 'ITodoService'
+[INFO] Koan:discover postgresql: server=localhost;database=myapp ... OK
+[INFO] Koan:discover mongodb:    connection timeout FAILED
+[INFO] Koan:modules data→postgresql (elected: connection successful)
+[INFO] Koan:modules web→controllers (discovered: 5 controllers)
+[INFO] Koan:modules MyApp v1.0.0 (services: TodoService)
+[WARNING] Email SMTP missing — using console fallback
 ```
 
-**Diagnosis:**
-1. Check if `KoanAutoRegistrar` exists at `/Initialization/KoanAutoRegistrar.cs`
-2. Verify class implements `IKoanAutoRegistrar`
-3. Verify class is `public` (not `internal`)
-4. Check boot logs for module registration
+| Look for | Means |
+|---|---|
+| `OK` per discovered provider | discovery + connection succeeded |
+| `data→postgresql` (not `→json (fallback)`) | the adapter you intend was elected |
+| your module listed with version | the registrar was discovered |
+| `FAILED` / `(fallback)` | connection failed → it silently dropped to a lower tier |
 
-**Solution:**
+## Common symptoms → cause → fix
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `Unable to resolve service for type 'ITodoService'` | `KoanAutoRegistrar` missing, `internal`, or not in a referenced assembly | make it `public sealed`, implement `IKoanAutoRegistrar`, register in `Initialize` |
+| `Koan:modules MyModule not found` | no `<ProjectReference>`/`<PackageReference>`, or assembly not copied to output | add the reference (Reference = Intent), confirm the dll ships |
+| `NotSupportedException: ... does not support LINQ` | adapter lacks `DataCaps.Query.Linq` (JSON / InMemory / Redis) | branch on `caps.Has(DataCaps.Query.Linq)`, fall back to `.All()` + in-memory `.Where(...)` |
+| `data→json (expected: mongodb)` | connection failed → fallback, or provider package missing | check connection string + service health; pin with `[DataAdapter("mongodb")]` |
+| `Entity ID is required but not set` | using `Entity<T,TKey>` (custom key) without assigning `Id` | use `Entity<T>` for auto GUID v7, or set the custom key yourself |
+| N+1 query flood | `Todo.Get(id)` inside a loop | one call: `await Todo.Get(ids)` |
+| `OutOfMemoryException` on `.All()` | materializing a huge set | `await foreach (var t in Todo.AllStream(batchSize: 1000))` |
+
+## Discoverability: the registrar contract
+
+A registrar must be `public`, implement `IKoanAutoRegistrar` (which extends `IKoanInitializer`), and live in a referenced assembly. `Describe` writes provenance through `ProvenanceModuleWriter` — its verbs are `Describe(version, description)`, `SetStatus`, `SetSetting`, `SetNote` (there is no `AddModule`/`AddWarning`).
+
 ```csharp
-// Verify KoanAutoRegistrar is discoverable
 public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 {
     public string ModuleName => "MyApp";
     public string? ModuleVersion => typeof(KoanAutoRegistrar).Assembly.GetName().Version?.ToString();
 
     public void Initialize(IServiceCollection services)
-    {
-        services.AddScoped<ITodoService, TodoService>();
-    }
+        => services.AddScoped<ITodoService, TodoService>();
 
     public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
-    {
-        module.Describe(ModuleVersion);
-    }
+        => module.Describe(ModuleVersion).SetStatus("ready");
 }
 ```
 
----
+> Prefer the `KoanModule` primitive (ARCH-0086 — `Id` / `Register` / `Start` / `Report`) for new modules; it implements `IKoanAutoRegistrar` so the same discovery + `[Before]`/`[After]` ordering applies.
 
-**Symptom:** Module not discovered
-```
-[WARNING] Koan:modules MyModule not found
-```
-
-**Diagnosis:**
-1. Verify `<ProjectReference>` or `<PackageReference>` exists
-2. Check assembly is copied to output directory
-3. Verify namespace and class visibility
-
-**Solution:**
-```xml
-<!-- Ensure project reference exists -->
-<ProjectReference Include="..\MyModule\MyModule.csproj" />
-```
-
-### 2. Entity and Data Layer Issues
-
-**Symptom:** ID not generated
-```
-System.InvalidOperationException: Entity ID is required but not set
-```
-
-**Diagnosis:**
-- Using `Entity<T, TKey>` with custom key type requires manual ID assignment
-- Verify entity inherits `Entity<T>` (not `Entity<T, TKey>`)
-
-**Solution:**
-```csharp
-// ✅ CORRECT: Auto GUID v7 generation
-public class Todo : Entity<Todo>
-{
-    public string Title { get; set; } = "";
-}
-
-// OR: Manual key management
-public class NumericTodo : Entity<NumericTodo, int>
-{
-    public override int Id { get; set; } // Must set manually
-}
-```
-
----
-
-**Symptom:** Query not working
-```
-System.NotSupportedException: Provider does not support LINQ queries
-```
-
-**Diagnosis:**
-- Provider lacks LINQ support (JSON, InMemory, Redis)
-- Need client-side filtering
-
-**Solution:**
-```csharp
-// Check capabilities first
-var caps = Data<Todo, string>.QueryCaps;
-
-if (caps.Capabilities.HasFlag(QueryCapabilities.LinqQueries))
-{
-    return await Todo.Query(t => t.Completed);
-}
-else
-{
-    var all = await Todo.All();
-    return all.Where(t => t.Completed).ToList();
-}
-```
-
-### 3. Multi-Provider Issues
-
-**Symptom:** Provider not available
-```
-[ERROR] Koan:discover mongodb: connection failed
-[INFO] Koan:modules data→json (fallback)
-```
-
-**Diagnosis:**
-1. Verify service is running (Docker, local install)
-2. Check connection string in `appsettings.json`
-3. Verify network connectivity
-4. Check provider package is referenced
-
-**Solution:**
-```json
-// Verify configuration
-{
-  "Koan": {
-    "Data": {
-      "Sources": {
-        "Default": {
-          "Adapter": "mongodb",
-          "ConnectionString": "mongodb://localhost:27017/myapp"
-        }
-      }
-    }
-  }
-}
-```
-
-```bash
-# Test MongoDB connectivity
-docker ps | grep mongo
-docker logs mongo-container
-```
-
----
-
-**Symptom:** Wrong provider elected
-```
-[INFO] Koan:modules data→json (expected: mongodb)
-```
-
-**Diagnosis:**
-- Configuration missing or incorrect
-- Provider package not referenced
-- Connection failed, fallback activated
-
-**Solution:**
-```csharp
-// Force specific provider with attribute
-[DataAdapter("mongodb")]
-public class Todo : Entity<Todo>
-{
-    public string Title { get; set; } = "";
-}
-
-// Or verify boot report
-if (KoanEnv.IsDevelopment)
-{
-    KoanEnv.DumpSnapshot(logger);
-}
-```
-
-### 4. Performance and Optimization Issues
-
-**Symptom:** N+1 query problem
-```
-// App making hundreds of queries
-[DEBUG] Executing query: SELECT * FROM Todo WHERE Id = 'id1'
-[DEBUG] Executing query: SELECT * FROM Todo WHERE Id = 'id2'
-[DEBUG] Executing query: SELECT * FROM Todo WHERE Id = 'id3'
-... (repeated hundreds of times)
-```
-
-**Diagnosis:**
-- Loading entities in loop instead of batch
-- Not using batch retrieval
-
-**Solution:**
-```csharp
-// ❌ WRONG: N queries
-foreach (var id in ids)
-{
-    var todo = await Todo.Get(id);
-}
-
-// ✅ CORRECT: 1 query
-var todos = await Todo.Get(ids);
-```
-
----
-
-**Symptom:** Out of memory
-```
-System.OutOfMemoryException: Array dimensions exceeded supported range
-```
-
-**Diagnosis:**
-- Loading large dataset with `.All()` instead of streaming
-- Materializing everything into memory
-
-**Solution:**
-```csharp
-// ❌ WRONG: Loads everything into memory
-var allTodos = await Todo.All(); // 1 million records!
-
-// ✅ CORRECT: Stream in batches
-await foreach (var todo in Todo.AllStream(batchSize: 1000))
-{
-    await ProcessTodo(todo);
-}
-```
-
-### 5. Container and Environment Issues
-
-**Symptom:** Container fails to start
-```
-[ERROR] Application startup exception
-[ERROR] Unable to connect to database
-```
-
-**Diagnosis:**
-1. Check container networking (wrong host references)
-2. Verify Docker Compose service dependencies
-3. Check health check endpoints
-
-**Solution:**
-```yaml
-# docker-compose.yml
-services:
-  app:
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-  postgres:
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U koan"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-```
-
-```json
-// Use container hostname, not localhost
-{
-  "Koan": {
-    "Data": {
-      "Sources": {
-        "Default": {
-          "ConnectionString": "Host=postgres;Database=myapp"
-        }
-      }
-    }
-  }
-}
-```
-
-### 6. Framework-Specific Error Patterns
-
-**Auto-Registration Errors**
-- **Symptom**: Service not found in DI
-- **Cause**: Missing `KoanAutoRegistrar` or assembly not loaded
-- **Solution**: Verify file exists, implements interface, is public
-
-**Provider Capability Mismatches**
-- **Symptom**: Query features not working as expected
-- **Cause**: Provider doesn't support specific capabilities
-- **Solution**: Check `QueryCaps` and implement graceful fallbacks
-
-**Entity Pattern Violations**
-- **Symptom**: ID generation issues or manual repository injection
-- **Cause**: Not using `Entity<T>` patterns properly
-- **Solution**: Migrate to entity-first patterns with proper inheritance
-
-**Context Routing Conflicts**
-- **Symptom**: Data going to wrong partition/source
-- **Cause**: Nested contexts or Source+Adapter conflict
-- **Solution**: Follow Source XOR Adapter rule, check context nesting
-
-## Boot Report Analysis
-
-### Enabling Detailed Boot Reporting
+## Environment detection
 
 ```csharp
-// In Development environment
-if (KoanEnv.IsDevelopment)
-{
-    var logger = app.Services.GetRequiredService<ILogger<Program>>();
-    KoanEnv.DumpSnapshot(logger);
-}
+logger.LogInformation("Env={Env} Dev={Dev} Prod={Prod} Container={C} Magic={M}",
+    KoanEnv.EnvironmentName, KoanEnv.IsDevelopment, KoanEnv.IsProduction,
+    KoanEnv.InContainer, KoanEnv.AllowMagicInProduction);
+KoanEnv.DumpSnapshot(logger);   // one-line structured snapshot of the resolved environment
 ```
 
-### Reading Boot Report
+`KoanEnv.EnvironmentName` is the string (there is no `CurrentEnvironment`). In containers, use the service hostname (`Host=postgres`) — `localhost` is the classic "Unable to connect" cause.
 
-```
-[INFO] Koan:discover postgresql: server=localhost;database=myapp;username=koan;password=*** OK
-[INFO] Koan:discover mongodb: connection timeout FAILED
-[INFO] Koan:modules data→postgresql (elected: connection successful)
-[INFO] Koan:modules web→controllers (discovered: 5 controllers)
-[INFO] Koan:modules ai→openai (api_key present, model: gpt-4)
-[INFO] Koan:modules MyApp v1.0.0 (services: TodoService, EmailService)
-[WARNING] Email SMTP configuration missing - using console fallback
-```
+## Anti-patterns to flag
 
-**What to look for:**
-- ✅ `OK` status for expected providers
-- ✅ Correct provider elections (`data→postgresql`)
-- ✅ Your modules listed with version
-- ⚠️ Warnings about missing configuration
-- ❌ `FAILED` status for critical services
+| If you see | Suggest |
+|---|---|
+| `Data<T,K>.QueryCaps` / `QueryCapabilities.HasFlag(...)` / `.ProviderName` | `Data<T,K>.Capabilities.Has(DataCaps.Query.Linq)` — the unified `CapabilitySet` (ARCH-0084) |
+| `KoanEnv.CurrentEnvironment` | `KoanEnv.EnvironmentName` |
+| Manual `services.AddXxx()` for a module that ships a registrar | reference the package — Reference = Intent wires it; double-registration masks the real boot order |
+| Catching the LINQ `NotSupportedException` and swallowing it | branch on `caps.Has(DataCaps.Query.Linq)` *before* querying |
+| `Todo.Get(id)` in a loop while debugging an N+1 | `Todo.Get(ids)` batch |
+| Reasoning about elections from memory | read the boot report / `DumpSnapshot` — elections are reported, not guessed |
 
-## Debug Provider Capabilities
+## Escape hatches
 
-```csharp
-// Log capabilities for current provider
-var caps = Data<Todo, string>.QueryCaps;
-logger.LogInformation("Provider: {Provider}", caps.ProviderName);
-logger.LogInformation("Capabilities: {Capabilities}", caps.Capabilities);
+- **Force an adapter** when election is ambiguous: `[DataAdapter("mongodb")]` on the entity pins the provider and removes fallback guessing.
+- **Trace a single stuck path**: `KoanEnv.DumpSnapshot(logger)` plus `grep "Koan:"` on the boot log isolates discovery vs election vs your module.
+- **Drop to the store** when you need to confirm the data physically landed: `IDataService.Direct(...)` (`Koan.Data.Core`) bypasses the entity decorators for a raw read/write probe.
+- **Capability probe in code**: `Data<T,K>.As<TCapability>()` returns `null` when the backing adapter doesn't implement an optional interface — the cast *is* the probe.
 
-// Check specific capabilities
-if (caps.Capabilities.HasFlag(QueryCapabilities.LinqQueries))
-{
-    logger.LogInformation("Provider supports server-side LINQ");
-}
+## See also
 
-if (caps.Capabilities.HasFlag(QueryCapabilities.Transactions))
-{
-    logger.LogInformation("Provider supports transactions");
-}
-
-if (Todo.SupportsFastRemove)
-{
-    logger.LogInformation("Provider supports TRUNCATE/DROP");
-}
-```
-
-## Environment Detection Debug
-
-```csharp
-logger.LogInformation("Environment: {Env}", KoanEnv.CurrentEnvironment);
-logger.LogInformation("IsDevelopment: {Dev}", KoanEnv.IsDevelopment);
-logger.LogInformation("IsProduction: {Prod}", KoanEnv.IsProduction);
-logger.LogInformation("InContainer: {Container}", KoanEnv.InContainer);
-logger.LogInformation("AllowMagicInProduction: {Magic}", KoanEnv.AllowMagicInProduction);
-```
-
-## Common Debug Commands
-
-```bash
-# Container development workflow
-./start.bat  # Always use project start scripts
-
-# View structured logs
-docker logs koan-app --tail 20 --follow | grep "Koan:"
-
-# Check assembly discovery
-docker exec koan-app ls /app/*.dll
-
-# Test database connectivity
-docker exec postgres-container psql -U koan -d myapp -c "SELECT 1"
-
-# Check Redis connectivity
-docker exec redis-container redis-cli PING
-```
-
-## When This Skill Applies
-
-Invoke this skill when:
-- ✅ Troubleshooting errors
-- ✅ Analyzing boot failures
-- ✅ Debugging provider issues
-- ✅ Investigating performance problems
-- ✅ Validating initialization
-- ✅ Reviewing boot reports
-
-## Reference Documentation
-
-- **Troubleshooting Guides:** `docs/guides/troubleshooting/`
-- **Bootstrap Failures:** `docs/guides/troubleshooting/bootstrap-failures.md`
-- **Adapter Issues:** `docs/guides/troubleshooting/adapter-connection-issues.md`
-- **Deep Dive:** `docs/guides/deep-dive/bootstrap-lifecycle.md`
+- [Reference card: data.md](../../../docs/reference/cards/data.md) — the pillar map (capabilities, providers, verbs)
+- [Troubleshooting: bootstrap-failures.md](../../../docs/guides/troubleshooting/bootstrap-failures.md) — DI / discovery failures
+- [Troubleshooting: adapter-connection-issues.md](../../../docs/guides/troubleshooting/adapter-connection-issues.md) — election + connectivity
+- [Deep dive: bootstrap-lifecycle.md](../../../docs/guides/deep-dive/bootstrap-lifecycle.md) — discovery → registrar → boot report order
+- [ARCH-0084 — unified capability model](../../../docs/decisions/ARCH-0084-unified-capability-model.md) — why `CapabilitySet.Has(token)` replaced the flags enum

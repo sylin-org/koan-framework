@@ -39,10 +39,10 @@ Every skill conforms — exemplars: **koan-caching**, **koan-jobs**.
 
 | Skill | Card | Status | When to use |
 |-------|------|--------|-------------|
-| **koan-quickstart** | — | ⟳ | Zero to first Koan app; S0 + S1 patterns |
-| **koan-entity-first** | data.md | ⟳ | `Entity<T>`, GUID v7, static methods vs manual repositories |
-| **koan-bootstrap** | — | ⟳ | Auto-registration, `KoanAutoRegistrar`/`KoanModule`, minimal `Program.cs` |
-| **koan-debugging** | — | ⟳ | Boot-report analysis, capability/provider diagnostics, common errors |
+| **koan-quickstart** | — | ✅ | Zero to first Koan app; S0 + S1 patterns |
+| **koan-entity-first** | data.md | ✅ | `Entity<T>`, GUID v7, static methods vs manual repositories |
+| **koan-bootstrap** | — | ✅ | Auto-registration, `KoanAutoRegistrar`/`KoanModule`, minimal `Program.cs` |
+| **koan-debugging** | — | ✅ | Boot-report analysis, capability/provider diagnostics, common errors |
 
 ### Pillar skills (1:1 with a card)
 
@@ -79,10 +79,11 @@ the Skill tool also works.
 
 ## Skill resources
 
-Most skills are a single `SKILL.md`. Two bundle extra material today:
-**koan-bootstrap** (`templates/`) and **koan-entity-first** (`examples/` + `anti-patterns/`).
-Additional `examples/templates/anti-patterns/diagnostics` directories are added per-skill only
-when they earn their keep — not promised by default.
+Most skills are a single `SKILL.md` — the overhaul folds the canonical pattern (compile-gated)
+and escape hatches inline, retiring the old uncompiled `.cs`/`.template` bundles that drifted.
+Two skills keep a focused extra: **koan-bootstrap** (`templates/` — a minimal `Program.cs` +
+`appsettings.json`) and **koan-entity-first** (`anti-patterns/manual-repositories.md`). New
+bundled directories are added per-skill only when they earn their keep — not promised by default.
 
 ## Relationship to the rest of the docs
 
