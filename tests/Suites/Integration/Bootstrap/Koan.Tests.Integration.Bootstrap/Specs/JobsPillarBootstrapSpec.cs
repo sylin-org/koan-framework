@@ -7,7 +7,6 @@ using Koan.Testing.Integration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Koan.Tests.Integration.Bootstrap.Specs;
 

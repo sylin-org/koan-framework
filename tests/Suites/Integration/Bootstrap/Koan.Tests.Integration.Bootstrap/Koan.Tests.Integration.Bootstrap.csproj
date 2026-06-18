@@ -4,12 +4,14 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <!-- ARCH-0091: xUnit v3 runs as a self-executing test assembly (VSTest-compatible mode keeps `dotnet test`). -->
+    <OutputType>Exe</OutputType>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="AwesomeAssertions" Version="9.4.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.6.0" />
-    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
@@ -17,7 +19,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\Shared\Koan.Testing\Koan.Testing.csproj" />
+    <!-- ARCH-0091: KoanIntegrationHost (xUnit-free host) + the v3 RedisFixture (CachePillarBootstrapSpec).
+         The bespoke Koan.Testing reference is dropped; its transitive graph is restored per-need. -->
+    <ProjectReference Include="..\..\..\..\Shared\Koan.Testing.Hosting\Koan.Testing.Hosting.csproj" />
+    <ProjectReference Include="..\..\..\..\Shared\Koan.Testing.Containers\Koan.Testing.Containers.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Core\Koan.Core.csproj" />
 
     <!-- Cache pillar (CachePillarBootstrapSpec) -->

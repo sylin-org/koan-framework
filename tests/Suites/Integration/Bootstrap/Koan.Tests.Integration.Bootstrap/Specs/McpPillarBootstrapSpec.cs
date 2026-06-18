@@ -5,7 +5,6 @@ using Koan.Mcp.Hosting;
 using Koan.Testing.Integration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Koan.Tests.Integration.Bootstrap.Specs;
 

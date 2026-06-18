@@ -1,20 +1,16 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using AwesomeAssertions;
 using Koan.Cache.Abstractions;
 using Koan.Cache.Abstractions.Primitives;
 using Koan.Cache.Abstractions.Stores;
 using Koan.Core;
-using Koan.Testing.Extensions;
+using Koan.Testing.Containers;
 using Koan.Testing.Integration;
-using Koan.Testing.Pipeline;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Koan.Tests.Integration.Bootstrap.Specs;
 
@@ -34,106 +30,87 @@ namespace Koan.Tests.Integration.Bootstrap.Specs;
 /// scope for cache-pillar boot smoke and deferred to a Tier 2 messaging smoke.
 /// </para>
 /// <para>
-/// All tests require Docker because <c>RedisCacheStore</c> resolves <c>IConnectionMultiplexer</c>
-/// eagerly during topology construction. Without a real Redis daemon, <c>BuildServiceProvider</c>
-/// + first ICacheStore enumeration would throw at connect time.
+/// ARCH-0091: Redis comes from the shared <see cref="RedisFixture"/> as a class fixture — the
+/// container starts once for this class only (the sibling offline boot-smoke specs never pay for
+/// it). All tests require Docker because <c>RedisCacheStore</c> resolves <c>IConnectionMultiplexer</c>
+/// eagerly during topology construction; without a real Redis daemon the fixture is unavailable and
+/// these specs <c>Assert.Skip</c>.
 /// </para>
 /// </remarks>
-public sealed class CachePillarBootstrapSpec
+public sealed class CachePillarBootstrapSpec(RedisFixture redis, ITestOutputHelper output) : IClassFixture<RedisFixture>
 {
-    private readonly ITestOutputHelper _output;
+    private readonly ITestOutputHelper _output = output;
 
-    public CachePillarBootstrapSpec(ITestOutputHelper output)
+    [Fact]
+    public async Task AddKoan_resolves_ICacheClient_through_real_bootstrap()
     {
-        _output = output;
+        Assert.SkipWhen(!redis.IsAvailable, redis.Reason ?? "Redis unavailable");
+        var ct = TestContext.Current.CancellationToken;
+        var executionId = Guid.CreateVersion7();
+
+        using var dbPath = CreateTempSqlitePath();
+
+        // The "Reference = Intent" headline test: with the four cache packages referenced,
+        // ICacheClient must resolve end-to-end without any explicit AddKoanCache() call in user
+        // code. Going through host startup also exercises the full hosted-service lifecycle, so
+        // descriptor-class bugs (e.g., the TryAddEnumerable indistinguishable bug fixed in 14a5e8ce)
+        // would surface here.
+        await using var host = await BuildBootstrapHost(redis.ConnectionString!, dbPath.Path, executionId).StartAsync(ct);
+
+        var client = host.Services.GetRequiredService<ICacheClient>();
+        client.Should().NotBeNull();
     }
 
     [Fact]
-    public Task AddKoan_resolves_ICacheClient_through_real_bootstrap()
-        => TestPipeline.For<CachePillarBootstrapSpec>(_output, nameof(AddKoan_resolves_ICacheClient_through_real_bootstrap))
-            .RequireDocker()
-            .UsingRedisContainer()
-            .Act(async ctx =>
-            {
-                var redis = ctx.GetRedisFixture();
-                if (!redis.IsAvailable || string.IsNullOrWhiteSpace(redis.ConnectionString))
-                    throw new InvalidOperationException($"Redis unavailable: {redis.UnavailableReason ?? "unspecified"}");
+    public async Task AddKoan_registers_memory_sqlite_and_redis_as_ICacheStore()
+    {
+        Assert.SkipWhen(!redis.IsAvailable, redis.Reason ?? "Redis unavailable");
+        var ct = TestContext.Current.CancellationToken;
+        var executionId = Guid.CreateVersion7();
 
-                using var dbPath = CreateTempSqlitePath();
+        using var dbPath = CreateTempSqlitePath();
+        await using var host = await BuildBootstrapHost(redis.ConnectionString!, dbPath.Path, executionId).StartAsync(ct);
 
-                // The "Reference = Intent" headline test: with the four cache packages
-                // referenced, ICacheClient must resolve end-to-end without any explicit
-                // AddKoanCache() call in user code. Going through host startup also exercises
-                // the full hosted-service lifecycle, so descriptor-class bugs (e.g., the
-                // TryAddEnumerable indistinguishable bug fixed in 14a5e8ce) would surface here.
-                await using var host = await BuildBootstrapHost(redis.ConnectionString!, dbPath.Path, ctx.ExecutionId).StartAsync(ctx.Cancellation);
+        var stores = host.Services.GetServices<ICacheStore>().ToList();
+        stores.Should().HaveCountGreaterThanOrEqualTo(3, "Memory + Sqlite + Redis are referenced");
 
-                var client = host.Services.GetRequiredService<ICacheClient>();
-                client.Should().NotBeNull();
-            })
-            .Run();
+        var storeNames = stores.Select(s => s.Name).ToList();
+        storeNames.Should().Contain("memory");
+        storeNames.Should().Contain("sqlite");
+        storeNames.Should().Contain("redis");
+    }
 
     [Fact]
-    public Task AddKoan_registers_memory_sqlite_and_redis_as_ICacheStore()
-        => TestPipeline.For<CachePillarBootstrapSpec>(_output, nameof(AddKoan_registers_memory_sqlite_and_redis_as_ICacheStore))
-            .RequireDocker()
-            .UsingRedisContainer()
-            .Act(async ctx =>
-            {
-                var redis = ctx.GetRedisFixture();
-                if (!redis.IsAvailable || string.IsNullOrWhiteSpace(redis.ConnectionString))
-                    throw new InvalidOperationException($"Redis unavailable: {redis.UnavailableReason ?? "unspecified"}");
+    public async Task AddKoan_activates_coherence_via_redis_channel_end_to_end()
+    {
+        Assert.SkipWhen(!redis.IsAvailable, redis.Reason ?? "Redis unavailable");
+        var ct = TestContext.Current.CancellationToken;
+        var executionId = Guid.CreateVersion7();
 
-                using var dbPath = CreateTempSqlitePath();
-                await using var host = await BuildBootstrapHost(redis.ConnectionString!, dbPath.Path, ctx.ExecutionId).StartAsync(ctx.Cancellation);
+        using var dbPath = CreateTempSqlitePath();
+        await using var host = await BuildBootstrapHost(redis.ConnectionString!, dbPath.Path, executionId).StartAsync(ct);
 
-                var stores = host.Services.GetServices<ICacheStore>().ToList();
-                stores.Should().HaveCountGreaterThanOrEqualTo(3, "Memory + Sqlite + Redis are referenced");
+        // Indirect activation proof: a write must successfully complete its full broadcast path
+        // (L1 + L2 + Coherence). If any link is broken, this throws. The cache key shares the host's
+        // execution id, so the write/read roundtrip stays inside this test's partition (key prefix).
+        var client = host.Services.GetRequiredService<ICacheClient>();
+        var key = new CacheKey($"bootstrap-coherence-{executionId:N}");
+        await client.CreateEntry<string>(key)
+            .WithAbsoluteTtl(TimeSpan.FromMinutes(1))
+            .Set("smoke", ct);
 
-                var storeNames = stores.Select(s => s.Name).ToList();
-                storeNames.Should().Contain("memory");
-                storeNames.Should().Contain("sqlite");
-                storeNames.Should().Contain("redis");
-            })
-            .Run();
-
-    [Fact]
-    public Task AddKoan_activates_coherence_via_redis_channel_end_to_end()
-        => TestPipeline.For<CachePillarBootstrapSpec>(_output, nameof(AddKoan_activates_coherence_via_redis_channel_end_to_end))
-            .RequireDocker()
-            .UsingRedisContainer()
-            .Act(async ctx =>
-            {
-                var redis = ctx.GetRedisFixture();
-                if (!redis.IsAvailable || string.IsNullOrWhiteSpace(redis.ConnectionString))
-                    throw new InvalidOperationException($"Redis unavailable: {redis.UnavailableReason ?? "unspecified"}");
-
-                using var dbPath = CreateTempSqlitePath();
-                await using var host = await BuildBootstrapHost(redis.ConnectionString!, dbPath.Path, ctx.ExecutionId).StartAsync(ctx.Cancellation);
-
-                // Indirect activation proof: a write must successfully complete its full
-                // broadcast path (L1 + L2 + Coherence). If any link is broken, this throws.
-                var client = host.Services.GetRequiredService<ICacheClient>();
-                var key = new CacheKey($"bootstrap-coherence-{ctx.ExecutionId:N}");
-                await client.CreateEntry<string>(key)
-                    .WithAbsoluteTtl(TimeSpan.FromMinutes(1))
-                    .Set("smoke", ctx.Cancellation);
-
-                var value = await client.CreateEntry<string>(key).Get(ctx.Cancellation);
-                value.Should().Be("smoke");
-            })
-            .Run();
+        var value = await client.CreateEntry<string>(key).Get(ct);
+        value.Should().Be("smoke");
+    }
 
     /// <summary>
-    /// Build a fully-configured <see cref="KoanIntegrationHost.Builder"/> for the cache
-    /// pillar's bootstrap smoke. Tests call <c>.StartAsync(ct)</c> on the returned builder
-    /// to get a started <see cref="IntegrationHost"/>.
+    /// Build a fully-configured <see cref="KoanIntegrationHost.Builder"/> for the cache pillar's
+    /// bootstrap smoke. Tests call <c>.StartAsync(ct)</c> on the returned builder to get a started host.
     /// </summary>
     /// <remarks>
-    /// Per ARCH-0080, <c>IConnectionMultiplexer</c> is owned by <c>Koan.Data.Connector.Redis</c>
-    /// and reads from the canonical <c>Koan:Data:Redis:ConnectionString</c> key. The cache
-    /// adapter consumes the multiplexer via DI and only owns cache-specific options
-    /// (key/tag prefixes, channel name).
+    /// Per ARCH-0080, <c>IConnectionMultiplexer</c> is owned by <c>Koan.Data.Connector.Redis</c> and
+    /// reads from the canonical <c>Koan:Data:Redis:ConnectionString</c> key. The cache adapter consumes
+    /// the multiplexer via DI and only owns cache-specific options (key/tag prefixes, channel name).
     /// </remarks>
     private static KoanIntegrationHost.Builder BuildBootstrapHost(string redisConnectionString, string sqliteDbPath, Guid executionId)
     {
@@ -153,7 +130,7 @@ public sealed class CachePillarBootstrapSpec
     }
 
     private static TempSqliteFile CreateTempSqlitePath()
-        => new(Path.Combine(Path.GetTempPath(), $"koan-boot-smoke-{Guid.NewGuid():N}.db"));
+        => new(Path.Combine(Path.GetTempPath(), $"koan-boot-smoke-{Guid.CreateVersion7():N}.db"));
 
     private sealed class TempSqliteFile : IDisposable
     {
