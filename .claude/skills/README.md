@@ -50,9 +50,9 @@ Every skill conforms — exemplars: **koan-caching**, **koan-jobs**.
 |-------|------|--------|-------------|
 | **koan-caching** | cache.md | ✅ | `[Cacheable]`, L1/L2, coherence, `EntityContext.NoCache()` |
 | **koan-jobs** | jobs.md | ✅ | `IKoanJob<T>`, `.Job`/`.Jobs`, scheduled/retried work, conveyors |
-| **koan-api-building** → koan-web | web.md | ⟳ | `EntityController<T>`, custom routes, transformers, auth policies |
-| **koan-vector-migration** → koan-vector | vector.md | ⟳ | Vector search, embeddings, export/import migration |
-| **koan-ai-integration** → koan-ai | ai-data.md | ⟳ | Chat, embeddings, RAG, entity-aware AI, media analysis |
+| **koan-web** | web.md | ✅ | `EntityController<T>`, custom routes, `IEntityTransformer`, auth policies |
+| **koan-vector** | vector.md | ✅ | Vector search (`Vector<T>.Search`), `[Embedding]`, provider-migration export |
+| **koan-ai** | ai-data.md | ✅ | `EntityAi.Embed/Chat/Ocr`, `[Embedding]`, `[MediaAnalysis]`, `Client` facade |
 | **koan-mcp-integration** → koan-mcp | mcp.md | ⟳ (deferred) | `[McpEntity]`/`[McpTool]`, MCP server, Code Mode |
 | **koan-auth** | auth.md | ＋ | OAuth2/OIDC, `[Authorize]`, roles, trust |
 
