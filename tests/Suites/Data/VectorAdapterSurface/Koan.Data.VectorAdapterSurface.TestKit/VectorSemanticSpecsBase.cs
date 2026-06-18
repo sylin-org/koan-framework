@@ -130,4 +130,71 @@ public abstract class VectorSemanticSpecsBase<TFactory> : IClassFixture<TFactory
         if (Factory.SupportsContinuationToken)
             caps.Has(Koan.Data.Vector.Abstractions.Capabilities.VectorCaps.NativeContinuation).Should().BeTrue();
     }
+
+    // ============================================================================================
+    // ExportAll / Stats  (capability-gated; the migration/backup surface — DATA-0103)
+    //
+    // These exercise IVectorSearchRepository.ExportAll (scroll streaming) and the IndexStats
+    // instruction. For the search-engine connectors this is the regression net that proves the
+    // OpenSearch capability gap is closed: OpenSearch now goes through the SHARED scroll/_count
+    // implementation instead of the throwing default-interface-method it previously hit.
+    // ============================================================================================
+
+    [SkippableFact]
+    public async Task ExportAll_streamsAllStoredVectors()
+    {
+        Skip.If(!Factory.SupportsExportAll, "Adapter does not implement ExportAll.");
+        SkipIfUnavailable();
+
+        await Vector<TodoVector>.Save("v1", Embed("alpha", 1));
+        await Vector<TodoVector>.Save("v2", Embed("alpha", 2));
+        await Vector<TodoVector>.Save("v3", Embed("beta", 1));
+
+        var repo = (Koan.Core.Hosting.App.AppHost.Current?.GetService(typeof(IVectorService)) as IVectorService)
+            ?.TryGetRepository<TodoVector, string>();
+        repo.Should().NotBeNull("ExportAll is exercised directly against the repository (not on the Vector<T> facade)");
+
+        var exported = new List<string>();
+        await foreach (var batch in repo!.ExportAll())
+        {
+            exported.Add((string)(object)batch.Id);
+            batch.Embedding.Length.Should().Be(Factory.EmbeddingDimension);
+        }
+
+        exported.Should().Contain(new[] { "v1", "v2", "v3" });
+    }
+
+    [SkippableFact]
+    public async Task ExportAll_onMissingIndex_returnsEmpty()
+    {
+        Skip.If(!Factory.SupportsExportAll, "Adapter does not implement ExportAll.");
+        SkipIfUnavailable();
+
+        await Vector<TodoVector>.Flush();
+
+        var repo = (Koan.Core.Hosting.App.AppHost.Current?.GetService(typeof(IVectorService)) as IVectorService)
+            ?.TryGetRepository<TodoVector, string>();
+        repo.Should().NotBeNull();
+
+        var exported = new List<string>();
+        await foreach (var batch in repo!.ExportAll())
+            exported.Add((string)(object)batch.Id);
+
+        exported.Should().BeEmpty();
+    }
+
+    [SkippableFact]
+    public async Task Stats_returnsStoredVectorCount()
+    {
+        // Stats rides the same capability surface as ExportAll for the search-engine connectors:
+        // the IndexStats instruction is implemented once in the shared base (GetCount over _count).
+        Skip.If(!Factory.SupportsExportAll, "Adapter does not implement the IndexStats instruction.");
+        SkipIfUnavailable();
+
+        await Vector<TodoVector>.Save("v1", Embed("alpha", 1));
+        await Vector<TodoVector>.Save("v2", Embed("alpha", 2));
+
+        var count = await Vector<TodoVector>.Stats();
+        count.Should().BeGreaterThanOrEqualTo(2);
+    }
 }

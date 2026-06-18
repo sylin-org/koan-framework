@@ -1,8 +1,10 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
+using Koan.Data.SearchEngine;
 using Koan.Data.Vector.Abstractions;
 using Koan.Orchestration;
 using Koan.Orchestration.Attributes;
@@ -33,9 +35,11 @@ public sealed class OpenSearchVectorAdapterFactory : IVectorAdapterFactory
 {
     public string Provider => "opensearch";
 
+    // DATA-0103 drift fix: removed the cross-claim on provider "elastic" — that alias belongs to the
+    // Elasticsearch factory (same ProviderPriority(20)), and both claiming it produced ambiguous
+    // provider resolution when both packages were referenced.
     public bool CanHandle(string provider)
-        => string.Equals(provider, "opensearch", StringComparison.OrdinalIgnoreCase) ||
-           string.Equals(provider, "elastic", StringComparison.OrdinalIgnoreCase);
+        => string.Equals(provider, "opensearch", StringComparison.OrdinalIgnoreCase);
 
     public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp)
         where TEntity : class, IEntity<TKey>
@@ -45,7 +49,15 @@ public sealed class OpenSearchVectorAdapterFactory : IVectorAdapterFactory
             ?? throw new InvalidOperationException("IHttpClientFactory not registered; call services.AddHttpClient().");
         var options = (IOptions<OpenSearchOptions>?)sp.GetService(typeof(IOptions<OpenSearchOptions>))
             ?? throw new InvalidOperationException("OpenSearchOptions not configured; bind Koan:Data:OpenSearch.");
-        return new OpenSearchVectorRepository<TEntity, TKey>(httpFactory, options, sp);
+        var logger = ((ILoggerFactory?)sp.GetService(typeof(ILoggerFactory)))
+            ?.CreateLogger<SearchEngineVectorRepository<TEntity, TKey>>();
+        return new SearchEngineVectorRepository<TEntity, TKey>(
+            httpFactory.CreateClient(Infrastructure.Constants.HttpClientName),
+            options.Value,
+            new OpenSearchDialect(),
+            OpenSearchTelemetry.Activity,
+            logger,
+            sp);
     }
 
     // OpenSearch index names are lowercase; the partition uses '-'. (Names are EntityType, so the name

@@ -123,7 +123,8 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             {
                 "Koan.Data.Connector.OpenSearch.OpenSearchOptionsConfigurator",
                 "Koan.Data.Connector.OpenSearch.OpenSearchVectorAdapterFactory"
-            });
+            },
+            sourceKey: endpoint.ResolvedKey);
 
         module.AddSetting(
             "IndexPrefix",
@@ -132,7 +133,8 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             consumers: new[]
             {
                 "Koan.Data.Connector.OpenSearch.OpenSearchVectorAdapterFactory"
-            });
+            },
+            sourceKey: indexPrefix.ResolvedKey);
 
         module.AddSetting(
             "VectorField",
@@ -141,7 +143,8 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             consumers: new[]
             {
                 "Koan.Data.Connector.OpenSearch.OpenSearchVectorAdapterFactory"
-            });
+            },
+            sourceKey: vectorField.ResolvedKey);
 
         module.AddSetting(
             "MetadataField",
@@ -150,7 +153,8 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             consumers: new[]
             {
                 "Koan.Data.Connector.OpenSearch.OpenSearchVectorAdapterFactory"
-            });
+            },
+            sourceKey: metadataField.ResolvedKey);
 
         module.AddSetting(
             "SimilarityMetric",
@@ -159,7 +163,8 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             consumers: new[]
             {
                 "Koan.Data.Connector.OpenSearch.OpenSearchVectorAdapterFactory"
-            });
+            },
+            sourceKey: similarityMetric.ResolvedKey);
 
         module.AddSetting(
             "TimeoutSeconds",
@@ -168,7 +173,8 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             consumers: new[]
             {
                 "Koan.Data.Connector.OpenSearch.OpenSearchVectorAdapterFactory"
-            });
+            },
+            sourceKey: timeoutSeconds.ResolvedKey);
     }
 }
 

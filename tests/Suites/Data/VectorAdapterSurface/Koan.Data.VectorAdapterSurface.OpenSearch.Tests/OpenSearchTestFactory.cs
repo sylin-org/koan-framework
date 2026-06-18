@@ -34,7 +34,7 @@ public sealed class OpenSearchTestFactory : IVectorAdapterTestFactory
     public bool SupportsGetEmbedding         => false; // not implemented in OS vector repo
     public bool SupportsBulkOperations       => true;
     public bool SupportsFlush                => true;  // adapter overrides: DELETE /<index>
-    public bool SupportsExportAll            => false; // no export override yet
+    public bool SupportsExportAll            => true;  // DATA-0103: gap closed — OS now uses the shared scroll/_count base
     public bool SupportsHybridSearch         => false;
     public bool SupportsMetadataFilters      => true;  // metadata.<key>.keyword mapping (live-verified; OS pre-filters via query.knn.filter)
     public bool SupportsContinuationToken    => false;

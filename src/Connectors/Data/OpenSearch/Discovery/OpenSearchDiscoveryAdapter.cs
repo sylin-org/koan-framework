@@ -14,7 +14,10 @@ namespace Koan.Data.Connector.OpenSearch.Discovery;
 internal sealed class OpenSearchDiscoveryAdapter : ServiceDiscoveryAdapterBase
 {
     public override string ServiceName => "opensearch";
-    public override string[] Aliases => new[] { "open-search", "os", "search" };
+    // DATA-0103 drift fix: the generic "search" alias was claimed by BOTH the OpenSearch and
+    // Elasticsearch discovery adapters — an ambiguous collision (two distinct backends on the same
+    // default port). Dropped from both; each keeps only its own unambiguous aliases.
+    public override string[] Aliases => new[] { "open-search", "os" };
 
     public OpenSearchDiscoveryAdapter(IConfiguration configuration, ILogger<OpenSearchDiscoveryAdapter> logger)
         : base(configuration, logger) { }

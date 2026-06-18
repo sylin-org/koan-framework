@@ -1,8 +1,10 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
+using Koan.Data.SearchEngine;
 using Koan.Data.Vector.Abstractions;
 using Koan.Orchestration;
 using Koan.Orchestration.Attributes;
@@ -45,7 +47,15 @@ public sealed class ElasticSearchVectorAdapterFactory : IVectorAdapterFactory
             ?? throw new InvalidOperationException("IHttpClientFactory not registered; call services.AddHttpClient().");
         var options = (IOptions<ElasticSearchOptions>?)sp.GetService(typeof(IOptions<ElasticSearchOptions>))
             ?? throw new InvalidOperationException("ElasticSearchOptions not configured; bind Koan:Data:ElasticSearch.");
-        return new ElasticSearchVectorRepository<TEntity, TKey>(httpFactory, options, sp);
+        var logger = ((ILoggerFactory?)sp.GetService(typeof(ILoggerFactory)))
+            ?.CreateLogger<SearchEngineVectorRepository<TEntity, TKey>>();
+        return new SearchEngineVectorRepository<TEntity, TKey>(
+            httpFactory.CreateClient(Infrastructure.Constants.HttpClientName),
+            options.Value,
+            new ElasticSearchDialect(),
+            ElasticSearchTelemetry.Activity,
+            logger,
+            sp);
     }
 
     // Elasticsearch index names are lowercase; the partition uses '-'. (Names are EntityType, so the

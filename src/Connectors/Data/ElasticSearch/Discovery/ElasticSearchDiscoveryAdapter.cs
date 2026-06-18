@@ -14,7 +14,10 @@ namespace Koan.Data.Connector.ElasticSearch.Discovery;
 internal sealed class ElasticSearchDiscoveryAdapter : ServiceDiscoveryAdapterBase
 {
     public override string ServiceName => "elasticsearch";
-    public override string[] Aliases => new[] { "elastic", "es", "search" };
+    // DATA-0103 drift fix: the generic "search" alias was claimed by BOTH the Elasticsearch and
+    // OpenSearch discovery adapters — an ambiguous collision (two distinct backends on the same
+    // default port). Dropped from both; each keeps only its own unambiguous aliases.
+    public override string[] Aliases => new[] { "elastic", "es" };
 
     public ElasticSearchDiscoveryAdapter(IConfiguration configuration, ILogger<ElasticSearchDiscoveryAdapter> logger)
         : base(configuration, logger) { }

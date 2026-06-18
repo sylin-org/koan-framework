@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Net.Http;
 using System.Globalization;
@@ -8,20 +9,28 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Instructions;
-using Koan.Data.SearchEngine;
 using Koan.Core.Capabilities;
 using Koan.Data.Vector.Abstractions;
 using Koan.Data.Vector.Abstractions.Capabilities;
 using Koan.Data.Vector.Abstractions.Configuration;
 
-namespace Koan.Data.Connector.ElasticSearch;
+namespace Koan.Data.SearchEngine;
 
-internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
+/// <summary>
+/// The shared vector repository for the Apache-Lucene search engines (Elasticsearch 8.x, OpenSearch 2.x).
+/// DATA-0103 folded the two ~79%-identical connectors into this one base behind a 3-member
+/// <see cref="ISearchEngineDialect"/> seam: every REST/transport detail (HttpClient config, auth, NDJSON
+/// bulk envelope, <c>_doc</c> PUT/DELETE, <c>_delete_by_query</c>, probe-then-create index flow, hit
+/// parsing, scroll export, id normalization) lives here; only the kNN search body, the index mapping body,
+/// and the similarity-token mapping come from the dialect. <see cref="ExportAll"/>/<c>GetCount</c>/index-stats
+/// are implemented once here — OpenSearch supports the identical scroll API, so it gains the parity it
+/// previously lacked.
+/// </summary>
+public sealed class SearchEngineVectorRepository<TEntity, TKey> :
     IVectorSearchRepository<TEntity, TKey>,
     IDescribesCapabilities,
     IInstructionExecutor<TEntity>
@@ -29,25 +38,32 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
     where TKey : notnull
 {
     private readonly HttpClient _http;
-    private readonly ElasticSearchOptions _options;
+    private readonly ISearchEngineVectorOptions _options;
+    private readonly ISearchEngineDialect _dialect;
+    private readonly ActivitySource _activity;
     private readonly IServiceProvider _services;
-    private readonly ILogger<ElasticSearchVectorRepository<TEntity, TKey>>? _logger;
+    private readonly ILogger? _logger;
     // Keyed by IndexName — one repo instance serves multiple partitions/storage names, so a
     // single bool would short-circuit EnsureIndex after the first partition is created and
     // every subsequent partition's writes would land in an auto-created index without
-    // dense_vector mapping. Per-IndexName tracking is the only correct shape.
+    // vector mapping. Per-IndexName tracking is the only correct shape.
     private readonly ConcurrentDictionary<string, byte> _ensuredIndexes = new(StringComparer.Ordinal);
     private int _discoveredDimension = -1;
 
-    public ElasticSearchVectorRepository(
-        IHttpClientFactory httpFactory,
-        IOptions<ElasticSearchOptions> options,
+    public SearchEngineVectorRepository(
+        HttpClient http,
+        ISearchEngineVectorOptions options,
+        ISearchEngineDialect dialect,
+        ActivitySource activity,
+        ILogger? logger,
         IServiceProvider services)
     {
-        _http = httpFactory.CreateClient(Infrastructure.Constants.HttpClientName);
-        _options = options.Value;
+        _http = http;
+        _options = options;
+        _dialect = dialect;
+        _activity = activity;
+        _logger = logger;
         _services = services;
-        _logger = (ILogger<ElasticSearchVectorRepository<TEntity, TKey>>?)services.GetService(typeof(ILogger<ElasticSearchVectorRepository<TEntity, TKey>>));
         ConfigureHttpClient();
     }
 
@@ -61,7 +77,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
         var dimension = _discoveredDimension > 0 ? _discoveredDimension : _options.Dimension ?? -1;
         if (dimension <= 0)
         {
-            throw new InvalidOperationException("Elasticsearch vector dimension is unknown. Configure Koan:Data:ElasticSearch:Dimension or upsert a vector to allow discovery.");
+            throw new InvalidOperationException($"{_dialect.EngineLabel} vector dimension is unknown. Configure the adapter's Dimension or upsert a vector to allow discovery.");
         }
 
         await EnsureIndex(dimension, ct);
@@ -75,7 +91,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
             throw new ArgumentException("Embedding must contain values.", nameof(embedding));
         }
 
-        using var _ = ElasticSearchTelemetry.Activity.StartActivity("vector.upsert");
+        using var _ = _activity.StartActivity("vector.upsert");
 
         var dimension = EnsureDimension(embedding.Length);
         await EnsureIndex(dimension, ct);
@@ -89,7 +105,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
         if (!response.IsSuccessStatusCode)
         {
             var body = await response.Content.ReadAsStringAsync(ct);
-            throw new InvalidOperationException($"Elasticsearch upsert failed: {(int)response.StatusCode} {response.ReasonPhrase} {body}");
+            throw new InvalidOperationException($"{_dialect.EngineLabel} upsert failed: {(int)response.StatusCode} {response.ReasonPhrase} {body}");
         }
     }
 
@@ -97,7 +113,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
     {
         ArgumentNullException.ThrowIfNull(items);
 
-        using var _ = ElasticSearchTelemetry.Activity.StartActivity("vector.bulkUpsert");
+        using var _ = _activity.StartActivity("vector.bulkUpsert");
 
         var list = items.ToList();
         if (list.Count == 0)
@@ -138,13 +154,13 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
 
         if (!resp.IsSuccessStatusCode)
         {
-            throw new InvalidOperationException($"Elasticsearch bulk upsert failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {respBody}");
+            throw new InvalidOperationException($"{_dialect.EngineLabel} bulk upsert failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {respBody}");
         }
 
         var parsed = string.IsNullOrWhiteSpace(respBody) ? null : JObject.Parse(respBody);
         if (parsed?["errors"]?.Value<bool>() == true)
         {
-            _logger?.LogWarning("Elasticsearch bulk upsert completed with errors: {Response}", respBody);
+            _logger?.LogWarning("{Engine} bulk upsert completed with errors: {Response}", _dialect.EngineLabel, respBody);
         }
 
         return list.Count;
@@ -152,7 +168,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
 
     public async Task<bool> Delete(TKey id, CancellationToken ct = default)
     {
-        using var _ = ElasticSearchTelemetry.Activity.StartActivity("vector.delete");
+        using var _ = _activity.StartActivity("vector.delete");
 
         await EnsureIndexInitialized(ct);
 
@@ -168,7 +184,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
         if (!resp.IsSuccessStatusCode)
         {
             var body = await resp.Content.ReadAsStringAsync(ct);
-            throw new InvalidOperationException($"Elasticsearch delete failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {body}");
+            throw new InvalidOperationException($"{_dialect.EngineLabel} delete failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {body}");
         }
 
         return true;
@@ -177,7 +193,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
     public async Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(ids);
-        using var _ = ElasticSearchTelemetry.Activity.StartActivity("vector.bulkDelete");
+        using var _ = _activity.StartActivity("vector.bulkDelete");
 
         await EnsureIndexInitialized(ct);
 
@@ -209,13 +225,13 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
 
         if (!resp.IsSuccessStatusCode)
         {
-            throw new InvalidOperationException($"Elasticsearch bulk delete failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {respBody}");
+            throw new InvalidOperationException($"{_dialect.EngineLabel} bulk delete failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {respBody}");
         }
 
         var parsed = string.IsNullOrWhiteSpace(respBody) ? null : JObject.Parse(respBody);
         if (parsed?["errors"]?.Value<bool>() == true)
         {
-            _logger?.LogWarning("Elasticsearch bulk delete completed with errors: {Response}", respBody);
+            _logger?.LogWarning("{Engine} bulk delete completed with errors: {Response}", _dialect.EngineLabel, respBody);
         }
 
         return list.Count;
@@ -229,7 +245,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
             throw new ArgumentException("Search query requires a vector with at least one value.", nameof(options));
         }
 
-        using var _ = ElasticSearchTelemetry.Activity.StartActivity("vector.search");
+        using var _ = _activity.StartActivity("vector.search");
 
         var dimension = EnsureDimension(options.Query.Length);
         await EnsureIndex(dimension, ct);
@@ -242,7 +258,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
 
         if (!resp.IsSuccessStatusCode)
         {
-            throw new InvalidOperationException($"Elasticsearch search failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {body}");
+            throw new InvalidOperationException($"{_dialect.EngineLabel} search failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {body}");
         }
 
         var parsed = string.IsNullOrWhiteSpace(body) ? new JObject() : JObject.Parse(body);
@@ -284,9 +300,9 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
         int? batchSize = null,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
-        using var _ = ElasticSearchTelemetry.Activity.StartActivity("vector.export");
+        using var _ = _activity.StartActivity("vector.export");
 
-        var size = batchSize ?? 1000; // ElasticSearch scroll default
+        var size = batchSize ?? 1000; // scroll default
         var scrollTime = "2m";
 
         // Check if index exists first
@@ -295,7 +311,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
 
         if (headResp.StatusCode == HttpStatusCode.NotFound)
         {
-            _logger?.LogInformation("ElasticSearch index {IndexName} does not exist, export returns empty", IndexName);
+            _logger?.LogInformation("{Engine} index {IndexName} does not exist, export returns empty", _dialect.EngineLabel, IndexName);
             yield break;
         }
 
@@ -313,7 +329,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
 
         if (!resp.IsSuccessStatusCode)
         {
-            throw new InvalidOperationException($"ElasticSearch export failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {respBody}");
+            throw new InvalidOperationException($"{_dialect.EngineLabel} export failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {respBody}");
         }
 
         var json = JObject.Parse(respBody);
@@ -356,7 +372,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
 
             if (!resp.IsSuccessStatusCode)
             {
-                _logger?.LogWarning("ElasticSearch scroll continuation failed: {Status} {Reason}", resp.StatusCode, resp.ReasonPhrase);
+                _logger?.LogWarning("{Engine} scroll continuation failed: {Status} {Reason}", _dialect.EngineLabel, resp.StatusCode, resp.ReasonPhrase);
                 break;
             }
 
@@ -388,7 +404,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
             }
         }
 
-        _logger?.LogInformation("ElasticSearch vector export completed: {Count} vectors exported", totalExported);
+        _logger?.LogInformation("{Engine} vector export completed: {Count} vectors exported", _dialect.EngineLabel, totalExported);
     }
 
     public async Task<TResult> ExecuteAsync<TResult>(Instruction instruction, CancellationToken ct = default)
@@ -417,32 +433,13 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
             return (TResult)result;
         }
 
-        throw new NotSupportedException($"Instruction '{instruction.Name}' not supported by Elasticsearch vector adapter.");
+        throw new NotSupportedException($"Instruction '{instruction.Name}' not supported by {_dialect.EngineLabel} vector adapter.");
     }
 
     private JObject BuildSearchRequest(VectorQueryOptions options, int topK)
     {
-        var request = new JObject
-        {
-            ["size"] = topK,
-            ["knn"] = new JObject
-            {
-                ["field"] = _options.VectorField,
-                ["query_vector"] = new JArray(options.Query.Select(v => (double)v)),
-                ["k"] = topK,
-                ["num_candidates"] = Math.Max(topK, topK * 2)
-            },
-            ["_source"] = new JArray(_options.MetadataField, _options.IdField)
-        };
-
-        var filter = SearchEngineFilterTranslator.TranslateWhereClause(options.Filter, _options.MetadataField, "Elasticsearch");
-        if (filter is not null)
-        {
-            // DATA-0097 F6: the filter must PRE-FILTER the kNN (knn.filter), not sit as a top-level
-            // query sibling — a sibling query is OR-combined with knn in ES 8.x, so the filter would
-            // not constrain the vector results (it returned the full top-K unfiltered).
-            ((JObject)request["knn"]!)["filter"] = filter;
-        }
+        var filter = SearchEngineFilterTranslator.TranslateWhereClause(options.Filter, _options.MetadataField, _dialect.EngineLabel);
+        var request = _dialect.BuildSearchRequestBody(options.Query, topK, filter, _options);
 
         if (options.Timeout is { } timeout)
         {
@@ -454,13 +451,13 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
 
     /// <summary>
     /// Drop the underlying index entirely. Subsequent operations re-create it lazily with the
-    /// correct dense_vector mapping — cleaner than _delete_by_query, which leaves the (possibly
+    /// correct vector mapping — cleaner than _delete_by_query, which leaves the (possibly
     /// stale) mapping in place. Invalidates the per-IndexName ensured-cache so the next
     /// EnsureIndex call hits the real probe path.
     /// </summary>
     public async Task Flush(CancellationToken ct = default)
     {
-        using var activity = ElasticSearchTelemetry.Activity.StartActivity("vector.flush");
+        using var activity = _activity.StartActivity("vector.flush");
 
         var indexName = IndexName;
         var url = $"/{Uri.EscapeDataString(indexName)}";
@@ -470,7 +467,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
         if (!resp.IsSuccessStatusCode && resp.StatusCode != HttpStatusCode.NotFound)
         {
             var body = await resp.Content.ReadAsStringAsync(ct);
-            throw new InvalidOperationException($"Elasticsearch flush failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {body}");
+            throw new InvalidOperationException($"{_dialect.EngineLabel} flush failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {body}");
         }
 
         _ensuredIndexes.TryRemove(indexName, out _);
@@ -492,7 +489,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
         if (!resp.IsSuccessStatusCode)
         {
             var body = await resp.Content.ReadAsStringAsync(ct);
-            throw new InvalidOperationException($"Elasticsearch clear failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {body}");
+            throw new InvalidOperationException($"{_dialect.EngineLabel} clear failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {body}");
         }
     }
 
@@ -513,7 +510,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
         if (!resp.IsSuccessStatusCode)
         {
             var body = await resp.Content.ReadAsStringAsync(ct);
-            throw new InvalidOperationException($"Elasticsearch count failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {body}");
+            throw new InvalidOperationException($"{_dialect.EngineLabel} count failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {body}");
         }
 
         var json = await resp.Content.ReadAsStringAsync(ct);
@@ -544,7 +541,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
             return;
         }
 
-        using var _ = ElasticSearchTelemetry.Activity.StartActivity("vector.index.ensureCreated");
+        using var _ = _activity.StartActivity("vector.index.ensureCreated");
 
         var url = $"/{Uri.EscapeDataString(indexName)}";
         var probe = await _http.GetAsync(url, ct);
@@ -556,41 +553,16 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
 
         if (_options.DisableIndexAutoCreate)
         {
-            throw new InvalidOperationException($"Elasticsearch index '{indexName}' does not exist and auto creation is disabled.");
+            throw new InvalidOperationException($"{_dialect.EngineLabel} index '{indexName}' does not exist and auto creation is disabled.");
         }
 
-        var body = new JObject
-        {
-            ["settings"] = new JObject
-            {
-                ["index"] = new JObject
-                {
-                    ["number_of_shards"] = 1,
-                    ["number_of_replicas"] = 0
-                }
-            },
-            ["mappings"] = new JObject
-            {
-                ["properties"] = new JObject
-                {
-                    [_options.IdField] = new JObject { ["type"] = "keyword" },
-                    [_options.VectorField] = new JObject
-                    {
-                        ["type"] = "dense_vector",
-                        ["dims"] = dimension,
-                        ["index"] = true,
-                        ["similarity"] = _options.SimilarityMetric
-                    },
-                    [_options.MetadataField] = new JObject { ["type"] = "object", ["dynamic"] = true }
-                }
-            }
-        };
+        var body = _dialect.BuildIndexBody(dimension, _dialect.MapSimilarityToken(_options.SimilarityMetric), _options);
 
         var create = await _http.PutAsync(url, new StringContent(body.ToString(Formatting.None), Encoding.UTF8, "application/json"), ct);
         if (!create.IsSuccessStatusCode && create.StatusCode != HttpStatusCode.BadRequest)
         {
             var text = await create.Content.ReadAsStringAsync(ct);
-            throw new InvalidOperationException($"Elasticsearch index creation failed: {(int)create.StatusCode} {create.ReasonPhrase} {text}");
+            throw new InvalidOperationException($"{_dialect.EngineLabel} index creation failed: {(int)create.StatusCode} {create.ReasonPhrase} {text}");
         }
 
         _ensuredIndexes[indexName] = 0;
@@ -620,7 +592,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
     {
         if (string.IsNullOrWhiteSpace(_options.Endpoint))
         {
-            throw new InvalidOperationException("Koan:Data:ElasticSearch:Endpoint must be configured.");
+            throw new InvalidOperationException($"{_dialect.EngineLabel} endpoint must be configured.");
         }
 
         _http.BaseAddress = new Uri(_options.Endpoint);
@@ -629,6 +601,10 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
             _http.Timeout = TimeSpan.FromSeconds(Math.Max(1, _options.DefaultTimeoutSeconds));
         }
 
+        // ApiKey is the Elasticsearch 'ApiKey' Authorization scheme. OpenSearch does not natively use it
+        // (it relies on Basic / the security plugin), but the branch is kept identical across both
+        // engines because it is harmless when ApiKey is unset (the default) and divergence here would
+        // re-introduce the very drift DATA-0103 collapses. Configure Username/Password for OpenSearch.
         if (!string.IsNullOrEmpty(_options.ApiKey))
         {
             _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("ApiKey", _options.ApiKey);
@@ -660,7 +636,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
     {
         if (_discoveredDimension > 0 && _discoveredDimension != dimension)
         {
-            _logger?.LogWarning("Elasticsearch vector dimension changed from {Previous} to {Current}. Using latest value.", _discoveredDimension, dimension);
+            _logger?.LogWarning("{Engine} vector dimension changed from {Previous} to {Current}. Using latest value.", _dialect.EngineLabel, _discoveredDimension, dimension);
         }
 
         _discoveredDimension = dimension;
@@ -701,4 +677,3 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
         return (TKey)Convert.ChangeType(value, typeof(TKey), CultureInfo.InvariantCulture);
     }
 }
-
