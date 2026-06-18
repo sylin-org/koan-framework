@@ -106,6 +106,6 @@ These trigger the `koan-entity-first` skill — do not write them:
 ## Pointers
 
 - `CLAUDE.md` — agent entry point: pattern → skill table, core principles, framework utilities
-- `.claude/skills/` — on-demand framework knowledge (entity-first, bootstrap, api-building, …)
+- `.claude/skills/` — 19 on-demand, card-anchored skills (entity-first, bootstrap, web, data-modeling, caching, jobs, vector, ai, auth, storage, …); each carries a compile-gated canonical pattern (DX-0048)
 - `docs/getting-started/overview.md` — the golden path, concept by concept (source of the snippets above)
 - `docs/assessment/00-overview.md` — the framework's own assessment: what is settled vs experimental
