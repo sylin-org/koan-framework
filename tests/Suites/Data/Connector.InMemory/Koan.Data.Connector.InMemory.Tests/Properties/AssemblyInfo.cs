@@ -1,3 +1,8 @@
-﻿using Xunit;
+using Koan.Testing.Containers;
+using Xunit;
 
-[assembly: CollectionBehavior(DisableTestParallelization = true, MaxParallelThreads = 1)]
+// ARCH-0091: one dockerless in-memory fixture shared across the whole assembly (started once before any
+// test, disposed after all). Tests run sequentially within the process because the static Entity<T> API
+// resolves through the process-global AppHost.Current; engines parallelize across processes.
+[assembly: CollectionBehavior(DisableTestParallelization = true)]
+[assembly: AssemblyFixture(typeof(InMemoryFixture))]
