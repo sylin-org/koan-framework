@@ -55,6 +55,8 @@ public sealed class EntityUpsertRequest<TEntity> where TEntity : class
     public required TEntity Model { get; init; }
     public string? Set { get; init; }
     public string? Accept { get; init; }
+    // AN11: rehearse the mutation — run the hook/validation pipeline + project the delta, commit nothing.
+    public bool DryRun { get; init; }
 }
 
 public sealed class EntityUpsertManyRequest<TEntity> where TEntity : class
@@ -62,6 +64,7 @@ public sealed class EntityUpsertManyRequest<TEntity> where TEntity : class
     public required EntityRequestContext Context { get; init; }
     public required IReadOnlyCollection<TEntity> Models { get; init; }
     public string? Set { get; init; }
+    public bool DryRun { get; init; }
 }
 
 public sealed class EntityDeleteRequest<TKey>
@@ -70,6 +73,7 @@ public sealed class EntityDeleteRequest<TKey>
     public required TKey Id { get; init; }
     public string? Set { get; init; }
     public string? Accept { get; init; }
+    public bool DryRun { get; init; }
 }
 
 public sealed class EntityDeleteManyRequest<TKey>
@@ -77,6 +81,7 @@ public sealed class EntityDeleteManyRequest<TKey>
     public required EntityRequestContext Context { get; init; }
     public required IReadOnlyCollection<TKey> Ids { get; init; }
     public string? Set { get; init; }
+    public bool DryRun { get; init; }
 }
 
 public sealed class EntityDeleteByQueryRequest
@@ -84,12 +89,14 @@ public sealed class EntityDeleteByQueryRequest
     public required EntityRequestContext Context { get; init; }
     public required string Query { get; init; }
     public string? Set { get; init; }
+    public bool DryRun { get; init; }
 }
 
 public sealed class EntityDeleteAllRequest
 {
     public required EntityRequestContext Context { get; init; }
     public string? Set { get; init; }
+    public bool DryRun { get; init; }
 }
 
 public sealed class EntityPatchRequest<TEntity, TKey> where TEntity : class
@@ -101,6 +108,7 @@ public sealed class EntityPatchRequest<TEntity, TKey> where TEntity : class
     public PatchKind Kind { get; init; }
     public string? Set { get; init; }
     public string? Accept { get; init; }
+    public bool DryRun { get; init; }
 }
 
 

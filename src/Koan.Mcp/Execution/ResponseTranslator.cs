@@ -42,6 +42,12 @@ public sealed class ResponseTranslator
             diagnostics["correlationId"] = pin;
         }
 
+        // AN11 — project the dry-run posture + the semantic state delta (prospective on a rehearsal,
+        // retrospective on a real run; identical shape). Walled-means-silent is enforced inside the projector.
+        var (dryRun, delta) = MutationDeltaProjector.Project(registration.EntityType, result);
+        if (dryRun) diagnostics["dryRun"] = true;
+        if (delta is not null) diagnostics["delta"] = delta;
+
         if (shortCircuit is JObject scObj && scObj.TryGetValue("statusCode", out var statusToken) && statusToken.Type == JTokenType.Integer)
         {
             diagnostics["shortCircuitStatusCode"] = statusToken;

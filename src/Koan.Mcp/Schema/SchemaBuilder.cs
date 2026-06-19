@@ -196,6 +196,7 @@ public sealed class SchemaBuilder
         props["model"] = BuildEntitySchema(entityType, "Entity payload to insert or update.", EntityEndpointOperationKind.Upsert);
         props["set"] = CreateStringProperty("Dataset key when routing to a specific tenant or dataset.");
         props["accept"] = CreateStringProperty("Optional Accept header override (view negotiation).");
+        props["dry_run"] = DryRunProperty();
         schema["required"] = new JsonArray { "model" };
         return schema;
     }
@@ -212,9 +213,15 @@ public sealed class SchemaBuilder
             ["items"] = BuildEntitySchema(entityType, operation: EntityEndpointOperationKind.UpsertMany)
         };
         props["set"] = CreateStringProperty("Dataset key when routing to a specific tenant or dataset.");
+        props["dry_run"] = DryRunProperty();
         schema["required"] = new JsonArray { "models" };
         return schema;
     }
+
+    // AN11 (A1, invariant #14) — every state-mutating verb advertises the reserved dry_run posture so an
+    // agent can discover that the mutation is rehearsable without trying it.
+    private static JsonObject DryRunProperty()
+        => CreateBooleanProperty("Rehearse only: run validation and return the prospective state delta in meta.diagnostics.delta; commit nothing.");
 
     private JsonObject BuildDeleteSchema(Type keyType, EntityEndpointOperationDescriptor operation)
     {
@@ -226,6 +233,7 @@ public sealed class SchemaBuilder
         {
             props["set"] = CreateStringProperty("Dataset key when routing to a specific tenant or dataset.");
         }
+        props["dry_run"] = DryRunProperty();
         return schema;
     }
 
@@ -244,6 +252,7 @@ public sealed class SchemaBuilder
         {
             props["set"] = CreateStringProperty("Dataset key when routing to a specific tenant or dataset.");
         }
+        props["dry_run"] = DryRunProperty();
         return schema;
     }
 
@@ -257,17 +266,19 @@ public sealed class SchemaBuilder
         {
             props["set"] = CreateStringProperty("Dataset key when routing to a specific tenant or dataset.");
         }
+        props["dry_run"] = DryRunProperty();
         return schema;
     }
 
     private JsonObject BuildDeleteAllSchema(EntityEndpointOperationDescriptor operation)
     {
         var schema = CreateObjectSchema();
+        var props = (JsonObject)schema["properties"]!;
         if (operation.SupportsDatasetRouting)
         {
-            var props = (JsonObject)schema["properties"]!;
             props["set"] = CreateStringProperty("Dataset key when routing to a specific tenant or dataset.");
         }
+        props["dry_run"] = DryRunProperty();
         return schema;
     }
 
@@ -303,6 +314,7 @@ public sealed class SchemaBuilder
         };
         props["set"] = CreateStringProperty("Dataset key when routing to a specific tenant or dataset.");
         props["accept"] = CreateStringProperty("Optional Accept header override (view negotiation).");
+        props["dry_run"] = DryRunProperty();
         schema["required"] = new JsonArray { "id", "patch" };
         return schema;
     }

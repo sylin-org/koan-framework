@@ -54,6 +54,27 @@ public sealed class EndpointToolExecutor
                 $"Entity endpoint service for '{registration.DisplayName}' is not available.");
         }
 
+        // AN11 (A3) — project schema-only "did you mean?" corrections BEFORE binding the payload, so an enum
+        // typo or a missing required field returns the valid members instead of an opaque bind error. Schema
+        // facts only — never row data (walled-means-silent on the error channel).
+        if (tool.IsMutation)
+        {
+            var issues = Schema.SchemaValidator.Validate(tool.InputSchema, arguments);
+            if (issues.Count > 0)
+            {
+                var diag = new JObject
+                {
+                    ["tool"] = toolName,
+                    ["reason"] = "validation",
+                    ["didYouMean"] = issues
+                };
+                return McpToolExecutionResult.Failure(
+                    CodeMode.Execution.CodeModeErrorCodes.InvalidPayload,
+                    "Validation failed — see didYouMean for schema-derived corrections.",
+                    diag);
+            }
+        }
+
         try
         {
             var translation = _requestTranslator.Translate(provider, registration, tool, arguments, cancellationToken);

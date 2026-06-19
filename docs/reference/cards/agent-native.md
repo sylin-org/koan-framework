@@ -53,10 +53,11 @@ public static class PostTools
 - **Resources** — `resources/list` / `resources/read`. `koan://entities` is the per-grant catalog (entities + the verbs *this caller* may use; a walled entity is absent). `koan://self` is the first-person introduction in **two faces in one resource** — a `prose` greeting *and* the `structured` contract beneath it (prose is the greeting, structured is the contract; prose is never the only form).
 - **Per-grant projection** — every face is computed for the caller's grant. STDIO is local-trust (full); the remote HTTP/SSE edge enforces auth ∩ scopes through one shared `McpToolAccessPolicy`, so STDIO, HTTP/SSE, and Code Mode can't drift apart.
 - **The pin** — pass `correlationId` on any call (or the server mints a GUIDv7); it's echoed in the result diagnostics for trajectory stitching. **Continuity ≠ authority**: the pin is opaque, untrusted, and gates nothing — authorization is always per-request against the grant.
+- **Rehearsal & deltas** — every mutating tool accepts `dry_run: true`: the server runs the full validation pipeline, commits nothing, and returns the prospective state delta (`meta.diagnostics.delta` = `{ operation, changes: [{ field, from, to }] }`); a real run returns the **same-shaped** retrospective delta (rehearse → execute → same diff). A bad payload comes back with `didYouMean` corrections drawn from the **schema only** (enum members, required fields — never row data, so the error channel can't leak existence). The delta is walled-means-silent — an `[McpIgnore(Output)]` field never appears in it. A custom verb whose effects the framework can't inspect returns an honest *partial rehearsal* instead of executing.
 
 ## Frontier (designed, not yet shipped)
 
-Grant disclosure (the **Door** — a locked-but-signposted verb), the headless **device-grant** auth on-ramp (RFC 8628, Reference = Intent over the configured providers), governed **edge traversal** as navigation sugar, **dry-run + state-delta**, and **Streamable HTTP + OAuth 2.1**. Tracked in [09 §8 / the AN cards](../../assessment/prompts/07/AN-cards.md).
+Grant disclosure (the **Door** — a locked-but-signposted verb), the headless **device-grant** auth on-ramp (RFC 8628, Reference = Intent over the configured providers), governed **edge traversal** as navigation sugar, and **Streamable HTTP + OAuth 2.1**. Tracked in [09 §8 / the AN cards](../../assessment/prompts/07/AN-cards.md).
 
 ## The sample that shows it
 

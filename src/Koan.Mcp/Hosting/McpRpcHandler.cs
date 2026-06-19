@@ -121,6 +121,14 @@ public sealed class McpRpcHandler
         // Handle custom [McpTool] verbs
         if (_customTools is not null && _customInvoker is not null && _customTools.TryGet(parameters.Name, out var customTool))
         {
+            // AN11 (A10) — a custom verb's effects live in imperative code the framework cannot inspect. A
+            // dry-run must NOT invoke it; it returns an honest PARTIAL rehearsal naming the limit (never a
+            // silently/falsely-complete — or, worse, actually-executing — "dry-run").
+            if (IsDryRunRequested(parameters.Arguments))
+            {
+                return BuildCustomPartialRehearsal(customTool);
+            }
+
             try
             {
                 var token = await _customInvoker.Invoke(customTool, parameters.Arguments, _services, cancellationToken);
@@ -151,6 +159,49 @@ public sealed class McpRpcHandler
         return new CallToolResult
         {
             Content = new List<McpContent> { new McpContent { Type = "text", Text = text } }
+        };
+    }
+
+    private static bool IsDryRunRequested(JObject? arguments)
+    {
+        if (arguments is null) return false;
+        if (arguments.TryGetValue(Koan.Mcp.Execution.McpDryRun.ArgumentName, StringComparison.OrdinalIgnoreCase, out var value))
+        {
+            if (value.Type == JTokenType.Boolean) return value.Value<bool>();
+            if (value.Type == JTokenType.String && bool.TryParse(value.Value<string>(), out var parsed)) return parsed;
+        }
+        return false;
+    }
+
+    // AN11 (A10) — the honest partial rehearsal for a custom verb: name the limit, surface any declared
+    // effect hints (AN4), and DO NOT execute. Not an error — it is a truthful "did not run".
+    private static CallToolResult BuildCustomPartialRehearsal(Koan.Mcp.CustomTools.McpCustomTool tool)
+    {
+        var declared = new JObject();
+        if (tool.ReadOnly is bool readOnly) declared["readOnly"] = readOnly;
+        if (tool.Destructive is bool destructive) declared["destructive"] = destructive;
+        if (tool.Idempotent is bool idempotent) declared["idempotent"] = idempotent;
+
+        var diagnostics = new JObject
+        {
+            ["dryRun"] = true,
+            ["rehearsable"] = false,
+            ["reason"] = "custom-verb-uninspectable",
+            ["tool"] = tool.Name
+        };
+        if (declared.Count > 0) diagnostics["declaredEffects"] = declared;
+
+        return new CallToolResult
+        {
+            Content = new List<McpContent>
+            {
+                new McpContent
+                {
+                    Type = "text",
+                    Text = $"Not executed. Dry-run rehearsal is not available for custom verb '{tool.Name}': its effects are not framework-inspectable (AN11/A10). Call without dry_run to execute it for real."
+                }
+            },
+            Meta = new JObject { ["diagnostics"] = diagnostics }
         };
     }
 

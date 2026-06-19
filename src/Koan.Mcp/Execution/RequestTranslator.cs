@@ -82,7 +82,8 @@ public sealed class RequestTranslator
                 new EntityDeleteAllRequest
                 {
                     Context = context,
-                    Set = ReadString(args, "set")
+                    Set = ReadString(args, "set"),
+                    DryRun = ReadBool(args, McpDryRun.ArgumentName) ?? false
                 }),
             EntityEndpointOperationKind.Patch => new RequestTranslation(
                 nameof(IEntityEndpointService<object, object>.Patch),
@@ -150,6 +151,7 @@ public sealed class RequestTranslator
         SetProperty(request, nameof(EntityUpsertRequest<object>.Model), ConvertEntity(modelNode, registration.EntityType));
         SetProperty(request, nameof(EntityUpsertRequest<object>.Set), ReadString(args, "set"));
         SetProperty(request, nameof(EntityUpsertRequest<object>.Accept), ReadString(args, "accept"));
+        SetProperty(request, nameof(EntityUpsertRequest<object>.DryRun), ReadBool(args, McpDryRun.ArgumentName) ?? false);
         return request;
     }
 
@@ -161,6 +163,7 @@ public sealed class RequestTranslator
         var modelsNode = TryGet(args, "models") ?? throw new JsonException("Missing required 'models' payload.");
         SetProperty(request, nameof(EntityUpsertManyRequest<object>.Models), ConvertEntityCollection(modelsNode, registration.EntityType));
         SetProperty(request, nameof(EntityUpsertManyRequest<object>.Set), ReadString(args, "set"));
+        SetProperty(request, nameof(EntityUpsertManyRequest<object>.DryRun), ReadBool(args, McpDryRun.ArgumentName) ?? false);
         return request;
     }
 
@@ -173,6 +176,7 @@ public sealed class RequestTranslator
         SetProperty(request, nameof(EntityDeleteRequest<object>.Id), ConvertValue(idNode, registration.KeyType));
         SetProperty(request, nameof(EntityDeleteRequest<object>.Set), ReadString(args, "set"));
         SetProperty(request, nameof(EntityDeleteRequest<object>.Accept), ReadString(args, "accept"));
+        SetProperty(request, nameof(EntityDeleteRequest<object>.DryRun), ReadBool(args, McpDryRun.ArgumentName) ?? false);
         return request;
     }
 
@@ -184,6 +188,7 @@ public sealed class RequestTranslator
         var idsNode = TryGet(args, "ids") ?? throw new JsonException("Missing required 'ids' collection.");
         SetProperty(request, nameof(EntityDeleteManyRequest<object>.Ids), ConvertKeyCollection(idsNode, registration.KeyType));
         SetProperty(request, nameof(EntityDeleteManyRequest<object>.Set), ReadString(args, "set"));
+        SetProperty(request, nameof(EntityDeleteManyRequest<object>.DryRun), ReadBool(args, McpDryRun.ArgumentName) ?? false);
         return request;
     }
 
@@ -199,7 +204,8 @@ public sealed class RequestTranslator
         {
             Context = context,
             Query = query!,
-            Set = ReadString(args, "set")
+            Set = ReadString(args, "set"),
+            DryRun = ReadBool(args, McpDryRun.ArgumentName) ?? false
         };
     }
 
@@ -215,6 +221,7 @@ public sealed class RequestTranslator
         SetProperty(request, nameof(EntityPatchRequest<object, object>.Patch), ConvertPatchDocument(patchNode, registration.EntityType));
         SetProperty(request, nameof(EntityPatchRequest<object, object>.Set), ReadString(args, "set"));
         SetProperty(request, nameof(EntityPatchRequest<object, object>.Accept), ReadString(args, "accept"));
+        SetProperty(request, nameof(EntityPatchRequest<object, object>.DryRun), ReadBool(args, McpDryRun.ArgumentName) ?? false);
         return request;
     }
 
@@ -257,6 +264,10 @@ public sealed class RequestTranslator
         }
 
         var context = builder.Build(options, cancellationToken);
+
+        // AN11 — every MCP mutation opts into the state delta (the pre-mutation read + the prospective/
+        // retrospective diff). REST stays cost-free until it opts in the same way.
+        context.Items[EntityMutationProbe.WantsDeltaKey] = true;
 
         // AN9 — the pin: accept a client-supplied correlation id as an opaque, untrusted, authority-free
         // label (mint a time-ordered GUIDv7 when absent). It is threaded into the request for audit

@@ -285,18 +285,36 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
         var hookContext = _hookPipeline.CreateContext(context);
 
+        using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
+
+        // AN11: capture the pre-mutation state (one keyed read) so a semantic delta can be projected. Only
+        // when a caller opts in (MCP always does, dry-run always does); a plain REST upsert stays a single
+        // write with no extra read.
+        if (WantsDelta(context, request.DryRun))
+        {
+            TEntity? before = null;
+            var id = request.Model.Id;
+            if (id is not null && !EqualityComparer<TKey>.Default.Equals(id, default!))
+            {
+                before = await Data<TEntity, TKey>.Get(id, context.CancellationToken);
+            }
+            context.Items[EntityMutationProbe.BeforeKey] = before;
+            context.Items[EntityMutationProbe.OperationKey] = before is null ? "create" : "update";
+        }
+
         await _hookPipeline.BeforeSave(hookContext, request.Model);
 
-        TEntity saved;
-        if (!string.IsNullOrWhiteSpace(request.Set))
+        if (request.DryRun)
         {
-            using var _ = EntityContext.With(partition: request.Set);
-            saved = await request.Model.Upsert<TEntity, TKey>(context.CancellationToken);
+            // Rehearsal: the full hook/validation pipeline ran; the adapter write does NOT, and AfterSave is
+            // not raised (no save happened). The "after" face is the would-be model.
+            context.Items[EntityMutationProbe.DryRunKey] = true;
+            ApplyViewHeader(context, request.Accept);
+            CopyHookHeaders(context, hookContext);
+            return new EntityModelResult<TEntity>(context, request.Model, request.Model);
         }
-        else
-        {
-            saved = await request.Model.Upsert<TEntity, TKey>(context.CancellationToken);
-        }
+
+        var saved = await request.Model.Upsert<TEntity, TKey>(context.CancellationToken);
 
         await _hookPipeline.AfterSave(hookContext, saved);
 
@@ -330,6 +348,17 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             await _hookPipeline.BeforeSave(hookContext, model);
         }
 
+        if (request.DryRun)
+        {
+            // AN11: batch rehearsal — validation ran, no write. Batch mutations carry a count-level delta
+            // (the affected count), not a per-field diff.
+            context.Items[EntityMutationProbe.DryRunKey] = true;
+            context.Items[EntityMutationProbe.OperationKey] = "upsertMany";
+            context.Items[EntityMutationProbe.AffectedCountKey] = list.Count;
+            CopyHookHeaders(context, hookContext);
+            return new EntityEndpointResult(context, new { wouldUpsert = list.Count });
+        }
+
         using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var upserted = await Data<TEntity, TKey>.UpsertMany(list, context.CancellationToken);
 
@@ -359,6 +388,22 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         }
 
         await _hookPipeline.BeforeDelete(hookContext, model);
+
+        if (WantsDelta(context, request.DryRun))
+        {
+            context.Items[EntityMutationProbe.BeforeKey] = model;
+            context.Items[EntityMutationProbe.OperationKey] = "delete";
+        }
+
+        if (request.DryRun)
+        {
+            // Rehearsal: BeforeDelete ran; the row is NOT removed and AfterDelete is not raised.
+            context.Items[EntityMutationProbe.DryRunKey] = true;
+            ApplyViewHeader(context, request.Accept);
+            CopyHookHeaders(context, hookContext);
+            return new EntityModelResult<TEntity>(context, model, model);
+        }
+
         var ok = await Data<TEntity, TKey>.Delete(request.Id, context.CancellationToken);
         if (!ok)
         {
@@ -378,6 +423,16 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         var context = request.Context;
         var repo = _dataService.GetRepository<TEntity, TKey>();
         context.Headers["Koan-Write-Capabilities"] = WriteCapabilitiesHeader(repo);
+
+        if (request.DryRun)
+        {
+            var requested = request.Ids?.Count ?? 0;
+            context.Items[EntityMutationProbe.DryRunKey] = true;
+            context.Items[EntityMutationProbe.OperationKey] = "deleteMany";
+            context.Items[EntityMutationProbe.AffectedCountKey] = requested;
+            return new EntityEndpointResult(context, new { wouldDelete = requested });
+        }
+
         using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var deleted = await Data<TEntity, TKey>.DeleteMany(request.Ids ?? [], context.CancellationToken);
         return new EntityEndpointResult(context, new { deleted });
@@ -406,6 +461,16 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
         var items = await Data<TEntity, TKey>.All(QueryDefinition.All.Where(filter), request.Context.CancellationToken);
         var ids = items.Select(e => e.Id).ToList();
+
+        if (request.DryRun)
+        {
+            // AN11: the query already ran, so the rehearsal reports an EXACT affected count for free.
+            request.Context.Items[EntityMutationProbe.DryRunKey] = true;
+            request.Context.Items[EntityMutationProbe.OperationKey] = "deleteByQuery";
+            request.Context.Items[EntityMutationProbe.AffectedCountKey] = ids.Count;
+            return new EntityEndpointResult(request.Context, new { wouldDelete = ids.Count });
+        }
+
         if (ids.Count == 0) return new EntityEndpointResult(request.Context, new { deleted = 0 });
         var removedByPredicate = await Data<TEntity, TKey>.DeleteMany(ids, request.Context.CancellationToken);
         return new EntityEndpointResult(request.Context, new { deleted = removedByPredicate });
@@ -414,6 +479,15 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     public async Task<EntityEndpointResult> DeleteAll(EntityDeleteAllRequest request)
     {
         using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
+
+        if (request.DryRun)
+        {
+            // Name the effect rather than scan the whole set for a count — honest A10 posture.
+            request.Context.Items[EntityMutationProbe.DryRunKey] = true;
+            request.Context.Items[EntityMutationProbe.OperationKey] = "deleteAll";
+            return new EntityEndpointResult(request.Context, new { wouldDeleteAll = true });
+        }
+
         var deleted = await Entity<TEntity, TKey>.RemoveAll(request.Context.CancellationToken);
         return new EntityEndpointResult(request.Context, new { deleted });
     }
@@ -471,6 +545,23 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         }
 
         await _hookPipeline.BeforeSave(hookContext, working!);
+
+        if (WantsDelta(context, request.DryRun))
+        {
+            // The pre-patch row (`original`) is already loaded — the delta costs nothing extra.
+            context.Items[EntityMutationProbe.BeforeKey] = original;
+            context.Items[EntityMutationProbe.OperationKey] = "update";
+        }
+
+        if (request.DryRun)
+        {
+            // Rehearsal: the patch is applied + validated against the working copy; nothing is saved.
+            context.Items[EntityMutationProbe.DryRunKey] = true;
+            ApplyViewHeader(context, request.Accept);
+            CopyHookHeaders(context, hookContext);
+            return new EntityModelResult<TEntity>(context, working, working);
+        }
+
         var saved = await working!.Upsert<TEntity, TKey>(context.CancellationToken);
         await _hookPipeline.AfterPatch(hookContext, saved);
 
@@ -498,6 +589,11 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         }
         return true;
     }
+
+    // AN11: a caller wants a state delta when it explicitly opts in (MCP sets WantsDeltaKey) or whenever the
+    // mutation is a dry-run (the rehearsal's whole point is the prospective delta).
+    private static bool WantsDelta(EntityRequestContext context, bool dryRun)
+        => dryRun || (context.Items.TryGetValue(EntityMutationProbe.WantsDeltaKey, out var v) && v is true);
 
     // ARCH-0084: negotiate via the unified CapabilitySet (the adapter's IDescribesCapabilities declaration).
     private static CapabilitySet Capabilities(IDataRepository<TEntity, TKey> repo)
