@@ -1,6 +1,6 @@
 # ARCH-0092: Entity exposure surfaces — terse attributes, realization classes, and the unified access floor
 
-**Status**: Accepted (2026-06-19) — direction signed off by the Enterprise Architect. Two forks resolved at sign-off: **full `IAuthorize` unification, no additive MCP-only bridge**; and **`EntityToolset<T>`** (not `EntityMcpController`/`EntityMcpToolset`). Implementation pending (phased; see below).
+**Status**: Accepted (2026-06-19) — direction signed off by the Enterprise Architect. Two forks resolved at sign-off: **full `IAuthorize` unification, no additive MCP-only bridge**; and **`EntityToolset<T>`** (not `EntityMcpController`/`EntityMcpToolset`). **Phase 1 (EntityToolset realization) landed 2026-06-19** (`7d055b3c` hierarchy + toolset discovery · `af01f0b7` `[McpTool]` instance verbs · `c76c741f` `[ToolDescription]`/`[ToolHidden]`) — additive, conformance-green. Phases 2–4 pending (Phase 3 is the breaking cross-surface auth refactor).
 **Date**: 2026-06-19
 **Deciders**: Enterprise Architect
 **Scope**: The entity-**exposure** model across the REST and MCP surfaces — how an `Entity<T>` becomes a RESTful resource and an MCP toolset, how access is declared, and where each concern lives. Establishes the framework pattern that P3.1 (governed agent access) builds on, and folds in the `X-mcp-rest-authz-unify` direction.
