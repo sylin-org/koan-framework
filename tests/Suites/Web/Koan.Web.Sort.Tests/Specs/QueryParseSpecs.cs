@@ -25,13 +25,13 @@ public sealed class QueryParseSpecs : IClassFixture<SortWebApplicationFactory>, 
         _client = factory.CreateClient();
     }
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         AppHost.Current = _factory.Services;
         await Widget.RemoveAll();
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     // === The dangerous case: a non-object body must NOT silently drop the filter and return everything ===
 

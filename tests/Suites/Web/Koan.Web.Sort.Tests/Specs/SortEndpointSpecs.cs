@@ -22,14 +22,14 @@ public sealed class SortEndpointSpecs : IClassFixture<SortWebApplicationFactory>
         _client = factory.CreateClient();
     }
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         // Reset state so each test class instance starts clean.
         AppHost.Current = _factory.Services;
         await Widget.RemoveAll();
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     // === Happy-path string grammar ===
 
