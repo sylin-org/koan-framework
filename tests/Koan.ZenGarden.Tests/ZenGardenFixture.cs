@@ -30,7 +30,7 @@ public sealed class ZenGardenFixture : IAsyncLifetime
     public bool IsAvailable { get; private set; }
     public string? UnavailableReason { get; private set; }
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         Client = new ZenGardenClient(
             NullLogger<ZenGardenClient>.Instance,
@@ -57,10 +57,10 @@ public sealed class ZenGardenFixture : IAsyncLifetime
         }
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         Client.Dispose();
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     private static bool ReadBooleanEnvironment(string key)

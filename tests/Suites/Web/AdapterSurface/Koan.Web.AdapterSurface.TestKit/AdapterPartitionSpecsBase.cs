@@ -29,7 +29,7 @@ public abstract class AdapterPartitionSpecsBase<TFactory> : IClassFixture<TFacto
     /// </summary>
     protected virtual IReadOnlyList<string> KnownPartitions { get; } = new[] { "alpha", "beta", "gamma" };
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         if (!Factory.IsAvailable) return;
         // See AdapterSurfaceSpecsBase for the Phase 1c rationale on this reset.
@@ -69,24 +69,24 @@ public abstract class AdapterPartitionSpecsBase<TFactory> : IClassFixture<TFacto
         }
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _scope?.Dispose();
         _scope = null;
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     protected void SkipIfUnavailable()
-        => Skip.If(!Factory.IsAvailable, $"[{typeof(TFactory).Name}] {Factory.UnavailableReason ?? "Adapter infrastructure unavailable"}");
+        => Assert.SkipWhen(!Factory.IsAvailable, $"[{typeof(TFactory).Name}] {Factory.UnavailableReason ?? "Adapter infrastructure unavailable"}");
 
     protected void SkipIfPartitionsUnsupported()
-        => Skip.If(!Factory.SupportsPartitions, $"[{typeof(TFactory).Name}] does not support partitions / entity sets.");
+        => Assert.SkipWhen(!Factory.SupportsPartitions, $"[{typeof(TFactory).Name}] does not support partitions / entity sets.");
 
     // ============================================================================================
     // ?set= write isolation
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task PostUpsert_with_set_writes_only_into_named_partition()
     {
         SkipIfPartitionsUnsupported();
@@ -104,7 +104,7 @@ public abstract class AdapterPartitionSpecsBase<TFactory> : IClassFixture<TFacto
         IdOf(alphaList[0]).Should().Be("p-001");
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task PostUpsert_in_two_partitions_keeps_them_isolated()
     {
         SkipIfPartitionsUnsupported();
@@ -126,7 +126,7 @@ public abstract class AdapterPartitionSpecsBase<TFactory> : IClassFixture<TFacto
     // ?set= read isolation
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task GetById_with_set_does_not_leak_other_partitions()
     {
         SkipIfPartitionsUnsupported();
@@ -141,7 +141,7 @@ public abstract class AdapterPartitionSpecsBase<TFactory> : IClassFixture<TFacto
         alpha.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task GetCollection_with_set_returns_only_partition_rows()
     {
         SkipIfPartitionsUnsupported();
@@ -162,7 +162,7 @@ public abstract class AdapterPartitionSpecsBase<TFactory> : IClassFixture<TFacto
     // ?set= delete isolation
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task Delete_with_set_removes_only_partition_row()
     {
         SkipIfPartitionsUnsupported();
@@ -181,11 +181,11 @@ public abstract class AdapterPartitionSpecsBase<TFactory> : IClassFixture<TFacto
         beta.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task DeleteAll_with_set_clears_only_that_partition()
     {
         SkipIfPartitionsUnsupported();
-        Skip.If(!Factory.SupportsDeleteAll, $"[{typeof(TFactory).Name}] does not support DELETE /all.");
+        Assert.SkipWhen(!Factory.SupportsDeleteAll, $"[{typeof(TFactory).Name}] does not support DELETE /all.");
         SkipIfUnavailable();
 
         await PostWidget("a-1", name: "A1", set: "alpha");
@@ -203,11 +203,11 @@ public abstract class AdapterPartitionSpecsBase<TFactory> : IClassFixture<TFacto
     // ?set= patch isolation
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task PatchPartial_with_set_updates_only_partition_row()
     {
         SkipIfPartitionsUnsupported();
-        Skip.If(!Factory.SupportsPartialPatch, $"[{typeof(TFactory).Name}] does not support Partial JSON Patch.");
+        Assert.SkipWhen(!Factory.SupportsPartialPatch, $"[{typeof(TFactory).Name}] does not support Partial JSON Patch.");
         SkipIfUnavailable();
 
         await PostWidget("p-shared", name: "Original", set: "alpha");
@@ -231,11 +231,11 @@ public abstract class AdapterPartitionSpecsBase<TFactory> : IClassFixture<TFacto
     // Bulk upsert + ?set=
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task UpsertMany_with_set_writes_all_into_partition()
     {
         SkipIfPartitionsUnsupported();
-        Skip.If(!Factory.SupportsBulkUpsert, $"[{typeof(TFactory).Name}] does not support POST /bulk.");
+        Assert.SkipWhen(!Factory.SupportsBulkUpsert, $"[{typeof(TFactory).Name}] does not support POST /bulk.");
         SkipIfUnavailable();
 
         var bulk = new[]
@@ -261,7 +261,7 @@ public abstract class AdapterPartitionSpecsBase<TFactory> : IClassFixture<TFacto
     /// state in a mutable instance field (as Mongo did) misroutes writes here. The sequential isolation specs
     /// above cannot catch it because they never interleave two partitions in flight.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task Concurrent_writes_across_partitions_remain_isolated()
     {
         SkipIfPartitionsUnsupported();

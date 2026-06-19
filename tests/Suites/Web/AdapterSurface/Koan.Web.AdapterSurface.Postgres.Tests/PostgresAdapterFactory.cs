@@ -1,61 +1,29 @@
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.AspNetCore.TestHost;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Koan.Web.AdapterSurface.TestKit;
 using Koan.Web.AdapterSurface.TestKit.Containers;
 
 namespace Koan.Web.AdapterSurface.Postgres.Tests;
 
-public sealed class PostgresAdapterFactory : WebApplicationFactory<Program>, IAdapterTestFactory
+public sealed class PostgresAdapterFactory : AdapterTestFactoryBase
 {
     private readonly PostgresContainerHelper _pg = new();
-    private bool _initialized;
 
-    public bool IsAvailable => _pg.IsAvailable;
-    public string? UnavailableReason => _pg.UnavailableReason;
-    public HttpClient Client => _pg.IsAvailable ? CreateClient() : new HttpClient();
-    public new IServiceProvider Services => base.Services;
+    public override bool IsAvailable => _pg.IsAvailable;
+    public override string? UnavailableReason => _pg.UnavailableReason;
 
-    public async Task InitializeAsync()
+    protected override async ValueTask StartBackingStoreAsync() => await _pg.InitializeAsync();
+    protected override async ValueTask StopBackingStoreAsync() => await _pg.DisposeAsync();
+    public override Task ResetAsync() => _pg.ResetAsync();
+
+    protected override IEnumerable<KeyValuePair<string, string?>> AdapterConfiguration() => new Dictionary<string, string?>
     {
-        if (_initialized) return;
-        _initialized = true;
-        await _pg.InitializeAsync();
-    }
-
-    async Task IAsyncLifetime.DisposeAsync() => await _pg.DisposeAsync();
-
-    public Task ResetAsync() => _pg.ResetAsync();
-
-    protected override IHost CreateHost(IHostBuilder builder)
-    {
-        builder.ConfigureWebHost(webBuilder =>
-        {
-            webBuilder.UseContentRoot(AppContext.BaseDirectory);
-            webBuilder.UseTestServer();
-            webBuilder.UseEnvironment("Development");
-            webBuilder.ConfigureAppConfiguration((_, cfg) =>
-            {
-                cfg.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Koan:Environment"] = "Development",
-                    ["Koan:AllowMagicInProduction"] = "true",
-                    ["Koan:Data:Sources:Default:Adapter"] = "postgres",
-                    ["Koan:Data:Sources:Default:ConnectionString"] = _pg.ConnectionString,
-                    ["Koan:Data:Postgres:ConnectionString"] = _pg.ConnectionString,
-                    ["Koan:Data:Postgres:DdlPolicy"] = "AutoCreate",
-                    ["Koan:Data:Relational:Materialization:FailOnMismatch"] = "false",
-                    ["Koan:BackgroundServices:Enabled"] = "false",
-                    ["Logging:LogLevel:Default"] = "Warning",
-                });
-            });
-            webBuilder.ConfigureServices(_ => { Koan.Core.Hosting.App.AppHost.Current = null; });
-        });
-        var host = builder.Build();
-        host.Start();
-        return host;
-    }
+        ["Koan:Environment"] = "Development",
+        ["Koan:AllowMagicInProduction"] = "true",
+        ["Koan:Data:Sources:Default:Adapter"] = "postgres",
+        ["Koan:Data:Sources:Default:ConnectionString"] = _pg.ConnectionString,
+        ["Koan:Data:Postgres:ConnectionString"] = _pg.ConnectionString,
+        ["Koan:Data:Postgres:DdlPolicy"] = "AutoCreate",
+        ["Koan:Data:Relational:Materialization:FailOnMismatch"] = "false",
+        ["Koan:BackgroundServices:Enabled"] = "false",
+        ["Logging:LogLevel:Default"] = "Warning",
+    };
 }

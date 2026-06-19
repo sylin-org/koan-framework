@@ -30,7 +30,7 @@ public abstract class AdapterTransferSpecsBase<TFactory> : IClassFixture<TFactor
         "to-clear", "same"
     };
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         if (!Factory.IsAvailable) return;
         // See AdapterSurfaceSpecsBase for the Phase 1c rationale on this reset.
@@ -65,24 +65,24 @@ public abstract class AdapterTransferSpecsBase<TFactory> : IClassFixture<TFactor
         }
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _scope?.Dispose();
         _scope = null;
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     protected void SkipIfUnavailable()
-        => Skip.If(!Factory.IsAvailable, $"[{typeof(TFactory).Name}] {Factory.UnavailableReason ?? "Adapter infrastructure unavailable"}");
+        => Assert.SkipWhen(!Factory.IsAvailable, $"[{typeof(TFactory).Name}] {Factory.UnavailableReason ?? "Adapter infrastructure unavailable"}");
 
     protected void SkipIfTransferUnsupported()
-        => Skip.If(!Factory.SupportsCrossPartitionTransfer, $"[{typeof(TFactory).Name}] does not support cross-partition transfer.");
+        => Assert.SkipWhen(!Factory.SupportsCrossPartitionTransfer, $"[{typeof(TFactory).Name}] does not support cross-partition transfer.");
 
     // ============================================================================================
     // Entity<T>.Copy().From().To().Run()
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task EntityCopy_moves_rows_to_target_partition_and_leaves_source_intact()
     {
         SkipIfTransferUnsupported();
@@ -107,7 +107,7 @@ public abstract class AdapterTransferSpecsBase<TFactory> : IClassFixture<TFactor
     // Entity<T>.Move().From().To().Run()
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task EntityMove_transfers_rows_and_clears_source_partition()
     {
         SkipIfTransferUnsupported();
@@ -132,7 +132,7 @@ public abstract class AdapterTransferSpecsBase<TFactory> : IClassFixture<TFactor
     // Entity<T>.Copy(predicate).From().To().Run() — filtered transfer
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task EntityCopy_with_predicate_transfers_only_matching_rows()
     {
         SkipIfTransferUnsupported();
@@ -159,7 +159,7 @@ public abstract class AdapterTransferSpecsBase<TFactory> : IClassFixture<TFactor
     // Data<T,K>.CopyPartition (direct API)
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task DataCopyPartition_returns_copied_count_and_preserves_source()
     {
         SkipIfTransferUnsupported();
@@ -179,7 +179,7 @@ public abstract class AdapterTransferSpecsBase<TFactory> : IClassFixture<TFactor
     // Data<T,K>.MovePartition (direct API)
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task DataMovePartition_returns_moved_count_and_drains_source()
     {
         SkipIfTransferUnsupported();
@@ -199,7 +199,7 @@ public abstract class AdapterTransferSpecsBase<TFactory> : IClassFixture<TFactor
     // Data<T,K>.MoveFrom(...).To(...) fluent builder
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task MoveFrom_fluent_builder_copies_with_Copy_flag()
     {
         SkipIfTransferUnsupported();
@@ -218,7 +218,7 @@ public abstract class AdapterTransferSpecsBase<TFactory> : IClassFixture<TFactor
         (await CountIn("fl-dst")).Should().Be(2);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task MoveFrom_fluent_builder_move_drains_source()
     {
         SkipIfTransferUnsupported();
@@ -237,7 +237,7 @@ public abstract class AdapterTransferSpecsBase<TFactory> : IClassFixture<TFactor
     // Data<T,K>.ClearPartition
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task ClearPartition_removes_all_partition_rows()
     {
         SkipIfTransferUnsupported();
@@ -256,7 +256,7 @@ public abstract class AdapterTransferSpecsBase<TFactory> : IClassFixture<TFactor
     // No-op: src == dst
     // ============================================================================================
 
-    [SkippableFact]
+    [Fact]
     public async Task CopyPartition_same_source_and_target_is_noop()
     {
         SkipIfTransferUnsupported();

@@ -9,7 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Koan.ZenGarden.Tests;
 

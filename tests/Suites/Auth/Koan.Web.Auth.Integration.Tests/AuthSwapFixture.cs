@@ -31,7 +31,7 @@ public sealed class AuthSwapFixture : IAsyncLifetime
     public string BaseUrl => $"http://127.0.0.1:{Port}";
     public IServiceProvider Services => _host?.Services ?? throw new InvalidOperationException("Host not started");
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         Port = GrabFreePort();
         _priorUrls = Environment.GetEnvironmentVariable("ASPNETCORE_URLS");
@@ -79,7 +79,7 @@ public sealed class AuthSwapFixture : IAsyncLifetime
         return new HttpClient(handler) { BaseAddress = new Uri(BaseUrl) };
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         Environment.SetEnvironmentVariable("ASPNETCORE_URLS", _priorUrls);
         if (_host is not null)
