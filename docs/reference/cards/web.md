@@ -33,7 +33,7 @@ GET    /api/todos/{id}            POST /api/todos            PUT  /api/todos/{id
 POST   /api/todos/query           PATCH /api/todos/{id}      DELETE /api/todos/{id}
 ```
 
-Override `CanRead` / `CanWrite` / `CanRemove` to gate operations; add ordinary `[HttpGet("…")]` actions on the same controller for custom routes.
+Authorize the surface with the per-action `[Access(read:, write:, remove:)]` gate on the entity (+ `EntityAccess<T>` for row scope — see the [auth card](auth.md)); add ordinary `[HttpGet("…")]` actions on the same controller for custom routes. (The old `CanRead` / `CanWrite` / `CanRemove` virtuals were removed — ARCH-0092.)
 
 ## ≤5 attributes you'll use
 

@@ -1,6 +1,6 @@
 ---
 name: koan-auth
-description: External sign-in and authorization for Koan web apps — OAuth2/OIDC connector packages (Reference = Intent), the AuthController challenge/callback flow, [Authorize]/[Authorize(Roles=)] gates, the entity access floor ([Authorize]/[RequireScope] on Entity<T>, enforced cross-surface by the IAuthorize seam — ARCH-0092), dynamic scheme registration (WEB-0071), and Security.Trust inbound bearer token validation
+description: External sign-in and authorization for Koan web apps — OAuth2/OIDC connector packages (Reference = Intent), the AuthController challenge/callback flow, [Authorize]/[Authorize(Roles=)] gates, the entity capability authorization model gate·constrain·project ([Access] per-action gate + EntityAccess<T> row Constrain + the can:[] projection, enforced cross-surface by the IAuthorize seam — SEC-0004/ARCH-0092), dynamic scheme registration (WEB-0071), and Security.Trust inbound bearer token validation
 pillar: web
 card: docs/reference/cards/auth.md
 status: current
@@ -12,7 +12,8 @@ last_validated: 2026-06-18
 ## Trigger this skill when you see
 
 - `[Authorize]`, `[Authorize(Roles = "admin")]`, `[Authorize(Policy = "...")]` on a Koan controller / action
-- The **entity access floor** — `[Authorize]` / `[AllowAnonymous]` / `[RequireScope]` on `Entity<T>`, enforced on every surface (REST + MCP) by the unified `IAuthorize` seam (ARCH-0092); per-operation gating is a controller-action override
+- The **entity capability model — gate · constrain · project** (SEC-0004): `[Access(read:, write:, remove:)]` per-action gate on `Entity<T>` (legacy `[Authorize]` / `[AllowAnonymous]` / `[RequireScope]` lower into it as sugar), an `EntityAccess<T>` realization for row-level `Owner` + `Constrain`, and the `can:[]` projection — all enforced on every surface (REST + MCP) by the unified `IAuthorize` seam (ARCH-0092)
+- `EntityAccess<T>`, `[Access(...)]`, `Constrain(q, action)`, `Owner`, `q.Where(...)` / `q.Stamp(...)`, the `Koan-Access` header, `?access=true`, `can:[...]`
 - Provider config under `Koan:Web:Auth:Providers` (`ClientId` / `ClientSecret` / `Authority`)
 - A `Koan.Web.Auth.Connector.Google` / `.Microsoft` / `.Discord` / `.Oidc` package reference
 - `[AuthProviderDescriptor("id", "Name", "OIDC")]` (assembly-level) or `IAuthProviderContributor` / `ProviderOptions`
@@ -23,53 +24,60 @@ last_validated: 2026-06-18
 
 ## Core principle
 
-**Reference = Intent for identity.** Add an auth connector package (e.g. `Koan.Web.Auth.Connector.Google`) and its provider self-registers via an assembly-level `[AuthProviderDescriptor]`; config under `Koan:Web:Auth:Providers` supplies only the per-provider `ClientId` / `ClientSecret`. The OAuth2/OIDC exchange itself rides the **maintained ASP.NET `OAuthHandler` / `OpenIdConnectHandler`** — PKCE, nonce, state, and `id_token` validation are owned by the framework, bound at startup by `AuthSchemeSeeder` via **dynamic scheme registration** ([WEB-0071](../../../docs/decisions/WEB-0071-auth-engine-swap-dynamic-schemes.md)). Koan stopped hand-rolling the exchange. You then gate custom actions with the stock ASP.NET `[Authorize]`, and declare the **entity access floor** — `[Authorize]` / `[AllowAnonymous]` / `[RequireScope]` on `Entity<T>` — so the *same* requirement is enforced on REST **and** MCP through the one `IAuthorize` seam ([ARCH-0092](../../../docs/decisions/ARCH-0092-entity-exposure-surfaces.md)). The floor is entity-wide in v1; finer per-operation control is a controller-action override. Provider roles land on `ClaimTypes.Role`, so `[Authorize(Roles = "admin")]` and `User.IsInRole("admin")` work once a provider returns roles.
+**Reference = Intent for identity.** Add an auth connector package (e.g. `Koan.Web.Auth.Connector.Google`) and its provider self-registers via an assembly-level `[AuthProviderDescriptor]`; config under `Koan:Web:Auth:Providers` supplies only the per-provider `ClientId` / `ClientSecret`. The OAuth2/OIDC exchange itself rides the **maintained ASP.NET `OAuthHandler` / `OpenIdConnectHandler`** — PKCE, nonce, state, and `id_token` validation are owned by the framework, bound at startup by `AuthSchemeSeeder` via **dynamic scheme registration** ([WEB-0071](../../../docs/decisions/WEB-0071-auth-engine-swap-dynamic-schemes.md)). Koan stopped hand-rolling the exchange. You gate custom actions with the stock ASP.NET `[Authorize]`. Provider roles land on `ClaimTypes.Role`, so `[Authorize(Roles = "admin")]` and `User.IsInRole("admin")` work once a provider returns roles.
+
+**Authorize the entity surface with gate · constrain · project** ([SEC-0004](../../../docs/decisions/SEC-0004-capability-authorization-gate-constrain-project.md)) — one model, enforced identically on REST **and** MCP through the one `IAuthorize` seam ([ARCH-0092](../../../docs/decisions/ARCH-0092-entity-exposure-surfaces.md)), composable from nothing up:
+
+- **Gate** — *who may touch this entity at all, per action.* `[Access(read: "anyone", write: "is:member", remove: "is:admin")]` on the entity. Allow-by-default: an unspecified action is open. Legacy `[Authorize]` / `[AllowAnonymous]` / `[RequireScope]` still work — they lower into the same gate as sugar.
+- **Constrain** — *which rows, per action.* Derive an `EntityAccess<T>` realization, declare `Owner` ONCE, and `Constrain(q, action)` transforms the query: the same one-liner filters the collection, 404s an out-of-scope fetch, bounds a mass delete, and **stamps** the owner on create (server-truth, so a forged owner id cannot escalate).
+- **Project** — *what you may actually do, per item.* Every response advertises the realized `can:[...]` verbs (the honesty counterweight to the open default): a single item → the `Koan-Access: read, write` header; a collection → an opt-in `{ items, access }` sidecar (`?access=true`); MCP → per-item `can` in the tool metadata, default-on.
 
 <!-- validate -->
 ```csharp
-using System.Threading;
+using System;
+using System.Linq.Expressions;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Koan.Data.Core.Model;
 using Koan.Web.Authorization;
-using Koan.Web.Controllers;
 
-public sealed class Todo : Entity<Todo>      // string-keyed aggregate; REST surface is generated
+// GATE — per-action, on the entity. Enforced identically on REST + MCP. (Legacy [Authorize]/[RequireScope]
+// still lower into this same gate as sugar; [Access] adds the per-action grain the entity-wide floor lacked.)
+[Access(read: "anyone", write: "authenticated", remove: "is:admin")]
+public sealed class Ledger : Entity<Ledger>
 {
-    public string Title { get; set; } = "";
-    public bool Done { get; set; }
+    public string Entry { get; set; } = "";
 }
 
-[ApiController, Route("api/library")]
-public sealed class LibraryController : ControllerBase
+// CONSTRAIN — an owned entity. Owner is declared ONCE and drives the collection filter, the out-of-scope 404,
+// mass-delete bounding, AND the create-stamp / freeze-on-update. No row-level rule is hand-repeated.
+public sealed class Memo : Entity<Memo>
 {
-    [Authorize]                                   // any signed-in user (cookie session)
-    [HttpPut("by-me/{id}")]
-    public Task<IActionResult> UpdateMine(string id) => Task.FromResult<IActionResult>(NoContent());
-
-    [Authorize(Roles = "admin")]                  // requires the mapped ClaimTypes.Role = "admin"
-    [HttpDelete("{id}")]
-    public Task<IActionResult> Purge(string id) => Task.FromResult<IActionResult>(NoContent());
+    public string? OwnerId { get; set; }
+    public string Text { get; set; } = "";
 }
 
-// ARCH-0092: declare the access floor ON THE ENTITY — the unified IAuthorize seam enforces it identically on
-// EVERY surface that exposes it (REST + MCP), not just this controller. Standard [Authorize]/[AllowAnonymous]
-// plus the one Koan primitive [RequireScope]. The floor is entity-wide (read+write+remove) in v1.
-[Authorize(Roles = "admin")]                  // the whole AuditLog entity is admin-only, on REST and MCP
-public sealed class AuditLog : Entity<AuditLog>
+public sealed class MemoAccess : EntityAccess<Memo>
 {
-    public string Message { get; set; } = "";
+    protected override Expression<Func<Memo, bool>>? Owner => m => m.OwnerId == CurrentUserId;
+
+    public override IAccessFilter<Memo> Constrain(IAccessFilter<Memo> q, AccessAction action) => action switch
+    {
+        AccessAction.Create => q.Stamp(m => m.OwnerId, CurrentUserId),                  // server-truth owner
+        AccessAction.Update => q.Where(Owner!).Stamp(m => m.OwnerId, CurrentUserId),    // own rows; freeze owner
+        _ => q.Where(Owner!),                                                           // read/delete: own rows
+    };
 }
+// PROJECT is automatic: each response carries the realized can:[] (header / ?access=true sidecar / MCP metadata).
 
-[RequireScope("todos:write")]                 // any caller needs the scope to touch Note (any surface)
-public sealed class Note : Entity<Note> { public string Text { get; set; } = ""; }
-
-// Finer, per-operation control is a controller-action override (the entity floor is entity-wide in v1):
-public sealed class TodoAdminController : EntityController<Todo>
+// Custom (non-entity) actions still gate with the stock ASP.NET [Authorize] (cookie session / roles).
+[ApiController, Route("api/reports")]
+public sealed class ReportsController : ControllerBase
 {
-    public override Task<IActionResult> Delete(string id, CancellationToken ct)
-        => User.IsInRole("admin") ? base.Delete(id, ct) : Task.FromResult<IActionResult>(Forbid());
+    [Authorize(Roles = "admin")]
+    [HttpPost("rebuild")]
+    public Task<IActionResult> Rebuild() => Task.FromResult<IActionResult>(NoContent());
 }
 ```
 
@@ -100,8 +108,11 @@ The cookie scheme stays the **default**; bearer is additive and opted into per e
 |---|---|
 | Hand-rolling the OAuth2/OIDC authorize+token exchange (building authorize URLs, parsing `id_token`) | Reference a connector — the maintained ASP.NET handler does PKCE/nonce/state/`id_token` validation (WEB-0071). |
 | `services.AddAuthentication().AddGoogle(...)` wired manually in `Program.cs` | Reference `Koan.Web.Auth.Connector.Google`; the descriptor + contributor self-register, config supplies the secret. |
-| Hunting for `CanRead/CanWrite/CanRemove` overrides on `EntityController<T>` | They were removed (ARCH-0092). Declare the floor on the **entity** with `[Authorize]`/`[RequireScope]` — enforced on REST + MCP — or override a controller action for one verb. |
-| `if (user.Role != "admin") return Forbid();` scattered in actions | `[Authorize(Roles = "admin")]` on the entity (the floor, enforced on every surface) — or a controller-action override for a single verb. |
+| Hunting for `CanRead/CanWrite/CanRemove` overrides on `EntityController<T>` | They were removed (ARCH-0092). Declare the **gate** on the entity: `[Access(read:, write:, remove:)]` — per-action, enforced on REST + MCP. |
+| `if (user.Role != "admin") return Forbid();` scattered in actions | `[Access(remove: "is:admin")]` on the entity (per-action gate, enforced on every surface). |
+| Hand-writing a `Where(o => o.OwnerId == me)` row filter in every read/update/delete | Declare `Owner` once on an `EntityAccess<T>` realization and `Constrain(q, action)` — the rule IS the filter (collection + 404 + mass-delete bound + create-stamp all derive from it). |
+| A `Where` on create to scope ownership | A `Where` on create is a silent no-op (no row yet). **Stamp** instead: `q.Stamp(o => o.OwnerId, CurrentUserId)` overwrites a forged owner with server-truth. |
+| Hand-building a per-row "can the user edit this?" map for the UI/agent | It is already projected — read the `Koan-Access` header (single), the `?access=true` `{ items, access }` sidecar (collection), or the MCP tool `can` metadata (default-on). |
 | A custom callback action handling the OAuth redirect | The handler intercepts `/auth/{provider}/callback` as RemoteAuthentication middleware — there is no callback action to write. |
 | Reading `returnUrl` and redirecting without validation | The challenge resolves it through the SEC-0001 allow-list (`Koan:Web:Auth:ReturnUrl:AllowList`) before handing it to the handler. |
 | Hand-validating inbound JWTs (manual `JwtSecurityTokenHandler`) | `Koan.Security.Trust` + `[Authorize(AuthenticationSchemes = KoanBearerDefaults.AuthenticationScheme)]` — validation params come from the issuer. |
@@ -118,7 +129,8 @@ The cookie scheme stays the **default**; bearer is additive and opted into per e
 
 - [Authentication setup](../../../docs/guides/authentication-setup.md) — provider config, the challenge/callback flow, full detail
 - [Auth how-to](../../../docs/guides/auth-howto.md) — connector walkthrough
-- [Authorization how-to](../../../docs/guides/authorization-howto.md) — `[Authorize]`, roles, and the `Can*` gates
+- [Authorization how-to](../../../docs/guides/authorization-howto.md) — the `IAuthorize` seam + the gate · constrain · project entity model
+- [SEC-0004 — capability authorization (gate · constrain · project)](../../../docs/decisions/SEC-0004-capability-authorization-gate-constrain-project.md) — the entity authorization model
 - [Reference card: auth.md](../../../docs/reference/cards/auth.md) — one-screen pillar map
 - [WEB-0071 — auth engine swap to dynamic schemes](../../../docs/decisions/WEB-0071-auth-engine-swap-dynamic-schemes.md)
 - [`samples/S5.Recs`](../../../samples/S5.Recs/README.md) — provider discovery, cookie-session login, `[Authorize]`-gated claim-scoped controllers
