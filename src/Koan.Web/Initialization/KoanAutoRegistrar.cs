@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Koan.Core;
 using Koan.Core.Extensions;
 using Koan.Core.Modules;
@@ -29,10 +30,23 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // base CRUD (and the MCP edge) can authorize through one engine. With no provider granting/denying, the
         // ladder falls through to AuthorizeOptions.DefaultDecision (Allow) — allow-by-default is preserved.
         // Koan.Web.Extensions stacks the RBAC + named-policy rungs on top when capability authz is configured.
-        // SEC-0004: the per-entity gate cache (lazily compiles [Access] + lowered legacy floor sugar) feeds the
-        // floor rung; a singleton so the parse/lowering happens once per entity type.
         services.AddKoanOptions<AuthorizeOptions>(AuthorizeOptions.SectionPath);
-        services.TryAddSingleton<IAccessGateCache, AccessGateCache>();
+
+        // SEC-0004 Slice B: discover EntityAccess<T> realizations once (the same discovery authority every Koan
+        // contract uses). The gate cache reads each realization's principal-FREE gate; the endpoint resolves the
+        // SCOPED realization for Constrain; and an open-generic read hook rides the WEB-0068 predicate rail. A type
+        // with no realization is a no-op in every consumer (the backward-compat contract).
+        var accessRegistry = Authorization.EntityAccessRegistry.FromDiscovery();
+        services.TryAddSingleton(accessRegistry);
+        services.TryAddSingleton<IAccessGateCache>(sp =>
+            new AccessGateCache(sp.GetService<ILogger<AccessGateCache>>(), accessRegistry.For));
+        foreach (var (entity, realization) in accessRegistry.All())
+        {
+            services.TryAddScoped(typeof(Authorization.EntityAccess<>).MakeGenericType(entity), realization);
+        }
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(
+            typeof(Koan.Web.Hooks.IRequestOptionsHook<>), typeof(Authorization.EntityAccessConstrainHook<>)));
+
         services.TryAddScoped<IAuthorize, Authorizer>();
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizationProvider, EntityFloorAuthorizationProvider>());
 

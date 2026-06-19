@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
@@ -92,6 +93,28 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
     private static EntityEndpointResult Denied(EntityRequestContext context, AuthorizeDecision decision)
         => new(context, payload: null, shortCircuit: decision);
+
+    // SEC-0004 (§B): the per-request EntityAccess<TEntity> realization (null = no Constrain → byte-identical to
+    // today). Resolved + principal-bound once, memoized on the context. Reads ride the open-generic
+    // IRequestOptionsHook; these write/delete paths (which never call BuildOptions) resolve it directly.
+    private static EntityAccess<TEntity>? ResolveAccessor(EntityRequestContext context)
+    {
+        const string key = "Koan.Access.Accessor";
+        if (context.Items.TryGetValue(key, out var cached)) return (EntityAccess<TEntity>?)cached;
+        var accessor = context.Services.GetService<EntityAccess<TEntity>>();
+        accessor?.Bind(context);
+        context.Items[key] = accessor;
+        return accessor;
+    }
+
+    // Run the realization's Constrain for one action and return the populated accumulator (Predicates + pending
+    // owner Stamps). The author composes Owner via q.Where(Owner) / q.Stamp(ownerSelector, CurrentUserId).
+    private static AccessFilter<TEntity> ConstrainFor(EntityAccess<TEntity> accessor, AccessAction action)
+    {
+        var filter = new AccessFilter<TEntity>();
+        accessor.Constrain(filter, action);
+        return filter;
+    }
 
     public async Task<EntityCollectionResult<TEntity>> GetCollection(EntityCollectionRequest request)
     {
@@ -350,19 +373,43 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
         using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
 
-        // AN11: capture the pre-mutation state (one keyed read) so a semantic delta can be projected. Only
-        // when a caller opts in (MCP always does, dry-run always does); a plain REST upsert stays a single
-        // write with no extra read.
-        if (WantsDelta(context, request.DryRun))
+        // AN11 delta + SEC-0004 Constrain both need the pre-mutation row. Read it ONCE when either asks (MCP and
+        // dry-run always want the delta; a constrained entity always needs the create-vs-update split). A plain,
+        // unconstrained REST upsert stays a single write with no extra read.
+        var accessor = ResolveAccessor(context);
+        TEntity? before = null;
+        if (WantsDelta(context, request.DryRun) || accessor is not null)
         {
-            TEntity? before = null;
             var id = request.Model.Id;
             if (id is not null && !EqualityComparer<TKey>.Default.Equals(id, default!))
             {
                 before = await Data<TEntity, TKey>.Get(id, context.CancellationToken);
             }
+        }
+        if (WantsDelta(context, request.DryRun))
+        {
             context.Items[EntityMutationProbe.BeforeKey] = before;
             context.Items[EntityMutationProbe.OperationKey] = before is null ? "create" : "update";
+        }
+        if (accessor is not null)
+        {
+            // create (no existing row) → STAMP the owner onto the payload — server-truth that overwrites a forged
+            // owner (a Where on create is a silent no-op that lets it through). update → the existing row must be
+            // in scope (404 if not, existence-hiding, matching the read rail) then apply the update stamp
+            // (freeze ownership by default).
+            if (before is null)
+            {
+                ConstrainFor(accessor, AccessAction.Create).ApplyStamps(request.Model);
+            }
+            else
+            {
+                var constrain = ConstrainFor(accessor, AccessAction.Update);
+                if (!PassesRequestPredicates(before, constrain.Predicates))
+                {
+                    return new EntityModelResult<TEntity>(context, null, null, new NotFoundResult());
+                }
+                constrain.ApplyStamps(request.Model);
+            }
         }
 
         await _hookPipeline.BeforeSave(hookContext, request.Model);
@@ -408,6 +455,36 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             return new EntityEndpointResult(context, null, new BadRequestObjectResult(new { error = "Null items are not allowed" }));
         }
 
+        // One partition scope spans the constraint probe, BeforeSave hooks, and the write (mirrors single-item Upsert).
+        using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
+
+        var accessor = ResolveAccessor(context);
+        if (accessor is not null)
+        {
+            // SEC-0004: per-item create-stamp / update-verify. ATOMIC — if any update target is out of scope the
+            // WHOLE batch is rejected (404), never a silent partial drop.
+            foreach (var model in list)
+            {
+                var id = model.Id;
+                var before = id is not null && !EqualityComparer<TKey>.Default.Equals(id, default!)
+                    ? await Data<TEntity, TKey>.Get(id, context.CancellationToken)
+                    : null;
+                if (before is null)
+                {
+                    ConstrainFor(accessor, AccessAction.Create).ApplyStamps(model);
+                }
+                else
+                {
+                    var constrain = ConstrainFor(accessor, AccessAction.Update);
+                    if (!PassesRequestPredicates(before, constrain.Predicates))
+                    {
+                        return new EntityEndpointResult(context, null, new NotFoundResult());
+                    }
+                    constrain.ApplyStamps(model);
+                }
+            }
+        }
+
         foreach (var model in list)
         {
             await _hookPipeline.BeforeSave(hookContext, model);
@@ -424,7 +501,6 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             return new EntityEndpointResult(context, new { wouldUpsert = list.Count });
         }
 
-        using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var upserted = await Data<TEntity, TKey>.UpsertMany(list, context.CancellationToken);
 
         foreach (var model in list)
@@ -450,6 +526,13 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var model = await Data<TEntity, TKey>.Get(request.Id, context.CancellationToken);
         if (model is null)
+        {
+            return new EntityModelResult<TEntity>(context, null, null, new NotFoundResult());
+        }
+
+        // SEC-0004: a row outside the principal's scope is a 404, never deleted (existence-hiding, matches reads).
+        var accessor = ResolveAccessor(context);
+        if (accessor is not null && !PassesRequestPredicates(model, ConstrainFor(accessor, AccessAction.Delete).Predicates))
         {
             return new EntityModelResult<TEntity>(context, null, null, new NotFoundResult());
         }
@@ -493,17 +576,33 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         var repo = _dataService.GetRepository<TEntity, TKey>();
         context.Headers["Koan-Write-Capabilities"] = WriteCapabilitiesHeader(repo);
 
-        if (request.DryRun)
+        using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
+        IReadOnlyCollection<TKey> targets = request.Ids ?? [];
+        var accessor = ResolveAccessor(context);
+        if (accessor is not null && targets.Count > 0)
         {
-            var requested = request.Ids?.Count ?? 0;
-            context.Items[EntityMutationProbe.DryRunKey] = true;
-            context.Items[EntityMutationProbe.OperationKey] = "deleteMany";
-            context.Items[EntityMutationProbe.AffectedCountKey] = requested;
-            return new EntityEndpointResult(context, new { wouldDelete = requested });
+            // SEC-0004: trust no id — a row must be in scope to be deleted (out-of-scope ids are silently skipped,
+            // the same hidden-row semantics as a single delete). This bounding runs BEFORE the dry-run report so a
+            // rehearsal cannot leak the existence of out-of-scope ids.
+            var constrain = ConstrainFor(accessor, AccessAction.Delete);
+            var owned = new List<TKey>(targets.Count);
+            foreach (var id in targets)
+            {
+                var row = await Data<TEntity, TKey>.Get(id, context.CancellationToken);
+                if (row is not null && PassesRequestPredicates(row, constrain.Predicates)) owned.Add(id);
+            }
+            targets = owned;
         }
 
-        using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
-        var deleted = await Data<TEntity, TKey>.DeleteMany(request.Ids ?? [], context.CancellationToken);
+        if (request.DryRun)
+        {
+            context.Items[EntityMutationProbe.DryRunKey] = true;
+            context.Items[EntityMutationProbe.OperationKey] = "deleteMany";
+            context.Items[EntityMutationProbe.AffectedCountKey] = targets.Count;
+            return new EntityEndpointResult(context, new { wouldDelete = targets.Count });
+        }
+
+        var deleted = await Data<TEntity, TKey>.DeleteMany(targets, context.CancellationToken);
         return new EntityEndpointResult(context, new { deleted });
     }
 
@@ -530,6 +629,14 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             return new EntityEndpointResult(request.Context, null, new BadRequestObjectResult(new { error = ex.Message }));
         }
 
+        var accessor = ResolveAccessor(request.Context);
+        if (accessor is not null)
+        {
+            // SEC-0004: a mass delete cannot exceed the principal's rows — AND the Constrain predicate into the
+            // user's filter before it ever reaches the adapter (agent-safety).
+            filter = QueryFilterComposer.AndAll<TEntity>(filter, ConstrainFor(accessor, AccessAction.Delete).Predicates) ?? filter;
+        }
+
         var items = await Data<TEntity, TKey>.All(QueryDefinition.All.Where(filter), request.Context.CancellationToken);
         var ids = items.Select(e => e.Id).ToList();
 
@@ -553,9 +660,33 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         await AnnotateAccess(request.Context).ConfigureAwait(false);
         using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
 
+        var accessor = ResolveAccessor(request.Context);
+        if (accessor is not null)
+        {
+            // SEC-0004: a row-scoped entity must NOT truncate the table — bound by the delete constraint, falling
+            // back to the read constraint ("delete all the rows I can see") so an author who scopes reads but
+            // forgets Delete cannot accidentally truncate. Only an entity with NEITHER narrowing keeps RemoveAll.
+            var bound = QueryFilterComposer.AndAll<TEntity>(null, ConstrainFor(accessor, AccessAction.Delete).Predicates)
+                     ?? QueryFilterComposer.AndAll<TEntity>(null, ConstrainFor(accessor, AccessAction.Read).Predicates);
+            if (bound is not null)
+            {
+                var ids = (await Data<TEntity, TKey>.All(QueryDefinition.All.Where(bound), request.Context.CancellationToken))
+                    .Select(e => e.Id).ToList();
+                if (request.DryRun)
+                {
+                    request.Context.Items[EntityMutationProbe.DryRunKey] = true;
+                    request.Context.Items[EntityMutationProbe.OperationKey] = "deleteAll";
+                    request.Context.Items[EntityMutationProbe.AffectedCountKey] = ids.Count;
+                    return new EntityEndpointResult(request.Context, new { wouldDelete = ids.Count });
+                }
+                var deletedBounded = ids.Count == 0 ? 0 : await Data<TEntity, TKey>.DeleteMany(ids, request.Context.CancellationToken);
+                return new EntityEndpointResult(request.Context, new { deleted = deletedBounded });
+            }
+        }
+
         if (request.DryRun)
         {
-            // Name the effect rather than scan the whole set for a count — honest A10 posture.
+            // Unconstrained: name the effect rather than scan the whole set for a count — honest A10 posture.
             request.Context.Items[EntityMutationProbe.DryRunKey] = true;
             request.Context.Items[EntityMutationProbe.OperationKey] = "deleteAll";
             return new EntityEndpointResult(request.Context, new { wouldDeleteAll = true });
@@ -580,6 +711,15 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var original = await Data<TEntity, TKey>.Get(request.Id!, context.CancellationToken);
         if (original is null)
+        {
+            return new EntityModelResult<TEntity>(context, null, null, new NotFoundResult());
+        }
+
+        // SEC-0004: the existing row must be in scope (404 if not, existence-hiding); the same filter freezes
+        // ownership on the patched copy below.
+        var accessor = ResolveAccessor(context);
+        var constrain = accessor is null ? null : ConstrainFor(accessor, AccessAction.Update);
+        if (constrain is not null && !PassesRequestPredicates(original, constrain.Predicates))
         {
             return new EntityModelResult<TEntity>(context, null, null, new NotFoundResult());
         }
@@ -618,6 +758,8 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
                 return new EntityModelResult<TEntity>(context, null, null, new ConflictResult());
             }
         }
+
+        constrain?.ApplyStamps(working!); // freeze ownership (re-stamp owner to principal) before save
 
         await _hookPipeline.BeforeSave(hookContext, working!);
 

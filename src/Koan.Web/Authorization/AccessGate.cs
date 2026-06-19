@@ -19,7 +19,7 @@ public sealed record ActionGate(IReadOnlyList<AccessBag> AnyOf)
     public bool IsOpen => AnyOf.Count == 0;
 
     /// <summary>
-    /// Coarse (no-row) evaluation: ergonomic delegate to <see cref="AccessGateEvaluator.Evaluate"/>. At the gate an
+    /// Coarse (no-row) evaluation: ergonomic delegate to <see cref="AccessGateEvaluator.Evaluate(ActionGate, System.Security.Claims.ClaimsPrincipal, bool)"/>. At the gate an
     /// <c>owner</c> term degrades to <paramref name="ownerSatisfied"/> (the caller passes
     /// <c>principal.Identity.IsAuthenticated</c>). Slice B adds a row-bound overload that computes ownership from a
     /// loaded row, reusing the same bag logic.

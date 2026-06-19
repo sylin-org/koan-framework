@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq.Expressions;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Koan.Data.Abstractions.Annotations;
@@ -87,6 +88,31 @@ public sealed class Ledger : Entity<Ledger>
 }
 
 /// <summary>
+/// SEC-0004 Slice B — an OWNED entity. <see cref="MemoAccess"/> scopes every row to its owner: reads narrow,
+/// create stamps server-truth, update freezes ownership, delete/mass-delete are bounded.
+/// </summary>
+[RestEntity]
+[StorageName("rest_memos")]
+public sealed class Memo : Entity<Memo>
+{
+    public string? OwnerId { get; set; }
+    public string Text { get; set; } = "";
+}
+
+/// <summary>The realization: <see cref="Owner"/> declared once; create stamps, update verifies + freezes, read/delete narrow.</summary>
+public sealed class MemoAccess : EntityAccess<Memo>
+{
+    protected override Expression<Func<Memo, bool>>? Owner => m => m.OwnerId == CurrentUserId;
+
+    public override IAccessFilter<Memo> Constrain(IAccessFilter<Memo> q, AccessAction action) => action switch
+    {
+        AccessAction.Create => q.Stamp(m => m.OwnerId, CurrentUserId),
+        AccessAction.Update => q.Where(Owner!).Stamp(m => m.OwnerId, CurrentUserId),
+        _ => q.Where(Owner!),
+    };
+}
+
+/// <summary>
 /// Test authentication handler: a request carrying <c>X-Test-Scopes</c> (space-delimited) and/or
 /// <c>X-Test-Roles</c> (space/comma-delimited) is authenticated with those scopes and roles; without either header
 /// the request stays anonymous.
@@ -104,7 +130,8 @@ public sealed class TestAuthHandler : AuthenticationHandler<AuthenticationScheme
     {
         var hasScopes = Request.Headers.TryGetValue("X-Test-Scopes", out var scopes);
         var hasRoles = Request.Headers.TryGetValue("X-Test-Roles", out var roles);
-        if (!hasScopes && !hasRoles)
+        var hasUser = Request.Headers.TryGetValue("X-Test-User", out var user);
+        if (!hasScopes && !hasRoles && !hasUser)
         {
             return Task.FromResult(AuthenticateResult.NoResult());
         }
@@ -115,6 +142,7 @@ public sealed class TestAuthHandler : AuthenticationHandler<AuthenticationScheme
         {
             claims.Add(new Claim(ClaimTypes.Role, role));
         }
+        if (hasUser) claims.Add(new Claim(ClaimTypes.NameIdentifier, user.ToString()));
 
         var identity = new ClaimsIdentity(claims, SchemeName);
         var ticket = new AuthenticationTicket(new ClaimsPrincipal(identity), SchemeName);

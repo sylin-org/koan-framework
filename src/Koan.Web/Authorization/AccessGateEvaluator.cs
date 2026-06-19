@@ -44,6 +44,18 @@ public static class AccessGateEvaluator
             : AuthorizeDecision.Forbidden(Describe(gate));
     }
 
+    /// <summary>
+    /// SEC-0004 Slice C seam (carried-but-unused in Slice B): row-bound evaluation. <paramref name="ownerProbe"/>
+    /// is invoked LAZILY — only when some bag actually requires <c>owner</c> — so the row's Owner predicate is
+    /// compiled/run only when it can affect the outcome. Slice C's per-row <c>can:[]</c> projection binds the
+    /// realization's single Owner predicate here; the coarse gate provider still degrades owner→authenticated.
+    /// </summary>
+    public static AuthorizeDecision Evaluate(ActionGate gate, ClaimsPrincipal user, Func<bool> ownerProbe)
+    {
+        var ownerSatisfied = gate.AnyOf.Any(b => b.RequiresOwner) && ownerProbe();
+        return Evaluate(gate, user, ownerSatisfied);
+    }
+
     /// <summary>Is a single bag satisfied? <c>anyone</c> short-circuits; otherwise auth, any-of roles, all-of
     /// grants, and (degraded) ownership must all hold.</summary>
     public static bool BagSatisfied(AccessBag bag, ClaimsPrincipal user, bool authed, bool ownerSatisfied)

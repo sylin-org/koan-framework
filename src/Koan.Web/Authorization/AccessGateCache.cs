@@ -33,29 +33,56 @@ public sealed class AccessGateCache : IAccessGateCache
 
     private readonly ConcurrentDictionary<Type, AccessGate> _cache = new();
     private readonly ILogger<AccessGateCache>? _logger;
+    private readonly Func<Type, Type?>? _realizationFor;
 
-    public AccessGateCache(ILogger<AccessGateCache>? logger = null) => _logger = logger;
+    public AccessGateCache(ILogger<AccessGateCache>? logger = null, Func<Type, Type?>? realizationFor = null)
+    {
+        _logger = logger;
+        _realizationFor = realizationFor;
+    }
 
     public AccessGate GetOrCompile(Type entityType) => _cache.GetOrAdd(entityType, Compile1);
 
     private AccessGate Compile1(Type entityType)
     {
-        var gate = Compile(entityType);
-        if (DeclaresOwner(gate))
+        var realizationType = _realizationFor?.Invoke(entityType);
+        AccessGate? realizationGate = null;
+        if (realizationType is not null)
         {
-            // Slice A: no EntityAccess<T> realization exists yet, so an `owner` term degrades to `authenticated`
-            // and rows are NOT narrowed. Slice B's Constrain makes it honest; until then, nudge loudly.
+            // The gate declaration is principal-INDEPENDENT (structure only), so a throwaway UNBOUND instance is
+            // safe — the singleton cache must never hold the scoped per-request realization.
+            var probe = (IEntityAccessRealization)Activator.CreateInstance(realizationType)!;
+            realizationGate = probe.BuildGate();
+            if (probe.IsCreateUnstamped())
+            {
+                _logger?.LogWarning(
+                    "EntityAccess for {Entity} constrains Create with a Where but no Stamp — a Where on create is a " +
+                    "no-op, so a forged owner is NOT overwritten. Use q.Stamp(o => o.OwnerField, CurrentUserId) on create.",
+                    entityType.Name);
+            }
+        }
+
+        var gate = Compile(entityType, realizationGate);
+
+        // The owner-inert warning only applies when NO realization exists — with a realization, Constrain (Slice B)
+        // makes `owner` honest at the row level, so the gate-time degrade is expected and silent.
+        if (realizationType is null && DeclaresOwner(gate))
+        {
             _logger?.LogWarning(
-                "[Access] on {Entity} declares 'owner' but Constrain (SEC-0004 Slice B) is not present — 'owner' " +
-                "degrades to 'authenticated' (any signed-in principal passes the gate) and rows are not narrowed yet.",
+                "[Access] on {Entity} declares 'owner' but no EntityAccess realization is present — 'owner' " +
+                "degrades to 'authenticated' (any signed-in principal passes the gate) and rows are not narrowed.",
                 entityType.Name);
         }
         return gate;
     }
 
-    /// <summary>Compile the gate for one entity type (pure; also the unit-test entry point). Throws
-    /// <see cref="AccessGateException"/> on a malformed <c>[Access]</c> value.</summary>
-    public static AccessGate Compile(Type entityType)
+    /// <summary>Compile the gate for one entity type from <c>[Access]</c> + lowered legacy sugar (no realization;
+    /// the unit-test entry point). Throws <see cref="AccessGateException"/> on a malformed <c>[Access]</c> value.</summary>
+    public static AccessGate Compile(Type entityType) => Compile(entityType, realizationGate: null);
+
+    /// <summary>Compile with precedence: realization gate (highest) &gt; explicit <c>[Access]</c> (and its <c>all</c>)
+    /// &gt; lowered legacy floor &gt; open.</summary>
+    internal static AccessGate Compile(Type entityType, AccessGate? realizationGate)
     {
         var access = entityType.GetCustomAttribute<AccessAttribute>(inherit: true);
         var explicitGate = access is null
@@ -64,14 +91,18 @@ public sealed class AccessGateCache : IAccessGateCache
 
         var legacy = LowerLegacyFloor(entityType);
 
-        if (explicitGate is null && legacy is null) return AccessGate.Open;
+        if (realizationGate is null && explicitGate is null && legacy is null) return AccessGate.Open;
 
         var byAction = new Dictionary<string, ActionGate>(StringComparer.OrdinalIgnoreCase);
         foreach (var action in Actions)
         {
-            if (explicitGate is not null && explicitGate.ByAction.TryGetValue(action, out var ex))
+            if (realizationGate is not null && realizationGate.ByAction.TryGetValue(action, out var rg))
             {
-                byAction[action] = ex; // explicit [Access] (or its `all`) wins for the actions it names
+                byAction[action] = rg; // realization (fluent) gate wins
+            }
+            else if (explicitGate is not null && explicitGate.ByAction.TryGetValue(action, out var ex))
+            {
+                byAction[action] = ex; // explicit [Access] (or its `all`) for the actions it names
             }
             else if (legacy is not null && legacy.ByAction.TryGetValue(action, out var lg))
             {
@@ -79,7 +110,8 @@ public sealed class AccessGateCache : IAccessGateCache
             }
             // else: open — leave the action out of the map
         }
-        return new AccessGate(byAction, EmptyCustom());
+        var custom = realizationGate is { Custom.Count: > 0 } ? realizationGate.Custom : EmptyCustom();
+        return new AccessGate(byAction, custom);
     }
 
     /// <summary>True when the entity uses an <c>owner</c> term but (Slice A) cannot narrow rows yet — the registrar
