@@ -26,7 +26,7 @@ public sealed class GetByIdVisibilitySpecs : IClassFixture<InMemoryAdapterFactor
         _factory = factory;
     }
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         AggregateConfigs.Reset();
         _scope = AppHost.PushScope(_factory.Services);
@@ -35,11 +35,11 @@ public sealed class GetByIdVisibilitySpecs : IClassFixture<InMemoryAdapterFactor
         await SeedMatrix();
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _scope?.Dispose();
         _scope = null;
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     [Fact]
