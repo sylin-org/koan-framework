@@ -56,6 +56,20 @@ public static class GenericControllers
         return services;
     }
 
+    /// <summary>
+    /// ARCH-0092 (§B): register the terse <see cref="RestEntityController{TEntity,TKey}"/> closure for an
+    /// entity discovered via <c>[RestEntity]</c>. Non-generic because the entity/key are runtime types
+    /// resolved by reflection during discovery.
+    /// </summary>
+    internal static IServiceCollection AddRestEntityController(this IServiceCollection services, Type entityType, Type keyType, string routePrefix)
+    {
+        if (entityType is null) throw new ArgumentNullException(nameof(entityType));
+        if (keyType is null) throw new ArgumentNullException(nameof(keyType));
+        var genericDef = typeof(RestEntityController<,>);
+        _registrations[Key(genericDef, entityType, keyType, routePrefix)] = new Registration(genericDef, entityType, keyType, routePrefix);
+        return services;
+    }
+
     internal static IEnumerable<Registration> Registrations => _registrations.Values;
 
     internal sealed record Registration(Type GenericDefinition, Type EntityType, Type? KeyType, string RoutePrefix);

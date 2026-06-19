@@ -30,6 +30,11 @@ public sealed class KoanWebExtensionsAutoRegistrar : IKoanAutoRegistrar
         // Ensure the feature provider is added only once
         mvc.PartManager.FeatureProviders.Add(new GenericControllers.GenericControllers.FeatureProvider());
 
+        // ARCH-0092 (§B): discover [RestEntity]-annotated entities and register the terse full-CRUD
+        // controller for each (explicit EntityController<T> subclasses win). Runs here so the registrations
+        // are in place before MVC's FeatureProvider materializes the controller feature.
+        GenericControllers.RestEntityRegistration.RegisterDiscovered(services);
+
         // Expose registration extension methods on IServiceCollection (already provided by GenericControllers class)
     }
 
