@@ -97,6 +97,9 @@ make `readOnlyHint`/`destructiveHint`/`idempotentHint` mechanically derivable.
   `[McpTool]` verbs gain nothing automatically — add `[ReadOnly]`/`[Destructive]`/`[Idempotent]`
   attributes (the dangerous hand-written verbs are exactly the ones that need explicit marking).
 - **TEST**: assert each entity verb carries the right annotation; a `[Destructive]` custom verb too.
+- **+ Addendum A (A9, 09 §14):** also carry the **human-readable** side-effect prose (the "type can't
+  say" case — create-vs-overwrite-vs-draft, idempotency, publication consequences) via `[McpDescription]`.
+  A9 is the prose half; the annotations here are the machine half — they pair.
 
 ## AN5 · Edge-of-capability disclosure (the Door) 〔opt-in, deny-by-default〕
 
@@ -118,6 +121,9 @@ but is discarded at the sink. The Door projection state (§9.2) is its home.
 - **TEST**: anonymous sees a Door (named + unlock) for a door-marked verb; a wall-marked verb stays
   **absent**; an admin-marked verb is **absent at every lesser tier** (charter T6); the denial error
   names the requirement only when disclosure is opted in.
+- **+ Addendum A (A8, 09 §14):** a Door may carry an **optional `Goal`** (the *why* — "build a
+  persistent list of your favorites") beside `Door` (the *how*). Value-statement, **never pitch** —
+  same honesty discipline as every descriptor.
 
 ## AN6 · Protocol currency (Streamable HTTP + OAuth 2.1) 〔T3/hard〕
 
@@ -179,6 +185,14 @@ lie-proof conversion funnel.
   mention of any admin tier**; signed-in promotes the door to a verb; admin shows the admin verbs;
   each tier is a *complete, self-consistent* world, not a redaction.
 - **DEPS**: P1.2/O6 (resources) + the Wall/Door/Verb projection (AN3 enforcement). Examples neutral.
+- **+ Addendum A (09 §14):** **A4** — surface the existing pagination contract (`X-Total-Count`/
+  `X-Total-Pages`/page size — already in `EntityEndpointService`) **into the MCP tool result** (an
+  agent doesn't see HTTP headers); state the chunk size pre-call. **Skip cursor-as-edge** (offset+count
+  is more informative). **A5** — `If-None-Match`/`304` on `koan://self`, etag = hash of the
+  **grant-specific** projection (reuse the media `StorageMediaController`/`MediaController` ETag impl);
+  makes stale-greeting-fresh-enforcement cheap. **A6** — optional `?depth=menu|schema|full` **fixed
+  ladder** (not a query language — GraphQL was cut); **verbosity never visibility**: the *set* of
+  capabilities is grant-fixed across all depths (invariants #17/#19).
 
 ## AN9 · Authority-free correlation (the "pin") 〔v2, 09 §11.3 — grounded〕
 
@@ -201,6 +215,11 @@ stitching + continuity**, carrying **zero authority**.
 - **NOTE**: net-new but cheap (GUIDv7 minter + passive trace header already exist); pair with P3.1
   grants/audit. The continuity≠authority contract is a *standing guardrail* for all of P3 — never let
   a pin/session/connection id gate authorization.
+- **+ Addendum A (A7/invariant #20, 09 §14):** the pin is **client-OWNED** — accept a client-supplied
+  `x-correlation-id` as an **opaque, untrusted, authority-free label** (agent threads one across many
+  servers); never validate / dedup-for-trust / associate-with-grant / believe it. Colliding ids =
+  messy logs, not a security event (it gates nothing). **The `device_code` (AN10) stays server-issued**
+  — do NOT overgeneralize "agent issues the pin" to "agent issues identifiers/keys" (the #13 line).
 
 ## AN10 · Auth on-ramp — device grant (RFC 8628), Reference=Intent 〔companion, 09 §12〕
 
@@ -237,3 +256,43 @@ substrate. The menu *advertises* the door; this *opens* it.
   set equals `IProviderRegistry` (no enumeration drift); production gating respected.
 - **DEPS:** the grant model (P3.1) + the projector (AN3) + AN9 (the pin) + the WEB-0071 auth
   substrate. It is the **front door** — built after the room exists.
+
+## AN11 · Dry-run + state-delta + honest validation errors 〔Addendum A → A1/A2/A3/A10〕
+
+The genuinely-new agent-ergonomics build: let an agent **rehearse** a mutation, **see exactly what
+changed** when it commits, and **recover from a bad value in one step** — the projector pointed at the
+hypothetical action, the completed action, and the constraint at the error site. (Everything else in
+Addendum A folds into AN4/AN5/AN8/AN9 — see 09 §14.)
+
+- **A1 · Universal dry-run (invariant #14):** every state-mutating verb accepts `dry_run: true`; the
+  projector runs the full hook/validation pipeline (auth, predicates, business rules) and returns a
+  structured **prospective delta** — *what would change* — committing nothing. Rehearsability is
+  **capability-graded** (A10): a transactional adapter rehearses-and-rolls-back; declare what's
+  rehearsable, fail honest where not. `dry_run` is a posture, never wiring.
+- **A2 · State delta (invariant #15):** a successful mutation returns a **semantic diff** of committed
+  changes (field transitions, relations ±), shaped **identically** to the A1 preview — rehearse →
+  execute → same diff confirms it landed. **v1 scope: diff the payload-touched fields** (read current
+  for just those before write) — avoid a full before-snapshot. Canon's `Previous/CurrentValue`
+  (`CanonAuditLog`) is the reference primitive.
+- **A3 · "Did you mean?" (invariant #16):** a validation error projects a correction from **schema
+  facts only** (enum members, type, required fields) — **never from row data / counts / which records
+  exist.** The schema-not-rows boundary is walled-means-silent (#6) re-applied to the error channel
+  (the AN-leak existence-leak, via errors). Reuse `SchemaBuilder`.
+- **A10 · Rehearsability gate (design constraint on A1):** an external effect (queue/email/charge)
+  cannot be rolled back, only not-done. Verbs **declare** external effects → dry-run
+  *enumerates-without-invoking* (*"would publish to X, would email Y"*); un-rehearsable effects return
+  an honest **partial rehearsal** naming the limit — never a silently/falsely-complete dry-run.
+  Effects buried in imperative code the framework can't inspect → a **build-time warning** (the
+  dry-run analogue of a non-lowerable predicate). **v1 = DB + validation + declared stubs; saga
+  compensation = v3, must not gate v1.** Mirrors the ARCH-0084 pushdown-or-fail discipline.
+- **BUILD:** a `dry_run` flag threaded through the `IEntityEndpointService` mutation paths
+  (Upsert/Patch/Delete/custom) terminating before the adapter write (or in a rolled-back tx where
+  supported); the prospective/retrospective delta computed once and shared by both faces; validation
+  errors enriched from the entity schema; capability tokens for rehearsability (A10 gate).
+- **TEST (ARCH-0079):** **T12** (dry-run writes nothing, no audit row, returns delta + validation;
+  real-run reports the **same delta shape**) · **T13** (mutation returns a semantic delta, same shape
+  as the preview) · **T14** (error names enum members; a forbidden-row ref reveals **nothing** about
+  existence — §3a/T11 consistency) + an A10 partial-rehearsal test (a declared-external-effect verb
+  enumerates without invoking; an un-inspectable verb surfaces the build-time warning).
+- **DEPS:** the projector (AN2/AN3) + the hook/validation pipeline. Pairs with **AN4** (A9 side-effect
+  descriptors make the dry-run's enumerated effects legible).

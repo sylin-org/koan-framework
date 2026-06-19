@@ -497,3 +497,45 @@ already grounded at `file:line` (`[McpApplication]`, the pin, `[McpAuth]`, edges
 `KoanEnv.CurrentSnapshot.Application` + Provenance. AN8's self-introduction *reads that*. Posture is
 already `[McpDefaults]` + `McpServerOptions.Exposure`. Only the per-app mutation-audit toggle is new,
 and it belongs in `McpServerOptions`, not a new attribute.
+
+---
+
+## §14 Addendum A — agent-side ergonomics, harvested
+
+A third companion (Addendum A) folds in field reports from agents operating *on the far side of the
+seam*. Its meta-principle is the §13 fold map applied recursively by the spec itself: *"almost
+nothing here is a new mechanism — it is the one projector pointed at new questions"* (dry-run =
+projection of a *hypothetical* action; delta = of a *completed* one; did-you-mean = of a *constraint
+at the error*; etag = the projection's *fingerprint*; depth = *variable verbosity*; volume =
+*respecting memory*). The two lines it draws — `depth` controls verbosity never *visibility*; an
+agent-issued id is a *label* never a *key* — are the program's master invariants (visibility and
+authority were never the agent's to set). **Verdict: adopt all ten — but grounded, that is ~1
+already-built, several folds, and ~2 genuinely-new builds.**
+
+**Grounded fold map (A1–A10):**
+
+| Item | What it adds | Grounded status | Disposition |
+|---|---|---|---|
+| **A1** Universal dry-run | `dry_run:true` on every mutating verb → prospective delta, commits nothing | NET-NEW (no validate-only path) | **AN11** — the build; rehearsability is capability-graded (A10) |
+| **A2** State deltas | mutation returns a semantic diff (same shape as A1) | NET-NEW for general entities (Canon has the per-field `Previous/CurrentValue` primitive) | **AN11** — scope v1 to payload-touched fields (avoid a full before-snapshot) |
+| **A3** "Did you mean?" | validation errors project a correction from **schema only** (enums/types/required), never rows | partial (`SchemaBuilder` is projectable) | **AN11** — schema-not-rows IS walled-means-silent (#6) on the error channel |
+| **A4** Volume projection | page size stated in the contract; cursor-as-edge | **ALREADY-HAVE** — `X-Total-Count`/`X-Total-Pages`/`[Pagination]` policy | **AN8** — only surface the existing contract in the MCP tool result; **skip cursor-as-edge** (offset+count is more informative to an agent) |
+| **A5** ETag heartbeat | `If-None-Match` on `koan://self`; etag = hash of grant-specific projection | NET-NEW for entities; **media has a complete ref impl** (`StorageMediaController`/`MediaController`) | **AN8** — reuse the media ETag pattern; grant-specific hash makes stale-greeting-fresh cheap |
+| **A6** `?depth=` | density ladder `menu\|schema\|full`; verbosity never visibility | PARTIAL (`?shape=`/`?view=` exist; arbitrary `?fields=` deliberately unwired) | **AN8** — bounded; the "no query language" bound is already Koan policy (GraphQL cut) |
+| **A7** Agent-issued id | agent generates+threads the correlation id globally; opaque/untrusted/authority-free | nearly true (MCP `correlationId` already caller-supplied + powerless) | **AN9** — sharpen: client-OWNED; never validated/dedup-for-trust/grant-associated; **`device_code` stays server-issued** (#13/#20) |
+| **A8** Goal doors | optional `Goal` (why) beside `Door` (how) — value, never pitch | NET-NEW small (doors are AN5) | **AN5** — optional, honesty-leashed |
+| **A9** Side-effect descriptors | verb prose for create-vs-overwrite-vs-draft / idempotency — the "type can't say" case | clarification (no mechanism) | **AN4** — the human-readable half pairing AN4's machine `readOnly/destructive/idempotent`; `[McpDescription]` carries it |
+| **A10** External-effect dry-run | declarative external effects + honest partial-rehearsal; saga = v3 | design constraint on A1 | **AN11** — the rehearsability gate; parallels filter-pushdown ("rehearse only what you can declare" ≈ "push down only what lowers to SQL", ARCH-0084) |
+
+New invariants **#14–#20** and tests **T12–T18** ride their dispositions (#14 dry-run-everywhere ·
+#15 delta-as-response · #16 errors-from-schema-not-rows · #17/#19 depth-verbosity-not-visibility ·
+#18 etag-grant-specific · #20 client-id-opaque-untrusted).
+
+**The two lines to hold** (both already master invariants): `depth` never changes *what exists* (else
+diffing depths enumerates walls); an agent-issued id never gates anything (else continuity becomes
+authority — the `device_code`/pin separation, #13). And the honesty gate: a dry-run that silently
+rehearses only half a verb's effects is **worse** than none — A10's "name the wall of the sandbox" is
+what makes A1 trustworthy.
+
+**Net-new build = AN11 (dry-run + state-delta + did-you-mean), gated by the A10 rehearsability
+discipline.** Everything else folds into AN4/AN5/AN8/AN9 — the same concept-budget win as §13.

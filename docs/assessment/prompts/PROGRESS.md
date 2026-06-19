@@ -142,6 +142,7 @@ of the rest.**
 | AN8 | T3 | P1.2/O6, AN3 | pending | | | | self-introduction surface — `koan://self` prose + structured; the menu writes itself from descriptors; cold-start funnel (charter v2 §11.1) |
 | AN9 | T2 | — | pending | | | | authority-free correlation ("pin") — GUIDv7 (`StringId.New()` exists) + `x-correlation-id` + audit stitching; **continuity ≠ authority** guardrail (no session-fixation risk today — preserve it) (charter v2 §11.3) |
 | AN10 | T3 | P3.1, AN3, AN9, WEB-0071 | pending | | | | auth on-ramp — device grant (RFC 8628) for headless agents; **Reference=Intent, NOT enumeration** (reuse `IProviderRegistry`/`/.well-known/auth/providers`; no `[McpAuth(...)]` attribute); the 3-strings invariant #13 (device_code ≠ pin); device-grant is net-new (companion spec, 09 §12) |
+| AN11 | T3 | AN2, AN3 | pending | | | | dry-run + state-delta + honest validation errors (Addendum A → A1/A2/A3/A10, 09 §14) — `dry_run:true` prospective delta (rehearsability capability-graded); mutation returns same-shape semantic diff (v1 = payload-touched fields; Canon `Previous/CurrentValue` is the primitive); did-you-mean errors from **schema not rows** (#6 on the error channel); A10 = declare external effects + honest partial-rehearsal, saga=v3. Addendum A4/A5/A6→AN8, A7→AN9, A8→AN5, A9→AN4 |
 
 ## Cards discovered during pilot execution
 
