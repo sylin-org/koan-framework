@@ -101,6 +101,11 @@ public sealed class StdioTransport : BackgroundService
         transportLogger.LogInformation("STDIO transport online with {ToolCount} tools.", _toolCount);
         PublishTransportHealth(HealthStatus.Healthy, "STDIO transport online.", options, _entityCount, _toolCount);
 
+        // AN3 local-trust invariant: STDIO binds the RAW handler with no McpToolAccessPolicy filter, by
+        // design. stdin/stdout is the same-machine process owner, so the local caller has full access —
+        // there is no remote principal to gate. Enforcement (auth ∩ scopes) is a remote-transport-edge
+        // concern (see HttpSseRpcBridge). Any FUTURE remote transport that reuses this handler MUST wrap it
+        // with McpToolAccessPolicy; the local-trust assumption is pinned by EnforcementConsolidationSpec.
         var handler = _server.CreateHandler();
         var runTask = _server.Run(handler, input, output, linkedCts.Token);
         _sessionTask = runTask;

@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
+using Koan.Mcp.Execution;
 using Koan.Mcp.Options;
 using Koan.Mcp;
 using Microsoft.Extensions.Logging;
@@ -18,13 +19,6 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
     private static readonly JsonSerializerSettings SerializerSettings = new()
     {
         NullValueHandling = NullValueHandling.Ignore
-    };
-
-    private static readonly string[] ScopeClaimTypes =
-    {
-        "scope",
-        "scp",
-        "http://schemas.microsoft.com/identity/claims/scope"
     };
 
     private readonly McpServer _server;
@@ -245,80 +239,14 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
         return false;
     }
 
+    // AN3: enforcement is the shared McpToolAccessPolicy, not a per-transport copy. The HTTP/SSE edge is
+    // the remote transport, so it consults the policy with the authenticated session principal for both
+    // tools/list (filter) and tools/call (deny).
     private bool HasAccessCustom(Koan.Mcp.CustomTools.McpCustomTool tool)
-    {
-        var options = _options.CurrentValue;
-        if (options.RequireAuthentication && _session.User?.Identity?.IsAuthenticated != true)
-        {
-            return false;
-        }
-
-        return tool.RequiredScopes.Count == 0 || UserHasScopes(tool.RequiredScopes);
-    }
+        => McpToolAccessPolicy.IsCustomToolPermitted(_session.User, tool, _options.CurrentValue);
 
     private bool HasAccess(McpEntityRegistration registration, McpToolDefinition tool)
-    {
-        var options = _options.CurrentValue;
-        var requiresAuth = registration.RequireAuthentication ?? options.RequireAuthentication;
-        var user = _session.User;
-
-        if (requiresAuth)
-        {
-            if (user?.Identity?.IsAuthenticated != true)
-            {
-                return false;
-            }
-        }
-
-        if (tool.RequiredScopes.Count > 0)
-        {
-            if (!UserHasScopes(tool.RequiredScopes))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private bool UserHasScopes(IReadOnlyList<string> requiredScopes)
-    {
-        if (requiredScopes.Count == 0)
-        {
-            return true;
-        }
-
-        var user = _session.User;
-        if (user is null)
-        {
-            return false;
-        }
-
-        var scopes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var claimType in ScopeClaimTypes)
-        {
-            foreach (var claim in user.FindAll(claimType))
-            {
-                if (string.IsNullOrWhiteSpace(claim.Value))
-                {
-                    continue;
-                }
-
-                var values = claim.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-                foreach (var value in values)
-                {
-                    scopes.Add(value);
-                }
-            }
-        }
-
-        if (scopes.Count == 0)
-        {
-            return false;
-        }
-
-        return requiredScopes.All(scope => scopes.Contains(scope));
-    }
+        => McpToolAccessPolicy.IsEntityToolPermitted(_session.User, registration, tool, _options.CurrentValue);
 
     private static JObject CreateError(JToken? id, int code, string message, JToken? data = null)
     {
