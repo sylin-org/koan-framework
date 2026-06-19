@@ -69,6 +69,8 @@ Provider roles map onto `ClaimTypes.Role`, so `[Authorize(Roles = "admin")]` and
 
 The old `CanRead` / `CanWrite` / `CanRemove` virtuals on `EntityController<T>` were **removed** (ARCH-0092) — use `[Access(...)]` for the gate and `EntityAccess<T>` for row scope.
 
+**Governed agent access** ([SEC-0005](../../decisions/SEC-0005-governed-agent-access-grants-audit-door.md)) layers on the gate: a server-side **`AgentGrant`** lends a subject a capability *beyond* its token (`new AgentGrant { Subject, Capability = "has:scope:x", Resource, ExpiresAt }.Save()`) — the gate materializes active grants only on the token-denied path and re-evaluates the same gate; `Remove()`/expiry revoke on the next call. **`[Audit]`** writes an `AgentAction` per mutation; **`[Door]`** discloses a denied verb's `needs` instead of walling it (role-gated stays a Wall). See the [agent-native card](agent-native.md).
+
 ## The escape hatch
 
 When no first-party connector fits, reference the generic **`Koan.Web.Auth.Connector.Oidc`** package (disabled by default — `Defaults.Enabled = false`, it ships handler wiring with no provider defaults). Add a provider entry under `Koan:Web:Auth:Providers` with its `Authority` / `ClientId` / `ClientSecret` and the dynamic-scheme seeder wires a real `OpenIdConnectHandler` for it. To contribute provider defaults from your own package instead, implement **`IAuthProviderContributor`** (`Koan.Web.Auth.Providers`) and return `ProviderOptions` keyed by id — the same seam the built-in connectors use.

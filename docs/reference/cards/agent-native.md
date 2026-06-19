@@ -25,6 +25,7 @@ validation:
 | `[McpEntity]` on an `Entity<T>` | Pure exposure — the entity's `Save` / `Remove` / `Query` verbs become MCP tools, schema + visibility identical to REST. `AllowMutations=false` is read-only. Access is the entity's `[Access]` gate (below), never a per-`[McpEntity]` scope. |
 | `[Access(read:, write:, remove:, all:)]` | The per-action gate (SEC-0004), enforced identically on REST + MCP. Each value is a comma-OR of terms: `anyone` · `authenticated` · `is:role` · `has:scope:x`/`has:role:y`/`has:claim:t=v` · `owner` · `origin:local`/`internal`/`remote`. A walled verb is **absent from `tools/list`** and denied on call. |
 | `EntityAccess<T>` (a `[KoanDiscoverable]` realization) | Ownership declared ONCE: `Owner` + `Constrain(q, action)` narrows rows to the caller — reads filter, `create` stamps server-truth, `update` freezes the owner. Drives the per-row `can:[]` manifest. The compile-safe `Gate` builder (AND-within-a-bag the string can't express) lives here too. |
+| `[Audit]` · `[Door]` (SEC-0005) | Govern the agent. `[Audit]` writes an `AgentAction` per mutation (queryable trail; reads never audited); `[Door]` discloses a denied verb with its `needs` instead of walling it (role-gated stays a Wall). Server-side `AgentGrant` entities lend access the token lacks — revocable, expiring. |
 | `[McpReadOnly]` · `[McpDestructive]` · `[McpIdempotent]` | Spec tool-annotation hints on a custom `[McpTool]` verb. Entity verbs derive these mechanically (Query/Get → readOnly, Delete* → destructive, Save* → idempotent); hand-written verbs gain nothing automatically — the dangerous ones must be marked. |
 | `IMcpResourceProvider` (registered in DI) | A readable `koan://…` introspection resource, projected per grant. The framework ships `koan://entities` + `koan://self`; you add more over the same seam. |
 | `[assembly: KoanApp(...)]` | The app identity (`Name`/`Description`) that `koan://self` renders as its first-person greeting — no MCP-specific app attribute. |
@@ -80,9 +81,17 @@ public static class PostTools
 - **The pin** — pass `correlationId` on any call (or the server mints a GUIDv7); it's echoed in the result diagnostics for trajectory stitching. **Continuity ≠ authority**: the pin is opaque, untrusted, and gates nothing — authorization is always per-request against the grant.
 - **Rehearsal & deltas** — every mutating tool accepts `dry_run: true`: the server runs the full validation pipeline, commits nothing, and returns the prospective state delta (`meta.diagnostics.delta` = `{ operation, changes: [{ field, from, to }] }`); a real run returns the **same-shaped** retrospective delta (rehearse → execute → same diff). A bad payload comes back with `didYouMean` corrections drawn from the **schema only** (enum members, required fields — never row data, so the error channel can't leak existence). The delta is walled-means-silent — an `[McpIgnore(Output)]` field never appears in it. A custom verb whose effects the framework can't inspect returns an honest *partial rehearsal* instead of executing.
 
+## Governed access — grants · audit · doors ([SEC-0005](../../decisions/SEC-0005-governed-agent-access-grants-audit-door.md))
+
+Access an agent is *lent* (beyond its token), the *trail* it leaves, and what it's *told it could do*:
+
+- **`AgentGrant`** — a server-side, queryable, revocable grant: `new AgentGrant { Subject = "kitchen-agent", Capability = "has:scope:orders:fulfill", Resource = "Order", ExpiresAt = … }.Save()`. The gate materializes a subject's active grants only when its token alone is denied, re-evaluating the **same** gate — so a grant composes with bags/origin/Constrain, never a per-transport bypass. `Remove()`/expiry revoke on the next call, fleet-wide.
+- **`[Audit]`** — every successful write/remove on the entity writes one `AgentAction { Subject, Resource, Action, EntityId, At }` through the normal entity path (queryable like anything else: `AgentAction.Query(a => a.Subject == …)`); reads are never audited.
+- **`[Door]`** (the Wall·Door·Verb model, 09 §8) — a verb the caller may invoke is a **Verb**; one they may not is, by default, a silent **Wall** (absent). `[Door]` discloses a denied verb as a **door** in `koan://entities` — `{ name, operation, needs }`, named + how-to-unlock — whose `needs` derives from the **same gate that enforces** it (Description = Enforcement). A **role-gated (privilege) verb is never a door** even with `[Door]` — admin stays a silent Wall (no privilege enumeration).
+
 ## Frontier (designed, not yet shipped)
 
-Grant disclosure (the **Door** — a locked-but-signposted verb), the headless **device-grant** auth on-ramp (RFC 8628, Reference = Intent over the configured providers), and **Streamable HTTP + OAuth 2.1**. Tracked in [09 §8 / the AN cards](../../assessment/prompts/07/AN-cards.md).
+The headless **device-grant** auth on-ramp (RFC 8628, Reference = Intent over the configured providers) and **Streamable HTTP + OAuth 2.1**. Tracked in [09 §8 / the AN cards](../../assessment/prompts/07/AN-cards.md).
 
 ## Where it's exercised
 
