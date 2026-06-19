@@ -52,24 +52,36 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     private async Task<AuthorizeDecision?> Gate(EntityRequestContext context, string action)
     {
         if (_authorize is null) return null;
+        // Memoize per (action) for the lifetime of this request: the operation's guard and AnnotateAccess both
+        // ask for the same verbs, so a verb is evaluated through the seam at most once — which matters once an
+        // external PDP/ReBAC rung joins the ladder — and the gate decision stays consistent within the request.
+        var key = "Koan.Access.Gate." + action;
+        if (context.Items.TryGetValue(key, out var cached)) return (AuthorizeDecision?)cached;
         var decision = await _authorize.AuthorizeAsync(new AuthorizeRequest
         {
             Subject = context.User,
             Action = action,
             Resource = typeof(TEntity),
         }).ConfigureAwait(false);
-        return decision is AuthorizeDecision.Allow ? null : decision;
+        var result = decision is AuthorizeDecision.Allow ? null : decision;
+        context.Items[key] = result;
+        return result;
     }
 
-    // Honest capability advertisement: recompute the Koan-Access-* headers from the seam for THIS principal
-    // (replacing the old CanRead/CanWrite/CanRemove controller virtuals). Written into context.Headers, which the
-    // result snapshots and the controller emits.
+    // SEC-0004 (§C) — honest capability advertisement: the single-item form of the per-row projection. One
+    // open-vocabulary list header naming the verbs THIS principal may perform (a verb is permitted when its gate
+    // returns null = allow). Replaces the three Koan-Access-Read/Write/Remove booleans. Reached only on a request
+    // whose own action gate passed, so the list always includes at least that verb. Gate() is memoized per
+    // request, so the guard + these three calls evaluate each verb at most once. Slice B/C extend the same list
+    // with custom verbs and the per-row can:[] sidecar, sharing this per-verb gate-allow computation.
     private async Task AnnotateAccess(EntityRequestContext context)
     {
         if (_authorize is null) return;
-        context.Headers["Koan-Access-Read"] = await Gate(context, EntityAuthorizeActions.Read).ConfigureAwait(false) is null ? "true" : "false";
-        context.Headers["Koan-Access-Write"] = await Gate(context, EntityAuthorizeActions.Write).ConfigureAwait(false) is null ? "true" : "false";
-        context.Headers["Koan-Access-Remove"] = await Gate(context, EntityAuthorizeActions.Remove).ConfigureAwait(false) is null ? "true" : "false";
+        var verbs = new List<string>(3);
+        if (await Gate(context, EntityAuthorizeActions.Read).ConfigureAwait(false) is null) verbs.Add(EntityAuthorizeActions.Read);
+        if (await Gate(context, EntityAuthorizeActions.Write).ConfigureAwait(false) is null) verbs.Add(EntityAuthorizeActions.Write);
+        if (await Gate(context, EntityAuthorizeActions.Remove).ConfigureAwait(false) is null) verbs.Add(EntityAuthorizeActions.Remove);
+        context.Headers["Koan-Access"] = string.Join(", ", verbs);
     }
 
     private static EntityCollectionResult<TEntity> CollectionDenied(EntityRequestContext context, AuthorizeDecision decision)

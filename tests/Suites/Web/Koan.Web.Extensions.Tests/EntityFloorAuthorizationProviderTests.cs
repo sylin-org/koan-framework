@@ -28,7 +28,9 @@ public sealed class EntityFloorAuthorizationProviderTests
     [Authorize(Roles = "admin")]
     private sealed class AdminGadget { }
 
-    private static readonly EntityFloorAuthorizationProvider Provider = new();
+    // SEC-0004: the provider now reads precompiled gates from the cache; the legacy floor attributes still lower
+    // into the same gate, so this decision matrix is the unchanged regression contract for sugar parity.
+    private static readonly EntityFloorAuthorizationProvider Provider = new(new AccessGateCache());
 
     private static async Task<AuthorizeDecision?> Evaluate(System.Type entity, ClaimsPrincipal user)
         => await Provider.EvaluateAsync(new AuthorizeRequest

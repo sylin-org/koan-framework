@@ -1,5 +1,6 @@
 using System.Net;
-using System.Net.Http.Headers;
+using System.Net.Http;
+using System.Text;
 using AwesomeAssertions;
 using Xunit;
 
@@ -52,5 +53,71 @@ public sealed class EntityFloorE2ESpec
         // Trinket carries [RestEntity] but no floor attribute → seam defers → allow-by-default.
         var res = await _fx.Client.SendAsync(Get("/api/trinket"));
         res.StatusCode.Should().Be(HttpStatusCode.OK, "no floor declared → CRUD stays open");
+    }
+
+    // ── SEC-0004 per-action gate: read and write require DIFFERENT scopes (Strongbox) ────────────────────────────
+    // The entity-wide [RequireScope] floor structurally cannot express this; the per-action gate can.
+
+    [Fact]
+    public async Task Read_is_gated_on_the_read_scope_only()
+    {
+        var ok = await _fx.Client.SendAsync(Get("/api/strongbox", scopes: "strongbox:read"));
+        ok.StatusCode.Should().Be(HttpStatusCode.OK, "read gate is has:scope:strongbox:read");
+
+        var wrong = await _fx.Client.SendAsync(Get("/api/strongbox", scopes: "strongbox:write"));
+        wrong.StatusCode.Should().Be(HttpStatusCode.Forbidden, "the WRITE scope does not satisfy the READ gate — per-action granularity");
+
+        var anon = await _fx.Client.SendAsync(Get("/api/strongbox"));
+        anon.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Write_is_gated_on_the_write_scope_independently_of_read()
+    {
+        var ok = await _fx.Client.SendAsync(Post("/api/strongbox", "{\"contents\":\"x\"}", scopes: "strongbox:write"));
+        ok.IsSuccessStatusCode.Should().BeTrue("write gate is has:scope:strongbox:write");
+
+        var wrong = await _fx.Client.SendAsync(Post("/api/strongbox", "{\"contents\":\"x\"}", scopes: "strongbox:read"));
+        wrong.StatusCode.Should().Be(HttpStatusCode.Forbidden, "the READ scope does not satisfy the WRITE gate");
+    }
+
+    // ── SEC-0004 projection: the single Koan-Access list header (replaces the 3 booleans) ────────────────────────
+
+    [Fact]
+    public async Task An_open_entity_advertises_every_verb()
+    {
+        var res = await _fx.Client.SendAsync(Get("/api/trinket"));
+        Access(res).Should().Be("read, write, remove");
+        res.Headers.Contains("Koan-Access-Read").Should().BeFalse("the three boolean headers are collapsed into one list header");
+    }
+
+    [Fact]
+    public async Task A_non_admin_does_not_see_the_remove_verb()
+    {
+        // Ledger: read + write open, remove is:admin. Anonymous principal → read, write (no remove).
+        var res = await _fx.Client.SendAsync(Get("/api/ledger"));
+        Access(res).Should().Be("read, write");
+    }
+
+    [Fact]
+    public async Task An_admin_sees_the_remove_verb()
+    {
+        var req = new HttpRequestMessage(HttpMethod.Get, "/api/ledger");
+        req.Headers.Add("X-Test-Roles", "admin");
+        var res = await _fx.Client.SendAsync(req);
+        Access(res).Should().Be("read, write, remove");
+    }
+
+    private static string Access(HttpResponseMessage res)
+        => res.Headers.TryGetValues("Koan-Access", out var v) ? string.Join(", ", v) : "<absent>";
+
+    private static HttpRequestMessage Post(string path, string json, string? scopes = null)
+    {
+        var req = new HttpRequestMessage(HttpMethod.Post, path)
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json"),
+        };
+        if (scopes is not null) req.Headers.Add("X-Test-Scopes", scopes);
+        return req;
     }
 }

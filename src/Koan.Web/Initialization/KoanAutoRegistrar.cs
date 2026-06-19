@@ -29,9 +29,16 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // base CRUD (and the MCP edge) can authorize through one engine. With no provider granting/denying, the
         // ladder falls through to AuthorizeOptions.DefaultDecision (Allow) — allow-by-default is preserved.
         // Koan.Web.Extensions stacks the RBAC + named-policy rungs on top when capability authz is configured.
+        // SEC-0004: the per-entity gate cache (lazily compiles [Access] + lowered legacy floor sugar) feeds the
+        // floor rung; a singleton so the parse/lowering happens once per entity type.
         services.AddKoanOptions<AuthorizeOptions>(AuthorizeOptions.SectionPath);
+        services.TryAddSingleton<IAccessGateCache, AccessGateCache>();
         services.TryAddScoped<IAuthorize, Authorizer>();
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizationProvider, EntityFloorAuthorizationProvider>());
+
+        // SEC-0004: fail fast at boot — compile every [Access] declaration now and aggregate all malformed ones
+        // into one exception, so a typo can never reach production as a silently-open or silently-denied gate.
+        Authorization.AccessGateRegistrar.Validate();
 
         // Ensure MVC discovers controllers from this assembly
         services.AddKoanControllersFrom<Controllers.HealthController>();

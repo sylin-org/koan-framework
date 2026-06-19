@@ -160,9 +160,9 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     protected virtual ObjectResult PrepareResponse(object? content)
     {
         Response.Headers["Vary"] = "Accept";
-        // ARCH-0092 (§D): the Koan-Access-Read/Write/Remove headers are now recomputed from the seam for this
-        // principal inside the endpoint service and flow via result.Headers (ApplyResponseMetadata) — honest
-        // per-principal capability advertisement, not the old static CanRead/CanWrite/CanRemove virtuals.
+        // SEC-0004 (§C): the single Koan-Access list header (the permitted verbs for this principal) is computed
+        // from the seam inside the endpoint service and flows via result.Headers (ApplyResponseMetadata) — the
+        // single-item form of the per-row capability projection, not the old CanRead/CanWrite/CanRemove virtuals.
         return new ObjectResult(content);
     }
 

@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Koan.Data.Abstractions.Annotations;
@@ -61,8 +63,33 @@ public sealed class Vault : Entity<Vault>
 }
 
 /// <summary>
-/// Test authentication handler: a request carrying <c>X-Test-Scopes</c> is authenticated with those scopes
-/// (space-delimited); without the header the request stays anonymous.
+/// SEC-0004 — a PER-ACTION gate: read and write require DIFFERENT scopes — a shape the entity-wide
+/// <c>[RequireScope]</c> floor structurally could not express. Drives the per-action e2e proof.
+/// </summary>
+[RestEntity]
+[Access(read: "has:scope:strongbox:read", write: "has:scope:strongbox:write")]
+[StorageName("rest_strongboxes")]
+public sealed class Strongbox : Entity<Strongbox>
+{
+    public string Contents { get; set; } = "";
+}
+
+/// <summary>
+/// SEC-0004 — read + write open, delete admin-only. Drives the <c>Koan-Access</c> projection list header
+/// (a non-admin sees <c>read, write</c>; an admin sees <c>read, write, remove</c>).
+/// </summary>
+[RestEntity]
+[Access(remove: "is:admin")]
+[StorageName("rest_ledgers")]
+public sealed class Ledger : Entity<Ledger>
+{
+    public string Entry { get; set; } = "";
+}
+
+/// <summary>
+/// Test authentication handler: a request carrying <c>X-Test-Scopes</c> (space-delimited) and/or
+/// <c>X-Test-Roles</c> (space/comma-delimited) is authenticated with those scopes and roles; without either header
+/// the request stays anonymous.
 /// </summary>
 public sealed class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
 {
@@ -75,12 +102,21 @@ public sealed class TestAuthHandler : AuthenticationHandler<AuthenticationScheme
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        if (!Request.Headers.TryGetValue("X-Test-Scopes", out var scopes))
+        var hasScopes = Request.Headers.TryGetValue("X-Test-Scopes", out var scopes);
+        var hasRoles = Request.Headers.TryGetValue("X-Test-Roles", out var roles);
+        if (!hasScopes && !hasRoles)
         {
             return Task.FromResult(AuthenticateResult.NoResult());
         }
 
-        var identity = new ClaimsIdentity(new[] { new Claim("scope", scopes.ToString()) }, SchemeName);
+        var claims = new List<Claim>();
+        if (hasScopes) claims.Add(new Claim("scope", scopes.ToString()));
+        foreach (var role in roles.ToString().Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            claims.Add(new Claim(ClaimTypes.Role, role));
+        }
+
+        var identity = new ClaimsIdentity(claims, SchemeName);
         var ticket = new AuthenticationTicket(new ClaimsPrincipal(identity), SchemeName);
         return Task.FromResult(AuthenticateResult.Success(ticket));
     }
