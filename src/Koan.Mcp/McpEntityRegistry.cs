@@ -161,8 +161,7 @@ public sealed class McpEntityRegistry
                 descriptor,
                 tools,
                 displayName,
-                effectiveAttribute.EnabledTransports,
-                effectiveAttribute.RequireAuthentication ?? entityOverride?.RequireAuthentication);
+                effectiveAttribute.EnabledTransports);
 
             registrations.Add(registration);
             AddIndex(registrationIndex, type.FullName, registration);
@@ -326,19 +325,13 @@ public sealed class McpEntityRegistry
             return attribute;
         }
 
-        var scopes = entityOverride.RequiredScopes.Length > 0
-            ? entityOverride.RequiredScopes
-            : attribute.RequiredScopes;
-
         var merged = new McpEntityAttribute
         {
             Name = entityOverride.Name ?? attribute.Name,
             Description = entityOverride.Description ?? attribute.Description,
             AllowMutations = entityOverride.AllowMutations ?? attribute.AllowMutations,
             SchemaOverride = entityOverride.SchemaOverride ?? attribute.SchemaOverride,
-            ToolPrefix = attribute.ToolPrefix,
-            RequireAuthentication = entityOverride.RequireAuthentication ?? attribute.RequireAuthentication,
-            RequiredScopes = scopes.Length == 0 ? [] : scopes.ToArray()
+            ToolPrefix = attribute.ToolPrefix
         };
 
         merged.EnableStdio = entityOverride.EnableStdio ?? attribute.EnableStdio;

@@ -59,7 +59,7 @@ public sealed class SelfIntroductionSpec : IClassFixture<ConformanceFixture>
         // (walled-means-silent) — a tier you can't reach is invisible, not redacted.
         var provider = new SelfResourceProvider(
             _fx.Services.GetRequiredService<McpEntityRegistry>(),
-            _fx.Services.GetRequiredService<IOptions<McpServerOptions>>());
+            _fx.Services.GetRequiredService<Koan.Web.Authorization.IAccessGateCache>());
 
         var doc = JObject.Parse(provider.Read(SelfResourceProvider.ResourceUri, new ClaimsPrincipal(new ClaimsIdentity()))!.Text);
         var names = ((JArray)doc["entities"]!).OfType<JObject>().Select(e => e["name"]?.Value<string>()).ToList();

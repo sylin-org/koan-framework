@@ -103,8 +103,6 @@ public sealed class McpEntityOverride
     public bool? AllowMutations { get; set; }
     public bool? EnableStdio { get; set; }
     public bool? EnableHttpSse { get; set; }
-    public bool? RequireAuthentication { get; set; }
     public McpTransportMode? EnabledTransports { get; set; }
     public string? SchemaOverride { get; set; }
-    public string[] RequiredScopes { get; set; } = [];
 }

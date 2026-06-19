@@ -19,11 +19,6 @@ public sealed class McpEntityAttribute : Attribute
     public string? Description { get; set; }
 
     /// <summary>
-    /// Scopes required before tools are exposed.
-    /// </summary>
-    public string[] RequiredScopes { get; set; } = [];
-
-    /// <summary>
     /// When false mutation operations are filtered from the registry.
     /// </summary>
     public bool AllowMutations { get; set; } = true;
@@ -67,11 +62,6 @@ public sealed class McpEntityAttribute : Attribute
             }
         }
     }
-
-    /// <summary>
-    /// Optional per-entity authentication requirement. When null the server default is used.
-    /// </summary>
-    public bool? RequireAuthentication { get; set; }
 
     /// <summary>
     /// Configures the set of transports the entity participates in.

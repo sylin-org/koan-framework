@@ -49,9 +49,6 @@ public sealed class DescriptorMapper
         if (string.IsNullOrWhiteSpace(displayName)) throw new ArgumentException("Display name is required.", nameof(displayName));
 
         var allowMutations = entityOverride?.AllowMutations ?? attribute.AllowMutations;
-        var requiredScopes = entityOverride?.RequiredScopes?.Length > 0
-            ? entityOverride!.RequiredScopes
-            : attribute.RequiredScopes;
 
         // ARCH-0092 §H: an EntityToolset<T> realization may tune its built-in verbs via class attributes —
         // [ToolHidden(op)] removes a verb absolutely; [ToolDescription(op, text)] overrides the template.
@@ -89,8 +86,7 @@ public sealed class DescriptorMapper
                 jSchema,
                 operation.ReturnsCollection,
                 isMutation,
-                description,
-                requiredScopes
+                description
             ));
         }
 

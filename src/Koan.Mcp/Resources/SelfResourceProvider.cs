@@ -5,8 +5,7 @@ using System.Security.Claims;
 using System.Text;
 using Koan.Core;
 using Koan.Core.Hosting.App;
-using Koan.Mcp.Options;
-using Microsoft.Extensions.Options;
+using Koan.Web.Authorization;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -29,12 +28,12 @@ public sealed class SelfResourceProvider : IMcpResourceProvider
     public const string ResourceUri = "koan://self";
 
     private readonly McpEntityRegistry _registry;
-    private readonly IOptions<McpServerOptions> _options;
+    private readonly IAccessGateCache _gateCache;
 
-    public SelfResourceProvider(McpEntityRegistry registry, IOptions<McpServerOptions> options)
+    public SelfResourceProvider(McpEntityRegistry registry, IAccessGateCache gateCache)
     {
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
-        _options = options ?? throw new ArgumentNullException(nameof(options));
+        _gateCache = gateCache ?? throw new ArgumentNullException(nameof(gateCache));
     }
 
     public IEnumerable<McpResourceDescriptor> List(ClaimsPrincipal? user)
@@ -54,7 +53,7 @@ public sealed class SelfResourceProvider : IMcpResourceProvider
         }
 
         var app = KoanEnv.CurrentSnapshot.Application;
-        var visible = EntityProjection.Visible(_registry, _options.Value, user);
+        var visible = EntityProjection.Visible(_registry, _gateCache, user);
 
         var entities = new JArray(visible.Select(v => new JObject
         {

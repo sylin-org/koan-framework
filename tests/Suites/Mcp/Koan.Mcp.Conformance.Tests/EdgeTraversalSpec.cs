@@ -77,7 +77,7 @@ public sealed class EdgeTraversalSpec : IClassFixture<EdgeFixture>
         var provider = new EntityCatalogResourceProvider(
             _fx.Services.GetRequiredService<McpEntityRegistry>(),
             _fx.Services.GetRequiredService<IRelationshipMetadata>(),
-            _fx.Services.GetRequiredService<IOptions<McpServerOptions>>());
+            _fx.Services.GetRequiredService<Koan.Web.Authorization.IAccessGateCache>());
 
         var anonymous = new ClaimsPrincipal(new ClaimsIdentity());
         var doc = JObject.Parse(provider.Read(EntityCatalogResourceProvider.ResourceUri, anonymous)!.Text);

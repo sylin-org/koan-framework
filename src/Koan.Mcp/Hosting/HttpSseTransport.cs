@@ -23,6 +23,7 @@ public sealed class HttpSseTransport
     private readonly McpEntityRegistry _registry;
     private readonly Koan.Mcp.CustomTools.McpCustomToolRegistry _customTools;
     private readonly IOptionsMonitor<McpServerOptions> _options;
+    private readonly Koan.Web.Authorization.IAccessGateCache _gateCache;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<HttpSseTransport> _logger;
     private readonly ILoggerFactory _loggerFactory;
@@ -33,6 +34,7 @@ public sealed class HttpSseTransport
         McpEntityRegistry registry,
         Koan.Mcp.CustomTools.McpCustomToolRegistry customTools,
         IOptionsMonitor<McpServerOptions> options,
+        Koan.Web.Authorization.IAccessGateCache gateCache,
         TimeProvider timeProvider,
         ILogger<HttpSseTransport> logger,
         ILoggerFactory loggerFactory)
@@ -42,6 +44,7 @@ public sealed class HttpSseTransport
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
         _customTools = customTools ?? throw new ArgumentNullException(nameof(customTools));
         _options = options ?? throw new ArgumentNullException(nameof(options));
+        _gateCache = gateCache ?? throw new ArgumentNullException(nameof(gateCache));
         _timeProvider = timeProvider ?? TimeProvider.System;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
@@ -112,6 +115,7 @@ public sealed class HttpSseTransport
             _registry,
             _customTools,
             _options,
+            _gateCache,
             session,
             _loggerFactory.CreateLogger<HttpSseRpcBridge>());
         session.AttachBridge(bridge);

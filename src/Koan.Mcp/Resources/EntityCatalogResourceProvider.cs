@@ -2,10 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
-using Koan.Mcp.Execution;
-using Koan.Mcp.Hosting;
-using Koan.Mcp.Options;
-using Microsoft.Extensions.Options;
+using Koan.Web.Authorization;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -13,10 +10,10 @@ namespace Koan.Mcp.Resources;
 
 /// <summary>
 /// P1.2 — the built-in <c>koan://entities</c> introspection resource: the catalog of MCP-projected
-/// entities and their verbs, PROJECTED PER GRANT. Each entity's verbs are filtered through the shared
-/// <see cref="McpToolAccessPolicy"/> (AN3) for the calling principal, and an entity with no caller-visible
-/// verb is omitted entirely (walled-means-silent) — the same projection the tool surface enforces, now
-/// readable as a resource rather than inferred from the tool list.
+/// entities and their verbs, PROJECTED PER GRANT. Each entity's verbs are filtered through the SAME
+/// data-layer <c>[Access]</c> gate the endpoint service enforces (via <see cref="Koan.Mcp.Execution.McpEntityGate"/>),
+/// and an entity with no caller-visible verb is omitted entirely (walled-means-silent) — the same projection the
+/// tool surface enforces, now readable as a resource rather than inferred from the tool list.
 /// </summary>
 public sealed class EntityCatalogResourceProvider : IMcpResourceProvider
 {
@@ -24,16 +21,16 @@ public sealed class EntityCatalogResourceProvider : IMcpResourceProvider
 
     private readonly McpEntityRegistry _registry;
     private readonly Koan.Data.Core.Relationships.IRelationshipMetadata _metadata;
-    private readonly IOptions<McpServerOptions> _options;
+    private readonly IAccessGateCache _gateCache;
 
     public EntityCatalogResourceProvider(
         McpEntityRegistry registry,
         Koan.Data.Core.Relationships.IRelationshipMetadata metadata,
-        IOptions<McpServerOptions> options)
+        IAccessGateCache gateCache)
     {
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
         _metadata = metadata ?? throw new ArgumentNullException(nameof(metadata));
-        _options = options ?? throw new ArgumentNullException(nameof(options));
+        _gateCache = gateCache ?? throw new ArgumentNullException(nameof(gateCache));
     }
 
     public IEnumerable<McpResourceDescriptor> List(ClaimsPrincipal? user)
@@ -55,7 +52,7 @@ public sealed class EntityCatalogResourceProvider : IMcpResourceProvider
         var entities = new JArray();
 
         // Shared per-grant projection (null principal = local-trust full; concrete principal = per grant).
-        var visible = EntityProjection.Visible(_registry, _options.Value, user);
+        var visible = EntityProjection.Visible(_registry, _gateCache, user);
 
         // AN7: edges are governed at the catalog level by target-type visibility — an edge pointing at a
         // type this grant cannot see is absent (walled-means-silent). Build the visible-type → name map once.

@@ -22,14 +22,15 @@ validation:
 
 | Declaration | What it projects to the agent |
 |---|---|
-| `[McpEntity]` on an `Entity<T>` | The entity's `Save` / `Remove` / `Query` verbs become MCP tools, schema + visibility identical to REST. `RequiredScopes` gates them; `AllowMutations=false` is read-only. |
+| `[McpEntity]` on an `Entity<T>` | The entity's `Save` / `Remove` / `Query` verbs become MCP tools, schema + visibility identical to REST. The entity's `[Access]` gate (SEC-0004) gates them — the same gate REST enforces; `AllowMutations=false` is read-only. |
 | `[McpReadOnly]` · `[McpDestructive]` · `[McpIdempotent]` | Spec tool-annotation hints on a custom `[McpTool]` verb. Entity verbs derive these mechanically (Query/Get → readOnly, Delete* → destructive, Save* → idempotent); hand-written verbs gain nothing automatically — the dangerous ones must be marked. |
 | `IMcpResourceProvider` (registered in DI) | A readable `koan://…` introspection resource, projected per grant. The framework ships `koan://entities` + `koan://self`; you add more over the same seam. |
 | `[assembly: KoanApp(...)]` | The app identity (`Name`/`Description`) that `koan://self` renders as its first-person greeting — no MCP-specific app attribute. |
 | `[McpDescription]` · `[McpIgnore]` | Per-property prose into the schema · hide a property from the agent (input/output/both) without touching storage or REST. |
 
 ```csharp
-[McpEntity(Name = "Post", Description = "A blog post", RequiredScopes = ["posts:write"])]
+[McpEntity(Name = "Post", Description = "A blog post")]
+[Access(write: "has:scope:posts:write")]   // SEC-0004 gate — same authority on REST + MCP
 public sealed class Post : Entity<Post> { public string Title { get; set; } = ""; }
 
 [assembly: KoanApp(Name = "Bloggr", Description = "A small blog you can manage by conversation.")]

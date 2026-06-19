@@ -25,6 +25,7 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
     private readonly McpEntityRegistry _registry;
     private readonly Koan.Mcp.CustomTools.McpCustomToolRegistry _customTools;
     private readonly IOptionsMonitor<McpServerOptions> _options;
+    private readonly Koan.Web.Authorization.IAccessGateCache _gateCache;
     private readonly HttpSseSession _session;
     private readonly ILogger<HttpSseRpcBridge> _logger;
     private readonly Channel<JsonRpcEnvelope> _requests;
@@ -37,6 +38,7 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
         McpEntityRegistry registry,
         Koan.Mcp.CustomTools.McpCustomToolRegistry customTools,
         IOptionsMonitor<McpServerOptions> options,
+        Koan.Web.Authorization.IAccessGateCache gateCache,
         HttpSseSession session,
         ILogger<HttpSseRpcBridge> logger)
     {
@@ -44,6 +46,7 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
         _customTools = customTools ?? throw new ArgumentNullException(nameof(customTools));
         _options = options ?? throw new ArgumentNullException(nameof(options));
+        _gateCache = gateCache ?? throw new ArgumentNullException(nameof(gateCache));
         _session = session ?? throw new ArgumentNullException(nameof(session));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _requests = Channel.CreateUnbounded<JsonRpcEnvelope>(new UnboundedChannelOptions
@@ -193,8 +196,11 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
             return;
         }
 
-        var permitted = isEntityTool ? HasAccess(registration, tool) : HasAccessCustom(customTool!);
-        if (!permitted)
+        // SEC-0004 Phase 3.3b: an ENTITY tool's authority is the data-layer [Access] gate, enforced inside
+        // CallToolFor with the threaded session principal — a denial rides back as meta.shortCircuit (the MCP
+        // mirror of REST 403/401), NOT a transport-edge -32604. So the edge no longer pre-checks entity tools;
+        // it still gates a CUSTOM verb here (custom verbs have no entity/no row, so no data-layer gate yet).
+        if (isCustomTool && !HasAccessCustom(customTool!))
         {
             _session.Enqueue(ServerSentEvent.FromJsonRpc(CreateError(envelope.Id, -32604, "Forbidden.")));
             return;
@@ -273,11 +279,17 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
         _session.Enqueue(ServerSentEvent.FromJsonRpc(response));
     }
 
+    // SEC-0004 Phase 3.3b: tools/list must not advertise what the gate will deny. An ENTITY tool is visible iff
+    // the SAME [Access] gate the data layer enforces coarsely allows the session principal (McpEntityGate). A
+    // CUSTOM verb still consults McpToolAccessPolicy (its scope filter). The remote edge NEVER passes null
+    // (null = STDIO local-trust): an anonymous remote caller is a concrete empty principal, so it is gated.
     private bool IsToolVisible(McpRpcHandler.ToolDescriptor tool)
     {
         if (_registry.TryGetTool(tool.Name, out var registration, out var definition))
         {
-            return HasAccess(registration, definition);
+            return McpEntityGate.CoarseAllows(
+                _gateCache, registration.EntityType, definition.Operation,
+                _session.User ?? new System.Security.Claims.ClaimsPrincipal());
         }
 
         if (_customTools.TryGet(tool.Name, out var custom))
@@ -288,14 +300,10 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
         return false;
     }
 
-    // AN3: enforcement is the shared McpToolAccessPolicy, not a per-transport copy. The HTTP/SSE edge is
-    // the remote transport, so it consults the policy with the authenticated session principal for both
-    // tools/list (filter) and tools/call (deny).
+    // A custom [McpTool] verb's edge authority: the shared McpToolAccessPolicy consulted with the session
+    // principal for both tools/list (filter) and tools/call (deny). Entity tools use the gate (see IsToolVisible).
     private bool HasAccessCustom(Koan.Mcp.CustomTools.McpCustomTool tool)
         => McpToolAccessPolicy.IsCustomToolPermitted(_session.User, tool, _options.CurrentValue);
-
-    private bool HasAccess(McpEntityRegistration registration, McpToolDefinition tool)
-        => McpToolAccessPolicy.IsEntityToolPermitted(_session.User, registration, tool, _options.CurrentValue);
 
     private static JObject CreateError(JToken? id, int code, string message, JToken? data = null)
     {

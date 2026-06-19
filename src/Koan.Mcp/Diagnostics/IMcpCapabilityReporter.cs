@@ -46,7 +46,9 @@ public sealed class HttpSseCapabilityReporter : IMcpCapabilityReporter
             {
                 Name = tool.Name,
                 Description = tool.Description,
-                RequireAuthentication = registration.RequireAuthentication ?? options.RequireAuthentication,
+                // SEC-0004 Phase 3.3b: entity tools no longer carry a per-entity auth flag; this reports the
+                // server-wide transport authentication requirement. Per-entity access is the [Access] gate.
+                RequireAuthentication = options.RequireAuthentication,
                 EnabledTransports = registration.EnabledTransports
             }))
             .ToArray();

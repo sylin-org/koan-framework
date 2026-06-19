@@ -44,8 +44,9 @@ builder.Services.AddKoanMcp();   // binds Koan:Mcp config; tools served over JSO
 
 | Attribute | What it does |
 |---|---|
-| `[McpEntity]` | Mark an entity for MCP exposure; `Name`, `Description`, `AllowMutations`, `RequiredScopes`, `Exposure` (`"auto"`/`"code"`/`"tools"`/`"full"`), `EnabledTransports`. |
-| `[McpTool]` | Expose a public static method as a custom verb (not an entity CRUD op) over the same `tools/list` + `tools/call` surface. |
+| `[McpEntity]` | Mark an entity for MCP exposure; `Name`, `Description`, `AllowMutations`, `Exposure` (`"auto"`/`"code"`/`"tools"`/`"full"`), `EnabledTransports`. Pure exposure — access is the entity's `[Access]` gate (SEC-0004), enforced identically on REST + MCP. |
+| `[Access]` | The per-action access gate (SEC-0004) — `[Access(read: "anyone", write: "has:scope:posts:write")]`. The MCP edge gates entity tools through THIS (the same gate REST enforces); a walled verb is absent from `tools/list` and denied on call. Custom `[McpTool]` verbs keep `RequiredScopes`. |
+| `[McpTool]` | Expose a public static method as a custom verb (not an entity CRUD op) over the same `tools/list` + `tools/call` surface; `RequiredScopes` gates it. |
 | `[McpDescription("…")]` | Per-property description text surfaced into the generated JSON schema; optional `Operation` scope. |
 | `[McpIgnore]` · `[McpIgnore(McpFieldDirection.Input)]` | Hide a property from MCP input, output, or both (mass-assignment / PII guard) without touching storage. |
 | `[McpDefaults]` | Assembly-level defaults (`[assembly: McpDefaults(Exposure = "code")]`); overridden by config or per-entity attributes. |

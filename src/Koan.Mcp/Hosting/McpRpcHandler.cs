@@ -734,13 +734,15 @@ public sealed class McpRpcHandler
 
         public static ToolDescriptor From(McpEntityRegistration registration, McpToolDefinition tool)
         {
+            // SEC-0004 Phase 3.3b: entity tools no longer advertise a flat scope list — their access authority is
+            // the data-layer [Access] gate (enforced on call, projected per-row via Slice C's can:[]), not a
+            // transport-edge scope filter. Custom verbs still carry requiredScopes (see FromCustom).
             var metadata = new JObject
             {
                 ["entity"] = registration.DisplayName,
                 ["operation"] = tool.Operation.ToString(),
                 ["returnsCollection"] = tool.ReturnsCollection,
-                ["isMutation"] = tool.IsMutation,
-                ["requiredScopes"] = new JArray(tool.RequiredScopes.Select(scope => JValue.CreateString(scope)))
+                ["isMutation"] = tool.IsMutation
             };
 
             var (readOnly, destructive, idempotent) = HintsForOperation(tool.Operation);

@@ -2,6 +2,7 @@ using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Core.Model;
 using Koan.Data.Core.Relationships;
 using Koan.Mcp;
+using Koan.Web.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Koan.Web.Controllers;
 
@@ -19,9 +20,11 @@ public sealed class Author : Entity<Author>
     public string Name { get; set; } = "";
 }
 
-/// <summary>A SCOPED child entity (requires <c>articles:read</c>) — so an unscoped remote grant walls it, and
-/// the author's edges to it must then be ABSENT from the catalog (walled-means-silent at the edge level).</summary>
-[McpEntity(Name = "article", Description = "An article", Exposure = McpExposureMode.Full, RequiredScopes = new[] { "articles:read" })]
+/// <summary>A SCOPED child entity — its access is the data-layer <c>[Access]</c> gate (every verb needs
+/// <c>articles:read</c>), so an unscoped remote grant walls it, and the author's edges to it must then be ABSENT
+/// from the catalog (walled-means-silent at the edge level). <c>all:</c> gates read+write+remove uniformly.</summary>
+[McpEntity(Name = "article", Description = "An article", Exposure = McpExposureMode.Full)]
+[Access(all: "has:scope:articles:read")]
 [StorageName("an7_articles")]
 public sealed class Article : Entity<Article>
 {

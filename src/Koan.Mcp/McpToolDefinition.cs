@@ -11,6 +11,5 @@ public sealed record McpToolDefinition(
     JObject InputSchema,
     bool ReturnsCollection,
     bool IsMutation,
-    string? Description,
-    IReadOnlyList<string> RequiredScopes
+    string? Description
 );

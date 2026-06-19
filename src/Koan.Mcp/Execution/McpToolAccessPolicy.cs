@@ -7,16 +7,16 @@ using Koan.Mcp.Options;
 namespace Koan.Mcp.Execution;
 
 /// <summary>
-/// AN3 (docs/assessment/09 §8) — the single MCP effective-access decision: <c>requiresAuth ∩ required
-/// scopes</c> evaluated against the caller's <see cref="ClaimsPrincipal"/>. Every remote transport edge
-/// consults THIS policy so enforcement is one projection, not a per-transport copy that can drift (the
-/// WEB-0068 per-surface-drift lesson applied to MCP authz).
+/// SEC-0004 Phase 3.3b — the effective-access decision for CUSTOM <c>[McpTool]</c> verbs: <c>requiresAuth ∩
+/// required scopes</c> evaluated against the caller's <see cref="ClaimsPrincipal"/>. Entity tools no longer
+/// flow through here — their authority is the data-layer <see cref="Koan.Web.Authorization.AccessGate"/>
+/// (enforced inside <c>CallToolFor</c>, advertised via <see cref="McpEntityGate"/>). Custom verbs have no
+/// entity / no row, so they keep this transport-edge scope check until they join the gate model.
 ///
 /// Transport trust model:
 /// <list type="bullet">
-///   <item><b>HTTP/SSE</b> (remote) — <see cref="Koan.Mcp.Hosting.HttpSseRpcBridge"/> gates both
-///   <c>tools/list</c> (filter) and <c>tools/call</c> (deny) through this policy with the authenticated
-///   session principal.</item>
+///   <item><b>HTTP/SSE</b> (remote) — <see cref="Koan.Mcp.Hosting.HttpSseRpcBridge"/> gates a custom verb's
+///   <c>tools/list</c> (filter) and <c>tools/call</c> (deny) through this policy with the session principal.</item>
 ///   <item><b>STDIO</b> (local) — binds the raw <see cref="Koan.Mcp.Hosting.McpRpcHandler"/> with no
 ///   filter: stdin/stdout is the same-machine process owner, so it is full local-trust BY DESIGN (the
 ///   handler is unfiltered; enforcement is a transport-edge concern). Any FUTURE remote transport MUST
@@ -42,18 +42,6 @@ public static class McpToolAccessPolicy
         }
 
         return requiredScopes is null or { Count: 0 } || UserHasScopes(user, requiredScopes);
-    }
-
-    /// <summary>Effective access for an entity tool: the registration's per-entity auth requirement
-    /// (falling back to the server default) ∩ the tool's required scopes.</summary>
-    public static bool IsEntityToolPermitted(ClaimsPrincipal? user, McpEntityRegistration registration, McpToolDefinition tool, McpServerOptions options)
-    {
-        if (registration is null) throw new ArgumentNullException(nameof(registration));
-        if (tool is null) throw new ArgumentNullException(nameof(tool));
-        if (options is null) throw new ArgumentNullException(nameof(options));
-
-        var requiresAuth = registration.RequireAuthentication ?? options.RequireAuthentication;
-        return IsPermitted(user, requiresAuth, tool.RequiredScopes);
     }
 
     /// <summary>Effective access for a custom <c>[McpTool]</c> verb: the server auth requirement ∩ the
