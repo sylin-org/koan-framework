@@ -73,6 +73,10 @@ public static class Access
     /// <summary>A claim grant — <c>Access.HasClaim("tier", "pro")</c> → <c>"has:claim:tier=pro"</c>.</summary>
     public static string HasClaim(string type, string value) => $"has:claim:{type}={value}";
 
+    /// <summary>A transport-origin term — <c>Access.Origin(OriginTier.Local)</c> → <c>"origin:local"</c>. WHERE the
+    /// call came from (server-stamped, un-forgeable), distinct from WHO the caller is. Satisfiable anonymously.</summary>
+    public static string Origin(OriginTier tier) => "origin:" + Authorization.Origin.Value(tier);
+
     /// <summary>An OR-list of single terms — <c>Access.Or(Access.Is("admin"), Access.Owner)</c> → <c>"is:admin, owner"</c>.</summary>
     public static string Or(params string[] terms) => string.Join(", ", terms);
 }

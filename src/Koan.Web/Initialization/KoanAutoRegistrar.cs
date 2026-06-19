@@ -32,6 +32,10 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // Koan.Web.Extensions stacks the RBAC + named-policy rungs on top when capability authz is configured.
         services.AddKoanOptions<AuthorizeOptions>(AuthorizeOptions.SectionPath);
 
+        // SEC-0004 origin dimension: the declared trusted-internal networks (fail-closed when unset). The request
+        // builder stamps the server-trusted koan:origin claim from these + the connection's remote IP.
+        services.AddKoanOptions<OriginOptions>(OriginOptions.SectionPath);
+
         // SEC-0004 Slice B: discover EntityAccess<T> realizations once (the same discovery authority every Koan
         // contract uses). The gate cache reads each realization's principal-FREE gate; the endpoint resolves the
         // SCOPED realization for Constrain; and an open-generic read hook rides the WEB-0068 predicate rail. A type

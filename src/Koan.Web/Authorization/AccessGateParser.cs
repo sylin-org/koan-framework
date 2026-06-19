@@ -60,6 +60,22 @@ public static class AccessGateParser
         if (Eq(term, "authenticated")) return Bag();
         if (Eq(term, "owner")) return Bag(requiresOwner: true);
 
+        if (StartsWith(term, "origin:"))
+        {
+            var tier = term.Substring(7).Trim();
+            if (!Eq(tier, Origin.Local) && !Eq(tier, Origin.Internal) && !Eq(tier, Origin.Remote))
+            {
+                throw Error(entityName, action, raw, term,
+                    $"unknown origin '{tier}'; expected origin:local / origin:internal / origin:remote");
+            }
+            // Origin is a TRANSPORT marker, orthogonal to identity — a local (STDIO) caller is anonymous yet
+            // satisfies origin:local. So this bag does NOT require authentication (unlike every other grant term).
+            return new AccessBag(
+                Array.Empty<string>(),
+                new Grant[] { new Grant.Claim(Origin.ClaimType, tier.ToLowerInvariant()) },
+                RequiresOwner: false, Anyone: false, Authenticated: false);
+        }
+
         if (StartsWith(term, "is:"))
         {
             var role = term.Substring(3).Trim();

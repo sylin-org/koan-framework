@@ -7,7 +7,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Koan.Core.Observability.Health;
 using Koan.Mcp.Options;
+using Koan.Web.Authorization;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -51,7 +53,15 @@ public sealed class HttpSseSessionManager : IHostedService, IDisposable
         var id = Guid.NewGuid().ToString("N");
         var cancellation = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
         var now = _timeProvider.GetUtcNow();
-        session = new HttpSseSession(id, context.User ?? new System.Security.Claims.ClaimsPrincipal(), cancellation, _timeProvider, now);
+
+        // SEC-0004 origin: a remote (HTTP/SSE) caller is never `local` — stamp the session principal `internal` when
+        // its source IP is in a declared trusted network, else `remote` (the safe default). Stamped ONCE at the
+        // session edge, so every tools/call + resource read this session makes carries the correct origin.
+        var originOptions = context.RequestServices.GetService<IOptions<OriginOptions>>()?.Value ?? OriginOptions.Empty;
+        var principal = OriginStamp.Apply(
+            context.User ?? new System.Security.Claims.ClaimsPrincipal(),
+            OriginResolver.FromHttpContext(context, originOptions));
+        session = new HttpSseSession(id, principal, cancellation, _timeProvider, now);
 
         if (!_sessions.TryAdd(id, session))
         {

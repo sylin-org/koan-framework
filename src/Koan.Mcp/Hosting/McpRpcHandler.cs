@@ -101,12 +101,16 @@ public sealed class McpRpcHandler
     }
 
     // SEC-0004 Phase 3.3: the JSON-RPC entry point. STDIO (and any raw JSON-RPC dispatch) reaches the handler
-    // here with NO caller identity, so it delegates with an anonymous principal — the STDIO local-trust default
-    // (the channel is the process owner's, but the *caller* is nobody until an identity is supplied). The
-    // HTTP/SSE bridge calls CallToolFor with the authenticated session principal instead.
+    // here with NO caller identity, but the channel IS the local process owner — so it delegates with an
+    // anonymous principal STAMPED origin:local (SEC-0004): the *caller* is nobody (unauthenticated), yet the call
+    // demonstrably arrived over STDIO, so an [Access(... "origin:local")] gate admits it while a remote call does
+    // not. The HTTP/SSE bridge calls CallToolFor with the session principal (stamped remote/internal) instead.
     [JsonRpcMethod("tools/call")]
     public Task<CallToolResult> CallTool(ToolsCallParams parameters, CancellationToken cancellationToken)
-        => CallToolFor(parameters, user: null, cancellationToken);
+        => CallToolFor(
+            parameters,
+            Koan.Web.Authorization.OriginStamp.Apply(new ClaimsPrincipal(), Koan.Web.Authorization.OriginTier.Local),
+            cancellationToken);
 
     /// <summary>
     /// SEC-0004 Phase 3.3 — execute a tool AS <paramref name="user"/> (null = anonymous). The principal threads
