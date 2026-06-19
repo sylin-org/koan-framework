@@ -454,3 +454,46 @@ token endpoint yields nothing; only the single-use `device_code` redeems, and on
 `device_code` never appears in full in any audit entity). **T10** (cold-start on-ramp walkable
 end-to-end: anonymous reads the door → `auth.signin` → artifacts → [human browser leg] → poll on
 `device_code` → grant → re-project; additions-only delta; the whole trajectory stitched on one pin).
+
+---
+
+## §13 Concept fold map — bind to existing primitives before minting new ones
+
+The harvested specs share a pattern worth naming as the program's **first discipline**: they propose
+*new* surface where Koan often already carries the intent. Four dissolutions have landed this way —
+edges → `[Parent]`/`GetChildren`; the pin → `StringId.New()`/correlation; auth providers →
+`IProviderRegistry`; and `[McpApplication]` → `[KoanApp]` (below). This is the "fewer but more
+meaningful parts" / concept-budget discipline ([[koan-redesign-discipline]]), and it guards against
+the very drift the program exists to kill: **an authored copy that silently diverges from the
+primitive it duplicates.** So before any AN card is built, each agentic concept **binds to its
+existing Koan primitive; net-new is the exception that earns its place** — the charter's own
+"descriptors earn their place" rule, turned on the framework's own surface.
+
+| Charter surface | What it carries | Existing Koan primitive | Disposition |
+|---|---|---|---|
+| `[McpApplication]` — Description | app "I'm X" identity | `[KoanApp]` → `ApplicationIdentitySnapshot` / `KoanEnv.CurrentSnapshot.Application` | **FOLD** — no new attribute; AN8 reads the snapshot |
+| `[McpApplication]` — DefaultExposure | wall-by-default agent posture | `[McpDefaults]` + `McpServerOptions.Exposure` | **FOLD** — already there |
+| `[McpApplication]` — Audit | per-app mutation history | *(none in Koan.Mcp; `CanonAuditLog` lives elsewhere)* | **NET-NEW** — a `McpServerOptions`/`McpAuditOptions` flag, stitched by the pin (AN9), tied to P3.1 |
+| `[McpField]` | a field rule the type can't say | `[McpDescription]` (+ `[McpIgnore]` for exclusion) | **FOLD** — exists |
+| `[McpMethod]` | custom-verb truth + Needs/Door | `[McpTool]` + the entity verb taxonomy + the authz seam | **FOLD** — `[McpTool]` exists; Needs/Door = authz |
+| `[Door]` / `Grant` / `Needs` | the `Needs ≤ grant` comparison | SEC-0002 `IAuthorize` + `RequiredScopes` (+ P3.1 `AgentGrant`) | **BIND** to existing authz; mint only `AgentGrant` (P3.1) |
+| `project(model × grant)` | the one projector | `IEntityEndpointService` + `EntityEndpointDescriptor` + WEB-0068 predicates + hook pipeline | **EXTEND** the execution core (AN2/AN3) — don't invent |
+| the `pin` | authority-free correlation | `StringId.New()` (GUIDv7) + `Koan-Trace-Id` | **EXTEND** (AN9) |
+| `[McpAuth]` provider list | the auth providers | `IProviderRegistry` / `GET /.well-known/auth/providers` | **FOLD** — no enumeration (AN10) |
+| edge-traversal sugar | navigable relationships | `[Parent]`/`[ParentOf]` + `GetChildren` | **EXTEND** (AN7) governed |
+
+**The headline:** of the ~10 surfaces the specs propose, **only two are genuinely net-new** — the
+`AgentGrant` entity (P3.1) and the MCP mutation-audit option. Everything else **folds into or extends
+an existing primitive.** The agent-native program is ~80% *a new lens on primitives Koan already has*,
+not new machinery — the strongest evidence it's the right shape, and the reassurance it is not
+over-building. **Build = mostly extension; invention is the exception.** Dispositions marked
+FOLD/BIND/EXTEND on a strong inference are *verify-at-build* (the cards are target shapes); the four
+already grounded at `file:line` (`[McpApplication]`, the pin, `[McpAuth]`, edges) are firm.
+
+**`[McpApplication]` specifically (the architect's catch, grounded):** don't create it. `[KoanApp]`
+(assembly attribute, [KoanAppAttribute.cs](../../src/Koan.Core/Hosting/App/KoanAppAttribute.cs) —
+`Name`/`Code`/`Description`/…) already carries app identity, resolved into `ApplicationIdentitySnapshot`
+(precedence: `Koan:Application:*` config → `[KoanApp]` → assembly metadata → host env) and surfaced at
+`KoanEnv.CurrentSnapshot.Application` + Provenance. AN8's self-introduction *reads that*. Posture is
+already `[McpDefaults]` + `McpServerOptions.Exposure`. Only the per-app mutation-audit toggle is new,
+and it belongs in `McpServerOptions`, not a new attribute.

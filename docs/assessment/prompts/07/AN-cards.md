@@ -158,8 +158,14 @@ explosion: 70 entities × relationships = hundreds of edge-verbs = the bloat we 
 ## AN8 · Self-introduction surface (`koan://self` — prose + structured) 〔v2, 09 §11.1〕
 
 Render the projector's per-grant output as `koan://self` in **two faces**: first-person **prose**
-(the menu, written from the `[McpApplication]`/`[McpEntity]`/Door descriptors) + the **structured**
-projection beneath it. The menu reshapes per grant and is authored by nobody (rename → updates; wall
+(the menu, written from the app identity + `[McpEntity]`/Door descriptors) + the **structured**
+projection beneath it.
+
+> **DECIDED — no `[McpApplication]` (09 §13 fold map).** App identity is already `[KoanApp]` →
+> `ApplicationIdentitySnapshot` (read `KoanEnv.CurrentSnapshot.Application` — Name/Description); the
+> "I'm X" sentence is its `Description`. Posture is `[McpDefaults]` + `McpServerOptions.Exposure`. Do
+> not mint an app-level MCP attribute; the only net-new app-level concern (mutation audit) is a
+> `McpServerOptions` flag. The menu reshapes per grant and is authored by nobody (rename → updates; wall
 → vanishes; promote a door → invitation appears). The "one step further" door line is a built-in,
 lie-proof conversion funnel.
 
