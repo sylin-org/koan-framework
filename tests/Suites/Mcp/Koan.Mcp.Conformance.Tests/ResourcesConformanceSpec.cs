@@ -71,6 +71,7 @@ public sealed class ResourcesConformanceSpec : IClassFixture<ConformanceFixture>
         // An anonymous remote caller sees the public entity but never the scoped one (walled-means-silent).
         var provider = new EntityCatalogResourceProvider(
             _fx.Services.GetRequiredService<McpEntityRegistry>(),
+            _fx.Services.GetRequiredService<Koan.Data.Core.Relationships.IRelationshipMetadata>(),
             _fx.Services.GetRequiredService<IOptions<McpServerOptions>>());
 
         var anonymousRemote = new ClaimsPrincipal(new ClaimsIdentity());

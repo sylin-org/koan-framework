@@ -23,11 +23,16 @@ public sealed class EntityCatalogResourceProvider : IMcpResourceProvider
     public const string ResourceUri = "koan://entities";
 
     private readonly McpEntityRegistry _registry;
+    private readonly Koan.Data.Core.Relationships.IRelationshipMetadata _metadata;
     private readonly IOptions<McpServerOptions> _options;
 
-    public EntityCatalogResourceProvider(McpEntityRegistry registry, IOptions<McpServerOptions> options)
+    public EntityCatalogResourceProvider(
+        McpEntityRegistry registry,
+        Koan.Data.Core.Relationships.IRelationshipMetadata metadata,
+        IOptions<McpServerOptions> options)
     {
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
+        _metadata = metadata ?? throw new ArgumentNullException(nameof(metadata));
         _options = options ?? throw new ArgumentNullException(nameof(options));
     }
 
@@ -50,7 +55,17 @@ public sealed class EntityCatalogResourceProvider : IMcpResourceProvider
         var entities = new JArray();
 
         // Shared per-grant projection (null principal = local-trust full; concrete principal = per grant).
-        foreach (var (registration, verbs) in EntityProjection.Visible(_registry, _options.Value, user))
+        var visible = EntityProjection.Visible(_registry, _options.Value, user);
+
+        // AN7: edges are governed at the catalog level by target-type visibility — an edge pointing at a
+        // type this grant cannot see is absent (walled-means-silent). Build the visible-type → name map once.
+        var visibleByType = new Dictionary<Type, string>();
+        foreach (var (registration, _) in visible)
+        {
+            visibleByType[registration.EntityType] = registration.DisplayName;
+        }
+
+        foreach (var (registration, verbs) in visible)
         {
             entities.Add(new JObject
             {
@@ -61,7 +76,9 @@ public sealed class EntityCatalogResourceProvider : IMcpResourceProvider
                     ["name"] = tool.Name,
                     ["operation"] = tool.Operation.ToString(),
                     ["isMutation"] = tool.IsMutation
-                }))
+                })),
+                // AN7: the navigable graph — edges as routes (target + via field), never verbs.
+                ["edges"] = EntityEdgeProjection.For(registration.EntityType, _metadata, visibleByType)
             });
         }
 
