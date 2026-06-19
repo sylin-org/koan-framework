@@ -23,25 +23,29 @@ namespace Koan.Web.Authorization;
 public sealed class EntityFloorAuthorizationProvider : IAuthorizationProvider
 {
     private readonly IAccessGateCache _cache;
+    private readonly IAgentGrantStore? _grants;
 
-    public EntityFloorAuthorizationProvider(IAccessGateCache cache)
-        => _cache = cache ?? throw new ArgumentNullException(nameof(cache));
+    public EntityFloorAuthorizationProvider(IAccessGateCache cache, IAgentGrantStore? grants = null)
+    {
+        _cache = cache ?? throw new ArgumentNullException(nameof(cache));
+        _grants = grants; // SEC-0005: null = no server-side grants (backward-compatible)
+    }
 
     /// <summary>After the RBAC floor (0), before named-policy (100): the entity gate is authoritative for the
     /// authority it understands (the <c>[Access]</c> declaration), deferring policy/PDP to higher rungs.</summary>
     public int Order => 50;
 
-    public Task<AuthorizeDecision?> EvaluateAsync(AuthorizeRequest request, CancellationToken ct = default)
+    public async Task<AuthorizeDecision?> EvaluateAsync(AuthorizeRequest request, CancellationToken ct = default)
     {
         if (request.Resource is not Type entityType)
         {
-            return Task.FromResult<AuthorizeDecision?>(null); // the gate only understands entity-typed resources
+            return null; // the gate only understands entity-typed resources
         }
 
         var actionGate = _cache.GetOrCompile(entityType).For(request.Action);
         if (actionGate.IsOpen)
         {
-            return Task.FromResult<AuthorizeDecision?>(null); // open action → defer (allow-by-default preserved)
+            return null; // open action → defer (allow-by-default preserved)
         }
 
         // A null subject (reflection-built request / misbehaving provider) is treated as anonymous, never NRE.
@@ -49,6 +53,37 @@ public sealed class EntityFloorAuthorizationProvider : IAuthorizationProvider
         // owner degrades to authenticated at the coarse gate (no row to bind).
         var ownerAtGate = subject.Identity?.IsAuthenticated == true;
         var decision = AccessGateEvaluator.Evaluate(actionGate, subject, ownerSatisfied: ownerAtGate);
-        return Task.FromResult<AuthorizeDecision?>(decision);
+        if (decision is AuthorizeDecision.Allow)
+        {
+            return decision; // the token alone satisfies the gate — the common path never loads grants
+        }
+
+        // SEC-0005: the token was denied — a server-side AgentGrant may still unlock it. Load the subject's active
+        // grants for THIS resource, materialize them as scoped effective-claims, and re-evaluate the SAME gate (so a
+        // grant composes with the bag logic / origin / Constrain, never a per-transport bypass). Anonymous = no id =
+        // no grants. The common Allow path above never reaches here, so the lookup is the slow-path-only cost.
+        var subjectId = SubjectId(subject);
+        if (_grants is not null && subjectId is not null)
+        {
+            var caps = await _grants.ActiveCapabilities(subjectId, entityType.Name, ct).ConfigureAwait(false);
+            if (caps.Count > 0)
+            {
+                var granted = GrantClaims.Enrich(subject, caps);
+                var regrant = AccessGateEvaluator.Evaluate(actionGate, granted, ownerSatisfied: granted.Identity?.IsAuthenticated == true);
+                if (regrant is AuthorizeDecision.Allow) return regrant;
+            }
+        }
+
+        return decision; // the original (token-only) denial stands
+    }
+
+    /// <summary>Subject id — <c>sub</c> (bearer KSVID) then <c>NameIdentifier</c> (cookie), matching SEC-0001's
+    /// <c>KoanIdentity.Id</c>. An anonymous principal has neither → no grants apply.</summary>
+    private static string? SubjectId(ClaimsPrincipal p)
+    {
+        var sub = p.FindFirst("sub")?.Value;
+        if (!string.IsNullOrEmpty(sub)) return sub;
+        var nameId = p.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        return string.IsNullOrEmpty(nameId) ? null : nameId;
     }
 }

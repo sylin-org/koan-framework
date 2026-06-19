@@ -52,6 +52,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             typeof(Koan.Web.Hooks.IRequestOptionsHook<>), typeof(Authorization.EntityAccessConstrainHook<>)));
 
         services.TryAddScoped<IAuthorize, Authorizer>();
+        // SEC-0005: server-side AgentGrants enrich the gate decision on the token-denied path. Scoped = memoized per
+        // request (fresh each request → Remove()/expiry revoke on the next call). No grants declared = inert.
+        services.TryAddScoped<IAgentGrantStore, AgentGrantStore>();
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizationProvider, EntityFloorAuthorizationProvider>());
 
         // SEC-0004: fail fast at boot — compile every [Access] declaration now and aggregate all malformed ones
