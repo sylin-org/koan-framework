@@ -121,6 +121,25 @@ Preamble for these cards: the `[SESSION-PREAMBLE]` block in `../07-strategic-pro
 | P5.1 | T3 | 06 B2 | pending | | | | sovereign / scales-down deployment (AOT) |
 | P5.2 | T3 | P1.2, P3.1, 06 H1 | pending | | | | the wedge demo — agent transcript |
 
+## 07-AN — Agent-native projection (Stage 9 harvest)
+
+Net-new cards from [09-agent-native-projection.md](../09-agent-native-projection.md) (the grounded
++ adversarially-verified harvest of the agent-native charter), stashed in
+[07/AN-cards.md](07/AN-cards.md). The "one projector" reframe: description and enforcement are the
+same projection, or they drift. **AN-leak is a confirmed live security finding — triage independent
+of the rest.**
+
+| ID | Tier | Deps | Status | Date | Agent/model | Commits | Notes |
+|---|---|---|---|---|---|---|---|
+| AN-leak | T2 | — | pending | | | | **SECURITY (confirmed, 09 §10).** Relationship expansion (`?with=all` REST + MCP `with:"all"`) + `GetRelatives`/`GetChildren` bypass WEB-0068 visibility predicates: traversal loaders call `Data<T>.All()`/`.Get()` directly (Entity.cs:863-920); the root gate (EntityEndpointService.cs:252-260) is not re-applied to expanded rows (:262-268). Read-path leak on REST **and** MCP, same class as the get-by-id bypass — on a surface the 2026-06-14 sweep missed. Fix = governed traversal; tests = charter T1/T2 (currently MISSING). |
+| AN1 | T2 | — | pending | | | | MCP wire-shape conformance (`input_schema`+`metadata` bag → spec `inputSchema`+`annotations`); **blocks AN4** |
+| AN2 | T3 | — | pending | | | | one schema projector — OpenAPI honors the same field policy as MCP (`[McpIgnore]` leaks in Swagger today) |
+| AN3 | T3 | — | pending | | | | enforcement consolidation — one choke point (STDIO binds the raw handler, unfiltered, today); per-verb topology declared once for REST+MCP |
+| AN4 | T2 | AN1 | pending | | | | verb-derived annotations (readOnly/destructive/idempotent from the 12-op verb enum) |
+| AN5 | T3 | AN3 (soft) | pending | | | | edge-of-capability disclosure (the "Door") — opt-in, deny-by-default (privilege-enumeration oracle) |
+| AN6 | T3 | — | pending | | | | protocol currency — Streamable HTTP (SSE deprecated) + OAuth 2.1 (RFC 9728/8707) |
+| AN7 | T3 | AN-leak | pending | | | | governed edge traversal (edges-as-sugar, never verbs); subsumes AN-leak |
+
 ## Cards discovered during pilot execution
 
 New cards surfaced while running other cards (not in the original 06/07 stash). Same columns.

@@ -1,0 +1,319 @@
+# Stage 9 — The agent-native projection (grounded)
+
+**Date**: 2026-06-18 · **Status**: strategic harvest, grounded against the codebase and
+adversarially verified. Extends [05 §3](05-strategic-position.md) (the agent-native thesis) and
+[07](07-strategic-prompt-stash.md) (the build ladder) with a sharper *definition*, a structural
+*reframe*, and a verified *opportunity catalog*.
+
+> ⚠️ Like 07, the shapes below are TARGET shapes and verified GAPS — not a claim that every named
+> API exists. Each "Koan has X" / "Koan lacks Y" was grounded at a `file:line` an agent actually
+> read, then adversarially re-checked; the verification pass corrected optimism in **7 of 10**
+> groundings (one was *upgraded* — Code Mode is more real than first scored — and one *downgraded*
+> — per-caller filtering is transport-asymmetric, not "complete"). This file is excluded from the
+> snippet-compile lint.
+
+---
+
+## §1 What "agent-native" means
+
+An **agent-native application framework** is not an agent runtime (orchestration, memory, model
+routing — that lane is crowded: Semantic Kernel, LangGraph, Mastra, Vercel AI SDK). It is the
+*server side of the agent seam*, done so well the developer writes no tool:
+
+> **The application projects itself — what it is, what it can do, what it requires, where its edges
+> are — as a single truth, computed for whoever is asking, such that the developer writes no tool
+> and the agent holds no false belief.**
+
+The decisive idea is **one honest projection, seen from two faces.** "The app explains itself to a
+human" and "the app is operable by an agent" are not two systems someone integrated — they are the
+*same truth* viewed from opposite sides of one seam. Which face you see depends only on which side
+you stand. That is what *native* means: you cannot pry the app-ness and the agent-ness apart,
+because the thing that makes the app legible is the identical thing that makes it operable.
+
+The wish list has two authors, and they are the same wish twice:
+
+| The developer wishes | …is the agent's | …seen from the other face |
+|---|---|---|
+| I declare my domain once; never write a tool/schema/auth-rule | I meet a world my own size | the surface is *reflected*, not authored |
+| The secure posture is the lazy one — walls until I open a door | everything I perceive, I can do; I never reason about permission | least-privilege is the default, not a setting |
+| I never write upsell; the app advertises its depth truthfully | at my edge, I'm told what lies beyond and how to reach it | locked doors name themselves |
+| My surface can't drift | I hold no false beliefs | one source, projected — not two kept in sync |
+| Any agent, from any framework, can operate my app | no protocol to negotiate; I act on a shared reality | MCP as the universal seam; marry no runtime |
+| When an agent breaks something, I read exactly what happened | — | history is just entities |
+| My app gets *safer* as models get smarter | when I fail, the error names the fix | honesty is the contract, not the model |
+
+**Why this is the durable bet.** A smarter frontier model makes *orchestration* matter less — it
+plans, decomposes, and selects tools that a runtime spent a release scaffolding, so the runtime
+depreciates with every capability jump. But no model release makes your application automatically
+safe to touch, honest to read, or sized to its caller. **The world appreciates while the mind
+commoditizes.** Build the ground every mind walks on — it is the only thing in this landscape worth
+more next year than today. This is the strategic answer to "won't frontier models obsolete this?":
+Koan is the *application* framework, not the agent framework, on purpose.
+
+---
+
+## §2 The reframe: one execution core, many projection faces
+
+Grounding the vision against the codebase produces one finding that reorganizes the whole program:
+
+**Koan's "one projection" is already TRUE on the axis where it executes, and NOT YET true on the
+axis where it describes and enforces.**
+
+- **Unified today — the execution core.** REST and MCP run through the *same*
+  `IEntityEndpointService<T,K>` + the *same* `EntityEndpointDescriptor` + the *same* WEB-0068
+  visibility predicates + the *same* hook pipeline. A tool call and an HTTP call are one motion.
+  Verified: [EndpointToolExecutor.cs:44-60](../../src/Koan.Mcp/Execution/EndpointToolExecutor.cs#L44-L60)
+  (MCP resolves the same service by reflection), [McpEntityRegistry.cs:155-156](../../src/Koan.Mcp/McpEntityRegistry.cs#L155-L156)
+  (identical descriptor provider + mapper), `EntityEndpointService` predicate enforcement on keyed
+  reads (`PassesRequestPredicates`).
+- **Divergent today — the projection / enforcement faces.**
+  1. **Schema is generated twice.** OpenAPI/Swagger comes from ASP.NET's stock reflective
+     generator — *blind to `[McpIgnore]`/`[McpDescription]`* — while MCP comes from `SchemaBuilder`.
+     An entity can hide a field from an agent and **leak it in Swagger.** (The "shared descriptor"
+     is an *operation-kind* catalog, not a field-level schema model — OpenAPI doesn't consume it.)
+  2. **Enforcement lives per-transport.** Per-principal `tools/list` filtering + scope gating live
+     only in `HttpSseRpcBridge`; the **default-on STDIO transport binds the raw `McpRpcHandler`**,
+     which lists every tool unfiltered and executes `tools/call` with no scope check.
+  3. **The self-describing runtime is HTTP-only.** Provenance, `CapabilitySet`,
+     `/.well-known/aggregates`, `/mcp/health` exist — but MCP exposes **only `tools/*` + `ping`**;
+     there is **no `resources/list` / `resources/read`.** The agent cannot *ask*.
+
+**So the work is not "build agent features." It is: collapse the projection-and-enforcement axis
+down to the already-unified execution axis.** That is the vision's "one surface, two faces," stated
+in Koan's own architecture.
+
+### §2.1 The master principle: declare once, project and enforce from there
+
+Every catch in the catalog below reduces to the **same** structural hazard — *anything declared or
+enforced per-surface drifts.* This is the team's own WEB-0068 lesson ("visibility is per-surface;
+sweep them all") generalized into a design law:
+
+> **Declare the topology once at the shared descriptor/operation layer; project the schema and
+> enforce the access from there to every face (REST, OpenAPI, MCP tools, MCP resources, the typed
+> SDK).** A field policy, a verb's door/wall status, or a scope that lives on *one* surface is a
+> latent "gated on one door, open on the other" footgun.
+
+This single principle de-risks default-to-wall, per-verb topology, grants, *and* schema unification
+at once. It is the spine of the cards in §8.
+
+### §2.2 A structural validation
+
+The adversarial pass judged **all ten wishes sound and in-charter for an application framework** —
+none required becoming an agent runtime. The places that *edged* toward over-reach were exactly the
+unbuilt parts the framework already, correctly, punts (the Auto-mode client-capability handshake;
+a bespoke per-operation RBAC DSL; hard cryptographic revocation). That is itself a harvest: *native
+= one projection, not features bolted on* is structurally true here — the domain-exposure mandate
+already owns every wish.
+
+---
+
+## §3 The verified opportunity catalog
+
+Applicability scale: **true-today** · **achievable-cheap** (bounded) · **achievable-hard** (a real,
+design-needed program). No wish scored *aspirational* or *out-of-scope*.
+
+### Tier 0 — already real (lead with these)
+
+| # | Opportunity | Verdict | The honest catch |
+|---|---|---|---|
+| O9 | **Code Mode** — act on the whole world in one motion (Jint sandbox + generated TS SDK + entity proxy + quotas + a tested sample suite) | **true-today, ahead of the field** | Auto-mode silently degrades to *Full* (worst-of-both for tokens). Fix is **docs/default guidance** (`Exposure=Code`), not a nonexistent capability-negotiation RFC. Plus an ADR/code drift: per-entity exposure is documented but `ResolveExposureMode()` doesn't implement it. |
+| O3 | **Per-caller sized projection** — `tools/list` filtered per principal | **true-today on HTTP/SSE** | Filtering + call-time gating live only in `HttpSseRpcBridge`; default-on **STDIO binds the raw handler** (unfiltered). Defensible as a local trust boundary — but make it explicit + tripwired, not "complete." `resources/list` half is moot until O6 ships. |
+| O1ᵉ | **The unified execution core** — one service + descriptor + predicates + hooks behind REST and MCP | **true-today** | The foundation that makes everything below cheap. Its *schema* half is not unified (Tier 2, O1ˢ). |
+| O8ᵃ | **Audit substrate** — `CanonAuditLog : Entity<T>` auto-records policy-eval mutations, queryable | **partially true-today** | The *agent*-mutation audit path is the missing slice (Tier 2, O8). "History is just entities" is closer to true than first scored. |
+
+### Tier 1 — the doorway (cheap, high-leverage)
+
+| # | Opportunity | Verdict | The honest catch |
+|---|---|---|---|
+| O6 | **The app explains itself as MCP resources** (`koan://app`/`entities`/`capabilities`/`boot-report`/`health`) — the neglected primitive | **achievable-cheap** | Two `[JsonRpcMethod]` handlers + a URI parser over material that already exists. Client-gated (not all MCP clients consume resources). *This is P1.2 — the self-introspection gap the competitive scan said nobody fills well.* |
+| O2 | **Default-to-wall** — flip `AllowMutations` default to false | **achievable-cheap** | One line + ~16-declaration audit (not 50). But: (a) already *decided* inside P3.1 — don't double-count; (b) the flip walls **writes only** — reads still return every field by default. True default-to-wall must also default the **read surface** closed. Breaking change that bites silently (tools vanish from `tools/list`) → major-version + migration guide + boot warning. |
+| AN4 | **Verb-derived annotations** (`readOnly`/`destructive`/`idempotent` from the 12-op verb enum) | **achievable-cheap** | "For free" only after **AN1**: Koan's wire shape is non-spec (`input_schema` + a custom `metadata` bag), so hints dumped there are *ignored by compliant clients*. Custom `[McpTool]` verbs (most likely to be dangerous) get nothing automatically — they need explicit attributes. |
+| AN5 | **Edge-of-capability disclosure** — turn bare `"Forbidden."` into "required: scope/role X" | **achievable-cheap** | The reason **already exists** (`AuthorizeDecision.Forbid(Reason)`, `RbacAuthorizationProvider` emits "requires one of: {roles}") and is *discarded at the sink*. The real work is a **policy gate, not plumbing**: disclosure is a privilege-enumeration oracle → must ship **deny-by-default, opt-in per surface.** *What's required vs held* = framework's job; *how to acquire it* = a templated slot for app/IdP logic. |
+| O7ʰ | **Honest errors (the swallow half)** — the 3 genuine silent catches ([ResponseTranslator.cs:149](../../src/Koan.Mcp/Execution/ResponseTranslator.cs#L149), [McpCustomToolInvoker.cs:70](../../src/Koan.Mcp/CustomTools/McpCustomToolInvoker.cs#L70)) | **achievable-cheap** | **This is the deferred F2-mcp card** — pre-scoped hygiene, reframed as the "honest tools" *feature*. The structured-output half is Tier 2. |
+
+### Tier 2 — the cathedral (hard; "declare once" or it drifts)
+
+| # | Opportunity | Verdict | The honest catch |
+|---|---|---|---|
+| O1ˢ / AN2 | **One schema projector** — make OpenAPI a *face of the same descriptor + field policy* | **achievable-hard** | Closes the "hidden from MCP, leaked in Swagger" drift. Touches ASP.NET's schema-transformer seam → risks Swagger-output changes. The honest first increment of the whole "one projection" vision. |
+| O5 / AN-topology | **Per-verb door/wall topology** — extend the single read/write axis (`AllowMutations` already partitions the 11 kinds) to per-operation scopes | **achievable-cheap to build, hard to keep honest** | **Must be declared once at the shared operation level**, consumed by REST *and* MCP — MCP-only re-opens the per-surface drift class WEB-0068 just fixed. (Folded into AN3.) |
+| O8 | **Grants + agent identity + single choke point** — `AgentGrant`/`AgentAction` as entities | **achievable-cheap in LOC, do-it-carefully in review** | RequiredScopes *is* enforced today (per-transport). Enforcement must **consolidate** to one choke point (AN3) before a grant gate is added, or you ship two divergent authz paths. Agent-identity projection is genuinely new. **"Revoked in seconds, fleet-wide" via cache coherence is best-effort, not a hard guarantee** (P3.1 punts real epoch/CAEP to the Trust fabric). |
+| O7ˢ | **MCP structured output** (`outputSchema`/`structuredContent`) | **achievable-hard** | The part that delivers "agent understands the response shape" — but it is a spec-coupled schema-derivation effort across collection/model/short-circuit shapes, not a 2-line add. |
+| AN6 | **Protocol currency** — Streamable HTTP (SSE is deprecated) + OAuth 2.1 (RFC 9728/8707) | **achievable-hard** | Transport churn obsoletes the just-shipped SSE stack. Transport + ingress validation are in-charter; dynamic client registration is over-reach. Table-stakes for "any agent from any framework." |
+
+---
+
+## §4 Cross-cutting discoveries (surfaced by grounding, not in the original list)
+
+1. **The "declare once" master principle** (§2.1) — the de-risker for O1ˢ/O3/O5/O8 *as a set*.
+   Harvest it as the governing law, not four separate fixes.
+2. **Non-spec MCP wire shape** — Koan serializes `input_schema` (snake_case) + a custom `metadata`
+   bag where the MCP spec uses `inputSchema` (camelCase) + a dedicated `annotations` object. A
+   conformance debt that **blocks AN4** and bites any strict client. Cheap, foundational. → **AN1**.
+3. **SSE is deprecated** in favor of Streamable HTTP. → **AN6**.
+4. **Default-to-wall is internally inconsistent today** — `EnableHttpSseTransport=false` and
+   `RequireAuthentication=true`-in-prod already wall-by-default, while `AllowMutations=true` does
+   not. The flip is consistency, not just policy.
+5. **"Walls" covers writes only** — the read-surface default-exposure is the *unaddressed half* of
+   default-to-wall (every public field is returned by default). → folded into the P3.1/O2 refinement.
+
+---
+
+## §5 The meta-harvests (principles, positioning, sequencing)
+
+- **Single-seam as the architectural north-star** — derive *every* external face (REST, OpenAPI,
+  MCP tools, MCP resources, typed SDK) from one entity projection. Koan proves it on execution; the
+  program is to extend it to schema, enforcement, and introspection.
+- **Default-to-wall as a design law** — the zero-config posture must be the maximally safe one; you
+  cannot misconfigure into danger because the lazy path is the locked path.
+- **The "appreciating ground" positioning** (§1) — the defensible answer to model-commoditization,
+  and the reason Koan is the *app* framework.
+- **Doorway-first sequencing** — build the small honest doorway before any cathedral.
+
+---
+
+## §6 Honest caveats (so we don't oversell)
+
+Perception-equals-capability is **transport-asymmetric** (STDIO is unfiltered by design).
+"Revoked in seconds" via cache coherence is **best-effort**, not a security guarantee.
+"Told how to earn it" is a **privilege-enumeration oracle** unless opt-in/deny-by-default.
+"Annotations for free" covers **entity CRUD only**, not the hand-written verbs most likely to be
+dangerous. Code Mode's *Auto* default **defeats its own token premise**. None of these sink the
+vision — each is the difference between a true claim and a manifesto.
+
+---
+
+## §7 The doorway (one gesture), grounded
+
+The vision's proof is that the whole list collapses into one gesture: **`[McpEntity]`,
+default-to-wall, point an agent at it.** Anonymous, the agent meets a true and bounded reading-room
+that honestly names the doors it hasn't earned and how to earn them; authenticated, the walls move,
+new verbs exist, and the dangerous ones wear their warnings where the agent can read them. Same
+code, same entities, no tool/schema/upsell/false-belief on either side.
+
+Grounded, that gesture is **reachable from Tier 0 + Tier 1**: it needs the **O2** default-to-wall
+flip (+ read-surface-closed), **O6/P1.2** resources (so the agent can ask), **AN5** opt-in
+disclosure (so locked doors name themselves), and **AN1** the wire-shape fix (so **AN4** annotations
+land where clients read them). That is the doorway. The cathedral — **AN2** schema unification,
+**AN3** enforcement consolidation, **O8/P3.1** grants, **AN6** protocol currency — grows behind it,
+once anyone can walk through.
+
+---
+
+## §8 Card map
+
+How the catalog maps onto the existing ladder and the net-new cards this harvest discovered (cards
+in [`prompts/07/`](prompts/), tracked in [`prompts/PROGRESS.md`](prompts/PROGRESS.md)):
+
+| Catalog item | Card | State |
+|---|---|---|
+| O6 — app explains itself as resources | **P1.2** (sharpened: resources are the core) | existing |
+| O2 — default-to-wall + O8 grants/audit | **P3.1** (sharpened: + read-surface-closed; enforce via AN3) | existing |
+| O9 — Code Mode | Tier-0 asset; fix = docs/default guidance + the exposure-resolver drift | — |
+| O3 — per-caller filtering | Tier-0; STDIO tripwire | — |
+| Wire-shape conformance (`inputSchema` + `annotations`) | **AN1** | new |
+| One schema projector (OpenAPI = a face) | **AN2** | new |
+| Enforcement consolidation (one choke point, all transports) | **AN3** | new |
+| Verb-derived annotations | **AN4** (← AN1) | new |
+| Edge-of-capability disclosure (opt-in) | **AN5** | new |
+| Protocol currency (Streamable HTTP + OAuth 2.1) | **AN6** | new |
+| **Relationship-expansion visibility leak** (confirmed — §10) | **AN-leak** | new (security) |
+| Governed edge traversal (edges-as-sugar) | **AN7** | new |
+
+Cards are stashed in [prompts/07/AN-cards.md](prompts/07/AN-cards.md). As each ships, re-score the
+affected pillar in [03-maturity-model.md](03-maturity-model.md) and update the
+[05 §3.1](05-strategic-position.md) capability table.
+
+---
+
+## §9 The design charter, harvested
+
+A second, more detailed frontier-model spec (the "Agent-Native Projection Design Charter") was
+read against this harvest. Treated as *meaning, not implementation* (its API shapes are
+illustrative), it sharpens the program in four ways and adds one genuinely new surface (§10).
+
+**§9.1 The One Projector — §2.1 crystallized into a function.** The charter states the
+"declare once" law as a single function:
+
+```text
+project(model × grant) → { resources, verbs, edges, schemas, errors }
+```
+
+…and names the reason it matters: *"the thing that enforces a boundary and the thing that
+describes it must be the same projection, or they drift — and a drifting security boundary is a
+boundary that lies."* This is the resolution of the legible-governance gap the competitive scan
+found unfilled industry-wide: **everyone builds two artifacts — an enforcement policy and a
+separate explanation of it — and they drift forever. The projector collapses them: the explanation
+*is* the enforcement.** This reframes **AN2** (one schema projector) + **AN3** (one enforcement
+choke point) as facets of one mandate — *there is one projector* — and tells us how to build it:
+it is not an architecture decorated with governance; it *is* the governance.
+
+**§9.2 Wall / Door / Verb — O2 + O4/AN5 + O5 are one model, not three features.** Project each
+capability by comparing its `Needs` to the caller's grant:
+
+| State | Condition | Agent sees | Can call |
+|---|---|---|---|
+| **Verb** | `Needs ≤ grant` | listed, schema'd, real | yes |
+| **Door** | `Needs > grant` *and* a door is set | named + how-to-unlock, truthfully | no |
+| **Wall** | `Needs > grant`, no door | nothing — absent | no |
+
+Default is **Wall**. A "Door" is not a separate concept — it is a *projection state* of a verb
+whose `Needs` exceeds the grant, and its signpost is **drift-proof because it derives from the same
+`Needs` that enforces it** (Invariant: *Description = Enforcement*). So default-to-wall (O2),
+honest-upsell disclosure (O4/AN5), and per-verb topology (O5) are one mechanism: *a per-grant
+projection with three states.* The agent "reasons about permission zero times — it wakes up in a
+room its own size."
+
+**§9.3 Reflection is the default voice; descriptors earn their place.** Three self-similar scales
+(app → entity → field/verb), each with one optional short descriptor *only for what the type cannot
+say.* "The empty descriptor must feel complete, not negligent" — otherwise the culture becomes
+*annotate everything* and rebuilds the schema-bloat we engineer against. Koan already has the
+reflective half (`[McpEntity]`/`[McpDescription]` + XML-doc). The new bit worth harvesting: an
+**app-level descriptor as the single visible home of app-wide posture** (`DefaultExposure`,
+`Audit`) — default-to-wall *stated once, reviewable*, not scattered per-entity.
+
+**§9.4 Walled means silent — cardinality and existence are disclosures.** A walled capability
+discloses *nothing*: not a count, not a field name, not the shape. `"this Patient has 4 [walled]
+records"` leaks volume. This sharpens O3 ("no false beliefs") into a hard invariant and is the
+breach the §10 finding exemplifies.
+
+**§9.5 The breaches are the spec.** The charter's acceptance tests (T1 lateral-movement tunnel; T2
+divergent edges, same target, asymmetric disclosure; T3 revocation-race honest failure; T4
+destructive dry-run-from-one-annotation; T5 three-tier projection from one declaration) live in the
+*asymmetric and dynamic* cases, not the happy path — *"write these first; if they pass, everything
+simpler is a special case."* This maps onto Koan's ARCH-0079 integration-tests-as-canon. Grounding
+T1/T2 against the real code found a live bug (§10).
+
+---
+
+## §10 Confirmed finding — the relationship-expansion visibility leak
+
+Grounding the charter's §5 (edges) and T1/T2 against the codebase surfaced a **live read-path
+visibility bypass**, confirmed by two independent code-readings and verified first-hand:
+
+- The **root** get-by-id read applies the WEB-0068 visibility predicates
+  ([EntityEndpointService.cs:252-260](../../src/Koan.Web/Endpoints/EntityEndpointService.cs#L252-L260)) —
+  the keyed-read gate closed in WEB-0068 (the `PassesRequestPredicates` / NotFound-on-hidden path).
+- But **relationship expansion** (`?with=all` over REST and `with:"all"` over MCP) then calls
+  `entity.GetRelatives(...)` with **no predicate re-application**
+  ([EntityEndpointService.cs:262-268](../../src/Koan.Web/Endpoints/EntityEndpointService.cs#L262-L268)).
+- And the traversal loaders fetch related rows via `Data<TChild,TKey>.All()` / `.Get()` directly,
+  filtering by foreign key in-memory — **raw, app-authority, no hook pipeline**
+  ([Entity.cs:863-920](../../src/Koan.Data.Core/Model/Entity.cs#L863-L920)).
+
+**Effect:** a caller reads a *visible* parent, expands, and receives related rows that a direct
+query of the child entity would have hidden — on **both REST and MCP**. MCP amplifies it: the agent
+cannot distinguish "forbidden to see" from "doesn't exist" (the §9.4 invariant, violated).
+
+This is the **same class** as the get-by-id bypass the WEB-0068 comment at
+[EntityEndpointService.cs:237-240](../../src/Koan.Web/Endpoints/EntityEndpointService.cs#L237-L240)
+describes — but on the **relationship-expansion / traversal surface**, which the 2026-06-14
+per-surface read-path sweep missed. (The WEB-0068 suite's `Relationship_expansion_path_is_also_gated`
+test checks only that the *root* is gated, not the expanded children.) **The charter's T1/T2 are
+exactly the missing test.**
+
+**Disposition:** high-severity read-path leak; should be triaged for a fix independent of the
+broader agent-native program. The fix *is* the charter's edge principle — traversal must run
+through the governed read path so an edge "inherits its resolved query's projection." Tracked as
+**AN-leak** (the fix, security-priority) and subsumed by **AN7** (governed edge traversal as the
+general design). Secondary: `All()`+in-memory-filter is also an N-load performance bug.
