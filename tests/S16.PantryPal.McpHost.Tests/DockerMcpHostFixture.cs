@@ -20,7 +20,7 @@ public sealed class DockerMcpHostFixture : IAsyncLifetime
     public HttpClient Client => SharedClient;
     private int _hostPort = 5026; // Dockerfile exposes 8080; compose mapped earlier to 5026. We'll map 5026 -> 8080 here for parity.
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         if (!await DockerAvailable())
         {
@@ -35,7 +35,7 @@ public sealed class DockerMcpHostFixture : IAsyncLifetime
         SharedClient.BaseAddress = new Uri($"http://localhost:{_hostPort}");
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         if (_containerId != null)
         {

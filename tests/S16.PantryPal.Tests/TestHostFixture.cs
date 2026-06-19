@@ -10,7 +10,7 @@ public sealed class TestHostFixture : IAsyncLifetime
     private static int _initialized;
     public IServiceProvider Services { get; private set; } = default!;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         if (Interlocked.CompareExchange(ref _initialized, 1, 0) != 0)
             return; // already initialized
@@ -32,9 +32,9 @@ public sealed class TestHostFixture : IAsyncLifetime
         await Task.CompletedTask;
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
-        return Task.CompletedTask; // keep host for test run duration
+        return ValueTask.CompletedTask; // keep host for test run duration
     }
 
 }
