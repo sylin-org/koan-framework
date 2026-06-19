@@ -62,7 +62,7 @@ public sealed class EntityFloorAuthorizationProvider : IAuthorizationProvider
         // grants for THIS resource, materialize them as scoped effective-claims, and re-evaluate the SAME gate (so a
         // grant composes with the bag logic / origin / Constrain, never a per-transport bypass). Anonymous = no id =
         // no grants. The common Allow path above never reaches here, so the lookup is the slow-path-only cost.
-        var subjectId = SubjectId(subject);
+        var subjectId = AuthSubject.Id(subject);
         if (_grants is not null && subjectId is not null)
         {
             var caps = await _grants.ActiveCapabilities(subjectId, entityType.Name, ct).ConfigureAwait(false);
@@ -75,15 +75,5 @@ public sealed class EntityFloorAuthorizationProvider : IAuthorizationProvider
         }
 
         return decision; // the original (token-only) denial stands
-    }
-
-    /// <summary>Subject id — <c>sub</c> (bearer KSVID) then <c>NameIdentifier</c> (cookie), matching SEC-0001's
-    /// <c>KoanIdentity.Id</c>. An anonymous principal has neither → no grants apply.</summary>
-    private static string? SubjectId(ClaimsPrincipal p)
-    {
-        var sub = p.FindFirst("sub")?.Value;
-        if (!string.IsNullOrEmpty(sub)) return sub;
-        var nameId = p.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        return string.IsNullOrEmpty(nameId) ? null : nameId;
     }
 }

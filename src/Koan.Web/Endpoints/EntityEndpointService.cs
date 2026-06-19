@@ -37,6 +37,23 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     private static readonly IReadOnlyList<Expression<Func<TEntity, bool>>> NoPredicates =
         Array.Empty<Expression<Func<TEntity, bool>>>();
 
+    // SEC-0005: an [Audit] entity writes one AgentAction per successful MUTATION (write/remove) through the normal
+    // entity path; reads are never audited. Computed once per closed generic. A bulk op records one row (EntityId="").
+    private static readonly bool IsAudited = typeof(TEntity).GetCustomAttribute<AuditAttribute>(inherit: true) is not null;
+
+    private static async System.Threading.Tasks.Task AuditMutation(EntityRequestContext context, string action, string entityId)
+    {
+        if (!IsAudited) return;
+        await new AgentAction
+        {
+            Subject = AuthSubject.Id(context.User) ?? "anonymous",
+            Resource = typeof(TEntity).Name,
+            Action = action,
+            EntityId = entityId,
+            At = DateTimeOffset.UtcNow,
+        }.Save(context.CancellationToken).ConfigureAwait(false);
+    }
+
     public EntityEndpointService(
         IDataService dataService,
         IEntityHookPipeline<TEntity> hookPipeline,
@@ -522,6 +539,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         var emit = await _hookPipeline.EmitModel(hookContext, saved);
         var payload = emit.replaced ? emit.payload : saved;
         CopyHookHeaders(context, hookContext);
+        await AuditMutation(context, EntityAuthorizeActions.Write, saved.Id?.ToString() ?? "").ConfigureAwait(false);
         return new EntityModelResult<TEntity>(context, saved, payload);
     }
 
@@ -600,6 +618,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
         context.Headers["Koan-Write-Capabilities"] = WriteCapabilitiesHeader(repo);
         CopyHookHeaders(context, hookContext);
+        await AuditMutation(context, EntityAuthorizeActions.Write, "").ConfigureAwait(false);
         return new EntityEndpointResult(context, new { upserted });
     }
 
@@ -655,6 +674,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         var emit = await _hookPipeline.EmitModel(hookContext, model);
         var payload = emit.replaced ? emit.payload : model;
         CopyHookHeaders(context, hookContext);
+        await AuditMutation(context, EntityAuthorizeActions.Remove, request.Id?.ToString() ?? "").ConfigureAwait(false);
         return new EntityModelResult<TEntity>(context, model, payload);
     }
 
@@ -693,6 +713,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         }
 
         var deleted = await Data<TEntity, TKey>.DeleteMany(targets, context.CancellationToken);
+        await AuditMutation(context, EntityAuthorizeActions.Remove, "").ConfigureAwait(false);
         return new EntityEndpointResult(context, new { deleted });
     }
 
@@ -741,6 +762,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
         if (ids.Count == 0) return new EntityEndpointResult(request.Context, new { deleted = 0 });
         var removedByPredicate = await Data<TEntity, TKey>.DeleteMany(ids, request.Context.CancellationToken);
+        await AuditMutation(request.Context, EntityAuthorizeActions.Remove, "").ConfigureAwait(false);
         return new EntityEndpointResult(request.Context, new { deleted = removedByPredicate });
     }
 
@@ -770,6 +792,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
                     return new EntityEndpointResult(request.Context, new { wouldDelete = ids.Count });
                 }
                 var deletedBounded = ids.Count == 0 ? 0 : await Data<TEntity, TKey>.DeleteMany(ids, request.Context.CancellationToken);
+                await AuditMutation(request.Context, EntityAuthorizeActions.Remove, "").ConfigureAwait(false);
                 return new EntityEndpointResult(request.Context, new { deleted = deletedBounded });
             }
         }
@@ -783,6 +806,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         }
 
         var deleted = await Entity<TEntity, TKey>.RemoveAll(request.Context.CancellationToken);
+        await AuditMutation(request.Context, EntityAuthorizeActions.Remove, "").ConfigureAwait(false);
         return new EntityEndpointResult(request.Context, new { deleted });
     }
 
@@ -876,6 +900,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         var emit = await _hookPipeline.EmitModel(hookContext, saved);
         var payload = emit.replaced ? emit.payload : saved;
         CopyHookHeaders(context, hookContext);
+        await AuditMutation(context, EntityAuthorizeActions.Write, request.Id?.ToString() ?? "").ConfigureAwait(false);
         return new EntityModelResult<TEntity>(context, saved, payload);
     }
 

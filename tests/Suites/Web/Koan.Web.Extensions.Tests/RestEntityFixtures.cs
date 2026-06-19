@@ -88,6 +88,18 @@ public sealed class Ledger : Entity<Ledger>
 }
 
 /// <summary>
+/// SEC-0005 — an <c>[Audit]</c> entity: every successful write/remove writes one <see cref="AgentAction"/> through
+/// the normal entity path. Open access (no <c>[Access]</c>) so the audit, not the gate, is what the spec exercises.
+/// </summary>
+[RestEntity]
+[Audit]
+[StorageName("rest_audited")]
+public sealed class Audited : Entity<Audited>
+{
+    public string Note { get; set; } = "";
+}
+
+/// <summary>
 /// SEC-0004 Slice B — an OWNED entity. <see cref="MemoAccess"/> scopes every row to its owner: reads narrow,
 /// create stamps server-truth, update freezes ownership, delete/mass-delete are bounded.
 /// </summary>
