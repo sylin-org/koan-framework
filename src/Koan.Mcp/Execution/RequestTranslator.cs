@@ -256,7 +256,17 @@ public sealed class RequestTranslator
             }
         }
 
-        return builder.Build(options, cancellationToken);
+        var context = builder.Build(options, cancellationToken);
+
+        // AN9 — the pin: accept a client-supplied correlation id as an opaque, untrusted, authority-free
+        // label (mint a time-ordered GUIDv7 when absent). It is threaded into the request for audit
+        // stitching only; it gates NOTHING (continuity ≠ authority — see McpCorrelation).
+        var correlationId = ReadString(args, McpCorrelation.ArgumentName);
+        context.Items[McpCorrelation.ItemsKey] = string.IsNullOrWhiteSpace(correlationId)
+            ? Koan.Core.StringId.New()
+            : correlationId;
+
+        return context;
     }
 
     private static JToken? TryGet(JObject args, string property)

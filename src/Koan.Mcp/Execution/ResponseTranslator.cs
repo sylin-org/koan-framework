@@ -35,6 +35,13 @@ public sealed class ResponseTranslator
             ["shortCircuited"] = result.IsShortCircuited
         };
 
+        // AN9 — echo the pin so the agent can stitch its trajectory across calls. Authority-free: it is
+        // diagnostics only, never a credential.
+        if (result.Context.Items.TryGetValue(McpCorrelation.ItemsKey, out var correlation) && correlation is string pin)
+        {
+            diagnostics["correlationId"] = pin;
+        }
+
         if (shortCircuit is JObject scObj && scObj.TryGetValue("statusCode", out var statusToken) && statusToken.Type == JTokenType.Integer)
         {
             diagnostics["shortCircuitStatusCode"] = statusToken;
