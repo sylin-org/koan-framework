@@ -46,6 +46,8 @@ public static class ServiceCollectionExtensions
         // P1.2: introspection resources. The framework ships koan://entities; apps (and AN8's koan://self)
         // add more via TryAddEnumerable(ServiceDescriptor.Singleton<IMcpResourceProvider, …>()).
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Koan.Mcp.Resources.IMcpResourceProvider, Koan.Mcp.Resources.EntityCatalogResourceProvider>());
+        // AN8: koan://self self-introduction (prose + structured), per grant.
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<Koan.Mcp.Resources.IMcpResourceProvider, Koan.Mcp.Resources.SelfResourceProvider>());
 
         services.TryAddSingleton<HttpSseSessionManager>();
         services.AddHostedService(sp => sp.GetRequiredService<HttpSseSessionManager>());

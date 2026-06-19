@@ -47,34 +47,21 @@ public sealed class EntityCatalogResourceProvider : IMcpResourceProvider
             return null;
         }
 
-        var options = _options.Value;
         var entities = new JArray();
 
-        foreach (var registration in _registry.Registrations)
+        // Shared per-grant projection (null principal = local-trust full; concrete principal = per grant).
+        foreach (var (registration, verbs) in EntityProjection.Visible(_registry, _options.Value, user))
         {
-            // null principal = local-trust (STDIO, AN3): no projection constraint. A concrete principal
-            // (always supplied by the remote edge, anonymous = an empty principal) is projected per grant.
-            var verbs = registration.Tools
-                .Where(tool => user is null || McpToolAccessPolicy.IsEntityToolPermitted(user, registration, tool, options))
-                .Select(tool => new JObject
-                {
-                    ["name"] = tool.Name,
-                    ["operation"] = tool.Operation.ToString(),
-                    ["isMutation"] = tool.IsMutation
-                })
-                .ToList();
-
-            // Walled-means-silent: an entity with no caller-visible verb is absent from the catalog.
-            if (verbs.Count == 0)
-            {
-                continue;
-            }
-
             entities.Add(new JObject
             {
                 ["name"] = registration.DisplayName,
                 ["description"] = registration.Attribute.Description,
-                ["verbs"] = new JArray(verbs)
+                ["verbs"] = new JArray(verbs.Select(tool => new JObject
+                {
+                    ["name"] = tool.Name,
+                    ["operation"] = tool.Operation.ToString(),
+                    ["isMutation"] = tool.IsMutation
+                }))
             });
         }
 
