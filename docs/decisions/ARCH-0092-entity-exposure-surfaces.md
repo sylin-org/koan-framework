@@ -1,6 +1,6 @@
 # ARCH-0092: Entity exposure surfaces — terse attributes, realization classes, and the unified access floor
 
-**Status**: Accepted (2026-06-19) — direction signed off by the Enterprise Architect. Two forks resolved at sign-off: **full `IAuthorize` unification, no additive MCP-only bridge**; and **`EntityToolset<T>`** (not `EntityMcpController`/`EntityMcpToolset`). **Phase 1 (EntityToolset realization) landed 2026-06-19** (`7d055b3c` hierarchy + toolset discovery · `af01f0b7` `[McpTool]` instance verbs · `c76c741f` `[ToolDescription]`/`[ToolHidden]`) — additive, conformance-green. Phases 2–4 pending (Phase 3 is the breaking cross-surface auth refactor).
+**Status**: Accepted (2026-06-19) — direction signed off by the Enterprise Architect. Two forks resolved at sign-off: **full `IAuthorize` unification, no additive MCP-only bridge**; and **`EntityToolset<T>`** (not `EntityMcpController`/`EntityMcpToolset`). **Phase 1 (EntityToolset realization) landed 2026-06-19** (`7d055b3c` hierarchy + toolset discovery · `af01f0b7` `[McpTool]` instance verbs · `c76c741f` `[ToolDescription]`/`[ToolHidden]`) — additive, conformance-green. **Phase 2 (`[RestEntity]` terse REST exposure) landed 2026-06-19** (`90dcede0`) — additive, over the existing `GenericControllers` machinery, with explicit-controller precedence; Web.Extensions e2e 16 green, MCP conformance 39 green. The `[McpEntity]` access-config demotion is **held for Phase 3** (it needs the unified floor to receive `RequiredScopes` first). Phases 3–4 pending (Phase 3 is the breaking cross-surface auth refactor).
 **Date**: 2026-06-19
 **Deciders**: Enterprise Architect
 **Scope**: The entity-**exposure** model across the REST and MCP surfaces — how an `Entity<T>` becomes a RESTful resource and an MCP toolset, how access is declared, and where each concern lives. Establishes the framework pattern that P3.1 (governed agent access) builds on, and folds in the `X-mcp-rest-authz-unify` direction.
@@ -185,8 +185,8 @@ Making the agent-facing realization a **first-class, typed, composable unit over
 ## Implementation (phased — green ratchet + dogfood between phases)
 
 1. **`EntityToolset<T>`** over `IEntityEndpointService` (MCP realization) per the authoring shape in Decision H — base `Toolset`, the `<TEntity[,TKey]>` hierarchy, `[McpTool]` instance verbs, template descriptions at the registration layer, `[ToolDescription]`/`[ToolHidden]` tuning, tune-only built-ins; + registration from toolset discovery (Decision G).
-2. **`[RestEntity]`** terse attribute over the existing `GenericControllers` machinery; reduce `[McpEntity]` to pure exposure.
-3. **Access-floor unification** — route REST base CRUD + the MCP edge through `IAuthorize`; add `[RequireScope]`; migrate `[McpEntity(RequiredScopes=…)]` → the floor; compat path for `CanRead`/`CanWrite`.
+2. ✅ **`[RestEntity]`** (`90dcede0`) terse attribute over the existing `GenericControllers` machinery — auto-registers a concrete `RestEntityController<TEntity,TKey>`, explicit-controller precedence, additive. *Reducing `[McpEntity]` to pure exposure moved to Phase 3* — the access-config demotion needs the floor to receive `RequiredScopes` first.
+3. **Access-floor unification** — route REST base CRUD + the MCP edge through `IAuthorize`; add `[RequireScope]`; migrate `[McpEntity(RequiredScopes=…)]` → the floor (and demote `[McpEntity]` to pure exposure); compat path for `CanRead`/`CanWrite`.
 4. **P3.1** — `AgentGrant`/`AgentAction` on the floor (grants, audit, cache-coherence revocation).
 
 ## Explicitly deferred / out of scope
