@@ -27,6 +27,24 @@ public sealed class EntityToolsetSpec : IClassFixture<ToolsetFixture>
     }
 
     [Fact]
+    public void ToolHidden_absolutely_removes_a_built_in_verb()
+    {
+        // [ToolHidden(Delete)] on SprocketToolset → no delete tool exists at all.
+        var resolveDelete = () => _fx.ResolveToolName("sprocket", EntityEndpointOperationKind.Delete);
+        resolveDelete.Should().Throw<System.InvalidOperationException>("the delete verb is hidden");
+        _fx.ResolveToolName("sprocket", EntityEndpointOperationKind.Collection).Should().NotBeNullOrEmpty("other verbs remain");
+    }
+
+    [Fact]
+    public async Task ToolDescription_overrides_the_template_description()
+    {
+        var query = _fx.ResolveToolName("sprocket", EntityEndpointOperationKind.Query);
+        var tool = await _fx.GetWireToolAsync(query);
+        tool!["description"]?.Value<string>().Should().Be("Search sprockets by name.",
+            "[ToolDescription] overrides the generated template description");
+    }
+
+    [Fact]
     public async Task A_custom_McpTool_instance_verb_on_a_toolset_is_discovered_and_invoked()
     {
         var call = await _fx.CallToolAsync("sprocket_echo", new JObject { ["value"] = "hi" });

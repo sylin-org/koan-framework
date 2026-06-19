@@ -1,6 +1,7 @@
 using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Core.Model;
 using Koan.Mcp;
+using Koan.Web.Endpoints;
 
 namespace Koan.Mcp.Conformance.Tests;
 
@@ -16,6 +17,8 @@ public sealed class Sprocket : Entity<Sprocket>
     public string Name { get; set; } = "";
 }
 
+[ToolHidden(EntityEndpointOperationKind.Delete)]                                  // absolute removal
+[ToolDescription(EntityEndpointOperationKind.Query, "Search sprockets by name.")] // override the template
 public sealed class SprocketToolset : EntityToolset<Sprocket>
 {
     // ARCH-0092 §H — a custom verb as an INSTANCE method on the toolset (the win over static [McpTool]:

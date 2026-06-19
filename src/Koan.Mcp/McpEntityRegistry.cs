@@ -127,7 +127,7 @@ public sealed class McpEntityRegistry
         var registrationIndex = new Dictionary<string, McpEntityRegistration>(StringComparer.OrdinalIgnoreCase);
         var toolIndex = new Dictionary<string, McpRegisteredTool>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var (type, attribute) in DiscoverEntitySources())
+        foreach (var (type, attribute, toolsetType) in DiscoverEntitySources())
         {
             var keyType = ResolveKeyType(type);
             if (keyType is null)
@@ -147,7 +147,7 @@ public sealed class McpEntityRegistry
             }
 
             var descriptor = _descriptorProvider.Describe(type, keyType);
-            var tools = _descriptorMapper.Map(type, keyType, descriptor, effectiveAttribute, entityOverride, displayName);
+            var tools = _descriptorMapper.Map(type, keyType, descriptor, effectiveAttribute, entityOverride, displayName, toolsetType);
             if (tools.Count == 0)
             {
                 _logger.LogDebug("Entity {Entity} produced zero tools. Skipping registration.", type.FullName);
@@ -214,14 +214,14 @@ public sealed class McpEntityRegistry
     // classes (the symmetric peer of EntityController) and the terse [McpEntity] attribute. The explicit
     // class wins when an entity is covered by both (§B precedence); a toolset-only entity uses
     // bare-[McpEntity] default semantics (a synthesized attribute).
-    private static IEnumerable<(Type EntityType, McpEntityAttribute Attribute)> DiscoverEntitySources()
+    private static IEnumerable<(Type EntityType, McpEntityAttribute Attribute, Type? ToolsetType)> DiscoverEntitySources()
     {
         var seen = new HashSet<Type>();
 
-        foreach (var entityType in DiscoverToolsetEntities())
+        foreach (var (entityType, toolsetType) in DiscoverToolsets())
         {
             if (!seen.Add(entityType)) continue;
-            yield return (entityType, entityType.GetCustomAttribute<McpEntityAttribute>() ?? new McpEntityAttribute());
+            yield return (entityType, entityType.GetCustomAttribute<McpEntityAttribute>() ?? new McpEntityAttribute(), toolsetType);
         }
 
         foreach (var type in DiscoverMcpEntityAnnotatedTypes())
@@ -229,7 +229,7 @@ public sealed class McpEntityRegistry
             if (!seen.Add(type)) continue;
             var attribute = type.GetCustomAttribute<McpEntityAttribute>();
             if (attribute is null) continue;
-            yield return (type, attribute);
+            yield return (type, attribute, null);
         }
     }
 
@@ -258,9 +258,10 @@ public sealed class McpEntityRegistry
         }
     }
 
-    // Concrete EntityToolset<TEntity[,TKey]> subclasses → the entity they realize (the first generic arg of
-    // the closed EntityToolset<,> in the base chain).
-    private static IEnumerable<Type> DiscoverToolsetEntities()
+    // Concrete EntityToolset<TEntity[,TKey]> subclasses → (the entity they realize, the toolset type).
+    // The entity is the first generic arg of the closed EntityToolset<,> in the base chain; the toolset type
+    // carries the [ToolDescription]/[ToolHidden] tuning.
+    private static IEnumerable<(Type EntityType, Type ToolsetType)> DiscoverToolsets()
     {
         foreach (var assembly in AssemblyCache.Instance.GetAllAssemblies())
         {
@@ -278,7 +279,7 @@ public sealed class McpEntityRegistry
             {
                 if (type is null || !type.IsClass || type.IsAbstract) continue;
                 var entityType = ExtractToolsetEntityType(type);
-                if (entityType is not null) yield return entityType;
+                if (entityType is not null) yield return (entityType, type);
             }
         }
     }

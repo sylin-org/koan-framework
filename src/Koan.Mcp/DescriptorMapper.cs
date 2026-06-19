@@ -39,7 +39,8 @@ public sealed class DescriptorMapper
         EntityEndpointDescriptor descriptor,
         McpEntityAttribute attribute,
         McpEntityOverride? entityOverride,
-        string displayName)
+        string displayName,
+        Type? toolsetType = null)
     {
         if (entityType is null) throw new ArgumentNullException(nameof(entityType));
         if (keyType is null) throw new ArgumentNullException(nameof(keyType));
@@ -51,10 +52,21 @@ public sealed class DescriptorMapper
         var requiredScopes = entityOverride?.RequiredScopes?.Length > 0
             ? entityOverride!.RequiredScopes
             : attribute.RequiredScopes;
+
+        // ARCH-0092 §H: an EntityToolset<T> realization may tune its built-in verbs via class attributes —
+        // [ToolHidden(op)] removes a verb absolutely; [ToolDescription(op, text)] overrides the template.
+        var hidden = ReadHidden(toolsetType);
+        var descriptionOverrides = ReadDescriptionOverrides(toolsetType);
+
         var tools = new List<McpToolDefinition>();
 
         foreach (var operation in descriptor.Operations)
         {
+            if (hidden is not null && hidden.Contains(operation.Kind))
+            {
+                continue;
+            }
+
             var isMutation = MutationKinds.Contains(operation.Kind);
             if (isMutation && !allowMutations)
             {
@@ -64,7 +76,9 @@ public sealed class DescriptorMapper
 
             var toolName = BuildToolName(displayName, attribute.ToolPrefix, operation.Kind);
             var jsonSchema = _schemaBuilder.BuildParametersSchema(entityType, keyType, descriptor, operation, attribute, entityOverride);
-            var description = BuildDescription(attribute.Description, operation.Kind, displayName);
+            var description = descriptionOverrides is not null && descriptionOverrides.TryGetValue(operation.Kind, out var overridden)
+                ? overridden
+                : BuildDescription(attribute.Description, operation.Kind, displayName);
 
             // Convert System.Text.Json.Nodes.JsonObject -> Newtonsoft JObject for unified JSON layer
             var jSchema = JObject.Parse(jsonSchema.ToJsonString());
@@ -81,6 +95,29 @@ public sealed class DescriptorMapper
         }
 
         return tools;
+    }
+
+    private static HashSet<EntityEndpointOperationKind>? ReadHidden(Type? toolsetType)
+    {
+        if (toolsetType is null) return null;
+        var hidden = new HashSet<EntityEndpointOperationKind>();
+        foreach (var attr in toolsetType.GetCustomAttributes(typeof(ToolHiddenAttribute), inherit: true))
+        {
+            hidden.Add(((ToolHiddenAttribute)attr).Operation);
+        }
+        return hidden.Count == 0 ? null : hidden;
+    }
+
+    private static Dictionary<EntityEndpointOperationKind, string>? ReadDescriptionOverrides(Type? toolsetType)
+    {
+        if (toolsetType is null) return null;
+        Dictionary<EntityEndpointOperationKind, string>? overrides = null;
+        foreach (var attr in toolsetType.GetCustomAttributes(typeof(ToolDescriptionAttribute), inherit: true))
+        {
+            var description = (ToolDescriptionAttribute)attr;
+            (overrides ??= new())[description.Operation] = description.Description; // last write wins
+        }
+        return overrides;
     }
 
     private static string BuildToolName(string displayName, string? prefix, EntityEndpointOperationKind operation)
