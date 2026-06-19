@@ -263,6 +263,8 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             AbsoluteMaxRecords = policy.AbsoluteMaxRecords,
             Accept = HttpContext.Request.Headers["Accept"].ToString(),
             BasePath = HttpContext.Request.Path.HasValue ? HttpContext.Request.Path.Value : "/",
+            // SEC-0004 (§C): ?access=true opts into the per-row `access` sidecar (decoupled from ?with= expansion).
+            IncludeAccess = GetBooleanQueryValue(query, Koan.Web.Authorization.AccessProjection.QueryToggle),
             QueryParameters = ToQueryDictionary(query)
         };
 

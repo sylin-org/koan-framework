@@ -113,6 +113,59 @@ public sealed class MemoAccess : EntityAccess<Memo>
 }
 
 /// <summary>
+/// SEC-0004 Slice C — PUBLIC read, owner-only write/remove. The read Constrain is OPEN, so a collection returns
+/// every principal's rows; the per-row <c>can</c> projection then DIFFERS by row (own rows advertise
+/// <c>read, write, remove</c>; others advertise <c>read</c> only). That divergence is the projection's reason to
+/// exist — it makes allow-by-default honest.
+/// </summary>
+[RestEntity]
+[StorageName("rest_sprockets")]
+public sealed class Sprocket : Entity<Sprocket>
+{
+    public string? OwnerId { get; set; }
+    public string Spec { get; set; } = "";
+}
+
+/// <summary>Read open (every row visible); write/remove narrow to the owner; create stamps server-truth.</summary>
+public sealed class SprocketAccess : EntityAccess<Sprocket>
+{
+    protected override Expression<Func<Sprocket, bool>>? Owner => s => s.OwnerId == CurrentUserId;
+
+    public override IAccessFilter<Sprocket> Constrain(IAccessFilter<Sprocket> q, AccessAction action) => action switch
+    {
+        AccessAction.Create => q.Stamp(s => s.OwnerId, CurrentUserId),
+        AccessAction.Update => q.Where(Owner!).Stamp(s => s.OwnerId, CurrentUserId),
+        AccessAction.Delete => q.Where(Owner!),
+        _ => q, // Read is OPEN — the whole collection is visible; `can` differs per row
+    };
+}
+
+/// <summary>
+/// SEC-0004 Slice C — a CUSTOM verb. <see cref="OrderAccess"/> declares a "fulfill" verb (admin-only) in
+/// <see cref="AccessGate.Custom"/>; the per-row projection surfaces it in <c>can</c> exactly when permitted (an
+/// admin sees it; others do not), proving custom verbs participate with zero extra wiring.
+/// </summary>
+[RestEntity]
+[StorageName("rest_orders")]
+public sealed class Order : Entity<Order>
+{
+    public string Item { get; set; } = "";
+}
+
+/// <summary>Read/write/remove stay open; only the custom "fulfill" verb is gated (is:admin).</summary>
+public sealed class OrderAccess : EntityAccess<Order>
+{
+    protected override AccessGate ConfigureGate()
+    {
+        var custom = new Dictionary<string, ActionGate>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fulfill"] = Gate.Is("admin"),
+        };
+        return new AccessGate(new Dictionary<string, ActionGate>(StringComparer.OrdinalIgnoreCase), custom);
+    }
+}
+
+/// <summary>
 /// Test authentication handler: a request carrying <c>X-Test-Scopes</c> (space-delimited) and/or
 /// <c>X-Test-Roles</c> (space/comma-delimited) is authenticated with those scopes and roles; without either header
 /// the request stays anonymous.

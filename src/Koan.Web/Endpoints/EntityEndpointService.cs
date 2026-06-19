@@ -31,17 +31,23 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     private readonly IDataService _dataService;
     private readonly IEntityHookPipeline<TEntity> _hookPipeline;
     private readonly IAuthorize? _authorize;
+    private readonly IAccessGateCache? _gateCache;
     private readonly ILogger<EntityEndpointService<TEntity, TKey>>? _logger;
+
+    private static readonly IReadOnlyList<Expression<Func<TEntity, bool>>> NoPredicates =
+        Array.Empty<Expression<Func<TEntity, bool>>>();
 
     public EntityEndpointService(
         IDataService dataService,
         IEntityHookPipeline<TEntity> hookPipeline,
         IAuthorize? authorize = null,
+        IAccessGateCache? gateCache = null,
         ILogger<EntityEndpointService<TEntity, TKey>>? logger = null)
     {
         _dataService = dataService ?? throw new ArgumentNullException(nameof(dataService));
         _hookPipeline = hookPipeline ?? throw new ArgumentNullException(nameof(hookPipeline));
         _authorize = authorize;
+        _gateCache = gateCache;
         _logger = logger;
     }
 
@@ -114,6 +120,64 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         var filter = new AccessFilter<TEntity>();
         accessor.Constrain(filter, action);
         return filter;
+    }
+
+    // SEC-0004 (§C): does the COARSE seam allow this verb at all (respecting every IAuthorize provider)? The outer
+    // guard of the per-row projection — the row-bound gate + Constrain then refine it. Gate() is memoized per verb.
+    private async Task<bool> CoarseAllows(EntityRequestContext context, string action)
+        => _authorize is null || await Gate(context, action).ConfigureAwait(false) is null;
+
+    // SEC-0004 (§C): assemble the per-row projector ONCE per request — coarse seam decisions, the entity's compiled
+    // gate (the SAME gate the floor provider enforces, so the projection never disagrees with enforcement), the
+    // principal, the realization's single Owner predicate, and the per-verb Constrain predicates (Update is the
+    // row-bound write; Delete the row-bound remove).
+    private async Task<RowProjection<TEntity>> CreateProjector(EntityRequestContext context)
+    {
+        var coarseRead = await CoarseAllows(context, EntityAuthorizeActions.Read).ConfigureAwait(false);
+        var coarseWrite = await CoarseAllows(context, EntityAuthorizeActions.Write).ConfigureAwait(false);
+        var coarseRemove = await CoarseAllows(context, EntityAuthorizeActions.Remove).ConfigureAwait(false);
+
+        var gate = _gateCache?.GetOrCompile(typeof(TEntity)) ?? AccessGate.Open;
+        var accessor = ResolveAccessor(context);
+        var authed = context.User.Identity?.IsAuthenticated == true;
+        var owner = accessor?.OwnerExpression?.Compile();
+
+        var readPredicates = accessor is null ? NoPredicates : ConstrainFor(accessor, AccessAction.Read).Predicates;
+        var writePredicates = accessor is null ? NoPredicates : ConstrainFor(accessor, AccessAction.Update).Predicates;
+        var removePredicates = accessor is null ? NoPredicates : ConstrainFor(accessor, AccessAction.Delete).Predicates;
+
+        return new RowProjection<TEntity>(gate, context.User, coarseRead, coarseWrite, coarseRemove,
+            owner, authed, readPredicates, writePredicates, removePredicates);
+    }
+
+    // SEC-0004 (§C): the per-row can:[] manifest for a set of rows (id → { can }). Computed once per request and
+    // stored on the context for any surface to render — REST wraps it as the `access` sidecar, the MCP edge
+    // attaches it to the tool-result metadata.
+    private async Task<Dictionary<string, object>> BuildAccessManifest(EntityRequestContext context, IReadOnlyList<TEntity> rows)
+    {
+        var projector = await CreateProjector(context).ConfigureAwait(false);
+        var manifest = new Dictionary<string, object>(rows.Count, StringComparer.Ordinal);
+        foreach (var row in rows)
+        {
+            // The key is the row's id rendered as a string — it must match the `id` field the client reads off the
+            // serialized item to correlate. This holds for the canonical IEntity key types (string / Guid /
+            // numeric: ToString() is the same text JSON emits). The verb list is lowercase-by-design so no
+            // serializer naming policy reshapes the manifest's `can` / `items` / `access` keys.
+            var id = GetEntityId(row)?.ToString();
+            if (id is null) continue;
+            manifest[id] = new { can = projector.Can(row) };
+        }
+        context.Items[AccessProjection.ManifestKey] = manifest;
+        return manifest;
+    }
+
+    // SEC-0004 (§C): a request opts into the projection when a surface asks — the MCP edge sets RequestKey by
+    // default; REST sets includeAccess from ?access=true. wrapRest distinguishes the REST sidecar (wrap the payload
+    // into { items, access }) from the MCP path (manifest read off the context; the bare payload is unchanged).
+    private static bool ShouldProject(EntityRequestContext context, bool includeAccess, out bool wrapRest)
+    {
+        wrapRest = includeAccess;
+        return includeAccess || context.Items.ContainsKey(AccessProjection.RequestKey);
     }
 
     public async Task<EntityCollectionResult<TEntity>> GetCollection(EntityCollectionRequest request)
@@ -227,6 +291,15 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         payload = emit.replaced ? emit.payload : payload;
         CopyHookHeaders(context, hookContext);
 
+        // SEC-0004 (§C): the per-row capability projection. Opt-in (REST ?access=true / MCP default) keeps the bare
+        // array the default for existing consumers; REST wraps { items, access }, MCP reads the manifest off the
+        // context. Computed after EmitCollection so `items` carries whatever the response would have been.
+        if (ShouldProject(context, request.IncludeAccess, out var wrapAccess))
+        {
+            var manifest = await BuildAccessManifest(context, list).ConfigureAwait(false);
+            if (wrapAccess) payload = new { items = payload, access = manifest };
+        }
+
         return new EntityCollectionResult<TEntity>(context, list, total, payload);
     }
 
@@ -282,6 +355,13 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         var emit = await _hookPipeline.EmitCollection(hookContext, list);
         var payload = emit.replaced ? emit.payload : list;
         CopyHookHeaders(context, hookContext);
+
+        // SEC-0004 (§C): the body-query path has no REST sidecar toggle (the bare body schema stays stable); the MCP
+        // edge still opts in by default, so the manifest is computed + stashed for the tool-result metadata.
+        if (ShouldProject(context, includeAccess: false, out _))
+        {
+            await BuildAccessManifest(context, list).ConfigureAwait(false);
+        }
 
         return new EntityCollectionResult<TEntity>(context, list, total, payload);
     }
@@ -341,6 +421,16 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             // revealed to a caller the visibility hook excludes.
             CopyHookHeaders(context, hookContext);
             return new EntityModelResult<TEntity>(context, null, null, new NotFoundResult());
+        }
+
+        // SEC-0004 (§C): refine the single-item Koan-Access header against THIS row — but only when a realization
+        // exists, since without one the coarse header from AnnotateAccess is already exact (no Owner/Constrain to
+        // bind). This is the single-item form of the per-row projection: a public-read/owner-write row fetched by a
+        // non-owner advertises `read`, not `read, write` — honest about what the principal may actually do.
+        if (_authorize is not null && ResolveAccessor(context) is not null)
+        {
+            var projector = await CreateProjector(context).ConfigureAwait(false);
+            context.Headers["Koan-Access"] = string.Join(", ", projector.Can(model));
         }
 
         if (!string.IsNullOrWhiteSpace(request.With) && request.With.Contains("all", StringComparison.OrdinalIgnoreCase) && model is Entity<TEntity, TKey>)

@@ -57,8 +57,10 @@ public sealed class RestEntityWebFactory : IAsyncLifetime
                     AppHost.Current = null;
                     services.AddKoan();
                     services.AddKoanControllersFrom<CogController>();
-                    // SEC-0004 Slice B: register the realization (belt-and-suspenders vs discovery in the test assembly).
+                    // SEC-0004 Slice B/C: register the realizations (belt-and-suspenders vs discovery in the test assembly).
                     services.AddScoped<EntityAccess<Memo>, MemoAccess>();
+                    services.AddScoped<EntityAccess<Sprocket>, SprocketAccess>();
+                    services.AddScoped<EntityAccess<Order>, OrderAccess>();
                     // ARCH-0092 Phase 3.2: a test auth scheme so the entity floor can be exercised end-to-end.
                     services.AddAuthentication(TestAuthHandler.SchemeName)
                         .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, _ => { });

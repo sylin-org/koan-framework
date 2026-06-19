@@ -66,6 +66,14 @@ public sealed class ResponseTranslator
             }
         }
 
+        // SEC-0004 (§C) — the per-row capability manifest (id → { can }), default-on for agents. Computed once in
+        // the shared endpoint and read off the context here, rendered into the tool-result metadata. A single-item
+        // operation carries its verbs in the Koan-Access header (already in `headers`) instead.
+        if (result.Context.Items.TryGetValue(Koan.Web.Authorization.AccessProjection.ManifestKey, out var manifest) && manifest is not null)
+        {
+            diagnostics["access"] = SerializeObject(manifest);
+        }
+
         return McpToolExecutionResult.SuccessResult(payload, shortCircuit, headers, warnings, diagnostics);
     }
 

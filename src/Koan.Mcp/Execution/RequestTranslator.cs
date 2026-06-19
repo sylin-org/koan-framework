@@ -269,6 +269,11 @@ public sealed class RequestTranslator
         // retrospective diff). REST stays cost-free until it opts in the same way.
         context.Items[EntityMutationProbe.WantsDeltaKey] = true;
 
+        // SEC-0004 (§C) — the MCP edge opts into the per-row capability projection BY DEFAULT: agents need the
+        // `can:[]` manifest to plan, and MCP carries structured metadata natively. REST opts in per request
+        // (?access=true). The endpoint computes the manifest once and stashes it for the ResponseTranslator.
+        context.Items[Koan.Web.Authorization.AccessProjection.RequestKey] = true;
+
         // AN9 — the pin: accept a client-supplied correlation id as an opaque, untrusted, authority-free
         // label (mint a time-ordered GUIDv7 when absent). It is threaded into the request for audit
         // stitching only; it gates NOTHING (continuity ≠ authority — see McpCorrelation).

@@ -67,6 +67,10 @@ public abstract class EntityAccess<TEntity> : IEntityAccessRealization
     /// can be lowered to the unified filter for mass-delete pushdown. <c>null</c> = no ownership concept.</summary>
     protected virtual Expression<Func<TEntity, bool>>? Owner => null;
 
+    /// <summary>SEC-0004 (§C): the bound <see cref="Owner"/> predicate, for the per-row projection's owner probe.
+    /// Read after <see cref="Bind"/> so it closes over the current principal's <see cref="CurrentUserId"/>.</summary>
+    internal Expression<Func<TEntity, bool>>? OwnerExpression => Owner;
+
     /// <summary>Scope rows / stamp the owner, per action. Default = no-op (all rows — allow-by-default). See the
     /// canonical example in the type remarks.</summary>
     public virtual IAccessFilter<TEntity> Constrain(IAccessFilter<TEntity> q, AccessAction action) => q;

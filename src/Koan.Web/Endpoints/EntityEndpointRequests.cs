@@ -22,6 +22,9 @@ public sealed class EntityCollectionRequest
     public int AbsoluteMaxRecords { get; init; }
     public string? Accept { get; init; }
     public string? BasePath { get; init; }
+    // SEC-0004 (§C): opt the collection response into the per-row `access` sidecar (REST ?access=true). Default
+    // false keeps the bare array for existing consumers.
+    public bool IncludeAccess { get; init; }
     public IReadOnlyDictionary<string, string?> QueryParameters { get; init; } = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
 }
 
