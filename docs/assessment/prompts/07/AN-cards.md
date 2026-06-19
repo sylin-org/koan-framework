@@ -195,3 +195,39 @@ stitching + continuity**, carrying **zero authority**.
 - **NOTE**: net-new but cheap (GUIDv7 minter + passive trace header already exist); pair with P3.1
   grants/audit. The continuity≠authority contract is a *standing guardrail* for all of P3 — never let
   a pin/session/connection id gate authorization.
+
+## AN10 · Auth on-ramp — device grant (RFC 8628), Reference=Intent 〔companion, 09 §12〕
+
+**The missing half of the cold-start funnel (AN8).** A headless agent earns a grant via the OAuth 2.0
+Device Authorization Grant (RFC 8628), seated in MCP's OAuth-2.1 resource-server model — net-new
+(Koan has only interactive auth-code/OIDC + inbound bearer today), built on the WEB-0071 handler
+substrate. The menu *advertises* the door; this *opens* it.
+
+- **DECIDED — Reference = Intent, NOT enumeration (the architect's correction):** there is **no
+  `[McpAuth(providers…)]` attribute and no marker class.** The on-ramp projects automatically when
+  `Koan.Mcp` + ≥1 configured+healthy auth provider are present, offering exactly the set from
+  **`IProviderRegistry.EffectiveProviders`** — the same set Koan already projects at
+  `GET /.well-known/auth/providers` ([DiscoveryController.cs:10-14](../../../../src/Koan.Web.Auth/Controllers/DiscoveryController.cs#L10-L14));
+  reuse it, the provider list is a projection, not authored. Production gating
+  ([ProviderRegistry.cs:65-83](../../../../src/Koan.Web.Auth/Providers/ProviderRegistry.cs#L65-L83))
+  is inherited. Posture = config (`Koan:Mcp:Auth:*` to disable the on-ramp or restrict which
+  configured providers are offered to agents), **defaulting to all configured** — opt-out, never
+  enumeration.
+- **DECIDED — adopt, don't invent:** implement RFC 8628 device grant on the maintained ASP.NET
+  OAuth/OIDC handlers (WEB-0071 `AuthSchemeSeeder`), PKCE on the browser leg. Do not hand-roll code
+  entropy / expiry / backoff / single-use redemption.
+- **DECIDED — the three strings (invariant #13):** `user_code` (human, low-entropy, say-aloud),
+  `device_code` (agent-only, high-entropy, single-use secret — the poll key + bearer; never logged in
+  full), `pin` (authority-free correlation, AN9). Never equal/derived/interchangeable. The pin is
+  **never accepted at the token endpoint**; authority redeems on the `device_code` alone.
+- **BUILD:** MCP capability `auth.signin { provider }` → device-authorization request → return
+  `verification_uri(_complete)` + `user_code` + `device_code` + `interval` + `expires_in`;
+  `auth.poll { device_code }` → `authorization_pending` / `slow_down` / `complete(grant)` / `expired`
+  / `denied`. On complete, bind the grant to the session and **trigger re-projection** (charter §5);
+  stale-greeting-fresh-enforcement holds (revocation caught at next action). The human consent event
+  is a first-class audit entity stitched on the pin.
+- **TEST:** charter **T9** (poll-key ≠ pin / single-use / `device_code` never logged in full) +
+  **T10** (cold-start walkable end-to-end; additions-only delta; one pin). Plus: the offered provider
+  set equals `IProviderRegistry` (no enumeration drift); production gating respected.
+- **DEPS:** the grant model (P3.1) + the projector (AN3) + AN9 (the pin) + the WEB-0071 auth
+  substrate. It is the **front door** — built after the room exists.

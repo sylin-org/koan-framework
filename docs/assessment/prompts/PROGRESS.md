@@ -141,6 +141,7 @@ of the rest.**
 | AN7 | T3 | AN-leak | pending | | | | governed edge traversal (edges-as-sugar, never verbs); subsumes AN-leak |
 | AN8 | T3 | P1.2/O6, AN3 | pending | | | | self-introduction surface — `koan://self` prose + structured; the menu writes itself from descriptors; cold-start funnel (charter v2 §11.1) |
 | AN9 | T2 | — | pending | | | | authority-free correlation ("pin") — GUIDv7 (`StringId.New()` exists) + `x-correlation-id` + audit stitching; **continuity ≠ authority** guardrail (no session-fixation risk today — preserve it) (charter v2 §11.3) |
+| AN10 | T3 | P3.1, AN3, AN9, WEB-0071 | pending | | | | auth on-ramp — device grant (RFC 8628) for headless agents; **Reference=Intent, NOT enumeration** (reuse `IProviderRegistry`/`/.well-known/auth/providers`; no `[McpAuth(...)]` attribute); the 3-strings invariant #13 (device_code ≠ pin); device-grant is net-new (companion spec, 09 §12) |
 
 ## Cards discovered during pilot execution
 

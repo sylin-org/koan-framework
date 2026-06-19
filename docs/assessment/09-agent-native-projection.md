@@ -221,6 +221,7 @@ in [`prompts/07/`](prompts/), tracked in [`prompts/PROGRESS.md`](prompts/PROGRES
 | Governed edge traversal (edges-as-sugar) | **AN7** | new |
 | Self-introduction surface (`koan://self` prose + structured) | **AN8** | new (v2 — §11.1) |
 | Authority-free correlation (the "pin") | **AN9** | new (v2 — §11.3) |
+| Auth on-ramp — device grant (RFC 8628), Reference=Intent | **AN10** | new (companion — §12) |
 
 Cards are stashed in [prompts/07/AN-cards.md](prompts/07/AN-cards.md). As each ships, re-score the
 affected pillar in [03-maturity-model.md](03-maturity-model.md) and update the
@@ -395,3 +396,61 @@ complete self-consistent world), **T7** (the pin carries no authority — replay
 the anonymous world; session-fixation resistance), **T8** (stepped continuity across *different
 nodes* — statelessness; the upgrade delta lists additions only). These fold into AN8/AN9 as their
 specs.
+
+---
+
+## §12 The auth on-ramp — device grant, harvested (charter companion)
+
+A companion spec (`[McpAuth]` / "Agent-Native Authentication") answers the question the projection
+charter assumed away: **how a headless agent earns a grant.** It is the missing half of the
+cold-start funnel (§11.1 / AN8) — the menu *advertises* the door; the on-ramp *opens* it. → card
+**AN10**.
+
+**§12.1 The shape is right: device grant (RFC 8628).** A headless agent can't show a browser, so use
+the OAuth 2.0 Device Authorization Grant: the human completes the browser leg elsewhere and the two
+halves rendezvous on the `device_code` poll. **Adopt, don't invent** — the parts you'd reinvent
+(code entropy, expiry, polling backoff, single-use redemption, PKCE) are the hardened parts; a DIY
+auth hole in the most-exercised path is exactly what "Built on Koan = the wall holds" cannot survive.
+Grounded: device-grant is **net-new** (Koan has only interactive auth-code/OIDC + inbound bearer
+today), built on the maintained ASP.NET OAuth/OIDC handler substrate from WEB-0071/E5.
+
+**§12.2 The three strings = continuity ≠ authority, applied to auth (invariant #13).** The flow mints
+three strings with three jobs and three sensitivities, never equal/derived/interchangeable:
+- `user_code` — human-held, low-entropy, safe to say aloud (inert without a human browser login).
+- `device_code` — **agent-only, high-entropy, single-use SECRET**; the poll key AND the bearer of the
+  result. Whoever presents it gets the token. Never logged in full, never shared.
+- `pin` — the authority-free correlation id (§11.3 / AN9); least-sensitive, lives in the greeting.
+
+**Invariant #13 — the poll key is not the pin.** Authority redeems on the `device_code` alone; the
+`pin` is **never accepted at the token endpoint.** This is AN9's continuity ≠ authority extended to
+the auth flow, and the reason the three strings stay distinct end-to-end.
+
+**§12.3 The deviation — and why Koan already dissolves it.** The spec proposes
+`[McpAuth(ProviderA, ProviderB)]` (enumerating providers on a marker class). **That contradicts
+Reference = Intent**, and grounding shows Koan already does it better:
+- "Configured ⇒ available, no enumeration" is Koan's real model — providers self-register via
+  `IAuthProviderContributor` per connector package, composed in `ProviderRegistry`, seeded as ASP.NET
+  schemes by `AuthSchemeSeeder`
+  ([ProviderRegistry.cs:15-83](../../src/Koan.Web.Auth/Providers/ProviderRegistry.cs#L15-L83)). No
+  per-app provider list.
+- **The provider set is ALREADY a projection** — `IProviderRegistry.GetDescriptors()` is surfaced at
+  `GET /.well-known/auth/providers`
+  ([DiscoveryController.cs:10-14](../../src/Koan.Web.Auth/Controllers/DiscoveryController.cs#L10-L14)).
+  The on-ramp reuses *that*; the list is discovered, not authored.
+- **Production gating already exists** — dynamic providers are off in prod unless explicitly
+  configured ([ProviderRegistry.cs:65-83](../../src/Koan.Web.Auth/Providers/ProviderRegistry.cs#L65-L83)).
+
+**The corrected surface (Koan-idiomatic):** no `[McpAuth]` enumeration, no marker class. Reference
+`Koan.Mcp` + reference ≥1 auth connector + configure it → the `auth.signin` device-grant capability
+**projects automatically over MCP, offering exactly the configured+healthy providers from
+`IProviderRegistry`**. Posture (turn the on-ramp off, or restrict which configured providers are
+offered to agents) is **config, defaulting to all configured** — opt-out, never enumeration. This is
+the architect's principle verbatim: *if an auth provider is present and properly configured, it
+should be available.* It also kills a drift class — an enumerating attribute would be a second source
+of truth that silently diverges from what's actually configured.
+
+**§12.4 Tests.** **T9** (poll-key ≠ pin: presenting the `pin` / `user_code` / a random value at the
+token endpoint yields nothing; only the single-use `device_code` redeems, and only once;
+`device_code` never appears in full in any audit entity). **T10** (cold-start on-ramp walkable
+end-to-end: anonymous reads the door → `auth.signin` → artifacts → [human browser leg] → poll on
+`device_code` → grant → re-project; additions-only delta; the whole trajectory stitched on one pin).
