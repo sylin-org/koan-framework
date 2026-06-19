@@ -4,10 +4,10 @@ domain: mcp
 title: "MCP — pillar map"
 audience: [developers, ai-agents]
 status: current
-last_updated: 2026-06-18
+last_updated: 2026-06-19
 framework_version: v0.17.0
 validation:
-  date_last_tested: 2026-06-18
+  date_last_tested: 2026-06-19
   status: verified
   scope: docs/reference/cards/mcp.md
 ---
@@ -17,6 +17,8 @@ validation:
 > One-screen map of the MCP pillar — exposing Koan entities + verbs to MCP clients. Full detail: [mcp-http-sse-howto.md](../../guides/mcp-http-sse-howto.md).
 
 **What it does** — Projects your `Entity<T>` types and hand-written verbs as Model Context Protocol tools that AI clients invoke over JSON-RPC (stdio + HTTP/SSE) ([AI-0012](../../decisions/AI-0012-mcp-jsonrpc-runtime.md)). Annotate an entity `[McpEntity]` and its CRUD/query operations become MCP tools — same schema and read-path visibility predicates as the REST surface ([WEB-0068](../../decisions/WEB-0068-query-options-predicates.md)). Referencing `Koan.Mcp` + calling `AddKoanMcp()` is the whole opt-in (Reference = Intent); **Code Mode** ([AI-0014](../../decisions/AI-0014-mcp-code-mode.md)) lets a client compose several tools in one sandboxed script instead of one round-trip per call.
+
+> **Beyond tools** — the server also emits spec-shaped tool annotations (`readOnly`/`destructive`/`idempotent`; mark custom verbs with `[McpReadOnly]`/`[McpDestructive]`/`[McpIdempotent]`), introspection **resources** (`koan://entities`, `koan://self`) over the `IMcpResourceProvider` seam, and an authority-free `correlationId` pin — all projected per grant. See the [agent-native projection card](agent-native.md).
 
 ## The one canonical pattern
 
