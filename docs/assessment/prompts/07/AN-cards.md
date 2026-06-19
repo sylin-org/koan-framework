@@ -18,7 +18,10 @@ second code path** that lets it drift. **Default is Wall** (least privilege is t
 
 ---
 
-## AN-leak · Relationship-expansion visibility bypass 〔SECURITY — do first〕
+## AN-leak · Relationship-expansion visibility bypass 〔SECURITY — do first · T3〕
+
+> **Runnable card**: [AN-leak-relationship-expansion-visibility.md](AN-leak-relationship-expansion-visibility.md)
+> — the full self-contained session (preamble + anchors + the asymmetric T1/T2 tests as the spec).
 
 **Confirmed finding (09 §10), high severity.** Relationship expansion (`?with=all` REST +
 `with:"all"` MCP) and `GetRelatives`/`GetChildren`/`GetParents` fetch related rows via
