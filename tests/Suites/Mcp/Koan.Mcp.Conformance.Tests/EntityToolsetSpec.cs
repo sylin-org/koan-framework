@@ -27,6 +27,14 @@ public sealed class EntityToolsetSpec : IClassFixture<ToolsetFixture>
     }
 
     [Fact]
+    public async Task A_custom_McpTool_instance_verb_on_a_toolset_is_discovered_and_invoked()
+    {
+        var call = await _fx.CallToolAsync("sprocket_echo", new JObject { ["value"] = "hi" });
+        McpHarnessFixtureBase.ContentText(call).Should().Be("echo:hi",
+            "an instance [McpTool] verb on a toolset is discovered and invoked on a DI-created instance");
+    }
+
+    [Fact]
     public async Task A_toolset_only_entity_is_fully_functional_end_to_end()
     {
         var upsert = _fx.ResolveToolName("sprocket", EntityEndpointOperationKind.Upsert);

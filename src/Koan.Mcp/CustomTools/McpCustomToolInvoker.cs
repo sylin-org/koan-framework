@@ -2,6 +2,7 @@ using System;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json.Linq;
 
 namespace Koan.Mcp.CustomTools;
@@ -30,10 +31,16 @@ public sealed class McpCustomToolInvoker
             };
         }
 
+        // ARCH-0092 §H: static verbs invoke with a null target; an instance verb on a Toolset is invoked on a
+        // DI-created instance (constructor dependencies resolved from the request scope).
+        var target = tool.Method.IsStatic
+            ? null
+            : ActivatorUtilities.CreateInstance(services, tool.Method.DeclaringType!);
+
         object? result;
         try
         {
-            result = tool.Method.Invoke(null, args);
+            result = tool.Method.Invoke(target, args);
         }
         catch (TargetInvocationException tie) when (tie.InnerException is not null)
         {

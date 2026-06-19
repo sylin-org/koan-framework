@@ -18,4 +18,8 @@ public sealed class Sprocket : Entity<Sprocket>
 
 public sealed class SprocketToolset : EntityToolset<Sprocket>
 {
+    // ARCH-0092 §H — a custom verb as an INSTANCE method on the toolset (the win over static [McpTool]:
+    // this-context + DI). Discovered + invoked on a DI-created toolset instance.
+    [McpTool(Name = "sprocket_echo", Description = "Echoes a value through the toolset instance.")]
+    public string Echo(string value) => $"echo:{value}";
 }

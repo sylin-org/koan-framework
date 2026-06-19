@@ -86,6 +86,7 @@ public sealed class McpCustomToolRegistry
             {
                 if (type is null || !type.IsClass) continue;
 
+                // The established standalone-verb path: public static [McpTool] methods anywhere.
                 foreach (var method in type.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly))
                 {
                     var attribute = method.GetCustomAttribute<McpToolAttribute>();
@@ -93,6 +94,20 @@ public sealed class McpCustomToolRegistry
 
                     var tool = Build(method, attribute);
                     if (tool is not null) result.Add(tool);
+                }
+
+                // ARCH-0092 §H: custom [McpTool] verbs as INSTANCE methods on a Toolset subclass — invoked on
+                // a DI-created toolset instance (this-context + injected dependencies).
+                if (!type.IsAbstract && typeof(Toolset).IsAssignableFrom(type))
+                {
+                    foreach (var method in type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
+                    {
+                        var attribute = method.GetCustomAttribute<McpToolAttribute>();
+                        if (attribute is null) continue;
+
+                        var tool = Build(method, attribute);
+                        if (tool is not null) result.Add(tool);
+                    }
                 }
             }
         }
