@@ -239,6 +239,8 @@ public Task<ToolsListResponse> ListToolsAsync(CancellationToken ct)
 
 ### Proof of Concept: S16 PantryPal
 
+> **Retired (2026-06):** S16.PantryPal was removed from the repo (a single-user anonymous app that did not exercise the agent-native access surface). MCP Code Mode is now validated by the `Koan.Samples.McpCodeMode` sample + `tests/Suites/Mcp/Koan.Mcp.Conformance.Tests`; a purpose-built MCP showcase sample is forthcoming. The original POC framing below is kept for historical context.
+
 - S16 PantryPal will serve as the reference implementation and validation suite for MCP code mode.
 - It will demonstrate agentic AI pipelines that reason over, discover, and orchestrate workflows using the code-enabled MCP service.
 - Multi-step workflows (e.g., photo → detection → pantry update → meal suggestion) will be implemented as single code-mode scripts, showcasing the value of the approach.

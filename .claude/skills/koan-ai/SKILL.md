@@ -124,6 +124,6 @@ When you need a testable seam, inject `IAiPipeline` and call `Prompt(AiChatReque
 - [Reference card: ai-data.md](../../../docs/reference/cards/ai-data.md) — one-screen pillar map
 - [AI integration guide](../../../docs/guides/ai-integration.md) · [AI vector how-to](../../../docs/guides/ai-vector-howto.md)
 - [`samples/S7.Meridian`](../../../samples/S7.Meridian/README.md) — `[MediaAnalysis]` + `[Embedding]` + entity-as-context chat (Ollama)
-- [`samples/S5.Recs`](../../../samples/S5.Recs/README.md) — AI recommendation engine · [`samples/S16.PantryPal`](../../../samples/S16.PantryPal/README.md) — vision AI
+- [`samples/S5.Recs`](../../../samples/S5.Recs/README.md) — AI recommendation engine
 - [ARCH-0089 — AI pillar dissolution](../../../docs/decisions/ARCH-0089-ai-pillar-dissolution.md) — entity-AI stays, agentic/RAG → Agyo
 - Vector deep-dive: the `koan-vector` skill (`Vector<T>.Search(float[])`, export/import migration)

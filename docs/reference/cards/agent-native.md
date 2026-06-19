@@ -60,6 +60,6 @@ public static class PostTools
 
 Grant disclosure (the **Door** — a locked-but-signposted verb), the headless **device-grant** auth on-ramp (RFC 8628, Reference = Intent over the configured providers), and **Streamable HTTP + OAuth 2.1**. Tracked in [09 §8 / the AN cards](../../assessment/prompts/07/AN-cards.md).
 
-## The sample that shows it
+## Where it's exercised
 
-[`samples/S16.PantryPal`](../../../samples/S16.PantryPal/README.md) — `[McpEntity]` types served over MCP; the resource + self-introduction surfaces are exercised end-to-end by `tests/Suites/Mcp/Koan.Mcp.Conformance.Tests`.
+`[McpEntity]` exposure, the `[Access]` gate, and the resource + self-introduction surfaces are exercised end-to-end against a real `AddKoan()` host by [`tests/Suites/Mcp/Koan.Mcp.Conformance.Tests`](../../../tests/Suites/Mcp/Koan.Mcp.Conformance.Tests). (A dedicated MCP showcase sample is being reworked.)

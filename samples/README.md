@@ -22,7 +22,6 @@ After the ladder, pick by interest:
 | Sample | What it is | Status |
 |---|---|---|
 | **S5.Recs** | AI recommendation engine: Mongo + Weaviate + Ollama, `[Embedding]` pipeline, partitioned imports, auth, scheduling | ✅ 🛠 dogfood |
-| **S16.PantryPal** (API + MCP host) | Vision AI meal planning; `[McpEntity]` agent tools over HTTP/SSE; MCP Code Mode | ✅ 🛠 dogfood |
 | **S18.Prism** | Personal knowledge intelligence; exercises the AI pillar end-to-end | ✅ 🛠 dogfood (spec-led; no README yet) |
 | **S8.Canon** (Api + Shared) | Canon runtime pipelines (`CanonEntity<T>`, pipeline contributors) | ✅ (root project excluded; use Api) |
 | **g1c1.GardenCoop** (guides/) | Narrative chapter-style guide; the only NativeAOT-publish dogfood | ✅ |

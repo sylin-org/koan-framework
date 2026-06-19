@@ -66,6 +66,6 @@ public static class SearchTools
 
 Parameters of type `IServiceProvider` / `CancellationToken` are injected; every other parameter binds from the call `arguments` by name and contributes to the input schema. Give optional args a default to advertise them as optional.
 
-## The sample that shows it
+## Where it's exercised
 
-[`samples/S16.PantryPal`](../../../samples/S16.PantryPal/README.md) — eight `[McpEntity]` types served over MCP HTTP/SSE, plus a Code Mode script that composes multi-entity workflows in a single execution.
+The full MCP surface — `[McpEntity]` tools, custom `[McpTool]` verbs, Code Mode, and the `koan://entities` / `koan://self` resources — is exercised end-to-end against a real `AddKoan()` host by [`tests/Suites/Mcp/Koan.Mcp.Conformance.Tests`](../../../tests/Suites/Mcp/Koan.Mcp.Conformance.Tests). (A dedicated MCP showcase sample is being reworked.)
