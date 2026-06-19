@@ -110,8 +110,14 @@ but is discarded at the sink. The Door projection state (§9.2) is its home.
   `error.data`). **Deny-by-default**: terse `"Forbidden."` stays the default; disclosure is opt-in
   per capability — disclosing the authz lattice is a privilege-enumeration oracle (Invariant §6.8).
   *What's required vs held* = framework's job; *how to acquire it* = a templated developer slot.
+- **DECIDED — admin is a Wall, not a Door (09 §11.4)**: privileged/admin capabilities are **silent
+  walls**, never signposted doors — reachable for the right grant, *invisible* to every lesser one
+  (silent even at the door tier). Never default a capability to Door. Signposting an admin tier ships
+  an attack-surface map ("not-projecting ≠ hiding"). A Door is only ever a *deliberate, per-capability*
+  promotion of a non-sensitive gap.
 - **TEST**: anonymous sees a Door (named + unlock) for a door-marked verb; a wall-marked verb stays
-  **absent**; the denial error names the requirement only when disclosure is opted in.
+  **absent**; an admin-marked verb is **absent at every lesser tier** (charter T6); the denial error
+  names the requirement only when disclosure is opted in.
 
 ## AN6 · Protocol currency (Streamable HTTP + OAuth 2.1) 〔T3/hard〕
 
@@ -148,3 +154,44 @@ explosion: 70 entities × relationships = hundreds of edge-verbs = the bloat we 
   per-grant with the full Wall/Door/Verb trichotomy.
 - **TEST**: the charter's T1 + T2 (also AN-leak's tests), plus: a grant that opens reviewer
   visibility makes `works-reviewed` appear, navigable, sized to that grant.
+
+## AN8 · Self-introduction surface (`koan://self` — prose + structured) 〔v2, 09 §11.1〕
+
+Render the projector's per-grant output as `koan://self` in **two faces**: first-person **prose**
+(the menu, written from the `[McpApplication]`/`[McpEntity]`/Door descriptors) + the **structured**
+projection beneath it. The menu reshapes per grant and is authored by nobody (rename → updates; wall
+→ vanishes; promote a door → invitation appears). The "one step further" door line is a built-in,
+lie-proof conversion funnel.
+
+- **BUILD**: a `koan://self` MCP resource (rides P1.2/O6 introspection resources) emitting (1) the
+  structured self-projection — entities/verbs/edges/capabilities visible to THIS grant — and (2) a
+  `ToProse()` rendering of it. Not a new surface: it's one rendering over the projector output.
+- **DECIDED**: both faces in one resource; **prose is the greeting, structured is the contract —
+  prose is NEVER the only form** (prose is lossy: exact verb names/schemas don't survive a friendly
+  sentence). On re-pull after a grant change, the agent diffs to the delta (deltas-add-only, §11.2).
+- **TEST**: charter **T6** — anonymous menu shows verbs + the door's "one step further" line and **no
+  mention of any admin tier**; signed-in promotes the door to a verb; admin shows the admin verbs;
+  each tier is a *complete, self-consistent* world, not a redaction.
+- **DEPS**: P1.2/O6 (resources) + the Wall/Door/Verb projection (AN3 enforcement). Examples neutral.
+
+## AN9 · Authority-free correlation (the "pin") 〔v2, 09 §11.3 — grounded〕
+
+A per-conversation id (client-facing **pin**, builder-facing **correlation id**) for **audit
+stitching + continuity**, carrying **zero authority**.
+
+- **DECIDED — the invariant**: **continuity ≠ authority.** The pin is *never* consulted for
+  permission; authorization is per-request against the grant (the token), always. Accepting a pin in
+  place of a grant is **session fixation**. (Grounding: Koan HONORS this today — the MCP session id is
+  opaque and auth is re-checked per RPC from the captured `ClaimsPrincipal`,
+  `HttpSseRpcBridge.cs:259-321` — **no session-fixation risk to fix; preserve it**.)
+- **BUILD**: mint via the existing **`StringId.New()`** (GUIDv7, [`src/Koan.Core/StringId.cs`](../../../../src/Koan.Core/StringId.cs)
+  — free, time-ordered, orders the audit trail for free); accept/propagate a caller-supplied
+  **`x-correlation-id`** (Koan already emits passive `Koan-Trace-Id` from OTel `Activity`); thread it
+  into audit so a trajectory stitches into one ordered story (`CanonAuditLog.Evidence` freeform bag,
+  or a dedicated field). Optional stateful scratch keyed off it; a stateless app ignores it.
+- **TEST**: charter **T7** (replay the same pin WITHOUT the token → the **anonymous** world; the pin
+  alone unlocks nothing) + **T8** (stepped continuity across *different nodes* — statelessness; the
+  upgrade delta lists additions only).
+- **NOTE**: net-new but cheap (GUIDv7 minter + passive trace header already exist); pair with P3.1
+  grants/audit. The continuity≠authority contract is a *standing guardrail* for all of P3 — never let
+  a pin/session/connection id gate authorization.

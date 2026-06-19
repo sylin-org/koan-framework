@@ -139,6 +139,8 @@ of the rest.**
 | AN5 | T3 | AN3 (soft) | pending | | | | edge-of-capability disclosure (the "Door") — opt-in, deny-by-default (privilege-enumeration oracle) |
 | AN6 | T3 | — | pending | | | | protocol currency — Streamable HTTP (SSE deprecated) + OAuth 2.1 (RFC 9728/8707) |
 | AN7 | T3 | AN-leak | pending | | | | governed edge traversal (edges-as-sugar, never verbs); subsumes AN-leak |
+| AN8 | T3 | P1.2/O6, AN3 | pending | | | | self-introduction surface — `koan://self` prose + structured; the menu writes itself from descriptors; cold-start funnel (charter v2 §11.1) |
+| AN9 | T2 | — | pending | | | | authority-free correlation ("pin") — GUIDv7 (`StringId.New()` exists) + `x-correlation-id` + audit stitching; **continuity ≠ authority** guardrail (no session-fixation risk today — preserve it) (charter v2 §11.3) |
 
 ## Cards discovered during pilot execution
 

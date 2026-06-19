@@ -219,6 +219,8 @@ in [`prompts/07/`](prompts/), tracked in [`prompts/PROGRESS.md`](prompts/PROGRES
 | Protocol currency (Streamable HTTP + OAuth 2.1) | **AN6** | new |
 | **Relationship-expansion visibility leak** (confirmed — §10) | **AN-leak** | new (security) |
 | Governed edge traversal (edges-as-sugar) | **AN7** | new |
+| Self-introduction surface (`koan://self` prose + structured) | **AN8** | new (v2 — §11.1) |
+| Authority-free correlation (the "pin") | **AN9** | new (v2 — §11.3) |
 
 Cards are stashed in [prompts/07/AN-cards.md](prompts/07/AN-cards.md). As each ships, re-score the
 affected pillar in [03-maturity-model.md](03-maturity-model.md) and update the
@@ -317,3 +319,79 @@ broader agent-native program. The fix *is* the charter's edge principle — trav
 through the governed read path so an edge "inherits its resolved query's projection." Tracked as
 **AN-leak** (the fix, security-priority) and subsumed by **AN7** (governed edge traversal as the
 general design). Secondary: `All()`+in-memory-filter is also an N-load performance bug.
+
+---
+
+## §11 The conversational surface (charter v2), harvested
+
+A v2 of the charter adds an *agent-experience* layer over the projector. Most of it restates §9; four
+things are genuinely new. (Examples kept neutral — no app/persona names, per the repo's
+persona-separation rule.)
+
+**§11.1 The self-introduction is the projection's voice → AN8.** `koan://self` renders the
+projector's per-grant output two ways: first-person **prose** *and* the **structured** projection
+beneath it.
+
+```text
+I'm a directory of makers and their works.     (you: anonymous)
+You can:
+  • browse & query works     works
+One step further:
+  • favorite a work          → sign in to save works you like
+```
+
+The menu *writes itself from the descriptors* (app Description = the "I'm X" line; each entity
+Description = a menu line; each Door = a "one step further" line), reshapes per grant, and is
+drift-proof (rename → menu updates; wall → vanishes; promote a door → invitation appears). The "one
+step further" door line is a built-in, **lie-proof conversion funnel** — the answer to an anonymous
+agent's blank-room cold start, in the app's own voice. **Guardrail: prose is lossy** — the greeting
+*invites*, the structured surface *operates*; `koan://self` must offer BOTH faces or the app is
+"charming and unusable." Extends O6/P1.2 (resources) with the prose dimension.
+
+**§11.2 The projector is stateless; the stepped conversation lives in the client.** The
+"ask → here's your world → present a token → here's your bigger world → silence" feel is **emergent,
+not implemented**: MCP resources are *pulled*, so the agent re-pulls `koan://self` after a grant
+change and gets the delta; in steady state it stops pulling and just acts. The app holds **no
+per-conversation state** — *the app projects; the agent remembers.* This **affirms the thesis
+boundary**: conversational memory is the agent's job (agent-runtime territory), not the framework's —
+Koan stays out of it. Two invariants fall out:
+- **Deltas add only** — a widened grant announces what *entered* the world; it never enumerates
+  remaining walls (that would leak their shape).
+- **Stale greeting, fresh enforcement** — the greeting is cacheable; capability is not. Every
+  *action* re-projects and re-checks, so a narrowed grant is caught at call-time with an honest
+  error even when the cached greeting lags. *"That gap is exactly where the honest error lives — the
+  conversational design and the structured-error work are the same work."* → ties directly to
+  **AN-leak** / honest errors (O7).
+
+**§11.3 The "pin" — authority-free correlation → AN9 (grounded).** A per-conversation id
+(client-facing *pin*, builder-facing *correlation id*) for **audit stitching + continuity**, carrying
+**zero authority**. The load-bearing invariant: **continuity ≠ authority** — a pin is never accepted
+in place of a grant (else **session fixation**: seed/steal a pre-auth pin, ride it into the
+authenticated world). Grounded against the code:
+- The GUIDv7 minter already exists and is **free** — `StringId.New()` → `Guid.CreateVersion7()`
+  ([StringId.cs](../../src/Koan.Core/StringId.cs)), time-ordered (orders the audit trail for free).
+- `Koan-Trace-Id` (OTel `Activity`) is a passive response correlation today; the MCP `correlationId`
+  param exists but is diagnostic-log-only, not threaded to audit.
+- **Koan already HONORS continuity ≠ authority**: the MCP session id is opaque and auth is re-checked
+  per RPC from the captured `ClaimsPrincipal`
+  ([HttpSseRpcBridge.cs:259-321](../../src/Koan.Mcp/Hosting/HttpSseRpcBridge.cs#L259-L321)) — **no
+  session-fixation risk today.** So AN9 is (a) a *preservation guardrail* (never let a pin/session id
+  gate auth) + (b) net-new but cheap plumbing: a caller-supplied `x-correlation-id` threaded into
+  audit (`CanonAuditLog.Evidence` is a freeform bag that can carry it, or a field).
+
+**§11.4 Admin is a Wall, not a Door** (sharpens AN5 + the Wall/Door/Verb model). Privileged tiers
+must be **silent walls** — reachable for the right grant, *invisible* to every lesser one, silent even
+at the door tier. Signposting an admin tier ("more options for administrators") ships an
+attack-surface map to anonymous callers. The framing: **not-projecting ≠ hiding** — *"you moved the
+building, you didn't lock the door"*; an attacker can't form an intention toward a capability they
+were never shown. Hard rule for the disclosure model: **never default a capability to Door;
+admin/privileged capabilities are Walls.** Reinforces the deny-by-default + privilege-enumeration
+caution already in AN5.
+
+**§11.5 Invariants & tests.** v2 grows the invariant set to 12 (adds: stateless projector;
+admin-is-a-wall; continuity ≠ authority; stale-greeting-fresh-enforcement; deltas-add-only) and the
+acceptance tests to T8 — **T6** (self-introduction reshapes per grant; admin invisible; each tier a
+complete self-consistent world), **T7** (the pin carries no authority — replay it without the token →
+the anonymous world; session-fixation resistance), **T8** (stepped continuity across *different
+nodes* — statelessness; the upgrade delta lists additions only). These fold into AN8/AN9 as their
+specs.
