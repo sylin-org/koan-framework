@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.AspNetCore.Mvc;
+using Koan.Web.Hooks;
 
 namespace Koan.Web.Endpoints;
 
@@ -25,6 +26,14 @@ public class EntityEndpointResult
     public IActionResult? ShortCircuitResult => ShortCircuitPayload as IActionResult;
 
     public bool IsShortCircuited => ShortCircuitPayload is not null;
+
+    /// <summary>
+    /// ARCH-0092 (§D): when the shared <c>IEntityEndpointService</c> authorize gate denies an operation, the
+    /// transport-agnostic <see cref="AuthorizeDecision"/> (Forbid / Challenge) is carried here. Each surface
+    /// translates it — REST → 403 / 401, the MCP edge → an access-denied error — instead of an HTTP-specific
+    /// result leaking across surfaces.
+    /// </summary>
+    public AuthorizeDecision? DeniedDecision => ShortCircuitPayload as AuthorizeDecision;
 
     public IReadOnlyDictionary<string, string> Headers { get; }
 

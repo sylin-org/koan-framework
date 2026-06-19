@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
@@ -9,6 +10,15 @@ using Koan.Core.Hosting.App;
 using Xunit;
 
 namespace Koan.Web.Extensions.Tests;
+
+// ARCH-0091: a single shared TestServer host for ALL [RestEntity]/floor specs. Each host sets the static
+// AppHost.Current, so two host fixtures in one assembly race under xUnit's parallel class execution — sharing
+// ONE host via a collection fixture serializes the specs and removes the collision.
+[CollectionDefinition(RestEntityCollection.Name)]
+public sealed class RestEntityCollection : ICollectionFixture<RestEntityWebFactory>
+{
+    public const string Name = "RestEntity";
+}
 
 /// <summary>
 /// ARCH-0091 / ARCH-0092: boots a direct in-memory TestServer host (no WebApplicationFactory — xUnit v3
@@ -46,6 +56,9 @@ public sealed class RestEntityWebFactory : IAsyncLifetime
                     AppHost.Current = null;
                     services.AddKoan();
                     services.AddKoanControllersFrom<CogController>();
+                    // ARCH-0092 Phase 3.2: a test auth scheme so the entity floor can be exercised end-to-end.
+                    services.AddAuthentication(TestAuthHandler.SchemeName)
+                        .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, _ => { });
                 });
                 web.Configure(_ => { });
             });

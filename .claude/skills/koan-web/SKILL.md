@@ -1,6 +1,6 @@
 ---
 name: koan-web
-description: Instant REST for Entity<T> — EntityController<T> CRUD + POST /query, custom [HttpGet]/[HttpPost] routes, override Upsert/Get/Delete, [Authorize] policies/roles, IEntityTransformer content shaping, CanRead/CanWrite/CanRemove gates, IEntityEndpointService escape hatch
+description: Instant REST for Entity<T> — EntityController<T> CRUD + POST /query, custom [HttpGet]/[HttpPost] routes, override Upsert/Get/Delete, [Authorize] policies/roles, IEntityTransformer content shaping, the entity access floor ([Authorize]/[RequireScope] on Entity<T>, cross-surface via the IAuthorize seam — ARCH-0092), IEntityEndpointService escape hatch
 pillar: web
 card: docs/reference/cards/web.md
 status: current
@@ -15,14 +15,14 @@ last_validated: 2026-06-18
 - REST surface talk — `GET /api/todos`, `POST /api/todos/query`, pagination/filter/sort query strings, capability headers
 - Custom endpoints alongside CRUD — `[HttpGet("…")]` / `[HttpPost("{id}/…")]` actions on the same controller
 - Overriding a generated verb — `override Upsert(...)`, `override GetById(...)`, `override Delete(...)`
-- `[Authorize]` / `[Authorize(Policy = "…")]` / `[Authorize(Roles = "…")]`, or `CanRead` / `CanWrite` / `CanRemove` gates
+- `[Authorize]` / `[Authorize(Policy = "…")]` / `[Authorize(Roles = "…")]` on a controller (REST-only), or the **entity access floor** (`[Authorize]` / `[AllowAnonymous]` / `[RequireScope]` on `Entity<T>`, enforced on REST + MCP by the `IAuthorize` seam — ARCH-0092)
 - Response shaping — `IEntityTransformer<TEntity, TShape>`, `AddEntityTransformer<...>(contentTypes)`, content negotiation, CSV/HAL output
 - `[Pagination(...)]`, `[KoanDataBehavior(...)]`, `[RequireCapability(...)]` on a controller, `IEntityEndpointService<TEntity, TKey>`
 - References to `Koan.Web`, "REST API", "web endpoint", "controller", "content negotiation", read-path visibility (WEB-0068)
 
 ## Core principle
 
-**`EntityController<T>` is the whole REST surface.** Derive one controller from `EntityController<Todo>` and Reference = Intent auto-maps GET (list + by-id) / POST / PUT / PATCH / DELETE plus `POST /query`, with pagination, filtering, sort, capability headers, and request hooks — no manual MVC wiring. Add ordinary `[HttpGet("…")]` actions for custom routes, `override Upsert(...)` to intercept a generated verb, `[Authorize]` (or the `CanRead`/`CanWrite`/`CanRemove` gates) for authz, and an `IEntityTransformer<TEntity, TShape>` for alternate output shapes. Read-path visibility predicates are enforced **per surface** ([WEB-0068](../../../docs/decisions/WEB-0068-query-options-predicates.md)).
+**`EntityController<T>` is the whole REST surface.** Derive one controller from `EntityController<Todo>` and Reference = Intent auto-maps GET (list + by-id) / POST / PUT / PATCH / DELETE plus `POST /query`, with pagination, filtering, sort, capability headers, and request hooks — no manual MVC wiring. Add ordinary `[HttpGet("…")]` actions for custom routes, `override Upsert(...)` to intercept a generated verb, `[Authorize]` on the controller (REST authz) — or the **entity access floor** (`[Authorize]`/`[RequireScope]` on `Entity<T>`) for authz enforced on REST **and** MCP through the unified seam ([ARCH-0092](../../../docs/decisions/ARCH-0092-entity-exposure-surfaces.md)) — and an `IEntityTransformer<TEntity, TShape>` for alternate output shapes. Read-path visibility predicates are enforced **per surface** ([WEB-0068](../../../docs/decisions/WEB-0068-query-options-predicates.md)).
 
 <!-- validate -->
 ```csharp
@@ -54,7 +54,11 @@ public sealed class Order : Entity<Order>
 [Authorize]                                             // authn for every generated + custom action
 public sealed class OrdersController : EntityController<Order>
 {
-    protected override bool CanRemove => false;         // gate DELETE without overriding the verb
+    // ARCH-0092 removed the Can* gates. Disable/guard a single verb by overriding its action (REST-only).
+    // For authz enforced on EVERY surface (REST + MCP), declare the floor on the ENTITY instead:
+    // [Authorize]/[AllowAnonymous]/[RequireScope] on Order — the unified IAuthorize seam evaluates it.
+    public override Task<IActionResult> Delete(string id, CancellationToken ct)
+        => Task.FromResult<IActionResult>(Forbid());    // disable DELETE on this controller
 
     [HttpGet("mine")]                                   // custom route beside the generated CRUD
     public Task<IReadOnlyList<Order>> Mine(CancellationToken ct)
@@ -126,13 +130,13 @@ public static class WebRegistration
 | `Task<List<Order>>` as a custom-action return | `Task<IReadOnlyList<Order>>` — entity statics (`Order.Query(...)`) return `IReadOnlyList<T>`, not `List<T>`. |
 | `Order.Query().Where(o => ...)` (parameterless then filter) | `Order.Query(o => ..., ct)` — the predicate is the argument (canonical verb `Query`). |
 | Hand-written `[HttpGet]`/`[HttpPost]` CRUD actions calling a repository | Derive `EntityController<Order>` — the CRUD surface is generated; only add genuinely custom routes. |
-| `if (!isAdmin) return Forbid();` scattered in each action | `[Authorize(Policy=...)]` or the `CanRead`/`CanWrite`/`CanRemove` gates — declarative, one place. |
+| `if (!isAdmin) return Forbid();` scattered in each action | `[Authorize(Policy=...)]` on the controller, or the entity access floor (`[Authorize]`/`[RequireScope]` on `Entity<T>`) — declarative, and enforced on every surface (ARCH-0092). |
 | `app.UseMvc()` / `services.AddControllers()` hand-wiring for Koan controllers | Referencing `Koan.Web` maps them automatically (Reference = Intent). |
 
 ## Escape hatches
 
 - **Custom shape the generic controller doesn't give**: drop to a plain `ControllerBase` action and call entity statics directly, or inject `IEntityEndpointService<TEntity, TKey>` (`Koan.Web.Endpoints`) — the service `EntityController` delegates to — to reuse the hooks / paging / visibility machinery in a hand-written endpoint.
-- **Intercept a generated verb**: `override Upsert(...)` / `override GetById(...)` / `override Delete(...)`, mutate then `return base.<Verb>(...)`. Coarse gates without an override: `protected override bool CanWrite => false;`.
+- **Intercept a generated verb**: `override Upsert(...)` / `override GetById(...)` / `override Delete(...)`, mutate then `return base.<Verb>(...)` (also the way to gate a single verb now the `Can*` virtuals are gone). Cross-surface authz: declare `[Authorize]`/`[RequireScope]` on the **entity** (the floor).
 - **Per-request data behavior from HTTP**: `app.UseKoanCacheControl()` (opt-in) maps `Cache-Control: no-cache/no-store` and `X-Koan-Cache` onto `EntityContext.CacheBehavior` — see [koan-caching](../koan-caching/SKILL.md).
 - **Read-path visibility (WEB-0068)**: predicates are enforced **per read surface** (REST + MCP via `EntityEndpointService`; GraphQL separately). When tightening a read filter, sweep every surface — a get-by-id path is a separate gate from list/query.
 

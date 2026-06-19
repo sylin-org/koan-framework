@@ -11,7 +11,8 @@ namespace Koan.Web.Extensions.Tests;
 /// (no hand-written controller) auto-registers a full-CRUD <c>EntityController</c> over the same governed
 /// <c>IEntityEndpointService</c> as the explicit path, routed by convention. An explicit controller wins.
 /// </summary>
-public sealed class RestEntitySpec : IClassFixture<RestEntityWebFactory>
+[Collection(RestEntityCollection.Name)]
+public sealed class RestEntitySpec
 {
     private readonly RestEntityWebFactory _fx;
 

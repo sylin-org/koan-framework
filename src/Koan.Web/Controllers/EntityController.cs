@@ -46,9 +46,10 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         _endpointService = endpointService;
     }
 
-    protected virtual bool CanRead => true;
-    protected virtual bool CanWrite => true;
-    protected virtual bool CanRemove => true;
+    // ARCH-0092 (§D): the CanRead/CanWrite/CanRemove virtuals were hard-cut — authorization is no longer a
+    // REST-only controller toggle. Base CRUD is gated by the unified IAuthorize seam inside the shared
+    // IEntityEndpointService (so REST and MCP enforce the same declaration). Declare access on the entity with
+    // standard [Authorize]/[AllowAnonymous] + [RequireScope].
 
     protected IEntityEndpointService<TEntity, TKey> EndpointService =>
         _endpointService ?? HttpContext.RequestServices.GetRequiredService<IEntityEndpointService<TEntity, TKey>>();
@@ -64,7 +65,18 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         => ContextBuilder.Build(options, ct, HttpContext, HttpContext?.User);
 
     private IActionResult ResolveShortCircuit(EntityEndpointResult result)
-        => result.ShortCircuitResult ?? PrepareResponse(result.ShortCircuitPayload ?? result.Payload);
+    {
+        // ARCH-0092 (§D): a seam denial is carried as a transport-agnostic AuthorizeDecision — translate it to
+        // the REST status (Challenge → 401, Forbid → 403) here.
+        if (result.DeniedDecision is { } decision)
+        {
+            return decision is AuthorizeDecision.Challenge
+                ? Unauthorized()
+                : StatusCode(StatusCodes.Status403Forbidden);
+        }
+
+        return result.ShortCircuitResult ?? PrepareResponse(result.ShortCircuitPayload ?? result.Payload);
+    }
 
     private static Dictionary<string, string?> ToQueryDictionary(IQueryCollection query)
     {
@@ -148,9 +160,9 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     protected virtual ObjectResult PrepareResponse(object? content)
     {
         Response.Headers["Vary"] = "Accept";
-        Response.Headers["Koan-Access-Read"] = CanRead.ToString().ToLowerInvariant();
-        Response.Headers["Koan-Access-Write"] = CanWrite.ToString().ToLowerInvariant();
-        Response.Headers["Koan-Access-Remove"] = CanRemove.ToString().ToLowerInvariant();
+        // ARCH-0092 (§D): the Koan-Access-Read/Write/Remove headers are now recomputed from the seam for this
+        // principal inside the endpoint service and flow via result.Headers (ApplyResponseMetadata) — honest
+        // per-principal capability advertisement, not the old static CanRead/CanWrite/CanRemove virtuals.
         return new ObjectResult(content);
     }
 
@@ -166,7 +178,6 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     [Produces(MediaTypeNames.Application.Json)]
     public virtual async Task<IActionResult> GetCollection(CancellationToken ct)
     {
-        if (!CanRead) return Forbid();
 
         var query = HttpContext.Request.Query;
         var policy = GetPaginationPolicy();
@@ -271,7 +282,6 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     [Produces(MediaTypeNames.Application.Json)]
     public virtual async Task<IActionResult> Query([FromBody] object body, CancellationToken ct)
     {
-        if (!CanRead) return Forbid();
 
         QueryOptions options;
         try
@@ -404,7 +414,6 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     [HttpGet("new")]
     public virtual async Task<IActionResult> GetNew(CancellationToken ct)
     {
-        if (!CanRead) return Forbid();
         var options = BuildOptions();
         var context = CreateRequestContext(options, ct);
         var request = new EntityGetNewRequest
@@ -421,7 +430,6 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     [HttpGet("{id}")]
     public virtual async Task<IActionResult> GetById([FromRoute] TKey id, CancellationToken ct)
     {
-        if (!CanRead) return Forbid();
         var options = BuildOptions();
         var context = CreateRequestContext(options, ct);
         var query = HttpContext.Request.Query;
@@ -443,7 +451,6 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     public virtual async Task<IActionResult> Upsert([FromBody][ValidateNever] TEntity model, CancellationToken ct)
     {
         if (model is null) return BadRequest(new { error = "Request body is required" });
-        if (!CanWrite) return Forbid();
         var options = BuildOptions();
         var context = CreateRequestContext(options, ct);
         var query = HttpContext.Request.Query;
@@ -464,7 +471,6 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     public virtual async Task<IActionResult> UpsertMany([FromBody][ValidateNever] IEnumerable<TEntity> models, CancellationToken ct)
     {
         if (models is null) return BadRequest(new { error = "Request body is required" });
-        if (!CanWrite) return Forbid();
         var list = models.ToList();
         var options = BuildOptions();
         var context = CreateRequestContext(options, ct);
@@ -484,7 +490,6 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     [HttpDelete("{id}")]
     public virtual async Task<IActionResult> Delete([FromRoute] TKey id, CancellationToken ct)
     {
-        if (!CanRemove) return Forbid();
         var options = BuildOptions();
         var context = CreateRequestContext(options, ct);
         var query = HttpContext.Request.Query;
@@ -504,7 +509,6 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     [HttpDelete("bulk")]
     public virtual async Task<IActionResult> DeleteMany([FromBody] IEnumerable<TKey> ids, CancellationToken ct)
     {
-        if (!CanRemove) return Forbid();
         var list = ids?.ToList() ?? new List<TKey>();
         var options = BuildOptions();
         var context = CreateRequestContext(options, ct);
@@ -524,7 +528,6 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     [HttpDelete("")]
     public virtual async Task<IActionResult> DeleteByQuery([FromQuery] string? q, CancellationToken ct)
     {
-        if (!CanRemove) return Forbid();
         if (string.IsNullOrWhiteSpace(q)) return BadRequest();
         var options = BuildOptions();
         var context = CreateRequestContext(options, ct);
@@ -544,7 +547,6 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     [HttpDelete("all")]
     public virtual async Task<IActionResult> DeleteAll(CancellationToken ct)
     {
-        if (!CanRemove) return Forbid();
         var options = BuildOptions();
         var context = CreateRequestContext(options, ct);
         var query = HttpContext.Request.Query;
@@ -571,7 +573,6 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         Infrastructure.KoanWebConstants.ContentTypes.ApplicationJson)]
     public virtual async Task<IActionResult> Patch([FromRoute] TKey id, CancellationToken ct)
     {
-        if (!CanWrite) return Forbid();
 
         // Buffer the body so we can parse it with the right shape per Content-Type.
         Microsoft.AspNetCore.Http.HttpRequestRewindExtensions.EnableBuffering(HttpContext.Request);
@@ -619,7 +620,6 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
 
     private async Task<IActionResult> PatchNormalized(TKey id, Koan.Data.Abstractions.Instructions.PatchPayload<TKey> payload, CancellationToken ct)
     {
-        if (!CanWrite) return Forbid();
         var options = BuildOptions();
         var context = CreateRequestContext(options, ct);
         var query = HttpContext.Request.Query;

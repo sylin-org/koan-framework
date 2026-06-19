@@ -16,6 +16,7 @@ using Koan.Data.Core;
 using Koan.Data.Core.Model;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
+using Koan.Web.Authorization;
 using Koan.Web.Filtering;
 using Koan.Web.Hooks;
 using Koan.Web.Infrastructure;
@@ -28,21 +29,63 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 {
     private readonly IDataService _dataService;
     private readonly IEntityHookPipeline<TEntity> _hookPipeline;
+    private readonly IAuthorize? _authorize;
     private readonly ILogger<EntityEndpointService<TEntity, TKey>>? _logger;
 
     public EntityEndpointService(
         IDataService dataService,
         IEntityHookPipeline<TEntity> hookPipeline,
+        IAuthorize? authorize = null,
         ILogger<EntityEndpointService<TEntity, TKey>>? logger = null)
     {
         _dataService = dataService ?? throw new ArgumentNullException(nameof(dataService));
         _hookPipeline = hookPipeline ?? throw new ArgumentNullException(nameof(hookPipeline));
+        _authorize = authorize;
         _logger = logger;
     }
+
+    // ARCH-0092 (§D): the single cross-surface authorization gate. Maps the operation onto a read/write/remove
+    // action and asks the unified IAuthorize seam (resource = the entity type). Returns null to PROCEED (the seam
+    // allowed, or no seam is registered = allow-by-default); otherwise the denying decision (Forbid/Challenge),
+    // which each surface translates. Both REST and the MCP edge run through this one service, so this is the one
+    // place base CRUD is authorized.
+    private async Task<AuthorizeDecision?> Gate(EntityRequestContext context, string action)
+    {
+        if (_authorize is null) return null;
+        var decision = await _authorize.AuthorizeAsync(new AuthorizeRequest
+        {
+            Subject = context.User,
+            Action = action,
+            Resource = typeof(TEntity),
+        }).ConfigureAwait(false);
+        return decision is AuthorizeDecision.Allow ? null : decision;
+    }
+
+    // Honest capability advertisement: recompute the Koan-Access-* headers from the seam for THIS principal
+    // (replacing the old CanRead/CanWrite/CanRemove controller virtuals). Written into context.Headers, which the
+    // result snapshots and the controller emits.
+    private async Task AnnotateAccess(EntityRequestContext context)
+    {
+        if (_authorize is null) return;
+        context.Headers["Koan-Access-Read"] = await Gate(context, EntityAuthorizeActions.Read).ConfigureAwait(false) is null ? "true" : "false";
+        context.Headers["Koan-Access-Write"] = await Gate(context, EntityAuthorizeActions.Write).ConfigureAwait(false) is null ? "true" : "false";
+        context.Headers["Koan-Access-Remove"] = await Gate(context, EntityAuthorizeActions.Remove).ConfigureAwait(false) is null ? "true" : "false";
+    }
+
+    private static EntityCollectionResult<TEntity> CollectionDenied(EntityRequestContext context, AuthorizeDecision decision)
+        => new(context, Array.Empty<TEntity>(), 0, payload: null, shortCircuit: decision);
+
+    private static EntityModelResult<TEntity> ModelDenied(EntityRequestContext context, AuthorizeDecision decision)
+        => new(context, default, payload: null, shortCircuit: decision);
+
+    private static EntityEndpointResult Denied(EntityRequestContext context, AuthorizeDecision decision)
+        => new(context, payload: null, shortCircuit: decision);
 
     public async Task<EntityCollectionResult<TEntity>> GetCollection(EntityCollectionRequest request)
     {
         var context = request.Context;
+        if (await Gate(context, EntityAuthorizeActions.Read).ConfigureAwait(false) is { } denied) return CollectionDenied(context, denied);
+        await AnnotateAccess(context).ConfigureAwait(false);
         var repo = _dataService.GetRepository<TEntity, TKey>();
         context.Capabilities = Capabilities(repo);
 
@@ -155,6 +198,8 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     public async Task<EntityCollectionResult<TEntity>> Query(EntityQueryRequest request)
     {
         var context = request.Context;
+        if (await Gate(context, EntityAuthorizeActions.Read).ConfigureAwait(false) is { } denied) return CollectionDenied(context, denied);
+        await AnnotateAccess(context).ConfigureAwait(false);
         var repo = _dataService.GetRepository<TEntity, TKey>();
         context.Capabilities = Capabilities(repo);
 
@@ -209,6 +254,8 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     public async Task<EntityModelResult<TEntity>> GetNew(EntityGetNewRequest request)
     {
         var context = request.Context;
+        if (await Gate(context, EntityAuthorizeActions.Read).ConfigureAwait(false) is { } denied) return ModelDenied(context, denied);
+        await AnnotateAccess(context).ConfigureAwait(false);
         var repo = _dataService.GetRepository<TEntity, TKey>();
         context.Capabilities = Capabilities(repo);
 
@@ -229,6 +276,8 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     public async Task<EntityModelResult<TEntity>> GetById(EntityGetByIdRequest<TKey> request)
     {
         var context = request.Context;
+        if (await Gate(context, EntityAuthorizeActions.Read).ConfigureAwait(false) is { } denied) return ModelDenied(context, denied);
+        await AnnotateAccess(context).ConfigureAwait(false);
         var repo = _dataService.GetRepository<TEntity, TKey>();
         context.Capabilities = Capabilities(repo);
 
@@ -280,6 +329,8 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     public async Task<EntityModelResult<TEntity>> Upsert(EntityUpsertRequest<TEntity> request)
     {
         var context = request.Context;
+        if (await Gate(context, EntityAuthorizeActions.Write).ConfigureAwait(false) is { } denied) return ModelDenied(context, denied);
+        await AnnotateAccess(context).ConfigureAwait(false);
         var repo = _dataService.GetRepository<TEntity, TKey>();
         context.Capabilities = Capabilities(repo);
 
@@ -328,6 +379,8 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     public async Task<EntityEndpointResult> UpsertMany(EntityUpsertManyRequest<TEntity> request)
     {
         var context = request.Context;
+        if (await Gate(context, EntityAuthorizeActions.Write).ConfigureAwait(false) is { } denied) return Denied(context, denied);
+        await AnnotateAccess(context).ConfigureAwait(false);
         var repo = _dataService.GetRepository<TEntity, TKey>();
         context.Capabilities = Capabilities(repo);
 
@@ -375,6 +428,8 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     public async Task<EntityModelResult<TEntity>> Delete(EntityDeleteRequest<TKey> request)
     {
         var context = request.Context;
+        if (await Gate(context, EntityAuthorizeActions.Remove).ConfigureAwait(false) is { } denied) return ModelDenied(context, denied);
+        await AnnotateAccess(context).ConfigureAwait(false);
         var repo = _dataService.GetRepository<TEntity, TKey>();
         context.Capabilities = Capabilities(repo);
 
@@ -421,6 +476,8 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     public async Task<EntityEndpointResult> DeleteMany(EntityDeleteManyRequest<TKey> request)
     {
         var context = request.Context;
+        if (await Gate(context, EntityAuthorizeActions.Remove).ConfigureAwait(false) is { } denied) return Denied(context, denied);
+        await AnnotateAccess(context).ConfigureAwait(false);
         var repo = _dataService.GetRepository<TEntity, TKey>();
         context.Headers["Koan-Write-Capabilities"] = WriteCapabilitiesHeader(repo);
 
@@ -440,6 +497,8 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
     public async Task<EntityEndpointResult> DeleteByQuery(EntityDeleteByQueryRequest request)
     {
+        if (await Gate(request.Context, EntityAuthorizeActions.Remove).ConfigureAwait(false) is { } denied) return Denied(request.Context, denied);
+        await AnnotateAccess(request.Context).ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(request.Query))
         {
             return new EntityEndpointResult(request.Context, null, new BadRequestResult());
@@ -478,6 +537,8 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
     public async Task<EntityEndpointResult> DeleteAll(EntityDeleteAllRequest request)
     {
+        if (await Gate(request.Context, EntityAuthorizeActions.Remove).ConfigureAwait(false) is { } denied) return Denied(request.Context, denied);
+        await AnnotateAccess(request.Context).ConfigureAwait(false);
         using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
 
         if (request.DryRun)
@@ -495,6 +556,8 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     public async Task<EntityModelResult<TEntity>> Patch(EntityPatchRequest<TEntity, TKey> request)
     {
         var context = request.Context;
+        if (await Gate(context, EntityAuthorizeActions.Write).ConfigureAwait(false) is { } denied) return ModelDenied(context, denied);
+        await AnnotateAccess(context).ConfigureAwait(false);
         var repo = _dataService.GetRepository<TEntity, TKey>();
         context.Capabilities = Capabilities(repo);
 
