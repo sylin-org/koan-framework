@@ -17,6 +17,12 @@ public sealed class McpCustomTool
     public required JObject InputSchema { get; init; }
     public IReadOnlyList<string> RequiredScopes { get; init; } = Array.Empty<string>();
     public bool IsMutation { get; init; }
+
+    // AN4 — opt-in spec annotations (null = unmarked → omitted from the wire annotations object).
+    public bool? ReadOnly { get; init; }
+    public bool? Destructive { get; init; }
+    public bool? Idempotent { get; init; }
+
     public required MethodInfo Method { get; init; }
     public required IReadOnlyList<McpCustomToolParameter> Parameters { get; init; }
 }

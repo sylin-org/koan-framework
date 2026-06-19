@@ -22,9 +22,15 @@ public sealed class GadgetsController : EntityController<Gadget>
 {
 }
 
-/// <summary>A custom [McpTool] verb so the conformance specs cover the non-entity tool path too.</summary>
+/// <summary>Custom [McpTool] verbs so the conformance specs cover the non-entity tool path too.</summary>
 public static class ConformanceTools
 {
+    // Unmarked: AN4 emits no hints for it (custom verbs gain nothing automatically).
     [McpTool(Name = "gadget_ping", Description = "Returns pong for the gadget tools.")]
     public static string GadgetPing(string echo) => $"pong:{echo}";
+
+    // Explicitly marked destructive (AN4 opt-in) — the dangerous hand-written verb that must be annotated.
+    [McpTool(Name = "gadget_purge", Description = "Permanently purges gadgets.")]
+    [McpDestructive]
+    public static string GadgetPurge(string confirm) => $"purged:{confirm}";
 }

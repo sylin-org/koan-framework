@@ -144,6 +144,10 @@ public sealed class McpCustomToolRegistry
             InputSchema = schema,
             RequiredScopes = attribute.RequiredScopes ?? Array.Empty<string>(),
             IsMutation = attribute.IsMutation,
+            // AN4: opt-in spec annotations from the method markers (unmarked stays null → omitted).
+            ReadOnly = method.GetCustomAttribute<McpReadOnlyAttribute>() is not null ? true : null,
+            Destructive = method.GetCustomAttribute<McpDestructiveAttribute>() is not null ? true : null,
+            Idempotent = method.GetCustomAttribute<McpIdempotentAttribute>() is not null ? true : null,
             Method = method,
             Parameters = parameters
         };

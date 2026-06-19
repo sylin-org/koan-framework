@@ -10,6 +10,7 @@ using Koan.Mcp.CodeExecution;
 using Koan.Mcp.CodeMode.Sdk;
 using Koan.Mcp.Execution;
 using Koan.Mcp.Options;
+using Koan.Web.Endpoints;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -278,7 +279,8 @@ public sealed class McpRpcHandler
             Name = "koan.code.execute",
             Description = "Execute JavaScript code against Koan entity operations. Use SDK.Entities.* for entity operations and SDK.Out.answer() to return results.",
             InputSchema = inputSchema,
-            Annotations = ToolDescriptor.BuildAnnotations("Execute code"),
+            // Code execution can mutate entities (SDK.Entities.*) — not read-only; effects depend on the script.
+            Annotations = ToolDescriptor.BuildAnnotations("Execute code", readOnly: false),
             Metadata = metadata
         };
     }
@@ -315,7 +317,8 @@ public sealed class McpRpcHandler
             Name = "koan.code.validate",
             Description = "Validate JavaScript code for syntax errors before execution.",
             InputSchema = inputSchema,
-            Annotations = ToolDescriptor.BuildAnnotations("Validate code"),
+            // Validation only parses — it never executes code or touches state.
+            Annotations = ToolDescriptor.BuildAnnotations("Validate code", readOnly: true),
             Metadata = metadata
         };
     }
@@ -520,13 +523,35 @@ public sealed class McpRpcHandler
         [Newtonsoft.Json.JsonProperty("metadata")]
         public required JObject Metadata { get; init; }
 
-        // AN1: the ToolAnnotations container. A human title now; AN4 adds the verb-derived hint booleans.
-        internal static JObject BuildAnnotations(string? title)
+        // AN1/AN4: the spec ToolAnnotations container — a human title plus the verb-derived hint booleans.
+        // readOnlyHint is emitted whenever known; destructiveHint/idempotentHint are only meaningful when
+        // NOT read-only (MCP spec), so they ride alongside a false readOnlyHint.
+        internal static JObject BuildAnnotations(string? title, bool? readOnly = null, bool? destructive = null, bool? idempotent = null)
         {
             var annotations = new JObject();
             if (!string.IsNullOrWhiteSpace(title)) annotations["title"] = title;
+            if (readOnly is bool ro)
+            {
+                annotations["readOnlyHint"] = ro;
+                if (!ro)
+                {
+                    if (destructive is bool d) annotations["destructiveHint"] = d;
+                    if (idempotent is bool i) annotations["idempotentHint"] = i;
+                }
+            }
             return annotations;
         }
+
+        // AN4: mechanical hint derivation from the entity verb (the 12-op kind is the single source of truth).
+        internal static (bool ReadOnly, bool Destructive, bool Idempotent) HintsForOperation(EntityEndpointOperationKind kind) => kind switch
+        {
+            EntityEndpointOperationKind.Collection or EntityEndpointOperationKind.Query
+                or EntityEndpointOperationKind.GetNew or EntityEndpointOperationKind.GetById => (true, false, false),
+            EntityEndpointOperationKind.Upsert or EntityEndpointOperationKind.UpsertMany => (false, false, true),
+            EntityEndpointOperationKind.Delete or EntityEndpointOperationKind.DeleteMany
+                or EntityEndpointOperationKind.DeleteByQuery or EntityEndpointOperationKind.DeleteAll => (false, true, false),
+            _ => (false, false, false) // Patch / None: a mutation with no asserted destructive/idempotent guarantee
+        };
 
         public static ToolDescriptor From(McpEntityRegistration registration, McpToolDefinition tool)
         {
@@ -539,12 +564,14 @@ public sealed class McpRpcHandler
                 ["requiredScopes"] = new JArray(tool.RequiredScopes.Select(scope => JValue.CreateString(scope)))
             };
 
+            var (readOnly, destructive, idempotent) = HintsForOperation(tool.Operation);
+
             return new ToolDescriptor
             {
                 Name = tool.Name,
                 Description = tool.Description,
                 InputSchema = tool.InputSchema,
-                Annotations = BuildAnnotations(tool.Description ?? tool.Name),
+                Annotations = BuildAnnotations(tool.Description ?? tool.Name, readOnly, destructive, idempotent),
                 Metadata = metadata
             };
         }
@@ -558,12 +585,14 @@ public sealed class McpRpcHandler
                 ["requiredScopes"] = new JArray(tool.RequiredScopes.Select(scope => JValue.CreateString(scope)))
             };
 
+            // AN4: custom verbs gain NOTHING automatically — only the explicit [McpReadOnly]/[McpDestructive]/
+            // [McpIdempotent] markers are emitted (the dangerous hand-written verbs are the ones to mark).
             return new ToolDescriptor
             {
                 Name = tool.Name,
                 Description = tool.Description,
                 InputSchema = tool.InputSchema,
-                Annotations = BuildAnnotations(tool.Description ?? tool.Name),
+                Annotations = BuildAnnotations(tool.Description ?? tool.Name, tool.ReadOnly, tool.Destructive, tool.Idempotent),
                 Metadata = metadata
             };
         }
