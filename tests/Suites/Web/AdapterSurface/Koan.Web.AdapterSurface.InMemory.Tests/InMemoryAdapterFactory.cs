@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Core.Hosting.App;
 using Koan.Web.AdapterSurface.InMemory.Tests.PredicateHook;
+using Koan.Web.AdapterSurface.InMemory.Tests.RelationshipExpansion;
 using Koan.Web.AdapterSurface.TestKit;
 using Koan.Web.Extensions;
 using Koan.Web.Hooks;
@@ -19,6 +20,14 @@ public sealed class InMemoryAdapterFactory : AdapterTestFactoryBase
     {
         services.AddKoanControllersFrom<VisibilityWidgetController>();
         services.AddSingleton<IRequestOptionsHook<VisibilityWidget>, VisibilityHook>();
+
+        // AN-leak: relationship-expansion visibility surface (Maker [parent] / Work [child] with two
+        // divergent edges to the same target). The Work/Maker hooks wall non-public rows so the
+        // governed-expansion specs can prove ?with=all honors each related type's own predicates.
+        services.AddKoanControllersFrom<MakersController>();
+        services.AddKoanControllersFrom<WorksController>();
+        services.AddSingleton<IRequestOptionsHook<Maker>, MakerVisibilityHook>();
+        services.AddSingleton<IRequestOptionsHook<Work>, WorkVisibilityHook>();
     }
 
     protected override IEnumerable<KeyValuePair<string, string?>> AdapterConfiguration() => new Dictionary<string, string?>

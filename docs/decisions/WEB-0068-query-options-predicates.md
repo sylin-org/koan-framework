@@ -309,3 +309,39 @@ references in `InternalsVisibleTo` point at projects that no longer exist). The 
 tested REST/MCP logic, but a GraphQL ARCH-0079 harness is an outstanding follow-up. The durable fix
 is to route the GraphQL resolvers through `IEntityEndpointService` so they stop drifting from the
 canonical read pipeline.
+
+## Amendment 2026-06-19: relationship expansion (`?with=all`) is governed per related type (AN-leak)
+
+The keyed-read amendment gated the *root* row before the expansion branch ran, but the expansion
+itself was still app-authority: `EntityEndpointService` called the raw `Entity<T,K>.GetRelatives()`
+loaders, which fetch related rows via `Data<TChild,TKey>.All()` and filter by foreign key in-memory
+with **no request predicates**. That is a second row-level visibility bypass — a caller reads a
+*visible* parent, expands with `?with=all` (REST) or `with: "all"` (MCP), and receives related rows a
+direct query of that type would hide. MCP amplifies it: the agent cannot distinguish "forbidden to
+see" from "doesn't exist." The original report (docs/assessment/09 §10) confirmed it first-hand: a
+visible `Maker` expanded out its Draft `Work` children, and a visible `Work` expanded out a hidden
+parent `Maker`.
+
+**Resolution.** A new internal `GovernedRelationshipExpander` (in `Koan.Web`) resolves each edge as a
+*governed* query through the related type's own visibility pipeline. For each relationship it runs the
+related type's `IRequestOptionsHook`s for the same request (principal + headers), AND-composes the
+contributed predicates with the foreign-key filter via `QueryFilterComposer`/`LinqFilterCompiler`, and
+pushes the whole thing down to the adapter — fixing the leak **and** the `All()`+in-memory N-load. An
+edge inherits its resolved query's projection: a child edge that resolves to zero visible rows is
+omitted entirely (no empty-but-present edge that would leak the relationship), and a walled or missing
+parent is omitted. Walled-means-silent — no count, no field name, no existence signal. Both expansion
+entry points are fixed (GetById and the collection `EnrichRelationships`). MCP rides the same
+`IEntityEndpointService`, so the endpoint fix covers every transport — the governance is **not**
+duplicated in the transport.
+
+**Scope boundary (deliberate).** The domain traversal API `Entity<T,K>.GetChildren()/GetParents()/
+GetRelatives()` stays **app-authority and unchanged** — service code (no HTTP principal) still sees all
+related rows. Request predicates never leak into `Koan.Data.Core`; the clamp lives entirely at the
+`Koan.Web` endpoint layer, where the request context and each related type's hooks exist.
+
+Coverage: `RelationshipExpansionVisibilitySpecs` in the adapter-surface InMemory suite (T1
+lateral-movement tunnel, T2 divergent edges to the same target with asymmetric disclosure, T-parent
+walled-parent omission, T-app-authority the domain API stays app-authority) and
+`RelationshipVisibilityMcpSpec` (the MCP `get-by-id` `with: "all"` path) — the latter through the new
+reusable `Koan.Mcp.TestKit` harness. Mutation-verified (dropping the predicates reverts the leak and
+fails the specs).

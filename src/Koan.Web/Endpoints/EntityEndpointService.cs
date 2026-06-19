@@ -136,7 +136,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
         if (!string.IsNullOrWhiteSpace(request.With) && request.With.Contains("all", StringComparison.OrdinalIgnoreCase))
         {
-            payload = await EnrichRelationships(list, context.CancellationToken);
+            payload = await EnrichRelationships(list, context, request.Set);
         }
         else if (!string.IsNullOrWhiteSpace(request.Shape))
         {
@@ -259,9 +259,12 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             return new EntityModelResult<TEntity>(context, null, null, new NotFoundResult());
         }
 
-        if (!string.IsNullOrWhiteSpace(request.With) && request.With.Contains("all", StringComparison.OrdinalIgnoreCase) && model is Entity<TEntity, TKey> entity)
+        if (!string.IsNullOrWhiteSpace(request.With) && request.With.Contains("all", StringComparison.OrdinalIgnoreCase) && model is Entity<TEntity, TKey>)
         {
-            var enriched = await entity.GetRelatives(context.CancellationToken);
+            // WEB-0068 / AN-leak: relationship expansion must govern every related entity by ITS OWN
+            // type's visibility predicates — the raw GetRelatives() loaders are app-authority and would
+            // tunnel hidden rows out through a visible parent. Already inside the partition scope above.
+            var enriched = await GovernedRelationshipExpander.ExpandAsync<TEntity, TKey>(model, request.Id!, context);
             ApplyViewHeader(context, request.Accept);
             CopyHookHeaders(context, hookContext);
             return new EntityModelResult<TEntity>(context, model, enriched);
@@ -639,19 +642,23 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         return (result.Items, result.TotalCount);
     }
 
-    private static async Task<IReadOnlyList<object>> EnrichRelationships(IReadOnlyList<TEntity> list, CancellationToken cancellationToken)
+    // WEB-0068 / AN-leak: collection ?with=all expands each row's relationships through the SAME governed
+    // path as the keyed read — every related entity is gated by its own type's visibility predicates.
+    // Scope the partition explicitly: the QueryCollection partition scope has already disposed by here.
+    private static async Task<IReadOnlyList<object>> EnrichRelationships(IReadOnlyList<TEntity> list, EntityRequestContext context, string? set)
     {
-        var enrichedResults = new List<object>();
+        using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(set) ? null : set);
+        var enrichedResults = new List<object>(list.Count);
         foreach (var item in list)
         {
-            if (item is Entity<TEntity, TKey> entity)
+            if (item is Entity<TEntity, TKey>)
             {
-                var enriched = await entity.GetRelatives(cancellationToken);
+                var enriched = await GovernedRelationshipExpander.ExpandAsync<TEntity, TKey>(item, item.Id, context);
                 enrichedResults.Add(enriched);
             }
             else
             {
-                enrichedResults.Add(item);
+                enrichedResults.Add(item!);
             }
         }
         return enrichedResults;

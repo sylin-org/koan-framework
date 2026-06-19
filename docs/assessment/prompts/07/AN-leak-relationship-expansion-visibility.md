@@ -1,5 +1,11 @@
 # AN-leak · Relationship-expansion visibility bypass 〔SECURITY〕
 
+> **STATUS: DONE 2026-06-19.** Fixed via `GovernedRelationshipExpander` (Koan.Web); chose DEFAULT (a)
+> re-query-through-the-projector (fixes the leak AND the `All()`+in-memory N-load). Tests:
+> `RelationshipExpansionVisibilitySpecs` (REST) + `RelationshipVisibilityMcpSpec` (MCP, via the new
+> reusable `Koan.Mcp.TestKit` harness), mutation-verified. ADR WEB-0068 amended (§2026-06-19). The card
+> below is preserved as the design record.
+>
 > **Source**: docs/assessment/09-agent-native-projection.md §10 · 07-AN · **Tier**: T3 (read-path
 > security semantics — frontier only) · **Depends on**: — (do first; unblocks AN7)
 > Self-contained session prompt — paste this entire file into a fresh session.

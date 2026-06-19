@@ -321,6 +321,15 @@ through the governed read path so an edge "inherits its resolved query's project
 **AN-leak** (the fix, security-priority) and subsumed by **AN7** (governed edge traversal as the
 general design). Secondary: `All()`+in-memory-filter is also an N-load performance bug.
 
+**RESOLVED 2026-06-19 (AN-leak done).** `GovernedRelationshipExpander` (Koan.Web) now resolves each
+edge through the related type's own visibility pipeline — predicates AND-composed with the FK filter
+and pushed down (the leak *and* the N-load fixed). Walled child edges and walled parents are omitted
+(walled-means-silent). The domain traversal API stays app-authority and unchanged. The charter's
+T1/T2 (plus T-parent and a T-app-authority regression guard) shipped as `RelationshipExpansionVisibilitySpecs`
+(REST) + `RelationshipVisibilityMcpSpec` (MCP, via the new reusable `Koan.Mcp.TestKit` harness),
+mutation-verified. See ADR WEB-0068 §"Amendment 2026-06-19". AN7 remains for the general edges-as-sugar
+design; this fix is its security-critical first slice.
+
 ---
 
 ## §11 The conversational surface (charter v2), harvested
