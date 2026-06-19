@@ -106,8 +106,17 @@ public static class AccessGateEvaluator
     private static bool AllBagsNeedAuth(ActionGate gate)
         => gate.AnyOf.All(b => !b.Anyone && (b.Authenticated || b.IsRolesAnyOf.Count > 0 || b.HasAllOf.Count > 0 || b.RequiresOwner));
 
-    private static string Describe(ActionGate gate)
+    /// <summary>SEC-0005 (Door) — a human description of what would satisfy a gate ("requires scope:x or owner"),
+    /// the same string the Forbid decision carries. Used as the Door signpost's <c>needs</c>, so it cannot drift
+    /// from enforcement.</summary>
+    public static string Describe(ActionGate gate)
         => "requires " + string.Join(" or ", gate.AnyOf.Select(DescribeBag));
+
+    /// <summary>SEC-0005 (Door) — true when any path to satisfy the gate requires a ROLE. A role gate is a
+    /// PRIVILEGE tier (09 §8: "admin is a Wall, not a Door"), so such verbs stay silent Walls even on a <c>[Door]</c>
+    /// entity — disclosing one would leak that a privileged capability exists (privilege enumeration).</summary>
+    public static bool RequiresRole(ActionGate gate)
+        => gate.AnyOf.Any(b => b.IsRolesAnyOf.Count > 0 || b.HasAllOf.Any(g => g is Grant.Role or Grant.RoleAnyOf));
 
     private static string DescribeBag(AccessBag bag)
     {

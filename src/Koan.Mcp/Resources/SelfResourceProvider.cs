@@ -87,7 +87,7 @@ public sealed class SelfResourceProvider : IMcpResourceProvider
 
     private static string BuildProse(
         ApplicationIdentitySnapshot app,
-        IReadOnlyList<(McpEntityRegistration Registration, IReadOnlyList<McpToolDefinition> Verbs)> visible)
+        IReadOnlyList<(McpEntityRegistration Registration, IReadOnlyList<McpToolDefinition> Verbs, IReadOnlyList<EntityProjection.Door> Doors)> visible)
     {
         var sb = new StringBuilder();
         sb.Append("I'm ").Append(app.Name).Append('.');
@@ -106,7 +106,7 @@ public sealed class SelfResourceProvider : IMcpResourceProvider
           .Append(string.Join(", ", visible.Select(v => v.Registration.DisplayName)))
           .Append('.');
 
-        foreach (var (registration, verbs) in visible)
+        foreach (var (registration, verbs, _) in visible)
         {
             var canModify = verbs.Any(tool => tool.IsMutation);
             sb.Append(" For ").Append(registration.DisplayName).Append(" you can ")

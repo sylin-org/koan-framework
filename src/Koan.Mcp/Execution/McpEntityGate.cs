@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using System.Security.Claims;
 using Koan.Web.Authorization;
 using Koan.Web.Endpoints;
@@ -40,6 +41,28 @@ public static class McpEntityGate
             // Coarse degrade: owner→authenticated (no row to bind here), identical to EntityFloorAuthorizationProvider.
             ownerSatisfied: user.Identity?.IsAuthenticated == true);
         return decision is AuthorizeDecision.Allow;
+    }
+
+    /// <summary>
+    /// SEC-0005 (the Door) — the door signpost for a verb the caller cannot invoke, or <c>null</c> when the verb is
+    /// a Verb (allowed) or a silent Wall. A door is returned only when the entity is <c>[Door]</c>, the caller is
+    /// DENIED the action, and the gate is NOT role-gated (a role gate is a privilege tier and stays a Wall — 09 §8).
+    /// The returned string is the gate's <c>needs</c> ("requires scope:x or owner"), derived from the SAME gate that
+    /// enforces, so it cannot drift. A null principal (STDIO local-trust) has no doors — everything is a Verb.
+    /// </summary>
+    public static string? DoorNeeds(IAccessGateCache gateCache, Type entityType, EntityEndpointOperationKind operation, ClaimsPrincipal? user)
+    {
+        if (gateCache is null) throw new ArgumentNullException(nameof(gateCache));
+        if (entityType is null) throw new ArgumentNullException(nameof(entityType));
+        if (user is null) return null;                                                  // local-trust: no doors
+        if (entityType.GetCustomAttribute<DoorAttribute>(inherit: true) is null) return null; // no [Door] → Wall
+
+        var actionGate = gateCache.GetOrCompile(entityType).For(ActionFor(operation));
+        if (actionGate.IsOpen) return null;                                             // open → Verb
+        var decision = AccessGateEvaluator.Evaluate(actionGate, user, ownerSatisfied: user.Identity?.IsAuthenticated == true);
+        if (decision is AuthorizeDecision.Allow) return null;                           // the caller may invoke → Verb
+        if (AccessGateEvaluator.RequiresRole(actionGate)) return null;                  // privilege tier → silent Wall
+        return AccessGateEvaluator.Describe(actionGate);                                // a disclosed door + its needs
     }
 
     /// <summary>Maps a 12-op endpoint operation to the gate's three-verb action — the SAME read/write/remove split

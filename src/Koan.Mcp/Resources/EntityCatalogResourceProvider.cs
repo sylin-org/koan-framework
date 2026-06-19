@@ -57,14 +57,14 @@ public sealed class EntityCatalogResourceProvider : IMcpResourceProvider
         // AN7: edges are governed at the catalog level by target-type visibility — an edge pointing at a
         // type this grant cannot see is absent (walled-means-silent). Build the visible-type → name map once.
         var visibleByType = new Dictionary<Type, string>();
-        foreach (var (registration, _) in visible)
+        foreach (var (registration, _, _) in visible)
         {
             visibleByType[registration.EntityType] = registration.DisplayName;
         }
 
-        foreach (var (registration, verbs) in visible)
+        foreach (var (registration, verbs, doors) in visible)
         {
-            entities.Add(new JObject
+            var entity = new JObject
             {
                 ["name"] = registration.DisplayName,
                 ["description"] = registration.Attribute.Description,
@@ -76,7 +76,21 @@ public sealed class EntityCatalogResourceProvider : IMcpResourceProvider
                 })),
                 // AN7: the navigable graph — edges as routes (target + via field), never verbs.
                 ["edges"] = EntityEdgeProjection.For(registration.EntityType, _metadata, visibleByType)
-            });
+            };
+
+            // SEC-0005 (the Door): verbs the caller cannot invoke yet, disclosed with how to unlock them. Omitted
+            // entirely (no `doors` key) unless the [Door] entity has at least one — a Wall leaves no trace.
+            if (doors.Count > 0)
+            {
+                entity["doors"] = new JArray(doors.Select(door => new JObject
+                {
+                    ["name"] = door.Tool.Name,
+                    ["operation"] = door.Tool.Operation.ToString(),
+                    ["needs"] = door.Needs
+                }));
+            }
+
+            entities.Add(entity);
         }
 
         var document = new JObject { ["entities"] = entities };
