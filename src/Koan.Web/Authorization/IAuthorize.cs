@@ -1,6 +1,6 @@
 using Koan.Web.Hooks;
 
-namespace Koan.Web.Extensions.Authorization;
+namespace Koan.Web.Authorization;
 
 /// <summary>
 /// SEC-0002 — the single resource-side authorization decision seam. Channel-agnostic by contract: it takes a

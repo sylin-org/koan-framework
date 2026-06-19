@@ -11,8 +11,6 @@ public interface IEntityHookPipeline<TEntity>
 {
     HookContext<TEntity> CreateContext(EntityRequestContext requestContext);
 
-    Task<AuthorizeDecision> Authorize(HookContext<TEntity> context, AuthorizeRequest request);
-
     Task<bool> BuildOptions(HookContext<TEntity> context, QueryOptions options);
 
     Task<bool> BeforeCollection(HookContext<TEntity> context, QueryOptions options);

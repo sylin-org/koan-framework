@@ -1,14 +1,15 @@
 using Microsoft.Extensions.Options;
 using Koan.Web.Hooks;
 
-namespace Koan.Web.Extensions.Authorization;
+namespace Koan.Web.Authorization;
 
 /// <summary>
-/// SEC-0002 — the seam implementation. Runs the <see cref="IAuthorizationProvider"/> ladder in <c>Order</c>;
-/// the first non-<c>null</c> provider decision wins; if every provider defers, the configured default
-/// behavior applies.
+/// SEC-0002 / ARCH-0092 — the canonical seam implementation, now in Koan.Web so the shared
+/// <c>EntityEndpointService</c> and <c>Koan.Mcp</c> both reach it. Runs the <see cref="IAuthorizationProvider"/>
+/// ladder in <c>Order</c>; the first non-<c>null</c> provider decision wins; if every provider defers, the
+/// configured default behavior applies.
 /// </summary>
-internal sealed class Authorizer : IAuthorize
+public sealed class Authorizer : IAuthorize
 {
     private readonly IAuthorizationProvider[] _providers;
     private readonly AuthorizeOptions _options;

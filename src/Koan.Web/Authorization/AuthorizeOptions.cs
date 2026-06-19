@@ -1,4 +1,4 @@
-namespace Koan.Web.Extensions.Authorization;
+namespace Koan.Web.Authorization;
 
 public enum AuthorizeDefault
 {

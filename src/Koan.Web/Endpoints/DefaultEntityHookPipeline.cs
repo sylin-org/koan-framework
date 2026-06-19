@@ -8,20 +8,16 @@ internal sealed class DefaultEntityHookPipeline<TEntity> : IEntityHookPipeline<T
     private readonly HookRunner<TEntity> _runner;
 
     public DefaultEntityHookPipeline(
-        IEnumerable<IAuthorizeHook<TEntity>> authorizeHooks,
         IEnumerable<IRequestOptionsHook<TEntity>> optionHooks,
         IEnumerable<ICollectionHook<TEntity>> collectionHooks,
         IEnumerable<IModelHook<TEntity>> modelHooks,
         IEnumerable<IEmitHook<TEntity>> emitHooks)
     {
-        _runner = new HookRunner<TEntity>(authorizeHooks, optionHooks, collectionHooks, modelHooks, emitHooks);
+        _runner = new HookRunner<TEntity>(optionHooks, collectionHooks, modelHooks, emitHooks);
     }
 
     public HookContext<TEntity> CreateContext(EntityRequestContext requestContext)
         => new HookContext<TEntity>(requestContext);
-
-    public Task<AuthorizeDecision> Authorize(HookContext<TEntity> context, AuthorizeRequest request)
-        => _runner.Authorize(context, request);
 
     public Task<bool> BuildOptions(HookContext<TEntity> context, QueryOptions options)
         => _runner.BuildOptions(context, options);

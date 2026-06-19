@@ -1,6 +1,6 @@
 using System.Security.Claims;
 
-namespace Koan.Web.Extensions.Authorization;
+namespace Koan.Web.Authorization;
 
 /// <summary>
 /// SEC-0002 — the authorization question: may <see cref="Subject"/> perform <see cref="Action"/> on the

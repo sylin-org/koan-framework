@@ -5,36 +5,20 @@ namespace Koan.Web.Hooks;
 /// </summary>
 internal sealed class HookRunner<TEntity>
 {
-    private readonly IEnumerable<IAuthorizeHook<TEntity>> _auth;
     private readonly IEnumerable<IRequestOptionsHook<TEntity>> _opts;
     private readonly IEnumerable<ICollectionHook<TEntity>> _col;
     private readonly IEnumerable<IModelHook<TEntity>> _model;
     private readonly IEnumerable<IEmitHook<TEntity>> _emit;
 
-    public HookRunner(IEnumerable<IAuthorizeHook<TEntity>> auth,
-                      IEnumerable<IRequestOptionsHook<TEntity>> opts,
+    public HookRunner(IEnumerable<IRequestOptionsHook<TEntity>> opts,
                       IEnumerable<ICollectionHook<TEntity>> col,
                       IEnumerable<IModelHook<TEntity>> model,
                       IEnumerable<IEmitHook<TEntity>> emit)
     {
-        _auth = auth.OrderBy(i => i.Order).ToArray();
         _opts = opts.OrderBy(i => i.Order).ToArray();
         _col = col.OrderBy(i => i.Order).ToArray();
         _model = model.OrderBy(i => i.Order).ToArray();
         _emit = emit.OrderBy(i => i.Order).ToArray();
-    }
-
-    /// <summary>
-    /// Run authorization hooks until a non-allow decision appears.
-    /// </summary>
-    public async Task<AuthorizeDecision> Authorize(HookContext<TEntity> ctx, AuthorizeRequest req)
-    {
-        foreach (var h in _auth)
-        {
-            var d = await h.OnAuthorize(ctx, req);
-            if (d is AuthorizeDecision.Forbid or AuthorizeDecision.Challenge) return d;
-        }
-        return AuthorizeDecision.Allowed();
     }
 
     /// <summary>

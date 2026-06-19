@@ -1,6 +1,6 @@
 using Koan.Web.Hooks;
 
-namespace Koan.Web.Extensions.Authorization;
+namespace Koan.Web.Authorization;
 
 /// <summary>
 /// SEC-0002 — a graded authorization decision strategy (ARCH-0084-style capability rung). Returns a

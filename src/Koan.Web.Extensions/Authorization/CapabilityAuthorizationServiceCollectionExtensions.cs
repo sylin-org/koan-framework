@@ -4,6 +4,8 @@ using Koan.Core.Modules;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
+using Koan.Web.Authorization;
+
 namespace Koan.Web.Extensions.Authorization;
 
 public static class CapabilityAuthorizationServiceCollectionExtensions

@@ -4,7 +4,10 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Koan.Core;
 using Koan.Core.Extensions;
+using Koan.Core.Modules;
+using Koan.Web.Authorization;
 using Koan.Web.Extensions;
+using Koan.Web.Hooks;
 using Koan.Web.Infrastructure;
 using Koan.Web.Pillars;
 using Koan.Core.Hosting.Bootstrap;
@@ -21,6 +24,14 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         WebPillarManifest.EnsureRegistered();
         services.AddKoanWeb();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Microsoft.AspNetCore.Hosting.IStartupFilter, Hosting.KoanWebStartupFilter>());
+
+        // ARCH-0092 (§D): register the unified IAuthorize seam + the built-in entity-floor rung BY DEFAULT so
+        // base CRUD (and the MCP edge) can authorize through one engine. With no provider granting/denying, the
+        // ladder falls through to AuthorizeOptions.DefaultDecision (Allow) — allow-by-default is preserved.
+        // Koan.Web.Extensions stacks the RBAC + named-policy rungs on top when capability authz is configured.
+        services.AddKoanOptions<AuthorizeOptions>(AuthorizeOptions.SectionPath);
+        services.TryAddScoped<IAuthorize, Authorizer>();
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizationProvider, EntityFloorAuthorizationProvider>());
 
         // Ensure MVC discovers controllers from this assembly
         services.AddKoanControllersFrom<Controllers.HealthController>();

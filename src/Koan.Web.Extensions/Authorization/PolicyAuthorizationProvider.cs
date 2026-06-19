@@ -4,6 +4,7 @@ using System.Reflection;
 using Microsoft.AspNetCore.Authorization;
 using Koan.Web.Extensions.Capabilities;
 using Koan.Web.Hooks;
+using Koan.Web.Authorization;
 
 namespace Koan.Web.Extensions.Authorization;
 
