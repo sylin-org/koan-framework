@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Newtonsoft.Json.Linq;
+using System.Security.Claims;
 using System.Threading;
 using Koan.Mcp;
 using Koan.Web.Attributes;
@@ -34,7 +35,8 @@ public sealed class RequestTranslator
         McpEntityRegistration registration,
         McpToolDefinition tool,
     JObject? arguments,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        ClaimsPrincipal? user = null)
     {
         if (services is null) throw new ArgumentNullException(nameof(services));
         if (registration is null) throw new ArgumentNullException(nameof(registration));
@@ -42,7 +44,7 @@ public sealed class RequestTranslator
 
     var args = arguments ?? new JObject();
         var builder = services.GetRequiredService<EntityRequestContextBuilder>();
-        var context = BuildContext(builder, registration.EntityType, args, cancellationToken);
+        var context = BuildContext(builder, registration.EntityType, args, cancellationToken, user);
 
         return tool.Operation switch
         {
@@ -225,7 +227,7 @@ public sealed class RequestTranslator
         return request;
     }
 
-    private static EntityRequestContext BuildContext(EntityRequestContextBuilder builder, Type entityType, JObject args, CancellationToken cancellationToken)
+    private static EntityRequestContext BuildContext(EntityRequestContextBuilder builder, Type entityType, JObject args, CancellationToken cancellationToken, ClaimsPrincipal? user)
     {
         var options = new QueryOptions();
 
@@ -263,7 +265,9 @@ public sealed class RequestTranslator
             }
         }
 
-        var context = builder.Build(options, cancellationToken);
+        // SEC-0004 Phase 3.3: thread the MCP caller's principal (null = anonymous) into EntityRequestContext.User,
+        // so the data-layer gate / constrain / projection evaluate against the real caller instead of anonymous.
+        var context = builder.Build(options, cancellationToken, httpContext: null, user: user);
 
         // AN11 — every MCP mutation opts into the state delta (the pre-mutation read + the prospective/
         // retrospective diff). REST stays cost-free until it opts in the same way.

@@ -212,7 +212,9 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
             Arguments = arguments
         };
 
-        var result = await _handler.CallTool(callParams, cancellationToken);
+        // SEC-0004 Phase 3.3: the remote edge calls AS the authenticated session principal (anonymous → a concrete
+        // empty principal, never null), so the data-layer gate / constrain / projection reflect this caller.
+        var result = await _handler.CallToolFor(callParams, _session.User ?? new System.Security.Claims.ClaimsPrincipal(), cancellationToken);
         var node = JToken.FromObject(result, JsonSerializer.Create(SerializerSettings));
         if (node is null)
         {

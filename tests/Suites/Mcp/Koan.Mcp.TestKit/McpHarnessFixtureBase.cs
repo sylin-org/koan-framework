@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Core;
@@ -157,7 +159,8 @@ public abstract class McpHarnessFixtureBase : IAsyncLifetime
         return (json["contents"] as JArray)?.OfType<JObject>().FirstOrDefault();
     }
 
-    /// <summary>Invokes an MCP tool through the real RPC handler and returns the serialized CallToolResult.</summary>
+    /// <summary>Invokes an MCP tool through the real RPC handler and returns the serialized CallToolResult.
+    /// Anonymous — the raw-handler path (STDIO-equivalent), the SEC-0004 STDIO local-trust default.</summary>
     public async Task<JToken> CallToolAsync(string toolName, JObject? arguments, CancellationToken ct = default)
     {
         using var scope = Services.CreateScope();
@@ -167,6 +170,32 @@ public abstract class McpHarnessFixtureBase : IAsyncLifetime
         var result = await handler.CallTool(callParams, ct);
         return JToken.Parse(JsonConvert.SerializeObject(result));
     }
+
+    /// <summary>SEC-0004 §3.3 — invokes an MCP tool AS <paramref name="user"/> (the HTTP/SSE-with-identity path,
+    /// via <c>CallToolFor</c>), so the data-layer gate / constrain / projection evaluate against this caller.</summary>
+    public async Task<JToken> CallToolAsAsync(string toolName, JObject? arguments, ClaimsPrincipal user, CancellationToken ct = default)
+    {
+        using var scope = Services.CreateScope();
+        var server = scope.ServiceProvider.GetRequiredService<McpServer>();
+        var handler = server.CreateHandler();
+        var callParams = new McpRpcHandler.ToolsCallParams { Name = toolName, Arguments = arguments };
+        var result = await handler.CallToolFor(callParams, user, ct);
+        return JToken.Parse(JsonConvert.SerializeObject(result));
+    }
+
+    /// <summary>Builds an authenticated test principal carrying the given space-delimited <c>scope</c> claim and roles.</summary>
+    public static ClaimsPrincipal Principal(string? scopes = null, params string[] roles)
+    {
+        var claims = new List<Claim>();
+        if (!string.IsNullOrWhiteSpace(scopes)) claims.Add(new Claim("scope", scopes));
+        foreach (var role in roles) claims.Add(new Claim(ClaimTypes.Role, role));
+        return new ClaimsPrincipal(new ClaimsIdentity(claims, "Test"));
+    }
+
+    /// <summary>True when a CallToolResult carries a gate/visibility short-circuit (a Forbid/Challenge denial rides
+    /// here as <c>meta.shortCircuit</c>, mirroring the REST 403/401 short-circuit; null = the call was permitted).</summary>
+    public static bool IsShortCircuited(JToken callResult)
+        => callResult["meta"]?["shortCircuit"] is { Type: not JTokenType.Null and not JTokenType.None };
 
     /// <summary>Returns the input schema (JObject) for a tool, read straight from the registry.</summary>
     public JObject GetToolInputSchema(string toolName)

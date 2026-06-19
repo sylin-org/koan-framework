@@ -67,6 +67,9 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<TypeScriptSdkProvider>();
         services.TryAddSingleton<ITypeScriptSdkProvider>(sp => sp.GetRequiredService<TypeScriptSdkProvider>());
     services.TryAddScoped<KoanSdkBindings>();
+        // SEC-0004 Phase 3.3: per-scope holder for the code-mode caller principal (set at the execution-scope
+        // boundary by JintCodeExecutor, read by the SDK entity proxy).
+        services.TryAddScoped<McpCallContext>();
 
         return services;
     }

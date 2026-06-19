@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -23,7 +24,10 @@ public sealed record CodeExecutionRequest(
     string? EntryFunction, // optional named entry; null = default exported run()
     string? UserId,
     string? Set,
-    string? CorrelationId
+    string? CorrelationId,
+    // SEC-0004 Phase 3.3: the caller's principal (null = anonymous), threaded into the sandbox SDK so entity
+    // operations inside the code run AS the caller through the data-layer gate / constrain / projection.
+    ClaimsPrincipal? Principal = null
 );
 
 public sealed record CodeExecutionResult(

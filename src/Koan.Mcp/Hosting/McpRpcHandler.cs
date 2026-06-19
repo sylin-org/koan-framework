@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json.Linq;
+using System.Security.Claims;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
@@ -99,8 +100,20 @@ public sealed class McpRpcHandler
         return Task.FromResult(response);
     }
 
+    // SEC-0004 Phase 3.3: the JSON-RPC entry point. STDIO (and any raw JSON-RPC dispatch) reaches the handler
+    // here with NO caller identity, so it delegates with an anonymous principal — the STDIO local-trust default
+    // (the channel is the process owner's, but the *caller* is nobody until an identity is supplied). The
+    // HTTP/SSE bridge calls CallToolFor with the authenticated session principal instead.
     [JsonRpcMethod("tools/call")]
-    public async Task<CallToolResult> CallTool(ToolsCallParams parameters, CancellationToken cancellationToken)
+    public Task<CallToolResult> CallTool(ToolsCallParams parameters, CancellationToken cancellationToken)
+        => CallToolFor(parameters, user: null, cancellationToken);
+
+    /// <summary>
+    /// SEC-0004 Phase 3.3 — execute a tool AS <paramref name="user"/> (null = anonymous). The principal threads
+    /// to <c>EntityRequestContext.User</c> so the data-layer gate / constrain / projection see the real caller.
+    /// Mirrors the resources path's <c>ListResourcesFor</c> / <c>ReadResourceFor</c> convention.
+    /// </summary>
+    public async Task<CallToolResult> CallToolFor(ToolsCallParams parameters, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
         if (parameters is null) throw new ArgumentNullException(nameof(parameters));
         _logger.LogDebug("MCP tools/call for {Tool} invoked.", parameters.Name);
@@ -108,7 +121,7 @@ public sealed class McpRpcHandler
         // Handle code execution tool
         if (parameters.Name == "koan.code.execute")
         {
-            var res = await ExecuteCode(parameters.Arguments, cancellationToken);
+            var res = await ExecuteCode(parameters.Arguments, user, cancellationToken);
             return ToCallToolResult(res);
         }
         // Handle code validation tool
@@ -145,8 +158,8 @@ public sealed class McpRpcHandler
             }
         }
 
-        // Handle traditional entity tools
-        var result = await _executor.Execute(parameters.Name, parameters.Arguments, cancellationToken);
+        // Handle traditional entity tools — thread the caller's principal to the data-layer gate (SEC-0004 §3.3).
+        var result = await _executor.Execute(parameters.Name, parameters.Arguments, cancellationToken, user);
         return ToCallToolResult(parameters.Name, result);
     }
 
@@ -467,7 +480,7 @@ public sealed class McpRpcHandler
         };
     }
 
-    private async Task<ToolsCallResult> ExecuteCode(JObject? arguments, CancellationToken cancellationToken)
+    private async Task<ToolsCallResult> ExecuteCode(JObject? arguments, ClaimsPrincipal? user, CancellationToken cancellationToken)
     {
         if (TryDenyCodeExecution(out var denial)) return denial;
 
@@ -498,8 +511,9 @@ public sealed class McpRpcHandler
             using var scope = _services.CreateScope();
             var bindings = scope.ServiceProvider.GetRequiredService<KoanSdkBindings>();
 
-            // Build execution request from arguments
-            var request = BuildExecutionRequest(arguments!, code);
+            // Build execution request from arguments — carry the caller's principal so the sandbox SDK's entity
+            // operations run AS the caller (SEC-0004 §3.3), not anonymously.
+            var request = BuildExecutionRequest(arguments!, code, user);
 
             // Execute code via unified executor (bindings are created internally in implementation; we keep existing for side-effects if needed in future).
             // TryDenyCodeExecution above guarantees _codeExecutor is non-null on this path.
@@ -561,7 +575,7 @@ public sealed class McpRpcHandler
         }
     }
 
-    private static CodeExecutionRequest BuildExecutionRequest(JObject arguments, string code)
+    private static CodeExecutionRequest BuildExecutionRequest(JObject arguments, string code, ClaimsPrincipal? user)
     {
         string? TryGetString(string name)
             => arguments.TryGetValue(name, StringComparison.OrdinalIgnoreCase, out var node) ? node?.Value<string>() : null;
@@ -572,7 +586,8 @@ public sealed class McpRpcHandler
             EntryFunction: TryGetString("entryFunction"),
             UserId: null,
             Set: TryGetString("set"),
-            CorrelationId: TryGetString("correlationId"));
+            CorrelationId: TryGetString("correlationId"),
+            Principal: user);
     }
 
     public sealed class ToolsCallParams
