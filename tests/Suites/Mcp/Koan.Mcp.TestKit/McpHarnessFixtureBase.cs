@@ -135,6 +135,28 @@ public abstract class McpHarnessFixtureBase : IAsyncLifetime
             string.Equals(t["name"]?.Value<string>(), toolName, StringComparison.OrdinalIgnoreCase));
     }
 
+    /// <summary>Lists MCP resources through the real RPC handler (the `resources/list` wire shape).</summary>
+    public async Task<JArray> ListResourcesAsync(CancellationToken ct = default)
+    {
+        using var scope = Services.CreateScope();
+        var server = scope.ServiceProvider.GetRequiredService<McpServer>();
+        var handler = server.CreateHandler();
+        var response = await handler.ListResources(ct);
+        var json = JToken.Parse(JsonConvert.SerializeObject(response));
+        return json["resources"] as JArray ?? new JArray();
+    }
+
+    /// <summary>Reads an MCP resource by uri through the real RPC handler; returns the first contents block.</summary>
+    public async Task<JObject?> ReadResourceAsync(string uri, CancellationToken ct = default)
+    {
+        using var scope = Services.CreateScope();
+        var server = scope.ServiceProvider.GetRequiredService<McpServer>();
+        var handler = server.CreateHandler();
+        var result = await handler.ReadResource(new McpRpcHandler.ReadResourceParams { Uri = uri }, ct);
+        var json = JToken.Parse(JsonConvert.SerializeObject(result));
+        return (json["contents"] as JArray)?.OfType<JObject>().FirstOrDefault();
+    }
+
     /// <summary>Invokes an MCP tool through the real RPC handler and returns the serialized CallToolResult.</summary>
     public async Task<JToken> CallToolAsync(string toolName, JObject? arguments, CancellationToken ct = default)
     {

@@ -111,6 +111,12 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
                 case "tools/call":
                     await HandleToolsCall(envelope, cancellationToken);
                     break;
+                case "resources/list":
+                    HandleResourcesList(envelope);
+                    break;
+                case "resources/read":
+                    HandleResourcesRead(envelope);
+                    break;
                 case "ping":
                     var pong = new JObject { ["jsonrpc"] = "2.0", ["id"] = CloneId(envelope.Id), ["result"] = "pong" };
                     _session.Enqueue(ServerSentEvent.FromJsonRpc(pong));
@@ -221,6 +227,47 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
             ["result"] = node
         };
 
+        _session.Enqueue(ServerSentEvent.FromJsonRpc(response));
+    }
+
+    // P1.2: resources are PROJECTED PER GRANT inside the provider — the remote edge passes the session
+    // principal so List/Read reflect only what this caller may see (no separate visibility filter needed).
+    private void HandleResourcesList(JsonRpcEnvelope envelope)
+    {
+        // Remote edge: NEVER pass null (null = local-trust). An anonymous caller is a concrete empty
+        // principal so the per-grant projection restricts privileged resources rather than opening them.
+        var response = _handler.ListResourcesFor(_session.User ?? new System.Security.Claims.ClaimsPrincipal());
+        EnqueueResult(envelope, JToken.FromObject(response, JsonSerializer.Create(SerializerSettings)));
+    }
+
+    private void HandleResourcesRead(JsonRpcEnvelope envelope)
+    {
+        if (envelope.Params is not JObject parameters
+            || !parameters.TryGetValue("uri", StringComparison.OrdinalIgnoreCase, out var uriNode)
+            || uriNode?.Value<string>() is not { Length: > 0 } uri)
+        {
+            _session.Enqueue(ServerSentEvent.FromJsonRpc(CreateError(envelope.Id, -32602, "Missing 'uri' parameter.")));
+            return;
+        }
+
+        var result = _handler.ReadResourceFor(uri, _session.User ?? new System.Security.Claims.ClaimsPrincipal());
+        EnqueueResult(envelope, JToken.FromObject(result, JsonSerializer.Create(SerializerSettings)));
+    }
+
+    private void EnqueueResult(JsonRpcEnvelope envelope, JToken? node)
+    {
+        if (node is null)
+        {
+            _session.Enqueue(ServerSentEvent.FromJsonRpc(CreateError(envelope.Id, -32603, "Failed to serialise response.")));
+            return;
+        }
+
+        var response = new JObject
+        {
+            ["jsonrpc"] = "2.0",
+            ["id"] = CloneId(envelope.Id),
+            ["result"] = node
+        };
         _session.Enqueue(ServerSentEvent.FromJsonRpc(response));
     }
 

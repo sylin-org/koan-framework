@@ -28,6 +28,7 @@ public sealed class McpRpcHandler
     private readonly Koan.Mcp.CodeExecution.ICodeExecutor? _codeExecutor;
     private readonly Koan.Mcp.CustomTools.McpCustomToolRegistry? _customTools;
     private readonly Koan.Mcp.CustomTools.McpCustomToolInvoker? _customInvoker;
+    private readonly IReadOnlyList<Koan.Mcp.Resources.IMcpResourceProvider> _resourceProviders;
 
     public McpRpcHandler(
         McpEntityRegistry registry,
@@ -48,6 +49,9 @@ public sealed class McpRpcHandler
         // Custom [McpTool] verbs are optional (registered by AddKoanMcp).
         _customTools = services.GetService<Koan.Mcp.CustomTools.McpCustomToolRegistry>();
         _customInvoker = services.GetService<Koan.Mcp.CustomTools.McpCustomToolInvoker>();
+
+        // P1.2: introspection resource providers (the framework ships koan://entities; apps + AN8 add more).
+        _resourceProviders = services.GetServices<Koan.Mcp.Resources.IMcpResourceProvider>().ToArray();
     }
 
     [JsonRpcMethod("tools/list")]
@@ -152,6 +156,59 @@ public sealed class McpRpcHandler
 
     [JsonRpcMethod("ping")]
     public Task<string> Ping() => Task.FromResult("pong");
+
+    // P1.2: MCP resources. The JSON-RPC entry points carry no caller principal (STDIO binds this handler
+    // directly = local-trust, AN3), so they project with a null principal (full). The remote HTTP/SSE edge
+    // calls the *For overloads with its authenticated session principal so resources project per grant.
+    [JsonRpcMethod("resources/list")]
+    public Task<ResourcesListResponse> ListResources(CancellationToken cancellationToken)
+        => Task.FromResult(ListResourcesFor(null));
+
+    [JsonRpcMethod("resources/read")]
+    public Task<ReadResourceResult> ReadResource(ReadResourceParams parameters, CancellationToken cancellationToken)
+        => Task.FromResult(ReadResourceFor(parameters?.Uri, null));
+
+    public ResourcesListResponse ListResourcesFor(System.Security.Claims.ClaimsPrincipal? user)
+    {
+        var resources = _resourceProviders
+            .SelectMany(provider => provider.List(user))
+            .Select(r => new ResourceDescriptor
+            {
+                Uri = r.Uri,
+                Name = r.Name,
+                Description = r.Description,
+                MimeType = r.MimeType
+            })
+            .ToArray();
+
+        return new ResourcesListResponse { Resources = resources };
+    }
+
+    public ReadResourceResult ReadResourceFor(string? uri, System.Security.Claims.ClaimsPrincipal? user)
+    {
+        if (string.IsNullOrWhiteSpace(uri))
+        {
+            throw new StreamJsonRpc.LocalRpcException("Missing required 'uri' parameter.") { ErrorCode = -32602 };
+        }
+
+        foreach (var provider in _resourceProviders)
+        {
+            var contents = provider.Read(uri, user);
+            if (contents is not null)
+            {
+                return new ReadResourceResult
+                {
+                    Contents = new[]
+                    {
+                        new ResourceContents { Uri = contents.Uri, MimeType = contents.MimeType, Text = contents.Text }
+                    }
+                };
+            }
+        }
+
+        // Unknown-or-walled uri returns no contents (existence is not revealed to a caller who can't read it).
+        return new ReadResourceResult { Contents = Array.Empty<ResourceContents>() };
+    }
 
     private McpExposureMode ResolveExposureMode()
     {
@@ -474,6 +531,62 @@ public sealed class McpRpcHandler
 
         [JsonPropertyName("arguments")]
     public JObject? Arguments { get; init; }
+    }
+
+    // P1.2: MCP resources wire shapes (dual STJ + Newtonsoft attributes, matching ToolDescriptor).
+    public sealed class ReadResourceParams
+    {
+        [JsonPropertyName("uri")]
+        [Newtonsoft.Json.JsonProperty("uri")]
+        public string? Uri { get; init; }
+    }
+
+    public sealed class ResourcesListResponse
+    {
+        [JsonPropertyName("resources")]
+        [Newtonsoft.Json.JsonProperty("resources")]
+        public IReadOnlyList<ResourceDescriptor> Resources { get; init; } = [];
+    }
+
+    public sealed class ResourceDescriptor
+    {
+        [JsonPropertyName("uri")]
+        [Newtonsoft.Json.JsonProperty("uri")]
+        public required string Uri { get; init; }
+
+        [JsonPropertyName("name")]
+        [Newtonsoft.Json.JsonProperty("name")]
+        public required string Name { get; init; }
+
+        [JsonPropertyName("description")]
+        [Newtonsoft.Json.JsonProperty("description", NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? Description { get; init; }
+
+        [JsonPropertyName("mimeType")]
+        [Newtonsoft.Json.JsonProperty("mimeType")]
+        public required string MimeType { get; init; }
+    }
+
+    public sealed class ReadResourceResult
+    {
+        [JsonPropertyName("contents")]
+        [Newtonsoft.Json.JsonProperty("contents")]
+        public IReadOnlyList<ResourceContents> Contents { get; init; } = [];
+    }
+
+    public sealed class ResourceContents
+    {
+        [JsonPropertyName("uri")]
+        [Newtonsoft.Json.JsonProperty("uri")]
+        public required string Uri { get; init; }
+
+        [JsonPropertyName("mimeType")]
+        [Newtonsoft.Json.JsonProperty("mimeType")]
+        public required string MimeType { get; init; }
+
+        [JsonPropertyName("text")]
+        [Newtonsoft.Json.JsonProperty("text")]
+        public required string Text { get; init; }
     }
 
     public sealed class ToolsListResponse

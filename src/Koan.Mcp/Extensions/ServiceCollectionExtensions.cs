@@ -43,6 +43,10 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<McpServer>();
         services.AddHostedService<StdioTransport>();
 
+        // P1.2: introspection resources. The framework ships koan://entities; apps (and AN8's koan://self)
+        // add more via TryAddEnumerable(ServiceDescriptor.Singleton<IMcpResourceProvider, …>()).
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<Koan.Mcp.Resources.IMcpResourceProvider, Koan.Mcp.Resources.EntityCatalogResourceProvider>());
+
         services.TryAddSingleton<HttpSseSessionManager>();
         services.AddHostedService(sp => sp.GetRequiredService<HttpSseSessionManager>());
         services.TryAddSingleton<HttpSseTransport>();
