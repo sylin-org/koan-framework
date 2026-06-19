@@ -278,6 +278,7 @@ public sealed class McpRpcHandler
             Name = "koan.code.execute",
             Description = "Execute JavaScript code against Koan entity operations. Use SDK.Entities.* for entity operations and SDK.Out.answer() to return results.",
             InputSchema = inputSchema,
+            Annotations = ToolDescriptor.BuildAnnotations("Execute code"),
             Metadata = metadata
         };
     }
@@ -314,6 +315,7 @@ public sealed class McpRpcHandler
             Name = "koan.code.validate",
             Description = "Validate JavaScript code for syntax errors before execution.",
             InputSchema = inputSchema,
+            Annotations = ToolDescriptor.BuildAnnotations("Validate code"),
             Metadata = metadata
         };
     }
@@ -492,13 +494,39 @@ public sealed class McpRpcHandler
         [Newtonsoft.Json.JsonProperty("description")]
         public string? Description { get; init; }
 
-        [JsonPropertyName("input_schema")]
-        [Newtonsoft.Json.JsonProperty("input_schema")]
+        // AN1: the MCP spec names the schema `inputSchema` (camelCase), not `input_schema`. A non-spec
+        // name is silently dropped by spec-compliant clients.
+        [JsonPropertyName("inputSchema")]
+        [Newtonsoft.Json.JsonProperty("inputSchema")]
         public required JObject InputSchema { get; init; }
 
+        // AN1: outputSchema slot for AN-structured to fill later. Omitted entirely while empty — never
+        // emitted as null or under a non-spec name.
+        [JsonPropertyName("outputSchema")]
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+        [Newtonsoft.Json.JsonProperty("outputSchema", NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public JObject? OutputSchema { get; init; }
+
+        // AN1: the MCP spec carries hints (readOnly/destructive/idempotent + title) in a dedicated
+        // `annotations` object (ToolAnnotations). AN4 fills the verb-derived hints; AN1 establishes the
+        // correctly-named container so spec clients stop ignoring them.
+        [JsonPropertyName("annotations")]
+        [Newtonsoft.Json.JsonProperty("annotations")]
+        public required JObject Annotations { get; init; }
+
+        // Koan-internal richer metadata, kept alongside the spec fields. Spec clients ignore unknown
+        // members; Koan-aware tooling can still read entity/operation/scope provenance from here.
         [JsonPropertyName("metadata")]
         [Newtonsoft.Json.JsonProperty("metadata")]
         public required JObject Metadata { get; init; }
+
+        // AN1: the ToolAnnotations container. A human title now; AN4 adds the verb-derived hint booleans.
+        internal static JObject BuildAnnotations(string? title)
+        {
+            var annotations = new JObject();
+            if (!string.IsNullOrWhiteSpace(title)) annotations["title"] = title;
+            return annotations;
+        }
 
         public static ToolDescriptor From(McpEntityRegistration registration, McpToolDefinition tool)
         {
@@ -516,6 +544,7 @@ public sealed class McpRpcHandler
                 Name = tool.Name,
                 Description = tool.Description,
                 InputSchema = tool.InputSchema,
+                Annotations = BuildAnnotations(tool.Description ?? tool.Name),
                 Metadata = metadata
             };
         }
@@ -534,6 +563,7 @@ public sealed class McpRpcHandler
                 Name = tool.Name,
                 Description = tool.Description,
                 InputSchema = tool.InputSchema,
+                Annotations = BuildAnnotations(tool.Description ?? tool.Name),
                 Metadata = metadata
             };
         }

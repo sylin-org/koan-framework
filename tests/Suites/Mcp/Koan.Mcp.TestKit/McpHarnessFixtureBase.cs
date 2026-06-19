@@ -116,6 +116,25 @@ public abstract class McpHarnessFixtureBase : IAsyncLifetime
     /// <summary>A plain REST client against the same host — used to seed/verify entities out of band.</summary>
     public HttpClient CreateClient() => _client ?? throw new InvalidOperationException("MCP harness not initialized.");
 
+    /// <summary>Lists tools through the real RPC handler (the `tools/list` wire shape) as a JArray.</summary>
+    public async Task<JArray> ListToolsAsync(CancellationToken ct = default)
+    {
+        using var scope = Services.CreateScope();
+        var server = scope.ServiceProvider.GetRequiredService<McpServer>();
+        var handler = server.CreateHandler();
+        var response = await handler.ListTools(ct);
+        var json = JToken.Parse(JsonConvert.SerializeObject(response));
+        return json["tools"] as JArray ?? new JArray();
+    }
+
+    /// <summary>The `tools/list` tool object whose <c>name</c> matches, as serialized over the wire.</summary>
+    public async Task<JObject?> GetWireToolAsync(string toolName, CancellationToken ct = default)
+    {
+        var tools = await ListToolsAsync(ct);
+        return tools.OfType<JObject>().FirstOrDefault(t =>
+            string.Equals(t["name"]?.Value<string>(), toolName, StringComparison.OrdinalIgnoreCase));
+    }
+
     /// <summary>Invokes an MCP tool through the real RPC handler and returns the serialized CallToolResult.</summary>
     public async Task<JToken> CallToolAsync(string toolName, JObject? arguments, CancellationToken ct = default)
     {
