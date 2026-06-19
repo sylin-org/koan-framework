@@ -14,7 +14,7 @@ validation:
 
 # MCP — pillar map
 
-> One-screen map of the MCP pillar — exposing Koan entities + verbs to MCP clients. Full detail: [mcp-http-sse-howto.md](../../guides/mcp-http-sse-howto.md).
+> One-screen map of the MCP pillar — exposing Koan entities + verbs to MCP clients. Walkthrough: [mcp-agent-native-howto.md](../../guides/mcp-agent-native-howto.md) (one entity from `[McpEntity]` to governed access). Transport detail: [mcp-http-sse-howto.md](../../guides/mcp-http-sse-howto.md).
 
 **What it does** — Projects your `Entity<T>` types and hand-written verbs as Model Context Protocol tools that AI clients invoke over JSON-RPC (stdio + HTTP/SSE) ([AI-0012](../../decisions/AI-0012-mcp-jsonrpc-runtime.md)). Annotate an entity `[McpEntity]` and its CRUD/query operations become MCP tools — same schema and read-path visibility predicates as the REST surface ([WEB-0068](../../decisions/WEB-0068-query-options-predicates.md)). Referencing `Koan.Mcp` + calling `AddKoanMcp()` is the whole opt-in (Reference = Intent); **Code Mode** ([AI-0014](../../decisions/AI-0014-mcp-code-mode.md)) lets a client compose several tools in one sandboxed script instead of one round-trip per call.
 

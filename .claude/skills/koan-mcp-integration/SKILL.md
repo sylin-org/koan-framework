@@ -88,6 +88,7 @@ MCP servers integrate with Claude Code Mode for enhanced capabilities.
 
 ## Reference Documentation
 
-- **Guide:** `docs/guides/mcp-http-sse-howto.md`
+- **Walkthrough (start here):** `docs/guides/mcp-agent-native-howto.md` — one entity from `[McpEntity]` to governed access (grants/audit/door), what you write vs what the agent sees
+- **Transport guide:** `docs/guides/mcp-http-sse-howto.md` — STDIO vs HTTP/SSE, auth, sessions, streaming
 - **Conformance suite (end-to-end exercise):** `tests/Suites/Mcp/Koan.Mcp.Conformance.Tests` (a dedicated MCP showcase sample is being reworked)
 - **Module:** `src/Koan.Mcp/`
