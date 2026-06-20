@@ -25,6 +25,15 @@ public sealed class McpServerOptions
     /// </summary>
     public string HttpSseRoute { get; set; } = "/mcp";
 
+    /// <summary>
+    /// SEC-0006 D2 — the canonical OAuth resource identifier (RFC 8707 <c>aud</c>) for this MCP edge, e.g.
+    /// <c>https://app.example.com/mcp</c>. When set, it is the fixed audience the edge enforces and advertises,
+    /// independent of the request <c>Host</c> header — the correct posture behind a proxy, and the defence
+    /// against a spoofed <c>Host</c> aligning a token's audience. When unset (Development default), the resource
+    /// id is derived from the live request host.
+    /// </summary>
+    public string? ResourceUri { get; set; }
+
     private bool? _requireAuthentication;
 
     /// <summary>

@@ -26,5 +26,8 @@
     <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\Koan.Web\Koan.Web.csproj" />
     <ProjectReference Include="..\Koan.Web.Sse\Koan.Web.Sse.csproj" />
+    <!-- SEC-0006 D2/D3: the MCP edge is an OAuth resource server — it validates Koan.bearer tokens
+         (scheme name) and enforces the RFC 8707 audience. One-way reference down to the trust pillar. -->
+    <ProjectReference Include="..\Koan.Security.Trust\Koan.Security.Trust.csproj" />
   </ItemGroup>
 </Project>

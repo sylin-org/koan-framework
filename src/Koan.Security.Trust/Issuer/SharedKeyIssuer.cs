@@ -1,5 +1,3 @@
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Logging;
@@ -15,18 +13,18 @@ namespace Koan.Security.Trust.Issuer;
 /// different boxes with the same value) trust each other's tokens. Registered as a singleton.
 /// <para>
 /// Symmetric "whoever holds the key can mint" is the accepted trade-off for the dev / small-trusted-team
-/// rungs; the per-node asymmetric fleet tier (SEC-0001 Rung 2) elects in when a real issuer is configured.
+/// rungs; the asymmetric <see cref="EcdsaIssuer"/> (ES256) is the user-facing / authorization-server tier
+/// where the verifier must never be able to forge (SEC-0006 D1).
 /// </para>
 /// </summary>
-public sealed class SharedKeyIssuer : IIssuer
+public sealed class SharedKeyIssuer : JwtIssuerBase
 {
-    private readonly ILogger<SharedKeyIssuer> _logger;
     private readonly TrustIssuerOptions _options;
     private readonly SymmetricSecurityKey _signingKey;
 
     public SharedKeyIssuer(IOptions<TrustIssuerOptions> options, ILogger<SharedKeyIssuer> logger)
+        : base(logger)
     {
-        _logger = logger;
         _options = options.Value;
         // SHA-256(secret) → a uniform 256-bit HMAC key: valid for any secret length, and deterministic so all
         // holders of the same secret derive the same key (mutual validation + cross-service self-mint).
@@ -37,42 +35,16 @@ public sealed class SharedKeyIssuer : IIssuer
         };
     }
 
-    public string KeyId => _signingKey.KeyId!;
-    public string Algorithm => SecurityAlgorithms.HmacSha256; // "HS256"
-    public string Issuer => _options.Issuer;
-    public string Audience => _options.Audience;
-    public SecurityKey SignatureKey => _signingKey;
+    public override string KeyId => _signingKey.KeyId!;
+    public override string Algorithm => SecurityAlgorithms.HmacSha256; // "HS256"
+    public override string Issuer => _options.Issuer;
+    public override string Audience => _options.Audience;
+    public override SecurityKey SignatureKey => _signingKey;
 
-    public string Issue(TrustClaims c, TimeSpan? lifetime = null)
-    {
-        var claims = new List<Claim>
-        {
-            new(JwtRegisteredClaimNames.Sub, c.Subject),
-            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("n")),
-            new(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
-        };
-        if (!string.IsNullOrWhiteSpace(c.Name)) claims.Add(new Claim(JwtRegisteredClaimNames.Name, c.Name));
-        if (!string.IsNullOrWhiteSpace(c.Email)) claims.Add(new Claim(JwtRegisteredClaimNames.Email, c.Email));
-        foreach (var role in c.Roles) claims.Add(new Claim(ClaimTypes.Role, role));
-        foreach (var permission in c.Permissions) claims.Add(new Claim("Koan.permission", permission));
-        if (c.Extra is not null)
-            foreach (var kvp in c.Extra)
-                foreach (var value in kvp.Value)
-                    claims.Add(new Claim(kvp.Key, value));
+    protected override SigningCredentials SigningCredentials => new(_signingKey, Algorithm);
+    protected override TimeSpan DefaultLifetime => TimeSpan.FromMinutes(_options.DefaultLifetimeMinutes);
 
-        var handler = new JwtSecurityTokenHandler();
-        var descriptor = new SecurityTokenDescriptor
-        {
-            Subject = new ClaimsIdentity(claims),
-            Expires = DateTime.UtcNow.Add(lifetime ?? TimeSpan.FromMinutes(_options.DefaultLifetimeMinutes)),
-            Issuer = _options.Issuer,
-            Audience = _options.Audience,
-            SigningCredentials = new SigningCredentials(_signingKey, Algorithm),
-        };
-        return handler.WriteToken(handler.CreateToken(descriptor));
-    }
-
-    public TokenValidationParameters CreateValidationParameters() => new()
+    public override TokenValidationParameters CreateValidationParameters() => new()
     {
         ValidateIssuerSigningKey = true,
         IssuerSigningKey = _signingKey,
@@ -84,31 +56,4 @@ public sealed class SharedKeyIssuer : IIssuer
         ValidateLifetime = true,
         ClockSkew = TimeSpan.FromMinutes(1),
     };
-
-    public bool TryValidate(string token, out ClaimsPrincipal principal)
-    {
-        principal = default!;
-        try
-        {
-            var handler = new JwtSecurityTokenHandler();
-            principal = handler.ValidateToken(token, CreateValidationParameters(), out var validated);
-            if (validated is not JwtSecurityToken jwt ||
-                !string.Equals(jwt.Header.Alg, Algorithm, StringComparison.OrdinalIgnoreCase))
-            {
-                _logger.LogWarning("Trust issuer: token rejected — algorithm mismatch.");
-                return false;
-            }
-            return true;
-        }
-        catch (SecurityTokenException ex)
-        {
-            _logger.LogDebug("Trust issuer: token validation failed: {Error}", ex.Message);
-            return false;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Trust issuer: unexpected error during token validation.");
-            return false;
-        }
-    }
 }

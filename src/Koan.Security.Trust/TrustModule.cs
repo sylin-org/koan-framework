@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Koan.Core;
@@ -37,6 +38,13 @@ public sealed class TrustModule : KoanModule
         // self-mints zero-config (and they trust each other). Fail-closed outside Development (see Start).
         services.AddKoanOptions<TrustIssuerOptions>(TrustIssuerOptions.SectionPath);
         services.AddSingleton<IIssuer, SharedKeyIssuer>();
+        // SEC-0006 D1 — the asymmetric (ES256) issuer tier, exposed through its own seam so it never hijacks
+        // the default IIssuer (HS256 service-mesh) resolution. The embedded Authorization Server, the JWKS
+        // endpoint, and the inbound bearer scheme resolve IAsymmetricIssuer; the default key store is an
+        // ephemeral per-process keypair (a persisted, encrypted-at-rest store overrides it via TryAdd —
+        // Reference = Intent). Zero key config: the asymmetric tier "just works" with an unforgeable key.
+        services.TryAddSingleton<IIssuerKeyStore, EphemeralIssuerKeyStore>();
+        services.AddSingleton<IAsymmetricIssuer, EcdsaIssuer>();
         // 2e — the ambient Identity.Current reads HttpContext.User through this accessor (idempotent).
         services.AddHttpContextAccessor();
         // Rung 0 — zero-config dev identity options. The middleware is inserted by the auth pipeline in

@@ -50,10 +50,37 @@ public static class EndpointRouteBuilderExtensions
             });
         }
 
+        var configuredResource = options.ResourceUri;
         if (options.RequireAuthentication)
         {
-            group.RequireAuthorization();
+            // SEC-0006 D2/D3 — gate the whole group by authenticating the trust-fabric bearer scheme explicitly
+            // (not RequireAuthorization, whose generic 401 would pre-empt the RFC 9728 challenge). The filter
+            // lands the bearer identity in context.User and enforces aud == this resource; from there the
+            // existing OriginStamp → HttpSseSession.User → SEC-0004/0005 chain runs unchanged.
+            group.AddEndpointFilter(async (efic, next) =>
+            {
+                if (!await McpEdgeAuth.EnsureAuthorized(efic.HttpContext, baseRoute, requireAuth: true, configuredResource))
+                    return Results.Empty; // EnsureAuthorized already wrote the 401 + WWW-Authenticate
+                return await next(efic);
+            });
         }
+
+        // SEC-0006 D2 (RFC 9728) — public protected-resource metadata at the well-known root (NOT under the
+        // authenticated group) so an unauthenticated client can discover the Authorization Server. Mounted at
+        // /.well-known/oauth-protected-resource{baseRoute}; the WWW-Authenticate header on the 401 points here.
+        endpoints.MapGet($"/.well-known/oauth-protected-resource{baseRoute}", context =>
+        {
+            var doc = new
+            {
+                resource = McpResourceIdentity.Resolve(context, baseRoute, configuredResource),
+                authorization_servers = new[] { McpResourceIdentity.AuthorizationServer(context) },
+                bearer_methods_supported = new[] { "header" },
+            };
+            return context.Response.WriteAsJsonAsync(doc, cancellationToken: context.RequestAborted);
+        })
+        .WithName("KoanMcpProtectedResourceMetadata")
+        .WithMetadata(new ProducesResponseTypeAttribute(typeof(object), StatusCodes.Status200OK, "application/json"))
+        .ExcludeFromDescription();
 
         group.MapGet("sse", context => transport.AcceptStream(context))
             .WithName("KoanMcpSseStream")

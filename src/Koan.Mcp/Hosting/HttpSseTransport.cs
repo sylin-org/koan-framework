@@ -79,6 +79,9 @@ public sealed class HttpSseTransport
             return;
         }
 
+        // Authentication + RFC 8707 audience enforcement (SEC-0006 D2/D3) is owned by the McpEdgeAuth endpoint
+        // filter on the route group, which runs before this handler and has already placed the bearer identity
+        // in context.User. This defence-in-depth check covers any direct invocation that bypasses the filter.
         if (options.RequireAuthentication && context.User?.Identity?.IsAuthenticated != true)
         {
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
@@ -154,6 +157,16 @@ public sealed class HttpSseTransport
         if (!_sessions.TryGet(sessionId, out var session))
         {
             return Results.NotFound(new { error = "session_not_found" });
+        }
+
+        // SEC-0006 — the session id is not a bearer capability: an RPC submitter must be the SAME subject that
+        // established the session on the SSE handshake. Otherwise a different authenticated caller who learns a
+        // session id could inject RPC that runs under the session owner's principal (the downstream gate uses
+        // session.User, not the submitter). Skipped when auth is not required (open dev mode).
+        if (options.RequireAuthentication && !McpEdgeAuth.SamePrincipal(context.User, session.User))
+        {
+            _logger.LogWarning("Rejected MCP RPC submit: caller principal does not own session {SessionId}.", sessionId);
+            return Results.StatusCode(StatusCodes.Status403Forbidden);
         }
 
         JToken? payload;
