@@ -29,6 +29,16 @@ public sealed class AuthServerOptions
     public int DevTokenLifetimeMinutes { get; set; } = 60;
 
     /// <summary>
+    /// SEC-0006 addendum (WEB-0072 P3) — seed a well-known <b>public</b> dev client (<c>koan-dev-explorer</c>) on
+    /// boot so the MCP Explorer's device-flow exerciser can play RFC 8628 without manual registration (DCR is
+    /// loopback-only per RFC 8252, so a same-origin browser can't self-register a usable client). Like the
+    /// dev-token endpoint it is <b>additionally</b> hard-gated to Development at boot time — the known client_id
+    /// must never exist in production (a guessable pre-registered client is a takeover vector). Idempotent
+    /// (seed-once). Turn off to keep even Development free of any pre-seeded client.
+    /// </summary>
+    public bool SeedDevClient { get; set; } = true;
+
+    /// <summary>
     /// SEC-0006 D7 — the app's consent page (it renders the requesting client + scopes + Allow/Deny). The AS
     /// redirects the browser here with <c>?rid=…</c> after <c>/oauth/authorize</c>. The app owns rendering; the
     /// framework owns the protocol. Defaults under the app's <c>/me/…</c> namespace.

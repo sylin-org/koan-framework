@@ -97,3 +97,19 @@ Each phase is TDD + mutation-checked + ratchet-green; the integration suite boot
 - **Positive:** a general, reusable Koan OAuth 2.1 AS (any app issues tokens to API/agent clients, not just MCP); the confused-deputy audience bug (D2) is closed; the trust fabric gains the real asymmetric tier SEC-0001 always intended; the app's auth surface stays two pages.
 - **Negative / cost:** a security-critical new leaf with real attack surface (DCR, device flow, consent CSRF) that must be threat-modelled and conformance-tested, not assumed; a new persisted-key lifecycle (rotation, JWKS) to operate.
 - **Neutral:** the app's only obligations are declaring `[Access]` gates and rendering `/connect` + `/connect/done` against the seam contract.
+
+## Addendum (2026-06-20) — Development dev-client auto-seed (WEB-0072 P3)
+
+The WEB-0072 MCP Explorer console ships an interactive **"play the device" exerciser**: a button that drives a *real* RFC 8628 device grant (D8) from the browser so a developer can watch the headless-client ceremony end-to-end (request → `user_code` → approve in a second tab → poll → token). That exerciser needs a registered, active public `OAuthClient` to post `/oauth/device` against — and **it cannot create one itself**: D5's DCR (`/oauth/register`) constrains dynamic clients to **loopback redirects (RFC 8252)**, so a same-origin browser SPA can never self-register a usable client. The device endpoint correctly refuses an unknown `client_id` (`invalid_client`).
+
+**Decision: the AS seeds a single well-known *public* dev client (`koan-dev-explorer`) on boot, Development-only.** This is the unanimous prior-art pattern — every mature AS seeds known dev clients rather than relying on DCR (Duende `AddInMemoryClients`, Keycloak `--import-realm`, Spring `InMemoryRegisteredClientRepository`, Hydra/FusionAuth entrypoint seeding), and the MCP authorization spec itself re-ranked client provisioning to **CIMD first, pre-registration second, DCR deprecated**. Device-flow clients are *always* public + pre-registered by design (there is no DCR for the device grant). So a fixed seeded dev client is spec-aligned, not a shortcut.
+
+The seed runs in `AuthServerModule.Start` (the ARCH-0086 one-time startup hook — the same place the persisted issuer key is provisioned; the data layer is up by then). It is governed by the same **two-gate, fail-closed** discipline as the dev-token endpoint:
+
+- **Hard-gated to Development** (`IHostEnvironment.IsDevelopment()`) — the real safety. The known/guessable `client_id` must **never** exist in production; a pre-registered public client there is a takeover vector.
+- **Config opt-out** `AuthServerOptions.SeedDevClient` (default `true`) — turn it off to keep even Development free of any pre-seeded client.
+- **Idempotent** — seed-once; skipped if `OAuthClient.Get("koan-dev-explorer")` already resolves.
+
+Seed shape: `{ Id = "koan-dev-explorer", ClientName = "Koan Dev Explorer", IsPublic = true, IsDynamic = false, ExpiresUtc = null }`. It is a **public** client (no secret), so its security rests entirely on PKCE + the device-consent ceremony (the user still approves in their authenticated browser session, D7/D8) — not on a shared secret. `IsDynamic = false` keeps it off the loopback-redirect constraint and out of the dynamic-client GC sweep; it carries no registered `RedirectUris` because the device grant never uses a redirect. The exerciser posts `client_id=koan-dev-explorer`, a demo `scope`, and `resource={origin}/mcp`; the approval still flows through the app's real consent page (the framework owns the protocol, the app owns the page — unchanged). In production (or with the knob off) the client is absent and the exerciser's `/oauth/device` call fails closed with `invalid_client` — exactly as it should.
+
+This is the only behavior the addendum adds; D1–D9 are unchanged.

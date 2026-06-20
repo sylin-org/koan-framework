@@ -2,15 +2,18 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Core.Provenance;
+using Koan.Data.Core;
 using Koan.Security.Trust.Issuer;
 using Koan.Web.Auth.Server.Hosting;
 using Koan.Web.Auth.Server.Keys;
 using Koan.Web.Auth.Server.Options;
+using Koan.Web.Auth.Server.Protocol;
 using Koan.Web.Hosting;
 
 namespace Koan.Web.Auth.Server;
@@ -29,6 +32,12 @@ namespace Koan.Web.Auth.Server;
 public sealed class AuthServerModule : KoanModule
 {
     public override string Id => "web.auth.server";
+
+    /// <summary>
+    /// SEC-0006 addendum (WEB-0072 P3) — the well-known public dev client the MCP Explorer's device-flow exerciser
+    /// plays. Seeded Development-only (see <see cref="SeedDevExplorerClientAsync"/>); never present in production.
+    /// </summary>
+    public const string DevExplorerClientId = "koan-dev-explorer";
 
     public override void Register(IServiceCollection services)
     {
@@ -74,6 +83,46 @@ public sealed class AuthServerModule : KoanModule
 
         if (store is PersistedIssuerKeyStore persisted)
             await persisted.InitializeAsync(ct);
+
+        await SeedDevExplorerClientAsync(env, options, services, ct);
+    }
+
+    /// <summary>
+    /// SEC-0006 addendum (WEB-0072 P3) — seed the well-known public dev client (<see cref="DevExplorerClientId"/>)
+    /// the MCP Explorer's device-flow exerciser posts against. Two-gate fail-closed, mirroring the dev-token
+    /// endpoint: the <c>IHostEnvironment.IsDevelopment()</c> gate is the real safety (a guessable
+    /// pre-registered client must never exist in production), with <see cref="AuthServerOptions.SeedDevClient"/> as
+    /// the operator opt-out. Idempotent (seed-once). The client is <b>public</b> — its security rests on PKCE + the
+    /// device-consent ceremony, not a secret — and carries no redirect URIs (the device grant never redirects).
+    /// </summary>
+    private static async Task SeedDevExplorerClientAsync(
+        IHostEnvironment env, AuthServerOptions options, IServiceProvider services, CancellationToken ct)
+    {
+        if (!env.IsDevelopment() || !options.SeedDevClient) return;
+
+        try
+        {
+            if (await OAuthClient.Get(DevExplorerClientId, ct) is not null) return; // idempotent — already seeded
+
+            var now = services.GetRequiredService<TimeProvider>().GetUtcNow();
+            await new OAuthClient
+            {
+                Id = DevExplorerClientId,
+                ClientName = "Koan Dev Explorer",
+                IsPublic = true,    // public client — no secret; PKCE + device consent are the protection
+                IsDynamic = false,  // not loopback-constrained, not swept by the dynamic-client GC
+                ExpiresUtc = null,  // no expiry (it is re-seeded idempotently on every dev boot)
+                CreatedUtc = now,
+            }.Save(ct);
+        }
+        catch (Exception ex)
+        {
+            // The seed is a Development convenience and needs a data store. A host that boots the AS without one
+            // (e.g. a dev-token-only composition) legitimately can't seed — log and carry on; the device-flow
+            // exerciser is simply unavailable there. Never fail boot over an optional dev affordance.
+            services.GetService<ILoggerFactory>()?.CreateLogger("Koan.Web.Auth.Server.DevClientSeed")
+                .LogWarning(ex, "Dev-explorer OAuth client not seeded (no data store available); the MCP Explorer device-flow exerciser will be unavailable.");
+        }
     }
 
     public override void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)

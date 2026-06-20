@@ -335,16 +335,155 @@
     card.appendChild(devRow);
     card.appendChild(devOut);
 
-    // The full OAuth grants (device / auth-code + PKCE / refresh) are driven by a real MCP client — the client
-    // is the OAuth actor (it registers via DCR, requests scope + resource, and runs the consent round-trip).
-    // The console hands off rather than re-implementing the dance.
+    // The interactive device-flow exerciser — the page plays the headless client (RFC 8628).
+    buildDeviceExerciser(card);
+
+    // Auth-code + PKCE / refresh are driven by a real MCP client at its own redirect_uri (a loopback the browser
+    // can't stand in for) — those stay a hand-off. Device flow is the one a browser CAN faithfully play.
     var note = el("div", "kx-anon",
-      "For the full OAuth flow (device / auth-code + PKCE / refresh), connect a real MCP client — it drives the grant (DCR + scope + resource + consent). Use the Connect URL above.");
+      "For the authorization-code + PKCE / refresh flow, connect a real MCP client — it drives the grant at its own redirect URI. Use the Connect URL above.");
     note.style.marginTop = "0.75rem";
     note.style.marginBottom = "0";
     card.appendChild(note);
 
     app.appendChild(card);
+  }
+
+  // WEB-0072 P3 — the interactive device-flow exerciser. The page "plays the headless client" (RFC 8628): it
+  // requests a device code against the seeded Development client (SEC-0006 addendum: `koan-dev-explorer`), shows the
+  // user_code, opens the app's verification page in a second tab, and polls /oauth/token on the server's real
+  // interval — exactly the ceremony a TV / CLI runs. Development-only by construction: outside Development the
+  // seeded client is absent and /oauth/device fails closed with invalid_client (surfaced honestly below).
+  var DEVICE_CLIENT_ID = "koan-dev-explorer";
+  var DEVICE_GRANT = "urn:ietf:params:oauth:grant-type:device_code";
+
+  function buildDeviceExerciser(card) {
+    var resource = window.location.origin + base; // the MCP resource indicator (RFC 8707)
+    var wrap = el("div");
+    wrap.style.marginTop = "0.75rem";
+    wrap.appendChild(el("div", "kx-section-title", "Simulate a headless client (device flow)"));
+    var hint = el("div", "kx-anon",
+      "Plays RFC 8628 end-to-end against the seeded dev client: request a code, approve it in a second tab, watch the poll resolve. Development-only.");
+    hint.style.margin = "0 0 0.5rem";
+    wrap.appendChild(hint);
+
+    var scopeField = el("div", "kx-field");
+    var scopeLabel = el("label");
+    scopeLabel.textContent = "scope";
+    var scopeInput = el("input");
+    scopeInput.type = "text";
+    scopeInput.value = "mcp.read";
+    scopeField.appendChild(scopeLabel);
+    scopeField.appendChild(scopeInput);
+    wrap.appendChild(scopeField);
+
+    var startBtn = el("button", "kx-btn", "Start device flow");
+    var stopBtn = el("button", "kx-btn ghost", "Stop");
+    stopBtn.style.marginLeft = "0.5rem";
+    stopBtn.style.display = "none";
+    var btnRow = el("div");
+    btnRow.style.margin = "0.25rem 0 0.5rem";
+    btnRow.appendChild(startBtn);
+    btnRow.appendChild(stopBtn);
+    wrap.appendChild(btnRow);
+
+    var info = el("div", "kx-result");   // the persistent user_code + approve link
+    var status = el("div", "kx-result"); // the live poll state
+    wrap.appendChild(info);
+    wrap.appendChild(status);
+
+    var state = { timer: null, stopped: false };
+
+    function setStatus(cls, text) {
+      status.style.display = "block";
+      status.className = "kx-result " + cls;
+      status.textContent = text;
+    }
+
+    function stop() {
+      state.stopped = true;
+      if (state.timer) { clearTimeout(state.timer); state.timer = null; }
+      startBtn.disabled = false;
+      startBtn.textContent = "Start device flow";
+      stopBtn.style.display = "none";
+    }
+
+    stopBtn.addEventListener("click", function () { stop(); setStatus("", "Stopped."); });
+
+    startBtn.addEventListener("click", function () {
+      startBtn.disabled = true;
+      startBtn.textContent = "Requesting…";
+      info.style.display = "none";
+      state.stopped = false;
+      fetch("/oauth/device", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+        body: new URLSearchParams({ client_id: DEVICE_CLIENT_ID, scope: scopeInput.value || "mcp.read", resource: resource })
+      }).then(async function (r) {
+        var body = await r.json().catch(function () { return {}; });
+        if (r.status !== 200) {
+          setStatus("err", "Device request failed (" + r.status + "): " + (body.error || "") + " " + (body.error_description || "") +
+            (body.error === "invalid_client" ? "\nThe seeded dev client is Development-only — this is the fail-closed path." : ""));
+          stop();
+          return;
+        }
+        stopBtn.style.display = "";
+        startBtn.textContent = "In progress…";
+        showApproval(body);
+        var deadline = Date.now() + ((body.expires_in || 900) * 1000);
+        schedulePoll(body.device_code, body.interval || 5, deadline);
+      }).catch(function (err) { setStatus("err", String(err)); stop(); });
+    });
+
+    function showApproval(body) {
+      info.style.display = "block";
+      info.className = "kx-result ok";
+      info.innerHTML = "";
+      info.appendChild(el("div", null, "user_code: " + body.user_code));
+      var verify = body.verification_uri_complete || body.verification_uri;
+      if (verify) {
+        var row = el("div");
+        row.appendChild(document.createTextNode("Approve at "));
+        var a = el("a", null, verify);
+        a.href = verify;
+        a.target = "_blank";
+        a.rel = "noopener";
+        row.appendChild(a);
+        info.appendChild(row);
+        window.open(verify, "_blank", "noopener"); // best-effort; the link above is the fallback if blocked
+      }
+    }
+
+    function schedulePoll(deviceCode, interval, deadline) {
+      setStatus("ok", "Polling every " + interval + "s — waiting for approval…");
+      state.timer = setTimeout(function () { pollOnce(deviceCode, interval, deadline); }, interval * 1000);
+    }
+
+    function pollOnce(deviceCode, interval, deadline) {
+      if (state.stopped) return;
+      if (Date.now() > deadline) { setStatus("err", "The device_code expired before approval."); stop(); return; }
+      fetch("/oauth/token", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+        body: new URLSearchParams({ grant_type: DEVICE_GRANT, device_code: deviceCode, client_id: DEVICE_CLIENT_ID })
+      }).then(async function (r) {
+        var body = await r.json().catch(function () { return {}; });
+        if (r.status === 200) {
+          info.style.display = "none";
+          setStatus("ok", "Authorized. Access token (expires_in " + body.expires_in + "s):\n" + body.access_token);
+          stop();
+          return;
+        }
+        if (body.error === "authorization_pending") { schedulePoll(deviceCode, interval, deadline); return; }
+        // RFC 8628 §3.5 — back off by 5s and keep polling.
+        if (body.error === "slow_down") { schedulePoll(deviceCode, interval + 5, deadline); return; }
+        // access_denied / expired_token / anything else → terminal.
+        setStatus("err", "Flow ended: " + (body.error || r.status) + (body.error_description ? " — " + body.error_description : ""));
+        stop();
+      }).catch(function (err) { setStatus("err", String(err)); stop(); });
+    }
   }
 
 })();
