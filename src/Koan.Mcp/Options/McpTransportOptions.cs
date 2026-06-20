@@ -45,4 +45,30 @@ public sealed class McpTransportOptions
         get => _sseKeepAliveInterval;
         set => _sseKeepAliveInterval = value <= TimeSpan.Zero ? TimeSpan.FromSeconds(15) : value;
     }
+
+    private int _streamReplayBufferSize = 256;
+
+    /// <summary>
+    /// AI-0037 — per-stream replay buffer capacity for MCP Streamable HTTP resumability: the number of recent SSE
+    /// events each stream retains so a resumption GET carrying <c>Last-Event-ID</c> can replay that stream's tail.
+    /// <c>0</c> disables resumability (no <c>id:</c> lines are buffered). Default 256.
+    /// </summary>
+    public int StreamReplayBufferSize
+    {
+        get => _streamReplayBufferSize;
+        set => _streamReplayBufferSize = value < 0 ? 0 : value;
+    }
+
+    private int _maxRetainedStreamsPerSession = 64;
+
+    /// <summary>
+    /// AI-0037 — the maximum number of completed per-request POST streams a session retains for resumption replay
+    /// before evicting the oldest (the long-lived standalone GET stream is never evicted). Bounds session memory.
+    /// Default 64.
+    /// </summary>
+    public int MaxRetainedStreamsPerSession
+    {
+        get => _maxRetainedStreamsPerSession;
+        set => _maxRetainedStreamsPerSession = value < 1 ? 1 : value;
+    }
 }
