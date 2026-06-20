@@ -85,3 +85,129 @@ This keeps the console at bare `/mcp` (WEB-0072's discoverable human face) while
 - **Streamable GET stream on a sub-path** (e.g. `{baseRoute}/stream`) to dodge the Explorer collision — rejected: non-conformant (the client opens `GET` on the **same** endpoint URL it POSTs to).
 - **Moving the Explorer console to `{baseRoute}/console`** — rejected: loses WEB-0072's bare-`/mcp` discoverable human face; the `IMcpConsoleRenderer` seam preserves it.
 - **Stateless JSON-only v1** (no SSE-per-POST, no GET stream, no sessions) — rejected by the "full streaming now" decision.
+
+---
+
+## Addendum (2026-06-20) — Phase 3 Architecture Evaluation: transport/session convergence
+
+Before implementing Phase 3 the current MCP edge was mapped in full to find every duplicate or
+near-duplicate path ("less but more meaningful parts"). Findings + decisions below; this addendum
+governs Phase 3 and **revises** the Phase-4 "STDIO onto the core" item.
+
+### Current state — 3 transports, 2 session models, 2 dispatch mechanisms, 2 SSE frame types
+
+- **STDIO** (`StdioTransport`, default-on) → `McpServer.Run` → `StreamJsonRpcTransportDispatcher`
+  (StreamJsonRpc **reflection** over `McpRpcHandler`). Deliberately **ungated** (AN3 local-trust: stdin/stdout
+  is the same-machine process owner; no remote principal to gate).
+- **Legacy HTTP+SSE** (`HttpSseTransport`, opt-in/deprecated) → 2 endpoints: `GET /sse` (open stream, emit
+  `connected`+`endpoint` control frames) + `POST /rpc` (`HttpSseRpcBridge` → `McpRpcDispatcher` → enqueue the
+  response on the GET stream). Session = `HttpSseSession`/`HttpSseSessionManager` (request-linked CTS, health
+  publish, heartbeat broadcast, a single `ServerSentEvent` channel). Session-id header = `X-Mcp-Session`.
+- **Streamable HTTP** (`StreamableHttpTransport`, Phase 2b) → single endpoint `{baseRoute}` POST/GET/DELETE.
+  Session = `McpSession`/`McpSessionManager` (session-scoped CTS, multi-stream, replay buffers). Dispatch =
+  `McpRpcDispatcher`. Session-id header = `Mcp-Session-Id`.
+
+### Duplications, ranked
+
+| # | Duplication | Similarity | Collapse value | Risk | Decision |
+|---|---|---|---|---|---|
+| A | `HttpSseSession`/Manager **vs** `McpSession`/Manager | HIGH | HIGH | Med (legacy e2e) | **Collapse** |
+| B | `ServerSentEvent` **vs** `SseEnvelope`/`McpSseStream` | MED | MED | Low | **Collapse (delete)** |
+| C | Bare `GET {baseRoute}` owner — Explorer **vs** Streamable | COLLISION | required | Low | **Seam (core owns it)** |
+| D | `McpRpcDispatcher` switch **vs** StreamJsonRpc reflection (STDIO) | LOW (justified) | LOW | High | **Keep separate** |
+
+### Decisions
+
+**D-C — route ownership (the Phase 2b default-off blocker).** Koan.Mcp core becomes the **sole owner** of
+`GET {baseRoute}`. New seam **`IMcpConsoleRenderer`** (in Koan.Mcp). The core GET handler content-negotiates:
+`Accept: text/event-stream` (+ Streamable on) → the SSE stream; browser `text/html` / `?format=html` (+ a
+renderer registered) → `renderer.RenderConsoleAsync`; else 404. The WEB-0072 Explorer **drops** its bare-GET
+mapping, **implements** `IMcpConsoleRenderer`, and keeps its sub-paths (`/map.json`, `/access-map.json`,
+`/explorer/*`). `MapKoanMcpEndpoints` maps the bare GET when (Streamable enabled **or** a renderer is
+registered) and no longer early-returns when only the Explorer is active. → **one** route owner, **one**
+console path. The `AcceptsHtml` negotiation moves from the Explorer into the core handler.
+
+**D-A + D-B — session collapse.** The legacy HTTP+SSE transport becomes a thin **deprecated shim** over the
+unified `McpSession`/`McpSessionManager`/`McpRpcDispatcher`. `GET /sse` mints/opens the unified session's GET
+stream, emits the legacy `connected`+`endpoint` frames, streams it, and **terminates the session when the
+connection drops** (legacy request-scoped lifetime). `POST /rpc` resolves the session, dispatches inline
+through `McpRpcDispatcher`, and enqueues the response on that session's GET stream (no background pump — the
+per-session serial `HttpSseRpcBridge` thread is **deleted**; inline dispatch is correct because the stream's
+channel is thread-safe). `ServerSentEvent`'s control-frame factories are inlined as `SseEnvelope`s.
+**Deleted:** `HttpSseSession`, `HttpSseSessionManager`, `HttpSseRpcBridge`, `ServerSentEvent` (4 files). The
+cross-cutting concerns the legacy manager owned (health publish via `IHealthAggregator`, idle reclaim, optional
+keep-alive) **move up** into the unified `McpSessionManager` — extending self-reporting to Streamable too
+(which currently has neither). Legacy wire (`X-Mcp-Session`, the `connected`/`endpoint`/`ack`/`end` events) is
+**byte-preserved** so the existing legacy e2e stays green. Blast radius is contained to `HttpSseTransport.cs` +
+DI + two doc-comments; `HttpSseCapabilityReporter` is registry-only (untouched).
+
+**D-D — STDIO stays on StreamJsonRpc (revises Phase 4).** The ADR's Phase-4 "STDIO onto the core" is
+**withdrawn.** StreamJsonRpc is *justified divergence*, not duplication: (a) it provides framing
+(`NewLineDelimitedMessageHandler`), request/response correlation, and notification plumbing that
+`McpRpcDispatcher` does not; (b) STDIO is deliberately **ungated** (AN3 local-trust) whereas `McpRpcDispatcher`
+is gating-centric — routing STDIO through it would either misapply remote gating or require a "local-trust
+bypass" branch that re-introduces drift; (c) STDIO is the **default** transport — a rewrite risks everything
+for no dedup win. **The shared core is already `McpRpcHandler`**; STDIO (reflection) and HTTP (explicit switch +
+gating) are two thin adapters over that one core. That is the correct shape — not a duplication to collapse.
+
+### Net effect
+Session models 2 → 1 · SSE frame types 2 → 1 · bare-GET owners 2 → 1 · HTTP dispatch already 1 (now serves
+Streamable + the legacy shim) · **−3 files net** (4 deleted, 1 added: `IMcpConsoleRenderer`) · health +
+keep-alive now cover **both** HTTP transports. STDIO untouched (correctly).
+
+### Sub-phases
+- **3a** — `IMcpConsoleRenderer` seam + core owns `GET {baseRoute}` + Explorer becomes the renderer + flip
+  `EnableStreamableHttpTransport` default on-when-HTTP.
+- **3b** — legacy `/sse`+`/rpc` collapsed onto the unified session/dispatch; delete the 4 legacy files; lift
+  health/keep-alive into `McpSessionManager`.
+
+### Revisions after adversarial review (2026-06-20)
+
+A 3-lens adversarial review (verified against source) found the addendum above understated work and
+leaned on a safety net that does not exist. These revisions are **binding** and supersede the conflicting
+prose above. The shape (D-A/D-B/D-C collapse; D-D keep STDIO) holds and was independently re-confirmed.
+
+1. **No legacy wire e2e exists — "byte-preserved, stays green" is withdrawn.** The only specs touching
+   `GET /mcp/sse` (`McpAuthRampSpec`, `McpConfiguredResourceSpec`) assert auth/401/`no_entities` only; none read
+   the `connected/endpoint/ack/message/end` frames, the `X-Mcp-Session` header, or POST `/rpc`. **Precondition
+   Ph3-pre:** land a NET-NEW real-Kestrel legacy wire conformance spec against the **current** transport
+   (golden bytes) BEFORE deleting anything, then re-run it against the shim.
+2. **Console must NOT inherit the group's bearer-auth/CORS.** The Explorer console is mapped today on the ROOT
+   builder (outside the auth group) and is anonymous-discoverable (WEB-0072). The core's bare `GET {baseRoute}`
+   is therefore mapped **outside** the auth group; the handler does conditional auth **inline** — the
+   `text/event-stream` (stream) branch runs `McpEdgeAuth.EnsureAuthorized` when `RequireAuthentication`; the
+   `text/html` (console) branch is anonymous. POST + DELETE stay inside the auth group (always gated).
+3. **Legacy frames — incl. the JSON-RPC response — emit via `EnqueueRaw`, not `EnqueueMessage`.**
+   `EnqueueMessage` unconditionally stamps `id:{stream}.{seq}` + `event: message`; the legacy wire has no `id:`
+   line. The shim hand-builds every `SseEnvelope` (`connected`/`endpoint`/`ack`/`end` + the `message` response)
+   to reproduce the exact legacy bytes. The Ph3-pre spec asserts the **absence** of `id:` on the legacy message.
+4. **Inline dispatch — ordering contract (option b, documented).** Deleting the serial `HttpSseRpcBridge` pump
+   means concurrent POSTs to one legacy session enqueue responses in completion order, not submission order.
+   **Decision:** the deprecated shim no longer guarantees submission-order responses — JSON-RPC `id` correlates
+   responses (spec-compliant). Pinned by an order-independent pipelined-requests test. (No per-session
+   serializer is re-added — that would re-grow the part we are deleting.)
+5. **GET fallthrough status matrix (resolves the 404/405/406 contradiction).** `?format=html` OR (browser
+   `text/html`, no `event-stream`) → console: renderer present → **200**, else **404**. `Accept:
+   text/event-stream` → stream: Streamable on → [auth then] stream, Streamable off → **405** (stream not
+   offered). Else → **404**. Port the Explorer's exact precedence (`?format=` wins; the 3-way `AcceptsHtml`
+   rule) + `Vary: Accept` + `Cache-Control: no-store` on the rendered response.
+6. **Atomicity.** The Explorer dropping its bare-GET mapping and the core registering the renderer-aware GET are
+   ONE change; the `EnableStreamableHttpTransport` default-flip is gated behind it. New co-enabled integration
+   test (Streamable-on + Explorer-on) asserts exactly one `GET /mcp` resolves and client/browser route correctly
+   (no `AmbiguousMatchException`).
+7. **Shim session lifetime.** The shim session **dies with its GET `/sse` stream** (explicit
+   `_sessions.Terminate(id)` in the GET handler's `finally`). POST `/rpc` dispatches under its **own**
+   `RequestAborted`, so a GET drop cannot kill an in-flight POST; a post-drop enqueue onto the completed GET
+   stream is a no-op (`TryWrite` → false). Tested: GET-drop → session immediately 404; in-flight POST survives.
+8. **Health/keep-alive lift is NET-NEW, transport-shaped (not "preserved").** Idle-reclaim already lives in
+   `McpSessionManager`. Health-publish lifts up under a transport-neutral component id (`mcp-http`, not the old
+   `mcp-http-sse`). Keep-alive becomes a raw **SSE comment** pushed on the sweep tick to each **open GET stream**
+   (conformant for BOTH transports), replacing the legacy named `heartbeat` event (documented wire change;
+   guarded for "no GET stream open"). Ph3-pre uses a long keep-alive interval so it does not perturb the golden
+   frame sequence.
+9. **Blast radius (corrected).** Relocate `HttpSseHeaders.SessionId` (the `X-Mcp-Session` constant the shim +
+   CORS still need) out of the deleted `ServerSentEvent.cs`; fix the stale `<see cref="HttpSseRpcBridge"/>` in
+   `McpToolAccessPolicy.cs`; rewrite the `McpPillarBootstrapSpec` remarks (hosted services = `StdioTransport` +
+   `McpSessionManager`; drop the never-registered `WebSocketTransport`).
+10. **D-D guard.** Keep `EnforcementConsolidationSpec`'s raw-handler assertion; STDIO never routes through the
+    gating `McpRpcDispatcher` (re-confirmed correct — no change).
