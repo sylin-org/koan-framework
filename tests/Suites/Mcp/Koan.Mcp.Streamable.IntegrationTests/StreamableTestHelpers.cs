@@ -99,18 +99,34 @@ public static class StreamableTestHelpers
     /// <summary>Read exactly one SSE event off a live (never-closing) stream, with the caller's timeout.</summary>
     public static async Task<SseEvent> ReadOneEvent(Stream stream, CancellationToken ct)
     {
-        using var reader = new StreamReader(stream, Encoding.UTF8, leaveOpen: true);
+        await using var reader = new SseStreamReader(stream);
+        return await reader.ReadAsync(ct);
+    }
+}
+
+/// <summary>
+/// A stateful SSE frame reader: ONE underlying <see cref="StreamReader"/> for the whole stream so reading
+/// several frames in sequence does not lose bytes the reader buffered ahead (the trap that makes a fresh
+/// reader-per-call hang on the second frame).
+/// </summary>
+public sealed class SseStreamReader : IAsyncDisposable
+{
+    private readonly StreamReader _reader;
+    public SseStreamReader(Stream stream) => _reader = new StreamReader(stream, Encoding.UTF8, leaveOpen: true);
+
+    public async Task<SseEvent> ReadAsync(CancellationToken ct)
+    {
         string? id = null, ev = null;
         var data = new StringBuilder();
         while (true)
         {
-            var line = await reader.ReadLineAsync(ct);
+            var line = await _reader.ReadLineAsync(ct);
             if (line is null) throw new EndOfStreamException("SSE stream closed before an event arrived.");
             if (line.Length == 0)
             {
                 if (data.Length > 0 || id is not null || ev is not null)
                     return new SseEvent(id, ev, data.ToString());
-                continue;
+                continue; // skip keep-alive comments / blank separators with no fields
             }
             if (line.StartsWith("id:", StringComparison.Ordinal)) id = line[3..].Trim();
             else if (line.StartsWith("event:", StringComparison.Ordinal)) ev = line[6..].Trim();
@@ -120,5 +136,11 @@ public static class StreamableTestHelpers
                 data.Append(line[5..].TrimStart());
             }
         }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        _reader.Dispose();
+        return ValueTask.CompletedTask;
     }
 }
