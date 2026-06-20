@@ -16,7 +16,7 @@
 
   fetch(base + "/map.json", { headers: { Accept: "application/json" }, credentials: "same-origin" })
     .then(function (r) { return r.json(); })
-    .then(function (surface) { render(surface); loadAccessMap(); })
+    .then(function (surface) { render(surface); loadAccessMap(); loadGrants(); })
     .catch(function (err) { app.className = ""; app.textContent = "Failed to load the surface: " + err; });
 
   function render(surface) {
@@ -295,4 +295,56 @@
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
+
+  // WEB-0072 P3 — grant exercisers. Shown only when the embedded OAuth AS (SEC-0006) is present (RFC 8414
+  // discovery probes 200). A 404 means no AS — omit silently (the console still works standalone).
+  function loadGrants() {
+    fetch("/.well-known/oauth-authorization-server", { headers: { Accept: "application/json" } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (meta) { if (meta) renderGrants(meta); })
+      .catch(function () { /* no AS — omit */ });
+  }
+
+  function renderGrants(meta) {
+    app.appendChild(el("div", "kx-section-title", "Authenticate — exercise the OAuth grants"));
+    var card = el("div", "kx-card");
+
+    // Dev token — the quick path (Development-only; the endpoint 404s elsewhere).
+    var devBtn = el("button", "kx-btn ghost", "Mint a dev token");
+    var devOut = el("div", "kx-result");
+    devBtn.addEventListener("click", function () {
+      devBtn.disabled = true;
+      fetch("/oauth/dev-token", { credentials: "same-origin", headers: { Accept: "application/json" } })
+        .then(async function (r) { return { status: r.status, body: await r.text() }; })
+        .then(function (res) {
+          devOut.style.display = "block";
+          if (res.status !== 200) {
+            devOut.className = "kx-result err";
+            devOut.textContent = "dev-token unavailable (" + res.status + "). Sign in first; it is Development-only.";
+            return;
+          }
+          devOut.className = "kx-result ok";
+          try { var j = JSON.parse(res.body); devOut.textContent = "Bearer token (expires_in " + j.expires_in + "s):\n" + j.access_token; }
+          catch (e) { devOut.textContent = res.body; }
+        })
+        .finally(function () { devBtn.disabled = false; });
+    });
+    var devRow = el("div");
+    devRow.style.marginBottom = "0.75rem";
+    devRow.appendChild(devBtn);
+    card.appendChild(devRow);
+    card.appendChild(devOut);
+
+    // The full OAuth grants (device / auth-code + PKCE / refresh) are driven by a real MCP client — the client
+    // is the OAuth actor (it registers via DCR, requests scope + resource, and runs the consent round-trip).
+    // The console hands off rather than re-implementing the dance.
+    var note = el("div", "kx-anon",
+      "For the full OAuth flow (device / auth-code + PKCE / refresh), connect a real MCP client — it drives the grant (DCR + scope + resource + consent). Use the Connect URL above.");
+    note.style.marginTop = "0.75rem";
+    note.style.marginBottom = "0";
+    card.appendChild(note);
+
+    app.appendChild(card);
+  }
+
 })();
