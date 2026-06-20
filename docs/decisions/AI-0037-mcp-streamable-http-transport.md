@@ -1,6 +1,6 @@
 # AI-0037 — MCP Streamable HTTP transport (break-and-rebuild)
 
-- **Status**: Proposed
+- **Status**: Accepted (Phases 1–3 implemented + adversarially reviewed + green; Phase 4 = doc-surface follow-ups)
 - **Date**: 2026-06-20
 - **Supersedes**: AI-0013 (MCP HTTP+SSE deployment) — the transport surface
 - **Relates**: AI-0012 (MCP JSON-RPC runtime), WEB-0072 (MCP Explorer console), SEC-0006 (embedded OAuth AS / the MCP ingress), AN6 (protocol currency)
