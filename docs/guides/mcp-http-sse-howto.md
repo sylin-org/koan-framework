@@ -4,13 +4,13 @@ domain: mcp
 title: "MCP over HTTP + SSE How-To"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-06-14
+last_updated: 2026-06-20
 framework_version: v0.17
 validation:
-  date_last_tested: 2026-06-12
+  date_last_tested: 2026-06-20
   status: verified
   scope: all-examples-tested
-  notes: "Section 3 'Hiding internal / PII fields' ([McpIgnore]) is covered by tests/Suites/Samples/Koan.Mcp.FieldExclusion.Tests (added 2026-06-14)."
+  notes: "Section 5 'Authentication' updated for the SEC-0006 embedded AS / Koan.bearer resource-server edge; deep AS flow in oauth-server-howto.md. [McpIgnore] field exclusion covered by tests/Suites/Samples/Koan.Mcp.FieldExclusion.Tests."
 related_guides:
   - entity-capabilities-howto.md
   - patch-capabilities-howto.md
@@ -862,18 +862,47 @@ public sealed class Todo : Entity<Todo> { public string Title { get; set; } = ""
 
 A verb the caller lacks the grant for is absent from `tools/list` and denied on call (its denial rides back as `meta.shortCircuit`). Custom `[McpTool]` verbs gate with their own `RequiredScopes`. Full model: [authorization-howto.md](authorization-howto.md).
 
-### Recipe: OAuth token authentication
+### Recipe: the embedded Authorization Server (the on-ramp)
+
+The canonical path is **Reference = Intent**: reference `Koan.Web.Auth.Server` and `/mcp` becomes an OAuth 2.1 **resource server** that validates the framework-issued ES256 bearer tokens via the `Koan.bearer` scheme — **no `AddAuthentication` / `AddJwtBearer` / `UseAuthentication` ceremony**. The same package activates the Authorization Server at `/oauth/…` that mints those tokens (Authorization Code + PKCE, the RFC 8628 device grant, RFC 7591 DCR, rotating refresh) plus the RFC 9728/8414 discovery documents.
+
+```xml
+<PackageReference Include="Sylin.Koan.Web.Auth.Server" />
+```
 
 ```csharp
-// Program.cs
-using Koan.Core;
-using Microsoft.IdentityModel.Tokens;
+// Program.cs — that's the whole wiring.
+builder.Services.AddKoan();
+```
 
-var builder = WebApplication.CreateBuilder(args);
+```jsonc
+"Koan": { "Mcp": {
+  "EnableHttpSseTransport": true,
+  "RequireAuthentication": true,
+  "ResourceUri": "https://app.example.com/mcp"
+} }
+```
 
-// Reference = Intent: Koan.Mcp + Koan.Web are active from the package references. The framework wires the whole
-// pipeline (AppHost, routing, UseAuthentication/UseAuthorization, controller + MCP endpoint mapping), so you only
-// register the bearer SCHEME the agent's token is validated against — standard ASP.NET, your IdP, your call.
+The app implements only **two pages** (consent + done). The full flow, the consent-seam contract, and the config live in **[oauth-server-howto.md](oauth-server-howto.md)**.
+
+#### The /mcp resource-server edge
+
+Without a valid token the edge returns `401` with an RFC 9728 challenge — `WWW-Authenticate: Bearer resource_metadata="…/.well-known/oauth-protected-resource/mcp"` — and serves that protected-resource metadata so the client can discover the AS. It enforces the **per-resource audience** (RFC 8707): a token whose `aud` is not this resource is rejected even though its signature is valid (the confused-deputy fix). `Koan:Mcp:ResourceUri` is the canonical resource id — authoritative when set (host-spoof-proof behind a proxy); in Development it derives from the request host. Once the bearer identity is in `context.User`, the `[Access]` gate runs exactly as for REST.
+
+#### Test it locally: `/oauth/dev-token`
+
+In Development only (a hard 404 elsewhere), mint a token for the current cookie user and exercise the authenticated transport without a real OAuth client:
+
+```bash
+curl -b cookies.txt "http://localhost:5000/oauth/dev-token"           # after signing in via the app
+curl -H "Authorization: Bearer <token>" "http://localhost:5000/mcp/sse"
+```
+
+### Recipe: validate tokens from an external IdP (advanced)
+
+If you already run your own IdP and want the MCP edge to trust *its* tokens instead of the embedded AS, register a bearer scheme yourself:
+
+```csharp
 builder.Services.AddKoan();
 
 builder.Services.AddAuthentication("Bearer")
@@ -881,19 +910,10 @@ builder.Services.AddAuthentication("Bearer")
     {
         options.Authority = "https://auth.example.com";
         options.Audience = "koan-mcp-api";
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true
-        };
     });
-
-var app = builder.Build();
-app.Run();
 ```
 
-> No named ASP.NET policies for entity access — the validated token's `scope`/role claims feed the entity `[Access]` gate directly (`[Access(write: "has:scope:todos:write")]`). You register the *scheme*; the gate does the *authorization*.
+> Either way, no named ASP.NET policies for entity access — the validated token's `scope`/role claims feed the entity `[Access]` gate directly (`[Access(write: "has:scope:todos:write")]`). You register (or reference) the *scheme*; the gate does the *authorization*.
 
 ### Recipe: API key authentication
 

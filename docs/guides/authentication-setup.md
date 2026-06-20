@@ -417,7 +417,13 @@ public async Task Should_Allow_Authenticated_User()
 
 Testable authentication flows.
 
+## OAuth Authorization Server (issuing tokens)
+
+The provider endpoints above sign a **user** in via an external IdP. Koan can also **issue** tokens: reference the opt-in leaf **`Koan.Web.Auth.Server`** and an embedded OAuth 2.1 Authorization Server activates under `AddKoan()` (no ceremony — no `AddKoanMcp()` / `UseAuthentication()`). It lives at its own root `/oauth/…` — distinct from `/auth/{provider}/` login: it issues tokens to **clients** (e.g. an MCP client like Claude Desktop), it is **not** a login provider. The app owns only two render-only pages (`Koan:Web:Auth:Server:ConsentPath` / `DonePath`); the framework owns the protocol. Full walkthrough: [oauth-server-howto.md](oauth-server-howto.md) ([SEC-0006](../decisions/SEC-0006-embedded-oauth-authorization-server.md)).
+
 ## Built-in Endpoints
+
+Provider sign-in (always present):
 
 - `GET /.well-known/auth/providers` - Available providers
 - `POST /auth/challenge/{provider}` - Start login
@@ -425,7 +431,16 @@ Testable authentication flows.
 - `POST /auth/logout` - Sign out
 - `GET /auth/user` - Current user info
 
-All endpoints work automatically with any configured provider.
+OAuth Authorization Server (when `Koan.Web.Auth.Server` is referenced):
+
+- `GET /.well-known/oauth-authorization-server` · `GET /.well-known/jwks.json` - discovery (RFC 8414) + public ES256 keys
+- `GET /oauth/authorize` · `POST /oauth/token` - Authorization Code + PKCE (and the `refresh_token` / `device_code` grants)
+- `POST /oauth/device` - device authorization request (RFC 8628)
+- `POST /oauth/register` - dynamic client registration (RFC 7591)
+- `GET /oauth/request/{rid}` (+ `…/approve`, `…/deny`) - the consent seam your page consumes
+- `GET /oauth/dev-token` - Development-only token for the current cookie user
+
+All endpoints work automatically with any configured provider; the `/oauth/…` set is active once `Koan.Web.Auth.Server` is referenced.
 
 ---
 

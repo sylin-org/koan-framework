@@ -98,7 +98,8 @@ Sign-in is a cookie-session flow: the browser hits `GET /auth/{provider}/challen
 | `+ Koan.Web.Auth.Connector.Google` | `[AuthProviderDescriptor("google", "Google", "OIDC")]` self-registers; `GoogleProviderContributor : IAuthProviderContributor` supplies the `Authority` + scope defaults. Config adds the secret. |
 | `+ Koan.Web.Auth.Connector.Microsoft` / `.Discord` | Same shape for Microsoft (OIDC) / Discord (OAuth2). |
 | `+ Koan.Web.Auth.Connector.Oidc` | **Generic** OIDC — disabled by default (`Defaults.Enabled = false`); supply `Authority` + `ClientId` + `ClientSecret` per provider and the seeder wires a real `OpenIdConnectHandler`. The escape hatch. |
-| `+ Koan.Security.Trust` | Inbound trust fabric: opt-in bearer scheme `KoanBearerDefaults.AuthenticationScheme` (`"Koan.bearer"`) validates KSVID JWTs against the issuer key (ES256-pinned). |
+| `+ Koan.Security.Trust` | Inbound trust fabric: the opt-in bearer scheme `"Koan.bearer"` validates **both** issuer tiers — HS256 `SharedKeyIssuer` (service mesh, shared secret) and the ES256 `IAsymmetricIssuer` / `EcdsaIssuer` (persisted + rotating keys, published JWKS, fail-closed boot guard) that the Authorization Server signs with. |
+| `+ Koan.Web.Auth.Server` | The embedded **OAuth 2.1 Authorization Server** at `/oauth/…` (Reference = Intent): Authorization Code + PKCE-S256, RFC 8628 device grant, RFC 7591 DCR, rotating refresh tokens; discovery at `/.well-known/oauth-authorization-server` + JWKS. **Issues** ES256 tokens to clients — distinct from `/auth/{provider}/` login (it is NOT a login provider). The app owns only two render-only pages. See [oauth-server-howto.md](../../../docs/guides/oauth-server-howto.md). |
 
 The cookie scheme stays the **default**; bearer is additive and opted into per endpoint with `[Authorize(AuthenticationSchemes = KoanBearerDefaults.AuthenticationScheme)]`.
 
@@ -116,6 +117,7 @@ The cookie scheme stays the **default**; bearer is additive and opted into per e
 | A custom callback action handling the OAuth redirect | The handler intercepts `/auth/{provider}/callback` as RemoteAuthentication middleware — there is no callback action to write. |
 | Reading `returnUrl` and redirecting without validation | The challenge resolves it through the SEC-0001 allow-list (`Koan:Web:Auth:ReturnUrl:AllowList`) before handing it to the handler. |
 | Hand-validating inbound JWTs (manual `JwtSecurityTokenHandler`) | `Koan.Security.Trust` + `[Authorize(AuthenticationSchemes = KoanBearerDefaults.AuthenticationScheme)]` — validation params come from the issuer. |
+| Hand-rolling an OAuth `/authorize`+`/token` endpoint / token issuance / a consent-protocol to give an MCP client a token | Reference `Koan.Web.Auth.Server` — the framework owns the OAuth protocol (Authorization Code + PKCE, device, DCR, refresh, discovery). The app owns only the consent + done render pages ([SEC-0006](../../../docs/decisions/SEC-0006-embedded-oauth-authorization-server.md)). |
 
 ## Escape hatches
 

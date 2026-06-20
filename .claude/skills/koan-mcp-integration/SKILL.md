@@ -78,6 +78,12 @@ public static class TodoTools
 }
 ```
 
+### Authenticating the HTTP/SSE edge (SEC-0006)
+
+Setting `Koan:Mcp:RequireAuthentication=true` makes `/mcp` an OAuth 2.1 **resource server**: it validates ES256 bearer tokens via the framework's `Koan.bearer` scheme, emits an RFC 9728 `WWW-Authenticate` challenge, serves `GET /.well-known/oauth-protected-resource/mcp`, and enforces the per-resource audience (RFC 8707 — `Koan:Mcp:ResourceUri` is the canonical id; a token for another resource is rejected). Once the bearer identity is in `context.User`, the **same** SEC-0004 `[Access]` gate chain runs unchanged. STDIO stays anonymous + `origin:local`.
+
+The token issuer is the embedded **Authorization Server**, opt-in via **Reference = Intent**: reference `Koan.Web.Auth.Server` (no `AddKoanMcp()` / `UseAuthentication()` / `MapKoanMcpEndpoints()`). It lives at `/oauth/…` (distinct from `/auth/{provider}/` login), and the app renders only two pages — consent + done (`Koan:Mcp:Auth:ConsentPath` / `DonePath`). For local testing, `GET /oauth/dev-token` (Development only) mints a token for the current cookie user. Full flow + the two-page contract: [oauth-server-howto.md](../../../docs/guides/oauth-server-howto.md) and [mcp-http-sse-howto.md](../../../docs/guides/mcp-http-sse-howto.md).
+
 ## Code Mode Integration
 
 An agent can send one sandboxed JavaScript script (`koan.code.execute`) over an SDK mirroring your entities — `SDK.Entities.Todo.upsert({...})`, `.collection()`, `SDK.Out.answer(...)` — instead of N tool round-trips. The SDK runs through the **same gate / constrain / origin** as direct tool calls (not a privilege bypass). Quotas bound the call count; `[McpEntity(Exposure = "code")]` or `Koan:Mcp:Exposure` choose tools / code / both.

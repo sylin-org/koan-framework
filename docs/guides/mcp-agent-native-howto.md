@@ -4,10 +4,10 @@ domain: mcp
 title: "Agent-native MCP — from one attribute to governed access"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-06-19
+last_updated: 2026-06-20
 framework_version: v0.17
 validation:
-  date_last_tested: 2026-06-19
+  date_last_tested: 2026-06-20
   status: verified
   scope: patterns-exercised
   notes: "Every layer below is exercised end-to-end by tests/Suites/Mcp/Koan.Mcp.Conformance.Tests and tests/Suites/Web/Koan.Web.Extensions.Tests (gate/constrain/project/origin/grant/audit/door). The transport half is mcp-http-sse-howto.md."
@@ -288,7 +288,7 @@ public sealed class Note : Entity<Note> { /* … */ }
 
 ## Rung 9 — Go remote
 
-Everything above is transport-neutral. STDIO (rung 1's bootstrap) is local-trust for *discovery* but its *data* runs anonymous + `origin:local`. To reach an agent over the network, add the HTTP/SSE transport and an auth scheme:
+Everything above is transport-neutral. STDIO (rung 1's bootstrap) is local-trust for *discovery* but its *data* runs anonymous + `origin:local`. To reach an agent over the network, add the HTTP/SSE transport — and you do **not** hand-roll an auth scheme: referencing the embedded Authorization Server *is* the scheme.
 
 ```csharp
 // Referencing Koan.Web (for the HTTP host) + Koan.Mcp is the whole change — the framework maps /mcp/sse + /mcp/rpc
@@ -300,7 +300,9 @@ var app = builder.Build();
 await app.RunAsync();
 ```
 
-The session principal then threads into the gate, so the *same* `[Access]`/`origin`/grant decisions apply to a remote agent. The full transport story — sessions, CORS, streaming, the `device_code` on-ramp — is in [mcp-http-sse-howto.md](mcp-http-sse-howto.md).
+With `RequireAuthentication: true`, `/mcp` is an OAuth 2.1 **resource server**. Reference the opt-in leaf **`Koan.Web.Auth.Server`** (Reference = Intent) and the framework's `Koan.bearer` scheme validates the ES256 token, lands the identity in `context.User`, and the *same* `[Access]`/`origin`/grant decisions (rungs 3–8) apply to a remote agent — no hand-rolled `AddJwtBearer`. The AS lives at its own `/oauth/…` root (distinct from `/auth/{provider}/` login); `Koan:Mcp:ResourceUri` is the canonical audience the edge enforces.
+
+**The app owns exactly two pages.** A consent page and a "you can close this page" terminal page (wired via `Koan:Web:Auth:Server:ConsentPath` / `DonePath`) — the app *renders*; the framework owns the OAuth protocol. The full transport + auth story — sessions, CORS, streaming, the Authorization Code + device on-ramp, the consent-seam contract — is in [mcp-http-sse-howto.md](mcp-http-sse-howto.md) and [oauth-server-howto.md](oauth-server-howto.md).
 
 ---
 

@@ -4,10 +4,10 @@ domain: web
 title: "Authentication & Identity How-To"
 audience: [developers, architects, security-engineers]
 status: current
-last_updated: 2026-06-07
+last_updated: 2026-06-20
 framework_version: 0.17.x
 validation:
-  date_last_tested: 2026-06-07
+  date_last_tested: 2026-06-20
   status: verified
   scope: Auth fabric covered by Koan.Security.Trust.IntegrationTests (HTTP e2e)
 related_guides:
@@ -182,7 +182,7 @@ Browsers carry cookies; services carry **bearer tokens**. Koan validates inbound
 public IActionResult Sync() => Ok(/* ... */);
 ```
 
-A caller presents `Authorization: Bearer <token>`; a missing or invalid token is **401**. Koan signs and validates these with a **shared secret**, `Koan:Security:Trust:Key`, which in a fresh app **defaults to a well-known development value**. Because every Koan service defaults to the *same* key, they all **self-mint valid tokens and trust each other with zero configuration** — local service-to-service auth just works. To mint one yourself — in a test, a dev tool, or a service calling another — use the issuer:
+A caller presents `Authorization: Bearer <token>`; a missing or invalid token is **401**. For the **service mesh**, Koan signs and validates these with a **shared secret** (HS256), `Koan:Security:Trust:Key`, which in a fresh app **defaults to a well-known development value**. Because every Koan service defaults to the *same* key, they all **self-mint valid tokens and trust each other with zero configuration** — local service-to-service auth just works. To mint one yourself — in a test, a dev tool, or a service calling another — use the issuer:
 
 ```csharp
 public sealed class SyncTrigger(IIssuer issuer)
@@ -192,7 +192,7 @@ public sealed class SyncTrigger(IIssuer issuer)
 }
 ```
 
-> **Mentor note.** This is the seed of *fleet identity*: one verifiable token a service presents to any other, validated the same way everywhere. That default key is **loudly insecure by name** (`super-insecure-shared-secret-replace-asap`) and bootstrap warns you on every start — it's for local dev only, and Koan **refuses to boot** a Production/Staging app that still uses it (§8). For a private team or a shared environment, set `Koan:Security:Trust:Key` to a real secret; every service that shares it interoperates. (Per-node asymmetric identity with *no* shared secret is the SEC-0001 fleet roadmap — the `Koan.bearer` / `Identity.Current` / `[Authorize]` surface won't change as it lands.)
+> **Mentor note.** This is the seed of *fleet identity*: one verifiable token a service presents to any other, validated the same way everywhere. That default key is **loudly insecure by name** (`super-insecure-shared-secret-replace-asap`) and bootstrap warns you on every start — it's for local dev only, and Koan **refuses to boot** a Production/Staging app that still uses it (§8). For a private team or a shared environment, set `Koan:Security:Trust:Key` to a real secret; every service that shares it interoperates. (The per-node **asymmetric ES256** tier this anticipated has now shipped: `Koan.Security.Trust`'s `EcdsaIssuer` / `IAsymmetricIssuer` — persisted + rotating keys, published JWKS — is what the embedded OAuth Authorization Server signs with, and `Koan.bearer` validates **both** tiers (the HS256 mesh secret here *and* the ES256 AS tokens) without the `Identity.Current` / `[Authorize]` surface changing. To **issue** tokens to API/agent clients, reference `Koan.Web.Auth.Server` — see [oauth-server-howto.md](oauth-server-howto.md).)
 
 ---
 

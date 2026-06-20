@@ -96,6 +96,7 @@ _For contributors_: How application initialization actually works
 - Zero-config dev identity → roles → real logins → service tokens (KSVID) → production
 - `Identity.Current`, persona testing (`?_as=`), and the fail-closed production posture
 - Provider/OAuth/SAML configuration reference: [Authentication Setup](authentication-setup.md)
+- Issuing tokens (the MCP auth on-ramp): [Embedded OAuth 2.1 Authorization Server](oauth-server-howto.md)
 
 ### [Authorization](authorization-howto.md)
 

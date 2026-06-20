@@ -4,10 +4,10 @@ domain: mcp
 title: "Agent-native projection — surface map"
 audience: [developers, ai-agents]
 status: current
-last_updated: 2026-06-19
+last_updated: 2026-06-20
 framework_version: v0.17.0
 validation:
-  date_last_tested: 2026-06-19
+  date_last_tested: 2026-06-20
   status: verified
   scope: docs/reference/cards/agent-native.md
 ---
@@ -89,9 +89,9 @@ Access an agent is *lent* (beyond its token), the *trail* it leaves, and what it
 - **`[Audit]`** — every successful write/remove on the entity writes one `AgentAction { Subject, Resource, Action, EntityId, At }` through the normal entity path (queryable like anything else: `AgentAction.Query(a => a.Subject == …)`); reads are never audited.
 - **`[Door]`** (the Wall·Door·Verb model, 09 §8) — a verb the caller may invoke is a **Verb**; one they may not is, by default, a silent **Wall** (absent). `[Door]` discloses a denied verb as a **door** in `koan://entities` — `{ name, operation, needs }`, named + how-to-unlock — whose `needs` derives from the **same gate that enforces** it (Description = Enforcement). A **role-gated (privilege) verb is never a door** even with `[Door]` — admin stays a silent Wall (no privilege enumeration).
 
-## Frontier (designed, not yet shipped)
+## The auth on-ramp ([SEC-0006](../../decisions/SEC-0006-embedded-oauth-authorization-server.md))
 
-The headless **device-grant** auth on-ramp (RFC 8628, Reference = Intent over the configured providers) and **Streamable HTTP + OAuth 2.1**. Tracked in [09 §8 / the AN cards](../../assessment/prompts/07/AN-cards.md).
+How an authenticated agent *gets to* the gate chain above. STDIO is anonymous + `origin:local` (local trust). An HTTP/SSE agent reaching `/mcp` (when `Koan:Mcp:RequireAuthentication=true`) hits an OAuth 2.1 **resource server**: a `401` carries the RFC 9728 `WWW-Authenticate` pointing at `/.well-known/oauth-protected-resource/mcp`; the agent discovers + drives the **embedded Authorization Server** (Reference = Intent via `Koan.Web.Auth.Server`) — Authorization Code + PKCE *or* the RFC 8628 **device grant** — to mint an ES256 token; the `Koan.bearer` scheme validates it (signature + the per-resource audience, RFC 8707 — a token for another resource is rejected) and lands the identity in `context.User`. From there the **same** gate · constrain · project · origin · grant chain runs unchanged. The full flow catalogue, the two app-rendered pages, and the config live in [oauth-server-howto.md](../../guides/oauth-server-howto.md).
 
 ## Where it's exercised
 

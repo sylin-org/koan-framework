@@ -4,17 +4,17 @@ domain: web
 title: "Auth — pillar map"
 audience: [developers, ai-agents]
 status: current
-last_updated: 2026-06-18
+last_updated: 2026-06-20
 framework_version: v0.17.0
 validation:
-  date_last_tested: 2026-06-18
+  date_last_tested: 2026-06-20
   status: verified
   scope: docs/reference/cards/auth.md
 ---
 
 # Auth — pillar map
 
-> One-screen map of the Auth pillar — external sign-in and authorization on top of the [Web](web.md) pillar. Full detail: [authentication-setup.md](../../guides/authentication-setup.md).
+> One-screen map of the Auth pillar — external sign-in, authorization, and **token issuance** on top of the [Web](web.md) pillar. Full detail: [authentication-setup.md](../../guides/authentication-setup.md).
 
 **What it does** — Cookie-session sign-in through external OAuth2 / OIDC providers, then entity surfaces authorized by **gate · constrain · project** ([SEC-0004](../../decisions/SEC-0004-capability-authorization-gate-constrain-project.md)). Reference an auth connector package (`Koan.Web.Auth.Connector.Google` / `.Microsoft` / `.Discord`) and its provider self-registers; config supplies the per-provider `ClientId` / `ClientSecret`. The flow itself rides the **maintained ASP.NET `OAuthHandler` / `OpenIdConnectHandler`** (PKCE, nonce, state, id_token validation owned by the framework), bound at startup via dynamic scheme registration — Koan stopped hand-rolling the OAuth2/OIDC exchange ([WEB-0071](../../decisions/WEB-0071-auth-engine-swap-dynamic-schemes.md)).
 
@@ -70,6 +70,10 @@ Provider roles map onto `ClaimTypes.Role`, so `[Authorize(Roles = "admin")]` and
 The old `CanRead` / `CanWrite` / `CanRemove` virtuals on `EntityController<T>` were **removed** (ARCH-0092) — use `[Access(...)]` for the gate and `EntityAccess<T>` for row scope.
 
 **Governed agent access** ([SEC-0005](../../decisions/SEC-0005-governed-agent-access-grants-audit-door.md)) layers on the gate: a server-side **`AgentGrant`** lends a subject a capability *beyond* its token (`new AgentGrant { Subject, Capability = "has:scope:x", Resource, ExpiresAt }.Save()`) — the gate materializes active grants only on the token-denied path and re-evaluates the same gate; `Remove()`/expiry revoke on the next call. **`[Audit]`** writes an `AgentAction` per mutation; **`[Door]`** discloses a denied verb's `needs` instead of walling it (role-gated stays a Wall). See the [agent-native card](agent-native.md).
+
+## Issuing tokens (OAuth 2.1 AS)
+
+Beyond signing users in, Koan can **issue** tokens — an embedded OAuth 2.1 Authorization Server, the on-ramp that lets an MCP client (Claude Desktop, a headless agent) obtain a bearer token. Reference the opt-in leaf **`Koan.Web.Auth.Server`** and it activates under `AddKoan()` (no ceremony). It lives at its own root **`/oauth/…`** — distinct from `/auth/{provider}/` login: it issues tokens to **clients**, it is not a provider. It speaks Authorization Code + PKCE, the RFC 8628 device grant, RFC 7591 DCR, and rotating refresh tokens (reuse-detection, backed by a revocable SEC-0005 `AgentGrant`), with discovery at `/.well-known/oauth-authorization-server` + a published JWKS. The signing tier is the `Koan.Security.Trust` ES256 asymmetric issuer (`IAsymmetricIssuer` / `EcdsaIssuer` — persisted + rotating keys, published JWKS, fail-closed boot guard); the `Koan.bearer` scheme validates the tokens it mints. The app owns only **two render-only pages** (consent + done) — the framework owns the protocol. Full walkthrough: [oauth-server-howto.md](../../guides/oauth-server-howto.md) ([SEC-0006](../../decisions/SEC-0006-embedded-oauth-authorization-server.md)).
 
 ## The escape hatch
 

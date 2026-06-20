@@ -4,10 +4,10 @@ domain: mcp
 title: "MCP — pillar map"
 audience: [developers, ai-agents]
 status: current
-last_updated: 2026-06-19
+last_updated: 2026-06-20
 framework_version: v0.17.0
 validation:
-  date_last_tested: 2026-06-19
+  date_last_tested: 2026-06-20
   status: verified
   scope: docs/reference/cards/mcp.md
 ---
@@ -19,6 +19,8 @@ validation:
 **What it does** — Projects your `Entity<T>` types and hand-written verbs as Model Context Protocol tools that AI clients invoke over JSON-RPC (stdio + HTTP/SSE) ([AI-0012](../../decisions/AI-0012-mcp-jsonrpc-runtime.md)). Annotate an entity `[McpEntity]` and its CRUD/query operations become MCP tools — same schema and read-path visibility predicates as the REST surface ([WEB-0068](../../decisions/WEB-0068-query-options-predicates.md)). Referencing `Koan.Mcp` + calling `AddKoanMcp()` is the whole opt-in (Reference = Intent); **Code Mode** ([AI-0014](../../decisions/AI-0014-mcp-code-mode.md)) lets a client compose several tools in one sandboxed script instead of one round-trip per call.
 
 > **Beyond tools** — the server also emits spec-shaped tool annotations (`readOnly`/`destructive`/`idempotent`; mark custom verbs with `[McpReadOnly]`/`[McpDestructive]`/`[McpIdempotent]`), introspection **resources** (`koan://entities`, `koan://self`) over the `IMcpResourceProvider` seam, and an authority-free `correlationId` pin — all projected per grant. See the [agent-native projection card](agent-native.md).
+
+> **Authenticated edge** ([SEC-0006](../../decisions/SEC-0006-embedded-oauth-authorization-server.md)) — with `Koan:Mcp:RequireAuthentication=true` the HTTP/SSE edge is an OAuth 2.1 **resource server**: it validates framework-issued ES256 bearer tokens (`Koan.bearer`), enforces the per-resource audience (RFC 8707), and serves RFC 9728/8414 discovery. The embedded **Authorization Server** (Reference = Intent via `Koan.Web.Auth.Server`) is the on-ramp that mints those tokens — once the identity lands in `context.User` the `[Access]` gate chain runs unchanged. See [mcp-http-sse-howto.md](../../guides/mcp-http-sse-howto.md) + [oauth-server-howto.md](../../guides/oauth-server-howto.md).
 
 ## The one canonical pattern
 
