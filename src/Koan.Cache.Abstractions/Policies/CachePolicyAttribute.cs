@@ -41,44 +41,44 @@ public class CachePolicyAttribute : Attribute
     public string KeyTemplate { get; }
 
     /// <summary>Read/write behavior. Default <c>GetOrSet</c> (read-through, write-back).</summary>
-    public CacheStrategy Strategy { get; init; } = CacheStrategy.GetOrSet;
+    public CacheStrategy Strategy { get; set; } = CacheStrategy.GetOrSet;
 
     /// <summary>Consistency mode when cache is unavailable or stale. Default <c>StaleWhileRevalidate</c>.</summary>
-    public CacheConsistencyMode Consistency { get; init; } = CacheConsistencyMode.StaleWhileRevalidate;
+    public CacheConsistencyMode Consistency { get; set; } = CacheConsistencyMode.StaleWhileRevalidate;
 
     /// <summary>Which tiers to use. Default <c>Layered</c> (L1 + L2 with auto-fallback).</summary>
-    public CacheTier Tier { get; init; } = CacheTier.Layered;
+    public CacheTier Tier { get; set; } = CacheTier.Layered;
 
     /// <summary>Absolute expiration. Set via <c>CacheableAttribute</c>'s <c>ttlSeconds</c> in attribute syntax.</summary>
-    public TimeSpan? AbsoluteTtl { get; init; }
+    public TimeSpan? AbsoluteTtl { get; set; }
 
     /// <summary>L1-specific TTL override. Null = derive <c>max(30s, AbsoluteTtl/2)</c> at write time.</summary>
-    public TimeSpan? L1AbsoluteTtl { get; init; }
+    public TimeSpan? L1AbsoluteTtl { get; set; }
 
     /// <summary>Sliding expiration window. Refreshed on each read when supported.</summary>
-    public TimeSpan? SlidingTtl { get; init; }
+    public TimeSpan? SlidingTtl { get; set; }
 
     /// <summary>How long to serve stale data while a background refresh runs. SWR consistency only.</summary>
-    public TimeSpan? AllowStaleFor { get; init; }
+    public TimeSpan? AllowStaleFor { get; set; }
 
     /// <summary>Tags applied to entries created under this policy. Used for bulk invalidation.</summary>
-    public string[] Tags { get; init; } = EmptyTags;
+    public string[] Tags { get; set; } = EmptyTags;
 
     /// <summary>Optional region scoping for tenant isolation.</summary>
-    public string? Region { get; init; }
+    public string? Region { get; set; }
 
     /// <summary>Optional scope-id for fine-grained isolation within a region.</summary>
-    public string? ScopeId { get; init; }
+    public string? ScopeId { get; set; }
 
     /// <summary>Pin L1 (local) tier to a specific store by <c>ICacheStore.Name</c>. Null = let the resolver pick.</summary>
-    public string? LocalProvider { get; init; }
+    public string? LocalProvider { get; set; }
 
     /// <summary>Pin L2 (remote) tier to a specific store by <c>ICacheStore.Name</c>. Null = let the resolver pick.</summary>
-    public string? RemoteProvider { get; init; }
+    public string? RemoteProvider { get; set; }
 
     /// <summary>Whether writes under this policy broadcast a coherence message. Default <c>true</c>.</summary>
-    public bool ForceCoherenceBroadcast { get; init; } = true;
+    public bool ForceCoherenceBroadcast { get; set; } = true;
 
     /// <summary>Arbitrary policy metadata, available on the descriptor at runtime.</summary>
-    public IDictionary<string, string> Metadata { get; init; } = new Dictionary<string, string>();
+    public IDictionary<string, string> Metadata { get; set; } = new Dictionary<string, string>();
 }

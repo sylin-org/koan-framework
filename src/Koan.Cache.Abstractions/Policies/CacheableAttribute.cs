@@ -47,9 +47,15 @@ public class CacheableAttribute : CachePolicyAttribute
     }
 
     /// <summary>L1-specific TTL in seconds. <c>0</c> = same as L2. When unset, L1 derives <c>max(30, L2Ttl/2)</c>.</summary>
+    /// <remarks>
+    /// A read-write projection of the canonical <see cref="CachePolicyAttribute.L1AbsoluteTtl"/> (no duplicate
+    /// state). The getter exists so this can be used as a <b>named attribute argument</b>
+    /// (<c>[Cacheable(60, L1TtlSeconds = 10)]</c>) — C# requires named arguments to be read-write (CS0617).
+    /// </remarks>
     public int L1TtlSeconds
     {
-        init
+        get => L1AbsoluteTtl is { } ttl ? (int)ttl.TotalSeconds : 0;
+        set
         {
             if (value < 0) throw new ArgumentOutOfRangeException(nameof(value), "L1 TTL seconds must be non-negative.");
             L1AbsoluteTtl = value > 0 ? TimeSpan.FromSeconds(value) : null;
@@ -57,9 +63,11 @@ public class CacheableAttribute : CachePolicyAttribute
     }
 
     /// <summary>Sliding TTL in seconds. Refreshed on each read when supported by the store.</summary>
+    /// <remarks>Read-write projection of <see cref="CachePolicyAttribute.SlidingTtl"/> (see <see cref="L1TtlSeconds"/>).</remarks>
     public int SlidingTtlSeconds
     {
-        init
+        get => SlidingTtl is { } ttl ? (int)ttl.TotalSeconds : 0;
+        set
         {
             if (value < 0) throw new ArgumentOutOfRangeException(nameof(value), "Sliding TTL seconds must be non-negative.");
             SlidingTtl = value > 0 ? TimeSpan.FromSeconds(value) : null;
@@ -67,9 +75,11 @@ public class CacheableAttribute : CachePolicyAttribute
     }
 
     /// <summary>How long to serve stale data while a refresh runs, in seconds. SWR consistency only.</summary>
+    /// <remarks>Read-write projection of <see cref="CachePolicyAttribute.AllowStaleFor"/> (see <see cref="L1TtlSeconds"/>).</remarks>
     public int AllowStaleForSeconds
     {
-        init
+        get => AllowStaleFor is { } ttl ? (int)ttl.TotalSeconds : 0;
+        set
         {
             if (value < 0) throw new ArgumentOutOfRangeException(nameof(value), "AllowStaleFor seconds must be non-negative.");
             AllowStaleFor = value > 0 ? TimeSpan.FromSeconds(value) : null;
