@@ -39,6 +39,22 @@ public sealed class AuthServerOptions
     public TimeSpan AccessTokenLifetime { get; set; } = TimeSpan.FromMinutes(15);
 
     /// <summary>
+    /// SEC-0006 D5 — open Dynamic Client Registration (RFC 7591). On by default (the Claude Desktop happy path:
+    /// no pre-shared client_id), but every dynamic client is zero-trust: public-only, loopback-only redirects,
+    /// rate-limited, TTL-expired. Turn off for a hardened deployment (pre-registered clients only).
+    /// </summary>
+    public bool AllowDynamicRegistration { get; set; } = true;
+
+    /// <summary>SEC-0006 D5 — how long a dynamically-registered client lives before it is GC'd.</summary>
+    public TimeSpan DynamicClientLifetime { get; set; } = TimeSpan.FromDays(90);
+
+    /// <summary>SEC-0006 D5 — registration attempts allowed per source IP per minute.</summary>
+    public int RegistrationRateLimitPerMinute { get; set; } = 10;
+
+    /// <summary>SEC-0006 D5 — registration attempts allowed globally per minute (a flood ceiling).</summary>
+    public int RegistrationRateLimitGlobalPerMinute { get; set; } = 100;
+
+    /// <summary>
     /// SEC-0006 D1 — how long an active ES256 signing key is used before it is rotated out. On rotation a fresh
     /// key becomes active and the previous key keeps validating (JWKS overlap) until <see cref="KeyOverlap"/>
     /// elapses. Applies only to the persisted key store (non-Development); Development uses an ephemeral key.
