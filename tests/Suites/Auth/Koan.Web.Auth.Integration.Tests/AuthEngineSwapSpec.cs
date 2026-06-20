@@ -70,6 +70,22 @@ public sealed class AuthEngineSwapSpec : IClassFixture<AuthSwapFixture>
             "the Test simulator endpoints must auto-map in Development (advertise ⇒ map) with no opt-in");
     }
 
+    [Fact]
+    public async Task TestProvider_login_page_forwards_all_authorize_params_including_nonce()
+    {
+        // Bug: login.html rebuilt the authorize URL from a hand-picked param list that omitted `nonce`, so the
+        // re-submitted authorize had no nonce → the id_token was minted without one → OIDC nonce validation failed
+        // (IDX21320). The round-trip specs above bypass login.html via the pre-seeded persona cookie, so they can't
+        // catch this. Guard the static page: it must seed the re-submitted authorize from ALL original params.
+        using var client = _fx.NewClient();
+        var resp = await client.GetAsync("/.testoauth/login.html");
+        resp.StatusCode.Should().Be(HttpStatusCode.OK, "the dev login page is served in Development");
+        var html = await resp.Content.ReadAsStringAsync();
+        html.Should().Contain("const params = new URLSearchParams(location.search)",
+            "the login page must seed the re-submitted authorize from ALL original params (incl. nonce), " +
+            "not a hand-picked subset that silently drops new ones");
+    }
+
     // ── helpers ─────────────────────────────────────────────────────────────
 
     /// <summary>
