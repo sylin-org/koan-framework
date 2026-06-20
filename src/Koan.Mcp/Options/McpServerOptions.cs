@@ -71,6 +71,13 @@ public sealed class McpServerOptions
     public bool PublishCapabilityEndpoint { get; set; } = true;
 
     /// <summary>
+    /// WEB-0072 — the free-text guidance returned in the MCP <c>initialize</c> response's <c>instructions</c>
+    /// field (effectively the system prompt of this MCP surface — what the LLM is told about how to use the
+    /// server). When unset, the application description (<c>[KoanApp].Description</c>) is used.
+    /// </summary>
+    public string? Instructions { get; set; }
+
+    /// <summary>
     /// Determines how MCP capabilities are exposed to clients (Auto, Code, Tools, Full).
     /// Auto: Detect client capabilities and adapt (default).
     /// Code: Expose code execution only (token optimized).

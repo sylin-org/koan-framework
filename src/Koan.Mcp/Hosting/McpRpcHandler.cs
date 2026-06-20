@@ -55,6 +55,40 @@ public sealed class McpRpcHandler
         _resourceProviders = services.GetServices<Koan.Mcp.Resources.IMcpResourceProvider>().ToArray();
     }
 
+    /// <summary>WEB-0072 — the MCP <c>initialize</c> handshake. Advertises the protocol version + capabilities and,
+    /// crucially, the server identity (<c>serverInfo</c> from <c>[KoanApp]</c>) and <c>instructions</c> (the
+    /// LLM-facing guidance) the client surfaces. Sourced declare-once from the application identity.</summary>
+    [JsonRpcMethod("initialize")]
+    public Task<InitializeResult> Initialize(InitializeParams? parameters, CancellationToken cancellationToken)
+        => Task.FromResult(BuildInitializeResult(parameters));
+
+    public const string DefaultProtocolVersion = "2025-06-18";
+
+    internal InitializeResult BuildInitializeResult(InitializeParams? parameters)
+    {
+        var app = Koan.Core.KoanEnv.CurrentSnapshot.Application;
+        var options = _serverOptions.Value;
+        var instructions = !string.IsNullOrWhiteSpace(options.Instructions)
+            ? options.Instructions
+            : (string.IsNullOrWhiteSpace(app.Description) ? null : app.Description);
+
+        return new InitializeResult
+        {
+            ProtocolVersion = string.IsNullOrWhiteSpace(parameters?.ProtocolVersion) ? DefaultProtocolVersion : parameters!.ProtocolVersion!,
+            Capabilities = new JObject
+            {
+                ["tools"] = new JObject { ["listChanged"] = false },
+                ["resources"] = new JObject { ["listChanged"] = false },
+            },
+            ServerInfo = new ServerInfo
+            {
+                Name = app.Name,
+                Version = typeof(McpRpcHandler).Assembly.GetName().Version?.ToString() ?? "0.0.0",
+            },
+            Instructions = instructions,
+        };
+    }
+
     [JsonRpcMethod("tools/list")]
     public Task<ToolsListResponse> ListTools(CancellationToken cancellationToken)
     {
@@ -609,6 +643,44 @@ public sealed class McpRpcHandler
         [JsonPropertyName("uri")]
         [Newtonsoft.Json.JsonProperty("uri")]
         public string? Uri { get; init; }
+    }
+
+    public sealed class InitializeParams
+    {
+        [JsonPropertyName("protocolVersion")]
+        [Newtonsoft.Json.JsonProperty("protocolVersion")]
+        public string? ProtocolVersion { get; init; }
+    }
+
+    public sealed class InitializeResult
+    {
+        [JsonPropertyName("protocolVersion")]
+        [Newtonsoft.Json.JsonProperty("protocolVersion")]
+        public required string ProtocolVersion { get; init; }
+
+        [JsonPropertyName("capabilities")]
+        [Newtonsoft.Json.JsonProperty("capabilities")]
+        public required JObject Capabilities { get; init; }
+
+        [JsonPropertyName("serverInfo")]
+        [Newtonsoft.Json.JsonProperty("serverInfo")]
+        public required ServerInfo ServerInfo { get; init; }
+
+        [JsonPropertyName("instructions")]
+        [System.Text.Json.Serialization.JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [Newtonsoft.Json.JsonProperty("instructions", NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? Instructions { get; init; }
+    }
+
+    public sealed class ServerInfo
+    {
+        [JsonPropertyName("name")]
+        [Newtonsoft.Json.JsonProperty("name")]
+        public required string Name { get; init; }
+
+        [JsonPropertyName("version")]
+        [Newtonsoft.Json.JsonProperty("version")]
+        public required string Version { get; init; }
     }
 
     public sealed class ResourcesListResponse

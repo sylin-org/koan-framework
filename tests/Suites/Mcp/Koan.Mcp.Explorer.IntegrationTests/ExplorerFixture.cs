@@ -29,6 +29,8 @@ public sealed class ExplorerFixture : IAsyncLifetime
 {
     private IHost? _host;
 
+    public const string TestInstructions = "Use the trinket tools to manage trinkets.";
+
     public int Port { get; private set; }
     public string BaseUrl => $"http://127.0.0.1:{Port}";
     public IServiceProvider Services => _host?.Services ?? throw new InvalidOperationException("Host not started");
@@ -41,6 +43,7 @@ public sealed class ExplorerFixture : IAsyncLifetime
             .ConfigureAppConfiguration(b => b.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Koan:Mcp:Explorer:Enabled"] = "true",
+                ["Koan:Mcp:Instructions"] = TestInstructions,
             }))
             .ConfigureWebHostDefaults(web =>
             {

@@ -108,6 +108,9 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
         {
             switch (envelope.Method)
             {
+                case "initialize":
+                    await HandleInitialize(envelope, cancellationToken);
+                    break;
                 case "tools/list":
                     await HandleToolsList(envelope, cancellationToken);
                     break;
@@ -138,6 +141,28 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
             _logger.LogError(ex, "Error handling JSON-RPC request {Method}.", envelope.Method);
             _session.Enqueue(ServerSentEvent.FromJsonRpc(CreateError(envelope.Id, -32603, "Internal server error.")));
         }
+    }
+
+    private async Task HandleInitialize(JsonRpcEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var parameters = envelope.Params is JObject obj
+            ? obj.ToObject<McpRpcHandler.InitializeParams>(JsonSerializer.Create(SerializerSettings))
+            : null;
+        var response = await _handler.Initialize(parameters, cancellationToken);
+
+        var node = JToken.FromObject(response, JsonSerializer.Create(SerializerSettings)) as JObject;
+        if (node is null)
+        {
+            _session.Enqueue(ServerSentEvent.FromJsonRpc(CreateError(envelope.Id, -32603, "Failed to serialise response.")));
+            return;
+        }
+
+        _session.Enqueue(ServerSentEvent.FromJsonRpc(new JObject
+        {
+            ["jsonrpc"] = "2.0",
+            ["id"] = CloneId(envelope.Id),
+            ["result"] = node
+        }));
     }
 
     private async Task HandleToolsList(JsonRpcEnvelope envelope, CancellationToken cancellationToken)
