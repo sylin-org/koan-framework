@@ -13,6 +13,7 @@ using Xunit;
 namespace Koan.Web.Auth.Server.IntegrationTests;
 
 /// <summary>SEC-0006 D2 — the configured canonical resource id is authoritative; the request Host is not trusted.</summary>
+[Collection(AuthServerHostCollection.Name)]
 public sealed class McpConfiguredResourceSpec : IClassFixture<McpConfiguredResourceFixture>
 {
     private readonly McpConfiguredResourceFixture _fx;

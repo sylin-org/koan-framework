@@ -17,7 +17,7 @@ namespace Koan.Web.Auth.Server.IntegrationTests;
 /// real ES256 token that reaches its gates. Proves the protected-resource discovery (RFC 9728), the bearer +
 /// audience enforcement (RFC 8707 confused-deputy fix), and the dev-token on-ramp from a cookie session.
 /// </summary>
-[Collection("mcp-auth-ramp")]
+[Collection(AuthServerHostCollection.Name)]
 public sealed class McpAuthRampSpec : IClassFixture<McpAuthRampFixture>
 {
     private readonly McpAuthRampFixture _fx;

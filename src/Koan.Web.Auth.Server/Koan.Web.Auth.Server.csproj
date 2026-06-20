@@ -10,13 +10,14 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\Koan.Web\Koan.Web.csproj" />
     <ProjectReference Include="..\Koan.Web.Auth\Koan.Web.Auth.csproj" />
     <ProjectReference Include="..\Koan.Security.Trust\Koan.Security.Trust.csproj" />
   </ItemGroup>
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
-      <_Parameter1>Koan.Web.Auth.Server.Tests</_Parameter1>
+      <_Parameter1>Koan.Web.Auth.Server.IntegrationTests</_Parameter1>
     </AssemblyAttribute>
   </ItemGroup>
 </Project>

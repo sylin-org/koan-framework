@@ -18,4 +18,24 @@ public sealed class AuthServerOptions
 
     /// <summary>Lifetime of a dev-token, in minutes.</summary>
     public int DevTokenLifetimeMinutes { get; set; } = 60;
+
+    /// <summary>
+    /// SEC-0006 D1 — how long an active ES256 signing key is used before it is rotated out. On rotation a fresh
+    /// key becomes active and the previous key keeps validating (JWKS overlap) until <see cref="KeyOverlap"/>
+    /// elapses. Applies only to the persisted key store (non-Development); Development uses an ephemeral key.
+    /// </summary>
+    public TimeSpan KeyRotationInterval { get; set; } = TimeSpan.FromDays(30);
+
+    /// <summary>
+    /// SEC-0006 D1 — the JWKS overlap window: how long a rotated-out key stays published and validating after it
+    /// stops signing. Must exceed the maximum lifetime of any token it signed so in-flight tokens keep verifying.
+    /// </summary>
+    public TimeSpan KeyOverlap { get; set; } = TimeSpan.FromHours(2);
+
+    /// <summary>
+    /// SEC-0006 D1 / SEC-0003-style — acknowledge running a production/staging Authorization Server on an
+    /// ephemeral (non-persisted) signing key. The boot guard fails closed otherwise (a restart would invalidate
+    /// every issued token and the JWKS would be unstable). Leave false for any real deployment.
+    /// </summary>
+    public bool AllowEphemeralKeyOutsideDevelopment { get; set; }
 }
