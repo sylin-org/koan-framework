@@ -2,9 +2,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Koan.Core;
+using Koan.Core.Hosting.App;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Core.Provenance;
@@ -94,35 +94,34 @@ public sealed class AuthServerModule : KoanModule
     /// pre-registered client must never exist in production), with <see cref="AuthServerOptions.SeedDevClient"/> as
     /// the operator opt-out. Idempotent (seed-once). The client is <b>public</b> — its security rests on PKCE + the
     /// device-consent ceremony, not a secret — and carries no redirect URIs (the device grant never redirects).
+    /// <para>
+    /// <see cref="OAuthClient"/>'s static <c>Get</c>/<c>Save</c> resolve their repository through the ambient
+    /// <see cref="AppHost.Current"/>. That global is bound once-per-process and is the live host in production, but
+    /// across a multi-host test run it can still reference a prior, disposed host. So the seed runs inside
+    /// <see cref="AppHost.PushScope"/> bound to the provider this module was <b>handed</b> for startup — the
+    /// blessed flow-scoped override — instead of trusting the global. A genuine persistence failure still
+    /// propagates (no swallow).
+    /// </para>
     /// </summary>
     private static async Task SeedDevExplorerClientAsync(
         IHostEnvironment env, AuthServerOptions options, IServiceProvider services, CancellationToken ct)
     {
         if (!env.IsDevelopment() || !options.SeedDevClient) return;
 
-        try
-        {
-            if (await OAuthClient.Get(DevExplorerClientId, ct) is not null) return; // idempotent — already seeded
+        using var scope = AppHost.PushScope(services);
 
-            var now = services.GetRequiredService<TimeProvider>().GetUtcNow();
-            await new OAuthClient
-            {
-                Id = DevExplorerClientId,
-                ClientName = "Koan Dev Explorer",
-                IsPublic = true,    // public client — no secret; PKCE + device consent are the protection
-                IsDynamic = false,  // not loopback-constrained, not swept by the dynamic-client GC
-                ExpiresUtc = null,  // no expiry (it is re-seeded idempotently on every dev boot)
-                CreatedUtc = now,
-            }.Save(ct);
-        }
-        catch (Exception ex)
+        if (await OAuthClient.Get(DevExplorerClientId, ct) is not null) return; // idempotent — already seeded
+
+        var now = services.GetRequiredService<TimeProvider>().GetUtcNow();
+        await new OAuthClient
         {
-            // The seed is a Development convenience and needs a data store. A host that boots the AS without one
-            // (e.g. a dev-token-only composition) legitimately can't seed — log and carry on; the device-flow
-            // exerciser is simply unavailable there. Never fail boot over an optional dev affordance.
-            services.GetService<ILoggerFactory>()?.CreateLogger("Koan.Web.Auth.Server.DevClientSeed")
-                .LogWarning(ex, "Dev-explorer OAuth client not seeded (no data store available); the MCP Explorer device-flow exerciser will be unavailable.");
-        }
+            Id = DevExplorerClientId,
+            ClientName = "Koan Dev Explorer",
+            IsPublic = true,    // public client — no secret; PKCE + device consent are the protection
+            IsDynamic = false,  // not loopback-constrained, not swept by the dynamic-client GC
+            ExpiresUtc = null,  // no expiry (it is re-seeded idempotently on every dev boot)
+            CreatedUtc = now,
+        }.Save(ct);
     }
 
     public override void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
