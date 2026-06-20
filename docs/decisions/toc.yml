@@ -58,6 +58,8 @@
       href: AI-0014-ai-modernization-sources-capabilities-fallback.md
     - name: AI-0014 MCP code mode
       href: AI-0014-mcp-code-mode.md
+    - name: AI-0037 MCP Streamable HTTP transport
+      href: AI-0037-mcp-streamable-http-transport.md
     - name: AI-0015 Canonical source member architecture
       href: AI-0015-canonical-source-member-architecture.md
     - name: AI-0016 LM Studio adapter for Koan AI

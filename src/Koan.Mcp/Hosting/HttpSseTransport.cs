@@ -20,10 +20,8 @@ public sealed class HttpSseTransport
 {
     private readonly HttpSseSessionManager _sessions;
     private readonly McpServer _server;
-    private readonly McpEntityRegistry _registry;
-    private readonly Koan.Mcp.CustomTools.McpCustomToolRegistry _customTools;
+    private readonly McpRpcDispatcher _dispatcher;
     private readonly IOptionsMonitor<McpServerOptions> _options;
-    private readonly Koan.Web.Authorization.IAccessGateCache _gateCache;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<HttpSseTransport> _logger;
     private readonly ILoggerFactory _loggerFactory;
@@ -31,20 +29,16 @@ public sealed class HttpSseTransport
     public HttpSseTransport(
         HttpSseSessionManager sessions,
         McpServer server,
-        McpEntityRegistry registry,
-        Koan.Mcp.CustomTools.McpCustomToolRegistry customTools,
+        McpRpcDispatcher dispatcher,
         IOptionsMonitor<McpServerOptions> options,
-        Koan.Web.Authorization.IAccessGateCache gateCache,
         TimeProvider timeProvider,
         ILogger<HttpSseTransport> logger,
         ILoggerFactory loggerFactory)
     {
         _sessions = sessions ?? throw new ArgumentNullException(nameof(sessions));
         _server = server ?? throw new ArgumentNullException(nameof(server));
-        _registry = registry ?? throw new ArgumentNullException(nameof(registry));
-        _customTools = customTools ?? throw new ArgumentNullException(nameof(customTools));
+        _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
         _options = options ?? throw new ArgumentNullException(nameof(options));
-        _gateCache = gateCache ?? throw new ArgumentNullException(nameof(gateCache));
         _timeProvider = timeProvider ?? TimeProvider.System;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
@@ -115,10 +109,7 @@ public sealed class HttpSseTransport
 
         await using var bridge = new HttpSseRpcBridge(
             _server,
-            _registry,
-            _customTools,
-            _options,
-            _gateCache,
+            _dispatcher,
             session,
             _loggerFactory.CreateLogger<HttpSseRpcBridge>());
         session.AttachBridge(bridge);
