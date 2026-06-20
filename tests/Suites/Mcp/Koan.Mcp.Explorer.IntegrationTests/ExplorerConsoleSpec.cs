@@ -41,9 +41,11 @@ public sealed class ExplorerConsoleSpec : IClassFixture<ExplorerFixture>
         html.Content.Headers.ContentType!.MediaType.Should().Be("text/html");
         (await html.Content.ReadAsStringAsync(Ct)).Should().Contain("MCP Explorer");
 
-        // An MCP client (advertises text/event-stream) is never intercepted; nor is a JSON client.
-        (await Get("/mcp", accept: "text/event-stream")).StatusCode.Should().Be(HttpStatusCode.NotFound);
-        (await Get("/mcp", accept: "application/json, text/event-stream")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        // An MCP client (advertises text/event-stream) is never served the console. AI-0037: the core now owns the
+        // route and answers a stream request with 405 (stream not offered) when no Streamable transport is enabled —
+        // the spec-correct signal, replacing the Explorer's old 404.
+        (await Get("/mcp", accept: "text/event-stream")).StatusCode.Should().Be(HttpStatusCode.MethodNotAllowed);
+        (await Get("/mcp", accept: "application/json, text/event-stream")).StatusCode.Should().Be(HttpStatusCode.MethodNotAllowed);
     }
 
     [Fact]

@@ -4,32 +4,30 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
 using System.Threading.Tasks;
+using Koan.Core;
+using Koan.Mcp.Explorer;
+using Koan.Mcp.Options;
+using Koan.Web.Extensions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Koan.Core;
-using Koan.Mcp.Options;
-using Koan.Web.Extensions;
 using Xunit;
 
-namespace Koan.Web.Auth.Server.IntegrationTests;
+namespace Koan.Mcp.Streamable.IntegrationTests;
 
 /// <summary>
-/// SEC-0006 D2 — a host with a FIXED canonical resource id (<c>Koan:Mcp:ResourceUri</c>) configured. Proves the
-/// edge enforces the configured audience independent of the request <c>Host</c> header (the host-spoof defence):
-/// a token bound to the configured resource is accepted even when the live host differs; a token bound to the
-/// (spoofable) host-derived resource is rejected.
+/// AI-0037 D-C / review finding 2 — Streamable + Explorer with <c>RequireAuthentication = true</c>. Proves the
+/// console (the WEB-0072 anonymous-discoverable human face) is NOT bearer-gated even when auth is required, while
+/// the SSE-stream branch of the same route IS — the reason the bare GET is mapped outside the auth group with
+/// inline per-branch auth.
 /// </summary>
-public sealed class McpConfiguredResourceFixture : IAsyncLifetime
+public sealed class StreamableAuthWithExplorerFixture : IAsyncLifetime
 {
-    public const string CanonicalResource = "https://canonical.example/mcp";
-
     private IHost? _host;
 
     public int Port { get; private set; }
     public string BaseUrl => $"http://127.0.0.1:{Port}";
-    public IServiceProvider Services => _host?.Services ?? throw new InvalidOperationException("Host not started");
 
     public async ValueTask InitializeAsync()
     {
@@ -50,10 +48,10 @@ public sealed class McpConfiguredResourceFixture : IAsyncLifetime
                     s.AddKoanWeb();
                     s.Configure<McpServerOptions>(o =>
                     {
-                        o.EnableLegacySseTransport = true; // AI-0037: /sse is now the explicit legacy opt-in
-                        o.RequireAuthentication = true;
-                        o.ResourceUri = CanonicalResource; // fixed, host-independent
+                        o.EnableHttpSseTransport = true;
+                        o.RequireAuthentication = true; // the deployment posture the review flagged
                     });
+                    s.Configure<McpExplorerOptions>(o => o.Enabled = true);
                 });
                 web.Configure(_ => { });
             })

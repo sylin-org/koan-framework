@@ -10,6 +10,7 @@ using Koan.Web.Sse;
 using Koan.Web.Sse.Formatting;
 using Koan.Web.Sse.Results;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Primitives;
@@ -167,18 +168,76 @@ public sealed class StreamableHttpTransport
         await result.ExecuteAsync(context);
     }
 
-    // ---- GET {baseRoute} : the standalone server-push SSE stream ---------------------------------------------------
+    // ---- GET {baseRoute} : content-negotiated — the SSE stream (MCP client) OR the console (browser) -------------
 
+    /// <summary>
+    /// The core owns the bare <c>GET {baseRoute}</c> (AI-0037 D-C). It negotiates: an explicit
+    /// <c>text/event-stream</c> request is the Streamable server-push stream (bearer-gated when auth is required);
+    /// a browser (<c>text/html</c> / <c>?format=html</c>) is delegated to the registered
+    /// <see cref="IMcpConsoleRenderer"/> (anonymous — the WEB-0072 discoverable human face). Mapped OUTSIDE the
+    /// auth group precisely so the console branch is not bearer-gated.
+    /// </summary>
     public async Task HandleGet(HttpContext context)
     {
         if (context is null) throw new ArgumentNullException(nameof(context));
         var options = _options.CurrentValue;
-        if (!await PreflightAsync(context, options)) return;
 
-        if (!AcceptsEventStream(context.Request))
+        if (!OriginAllowed(context, options))
         {
-            await WriteStatus(context, StatusCodes.Status406NotAcceptable, "not_acceptable",
-                "Accept must include text/event-stream.");
+            await WriteStatus(context, StatusCodes.Status403Forbidden, "origin_not_allowed",
+                "The request Origin is not permitted.");
+            return;
+        }
+
+        var format = context.Request.Query["format"].ToString();
+        var explicitEventStream = AcceptsEventStreamExplicit(context.Request);
+        var wantsConsole = string.Equals(format, "html", StringComparison.OrdinalIgnoreCase)
+            || (!string.Equals(format, "json", StringComparison.OrdinalIgnoreCase) && AcceptsHtml(context.Request));
+
+        // STREAM branch — an MCP client explicitly requesting the SSE stream.
+        if (explicitEventStream)
+        {
+            if (!options.StreamableHttpEnabled)
+            {
+                context.Response.Headers.Allow = "GET, POST, DELETE";
+                await WriteStatus(context, StatusCodes.Status405MethodNotAllowed, "stream_not_offered",
+                    "The Streamable HTTP transport is not enabled on this endpoint.");
+                return;
+            }
+            var baseRoute = ResolveBaseRoute(options);
+            if (options.RequireAuthentication
+                && !await McpEdgeAuth.EnsureAuthorized(context, baseRoute, requireAuth: true, options.ResourceUri))
+            {
+                return; // EnsureAuthorized wrote the 401 + WWW-Authenticate
+            }
+            await StreamServerPushAsync(context, options);
+            return;
+        }
+
+        // CONSOLE branch — a browser (or ?format=html). Anonymous; delegated to the renderer seam.
+        if (wantsConsole)
+        {
+            var renderer = context.RequestServices.GetService<IMcpConsoleRenderer>();
+            if (renderer is null)
+            {
+                context.Response.StatusCode = StatusCodes.Status404NotFound;
+                return;
+            }
+            await renderer.RenderConsoleAsync(context, ResolveBaseRoute(options));
+            return;
+        }
+
+        context.Response.StatusCode = StatusCodes.Status404NotFound;
+    }
+
+    /// <summary>The Streamable server-push SSE stream (the event-stream branch of <see cref="HandleGet"/>). Assumes
+    /// Origin + auth + content-negotiation already passed.</summary>
+    private async Task StreamServerPushAsync(HttpContext context, McpServerOptions options)
+    {
+        if (KoanEnv.IsProduction && !KoanEnv.InContainer && !context.Request.IsHttps)
+        {
+            await WriteStatus(context, StatusCodes.Status400BadRequest, "https_required",
+                "Streamable HTTP transport requires HTTPS in non-containerized production environments.");
             return;
         }
         if (!ValidateProtocolVersion(context, out var protocolError))
@@ -275,7 +334,7 @@ public sealed class StreamableHttpTransport
     /// response and returns false when a check fails.</summary>
     private async Task<bool> PreflightAsync(HttpContext context, McpServerOptions options)
     {
-        if (!options.EnableStreamableHttpTransport)
+        if (!options.StreamableHttpEnabled)
         {
             context.Response.StatusCode = StatusCodes.Status404NotFound;
             return false;
@@ -364,11 +423,42 @@ public sealed class StreamableHttpTransport
         return AcceptIncludes(accept, "application/json") && AcceptIncludes(accept, "text/event-stream");
     }
 
-    private static bool AcceptsEventStream(HttpRequest request)
+    /// <summary>The bare GET is dual-purpose, so the stream branch requires an EXPLICIT <c>text/event-stream</c> in
+    /// Accept (NOT the lenient empty→stream rule) — a browser sending <c>*/*</c> or no Accept must fall to the
+    /// console branch, never the SSE stream.</summary>
+    private static bool AcceptsEventStreamExplicit(HttpRequest request)
     {
-        var accept = request.Headers.Accept;
-        if (accept.Count == 0) return true; // a GET with no Accept still wants the stream — be lenient
-        return AcceptIncludes(accept, "text/event-stream");
+        foreach (var raw in request.Headers.Accept)
+        {
+            if (string.IsNullOrEmpty(raw)) continue;
+            foreach (var part in raw.Split(','))
+            {
+                if (string.Equals(part.Split(';')[0].Trim(), "text/event-stream", StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>The console (HTML) negotiation, ported verbatim from the Explorer: <c>text/html</c> present AND both
+    /// <c>text/event-stream</c> and <c>application/json</c> absent — i.e. a browser, never an MCP client.</summary>
+    private static bool AcceptsHtml(HttpRequest request)
+    {
+        var accept = request.Headers.Accept.ToString();
+        if (string.IsNullOrEmpty(accept)) return false;
+        var tokens = accept
+            .Split(',', StringSplitOptions.RemoveEmptyEntries)
+            .Select(t => t.Split(';')[0].Trim().ToLowerInvariant())
+            .ToHashSet();
+        return tokens.Contains("text/html")
+            && !tokens.Contains("text/event-stream")
+            && !tokens.Contains("application/json");
+    }
+
+    private static string ResolveBaseRoute(McpServerOptions options)
+    {
+        var route = string.IsNullOrWhiteSpace(options.HttpSseRoute) ? "/mcp" : options.HttpSseRoute.TrimEnd('/');
+        return string.IsNullOrEmpty(route) ? "/mcp" : route;
     }
 
     private static bool AcceptIncludes(StringValues accept, string mediaType)

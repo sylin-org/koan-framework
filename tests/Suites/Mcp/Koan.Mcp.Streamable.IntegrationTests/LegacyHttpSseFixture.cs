@@ -48,8 +48,8 @@ public sealed class LegacyHttpSseFixture : IAsyncLifetime
                     s.AddKoanWeb();
                     s.Configure<McpServerOptions>(o =>
                     {
-                        o.EnableHttpSseTransport = true;        // the legacy transport under test
-                        o.EnableStreamableHttpTransport = false;
+                        o.EnableHttpSseTransport = false;
+                        o.EnableLegacySseTransport = true;      // the legacy transport under test
                         o.RequireAuthentication = false;
                         o.Transport.SseKeepAliveInterval = TimeSpan.FromMinutes(10); // no heartbeat during the test
                     });

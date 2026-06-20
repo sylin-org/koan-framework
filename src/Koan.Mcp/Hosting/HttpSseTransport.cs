@@ -49,7 +49,7 @@ public sealed class HttpSseTransport
         if (context is null) throw new ArgumentNullException(nameof(context));
 
         var options = _options.CurrentValue;
-        if (!options.EnableHttpSseTransport)
+        if (!options.EnableLegacySseTransport)
         {
             context.Response.StatusCode = StatusCodes.Status404NotFound;
             return;
@@ -134,7 +134,7 @@ public sealed class HttpSseTransport
         if (context is null) throw new ArgumentNullException(nameof(context));
 
         var options = _options.CurrentValue;
-        if (!options.EnableHttpSseTransport)
+        if (!options.EnableLegacySseTransport)
         {
             return Results.NotFound(new { error = "transport_disabled" });
         }

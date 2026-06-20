@@ -16,17 +16,30 @@ public sealed class McpServerOptions
     public bool EnableStdioTransport { get; set; } = true;
 
     /// <summary>
-    /// Controls whether the HTTP + SSE transport is hosted automatically.
+    /// The master "HTTP MCP transport on/off" switch. When true, the modern Streamable HTTP transport
+    /// (AI-0037) is hosted by default (see <see cref="StreamableHttpEnabled"/>); the deprecated legacy
+    /// <c>/sse</c>+<c>/rpc</c> pair is a separate opt-in (<see cref="EnableLegacySseTransport"/>).
     /// </summary>
     public bool EnableHttpSseTransport { get; set; } = false;
 
     /// <summary>
-    /// AI-0037 — controls whether the MCP Streamable HTTP transport (spec 2025-06-18) is hosted: a single endpoint
-    /// at <see cref="HttpSseRoute"/> serving POST (client→server JSON-RPC), GET (the resumable server-push stream),
-    /// and DELETE (session termination). The legacy <c>/sse</c>+<c>/rpc</c> pair (<see cref="EnableHttpSseTransport"/>)
-    /// is the deprecated predecessor. Default false in this phase (flips on-when-HTTP once the Explorer GET seam lands).
+    /// AI-0037 — explicit override for the MCP Streamable HTTP transport (spec 2025-06-18): a single endpoint at
+    /// <see cref="HttpSseRoute"/> serving POST (client→server JSON-RPC), GET (the resumable server-push stream), and
+    /// DELETE (session termination). <c>null</c> (the default) means "follow the master switch"
+    /// (<see cref="EnableHttpSseTransport"/>) — i.e. Streamable is the modern default whenever HTTP is enabled. Set
+    /// it explicitly to force-enable or force-disable independent of the master. Resolved by <see cref="StreamableHttpEnabled"/>.
     /// </summary>
-    public bool EnableStreamableHttpTransport { get; set; } = false;
+    public bool? EnableStreamableHttpTransport { get; set; }
+
+    /// <summary>The resolved Streamable HTTP on/off state: the explicit override, else the master HTTP switch.</summary>
+    public bool StreamableHttpEnabled => EnableStreamableHttpTransport ?? EnableHttpSseTransport;
+
+    /// <summary>
+    /// AI-0037 — opt-in for the DEPRECATED legacy HTTP+SSE transport (the 2-endpoint <c>{baseRoute}/sse</c> +
+    /// <c>{baseRoute}/rpc</c> 2024-11-05 shape), for clients that have not migrated to Streamable HTTP. Default
+    /// false — even when the HTTP master switch is on, Streamable is the default and legacy is explicit opt-in.
+    /// </summary>
+    public bool EnableLegacySseTransport { get; set; } = false;
 
     /// <summary>
     /// Base route used for HTTP + SSE endpoints (e.g. /mcp => /mcp/sse, /mcp/rpc).

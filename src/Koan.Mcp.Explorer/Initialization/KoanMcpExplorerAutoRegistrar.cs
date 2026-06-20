@@ -23,6 +23,9 @@ public sealed class KoanMcpExplorerAutoRegistrar : IKoanAutoRegistrar
     {
         services.AddOptions<McpExplorerOptions>().BindConfiguration("Koan:Mcp:Explorer");
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Koan.Web.Hosting.IKoanEndpointContributor, McpExplorerEndpointContributor>());
+        // AI-0037 D-C — the core owns GET {baseRoute}; the Explorer plugs in its console via this seam (no longer
+        // mapping the bare route itself, so there is exactly one owner of the route — no collision with Streamable).
+        services.TryAddSingleton<Koan.Mcp.Hosting.IMcpConsoleRenderer, McpConsoleRenderer>();
     }
 
     public void Describe(ProvenanceModuleWriter module, IConfiguration configuration, IHostEnvironment environment)

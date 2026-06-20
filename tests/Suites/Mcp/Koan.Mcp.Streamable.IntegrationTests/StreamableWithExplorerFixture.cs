@@ -4,32 +4,30 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
 using System.Threading.Tasks;
+using Koan.Core;
+using Koan.Mcp.Explorer;
+using Koan.Mcp.Options;
+using Koan.Web.Extensions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Koan.Core;
-using Koan.Mcp.Options;
-using Koan.Web.Extensions;
 using Xunit;
 
-namespace Koan.Web.Auth.Server.IntegrationTests;
+namespace Koan.Mcp.Streamable.IntegrationTests;
 
 /// <summary>
-/// SEC-0006 D2 — a host with a FIXED canonical resource id (<c>Koan:Mcp:ResourceUri</c>) configured. Proves the
-/// edge enforces the configured audience independent of the request <c>Host</c> header (the host-spoof defence):
-/// a token bound to the configured resource is accepted even when the live host differs; a token bound to the
-/// (spoofable) host-derived resource is rejected.
+/// AI-0037 D-C atomicity (review finding 6) — boots the Streamable HTTP transport AND the WEB-0072 Explorer
+/// console TOGETHER (the configuration no existing fixture exercised, and the one that would have thrown
+/// <c>AmbiguousMatchException</c> if both still mapped <c>GET /mcp</c>). Proves the seam: exactly one
+/// <c>GET /mcp</c> resolves, routing a browser to the console and an MCP client to the stream.
 /// </summary>
-public sealed class McpConfiguredResourceFixture : IAsyncLifetime
+public sealed class StreamableWithExplorerFixture : IAsyncLifetime
 {
-    public const string CanonicalResource = "https://canonical.example/mcp";
-
     private IHost? _host;
 
     public int Port { get; private set; }
     public string BaseUrl => $"http://127.0.0.1:{Port}";
-    public IServiceProvider Services => _host?.Services ?? throw new InvalidOperationException("Host not started");
 
     public async ValueTask InitializeAsync()
     {
@@ -48,12 +46,13 @@ public sealed class McpConfiguredResourceFixture : IAsyncLifetime
                 {
                     s.AddKoan();
                     s.AddKoanWeb();
+                    // EnableHttpSseTransport is the master switch → Streamable mounts by default.
                     s.Configure<McpServerOptions>(o =>
                     {
-                        o.EnableLegacySseTransport = true; // AI-0037: /sse is now the explicit legacy opt-in
-                        o.RequireAuthentication = true;
-                        o.ResourceUri = CanonicalResource; // fixed, host-independent
+                        o.EnableHttpSseTransport = true;
+                        o.RequireAuthentication = false;
                     });
+                    s.Configure<McpExplorerOptions>(o => o.Enabled = true); // the console, co-enabled
                 });
                 web.Configure(_ => { });
             })

@@ -41,52 +41,12 @@ internal sealed class McpExplorerEndpointContributor : IKoanEndpointContributor
         var baseRoute = string.IsNullOrWhiteSpace(mcp.HttpSseRoute) ? "/mcp" : mcp.HttpSseRoute.TrimEnd('/');
         if (string.IsNullOrEmpty(baseRoute)) baseRoute = "/mcp";
 
-        endpoints.MapGet(baseRoute, ctx => ServeConsole(ctx, baseRoute)).WithName("KoanMcpExplorerConsole").ExcludeFromDescription();
+        // AI-0037 D-C — the bare GET {baseRoute} (the console) is now owned by the CORE, which content-negotiates and
+        // delegates the HTML branch to this package's IMcpConsoleRenderer. The Explorer keeps only its sub-paths.
         endpoints.MapGet($"{baseRoute}/map.json", ServeMap).WithName("KoanMcpExplorerMap").ExcludeFromDescription();
         endpoints.MapGet($"{baseRoute}/access-map.json", ServeAccessMap).WithName("KoanMcpExplorerAccessMap").ExcludeFromDescription();
         endpoints.MapGet($"{baseRoute}/explorer/{{**asset}}", ServeAsset).WithName("KoanMcpExplorerAssets").ExcludeFromDescription();
         endpoints.MapPost($"{baseRoute}/explorer/call", ExecuteTool).WithName("KoanMcpExplorerCall").ExcludeFromDescription();
-    }
-
-    // GET {baseRoute} — WEB-0072 D2: serve HTML only to a browser-style Accept (or explicit ?format=html);
-    // never intercept an MCP client (which advertises text/event-stream / application/json). 404 otherwise,
-    // preserving the bare path's current behavior.
-    private static async Task ServeConsole(HttpContext context, string baseRoute)
-    {
-        var format = context.Request.Query["format"].ToString();
-        var wantHtml = string.Equals(format, "html", StringComparison.OrdinalIgnoreCase)
-            || (!string.Equals(format, "json", StringComparison.OrdinalIgnoreCase)
-                && AcceptsHtml(context.Request.Headers.Accept.ToString()));
-
-        if (!wantHtml)
-        {
-            context.Response.StatusCode = StatusCodes.Status404NotFound;
-            return;
-        }
-
-        if (!ExplorerAssetProvider.TryGet("index.html", out var html, out _))
-        {
-            context.Response.StatusCode = StatusCodes.Status404NotFound;
-            return;
-        }
-
-        html = html.Replace("{{base}}", baseRoute);
-        context.Response.Headers["Cache-Control"] = "no-store";
-        context.Response.Headers["Vary"] = "Accept";
-        context.Response.ContentType = "text/html; charset=utf-8";
-        await context.Response.WriteAsync(html);
-    }
-
-    private static bool AcceptsHtml(string accept)
-    {
-        if (string.IsNullOrEmpty(accept)) return false;
-        var tokens = accept
-            .Split(',', StringSplitOptions.RemoveEmptyEntries)
-            .Select(t => t.Split(';')[0].Trim().ToLowerInvariant())
-            .ToHashSet();
-        return tokens.Contains("text/html")
-            && !tokens.Contains("text/event-stream")
-            && !tokens.Contains("application/json");
     }
 
     // GET {baseRoute}/map.json — the per-caller surface (anonymous-safe by construction; mirrors tools/list + doors).
