@@ -296,6 +296,8 @@
       href: WEB-0063-admin-dashboard-roadmap.md
     - name: WEB-0064 Koan.Context monitoring remediation
       href: WEB-0064-koan-context-monitoring-remediation.md
+    - name: WEB-0072 MCP Explorer Console and Capability Access Map
+      href: WEB-0072-mcp-explorer-console-and-access-map.md
 - name: Flow (FLOW)
   items:
     - name: FLOW-0070 Flow commands bus
