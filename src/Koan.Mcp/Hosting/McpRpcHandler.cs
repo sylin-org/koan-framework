@@ -116,7 +116,12 @@ public sealed class McpRpcHandler
 
             if (_customTools is not null)
             {
-                toolsList.AddRange(_customTools.Tools.Select(ToolDescriptor.FromCustom));
+                // P3.2: a verb on a config-disabled operational toolset is absent from the surface (global gate —
+                // applies on STDIO + remote, unlike the per-caller visibility filter). The grant is enforced separately.
+                var options = _serverOptions.Value;
+                toolsList.AddRange(_customTools.Tools
+                    .Where(t => t.OperationalToolsetKey is not { Length: > 0 } key || options.IsOperationalToolsetEnabled(key))
+                    .Select(ToolDescriptor.FromCustom));
             }
         }
 
@@ -172,6 +177,17 @@ public sealed class McpRpcHandler
         // Handle custom [McpTool] verbs
         if (_customTools is not null && _customInvoker is not null && _customTools.TryGet(parameters.Name, out var customTool))
         {
+            // P3.2: a config-disabled operational toolset's verb is treated as absent (the global gate; the @ops grant
+            // is a separate in-verb check). Mirror the list filter so list + invoke agree.
+            if (customTool.OperationalToolsetKey is { Length: > 0 } opsKey && !_serverOptions.Value.IsOperationalToolsetEnabled(opsKey))
+            {
+                return new CallToolResult
+                {
+                    IsError = true,
+                    Content = new List<McpContent> { new McpContent { Type = "text", Text = $"Tool '{parameters.Name}' is not available — the operational toolset '{opsKey}' is disabled (Koan:Mcp:Operations:{opsKey})." } }
+                };
+            }
+
             // AN11 (A10) — a custom verb's effects live in imperative code the framework cannot inspect. A
             // dry-run must NOT invoke it; it returns an honest PARTIAL rehearsal naming the limit (never a
             // silently/falsely-complete — or, worse, actually-executing — "dry-run").
