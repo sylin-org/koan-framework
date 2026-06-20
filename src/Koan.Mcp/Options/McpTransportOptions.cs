@@ -59,6 +59,14 @@ public sealed class McpTransportOptions
         set => _streamReplayBufferSize = value < 0 ? 0 : value;
     }
 
+    /// <summary>
+    /// AI-0037 — when true, a Streamable HTTP POST carrying a JSON-RPC request is answered as a single
+    /// <c>application/json</c> object instead of the default per-request <c>text/event-stream</c> response. The SSE
+    /// response is the spec default (and the only shape that can carry interim notifications before the result);
+    /// JSON is the simpler shape for stateless request/response clients. Default false (SSE-per-request).
+    /// </summary>
+    public bool StreamableJsonResponse { get; set; } = false;
+
     private int _maxRetainedStreamsPerSession = 64;
 
     /// <summary>

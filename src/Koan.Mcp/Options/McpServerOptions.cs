@@ -21,6 +21,14 @@ public sealed class McpServerOptions
     public bool EnableHttpSseTransport { get; set; } = false;
 
     /// <summary>
+    /// AI-0037 — controls whether the MCP Streamable HTTP transport (spec 2025-06-18) is hosted: a single endpoint
+    /// at <see cref="HttpSseRoute"/> serving POST (client→server JSON-RPC), GET (the resumable server-push stream),
+    /// and DELETE (session termination). The legacy <c>/sse</c>+<c>/rpc</c> pair (<see cref="EnableHttpSseTransport"/>)
+    /// is the deprecated predecessor. Default false in this phase (flips on-when-HTTP once the Explorer GET seam lands).
+    /// </summary>
+    public bool EnableStreamableHttpTransport { get; set; } = false;
+
+    /// <summary>
     /// Base route used for HTTP + SSE endpoints (e.g. /mcp => /mcp/sse, /mcp/rpc).
     /// </summary>
     public string HttpSseRoute { get; set; } = "/mcp";

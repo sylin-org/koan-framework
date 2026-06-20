@@ -183,7 +183,7 @@ public sealed class HttpSseTransport
             return Results.BadRequest(new { error = "invalid_json" });
         }
 
-        if (!TryCreateEnvelope(payload, out var envelope, out var message))
+        if (!JsonRpcEnvelope.TryParse(payload, out var envelope, out var message))
         {
             return Results.BadRequest(new { error = "invalid_jsonrpc", message });
         }
@@ -211,36 +211,6 @@ public sealed class HttpSseTransport
         }
 
         return null;
-    }
-
-    private static bool TryCreateEnvelope(JToken node, out JsonRpcEnvelope envelope, out string? error)
-    {
-        envelope = default!;
-        error = null;
-
-        if (node is not JObject obj)
-        {
-            error = "Payload must be a JSON object.";
-            return false;
-        }
-
-        var methodNode = obj["method"];
-        if (methodNode?.Type == JTokenType.String && methodNode.Value<string>() is { Length: > 0 } method)
-        {
-            // ok
-        }
-        else
-        {
-            error = "Missing method.";
-            return false;
-        }
-
-        var jsonRpc = obj["jsonrpc"]?.Value<string>() ?? "2.0";
-        var parameters = obj.TryGetValue("params", out var paramsNode) ? paramsNode : null;
-        var id = obj.TryGetValue("id", out var idNode) ? idNode : null;
-
-        envelope = new JsonRpcEnvelope(jsonRpc, method, parameters, id);
-        return true;
     }
 
     private static async IAsyncEnumerable<SseEnvelope> StreamSession(HttpSseSession session, [EnumeratorCancellation] CancellationToken cancellationToken)

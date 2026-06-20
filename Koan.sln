@@ -543,6 +543,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Mcp.Explorer", "src\Ko
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Mcp.Explorer.IntegrationTests", "tests\Suites\Mcp\Koan.Mcp.Explorer.IntegrationTests\Koan.Mcp.Explorer.IntegrationTests.csproj", "{2DC5F2EB-A31A-407E-B194-E65FC3B2B9C5}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Mcp.Streamable.IntegrationTests", "tests\Suites\Mcp\Koan.Mcp.Streamable.IntegrationTests\Koan.Mcp.Streamable.IntegrationTests.csproj", "{3B56137D-0F68-4941-82D2-E615C019D94E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -2747,6 +2749,18 @@ Global
 		{2DC5F2EB-A31A-407E-B194-E65FC3B2B9C5}.Release|x64.Build.0 = Release|Any CPU
 		{2DC5F2EB-A31A-407E-B194-E65FC3B2B9C5}.Release|x86.ActiveCfg = Release|Any CPU
 		{2DC5F2EB-A31A-407E-B194-E65FC3B2B9C5}.Release|x86.Build.0 = Release|Any CPU
+		{3B56137D-0F68-4941-82D2-E615C019D94E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3B56137D-0F68-4941-82D2-E615C019D94E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3B56137D-0F68-4941-82D2-E615C019D94E}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{3B56137D-0F68-4941-82D2-E615C019D94E}.Debug|x64.Build.0 = Debug|Any CPU
+		{3B56137D-0F68-4941-82D2-E615C019D94E}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{3B56137D-0F68-4941-82D2-E615C019D94E}.Debug|x86.Build.0 = Debug|Any CPU
+		{3B56137D-0F68-4941-82D2-E615C019D94E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3B56137D-0F68-4941-82D2-E615C019D94E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3B56137D-0F68-4941-82D2-E615C019D94E}.Release|x64.ActiveCfg = Release|Any CPU
+		{3B56137D-0F68-4941-82D2-E615C019D94E}.Release|x64.Build.0 = Release|Any CPU
+		{3B56137D-0F68-4941-82D2-E615C019D94E}.Release|x86.ActiveCfg = Release|Any CPU
+		{3B56137D-0F68-4941-82D2-E615C019D94E}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -3012,6 +3026,7 @@ Global
 		{91A0FFA4-E3EC-4068-848D-4CA3D1B5904D} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{1B261DE4-932A-45DB-BCE8-B5F6403623C7} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{2DC5F2EB-A31A-407E-B194-E65FC3B2B9C5} = {2DA8B874-0DC2-BBEB-EF76-614076FE5ED1}
+		{3B56137D-0F68-4941-82D2-E615C019D94E} = {2DA8B874-0DC2-BBEB-EF76-614076FE5ED1}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {669C5778-BFAE-4972-B427-0AFF99562045}

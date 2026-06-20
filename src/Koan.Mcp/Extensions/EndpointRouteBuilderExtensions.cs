@@ -23,7 +23,10 @@ public static class EndpointRouteBuilderExtensions
         var optionsMonitor = services.GetRequiredService<IOptionsMonitor<McpServerOptions>>();
         var options = optionsMonitor.CurrentValue;
 
-        if (!options.EnableHttpSseTransport)
+        // AI-0037 — the two HTTP transports share this route group (and its auth filter + well-known metadata). The
+        // Streamable HTTP transport owns the bare {baseRoute} (POST/GET/DELETE); the deprecated legacy transport owns
+        // {baseRoute}/sse + {baseRoute}/rpc. Neither mounted unless its switch is on.
+        if (!options.EnableHttpSseTransport && !options.EnableStreamableHttpTransport)
         {
             return endpoints;
         }
@@ -34,7 +37,6 @@ public static class EndpointRouteBuilderExtensions
             baseRoute = "/mcp";
         }
 
-        var transport = services.GetRequiredService<HttpSseTransport>();
         var capabilityReporter = services.GetService<IMcpCapabilityReporter>();
 
         var group = endpoints.MapGroup(baseRoute);
@@ -45,8 +47,9 @@ public static class EndpointRouteBuilderExtensions
             {
                 policy.WithOrigins(options.AllowedOrigins)
                       .AllowCredentials()
-                      .WithHeaders("Authorization", "Content-Type", HttpSseHeaders.SessionId)
-                      .WithMethods("GET", "POST", "OPTIONS");
+                      .WithHeaders("Authorization", "Content-Type", HttpSseHeaders.SessionId, "Mcp-Session-Id", "MCP-Protocol-Version", "Last-Event-ID")
+                      .WithExposedHeaders("Mcp-Session-Id")
+                      .WithMethods("GET", "POST", "DELETE", "OPTIONS");
             });
         }
 
@@ -82,17 +85,41 @@ public static class EndpointRouteBuilderExtensions
         .WithMetadata(new ProducesResponseTypeAttribute(typeof(object), StatusCodes.Status200OK, "application/json"))
         .ExcludeFromDescription();
 
-        group.MapGet("sse", context => transport.AcceptStream(context))
-            .WithName("KoanMcpSseStream")
-            .WithMetadata(new ProducesResponseTypeAttribute(typeof(void), StatusCodes.Status200OK, "text/event-stream"));
-
-        group.MapPost("rpc", async context =>
+        // AI-0037 — the current Streamable HTTP transport: a single endpoint at the bare {baseRoute}.
+        if (options.EnableStreamableHttpTransport)
         {
-            var result = await transport.SubmitRequest(context);
-            await result.ExecuteAsync(context);
-        })
-            .WithName("KoanMcpRpcSubmit")
-            .WithMetadata(new ProducesResponseTypeAttribute(typeof(IResult), StatusCodes.Status202Accepted, "application/json"));
+            var streamable = services.GetRequiredService<StreamableHttpTransport>();
+
+            group.MapPost("", context => streamable.HandlePost(context))
+                .WithName("KoanMcpStreamablePost")
+                .WithMetadata(new ProducesResponseTypeAttribute(typeof(void), StatusCodes.Status200OK, "text/event-stream"));
+
+            group.MapGet("", context => streamable.HandleGet(context))
+                .WithName("KoanMcpStreamableGet")
+                .WithMetadata(new ProducesResponseTypeAttribute(typeof(void), StatusCodes.Status200OK, "text/event-stream"));
+
+            group.MapDelete("", context => streamable.HandleDelete(context))
+                .WithName("KoanMcpStreamableDelete")
+                .WithMetadata(new ProducesResponseTypeAttribute(typeof(void), StatusCodes.Status200OK, "application/json"));
+        }
+
+        // Legacy 2024-11-05 HTTP+SSE transport (deprecated): the {baseRoute}/sse + {baseRoute}/rpc pair.
+        if (options.EnableHttpSseTransport)
+        {
+            var transport = services.GetRequiredService<HttpSseTransport>();
+
+            group.MapGet("sse", context => transport.AcceptStream(context))
+                .WithName("KoanMcpSseStream")
+                .WithMetadata(new ProducesResponseTypeAttribute(typeof(void), StatusCodes.Status200OK, "text/event-stream"));
+
+            group.MapPost("rpc", async context =>
+            {
+                var result = await transport.SubmitRequest(context);
+                await result.ExecuteAsync(context);
+            })
+                .WithName("KoanMcpRpcSubmit")
+                .WithMetadata(new ProducesResponseTypeAttribute(typeof(IResult), StatusCodes.Status202Accepted, "application/json"));
+        }
 
         if (options.PublishCapabilityEndpoint && capabilityReporter is not null)
         {
