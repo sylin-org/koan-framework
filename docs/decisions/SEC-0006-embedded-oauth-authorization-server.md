@@ -1,7 +1,7 @@
 # SEC-0006 — Embedded OAuth 2.1 Authorization Server (the MCP auth on-ramp)
 
-- **Status:** Proposed
-- **Date:** 2026-06-19
+- **Status:** Accepted — implemented (Phases 1–5 + adversarial-review hardening), `Koan.Web.Auth.Server`
+- **Date:** 2026-06-19 (implemented 2026-06-20)
 - **Deciders:** framework architect
 - **Related:** [SEC-0001](SEC-0001-fleet-identity-and-trust-fabric.md) (trust fabric / issuer), [SEC-0002](SEC-0002-unified-authorization-model.md) (`IAuthorize`/scopes), [SEC-0003](SEC-0003-dev-and-shared-secret-identity.md) (dev identity, fail-closed boot guard), [SEC-0004](SEC-0004-capability-authorization-gate-constrain-project.md) (gate·constrain·project), [SEC-0005](SEC-0005-governed-agent-access-grants-audit-door.md) (grants·audit·door), [WEB-0071](WEB-0071-auth-engine-swap-dynamic-schemes.md) (maintained OAuth handlers / `AuthSchemeSeeder`), [AI-0012](AI-0012-mcp-jsonrpc-runtime.md) (MCP runtime). AN6 + AN10 ([07/AN-cards.md](../assessment/prompts/07/AN-cards.md)).
 
