@@ -140,7 +140,11 @@ public sealed class McpCustomToolRegistry
 
             if (source == McpCustomToolParameterSource.Arguments && parameter.Name is { Length: > 0 } argName)
             {
-                properties[argName] = BuildParameterSchema(parameter.ParameterType);
+                var paramSchema = BuildParameterSchema(parameter.ParameterType);
+                // WEB-0072: describe a custom verb's parameter via [McpDescription] (or [Description]) on the parameter.
+                var description = ParameterDescription(parameter);
+                if (description is not null) paramSchema["description"] = description;
+                properties[argName] = paramSchema;
                 if (!isOptional) required.Add(argName);
             }
         }
@@ -166,6 +170,14 @@ public sealed class McpCustomToolRegistry
             Method = method,
             Parameters = parameters
         };
+    }
+
+    private static string? ParameterDescription(ParameterInfo parameter)
+    {
+        var mcp = parameter.GetCustomAttribute<McpDescriptionAttribute>();
+        if (mcp is not null) return mcp.Description;
+        var description = parameter.GetCustomAttribute<System.ComponentModel.DescriptionAttribute>();
+        return string.IsNullOrWhiteSpace(description?.Description) ? null : description!.Description;
     }
 
     private static McpCustomToolParameterSource ResolveSource(Type type)

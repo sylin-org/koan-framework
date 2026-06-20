@@ -6,7 +6,7 @@ namespace Koan.Mcp;
 /// <summary>
 /// Provides MCP-specific description metadata used when generating JSON schemas.
 /// </summary>
-[AttributeUsage(AttributeTargets.Property, AllowMultiple = true, Inherited = true)]
+[AttributeUsage(AttributeTargets.Property | AttributeTargets.Parameter, AllowMultiple = true, Inherited = true)]
 public sealed class McpDescriptionAttribute : Attribute
 {
     /// <summary>

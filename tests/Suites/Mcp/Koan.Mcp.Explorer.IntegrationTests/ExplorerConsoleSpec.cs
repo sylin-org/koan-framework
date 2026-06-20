@@ -117,6 +117,15 @@ public sealed class ExplorerConsoleSpec : IClassFixture<ExplorerFixture>
         Entity((JArray)admin["entities"]!, "adminlog").Should().NotBeNull();
     }
 
+    [Fact]
+    public async Task Custom_tool_parameter_descriptions_flow_to_the_schema()
+    {
+        var map = await GetJson("/mcp/map.json");
+        var custom = (JArray)map["customTools"]!;
+        var echo = custom.OfType<JObject>().First(t => string.Equals((string?)t["name"], "echo_note", StringComparison.OrdinalIgnoreCase));
+        ((string?)echo["inputSchema"]!["properties"]!["note"]!["description"]).Should().Be("The note to echo back.");
+    }
+
     // === D4: in-process try-it ===
 
     [Fact]

@@ -34,3 +34,11 @@ public sealed class AdminLog : Entity<AdminLog>
 {
     public string Message { get; set; } = "";
 }
+
+/// <summary>A custom [McpTool] verb whose parameter carries a description (WEB-0072 P2 — proving the description
+/// flows into the input schema).</summary>
+public static class ExplorerTools
+{
+    [McpTool(Name = "echo_note", Description = "Echo a note back.")]
+    public static string EchoNote([McpDescription("The note to echo back.")] string note) => "echo:" + note;
+}
