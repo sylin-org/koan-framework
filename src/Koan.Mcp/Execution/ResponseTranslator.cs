@@ -167,6 +167,12 @@ public sealed class ResponseTranslator
         if (value is null) return null;
         if (value is JToken token) return token;
         try { return JToken.FromObject(value, JsonSerializer.Create(SerializerSettings)); }
-        catch { return JValue.CreateNull(); }
+        catch (Exception ex)
+        {
+            // F2 burn-down: a tool result that cannot be serialised is an ERROR, not a null result. Mirror
+            // RequestTranslator's rethrow-as-JsonException-with-context pattern so the dispatch boundary logs it and
+            // maps it to a JSON-RPC error — instead of silently handing the client a null payload.
+            throw new JsonException($"Unable to serialise MCP tool result of type {value.GetType().Name}: {ex.Message}", ex);
+        }
     }
 }

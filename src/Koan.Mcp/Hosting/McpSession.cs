@@ -97,6 +97,6 @@ public sealed class McpSession : IDisposable
     {
         foreach (var stream in _streams.Values) stream.Complete();
         _streams.Clear();
-        try { Cancellation.Dispose(); } catch { /* already disposed */ }
+        try { Cancellation.Dispose(); } catch (ObjectDisposedException) { /* already disposed — the only expected race */ }
     }
 }

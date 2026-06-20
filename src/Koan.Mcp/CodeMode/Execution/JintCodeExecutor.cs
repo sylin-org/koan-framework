@@ -249,6 +249,9 @@ public sealed class JintCodeExecutor : Koan.Mcp.CodeExecution.ICodeExecutor
         }
         catch (Exception ex)
         {
+            // F2 burn-down: a non-syntax failure during the validation parse is unexpected — log a diagnostic
+            // instead of folding it silently into a generic "Validation error" string.
+            _logger.LogDebug(ex, "Unexpected error validating MCP code-mode script syntax");
             error = $"Validation error: {ex.Message}";
             return false;
         }

@@ -100,7 +100,7 @@ public sealed class McpSessionManager : IHostedService, IDisposable
             return false;
         }
 
-        try { session.Cancellation.Cancel(); } catch { /* ignore */ }
+        try { session.Cancellation.Cancel(); } catch (ObjectDisposedException) { /* already disposed — the only expected race */ }
         session.Dispose();
         PublishHealth();
         return true;

@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace Koan.Mcp.CustomTools;
@@ -74,9 +75,11 @@ public sealed class McpCustomToolInvoker
             {
                 return node.ToObject(parameter.Type);
             }
-            catch
+            catch (Exception ex) when (ex is JsonException or FormatException or InvalidCastException or ArgumentException or OverflowException)
             {
-                // Fall through to default/empty when the supplied value cannot bind to the target type.
+                // A supplied value that cannot bind to the target type falls through to the default (lenient
+                // binding, by design). F2 burn-down: the catch is narrowed to conversion failures so an UNEXPECTED
+                // exception is no longer swallowed under the same fallthrough.
             }
         }
 

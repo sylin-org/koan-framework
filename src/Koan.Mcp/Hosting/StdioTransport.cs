@@ -122,9 +122,10 @@ public sealed class StdioTransport : BackgroundService
         finally
         {
             _sessionTask = null;
-            // Release the std streams (no longer scoped by `using`, so StopAsync can close stdin early).
-            try { input.Dispose(); } catch { /* best-effort */ }
-            try { output.Dispose(); } catch { /* best-effort */ }
+            // Release the std streams (no longer scoped by `using`, so StopAsync can close stdin early). Disposal at
+            // shutdown is best-effort (a console stream can throw) — swallowed but LogDebug-observable (F2), not silent.
+            try { input.Dispose(); } catch (Exception ex) { transportLogger.LogDebug(ex, "Best-effort stdin dispose failed during shutdown."); }
+            try { output.Dispose(); } catch (Exception ex) { transportLogger.LogDebug(ex, "Best-effort stdout dispose failed during shutdown."); }
             _input = null;
             _output = null;
             var cts = Interlocked.Exchange(ref _sessionCts, null);
@@ -182,14 +183,14 @@ public sealed class StdioTransport : BackgroundService
 
         // Cancellation cannot interrupt a synchronous console ReadFile; disposing stdin closes the OS handle
         // and forces the blocking read to return, which is what actually lets the session unwind.
-        try { _input?.Dispose(); } catch { /* best-effort */ }
+        try { _input?.Dispose(); } catch (Exception ex) { _logger.LogDebug(ex, "Best-effort stdin dispose failed during shutdown."); }
 
         if (sessionTask is not null && !sessionTask.IsCompleted)
         {
             var completed = await Task.WhenAny(sessionTask, Task.Delay(timeout, CancellationToken.None));
             if (completed == sessionTask)
             {
-                try { await sessionTask; } catch { /* session faulted during shutdown */ }
+                try { await sessionTask; } catch (Exception ex) { _logger.LogDebug(ex, "STDIO session faulted during shutdown."); }
             }
             else
             {
