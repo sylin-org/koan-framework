@@ -1,8 +1,5 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Runtime.CompilerServices;
-using System.Threading;
 using System.Threading.Tasks;
 using Koan.Core;
 using Koan.Mcp.Options;
@@ -16,24 +13,31 @@ using Newtonsoft.Json.Linq;
 
 namespace Koan.Mcp.Hosting;
 
+/// <summary>
+/// AI-0037 (Ph3b) — the DEPRECATED legacy HTTP+SSE transport, now a thin SHIM over the unified MCP core
+/// (<see cref="McpSessionManager"/> / <see cref="McpSession"/> / <see cref="McpSseStream"/> /
+/// <see cref="McpRpcDispatcher"/>). It reproduces the 2024-11-05 2-endpoint wire — <c>GET /sse</c> opens the
+/// stream and emits <c>connected</c>+<c>endpoint</c> frames; <c>POST /rpc</c> acks then dispatches and the response
+/// rides the GET stream — with no parallel session model, frame type, or background pump of its own (those were
+/// deleted). The exact legacy bytes (the <c>X-Mcp-Session</c> header, the event names, and the ABSENCE of an
+/// <c>id:</c> line on each frame) are pinned by the golden <c>LegacyHttpSseWireSpec</c>.
+/// </summary>
 public sealed class HttpSseTransport
 {
-    private readonly HttpSseSessionManager _sessions;
+    private readonly McpSessionManager _sessions;
     private readonly McpServer _server;
     private readonly McpRpcDispatcher _dispatcher;
     private readonly IOptionsMonitor<McpServerOptions> _options;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<HttpSseTransport> _logger;
-    private readonly ILoggerFactory _loggerFactory;
 
     public HttpSseTransport(
-        HttpSseSessionManager sessions,
+        McpSessionManager sessions,
         McpServer server,
         McpRpcDispatcher dispatcher,
         IOptionsMonitor<McpServerOptions> options,
         TimeProvider timeProvider,
-        ILogger<HttpSseTransport> logger,
-        ILoggerFactory loggerFactory)
+        ILogger<HttpSseTransport> logger)
     {
         _sessions = sessions ?? throw new ArgumentNullException(nameof(sessions));
         _server = server ?? throw new ArgumentNullException(nameof(server));
@@ -41,8 +45,9 @@ public sealed class HttpSseTransport
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _timeProvider = timeProvider ?? TimeProvider.System;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
     }
+
+    // ---- GET {baseRoute}/sse : open the legacy server-push stream ---------------------------------------------------
 
     public async Task AcceptStream(HttpContext context)
     {
@@ -58,7 +63,7 @@ public sealed class HttpSseTransport
         if (!options.RequireAuthentication && (KoanEnv.IsProduction || KoanEnv.InContainer))
         {
             _logger.LogWarning(
-                "SECURITY WARNING: MCP HTTP+SSE transport running without authentication in {Environment}.",
+                "SECURITY WARNING: legacy MCP HTTP+SSE transport running without authentication in {Environment}.",
                 KoanEnv.EnvironmentName);
         }
 
@@ -73,9 +78,7 @@ public sealed class HttpSseTransport
             return;
         }
 
-        // Authentication + RFC 8707 audience enforcement (SEC-0006 D2/D3) is owned by the McpEdgeAuth endpoint
-        // filter on the route group, which runs before this handler and has already placed the bearer identity
-        // in context.User. This defence-in-depth check covers any direct invocation that bypasses the filter.
+        // Defence-in-depth: the route-group filter (McpEdgeAuth) already authenticated when RequireAuthentication.
         if (options.RequireAuthentication && context.User?.Identity?.IsAuthenticated != true)
         {
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
@@ -83,51 +86,60 @@ public sealed class HttpSseTransport
             return;
         }
 
-        var registrations = _server.GetRegistrationsForHttpSse();
-        if (registrations.Count == 0)
+        if (_server.GetRegistrationsForHttpSse().Count == 0)
         {
             context.Response.StatusCode = StatusCodes.Status404NotFound;
             await context.Response.WriteAsJsonAsync(new { error = "no_entities" }, cancellationToken: context.RequestAborted);
             return;
         }
 
-        if (!_sessions.TryOpenSession(context, out var session))
+        var session = _sessions.Create(context);
+        if (session is null)
         {
             context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
             await context.Response.WriteAsJsonAsync(new { error = "max_connections_exceeded" }, cancellationToken: context.RequestAborted);
             return;
         }
 
-        context.Response.Headers[HttpSseHeaders.SessionId] = session.Id;
-
-        var connectedAt = _timeProvider.GetUtcNow();
-        session.Enqueue(ServerSentEvent.Connected(session.Id, connectedAt));
-
-        var baseRoute = string.IsNullOrWhiteSpace(options.HttpSseRoute) ? "/mcp" : options.HttpSseRoute.TrimEnd('/');
-        var endpointUrl = $"{context.Request.PathBase}{baseRoute}/rpc?sessionId={session.Id}";
-        session.Enqueue(ServerSentEvent.Endpoint(endpointUrl));
-
-        await using var bridge = new HttpSseRpcBridge(
-            _server,
-            _dispatcher,
-            session,
-            _loggerFactory.CreateLogger<HttpSseRpcBridge>());
-        session.AttachBridge(bridge);
-
         try
         {
-            var result = SseResults.StreamEnvelopes(StreamSession(session, context.RequestAborted));
+            context.Response.Headers[HttpSseHeaders.SessionId] = session.Id;
+
+            var getStream = session.TryOpenGetStream();
+            if (getStream is null)
+            {
+                context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+                return;
+            }
+
+            var baseRoute = ResolveBaseRoute(options);
+            var endpointUrl = $"{context.Request.PathBase}{baseRoute}/rpc?sessionId={session.Id}";
+
+            // The legacy handshake frames — hand-built so they carry the legacy event names and NO id: line (the
+            // unified EnqueueMessage would stamp an id: the 2024-11-05 wire never emitted).
+            getStream.EnqueueRaw(new SseEnvelope("connected", new JObject
+            {
+                ["sessionId"] = session.Id,
+                ["timestamp"] = _timeProvider.GetUtcNow().ToString("O"),
+            }.ToString(Formatting.None)));
+            getStream.EnqueueRaw(new SseEnvelope("endpoint", endpointUrl));
+
+            var result = SseResults.StreamEnvelopes(getStream.Read(context.RequestAborted));
             await result.ExecuteAsync(context);
         }
         catch (OperationCanceledException)
         {
+            // client disconnected — normal.
         }
         finally
         {
-            session.Enqueue(ServerSentEvent.Completed(_timeProvider.GetUtcNow()));
-            _sessions.CloseSession(session);
+            // Legacy lifetime: the session dies with its GET stream (the legacy CTS was request-linked). Terminating
+            // here also completes the GET stream so a late POST's enqueue is a harmless no-op.
+            _sessions.Terminate(session.Id);
         }
     }
+
+    // ---- POST {baseRoute}/rpc : submit a JSON-RPC request; the response rides the GET stream -----------------------
 
     public async Task<IResult> SubmitRequest(HttpContext context)
     {
@@ -151,13 +163,16 @@ public sealed class HttpSseTransport
         }
 
         // SEC-0006 — the session id is not a bearer capability: an RPC submitter must be the SAME subject that
-        // established the session on the SSE handshake. Otherwise a different authenticated caller who learns a
-        // session id could inject RPC that runs under the session owner's principal (the downstream gate uses
-        // session.User, not the submitter). Skipped when auth is not required (open dev mode).
+        // established the session on the GET /sse handshake (the dispatch runs as session.User).
         if (options.RequireAuthentication && !McpEdgeAuth.SamePrincipal(context.User, session.User))
         {
-            _logger.LogWarning("Rejected MCP RPC submit: caller principal does not own session {SessionId}.", sessionId);
+            _logger.LogWarning("Rejected legacy MCP RPC submit: caller principal does not own session {SessionId}.", sessionId);
             return Results.StatusCode(StatusCodes.Status403Forbidden);
+        }
+
+        if (!session.TryGetStream(McpSseStream.GetStreamId, out var getStream))
+        {
+            return Results.StatusCode(StatusCodes.Status503ServiceUnavailable); // the GET /sse stream is not open
         }
 
         JToken? payload;
@@ -167,14 +182,9 @@ public sealed class HttpSseTransport
             using var jsonReader = new JsonTextReader(reader);
             payload = await JToken.ReadFromAsync(jsonReader, context.RequestAborted);
         }
-        catch (JsonReaderException ex)
+        catch (Exception ex) when (ex is JsonReaderException or IOException)
         {
-            _logger.LogWarning(ex, "Invalid JSON payload submitted to MCP HTTP+SSE RPC endpoint.");
-            return Results.BadRequest(new { error = "invalid_json" });
-        }
-        catch (IOException ex)
-        {
-            _logger.LogWarning(ex, "I/O failure while reading MCP HTTP+SSE RPC payload.");
+            _logger.LogWarning(ex, "Invalid JSON payload submitted to the legacy MCP RPC endpoint.");
             return Results.BadRequest(new { error = "invalid_json" });
         }
 
@@ -188,13 +198,23 @@ public sealed class HttpSseTransport
             return Results.BadRequest(new { error = "invalid_jsonrpc", message });
         }
 
-        if (!session.TryGetBridge(out var bridge))
+        session.Touch();
+
+        // ack, then the response — both hand-built (no id: line). AI-0037 §4: the deprecated shim no longer
+        // guarantees submission-order responses under concurrent POSTs (inline dispatch, completion order); JSON-RPC
+        // ids correlate. The single serial pump that gave incidental ordering was deleted with the parallel session.
+        getStream.EnqueueRaw(new SseEnvelope("ack", new JObject
         {
-            return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+            ["id"] = envelope.Id is null ? JValue.CreateNull() : envelope.Id.DeepClone(),
+        }.ToString(Formatting.None)));
+
+        var handler = _server.CreateHandler();
+        var response = await _dispatcher.DispatchAsync(envelope, session.User, handler, context.RequestAborted);
+        if (response is not null)
+        {
+            getStream.EnqueueRaw(new SseEnvelope("message", response.ToString(Formatting.None)));
         }
 
-        session.Enqueue(ServerSentEvent.Acknowledged(envelope.Id));
-        await bridge.Submit(envelope, context.RequestAborted);
         return Results.Accepted();
     }
 
@@ -204,20 +224,16 @@ public sealed class HttpSseTransport
         {
             return header.ToString();
         }
-
         if (request.Query.TryGetValue("sessionId", out var query) && !string.IsNullOrWhiteSpace(query))
         {
             return query.ToString();
         }
-
         return null;
     }
 
-    private static async IAsyncEnumerable<SseEnvelope> StreamSession(HttpSseSession session, [EnumeratorCancellation] CancellationToken cancellationToken)
+    private static string ResolveBaseRoute(McpServerOptions options)
     {
-        await foreach (var message in session.OutboundMessages(cancellationToken))
-        {
-            yield return message.ToEnvelope();
-        }
+        var route = string.IsNullOrWhiteSpace(options.HttpSseRoute) ? "/mcp" : options.HttpSseRoute.TrimEnd('/');
+        return string.IsNullOrEmpty(route) ? "/mcp" : route;
     }
 }

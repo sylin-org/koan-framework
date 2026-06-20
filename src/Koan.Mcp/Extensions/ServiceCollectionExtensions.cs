@@ -55,13 +55,11 @@ public static class ServiceCollectionExtensions
 
         // AI-0037 — the shared, transport-agnostic JSON-RPC dispatch core (every HTTP surface routes through it).
         services.TryAddSingleton<McpRpcDispatcher>();
-        // AI-0037 — the Streamable HTTP transport (current 2025-06-18) + its session registry.
+        // AI-0037 — the unified MCP HTTP session registry + the two transports that ride it: the modern Streamable
+        // HTTP transport and the deprecated legacy /sse+/rpc shim (Ph3b collapsed both onto ONE session model).
         services.TryAddSingleton<McpSessionManager>();
         services.AddHostedService(sp => sp.GetRequiredService<McpSessionManager>());
         services.TryAddSingleton<StreamableHttpTransport>();
-        // Legacy 2024-11-05 HTTP+SSE transport (deprecated; opt-in via EnableHttpSseTransport).
-        services.TryAddSingleton<HttpSseSessionManager>();
-        services.AddHostedService(sp => sp.GetRequiredService<HttpSseSessionManager>());
         services.TryAddSingleton<HttpSseTransport>();
         services.TryAddSingleton<IMcpCapabilityReporter, HttpSseCapabilityReporter>();
 

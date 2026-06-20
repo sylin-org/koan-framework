@@ -15,8 +15,9 @@ namespace Koan.Mcp.Execution;
 ///
 /// Transport trust model:
 /// <list type="bullet">
-///   <item><b>HTTP/SSE</b> (remote) — <see cref="Koan.Mcp.Hosting.HttpSseRpcBridge"/> gates a custom verb's
-///   <c>tools/list</c> (filter) and <c>tools/call</c> (deny) through this policy with the session principal.</item>
+///   <item><b>HTTP</b> (remote) — the shared <see cref="Koan.Mcp.Hosting.McpRpcDispatcher"/> (Streamable HTTP +
+///   the legacy SSE shim) gates a custom verb's <c>tools/list</c> (filter) and <c>tools/call</c> (deny) through
+///   this policy with the session principal.</item>
 ///   <item><b>STDIO</b> (local) — binds the raw <see cref="Koan.Mcp.Hosting.McpRpcHandler"/> with no
 ///   filter: stdin/stdout is the same-machine process owner, so it is full local-trust BY DESIGN (the
 ///   handler is unfiltered; enforcement is a transport-edge concern). Any FUTURE remote transport MUST

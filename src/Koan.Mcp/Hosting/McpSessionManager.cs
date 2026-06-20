@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Koan.Core.Observability.Health;
 using Koan.Mcp.Options;
 using Koan.Web.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -22,20 +25,25 @@ namespace Koan.Mcp.Hosting;
 /// </summary>
 public sealed class McpSessionManager : IHostedService, IDisposable
 {
+    private const string HealthComponent = "mcp-http"; // serves BOTH HTTP transports (Streamable + legacy shim)
+
     private readonly ConcurrentDictionary<string, McpSession> _sessions = new(StringComparer.Ordinal);
     private readonly IOptionsMonitor<McpServerOptions> _options;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<McpSessionManager> _logger;
+    private readonly IHealthAggregator? _healthAggregator;
     private Timer? _sweepTimer;
 
     public McpSessionManager(
         IOptionsMonitor<McpServerOptions> options,
         TimeProvider timeProvider,
-        ILogger<McpSessionManager> logger)
+        ILogger<McpSessionManager> logger,
+        IHealthAggregator? healthAggregator = null)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _timeProvider = timeProvider ?? TimeProvider.System;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _healthAggregator = healthAggregator;
     }
 
     public int Count => _sessions.Count;
@@ -76,7 +84,9 @@ public sealed class McpSessionManager : IHostedService, IDisposable
             options.Transport.StreamReplayBufferSize,
             options.Transport.MaxRetainedStreamsPerSession);
 
-        return _sessions.TryAdd(id, session) ? session : null;
+        if (!_sessions.TryAdd(id, session)) return null;
+        PublishHealth();
+        return session;
     }
 
     public bool TryGet(string sessionId, out McpSession session)
@@ -92,7 +102,25 @@ public sealed class McpSessionManager : IHostedService, IDisposable
 
         try { session.Cancellation.Cancel(); } catch { /* ignore */ }
         session.Dispose();
+        PublishHealth();
         return true;
+    }
+
+    // AI-0037 (Ph3b) — self-reporting lifted up from the deleted legacy HttpSseSessionManager so it now covers BOTH
+    // HTTP transports. Healthy while sessions are live, Degraded when idle (the edge is up but unused).
+    private void PublishHealth()
+    {
+        if (_healthAggregator is null) return;
+        var count = _sessions.Count;
+        var facts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["sessions"] = count.ToString(CultureInfo.InvariantCulture),
+        };
+        _healthAggregator.Push(
+            HealthComponent,
+            count > 0 ? HealthStatus.Healthy : HealthStatus.Degraded,
+            count > 0 ? "MCP HTTP transport active." : "MCP HTTP transport idle.",
+            facts: facts);
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
