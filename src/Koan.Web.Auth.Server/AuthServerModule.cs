@@ -38,6 +38,7 @@ public sealed class AuthServerModule : KoanModule
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanEndpointContributor, Protocol.OAuthProtocolEndpoints>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanEndpointContributor, Protocol.WellKnownEndpoints>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanEndpointContributor, Protocol.DcrEndpoint>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanEndpointContributor, Protocol.DeviceEndpoint>());
         services.TryAddSingleton<Protocol.FixedWindowRateLimiter>();
 
         // SEC-0006 D1 — the key lifecycle. The persisted, encrypted-at-rest, rotating ES256 store is the active

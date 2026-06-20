@@ -120,39 +120,34 @@ internal sealed class OAuthProtocolEndpoints : IKoanEndpointContributor
             ?? options.ConsentPath;
     }
 
-    // ---- GET /oauth/request/{rid} (the consent seam the app page consumes) ------------------------------
+    // ---- GET /oauth/request/{rid|user_code} (the consent seam — auth-code OR device, unified) ------------
 
     private static async Task GetRequest(HttpContext ctx, string rid)
     {
         ApplyAntiFraming(ctx);
         var now = ctx.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow();
+
         var consent = await ConsentRequest.Get(rid, ctx.RequestAborted);
-        if (consent is null || consent.IsExpired(now) || !consent.IsPending)
+        if (consent is not null && !consent.IsExpired(now) && consent.IsPending)
         {
-            await JsonError(ctx, StatusCodes.Status404NotFound, "invalid_request", "Unknown or expired consent request.");
+            await WriteConsentContext(ctx, consent.ClientId, consent.Scope, consent.Resource, userCode: null);
             return;
         }
 
-        var client = await OAuthClient.Get(consent.ClientId, ctx.RequestAborted);
-        var registry = ctx.RequestServices.GetService<IProviderRegistry>();
-        var providers = registry?.GetDescriptors().Where(d => d.Enabled).ToArray() ?? Array.Empty<ProviderDescriptor>();
-
-        var scopes = consent.Scope
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(s => new { id = s, description = s })
-            .ToArray();
-
-        await ctx.Response.WriteAsJsonAsync(new
+        // Device flow: the id is the typed user_code. Rate-limit so this can't be used to brute-force codes.
+        var options = ctx.RequestServices.GetRequiredService<IOptions<AuthServerOptions>>().Value;
+        if (!await RateLimitUserCodeAsync(ctx, options, now)) return;
+        var device = await FindPendingDevice(rid, now, ctx.RequestAborted);
+        if (device is not null)
         {
-            client = new { name = client?.ClientName ?? consent.ClientId, verified = false },
-            scopes,
-            resource = consent.Resource,
-            user = new { loggedIn = ctx.User?.Identity?.IsAuthenticated == true },
-            providers,
-        }, cancellationToken: ctx.RequestAborted);
+            await WriteConsentContext(ctx, device.ClientId, device.Scope, device.Resource, userCode: UserCode.Format(device.UserCode));
+            return;
+        }
+
+        await JsonError(ctx, StatusCodes.Status404NotFound, "invalid_request", "Unknown or expired request.");
     }
 
-    // ---- POST /oauth/request/{rid}/approve ------------------------------------------------------------
+    // ---- POST /oauth/request/{rid|user_code}/approve --------------------------------------------------
 
     private static async Task Approve(HttpContext ctx, string rid)
     {
@@ -160,79 +155,105 @@ internal sealed class OAuthProtocolEndpoints : IKoanEndpointContributor
         var options = ctx.RequestServices.GetRequiredService<IOptions<AuthServerOptions>>().Value;
         var now = ctx.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow();
 
-        var consent = await LoadBoundPendingConsent(ctx, rid, now);
-        if (consent is null) return; // response already written
-
-        // The subject is the signed-in cookie user; the app must authenticate first (provider pills) and return here.
-        if (ctx.User?.Identity?.IsAuthenticated != true)
+        // Auth-code flow (browser-bound rid).
+        var consent = await ConsentRequest.Get(rid, ctx.RequestAborted);
+        if (consent is not null)
         {
-            await JsonError(ctx, StatusCodes.Status401Unauthorized, "login_required", "Sign in before approving the request.");
+            if (consent.IsExpired(now) || !consent.IsPending) { await JsonError(ctx, StatusCodes.Status404NotFound, "invalid_request", "Unknown or expired request."); return; }
+            if (!VerifyBinding(ctx, rid, consent)) { await JsonError(ctx, StatusCodes.Status403Forbidden, "invalid_request", "This request was not initiated by this browser."); return; }
+            var sub = await RequireSubjectAsync(ctx);
+            if (sub is null) return;
+
+            var granted = consent.Scope.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+            var code = new AuthorizationCode
+            {
+                Id = OpaqueToken.New(),
+                ClientId = consent.ClientId,
+                RedirectUri = consent.RedirectUri,
+                CodeChallenge = consent.CodeChallenge,
+                Resource = consent.Resource,
+                Subject = sub,
+                SubjectName = ctx.User!.FindFirst(ClaimTypes.Name)?.Value ?? ctx.User.FindFirst(JwtRegisteredClaimNames.Name)?.Value,
+                SubjectEmail = ctx.User.FindFirst(ClaimTypes.Email)?.Value ?? ctx.User.FindFirst(JwtRegisteredClaimNames.Email)?.Value,
+                Roles = ctx.User.FindAll(ClaimTypes.Role).Select(c => c.Value).Distinct(StringComparer.Ordinal).ToList(),
+                GrantedScopes = granted,
+                ExpiresUtc = now + options.AuthorizationCodeLifetime,
+            };
+            await code.Save(ctx.RequestAborted);
+            consent.Status = ConsentRequest.StatusApproved;
+            await consent.Save(ctx.RequestAborted);
+            ClearBinding(ctx, rid);
+
+            await WriteRedirectResult(ctx, QueryHelpers.AddQueryString(consent.RedirectUri, BuildPairs(("code", code.Id), ("state", consent.State))));
             return;
         }
 
-        var subject = Subject(ctx.User);
-        if (subject is null)
-        {
-            await JsonError(ctx, StatusCodes.Status401Unauthorized, "login_required", "The session principal has no subject.");
-            return;
-        }
+        // Device flow (user_code). No browser binding (the verifying browser is NOT the device) — the auth session
+        // is the authority; rate-limited against user_code brute force (D8).
+        if (!await RateLimitUserCodeAsync(ctx, options, now)) return;
+        var device = await FindPendingDevice(rid, now, ctx.RequestAborted);
+        if (device is null) { await JsonError(ctx, StatusCodes.Status404NotFound, "invalid_request", "Unknown or expired request."); return; }
+        var subject = await RequireSubjectAsync(ctx);
+        if (subject is null) return;
 
-        // D6 — roles come from the SESSION (held authority), never the request. Scopes are consented as-requested.
-        var granted = consent.Scope.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
-        var code = new AuthorizationCode
-        {
-            Id = OpaqueToken.New(),
-            ClientId = consent.ClientId,
-            RedirectUri = consent.RedirectUri,
-            CodeChallenge = consent.CodeChallenge,
-            Resource = consent.Resource,
-            Subject = subject,
-            SubjectName = ctx.User.FindFirst(ClaimTypes.Name)?.Value ?? ctx.User.FindFirst(JwtRegisteredClaimNames.Name)?.Value,
-            SubjectEmail = ctx.User.FindFirst(ClaimTypes.Email)?.Value ?? ctx.User.FindFirst(JwtRegisteredClaimNames.Email)?.Value,
-            Roles = ctx.User.FindAll(ClaimTypes.Role).Select(c => c.Value).Distinct(StringComparer.Ordinal).ToList(),
-            GrantedScopes = granted,
-            ExpiresUtc = now + options.AuthorizationCodeLifetime,
-        };
-        await code.Save(ctx.RequestAborted);
+        device.Status = DeviceCode.StatusApproved;
+        device.Subject = subject;
+        device.SubjectName = ctx.User!.FindFirst(ClaimTypes.Name)?.Value ?? ctx.User.FindFirst(JwtRegisteredClaimNames.Name)?.Value;
+        device.SubjectEmail = ctx.User.FindFirst(ClaimTypes.Email)?.Value ?? ctx.User.FindFirst(JwtRegisteredClaimNames.Email)?.Value;
+        device.Roles = ctx.User.FindAll(ClaimTypes.Role).Select(c => c.Value).Distinct(StringComparer.Ordinal).ToList();
+        device.GrantedScopes = device.Scope.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+        await device.Save(ctx.RequestAborted);
 
-        consent.Status = ConsentRequest.StatusApproved;
-        await consent.Save(ctx.RequestAborted);
-        ClearBinding(ctx, rid);
-
-        var location = QueryHelpers.AddQueryString(consent.RedirectUri, BuildPairs(("code", code.Id), ("state", consent.State)));
-        await WriteRedirectResult(ctx, location);
+        // The device (polling /oauth/token) gets the token; the user's browser just goes to the "you can close" page.
+        await WriteRedirectResult(ctx, RequestHost.Url(ctx, ResolveDonePath(ctx, options)));
     }
 
-    // ---- POST /oauth/request/{rid}/deny ---------------------------------------------------------------
+    // ---- POST /oauth/request/{rid|user_code}/deny -----------------------------------------------------
 
     private static async Task Deny(HttpContext ctx, string rid)
     {
         ApplyAntiFraming(ctx);
+        var options = ctx.RequestServices.GetRequiredService<IOptions<AuthServerOptions>>().Value;
         var now = ctx.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow();
-        var consent = await LoadBoundPendingConsent(ctx, rid, now);
-        if (consent is null) return;
 
-        consent.Status = ConsentRequest.StatusDenied;
-        await consent.Save(ctx.RequestAborted);
-        ClearBinding(ctx, rid);
+        var consent = await ConsentRequest.Get(rid, ctx.RequestAborted);
+        if (consent is not null)
+        {
+            if (consent.IsExpired(now) || !consent.IsPending) { await JsonError(ctx, StatusCodes.Status404NotFound, "invalid_request", "Unknown or expired request."); return; }
+            if (!VerifyBinding(ctx, rid, consent)) { await JsonError(ctx, StatusCodes.Status403Forbidden, "invalid_request", "This request was not initiated by this browser."); return; }
+            consent.Status = ConsentRequest.StatusDenied;
+            await consent.Save(ctx.RequestAborted);
+            ClearBinding(ctx, rid);
+            await WriteRedirectResult(ctx, QueryHelpers.AddQueryString(consent.RedirectUri, BuildPairs(("error", "access_denied"), ("state", consent.State))));
+            return;
+        }
 
-        var location = QueryHelpers.AddQueryString(consent.RedirectUri, BuildPairs(("error", "access_denied"), ("state", consent.State)));
-        await WriteRedirectResult(ctx, location);
+        if (!await RateLimitUserCodeAsync(ctx, options, now)) return;
+        var device = await FindPendingDevice(rid, now, ctx.RequestAborted);
+        if (device is null) { await JsonError(ctx, StatusCodes.Status404NotFound, "invalid_request", "Unknown or expired request."); return; }
+        device.Status = DeviceCode.StatusDenied;
+        await device.Save(ctx.RequestAborted);
+        await WriteRedirectResult(ctx, RequestHost.Url(ctx, ResolveDonePath(ctx, options)));
     }
 
-    // ---- POST /oauth/token (authorization_code grant) -------------------------------------------------
+    // ---- POST /oauth/token (authorization_code | device_code grants) ----------------------------------
 
     private static async Task Token(HttpContext ctx)
     {
+        var form = await ctx.Request.ReadFormAsync(ctx.RequestAborted);
+        var grant = form["grant_type"].ToString();
+        switch (grant)
+        {
+            case "authorization_code": await TokenAuthCode(ctx, form); return;
+            case "urn:ietf:params:oauth:grant-type:device_code": await TokenDeviceCode(ctx, form); return;
+            default: await JsonError(ctx, StatusCodes.Status400BadRequest, "unsupported_grant_type", "Unsupported grant_type."); return;
+        }
+    }
+
+    private static async Task TokenAuthCode(HttpContext ctx, IFormCollection form)
+    {
         var options = ctx.RequestServices.GetRequiredService<IOptions<AuthServerOptions>>().Value;
         var now = ctx.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow();
-        var form = await ctx.Request.ReadFormAsync(ctx.RequestAborted);
-
-        if (!string.Equals(form["grant_type"].ToString(), "authorization_code", StringComparison.Ordinal))
-        {
-            await JsonError(ctx, StatusCodes.Status400BadRequest, "unsupported_grant_type", "Only authorization_code is supported.");
-            return;
-        }
 
         var codeValue = form["code"].ToString();
         var code = string.IsNullOrEmpty(codeValue) ? null : await AuthorizationCode.Get(codeValue, ctx.RequestAborted);
@@ -260,47 +281,145 @@ internal sealed class OAuthProtocolEndpoints : IKoanEndpointContributor
 
         code.Consumed = true;
         await code.Save(ctx.RequestAborted);
+        await IssueAccessToken(ctx, options, code.Subject, code.SubjectName, code.SubjectEmail, code.Roles, code.GrantedScopes, code.ClientId, code.Resource);
+    }
 
+    private static async Task TokenDeviceCode(HttpContext ctx, IFormCollection form)
+    {
+        var options = ctx.RequestServices.GetRequiredService<IOptions<AuthServerOptions>>().Value;
+        var now = ctx.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow();
+
+        var deviceCodeValue = form["device_code"].ToString();
+        var device = string.IsNullOrEmpty(deviceCodeValue) ? null : await DeviceCode.Get(deviceCodeValue, ctx.RequestAborted);
+        if (device is null || device.Consumed)
+        {
+            await JsonError(ctx, StatusCodes.Status400BadRequest, "invalid_grant", "Unknown device_code.");
+            return;
+        }
+        if (device.IsExpired(now))
+        {
+            await JsonError(ctx, StatusCodes.Status400BadRequest, "expired_token", "The device_code has expired.");
+            return;
+        }
+
+        // RFC 8628 §3.5 — enforce the minimum poll interval (slow_down) before evaluating status.
+        if (device.LastPolledUtc is { } last && now - last < TimeSpan.FromSeconds(device.IntervalSeconds))
+        {
+            device.LastPolledUtc = now;
+            await device.Save(ctx.RequestAborted);
+            await JsonError(ctx, StatusCodes.Status400BadRequest, "slow_down", "Polling too frequently.");
+            return;
+        }
+        device.LastPolledUtc = now;
+
+        switch (device.Status)
+        {
+            case DeviceCode.StatusDenied:
+                await device.Save(ctx.RequestAborted);
+                await JsonError(ctx, StatusCodes.Status400BadRequest, "access_denied", "The user denied the request.");
+                return;
+            case DeviceCode.StatusPending:
+                await device.Save(ctx.RequestAborted);
+                await JsonError(ctx, StatusCodes.Status400BadRequest, "authorization_pending", "The user has not yet approved the request.");
+                return;
+        }
+
+        device.Consumed = true; // single-use
+        await device.Save(ctx.RequestAborted);
+        await IssueAccessToken(ctx, options, device.Subject ?? "", device.SubjectName, device.SubjectEmail, device.Roles, device.GrantedScopes, device.ClientId, device.Resource);
+    }
+
+    private static async Task IssueAccessToken(HttpContext ctx, AuthServerOptions options,
+        string subject, string? name, string? email, IReadOnlyCollection<string> roles, IReadOnlyCollection<string> scopes,
+        string clientId, string resource)
+    {
         var issuer = ctx.RequestServices.GetRequiredService<IAsymmetricIssuer>();
         var token = issuer.Issue(new TrustClaims
         {
-            Subject = code.Subject,
-            Name = code.SubjectName,
-            Email = code.SubjectEmail,
-            Roles = code.Roles,
-            Permissions = code.GrantedScopes,
-            Extra = new Dictionary<string, IReadOnlyList<string>> { ["client_id"] = new[] { code.ClientId } },
-        }, options.AccessTokenLifetime, audience: code.Resource);
+            Subject = subject,
+            Name = name,
+            Email = email,
+            Roles = roles,
+            Permissions = scopes,
+            Extra = new Dictionary<string, IReadOnlyList<string>> { ["client_id"] = new[] { clientId } },
+        }, options.AccessTokenLifetime, audience: resource);
 
         await ctx.Response.WriteAsJsonAsync(new
         {
             access_token = token,
             token_type = "Bearer",
             expires_in = (int)options.AccessTokenLifetime.TotalSeconds,
-            scope = string.Join(' ', code.GrantedScopes),
+            scope = string.Join(' ', scopes),
         }, cancellationToken: ctx.RequestAborted);
     }
 
     // ---- helpers --------------------------------------------------------------------------------------
 
-    private static async Task<ConsentRequest?> LoadBoundPendingConsent(HttpContext ctx, string rid, DateTimeOffset now)
+    // D7 — the approval/denial must come from the browser that initiated the request (constant-time compare).
+    private static bool VerifyBinding(HttpContext ctx, string rid, ConsentRequest consent)
     {
-        var consent = await ConsentRequest.Get(rid, ctx.RequestAborted);
-        if (consent is null || consent.IsExpired(now) || !consent.IsPending)
-        {
-            await JsonError(ctx, StatusCodes.Status404NotFound, "invalid_request", "Unknown or expired consent request.");
-            return null;
-        }
-        // D7 — the approval/denial must come from the browser that initiated the request.
         var cookie = ctx.Request.Cookies[BindingCookiePrefix + rid];
-        if (string.IsNullOrEmpty(cookie) || !System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
-                System.Text.Encoding.ASCII.GetBytes(cookie),
-                System.Text.Encoding.ASCII.GetBytes(consent.BrowserBinding)))
+        return !string.IsNullOrEmpty(cookie) && System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+            System.Text.Encoding.ASCII.GetBytes(cookie),
+            System.Text.Encoding.ASCII.GetBytes(consent.BrowserBinding));
+    }
+
+    // The subject is the signed-in cookie user; the app authenticates first (provider pills) and returns here.
+    // Returns the subject, or null after writing a 401 (the caller returns).
+    private static async Task<string?> RequireSubjectAsync(HttpContext ctx)
+    {
+        if (ctx.User?.Identity?.IsAuthenticated != true)
         {
-            await JsonError(ctx, StatusCodes.Status403Forbidden, "invalid_request", "This request was not initiated by this browser.");
+            await JsonError(ctx, StatusCodes.Status401Unauthorized, "login_required", "Sign in before approving the request.");
             return null;
         }
-        return consent;
+        var sub = Subject(ctx.User);
+        if (sub is null)
+            await JsonError(ctx, StatusCodes.Status401Unauthorized, "login_required", "The session principal has no subject.");
+        return sub;
+    }
+
+    private static async Task WriteConsentContext(HttpContext ctx, string clientId, string scope, string resource, string? userCode)
+    {
+        var client = await OAuthClient.Get(clientId, ctx.RequestAborted);
+        var registry = ctx.RequestServices.GetService<IProviderRegistry>();
+        var providers = registry?.GetDescriptors().Where(d => d.Enabled).ToArray() ?? Array.Empty<ProviderDescriptor>();
+        var scopes = scope.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(s => new { id = s, description = s }).ToArray();
+
+        await ctx.Response.WriteAsJsonAsync(new
+        {
+            client = new { name = client?.ClientName ?? clientId, verified = false },
+            scopes,
+            resource,
+            user_code = userCode,
+            user = new { loggedIn = ctx.User?.Identity?.IsAuthenticated == true },
+            providers,
+        }, cancellationToken: ctx.RequestAborted);
+    }
+
+    private static async Task<DeviceCode?> FindPendingDevice(string userCodeInput, DateTimeOffset now, CancellationToken ct)
+    {
+        var normalized = UserCode.Normalize(userCodeInput);
+        if (normalized.Length == 0) return null;
+        var matches = await DeviceCode.Query(d => d.UserCode == normalized, ct);
+        return matches.FirstOrDefault(d => d.IsPending && !d.IsExpired(now));
+    }
+
+    private static async Task<bool> RateLimitUserCodeAsync(HttpContext ctx, AuthServerOptions options, DateTimeOffset now)
+    {
+        var limiter = ctx.RequestServices.GetRequiredService<FixedWindowRateLimiter>();
+        var ip = ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        if (limiter.TryAcquire("usercode:" + ip, options.UserCodeVerificationRateLimitPerMinute, TimeSpan.FromMinutes(1), now))
+            return true;
+        await JsonError(ctx, StatusCodes.Status429TooManyRequests, "slow_down", "Too many verification attempts.");
+        return false;
+    }
+
+    private static string ResolveDonePath(HttpContext ctx, AuthServerOptions options)
+    {
+        var cfg = ctx.RequestServices.GetService<Microsoft.Extensions.Configuration.IConfiguration>();
+        return cfg?["Koan:Web:Auth:Server:DonePath"] ?? cfg?["Koan:Mcp:Auth:DonePath"] ?? options.DonePath;
     }
 
     private static string? Subject(ClaimsPrincipal user)

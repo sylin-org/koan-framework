@@ -33,9 +33,10 @@ internal sealed class WellKnownEndpoints : IKoanEndpointContributor
             ["issuer"] = root,
             ["authorization_endpoint"] = root + "/oauth/authorize",
             ["token_endpoint"] = root + "/oauth/token",
+            ["device_authorization_endpoint"] = root + "/oauth/device",
             ["jwks_uri"] = root + "/.well-known/jwks.json",
             ["response_types_supported"] = new[] { "code" },
-            ["grant_types_supported"] = new[] { "authorization_code" },
+            ["grant_types_supported"] = new[] { "authorization_code", "urn:ietf:params:oauth:grant-type:device_code" },
             ["code_challenge_methods_supported"] = new[] { Pkce.MethodS256 },
             ["token_endpoint_auth_methods_supported"] = new[] { "none" },
         };

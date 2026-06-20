@@ -54,6 +54,15 @@ public sealed class AuthServerOptions
     /// <summary>SEC-0006 D5 — registration attempts allowed globally per minute (a flood ceiling).</summary>
     public int RegistrationRateLimitGlobalPerMinute { get; set; } = 100;
 
+    /// <summary>SEC-0006 D8 — how long a device authorization (device_code / user_code) is valid.</summary>
+    public TimeSpan DeviceCodeLifetime { get; set; } = TimeSpan.FromMinutes(15);
+
+    /// <summary>SEC-0006 D8 — the minimum device poll interval advertised to the client (seconds).</summary>
+    public int DevicePollIntervalSeconds { get; set; } = 5;
+
+    /// <summary>SEC-0006 D8 — user_code verification attempts allowed per source IP per minute (anti-brute-force).</summary>
+    public int UserCodeVerificationRateLimitPerMinute { get; set; } = 10;
+
     /// <summary>
     /// SEC-0006 D1 — how long an active ES256 signing key is used before it is rotated out. On rotation a fresh
     /// key becomes active and the previous key keeps validating (JWKS overlap) until <see cref="KeyOverlap"/>
