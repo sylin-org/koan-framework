@@ -10,6 +10,15 @@ public sealed class AuthServerOptions
     public const string SectionPath = "Koan:Web:Auth:Server";
 
     /// <summary>
+    /// SEC-0006 — the AS's canonical public origin (e.g. <c>https://app.example.com</c>), used as the discovery
+    /// <c>issuer</c> and to build every externally-advertised endpoint URL (authorize/token/device/jwks +
+    /// the device <c>verification_uri</c>). When set it is authoritative and the request <c>Host</c> header is
+    /// ignored — the correct, host-spoof-proof posture behind a proxy. When unset (Development), URLs derive
+    /// from the live request host.
+    /// </summary>
+    public string? Issuer { get; set; }
+
+    /// <summary>
     /// Whether the <c>/oauth/dev-token</c> convenience endpoint is mapped. It is <b>additionally</b> hard-gated
     /// to the Development environment at request time (it returns 404 anywhere else, even if this is true), so a
     /// production build can never mint a token from a cookie session without the full authorization-code flow.

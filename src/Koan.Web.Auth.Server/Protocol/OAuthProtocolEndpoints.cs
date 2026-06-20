@@ -75,7 +75,8 @@ internal sealed class OAuthProtocolEndpoints : IKoanEndpointContributor
         var resource = q["resource"].ToString();
         if (string.IsNullOrWhiteSpace(resource))
         {
-            RedirectError(ctx, redirectUri, "invalid_target", "A resource indicator (RFC 8707) is required.", state);
+            // RFC 6749 §4.1.2.1 authorization-endpoint error code (invalid_target is a token-endpoint code).
+            RedirectError(ctx, redirectUri, "invalid_request", "A resource indicator (RFC 8707) is required.", state);
             return;
         }
 
@@ -84,7 +85,7 @@ internal sealed class OAuthProtocolEndpoints : IKoanEndpointContributor
         // D9 — remembered consent: a signed-in user who already granted this (client, scope-set) and whose grant
         // is still live skips the consent page; the code is minted directly. New scopes / a revoked grant re-prompt.
         if (options.RememberConsent && ctx.User?.Identity?.IsAuthenticated == true && Subject(ctx.User) is { } rememberedSub
-            && await OAuthGrants.FindLiveAsync(rememberedSub, clientId, scopeList, now, ctx.RequestAborted) is not null)
+            && await OAuthGrants.FindLiveAsync(rememberedSub, clientId, scopeList, resource, now, ctx.RequestAborted) is not null)
         {
             var remembered = new AuthorizationCode
             {
@@ -133,17 +134,7 @@ internal sealed class OAuthProtocolEndpoints : IKoanEndpointContributor
             MaxAge = options.ConsentRequestLifetime,
         });
 
-        ctx.Response.Redirect(QueryHelpers.AddQueryString(ResolveConsentPath(ctx, options), "rid", consent.Id));
-    }
-
-    // The app's consent page path: prefer the AS option (Koan:Web:Auth:Server:ConsentPath), fall back to the
-    // MCP-namespaced key the app may have been told to set (Koan:Mcp:Auth:ConsentPath), then the default.
-    private static string ResolveConsentPath(HttpContext ctx, AuthServerOptions options)
-    {
-        var cfg = ctx.RequestServices.GetService<Microsoft.Extensions.Configuration.IConfiguration>();
-        return cfg?["Koan:Web:Auth:Server:ConsentPath"]
-            ?? cfg?["Koan:Mcp:Auth:ConsentPath"]
-            ?? options.ConsentPath;
+        ctx.Response.Redirect(QueryHelpers.AddQueryString(AppPaths.Consent(ctx, options), "rid", consent.Id));
     }
 
     // ---- GET /oauth/request/{rid|user_code} (the consent seam — auth-code OR device, unified) ------------
@@ -151,6 +142,7 @@ internal sealed class OAuthProtocolEndpoints : IKoanEndpointContributor
     private static async Task GetRequest(HttpContext ctx, string rid)
     {
         ApplyAntiFraming(ctx);
+        if (await RejectOversizedId(ctx, rid)) return;
         var now = ctx.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow();
 
         var consent = await ConsentRequest.Get(rid, ctx.RequestAborted);
@@ -178,6 +170,7 @@ internal sealed class OAuthProtocolEndpoints : IKoanEndpointContributor
     private static async Task Approve(HttpContext ctx, string rid)
     {
         ApplyAntiFraming(ctx);
+        if (await RejectOversizedId(ctx, rid)) return;
         var options = ctx.RequestServices.GetRequiredService<IOptions<AuthServerOptions>>().Value;
         var now = ctx.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow();
 
@@ -231,7 +224,7 @@ internal sealed class OAuthProtocolEndpoints : IKoanEndpointContributor
         await device.Save(ctx.RequestAborted);
 
         // The device (polling /oauth/token) gets the token; the user's browser just goes to the "you can close" page.
-        await WriteRedirectResult(ctx, RequestHost.Url(ctx, ResolveDonePath(ctx, options)));
+        await WriteRedirectResult(ctx, RequestHost.Url(ctx, AppPaths.Done(ctx, options)));
     }
 
     // ---- POST /oauth/request/{rid|user_code}/deny -----------------------------------------------------
@@ -239,6 +232,7 @@ internal sealed class OAuthProtocolEndpoints : IKoanEndpointContributor
     private static async Task Deny(HttpContext ctx, string rid)
     {
         ApplyAntiFraming(ctx);
+        if (await RejectOversizedId(ctx, rid)) return;
         var options = ctx.RequestServices.GetRequiredService<IOptions<AuthServerOptions>>().Value;
         var now = ctx.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow();
 
@@ -259,7 +253,7 @@ internal sealed class OAuthProtocolEndpoints : IKoanEndpointContributor
         if (device is null) { await JsonError(ctx, StatusCodes.Status404NotFound, "invalid_request", "Unknown or expired request."); return; }
         device.Status = DeviceCode.StatusDenied;
         await device.Save(ctx.RequestAborted);
-        await WriteRedirectResult(ctx, RequestHost.Url(ctx, ResolveDonePath(ctx, options)));
+        await WriteRedirectResult(ctx, RequestHost.Url(ctx, AppPaths.Done(ctx, options)));
     }
 
     // ---- POST /oauth/token (authorization_code | device_code grants) ----------------------------------
@@ -290,10 +284,9 @@ internal sealed class OAuthProtocolEndpoints : IKoanEndpointContributor
             return;
         }
 
-        // Single-use: a replayed (already-consumed) code is rejected. [D9: revoke the issued family — Phase 5.]
-        if (code.Consumed || code.IsExpired(now))
+        if (code.IsExpired(now))
         {
-            await JsonError(ctx, StatusCodes.Status400BadRequest, "invalid_grant", "Authorization code is expired or already used.");
+            await JsonError(ctx, StatusCodes.Status400BadRequest, "invalid_grant", "Authorization code has expired.");
             return;
         }
 
@@ -306,8 +299,13 @@ internal sealed class OAuthProtocolEndpoints : IKoanEndpointContributor
             return;
         }
 
-        code.Consumed = true;
-        await code.Save(ctx.RequestAborted);
+        // D4 single-use — atomic claim: delete-by-id is atomic on every adapter, so exactly one of any concurrent
+        // redemptions wins (no read-check-write double-spend). The loser sees the row already gone.
+        if (!await code.Remove(ctx.RequestAborted))
+        {
+            await JsonError(ctx, StatusCodes.Status400BadRequest, "invalid_grant", "Authorization code already used.");
+            return;
+        }
 
         var id = new GrantedIdentity(code.Subject, code.SubjectName, code.SubjectEmail, code.Roles, code.GrantedScopes);
         var grant = await OAuthGrants.FindOrCreateAsync(id.Subject, code.ClientId, id.Scopes, code.Resource, now, options.RefreshTokenLifetime, ctx.RequestAborted);
@@ -321,9 +319,15 @@ internal sealed class OAuthProtocolEndpoints : IKoanEndpointContributor
 
         var deviceCodeValue = form["device_code"].ToString();
         var device = string.IsNullOrEmpty(deviceCodeValue) ? null : await DeviceCode.Get(deviceCodeValue, ctx.RequestAborted);
-        if (device is null || device.Consumed)
+        if (device is null)
         {
             await JsonError(ctx, StatusCodes.Status400BadRequest, "invalid_grant", "Unknown device_code.");
+            return;
+        }
+        // RFC 8628 §3.4 — the token request must present the same client_id as the device authorization request.
+        if (!string.Equals(form["client_id"].ToString(), device.ClientId, StringComparison.Ordinal))
+        {
+            await JsonError(ctx, StatusCodes.Status400BadRequest, "invalid_grant", "client_id does not match the device authorization.");
             return;
         }
         if (device.IsExpired(now))
@@ -332,9 +336,11 @@ internal sealed class OAuthProtocolEndpoints : IKoanEndpointContributor
             return;
         }
 
-        // RFC 8628 §3.5 — enforce the minimum poll interval (slow_down) before evaluating status.
+        // RFC 8628 §3.5 — enforce the minimum poll interval (slow_down) before evaluating status, and bump the
+        // interval each time a client polls too fast (the conformant back-off ladder).
         if (device.LastPolledUtc is { } last && now - last < TimeSpan.FromSeconds(device.IntervalSeconds))
         {
+            device.IntervalSeconds += 5;
             device.LastPolledUtc = now;
             await device.Save(ctx.RequestAborted);
             await JsonError(ctx, StatusCodes.Status400BadRequest, "slow_down", "Polling too frequently.");
@@ -354,8 +360,12 @@ internal sealed class OAuthProtocolEndpoints : IKoanEndpointContributor
                 return;
         }
 
-        device.Consumed = true; // single-use
-        await device.Save(ctx.RequestAborted);
+        // Single-use — atomic claim (delete-by-id), so concurrent polls of an approved device can't double-issue.
+        if (!await device.Remove(ctx.RequestAborted))
+        {
+            await JsonError(ctx, StatusCodes.Status400BadRequest, "invalid_grant", "The device_code has already been used.");
+            return;
+        }
 
         var id = new GrantedIdentity(device.Subject ?? "", device.SubjectName, device.SubjectEmail, device.Roles, device.GrantedScopes);
         var grant = await OAuthGrants.FindOrCreateAsync(id.Subject, device.ClientId, id.Scopes, device.Resource, now, options.RefreshTokenLifetime, ctx.RequestAborted);
@@ -429,6 +439,10 @@ internal sealed class OAuthProtocolEndpoints : IKoanEndpointContributor
             ["scope"] = string.Join(' ', id.Scopes),
         };
 
+        // RFC 6749 §5.1 — token responses must not be cached by intermediaries.
+        ctx.Response.Headers.CacheControl = "no-store";
+        ctx.Response.Headers.Pragma = "no-cache";
+
         if (options.EnableRefreshTokens)
         {
             var rawRefresh = OpaqueToken.New();
@@ -459,9 +473,12 @@ internal sealed class OAuthProtocolEndpoints : IKoanEndpointContributor
     private static bool VerifyBinding(HttpContext ctx, string rid, ConsentRequest consent)
     {
         var cookie = ctx.Request.Cookies[BindingCookiePrefix + rid];
-        return !string.IsNullOrEmpty(cookie) && System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
-            System.Text.Encoding.ASCII.GetBytes(cookie),
-            System.Text.Encoding.ASCII.GetBytes(consent.BrowserBinding));
+        if (string.IsNullOrEmpty(cookie)) return false;
+        // UTF-8 (not ASCII, which silently substitutes '?' for non-ASCII) + a length guard so FixedTimeEquals
+        // never short-circuits on a length mismatch from an attacker-shaped cookie.
+        var a = System.Text.Encoding.UTF8.GetBytes(cookie);
+        var b = System.Text.Encoding.UTF8.GetBytes(consent.BrowserBinding);
+        return a.Length == b.Length && System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(a, b);
     }
 
     // The subject is the signed-in cookie user; the app authenticates first (provider pills) and returns here.
@@ -516,10 +533,12 @@ internal sealed class OAuthProtocolEndpoints : IKoanEndpointContributor
         return false;
     }
 
-    private static string ResolveDonePath(HttpContext ctx, AuthServerOptions options)
+    // Reject absurd ids (a 1MB user_code / rid) before any DB access or allocation. Valid ids are <= 64 chars.
+    private static async Task<bool> RejectOversizedId(HttpContext ctx, string? id)
     {
-        var cfg = ctx.RequestServices.GetService<Microsoft.Extensions.Configuration.IConfiguration>();
-        return cfg?["Koan:Web:Auth:Server:DonePath"] ?? cfg?["Koan:Mcp:Auth:DonePath"] ?? options.DonePath;
+        if ((id?.Length ?? 0) <= 128) return false;
+        await JsonError(ctx, StatusCodes.Status404NotFound, "invalid_request", "Unknown or expired request.");
+        return true;
     }
 
     private static string? Subject(ClaimsPrincipal user)

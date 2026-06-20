@@ -1,3 +1,4 @@
+using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Core.Model;
 
 namespace Koan.Web.Auth.Server.Protocol;
@@ -11,6 +12,7 @@ namespace Koan.Web.Auth.Server.Protocol;
 public sealed class DeviceCode : Entity<DeviceCode>
 {
     /// <summary>The normalized (dash-less, upper-case) user code — the verification lookup key.</summary>
+    [Index]
     public string UserCode { get; set; } = "";
 
     public string ClientId { get; set; } = "";
@@ -32,8 +34,6 @@ public sealed class DeviceCode : Entity<DeviceCode>
 
     /// <summary>Last poll time — enforces the RFC 8628 minimum poll interval (slow_down).</summary>
     public DateTimeOffset? LastPolledUtc { get; set; }
-
-    public bool Consumed { get; set; }
 
     public const string StatusPending = "pending";
     public const string StatusApproved = "approved";

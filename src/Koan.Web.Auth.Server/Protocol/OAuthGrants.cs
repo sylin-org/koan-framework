@@ -34,7 +34,7 @@ internal static class OAuthGrants
     public static async Task<AgentGrant> FindOrCreateAsync(string subject, string clientId,
         IReadOnlyCollection<string> scopes, string resource, DateTimeOffset now, TimeSpan lifetime, CancellationToken ct)
     {
-        var existing = await FindLiveAsync(subject, clientId, scopes, now, ct);
+        var existing = await FindLiveAsync(subject, clientId, scopes, resource, now, ct);
         if (existing is not null) return existing;
         var grant = new AgentGrant
         {
@@ -48,10 +48,12 @@ internal static class OAuthGrants
     }
 
     public static async Task<AgentGrant?> FindLiveAsync(string subject, string clientId,
-        IReadOnlyCollection<string> scopes, DateTimeOffset now, CancellationToken ct)
+        IReadOnlyCollection<string> scopes, string resource, DateTimeOffset now, CancellationToken ct)
     {
         var cap = Capability(clientId, scopes);
-        var matches = await AgentGrant.Query(g => g.Subject == subject && g.Capability == cap, ct);
+        // SEC-0006 D2/D9 — the grant is bound to the RESOURCE too, so remembered consent for resource A can never
+        // mint a code (or refresh) for an attacker-supplied resource B (the confused-deputy/audience-substitution fix).
+        var matches = await AgentGrant.Query(g => g.Subject == subject && g.Capability == cap && g.Resource == resource, ct);
         return matches.FirstOrDefault(g => g.IsActive(now));
     }
 

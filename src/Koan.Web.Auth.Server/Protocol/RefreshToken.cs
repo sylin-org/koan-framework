@@ -1,3 +1,4 @@
+using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Core.Model;
 
 namespace Koan.Web.Auth.Server.Protocol;
@@ -12,6 +13,7 @@ namespace Koan.Web.Auth.Server.Protocol;
 public sealed class RefreshToken : Entity<RefreshToken>
 {
     /// <summary>The rotation family — every descendant of one authorization shares it (reuse-detection scope).</summary>
+    [Index]
     public string FamilyId { get; set; } = "";
 
     public string ClientId { get; set; } = "";

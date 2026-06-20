@@ -40,7 +40,7 @@ internal sealed class DeviceEndpoint : IKoanEndpointContributor
         }
         if (string.IsNullOrWhiteSpace(resource))
         {
-            await Error(ctx, "invalid_target", "A resource indicator (RFC 8707) is required.");
+            await Error(ctx, "invalid_request", "A resource indicator (RFC 8707) is required.");
             return;
         }
 
@@ -57,7 +57,8 @@ internal sealed class DeviceEndpoint : IKoanEndpointContributor
         };
         await device.Save(ctx.RequestAborted);
 
-        var verificationUri = RequestHost.Url(ctx, ResolveConsentPath(ctx, options));
+        var verificationUri = RequestHost.Url(ctx, AppPaths.Consent(ctx, options));
+        ctx.Response.Headers.CacheControl = "no-store"; // RFC 8628 §3.2
         await ctx.Response.WriteAsJsonAsync(new
         {
             device_code = device.Id,
@@ -68,12 +69,6 @@ internal sealed class DeviceEndpoint : IKoanEndpointContributor
             expires_in = (int)options.DeviceCodeLifetime.TotalSeconds,
             interval = device.IntervalSeconds,
         }, cancellationToken: ctx.RequestAborted);
-    }
-
-    private static string ResolveConsentPath(HttpContext ctx, AuthServerOptions options)
-    {
-        var cfg = ctx.RequestServices.GetService<Microsoft.Extensions.Configuration.IConfiguration>();
-        return cfg?["Koan:Web:Auth:Server:ConsentPath"] ?? cfg?["Koan:Mcp:Auth:ConsentPath"] ?? options.ConsentPath;
     }
 
     private static Task Error(HttpContext ctx, string error, string description)

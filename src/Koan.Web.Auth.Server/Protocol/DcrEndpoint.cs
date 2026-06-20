@@ -60,6 +60,12 @@ internal sealed class DcrEndpoint : IKoanEndpointContributor
             await Error(ctx, StatusCodes.Status400BadRequest, "invalid_redirect_uri", "At least one redirect_uri is required.");
             return;
         }
+        // D5 — bound the redirect set (anti-DoS: an unbounded list makes every /authorize a long linear scan).
+        if (redirectUris.Count > 10 || redirectUris.Any(u => u.Length > 512))
+        {
+            await Error(ctx, StatusCodes.Status400BadRequest, "invalid_redirect_uri", "Too many or over-long redirect URIs.");
+            return;
+        }
         // D5 — a dynamic client may NEVER register a non-loopback redirect.
         if (redirectUris.Any(u => !LoopbackRedirect.IsLoopback(u)))
         {
@@ -67,9 +73,7 @@ internal sealed class DcrEndpoint : IKoanEndpointContributor
             return;
         }
 
-        var clientName = body.TryGetProperty("client_name", out var n) && n.ValueKind == JsonValueKind.String
-            ? n.GetString() ?? ""
-            : "";
+        var clientName = SanitizeName(body.TryGetProperty("client_name", out var n) && n.ValueKind == JsonValueKind.String ? n.GetString() : null);
 
         var client = new OAuthClient
         {
@@ -84,17 +88,27 @@ internal sealed class DcrEndpoint : IKoanEndpointContributor
         await client.Save(ctx.RequestAborted);
 
         ctx.Response.StatusCode = StatusCodes.Status201Created;
+        ctx.Response.Headers.CacheControl = "no-store";
+        // Public client — client_secret / client_secret_expires_at are omitted (RFC 7591 §3.2.1: only with a secret).
         await ctx.Response.WriteAsJsonAsync(new
         {
             client_id = client.Id,
             client_id_issued_at = now.ToUnixTimeSeconds(),
-            client_secret_expires_at = 0, // public client — no secret
             client_name = client.ClientName,
             redirect_uris = client.RedirectUris,
             token_endpoint_auth_method = "none",
             grant_types = new[] { "authorization_code" },
             response_types = new[] { "code" },
         }, cancellationToken: ctx.RequestAborted);
+    }
+
+    // Untrusted display name → strip control chars and truncate, so a hostile client_name can't smuggle control
+    // sequences or unbounded length to the (escaping) consent page.
+    private static string SanitizeName(string? name)
+    {
+        if (string.IsNullOrEmpty(name)) return "";
+        var cleaned = new string(name.Where(c => !char.IsControl(c)).ToArray());
+        return cleaned.Length > 128 ? cleaned[..128] : cleaned;
     }
 
     private static List<string> ReadStringArray(JsonElement body, string property)
