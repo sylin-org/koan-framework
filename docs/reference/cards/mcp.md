@@ -22,7 +22,7 @@ validation:
 
 ## The one canonical pattern
 
-Annotate an `Entity<T>` with `[McpEntity]` — its `Save` / `Remove` / `Query` operations are auto-exposed as tools. Then `AddKoanMcp()` in `Program.cs`.
+Annotate an `Entity<T>` with `[McpEntity]` — its `Save` / `Remove` / `Query` operations are auto-exposed as tools. **Reference = Intent:** referencing `Koan.Mcp` is the whole opt-in (its auto-registrar calls `AddKoanMcp()` + maps the endpoints) — `AddKoan()` discovers it; you write no MCP wiring.
 
 ```csharp
 [McpEntity(Name = "Todo", Description = "Task management entity")]
@@ -32,10 +32,9 @@ public sealed class Todo : Entity<Todo>
     public bool IsCompleted { get; set; }
 }
 
-// Program.cs
+// Program.cs — that's all. (Referencing Koan.Mcp hosts STDIO; referencing Koan.Web + Koan:Mcp:EnableHttpSseTransport
+// adds HTTP/SSE. No AddKoanMcp() / AddKoanWeb() / MapKoanMcpEndpoints() to call.)
 builder.Services.AddKoan();
-builder.Services.AddKoanWeb();
-builder.Services.AddKoanMcp();   // binds Koan:Mcp config; tools served over JSON-RPC
 ```
 
 `[McpEntity(AllowMutations = false)]` exposes read-only; `Exposure = "code"` routes the entity through Code Mode instead of raw tool calls.

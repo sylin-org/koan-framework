@@ -7,7 +7,7 @@ description: MCP server patterns, Code Mode integration, tool building
 
 ## Core Principle
 
-**Expose Koan services as MCP tools for Claude integration.** Use framework patterns for tool implementations.
+**Reference = Intent — referencing `Koan.Mcp` projects your entities to agents automatically.** You never hand-write a tool class or an `IMcpTool`: an `[McpEntity]` exposes its `Save`/`Remove`/`Query` verbs as MCP tools with the SAME schema, visibility, and `[Access]` gate as REST. Hand-written, non-CRUD actions are `[McpTool]` static methods. Access is the entity's `[Access]` gate (SEC-0004) — never a per-tool reimplementation. **Anti-pattern:** manually building tool/schema/result objects, or calling `AddKoanMcp()`/`MapKoanMcpEndpoints()` — the framework does all of it from the package reference.
 
 ## MCP Server Setup
 
@@ -16,60 +16,63 @@ description: MCP server patterns, Code Mode integration, tool building
 ```csharp
 using Koan.Mcp;
 
+// Reference = Intent: referencing the Koan.Mcp package IS the whole opt-in — its auto-registrar wires the MCP
+// server (STDIO is hosted; HTTP/SSE is config-gated) and AddKoan() discovers it. There is NO AddKoanMcp() to
+// call, and no MapKoanMcpEndpoints() either (the MCP endpoint contributor maps them inside Koan's pipeline).
+// Any [McpEntity] in the app is then exposed automatically.
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan();
-builder.Services.AddKoanMcp(); // Adds MCP capabilities
 var app = builder.Build();
 app.Run();
 ```
 
-### Expose Entity as MCP Tool
+### Expose entities and custom verbs
 
+Entity verbs are exposed automatically — annotate the entity; write no tool class. A non-CRUD action is a `[McpTool]` static method.
+
+<!-- validate -->
 ```csharp
-public class TodoMcpTool : IMcpTool
+using System.Threading;
+using System.Threading.Tasks;
+using Koan.Data.Core;          // .Save() / .Query() entity statics + extensions
+using Koan.Data.Core.Model;    // Entity<T>
+using Koan.Mcp;                // [McpEntity], [McpTool], [McpIdempotent]
+using Koan.Web.Authorization;  // [Access]
+
+// CRUD/query verbs (todo.get-by-id, todo.collection, todo.upsert, …) are projected automatically.
+[McpEntity(Name = "todo", Description = "Task management")]
+[Access(read: "anyone", write: "has:scope:todos:write")]   // the SAME gate REST enforces (SEC-0004)
+public sealed class Todo : Entity<Todo>
 {
-    public string Name => "get_todo";
-    public string Description => "Retrieve a todo by ID";
+    public string Title { get; set; } = "";
+    public bool Completed { get; set; }
+}
 
-    public McpToolSchema Schema => new()
+// A verb that isn't entity CRUD: a public static method, marked with the right hint.
+public static class TodoTools
+{
+    [McpTool(Name = "complete_all", Description = "Mark every open todo complete.")]
+    [McpIdempotent]
+    public static async Task<int> CompleteAll(CancellationToken ct)
     {
-        Parameters = new[]
-        {
-            new McpParameter { Name = "id", Type = "string", Required = true }
-        }
-    };
-
-    public async Task<McpToolResult> ExecuteAsync(
-        Dictionary<string, object> args,
-        CancellationToken ct)
-    {
-        var id = args["id"].ToString();
-        var todo = await Todo.Get(id, ct);
-
-        return new McpToolResult
-        {
-            Content = todo != null
-                ? $"Todo: {todo.Title} (Completed: {todo.Completed})"
-                : "Todo not found"
-        };
+        var open = await Todo.Query(t => !t.Completed);
+        foreach (var todo in open) { todo.Completed = true; await todo.Save(); }
+        return open.Count;
     }
 }
 ```
 
-### Configuration
+### Configuration (real `Koan:Mcp` keys)
 
 ```json
 {
   "Koan": {
     "Mcp": {
-      "ServerName": "Todo MCP Server",
-      "Version": "1.0.0",
-      "Transport": "stdio",
-      "Capabilities": {
-        "Tools": true,
-        "Resources": true,
-        "Prompts": false
-      }
+      "EnableStdioTransport": true,
+      "EnableHttpSseTransport": false,
+      "RequireAuthentication": false,
+      "Exposure": "Auto",
+      "AllowedEntities": ["Todo"]
     }
   }
 }
@@ -77,7 +80,7 @@ public class TodoMcpTool : IMcpTool
 
 ## Code Mode Integration
 
-MCP servers integrate with Claude Code Mode for enhanced capabilities.
+An agent can send one sandboxed JavaScript script (`koan.code.execute`) over an SDK mirroring your entities — `SDK.Entities.Todo.upsert({...})`, `.collection()`, `SDK.Out.answer(...)` — instead of N tool round-trips. The SDK runs through the **same gate / constrain / origin** as direct tool calls (not a privilege bypass). Quotas bound the call count; `[McpEntity(Exposure = "code")]` or `Koan:Mcp:Exposure` choose tools / code / both.
 
 ## When This Skill Applies
 

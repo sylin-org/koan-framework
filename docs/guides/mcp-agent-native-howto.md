@@ -36,13 +36,12 @@ A Koan app projects itself to an agent as `project(model × grant)` — **one pr
 | 7 Compose | *Code Mode* | many steps in one sandboxed call |
 | 8 Govern | `AgentGrant` · `[Audit]` · `[Door]` | lent access, an audit trail, and signposted locks |
 
-**Reference = Intent.** Referencing `Koan.Mcp` and calling `AddKoanMcp()` turns it on; STDIO is hosted automatically. Everything below is just declarations on entities you already have.
+**Reference = Intent.** *Referencing* the `Koan.Mcp` package is the whole opt-in — its auto-registrar wires the MCP services and hosts the STDIO server for you. You never call `AddKoanMcp()`; `AddKoan()` discovers it. Everything below is just declarations on entities you already have.
 
 ```csharp
 // Program.cs — the whole bootstrap for a local (STDIO) MCP server.
 var builder = Host.CreateApplicationBuilder(args);
-builder.Services.AddKoan();      // reflective discovery (your entities, adapters, …)
-builder.Services.AddKoanMcp();   // Reference = Intent → the STDIO MCP server is hosted
+builder.Services.AddKoan();   // referencing Koan.Mcp → the STDIO MCP server is hosted (no AddKoanMcp() to call)
 await builder.Build().RunAsync();
 ```
 
@@ -292,12 +291,12 @@ public sealed class Note : Entity<Note> { /* … */ }
 Everything above is transport-neutral. STDIO (rung 1's bootstrap) is local-trust for *discovery* but its *data* runs anonymous + `origin:local`. To reach an agent over the network, add the HTTP/SSE transport and an auth scheme:
 
 ```csharp
+// Referencing Koan.Web (for the HTTP host) + Koan.Mcp is the whole change — the framework maps /mcp/sse + /mcp/rpc
+// inside its own pipeline (no AddKoanWeb / AddKoanMcp / MapKoanMcpEndpoints). The transport is config-gated.
+var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan();
-builder.Services.AddKoanWeb();
-builder.Services.AddKoanMcp();
 // appsettings: "Koan:Mcp:EnableHttpSseTransport": true, "Koan:Mcp:RequireAuthentication": true
 var app = builder.Build();
-app.MapKoanMcpEndpoints();
 await app.RunAsync();
 ```
 

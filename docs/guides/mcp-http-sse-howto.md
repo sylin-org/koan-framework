@@ -41,7 +41,7 @@ MCP over HTTP+SSE lets AI agents and IDEs call your backend operations as if the
 - Tool discovery and capability endpoints
 
 **Inputs:**
-- Koan application with `builder.Services.AddKoan().AsProxiedApi()` configured
+- A Koan web application (`builder.Services.AddKoan()` — referencing `Koan.Mcp` + `Koan.Web` is the whole opt-in)
 - Entities decorated with `[McpEntity]` attributes
 - HTTP+SSE transport enabled in configuration
 - Optional: authentication provider (OAuth, API keys)
@@ -202,28 +202,19 @@ public class Todo : Entity<Todo>
 ### Step 4: Wire up Program.cs
 
 ```csharp
-using Koan.Core;
-using Koan.Core.Hosting.App;
-using Koan.Mcp.Extensions;
-using Koan.Web.Extensions;
-
 var builder = WebApplication.CreateBuilder(args);
 
-// Register Core + Web + MCP services
-builder.Services.AddKoan().AsProxiedApi();
-builder.Services.AddKoanWeb();
-builder.Services.AddKoanMcp();
+// Reference = Intent: referencing Koan.Mcp (+ Koan.Web) is the whole opt-in. The Koan.Mcp auto-registrar
+// runs AddKoanMcp() for you, and the MCP endpoint contributor maps /mcp/sse + /mcp/rpc INSIDE Koan's
+// pipeline — so there is NO AddKoanMcp() / AddKoanWeb() / MapKoanMcpEndpoints() to call. AppHost, routing,
+// auth middleware, and controller mapping are wired by the framework too.
+builder.Services.AddKoan();
 
 var app = builder.Build();
-
-// Set the global AppHost service locator so that dynamic scanning and entity resolving works
-AppHost.Current = app.Services;
-
-// Map the MCP HTTP/SSE endpoints (/mcp/sse, /mcp/rpc, etc.)
-app.MapKoanMcpEndpoints();
-
 app.Run();
 ```
+
+> The HTTP/SSE transport is **off by default** — turn it on with the config below (`Koan:Mcp:EnableHttpSseTransport: true`). `MapKoanMcpEndpoints` self-gates on it, so the endpoints appear only once you opt in.
 
 ### Step 5: Run and test
 
@@ -478,7 +469,7 @@ Exclusion also blocks the field on JSON-Patch (`patch`) tools: a patch operation
 
 **Why a dedicated attribute and not `[JsonIgnore]`?** Newtonsoft is Koan's canonical serializer for *both* the wire and persistence, so a `[Newtonsoft.Json.JsonIgnore]` would also drop the field from the data store. A `[System.Text.Json.Serialization.JsonIgnore]` is silently ignored by the Newtonsoft-based MCP serializer and would leak. `[McpIgnore]` is MCP-local: it changes nothing about how the entity is stored or how REST serializes it.
 
-> **Note:** `[McpIgnore]` is a static, per-type decision (it is baked into the cached tool schema). It is **not** a per-caller / role-based filter — every MCP client sees the same shape. To vary visibility by caller, combine an entity-level scope (`RequiredScopes`) with a request-options hook that filters rows/fields, or expose a separate read-model entity.
+> **Note:** `[McpIgnore]` is a static, per-type decision (it is baked into the cached tool schema). It is **not** a per-caller / role-based filter — every MCP client sees the same shape. To vary visibility by caller, use the entity's `[Access]` gate + an `EntityAccess<T>` Constrain (which narrows rows per caller, WEB-0068), or expose a separate read-model entity.
 
 > Default-deny posture: `[McpIgnore]` is a denylist (everything is exposed unless annotated), which matches Koan's expose-by-convention model. For a public surface, audit new properties as they are added — a freshly added field is exposed until someone marks it.
 
@@ -855,40 +846,35 @@ public async Task DrainConnections()
   "Koan": {
     "Mcp": {
       "EnableHttpSseTransport": true,
-      "RequireAuthentication": true,
-      "AuthenticationScheme": "Bearer",
-      "EntityOverrides": {
-        "Todo": {
-          "RequireAuthentication": true,
-          "RequiredScopes": ["todos:write"],
-          "RequiredRoles": ["user"]
-        },
-        "AdminLog": {
-          "RequireAuthentication": true,
-          "RequiredRoles": ["admin"]
-        }
-      }
+      "RequireAuthentication": true
     }
   }
 }
 ```
+
+`RequireAuthentication: true` gates the whole HTTP/SSE **transport** — an unauthenticated connection is refused before any tool runs. **Per-entity access is NOT MCP config** — it is the entity's `[Access]` gate ([SEC-0004](../decisions/SEC-0004-capability-authorization-gate-constrain-project.md)), the *same* gate REST enforces, declared on the type:
+
+```csharp
+[McpEntity(Name = "todo")]
+[Access(write: "has:scope:todos:write", remove: "is:admin")]   // anyone reads; a scope writes; admin removes
+public sealed class Todo : Entity<Todo> { public string Title { get; set; } = ""; }
+```
+
+A verb the caller lacks the grant for is absent from `tools/list` and denied on call (its denial rides back as `meta.shortCircuit`). Custom `[McpTool]` verbs gate with their own `RequiredScopes`. Full model: [authorization-howto.md](authorization-howto.md).
 
 ### Recipe: OAuth token authentication
 
 ```csharp
 // Program.cs
 using Koan.Core;
-using Koan.Core.Hosting.App;
-using Koan.Mcp.Extensions;
-using Koan.Web.Extensions;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Register Core + Web + MCP
-builder.Services.AddKoan().AsProxiedApi();
-builder.Services.AddKoanWeb();
-builder.Services.AddKoanMcp();
+// Reference = Intent: Koan.Mcp + Koan.Web are active from the package references. The framework wires the whole
+// pipeline (AppHost, routing, UseAuthentication/UseAuthorization, controller + MCP endpoint mapping), so you only
+// register the bearer SCHEME the agent's token is validated against — standard ASP.NET, your IdP, your call.
+builder.Services.AddKoan();
 
 builder.Services.AddAuthentication("Bearer")
     .AddJwtBearer("Bearer", options =>
@@ -903,25 +889,11 @@ builder.Services.AddAuthentication("Bearer")
         };
     });
 
-builder.Services.AddAuthorization(options =>
-{
-    options.AddPolicy("todos:write", policy =>
-        policy.RequireClaim("scope", "todos:write"));
-});
-
 var app = builder.Build();
-
-// Set the global AppHost service locator so that dynamic scanning and entity resolving works
-AppHost.Current = app.Services;
-
-app.UseAuthentication();
-app.UseAuthorization();
-
-// Map MCP HTTP/SSE endpoints (/mcp/sse, /mcp/rpc, etc.)
-app.MapKoanMcpEndpoints();
-
 app.Run();
 ```
+
+> No named ASP.NET policies for entity access — the validated token's `scope`/role claims feed the entity `[Access]` gate directly (`[Access(write: "has:scope:todos:write")]`). You register the *scheme*; the gate does the *authorization*.
 
 ### Recipe: API key authentication
 
