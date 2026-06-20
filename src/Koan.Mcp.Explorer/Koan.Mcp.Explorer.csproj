@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <KoanPackageKind>Periphery</KoanPackageKind>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Description>MCP Explorer Console (WEB-0072): a Reference=Intent, Swagger-like human surface for a Koan MCP app — describe the tools, try them in-process as yourself, and read the per-caller capability map. Honest about authorization (Verb / Door / Wall).</Description>
+    <PackageTags>$(CommonPackageTags);mcp;explorer;console;agent;devex</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Mcp\Koan.Mcp.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Embedded SPA: the console HTML/CSS/JS is vendored (no CDN) and served from the manifest, so it works
+         offline / in air-gapped containers. LogicalName flattens wwwroot/foo.js -> Koan.Mcp.Explorer.wwwroot.foo.js. -->
+    <EmbeddedResource Include="wwwroot\**\*.*" LogicalName="Koan.Mcp.Explorer.wwwroot.%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

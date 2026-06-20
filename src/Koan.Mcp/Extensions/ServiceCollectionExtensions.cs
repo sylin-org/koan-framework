@@ -39,6 +39,8 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<RequestTranslator>();
         services.TryAddSingleton<ResponseTranslator>();
         services.TryAddSingleton<EndpointToolExecutor>();
+        // WEB-0072: the per-caller surface projection (backs the Explorer console + {baseRoute}/map.json).
+        services.TryAddSingleton<Koan.Mcp.Resources.McpSurfaceProjector>();
         services.TryAddSingleton<IMcpTransportDispatcher, StreamJsonRpcTransportDispatcher>();
         services.TryAddSingleton<McpServer>();
         services.AddHostedService<StdioTransport>();
