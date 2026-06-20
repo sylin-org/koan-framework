@@ -47,6 +47,14 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             options.AddOperationTransformer<TransformerMediaTypesOperationTransformer>();
         });
 
+        // X-openapi-newtonsoft-fidelity: the OpenAPI document is generated from System.Text.Json metadata, but Koan
+        // serializes REST via Newtonsoft (camelCase + StringEnumConverter + [JsonProperty] renames). Mirror the
+        // Newtonsoft wire onto the STJ options the generator reads — Http.Json.JsonOptions, which is what
+        // Microsoft.AspNetCore.OpenApi consults — so the doc is faithful BY CONSTRUCTION (string enums, real wire
+        // names) without per-schema doc transformers. The Newtonsoft formatter still owns the REST wire; these
+        // options also govern minimal-API responses, which now share the same string-enum contract.
+        services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o => Schema.NewtonsoftSchemaMirror.Apply(o.SerializerOptions));
+
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IStartupFilter, KoanOpenApiStartupFilter>());
 
         Log.BootDebug(LogActions.Init, "services-registered", ("module", ModuleName));
