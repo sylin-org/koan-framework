@@ -26,9 +26,10 @@ internal sealed class KoanTestProviderStartupFilter : IStartupFilter
                 var logger = app.ApplicationServices.GetService<ILogger<KoanTestProviderStartupFilter>>();
                 var opts = app.ApplicationServices.GetService<IOptions<TestProviderOptions>>()?.Value ?? new TestProviderOptions();
 
-                // SEC-0001 2h: opt-in only (no Development auto-enable). The everyday dev login is the
-                // zero-config trust identity; this OAuth-flow simulator's endpoints map only when enabled.
-                var enabled = opts.Enabled;
+                // Map the OAuth/OIDC simulator endpoints exactly when the contributor advertises the provider —
+                // shared IsActive predicate (active in Development, opt-in outside, fail-closed — SEC-0001/SEC-0003).
+                // Advertisement (TestProviderContributor) and mapping MUST agree, or buttons render with no endpoints.
+                var enabled = opts.IsActive(env);
                 if (!enabled)
                 {
                     logger?.LogDebug("Koan.Web.Auth.Connector.Test disabled (env={Env}). Set '{Section}:{Key}=true' to enable outside Development.", env?.EnvironmentName, TestProviderOptions.SectionPath, nameof(TestProviderOptions.Enabled));

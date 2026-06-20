@@ -12,15 +12,16 @@ internal sealed class TestProviderContributor(IConfiguration cfg, IHostEnvironme
         var o = cfg.GetSection(TestProviderOptions.SectionPath).Get<TestProviderOptions>() ?? new TestProviderOptions();
         // SEC-0003 §2.2: the TestProvider IS the zero-config dev login — available in Development with no config
         // (pick a profile → a real signed session). Opt-in outside Development. (The `?_as=` trust override is the
-        // separate, transient quick-test path; the default everywhere is anonymous.)
-        var enabled = o.Enabled || env.IsDevelopment() || o.ExposeInDiscoveryOutsideDevelopment;
-        if (!enabled) return new Dictionary<string, Koan.Web.Auth.Options.ProviderOptions>(StringComparer.OrdinalIgnoreCase);
+        // separate, transient quick-test path; the default everywhere is anonymous.) Shares the IsActive predicate
+        // with KoanTestProviderStartupFilter so advertisement and endpoint-mapping can't drift (Bug: advertised
+        // buttons whose /.testoauth endpoints 404).
+        if (!o.IsActive(env)) return new Dictionary<string, Koan.Web.Auth.Options.ProviderOptions>(StringComparer.OrdinalIgnoreCase);
         return new Dictionary<string, Koan.Web.Auth.Options.ProviderOptions>(StringComparer.OrdinalIgnoreCase)
         {
             ["test"] = new Koan.Web.Auth.Options.ProviderOptions
             {
                 Type = Koan.Web.Auth.Infrastructure.AuthConstants.Protocols.OAuth2,
-                DisplayName = "Test (Local)",
+                DisplayName = "Test OAuth2 (Local)",
                 Icon = "/icons/test.svg",
                 AuthorizationEndpoint = "/.testoauth/authorize",
                 TokenEndpoint = "/.testoauth/token",

@@ -107,7 +107,9 @@ internal static class AuthSchemeSeeder
         // WEB-0071: broaden the correlation cookie Path to root so it is returned on the templated
         // /auth/{id}/callback (the default narrows it to the callback path → "Correlation failed").
         o.CorrelationCookie.Path = "/";
-        ApplyDevCookiePolicyIfInsecure(o.CorrelationCookie, o.TokenEndpoint);
+        // Cookie storability follows the app's FRONT-CHANNEL request scheme (per request), not the provider's
+        // back-channel endpoint — see RequestSchemeAdaptiveCookieBuilder.
+        o.CorrelationCookie = RequestSchemeAdaptiveCookieBuilder.Wrap(o.CorrelationCookie);
         if (cfg.Scopes is { Length: > 0 })
         {
             o.Scope.Clear();
@@ -165,8 +167,10 @@ internal static class AuthSchemeSeeder
         // WEB-0071: broaden the correlation + nonce cookie Path to root so they return on the templated callback.
         o.CorrelationCookie.Path = "/";
         o.NonceCookie.Path = "/";
-        ApplyDevCookiePolicyIfInsecure(o.CorrelationCookie, authority);
-        ApplyDevCookiePolicyIfInsecure(o.NonceCookie, authority);
+        // Both adapt to the front-channel request scheme per request (see RequestSchemeAdaptiveCookieBuilder) — so a
+        // real https provider behind a plain-http dev host still gets storable (Lax) cookies.
+        o.CorrelationCookie = RequestSchemeAdaptiveCookieBuilder.Wrap(o.CorrelationCookie);
+        o.NonceCookie = RequestSchemeAdaptiveCookieBuilder.Wrap(o.NonceCookie);
         if (cfg.Scopes is { Length: > 0 })
         {
             o.Scope.Clear();
@@ -254,41 +258,13 @@ internal static class AuthSchemeSeeder
     }
 
     /// <summary>
-    /// For an http (dev/loopback) provider, relax the correlation/nonce cookie from the framework default
-    /// SameSite=None+Secure (which a browser / HttpClient will not send over plain http → "Correlation failed")
-    /// to Lax + SameAsRequest. Same-site dev flows work under Lax; production https providers keep None+Secure.
+    /// The maintained handler's Backchannel calls token/userinfo/discovery SERVER-side, so a relative endpoint must
+    /// be made in-network absolute. Delegates to <see cref="ServerAddressResolver"/>, which understands Kestrel's
+    /// wildcard bind forms (<c>http://+:8080</c>) that <see cref="Uri"/> cannot parse. Absolute endpoints pass through.
     /// </summary>
-    private static void ApplyDevCookiePolicyIfInsecure(Microsoft.AspNetCore.Http.CookieBuilder cookie, string? endpoint)
-    {
-        if (endpoint is null || !endpoint.StartsWith("http://", StringComparison.OrdinalIgnoreCase)) return;
-        cookie.SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Lax;
-        cookie.SecurePolicy = Microsoft.AspNetCore.Http.CookieSecurePolicy.SameAsRequest;
-    }
-
-    /// <summary>
-    /// The maintained handler's Backchannel calls token/userinfo SERVER-side, so those must be reachable.
-    /// Absolute stays as-is; a relative endpoint is prefixed with the in-network base (ASPNETCORE_URLS) when
-    /// resolvable, else returned unchanged (best-effort — see WEB-0071 backchannel note).
-    /// </summary>
-    private static string? ResolveServerAbsolute(string? endpoint)
-    {
-        if (string.IsNullOrWhiteSpace(endpoint)) return endpoint;
-        if (Uri.TryCreate(endpoint, UriKind.Absolute, out _)) return endpoint;
-
-        var urls = Environment.GetEnvironmentVariable("ASPNETCORE_URLS");
-        if (!string.IsNullOrWhiteSpace(urls))
-        {
-            var raw = urls.Split([';', ',', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .FirstOrDefault(p => p.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || p.StartsWith("https://", StringComparison.OrdinalIgnoreCase));
-            if (raw is not null && Uri.TryCreate(raw, UriKind.Absolute, out var b))
-            {
-                var scheme = b.Scheme;
-                var host = b.Host is "0.0.0.0" or "+" or "*" or "" ? "localhost" : b.Host;
-                var port = b.IsDefaultPort ? (scheme == Uri.UriSchemeHttps ? 443 : 80) : b.Port;
-                var path = endpoint.StartsWith('/') ? endpoint : "/" + endpoint;
-                return $"{scheme}://{host}:{port}{path}";
-            }
-        }
-        return endpoint; // relative; backchannel BaseAddress (if any) resolves it
-    }
+    private static string? ResolveServerAbsolute(string? endpoint) => ServerAddressResolver.ToAbsolute(
+        endpoint,
+        Environment.GetEnvironmentVariable("ASPNETCORE_URLS"),
+        Environment.GetEnvironmentVariable("ASPNETCORE_HTTPS_PORTS"),
+        Environment.GetEnvironmentVariable("ASPNETCORE_HTTP_PORTS"));
 }

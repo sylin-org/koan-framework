@@ -58,6 +58,18 @@ public sealed class AuthEngineSwapSpec : IClassFixture<AuthSwapFixture>
         await AssertLinked("alice@example.com", "test-oidc");
     }
 
+    [Fact]
+    public async Task Development_maps_test_endpoints_without_opt_in()
+    {
+        // Bug-1 regression: the contributor advertises test/test-oidc in Development, so their endpoints MUST be
+        // mapped there too — without any TestProvider:Enabled opt-in (the fixture sets none). If advertisement and
+        // mapping drift again, the discovery document 404s and OIDC discovery (and the round-trips above) break.
+        using var client = _fx.NewClient();
+        var resp = await client.GetAsync("/.testoauth/.well-known/openid-configuration");
+        resp.StatusCode.Should().Be(HttpStatusCode.OK,
+            "the Test simulator endpoints must auto-map in Development (advertise ⇒ map) with no opt-in");
+    }
+
     // ── helpers ─────────────────────────────────────────────────────────────
 
     /// <summary>

@@ -42,9 +42,10 @@ public sealed class AuthSwapFixture : IAsyncLifetime
             {
                 // offline-only, mirrors the bootstrap specs
                 ["Koan:Data:Redis:ConnectionString"] = "localhost:0",
-                // Map the Test provider's OAuth/OIDC simulator endpoints (opt-in, separate from the
-                // Development provider auto-enable — SEC-0003). Required to exercise the real flow.
-                ["Koan:Web:Auth:TestProvider:Enabled"] = "true",
+                // Deliberately NO TestProvider:Enabled opt-in — this fixture runs in plain Development, exactly like
+                // the real deployment that filed the regression. The Test simulator endpoints must AUTO-MAP in
+                // Development (advertise ⇒ map, shared IsActive predicate); if they don't, every round-trip below
+                // 404s. This is the Bug-1 regression guard against advertise/map gating drift.
             }))
             .ConfigureWebHostDefaults(web =>
             {
