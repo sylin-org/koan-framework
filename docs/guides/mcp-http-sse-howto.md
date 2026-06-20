@@ -1,7 +1,7 @@
 ---
 type: GUIDE
 domain: mcp
-title: "MCP over HTTP + SSE How-To"
+title: "MCP over HTTP How-To"
 audience: [developers, architects, ai-agents]
 status: current
 last_updated: 2026-06-20
@@ -10,14 +10,14 @@ validation:
   date_last_tested: 2026-06-20
   status: verified
   scope: all-examples-tested
-  notes: "Section 5 'Authentication' updated for the SEC-0006 embedded AS / Koan.bearer resource-server edge; deep AS flow in oauth-server-howto.md. [McpIgnore] field exclusion covered by tests/Suites/Samples/Koan.Mcp.FieldExclusion.Tests."
+  notes: "Now covers Streamable HTTP (AI-0037) as the modern default HTTP transport (single /mcp endpoint, spec 2025-06-18); the legacy HTTP+SSE /sse+/rpc transport documented in detail here is deprecated and opt-in (EnableLegacySseTransport). Section 5 'Authentication' updated for the SEC-0006 embedded AS / Koan.bearer resource-server edge; deep AS flow in oauth-server-howto.md. [McpIgnore] field exclusion covered by tests/Suites/Samples/Koan.Mcp.FieldExclusion.Tests."
 related_guides:
   - entity-capabilities-howto.md
   - patch-capabilities-howto.md
   - canon-capabilities-howto.md
 ---
 
-# MCP over HTTP + SSE How-To
+# MCP over HTTP How-To
 
 **Related Guides**
 - [Entity Capabilities](entity-capabilities-howto.md) - Entity-first patterns for MCP tool definitions
@@ -28,7 +28,44 @@ related_guides:
 
 Think of this guide as a conversation with a colleague who's integrated MCP servers into cloud IDEs, AI agent platforms, and collaborative coding environments. We'll explore Koan's HTTP + Server-Sent Events (SSE) transport—how to expose entity operations as MCP tools, handle authentication, and stream real-time responses to remote clients.
 
-MCP over HTTP+SSE lets AI agents and IDEs call your backend operations as if they were local functions—with type safety, streaming responses, and zero client-side infrastructure.
+MCP over HTTP lets AI agents and IDEs call your backend operations as if they were local functions—with type safety, streaming responses, and zero client-side infrastructure.
+
+## Transport at a glance
+
+Koan ships **two** HTTP transports for MCP, and the modern one is now the default.
+
+**Streamable HTTP** is the modern default (MCP spec [2025-06-18](https://modelcontextprotocol.io)). It is a **single** endpoint at `{baseRoute}` (default `/mcp`) that multiplexes everything over `POST` / `GET` / `DELETE` — see [AI-0037: MCP Streamable HTTP Transport](../decisions/AI-0037-mcp-streamable-http-transport.md). It is what mounts when you turn the HTTP transport on (`Koan:Mcp:EnableHttpSseTransport: true`), with no extra flag.
+
+A 60-second tour with `curl`:
+
+```bash
+# 1. Initialize — POST /mcp. Read the session id out of the RESPONSE header.
+curl -i -X POST http://localhost:5110/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
+# → 200, header:  Mcp-Session-Id: 5f3c...   (the response is one text/event-stream SSE answer)
+
+# 2. List/call tools — POST /mcp again, carrying that session id.
+SESSION="5f3c..."
+curl -X POST http://localhost:5110/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Mcp-Session-Id: $SESSION" \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+
+# 3. Open the standalone server-push stream — GET /mcp (Accept: text/event-stream).
+curl -N http://localhost:5110/mcp \
+  -H "Accept: text/event-stream" \
+  -H "Mcp-Session-Id: $SESSION"
+
+# 4. Terminate the session — DELETE /mcp.
+curl -X DELETE http://localhost:5110/mcp -H "Mcp-Session-Id: $SESSION"
+```
+
+A `POST` carrying a request is answered as a per-request `text/event-stream` SSE response (or a single `application/json` body); a `POST` carrying only a notification returns `202`. The `GET` stream is resumable via `Last-Event-ID`, and only one such stream may exist per session (a second returns `409`). A `404` with JSON-RPC error code `-32001` on a request is the **re-initialize** signal (the session has expired — `initialize` again).
+
+> **The legacy HTTP+SSE transport is deprecated.** The detailed mechanics in the rest of this guide — the two-endpoint `{baseRoute}/sse` + `{baseRoute}/rpc` shape (MCP spec 2024-11-05) — describe that **legacy** transport. It still works, byte-for-byte, but it is **opt-in only**: set `"EnableLegacySseTransport": true` (it does not mount otherwise, and `/sse` + `/rpc` would `404`). New deployments should prefer Streamable HTTP above.
 
 ## Contract
 
@@ -43,12 +80,12 @@ MCP over HTTP+SSE lets AI agents and IDEs call your backend operations as if the
 **Inputs:**
 - A Koan web application (`builder.Services.AddKoan()` — referencing `Koan.Mcp` + `Koan.Web` is the whole opt-in)
 - Entities decorated with `[McpEntity]` attributes
-- HTTP+SSE transport enabled in configuration
+- The HTTP transport enabled in configuration (`EnableHttpSseTransport: true`) — this mounts **Streamable HTTP** (the default); the **legacy** `/sse`+`/rpc` pair is opt-in via `EnableLegacySseTransport: true`
 - Optional: authentication provider (OAuth, API keys)
 
 **Outputs:**
-- `/mcp/sse` endpoint streaming JSON-RPC responses
-- `/mcp/rpc` endpoint accepting tool invocations
+- **Streamable HTTP (default):** a single `/mcp` endpoint serving `POST` (JSON-RPC requests, answered as per-request SSE or `application/json`), `GET` (the standalone server-push SSE stream), and `DELETE` (session terminate)
+- **Legacy HTTP+SSE (opt-in, deprecated):** `/mcp/sse` streaming JSON-RPC responses + `/mcp/rpc` accepting tool invocations
 - `/mcp/capabilities` endpoint exposing tool metadata
 - Real-time acknowledgments, results, errors, and heartbeats
 
@@ -154,6 +191,8 @@ Before following this guide:
 
 ## 1. Quick Start
 
+> **Deprecated.** From here on, this guide documents the **legacy** HTTP+SSE transport — the two-endpoint `{baseRoute}/sse` + `{baseRoute}/rpc` shape (MCP spec 2024-11-05). It is byte-faithful and still fully supported, but it is a thin shim over the same unified session/dispatch core as Streamable HTTP and has been **superseded**. It is **opt-in only** via `"EnableLegacySseTransport": true`. For new work, prefer Streamable HTTP — see [Transport at a glance](#transport-at-a-glance) and [AI-0037](../decisions/AI-0037-mcp-streamable-http-transport.md). The auth, CORS, nginx, session, and troubleshooting material below applies to the legacy transport.
+
 **Scenario:** Expose a Todo entity to remote AI agents so they can create, read, update, and delete tasks.
 
 ### Step 1: Create the project
@@ -182,14 +221,14 @@ public class Todo : Entity<Todo>
 }
 ```
 
-### Step 3: Configure HTTP+SSE transport
+### Step 3: Configure the legacy HTTP+SSE transport
 
 ```json
 // appsettings.Development.json
 {
   "Koan": {
     "Mcp": {
-      "EnableHttpSseTransport": true,
+      "EnableLegacySseTransport": true,
       "RequireAuthentication": false,
       "EnableCors": true,
       "AllowedOrigins": ["http://localhost:3000"],
@@ -214,7 +253,7 @@ var app = builder.Build();
 app.Run();
 ```
 
-> The HTTP/SSE transport is **off by default** — turn it on with the config below (`Koan:Mcp:EnableHttpSseTransport: true`). `MapKoanMcpEndpoints` self-gates on it, so the endpoints appear only once you opt in.
+> The legacy HTTP+SSE transport is **off by default** — opt in with the config above (`Koan:Mcp:EnableLegacySseTransport: true`) for the `/sse` + `/rpc` pair. (`Koan:Mcp:EnableHttpSseTransport: true` is the master "HTTP transport on" switch, but on its own it mounts **Streamable HTTP** at `/mcp` instead — see [Transport at a glance](#transport-at-a-glance).) The endpoints self-gate on these flags, so they appear only once you opt in.
 
 ### Step 5: Run and test
 
@@ -669,7 +708,7 @@ public class Post : Entity<Post>
 {
   "Koan": {
     "Mcp": {
-      "EnableHttpSseTransport": true,
+      "EnableLegacySseTransport": true,
       "SessionTimeoutMinutes": 30,
       "HeartbeatIntervalSeconds": 30,
       "MaxConcurrentConnections": 500,
@@ -845,7 +884,7 @@ public async Task DrainConnections()
 {
   "Koan": {
     "Mcp": {
-      "EnableHttpSseTransport": true,
+      "EnableLegacySseTransport": true,
       "RequireAuthentication": true
     }
   }
@@ -877,7 +916,7 @@ builder.Services.AddKoan();
 
 ```jsonc
 "Koan": { "Mcp": {
-  "EnableHttpSseTransport": true,
+  "EnableLegacySseTransport": true,
   "RequireAuthentication": true,
   "ResourceUri": "https://app.example.com/mcp"
 } }

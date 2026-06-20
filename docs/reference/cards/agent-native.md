@@ -70,7 +70,7 @@ public static class PostTools
 }
 ```
 
-> **Origin** (the *where*, not the *who*) — a gate term `origin: local | internal | remote`, server-stamped and un-forgeable, distinct from identity. `[Access(remove: "origin:local, is:admin")]` lets a **local** agent OR an admin remove: a STDIO tool call is `local` (yet anonymous — origin is orthogonal to auth), an HTTP/SSE caller is `remote` (or `internal` for a declared LAN, fail-closed). A remote agent's `can:[]` simply omits local-only verbs.
+> **Origin** (the *where*, not the *who*) — a gate term `origin: local | internal | remote`, server-stamped and un-forgeable, distinct from identity. `[Access(remove: "origin:local, is:admin")]` lets a **local** agent OR an admin remove: a STDIO tool call is `local` (yet anonymous — origin is orthogonal to auth), an HTTP caller is `remote` (or `internal` for a declared LAN, fail-closed). A remote agent's `can:[]` simply omits local-only verbs.
 
 ## What the AGENT SEES (the consumer surface)
 
@@ -91,7 +91,7 @@ Access an agent is *lent* (beyond its token), the *trail* it leaves, and what it
 
 ## The auth on-ramp ([SEC-0006](../../decisions/SEC-0006-embedded-oauth-authorization-server.md))
 
-How an authenticated agent *gets to* the gate chain above. STDIO is anonymous + `origin:local` (local trust). An HTTP/SSE agent reaching `/mcp` (when `Koan:Mcp:RequireAuthentication=true`) hits an OAuth 2.1 **resource server**: a `401` carries the RFC 9728 `WWW-Authenticate` pointing at `/.well-known/oauth-protected-resource/mcp`; the agent discovers + drives the **embedded Authorization Server** (Reference = Intent via `Koan.Web.Auth.Server`) — Authorization Code + PKCE *or* the RFC 8628 **device grant** — to mint an ES256 token; the `Koan.bearer` scheme validates it (signature + the per-resource audience, RFC 8707 — a token for another resource is rejected) and lands the identity in `context.User`. From there the **same** gate · constrain · project · origin · grant chain runs unchanged. The full flow catalogue, the two app-rendered pages, and the config live in [oauth-server-howto.md](../../guides/oauth-server-howto.md).
+How an authenticated agent *gets to* the gate chain above. STDIO is anonymous + `origin:local` (local trust). An HTTP agent reaching `/mcp` (when `Koan:Mcp:RequireAuthentication=true`) hits an OAuth 2.1 **resource server**: a `401` carries the RFC 9728 `WWW-Authenticate` pointing at `/.well-known/oauth-protected-resource/mcp`; the agent discovers + drives the **embedded Authorization Server** (Reference = Intent via `Koan.Web.Auth.Server`) — Authorization Code + PKCE *or* the RFC 8628 **device grant** — to mint an ES256 token; the `Koan.bearer` scheme validates it (signature + the per-resource audience, RFC 8707 — a token for another resource is rejected) and lands the identity in `context.User`. From there the **same** gate · constrain · project · origin · grant chain runs unchanged. The full flow catalogue, the two app-rendered pages, and the config live in [oauth-server-howto.md](../../guides/oauth-server-howto.md).
 
 ## Where it's exercised
 

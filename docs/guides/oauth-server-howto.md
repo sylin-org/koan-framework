@@ -117,7 +117,7 @@ A conformant client never needs hand-holding — it discovers and drives these i
 
 ## The `/mcp` resource-server edge
 
-With `Koan:Mcp:RequireAuthentication=true`, the MCP HTTP/SSE edge is an OAuth 2.1 **resource server**:
+With `Koan:Mcp:RequireAuthentication=true`, the MCP HTTP edge (Streamable HTTP by default; [AI-0037](../decisions/AI-0037-mcp-streamable-http-transport.md)) is an OAuth 2.1 **resource server**:
 
 ```jsonc
 "Koan": { "Mcp": {
@@ -143,7 +143,11 @@ In **Development only** (a hard `404` everywhere else), `GET /oauth/dev-token` m
 # sign in via your app first (sets the Koan.cookie), then:
 curl -b cookies.txt "http://localhost:5000/oauth/dev-token"
 # → { "access_token": "...", "token_type": "Bearer", "expires_in": 3600, "resource": "http://localhost:5000/mcp" }
-curl -H "Authorization: Bearer <token>" "http://localhost:5000/mcp/sse"   # reaches your gates
+
+# present it to the Streamable HTTP edge — the bearer passes the resource-server gate (a 200 + Mcp-Session-Id, not a 401):
+curl -i -H "Authorization: Bearer <token>" -H "Accept: application/json, text/event-stream" \
+  -X POST "http://localhost:5000/mcp" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"1"}}}'
 
 # request arbitrary scopes/roles to exercise a scope-gated [McpTool] / [Access(has:scope:x)] path:
 curl -b cookies.txt "http://localhost:5000/oauth/dev-token?scope=orders:read%20orders:fulfill&roles=admin"

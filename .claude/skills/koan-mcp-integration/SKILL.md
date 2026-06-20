@@ -62,6 +62,10 @@ public static class TodoTools
 }
 ```
 
+### Transports
+
+STDIO (default, local-trust, ungated) plus the HTTP edge. `EnableHttpSseTransport` is the master HTTP switch — when on, the modern **Streamable HTTP** transport (AI-0037: a single `{baseRoute}` endpoint serving POST/GET/DELETE, spec 2025-06-18) is mounted by default. The deprecated legacy `/sse`+`/rpc` pair is a separate opt-in (`EnableLegacySseTransport`); both ride one session/dispatch core.
+
 ### Configuration (real `Koan:Mcp` keys)
 
 ```json
@@ -70,6 +74,7 @@ public static class TodoTools
     "Mcp": {
       "EnableStdioTransport": true,
       "EnableHttpSseTransport": false,
+      "EnableLegacySseTransport": false,
       "RequireAuthentication": false,
       "Exposure": "Auto",
       "AllowedEntities": ["Todo"]
@@ -78,7 +83,7 @@ public static class TodoTools
 }
 ```
 
-### Authenticating the HTTP/SSE edge (SEC-0006)
+### Authenticating the HTTP edge (SEC-0006)
 
 Setting `Koan:Mcp:RequireAuthentication=true` makes `/mcp` an OAuth 2.1 **resource server**: it validates ES256 bearer tokens via the framework's `Koan.bearer` scheme, emits an RFC 9728 `WWW-Authenticate` challenge, serves `GET /.well-known/oauth-protected-resource/mcp`, and enforces the per-resource audience (RFC 8707 — `Koan:Mcp:ResourceUri` is the canonical id; a token for another resource is rejected). Once the bearer identity is in `context.User`, the **same** SEC-0004 `[Access]` gate chain runs unchanged. STDIO stays anonymous + `origin:local`.
 
