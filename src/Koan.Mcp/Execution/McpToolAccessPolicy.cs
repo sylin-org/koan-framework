@@ -52,6 +52,14 @@ public static class McpToolAccessPolicy
         if (tool is null) throw new ArgumentNullException(nameof(tool));
         if (options is null) throw new ArgumentNullException(nameof(options));
 
+        // P3.2 — a verb on a config-gated operational toolset is absent from the surface (and uninvocable) unless its
+        // toolset is explicitly enabled. The runtime @ops grant is a SEPARATE, in-verb gate (so an enabled-but-
+        // ungranted toolset stays discoverable — the agent learns the grant it needs).
+        if (tool.OperationalToolsetKey is { Length: > 0 } opsKey && !options.IsOperationalToolsetEnabled(opsKey))
+        {
+            return false;
+        }
+
         return IsPermitted(user, options.RequireAuthentication, tool.RequiredScopes);
     }
 

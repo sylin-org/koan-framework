@@ -25,6 +25,11 @@ public sealed class McpCustomTool
 
     public required MethodInfo Method { get; init; }
     public required IReadOnlyList<McpCustomToolParameter> Parameters { get; init; }
+
+    /// <summary>P3.2 — when set (from <c>[McpOperationalToolset(key)]</c>), this verb belongs to a config-gated
+    /// operational toolset: it is visible/invocable ONLY when <c>Koan:Mcp:Operations:{key}</c> is enabled. Null for
+    /// an ordinary custom verb.</summary>
+    public string? OperationalToolsetKey { get; init; }
 }
 
 /// <summary>One parameter of a custom tool method and how it is supplied at call time.</summary>
@@ -47,5 +52,9 @@ public enum McpCustomToolParameterSource
     ServiceProvider,
 
     /// <summary>Injected: the call's <see cref="System.Threading.CancellationToken"/>.</summary>
-    CancellationToken
+    CancellationToken,
+
+    /// <summary>Injected: the caller's <see cref="System.Security.Claims.ClaimsPrincipal"/> (P3.2 — null at an
+    /// anonymous/STDIO edge). Lets a custom verb gate/audit by the caller's subject without an HttpContext.</summary>
+    Principal
 }

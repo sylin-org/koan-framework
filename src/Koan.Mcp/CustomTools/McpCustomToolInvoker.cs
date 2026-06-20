@@ -1,5 +1,6 @@
 using System;
 using System.Reflection;
+using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,7 +16,7 @@ namespace Koan.Mcp.CustomTools;
 /// </summary>
 public sealed class McpCustomToolInvoker
 {
-    public async Task<JToken> Invoke(McpCustomTool tool, JObject? arguments, IServiceProvider services, CancellationToken cancellationToken)
+    public async Task<JToken> Invoke(McpCustomTool tool, JObject? arguments, IServiceProvider services, ClaimsPrincipal? principal, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(tool);
         ArgumentNullException.ThrowIfNull(services);
@@ -28,6 +29,7 @@ public sealed class McpCustomToolInvoker
             {
                 McpCustomToolParameterSource.CancellationToken => cancellationToken,
                 McpCustomToolParameterSource.ServiceProvider => services,
+                McpCustomToolParameterSource.Principal => principal,
                 _ => BindArgument(parameter, arguments)
             };
         }

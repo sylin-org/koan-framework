@@ -131,6 +131,18 @@ public sealed class McpServerOptions
     /// Telemetry and heartbeat behaviour for transports.
     /// </summary>
     public McpTransportOptions Transport { get; set; } = new();
+
+    /// <summary>
+    /// P3.2 — per-toolset opt-in for framework-shipped OPERATIONAL MCP toolsets (e.g. <c>Koan.Mcp.Operations</c>'s
+    /// <c>jobs</c>/<c>cache</c>). Keyed by the toolset's <c>[McpOperationalToolset]</c> key; ALL default OFF (including
+    /// Development) — operational verbs are privileged and grant-gated. A disabled toolset's verbs are absent from
+    /// <c>tools/list</c> and uninvocable. Generic by design: core does not know the toolset names.
+    /// </summary>
+    public Dictionary<string, bool> Operations { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>True when the operational toolset <paramref name="key"/> is explicitly enabled (default OFF).</summary>
+    public bool IsOperationalToolsetEnabled(string key)
+        => !string.IsNullOrWhiteSpace(key) && Operations.TryGetValue(key, out var on) && on;
 }
 
 public sealed class McpEntityOverride

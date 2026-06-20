@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <KoanPackageKind>Periphery</KoanPackageKind>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Description>Operational MCP toolsets (P3.2): framework-shipped, governed agent ops verbs — koan.jobs.{trigger,cancel,status} and koan.cache.{flush,flushAll}. Reference = Intent; each toolset is opt-in via Koan:Mcp:Operations (default OFF), grant-gated (@ops:jobs / @ops:cache AgentGrant), destructive verbs require confirm:true, every mutation audited (AgentAction).</Description>
+    <PackageTags>$(CommonPackageTags);mcp;operations;jobs;cache;agent;governance</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Mcp\Koan.Mcp.csproj" />
+    <ProjectReference Include="..\Koan.Jobs\Koan.Jobs.csproj" />
+    <ProjectReference Include="..\Koan.Cache\Koan.Cache.csproj" />
+  </ItemGroup>
+</Project>

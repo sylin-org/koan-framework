@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Security.Claims;
 using System.Threading;
 using Koan.Core.Hosting.Bootstrap;
 using Microsoft.Extensions.Logging;
@@ -167,6 +168,8 @@ public sealed class McpCustomToolRegistry
             ReadOnly = method.GetCustomAttribute<McpReadOnlyAttribute>() is not null ? true : null,
             Destructive = method.GetCustomAttribute<McpDestructiveAttribute>() is not null ? true : null,
             Idempotent = method.GetCustomAttribute<McpIdempotentAttribute>() is not null ? true : null,
+            // P3.2 — a verb on an [McpOperationalToolset]-marked Toolset is config-gated by that toolset's key.
+            OperationalToolsetKey = method.DeclaringType?.GetCustomAttribute<McpOperationalToolsetAttribute>()?.Key,
             Method = method,
             Parameters = parameters
         };
@@ -184,6 +187,7 @@ public sealed class McpCustomToolRegistry
     {
         if (type == typeof(CancellationToken)) return McpCustomToolParameterSource.CancellationToken;
         if (type == typeof(IServiceProvider)) return McpCustomToolParameterSource.ServiceProvider;
+        if (type == typeof(ClaimsPrincipal)) return McpCustomToolParameterSource.Principal;
         return McpCustomToolParameterSource.Arguments;
     }
 
