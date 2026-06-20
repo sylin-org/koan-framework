@@ -307,6 +307,29 @@ With `RequireAuthentication: true`, `/mcp` is an OAuth 2.1 **resource server**. 
 
 ---
 
+## Rung 10 — Operational toolsets (ops verbs)
+
+Sometimes the agent's job is to *operate* the system, not just its data — trigger a background job, flush a cache. Reference **`Koan.Mcp.Operations`** (Reference = Intent) and the framework ships those verbs as governed tools, on the *same* grant/audit rails as everything above (rung 8):
+
+- `koan.jobs.{trigger,cancel,status}` · `koan.cache.{flush,flushAll}`
+
+They are **off by default** — operational verbs are privileged, so each toolset is opt-in (posture, not wiring):
+
+```jsonc
+{ "Koan": { "Mcp": { "Operations": { "Jobs": true, "Cache": true } } } }   // both default OFF, incl. Development
+```
+
+A disabled toolset's verbs are simply **absent** from `tools/list`. When enabled, each verb requires an **`@ops:{jobs|cache}` `AgentGrant`** — the same revocable grant from rung 8, namespaced for operations (a blanket `"*"` entity grant does *not* confer ops; operational authority is explicit). Without it, the call fails loud, naming the grant it needs:
+
+```text
+new AgentGrant { Subject = "kitchen-agent", Resource = "@ops:jobs" }.Save();   // issue
+agent → koan.jobs.trigger { "workType": "ImportJob", "action": "import" }     → { "jobId": "…" }
+```
+
+**Destructive** verbs (`cancel`, `flushAll`) require `"confirm": true`; called without it they return a **dry-run** describing what *would* happen (the safe default). Every mutating call writes an `AgentAction` audit row (rung 8). An anonymous/STDIO caller has no subject and so cannot hold an ops grant — ops are for governed *remote* agents.
+
+The boot report names what's live: `mcp.ops: jobs,cache · grants required · audited`. Exercised end-to-end (real host, real ledger, real grant + audit) in [`tests/Suites/Mcp/Koan.Mcp.Operations.IntegrationTests`](../../tests/Suites/Mcp/Koan.Mcp.Operations.IntegrationTests). *(A Data toolset — re-embed / transfer — is deliberately absent until demand exists.)*
+
 ## Recap — the ladder
 
 ```text
@@ -319,6 +342,7 @@ With `RequireAuthentication: true`, `/mcp` is an OAuth 2.1 **resource server**. 
   + AgentGrant         → lend a capability, revocable + expiring
   + [Audit]            → an AgentAction per mutation (reads never audited)
   + [Door]             → disclose a locked verb's needs (role tiers stay silent Walls)
+  + Koan.Mcp.Operations → governed ops verbs (jobs/cache); opt-in + @ops grant + confirm + audit
 ```
 
 Each rung is one declaration; together they are *one projection*, computed per caller, identical on REST and MCP. Where it's exercised end-to-end: [`tests/Suites/Mcp/Koan.Mcp.Conformance.Tests`](../../tests/Suites/Mcp/Koan.Mcp.Conformance.Tests) and [`tests/Suites/Web/Koan.Web.Extensions.Tests`](../../tests/Suites/Web/Koan.Web.Extensions.Tests).

@@ -89,6 +89,10 @@ Setting `Koan:Mcp:RequireAuthentication=true` makes `/mcp` an OAuth 2.1 **resour
 
 The token issuer is the embedded **Authorization Server**, opt-in via **Reference = Intent**: reference `Koan.Web.Auth.Server` (no `AddKoanMcp()` / `UseAuthentication()` / `MapKoanMcpEndpoints()`). It lives at `/oauth/…` (distinct from `/auth/{provider}/` login), and the app renders only two pages — consent + done (`Koan:Mcp:Auth:ConsentPath` / `DonePath`). For local testing, `GET /oauth/dev-token` (Development only) mints a token for the current cookie user. Full flow + the two-page contract: [oauth-server-howto.md](../../../docs/guides/oauth-server-howto.md) and [mcp-http-sse-howto.md](../../../docs/guides/mcp-http-sse-howto.md).
 
+### Operational toolsets (P3.2)
+
+Reference `Koan.Mcp.Operations` (Reference = Intent) to ship governed **ops verbs** — `koan.jobs.{trigger,cancel,status}` + `koan.cache.{flush,flushAll}` — as `[McpTool]` verbs on `Toolset` subclasses. Each toolset is **opt-in + default OFF** via `Koan:Mcp:Operations:{Jobs,Cache}` (disabled ⇒ absent from `tools/list`). Every verb requires an `@ops:{jobs|cache}` **`AgentGrant`** (the SEC-0005 grant, exact-resource match — a `"*"` grant does NOT confer ops); destructive verbs (`cancel`, `flushAll`) need `confirm:true` else return a dry-run; every mutation writes an `AgentAction` audit row. Anonymous/STDIO callers can't hold a grant — ops are remote-governed. To author your own config-gated toolset, mark it `[McpOperationalToolset("key")]`; a custom verb can inject the caller via a `ClaimsPrincipal` parameter.
+
 ## Code Mode Integration
 
 An agent can send one sandboxed JavaScript script (`koan.code.execute`) over an SDK mirroring your entities — `SDK.Entities.Todo.upsert({...})`, `.collection()`, `SDK.Out.answer(...)` — instead of N tool round-trips. The SDK runs through the **same gate / constrain / origin** as direct tool calls (not a privilege bypass). Quotas bound the call count; `[McpEntity(Exposure = "code")]` or `Koan:Mcp:Exposure` choose tools / code / both.
