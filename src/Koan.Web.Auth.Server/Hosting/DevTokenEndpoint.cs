@@ -70,8 +70,14 @@ internal sealed class DevTokenEndpoint : IKoanEndpointContributor
             return;
         }
 
+        // Dev-only testing knobs: ?scope=<space-delimited> and ?roles=<space/comma-delimited> mint exactly those
+        // into the token (as-is, no held-filter) so a scope-gated [McpTool] / [Access(has:scope:x)] path is
+        // exercisable with a one-line curl. Absent → the session's own scopes/roles.
+        var scopeOverride = ParseList(ctx.Request.Query["scope"].ToString());
+        var rolesOverride = ParseList(ctx.Request.Query["roles"].ToString());
+
         var issuer = ctx.RequestServices.GetRequiredService<IAsymmetricIssuer>();
-        var claims = SessionPrincipal.ToTrustClaims(ctx.User, clientId: "koan-dev-token");
+        var claims = SessionPrincipal.ToTrustClaims(ctx.User, clientId: "koan-dev-token", scopeOverride, rolesOverride);
         // Clamp to a sane ceiling so a misconfigured option can't mint a long-lived dev credential.
         var minutes = Math.Clamp(options.DevTokenLifetimeMinutes, 1, 1440);
         var lifetime = TimeSpan.FromMinutes(minutes);
@@ -83,6 +89,14 @@ internal sealed class DevTokenEndpoint : IKoanEndpointContributor
             token_type = "Bearer",
             expires_in = (int)lifetime.TotalSeconds,
             resource,
+            scope = string.Join(' ', claims.Scopes),
         }, cancellationToken: ctx.RequestAborted);
     }
+
+    // Accepts space- OR comma-delimited input; null when the query param was absent (so the session value is kept).
+    private static IReadOnlyCollection<string>? ParseList(string? raw)
+        => string.IsNullOrWhiteSpace(raw)
+            ? null
+            : raw.Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                 .Distinct(StringComparer.Ordinal).ToArray();
 }

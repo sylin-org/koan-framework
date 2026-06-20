@@ -101,6 +101,20 @@ public sealed class EcdsaIssuerTests
     }
 
     [Fact]
+    public void Issue_emits_granted_scopes_as_a_space_delimited_scope_claim()
+    {
+        var issuer = NewIssuer();
+        var token = issuer.Issue(new TrustClaims { Subject = "alice", Scopes = new[] { "orders:read", "orders:fulfill" } });
+
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
+        // RFC 9068 §2.2.3 — a single space-delimited `scope` claim (the authorization grant the gates read).
+        var scope = jwt.Claims.Where(c => c.Type == "scope").Select(c => c.Value).Single();
+        scope.Split(' ').Should().BeEquivalentTo(new[] { "orders:read", "orders:fulfill" });
+        // Scopes are NOT folded into Koan.permission (SEC-0001 §8: permissions carry no authorization effect).
+        jwt.Claims.Any(c => c.Type == "Koan.permission").Should().BeFalse();
+    }
+
+    [Fact]
     public void A_foreign_HS256_token_is_rejected_alg_is_pinned()
     {
         // alg-pinning: an HS256 token must never validate against the ES256 issuer (HS↔ES confusion).

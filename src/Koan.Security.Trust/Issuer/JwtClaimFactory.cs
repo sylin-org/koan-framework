@@ -17,6 +17,9 @@ public static class JwtClaimFactory
     /// wire-format constant shared by every issuer and any consumer that projects a principal into trust claims.</summary>
     public const string PermissionClaimType = "Koan.permission";
 
+    /// <summary>The OAuth scope claim type (RFC 9068 §2.2.3) — the authorization grant read by the access gates.</summary>
+    public const string ScopeClaimType = "scope";
+
     public static List<Claim> From(TrustClaims c)
     {
         var claims = new List<Claim>
@@ -28,6 +31,9 @@ public static class JwtClaimFactory
         if (!string.IsNullOrWhiteSpace(c.Name)) claims.Add(new Claim(JwtRegisteredClaimNames.Name, c.Name));
         if (!string.IsNullOrWhiteSpace(c.Email)) claims.Add(new Claim(JwtRegisteredClaimNames.Email, c.Email));
         foreach (var role in c.Roles) claims.Add(new Claim(ClaimTypes.Role, role));
+        // RFC 9068 §2.2.3 — granted scopes are a single space-delimited `scope` claim (the authorization grant
+        // that [Access(has:scope:x)] and [McpTool(RequiredScopes)] read).
+        if (c.Scopes.Count > 0) claims.Add(new Claim(ScopeClaimType, string.Join(' ', c.Scopes)));
         foreach (var permission in c.Permissions) claims.Add(new Claim(PermissionClaimType, permission));
         if (c.Extra is not null)
             foreach (var kvp in c.Extra)

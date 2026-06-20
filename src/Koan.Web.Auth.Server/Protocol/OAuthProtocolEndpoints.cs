@@ -427,7 +427,7 @@ internal sealed class OAuthProtocolEndpoints : IKoanEndpointContributor
             Name = id.Name,
             Email = id.Email,
             Roles = id.Roles,
-            Permissions = id.Scopes,
+            Scopes = id.Scopes, // the granted scopes are the authorization grant → the RFC 9068 `scope` claim
             Extra = new Dictionary<string, IReadOnlyList<string>> { ["client_id"] = new[] { clientId } },
         }, options.AccessTokenLifetime, audience: resource);
 
