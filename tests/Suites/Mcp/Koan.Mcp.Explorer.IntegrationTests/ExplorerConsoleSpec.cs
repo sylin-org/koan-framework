@@ -92,8 +92,9 @@ public sealed class ExplorerConsoleSpec : IClassFixture<ExplorerFixture>
         // Wall: the role-gated entity leaves no trace.
         Entity(entities, "adminlog").Should().BeNull();
 
-        // Identity block is present.
+        // Identity block is present, and the LLM-facing instructions are surfaced (declare-once from config).
         ((string?)map["identity"]!["name"]).Should().NotBeNullOrEmpty();
+        ((string?)map["instructions"]).Should().Be(ExplorerFixture.TestInstructions);
     }
 
     [Fact]

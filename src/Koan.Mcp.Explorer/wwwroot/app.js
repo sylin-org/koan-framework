@@ -26,6 +26,41 @@
     if (id.name) identityEl.textContent = id.name;
     if (id.description) app.appendChild(el("div", "kx-entity-desc", id.description));
 
+    // "What the agent is told" — the MCP initialize `instructions` (the LLM-facing guidance).
+    if (surface.instructions) {
+      var insCard = el("div", "kx-card");
+      insCard.appendChild(el("div", "kx-section-title", "What the agent is told (instructions)"));
+      var insBody = el("div", null, surface.instructions);
+      insBody.style.whiteSpace = "pre-wrap";
+      insBody.style.color = "var(--muted)";
+      insCard.appendChild(insBody);
+      app.appendChild(insCard);
+    }
+
+    // Connect an MCP client — only when the HTTP/SSE transport is enabled (else the console is in-process only).
+    var transport = surface.transport || {};
+    if (transport.httpSse) {
+      var url = window.location.origin + (transport.route || "/mcp") + "/sse";
+      var conn = el("div", "kx-card");
+      conn.appendChild(el("div", "kx-section-title", "Connect an MCP client"));
+      var row = el("div");
+      row.style.display = "flex";
+      row.style.gap = "0.5rem";
+      row.style.alignItems = "center";
+      var code = el("code", "kx-tool-name", url);
+      code.style.wordBreak = "break-all";
+      var copy = el("button", "kx-btn ghost", "Copy");
+      copy.addEventListener("click", function () {
+        if (navigator.clipboard) navigator.clipboard.writeText(url);
+        copy.textContent = "Copied";
+        setTimeout(function () { copy.textContent = "Copy"; }, 1500);
+      });
+      row.appendChild(code);
+      row.appendChild(copy);
+      conn.appendChild(row);
+      app.appendChild(conn);
+    }
+
     var entities = surface.entities || [];
     var customTools = surface.customTools || [];
     var doorCount = entities.reduce(function (n, e) { return n + ((e.doors && e.doors.length) || 0); }, 0);

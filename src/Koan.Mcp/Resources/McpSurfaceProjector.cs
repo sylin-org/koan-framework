@@ -5,7 +5,9 @@ using Koan.Core;
 using Koan.Mcp.CustomTools;
 using Koan.Mcp.Execution;
 using Koan.Mcp.Hosting;
+using Koan.Mcp.Options;
 using Koan.Web.Authorization;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
 
 namespace Koan.Mcp.Resources;
@@ -28,12 +30,14 @@ public sealed class McpSurfaceProjector
     private readonly McpEntityRegistry _registry;
     private readonly McpCustomToolRegistry _customTools;
     private readonly IAccessGateCache _gateCache;
+    private readonly IOptions<McpServerOptions> _serverOptions;
 
-    public McpSurfaceProjector(McpEntityRegistry registry, McpCustomToolRegistry customTools, IAccessGateCache gateCache)
+    public McpSurfaceProjector(McpEntityRegistry registry, McpCustomToolRegistry customTools, IAccessGateCache gateCache, IOptions<McpServerOptions> serverOptions)
     {
         _registry = registry;
         _customTools = customTools;
         _gateCache = gateCache;
+        _serverOptions = serverOptions;
     }
 
     /// <summary>Project the per-caller surface document for <paramref name="user"/>.</summary>
@@ -79,6 +83,11 @@ public sealed class McpSurfaceProjector
             customTools.Add(ToolJson(McpRpcHandler.ToolDescriptor.FromCustom(tool)));
         }
 
+        var options = _serverOptions.Value;
+        var instructions = !string.IsNullOrWhiteSpace(options.Instructions)
+            ? options.Instructions
+            : (string.IsNullOrWhiteSpace(app.Description) ? null : app.Description);
+
         return new JObject
         {
             ["identity"] = new JObject
@@ -89,6 +98,14 @@ public sealed class McpSurfaceProjector
                 ["contactEmail"] = app.ContactEmail,
                 ["supportUrl"] = app.SupportUrl,
                 ["tags"] = new JArray(app.Tags),
+            },
+            // WEB-0072 P2: the LLM-facing guidance the initialize handshake returns — surfaced so the console can
+            // show "what the agent is told" (and a developer can tune it).
+            ["instructions"] = instructions,
+            ["transport"] = new JObject
+            {
+                ["httpSse"] = options.EnableHttpSseTransport,
+                ["route"] = string.IsNullOrWhiteSpace(options.HttpSseRoute) ? "/mcp" : options.HttpSseRoute.TrimEnd('/'),
             },
             ["entities"] = entities,
             ["customTools"] = customTools,
