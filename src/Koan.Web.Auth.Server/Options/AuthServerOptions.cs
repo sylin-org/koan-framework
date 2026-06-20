@@ -64,6 +64,22 @@ public sealed class AuthServerOptions
     public int UserCodeVerificationRateLimitPerMinute { get; set; } = 10;
 
     /// <summary>
+    /// SEC-0006 D9 — issue rotating refresh tokens (default on) so a client stays connected past the short
+    /// access-token lifetime without re-popping the browser. Every refresh rotates with reuse-detection and is
+    /// backed by a revocable grant.
+    /// </summary>
+    public bool EnableRefreshTokens { get; set; } = true;
+
+    /// <summary>SEC-0006 D9 — refresh-token / backing-grant lifetime ("authorize once" window).</summary>
+    public TimeSpan RefreshTokenLifetime { get; set; } = TimeSpan.FromDays(30);
+
+    /// <summary>
+    /// SEC-0006 D9 — remember consent (per user + client + scope set). A re-connect with an unchanged scope set
+    /// and a live grant skips the consent page; new scopes or a revoked grant re-prompt.
+    /// </summary>
+    public bool RememberConsent { get; set; } = true;
+
+    /// <summary>
     /// SEC-0006 D1 — how long an active ES256 signing key is used before it is rotated out. On rotation a fresh
     /// key becomes active and the previous key keeps validating (JWKS overlap) until <see cref="KeyOverlap"/>
     /// elapses. Applies only to the persisted key store (non-Development); Development uses an ephemeral key.

@@ -79,6 +79,32 @@ internal sealed class OAuthProtocolEndpoints : IKoanEndpointContributor
             return;
         }
 
+        var scopeList = q["scope"].ToString().Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+
+        // D9 — remembered consent: a signed-in user who already granted this (client, scope-set) and whose grant
+        // is still live skips the consent page; the code is minted directly. New scopes / a revoked grant re-prompt.
+        if (options.RememberConsent && ctx.User?.Identity?.IsAuthenticated == true && Subject(ctx.User) is { } rememberedSub
+            && await OAuthGrants.FindLiveAsync(rememberedSub, clientId, scopeList, now, ctx.RequestAborted) is not null)
+        {
+            var remembered = new AuthorizationCode
+            {
+                Id = OpaqueToken.New(),
+                ClientId = clientId,
+                RedirectUri = redirectUri,
+                CodeChallenge = challenge,
+                Resource = resource,
+                Subject = rememberedSub,
+                SubjectName = ctx.User.FindFirst(ClaimTypes.Name)?.Value ?? ctx.User.FindFirst(JwtRegisteredClaimNames.Name)?.Value,
+                SubjectEmail = ctx.User.FindFirst(ClaimTypes.Email)?.Value ?? ctx.User.FindFirst(JwtRegisteredClaimNames.Email)?.Value,
+                Roles = ctx.User.FindAll(ClaimTypes.Role).Select(c => c.Value).Distinct(StringComparer.Ordinal).ToList(),
+                GrantedScopes = scopeList,
+                ExpiresUtc = now + options.AuthorizationCodeLifetime,
+            };
+            await remembered.Save(ctx.RequestAborted);
+            ctx.Response.Redirect(QueryHelpers.AddQueryString(redirectUri, BuildPairs(("code", remembered.Id), ("state", state))));
+            return;
+        }
+
         var binding = OpaqueToken.New();
         var consent = new ConsentRequest
         {
@@ -246,6 +272,7 @@ internal sealed class OAuthProtocolEndpoints : IKoanEndpointContributor
         {
             case "authorization_code": await TokenAuthCode(ctx, form); return;
             case "urn:ietf:params:oauth:grant-type:device_code": await TokenDeviceCode(ctx, form); return;
+            case "refresh_token": await TokenRefresh(ctx, form); return;
             default: await JsonError(ctx, StatusCodes.Status400BadRequest, "unsupported_grant_type", "Unsupported grant_type."); return;
         }
     }
@@ -281,7 +308,10 @@ internal sealed class OAuthProtocolEndpoints : IKoanEndpointContributor
 
         code.Consumed = true;
         await code.Save(ctx.RequestAborted);
-        await IssueAccessToken(ctx, options, code.Subject, code.SubjectName, code.SubjectEmail, code.Roles, code.GrantedScopes, code.ClientId, code.Resource);
+
+        var id = new GrantedIdentity(code.Subject, code.SubjectName, code.SubjectEmail, code.Roles, code.GrantedScopes);
+        var grant = await OAuthGrants.FindOrCreateAsync(id.Subject, code.ClientId, id.Scopes, code.Resource, now, options.RefreshTokenLifetime, ctx.RequestAborted);
+        await IssueTokens(ctx, options, id, code.ClientId, code.Resource, OpaqueToken.New(), grant.Id, now);
     }
 
     private static async Task TokenDeviceCode(HttpContext ctx, IFormCollection form)
@@ -326,31 +356,101 @@ internal sealed class OAuthProtocolEndpoints : IKoanEndpointContributor
 
         device.Consumed = true; // single-use
         await device.Save(ctx.RequestAborted);
-        await IssueAccessToken(ctx, options, device.Subject ?? "", device.SubjectName, device.SubjectEmail, device.Roles, device.GrantedScopes, device.ClientId, device.Resource);
+
+        var id = new GrantedIdentity(device.Subject ?? "", device.SubjectName, device.SubjectEmail, device.Roles, device.GrantedScopes);
+        var grant = await OAuthGrants.FindOrCreateAsync(id.Subject, device.ClientId, id.Scopes, device.Resource, now, options.RefreshTokenLifetime, ctx.RequestAborted);
+        await IssueTokens(ctx, options, id, device.ClientId, device.Resource, OpaqueToken.New(), grant.Id, now);
     }
 
-    private static async Task IssueAccessToken(HttpContext ctx, AuthServerOptions options,
-        string subject, string? name, string? email, IReadOnlyCollection<string> roles, IReadOnlyCollection<string> scopes,
-        string clientId, string resource)
+    // ---- refresh_token grant (D9: rotation + reuse-detection + revocation) ----------------------------
+
+    private static async Task TokenRefresh(HttpContext ctx, IFormCollection form)
+    {
+        var options = ctx.RequestServices.GetRequiredService<IOptions<AuthServerOptions>>().Value;
+        var now = ctx.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow();
+
+        var raw = form["refresh_token"].ToString();
+        var rt = string.IsNullOrEmpty(raw) ? null : await RefreshToken.Get(OAuthGrants.HashToken(raw), ctx.RequestAborted);
+        if (rt is null)
+        {
+            await JsonError(ctx, StatusCodes.Status400BadRequest, "invalid_grant", "Unknown refresh token.");
+            return;
+        }
+
+        // OAuth 2.1 §4.3.1 — a replayed (already-rotated) token is reuse: revoke the whole family + the grant.
+        if (rt.Rotated)
+        {
+            await OAuthGrants.RevokeFamilyAsync(rt.FamilyId, ctx.RequestAborted);
+            await OAuthGrants.RevokeGrantAsync(rt.GrantId, ctx.RequestAborted);
+            await JsonError(ctx, StatusCodes.Status400BadRequest, "invalid_grant", "Refresh token reuse detected; the session has been revoked.");
+            return;
+        }
+        if (rt.IsExpired(now))
+        {
+            await JsonError(ctx, StatusCodes.Status400BadRequest, "invalid_grant", "Refresh token has expired.");
+            return;
+        }
+        // No client substitution; the backing grant must still be live (revocation fails closed).
+        if (!string.Equals(form["client_id"].ToString(), rt.ClientId, StringComparison.Ordinal)
+            || !await OAuthGrants.GrantLiveAsync(rt.GrantId, now, ctx.RequestAborted))
+        {
+            await JsonError(ctx, StatusCodes.Status400BadRequest, "invalid_grant", "The grant is no longer valid.");
+            return;
+        }
+
+        rt.Rotated = true; // rotate — this token is now spent
+        await rt.Save(ctx.RequestAborted);
+
+        var id = new GrantedIdentity(rt.Subject, rt.SubjectName, rt.SubjectEmail, rt.Roles, rt.GrantedScopes);
+        await IssueTokens(ctx, options, id, rt.ClientId, rt.Resource, rt.FamilyId, rt.GrantId, now);
+    }
+
+    private sealed record GrantedIdentity(string Subject, string? Name, string? Email, List<string> Roles, List<string> Scopes);
+
+    private static async Task IssueTokens(HttpContext ctx, AuthServerOptions options, GrantedIdentity id,
+        string clientId, string resource, string familyId, string grantId, DateTimeOffset now)
     {
         var issuer = ctx.RequestServices.GetRequiredService<IAsymmetricIssuer>();
-        var token = issuer.Issue(new TrustClaims
+        var access = issuer.Issue(new TrustClaims
         {
-            Subject = subject,
-            Name = name,
-            Email = email,
-            Roles = roles,
-            Permissions = scopes,
+            Subject = id.Subject,
+            Name = id.Name,
+            Email = id.Email,
+            Roles = id.Roles,
+            Permissions = id.Scopes,
             Extra = new Dictionary<string, IReadOnlyList<string>> { ["client_id"] = new[] { clientId } },
         }, options.AccessTokenLifetime, audience: resource);
 
-        await ctx.Response.WriteAsJsonAsync(new
+        var body = new Dictionary<string, object?>
         {
-            access_token = token,
-            token_type = "Bearer",
-            expires_in = (int)options.AccessTokenLifetime.TotalSeconds,
-            scope = string.Join(' ', scopes),
-        }, cancellationToken: ctx.RequestAborted);
+            ["access_token"] = access,
+            ["token_type"] = "Bearer",
+            ["expires_in"] = (int)options.AccessTokenLifetime.TotalSeconds,
+            ["scope"] = string.Join(' ', id.Scopes),
+        };
+
+        if (options.EnableRefreshTokens)
+        {
+            var rawRefresh = OpaqueToken.New();
+            var refresh = new RefreshToken
+            {
+                Id = OAuthGrants.HashToken(rawRefresh),
+                FamilyId = familyId,
+                ClientId = clientId,
+                Resource = resource,
+                Subject = id.Subject,
+                SubjectName = id.Name,
+                SubjectEmail = id.Email,
+                Roles = id.Roles,
+                GrantedScopes = id.Scopes,
+                GrantId = grantId,
+                ExpiresUtc = now + options.RefreshTokenLifetime,
+            };
+            await refresh.Save(ctx.RequestAborted);
+            body["refresh_token"] = rawRefresh;
+        }
+
+        await ctx.Response.WriteAsJsonAsync(body, cancellationToken: ctx.RequestAborted);
     }
 
     // ---- helpers --------------------------------------------------------------------------------------
