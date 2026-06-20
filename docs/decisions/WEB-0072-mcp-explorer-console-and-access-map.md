@@ -1,6 +1,6 @@
 # WEB-0072 — The MCP Explorer Console + Capability Access Map (the human face of the agent surface)
 
-- **Status:** Proposed — design captured, not yet implemented
+- **Status:** Accepted — implemented (P1–P4) in `Koan.Mcp.Explorer` + the MCP `initialize` handshake in `Koan.Mcp`. One follow-on open: the interactive "play the device" grant exerciser (see §Phased build P3 + §Follow-on).
 - **Date:** 2026-06-20
 - **Deciders:** framework architect
 - **Related:** [ARCH-0092](ARCH-0092-entity-exposure-surfaces.md) (entity exposure / `EntityToolset` / `[McpEntity]`), [SEC-0004](SEC-0004-capability-authorization-gate-constrain-project.md) (gate·constrain·project), [SEC-0005](SEC-0005-governed-agent-access-grants-audit-door.md) (grants·audit·**door**), [SEC-0006](SEC-0006-embedded-oauth-authorization-server.md) (OAuth AS — auth-code+PKCE, device, refresh, dev-token), [WEB-0068](WEB-0068-query-options-predicates.md) (read-path predicates), [WEB-0069](WEB-0069-web-pipeline-contributors.md) (single `UseEndpoints` contributors), [AI-0012](AI-0012-mcp-jsonrpc-runtime.md) (MCP runtime), [AI-0013](AI-0013-mcp-http-sse-deployment.md) (HTTP+SSE). Agent-native cards AN8 (`koan://self`), Wall/Door/Verb.
@@ -109,6 +109,19 @@ Delight here is the gap between what a developer braces for and what they get �
 2. **`map.json` shape** — two distinct routes (recommended: public `/mcp/map.json` + a separately-gated god-view route) **vs** one path with a `?full` flag behind an admin gate (fewer routes, dogfoods the model, but easier to misconfigure into a leak).
 3. **`instructions` wiring timing** — first cut (P1) **vs** fast-follow (P2). Listed in P2 above; promotable to P1 if the app-level face matters early.
 4. **Access map primary audience** — settled toward **operator/dev-first** (runtime console tab + on-demand download), with a CI artifact only on demand; revisit if a governance pipeline becomes the primary consumer.
+
+## Follow-on — the interactive "play the device" grant exerciser
+
+P3 shipped the dev-token quick-mint + a hand-off to a real client. The interactive device-flow exerciser (the
+console *plays the headless device*, you consent in another tab, it polls to a token) was **deliberately deferred**
+after verifying against the real SEC-0006 contract: the device flow needs a **registered `OAuthClient`** + `scope`
++ `resource`, and SEC-0006 DCR (D5) is **loopback-only** — but the console SPA is same-origin, so it cannot
+self-register via the loopback rule. The design hinge (greenlit) is to **auto-register a well-known dev OAuth
+client on boot in Development** (forced-public, a known id), so the console can drive the device flow without a
+manual registration step — mirroring how dev OAuth tooling pre-provisions a client. The exerciser then runs the
+real grant (device → poll on the true interval → consent at `/me/connect` → token), with the AS wired into a
+dedicated Explorer test fixture to integration-test the mechanics. To be specified in a WEB-0072/SEC-0006 addendum
+or its own ADR before building (no guessed OAuth UI — validate against the live AS).
 
 ## References
 
