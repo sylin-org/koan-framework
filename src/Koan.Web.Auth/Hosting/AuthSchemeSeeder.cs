@@ -70,7 +70,7 @@ internal static class AuthSchemeSeeder
                 }
                 else if (type == AuthConstants.Protocols.Oidc)
                 {
-                    var opts = BuildOidcOptions(id, cfg);
+                    var opts = BuildOidcOptions(id, cfg, sp);
                     oidcPost.PostConfigure(id, opts);    // MUST precede TryAdd (see remarks)
                     oidcCache.TryAdd(id, opts);
                     schemes.AddScheme(new AuthenticationScheme(id, cfg.DisplayName ?? id, typeof(OpenIdConnectHandler)));
@@ -119,6 +119,17 @@ internal static class AuthSchemeSeeder
         {
             OnRedirectToAuthorizationEndpoint = ctx =>
             {
+                // Self-hosted dev IdP: its token/userinfo endpoints are relative and reachable only at the app's own
+                // host. Resolve them via the back-channel base from the LIVE request host (forwarded-aware), set once
+                // before the callback's token exchange. Absolute provider endpoints ignore BaseAddress, so this is a
+                // no-op for real providers. (ASPNETCORE_URLS is unreliable in a container — the request is the truth.)
+                var backchannel = ctx.Options.Backchannel;
+                if (backchannel.BaseAddress is null)
+                {
+                    var req = ctx.HttpContext.Request;
+                    try { backchannel.BaseAddress = new Uri($"{req.Scheme}://{req.Host}"); }
+                    catch { /* best effort — absolute endpoints don't need it */ }
+                }
                 var url = ctx.RedirectUri;
                 if (ctx.Properties.Items.TryGetValue("prompt", out var prompt) && !string.IsNullOrWhiteSpace(prompt))
                     url = Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString(url, "prompt", prompt!);
@@ -145,15 +156,21 @@ internal static class AuthSchemeSeeder
         return o;
     }
 
-    private static OpenIdConnectOptions BuildOidcOptions(string id, ProviderOptions cfg)
+    private static OpenIdConnectOptions BuildOidcOptions(string id, ProviderOptions cfg, IServiceProvider sp)
     {
-        var authority = ResolveServerAbsolute(cfg.Authority) ?? cfg.Authority ?? "";
+        // A RELATIVE authority (the self-hosted Test IdP's /.testoauth, served by this same app) is resolved
+        // per-request from the live host via RequestHostOidcConfigurationManager (boot-time ASPNETCORE_URLS is
+        // unreliable, and the discovery doc's browser-facing endpoints must carry the public host). Real providers
+        // ship an absolute authority used directly.
+        var selfHosted = !string.IsNullOrEmpty(cfg.Authority)
+            && !Uri.IsWellFormedUriString(cfg.Authority, UriKind.Absolute);
+        var authority = selfHosted ? "" : (ResolveServerAbsolute(cfg.Authority) ?? cfg.Authority ?? "");
         var o = new OpenIdConnectOptions
         {
             SignInScheme = AuthenticationExtensions.CookieScheme,
             Authority = authority,
             // Allow http metadata only for a non-https (dev/loopback) authority; production https stays validated.
-            RequireHttpsMetadata = authority.StartsWith("https", StringComparison.OrdinalIgnoreCase),
+            RequireHttpsMetadata = !selfHosted && authority.StartsWith("https", StringComparison.OrdinalIgnoreCase),
             ClientId = cfg.ClientId ?? "",
             ClientSecret = cfg.ClientSecret,
             ResponseType = "code",
@@ -171,6 +188,14 @@ internal static class AuthSchemeSeeder
         // real https provider behind a plain-http dev host still gets storable (Lax) cookies.
         o.CorrelationCookie = RequestSchemeAdaptiveCookieBuilder.Wrap(o.CorrelationCookie);
         o.NonceCookie = RequestSchemeAdaptiveCookieBuilder.Wrap(o.NonceCookie);
+        if (selfHosted)
+        {
+            var http = sp.GetService<IHttpContextAccessor>()
+                ?? throw new InvalidOperationException(
+                    "Koan.Web.Auth: a self-hosted OIDC provider (relative authority) requires IHttpContextAccessor; " +
+                    "ensure services.AddHttpContextAccessor() is registered.");
+            o.ConfigurationManager = new RequestHostOidcConfigurationManager(cfg.Authority!, http, o);
+        }
         if (cfg.Scopes is { Length: > 0 })
         {
             o.Scope.Clear();

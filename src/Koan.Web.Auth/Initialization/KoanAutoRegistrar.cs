@@ -34,6 +34,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         SecurityPillarManifest.EnsureRegistered();
         // Ensure auth services are registered once
         services.AddKoanWebAuth();
+        // WEB-0071: a self-hosted OIDC provider (relative authority) resolves its absolute discovery URL from the
+        // live request at challenge time — RequestHostOidcConfigurationManager needs IHttpContextAccessor.
+        services.AddHttpContextAccessor();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Microsoft.AspNetCore.Hosting.IStartupFilter, Hosting.KoanWebAuthStartupFilter>());
         // SEC-0001 §4 / WEB-0069: the zero-config dev identity injects at the AfterAuthentication stage via the
         // supported pipeline-contributor seam on KoanWebStartupFilter — not via startup-filter ordering (dead).

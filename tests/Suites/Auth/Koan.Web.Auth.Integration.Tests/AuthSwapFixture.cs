@@ -19,8 +19,9 @@ namespace Koan.Web.Auth.Integration.Tests;
 /// Boots a REAL Kestrel host on a loopback port (Development) with the full Koan auth fabric + the dev Test
 /// provider (oauth2 <c>test</c> + oidc <c>test-oidc</c>). Real Kestrel (not TestServer) so the maintained
 /// OAuth/OIDC handler's server-side Backchannel — token/userinfo/discovery/JWKS — works over real HTTP, which
-/// is exactly what the engine swap (WEB-0071) delegates to the handler. <c>ASPNETCORE_URLS</c> is set so the
-/// scheme seeder resolves the Test provider's relative endpoints + OIDC Authority to in-network absolute URLs.
+/// is exactly what the engine swap (WEB-0071) delegates to the handler. <c>ASPNETCORE_URLS</c> is deliberately
+/// NOT set (reproducing a container/proxy deployment), so the Test provider's relative endpoints must resolve from
+/// the live request host at challenge time — the Bug-2 regression guard.
 /// </summary>
 public sealed class AuthSwapFixture : IAsyncLifetime
 {
@@ -35,7 +36,10 @@ public sealed class AuthSwapFixture : IAsyncLifetime
     {
         Port = GrabFreePort();
         _priorUrls = Environment.GetEnvironmentVariable("ASPNETCORE_URLS");
-        Environment.SetEnvironmentVariable("ASPNETCORE_URLS", BaseUrl);
+        // Reproduce the real deployment: the server binds (via UseUrls below) but ASPNETCORE_URLS is NOT readable by
+        // the process (a container / Kestrel-config / chiseled image). The self-hosted Test provider endpoints must
+        // therefore resolve from the LIVE request host, not the env var. This is the Bug-2 regression guard.
+        Environment.SetEnvironmentVariable("ASPNETCORE_URLS", null);
 
         _host = Host.CreateDefaultBuilder()
             .ConfigureAppConfiguration(b => b.AddInMemoryCollection(new Dictionary<string, string?>
