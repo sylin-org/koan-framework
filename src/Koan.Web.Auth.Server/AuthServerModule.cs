@@ -35,6 +35,7 @@ public sealed class AuthServerModule : KoanModule
         services.AddKoanOptions<AuthServerOptions>(AuthServerOptions.SectionPath);
         // Map /oauth/* inside Koan's single UseEndpoints block (WEB-0069 seam) — no app ceremony.
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanEndpointContributor, DevTokenEndpoint>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanEndpointContributor, Protocol.OAuthProtocolEndpoints>());
 
         // SEC-0006 D1 — the key lifecycle. The persisted, encrypted-at-rest, rotating ES256 store is the active
         // tier OUTSIDE Development (so tokens survive restart and the JWKS is stable); Development keeps the

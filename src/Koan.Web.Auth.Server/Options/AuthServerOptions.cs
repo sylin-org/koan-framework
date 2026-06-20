@@ -20,6 +20,25 @@ public sealed class AuthServerOptions
     public int DevTokenLifetimeMinutes { get; set; } = 60;
 
     /// <summary>
+    /// SEC-0006 D7 — the app's consent page (it renders the requesting client + scopes + Allow/Deny). The AS
+    /// redirects the browser here with <c>?rid=…</c> after <c>/oauth/authorize</c>. The app owns rendering; the
+    /// framework owns the protocol. Defaults under the app's <c>/me/…</c> namespace.
+    /// </summary>
+    public string ConsentPath { get; set; } = "/me/connect";
+
+    /// <summary>SEC-0006 — the app's terminal "you can close this page now" page (device flow lands here).</summary>
+    public string DonePath { get; set; } = "/me/connect/done";
+
+    /// <summary>SEC-0006 D4 — authorization-code lifetime. Must be short (RFC 6749 §4.1.2 recommends ≤ 10 min; we cap tighter).</summary>
+    public TimeSpan AuthorizationCodeLifetime { get; set; } = TimeSpan.FromSeconds(60);
+
+    /// <summary>SEC-0006 D7 — how long a pending consent request (<c>rid</c>) is valid before it must be restarted.</summary>
+    public TimeSpan ConsentRequestLifetime { get; set; } = TimeSpan.FromMinutes(10);
+
+    /// <summary>SEC-0006 D6 / token — issued access-token lifetime.</summary>
+    public TimeSpan AccessTokenLifetime { get; set; } = TimeSpan.FromMinutes(15);
+
+    /// <summary>
     /// SEC-0006 D1 — how long an active ES256 signing key is used before it is rotated out. On rotation a fresh
     /// key becomes active and the previous key keeps validating (JWKS overlap) until <see cref="KeyOverlap"/>
     /// elapses. Applies only to the persisted key store (non-Development); Development uses an ephemeral key.
