@@ -18,4 +18,13 @@ public sealed class McpExplorerOptions
         get => _enabled ?? !(KoanEnv.IsProduction || KoanEnv.InContainer);
         set => _enabled = value;
     }
+
+    /// <summary>
+    /// The role that unlocks the privileged access-map (god-view) outside Development. Null → the access map is
+    /// Development-only (fail-closed in Production — it is never served to a caller without a configured admin gate).
+    /// </summary>
+    public string? AdminRole { get; set; }
+
+    /// <summary>A scope that unlocks the privileged access-map outside Development (alternative to <see cref="AdminRole"/>).</summary>
+    public string? AdminScope { get; set; }
 }

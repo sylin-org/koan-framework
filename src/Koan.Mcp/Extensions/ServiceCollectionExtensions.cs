@@ -41,6 +41,8 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<EndpointToolExecutor>();
         // WEB-0072: the per-caller surface projection (backs the Explorer console + {baseRoute}/map.json).
         services.TryAddSingleton<Koan.Mcp.Resources.McpSurfaceProjector>();
+        // WEB-0072 D5: the privileged, un-redacted access map (the governance god-view).
+        services.TryAddSingleton<Koan.Mcp.Resources.AccessMapProjector>();
         services.TryAddSingleton<IMcpTransportDispatcher, StreamJsonRpcTransportDispatcher>();
         services.TryAddSingleton<McpServer>();
         services.AddHostedService<StdioTransport>();

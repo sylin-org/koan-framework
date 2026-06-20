@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -42,6 +43,7 @@ internal sealed class McpExplorerEndpointContributor : IKoanEndpointContributor
 
         endpoints.MapGet(baseRoute, ctx => ServeConsole(ctx, baseRoute)).WithName("KoanMcpExplorerConsole").ExcludeFromDescription();
         endpoints.MapGet($"{baseRoute}/map.json", ServeMap).WithName("KoanMcpExplorerMap").ExcludeFromDescription();
+        endpoints.MapGet($"{baseRoute}/access-map.json", ServeAccessMap).WithName("KoanMcpExplorerAccessMap").ExcludeFromDescription();
         endpoints.MapGet($"{baseRoute}/explorer/{{**asset}}", ServeAsset).WithName("KoanMcpExplorerAssets").ExcludeFromDescription();
         endpoints.MapPost($"{baseRoute}/explorer/call", ExecuteTool).WithName("KoanMcpExplorerCall").ExcludeFromDescription();
     }
@@ -96,6 +98,26 @@ internal sealed class McpExplorerEndpointContributor : IKoanEndpointContributor
         context.Response.Headers["Vary"] = "Accept";
         context.Response.ContentType = "application/json; charset=utf-8";
         await context.Response.WriteAsync(surface.ToString(Formatting.None));
+    }
+
+    // GET {baseRoute}/access-map.json — WEB-0072 D5: the PRIVILEGED god-view (every requirement, walls included).
+    // Fail-closed: served in Development, or to a caller holding the configured admin role/scope; otherwise 404
+    // (so the endpoint's very existence is not disclosed to an unprivileged caller).
+    private static async Task ServeAccessMap(HttpContext context)
+    {
+        var env = context.RequestServices.GetRequiredService<IHostEnvironment>();
+        var options = context.RequestServices.GetRequiredService<IOptionsMonitor<McpExplorerOptions>>().CurrentValue;
+        if (!AccessMapGate.Allowed(env.IsDevelopment(), context.User, options))
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+
+        var projector = context.RequestServices.GetRequiredService<AccessMapProjector>();
+        var map = projector.Project();
+        context.Response.Headers["Cache-Control"] = "no-store";
+        context.Response.ContentType = "application/json; charset=utf-8";
+        await context.Response.WriteAsync(map.ToString(Formatting.None));
     }
 
     private static async Task ServeAsset(HttpContext context)

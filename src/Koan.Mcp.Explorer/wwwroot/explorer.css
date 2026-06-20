@@ -86,3 +86,8 @@ textarea { resize: vertical; font-family: ui-monospace, monospace; }
 .kx-result.err { border-color: #7f1d1d; color: #fca5a5; }
 
 .kx-anon { background: rgba(147, 51, 234, 0.08); border: 1px solid var(--border2); border-radius: 0.625rem; padding: 0.75rem 1rem; color: var(--muted); margin-bottom: 1rem; }
+
+.kx-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.kx-table th { text-align: left; color: var(--dim); font-weight: 600; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--border); }
+.kx-table td { padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+.kx-table tr:last-child td { border-bottom: none; }

@@ -16,7 +16,7 @@
 
   fetch(base + "/map.json", { headers: { Accept: "application/json" }, credentials: "same-origin" })
     .then(function (r) { return r.json(); })
-    .then(render)
+    .then(function (surface) { render(surface); loadAccessMap(); })
     .catch(function (err) { app.className = ""; app.textContent = "Failed to load the surface: " + err; });
 
   function render(surface) {
@@ -205,4 +205,59 @@
   }
 
   function pretty(v) { try { return JSON.stringify(v, null, 2); } catch (e) { return String(v); } }
+
+  // WEB-0072 D5: the privileged access map (god-view). Served only to Development / an admin caller — a 404 here
+  // is the fail-closed "not privileged" case, so omit the section silently.
+  function loadAccessMap() {
+    fetch(base + "/access-map.json", { headers: { Accept: "application/json" }, credentials: "same-origin" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (map) { if (map) renderAccessMap(map); })
+      .catch(function () { /* not privileged — silently omit */ });
+  }
+
+  function renderAccessMap(map) {
+    app.appendChild(el("div", "kx-section-title", "Capability access map (governance)"));
+    var card = el("div", "kx-card");
+
+    var dl = el("button", "kx-btn ghost", "Download JSON");
+    dl.style.marginBottom = "0.75rem";
+    dl.addEventListener("click", function () { downloadJson("access-map.json", map); });
+    card.appendChild(dl);
+
+    var table = el("table", "kx-table");
+    var head = el("tr");
+    ["Capability", "read", "write", "remove"].forEach(function (h) { head.appendChild(el("th", null, h)); });
+    table.appendChild(head);
+
+    (map.entities || []).forEach(function (e) {
+      var tr = el("tr");
+      tr.appendChild(el("td", "kx-tool-name", e.name));
+      var a = e.access || {};
+      ["read", "write", "remove"].forEach(function (k) { tr.appendChild(el("td", null, a[k] || "—")); });
+      table.appendChild(tr);
+    });
+    (map.customTools || []).forEach(function (t) {
+      var tr = el("tr");
+      tr.appendChild(el("td", "kx-tool-name", t.name));
+      var td = el("td", null, t.requirement || "—");
+      td.colSpan = 3;
+      tr.appendChild(td);
+      table.appendChild(tr);
+    });
+
+    card.appendChild(table);
+    app.appendChild(card);
+  }
+
+  function downloadJson(name, obj) {
+    var blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
 })();
