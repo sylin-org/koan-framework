@@ -31,8 +31,9 @@ content under `models/` (the `.csproj` copies it from `assets/models/all-MiniLM-
 dotnet run
 ```
 
-On first run it seeds five produce listings. For each, `Seed.cs` embeds the description **in-process** with the
-local ONNX model via the AI facade (`Client.Embed`) and writes the vector to sqlite-vec (`Vector<Produce>.Save`). Then:
+On first run it seeds five produce listings with a plain `item.Save()`. `[Embedding]` on `Produce` makes that
+single call embed the listing **in-process** with the local ONNX model and store the vector in sqlite-vec —
+no explicit embed call in `Seed.cs`. Then:
 
 ```bash
 # REST (auto from EntityController<Produce>)
@@ -66,13 +67,13 @@ spike, not a guarantee. Self-contained single-file is the honest single-binary d
 
 ## Notes
 
-- The embed→store flow uses the **AI facade** (`Client.Embed` → `Vector<Produce>.Save`): the in-process ONNX
-  connector publishes itself as an AI *source* (provider `onnx`, the embedded all-MiniLM model as its default),
-  so it's a first-class citizen of the same source/router pipeline that drives Ollama — `Client.Embed` and the
-  `[Embedding]` worker route to it with no provider name in app code. The adapter mirrors the Ollama shape:
-  provider-level identity, model is a usage-time concern (here, the one model bundled in the exe).
-- The fully-declarative `[Embedding(Async = true)]` auto-flow (no explicit `Client.Embed` call at all) routes
-  through a worker whose generic `EmbeddingState<T>` tracker still needs a relational-safe storage name — once
-  that lands, `Seed.cs`'s explicit embed call collapses into a plain `item.Save()`.
+- **Seeding is a plain `item.Save()`.** `[Embedding(Template = "{Name}. {Description}")]` on `Produce` wires the
+  embed→store loop onto Save: the framework embeds the listing via the in-process ONNX *source* and stores the
+  vector in sqlite-vec, with no provider named in app code. The ONNX connector publishes itself as an AI source
+  (provider `onnx`, the embedded all-MiniLM model as its default), so it's a first-class citizen of the same
+  source/router pipeline that drives Ollama — the adapter mirrors the Ollama shape (provider-level identity,
+  model is a usage-time concern, here the one model bundled in the exe).
+- **Search** embeds the *query* at request time via the facade (`Client.Embed`) and matches it in sqlite-vec —
+  see `ProduceSearchController`.
 - Nothing here references a provider by name except the deliberate `[VectorAdapter("sqlitevec")]` routing hint;
   remove it and the in-memory vector floor (`Koan.Data.Vector.Connector.InMemory`) would serve instead.

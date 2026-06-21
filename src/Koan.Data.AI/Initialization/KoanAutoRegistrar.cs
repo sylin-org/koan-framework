@@ -488,7 +488,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         var provenance = VectorProvenance.Build(
             metadata.Model, metadata.Source, metadata.Version,
             merge: VectorFilterableMetadata.Extract(entity));
-        await Koan.Data.Vector.VectorData<TEntity>.SaveWithVector(entity, embedding, provenance, ct);
+        // Vector-only: this runs inside the entity's AfterUpsert hook, so the row is already persisted.
+        // SaveWithVector would re-Save the entity, re-firing AfterUpsert -> infinite recursion (stack overflow).
+        await Koan.Data.Vector.VectorData<TEntity>.Save(entity, embedding, provenance, ct);
     }
 
     /// <summary>

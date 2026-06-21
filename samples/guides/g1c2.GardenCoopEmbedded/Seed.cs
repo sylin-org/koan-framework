@@ -1,13 +1,11 @@
-using Koan.AI;
 using Koan.Data.Core;
-using Koan.Data.Vector;
 
 namespace GardenCoopEmbedded;
 
 /// <summary>
-/// Seeds a handful of produce listings on first run. For each, the description is embedded in-process by the
-/// local ONNX model (<see cref="Client.Embed(string, System.Threading.CancellationToken)"/>) and the vector is
-/// written to the durable sqlite-vec store — the whole embed→store loop runs inside this one process.
+/// Seeds a handful of produce listings on first run. <c>[Embedding]</c> on <see cref="Produce"/> turns a plain
+/// <c>Save()</c> into the whole embed→store loop: the listing is embedded in-process by the local ONNX model and
+/// the vector is written to the durable sqlite-vec store automatically — no explicit embed or vector call here.
 /// </summary>
 internal static class Seed
 {
@@ -26,10 +24,6 @@ internal static class Seed
         };
 
         foreach (var item in items)
-        {
-            await item.Save();                                                   // row -> SQLite
-            var vector = await Client.Embed($"{item.Name}. {item.Description}"); // text -> vector (local ONNX, via the AI facade)
-            await Vector<Produce>.Save(item, vector);                            // vector -> sqlite-vec
-        }
+            await item.Save(); // [Embedding] hook embeds (local ONNX) + stores the vector (sqlite-vec) on Save
     }
 }

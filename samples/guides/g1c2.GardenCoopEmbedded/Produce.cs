@@ -1,3 +1,4 @@
+using Koan.Data.AI.Attributes;
 using Koan.Data.Core.Model;
 using Koan.Data.Vector.Abstractions;
 using Koan.Web.Controllers;
@@ -7,10 +8,12 @@ namespace GardenCoopEmbedded;
 
 /// <summary>
 /// A produce listing in the co-op. One entity = one table row + one REST resource + one vector in the
-/// in-process store. <c>[VectorAdapter("sqlitevec")]</c> routes its vectors to the durable, file-backed
-/// sqlite-vec store; the embedding itself is produced in-process by the local ONNX model. Nothing here
-/// names a server — the embedded stack is selected purely by which packages this project references.
+/// in-process store. <c>[Embedding]</c> makes <c>Save()</c> embed the listing in-process (local ONNX) and store
+/// the vector automatically — no explicit embed call. <c>[VectorAdapter("sqlitevec")]</c> routes those vectors
+/// to the durable, file-backed sqlite-vec store. Nothing here names a server — the embedded stack is selected
+/// purely by which packages this project references.
 /// </summary>
+[Embedding(Template = "{Name}. {Description}", Model = "all-MiniLM-L6-v2")]
 [VectorAdapter("sqlitevec")]
 public sealed class Produce : Entity<Produce>
 {

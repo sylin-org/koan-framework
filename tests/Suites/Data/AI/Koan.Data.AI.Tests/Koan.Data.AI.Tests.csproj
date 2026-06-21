@@ -33,6 +33,7 @@
     <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Vector\Koan.Data.Vector.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.AI\Koan.AI.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Connectors\Data\InMemory\Koan.Data.Connector.InMemory.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Connectors\Data\Vector\InMemory\Koan.Data.Vector.Connector.InMemory.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Testing.Hosting\Koan.Testing.Hosting.csproj" />
   </ItemGroup>
 </Project>
