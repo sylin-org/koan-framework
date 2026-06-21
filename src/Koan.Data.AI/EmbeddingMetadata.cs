@@ -205,22 +205,25 @@ public class EmbeddingMetadata
         return string.Join("\n\n", parts);
     }
 
+    // FullJson policy embeds the entity's JSON form. Serialize with Newtonsoft — the framework's canonical
+    // serializer — so this matches the entity's persisted (Id, Json) shape AND survives NativeAOT, where
+    // System.Text.Json's reflection serializer is disabled. (The low-level System.Text.Json DOM used by
+    // TruncateJsonDepth below is fine under AOT — it is JsonSerializer, the reflection serializer, that is off.)
     private string SerializeToJson(object entity)
     {
-        var options = new JsonSerializerOptions
+        var settings = new Newtonsoft.Json.JsonSerializerSettings
         {
-            WriteIndented = false,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-            MaxDepth = 64,
-            ReferenceHandler = ReferenceHandler.IgnoreCycles
+            Formatting = Newtonsoft.Json.Formatting.None,
+            NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore,
+            ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore,
         };
 
         if (Exclude != null && Exclude.Length > 0)
         {
-            options.TypeInfoResolver = new ExclusionTypeInfoResolver(Exclude);
+            settings.ContractResolver = new ExclusionContractResolver(Exclude);
         }
 
-        var json = JsonSerializer.Serialize(entity, entity.GetType(), options);
+        var json = Newtonsoft.Json.JsonConvert.SerializeObject(entity, settings);
 
         if (MaxDepth > 0)
         {
@@ -274,32 +277,26 @@ public class EmbeddingMetadata
         }
     }
 
-    private class ExclusionTypeInfoResolver : System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver
+    // Drops [Embedding(Exclude=...)] properties at the contract level — the Newtonsoft equivalent of the former
+    // System.Text.Json TypeInfoResolver. Matched on the CLR member name (what the attribute specifies).
+    private sealed class ExclusionContractResolver : Newtonsoft.Json.Serialization.DefaultContractResolver
     {
-        private readonly HashSet<string> _excludedProperties;
+        private readonly HashSet<string> _excluded;
 
-        public ExclusionTypeInfoResolver(string[] excludedProperties)
+        public ExclusionContractResolver(string[] excluded)
         {
-            _excludedProperties = new HashSet<string>(excludedProperties, StringComparer.OrdinalIgnoreCase);
+            _excluded = new HashSet<string>(excluded, StringComparer.OrdinalIgnoreCase);
         }
 
-        public override System.Text.Json.Serialization.Metadata.JsonTypeInfo GetTypeInfo(Type type, JsonSerializerOptions options)
+        protected override Newtonsoft.Json.Serialization.JsonProperty CreateProperty(
+            MemberInfo member, Newtonsoft.Json.MemberSerialization memberSerialization)
         {
-            var typeInfo = base.GetTypeInfo(type, options);
-
-            if (typeInfo.Kind == System.Text.Json.Serialization.Metadata.JsonTypeInfoKind.Object)
+            var property = base.CreateProperty(member, memberSerialization);
+            if (_excluded.Contains(member.Name))
             {
-                var propsToRemove = typeInfo.Properties
-                    .Where(p => _excludedProperties.Contains(p.Name))
-                    .ToList();
-
-                foreach (var prop in propsToRemove)
-                {
-                    typeInfo.Properties.Remove(prop);
-                }
+                property.ShouldSerialize = _ => false;
             }
-
-            return typeInfo;
+            return property;
         }
     }
 

@@ -29,6 +29,9 @@
          free-rode on Microsoft.AspNetCore.App leaked transitively through Koan.Core's OTel packages;
          declared explicitly now that OTel moved to Koan.Observability (ARCH-0088). -->
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="10.0.8" />
+    <!-- Canonical serializer for the FullJson embedding text + migrator export (System.Text.Json's reflection
+         serializer is disabled under NativeAOT). Used directly; declared explicitly rather than via transitive. -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
 
 </Project>

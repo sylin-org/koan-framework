@@ -178,11 +178,8 @@ public static class EmbeddingMigrator
 
         logger?.LogInformation("Loaded {Count} embedding states", statesList.Count);
 
-        // Export to JSON
-        var json = System.Text.Json.JsonSerializer.Serialize(statesList, new System.Text.Json.JsonSerializerOptions
-        {
-            WriteIndented = true
-        });
+        // Export to JSON via Newtonsoft (framework canon; System.Text.Json's reflection serializer is AOT-disabled)
+        var json = Newtonsoft.Json.JsonConvert.SerializeObject(statesList, Newtonsoft.Json.Formatting.Indented);
 
         await File.WriteAllTextAsync(outputPath, json, ct);
 

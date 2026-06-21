@@ -236,6 +236,28 @@ public sealed class EmbeddingEdgeCasesSpec
     }
 
     /// <summary>
+    /// Test: FullJson exclusion drops the property at the contract level (Newtonsoft ExclusionContractResolver).
+    /// </summary>
+    [Fact]
+    public void FullJson_exclude_removes_property_via_contract_resolver()
+    {
+        var metadata = EmbeddingMetadata.Resolve<FullJsonExclusionEntity>();
+
+        var entity = new FullJsonExclusionEntity
+        {
+            PublicData = "Should be included",
+            SecretData = "Should be excluded"
+        };
+
+        var embeddingText = metadata.BuildEmbeddingText(entity);
+
+        embeddingText.Should().StartWith("{", "FullJson policy serializes the entity as JSON");
+        embeddingText.Should().Contain("PublicData").And.Contain("Should be included");
+        embeddingText.Should().NotContain("SecretData", "the excluded property must be dropped from the JSON");
+        embeddingText.Should().NotContain("Should be excluded");
+    }
+
+    /// <summary>
     /// Test: Empty template produces empty string.
     /// </summary>
     [Fact]
@@ -385,6 +407,13 @@ public sealed class EmbeddingEdgeCasesSpec
 
     [Embedding(Policy = EmbeddingPolicy.AllStrings, Exclude = new[] { "SecretData" })]
     public class ExclusionEntity : Entity<ExclusionEntity>
+    {
+        public string PublicData { get; set; } = "";
+        public string SecretData { get; set; } = "";
+    }
+
+    [Embedding(Policy = EmbeddingPolicy.FullJson, Exclude = new[] { "SecretData" })]
+    public class FullJsonExclusionEntity : Entity<FullJsonExclusionEntity>
     {
         public string PublicData { get; set; } = "";
         public string SecretData { get; set; } = "";
