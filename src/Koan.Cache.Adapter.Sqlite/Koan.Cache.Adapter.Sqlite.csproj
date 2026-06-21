@@ -13,6 +13,9 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.8" />
+    <!-- Transitive-override for NU1903 (GHSA-2m69-gcr7-jv3q): pin the native SQLite binary to the
+         patched 3.50.3; Microsoft.Data.Sqlite's managed SQLitePCLRaw.core stays 2.1.11. -->
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.50.3" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.8" />
   </ItemGroup>
