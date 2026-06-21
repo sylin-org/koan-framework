@@ -32,9 +32,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- The embedding model travels with the app: fully offline, no model server. -->
-    <Content Include="..\..\..\assets\models\all-MiniLM-L6-v2\model_quantized.onnx" Link="models\model_quantized.onnx" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="..\..\..\assets\models\all-MiniLM-L6-v2\vocab.txt" Link="models\vocab.txt" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The embedding model travels with the app: fully offline, no model server. CopyToPublishDirectory
+         keeps it beside the published (incl. single-file) exe — a single self-contained folder. -->
+    <Content Include="..\..\..\assets\models\all-MiniLM-L6-v2\model_quantized.onnx" Link="models\model_quantized.onnx" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\..\assets\models\all-MiniLM-L6-v2\vocab.txt" Link="models\vocab.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
