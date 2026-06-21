@@ -109,7 +109,18 @@ public static class AppBootstrapper
             }
         }
 
-        // Also load any Koan.*.dll assemblies from base directory
+        // Reference=Intent modules (X-aot-substrate). A connector referenced via <ProjectReference> but never
+        // symbol-used is omitted from the compiled metadata (so the reference fixpoint above can't see it), and
+        // under a single-file publish it leaves no loose Koan.*.dll on disk to scan. The build embeds the Koan
+        // module list (the same @(ReferencePath) Koan-filter that drives the composition lockfile) as the
+        // "koan.modules.manifest" resource in the app assembly — which DOES survive single-file bundling, unlike
+        // the loose DLLs and the .deps.json (DependencyContext.Default is null under single-file). Load each.
+        // Assembly.Load is a no-op for already-loaded assemblies, so this is safe to run unconditionally.
+        lenientAssemblySkips += LoadIntentModulesFromManifest(AddAsm);
+
+        // Loose Koan.*.dll fallback: a directory deployment that drops a module assembly NOT in the embedded
+        // manifest (e.g. a side-loaded plugin, or a consumer that doesn't import the Koan build targets) is
+        // still discovered. No-op under single-file (no loose DLLs).
         try
         {
             var baseDir = AppContext.BaseDirectory;
@@ -182,6 +193,42 @@ public static class AppBootstrapper
         _registrySummary = registrySummary;
 
         KoanStartupTimeline.Mark(KoanStartupStage.DataReady);
+    }
+
+    /// <summary>The build-embedded module manifest resource (one <c>Koan.*</c> assembly name per line). Emitted
+    /// by <c>build/Sylin.Koan.Core.targets</c> from the same <c>@(ReferencePath)</c> Koan-filter as the
+    /// composition lockfile, into the app assembly — so it survives single-file bundling.</summary>
+    internal const string ModuleManifestResourceName = "koan.modules.manifest";
+
+    /// <summary>
+    /// Loads every <c>Koan.*</c> assembly named in the entry assembly's embedded <see cref="ModuleManifestResourceName"/>
+    /// — the build-time intent manifest that survives single-file bundling (unlike loose DLLs, whose directory is
+    /// empty, and the .deps.json, whose <c>DependencyContext.Default</c> is null when bundled). Reference=Intent
+    /// connectors are listed here even when no symbol uses them. <see cref="Assembly.Load(AssemblyName)"/> is a
+    /// no-op for already-loaded assemblies, so this runs unconditionally. Returns the count of lenient skips.
+    /// </summary>
+    // internal + injectable source so EmbeddedModuleManifestSpec can exercise the read/parse/load path against a
+    // test assembly carrying a planted manifest (InternalsVisibleTo: Koan.Tests.Integration.Bootstrap).
+    internal static int LoadIntentModulesFromManifest(Func<Assembly, bool, bool> addAsm, Assembly? source = null)
+    {
+        var skips = 0;
+        try
+        {
+            var entry = source ?? Assembly.GetEntryAssembly();
+            using var stream = entry?.GetManifestResourceStream(ModuleManifestResourceName);
+            if (stream is null) return 0; // consumer didn't import the Koan build targets — other prongs run
+            using var reader = new StreamReader(stream);
+            string? line;
+            while ((line = reader.ReadLine()) is not null)
+            {
+                var name = line.Trim();
+                if (name.Length == 0 || !name.StartsWith("Koan.", StringComparison.Ordinal)) continue;
+                try { addAsm(Assembly.Load(new AssemblyName(name)), /* isDiscovery: */ true); }
+                catch { skips++; /* TIER A: a named-but-unloadable module is counted, not fatal */ }
+            }
+        }
+        catch { skips++; /* manifest unreadable — fall back to the other prongs */ }
+        return skips;
     }
 
     // internal (not private) so AssemblySummaryVerboseGateSpec can pin the KOAN_VERBOSE_ASSEMBLIES gate

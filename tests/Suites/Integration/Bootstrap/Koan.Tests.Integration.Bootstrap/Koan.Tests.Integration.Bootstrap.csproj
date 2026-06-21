@@ -9,6 +9,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Planted manifest for EmbeddedModuleManifestSpec — exercises AppBootstrapper's manifest read/parse/load. -->
+    <EmbeddedResource Include="TestData\koan.modules.manifest" LogicalName="koan.modules.manifest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="AwesomeAssertions" Version="9.4.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.6.0" />
     <PackageReference Include="xunit.v3" Version="3.2.2" />

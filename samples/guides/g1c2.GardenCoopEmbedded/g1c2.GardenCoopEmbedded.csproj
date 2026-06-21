@@ -32,6 +32,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Plain SDK (not Web): appsettings.json isn't auto-included, so ship it with the (single-file) exe. -->
+    <Content Include="appsettings.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <!-- The embedding model travels with the app: fully offline, no model server. CopyToPublishDirectory
          keeps it beside the published (incl. single-file) exe — a single self-contained folder. -->
     <Content Include="..\..\..\assets\models\all-MiniLM-L6-v2\model_quantized.onnx" Link="models\model_quantized.onnx" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
@@ -42,4 +44,8 @@
     <!-- Seeds the trim roots for the NativeAOT stretch publish (see README). -->
     <TrimmerRootDescriptor Include="NativeAotRoots.xml" />
   </ItemGroup>
+
+  <!-- In-repo (ProjectReference) builds don't auto-import the package build targets; import explicitly so the
+       composition lockfile AND the embedded boot module manifest (single-file discovery) are emitted. -->
+  <Import Project="..\..\..\src\Koan.Core\build\Sylin.Koan.Core.targets" />
 </Project>

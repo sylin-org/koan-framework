@@ -46,14 +46,22 @@ curl "http://localhost:5099/api/produce/search?q=ripe%20red%20tomato"
 
 ## One `.exe`, no container
 
-Self-contained single-file publish bundles the runtime, the native `vec0` + ONNX binaries, and the model into
-one executable:
+Self-contained single-file publish bundles the runtime, the native `vec0` + ONNX binaries, and the model
+beside one executable:
 
 ```bash
 dotnet publish -c Release -r win-x64 \
   -p:PublishSingleFile=true --self-contained true
-# -> bin/Release/net10.0/win-x64/publish/GardenCoopEmbedded.exe  (runs offline, no install)
+# -> bin/Release/net10.0/win-x64/publish/  (GardenCoopEmbedded.exe + models/ + native libs)
+./bin/Release/net10.0/win-x64/publish/GardenCoopEmbedded.exe   # runs offline, no install, no container
 ```
+
+The published binary **runs the full embedded stack** — boot discovers all in-process connectors, embeds via
+the bundled ONNX model, and serves semantic search. This works because the Koan build embeds a
+**module manifest** (`koan.modules.manifest`) in the app assembly listing its `Koan.*` references: a
+Reference=Intent connector is referenced via `<ProjectReference>` but never symbol-used, so the compiler drops
+it from the app's metadata and a single-file bundle leaves no loose `Koan.*.dll` to scan — the embedded manifest
+is the one intent record that survives bundling, so boot loads each module by name (X-aot-substrate).
 
 Swap `-r linux-x64` / `-r linux-arm64` for the edge/appliance targets — the vec0 native ships for all three
 floor RIDs (embedded in the connector and self-extracted at load).
