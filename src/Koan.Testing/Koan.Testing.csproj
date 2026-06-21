@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    P2.1: the consumer conformance kit (Sylin.Koan.Testing). A consumer references this one package
+    and writes `class MyEntityConformance : EntityConformanceSpecs<MyEntity>` — trait-gated batteries
+    (round-trip, pushdown-vs-oracle, paging, partition isolation, caching, embedding) arrive by
+    inheritance. Built on the xUnit-free reflective host (Sylin.Koan.Testing.Hosting); the oracle is
+    the shipped InMemoryFilterEvaluator (Koan.Data.Abstractions), reused — not duplicated. Engine-
+    specific Testcontainers fixtures ship separately (Sylin.Koan.Testing.Containers) so the kit stays
+    lean; container-backed entities self-skip when their store is unreachable.
+  -->
+  <PropertyGroup>
+    <KoanPackageKind>Periphery</KoanPackageKind>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>true</IsPackable>
+    <Description>Koan conformance kit — your app inherits a test suite. Subclass EntityConformanceSpecs&lt;T&gt; (one method per entity); trait-gated batteries run round-trip, pushdown-vs-reference-oracle, paging, partition isolation, caching and embedding conformance automatically.</Description>
+    <PackageTags>$(CommonPackageTags);testing;conformance;integration-testing;xunit</PackageTags>
+    <!-- ARCH-0091: xUnit1051 (thread TestContext cancellation) is advisory; re-add (src/ doesn't inherit tests/). -->
+    <NoWarn>$(NoWarn);xUnit1051</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit.v3.extensibility.core" Version="3.2.2" />
+    <PackageReference Include="xunit.v3.assert" Version="3.2.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Testing.Hosting\Koan.Testing.Hosting.csproj" />
+    <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <ProjectReference Include="..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

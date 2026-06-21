@@ -161,7 +161,12 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         }
 
         // Get the static Events property
-        var eventsProperty = entityBaseType.GetProperty("Events", BindingFlags.Static | BindingFlags.Public);
+        // FlattenHierarchy: the static Events property is declared on Entity<T, TKey> (2-arg). When an
+        // entity derives from the 1-arg Entity<T> (the common shape), FindEntityBaseType returns that
+        // 1-arg base, and inherited STATIC members are only visible to reflection with FlattenHierarchy —
+        // without it, every Entity<T>-derived [Embedding]/[MediaAnalysis] entity (e.g. S5.Recs Media)
+        // throws "does not have a static Events property" at boot.
+        var eventsProperty = entityBaseType.GetProperty("Events", BindingFlags.Static | BindingFlags.Public | BindingFlags.FlattenHierarchy);
         if (eventsProperty == null)
         {
             throw new InvalidOperationException(
@@ -229,7 +234,12 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 $"Media analysis currently only supports string keys.");
         }
 
-        var eventsProperty = entityBaseType.GetProperty("Events", BindingFlags.Static | BindingFlags.Public);
+        // FlattenHierarchy: the static Events property is declared on Entity<T, TKey> (2-arg). When an
+        // entity derives from the 1-arg Entity<T> (the common shape), FindEntityBaseType returns that
+        // 1-arg base, and inherited STATIC members are only visible to reflection with FlattenHierarchy —
+        // without it, every Entity<T>-derived [Embedding]/[MediaAnalysis] entity (e.g. S5.Recs Media)
+        // throws "does not have a static Events property" at boot.
+        var eventsProperty = entityBaseType.GetProperty("Events", BindingFlags.Static | BindingFlags.Public | BindingFlags.FlattenHierarchy);
         if (eventsProperty == null)
         {
             throw new InvalidOperationException(

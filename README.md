@@ -159,6 +159,10 @@ compiled into your assemblies: deterministic, ordered, AOT-friendly.
 - **Composition you can diff** — every build writes a checked-in
   [`koan.lock.json`](docs/guides/composition-lockfile.md) describing the app's modules and elections,
   so PR review *sees* composition drift in a plain `git diff` and the boot report self-checks it.
+- **Your app inherits a test suite** — reference
+  [`Sylin.Koan.Testing`](docs/guides/testing-your-app.md) and write one method per entity;
+  `EntityConformanceSpecs<T>` runs round-trip, pushdown-vs-reference-oracle, paging, partition, cache
+  and embedding batteries — gated automatically on what the entity declares.
 
 ## Learn it
 

@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    ARCH-0091 + P2.1: the xUnit v3 container-fixture library. Thin IAsyncLifetime fixtures over the
+    official Testcontainers 4.x module builders, shared per engine assembly via
+    [assembly: AssemblyFixture(...)]. KoanDataSpec boots the ARCH-0079 reflective host + leases an
+    isolation partition per engine. Promoted to src/ and shipped (Sylin.Koan.Testing.Containers) so the
+    conformance kit's container-gated batteries (and consumers) reuse the same real fixtures.
+  -->
+  <PropertyGroup>
+    <KoanPackageKind>Periphery</KoanPackageKind>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>true</IsPackable>
+    <Description>Koan test harness — xUnit v3 Testcontainers fixtures (KoanContainerFixture / KoanDataSpec) for engine-backed integration tests.</Description>
+    <PackageTags>$(CommonPackageTags);testing;integration-testing;testcontainers;xunit</PackageTags>
+    <!-- ARCH-0091: xUnit1051 (thread TestContext cancellation token) is advisory; was suppressed
+         tree-wide by tests/Directory.Build.props, which src/ does not inherit — re-add it here. -->
+    <NoWarn>$(NoWarn);xUnit1051</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit.v3.extensibility.core" Version="3.2.2" />
+    <PackageReference Include="xunit.v3.assert" Version="3.2.2" />
+    <!-- Engine modules are added here as each engine is rolled out (ARCH-0091 staged rollout). -->
+    <PackageReference Include="Testcontainers.PostgreSql" Version="4.11.0" />
+    <PackageReference Include="Testcontainers.MongoDb" Version="4.11.0" />
+    <PackageReference Include="Testcontainers.Redis" Version="4.11.0" />
+    <PackageReference Include="Testcontainers.MsSql" Version="4.11.0" />
+    <PackageReference Include="Testcontainers.Couchbase" Version="4.11.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Testing.Hosting\Koan.Testing.Hosting.csproj" />
+    <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
+  </ItemGroup>
+</Project>

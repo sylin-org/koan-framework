@@ -24,8 +24,8 @@
 
   <ItemGroup>
     <!-- ARCH-0091 harness: the xUnit v3 container fixtures + KoanDataSpec base, and the xUnit-free host. -->
-    <ProjectReference Include="..\..\..\..\Shared\Koan.Testing.Containers\Koan.Testing.Containers.csproj" />
-    <ProjectReference Include="..\..\..\..\Shared\Koan.Testing.Hosting\Koan.Testing.Hosting.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Testing.Containers\Koan.Testing.Containers.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Testing.Hosting\Koan.Testing.Hosting.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />

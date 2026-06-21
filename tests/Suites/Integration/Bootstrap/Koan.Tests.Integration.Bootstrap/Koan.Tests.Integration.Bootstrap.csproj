@@ -21,8 +21,8 @@
   <ItemGroup>
     <!-- ARCH-0091: KoanIntegrationHost (xUnit-free host) + the v3 RedisFixture (CachePillarBootstrapSpec).
          The bespoke Koan.Testing reference is dropped; its transitive graph is restored per-need. -->
-    <ProjectReference Include="..\..\..\..\Shared\Koan.Testing.Hosting\Koan.Testing.Hosting.csproj" />
-    <ProjectReference Include="..\..\..\..\Shared\Koan.Testing.Containers\Koan.Testing.Containers.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Testing.Hosting\Koan.Testing.Hosting.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Testing.Containers\Koan.Testing.Containers.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Core\Koan.Core.csproj" />
 
     <!-- Cache pillar (CachePillarBootstrapSpec) -->

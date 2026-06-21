@@ -46,3 +46,8 @@ ignore-nulls, Newtonsoft) and next steps. Decide template packaging (template pa
 templates/), wire into packaging + release. The template IS the onboarding fix — design choices
 here ripple, hence frontier.
 ```
+
+> **P2.1 follow-on (2026-06-20):** the conformance kit `Sylin.Koan.Testing` shipped
+> ([testing-your-app.md](../../../guides/testing-your-app.md)). A future template iteration should add
+> a paired test project with a one-line `EntityConformanceSpecs<TEntity>` stub so a generated app boots
+> *with* an inherited test suite. Not done here (template scope), recorded for the next templates pass.
