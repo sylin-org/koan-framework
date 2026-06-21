@@ -21,6 +21,10 @@
     <!-- obj/ root (BaseIntermediateOutputPath is set in SDK props, available at this import; content is
          config-independent so the shared path is safe with WriteOnlyWhenDifferent). -->
     <_KoanModuleManifestFile>$(BaseIntermediateOutputPath)koan.modules.manifest</_KoanModuleManifestFile>
+    <_KoanTrimRootsFile>$(BaseIntermediateOutputPath)koan.trimroots.xml</_KoanTrimRootsFile>
+    <!-- The trim-root descriptor is only meaningful for a trimming/NativeAOT publish; emitting it for plain
+         builds would be inert noise. PublishAot is set in the app csproj before this import, so it's visible here. -->
+    <_KoanTrimRootsEnabled Condition="'$(_KoanCompositionEnabled)' == 'true' and ('$(PublishAot)' == 'true' or '$(PublishTrimmed)' == 'true')">true</_KoanTrimRootsEnabled>
   </PropertyGroup>
 
   <!-- Declared statically so the resource is in @(EmbeddedResource) from evaluation (a target adding it later
@@ -28,6 +32,12 @@
        CoreCompile; with LogicalName set, nothing reads the file until Csc embeds it. -->
   <ItemGroup Condition="'$(_KoanCompositionEnabled)' == 'true'">
     <EmbeddedResource Include="$(_KoanModuleManifestFile)" LogicalName="koan.modules.manifest" Visible="false" />
+  </ItemGroup>
+
+  <!-- AOT/trim discovery roots. The file is produced by KoanWriteTrimRoots before CoreCompile (well before ILC
+       reads the descriptor at publish); declaring the item here is harmless if the file is absent until then. -->
+  <ItemGroup Condition="'$(_KoanTrimRootsEnabled)' == 'true'">
+    <TrimmerRootDescriptor Include="$(_KoanTrimRootsFile)" />
   </ItemGroup>
 
   <UsingTask TaskName="WriteKoanLockfile"
@@ -139,6 +149,37 @@
                       WriteOnlyWhenDifferent="true" />
     <ItemGroup>
       <FileWrites Include="$(_KoanModuleManifestFile)" />
+    </ItemGroup>
+  </Target>
+
+  <!--
+    X-aot-substrate · Trim/AOT discovery roots (NativeAOT leg). Trimming and ILC start reachability at the entry
+    point; a Reference=Intent connector is never symbol-reachable, so ILC trims the whole assembly and its
+    source-generated [ModuleInitializer] self-registration never runs — boot discovers no adapters. Even an
+    assembly kept by a static reference loses members it only constructs reflectively: the registrar is reached
+    via Activator.CreateInstance(Type), whose parameterless .ctor ILC drops (MissingMethodException at boot).
+    Both are cured by rooting each Koan module with preserve="all": the same @(ReferencePath) Koan-filter that
+    drives the lockfile and manifest, written as an ILLink descriptor that ILC honors. Whole-assembly preservation
+    is deliberate — Koan's discovery is reflection-deep (Activator.CreateInstance on registrars, GetTypes() scans),
+    so member-level trimming would silently strip what reflection needs. Only emitted for trimming/AOT publishes.
+  -->
+  <Target Name="KoanWriteTrimRoots"
+          BeforeTargets="PrepareResources;CoreCompile"
+          DependsOnTargets="ResolveAssemblyReferences"
+          Condition="'$(_KoanTrimRootsEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true'">
+    <ItemGroup>
+      <_KoanTrimRootModule Include="@(ReferencePath)"
+                           Condition="$([System.String]::Copy('%(Filename)').StartsWith('Koan.'))" />
+      <_KoanTrimRootLine Include="&lt;linker&gt;" />
+      <_KoanTrimRootLine Include="@(_KoanTrimRootModule->'  &lt;assembly fullname=&quot;%(Filename)&quot; preserve=&quot;all&quot; /&gt;')" />
+      <_KoanTrimRootLine Include="&lt;/linker&gt;" />
+    </ItemGroup>
+    <WriteLinesToFile File="$(_KoanTrimRootsFile)"
+                      Lines="@(_KoanTrimRootLine)"
+                      Overwrite="true"
+                      WriteOnlyWhenDifferent="true" />
+    <ItemGroup>
+      <FileWrites Include="$(_KoanTrimRootsFile)" />
     </ItemGroup>
   </Target>
 </Project>

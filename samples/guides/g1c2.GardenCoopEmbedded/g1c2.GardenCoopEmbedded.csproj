@@ -40,6 +40,15 @@
     <Content Include="..\..\..\assets\models\all-MiniLM-L6-v2\vocab.txt" Link="models\vocab.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <!-- NativeAOT is an explicit "sovereign binary" publish, opted into with -p:KoanAot=true. Setting PublishAot
+       HERE (locally, not as a global -p: property) is deliberate: a global PublishAot flows to the netstandard2.0
+       Roslyn generator ProjectReferences and trips NETSDK1207. The flag keeps the normal solution build (and CI)
+       completely untouched — AOT analyzers/ILC only engage when sovereignty is the goal. Publish with:
+         dotnet publish -c Release -r win-x64 -p:KoanAot=true -->
+  <PropertyGroup Condition="'$(KoanAot)' == 'true'">
+    <PublishAot>true</PublishAot>
+  </PropertyGroup>
+
   <ItemGroup>
     <!-- Seeds the trim roots for the NativeAOT stretch publish (see README). -->
     <TrimmerRootDescriptor Include="NativeAotRoots.xml" />
