@@ -6,10 +6,11 @@
 **Scope**: Cross-repo canon for the three Sylin sibling repositories — **Koi** (Rust LAN substrate), **Zen Garden** (Rust fleet orchestrator), **Koan** (.NET application framework). This is the stack's first governed artifact: before it, no document in any repo adjudicated the cross-repo decisions, and that absence caused real divergences (Zen Garden planned to archive the AI crate Koan's adapter targets; Koan's sovereign profile named orchestrators that are stubs).
 **Related**: transcribed from `epic-assessment/04` (R1–R10) and `epic-assessment/03` §0; "violated today by" evidence from the interlock ledger `epic-assessment/01` §2. Enforcement prompts: E03–E16.
 
-> **Cross-repo canonical ADR.** Identical copies live in all three repos and must stay in sync — **edits propagate to all three**:
+> **Cross-repo canonical ADR.** Identical copies live in every Sylin repo and must stay in sync — **edits propagate to all copies** (the three stack layers — Koi, Zen Garden, Koan — plus the `agyo-tools` tooling repo, split out after this ADR was first written):
 > - `koan-framework/docs/decisions/STACK-0001-sylin-stack-canon.md`
 > - `zen-garden/docs/decisions/STACK-0001-sylin-stack-canon.md`
 > - `koi/docs/adr/STACK-0001-sylin-stack-canon.md`
+> - `agyo-tools/docs/decisions/STACK-0001-sylin-stack-canon.md`
 >
 > This is **transcription, not design**: every decision traces to the Epic analysis cited above. Do not edit a decision here without an upstream architect decision.
 
