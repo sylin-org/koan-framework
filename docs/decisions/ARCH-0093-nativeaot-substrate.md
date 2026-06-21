@@ -44,12 +44,12 @@ The SQLite fallback-create path's `((dynamic)ddl).CreateTableWithColumns(...)` u
 
 ## Consequences
 
-`g1c2.GardenCoopEmbedded` NativeAOT-publishes on win-x64 to a single ~42 MB native exe and runs the **whole stack end-to-end**: query embedded by the local ONNX model → sqlite-vec k-NN → SQLite read (Newtonsoft) → MVC JSON response — no container, no servers. The native dependencies are AOT-compatible in practice: ONNX Runtime (P/Invoke), the sqlite-vec `vec0` loadable extension, and `e_sqlite3`.
+`g1c2.GardenCoopEmbedded` NativeAOT-publishes on **both win-x64 (~42 MB) and linux-x64 (~40 MB, real Debian 13)** to a single native binary and runs the **whole stack end-to-end**: query embedded by the local ONNX model → sqlite-vec k-NN → SQLite read (Newtonsoft) → MVC JSON response — no container, no servers. Both RIDs return byte-identical semantic-search scores (ONNX inference is deterministic cross-platform), which also validates the framework changes are RID/OS-agnostic (different libc, loader, and linker — MSVC `link.exe` vs `clang`). The native dependencies are AOT-compatible in practice: ONNX Runtime (P/Invoke), the sqlite-vec `vec0` loadable extension, and `e_sqlite3`.
 
-Verification: SQLite connector 3/3 (the full filter-convergence corpus), Data.Core 158/158, Jobs-SQLite 76/76, Bootstrap ARCH-0079 38/38, full-solution build green, and the AOT binary's live semantic search.
+Verification: SQLite connector 3/3 (the full filter-convergence corpus), Data.Core 158/158, Jobs-SQLite 76/76, Bootstrap ARCH-0079 38/38, full-solution build green, and the AOT binary's live semantic search on both win-x64 and linux-x64.
 
 ### Deferred (tracked as follow-ups, not on the proven floor's path)
 
-- **`linux-arm64`** — the sovereign-claim RID. The framework changes are RID-agnostic; only the cross-ILC toolchain (clang + linux-arm64 sysroot, or a native/`buildx` builder) remains. win-x64 proves the substrate.
+- **`linux-arm64`** — the appliance/edge RID. win-x64 and linux-x64 prove the substrate is RID-agnostic; arm64 is the same recipe on an arm64 host (`-r linux-arm64`). Cross-compiling from x64 needs the aarch64 cross toolchain or a `buildx`/arm64 builder — a packaging step, not a framework one.
 - **Template-less `[Embedding]`** — `EmbeddingMetadata.SerializeToJson` uses `System.Text.Json` with a custom `TypeInfoResolver` (property exclusion); and `EmbeddingMigrator` uses STJ. Both need an STJ-source-gen or Newtonsoft port for AOT. The sample uses a `Template`, so neither is on its path.
 - **`X-sqlite-fallback-create-generic`** — the pre-existing `ensure: fallback-create-failed … Value cannot be null (Parameter 'key')` warning on the generic-entity fallback-create path (the primary path recovers).
