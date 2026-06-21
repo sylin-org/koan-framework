@@ -289,7 +289,9 @@ The five open tensions from the problem-space, now answered (recommendations; th
 5. **Tenancy → first-class slice with isolation teeth.** Not "partition renamed." Tenant carries
    identity + fail-closed + multi-axis auto-flow + repository-level enforcement. Partition remains the
    *dataset* axis; tenant is the *isolation* axis. (`"tenant-42"` as a partition value, in the §4.3
-   sketch, is exactly the conflation to avoid.)
+   sketch, is exactly the conflation to avoid.) **The full flagship design — mode ladder, registry,
+   identity/membership, operator console, control-plane data model — is captured in
+   [tenancy-design.md](./tenancy-design.md) (design-only, in prep for implementation).**
 
 ---
 
