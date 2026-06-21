@@ -116,10 +116,10 @@ _For contributors_: How application initialization actually works
 - Background worker throughput strategies
 - Diagnostics and tracing recommendations
 
-### [GardenCoop NativeAOT](nativeaot-gardencoop-howto.md)
+### [Publishing with NativeAOT](nativeaot-howto.md)
 
-- Step-by-step NativeAOT publish for the Garden Cooperative slice
-- Toolchain prerequisites, trimming roots, and validation checklist
+- The `KoanAot` opt-in, what the framework roots for you, Windows/Linux prerequisites
+- The Newtonsoft / Dapper-free / no-`dynamic` constraints, plus troubleshooting
 - Edge-case mitigations for SQLite, globalization, and VC++ toolchain gaps
 
 ### [Expose MCP over HTTP + SSE](mcp-http-sse-howto.md)

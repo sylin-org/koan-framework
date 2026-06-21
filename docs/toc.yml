@@ -28,8 +28,8 @@
       href: guides/authentication-setup.md
     - name: Performance Optimization
       href: guides/performance.md
-    - name: GardenCoop NativeAOT
-      href: guides/nativeaot-gardencoop-howto.md
+    - name: Publishing with NativeAOT
+      href: guides/nativeaot-howto.md
     - name: Semantic Pipelines
       href: guides/semantic-pipelines.md
     - name: Entity access and streaming

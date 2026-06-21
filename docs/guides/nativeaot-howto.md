@@ -85,6 +85,10 @@ Newtonsoft can serialize them via late-bound reflection):
 </linker>
 ```
 
+For a single reflection-reached type you can root it inline instead, with
+`[DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(MyEntity))]` on a method that runs at
+startup — equivalent to a descriptor entry, kept next to the code that needs it.
+
 ## 3. Prerequisites
 
 **Linux** (the AOT linker is `clang`):
@@ -161,3 +165,17 @@ reference sample:
 curl "http://127.0.0.1:5000/api/produce/search?q=sweet%20red%20fruit&k=3"
 # -> 200, semantically-ranked hits, all in one process
 ```
+
+## 7. Troubleshooting
+
+| Symptom | Cause / fix |
+|---|---|
+| `NETSDK1207` on a `Koan.*.Generators` project | A **global** `-p:PublishAot=true`. Use the `-p:KoanAot=true` gate (§1) so `PublishAot` is set only on the app. |
+| Windows link error mentioning `vswhere` / `link.exe` | Publish inside `vcvars64` with `-p:IlcUseEnvironmentalTools=true` (§3), or install the **Desktop development with C++** workload (MSVC `link.exe`). |
+| Boot throws missing-controller/entity `InvalidOperationException` | A reflection-reached type was trimmed — add it to `NativeAotRoots.xml` or `[DynamicDependency]` (§2). Koan modules are auto-rooted; this is for **your** types. |
+| `DllNotFoundException: e_sqlite3` (or `onnxruntime`) | The native lib wasn't published beside the binary. AOT is self-contained by default — don't force `--no-self-contained`; the connector's native bits travel with it. |
+| `Reflection-based serialization has been disabled` | Something serialized via `System.Text.Json`. The floor is Newtonsoft (§4); for an MVC app ensure Koan.Web's Newtonsoft pipeline is active. |
+| Need a stack trace from the native binary | Publish with `-p:StripSymbols=false` (or `-p:IlcGenerateCompleteDebugInfo=true`) to keep symbols. |
+
+Expect a wall of `IL2026`/`IL3050` trim/AOT **warnings** from ASP.NET Core MVC, Newtonsoft, and the
+reflection-based relationship/config paths — they're warnings, not errors; the floor runs correctly.
