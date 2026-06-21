@@ -1,4 +1,3 @@
-using Dapper;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,6 +18,7 @@ using Koan.Data.Abstractions.Sorting;
 using Koan.Data.Core;
 using Koan.Data.Core.Optimization;
 using Koan.Data.Relational;
+using Koan.Data.Relational.Ado;
 using Koan.Data.Relational.Linq;
 using Koan.Data.Relational.Orchestration;
 using System.Collections.Concurrent;
@@ -334,7 +334,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                 allColumns.Add(("Id", typeof(string), false, false, null, false));
                 allColumns.Add(("Json", typeof(string), false, false, null, false));
                 foreach (var p in projections) allColumns.Add((p.ColumnName, typeof(string), true, true, "$." + p.Property.Name, p.IsIndexed));
-                ((dynamic)ddl).CreateTableWithColumns("", table, allColumns);
+                ddl.CreateTableWithColumns("", table, allColumns);
                 // update the table exists flag after creating
                 vTableExists = ddl.TableExists("", table);
             }
@@ -378,7 +378,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                 {
                     allColumns.Add((p.ColumnName, typeof(string), true, true, "$." + p.Property.Name, p.IsIndexed));
                 }
-                ((dynamic)ddl).CreateTableWithColumns("", table, allColumns);
+                ddl.CreateTableWithColumns("", table, allColumns);
             }
             // Wait for expected projected columns to appear (poll with small backoff)
             try
@@ -480,8 +480,8 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         using var act = SqliteTelemetry.Activity.StartActivity("sqlite.get");
         act?.SetTag("entity", typeof(TEntity).FullName);
         using var conn = Open();
-        var row = await conn.QuerySingleOrDefaultAsync<(string Id, string Json)>($"SELECT Id, Json FROM [{TableName}] WHERE Id = @Id", new { Id = id!.ToString()! });
-        return row == default ? null : FromRow(row);
+        var rows = await AdoCommands.QueryIdJsonAsync(conn, $"SELECT Id, Json FROM [{TableName}] WHERE Id = @Id", new SqlParameters().Add("Id", id!.ToString()!), null, ct);
+        return rows.Count == 0 ? null : FromRow(rows[0]);
     }
 
     public async Task<IReadOnlyList<TEntity?>> GetMany(IEnumerable<TKey> ids, CancellationToken ct = default)
@@ -500,9 +500,9 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         var stringIds = idList.Select(id => id!.ToString()!).ToArray();
 
         // Use IN clause for bulk query
-        var rows = await conn.QueryAsync<(string Id, string Json)>(
+        var rows = await AdoCommands.QueryIdJsonAsync(conn,
             $"SELECT Id, Json FROM [{TableName}] WHERE Id IN @Ids",
-            new { Ids = stringIds });
+            new SqlParameters().Add("Ids", stringIds), null, ct);
 
         // Build dictionary for O(1) lookup
         var entityMap = rows.Select(FromRow).ToDictionary(e => e.Id);
@@ -543,8 +543,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             paginationHandled = true;
         }
 
-        var dyn = ToDapper(parameters);
-        var items = await ExecuteRows(sb.ToString(), dyn, ct);
+        var items = await ExecuteRows(sb.ToString(), SqlParameters.Positional(parameters), ct);
 
         long? totalCount = null;
         if (paginationHandled)
@@ -578,10 +577,10 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         var sql = whereSql is null
             ? $"SELECT COUNT(1) FROM [{TableName}]"
             : $"SELECT COUNT(1) FROM [{TableName}] WHERE {whereSql}";
-        var dyn = ToDapper(parameters);
+        var p = SqlParameters.Positional(parameters);
         try
         {
-            return await conn.ExecuteScalarAsync<long>(sql, dyn);
+            return await AdoCommands.ExecuteScalarInt64Async(conn, sql, p, null, ct);
         }
         catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
         {
@@ -589,16 +588,16 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             var sqliteConn = (SqliteConnection)conn;
             InvalidateHealth(sqliteConn, TableName);
             EnsureOrchestrated(sqliteConn);
-            return await conn.ExecuteScalarAsync<long>(sql, dyn);
+            return await AdoCommands.ExecuteScalarInt64Async(conn, sql, p, null, ct);
         }
     }
 
-    private async Task<IReadOnlyList<TEntity>> ExecuteRows(string sql, DynamicParameters dyn, CancellationToken ct)
+    private async Task<IReadOnlyList<TEntity>> ExecuteRows(string sql, SqlParameters p, CancellationToken ct)
     {
         using var conn = Open();
         try
         {
-            var rows = await conn.QueryAsync<(string Id, string Json)>(sql, dyn);
+            var rows = await AdoCommands.QueryIdJsonAsync(conn, sql, p, null, ct);
             return rows.Select(FromRow).ToList();
         }
         catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
@@ -607,7 +606,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             var sqliteConn = (SqliteConnection)conn;
             InvalidateHealth(sqliteConn, TableName);
             EnsureOrchestrated(sqliteConn);
-            var rows = await conn.QueryAsync<(string Id, string Json)>(sql, dyn);
+            var rows = await AdoCommands.QueryIdJsonAsync(conn, sql, p, null, ct);
             return rows.Select(FromRow).ToList();
         }
     }
@@ -674,13 +673,6 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         return (orderBy, sort.ToFrozenSet());
     }
 
-    private static DynamicParameters ToDapper(IReadOnlyList<object?> parameters)
-    {
-        var dyn = new DynamicParameters();
-        for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
-        return dyn;
-    }
-
     // ==================== Conditional compare-and-set (IConditionalWriteRepository) ====================
 
     /// <summary>Atomic CAS (JOBS-0005 §20.3): replace the row IFF the stored Json still matches <paramref name="guard"/>.
@@ -688,14 +680,14 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     public async Task<bool> ConditionalReplaceAsync(TEntity model, Expression<Func<TEntity, bool>> guard, CancellationToken ct = default)
     {
         var (whereSql, parameters) = BuildWhere(LinqFilterCompiler.Compile(guard));
-        var dyn = ToDapper(parameters);
+        var p = SqlParameters.Positional(parameters);
         var (id, json) = ToRow(model);
-        dyn.Add("__id", id);
-        dyn.Add("__json", json);
+        p.Add("__id", id);
+        p.Add("__json", json);
         var guardClause = whereSql is null ? string.Empty : $" AND ({whereSql})";
         var sql = $"UPDATE [{TableName}] SET Json = @__json WHERE Id = @__id{guardClause}";
         using var conn = Open();
-        var affected = await conn.ExecuteAsync(sql, dyn);
+        var affected = await AdoCommands.ExecuteAsync(conn, sql, p, null, ct);
         return affected > 0;
     }
 
@@ -737,9 +729,10 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         using var conn = Open();
         var whereSql = RewriteWhereForProjection(query);
         var sql = $"SELECT COUNT(1) FROM [{TableName}] WHERE {whereSql}";
+        var p = ToSqlParameters(parameters);
         try
         {
-            return CountResult.Exact(await conn.ExecuteScalarAsync<long>(sql, parameters));
+            return CountResult.Exact(await AdoCommands.ExecuteScalarInt64Async(conn, sql, p, null, ct));
         }
         catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
         {
@@ -747,15 +740,16 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             var sqliteConn = (SqliteConnection)conn;
             InvalidateHealth(sqliteConn, TableName);
             EnsureOrchestrated(sqliteConn);
-            return CountResult.Exact(await conn.ExecuteScalarAsync<long>(sql, parameters));
+            return CountResult.Exact(await AdoCommands.ExecuteScalarInt64Async(conn, sql, p, null, ct));
         }
     }
 
     private async Task<IReadOnlyList<TEntity>> QueryRowsWithRetry(IDbConnection conn, string sql, object? parameters)
     {
+        var p = ToSqlParameters(parameters);
         try
         {
-            var rows = await conn.QueryAsync<(string Id, string Json)>(sql, parameters);
+            var rows = await AdoCommands.QueryIdJsonAsync(conn, sql, p, null, CancellationToken.None);
             return rows.Select(FromRow).ToList();
         }
         catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
@@ -764,16 +758,17 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             var sqliteConn = (SqliteConnection)conn;
             InvalidateHealth(sqliteConn, TableName);
             EnsureOrchestrated(sqliteConn);
-            var rows = await conn.QueryAsync<(string Id, string Json)>(sql, parameters);
+            var rows = await AdoCommands.QueryIdJsonAsync(conn, sql, p, null, CancellationToken.None);
             return rows.Select(FromRow).ToList();
         }
     }
 
-    private async Task<IEnumerable<dynamic>> QueryDynamicWithRetry(IDbConnection conn, string sql, object? parameters)
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> QueryDynamicWithRetry(IDbConnection conn, string sql, object? parameters)
     {
+        var p = ToSqlParameters(parameters);
         try
         {
-            return await conn.QueryAsync(sql, parameters);
+            return await AdoCommands.QueryRowsAsync(conn, sql, p, null, CancellationToken.None);
         }
         catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
         {
@@ -781,7 +776,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             var sqliteConn = (SqliteConnection)conn;
             InvalidateHealth(sqliteConn, TableName);
             EnsureOrchestrated(sqliteConn);
-            return await conn.QueryAsync(sql, parameters);
+            return await AdoCommands.QueryRowsAsync(conn, sql, p, null, CancellationToken.None);
         }
     }
 
@@ -831,7 +826,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         {
             ct.ThrowIfCancellationRequested();
             var row = ToRow(e);
-            await conn.ExecuteAsync(sql, new { row.Id, row.Json }, tx);
+            await AdoCommands.ExecuteAsync(conn, sql, new SqlParameters().Add("Id", row.Id).Add("Json", row.Json), tx, ct);
             count++;
         }
         tx.Commit();
@@ -841,14 +836,14 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     public async Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
         using var conn = Open();
-        var count = await conn.ExecuteAsync($"DELETE FROM [{TableName}] WHERE Id IN @Ids", new { Ids = ids.Select(i => i!.ToString()!).ToArray() });
+        var count = await AdoCommands.ExecuteAsync(conn, $"DELETE FROM [{TableName}] WHERE Id IN @Ids", new SqlParameters().Add("Ids", ids.Select(i => i!.ToString()!).ToArray()), null, ct);
         return count;
     }
 
     public async Task<int> DeleteAll(CancellationToken ct = default)
     {
         using var conn = Open();
-        return await conn.ExecuteAsync($"DELETE FROM [{TableName}]");
+        return await AdoCommands.ExecuteAsync(conn, $"DELETE FROM [{TableName}]", null, null, ct);
     }
 
     public async Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default)
@@ -862,12 +857,12 @@ internal sealed class SqliteRepository<TEntity, TKey> :
 
         // SQLite has no TRUNCATE - both strategies use DELETE
         var countResult = await Count(QueryDefinition.All, ct);
-        await conn.ExecuteAsync($"DELETE FROM [{TableName}]", ct);
+        await AdoCommands.ExecuteAsync(conn, $"DELETE FROM [{TableName}]", null, null, ct);
 
         if (effectiveStrategy == RemoveStrategy.Fast)
         {
             // Fast strategy: reclaim space via VACUUM
-            await conn.ExecuteAsync("VACUUM", ct);
+            await AdoCommands.ExecuteAsync(conn, "VACUUM", null, null, ct);
         }
 
         return countResult.Value;
@@ -913,11 +908,11 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             {
                 ct.ThrowIfCancellationRequested();
                 var row = repo.ToRow(e);
-                await conn.ExecuteAsync($"INSERT INTO [{repo.TableName}] (Id, Json) VALUES (@Id, @Json) ON CONFLICT(Id) DO UPDATE SET Json = excluded.Json;", new { row.Id, row.Json });
+                await AdoCommands.ExecuteAsync(conn, $"INSERT INTO [{repo.TableName}] (Id, Json) VALUES (@Id, @Json) ON CONFLICT(Id) DO UPDATE SET Json = excluded.Json;", new SqlParameters().Add("Id", row.Id).Add("Json", row.Json), null, ct);
             }
             if (_deletes.Any())
             {
-                deleted = await conn.ExecuteAsync($"DELETE FROM [{repo.TableName}] WHERE Id IN @Ids", new { Ids = _deletes.Select(i => i!.ToString()!).ToArray() });
+                deleted = await AdoCommands.ExecuteAsync(conn, $"DELETE FROM [{repo.TableName}] WHERE Id IN @Ids", new SqlParameters().Add("Ids", _deletes.Select(i => i!.ToString()!).ToArray()), null, ct);
             }
             return new BatchResult(added, updated, deleted);
         }
@@ -1060,7 +1055,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                         {
                             allColumns.Add((p.ColumnName, typeof(string), true, true, "$." + p.Property.Name, p.IsIndexed));
                         }
-                        ((dynamic)ddl).CreateTableWithColumns("", TableName, allColumns);
+                        ddl.CreateTableWithColumns("", TableName, allColumns);
                     }
                     object d_ok = true; return (TResult)d_ok;
                 }
@@ -1068,7 +1063,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                 {
                     // Remove the table if present; do not create it.
                     var drop = $"DROP TABLE IF EXISTS \"{TableName}\";";
-                    try { await conn.ExecuteAsync(drop); }
+                    try { await AdoCommands.ExecuteAsync(conn, drop, null, null, ct); }
                     catch (SqliteException ex)
                     {
                         // Correctness path: SchemaClear's contract is to drop the table. A failed DROP must
@@ -1085,7 +1080,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                 }
             case DataInstructions.Clear:
                 EnsureOrchestrated(conn);
-                var del = await conn.ExecuteAsync($"DELETE FROM [{TableName}]");
+                var del = await AdoCommands.ExecuteAsync(conn, $"DELETE FROM [{TableName}]", null, null, ct);
                 object d_res = del;
                 return (TResult)d_res;
             case RelationalInstructions.SchemaEnsureCreated:
@@ -1102,7 +1097,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     var p = GetParamsFromInstruction(instruction);
                     try
                     {
-                        var result = await conn.ExecuteScalarAsync(sql, p);
+                        var result = await AdoCommands.ExecuteScalarAsync(conn, sql, p, null, ct);
                         return CastScalar<TResult>(result);
                     }
                     catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
@@ -1110,7 +1105,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                         Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
                         InvalidateHealth(conn, TableName);
                         EnsureOrchestrated(conn);
-                        var result = await conn.ExecuteScalarAsync(sql, p);
+                        var result = await AdoCommands.ExecuteScalarAsync(conn, sql, p, null, ct);
                         return CastScalar<TResult>(result);
                     }
                 }
@@ -1128,7 +1123,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     var p = GetParamsFromInstruction(instruction);
                     try
                     {
-                        var affected = await conn.ExecuteAsync(sql, p);
+                        var affected = await AdoCommands.ExecuteAsync(conn, sql, p, null, ct);
                         object res = affected;
                         return (TResult)res;
                     }
@@ -1137,7 +1132,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                         Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
                         InvalidateHealth(conn, TableName);
                         EnsureOrchestrated(conn);
-                        var affected = await conn.ExecuteAsync(sql, p);
+                        var affected = await AdoCommands.ExecuteAsync(conn, sql, p, null, ct);
                         object res = affected;
                         return (TResult)res;
                     }
@@ -1155,7 +1150,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     }
                     try
                     {
-                        var rows = await conn.QueryAsync(sql, p);
+                        var rows = await AdoCommands.QueryRowsAsync(conn, sql, p, null, ct);
                         var list = MapDynamicRows(rows);
                         return (TResult)(object)list;
                     }
@@ -1164,7 +1159,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                         Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
                         InvalidateHealth(conn, TableName);
                         EnsureOrchestrated(conn);
-                        var rows = await conn.QueryAsync(sql, p);
+                        var rows = await AdoCommands.QueryRowsAsync(conn, sql, p, null, ct);
                         var list = MapDynamicRows(rows);
                         return (TResult)(object)list;
                     }
@@ -1183,8 +1178,36 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         if (string.IsNullOrWhiteSpace(sql)) throw new ArgumentException("Instruction payload missing Sql.");
         return sql!;
     }
-    private static object? GetParamsFromInstruction(Instruction instruction)
-        => instruction.Parameters is null ? null : new DynamicParameters(new Dictionary<string, object?>(instruction.Parameters));
+    private static SqlParameters GetParamsFromInstruction(Instruction instruction)
+        => instruction.Parameters is null ? SqlParameters.None : SqlParameters.FromDictionary(instruction.Parameters);
+
+    // Raw-query escape hatch: normalise the open `object?` parameter into the AOT-clean SqlParameters model.
+    // Dictionaries and SqlParameters pass through; a POCO/anonymous object is reflected (as Dapper did) — that
+    // reflective branch is the only AOT-soft spot, confined to the rarely-used raw path.
+    private static SqlParameters ToSqlParameters(object? parameters)
+    {
+        switch (parameters)
+        {
+            case null: return SqlParameters.None;
+            case SqlParameters sp: return sp;
+            case IReadOnlyDictionary<string, object?> rod: return SqlParameters.FromDictionary(rod);
+            case IDictionary<string, object?> dict:
+            {
+                var bag = new SqlParameters();
+                foreach (var kv in dict) bag.Add(kv.Key, kv.Value);
+                return bag;
+            }
+            default:
+            {
+                var bag = new SqlParameters();
+                foreach (var prop in parameters.GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+                {
+                    if (prop.CanRead && prop.GetIndexParameters().Length == 0) bag.Add(prop.Name, prop.GetValue(parameters));
+                }
+                return bag;
+            }
+        }
+    }
 
     private static bool IsFullSelect(string sql)
     {
@@ -1540,14 +1563,13 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         return msg.IndexOf("no such table", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
-    private static List<TEntity> MapRowsToEntities(IEnumerable<dynamic> rows)
+    private static List<TEntity> MapRowsToEntities(IEnumerable<IReadOnlyDictionary<string, object?>> rows)
     {
         var list = new List<TEntity>();
         var t = typeof(TEntity);
         var idProp = t.GetProperty("Id");
-        foreach (var row in rows)
+        foreach (var dict in rows)
         {
-            var dict = (IDictionary<string, object?>)row;
             // Prefer Json column if present
             if (dict.TryGetValue("Json", out var jsonVal) && jsonVal is string jsonStr && !string.IsNullOrWhiteSpace(jsonStr))
             {
@@ -1655,26 +1677,14 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         }
     }
 
-    private static IReadOnlyList<Dictionary<string, object?>> MapDynamicRows(IEnumerable<dynamic> rows)
+    private static IReadOnlyList<Dictionary<string, object?>> MapDynamicRows(IEnumerable<IReadOnlyDictionary<string, object?>> rows)
     {
         var list = new List<Dictionary<string, object?>>();
         foreach (var row in rows)
         {
-            if (row is IDictionary<string, object?> map)
-            {
-                list.Add(new Dictionary<string, object?>(map, StringComparer.OrdinalIgnoreCase));
-            }
-            else
-            {
-                var dict = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-                var props = ((object)row).GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                foreach (var p in props)
-                {
-                    if (!p.CanRead) continue;
-                    dict[p.Name] = p.GetValue(row);
-                }
-                list.Add(dict);
-            }
+            var dict = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+            foreach (var kv in row) dict[kv.Key] = kv.Value;
+            list.Add(dict);
         }
         return list;
     }

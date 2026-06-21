@@ -18,7 +18,9 @@
          GHSA-2m69-gcr7-jv3q). Pin just the native binary to the patched 3.50.3 (SQLite 3.50.3); the
          managed SQLitePCLRaw.core stays 2.1.11, so Microsoft.Data.Sqlite is unaffected. -->
     <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.50.3" />
-    <PackageReference Include="Dapper" Version="2.1.66" />
+    <!-- Dapper removed (X-aot-substrate / S2): Dapper's GetTypeDeserializerImpl emits IL at runtime, which
+         NativeAOT forbids (PlatformNotSupportedException). The SQLite read/write path now uses the hand-rolled,
+         AOT-clean Koan.Data.Relational.Ado helpers. Non-AOT relational adapters can use Koan.Data.Relational.Dapper. -->
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
 </Project>
