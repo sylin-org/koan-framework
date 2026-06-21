@@ -43,7 +43,7 @@ public static class EntityCacheExtensions
     private static CacheKey BuildEntityKey<TEntity, TKey>(TKey id)
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
-        => new($"{typeof(TEntity).Name}:{id}");
+        => new($"{CacheKey.EntityTypeName(typeof(TEntity))}:{id}");
 
     private static ICacheWriter ResolveClient()
     {
@@ -76,7 +76,7 @@ public readonly struct EntityCacheHandle<TEntity, TKey>
     /// </summary>
     public ValueTask<bool> Flush(TKey id, CancellationToken ct = default)
     {
-        var key = new CacheKey($"{typeof(TEntity).Name}:{id}");
+        var key = new CacheKey($"{CacheKey.EntityTypeName(typeof(TEntity))}:{id}");
         return _writer.Remove(key, ct);
     }
 
@@ -88,7 +88,7 @@ public readonly struct EntityCacheHandle<TEntity, TKey>
     {
         if (_writer is ICacheClient client)
         {
-            return await client.FlushTags([typeof(TEntity).Name], ct).ConfigureAwait(false);
+            return await client.FlushTags([CacheKey.EntityTypeName(typeof(TEntity))], ct).ConfigureAwait(false);
         }
 
         throw new InvalidOperationException(

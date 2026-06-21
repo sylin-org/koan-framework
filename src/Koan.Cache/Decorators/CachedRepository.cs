@@ -52,7 +52,7 @@ internal sealed class CachedRepository<TEntity, TKey> :
         _rawQuery = inner as IRawQueryRepository<TEntity, TKey>;
         _instructionExecutor = inner as IInstructionExecutor<TEntity>;
         _keyAccessor = static entity => ((IEntity<TKey>)entity).Id;
-        _entityName = typeof(TEntity).Name;
+        _entityName = CacheKey.EntityTypeName(typeof(TEntity));
     }
 
     // ARCH-0084: forward the inner provider's unified capabilities (native IDescribesCapabilities,

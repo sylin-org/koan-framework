@@ -6,6 +6,7 @@ public class CacheKeyForSpec
 {
     private sealed class Todo { }
     private sealed class Product { }
+    private sealed class Track<T> { }
 
     [Fact]
     public void For_generic_with_id_and_partition_produces_canonical_key()
@@ -85,5 +86,35 @@ public class CacheKeyForSpec
         var keyB = CacheKey.For<Todo>("abc", partition: "b");
 
         keyA.Should().NotBe(keyB);
+    }
+
+    [Fact]
+    public void EntityTypeName_non_generic_is_the_type_name()
+    {
+        CacheKey.EntityTypeName(typeof(Todo)).Should().Be("Todo");
+    }
+
+    [Fact]
+    public void EntityTypeName_closed_generic_appends_type_args()
+    {
+        // Type.Name alone yields "Track`1" for BOTH — these must differ.
+        CacheKey.EntityTypeName(typeof(Track<Todo>)).Should().Be("Track<Todo>");
+        CacheKey.EntityTypeName(typeof(Track<Product>)).Should().Be("Track<Product>");
+    }
+
+    [Fact]
+    public void EntityTypeName_nested_generic_recurses()
+    {
+        CacheKey.EntityTypeName(typeof(Track<Track<Todo>>)).Should().Be("Track<Track<Todo>>");
+    }
+
+    [Fact]
+    public void For_closed_generics_with_different_args_do_not_collide()
+    {
+        // The X-generic-typeid-ephemeral guard: Type.Name would collapse both to "Track`1:_:1".
+        var a = CacheKey.For(typeof(Track<Todo>), "1");
+        var b = CacheKey.For(typeof(Track<Product>), "1");
+
+        a.Should().NotBe(b);
     }
 }

@@ -88,10 +88,33 @@ public readonly record struct CacheKey
         if (entityType is null) throw new ArgumentNullException(nameof(entityType));
         if (id is null) throw new ArgumentNullException(nameof(id));
 
-        var typeName = entityType.Name;
+        var typeName = EntityTypeName(entityType);
         var partitionToken = string.IsNullOrWhiteSpace(partition) ? "_" : partition.Trim();
         var idToken = id.ToString() ?? throw new ArgumentException("Id.ToString() returned null.", nameof(id));
 
         return new CacheKey($"{typeName}:{partitionToken}:{idToken}");
+    }
+
+    /// <summary>
+    /// Stable, collision-free type token for cache keys and tags. For a non-generic type this is
+    /// <see cref="System.Type.Name"/> (unchanged). For a closed generic it strips the arity marker AND appends
+    /// the (recursive) type-argument tokens — so <c>EmbeddingState&lt;Produce&gt;</c> and
+    /// <c>EmbeddingState&lt;Other&gt;</c> don't both collapse to <c>EmbeddingState`1</c> (a silent cross-type
+    /// cache collision) the way <c>Type.Name</c> does. Cache keys are ephemeral, so no migration is needed.
+    /// (Stripping the arity alone is insufficient — it would still collide; the type args are what disambiguate.)
+    /// </summary>
+    public static string EntityTypeName(Type type)
+    {
+        if (type is null) throw new ArgumentNullException(nameof(type));
+        if (!type.IsGenericType) return type.Name;
+
+        var name = type.Name;
+        var tick = name.IndexOf('`');
+        if (tick >= 0) name = name[..tick];
+
+        var args = type.GetGenericArguments();
+        var rendered = new string[args.Length];
+        for (var i = 0; i < args.Length; i++) rendered[i] = EntityTypeName(args[i]);
+        return name + "<" + string.Join(",", rendered) + ">";
     }
 }
