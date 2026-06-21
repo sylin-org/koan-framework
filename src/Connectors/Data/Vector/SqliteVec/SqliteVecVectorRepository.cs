@@ -1,4 +1,4 @@
-using System.Text.Json;
+using Newtonsoft.Json;
 using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
@@ -186,7 +186,7 @@ internal sealed class SqliteVecVectorRepository<TEntity, TKey>
             cmd.CommandText = $"SELECT vec_to_json(embedding) FROM \"{table}\" WHERE id = $id";
             cmd.Parameters.AddWithValue("$id", Key(id));
             var json = cmd.ExecuteScalar() as string;
-            return json is null ? null : JsonSerializer.Deserialize<float[]>(json);
+            return json is null ? null : JsonConvert.DeserializeObject<float[]>(json);
         }
         finally { _lock.Release(); }
     }
@@ -261,7 +261,7 @@ internal sealed class SqliteVecVectorRepository<TEntity, TKey>
     }
 
     private static string? SerializeMeta(object? metadata)
-        => metadata is null ? null : JsonSerializer.Serialize(metadata);
+        => metadata is null ? null : JsonConvert.SerializeObject(metadata);
 
     private static string Key(TKey id) => id?.ToString() ?? throw new ArgumentNullException(nameof(id));
 
