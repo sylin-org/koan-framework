@@ -4,6 +4,7 @@ using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Filtering;
+using Koan.Data.Abstractions.Naming;
 using Koan.Data.Abstractions.Sorting;
 using Koan.Data.Core.Sorting;
 using System.Collections.Concurrent;
@@ -277,7 +278,10 @@ internal sealed class JsonRepository<TEntity, TKey> :
             // Delegate to adapter naming (factory owns the cache and partition composition).
             return Core.Configuration.AdapterNaming.GetOrCompute<TEntity, TKey>(sp);
         }
-        return typeof(TEntity).Name;
+        // No host yet (early init / direct construction): still route through the resolver with this adapter's
+        // announced convention so a generic entity name is grammar-correct (not the mangled typeof(T).Name).
+        return StorageNameResolver.Resolve(typeof(TEntity),
+            new StorageNameResolver.Convention(StorageNamingStyle.EntityType, "_", NameCasing.AsIs));
     }
 
     private sealed class JsonBatch : IBatchSet<TEntity, TKey>

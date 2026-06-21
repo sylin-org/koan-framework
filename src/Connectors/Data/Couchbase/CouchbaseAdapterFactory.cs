@@ -53,6 +53,9 @@ public sealed class CouchbaseAdapterFactory : IDataAdapterFactory
             // default) produces an invalid collection name and CreateCollectionAsync fails. Use '_'.
             Separator = "_",
             Casing = NameCasing.AsIs,
+            // Collection names cap at 251 bytes; announce it so the framework hashes overlong names down rather
+            // than handing Couchbase an invalid identifier (partition rides the scope, so this bounds the name).
+            MaxIdentifierBytes = 251,
             EncodePartitionInName = false,
             NameOverride = entityType => !string.IsNullOrWhiteSpace(options.Collection)
                 ? options.Collection!.Trim()
