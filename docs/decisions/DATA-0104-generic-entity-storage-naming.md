@@ -76,8 +76,8 @@ Names are **opaque unique keys** — the framework never reverse-parses a name (
 
 **Explicitly carved out** — other `Type → identifier` sites the audit found, which the chokepoint fix does **not** reach (each is a separate path):
 
-- **`JobRecord.WorkType`** (`JobTypeBinding`, persisted ledger key) and the **messaging routing key** (`MessagingExtensions.GetConcreteTypeName`, wire identifier) also mangle closed generics — but they are **persisted / on-the-wire**, so changing their derivation orphans existing ledger rows / breaks in-flight messages. **Breaking change → separate card with a compat path. Not touched here.**
-- **Cache keys** (`CacheKey.For`, `EntityCacheExtensions`, `CachedRepository`) mangle too but are **ephemeral / re-derivable** — lower-priority follow-up card.
+- **`JobRecord.WorkType`** (`JobTypeBinding`, persisted ledger key) and the **messaging wire key** (the real one is `RabbitMqProvider.GetQueueName`; `MessagingExtensions.GetConcreteTypeName` is dead code) use `Type.FullName`, which for a closed generic is *unique but version-unstable* (it embeds the type-arg's assembly version). **Verified 2026-06-21 (card `X-generic-typeid-breaking`, CLOSED): no closed generic ever reaches either key** — a closed-generic `IKoanJob` can't be discovered (so no binding), and no generic message (`TransportEnvelope<T>`) is ever constructed/sent. So it is **not a live bug and not breaking**; documented limitation only (normalize the derivation *if* a closed-generic job/message is ever introduced).
+- **Cache keys** (`CacheKey.For`, `EntityCacheExtensions`, `CachedRepository`) mangled too but are **ephemeral / re-derivable** — **fixed 2026-06-21** (`cd700299`, card `X-generic-typeid-ephemeral`) via the shared `CacheKey.EntityTypeName` helper.
 - **Raw-SQL entity-token rewrite** (`RewriteEntityToken`) silently no-ops for generics (`\b` won't match a backtick) — raw-SQL-only, noted.
 
 ---
