@@ -118,6 +118,20 @@ HTTP/SSE bridge), dns, certmesh REST, udp bridging, truststore**. The proxy is r
 only after data-plane tests exist and `status()` reports truth — excluded-until-tested, not
 abandoned (Koi's own "OrbStack domains" opportunity still needs it).
 
+**Extension (ADR-020, operator-ratified 2026-06-20).** The contract surface additionally
+includes the **mode-transparent trust primitives' wire contract** — the signed `Envelope`
+(versioned, carry-cert, ES256 over canonical bytes; verify returns an assurance level, not
+a bool), the `Posture` descriptor (the orthogonal `signed`/`encrypted` booleans →
+`open`/`authenticated`/`confidential`, stamped advisorily into mDNS TXT), and the
+**same-port dual-mode transport handshake** (one socket serving plaintext and mTLS,
+dispatched per connection by a ClientHello sniff so a posture flip never drops an in-flight
+connection). These are published **language-neutrally** so a non-Rust sibling can implement
+byte-identical primitives — the realization is `koi/docs/reference/trust-protocol.md`
+(Posture, Envelope, Sealed, dual-mode handshake, diagnose), with certless conformance
+vectors + a validator for cross-language siblings. The reserved confidentiality rung
+(`Sealed`, group-key AEAD under a K3-distinct HKDF label) is named-but-not-yet-produced.
+This extends R6's five planes; it does not re-admit the proxy.
+
 ## R7 — One discovery seam per layer; the garden mesh stays ZG-internal forever
 
 Collapse ~6 mechanisms to one per layer: **Koi owns LAN mDNS/DNS naming. ZG owns fleet

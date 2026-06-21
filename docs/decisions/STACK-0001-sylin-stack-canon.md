@@ -65,6 +65,7 @@ The Sylin stack is bound by ten decisions, transcribed from the Epic analysis (`
 ### D7 — Koi contract scope: the five proven planes; the TLS proxy is excluded until tested
 
 **Decided:** the formal Koi contract surface is exactly **mdns (register/browse + HTTP/SSE bridge), dns, certmesh REST, udp bridging, truststore**. **The TLS proxy is outside all stack contracts** until data-plane tests exist and `status()` reports truth. Do not build on it; do not delete it either — it is excluded-until-tested, not abandoned.
+**Extended (ADR-020, operator-ratified 2026-06-20 — the architect decision this line's edit requires):** the contract surface additionally includes the **mode-transparent trust primitives' wire contract** — the signed `Envelope`, the `Posture` descriptor, and the same-port dual-mode transport handshake — published language-neutrally so a non-Rust sibling can implement identical primitives.
 **Rationale:** a contract is only as good as the substrate's *guarded* surface; the proxy regressed silently after the axum 0.8 upgrade (startup panic; `status()` hardcodes `running: true`) with zero data-plane tests, and neither sibling needs it (moss terminates its own TLS; the builder sets `proxy(false)`).
 **Violated today by / fixed by:** the proxy panics and misreports `running: true` (Koi README Corrections) → fixed by excluding it from the contract until data-plane tests + a truthful `status()` re-admit it (R6).
 
