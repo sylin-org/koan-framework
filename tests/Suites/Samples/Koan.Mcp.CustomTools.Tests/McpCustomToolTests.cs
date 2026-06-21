@@ -82,6 +82,7 @@ public sealed class McpCustomToolTests
             tool,
             new JObject { ["text"] = "hello", ["suffix"] = "!" },
             new ServiceCollection().BuildServiceProvider(),
+            principal: null,
             CancellationToken.None);
 
         result.Value<string>().Should().Be("HELLO!");
@@ -95,7 +96,7 @@ public sealed class McpCustomToolTests
         registry.TryGet("service_greeting", out var tool).Should().BeTrue();
 
         var services = new ServiceCollection().AddSingleton<IGreeter, Greeter>().BuildServiceProvider();
-        var result = await invoker.Invoke(tool, new JObject { ["name"] = "world" }, services, CancellationToken.None);
+        var result = await invoker.Invoke(tool, new JObject { ["name"] = "world" }, services, principal: null, CancellationToken.None);
 
         result.Value<string>().Should().Be("HELLO world!");
     }

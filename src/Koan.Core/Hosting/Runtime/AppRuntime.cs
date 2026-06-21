@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using Microsoft.Extensions.Configuration;
@@ -72,6 +73,7 @@ internal sealed class AppRuntime : IAppRuntime
             catch { /* best-effort */ }
 
             var hostDescription = DescribeHost();
+            var compositionLine = TryBuildCompositionLine(snapshot);
             var startupBlock = KoanConsoleBlocks.BuildStartupOverviewBlock(
                 snapshot,
                 hostDescription,
@@ -79,7 +81,8 @@ internal sealed class AppRuntime : IAppRuntime
                 runtimeVersion,
                 AppBootstrapper.RegistrySummary,
                 healthSnapshot,
-                registeredProbes);
+                registeredProbes,
+                compositionLine);
 
             KoanStartupTimeline.Mark(KoanStartupStage.ConfigReady);
             var timeline = KoanStartupTimeline.GetSummary();
@@ -140,6 +143,32 @@ internal sealed class AppRuntime : IAppRuntime
             {
                 // best-effort only; provenance should never block host start
             }
+        }
+    }
+
+    // P1.1: build the one-line composition verdict and write the resolved-twin lockfile. Best-effort
+    // — a composition failure must never disrupt the boot report. Runs here (Discover) because _sp is
+    // fully built; the resolved twin is a non-production artifact.
+    private string? TryBuildCompositionLine(KoanEnvironmentSnapshot snapshot)
+    {
+        try
+        {
+            var cfg = _sp.GetService<IConfiguration>();
+            var contentRoot = _sp.GetService<IHostEnvironment>()?.ContentRootPath;
+            var appName = string.IsNullOrWhiteSpace(snapshot.Application.Name) ? "app" : snapshot.Application.Name;
+
+            var resolved = Composition.KoanCompositionSnapshot.Build(_sp, appName, cfg);
+            if (!KoanEnv.IsProduction)
+                Composition.KoanCompositionSnapshot.TryWriteResolvedTwin(resolved, contentRoot);
+
+            var lockedPath = string.IsNullOrEmpty(contentRoot) ? null : Path.Combine(contentRoot!, "koan.lock.json");
+            var locked = lockedPath is null ? null : Composition.KoanLockfileSerializer.TryReadFile(lockedPath);
+            var comparison = Composition.KoanLockfileComparer.Compare(locked, resolved);
+            return comparison.Format(resolved.Modules.Count);
+        }
+        catch
+        {
+            return null;
         }
     }
 

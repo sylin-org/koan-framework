@@ -18,5 +18,10 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.8" />
   </ItemGroup>
 
+  <!-- P1.1 dogfood: in-repo (ProjectReference) NuGet does not auto-import build/<PackageId>.targets,
+       so import it explicitly. Real consumers get it automatically via PackageReference on
+       Sylin.Koan.Core. Emits the checked-in koan.lock.json on build (the headline `git diff` UX). -->
+  <Import Project="..\..\src\Koan.Core\build\Sylin.Koan.Core.targets" />
+
 </Project>
 

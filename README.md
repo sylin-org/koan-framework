@@ -156,6 +156,9 @@ compiled into your assemblies: deterministic, ordered, AOT-friendly.
   semantic search is a query, not a subsystem you build.
 - **Decision-first engineering** — 280+ ADRs, integration-tests-as-canon, and a self-assessment
   you can read. The architecture is auditable, not asserted.
+- **Composition you can diff** — every build writes a checked-in
+  [`koan.lock.json`](docs/guides/composition-lockfile.md) describing the app's modules and elections,
+  so PR review *sees* composition drift in a plain `git diff` and the boot report self-checks it.
 
 ## Learn it
 

@@ -200,7 +200,10 @@ public sealed class Todo : Entity<Todo> { /* exposed to agents over MCP (HTTP/SS
 1. **Read the boot report first.** It names every module discovered, the adapter elections, and
    the boot phases — most "why isn't X registered" questions are answered there.
 2. Resolution failures throw messages that name the exact configuration keys to set.
-3. [Troubleshooting hub](../support/troubleshooting.md) · [debugging guide patterns](../guides/README.md).
+3. **Check the composition lockfile.** The boot report's `Composition` line and the checked-in
+   [`koan.lock.json`](../guides/composition-lockfile.md) say which modules and adapter elections the
+   app is actually built from — a `lockfile DRIFT(...)` verdict points straight at an unexpected change.
+4. [Troubleshooting hub](../support/troubleshooting.md) · [debugging guide patterns](../guides/README.md).
 
 ## Where next
 

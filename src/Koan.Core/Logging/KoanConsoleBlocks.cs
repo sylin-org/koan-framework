@@ -20,7 +20,8 @@ internal static class KoanConsoleBlocks
         string runtimeVersion,
         RegistrySummarySnapshot? registry,
         HealthSnapshot? health,
-        int registeredProbes = 0)
+        int registeredProbes = 0,
+        string? compositionLine = null)
     {
         var identity = snapshot.Application;
         var uniqueModules = DeduplicateModules(modules);
@@ -62,6 +63,12 @@ internal static class KoanConsoleBlocks
             builder.AddLine(FormatKeyValue("AutoReg", registry.Value.AutoRegistrars.ToString()));
             builder.AddLine(FormatKeyValue("Background", FormatBackgroundSummary(registry.Value)));
             builder.AddLine(FormatKeyValue("Adapters", registry.Value.ServiceDiscoveryAdapters.ToString()));
+
+            // P1.1 composition lockfile verdict: "composition: <n> modules · lockfile ok|DRIFT(<keys>)".
+            if (!string.IsNullOrWhiteSpace(compositionLine))
+            {
+                builder.AddLine(FormatKeyValue("Composition", compositionLine!));
+            }
 
             // MODULES-FAILED block (Track F · fail-fast.json): in lenient boot a broken module no longer
             // vanishes — it is rendered here so the operator can see it in the boot report.

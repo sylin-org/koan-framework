@@ -22,6 +22,8 @@
     D.  Skills lint scripts/skills-lint.ps1 -Strict — the DX-0048 skill contract:
                     dir==name, frontmatter (name/description), no version pins, and
                     link/card resolution + catalog parity (now fatal — H10 complete).
+    E.  Lockfile    scripts/compare-koan-lock.ps1 — composition-lockfile drift (P1.1): the build
+                    regenerates each app's koan.lock.json; fail if one drifted uncommitted.
 
   Exit code is 0 (GREEN) only when every run leg passes; otherwise 1 (RED).
 
@@ -63,6 +65,10 @@ try {
     Write-Host "[ratchet] config=$Configuration  docs-base=$Base  skipTests=$SkipTests  fullDocs=$FullDocs"
 
     Invoke-Leg 'A. build' { & dotnet build "$root/Koan.sln" -c $Configuration --nologo }
+
+    # E. Lockfile drift (P1.1) — the build regenerates each app's koan.lock.json; fail if one drifted
+    # without being committed (composition changed but not recorded). Clean skip when none are tracked.
+    Invoke-Leg 'E. lockfile' { & "$root/scripts/compare-koan-lock.ps1" }
 
     if (-not $SkipTests) {
         Invoke-Leg "A'. test" { & dotnet test "$root/Koan.sln" -c $Configuration --no-build --nologo }

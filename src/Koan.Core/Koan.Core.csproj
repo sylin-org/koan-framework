@@ -23,6 +23,13 @@
   <ItemGroup>
     <ProjectReference Include="..\Koan.Orchestration.Abstractions\Koan.Orchestration.Abstractions.csproj" />
   </ItemGroup>
+  <!-- P1.1: ship the composition-lockfile build target. NuGet auto-imports build/<PackageId>.targets
+       (PackageId = Sylin.Koan.Core) for PackageReference consumers, so referencing this package emits
+       koan.lock.json at build. Remove-then-Include avoids the default-None-glob duplicate. -->
+  <ItemGroup>
+    <None Remove="build/Sylin.Koan.Core.targets" />
+    <None Include="build/Sylin.Koan.Core.targets" Pack="true" PackagePath="build/Sylin.Koan.Core.targets" />
+  </ItemGroup>
   <!-- Explicitly exclude adapter files to prevent Docker build conflicts -->
   <ItemGroup>
     <Compile Remove="Adapters/**/*.cs" />
