@@ -563,6 +563,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Messaging.Connector.In
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.AI.Connector.Onnx", "src\Connectors\AI\Onnx\Koan.AI.Connector.Onnx.csproj", "{D6E2D3D7-D89F-4B66-AAE0-286C031212D6}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Vector.Connector.SqliteVec", "src\Connectors\Data\Vector\SqliteVec\Koan.Data.Vector.Connector.SqliteVec.csproj", "{6D3F00F9-419B-41FD-81FA-3E07B79B3C40}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -2875,6 +2877,18 @@ Global
 		{D6E2D3D7-D89F-4B66-AAE0-286C031212D6}.Release|x64.Build.0 = Release|Any CPU
 		{D6E2D3D7-D89F-4B66-AAE0-286C031212D6}.Release|x86.ActiveCfg = Release|Any CPU
 		{D6E2D3D7-D89F-4B66-AAE0-286C031212D6}.Release|x86.Build.0 = Release|Any CPU
+		{6D3F00F9-419B-41FD-81FA-3E07B79B3C40}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6D3F00F9-419B-41FD-81FA-3E07B79B3C40}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6D3F00F9-419B-41FD-81FA-3E07B79B3C40}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{6D3F00F9-419B-41FD-81FA-3E07B79B3C40}.Debug|x64.Build.0 = Debug|Any CPU
+		{6D3F00F9-419B-41FD-81FA-3E07B79B3C40}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{6D3F00F9-419B-41FD-81FA-3E07B79B3C40}.Debug|x86.Build.0 = Debug|Any CPU
+		{6D3F00F9-419B-41FD-81FA-3E07B79B3C40}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6D3F00F9-419B-41FD-81FA-3E07B79B3C40}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6D3F00F9-419B-41FD-81FA-3E07B79B3C40}.Release|x64.ActiveCfg = Release|Any CPU
+		{6D3F00F9-419B-41FD-81FA-3E07B79B3C40}.Release|x64.Build.0 = Release|Any CPU
+		{6D3F00F9-419B-41FD-81FA-3E07B79B3C40}.Release|x86.ActiveCfg = Release|Any CPU
+		{6D3F00F9-419B-41FD-81FA-3E07B79B3C40}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -3150,6 +3164,7 @@ Global
 		{8E1FD70B-85BE-49A2-8D46-2C3E8E4D4281} = {50016D06-9933-125F-84C4-B9F9B90C374B}
 		{584C363F-9EBF-487A-A67B-E5BD5ABAB79C} = {72676E55-B627-DB14-2AA1-20808F5CEF1D}
 		{D6E2D3D7-D89F-4B66-AAE0-286C031212D6} = {BD51367E-21CB-BFF8-36A4-682352095FBF}
+		{6D3F00F9-419B-41FD-81FA-3E07B79B3C40} = {50016D06-9933-125F-84C4-B9F9B90C374B}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {669C5778-BFAE-4972-B427-0AFF99562045}
