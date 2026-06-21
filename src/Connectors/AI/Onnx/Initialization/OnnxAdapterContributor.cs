@@ -29,13 +29,17 @@ internal sealed class OnnxAdapterContributor : IAiAdapterContributor
             return;
         }
 
-        if (!File.Exists(options.ModelPath))
+        // Relative paths resolve against the app base dir, so a bundled model (copied next to the exe)
+        // works the same whether run from the project, published, or single-file.
+        var modelPath = Resolve(options.ModelPath);
+        if (!File.Exists(modelPath))
             throw new FileNotFoundException(
-                $"ONNX embedding model not found at '{options.ModelPath}'. Set Koan:Ai:Onnx:ModelPath to a valid ONNX sentence-embedding model.",
-                options.ModelPath);
+                $"ONNX embedding model not found at '{modelPath}'. Set Koan:Ai:Onnx:ModelPath to a valid ONNX sentence-embedding model.",
+                modelPath);
 
-        var vocabPath = options.VocabPath
-            ?? Path.Combine(Path.GetDirectoryName(Path.GetFullPath(options.ModelPath)) ?? ".", "vocab.txt");
+        var vocabPath = options.VocabPath is { Length: > 0 } v
+            ? Resolve(v)
+            : Path.Combine(Path.GetDirectoryName(modelPath) ?? ".", "vocab.txt");
         if (!File.Exists(vocabPath))
             throw new FileNotFoundException(
                 $"ONNX WordPiece vocabulary not found at '{vocabPath}'. Set Koan:Ai:Onnx:VocabPath, or place vocab.txt beside the model.",
@@ -45,11 +49,14 @@ internal sealed class OnnxAdapterContributor : IAiAdapterContributor
         using (var reader = File.OpenText(vocabPath))
             await tokenizer.LoadVocabularyAsync(reader, convertInputToLowercase: options.LowercaseInput).ConfigureAwait(false);
 
-        var session = new InferenceSession(options.ModelPath);
+        var session = new InferenceSession(modelPath);
         var adapter = new OnnxEmbeddingAdapter(options, session, tokenizer);
         registry.Add(adapter);
 
         logger.LogInformation("[ONNX] In-process embedding adapter registered: {Model} (dim {Dimension}) from {Path}.",
-            options.ModelName, adapter.Dimension, options.ModelPath);
+            options.ModelName, adapter.Dimension, modelPath);
     }
+
+    private static string Resolve(string path)
+        => Path.IsPathRooted(path) ? path : Path.Combine(AppContext.BaseDirectory, path);
 }
