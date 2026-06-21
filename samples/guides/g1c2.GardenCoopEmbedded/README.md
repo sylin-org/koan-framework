@@ -32,7 +32,7 @@ dotnet run
 ```
 
 On first run it seeds five produce listings. For each, `Seed.cs` embeds the description **in-process** with the
-local ONNX model (`Embedder.Embed`) and writes the vector to sqlite-vec (`Vector<Produce>.Save`). Then:
+local ONNX model via the AI facade (`Client.Embed`) and writes the vector to sqlite-vec (`Vector<Produce>.Save`). Then:
 
 ```bash
 # REST (auto from EntityController<Produce>)
@@ -66,14 +66,13 @@ spike, not a guarantee. Self-contained single-file is the honest single-binary d
 
 ## Notes
 
-- The sample uses an **explicit** embed→store flow (`Embedder.Embed` → `Vector<Produce>.Save`), which calls the
-  registered ONNX adapter directly. Two framework follow-ups surfaced while wiring it (the ONNX adapter itself is
-  complete and tested — both gaps are in higher-level AI machinery integration):
-  1. **`Client.Embed` / the AI router** resolve embedders via the AI *source* registry; the local ONNX adapter
-     registers as an adapter but not a source, so it isn't routable through the facade yet.
-  2. **`[Embedding(Async = true)]`** (the ergonomic auto-flow) queues through a worker whose generic
-     `EmbeddingState<T>` tracker gets a mangled table name the SQLite DDL path can't create.
-  Both are about making the in-process ONNX adapter a first-class citizen of the existing (Ollama-shaped) AI
-  source/worker pipeline — tracked for a follow-up; the direct path keeps this sample self-contained today.
+- The embed→store flow uses the **AI facade** (`Client.Embed` → `Vector<Produce>.Save`): the in-process ONNX
+  connector publishes itself as an AI *source* (provider `onnx`, the embedded all-MiniLM model as its default),
+  so it's a first-class citizen of the same source/router pipeline that drives Ollama — `Client.Embed` and the
+  `[Embedding]` worker route to it with no provider name in app code. The adapter mirrors the Ollama shape:
+  provider-level identity, model is a usage-time concern (here, the one model bundled in the exe).
+- The fully-declarative `[Embedding(Async = true)]` auto-flow (no explicit `Client.Embed` call at all) routes
+  through a worker whose generic `EmbeddingState<T>` tracker still needs a relational-safe storage name — once
+  that lands, `Seed.cs`'s explicit embed call collapses into a plain `item.Save()`.
 - Nothing here references a provider by name except the deliberate `[VectorAdapter("sqlitevec")]` routing hint;
   remove it and the in-memory vector floor (`Koan.Data.Vector.Connector.InMemory`) would serve instead.

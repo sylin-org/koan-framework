@@ -1,3 +1,4 @@
+using Koan.AI;
 using Koan.Data.Core;
 using Koan.Data.Vector;
 
@@ -26,9 +27,9 @@ internal static class Seed
 
         foreach (var item in items)
         {
-            await item.Save();                                                    // row -> SQLite
-            var vector = await Embedder.Embed($"{item.Name}. {item.Description}"); // text -> vector (local ONNX)
-            await Vector<Produce>.Save(item, vector);                             // vector -> sqlite-vec
+            await item.Save();                                                   // row -> SQLite
+            var vector = await Client.Embed($"{item.Name}. {item.Description}"); // text -> vector (local ONNX, via the AI facade)
+            await Vector<Produce>.Save(item, vector);                            // vector -> sqlite-vec
         }
     }
 }

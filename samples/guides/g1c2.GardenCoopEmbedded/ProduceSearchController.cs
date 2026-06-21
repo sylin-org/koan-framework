@@ -1,3 +1,4 @@
+using Koan.AI;
 using Koan.Data.Vector;
 using Microsoft.AspNetCore.Mvc;
 
@@ -19,7 +20,7 @@ public sealed class ProduceSearchController : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(q)) return BadRequest("query parameter 'q' is required");
 
-        var queryVector = await Embedder.Embed(q, ct);          // local ONNX embedding
+        var queryVector = await Client.Embed(q, ct);            // local ONNX embedding, via the AI facade
         var result = await Vector<Produce>.Search(queryVector, topK: k);
 
         var hits = new List<Hit>(result.Matches.Count);

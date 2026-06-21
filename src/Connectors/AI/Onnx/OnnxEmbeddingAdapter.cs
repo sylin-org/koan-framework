@@ -36,9 +36,16 @@ internal sealed class OnnxEmbeddingAdapter : IEmbedAdapter, IDisposable
 
     public int Dimension { get; }
 
-    public string Id => $"onnx:{_options.ModelName}";
+    // Provider-level identity, mirroring the Ollama adapter (Id == Type == "ollama"): the adapter is the
+    // in-process ONNX *provider*, and the embedded model is its default — a usage-time concern surfaced via
+    // the source's Embedding capability, not baked into the adapter's identity. The registry dedupes by Id,
+    // so one ONNX provider serves the one model the app embeds (the in-process single-model tier).
+    public string Id => "onnx";
     public string Name => $"ONNX ({_options.ModelName})";
     public string Type => "onnx";
+
+    /// <summary>The default (and, for the in-process tier, only) model this provider serves.</summary>
+    public string DefaultModel => _options.ModelName;
 
     public IReadOnlySet<string> Capabilities { get; } =
         new HashSet<string>(StringComparer.OrdinalIgnoreCase) { AiCapability.Embed };
