@@ -103,6 +103,26 @@ sudo apt-get install -y clang zlib1g-dev binutils libicu-dev   # Debian/Ubuntu
 - **No `dynamic`.** The DLR can't bind under AOT. Koan's hot paths avoid it.
 - **Native deps that work under AOT:** ONNX Runtime (P/Invoke), the sqlite-vec `vec0` loadable
   extension (embedded + self-extracted), and `e_sqlite3`.
+- **Globalization.** Set `<InvariantGlobalization>true</InvariantGlobalization>` in the app project
+  (the floor doesn't need culture data). Otherwise the AOT binary needs ICU present on the target.
+  Note the **build/SDK** box still needs `libicu` regardless — `dotnet` itself fails fast without it.
+
+## 4b. Ship the app's content beside the binary
+
+A single binary is still a folder: anything the app reads at runtime must be published next to it. The
+SDK auto-includes `appsettings.json` only for the **Web** SDK; a plain `OutputType=Exe` app (and any
+side-loaded asset, e.g. an embedding model) needs explicit `CopyToPublishDirectory`:
+
+```xml
+<ItemGroup>
+  <Content Include="appsettings.json" CopyToPublishDirectory="PreserveNewest" />
+  <Content Include="..\..\assets\models\all-MiniLM-L6-v2\model_quantized.onnx"
+           Link="models\model_quantized.onnx" CopyToPublishDirectory="PreserveNewest" />
+</ItemGroup>
+```
+
+Resolve such paths against `AppContext.BaseDirectory` (the exe's directory), never
+`Assembly.Location` (empty in a single-file/AOT app).
 
 ## 5. Known gaps (avoid or work around)
 
