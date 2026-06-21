@@ -1,3 +1,20 @@
+---
+type: GUIDE
+domain: orchestration
+title: "Publishing a Koan app with NativeAOT"
+audience: [developers, architects]
+status: current
+last_updated: 2026-06-21
+framework_version: v0.17.0
+validation:
+  date_last_tested: 2026-06-21
+  status: verified
+  scope: g1c2.GardenCoopEmbedded (win-x64 + linux-x64)
+related_guides:
+  - composition-lockfile.md
+  - ai-vector-howto.md
+---
+
 # Publishing a Koan app with NativeAOT
 
 A Koan app can publish to a single self-contained **NativeAOT** binary — no .NET runtime, no
@@ -126,11 +143,12 @@ Resolve such paths against `AppContext.BaseDirectory` (the exe's directory), nev
 
 ## 5. Known gaps (avoid or work around)
 
-- **`[Embedding]` without a `Template`** serializes the whole entity via `System.Text.Json` with a
-  custom resolver — not yet AOT-ready. Set an explicit `[Embedding(Template = "...")]`.
 - **`linux-arm64`** is the appliance/edge RID. Building on an arm64 host is straightforward (same
   steps, `-r linux-arm64`); cross-compiling from x64 needs the aarch64 cross toolchain or a
   `buildx`/arm64 builder.
+
+(All four `[Embedding]` text strategies — `Template`, `Properties`/`AllStrings`, and `FullJson` —
+are AOT-clean: text is built by reflection over names + string ops, and `FullJson` uses Newtonsoft.)
 
 ## 6. Verify it ran
 
