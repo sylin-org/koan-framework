@@ -119,7 +119,7 @@ Preamble for these cards: the `[SESSION-PREAMBLE]` block in `../07-strategic-pro
 | P4.1 | T3 | Facet 3 (HARD GATE), P2.1 | pending | | | | multi-tenancy primitive |
 | P4.2 | T3 | 06 S3, P2.1 | pending | | | | app-level AI evals |
 | P5.1 | T3 | 06 B2 | pending | | | | sovereign / scales-down deployment (AOT) |
-| P5.2 | T3 | P1.2, P3.1, 06 H1 | pending | | | | the wedge demo — agent transcript |
+| P5.2 | T3 | P1.2, P3.1, 06 H1 | done | 2026-06-20 | opus-4.8 | 014e158d | **Wedge demo — real 7-beat agent transcript** (`docs/case-studies/agent-wedge-demo/`), captured LIVE vs framework source (.NET 10 + Docker + Ollama). Built "Recs" anime app one entity → agent-operable MCP server: (1-2) EntityController REST (GUID v7) + boot `Composition` line + checked-in koan.lock.json (P1.1); (3) +Postgres connector + 1 config line → **Koan self-orchestrated a postgres container**, resolved-twin election `data:default→postgres` + verified row prove the zero-code swap; (4) `[Cacheable]` L1; (5) `IKoanJob<T>` durable import (RoutingJobLedger upgraded by Postgres); (6) `[Embedding]`+Ollama(all-minilm)+Weaviate → semantic search (Spy×Family/Vinland Saga ranked #1); (7) `[McpEntity]`+Streamable-HTTP → agent initialize → read `koan://entities` → mutate `anime.upsert` (same entity REST serves). Honest notes kept: Koan fail-loud on a Weaviate port conflict (fixed w/ explicit endpoint); `[Embedding] Async=true` routes through the vector-writing worker; open write gate is ungoverned (SEC-0005 grants/audit govern restricted writes). Prereqs verified (H1/P1.2/P3.1). No framework code changed; docs-lint 0 err. README linked under three-beats. |
 
 ## 07-AN — Agent-native projection (Stage 9 harvest)
 
