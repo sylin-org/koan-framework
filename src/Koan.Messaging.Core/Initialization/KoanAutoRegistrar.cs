@@ -30,10 +30,8 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             "true",
             source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
             consumers: new[] { "Koan.Messaging.Core.Runtime" });
-        module.AddSetting(
-            "InMemoryProvider.Available",
-            "true",
-            source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
-            consumers: new[] { "Koan.Messaging.Core.InMemory" });
+        // NOTE: Core ships no transport. The previously-hardcoded "InMemoryProvider.Available=true" was a
+        // false self-report — there was no in-memory provider class. The in-process provider now lives in
+        // Koan.Messaging.Connector.InMemory and reports its own availability only when referenced.
     }
 }

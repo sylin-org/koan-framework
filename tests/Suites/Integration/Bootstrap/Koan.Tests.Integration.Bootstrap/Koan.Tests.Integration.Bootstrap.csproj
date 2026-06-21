@@ -46,6 +46,7 @@
 
     <!-- Messaging pillar (MessagingCorePillarBootstrapSpec) — in-process provider -->
     <ProjectReference Include="..\..\..\..\..\src\Koan.Messaging.Core\Koan.Messaging.Core.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Connectors\Messaging\InMemory\Koan.Messaging.Connector.InMemory.csproj" />
 
     <!-- Auth pillar (AuthPillarBootstrapSpec) -->
     <ProjectReference Include="..\..\..\..\..\src\Koan.Web.Auth\Koan.Web.Auth.csproj" />

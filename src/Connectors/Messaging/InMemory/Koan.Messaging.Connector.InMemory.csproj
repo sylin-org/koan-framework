@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <KoanPackageKind>Periphery</KoanPackageKind>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>Koan.Messaging.Connector.InMemory</AssemblyName>
+    <RootNamespace>Koan.Messaging.Connector.InMemory</RootNamespace>
+    <Description>In-process messaging provider for Koan over System.Threading.Channels. The zero-broker messaging floor for single-binary deployments: fills the reserved Priority-10 slot, fans out to in-process subscribers, non-durable by design (durable work leans on the Jobs ledger). Pure managed, no native dependencies.</Description>
+    <PackageTags>$(CommonPackageTags);messaging;inmemory;inproc;channels;embedded</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Koan.Messaging.Core\Koan.Messaging.Core.csproj" />
+    <ProjectReference Include="..\..\..\Koan.Core\Koan.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
+  </ItemGroup>
+</Project>
