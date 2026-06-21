@@ -2,14 +2,17 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Vector;
 using Koan.Data.Vector.Abstractions;
+using Koan.Data.Vector.Connector.InMemory;
 using Koan.Data.VectorAdapterSurface.TestKit;
 
 namespace Koan.Data.VectorAdapterSurface.InMemory.Tests;
 
 /// <summary>
-/// Test factory for the InMemory cell of the vector matrix. Builds a minimal service provider
-/// with <see cref="InMemoryVectorAdapterFactory"/> registered as the vector adapter; specs drive
-/// <c>Vector&lt;TodoVector&gt;.*</c> through this provider via <c>AppHost.PushScope</c>.
+/// Test factory for the InMemory cell of the vector matrix. Builds a minimal service provider with the
+/// SHIPPING <see cref="InMemoryVectorAdapterFactory"/> (Koan.Data.Vector.Connector.InMemory) registered as
+/// the vector adapter; specs drive <c>Vector&lt;TodoVector&gt;.*</c> through this provider via
+/// <c>AppHost.PushScope</c>. The shipping adapter IS the cross-adapter convergence oracle, so the matrix
+/// validates every native provider against the same code that ships as the in-process vector floor.
 /// </summary>
 public sealed class InMemoryVectorTestFactory : IVectorAdapterTestFactory
 {

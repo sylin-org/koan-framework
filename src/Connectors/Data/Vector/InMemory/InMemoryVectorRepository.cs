@@ -1,53 +1,33 @@
+using System.Collections;
 using System.Collections.Concurrent;
+using System.Numerics.Tensors;
+using System.Runtime.CompilerServices;
 using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Vector.Abstractions;
 using Koan.Data.Vector.Abstractions.Capabilities;
 
-namespace Koan.Data.VectorAdapterSurface.InMemory.Tests;
+namespace Koan.Data.Vector.Connector.InMemory;
 
 /// <summary>
-/// Production-shaped in-memory <see cref="IVectorAdapterFactory"/> used by the InMemory cell of
-/// the vector matrix. The factory creates per-(entity, partition) <see cref="InMemoryVectorRepository{TEntity, TKey}"/>
-/// stores keyed by the adapter's own <see cref="INamingProvider.ResolveStorage"/> output — which
-/// gives the matrix a real per-partition isolation surface without any external infrastructure.
+/// Per-(entity, key) in-memory vector repository, routed at call time by the current EntityContext
+/// partition. The store dictionary is shared with the factory; the repository looks up the right
+/// bucket each call and operates on it.
 /// </summary>
-public sealed class InMemoryVectorAdapterFactory : IVectorAdapterFactory
-{
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, (float[] Embedding, object? Metadata)>> _stores = new(StringComparer.Ordinal);
-
-    public string Provider => "inmemoryvector";
-
-    public bool CanHandle(string provider)
-        => string.Equals(provider, "inmemoryvector", StringComparison.OrdinalIgnoreCase)
-           || string.Equals(provider, "inmemory", StringComparison.OrdinalIgnoreCase);
-
-    public StorageNamingCapability GetNamingCapability(IServiceProvider services)
-        => new()
-        {
-            Style = StorageNamingStyle.EntityType,
-            Casing = NameCasing.AsIs,
-            PartitionSeparator = '#',
-            Partition = PartitionTokenPolicy.Default,
-        };
-
-    public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp)
-        where TEntity : class, IEntity<TKey>
-        where TKey : notnull
-        => new InMemoryVectorRepository<TEntity, TKey>(this, sp, _stores);
-
-    /// <summary>Test-only: wipe every store the factory has ever issued.</summary>
-    public void ClearAll() => _stores.Clear();
-}
-
-/// <summary>
-/// Per-(entity, key) repository routed at call time by the current EntityContext partition. The
-/// store dictionary is shared with the factory; the repository's job is to look up the right
-/// bucket each time and operate on it.
-/// </summary>
-internal sealed class InMemoryVectorRepository<TEntity, TKey> : IVectorSearchRepository<TEntity, TKey>, IDescribesCapabilities, IInstructionExecutor<TEntity>
+/// <remarks>
+/// k-NN ranking runs <see cref="TensorPrimitives.CosineSimilarity(System.ReadOnlySpan{float}, System.ReadOnlySpan{float})"/>
+/// (hardware-accelerated SIMD, zero native dependencies). It honestly implements every capability it can
+/// model in-process — k-NN, metadata filters (the full unified <see cref="Filter"/> via
+/// <see cref="DictionaryFilterEvaluator"/>, making this the convergence oracle), hybrid (vector+keyword
+/// blend), offset continuation, streaming export, bulk ops, score normalization, dynamic collections. The
+/// two it does NOT claim are honest omissions a single-vector dictionary cannot model: multi-vector per
+/// entity and atomic batch (no transaction boundary).
+/// </remarks>
+internal sealed class InMemoryVectorRepository<TEntity, TKey>
+    : IVectorSearchRepository<TEntity, TKey>, IDescribesCapabilities, IInstructionExecutor<TEntity>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
@@ -65,16 +45,8 @@ internal sealed class InMemoryVectorRepository<TEntity, TKey> : IVectorSearchRep
         _stores = stores;
     }
 
-    // AI-0036 §9: the in-memory reference implements every capability it can model in-process —
-    // kNN, metadata filters (via the oracle), hybrid (vector+keyword blend), continuation paging,
-    // streaming export, bulk ops, score normalization, dynamic collections. The two it does NOT
-    // claim are honest omissions of features a single-vector dictionary cannot model: multi-vector
-    // per entity (one embedding per id) and atomic batch (no transaction boundary).
-    // AI-0036 §9: the in-memory adapter evaluates the full unified Filter via DictionaryFilterEvaluator
-    // — it IS the convergence oracle, so it declares Filters with FilterSupport.Full and the coordinator
-    // passes every filter through.
     public void Describe(ICapabilities caps) => caps
-        .Add(VectorCaps.Knn).Add(VectorCaps.Filters, Koan.Data.Abstractions.Filtering.FilterSupport.Full).Add(VectorCaps.Hybrid)
+        .Add(VectorCaps.Knn).Add(VectorCaps.Filters, FilterSupport.Full).Add(VectorCaps.Hybrid)
         .Add(VectorCaps.NativeContinuation).Add(VectorCaps.StreamingResults)
         .Add(VectorCaps.BulkUpsert).Add(VectorCaps.BulkDelete)
         .Add(VectorCaps.ScoreNormalization).Add(VectorCaps.DynamicCollections);
@@ -82,7 +54,7 @@ internal sealed class InMemoryVectorRepository<TEntity, TKey> : IVectorSearchRep
     private ConcurrentDictionary<string, (float[] Embedding, object? Metadata)> Bucket()
     {
         var partition = Koan.Data.Core.EntityContext.Current?.Partition;
-        var storage = ((Koan.Data.Abstractions.Naming.INamingProvider)_factory).ResolveStorage(typeof(TEntity), partition, _sp);
+        var storage = ((INamingProvider)_factory).ResolveStorage(typeof(TEntity), partition, _sp);
         return _stores.GetOrAdd(storage, _ => new ConcurrentDictionary<string, (float[], object?)>(StringComparer.Ordinal));
     }
 
@@ -142,11 +114,11 @@ internal sealed class InMemoryVectorRepository<TEntity, TKey> : IVectorSearchRep
         var topK = options.TopK ?? 10;
         var offset = ParseOffset(options.ContinuationToken);
 
-        // Filters: apply the metadata predicate BEFORE ranking (the convergence oracle), so the
-        // in-memory adapter returns the reference id-set every real provider must match.
+        // Filters: apply the metadata predicate BEFORE ranking (the convergence oracle), so this
+        // adapter returns the reference id-set every real provider must match.
         var predicate = options.Filter is null
             ? null
-            : Koan.Data.Abstractions.Filtering.DictionaryFilterEvaluator.Compile(options.Filter);
+            : DictionaryFilterEvaluator.Compile(options.Filter);
 
         // Hybrid: when SearchText + Alpha are supplied, blend the (normalized) cosine with a lexical
         // keyword score over the entry's metadata; alpha=1 => pure-vector, alpha=0 => pure-keyword.
@@ -174,6 +146,42 @@ internal sealed class InMemoryVectorRepository<TEntity, TKey> : IVectorSearchRep
         return Task.FromResult(new VectorQueryResult<TKey>(page, continuation, VectorTotalKind.Exact));
     }
 
+    public Task Flush(CancellationToken ct = default)
+    {
+        Bucket().Clear();
+        return Task.CompletedTask;
+    }
+
+    public async IAsyncEnumerable<VectorExportBatch<TKey>> ExportAll(int? batchSize = null, [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        await Task.Yield();
+        foreach (var kvp in Bucket())
+            yield return new VectorExportBatch<TKey>(ParseKey(kvp.Key), kvp.Value.Embedding, kvp.Value.Metadata);
+    }
+
+    // The vector-index instruction surface — the in-memory reference honors the same IndexStats /
+    // EnsureCreated / Clear / Rebuild instructions the search-engine connectors implement (Stats rides
+    // the ExportAll capability: an enumerable store can always count its entries).
+    public Task<TResult> ExecuteAsync<TResult>(Instruction instruction, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(instruction);
+        switch (instruction.Name)
+        {
+            case VectorInstructions.IndexStats:
+                return Task.FromResult((TResult)(object)Bucket().Count);
+            case VectorInstructions.IndexRebuild:
+                return Task.FromResult((TResult)(object)true); // no persisted index to rebuild
+            case VectorInstructions.IndexClear:
+                Bucket().Clear();
+                return Task.FromResult(default(TResult)!);
+            case VectorInstructions.IndexEnsureCreated:
+                _ = Bucket();
+                return Task.FromResult(default(TResult)!);
+            default:
+                throw new NotSupportedException($"Instruction '{instruction.Name}' is not supported by the in-memory vector adapter.");
+        }
+    }
+
     private static int ParseOffset(string? token)
         => int.TryParse(token, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var o) && o > 0 ? o : 0;
 
@@ -194,10 +202,10 @@ internal sealed class InMemoryVectorRepository<TEntity, TKey> : IVectorSearchRep
     private static string MetadataText(object? metadata)
     {
         if (metadata is null) return "";
-        if (metadata is System.Collections.IDictionary raw)
+        if (metadata is IDictionary raw)
         {
             var sb = new System.Text.StringBuilder();
-            foreach (System.Collections.DictionaryEntry e in raw) sb.Append(e.Value).Append(' ');
+            foreach (DictionaryEntry e in raw) sb.Append(e.Value).Append(' ');
             return sb.ToString();
         }
         return metadata.ToString() ?? "";
@@ -207,54 +215,18 @@ internal sealed class InMemoryVectorRepository<TEntity, TKey> : IVectorSearchRep
     {
         IReadOnlyDictionary<string, object?> rod => rod,
         IDictionary<string, object?> d => new Dictionary<string, object?>(d),
-        System.Collections.IDictionary raw => CoerceRaw(raw),
+        IDictionary raw => CoerceRaw(raw),
         _ => EmptyBag
     };
 
-    private static IReadOnlyDictionary<string, object?> CoerceRaw(System.Collections.IDictionary raw)
+    private static IReadOnlyDictionary<string, object?> CoerceRaw(IDictionary raw)
     {
         var bag = new Dictionary<string, object?>();
-        foreach (System.Collections.DictionaryEntry e in raw) bag[e.Key?.ToString() ?? ""] = e.Value;
+        foreach (DictionaryEntry e in raw) bag[e.Key?.ToString() ?? ""] = e.Value;
         return bag;
     }
 
     private static readonly IReadOnlyDictionary<string, object?> EmptyBag = new Dictionary<string, object?>();
-
-    public Task Flush(CancellationToken ct = default)
-    {
-        Bucket().Clear();
-        return Task.CompletedTask;
-    }
-
-    public async IAsyncEnumerable<VectorExportBatch<TKey>> ExportAll(int? batchSize = null, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
-    {
-        await Task.Yield();
-        foreach (var kvp in Bucket())
-            yield return new VectorExportBatch<TKey>(ParseKey(kvp.Key), kvp.Value.Embedding, kvp.Value.Metadata);
-    }
-
-    // The vector-index instruction surface — the in-memory reference honors the same IndexStats /
-    // EnsureCreated / Clear / Rebuild instructions the search-engine connectors implement (Stats rides
-    // the ExportAll capability the factory advertises: an enumerable store can always count its entries).
-    public Task<TResult> ExecuteAsync<TResult>(Instruction instruction, CancellationToken ct = default)
-    {
-        ArgumentNullException.ThrowIfNull(instruction);
-        switch (instruction.Name)
-        {
-            case VectorInstructions.IndexStats:
-                return Task.FromResult((TResult)(object)Bucket().Count);
-            case VectorInstructions.IndexRebuild:
-                return Task.FromResult((TResult)(object)true); // no persisted index to rebuild
-            case VectorInstructions.IndexClear:
-                Bucket().Clear();
-                return Task.FromResult(default(TResult)!);
-            case VectorInstructions.IndexEnsureCreated:
-                _ = Bucket();
-                return Task.FromResult(default(TResult)!);
-            default:
-                throw new NotSupportedException($"Instruction '{instruction.Name}' is not supported by the in-memory vector reference.");
-        }
-    }
 
     private static string Key(TKey id) => id?.ToString() ?? throw new ArgumentNullException(nameof(id));
 
@@ -264,17 +236,15 @@ internal sealed class InMemoryVectorRepository<TEntity, TKey> : IVectorSearchRep
         return (TKey)Convert.ChangeType(raw, typeof(TKey))!;
     }
 
+    /// <summary>
+    /// Cosine similarity via SIMD <see cref="TensorPrimitives"/>. Returns 0 on a dimension mismatch or a
+    /// zero-norm vector (TensorPrimitives yields NaN there) — preserving the convergence-oracle contract
+    /// that a non-comparable pair scores 0 rather than throwing or ranking unpredictably.
+    /// </summary>
     private static double Cosine(float[] a, float[] b)
     {
-        if (a.Length != b.Length) return 0;
-        double dot = 0, na = 0, nb = 0;
-        for (int i = 0; i < a.Length; i++)
-        {
-            dot += a[i] * b[i];
-            na += a[i] * a[i];
-            nb += b[i] * b[i];
-        }
-        var denom = Math.Sqrt(na) * Math.Sqrt(nb);
-        return denom == 0 ? 0 : dot / denom;
+        if (a.Length == 0 || a.Length != b.Length) return 0;
+        var score = TensorPrimitives.CosineSimilarity<float>(a, b);
+        return float.IsNaN(score) ? 0 : score;
     }
 }

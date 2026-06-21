@@ -1,0 +1,50 @@
+using System.Collections.Concurrent;
+using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Naming;
+using Koan.Data.Vector.Abstractions;
+
+namespace Koan.Data.Vector.Connector.InMemory;
+
+/// <summary>
+/// In-process, in-memory <see cref="IVectorAdapterFactory"/> — the zero-infrastructure vector floor.
+/// Issues per-(entity, partition) <see cref="InMemoryVectorRepository{TEntity, TKey}"/> stores keyed by
+/// the adapter's own <see cref="INamingProvider.ResolveStorage"/> output, so partition isolation works
+/// with no external infrastructure. Reference = Intent: referencing this package makes a single managed
+/// binary capable of semantic search (k-NN over <see cref="System.Numerics.Tensors.TensorPrimitives"/>).
+/// </summary>
+/// <remarks>
+/// Priority −100 mirrors the in-memory data adapter: it is the fallback that activates only when no
+/// other vector provider is configured (a real server, or sqlite-vec for the durable in-proc tier).
+/// This is also the cross-adapter convergence oracle — every native provider's pushdown is validated
+/// against the result this adapter produces in managed code.
+/// </remarks>
+[ProviderPriority(-100)]
+public sealed class InMemoryVectorAdapterFactory : IVectorAdapterFactory
+{
+    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, (float[] Embedding, object? Metadata)>> _stores
+        = new(StringComparer.Ordinal);
+
+    public string Provider => "inmemory";
+
+    public bool CanHandle(string provider)
+        => string.Equals(provider, "inmemory", StringComparison.OrdinalIgnoreCase)
+           || string.Equals(provider, "memory", StringComparison.OrdinalIgnoreCase)
+           || string.Equals(provider, "inproc", StringComparison.OrdinalIgnoreCase);
+
+    public StorageNamingCapability GetNamingCapability(IServiceProvider services)
+        => new()
+        {
+            Style = StorageNamingStyle.EntityType,
+            Casing = NameCasing.AsIs,
+            PartitionSeparator = '#',
+            Partition = PartitionTokenPolicy.Default,
+        };
+
+    public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp)
+        where TEntity : class, IEntity<TKey>
+        where TKey : notnull
+        => new InMemoryVectorRepository<TEntity, TKey>(this, sp, _stores);
+
+    /// <summary>Clears every per-(entity, partition) store this factory has issued (in-memory reset).</summary>
+    public void ClearAll() => _stores.Clear();
+}

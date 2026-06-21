@@ -36,6 +36,10 @@
     <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Connectors\Data\InMemory\Koan.Data.Connector.InMemory.csproj" />
 
+    <!-- Vector pillar (VectorInMemoryPillarBootstrapSpec) — in-process brute-force floor -->
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Vector\Koan.Data.Vector.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Connectors\Data\Vector\InMemory\Koan.Data.Vector.Connector.InMemory.csproj" />
+
     <!-- Storage pillar (StoragePillarBootstrapSpec) — uses Local connector -->
     <ProjectReference Include="..\..\..\..\..\src\Koan.Storage\Koan.Storage.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Connectors\Storage\Local\Koan.Storage.Connector.Local.csproj" />
