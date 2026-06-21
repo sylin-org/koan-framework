@@ -89,11 +89,13 @@ the API surface is consumer-shaped. Four moves:
 2. **De-consumer-ize the API**: parameterize the TOTP issuer (`"ZenGarden"` → config),
    genericize roster role docs, firewall-prefix examples, `.zengarden` zone comments — ZG
    passes its branding through configuration.
-3. **Freeze, never rename, the cryptographic domain-separation constants**
-   (`b"pond-unlock-slot-totp-v1"`, `b"pond-fido2-storage-key-v1"`): they are opaque HKDF
-   inputs whose renaming breaks every existing vault and enrolled slot. Document as immutable
-   v1 constants; allowlist in R1's grep gate. *(This is the no-stopgaps rule pointed the other
-   way: cosmetic cleanup here would be the band-aid that breaks production.)*
+3. **Freeze the cryptographic domain-separation constants at the neutral `b"koi-…-v1"`
+   namespace** (`b"koi-unlock-slot-totp-v1"`, `b"koi-promote-v1"`, `b"koi-seal-group-v1"`):
+   they are opaque HKDF inputs whose renaming breaks every existing vault and enrolled slot.
+   The original `pond-*` strings were renamed once in the pre-1.0 greenfield window (no
+   production vault existed); frozen at `koi-*` from here — a new algorithm gets a new
+   versioned label, never a rename. *(Post-1.0 this is the no-stopgaps rule pointed the other
+   way: cosmetic relabeling would be the band-aid that breaks production.)*
 4. **Fix the two contract bugs as contract bugs**, because they break exactly the programmatic
    consumers the Epic depends on: the undocumented per-boot `x-koi-token` (→ documented,
    stable token provisioning for programmatic consumers) and the loopback-only bind with no

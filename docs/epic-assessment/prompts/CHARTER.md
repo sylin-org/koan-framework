@@ -44,10 +44,12 @@ capacitated is the one most harmed by fictional docs and silent failures.
 2. **Coupling form**: "works alone, lights up together." Reference implementation:
    `KOAN/src/Connectors/Data/Mongo/MongoOptionsConfigurator.cs:74-93` (autonomous fallback).
    Never add a hard sibling dependency to anything mainline.
-3. **Frozen constants**: the HKDF domain-separation byte strings in
-   `KOI/crates/koi-crypto/src/unlock_slots.rs` (`b"pond-unlock-slot-totp-v1"`,
-   `b"pond-fido2-storage-key-v1"`) are immutable v1 values. Renaming them destroys existing
-   vaults. They are allowlisted from any vocabulary cleanup.
+3. **Frozen constants**: the HKDF domain-separation byte strings are one immutable
+   `b"koi-…-v1"` namespace — `b"koi-unlock-slot-totp-v1"` (`KOI/crates/koi-crypto/src/unlock_slots.rs`),
+   `b"koi-promote-v1"`, `b"koi-seal-group-v1"` (`key_agreement.rs`). Each is a frozen v1
+   value: a new algorithm gets a new versioned label, never a rename/reuse. They were renamed
+   once from the original `pond-*` strings in the pre-1.0 greenfield window (no production vault
+   existed); frozen at `koi-*` from here.
 4. **The Koi TLS proxy is outside all contracts** until it has data-plane tests and a
    truthful `status()`. Do not build anything on it; do not delete it either.
 5. **The garden mesh (UDP 7184, `stone_chirp`/`tools_beacon`) is Zen Garden-internal** —

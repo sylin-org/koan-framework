@@ -63,8 +63,10 @@ HARD GUARDRAILS (violating any of these fails the card):
   delete superseded code in the same session. The only backward contract is the test suite
   staying green plus CHARTER's frozen items.
 - FROZEN: never alter the HKDF domain-separation byte strings in koi-crypto
-  (b"pond-unlock-slot-totp-v1", b"pond-fido2-storage-key-v1") or anything CHARTER marks
-  frozen. Renaming them destroys existing data.
+  (the b"koi-…-v1" namespace: b"koi-unlock-slot-totp-v1", b"koi-promote-v1", b"koi-seal-group-v1")
+  or anything CHARTER marks frozen. A new algorithm gets a new versioned label, never a
+  rename. (They were renamed once from the original b"pond-*" strings in the pre-1.0 greenfield
+  window; frozen at koi-* from here.)
 - PRIVACY (ABSOLUTE): downstream solutions outside these three repos exist and exercise
   their surfaces. Refer to any such thing ONLY as "private downstream solution." Never write
   its name into any file, never guess it, never search for it.
