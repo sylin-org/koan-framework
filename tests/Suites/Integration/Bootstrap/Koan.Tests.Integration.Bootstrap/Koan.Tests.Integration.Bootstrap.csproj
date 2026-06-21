@@ -53,6 +53,7 @@
 
     <!-- AI pillar (AiPillarBootstrapSpec) -->
     <ProjectReference Include="..\..\..\..\..\src\Koan.AI\Koan.AI.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Connectors\AI\Onnx\Koan.AI.Connector.Onnx.csproj" />
 
     <!-- Web pillar (WebPillarBootstrapSpec) -->
     <ProjectReference Include="..\..\..\..\..\src\Koan.Web\Koan.Web.csproj" />
