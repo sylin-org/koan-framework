@@ -40,7 +40,7 @@ The **SQLite adapter is migrated off Dapper** to `AdoCommands` (Dapper `<Package
 
 `System.Text.Json`'s reflection serializer is disabled by default under NativeAOT (`InvalidOperationException: Reflection-based serialization has been disabled`). The framework's canonical serializer is already Newtonsoft (which falls back to late-bound reflection under AOT, no IL emit). The sqlite-vec connector's vector-metadata and stored-vector JSON moved from `System.Text.Json` to Newtonsoft — an AOT fix and a canon-consistency fix. Likewise the `EmbeddingPolicy.FullJson` embedding text (`EmbeddingMetadata.SerializeToJson`, with its property-exclusion resolver re-expressed as a Newtonsoft `DefaultContractResolver`) and the `EmbeddingMigrator` export moved to Newtonsoft — so the embedded JSON matches the entity's persisted `(Id, Json)` form, and the only entity serializer is the canonical one. (The low-level `System.Text.Json` DOM — `JsonDocument`/`Utf8JsonWriter`, used for FullJson depth-truncation — is retained; it is the reflection *serializer* that AOT disables, not the reader/writer.)
 
-The SQLite fallback-create path's `((dynamic)ddl).CreateTableWithColumns(...)` used DLR dispatch, which AOT cannot bind ("`'object' does not contain a definition for...`"); `ddl` is statically a `SqliteDdlExecutor`, so the `dynamic` was gratuitous and is replaced with a direct call.
+The SQLite fallback-create path's `((dynamic)ddl).CreateTableWithColumns(...)` used DLR dispatch, which the `Microsoft.CSharp` runtime binder cannot perform under AOT; `ddl` is statically a `SqliteDdlExecutor`, so the `dynamic` was gratuitous and is replaced with a direct call. A captured AOT stack (mutation-confirmed) showed this surfaces two ways: a generic argument throws the expected `RuntimeBinderException` ("'object' does not contain a definition for…"), while a non-generic one throws an *opaque* `ArgumentNullException("key")` from the binder's own `ExpressionTreeCallRewriter` → `Dictionary.TryInsert` — so `grep "(dynamic)"`, not the error text, is the reliable AOT tripwire.
 
 ## Consequences
 
@@ -51,4 +51,3 @@ Verification: SQLite connector 3/3 (the full filter-convergence corpus), Data.Co
 ### Deferred (tracked as follow-ups, not on the proven floor's path)
 
 - **`linux-arm64`** — the appliance/edge RID. win-x64 and linux-x64 prove the substrate is RID-agnostic; arm64 is the same recipe on an arm64 host (`-r linux-arm64`). Cross-compiling from x64 needs the aarch64 cross toolchain or a `buildx`/arm64 builder — a packaging step, not a framework one.
-- **`X-sqlite-fallback-create-generic`** — the pre-existing `ensure: fallback-create-failed … Value cannot be null (Parameter 'key')` warning on the generic-entity fallback-create path (the primary path recovers).
