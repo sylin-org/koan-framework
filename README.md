@@ -139,6 +139,11 @@ domain to agents through the same endpoint service the REST controllers use. The
 discovery isn't reflection magic at runtime — it's a **Roslyn source-generated registry**
 compiled into your assemblies: deterministic, ordered, AOT-friendly.
 
+> **See all three beats run for real** — [the wedge demo](docs/case-studies/agent-wedge-demo/README.md): a
+> live, captured transcript building a multi-provider AI app from one entity to an agent-operable MCP
+> server in one session (REST → Postgres → cache → jobs → semantic search → an agent mutating over
+> `koan://entities`), every command and output run against the framework.
+
 ## What's distinctive (and actually shipped)
 
 - **One grammar everywhere** — the same `Entity<T>` is your table row, your REST resource, your

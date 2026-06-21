@@ -1,0 +1,118 @@
+{
+  "schema": 1,
+  "app": {
+    "name": "Recs",
+    "koan": "0.17",
+    "tfm": "net10.0"
+  },
+  "modules": [
+    {
+      "id": "Koan.AI",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.AI.Connector.Ollama",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.AI.Contracts",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.AI.Prompt",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Cache",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Cache.Abstractions",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Core",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Core.Adapters",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Data.AI",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Data.Abstractions",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Data.Connector.Postgres",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Data.Connector.Sqlite",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Data.Core",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Data.Relational",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Data.Vector",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Data.Vector.Abstractions",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Data.Vector.Connector.Weaviate",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Jobs",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Mcp",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Media.Abstractions",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Orchestration.Abstractions",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Orchestration.Aspire",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Security.Trust",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Storage",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Web",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.Web.Sse",
+      "version": "0.17"
+    },
+    {
+      "id": "Koan.ZenGarden.Core",
+      "version": "0.17"
+    }
+  ]
+}

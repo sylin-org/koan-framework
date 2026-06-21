@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!--
+    The final composition of the wedge demo, as a consumer would reference it (PackageReference).
+    NOTE: the LIVE transcript was captured against the in-repo framework source, so the actual run used
+    <ProjectReference> to ../src/* and an <Import> of build/Sylin.Koan.Core.targets (the 0.17 features —
+    koan.lock.json, the resolved twin, koan://entities, the [Access] gate — are not yet on public NuGet).
+    Each reference below is exactly one beat of the demo (Reference = Intent).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Sylin.Koan.Web" Version="0.17.*" />                       <!-- beats 1-2: REST -->
+    <PackageReference Include="Sylin.Koan.Data.Connector.Sqlite" Version="0.17.*" />     <!-- beat 1 -->
+    <PackageReference Include="Sylin.Koan.Data.Connector.Postgres" Version="0.17.*" />   <!-- beat 3 -->
+    <PackageReference Include="Sylin.Koan.Cache" Version="0.17.*" />                     <!-- beat 4 -->
+    <PackageReference Include="Sylin.Koan.Jobs" Version="0.17.*" />                      <!-- beat 5 -->
+    <PackageReference Include="Sylin.Koan.Data.AI" Version="0.17.*" />                   <!-- beat 6 -->
+    <PackageReference Include="Sylin.Koan.Data.Vector" Version="0.17.*" />               <!-- beat 6 -->
+    <PackageReference Include="Sylin.Koan.Data.Vector.Connector.Weaviate" Version="0.17.*" /> <!-- beat 6 -->
+    <PackageReference Include="Sylin.Koan.AI.Connector.Ollama" Version="0.17.*" />       <!-- beat 6 -->
+    <PackageReference Include="Sylin.Koan.Mcp" Version="0.17.*" />                       <!-- beat 7 -->
+  </ItemGroup>
+</Project>
