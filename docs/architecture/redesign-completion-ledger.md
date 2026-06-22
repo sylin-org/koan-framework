@@ -273,14 +273,36 @@ implemented and its tests pass on real stores.
     empirical, not asserted.
     Note: the phase-0 `IWriteStamp` contributor seam stays a generic in-place-stamp extension point (classification uses
     the new field-transform seam); the priority field was the load-bearing phase-0 deliverable.
-- ◐ **TENANCY ARCH-0099 BUILD — posture seam (step 1) IN PROGRESS.** ADR §6 (the **Tenancy Dev Console**, a
-  dev-only TestProvider-styled control-plane page in a new `Koan.Web.Tenancy` connector) folded in + the build
-  order **reordered** so the durable control-plane + admin endpoints + console precede the particle/container
-  wiring (1 posture-seam → 2 durable control-plane + admin endpoints → 3 dev console → 4 particle → 5 P6 → 6
-  native-container). Now building step 1: `TenancyPosture` (Open/Closed from `KoanEnv`, kills the `Mode=Off`
-  default) + migrate `Koan.Tenancy` to `KoanModule` (DI-available `Start`) + gate-reads-posture + prod-boot
-  pre-flight (HARD-FAIL active+no-resolver/branded-marker/no-secret; WARN census) + dev auto-seed (smart-named
-  dev tenant + loopback Owner + dev-fallback resolution + branded ephemeral key) + Redis-style refusal diagnostic.
+- ✅ **TENANCY ARCH-0099 BUILD — posture seam (step 1) DELIVERED.** ADR §6 (the **Tenancy Dev Console**, a
+  dev-only TestProvider-styled control-plane page in a new `Koan.Web.Tenancy` connector) folded in (`d4de06d4`)
+  + the build order **reordered** so the durable control-plane + admin endpoints + console precede the
+  particle/container wiring (1 posture-seam → 2 durable control-plane + admin endpoints → 3 dev console → 4
+  particle → 5 P6 → 6 native-container). Posture seam built in 4 green+mutation-verified slices:
+  - **1a** (`385d0ee5`) — `TenancyPosture {Closed=0,Open=1}` (fail-safe default) + pure `TenancyPostureResolver`
+    (KoanEnv.IsDevelopment + override) + `TenancyRuntime` (resolve-once) + gate reads posture + **retire
+    `TenancyMode.Off`** + migrate `Koan.Tenancy` → `KoanModule`. 2 mutations killed.
+  - **1b** (`18637c96`) — `ITenantResolver` seam + `TenancyDevBrand` (`koan-dev-insecure-`) + pure
+    `TenancyPreflight` (Production hard-fail: forced-Open / no-resolver / branded-artifact; soft-warn else) +
+    `TenancyBootException` + `Start` runs it (throws → aborts boot). Prod signal = per-host `IHostEnvironment`
+    (testable, dodges the KoanEnv latch). 2 mutations killed.
+  - **1c** (`c0b50c81`) — dev auto-seed under Open: `TenancyDevSeed` (smart-name `leo@acme.dev`→`Acme`, Owner
+    `koan:owner`, branded per-machine key) + `TenancyDevState` (in-memory singleton) + `TenancyAmbient` (one
+    resolution point; unset slice → dev fallback via AppHost.Current). 2 mutations killed.
+  - **1d** (`d526f239`) — `TenancyRefusal` Redis-protected-mode-quality diagnostic (names entity + 3 exact
+    remediations + dev-open reminder).
+  - **Adversarial review** (`wf_baf637e1-c5b`, 5 lenses → verify) confirmed **7 findings** (2 HIGH security, 3
+    ADR-conformance, 2 test-adequacy), all one root cause: the pre-flight reconstructed the override from the
+    config string + gated on `IsProduction`, while the operative posture (which the gate/seed honor) was the
+    resolved value → blind to the fail-open signal. Three holes: Staging+override, KoanEnv process-latch (Prod
+    inherits a Dev snapshot), programmatic `Configure<TenancyOptions>`. **FIXED (`7edca2e2`):** posture now
+    derives from the **per-host `IHostEnvironment`** (not the latched `KoanEnv`); the pre-flight is **authoritative
+    over the resolved posture** with the invariant **"Open is legal only in Development"** (refuses a resolved Open
+    in any non-Dev env — closes all three holes in one check); branded-artifact hard-fail extended to all non-Dev;
+    seed gated on `env.IsDevelopment()` too; Report over-claim + census comment corrected; ARCH-0099 §1 refinement
+    note added. Dev-open is now exercised by booting a **Development** host (not forcing Open in Test).
+  - **Koan.Tenancy 62/62** (real `AddKoan` boots, ARCH-0079); **12 mutations killed total** (incl. the invariant
+    flip → 11 fail, per-host dev-flag → false → 5 fail); blast radius contained (no external project references
+    the module). All 7 review findings addressed. Posture seam (ARCH-0099 build-order step 1) COMPLETE.
 - ☐ **THEN:** Phase 3c schema-column DDL indexability (Indexed descriptors → computed/expression index; PG/SqlServer;
   SQLite JSON-only) + Mongo/bare-store managed serialization injection + in-memory managed `GetValue` · classification
   phases 4–7 (searchable blind-index · vector/messaging leak guards · crypto-shred+rotation · masked-read) · then
