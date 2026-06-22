@@ -1,27 +1,26 @@
 using System;
 using System.Collections.Concurrent;
-using Koan.Data.Core.Metadata;
-using Koan.Data.Core.Options;
 using Koan.Data.Core.Pipeline;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace Koan.Data.Core.Tenancy;
+namespace Koan.Tenancy;
 
 /// <summary>
-/// The tenant fail-closed gate (ARCH-0095 P1, charter L6/C5) as a generic <see cref="IStorageGuard"/>: the
-/// data-core chokepoint invokes registered guards without naming a tenant. Reads the <see cref="TenancyOptions"/>
-/// posture and the ambient <see cref="Tenant"/> slice, computing <c>[HostScoped]</c> itself (cached per type);
-/// the error <b>names the fix</b> (charter L6). (This type moves to <c>Koan.Tenancy</c> as <c>TenantStorageGuard</c>.)
+/// The tenant fail-closed gate (ARCH-0095 P1, charter L6/C5) — registered as a generic
+/// <see cref="IStorageGuard"/> contributor (DATA-0105 §0) so the data-core chokepoint invokes it without
+/// naming a tenant. Reads the <see cref="TenancyOptions"/> posture and the ambient <see cref="Tenant"/> slice,
+/// computing <c>[HostScoped]</c> itself (cached per type); the error <b>names the fix</b> (charter L6) rather
+/// than throwing a bare exception deep in business logic.
 /// </summary>
-internal sealed class TenantEnforcer : IStorageGuard
+internal sealed class TenantStorageGuard : IStorageGuard
 {
     private static readonly ConcurrentDictionary<Type, bool> HostScopedCache = new();
 
     private readonly IOptions<TenancyOptions> _options;
-    private readonly ILogger<TenantEnforcer> _logger;
+    private readonly ILogger<TenantStorageGuard> _logger;
 
-    public TenantEnforcer(IOptions<TenancyOptions> options, ILogger<TenantEnforcer> logger)
+    public TenantStorageGuard(IOptions<TenancyOptions> options, ILogger<TenantStorageGuard> logger)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));

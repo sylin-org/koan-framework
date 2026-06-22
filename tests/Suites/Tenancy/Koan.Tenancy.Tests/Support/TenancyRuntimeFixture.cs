@@ -1,0 +1,85 @@
+using Koan.Core;
+using Koan.Core.Hosting.App;
+using Koan.Data.Core;
+using Koan.Testing.Integration;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace Koan.Tenancy.Tests.Support;
+
+/// <summary>
+/// A no-Docker integration host (ARCH-0079) that boots a real <c>AddKoan()</c> with the JSON adapter AND the
+/// <c>Koan.Tenancy</c> module referenced — so the tenancy auto-registrar is discovered and the fail-closed
+/// guard is wired. Proves tenancy through real reflective discovery, not a fake.
+/// </summary>
+internal sealed class TenancyRuntimeFixture : IAsyncDisposable
+{
+    private readonly IntegrationHost _host;
+    private readonly string _rootPath;
+
+    private TenancyRuntimeFixture(IntegrationHost host, string rootPath)
+    {
+        _host = host;
+        _rootPath = rootPath;
+    }
+
+    public IServiceProvider Services => _host.Services;
+
+    public static async Task<TenancyRuntimeFixture> CreateAsync(IReadOnlyDictionary<string, string?>? extraSettings = null)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "Koan-Tenancy", Guid.CreateVersion7().ToString("n"));
+        Directory.CreateDirectory(root);
+
+        var settings = new Dictionary<string, string?>(StringComparer.Ordinal)
+        {
+            ["Koan:Environment"] = "Test",
+            ["Koan:Data:Json:DirectoryPath"] = root,
+        };
+
+        if (extraSettings is not null)
+        {
+            foreach (var kv in extraSettings)
+                settings[kv.Key] = kv.Value;
+        }
+
+        var host = await KoanIntegrationHost.Configure()
+            .WithSettings(settings)
+            .ConfigureServices(s => s.AddKoan())
+            .StartAsync()
+            .ConfigureAwait(false);
+
+        AppHost.Current = host.Services;
+
+        return new TenancyRuntimeFixture(host, root);
+    }
+
+    /// <summary>Bind the host and reset the per-type data-config caches so each fixture boot is clean.</summary>
+    public void ResetEntityCaches()
+    {
+        AppHost.Current = _host.Services;
+        TestHooks.ResetDataConfigs();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (ReferenceEquals(AppHost.Current, _host.Services))
+        {
+            AppHost.Current = null;
+        }
+
+        TestHooks.ResetDataConfigs();
+
+        await _host.DisposeAsync().ConfigureAwait(false);
+
+        try
+        {
+            if (Directory.Exists(_rootPath))
+            {
+                Directory.Delete(_rootPath, recursive: true);
+            }
+        }
+        catch
+        {
+            // best effort cleanup
+        }
+    }
+}

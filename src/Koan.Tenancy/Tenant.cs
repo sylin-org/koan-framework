@@ -1,16 +1,17 @@
 using System;
+using Koan.Data.Core;
 
-namespace Koan.Data.Core.Tenancy;
+namespace Koan.Tenancy;
 
 /// <summary>
 /// The developer-facing surface for the ambient tenant slice (ARCH-0095) — the curated, typed front door
-/// (charter D5) over the one carrier (<see cref="EntityContext"/>); the raw <see cref="TenantContext"/>
-/// stays hidden behind it. This is the <b>tenancy kernel</b> surface and lives in <c>Koan.Data.Core</c>
-/// (ARCH-0095 §3a: P1–P3+P7 at the <c>Koan.Data</c> level, no separate SKU).
+/// (charter D5) built on the data core's generic ambient carrier (<c>EntityContext.WithSlice</c>/
+/// <c>GetSlice</c>, ARCH-0097); the raw <see cref="TenantContext"/> stays hidden behind it. This surface — and
+/// all tenancy-related extensions — live in the <c>Koan.Tenancy</c> module, not the data core.
 ///
 /// <para>Lifecycle verbs (<c>Provision</c>/<c>Relocate</c>/<c>Erase</c>/<c>Rename</c>) and the rich
-/// registry-backed current-tenant projection (<c>{Id, Codes, Name}</c>) arrive in later slices; this slice
-/// is the scoping surface only.</para>
+/// registry-backed current-tenant projection (<c>{Id, Codes, Name}</c>) arrive in later slices; this slice is
+/// the scoping surface only.</para>
 /// </summary>
 public static class Tenant
 {
@@ -19,11 +20,15 @@ public static class Tenant
 
     /// <summary>
     /// Scope subsequent entity operations to <paramref name="tenantId"/> for the lifetime of the returned
-    /// scope; disposing restores the previous ambient tenant. Use for admin, jobs, tests, and support
-    /// act-as. Other ambient dimensions (source/adapter/partition/transaction) carry over unchanged.
+    /// scope; disposing restores the previous ambient tenant. The explicit, fluent verb. Use for admin, jobs,
+    /// tests, and support act-as. Other ambient dimensions (source/adapter/partition/transaction) carry over.
     /// </summary>
     /// <exception cref="ArgumentException">The id is null, empty, or whitespace.</exception>
-    public static IDisposable Use(string tenantId) => EntityContext.WithSlice(TenantContext.For(tenantId));
+    public static IDisposable WithTenant(string tenantId) => EntityContext.WithSlice(TenantContext.For(tenantId));
+
+    /// <summary>Short alias for <see cref="WithTenant"/> — scope subsequent operations to <paramref name="tenantId"/>.</summary>
+    /// <exception cref="ArgumentException">The id is null, empty, or whitespace.</exception>
+    public static IDisposable Use(string tenantId) => WithTenant(tenantId);
 
     /// <summary>
     /// Enter explicit <b>host / control-plane scope</b> — the one loud, audited escape from tenant scoping.

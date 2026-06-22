@@ -42,12 +42,9 @@ public static class ServiceCollectionExtensions
         services.AddKoanOptions<DataRuntimeOptions>();
         services.AddSingleton<IAggregateIdentityManager, AggregateIdentityManager>();
 
-        // Tenancy kernel (ARCH-0095): posture options + the fail-closed chokepoint gate (P1), registered as a
-        // generic Pipeline.IStorageGuard. Default Mode=Off → the guard is a no-op, so a non-tenant app behaves
-        // identically. (TODO: this registration moves to the Koan.Tenancy module's auto-registrar — the data
-        // core stays tenancy-agnostic; tracked by the Koan.Tenancy extraction.)
-        services.AddKoanOptions<Options.TenancyOptions>("Koan:Data:Tenancy");
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<Pipeline.IStorageGuard, Tenancy.TenantEnforcer>());
+        // The data core is tenancy-agnostic: it exposes the generic Pipeline.IStorageGuard seam (DATA-0105 §0).
+        // Tenancy registers its gate from the Koan.Tenancy module's auto-registrar (Reference = Intent); no
+        // registered guard → the chokepoint loop is empty → no-op. A grep for "tenant" here returns nothing.
 
         // Data source registry for source/adapter routing (DATA-0077)
         services.AddSingleton<DataSourceRegistry>(sp =>
