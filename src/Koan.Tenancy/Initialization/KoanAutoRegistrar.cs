@@ -1,4 +1,8 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Koan.Core;
 using Koan.Core.Modules;
 using Koan.Core.Provenance;
@@ -9,6 +13,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Koan.Tenancy.Initialization;
 
@@ -44,6 +49,40 @@ public sealed class KoanAutoRegistrar : KoanModule
             RequiredCapability: DataCaps.Isolation.RowScoped,
             Indexed: true));
     }
+
+    public override Task Start(IServiceProvider services, CancellationToken ct)
+    {
+        // The boot pre-flight (ARCH-0099 §1): refuse to boot in Production for the small exploitable-absence set
+        // (no resolver / a dev-branded artifact / a forced dev-open posture); warn softly otherwise. The prod
+        // signal comes from the per-host IHostEnvironment (the env abstraction KoanEnv itself wraps) so the check
+        // is per-host correct and testable; the resolved posture (TenancyRuntime) stays KoanEnv-derived.
+        var env = services.GetRequiredService<IHostEnvironment>();
+        var cfg = services.GetRequiredService<IConfiguration>();
+        var logger = services.GetService<ILoggerFactory>()?.CreateLogger("Koan.Tenancy");
+
+        var overrideRequestedOpen = string.Equals(
+            cfg["Koan:Data:Tenancy:Posture"], nameof(TenancyPosture.Open), StringComparison.OrdinalIgnoreCase);
+        var hasResolver = services.GetServices<ITenantResolver>().Any();
+        var brandedPresent = TenancyDevBrand.ContainsAny(SensitiveConfigValues(cfg));
+
+        var result = TenancyPreflight.Evaluate(new TenancyPreflightInput(
+            IsProduction: env.IsProduction(),
+            OverrideRequestedOpen: overrideRequestedOpen,
+            HasResolver: hasResolver,
+            BrandedDevMarkerPresent: brandedPresent));
+
+        foreach (var warning in result.Warnings)
+            logger?.LogWarning("Tenancy pre-flight: {Warning}", warning);
+
+        if (result.ShouldRefuseBoot)
+            throw new TenancyBootException(result.HardFailures);
+
+        return Task.CompletedTask;
+    }
+
+    // Every key/value under Koan:Data:Tenancy — scanned for a leaked dev brand (the dev key/secret lands here).
+    private static IEnumerable<string?> SensitiveConfigValues(IConfiguration cfg)
+        => cfg.GetSection("Koan:Data:Tenancy").AsEnumerable(makePathsRelative: false).Select(kv => kv.Value);
 
     public override void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {

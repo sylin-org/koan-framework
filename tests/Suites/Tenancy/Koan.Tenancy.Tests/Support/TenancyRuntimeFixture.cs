@@ -25,7 +25,10 @@ internal sealed class TenancyRuntimeFixture : IAsyncDisposable
     public IServiceProvider Services => _host.Services;
 
     public static async Task<TenancyRuntimeFixture> CreateAsync(
-        IReadOnlyDictionary<string, string?>? extraSettings = null, string adapter = "sqlite")
+        IReadOnlyDictionary<string, string?>? extraSettings = null,
+        string adapter = "sqlite",
+        string environment = "Test",
+        Action<IServiceCollection>? configureServices = null)
     {
         var root = Path.Combine(Path.GetTempPath(), "Koan-Tenancy", Guid.CreateVersion7().ToString("n"));
         Directory.CreateDirectory(root);
@@ -35,7 +38,7 @@ internal sealed class TenancyRuntimeFixture : IAsyncDisposable
         // NOT announce isolation; a tenant-scoped op there fails closed (a dedicated negative test boots adapter:"json").
         var settings = new Dictionary<string, string?>(StringComparer.Ordinal)
         {
-            ["Koan:Environment"] = "Test",
+            ["Koan:Environment"] = environment,
             ["Koan:Data:Sources:Default:Adapter"] = adapter,
         };
         if (string.Equals(adapter, "sqlite", StringComparison.OrdinalIgnoreCase))
@@ -49,11 +52,17 @@ internal sealed class TenancyRuntimeFixture : IAsyncDisposable
                 settings[kv.Key] = kv.Value;
         }
 
-        var host = await KoanIntegrationHost.Configure()
+        // The per-host IHostEnvironment drives the prod-boot pre-flight (ARCH-0099 §1); default "Test" is
+        // non-production. A test can boot environment: "Production" to exercise the boot-refusal, and inject an
+        // ITenantResolver via configureServices to satisfy it.
+        var builder = KoanIntegrationHost.Configure()
+            .WithEnvironment(environment)
             .WithSettings(settings)
-            .ConfigureServices(s => s.AddKoan())
-            .StartAsync()
-            .ConfigureAwait(false);
+            .ConfigureServices(s => s.AddKoan());
+        if (configureServices is not null)
+            builder.ConfigureServices(configureServices);
+
+        var host = await builder.StartAsync().ConfigureAwait(false);
 
         AppHost.Current = host.Services;
 
