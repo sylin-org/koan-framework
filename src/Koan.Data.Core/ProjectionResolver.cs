@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Reflection;
 
@@ -14,7 +15,14 @@ public static class ProjectionResolver
         }
     );
 
+    // Type-plane memoization (DATA-0105 §3). The projection is a pure function of the entity type; it is read
+    // on every relational schema-ensure and several adapter write paths, so it is computed once per type.
+    private static readonly ConcurrentDictionary<Type, IReadOnlyList<ProjectedProperty>> Cache = new();
+
     public static IReadOnlyList<ProjectedProperty> Get(Type aggregateType)
+        => Cache.GetOrAdd(aggregateType, static t => Compute(t));
+
+    private static IReadOnlyList<ProjectedProperty> Compute(Type aggregateType)
     {
         var props = aggregateType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(p => p.GetIndexParameters().Length == 0)
@@ -45,6 +53,6 @@ public static class ProjectionResolver
             var isIndexed = indexedProps.Contains(p);
             list.Add(new ProjectedProperty(p, colName!, isEnum, isIndexed));
         }
-        return list;
+        return list.ToArray();
     }
 }
