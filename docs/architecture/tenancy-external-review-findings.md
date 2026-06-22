@@ -501,3 +501,39 @@ Three rounds + a delight harvest. The design **held**: round 3 = refinements + *
 migration) + **1 cut** (the entity embeddability hint) + **3 closed decisions** + a **greenfield GTM**.
 Unanimous verdict: **ship the ADR.** **Next: ratify → the big fold-in into `tenancy-design.md` (incorporating
 the 4 corrections, the cut, and the regret-class seams) → ADR ARCH-009x → phased TDD.**
+
+---
+
+# Post-review refinements (architect dialogue)
+
+## Classification is ONE extensible axis, not N attributes
+Resolved in dialogue (applying the just-adopted "attributes-are-forever, bias-to-config" discipline): the
+classification axis is **one extensible primitive with an open taxonomy of named handling-bundles**, NOT a
+hard-coded attribute per data type. A *category* = `{ name, default-posture, applicable-handlings,
+retention-default }`. **Built-in well-known bundles: PII / PHI / PCI / Secret**; apps define their own
+(e.g. MNPI, ITAR, TradeSecret) in config. `[Pii]`/`[Phi]` are **ergonomic sugar** over `[Classified(...)]`.
+It **rides the capability model**: a category announces its required handlings (tokenize / field-encrypt /
+mask / write-only / redact-in-logs / exclude-from-embedding / region-pin); adapters announce support; the
+framework composes or fails-closed on a capability-mismatch.
+
+**Two fact-families** (they drive different handling):
+- **Sensitivity** — PII / PHI / **PCI** / **Secret** / biometric → isolate / encrypt / mask / tokenize /
+  residency.
+- **Lifecycle** — retention/TTL, immutable/append-only → purge / reject-update. Several **already exist**:
+  `[Timestamp]`, `[AppendOnly]`, `[Index(Ttl)]`.
+
+**`[Secret]` is the strongest add beyond the PII/PHI/PCI trio** — credentials-as-data (a tenant's Stripe
+key, SMTP password, webhook secret); near-universal in SaaS, and it carries a **distinct handling
+primitive PII lacks: write-only / masked-read** (`Set` works; `Get`/serialize returns a mask, never the
+plaintext, by default). → fold into the tenancy-design classification section at consolidation.
+
+## The conformance kit + agent-extensible adapters (framework-wide thread)
+The round-3 **external-infra delegation seam** gets a companion *capability*: **agent-authored,
+conformance-gated adapters** — the structural answer to the unanimous "owns-every-axis lock-in" barrier.
+Captured in [agent-extensible-adapters.md](./agent-extensible-adapters.md) (+ a frontier-model RFC). The
+keystone is the **capability-driven conformance kit**: a capability token and its conformance module are
+**co-defined** ("no capability-lies" — over-claim fails green, structurally); four validation layers
+(honesty · surface · correctness-via-oracle · isolation-fuzz); real-store only (ARCH-0079). It's the
+**same artifact** that (1) keeps the ARCH-0084 capability model honest today, (2) is the v1 P7
+isolation/classification proof, and (3) gates agent-built adapters tomorrow. Framework-wide — possibly its
+own facet; tenancy is the pilot.
