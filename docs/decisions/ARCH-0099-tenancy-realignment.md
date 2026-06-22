@@ -83,6 +83,22 @@ The control plane gets a default, Koan-provided **self-service portal** — a si
 - **Dev graduation:** on first request in dev the portal lazily calls `TenantBootstrap.EnsureDevAsync` (build-order step 2b), so the in-memory dev seed materialises as a durable `TenantRecord` + Owner `Membership` the site can show.
 - **Sequencing:** lands after the durable control-plane (step 2a/2b). It may graduate to its own `WEB-00xx` ADR when built; the design canon lives here for now.
 
+### 7. The tenant configuration plane — a governed overlay + framework-axis configs
+
+The control plane has two halves: the **structural** half (tenants / members / invites, §2 + steps 2a/2b) and a **configuration** half — the per-tenant solution settings a tenant self-serves through the portal (§6). The configuration half is **governed, not free-form**, and it reuses the lock model already designed for classification (ARCH-0098), generalised to all tenant config.
+
+**7a. The governed-config primitive (one model for everything).** The application *declares* a tenant-overridable setting — a typed key + a default + a **mutability lock** (`Locked` | `TenantMayChange`). Resolution is layered: the effective value is the tenant override when present *and* unlocked, else the solution default. A locked setting's tenant override is **ignored and degrades honestly** (boot-report / runtime warning), never a crash. This is conformity-by-design: the solution owner sets a floor tenants structurally cannot breach (a policy-gate-above-tenant, mirroring tenant-gate-above-roles). **Surface discipline:** the app declares (typed key + default + lock); the framework provides the storage (a `[HostScoped]` per-tenant config row keyed by tenant id), the layered resolution, and the portal surface **generated from the declaration** — never hand-rolled settings screens (R3-A: bias to config-as-declaration).
+
+**7b. Framework-axis configs (same governance, plus enforced invariants).** Some configs plug into framework seams and carry framework-defined shapes + security invariants the framework enforces **regardless of the lock** (you cannot "unlock" a security floor):
+- **Captured domains → tenant resolution.** A verified `TenantDomain` keyed entity feeds the `ITenantResolver` seam (§1b) as a domain-capture strategy (`jane@acme.com` → Acme). **Invariant:** capture requires **DNS-TXT verification** (a verification `IKoanJob`) — unverified capture is the 0ktapus account-takeover vector. A distinct sub-project, not a portal toggle.
+- **Registration posture → the invite/membership flow.** `open` (self-signup) | `invite-only` | `domain-gated` (auto-join by captured domain) governs §2a/2b. This one is a clean fit for the 7a primitive (a typed enum + default + lock).
+- **Allowed auth providers / SSO → `Koan.Web.Auth`.** A per-tenant provider allowlist / IdP config — enterprise tenants bring their own.
+- **Classification posture → ARCH-0098.** `CoLocate` / `Isolate` / `RegionPin` per tenant, already designed with this exact lock model; §7 is its generalisation.
+
+**7c. The governance lattice (who governs what).** Solution owner: declares the overridable set + defaults + locks. Tenant owner: overrides within the unlocked set, via the portal. Framework: enforces axis invariants (DNS verification, provider validation) regardless of lock — these are security floors, not config.
+
+**Sequencing:** the config plane lands as a distinct slice **after** the portal shell + control-plane CRUD (§6 / step 2c). Domain capture (verified-domain entity + resolver + verification job) is its own sub-project within it.
+
 ## Consequences
 
 - Tenancy's default flips from `Mode=Off` to **active-posture-by-env** (Reference = Intent). A non-tenant app that doesn't reference the module is unaffected; one that references it gets dev-open/prod-closed.
