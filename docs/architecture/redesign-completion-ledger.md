@@ -116,11 +116,18 @@ implemented and its tests pass on real stores.
   model, 3-plane memo, layering verified acyclic). **DATA-0105** finalized (6 stages, Key dropped, descriptor
   model, all must-fixes i–xi + upgrades A–D). **ARCH-0095 §2 erratum** filed. 3-lens spot-check (coherence /
   layering / adversarial-factual) = unanimous ship-ready, 0 blocking.
-- ◐ **NEXT: Phase 0a** — the extracted standalone memo/determinism fixes (`ProjectionResolver` Type-cache;
-  `IndexMetadata` determinism `:35` Guid group-key + `:41` Dict iteration, then Type-cache;
-  `AdapterNaming.GetOrCompute` no-cache fix; base-anchor split off partition) as green-ratchet commits.
-- ☐ Phase 0b pipeline model · write-stamp · name-particle · schema-column · tenancy=registration+SQLite proof ·
-  classification · ambient unification · Adapter Forge · Facet 4 · cross-cutting completion.
+- ✅ **Phase 0a DONE** — the 4 extracted standalone memo/determinism fixes, each TDD'd green-ratchet:
+  `IndexMetadata` determinism (`:35` Guid group-key → attribute-position; `:41` Dict iteration → explicit
+  insertion order) + Type-cache (`11e4439f`); `ProjectionResolver` Type-cache (`f2638aa0`);
+  `AdapterNaming.GetOrCompute` per-`ServiceProvider` factory-lookup cache via `ConditionalWeakTable`
+  (`81f2f2e1`); base-anchor split off partition in `StorageNameGenerator` (`28b30a42`). Data-core suite
+  174 → **190/190** (16 new specs). Each behaviour-preserving except the determinism fix (a correctness win).
+- ◐ **NEXT: Phase 0b** — the **ARCH-0096 engine** in `Koan.Core.Naming` (`IdentifierComposer` + `Particle`/
+  `CompositionPolicy` readonly structs + `ParticleDescriptor` `[KoanDiscoverable]` discovery + the 3-plane
+  cache + the 0-alloc benchmark) **then** the **DATA-0105 descriptor base** (`IStorageContributor`, plane tree,
+  structural closure, deterministic ordering, `OFF=structurally-absent` + `IsInvariantOnly` fast path).
+- ☐ Phase 1 write-stamp · 2 name-particle · 3 schema-column · 4 tenancy=registration+SQLite proof ·
+  5 classification · ambient unification · Adapter Forge · Facet 4 · cross-cutting completion.
 
 > Full per-area detail + the DATA-0105 review punch-list (must-fixes i–xi, upgrades A–D, opportunities):
 > memory **[[facet3-tenancy-design]]** (the anchor). Tenancy spec: [tenancy-design.md](./tenancy-design.md).
