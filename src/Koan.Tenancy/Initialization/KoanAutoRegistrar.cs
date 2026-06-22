@@ -35,6 +35,7 @@ public sealed class KoanAutoRegistrar : KoanModule
     {
         services.AddKoanOptions<TenancyOptions>("Koan:Data:Tenancy");
         services.TryAddSingleton<TenancyRuntime>();
+        services.TryAddSingleton<TenancyDevState>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IStorageGuard, TenantStorageGuard>());
 
         // The tenant managed field — the invisible shadow discriminator (no POCO property). The framework stamps
@@ -44,7 +45,7 @@ public sealed class KoanAutoRegistrar : KoanModule
         ManagedFieldRegistry.Register(new ManagedFieldDescriptor(
             StorageName: "__koan_tenant",
             ClrType: typeof(string),
-            ValueProvider: static () => Tenant.Current?.Id,
+            ValueProvider: static () => TenancyAmbient.EffectiveTenantId(),
             AppliesTo: static t => !TenantScopeMetadata.IsHostScopedType(t),
             RequiredCapability: DataCaps.Isolation.RowScoped,
             Indexed: true));
@@ -76,6 +77,23 @@ public sealed class KoanAutoRegistrar : KoanModule
 
         if (result.ShouldRefuseBoot)
             throw new TenancyBootException(result.HardFailures);
+
+        // Dev auto-seed (ARCH-0099 §1) — only under Open posture (a forced-Open-in-prod boot is refused above, so
+        // this never runs in production). Seed one in-memory dev tenant, make the loopback caller its Owner, and
+        // mint a branded per-machine key; an unset ambient scope then falls back to the dev tenant (no day-one 403).
+        var runtime = services.GetRequiredService<TenancyRuntime>();
+        if (runtime.Posture == TenancyPosture.Open)
+        {
+            var devState = services.GetRequiredService<TenancyDevState>();
+            if (!devState.IsSeeded)
+            {
+                var seed = TenancyDevSeed.Create(cfg["Koan:Data:Tenancy:DevUser"] ?? Environment.UserName, Environment.MachineName);
+                devState.Apply(seed);
+                logger?.LogInformation(
+                    "Tenancy dev-open: seeded tenant '{Name}' (id={Id}); you are {Role}; signing key {Key}.",
+                    seed.TenantName, seed.TenantId, seed.OwnerRole, seed.SigningKey);
+            }
+        }
 
         return Task.CompletedTask;
     }

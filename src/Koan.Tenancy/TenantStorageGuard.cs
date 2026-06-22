@@ -26,7 +26,7 @@ internal sealed class TenantStorageGuard : IStorageGuard
     public void Guard(Type entityType)
     {
         if (TenantScopeMetadata.IsHostScopedType(entityType)) return;   // [HostScoped] entity → not tenant-scoped
-        if (Tenant.Current?.HasTenant == true) return;                 // a concrete tenant is in scope → allowed
+        if (TenancyAmbient.HasEffectiveTenant()) return;               // a concrete tenant (explicit or dev-fallback) is in scope
 
         // A tenant-scoped operation with no concrete tenant in scope (unset, or explicit host scope).
         var message =

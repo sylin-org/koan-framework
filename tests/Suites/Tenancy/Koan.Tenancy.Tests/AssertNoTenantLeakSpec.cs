@@ -129,13 +129,13 @@ public sealed class AssertNoTenantLeakSpec
         }
     }
 
-    [Fact(DisplayName = "no tenant leak: the un-scoped path under Open is unstamped + unfiltered (byte-identical names)")]
-    public async Task Open_unscoped_path_is_unstamped_and_unfiltered()
+    [Fact(DisplayName = "no tenant leak: the un-scoped path under Open resolves to the dev tenant (coherent, isolated)")]
+    public async Task Open_unscoped_path_resolves_to_the_dev_tenant()
     {
-        // ARCH-0099 §1: there is no Off state. Under dev-open, a tenant-scoped op with NO tenant in scope is
-        // warned (not blocked) and the __koan_tenant value provider returns null → the write is unstamped and
-        // the read is unfiltered. (The fixture's Test env never triggers the IsDevelopment()-gated auto-seed,
-        // so nothing puts a tenant in scope here.) This is the new "zero regression" for the un-scoped path.
+        // ARCH-0099 §1: there is no Off state. Under dev-open the auto-seed runs and an unset ambient scope falls
+        // back to the dev tenant — so the write is stamped with the dev tenant and the read filters to it. The
+        // un-scoped path is therefore coherent (both rows belong to the same dev tenant and are mutually visible),
+        // not unfiltered. Cross-tenant isolation of the fallback is proven in TenancyDevAutoSeedSpec.
         await using var runtime = await TenancyRuntimeFixture.CreateAsync(extraSettings: Posture("Open"));
         runtime.ResetEntityCaches();
         using var _iso = Isolate();
