@@ -303,3 +303,85 @@ classification mechanism is validated (sibling capability, seam + adapters, sear
 request-scoped plaintext, opaque tokens) with one deep open tension (classification × AI). **Running:
 8 primitives (P1–P8) + 2 seams + 4 round-2 architect decisions.** Next: architect ratifies the round-2
 decisions + the accumulated round-1 negotiation → fold all into tenancy-design.md → enforcement mechanics.
+
+---
+
+# Delight synthesis — 4-persona blind harvest (developer · architect · operator · competitive)
+
+A web-grounded blind harvest on "what would most delight" each persona. **Zero design reversals** — it
+validated the 8 primitives + the classification axis by mapping each to a concrete, persona-specific,
+prior-art-grounded delight, and crowned one cross-persona flagship.
+
+## The unanimous flagship: the erasure certificate
+**All four lenses** independently crowned the cryptographically-signed **erasure certificate**. The
+competitive lens names why it's uniquely Koan: every incumbent proves deletion from the DB, **none** can
+prove it from cache/vector/search/logs/blobs (RLS = DB-only, Skyflow = vault-only, Clerk/WorkOS =
+identity-only) — only a runtime that owns every axis can. Market timing: the **Feb-2026 EDPB Coordinated
+Enforcement** report shifted the erasure burden-of-proof to the controller to *demonstrate* disposition
+(a ~€160k fine where "deletion logs" were ruled insufficient). It turns the scariest unprovable
+compliance task into a build artifact. Honest: it distinguishes surgically-purged axes vs.
+async-purging-with-ETA vs. retention-window backups.
+
+## The three persona magic moments
+- **Developer — "the leak you literally cannot write":** ship `Todo.Query(t => t.Done)` with no tenant
+  clause; it cannot leak (read OR write); a new entity is born tenant-safe on a Tuesday. Plus **"[Pii]
+  and walk away"** — classify one field and the whole compliance surface (logs/cache/search/erasure/
+  masking) updates itself.
+- **Architect — "the day-one tenancy decision stops being a decision":** isolation is a reversible config
+  dial; the day-200 HIPAA / month-nine enterprise pivot is a config diff + a relocate fan-out, not a
+  6–12-month re-platform. "This won't paint me into a corner" = the build-vs-buy argument in one sentence.
+- **Operator — "at 3am, 'which tenants are affected?' is already answered":** blast radius is a filter,
+  not a forensic reconstruction, because the tenant is auto-stamped on every axis (traces/metrics/jobs/
+  messages/cache/logs) by the runtime — not by an engineer who remembered.
+
+## Cross-persona convergent delights (≥2 lenses)
+- **The leak you can't write** (dev/arch/competitive) — P1 covers read + write + every axis. Wedge: RLS
+  has ~8 cataloged silent-leak modes (SET-vs-SET-LOCAL pool reuse, missing FORCE RLS, BYPASSRLS,
+  views/functions inheriting privileged roles, CVE-2025-8713) **and** is row-only (blind to the 5 non-DB
+  axes).
+- **Tenant survives the async hop** (all 4) — the structural edge no single-ORM library has.
+- **Classification flows everywhere from one `[Pii]`** (all 4) — kills the per-touchpoint PII tax;
+  grounding: GoodRx's in-house vault = 6 months / 10 engineers / 18-month MVP (why classification-as-a-
+  posture-flag erases a multi-$M build-vs-buy).
+- **Isolation test-kit** (dev/arch/competitive) — "prove it, regenerated every build"; security review
+  becomes a green check; the "why Koan vs. homegrown RLS" answer.
+- **Cross-axis tenant branching** (dev/op/competitive) — wedge: Neon branches Postgres bytes only; Koan
+  branches rows + vectors + blobs + cache + jobs (a half-branch of an AI app is no branch).
+- **Measured per-tenant cost / observability** (arch/op) — the runtime tags every op → metering is a
+  byproduct, removing the strongest argument against pooled (AWS SaaS Lens names cost-attribution as the
+  pool model's defining hard problem).
+- **The config-dial pivot** (arch/competitive) — Clerk teams "migrate out ~month nine" when
+  residency/self-hosting is demanded; Koan makes it a no-op. (Nile welds tenant-id into primary keys;
+  ABP carries dead Tenants tables.)
+- **Fleet compliance matrix as a sales asset** (arch/op/competitive) — generated truth, can't drift like
+  a maintained spreadsheet.
+- **Suspend as an atomic blast-radius brake / reversible offboard** (op/competitive).
+- **Context-aware auto-masking = minimum-necessary as a runtime property** (dev/competitive) — RLS is
+  column-blind (HIPAA minimum-necessary is hand-rolled per-endpoint DTOs today); Koan's masking extends
+  to the search index + log line too.
+- **Boot-report posture as a continuously-true attestation** (arch/op) — drift becomes a diff, not an
+  audit-time surprise.
+
+## Architect-trust delights (single-lens, strategically heavy)
+- **Honest-limits-as-a-feature** — "the fastest way to lose an experienced tech lead is a
+  too-good-to-be-true claim." Our honesty-corrections discipline is itself a selling point.
+- **Control plane = the same Koan you already trust** — no second, weaker, hand-rolled admin framework to
+  vet; one authz model to certify.
+- **Atomic deprovisioning / zero stale-privilege** — membership-resolved-per-request + gate-above-roles
+  closes the IDOR-from-URL and JWT-stale-claim breach classes by design.
+
+## Refinements the harvest surfaced (fold in)
+- **Observability cardinality split:** forensic cardinality (traces — sampled, always present) vs. SLO
+  cardinality (metrics — bounded, **tiered by the registry's tier field**: SLA'd tenants get their own
+  series, the long tail buckets).
+- **The registry IS the canary-cohort selector** — tenant-scoped feature flags + canary-by-cohort
+  (tier/region) fall out of the registry being live coherence-invalidated truth; makes round-2's
+  "deferred canary-by-tenant" partly available in v1 (cohort selection, not full logic-versioning).
+- **Auto-masking extends to search-index + log-line**, not just API responses — composes with the
+  SEC-0004 `can:[]` projection + the classification axis (a wedge RLS/Skyflow structurally can't match).
+
+## Net
+The harvest is the strongest **positioning** evidence we have: each primitive maps to a real,
+persona-grounded delight, and the erasure certificate is both the cross-persona flagship and the
+deal-maker. New competitive grounding (EDPB-2026, GoodRx, Clerk-month-nine, Neon-DB-only, RLS-8-leaks) is
+the "why Koan" case for the eventual positioning doc.
