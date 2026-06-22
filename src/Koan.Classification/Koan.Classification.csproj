@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <KoanPackageKind>Periphery</KoanPackageKind>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>Koan.Classification</AssemblyName>
+    <RootNamespace>Koan.Classification</RootNamespace>
+    <Description>Data-classification handling for Koan (ARCH-0098): the field-transform contributor (encrypt / tokenize / mask) + the per-tenant crypto seam (IKeyProvider, AES-GCM IFieldCipher, IBlindIndex) behind the [Pii]/[Phi]/[Pci]/[Secret] facts declared in Koan.Data.Abstractions. Registered as a contributor to the Koan.Data.Core storage pipeline (DATA-0105) under Reference = Intent. The data core stays classification-handling-free.</Description>
+    <PackageTags>$(CommonPackageTags);classification;pii;phi;encryption;privacy;gdpr;hipaa</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
+    <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
+  </ItemGroup>
+</Project>
