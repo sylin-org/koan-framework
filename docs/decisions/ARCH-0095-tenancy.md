@@ -91,6 +91,13 @@ The seam was re-derived from the data-core code and verified directly (not assum
   into `QueryDefinition` for `Query`/`Count`, and is a **post-fetch ownership check** for the key-based
   `Get`/`GetMany`/`Delete`. Implementation: a new injected `ITenantGuard<TEntity,TKey>` invoked in `Guard`
   and at the write/read boundaries.
+- **The shared-schema discriminator is an invisible, framework-managed shadow field** (ratified). A
+  tenant-scoped entity carries no tenant property on its POCO (secure-by-default, can't-forget, charter L8);
+  the adapter persists/filters a hidden discriminator at the storage layer, driven by the ambient tenant.
+  Adapters announce tenant-isolation support as a capability (ARCH-0084); a tenant-scoped entity on an
+  adapter that does not announce it fails closed under `enforce` (never fail-open). Marker-interface and
+  base-class alternatives were rejected as opt-in (a forgotten marker reintroduces the leak). Sequenced
+  JSON → relational (RLS backstop) → Mongo.
 - **P6 connection routing ⇒ `EntityContext.ContextState` + `AdapterResolver.ResolveForEntity`**
   (`src/Koan.Data.Core/AdapterResolver.cs`). The resolver returns a static `(Adapter, Source)` tuple read
   from the ambient context; the `DataService` cache key is `(EntityType, KeyType, Adapter, Source)`.

@@ -722,6 +722,18 @@ The structural floor. The detail the round-1 draft deferred:
   `Tenant.None()` = loud audited ad-hoc escape. The escape binds to the query / materializes in scope —
   dodging the deferred-`IQueryable` trap (a disabled scope expiring before the query runs → silent empty
   results).
+- **The shared-schema discriminator is an invisible, framework-managed shadow field** [SETTLED]. A
+  tenant-scoped entity carries **no tenant property on its POCO** — which is what keeps tenancy
+  *secure-by-default and structurally impossible to forget* (charter L8): you cannot forget to declare
+  what you never declare. The adapter persists and filters a **hidden tenant discriminator** at the storage
+  layer (a column alongside `id`; a Mongo/JSON field), driven by the ambient tenant — the guard stamps it
+  on write and filters reads by it. Adapters **announce tenant-isolation support as a capability**
+  (ARCH-0084); under `enforce`, a tenant-scoped entity routed to an adapter that does **not** announce
+  support **fails closed** (boot-reported), never silently fail-open — the same no-capability-lies contract
+  the Conformance Gate (P7) verifies. Rejected alternatives (a marker interface / a `TenantEntity<T>` base):
+  both are opt-in, so a forgotten marker reintroduces the leak. Sequenced: the no-Docker JSON adapter first
+  (carrying the `AssertNoTenantLeak` proof), then relational (Postgres/SQL Server/SQLite, where RLS is the
+  backstop), then Mongo.
 - **RLS backstop** (Postgres/SQL Server) for the surface the application-level floor can't reach:
   `IDataService.Direct(...)` / raw SQL / bulk ops. Named explicitly as the non-structural escape; covered
   by RLS + an explicit tenant-scope, never silently. **RLS session reset is guaranteed at the physical
