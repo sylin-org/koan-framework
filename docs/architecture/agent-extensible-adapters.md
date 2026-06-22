@@ -156,8 +156,9 @@ reference adapter may be included as an *example* of conformance — not "the on
 ### 3b. The surface-validation tools — the objective gate
 
 Tools that exercise the adapter's **observable surface** against a real instance and check it meets the
-contract + the Blueprint's obligations — **never reading the implementation.** (§4.) The Blueprint's
-*Test* step points here; this is what makes "green = trust" real.
+contract + the Blueprint's obligations — **black-box-first** (for high-blast seams, augmented by a narrow
+static lint + a review of the isolation-critical lines; §5). The Blueprint's *Test* step points here; this
+is what makes "green = trust" real.
 
 **Prior art:** the Jakarta/Java **TCK (Technology Compatibility Kit)** — "implement the spec, pass the TCK
 to claim conformance." The **Agentic Blueprint** is the authoring guide + spec-of-goodness; the
@@ -165,9 +166,11 @@ to claim conformance." The **Agentic Blueprint** is the authoring guide + spec-o
 
 ## 4. The keystone — the capability-driven conformance kit
 
-This is what makes "green = trust" *real* rather than vibes-based codegen. **All validation is black-box:
-it probes observable behavior against a real instance — it never reads, lints, or reviews the
-implementation.** We verify what the adapter *does*, not how it's written.
+This is what makes "green = trust" *real* rather than vibes-based codegen. Validation is
+**black-box-first** — it probes observable behavior against a real instance, verifying what the adapter
+*does*, not how it's written. *(External review corrected an over-pure version of this claim: for
+high-blast seams black-box alone is **not sufficient** — a narrow static lint + an isolation-line review
+are added as defense-in-depth; see §5.)*
 
 - **Capability-flag-driven.** The adapter announces a `CapabilitySet`; the harness runs **exactly** the
   conformance modules that match each flag; an un-announced capability → its module is **skipped** (you're
@@ -176,11 +179,22 @@ implementation.** We verify what the adapter *does*, not how it's written.
   you cannot introduce `Caps.X` into the framework without shipping `ConformanceModule.X`. Every
   announceable capability has an objective verifier, so **over-claim fails green, structurally.** (Parallel
   to Koan's "no boot-lies" self-reporting principle.)
-- **Four validation layers (all behavioral):** **honesty** (does the surface *behave* as each flag
-  claims — a behavioral probe, e.g. announce ACID → run a concurrency/atomicity test; not a code check) ·
-  **surface** (does every verb work?) · **correctness** (an *oracle* — results checked against a CLR
-  reference / cross-adapter convergence, not just "non-erroring") · **isolation + classification** (P7
-  tenant-isolation fuzz across *every* verb; carry-tenant; honor `[Phi]`; fail-closed).
+- **The behavioral layers** (all black-box, against a real instance): **honesty** (does the surface
+  *behave* as each flag claims?) · **surface** (every verb works?) · **correctness** (an *oracle* — results
+  vs a CLR reference / cross-adapter convergence) · **isolation + classification** (tenant-isolation fuzz
+  across *every* verb **including raw/bulk paths**; carry-tenant; honor `[Phi]`; fail-closed; **error
+  messages leak no cross-tenant identifiers**).
+- **Beyond the happy path** (round-1 review additions — still black-box, but harder): **contention**
+  (saturate the pool, N concurrent workers × M tenants → catch connection-state carryover / session
+  poisoning) · **soak** (N-thousand ops, measure the process's handle/connection/memory footprint → catch
+  resource leaks) · **chaos / fault-injection** (a Toxiproxy/Jepsen-style proxy drops/delays/severs calls →
+  prove the adapter fails **closed**, never open) · **durability/restart** (restart mid-run → catch the
+  "in-memory shim" that returns correct rows but persists nothing). The harness **reuses one adapter
+  instance across all tenants** (mimics the production singleton) — a fresh-per-test harness can't catch
+  instance-state leaks.
+- **Bias to strictness** (Rust Miri's stance): a green kit must *mean* something. False positives (a
+  correct adapter fails on brittleness) are annoying; false negatives (a broken adapter passes) are
+  catastrophic. Tune toward strict.
 - **Real-store only (ARCH-0079).** Runs against a real instance (Testcontainers); fakes structurally
   cannot reveal the claim-vs-reality gap.
 
@@ -188,16 +202,28 @@ It is a **generalization of what Koan already has in pieces**: the FilterConverg
 ARCH-0079 (real-store integration canon), the DATA-0104 capability-honesty oracle, ARCH-0091 (the
 Testcontainers harness), and P7 (the tenant-isolation fuzz).
 
-## 5. Tiering by blast-radius
+## 5. Tiering — by the data classification carried, not the infrastructure category
 
-A misbehaving *vector* adapter degrades search; a misbehaving *data/chokepoint* adapter **leaks tenants.**
-Tier the conformance rigor and the human-in-the-loop accordingly:
+**External review's sharpest correction:** "vector = low blast-radius" was *wrong.* A vector adapter
+carrying `[Phi]` fields (`Embeddable = true`) can leak medical records into another tenant's RAG context —
+cross-tenant prompt-injection / exfiltration. **An adapter's blast-radius is the highest data-classification
+tier permitted to ride its capability tokens — never its infrastructure category.** Tiering is therefore
+*dynamic*: the same vector adapter is low-blast carrying public data, high-blast carrying PHI. This ties
+the trust model directly to the classification axis (blast-radius *is* the classification posture).
 
-| Tier | Seams | Gate |
-|---|---|---|
-| **High-blast** | data, chokepoint, auth | ruthless conformance + isolation fuzz **mandatory** + human sign-off on the agent's output |
-| **Medium** | cache, messaging, jobs | conformance + isolation |
-| **Low** | vector, blob, media | conformance + functional |
+| Blast (by data carried) | Gate |
+|---|---|
+| **High** (PHI/PII/PCI/Secret rides the adapter) | the full behavioral suite **+ contention + soak + chaos + durability** · **a narrow static lint** (a Roslyn/AST denylist of structurally-dangerous patterns — `static` mutable state, in-memory data shims, unmanaged threads, missing connection-lifecycle hooks, raw-error passthrough; the eBPF-verifier model — *not* a correctness review) · **human diff-review of only the isolation-critical lines** (tenant-predicate injection + connection lifecycle) |
+| **Medium** (internal / low-sensitivity) | the full behavioral suite + contention |
+| **Low** (public) | the behavioral suite |
+
+**The two boundaries now decouple.** We still **never prescribe the optimal code** (that's craft) — but
+for high-blast we **do read it, *narrowly*** — a *forbidden-pattern* denylist, not a correctness grade.
+Black-box behavior stays the primary gate; the lint + isolation-line review are **defense-in-depth**,
+because the residual error-path / async-context-race risk is real and no black-box test fully automates it.
+(Koan's own `EntityContext` restore-on-scope-exit bounds any such leak to a *single* mis-routed op, never
+persistent — and the kit tests exactly that: trigger a fault inside an adapter call, assert the *next*
+call's tenant context is correct.)
 
 ## 6. Three jobs, one artifact
 
@@ -207,6 +233,39 @@ The conformance kit is the *same* artifact that:
 3. is the **acceptance gate** that makes agent-authored adapters trustworthy tomorrow.
 
 Build it once; three payoffs. That coincidence is the strongest argument it's the right primitive.
+
+## 6a. External review (round 1) — adopted corrections
+
+Three frontier models reviewed the RFC. They validated the boundaries, the vendor-agnostic empirical-probe
+design, the killer use, and the name — and **corrected the trust model from "black-box-only" to
+defense-in-depth tiered by data-classification** (folded into §4–§5). The rest:
+
+- **Maturity lifecycle (from Dapr's component model).** A green kit is binary; trust is earned over time.
+  Tier adapters by maturity, not just blast-radius: **conformant** (passes the kit) → **proven** (N months
+  in production, no incident) → **certified** (human review + soak + lint). A signal beyond pass/fail.
+- **Version-binding + fleet regression (from JDBC certification / Rust Crater).** A green result is bound
+  to *(framework version, provider version)*; on a framework or provider change, **re-run the kit across
+  every adapter** (Crater-style) to detect drift. The result records the versions it was run against.
+- **Governance of generated code = regenerate, don't hand-maintain.** The generated adapter is deposited
+  in the consumer's source control (for same-DX), but it is a **regenerable build artifact**, not
+  hand-maintained code. When a provider ships a breaking wire-protocol change: **re-run the Blueprint →
+  regenerate → re-verify** against the (unchanged) kit. The Blueprint + kit are the durable assets; the
+  adapter is their output. This answers "how do we maintain agent-written code at day-2."
+- **Negative-case + reject-illegal testing (from K8s CSI sanity tests).** The kit must verify the adapter
+  *rejects* illegal operations, not only that it *accepts* legal ones.
+- **Naming feedback.** All three flagged **"agentic"** as trend-prone (it may date the name). Two
+  recommend dropping it → **"Adapter Blueprint"** (the agent-optimization is a property of *how it's
+  written*, not the name; a human following the same script gets the same result); one judged "Agentic
+  Blueprint" stellar. The *verifier* name "surface-validation tools" was unanimously clunky → **Conformance
+  Kit / Conformance Gate**. The *capability* "agent-extensible adapters" → punchier as **the Adapter
+  Forge**. **Open for the architect** (low-stakes; concept is settled).
+- **Killer use, sharpened — the *procurement flip* / *substrate hot-swap*.** Not "connect to Oracle" but
+  "connect to *our* Oracle" (the weird schema, no-DDL DBA — only the empirical probe handles *this*
+  instance). The business framing: an enterprise demands "your data in *our* Azure tenant on Cosmos DB +
+  Service Bus" — normally a 9-month rewrite; with the Forge it's *"give us 24 hours"* (generate → green kit
+  → human-review the isolation lines → deploy). And when a vendor changes licensing (Redis → Garnet),
+  `koan adapter new --seam cache --provider Garnet` hot-swaps the fleet by config. "We don't support your
+  infrastructure" stops being a deal-killer.
 
 ## 7. Open questions
 
