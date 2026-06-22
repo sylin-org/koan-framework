@@ -1,17 +1,23 @@
 using System;
+using System.Collections.Concurrent;
+using Koan.Data.Core.Metadata;
 using Koan.Data.Core.Options;
+using Koan.Data.Core.Pipeline;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Koan.Data.Core.Tenancy;
 
 /// <summary>
-/// Default <see cref="ITenantEnforcer"/> — the fail-closed gate (ARCH-0095 P1, charter L6/C5). Reads the
-/// <see cref="TenancyOptions"/> posture and the ambient <see cref="Tenant"/> slice; the error <b>names the
-/// fix</b> (charter L6) rather than throwing a bare exception deep in business logic.
+/// The tenant fail-closed gate (ARCH-0095 P1, charter L6/C5) as a generic <see cref="IStorageGuard"/>: the
+/// data-core chokepoint invokes registered guards without naming a tenant. Reads the <see cref="TenancyOptions"/>
+/// posture and the ambient <see cref="Tenant"/> slice, computing <c>[HostScoped]</c> itself (cached per type);
+/// the error <b>names the fix</b> (charter L6). (This type moves to <c>Koan.Tenancy</c> as <c>TenantStorageGuard</c>.)
 /// </summary>
-internal sealed class TenantEnforcer : ITenantEnforcer
+internal sealed class TenantEnforcer : IStorageGuard
 {
+    private static readonly ConcurrentDictionary<Type, bool> HostScopedCache = new();
+
     private readonly IOptions<TenancyOptions> _options;
     private readonly ILogger<TenantEnforcer> _logger;
 
@@ -21,11 +27,11 @@ internal sealed class TenantEnforcer : ITenantEnforcer
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public void Guard(Type entityType, bool isHostScoped)
+    public void Guard(Type entityType)
     {
         var mode = _options.Value.Mode;
         if (mode == TenancyMode.Off) return;            // tenancy disabled (default) → no-op, zero regression
-        if (isHostScoped) return;                       // [HostScoped] entity → not tenant-scoped
+        if (IsHostScoped(entityType)) return;           // [HostScoped] entity → not tenant-scoped
         if (Tenant.Current?.HasTenant == true) return;  // a concrete tenant is in scope → allowed
 
         // A tenant-scoped operation with no concrete tenant in scope (unset, or explicit host scope).
@@ -41,4 +47,7 @@ internal sealed class TenantEnforcer : ITenantEnforcer
 
         throw new InvalidOperationException(message); // Enforce — fail closed
     }
+
+    private static bool IsHostScoped(Type entityType)
+        => HostScopedCache.GetOrAdd(entityType, static t => new TenantScopeMetadata(t).IsHostScoped);
 }

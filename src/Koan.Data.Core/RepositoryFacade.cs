@@ -6,7 +6,6 @@ using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Core.Metadata;
 using Koan.Data.Core.Pipeline;
-using Koan.Data.Core.Tenancy;
 
 namespace Koan.Data.Core;
 
@@ -31,14 +30,13 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
 {
     private readonly IDataRepository<TEntity, TKey> _inner;
     private readonly StorageWritePlan _writePlan;
-    private readonly TenantScopeMetadata _tenantScope;
-    private readonly ITenantEnforcer? _tenantEnforcer;
+    private readonly IStorageGuard[] _guards;
 
-    public RepositoryFacade(IDataRepository<TEntity, TKey> inner, ITenantEnforcer? tenantEnforcer = null)
+    public RepositoryFacade(IDataRepository<TEntity, TKey> inner, IStorageGuard[]? guards = null)
     {
-        _inner = inner; _tenantEnforcer = tenantEnforcer;
+        _inner = inner;
+        _guards = guards ?? Array.Empty<IStorageGuard>();
         _writePlan = StorageWritePlan.For(typeof(TEntity));
-        _tenantScope = new TenantScopeMetadata(typeof(TEntity));
     }
 
     // ARCH-0084: forward the inner provider's unified capabilities (native IDescribesCapabilities,
@@ -51,9 +49,10 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     private async Task Guard(CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        // ARCH-0095 P1: fail-closed tenant gate at the chokepoint, BEFORE touching the store. No-op when
-        // tenancy is off (default) or the entity is [HostScoped]. Read-filter/write-stamp land in the next slice.
-        _tenantEnforcer?.Guard(typeof(TEntity), _tenantScope.IsHostScoped);
+        // Generic fail-closed pre-op checks at the chokepoint, BEFORE touching the store (DATA-0105 §0).
+        // Cross-cutting modules register guards (Koan.Tenancy registers the tenant gate, ARCH-0095 P1); the
+        // data core never names them. No registered guard ⇒ empty loop ⇒ no-op.
+        for (var i = 0; i < _guards.Length; i++) _guards[i].Guard(typeof(TEntity));
         await _inner.EnsureReady(ct);
     }
 
