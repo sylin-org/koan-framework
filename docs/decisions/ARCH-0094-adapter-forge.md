@@ -1,6 +1,6 @@
 # ARCH-0094: The Adapter Forge — agent-authored, conformance-gated adapters
 
-**Status**: Accepted (2026-06-21) — *implementation queued behind tenancy (ARCH-009x); this ADR records the decision.*
+**Status**: Accepted (2026-06-21) — *implementation queued behind tenancy ([ARCH-0095](ARCH-0095-tenancy.md)); this ADR records the decision.*
 **Date**: 2026-06-21
 **Deciders**: Enterprise Architect
 **Scope**: How Koan grows its set of provider adapters (data, auth/OAuth, storage, messaging, vector, AI, cache, …) **without being bounded by maintainer time** — by directing an agent to author a conformant adapter for any seam/vendor, gated by an objective behavioral verifier. Defines the capability (**the Adapter Forge**), the per-adapter-type authoring artifact (**the Adapter Blueprint**), and the verifier (**the Conformance Gate**).

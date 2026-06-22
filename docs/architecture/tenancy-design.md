@@ -32,7 +32,7 @@ validation:
 >
 > **Status: design-only.** Nothing here is built yet. Forks marked **[SETTLED]** are ratified by the
 > architect; **[DECIDED]** items were closed by the external review's verdict; **[OPEN]** items remain.
-> The ADR that records this design is **ARCH-0095** (to be written next).
+> The ADR that records this design is [ARCH-0095](../decisions/ARCH-0095-tenancy.md).
 
 The two mandates carry from the charter: **Simplification** ("same developer experience regardless of
 tenancy mode") and **Delight** ("what would developers *and operators* love to have?"). Greenfield,
