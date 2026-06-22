@@ -385,3 +385,119 @@ The harvest is the strongest **positioning** evidence we have: each primitive ma
 persona-grounded delight, and the erasure certificate is both the cross-persona flagship and the
 deal-maker. New competitive grounding (EDPB-2026, GoodRx, Clerk-month-nine, Neon-DB-only, RLS-8-leaks) is
 the "why Koan" case for the eventual positioning doc.
+
+---
+
+# Round 3 (final) — 3 reviews · verdict: SHIP THE ADR
+
+All three independently said **ship** — the design held under the hardest pass; round 3 produced
+refinements, **4 corrections, 1 principled cut**, and closed the 3 open decisions.
+
+## R3.1 — The #1 regret class (all 3): durable serialized carriers must carry tenant + honor classification at v1
+- **Audit-event versioned envelope** (A): a typed event taxonomy (closed enum, minor-version-extensible)
+  + actor (identity + membership + scope) + target + ambient-context snapshot + **causal ordering** (not
+  just wall-clock) + a forward-compat extension bag. *The erasure certificate's credibility rests on the
+  audit trail's integrity.*
+- **Messaging OUTBOX `TenantId`-partitioning** (C, Critical): the outbox table needs `TenantId` and the
+  dispatcher filters by it, else cross-tenant event poisoning (A's event fires B's handler). Retrofitting
+  = a messaging-pillar rewrite.
+- **Classified-field stripping in DLQ / retry-ledger / event-store** (B): an erased tenant's plaintext
+  PII/PHI sitting in a dead-letter queue legally **voids the erasure certificate**. Durable carriers must
+  strip/blind-encrypt classified fields *before* durable storage.
+- → One theme: **bake tenant + classification into every durable serialized carrier (audit, outbox, DLQ,
+  event store) now.** This is the highest-regret cluster.
+
+## R3.2 — Credential / key seam on P6 + Placement now (all 3)
+First-class, vault-backed: an **`ICredentialProvider`** (resolved on pool-create + on auth-failure-retry)
++ a pluggable **KMS key-ring** for classification encryption + **tenant-scoped key rotation** +
+**cryptographic-shred** + the erasure certificate carries a **Key-ID + a verification endpoint** (else
+certs become unverifiable after the first key rotation). Define the seam now; implement rotation later.
+
+## R3.3 — Correction: identity-PII RESIDENCY is per-home-region, not solution-global (A + C)
+Last turn's "identity-PII handling is solution-level ONLY" overstated it. Split it: **handling rules**
+(isolate/encrypt) are solution-governed, but **residency** shards by the **identity's home region** —
+else John (EU) joining a US-pinned solution lands his PII in a US vault (GDPR violation), and the platform
+is forced to the lowest-common-denominator tier. Home region is **user-assertable/correctable**; changing
+it triggers an identity-PII relocation saga.
+
+## R3.4 — Correction: any effective-policy change triggers a migration saga, bi-directionally (B + C)
+A lock change (`MayChange`→`CannotChange`) **or** a tenant override, in **either direction** (relax OR
+**tighten**), is a **data migration, not an instant runtime switch** — else read-filters fail-open/throw
+against physically-mismatched data. Changing the effective posture triggers P5/P8 to vault+backfill
+*before* enforcing. Enterprises will demand the tighten path (`CoLocate`→`Isolate`).
+
+## R3.5 — THE CUT (2 of 3, on principle): kill the entity hint `[Phi(Embeddable = true)]`
+Embeddability is **handling (policy), not a fact** — putting it on the entity couples the domain model to
+the AI pillar and violates Reference = Intent (a silently-denied attribute). **Three clean seams: entity =
+facts only** (`[Pii]`/`[Phi]`); **solution config = posture + capabilities**
+(`Phi: { posture: Isolate, allowEmbedding: true, embeddingStrategy: ScrubAndEmbed }`); **tenant config =
+overrides where unlocked**. Intent is expressed by the *existing* `[Embedding]`; if the resolved policy
+denies it for a `[Phi]` field → `CapabilityDeniedException` at the AI call + boot-report + P7's
+`AssertEmbeddable` catches the dev/prod divergence in CI. This **sharpens the architect's own fact-vs-policy
+split** (A would keep the hint + CI-catch; B and C say cut it — cut wins on principle).
+
+## R3.6 — Open decisions closed
+- **D1 migrations → additive-only v1** (A + C; B dissented toward expand/contract). Refinements: a breaking
+  change is a **declaration** (`[BreakingMigration]` the canary *refuses*) not a detection problem; the
+  documented escape is a new entity version (`PatientV2`); watch **semantically-breaking-additive**
+  (NOT NULL without default, new enum value).
+- **D2 P8 → keep INTERNAL** (synthesis of all 3): *not* a developer-facing primitive, *not* a general
+  workflow engine (that's Temporal/MassTransit), orchestrates **only** idempotent compensable framework
+  primitives (P3/P4/P6), **no user business logic**. The coordinator owns phase lifecycle; each saga owns
+  its own consistency semantics (the anti-leak boundary). Developer surface stays `Tenant.Erase()`, never
+  `ISaga.Step()`.
+- **D3 adoption → graceful layering, no Lite SKU** (all 3), but **name + test the "tenancy kernel"**
+  (P1–P3 + P7 at the `Koan.Data` level) as a supported config, and **document the "Magic Cliff"**: 80% of
+  the value with `Koan.Data`; the async-hop safety (the flagship delight) requires `Koan.Jobs` +
+  `Koan.Messaging`.
+
+## R3.7 — Other regret holes (fold in)
+- **Classification propagation model** (complex types / collections / nav): define now; v1 = **per-leaf-field
+  only** (restrictive, unambiguous, relaxable later).
+- **Saga compensation contract**: undo-vs-forward *per phase*; compensation-can-fail → a `stuck` terminal
+  state (no infinite retry); per-tenant mutex (+ a cross-tenant pool-contention rule); structured per-phase
+  events.
+- **Erasure batching** as a saga parameter (batch size, backoff, **noisy-neighbor circuit-breaker**) — not
+  application logic.
+- **Fan-out query seam** `Tenant.FanOutQuery<T>` for ad-hoc cross-substrate admin queries, else operators
+  drop to raw SQL and bypass P1.
+- **External-infra delegation seam** (the answer to the fatal barrier): the capability model must carry
+  tenant context + classification across a boundary to **un-owned infra** (Pinecone vectors, enterprise
+  Kafka) **without silently failing-open** — softening "owns every axis" to "**coordinates** every axis,
+  even un-owned ones, via adapters."
+
+## R3.8 — Why-NOT: the fatal barrier is lock-in for EXISTING codebases → GTM is GREENFIELD (all 3)
+The owns-every-axis thesis is both the advantage and the fatal adoption barrier for teams with legacy or
+corporate-mandated infra. Convergent mitigations: **(1) GTM: greenfield-only** — don't pitch as a migration
+path; "Day 0 foundation for your next SaaS" (B, C); **(2) technical: the external-infra delegation seam**
+(R3.7) so a team can run Koan tenancy *with* Pinecone/Kafka. Trust/maturity (single-author, "who do I call
+at 2am") is the other top barrier — answered by dogfood + open governance + a published security/test
+track record. **None fatal given greenfield targeting.**
+
+## R3.9 — Discipline adopted (A)
+**"Attributes and verbs are expensive (forever); config knobs are cheap (discoverable). Bias new surface
+area toward config."** This is the rule that keeps the R3.5 cut from recurring.
+
+## R3.10 — Final delights (roadmap; all build on P4 → elevate P4)
+- **Point-in-time snapshot query** (A): `Tenant.Snapshot(id, at: t)` → a read-only cross-axis time-travel
+  view ("show me what the customer saw at 2pm yesterday").
+- **Merge/Split — M&A as a verb** (B): `Tenant.Merge(A, B, target)` resolves surrogate-key collisions,
+  re-assigns vault tokens, maps audit logs, signs an M&A compliance certificate.
+- **The Git model for data** (C): `Tenant.Branch` + `Tenant.Diff` + `Tenant.Checkout` — branch, modify,
+  diff the cross-axis delta, apply back as an audited compensating transaction.
+- → **P4 (logical Export/Import) + cross-axis snapshot is the substrate for a whole "data-as-versioned-
+  artifact" delight class.** P4 is more load-bearing than first rated.
+
+## R3.11 — Coherence verdict (all 3)
+The **developer surface stayed exquisitely small** throughout (≈4 attributes, 3 accessors, 3 verbs, 1
+config block; entity code unchanged) — the thesis holds *externally*. The accretion is **inherent** and
+lives in the host-plane (sagas, broker, state machines) — acceptable. The *one* internal cognitive-load
+risk all three flagged was the entity policy-hint → cut (R3.5). "Bias to config, not attributes" (R3.9)
+governs the rest.
+
+## R3.12 — Net (final)
+Three rounds + a delight harvest. The design **held**: round 3 = refinements + **4 corrections**
+(durable-carrier schema · credential/KMS seam · identity-residency-per-home-region · policy-change-is-a-
+migration) + **1 cut** (the entity embeddability hint) + **3 closed decisions** + a **greenfield GTM**.
+Unanimous verdict: **ship the ADR.** **Next: ratify → the big fold-in into `tenancy-design.md` (incorporating
+the 4 corrections, the cut, and the regret-class seams) → ADR ARCH-009x → phased TDD.**
