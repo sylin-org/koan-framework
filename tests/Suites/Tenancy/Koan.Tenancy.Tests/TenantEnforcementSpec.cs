@@ -10,21 +10,22 @@ using Xunit;
 namespace Koan.Tenancy.Tests;
 
 /// <summary>
-/// ARCH-0095 P1 — the fail-closed chokepoint gate, proven through a real <c>AddKoan()</c> boot (ARCH-0079) on
-/// the no-Docker JSON adapter with the <c>Koan.Tenancy</c> module referenced (so its auto-registrar discovers
-/// and wires the <c>TenantStorageGuard</c> as a generic <c>IStorageGuard</c>). Exercises the activation gradient
-/// (Off / Warn / Enforce) against tenant-scoped and <c>[HostScoped]</c> entities — proving the data core's
-/// generic guard seam carries tenancy purely by registration.
+/// ARCH-0095 P1 / ARCH-0099 §1 — the fail-closed chokepoint gate, proven through a real <c>AddKoan()</c> boot
+/// (ARCH-0079) with the <c>Koan.Tenancy</c> module referenced (so its registrar discovers and wires the
+/// <c>TenantStorageGuard</c> as a generic <c>IStorageGuard</c>). Exercises the posture (Open / Closed) against
+/// tenant-scoped and <c>[HostScoped]</c> entities — proving the data core's generic guard seam carries tenancy
+/// purely by registration, and that there is no <c>Off</c> state: the default (no config) in a non-dev host is
+/// <b>Closed</b>, secure-by-default.
 /// </summary>
 public sealed class TenantEnforcementSpec
 {
-    private static IReadOnlyDictionary<string, string?> Mode(string mode)
-        => new Dictionary<string, string?> { ["Koan:Data:Tenancy:Mode"] = mode };
+    private static IReadOnlyDictionary<string, string?> Posture(string posture)
+        => new Dictionary<string, string?> { ["Koan:Data:Tenancy:Posture"] = posture };
 
     [Fact]
-    public async Task Enforce_blocks_a_tenant_scoped_write_with_no_tenant_in_scope()
+    public async Task Closed_blocks_a_tenant_scoped_write_with_no_tenant_in_scope()
     {
-        await using var runtime = await TenancyRuntimeFixture.CreateAsync(extraSettings: Mode("Enforce"));
+        await using var runtime = await TenancyRuntimeFixture.CreateAsync(extraSettings: Posture("Closed"));
         runtime.ResetEntityCaches();
 
         var act = async () => await ScopedThing.Upsert(new ScopedThing { Title = "x" });
@@ -33,9 +34,9 @@ public sealed class TenantEnforcementSpec
     }
 
     [Fact]
-    public async Task Enforce_blocks_a_tenant_scoped_read_with_no_tenant_in_scope()
+    public async Task Closed_blocks_a_tenant_scoped_read_with_no_tenant_in_scope()
     {
-        await using var runtime = await TenancyRuntimeFixture.CreateAsync(extraSettings: Mode("Enforce"));
+        await using var runtime = await TenancyRuntimeFixture.CreateAsync(extraSettings: Posture("Closed"));
         runtime.ResetEntityCaches();
 
         var act = async () => await ScopedThing.All();
@@ -44,9 +45,9 @@ public sealed class TenantEnforcementSpec
     }
 
     [Fact]
-    public async Task Enforce_allows_the_write_inside_a_tenant_scope()
+    public async Task Closed_allows_the_write_inside_a_tenant_scope()
     {
-        await using var runtime = await TenancyRuntimeFixture.CreateAsync(extraSettings: Mode("Enforce"));
+        await using var runtime = await TenancyRuntimeFixture.CreateAsync(extraSettings: Posture("Closed"));
         runtime.ResetEntityCaches();
 
         using (Tenant.Use("t1"))
@@ -57,9 +58,9 @@ public sealed class TenantEnforcementSpec
     }
 
     [Fact]
-    public async Task Enforce_allows_a_host_scoped_entity_without_any_tenant()
+    public async Task Closed_allows_a_host_scoped_entity_without_any_tenant()
     {
-        await using var runtime = await TenancyRuntimeFixture.CreateAsync(extraSettings: Mode("Enforce"));
+        await using var runtime = await TenancyRuntimeFixture.CreateAsync(extraSettings: Posture("Closed"));
         runtime.ResetEntityCaches();
 
         // [HostScoped] entities opt out of tenant scoping — the quiet, legitimate system exception.
@@ -69,9 +70,10 @@ public sealed class TenantEnforcementSpec
     }
 
     [Fact]
-    public async Task Warn_allows_a_tenant_scoped_write_with_no_tenant_in_scope()
+    public async Task Open_allows_a_tenant_scoped_write_with_no_tenant_in_scope()
     {
-        await using var runtime = await TenancyRuntimeFixture.CreateAsync(extraSettings: Mode("Warn"));
+        // Dev-open: a tenant-scoped op with no tenant in scope is warned, not blocked (ARCH-0099 §1).
+        await using var runtime = await TenancyRuntimeFixture.CreateAsync(extraSettings: Posture("Open"));
         runtime.ResetEntityCaches();
 
         var saved = await ScopedThing.Upsert(new ScopedThing { Title = "x" });
@@ -80,16 +82,17 @@ public sealed class TenantEnforcementSpec
     }
 
     [Fact]
-    public async Task Off_by_default_does_not_gate_a_tenant_scoped_entity()
+    public async Task Default_posture_in_a_non_dev_host_is_closed_not_off()
     {
-        // No tenancy config → Mode=Off → a non-tenant app behaves identically (zero regression), even with the
-        // Koan.Tenancy module referenced.
+        // No posture config + the Test-env fixture (not Development) → posture derives to Closed. There is no
+        // Off state any more (ARCH-0099 §1 retired Mode=Off): the default is secure, a tenant-scoped op with no
+        // tenant fails closed.
         await using var runtime = await TenancyRuntimeFixture.CreateAsync();
         runtime.ResetEntityCaches();
 
-        var saved = await ScopedThing.Upsert(new ScopedThing { Title = "x" });
+        var act = async () => await ScopedThing.Upsert(new ScopedThing { Title = "x" });
 
-        saved.Id.Should().NotBeNullOrEmpty();
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*No tenant in scope*");
     }
 
     private sealed class ScopedThing : Entity<ScopedThing, string>
