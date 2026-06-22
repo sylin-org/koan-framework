@@ -187,16 +187,33 @@ implemented and its tests pass on real stores.
   `IQueryRepository` + Eq-pushability). **Errata filed:** DATA-0105 §1/§4 + tenancy-design.md §12 + ARCH-0095 §5
   (the "facade is the universal gateway" overstatement corrected; enforcement spans planes). Capability token =
   axis-free **`DataCaps.Isolation.RowScoped`**.
-- ☐ **Phase 3a** — converge column-name/exclusion into `ProjectionResolver`; **delete the dead
-  `src/Koan.Data.Relational/Schema/` cluster** (8 files, zero callers). Byte-identical.
-- ☐ **Phase 3b** — the managed-field seam (registry+write-scope in Abstractions · `ManagedFieldContractResolver`
-  in Relational · managed-aware `FieldPathResolver`+`ResolvedField.IsManaged` · full chokepoint surface +
-  fail-closed gate + conflict-aware upsert in Core/SQLite). Proven with a **generic non-tenant descriptor**.
-- ☐ **Phase 3c** schema-column DDL (Indexed descriptors → computed/expression index; PG/SqlServer) · **3d**
-  cache-key axis (`CacheKey.For` + `CachedRepository`) · **Phase 4** tenant registration + vector fail-closed +
-  SQLite `AssertNoTenantLeak` (incl. `[Cacheable]`, RemoveAll, upsert-takeover-rejected, IDOR, raw-fail-closed) ·
-  4-fan-out (PG/SqlServer/Mongo) · 5 classification + Mongo/JSON-file injection · ambient unification · Adapter
-  Forge · Facet 4 · cross-cutting completion.
+- ✅ **Phase 3a DONE** (`677004bb`) — converged column-name/exclusion onto `ProjectionResolver`
+  (`ColumnNameOf`/`IsExcludedFromStorage`, honoring `[Column]`+`[StorageName]` / `[NotMapped]`+`[IgnoreStorage]`);
+  **deleted the dead `src/Koan.Data.Relational/Schema/` cluster** (11 files, zero callers). Byte-identical; 192.
+- ✅ **Phase 3b DONE** (`8fb23fe8`) — the managed-field seam: `ManagedFieldRegistry`/`ManagedFieldDescriptor`/
+  `ManagedFieldWriteScope` + `DataCaps.Isolation.RowScoped` (Abstractions) · `ResolvedField.IsManaged` +
+  managed-aware `FieldPathResolver` (one change reaches translator + splitter; fail-loud `GetValue`) ·
+  `ManagedFieldContractResolver` Serialize-stage injection wired into the relational trio's
+  `ComparableScalarEncoding.Apply` · `RepositoryFacade` full chokepoint surface (read predicate, key-op→query
+  IDOR, RemoveAll/DeleteAll scoped, ConditionalReplace/raw fail-closed, capability gate) · SQLite conflict-aware
+  upsert (write-verify). Proven on real SQLite with a **generic non-tenant descriptor**, MUTATION-CHECKED (drop
+  read-predicate ⇒ isolation RED; drop conflict-guard ⇒ takeover RED). 204 + 5.
+- ✅ **Phase 3d DONE** (`59af99ac`) — the managed scope partitions the cache key (`CachedRepository.TryBuildEntityKey`
+  appends every registered managed field's value), closing blocker #2 (the cache wraps OUTSIDE the facade).
+- ✅ **PHASE 4 — THE TENANCY CAPABILITY DELIVERED + PROVEN** (`38ef15fe` core, `b5a57491` vector). `Koan.Tenancy`
+  registers the `__koan_tenant` `ManagedFieldDescriptor` (value=`Tenant.Current?.Id`, applies !`[HostScoped]`,
+  requires `Isolation.RowScoped`) — tenancy is now PURE REGISTRATION; the data core stays tenancy-agnostic. The
+  capability gate is use-time (ctor-bool + throw only when a managed value is in scope) so Off/unscoped is a true
+  no-op. Vector plane fails closed (`VectorData.Search`). **Flagship `AssertNoTenantLeak` on real SQLite (no-Docker,
+  Enforce), 6 cases ALL green + MUTATION-CHECKED** (cache-key neuter reopens the [Cacheable] leak): read isolation ·
+  get-by-id IDOR · cross-tenant upsert **takeover REJECTED** · scoped RemoveAll · `[HostScoped]` exempt · `[Cacheable]`
+  cache-key partition · raw fail-closed · non-isolating-adapter (JSON) fail-closed · tenancy-OFF zero regression.
+  Tenancy suite 23/23. **All 6 adversarial-review blockers closed.**
+- ☐ **NEXT:** Phase 3c schema-column DDL indexability (Indexed descriptors → computed/expression index; PG/SqlServer;
+  SQLite JSON-only) · Phase 4 fan-out (PG/SqlServer/Mongo `AssertNoTenantLeak` + per-adapter conflict-aware upsert +
+  Mongo BSON injection — needs Docker) · Phase 5 classification (2nd contributor module) + bare-store serialization +
+  in-memory managed `GetValue` · then control-plane keyed entities / sagas / erasure cert · ambient unification ·
+  Adapter Forge · Facet 4.
 
 > Full per-area detail + the DATA-0105 review punch-list (must-fixes i–xi, upgrades A–D, opportunities):
 > memory **[[facet3-tenancy-design]]** (the anchor). Tenancy spec: [tenancy-design.md](./tenancy-design.md).
