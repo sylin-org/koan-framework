@@ -190,7 +190,7 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
         {
             if (idx.IsPrimaryKey || idx.Ttl || idx.Properties.Count == 0) continue;   // PK is implicit; TTL is Mongo-only
             var cols = idx.Properties
-                .Select(p => p.GetCustomAttribute<ColumnAttribute>(inherit: true)?.Name ?? p.Name)
+                .Select(Koan.Data.Core.ProjectionResolver.ColumnNameOf)   // single converged column-name resolver (DATA-0105 §3a)
                 .ToArray();
             var name = !string.IsNullOrWhiteSpace(idx.Name) ? idx.Name! : $"IX_{table}_{string.Join("_", cols)}";
             try { ddl.CreateIndex(schema, table, name, cols, unique: idx.Unique); }
