@@ -53,6 +53,18 @@ Adopt **DATA-0094's** model for the tenant axis: the boundary maps onto each ada
 
 This **supersedes** ARCH-0096 §5's "tenant is a cache-key particle, not a name particle" and DATA-0105 §1's "4a is a schema-qualifier only, name-particles reserved for partition suffixes." The empirical objection that drove the June narrowing (the `.` flattens; the composer was append-only) is resolved: the composer now has positions (§5), and per-adapter rendering handles the flatten. ARCH-0095's *"tenant never enters the table-name **spine**"* still holds — the tenant is a **leading namespace particle**, not the `{model}` spine.
 
+#### 4a. The storage picture (ratified) — tenancy-on ≠ particles-everywhere
+
+A particle is the *container-mode* rendering only. The default rung when tenancy is on is the **control field** (shared-row), which adds **no name particle at all** — just the invisible `__koan_tenant` discriminator. And the **control-plane is exempt from every rung** (the `[HostScoped]` exemption the gate already uses): the registry entities (`Tenant`, `Membership`, …) live in the root/host scope, never prefixed. Every tenant's data is treated identically — **the app owner's own tenant is a normal tenant, not special** (no master powers; that is the rejected backdoor, §2).
+
+| State | Tenant data | Control-plane (`[HostScoped]`) |
+|---|---|---|
+| `Koan.Tenancy` **not referenced** | `Todo` (byte-identical to today) | — |
+| referenced · **default** (control-field) | `Todo` + invisible `__koan_tenant` field | `Tenant` / `Membership` (host scope, unprefixed) |
+| referenced · **container** mode | `2a6v7.Todo` (leading tenant-id particle) | `Tenant` / `Membership` (host scope, unprefixed) |
+
+So: no module ⇒ nothing; module on ⇒ the shadow field by default (names unchanged); the leading prefix appears only when a tenant (or the app) is placed in container mode; and the control-plane never gets a particle in any state.
+
 ### 5. Positional particles — the missing primitive (LANDED)
 
 `IdentifierComposer` was append-only (every particle trailed the anchor) — it could not express a leading container prefix. **Added** (`a46c11fc`): `Particle.Position` (Leading/Trailing, default Trailing) + an optional per-particle `Separator` override; the composer builds `[leading] anchor [trailing]`, the byte-clamp preserves the leading prefix and hashes the full id (clamped tenant containers never collide). Byte-identical for the existing trailing partition; 19 composer specs + data-naming 40/40; the leading-vs-trailing invariant mutation-killed.
