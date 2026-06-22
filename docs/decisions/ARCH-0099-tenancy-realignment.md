@@ -71,6 +71,15 @@ So: no module ⇒ nothing; module on ⇒ the shadow field by default (names unch
 
 **Next wiring (not this ADR):** build the `IParticleContributor` discovery seam (ARCH-0096 §2 designed it; partition is hand-wired today) so `Koan.Tenancy` *registers* a leading tenant-container particle — the same registration shape classification and partition use.
 
+### 6. The Tenancy Dev Console — the visible half of "open in dev"
+
+"Open in dev" (§1) means the developer lands in a *working* control plane on day one; the **Tenancy Dev Console** is the visible half of that — a default, Koan-provided **dev-only** management page, modeled on the auth **TestProvider** dev-login page (`Koan.Web.Auth.Connector.Test`): a connector that ships a styled page + the admin endpoints behind it, gated to Development by the same `IsActive(env)` predicate, **fail-closed outside dev** (explicit opt-in to surface it elsewhere). It lets a developer exercise the control plane without hand-writing admin calls — **see/create tenants, add identities to tenants as members with roles, issue/accept invites, switch the active tenant, and read the live posture + open-surfaces census + boot diagnostics.**
+
+- **Layering:** a **new web connector module** (`Koan.Web.Tenancy`), **not** `Koan.Tenancy` — the data-layer module stays web-free (no ASP.NET deps), exactly as the auth core stays separate from its TestProvider connector. Reference = Intent: referencing the connector in a web app maps the console + admin endpoints.
+- **Dogfood, not a backdoor:** the console is a **projection over the same tenancy admin endpoints** an operator/host-face console would call — every mutation runs through the real control-plane verbs + audit (cross-tenant ops are explicit, audited P8 sagas, §2), never a console-only privilege. It proves those endpoints *by use*.
+- **Auth in dev / prod:** in dev the loopback caller is already auto-trusted as the dev tenant's **Owner** (§1/§2), so the console opens with no login — like the TestProvider page. In prod it is **off by default**; if ever surfaced it sits behind the real `koan:owner` membership + the bootstrap allowlist (§2), never an ambient master.
+- **Sequencing:** the console needs the durable control-plane entities + admin endpoints, so it lands as the **capstone** of that work (build-order step 3), after the posture seam (step 1) and the durable control-plane (step 2). It may graduate to its own `WEB-00xx` ADR when built; the design canon lives here for now.
+
 ## Consequences
 
 - Tenancy's default flips from `Mode=Off` to **active-posture-by-env** (Reference = Intent). A non-tenant app that doesn't reference the module is unaffected; one that references it gets dev-open/prod-closed.
@@ -80,11 +89,14 @@ So: no module ⇒ nothing; module on ⇒ the shadow field by default (names unch
 
 ## Build order
 
-1. **Posture seam** — `TenancyPosture` computed once from `KoanEnv` (resolve Open/Closed, the hard-fail vs warn pre-flight, branded-marker detect, the boot line) + dev auto-seed (dev tenant + Owner membership + branded ephemeral key, in-memory, `IsDevelopment()`-gated) + the Redis-style refusal diagnostic. Delivers day-one delight, fail-closed in prod by construction.
-2. **`IParticleContributor` discovery seam** + wire `Koan.Tenancy` to register the **leading tenant-container particle** (id-based) → container-per-tenant on name-encoding stores. Prove with the cross-adapter oracle.
-3. **Durable control-plane** (`[HostScoped]` `Tenant` + `Membership` + `koan:owner` role) + the prod first-claim flow (allowlist/token/CLI).
-4. **P6 connection broker** (database-per-tenant) — re-derive empirically from the data-core connection-resolution code first.
-5. Native-container routing for the remaining stores (Couchbase scope already; Mongo database, Postgres schema) behind the same contributor.
+Reordered (2026-06-22) to bring the control-plane + console forward — the architect elevated the dev console (§6), and its prerequisites (durable control-plane + admin endpoints) now precede the particle/container wiring.
+
+1. **Posture seam + dev auto-seed** — `TenancyPosture` computed once from `KoanEnv` (resolve Open/Closed, the hard-fail vs warn pre-flight, branded-marker detect, the boot line) + dev auto-seed (dev tenant + Owner membership + branded ephemeral key, in-memory, `IsDevelopment()`-gated) + the Redis-style refusal diagnostic. Delivers day-one delight, fail-closed in prod by construction.
+2. **Durable control-plane + admin endpoints** — `[HostScoped]` `Tenant` + `Membership` + `Invite` (+ `Identity`) + `koan:owner` role + the prod first-claim flow (allowlist/token/CLI), and the **tenancy admin endpoints** (the new `Koan.Web.Tenancy` connector) the console projects. The dev auto-seed's in-memory tenant/Owner graduate to these durable entities.
+3. **The Tenancy Dev Console** (§6) — the dev-gated, TestProvider-styled page projecting the step-2 admin endpoints (tenants, members, invites, switch-tenant, posture/census diagnostics). Capstone of the control-plane experience.
+4. **`IParticleContributor` discovery seam** + wire `Koan.Tenancy` to register the **leading tenant-container particle** (id-based) → container-per-tenant on name-encoding stores. Prove with the cross-adapter oracle.
+5. **P6 connection broker** (database-per-tenant) — re-derive empirically from the data-core connection-resolution code first.
+6. Native-container routing for the remaining stores (Couchbase scope already; Mongo database, Postgres schema) behind the same contributor.
 
 ## Risks / open
 

@@ -273,6 +273,14 @@ implemented and its tests pass on real stores.
     empirical, not asserted.
     Note: the phase-0 `IWriteStamp` contributor seam stays a generic in-place-stamp extension point (classification uses
     the new field-transform seam); the priority field was the load-bearing phase-0 deliverable.
+- ◐ **TENANCY ARCH-0099 BUILD — posture seam (step 1) IN PROGRESS.** ADR §6 (the **Tenancy Dev Console**, a
+  dev-only TestProvider-styled control-plane page in a new `Koan.Web.Tenancy` connector) folded in + the build
+  order **reordered** so the durable control-plane + admin endpoints + console precede the particle/container
+  wiring (1 posture-seam → 2 durable control-plane + admin endpoints → 3 dev console → 4 particle → 5 P6 → 6
+  native-container). Now building step 1: `TenancyPosture` (Open/Closed from `KoanEnv`, kills the `Mode=Off`
+  default) + migrate `Koan.Tenancy` to `KoanModule` (DI-available `Start`) + gate-reads-posture + prod-boot
+  pre-flight (HARD-FAIL active+no-resolver/branded-marker/no-secret; WARN census) + dev auto-seed (smart-named
+  dev tenant + loopback Owner + dev-fallback resolution + branded ephemeral key) + Redis-style refusal diagnostic.
 - ☐ **THEN:** Phase 3c schema-column DDL indexability (Indexed descriptors → computed/expression index; PG/SqlServer;
   SQLite JSON-only) + Mongo/bare-store managed serialization injection + in-memory managed `GetValue` · classification
   phases 4–7 (searchable blind-index · vector/messaging leak guards · crypto-shred+rotation · masked-read) · then
