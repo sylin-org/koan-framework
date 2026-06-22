@@ -11,6 +11,7 @@ using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
+using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Core;
 using Microsoft.Extensions.Logging;
 
@@ -356,8 +357,28 @@ internal sealed class CachedRepository<TEntity, TKey> :
             return false;
         }
 
-        key = new CacheKey(formatted);
+        key = new CacheKey(AppendManagedScope(formatted));
         return true;
+    }
+
+    // DATA-0105 §3.2 — the cache decorator wraps OUTSIDE the RepositoryFacade, so a cache hit never reaches the
+    // managed read-filter. The managed scope (tenant/classification) MUST therefore partition the cache key, or a
+    // [Cacheable] managed entity serves one scope's row to another above the chokepoint. The scope is appended to
+    // the formatted key (independent of the template) in deterministic registration order. Off / no managed field
+    // for this type ⇒ no suffix ⇒ byte-identical key.
+    private static string AppendManagedScope(string baseKey)
+    {
+        if (ManagedFieldRegistry.IsEmpty) return baseKey;
+        var managed = ManagedFieldRegistry.ForType(typeof(TEntity));
+        if (managed.Count == 0) return baseKey;
+
+        var sb = new System.Text.StringBuilder(baseKey);
+        foreach (var d in managed)
+        {
+            var v = d.ValueProvider();
+            sb.Append("::").Append(d.StorageName).Append('=').Append(v?.ToString() ?? "_");
+        }
+        return sb.ToString();
     }
 
     private static bool IsDefaultKey(TKey key)
