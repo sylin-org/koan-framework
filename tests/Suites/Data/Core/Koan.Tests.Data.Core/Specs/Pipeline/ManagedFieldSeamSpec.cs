@@ -108,4 +108,23 @@ public sealed class ManagedFieldSeamSpec : IDisposable
 
         act.Should().Throw<InvalidOperationException>().WithMessage("*pushed down*");
     }
+
+    [Fact]
+    public void ForType_orders_managed_fields_by_priority_stably()
+    {
+        // DATA-0105 §3 prerequisite (ARCH-0098 phase 0): a total, stable, explicit-priority order. Register out of
+        // priority order; ForType must return them sorted by Priority (ties keep registration order).
+        ManagedFieldRegistry.Register(new ManagedFieldDescriptor("__late", typeof(string), () => "v", _ => true, Priority: 200));
+        ManagedFieldRegistry.Register(new ManagedFieldDescriptor("__early", typeof(string), () => "v", _ => true, Priority: 50));
+
+        ManagedFieldRegistry.ForType(typeof(Scoped)).Select(d => d.StorageName)
+            .Should().Equal("__early", "__late");
+    }
+
+    [Fact]
+    public void Priority_defaults_to_zero_for_the_canonical_single_field()
+    {
+        ManagedFieldRegistry.Register(Field("__scoped", _ => true));
+        ManagedFieldRegistry.ForType(typeof(Scoped)).Single().Priority.Should().Be(0);
+    }
 }

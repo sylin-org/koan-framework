@@ -14,6 +14,7 @@ namespace Koan.Tests.Data.Core.Specs.Pipeline;
 /// Upsert/UpsertMany and the batch subset runs on the batch path — preserving the shipped invariant that batch
 /// writes are NOT timestamp-stamped.
 /// </summary>
+[Collection("storage-write-plan")]   // serialize with WriteContributorSpec: shared plan memo + global registry state
 public class StorageWritePlanSpec
 {
     private sealed class Stamped : Entity<Stamped, string>

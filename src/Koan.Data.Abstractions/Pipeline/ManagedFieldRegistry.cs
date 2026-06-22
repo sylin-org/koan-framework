@@ -25,10 +25,10 @@ public static class ManagedFieldRegistry
     /// <summary>Whether no managed field is registered — the hot-path off gate. Cheap volatile read.</summary>
     public static bool IsEmpty => _isEmpty;
 
-    /// <summary>Every registered descriptor (e.g. for the cache-key axis and the boot report).</summary>
+    /// <summary>Every registered descriptor, priority-ordered (e.g. for the cache-key axis and the boot report).</summary>
     public static IReadOnlyList<ManagedFieldDescriptor> All
     {
-        get { lock (_gate) return _descriptors.ToArray(); }
+        get { lock (_gate) return _descriptors.OrderBy(d => d.Priority).ToArray(); }
     }
 
     /// <summary>
@@ -59,7 +59,9 @@ public static class ManagedFieldRegistry
         {
             ManagedFieldDescriptor[] snapshot;
             lock (_gate) snapshot = _descriptors.ToArray();
-            return snapshot.Where(d => d.AppliesTo(t)).ToArray();
+            // Stable order by explicit priority (DATA-0105 §3); ties keep registration order. Moot for the single
+            // tenant field today, deterministic once a second managed field exists.
+            return snapshot.Where(d => d.AppliesTo(t)).OrderBy(d => d.Priority).ToArray();
         });
     }
 

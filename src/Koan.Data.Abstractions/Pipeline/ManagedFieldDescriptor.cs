@@ -26,10 +26,17 @@ namespace Koan.Data.Abstractions.Pipeline;
 /// does not announce the token — or cannot push a scalar equality on the field — <b>fails closed</b>.
 /// </param>
 /// <param name="Indexed">Promote to an indexed computed/expression column where the adapter supports it (Schema stage).</param>
+/// <param name="Priority">
+/// The stable, explicit apply/inject order (lower runs earlier) — the DATA-0105 §3 "total, stable, explicit-priority
+/// order frozen at discovery". With a single managed field (the tenant discriminator) order is moot; the field exists
+/// so a future second managed field composes deterministically. <see cref="ManagedFieldRegistry.ForType"/> orders by
+/// it (stably; ties keep registration order).
+/// </param>
 public sealed record ManagedFieldDescriptor(
     string StorageName,
     Type ClrType,
     Func<object?> ValueProvider,
     Func<Type, bool> AppliesTo,
     Capability? RequiredCapability = null,
-    bool Indexed = false);
+    bool Indexed = false,
+    int Priority = 0);

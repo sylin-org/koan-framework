@@ -15,5 +15,8 @@ internal sealed class TimestampWriteStamp : IWriteStamp
 
     public bool AppliesInBatch => false;
 
+    /// <summary>100 — after identity, before any value-protecting transform.</summary>
+    public int Priority => 100;
+
     public void Apply(object entity) => _bag.UpdateTimestamp(entity);
 }

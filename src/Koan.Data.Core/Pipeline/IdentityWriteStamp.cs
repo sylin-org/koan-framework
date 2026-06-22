@@ -12,5 +12,8 @@ internal sealed class IdentityWriteStamp : IWriteStamp
 
     public bool AppliesInBatch => true;
 
+    /// <summary>0 — identity always stamps first, so every later contributor sees a populated id.</summary>
+    public int Priority => 0;
+
     public void Apply(object entity) => AggregateIdentity.Ensure(entity, _spec);
 }
