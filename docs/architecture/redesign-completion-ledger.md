@@ -303,6 +303,25 @@ implemented and its tests pass on real stores.
   - **Koan.Tenancy 62/62** (real `AddKoan` boots, ARCH-0079); **12 mutations killed total** (incl. the invariant
     flip → 11 fail, per-host dev-flag → false → 5 fail); blast radius contained (no external project references
     the module). All 7 review findings addressed. Posture seam (ARCH-0099 build-order step 1) COMPLETE.
+  - **ADR §1 realigned** (`3d337583`) — the per-host posture correction promoted into the canonical decision text
+    (not an erratum).
+- ◐ **TENANCY ARCH-0099 BUILD — step 2 (durable control-plane) IN PROGRESS.** Data-layer half DONE:
+  - **2a** (`06bbb16e`) — the durable registry entities, dogfooded `[HostScoped]` `Entity<T>`: `TenantRecord`
+    (immutable GUID-v7 id + mutable `Name` + `TenantStatus` + `[Timestamp]`), `Membership` (the identity↔tenant
+    bridge; **roles ON the membership**, StackExchange model; `IsOwner`/`HasRole`), `Invite` (opaque token +
+    expiry; `IsRedeemable` false once revoked/expired). Naming: the static `Tenant` keeps the ambient API, so the
+    row is `TenantRecord`. 65/65; 1 mutation killed.
+  - **2b** (`c5ebb77b`) — first-owner onboarding: pure `TenantBootstrapPolicy` (dev → anyone; prod → allowlist OR
+    constant-time one-time token) + durable `TenantBootstrap` (one-shot `ClaimOwnerAsync` — first claimant is the
+    only Owner, later claims ignored; `EnsureDevAsync` graduates the in-memory dev seed onto durable rows,
+    idempotent). Durable seeding stays **lazy** (not at module `Start` — a multi-host test can leave a stale
+    `AppHost.Current`). 72/72; 2 mutations killed.
+  - **▶ NEXT — 2c + step 3 (the WEB half):** a new **`Koan.Web.Tenancy`** connector (keeps `Koan.Tenancy`
+    web-free) exposing the tenancy admin endpoints (list/create tenants · list/add members · issue/accept/revoke
+    invites · switch tenant · posture+diagnostics), dev-gated by the same `IsActive(env)` as the auth TestProvider;
+    it lazily calls `TenantBootstrap.EnsureDevAsync` on first dev request. Then **step 3 = the Tenancy Dev Console**
+    page (TestProvider-styled, dev-only, a projection over those endpoints — never a backdoor). Model the connector
+    on `src/Connectors/Web/Auth/Test/` (StartupFilter + endpoint extensions + wwwroot static page).
 - ☐ **THEN:** Phase 3c schema-column DDL indexability (Indexed descriptors → computed/expression index; PG/SqlServer;
   SQLite JSON-only) + Mongo/bare-store managed serialization injection + in-memory managed `GetValue` · classification
   phases 4–7 (searchable blind-index · vector/messaging leak guards · crypto-shred+rotation · masked-read) · then
