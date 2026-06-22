@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Koan.Core.Naming;
 
 namespace Koan.Data.Abstractions.Naming;
 
@@ -6,6 +7,8 @@ namespace Koan.Data.Abstractions.Naming;
 /// Single source of truth that turns an <c>(entityType, partition)</c> pair into a physical storage
 /// identifier, honoring an adapter's announced <see cref="StorageNamingCapability"/>. Adapters announce
 /// their capability; the framework owns the algorithm — so name generation can never drift between adapters.
+/// The composition (anchor + partition particle + byte clamp) delegates to the shared ARCH-0096
+/// <see cref="IdentifierComposer"/>; only the base-name anchor and the partition token rendering are data-specific.
 /// </summary>
 public static class StorageNameGenerator
 {
@@ -41,28 +44,20 @@ public static class StorageNameGenerator
 
     private static string Compose(string baseName, string? partition, StorageNamingCapability cap)
     {
+        // Composition (ordering + separator + byte clamp) is the shared ARCH-0096 algorithm; the partition
+        // token rendering stays adapter-specific (its PartitionTokenPolicy). When the adapter isolates the
+        // partition through a native primitive (EncodePartitionInName = false, e.g. Couchbase scope) or there is
+        // no partition, no particle is contributed and the name is just the (clamped) anchor.
+        var policy = new CompositionPolicy(
+            cap.PartitionSeparator.ToString(),
+            new PartitionParticleFormatter(cap.Partition),
+            cap.MaxIdentifierBytes);
+
         var trimmed = partition?.Trim();
         if (!cap.EncodePartitionInName || string.IsNullOrEmpty(trimmed))
-            return Clamp(baseName, baseName, cap);
+            return IdentifierComposer.Compose(baseName, ReadOnlySpan<Particle>.Empty, policy);
 
-        var token = cap.Partition.Format(trimmed);
-        var composed = baseName + cap.PartitionSeparator + token;
-        return Clamp(composed, baseName, cap);
-    }
-
-    // When an identifier exceeds the adapter's byte limit, keep a readable prefix (the base name — which is
-    // already short under HashedNamespace) and append a deterministic hash of the FULL identifier. Because
-    // nothing in the framework ever reverse-parses a partition out of a name, replacing the overflowing tail
-    // with a hash is safe: only uniqueness must be preserved, not recoverability. Names within the limit
-    // (the common case) are returned unchanged.
-    private static string Clamp(string identifier, string readableBase, StorageNamingCapability cap)
-    {
-        if (cap.MaxIdentifierBytes is not { } max || NamingUtils.ByteLength(identifier) <= max)
-            return identifier;
-
-        const int hashChars = 8;
-        var hash = NamingUtils.ShortHash(identifier, hashChars);
-        var prefix = NamingUtils.TrimToBytes(readableBase, max - hashChars - 1); // reserve sep + hash
-        return prefix + cap.PartitionSeparator + hash;
+        Span<Particle> particles = [new Particle(0, "partition", trimmed)];
+        return IdentifierComposer.Compose(baseName, particles, policy);
     }
 }
