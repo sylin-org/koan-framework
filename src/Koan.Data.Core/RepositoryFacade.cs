@@ -5,6 +5,7 @@ using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Core.Metadata;
+using Koan.Data.Core.Pipeline;
 using Koan.Data.Core.Tenancy;
 
 namespace Koan.Data.Core;
@@ -29,15 +30,14 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     where TKey : notnull
 {
     private readonly IDataRepository<TEntity, TKey> _inner;
-    private readonly IAggregateIdentityManager _manager;
-    private readonly TimestampPropertyBag _timestampBag;
+    private readonly StorageWritePlan _writePlan;
     private readonly TenantScopeMetadata _tenantScope;
     private readonly ITenantEnforcer? _tenantEnforcer;
 
-    public RepositoryFacade(IDataRepository<TEntity, TKey> inner, IAggregateIdentityManager manager, ITenantEnforcer? tenantEnforcer = null)
+    public RepositoryFacade(IDataRepository<TEntity, TKey> inner, ITenantEnforcer? tenantEnforcer = null)
     {
-        _inner = inner; _manager = manager; _tenantEnforcer = tenantEnforcer;
-        _timestampBag = new TimestampPropertyBag(typeof(TEntity));
+        _inner = inner; _tenantEnforcer = tenantEnforcer;
+        _writePlan = StorageWritePlan.For(typeof(TEntity));
         _tenantScope = new TenantScopeMetadata(typeof(TEntity));
     }
 
@@ -111,8 +111,7 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     public async Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
     {
         await Guard(ct);
-        await _manager.EnsureIdAsync<TEntity, TKey>(model, ct);
-        if (_timestampBag.HasTimestamp) _timestampBag.UpdateTimestamp(model);
+        _writePlan.ApplyAll(model);
         return await _inner.Upsert(model, ct);
     }
 
@@ -123,8 +122,7 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         foreach (var m in list)
         {
             ct.ThrowIfCancellationRequested();
-            await _manager.EnsureIdAsync<TEntity, TKey>(m, ct);
-            if (_timestampBag.HasTimestamp) _timestampBag.UpdateTimestamp(m);
+            _writePlan.ApplyAll(m);
         }
         return await _inner.UpsertMany(list, ct);
     }
@@ -199,8 +197,9 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         public async Task<BatchResult> Save(BatchOptions? options = null, CancellationToken ct = default)
         {
             await _outer.Guard(ct);
-            foreach (var e in _adds) { ct.ThrowIfCancellationRequested(); await _outer._manager.EnsureIdAsync<TEntity, TKey>(e, ct); }
-            foreach (var e in _updates) { ct.ThrowIfCancellationRequested(); await _outer._manager.EnsureIdAsync<TEntity, TKey>(e, ct); }
+            // Batch path applies the batch-eligible write-stamps (identity; NOT [Timestamp] — the shipped invariant).
+            foreach (var e in _adds) { ct.ThrowIfCancellationRequested(); _outer._writePlan.ApplyBatch(e); }
+            foreach (var e in _updates) { ct.ThrowIfCancellationRequested(); _outer._writePlan.ApplyBatch(e); }
             if (_mutations.Count != 0)
             {
                 foreach (var (id, mutate) in _mutations)
@@ -210,7 +209,7 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
                     if (current is not null)
                     {
                         mutate(current);
-                        await _outer._manager.EnsureIdAsync<TEntity, TKey>(current, ct);
+                        _outer._writePlan.ApplyBatch(current);
                         _updates.Add(current);
                     }
                 }

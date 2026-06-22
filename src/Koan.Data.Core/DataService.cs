@@ -43,12 +43,11 @@ public sealed class DataService(IServiceProvider sp) : IDataService
         // Create repository with source context
         var repo = factory.Create<TEntity, TKey>(sp, source);
 
-        // Wrap with facade for identity management.
+        // Wrap with facade for the write-stamp pipeline (identity + [Timestamp]) and the tenant gate.
         // Schema readiness is the adapter's responsibility now (IDataRepository.EnsureReady);
         // the facade calls it before every operation — no separate EntitySchemaGuard layer.
-        var manager = sp.GetRequiredService<IAggregateIdentityManager>();
         var tenantEnforcer = sp.GetService<Tenancy.ITenantEnforcer>();
-        var facade = new RepositoryFacade<TEntity, TKey>(repo, manager, tenantEnforcer);
+        var facade = new RepositoryFacade<TEntity, TKey>(repo, tenantEnforcer);
 
         var decorated = ApplyDecorators(typeof(TEntity), typeof(TKey), facade, sp);
 

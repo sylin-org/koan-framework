@@ -24,8 +24,8 @@ public sealed class AggregateConfig<TEntity, TKey>
                           ?? throw new InvalidOperationException($"No data adapter factory for provider '{provider}'");
 
             var repo = factory.Create<TEntity, TKey>(sp);
-            var manager = sp.GetRequiredService<IAggregateIdentityManager>();
-            return new RepositoryFacade<TEntity, TKey>(repo, manager);
+            var tenantEnforcer = sp.GetService<Tenancy.ITenantEnforcer>();
+            return new RepositoryFacade<TEntity, TKey>(repo, tenantEnforcer);
         }, LazyThreadSafetyMode.ExecutionAndPublication);
     }
 }
