@@ -13,6 +13,7 @@ using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Core;
+using Koan.Data.Core.Pipeline;
 using Microsoft.Extensions.Logging;
 
 namespace Koan.Cache.Decorators;
@@ -36,6 +37,7 @@ internal sealed class CachedRepository<TEntity, TKey> :
     private readonly ILogger<CachedRepository<TEntity, TKey>> _logger;
     private readonly Func<TEntity, TKey> _keyAccessor;
     private readonly string _entityName;
+    private readonly bool _excludeFromCache;
 
     public CachedRepository(
         IDataRepository<TEntity, TKey> inner,
@@ -54,6 +56,11 @@ internal sealed class CachedRepository<TEntity, TKey> :
         _instructionExecutor = inner as IInstructionExecutor<TEntity>;
         _keyAccessor = static entity => ((IEntity<TKey>)entity).Id;
         _entityName = CacheKey.EntityTypeName(typeof(TEntity));
+        // ARCH-0098 §6: an entity whose stored value is transformed on read (e.g. a [Classified] field encrypted at
+        // rest) must NOT be cached — the cache decorates OUTSIDE the facade, so the cached value would be the
+        // post-reverse PLAINTEXT and would leak into L2. Such types are excluded from caching entirely (read + write).
+        // Generic: the cache never names classification; it asks the field-transform registry. Off ⇒ false ⇒ no change.
+        _excludeFromCache = StorageFieldTransformRegistry.HasTransformsFor(typeof(TEntity));
     }
 
     // ARCH-0084: forward the inner provider's unified capabilities (native IDescribesCapabilities,
@@ -64,6 +71,8 @@ internal sealed class CachedRepository<TEntity, TKey> :
 
     public async Task<TEntity?> Get(TKey id, CancellationToken ct = default)
     {
+        if (_excludeFromCache) return await _inner.Get(id, ct);   // never cache a read-transformed (e.g. classified) value
+
         var effectiveStrategy = ResolveEffectiveStrategy();
 
         if (effectiveStrategy is CacheStrategy.NoCache or CacheStrategy.SetOnly or CacheStrategy.Invalidate)
@@ -268,6 +277,8 @@ internal sealed class CachedRepository<TEntity, TKey> :
 
     private async ValueTask HandleWrite(TEntity entity, CancellationToken ct)
     {
+        if (_excludeFromCache) return;   // a read-transformed entity is never written to the cache (would store plaintext)
+
         if (_entityPolicy.Strategy is CacheStrategy.NoCache)
         {
             return;
@@ -295,6 +306,8 @@ internal sealed class CachedRepository<TEntity, TKey> :
 
     private async ValueTask Remove(TKey id, CancellationToken ct)
     {
+        if (_excludeFromCache) return;   // nothing was cached for this type
+
         if (_entityPolicy.Strategy is CacheStrategy.NoCache or CacheStrategy.SetOnly)
         {
             return;

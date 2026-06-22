@@ -36,6 +36,7 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
 {
     private readonly IDataRepository<TEntity, TKey> _inner;
     private readonly StorageWritePlan _writePlan;
+    private readonly StorageFieldTransformPlan _fieldTransform;
     private readonly IStorageGuard[] _guards;
     private readonly IReadOnlyList<ManagedFieldDescriptor> _managed;
     private readonly string _idField;
@@ -47,10 +48,56 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         _inner = inner;
         _guards = guards ?? Array.Empty<IStorageGuard>();
         _writePlan = StorageWritePlan.For(typeof(TEntity));
+        _fieldTransform = StorageFieldTransformPlan.For(typeof(TEntity));
         _managed = ManagedFieldRegistry.ForType(typeof(TEntity));
         _idField = AggregateMetadata.GetIdSpec(typeof(TEntity))?.Prop.Name ?? "Id";
         if (_managed.Count > 0) (_managedAdapterOk, _managedAdapterError) = InspectManagedAdapter();
         else _managedAdapterOk = true;
+    }
+
+    // --- field-transform helpers (ARCH-0098 §0). All are no-op fast paths when the type has no transform. ---
+
+    /// <summary>The persist payload for a write: an encrypted clone when a transform exists, else the entity itself.</summary>
+    private TEntity WritePayload(TEntity entity)
+        => _fieldTransform.HasTransforms ? (TEntity)_fieldTransform.CloneForWrite(entity) : entity;
+
+    /// <summary>Restore plaintext on a single returned entity, in place.</summary>
+    private TEntity? Reverse(TEntity? entity)
+    {
+        if (entity is not null && _fieldTransform.HasTransforms) _fieldTransform.ApplyOnRead(entity);
+        return entity;
+    }
+
+    /// <summary>Restore plaintext on every entity in a query result, in place.</summary>
+    private RepositoryQueryResult<TEntity> Reverse(RepositoryQueryResult<TEntity> result)
+    {
+        if (_fieldTransform.HasTransforms)
+            for (var i = 0; i < result.Items.Count; i++)
+            {
+                var e = result.Items[i];
+                if (e is not null) _fieldTransform.ApplyOnRead(e);
+            }
+        return result;
+    }
+
+    /// <summary>Restore plaintext on every non-null entity in a get-many result, in place.</summary>
+    private IReadOnlyList<TEntity?> Reverse(IReadOnlyList<TEntity?> items)
+    {
+        if (_fieldTransform.HasTransforms)
+            for (var i = 0; i < items.Count; i++)
+            {
+                var e = items[i];
+                if (e is not null) _fieldTransform.ApplyOnRead(e);
+            }
+        return items;
+    }
+
+    /// <summary>Persist an Upsert under the current managed write scope (the shared tenant/managed-field path).</summary>
+    private async Task<TEntity> PersistUpsert(TEntity payload, CancellationToken ct)
+    {
+        var values = CurrentManagedValues();
+        if (values is null) return await _inner.Upsert(payload, ct);
+        using (ManagedFieldWriteScope.Enter(values)) return await _inner.Upsert(payload, ct);
     }
 
     private bool HasManaged => _managed.Count > 0;
@@ -144,10 +191,10 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     {
         await Guard(ct);
         var managed = ManagedReadFilter();
-        if (managed is null) return await _inner.Get(id, ct);
+        if (managed is null) return Reverse(await _inner.Get(id, ct));
         // IDOR defence: a key read is lowered to a managed-scoped query; a wrong-scope row returns null = not-found.
         var res = await RequireQuery().Query(ScopedById(id, managed), ct);
-        return res.Items.Count > 0 ? res.Items[0] : null;
+        return Reverse(res.Items.Count > 0 ? res.Items[0] : null);
     }
 
     public async Task<IReadOnlyList<TEntity?>> GetMany(IEnumerable<TKey> ids, CancellationToken ct = default)
@@ -155,11 +202,11 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         await Guard(ct);
         var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
         var managed = ManagedReadFilter();
-        if (managed is null) return await _inner.GetMany(idList, ct);
+        if (managed is null) return Reverse(await _inner.GetMany(idList, ct));
         var res = await RequireQuery().Query(ScopedByIds(idList, managed), ct);
         var byId = new Dictionary<TKey, TEntity>();
         foreach (var e in res.Items) byId[e.Id] = e;          // owned subset
-        return idList.Select(id => byId.TryGetValue(id, out var e) ? e : (TEntity?)null).ToList();
+        return Reverse(idList.Select(id => byId.TryGetValue(id, out var e) ? e : (TEntity?)null).ToList());
     }
 
     // --- structured query ---
@@ -168,7 +215,7 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     {
         await Guard(ct);
         var managed = ManagedReadFilter();
-        return await RequireQuery().Query(managed is null ? query : ApplyManaged(query, managed), ct);
+        return Reverse(await RequireQuery().Query(managed is null ? query : ApplyManaged(query, managed), ct));
     }
 
     public async Task<CountResult> Count(QueryDefinition query, CancellationToken ct = default)
@@ -192,7 +239,7 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         await Guard(ct);
         GuardRawAgainstManagedScope();
         return _inner is IRawQueryRepository<TEntity, TKey> raw
-            ? await raw.QueryRaw(query, parameters, shaping, ct)
+            ? Reverse(await raw.QueryRaw(query, parameters, shaping, ct))   // raw values come back protected; restore plaintext
             : throw new NotSupportedException($"The adapter backing {typeof(TEntity).Name} does not support raw queries.");
     }
 
@@ -220,12 +267,13 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     {
         await Guard(ct);
         _writePlan.ApplyAll(model);
-        var values = CurrentManagedValues();
-        if (values is null) return await _inner.Upsert(model, ct);
-        // Stamp-AND-verify: the scope carries the managed values; the inner adapter injects them into the record
-        // AND adds a conflict guard so an id-keyed update of a row owned by another scope is rejected (no takeover).
-        using (ManagedFieldWriteScope.Enter(values))
-            return await _inner.Upsert(model, ct);
+        // Stamp-AND-verify (managed scope): the inner adapter injects the managed values into the record AND adds a
+        // conflict guard so an id-keyed update of a row owned by another scope is rejected (no takeover).
+        if (!_fieldTransform.HasTransforms) return await PersistUpsert(model, ct);
+        // Field transform (ARCH-0098 §0): persist an encrypted CLONE; return the plaintext original (with its
+        // assigned id + timestamp) so the caller's instance is never ciphertext-corrupted.
+        await PersistUpsert(WritePayload(model), ct);
+        return model;
     }
 
     public async Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default)
@@ -237,10 +285,13 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
             ct.ThrowIfCancellationRequested();
             _writePlan.ApplyAll(m);
         }
+        var payloads = _fieldTransform.HasTransforms
+            ? (IList<TEntity>)list.Select(WritePayload).ToList()   // encrypted clones; the caller's list stays plaintext
+            : list;
         var values = CurrentManagedValues();
-        if (values is null) return await _inner.UpsertMany(list, ct);
+        if (values is null) return await _inner.UpsertMany(payloads, ct);
         using (ManagedFieldWriteScope.Enter(values))
-            return await _inner.UpsertMany(list, ct);
+            return await _inner.UpsertMany(payloads, ct);
     }
 
     public async Task<bool> Delete(TKey id, CancellationToken ct = default)
@@ -306,7 +357,9 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
                 $"ConditionalReplaceAsync is not supported for managed-field-scoped entity '{typeof(TEntity).Name}' under an " +
                 "active managed scope — the compare-and-set guard cannot carry the managed predicate. Use Upsert (conflict-aware).");
         if (_inner is IConditionalWriteRepository<TEntity, TKey> cas)
-            return await cas.ConditionalReplaceAsync(model, guard, ct);
+            // Field transform (ARCH-0098 Blocker 2): persist an encrypted clone so a CAS write never stores plaintext.
+            // A classified property must NOT appear in the guard (it compares stored ciphertext to caller plaintext).
+            return await cas.ConditionalReplaceAsync(WritePayload(model), guard, ct);
         throw new NotSupportedException($"The adapter backing {typeof(TEntity).Name} does not support conditional replace.");
     }
 
@@ -359,8 +412,10 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
             }
 
             var native = _outer._inner.CreateBatch();
-            foreach (var e in _adds) native.Add(e);
-            foreach (var e in _updates) native.Update(e);
+            // Field transform (ARCH-0098 Blocker 1): the native batch persists encrypted CLONES, so a batch write —
+            // unlike a [Timestamp] stamp — never lands plaintext at rest. The caller's add/update instances stay plaintext.
+            foreach (var e in _adds) native.Add(_outer.WritePayload(e));
+            foreach (var e in _updates) native.Update(_outer.WritePayload(e));
             foreach (var id in _deletes) native.Delete(id);
 
             var values = _outer.CurrentManagedValues();

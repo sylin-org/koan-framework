@@ -226,7 +226,7 @@ implemented and its tests pass on real stores.
   green post-change: SQLite 5 · PG 9 · SqlServer 19 · Mongo 21 · InMemory(data) 33 · Json 7 · Redis 3 ·
   InMemory(vector) 29 · Qdrant 35 · data-core 206 · cache 109 · tenancy 23. **The non-isolating adapters
   (Couchbase/Redis/Json/InMemory + all vector) FAIL CLOSED for a tenant-scoped entity — secure, never leaky.**
-- ◐ **CLASSIFICATION (ARCH-0098) IN PROGRESS** — phases 1 + 0 LANDED, ADR reviewed (`wf_6a0f0278-5b5`) + amended:
+- ◐ **CLASSIFICATION (ARCH-0098) — phases 0 + 1 + 2a + 2b-1 + 3 DONE (encrypt-at-rest works end-to-end); searchable + prod-key-tier + leak-guards remain.** ADR reviewed (`wf_6a0f0278-5b5`) + amended:
   - ✅ **Phase 1 (facts)** `cc486781` — `[Classified]`/`[Pii]`/`[Phi]`/`[Pci]`/`[Secret]` + `ClassificationCategory` +
     `ClassifiedFieldDescriptor` (facts-only, no Kind) + `ClassifiedPropertyBag` + `ClassifiedFieldRegistry`
     (two-gate off-model), no crypto; 16/16 + 2 mutations killed.
@@ -245,14 +245,28 @@ implemented and its tests pass on real stores.
       12 specs, shred mutation killed.
     - ☐ **2b-2 (persisted prod tier)** — `Entity<TenantDataKeyRecord>` + `IDataProtector` dev-wrap / KMS-prod seam +
       fail-closed boot guard (§3a). DEFERRABLE (ephemeral suffices for dev/test). · ☐ **2c (IBlindIndex)** — keyed-HMAC,
-      tenant-local, FixedTimeEquals; build in phase 4 where searchable uses it. · ☐ **2d (request-scoped plaintext map)**
-      — AsyncLocal; build WITH phase 3 (its role crystallizes with the read-reverse).
-  - ☐ **NEXT = phase 3 (the integration, the #1 risk)** — `IFieldTransform` (ApplyOnWrite/ApplyOnRead) + the registrar
-    that wires the crypto DI + registers a `WriteStampContributor` (Priority >100, `AppliesInBatch=>true`) +
-    `ClassifiedFieldRegistry.Activate()` (Reference=Intent); **clone-then-encrypt** write (caller keeps plaintext+id);
-    **read-reverse** inside facade `Get`/`GetMany`/`Query`/stream **below `Data.QueryWithCount`** (exhaustive coverage
-    or asymmetric leak) covering `ConditionalReplaceAsync`; **cache L2-exclusion gate**; generic-descriptor proof on
-    SQLite then round-trip across adapters (write-stamp path is adapter-universal). Crypto core (2a+2b-1) is ready.
+      tenant-local, FixedTimeEquals; build in phase 4 where searchable uses it. · ✅ **2d (request-scoped plaintext map)**
+      — turned out UNNECESSARY as a separate component: the read-reverse sets plaintext directly back on the POCO
+      property (the caller's entity is the plaintext carrier), and the cache L2-exclusion handles the distributed-cache
+      leak. No AsyncLocal map needed.
+  - ✅ **Phase 3 (THE integration, the ADR's #1 risk) DONE** — a generic round-trip seam, classification wired onto it,
+    exhaustively proven on a real `AddKoan()` + SQLite boot (ARCH-0079). The clone-then-encrypt is NOT an in-place
+    `IWriteStamp` (in-place corrupts the caller), so it became a new generic seam: `IFieldTransform`
+    (ApplyOnWrite/ApplyOnRead) + `FieldTransformContributor` + `StorageFieldTransformRegistry` (off-gated) +
+    `StorageFieldTransformPlan` (per-type memo, `CloneForWrite`) + `EntityCloner` (MemberwiseClone open-delegate). The
+    facade: **clone-then-encrypt** on Upsert/UpsertMany/batch/`ConditionalReplaceAsync` (caller keeps plaintext+id+ts);
+    **read-reverse in place** on Get/GetMany/Query/QueryRaw (every entity-returning path; Count + delete-helpers
+    correctly excluded). `CachedRepository` excludes field-transform types from L2 (generic `HasTransformsFor` gate —
+    no plaintext cached). `Koan.Classification`: `ClassificationFieldTransform` (string-only, legacy-plaintext-tolerant,
+    idempotent, shred→null tombstone; resolves crypto from the running host per-op so multi-host tests are correct) +
+    `IClassificationTenantAccessor` (null=host bucket) + a `KoanModule` registrar (Register DI + Start Activates +
+    registers the contributor). **Tests: 9 seam + 46 crypto/transform unit + 8 real-store integration** (round-trip ·
+    caller-keeps-plaintext · at-rest ciphertext [raw SQLite read AND crypto-shred→null] · every read path decrypts ·
+    every write path incl. batch encrypts at rest [Blocker 1] · `[Cacheable]` no-stale-plaintext-after-shred [Blocker 3]
+    · unclassified untouched). **3 security mutations killed** (no-read-reverse, no-encrypt-on-write, cache-exclusion-off).
+    **Zero regression**: data-core 233 · tenancy 23 · sqlite-cache 2 · sqlite-connector 5 (off-gate byte-identical).
+    Note: the phase-0 `IWriteStamp` contributor seam stays a generic in-place-stamp extension point (classification uses
+    the new field-transform seam); the priority field was the load-bearing phase-0 deliverable.
 - ☐ **THEN:** Phase 3c schema-column DDL indexability (Indexed descriptors → computed/expression index; PG/SqlServer;
   SQLite JSON-only) + Mongo/bare-store managed serialization injection + in-memory managed `GetValue` · classification
   phases 4–7 (searchable blind-index · vector/messaging leak guards · crypto-shred+rotation · masked-read) · then
