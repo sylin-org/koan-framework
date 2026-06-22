@@ -115,6 +115,20 @@ assumed):
   (the fail-closed gate — it computes `[HostScoped]` and reads `Tenant.Current` itself) plus the tenant
   write-stamp and read-filter contributors; the facade invokes the registered seams generically and never
   names a tenant.
+
+  > **ERRATUM (2026-06-22) — enforcement spans planes; the facade is the gateway for the repo path only.**
+  > Adversarial review ([the managed-field design memo](../architecture/tenancy-managed-field-design.md), §3)
+  > verified in source that the facade is **not** a universal gateway: `CachedRepository` wraps **outside** it
+  > with a tenant-blind key, `VectorService` never wraps it, and `RemoveAll`/`DeleteAll`/`ConditionalReplaceAsync`
+  > were unscoped forwards. The realized design therefore enforces the tenant axis on **every plane**: the repo
+  > chokepoint (read predicate for `Query`/`Count`; **key-ops lowered to managed-scoped queries** — superseding
+  > "post-fetch ownership check", which could not read a non-POCO discriminator off the typed entity;
+  > `RemoveAll`/`DeleteAll` lowered to scoped DELETEs or fail-closed; `ConditionalReplace` ANDs the managed
+  > guard); the **cache key** (the managed axis enters `CacheKey.For`); the **vector** path (fail-closed on a
+  > non-isolating adapter, v1); and **raw/Direct** (out of scope for the predicate — **RLS is the named
+  > backstop**, landing with the capability). The discriminator stamp is a **Serialize-stage** managed-field
+  > injection (not an `IWriteStamp` sub-shape), and write enforcement is **stamp-AND-verify** via a
+  > conflict-aware upsert (a cross-tenant id-keyed `Upsert` is rejected, not silently allowed to take over a row).
 - **The shared-schema discriminator is an invisible, framework-managed shadow field** (ratified). A
   tenant-scoped entity carries no tenant property on its POCO (secure-by-default, can't-forget, charter L8);
   the adapter persists/filters a hidden discriminator at the storage layer, driven by the ambient tenant.

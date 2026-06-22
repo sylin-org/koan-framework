@@ -169,12 +169,34 @@ implemented and its tests pass on real stores.
     lines in `Koan.Data.Core`.**
 - ✅ **`Koan.Tenancy` EXTRACTION COMPLETE.** The data core owns generic seams; tenancy is a separate module
   providing contributors under Reference = Intent — the contributor pattern (DATA-0105 §0) is now real.
-- ☐ **THEN Phase 3 schema-column contributor** — `RelationalSchemaOrchestrator` (+ `ProjectionResolver`)
-  consult column descriptors so a contributor (tenant in phase 4) can add a column to the DDL + the projection;
-  converge `[Column]`/property-`[StorageName]` and `[NotMapped]`/`[IgnoreStorage]`. The genuinely per-adapter seam.
-- ☐ Phase 4 tenancy=registration (`TenancyContributor`: Route 4a / Schema column 4b / write-stamp / two-shaped
-  read-filter; subsume `ITenantEnforcer` same slice; + cache-key/tenant particle) + SQLite `AssertNoTenantLeak`
-  proof · 5 classification · ambient unification · Adapter Forge · Facet 4 · cross-cutting completion.
+- ✅ **MANAGED-FIELD DESIGN + ADVERSARIAL REVIEW DONE (2026-06-22).** Empirical re-derivation (5 Explores)
+  **falsified the ratified "sibling column" premise** — relational adapters persist **only `(Id, Json)`**
+  (`SqliteRepository.cs:822`); a non-POCO discriminator rides neither a (unpopulated) sibling column nor the
+  JSON without a hook, and `FieldPathResolver` throws on synthetic fields. Design memo
+  [tenancy-managed-field-design.md](./tenancy-managed-field-design.md): the **managed-field seam** — an
+  invisible field injected into the persisted record via a **Serialize-stage `ContractResolver`** hook,
+  filtered by making the **shared `FieldPathResolver` managed-aware** (one change reaches translator +
+  pushability splitter), with an optional indexed **computed column** (Schema stage). **4-lens adversarial
+  review (wf_d547d3d1-0fe) = ship-after-blocking-fixes; ALL 6 blockers folded:** (1) chokepoint surface
+  incomplete → enumerate EVERY write/delete member (RemoveAll/DeleteAll/ConditionalReplace scoped-or-fail-closed);
+  (2) cache decorator wraps OUTSIDE the facade with a tenant-blind key → the managed axis enters `CacheKey.For`
+  (phase 3d); (3) vector `VectorService` bypasses the facade → fail-closed v1; (4) raw/Direct uncovered →
+  out-of-scope + **RLS named backstop** (lands with the capability); (5) write **stamp-AND-verify** not deferred
+  → conflict-aware upsert rejects cross-tenant id-keyed takeover; (6) residual managed predicate silently empty
+  → structural fail-closed gate (predicate MUST be Pushable; `RequiredCapability` requires isolation-cap +
+  `IQueryRepository` + Eq-pushability). **Errata filed:** DATA-0105 §1/§4 + tenancy-design.md §12 + ARCH-0095 §5
+  (the "facade is the universal gateway" overstatement corrected; enforcement spans planes). Capability token =
+  axis-free **`DataCaps.Isolation.RowScoped`**.
+- ☐ **Phase 3a** — converge column-name/exclusion into `ProjectionResolver`; **delete the dead
+  `src/Koan.Data.Relational/Schema/` cluster** (8 files, zero callers). Byte-identical.
+- ☐ **Phase 3b** — the managed-field seam (registry+write-scope in Abstractions · `ManagedFieldContractResolver`
+  in Relational · managed-aware `FieldPathResolver`+`ResolvedField.IsManaged` · full chokepoint surface +
+  fail-closed gate + conflict-aware upsert in Core/SQLite). Proven with a **generic non-tenant descriptor**.
+- ☐ **Phase 3c** schema-column DDL (Indexed descriptors → computed/expression index; PG/SqlServer) · **3d**
+  cache-key axis (`CacheKey.For` + `CachedRepository`) · **Phase 4** tenant registration + vector fail-closed +
+  SQLite `AssertNoTenantLeak` (incl. `[Cacheable]`, RemoveAll, upsert-takeover-rejected, IDOR, raw-fail-closed) ·
+  4-fan-out (PG/SqlServer/Mongo) · 5 classification + Mongo/JSON-file injection · ambient unification · Adapter
+  Forge · Facet 4 · cross-cutting completion.
 
 > Full per-area detail + the DATA-0105 review punch-list (must-fixes i–xi, upgrades A–D, opportunities):
 > memory **[[facet3-tenancy-design]]** (the anchor). Tenancy spec: [tenancy-design.md](./tenancy-design.md).

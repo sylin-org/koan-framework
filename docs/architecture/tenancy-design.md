@@ -742,9 +742,21 @@ The structural floor. The detail the round-1 draft deferred:
   (ARCH-0084); under `enforce`, a tenant-scoped entity routed to an adapter that does **not** announce
   support **fails closed** (boot-reported), never silently fail-open — the same no-capability-lies contract
   the Conformance Gate (P7) verifies. Rejected alternatives (a marker interface / a `TenantEntity<T>` base):
-  both are opt-in, so a forgotten marker reintroduces the leak. Sequenced: the no-Docker JSON adapter first
-  (carrying the `AssertNoTenantLeak` proof), then relational (Postgres/SQL Server/SQLite, where RLS is the
-  backstop), then Mongo.
+  both are opt-in, so a forgotten marker reintroduces the leak.
+
+  > **ERRATUM (2026-06-22) — "a column alongside id" is re-derived to "a managed field in the persisted record".**
+  > Empirical re-derivation + adversarial review ([the managed-field design memo](./tenancy-managed-field-design.md))
+  > established that relational adapters persist **only `(Id, Json)`**, so the discriminator is **not** a sibling
+  > column but an **invisible framework-managed field injected into the persisted record** (the Json envelope /
+  > a BSON element / a JSON-file key), filtered via managed-aware field-resolution, with an **optional indexed
+  > computed column** as a Schema-stage optimization. The shadow-field *intent* (no POCO property,
+  > secure-by-default, can't-forget, capability-gated fail-closed) is unchanged. Two corrections to the
+  > sequencing below: (a) the **flagship no-leak proof runs on SQLite first** (no-Docker, the natural `(Id,Json)`
+  > envelope), not the JSON-file adapter; (b) enforcement spans **planes** — the repo chokepoint (read predicate
+  > + write **stamp-AND-verify** via a conflict-aware upsert), the **cache key** (the managed axis enters
+  > `CacheKey.For`), the **vector** path (fail-closed on a non-isolating adapter), and **raw/Direct** (out of
+  > scope for the predicate; **RLS is the named backstop**, landing with the capability, not after). The
+  > managed-field mechanism is added to the §14 settled forks.
 - **RLS backstop** (Postgres/SQL Server) for the surface the application-level floor can't reach:
   `IDataService.Direct(...)` / raw SQL / bulk ops. Named explicitly as the non-structural escape; covered
   by RLS + an explicit tenant-scope, never silently. **RLS session reset is guaranteed at the physical
