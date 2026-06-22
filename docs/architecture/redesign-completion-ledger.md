@@ -235,10 +235,24 @@ implemented and its tests pass on real stores.
     stable-priority merge + memo-invalidation; `ManagedFieldDescriptor.Priority` + ordered `ManagedFieldRegistry`.
     Behavior-preserving: data-core 233/233, tenancy 23/23, 2 mutations killed. The "one opening, two consumers" slot
     is open. The field-transform is **write-stamp clone-then-encrypt + net-new read-reverse** (NOT a serialize hook).
-  - ☐ **NEXT = phase 2** (crypto seam in a new `Koan.Classification` module: `IKeyProvider` per-tenant + `DestroyKey` +
-    `GetForDecrypt`-by-owning-tenant, `IFieldCipher` AES-GCM count-aware, `IBlindIndex`, request-scoped plaintext map;
-    borrow the `IIssuerKeyStore` SHAPE, honor the §3a contract) → phase 3 (write-stamp all-surfaces incl. batch/CAS +
-    read-reverse below `Data.QueryWithCount` + cache L2-exclusion gate; exhaustive read-path coverage).
+  - ◐ **Phase 2 (crypto seam)** — new `Koan.Classification` module (added to `Koan.sln`); crypto CORE done:
+    - ✅ **2a (cipher)** `62a8bdac` — `FieldDataKey` + `FieldCipherEnvelope` (magic-prefixed, bounds-safe `TryParse`
+      so the read-reverse tells ciphertext from legacy plaintext) + `IFieldCipher`/`AesGcmFieldCipher` (AES-256-GCM,
+      fresh nonce, fails closed) + `FieldDecryptionException`. 25 specs, 2 mutations killed (fail-open, static nonce).
+    - ✅ **2b-1 (key provider, dev tier)** `ada40eb1` — `IKeyProvider` (GetActiveKey/GetForDecrypt-by-owning-tenant/
+      DestroyKeyAsync; host bucket so classification ⊥ tenancy) + `KeyUnavailableException` + `EphemeralKeyProvider`
+      (per-tenant, count-aware rotation w/ retired-key survival, ZeroMemory crypto-shred, tenant-isolated + idempotent).
+      12 specs, shred mutation killed.
+    - ☐ **2b-2 (persisted prod tier)** — `Entity<TenantDataKeyRecord>` + `IDataProtector` dev-wrap / KMS-prod seam +
+      fail-closed boot guard (§3a). DEFERRABLE (ephemeral suffices for dev/test). · ☐ **2c (IBlindIndex)** — keyed-HMAC,
+      tenant-local, FixedTimeEquals; build in phase 4 where searchable uses it. · ☐ **2d (request-scoped plaintext map)**
+      — AsyncLocal; build WITH phase 3 (its role crystallizes with the read-reverse).
+  - ☐ **NEXT = phase 3 (the integration, the #1 risk)** — `IFieldTransform` (ApplyOnWrite/ApplyOnRead) + the registrar
+    that wires the crypto DI + registers a `WriteStampContributor` (Priority >100, `AppliesInBatch=>true`) +
+    `ClassifiedFieldRegistry.Activate()` (Reference=Intent); **clone-then-encrypt** write (caller keeps plaintext+id);
+    **read-reverse** inside facade `Get`/`GetMany`/`Query`/stream **below `Data.QueryWithCount`** (exhaustive coverage
+    or asymmetric leak) covering `ConditionalReplaceAsync`; **cache L2-exclusion gate**; generic-descriptor proof on
+    SQLite then round-trip across adapters (write-stamp path is adapter-universal). Crypto core (2a+2b-1) is ready.
 - ☐ **THEN:** Phase 3c schema-column DDL indexability (Indexed descriptors → computed/expression index; PG/SqlServer;
   SQLite JSON-only) + Mongo/bare-store managed serialization injection + in-memory managed `GetValue` · classification
   phases 4–7 (searchable blind-index · vector/messaging leak guards · crypto-shred+rotation · masked-read) · then
