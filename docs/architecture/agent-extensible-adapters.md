@@ -107,25 +107,51 @@ behavioral conformance, never code review.** We guide the build and we prove the
 over tuned code or grade the source. Both stay implementation-agnostic (work for an agent- or hand-written
 adapter) and durable (don't rot as coding techniques change).
 
-### 3a. The Agentic Blueprint — the per-adapter-type authoring guide
+### 3a. The Agentic Blueprint — a good-implementation-hygiene script
 
-The same way Koan ships **cards** (how to *use* a pillar), it ships an **Agentic Blueprint** per adapter
-type (how to *extend* a pillar by authoring an adapter): "How to build a Data adapter to a SQL database,"
-"How to build an AI adapter," "How to connect to a legacy database," … Each walks an author (agent or
-human) through the lifecycle:
+The Blueprint *set* is a collection of **good-implementation-hygiene scripts** — one per adapter type —
+that encode the disciplined process a good engineer follows. That is precisely what an agent most needs
+scaffolded: agents write code fluently but skip the *process* (they don't check what already exists, don't
+research, don't hunt for gotchas, don't test). The Blueprint enforces the hygiene; the conformance kit
+proves it was followed (you can't fake green). Parallel to **cards** (cards = how to *use* a pillar;
+blueprints = how to *extend* one) — **one per adapter type across every extensible pillar**: "How to build
+a Data adapter to a SQL database," "How to implement an OAuth adapter," "How to implement a storage
+adapter," "How to implement a messaging-queue adapter," "How to build an AI adapter," "How to connect to a
+legacy database," … 
 
-1. **Research** — how to investigate the target (its API, its capability / transaction / query model, its
-   limits); what to look for and where to find it.
-2. **Ingredients** — the client libraries, dependencies, concepts, and the Koan contract (the
-   interface(s) + the capability tokens the adapter may announce — the ARCH-0084 capability model).
-3. **Build** — how to approach and structure the adapter, and **what a good adapter has**: the obligations
-   — *isolate at the chokepoint; ACID where it claims transactions; push down what it announces; carry the
-   ambient context; fail-closed; honor classification.*
-4. **Test** — how to verify it: run the surface-validation conformance kit (§3b) against a real instance.
-5. **Gotchas** — the known pitfalls for this adapter type / target.
+**Two hard constraints on every blueprint:**
+- **Agent-optimized, not human-facing.** Blueprints are authored *for an agent to execute* — directive,
+  structured, machine-actionable — not narrative prose for a human reader. We are targeting agents. (A
+  human can still read one, but the agent is the audience.)
+- **Vendor-agnostic.** A blueprint is **per adapter *type*** ("a SQL data adapter," "a vector store," "a
+  message bus," "an AI provider") — **never per vendor.** Vendor specifics (Oracle's quirks, Pinecone's
+  API) are **discovered at runtime, not encoded.** This keeps the set small and durable (a new vendor
+  never needs a new blueprint) — and it *structurally requires* the empirical-probe model: a blueprint
+  that can't hardcode a vendor's capabilities **must** direct the agent to discover them.
+- **Grounded in factual first-party code.** A blueprint is **not invented theory — it is distilled from
+  Koan's own shipped, conformance-tested adapters** for that pillar (the real Postgres/SQL Server data
+  adapters, the RabbitMQ messaging adapter, the OAuth connectors, the storage profiles, …). The
+  vendor-agnostic obligations, patterns, and gotchas are extracted from what our *proven* adapters
+  actually do; a first-party adapter is the worked example. Like **cards** (API-truth derived from real
+  code), blueprints stay factual and checkable against the source — they can't drift into fiction.
 
-It **empowers** the author; it does **not** dictate the optimal code. (A reference adapter may be included
-as an *example* of conformance — not "the one true way.")
+Each scripts the same hygiene:
+
+1. **Discover** — find the right blueprint by intent; understand the target; **check NuGet / the catalogue
+   for an existing adapter first (reuse before build).**
+2. **Research** — investigate the target *empirically* (probe a live instance with a limited-privilege
+   credential to learn its real capability / transaction / query model); identify the contract + the
+   capability tokens to announce, and the ingredients (client libs, dependencies).
+3. **Check online for resources / how-tos** — search GitHub, vendor/library docs, and registries for
+   examples and driver guides (reuse *knowledge*, don't reinvent).
+4. **Implement** — build a generic, conformant adapter that satisfies the obligations (*what a good adapter
+   has*: isolate at the chokepoint; ACID where it claims transactions; push down what it announces; carry
+   the ambient context; fail-closed; honor classification).
+5. **Check for gotchas** — review against the known pitfalls for this adapter type / target.
+6. **Test** — run the surface-validation conformance kit (§3b) against the real instance; green = shippable.
+
+It **empowers** the author and enforces the *hygiene*; it does **not** dictate the optimal code. (A
+reference adapter may be included as an *example* of conformance — not "the one true way.")
 
 ### 3b. The surface-validation tools — the objective gate
 

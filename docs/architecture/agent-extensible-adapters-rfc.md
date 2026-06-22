@@ -93,22 +93,32 @@ against that instance. The developer said one sentence; the agent did safe, empi
 We do **not** prescribe "the optimal/performant code" — that's the author's craft. We *guide the build*
 and we *verify the behavior*. The author owns the implementation.
 
-**3a. The Agentic Blueprint — a per-adapter-type authoring guide.** The same way Koan ships *cards* (how
-to *use* a pillar), it ships an Agentic Blueprint per adapter type (how to *extend* a pillar by authoring
-an adapter): "How to build a Data adapter to a SQL database," "How to build an AI adapter," "How to
-connect to a legacy database," … Each walks an author through the lifecycle:
-- **Research** — how to investigate the target (API, capability/transaction/query model, limits); what to
-  look for and where.
-- **Ingredients** — the client libraries, dependencies, concepts, and the Koan contract (interface(s) +
-  the capability tokens it may announce).
-- **Build** — how to approach/structure it, and **what a good adapter has**: the obligations — *isolate at
-  the chokepoint; ACID where it claims transactions; push down what it announces; carry the ambient
-  context; fail-closed; honor classification.*
-- **Test** — how to verify it (run the surface validation, below).
-- **Gotchas** — the known pitfalls for this adapter type/target.
+**3a. The Agentic Blueprint — a good-implementation-hygiene script.** The Blueprint *set* is a collection
+of **good-implementation-hygiene scripts** — one per adapter type — that encode the disciplined process a
+good engineer follows (the thing agents most need scaffolded: they write code well but skip the *process*).
+Parallel to *cards* (cards = how to *use* a pillar; blueprints = how to *extend* one): "How to build a
+Data adapter to a SQL database," "How to build an AI adapter," "How to connect to a legacy database," …
+**Two hard constraints:** blueprints are **agent-optimized** (authored for an agent to *execute* —
+directive, machine-actionable — not human prose; we target agents) and **vendor-agnostic** (one per
+adapter *type* — "a SQL data adapter," "a vector store" — never per vendor; vendor specifics are
+*discovered at runtime*, which is *why* the empirical-probe step exists — a blueprint that can't hardcode a
+vendor's capabilities must direct the agent to discover them), and **grounded in factual code** — each is
+*distilled from Koan's own shipped, conformance-tested adapters* (the real data / OAuth / storage /
+messaging adapters), the way cards are derived from real code, not invented. Each scripts the same hygiene:
+- **Discover** — find the right blueprint by intent; understand the target; **check NuGet / the catalogue
+  for an existing adapter first (reuse before build).**
+- **Research** — investigate the target *empirically* (probe a live instance with a limited-privilege
+  credential); identify the contract + the capability tokens to announce, and the ingredients.
+- **Check online for resources / how-tos** — GitHub, vendor/library docs, registries (reuse *knowledge*).
+- **Implement** — a generic, conformant adapter satisfying the obligations: *isolate at the chokepoint;
+  ACID where it claims transactions; push down what it announces; carry the ambient context; fail-closed;
+  honor classification.*
+- **Check for gotchas** — the known pitfalls for this adapter type/target.
+- **Test** — run the surface validation (below) against the real instance; green = shippable.
 
-It empowers the author; it does not dictate the optimal code. (A reference adapter may be included as an
-*example* of conformance — not "the one true way.")
+It enforces the *hygiene*; it does not dictate the optimal code. (A reference adapter may be included as an
+*example* of conformance — not "the one true way.") The conformance kit is the proof the hygiene was
+followed.
 
 **3b. The surface validation — behavioral conformance (§4).** Tools that exercise the adapter's
 *observable surface* against a real instance and check it meets the contract + the Blueprint's obligations
