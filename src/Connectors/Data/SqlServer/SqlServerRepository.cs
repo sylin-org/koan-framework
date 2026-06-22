@@ -13,6 +13,7 @@ using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
+using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Abstractions.Sorting;
 using Koan.Data.Core;
 using Koan.Data.Core.Optimization;
@@ -44,7 +45,49 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         .Add(DataCaps.Write.BulkUpsert).Add(DataCaps.Write.BulkDelete)
         .Add(DataCaps.Write.AtomicBatch).Add(DataCaps.Write.FastRemove)
         .Add(DataCaps.Write.ConditionalReplace)
+        // Row-isolation (DATA-0105 §3b): persists a framework-managed discriminator inside the [Json] envelope and
+        // pushes scalar equality on it (JSON_VALUE), with a MERGE-guarded upsert verifying ownership on write.
+        .Add(DataCaps.Isolation.RowScoped)
         .Add(DataCaps.Query.Filter, RelationalFilterSupport.Default);
+
+    // Managed-field conflict-aware upsert (DATA-0105 §3b — the write-verify half). When a managed write-scope is
+    // active, the [Json] already carries the managed keys (the ManagedFieldContractResolver injected them) AND a
+    // MERGE updates the row ONLY when its existing managed fields match the scope — a guard mismatch leaves the row
+    // untouched (0 rows affected), which the caller treats as a rejected cross-scope write. Generic: reads the
+    // scope dict, never names tenant/classification. Unguarded ⇒ the existing UPDATE-then-INSERT path verbatim.
+    private static (bool Guarded, string MergeSql, KeyValuePair<string, object?>[] Managed) ManagedUpsert(string table)
+    {
+        var scope = ManagedFieldWriteScope.Current;
+        if (scope is null || scope.Count == 0) return (false, "", Array.Empty<KeyValuePair<string, object?>>());
+
+        var conds = new List<string>(scope.Count);
+        var prms = new List<KeyValuePair<string, object?>>(scope.Count);
+        var i = 0;
+        foreach (var kv in scope)
+        {
+            var p = "mf" + i++;
+            conds.Add($"JSON_VALUE(t.[Json], '$.{kv.Key}') = @{p}");
+            prms.Add(new KeyValuePair<string, object?>(p, kv.Value));
+        }
+        var sql =
+            $"MERGE [dbo].[{table}] AS t USING (SELECT @Id AS [Id], @Json AS [Json]) AS s ON t.[Id] = s.[Id] " +
+            $"WHEN MATCHED AND ({string.Join(" AND ", conds)}) THEN UPDATE SET t.[Json] = s.[Json] " +
+            $"WHEN NOT MATCHED THEN INSERT ([Id], [Json]) VALUES (s.[Id], s.[Json]);";
+        return (true, sql, prms.ToArray());
+    }
+
+    private static DynamicParameters UpsertParams(string id, string json, KeyValuePair<string, object?>[] managed)
+    {
+        var p = new DynamicParameters();
+        p.Add("Id", id);
+        p.Add("Json", json);
+        foreach (var kv in managed) p.Add(kv.Key, kv.Value);
+        return p;
+    }
+
+    private static InvalidOperationException CrossScopeWrite(string table, string id)
+        => new($"Rejected a cross-scope write to '{table}' id '{id}': the row is owned by a different managed scope " +
+               "(e.g. tenant/classification). A managed-field-scoped entity cannot overwrite another scope's row.");
 
     // Storage optimization support
     private readonly StorageOptimizationInfo _optimizationInfo;
@@ -532,15 +575,22 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
     {
         await using var conn = Open();
         await using var tx = conn.BeginTransaction();
+        var (guarded, mergeSql, managed) = ManagedUpsert(TableName);
         var count = 0;
         foreach (var e in models)
         {
             ct.ThrowIfCancellationRequested();
             var row = ToRow(e);
-            var updated = await conn.ExecuteAsync($"UPDATE [dbo].[{TableName}] SET [Json] = @Json WHERE [Id] = @Id", new { row.Id, row.Json }, tx);
-            if (updated == 0)
+            if (guarded)
             {
-                await conn.ExecuteAsync($"INSERT INTO [dbo].[{TableName}] ([Id], [Json]) VALUES (@Id, @Json)", new { row.Id, row.Json }, tx);
+                var affected = await conn.ExecuteAsync(mergeSql, UpsertParams(row.Id, row.Json, managed), tx);
+                if (affected == 0) throw CrossScopeWrite(TableName, row.Id);
+            }
+            else
+            {
+                var updated = await conn.ExecuteAsync($"UPDATE [dbo].[{TableName}] SET [Json] = @Json WHERE [Id] = @Id", new { row.Id, row.Json }, tx);
+                if (updated == 0)
+                    await conn.ExecuteAsync($"INSERT INTO [dbo].[{TableName}] ([Id], [Json]) VALUES (@Id, @Json)", new { row.Id, row.Json }, tx);
             }
             count++;
         }
@@ -627,13 +677,22 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
             await using var tx = conn.BeginTransaction();
             try
             {
+                var (guarded, mergeSql, managed) = ManagedUpsert(repo.TableName);
                 foreach (var e in upserts)
                 {
                     ct.ThrowIfCancellationRequested();
                     var row = repo.ToRow(e);
-                    var updatedRows = await conn.ExecuteAsync($"UPDATE [dbo].[{repo.TableName}] SET [Json] = @Json WHERE [Id] = @Id", new { row.Id, row.Json }, tx);
-                    if (updatedRows == 0)
-                        await conn.ExecuteAsync($"INSERT INTO [dbo].[{repo.TableName}] ([Id], [Json]) VALUES (@Id, @Json)", new { row.Id, row.Json }, tx);
+                    if (guarded)
+                    {
+                        var affected = await conn.ExecuteAsync(mergeSql, UpsertParams(row.Id, row.Json, managed), tx);
+                        if (affected == 0) throw CrossScopeWrite(repo.TableName, row.Id);
+                    }
+                    else
+                    {
+                        var updatedRows = await conn.ExecuteAsync($"UPDATE [dbo].[{repo.TableName}] SET [Json] = @Json WHERE [Id] = @Id", new { row.Id, row.Json }, tx);
+                        if (updatedRows == 0)
+                            await conn.ExecuteAsync($"INSERT INTO [dbo].[{repo.TableName}] ([Id], [Json]) VALUES (@Id, @Json)", new { row.Id, row.Json }, tx);
+                    }
                 }
                 var deleted = 0;
                 if (_deletes.Any())

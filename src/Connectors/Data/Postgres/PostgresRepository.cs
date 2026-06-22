@@ -12,6 +12,7 @@ using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
+using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Abstractions.Sorting;
 using Koan.Data.Core;
 using Koan.Data.Core.Optimization;
@@ -45,6 +46,9 @@ internal sealed class PostgresRepository<
         .Add(DataCaps.Query.Linq).Add(DataCaps.Query.String)
         .Add(DataCaps.Write.BulkUpsert).Add(DataCaps.Write.AtomicBatch).Add(DataCaps.Write.BulkDelete).Add(DataCaps.Write.FastRemove)
         .Add(DataCaps.Write.ConditionalReplace)
+        // Row-isolation (DATA-0105 §3b): persists a framework-managed discriminator inside the jsonb envelope and
+        // pushes scalar equality on it ("Json" #>> '{field}'), with a conflict-aware upsert verifying ownership.
+        .Add(DataCaps.Isolation.RowScoped)
         .Add(DataCaps.Query.Filter, RelationalFilterSupport.Default);
 
     // Storage optimization support
@@ -635,17 +639,56 @@ internal sealed class PostgresRepository<
     {
         await using var conn = Open();
         await using var tx = await conn.BeginTransactionAsync(ct);
+        var (sql, managed, guarded) = ManagedUpsert(QualifiedTable);
         var count = 0;
         foreach (var e in models)
         {
             ct.ThrowIfCancellationRequested();
             var row = ToRowOptimized(e);
-            var affected = await conn.ExecuteAsync($"INSERT INTO {QualifiedTable} (\"Id\", \"Json\") VALUES (@Id, CAST(@Json AS jsonb)) ON CONFLICT (\"Id\") DO UPDATE SET \"Json\" = EXCLUDED.\"Json\"", new { row.Id, row.Json }, tx);
+            var affected = await conn.ExecuteAsync(sql, UpsertParams(row.Id, row.Json, managed), tx);
+            if (guarded && affected == 0) throw CrossScopeWrite(QualifiedTable, row.Id?.ToString() ?? "");
             count += affected > 0 ? 1 : 0;
         }
         await tx.CommitAsync(ct);
         return count;
     }
+
+    // Managed-field conflict-aware upsert (DATA-0105 §3b — the write-verify half). When a managed write-scope is
+    // active, the jsonb already carries the managed keys (the ManagedFieldContractResolver injected them) AND the
+    // ON CONFLICT update is guarded so an existing row owned by a DIFFERENT scope is not overwritten — affected = 0
+    // then means a rejected cross-scope write. Generic: reads the scope dict, never names tenant/classification.
+    private static (string Sql, KeyValuePair<string, object?>[] Managed, bool Guarded) ManagedUpsert(string table)
+    {
+        var baseSql = $"INSERT INTO {table} (\"Id\", \"Json\") VALUES (@Id, CAST(@Json AS jsonb)) ON CONFLICT (\"Id\") DO UPDATE SET \"Json\" = EXCLUDED.\"Json\"";
+        var scope = ManagedFieldWriteScope.Current;
+        if (scope is null || scope.Count == 0) return (baseSql, Array.Empty<KeyValuePair<string, object?>>(), false);
+
+        var conds = new List<string>(scope.Count);
+        var prms = new List<KeyValuePair<string, object?>>(scope.Count);
+        var i = 0;
+        foreach (var kv in scope)
+        {
+            var p = "mf" + i++;
+            // Qualify with the target table — unqualified "Json" is ambiguous in DO UPDATE (target vs EXCLUDED).
+            // The table-qualified reference is the EXISTING row's value; EXCLUDED.* is the proposed row.
+            conds.Add($"({table}.\"Json\" #>> '{{{kv.Key}}}') = @{p}");
+            prms.Add(new KeyValuePair<string, object?>(p, kv.Value));
+        }
+        return ($"{baseSql} WHERE ({string.Join(" AND ", conds)})", prms.ToArray(), true);
+    }
+
+    private static DynamicParameters UpsertParams(object id, string json, KeyValuePair<string, object?>[] managed)
+    {
+        var p = new DynamicParameters();
+        p.Add("Id", id);
+        p.Add("Json", json);
+        foreach (var kv in managed) p.Add(kv.Key, kv.Value);
+        return p;
+    }
+
+    private static InvalidOperationException CrossScopeWrite(string table, string id)
+        => new($"Rejected a cross-scope write to '{table}' id '{id}': the row is owned by a different managed scope " +
+               "(e.g. tenant/classification). A managed-field-scoped entity cannot overwrite another scope's row.");
 
     public async Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
@@ -737,11 +780,13 @@ internal sealed class PostgresRepository<
             await using var tx = await conn.BeginTransactionAsync(ct);
             try
             {
+                var (upsertSql, managed, guarded) = ManagedUpsert(repo.QualifiedTable);
                 foreach (var e in upserts)
                 {
                     ct.ThrowIfCancellationRequested();
                     var row = repo.ToRow(e);
-                    await conn.ExecuteAsync($"INSERT INTO {repo.QualifiedTable} (\"Id\", \"Json\") VALUES (@Id, CAST(@Json AS jsonb)) ON CONFLICT (\"Id\") DO UPDATE SET \"Json\" = EXCLUDED.\"Json\"", new { row.Id, row.Json }, tx);
+                    var affected = await conn.ExecuteAsync(upsertSql, UpsertParams(row.Id, row.Json, managed), tx);
+                    if (guarded && affected == 0) throw CrossScopeWrite(repo.QualifiedTable, row.Id?.ToString() ?? "");
                 }
                 var deleted = 0;
                 if (_deletes.Any())
