@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Koan.Core.Adapters;
 using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
@@ -75,6 +76,9 @@ internal sealed class MongoRepository<TEntity, TKey> :
         .Add(DataCaps.Write.AtomicBatch).Add(DataCaps.Write.FastRemove)
         .Add(DataCaps.Write.ConditionalReplace)
         .Add(DataCaps.Retention.TtlIndex)
+        // Row-isolation (DATA-0105 §3b): injects a framework-managed discriminator as a BSON element and pushes
+        // scalar equality on it (the shared FieldPathResolver + IgnoreExtraElements), with a conflict-aware upsert.
+        .Add(DataCaps.Isolation.RowScoped)
         .Add(DataCaps.Query.Filter, MongoFilterTranslator<TEntity>.Capabilities);
     public StorageOptimizationInfo OptimizationInfo => _optimizationInfo;
 
@@ -448,11 +452,51 @@ internal sealed class MongoRepository<TEntity, TKey> :
             using var activity = MongoTelemetry.Activity.StartActivity("mongo.upsert");
             activity?.SetTag("entity", typeof(TEntity).FullName);
             var collection = await GetCollection(ct).ConfigureAwait(false);
-            var filter = Builders<TEntity>.Filter.Eq(x => x.Id, model.Id);
-            await collection.ReplaceOneAsync(filter, model, new ReplaceOptions { IsUpsert = true }, ct).ConfigureAwait(false);
-            //_logger?.LogDebug("Mongo upsert {Entity} id={Id}", typeof(TEntity).Name, model.Id);
+            var scope = ManagedFieldWriteScope.Current;
+            if (scope is null || scope.Count == 0)
+            {
+                var filter = Builders<TEntity>.Filter.Eq(x => x.Id, model.Id);
+                await collection.ReplaceOneAsync(filter, model, new ReplaceOptions { IsUpsert = true }, ct).ConfigureAwait(false);
+            }
+            else
+            {
+                await ManagedUpsertOneAsync(collection, model, scope, ct).ConfigureAwait(false);
+            }
             return model;
         }, ct);
+
+    // Managed-field conflict-aware upsert (DATA-0105 §3b — the write-verify half on Mongo). The entity is
+    // serialized to a BsonDocument via the registered class map, the managed elements (e.g. __koan_tenant) are
+    // injected (an invisible discriminator, not a POCO property — IgnoreExtraElements drops it on read), and the
+    // replace runs through a BsonDocument view with a conflict-aware filter {_id, <managed conds>}. A foreign-owned
+    // doc fails the filter → the upsert tries to INSERT the replacement with the same _id → E11000 duplicate key →
+    // a rejected cross-scope write. Generic: reads the scope dict, never names tenant/classification.
+    private static async Task ManagedUpsertOneAsync(
+        IMongoCollection<TEntity> collection, TEntity model, IReadOnlyDictionary<string, object?> scope, CancellationToken ct)
+    {
+        var doc = model.ToBsonDocument();
+        foreach (var kv in scope) doc[kv.Key] = ToBson(kv.Value);
+
+        var docs = collection.Database.GetCollection<BsonDocument>(collection.CollectionNamespace.CollectionName);
+        var filter = Builders<BsonDocument>.Filter.Eq("_id", doc["_id"]);
+        foreach (var kv in scope)
+            filter = Builders<BsonDocument>.Filter.And(filter, Builders<BsonDocument>.Filter.Eq(kv.Key, ToBson(kv.Value)));
+
+        try
+        {
+            await docs.ReplaceOneAsync(filter, doc, new ReplaceOptions { IsUpsert = true }, ct).ConfigureAwait(false);
+        }
+        catch (MongoWriteException ex) when (ex.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+        {
+            throw CrossScopeWrite(collection.CollectionNamespace.CollectionName, doc["_id"].ToString() ?? "");
+        }
+    }
+
+    private static BsonValue ToBson(object? value) => value is null ? BsonNull.Value : BsonValue.Create(value);
+
+    private static InvalidOperationException CrossScopeWrite(string collection, string id)
+        => new($"Rejected a cross-scope write to '{collection}' id '{id}': the document is owned by a different managed " +
+               "scope (e.g. tenant/classification). A managed-field-scoped entity cannot overwrite another scope's document.");
 
     public Task<bool> Delete(TKey id, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
@@ -475,17 +519,33 @@ internal sealed class MongoRepository<TEntity, TKey> :
             using var activity = MongoTelemetry.Activity.StartActivity("mongo.bulk.upsert");
             activity?.SetTag("entity", typeof(TEntity).FullName);
             var collection = await GetCollection(ct).ConfigureAwait(false);
-            var writes = models
+            var modelList = models as IReadOnlyCollection<TEntity> ?? models.ToList();
+            if (modelList.Count == 0)
+            {
+                return 0;
+            }
+
+            var scope = ManagedFieldWriteScope.Current;
+            if (scope is not null && scope.Count > 0)
+            {
+                // Under a managed scope, replace per document (the conflict-aware path); the bulk path stays the
+                // byte-identical fast path when nothing is in scope.
+                var n = 0;
+                foreach (var model in modelList)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    await ManagedUpsertOneAsync(collection, model, scope, ct).ConfigureAwait(false);
+                    n++;
+                }
+                return n;
+            }
+
+            var writes = modelList
                 .Select(model => new ReplaceOneModel<TEntity>(Builders<TEntity>.Filter.Eq(x => x.Id, model.Id), model)
                 {
                     IsUpsert = true
                 })
                 .ToArray();
-
-            if (writes.Length == 0)
-            {
-                return 0;
-            }
 
             var result = await collection.BulkWriteAsync(writes, cancellationToken: ct).ConfigureAwait(false);
             var count = (int)(result.ModifiedCount + result.Upserts.Count);
