@@ -53,24 +53,21 @@ public sealed class KoanAutoRegistrar : KoanModule
 
     public override Task Start(IServiceProvider services, CancellationToken ct)
     {
-        // The boot pre-flight (ARCH-0099 §1): refuse to boot in Production for the small exploitable-absence set
-        // (no resolver / a dev-branded artifact / a forced dev-open posture); warn softly otherwise. The prod
-        // signal comes from the per-host IHostEnvironment (the env abstraction KoanEnv itself wraps) so the check
-        // is per-host correct and testable; the resolved posture (TenancyRuntime) stays KoanEnv-derived.
+        // The boot pre-flight (ARCH-0099 §1): refuse to boot for the small exploitable-absence set. It is
+        // AUTHORITATIVE over the RESOLVED posture (TenancyRuntime, per-host) — not over how the posture was
+        // requested — so it catches a forced-Open whether it arrived via the config key, a programmatic
+        // Configure<TenancyOptions>, or any env divergence, in one invariant: Open is legal only in Development.
         var env = services.GetRequiredService<IHostEnvironment>();
         var cfg = services.GetRequiredService<IConfiguration>();
+        var runtime = services.GetRequiredService<TenancyRuntime>();
         var logger = services.GetService<ILoggerFactory>()?.CreateLogger("Koan.Tenancy");
 
-        var overrideRequestedOpen = string.Equals(
-            cfg["Koan:Data:Tenancy:Posture"], nameof(TenancyPosture.Open), StringComparison.OrdinalIgnoreCase);
-        var hasResolver = services.GetServices<ITenantResolver>().Any();
-        var brandedPresent = TenancyDevBrand.ContainsAny(SensitiveConfigValues(cfg));
-
         var result = TenancyPreflight.Evaluate(new TenancyPreflightInput(
+            IsDevelopment: env.IsDevelopment(),
             IsProduction: env.IsProduction(),
-            OverrideRequestedOpen: overrideRequestedOpen,
-            HasResolver: hasResolver,
-            BrandedDevMarkerPresent: brandedPresent));
+            PostureIsOpen: runtime.Posture == TenancyPosture.Open,
+            HasResolver: services.GetServices<ITenantResolver>().Any(),
+            BrandedDevMarkerPresent: TenancyDevBrand.ContainsAny(SensitiveConfigValues(cfg))));
 
         foreach (var warning in result.Warnings)
             logger?.LogWarning("Tenancy pre-flight: {Warning}", warning);
@@ -78,11 +75,14 @@ public sealed class KoanAutoRegistrar : KoanModule
         if (result.ShouldRefuseBoot)
             throw new TenancyBootException(result.HardFailures);
 
-        // Dev auto-seed (ARCH-0099 §1) — only under Open posture (a forced-Open-in-prod boot is refused above, so
-        // this never runs in production). Seed one in-memory dev tenant, make the loopback caller its Owner, and
-        // mint a branded per-machine key; an unset ambient scope then falls back to the dev tenant (no day-one 403).
-        var runtime = services.GetRequiredService<TenancyRuntime>();
-        if (runtime.Posture == TenancyPosture.Open)
+        logger?.LogInformation("Tenancy posture resolved: {Posture}.", runtime.Posture);
+
+        // Dev auto-seed (ARCH-0099 §1) — only in Development with an Open posture (a forced-Open-outside-dev boot is
+        // refused above, so this never runs in Staging/Production). Gating on env.IsDevelopment() too is the
+        // belt-and-suspenders: a non-Development host can never seed regardless of how the posture resolved. Seed
+        // one in-memory dev tenant, make the loopback caller its Owner, and mint a branded per-machine key; an
+        // unset ambient scope then falls back to the dev tenant (no day-one 403).
+        if (env.IsDevelopment() && runtime.Posture == TenancyPosture.Open)
         {
             var devState = services.GetRequiredService<TenancyDevState>();
             if (!devState.IsSeeded)

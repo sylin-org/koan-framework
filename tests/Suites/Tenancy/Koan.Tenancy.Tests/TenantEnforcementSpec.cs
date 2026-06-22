@@ -70,10 +70,11 @@ public sealed class TenantEnforcementSpec
     }
 
     [Fact]
-    public async Task Open_allows_a_tenant_scoped_write_with_no_tenant_in_scope()
+    public async Task Dev_open_allows_a_tenant_scoped_write()
     {
-        // Dev-open: a tenant-scoped op with no tenant in scope is warned, not blocked (ARCH-0099 §1).
-        await using var runtime = await TenancyRuntimeFixture.CreateAsync(extraSettings: Posture("Open"));
+        // Dev-open (a Development host, ARCH-0099 §1): a tenant-scoped op is never blocked — the auto-seeded dev
+        // tenant resolves the ambient scope, so the write succeeds with no ceremony.
+        await using var runtime = await TenancyRuntimeFixture.CreateAsync(environment: "Development");
         runtime.ResetEntityCaches();
 
         var saved = await ScopedThing.Upsert(new ScopedThing { Title = "x" });

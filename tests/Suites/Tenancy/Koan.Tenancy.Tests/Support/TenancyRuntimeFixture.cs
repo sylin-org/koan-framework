@@ -40,6 +40,10 @@ internal sealed class TenancyRuntimeFixture : IAsyncDisposable
         {
             ["Koan:Environment"] = environment,
             ["Koan:Data:Sources:Default:Adapter"] = adapter,
+            // Pin Standalone so a Development boot (used to exercise the dev-open posture) never arms the
+            // self-orchestration heuristic; the tenancy suite references no orchestration adapter, so this is inert
+            // belt-and-suspenders.
+            ["Koan:Orchestration:ForceOrchestrationMode"] = "Standalone",
         };
         if (string.Equals(adapter, "sqlite", StringComparison.OrdinalIgnoreCase))
             settings["Koan:Data:Sources:Default:ConnectionString"] = $"Data Source={Path.Combine(root, "tenancy.db")}";

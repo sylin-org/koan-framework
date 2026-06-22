@@ -132,11 +132,11 @@ public sealed class AssertNoTenantLeakSpec
     [Fact(DisplayName = "no tenant leak: the un-scoped path under Open resolves to the dev tenant (coherent, isolated)")]
     public async Task Open_unscoped_path_resolves_to_the_dev_tenant()
     {
-        // ARCH-0099 §1: there is no Off state. Under dev-open the auto-seed runs and an unset ambient scope falls
-        // back to the dev tenant — so the write is stamped with the dev tenant and the read filters to it. The
+        // ARCH-0099 §1: there is no Off state. On a Development host the auto-seed runs and an unset ambient scope
+        // falls back to the dev tenant — so the write is stamped with the dev tenant and the read filters to it. The
         // un-scoped path is therefore coherent (both rows belong to the same dev tenant and are mutually visible),
         // not unfiltered. Cross-tenant isolation of the fallback is proven in TenancyDevAutoSeedSpec.
-        await using var runtime = await TenancyRuntimeFixture.CreateAsync(extraSettings: Posture("Open"));
+        await using var runtime = await TenancyRuntimeFixture.CreateAsync(environment: "Development");
         runtime.ResetEntityCaches();
         using var _iso = Isolate();
 
