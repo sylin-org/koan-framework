@@ -1,6 +1,8 @@
 using System.Collections;
 using System.Collections.Concurrent;
+using System.Linq;
 using System.Reflection;
+using Koan.Data.Abstractions.Pipeline;
 
 namespace Koan.Data.Abstractions.Filtering;
 
@@ -40,6 +42,24 @@ public static class FieldPathResolver
 
     private static ResolvedField ResolveCore(Type rootType, FieldPath path)
     {
+        // Managed-field resolution (DATA-0105 §3b, Seam 3) — a single segment that matches a registered managed
+        // field for this entity type resolves to a managed ResolvedField (no CLR member). Gated on registry
+        // non-emptiness so the throw-path and success-only memoization below are byte-identical when no module
+        // registers. Because the relational translator AND the pushability splitter both funnel through this one
+        // resolver, this single change makes both managed-aware consistently.
+        if (!ManagedFieldRegistry.IsEmpty && path.Segments.Count == 1)
+        {
+            var seg = path.Segments[0];
+            var managed = ManagedFieldRegistry.ForType(rootType)
+                .FirstOrDefault(d => string.Equals(d.StorageName, seg, StringComparison.Ordinal));
+            if (managed is not null)
+            {
+                var managedComparable = Nullable.GetUnderlyingType(managed.ClrType) ?? managed.ClrType;
+                return new ResolvedField(rootType, Array.Empty<MemberInfo>(), managed.ClrType, managedComparable,
+                    TargetsCollection: false, ElementType: null, IsManaged: true, StorageName: managed.StorageName);
+            }
+        }
+
         var members = new MemberInfo[path.Segments.Count];
         var currentType = rootType;
 

@@ -39,6 +39,16 @@ public static class DataCaps
         public static readonly Capability ConditionalReplace = new("write.conditionalReplace");
     }
 
+    /// <summary>Row-isolation negotiation tokens (DATA-0105 / ARCH-0095). Axis-free: the token names the
+    /// adapter <b>guarantee</b>, not the consumer that needs it (Koan.Tenancy <c>Require</c>s it).</summary>
+    public static class Isolation
+    {
+        /// <summary>Provider can persist and filter a framework-managed row discriminator (a managed field, see
+        /// <see cref="Pipeline.ManagedFieldDescriptor"/>): it stores the injected key with each record AND pushes
+        /// a scalar equality on it. A managed-scoped entity routed to an adapter lacking this token fails closed.</summary>
+        public static readonly Capability RowScoped = new("isolation.rowScoped");
+    }
+
     /// <summary>Retention negotiation tokens.</summary>
     public static class Retention
     {
