@@ -216,6 +216,16 @@ implemented and its tests pass on real stores.
   JSON_VALUE = @scope` (0 rows ⇒ reject). Shared generic oracle **`ManagedFieldNoLeak`** (AdapterSurface TestKit,
   non-tenant) run per adapter: **Postgres 1/1 · SqlServer 1/1 on real containers** (isolation · IDOR · cross-scope
   upsert-takeover REJECTED · scoped RemoveAll). **The relational trio (SQLite+PG+SqlServer) all enforce isolation.**
+- ✅ **MONGO ISOLATION DONE** (`0720a729`, Docker-verified) — the **first bare-store / non-Newtonsoft** realization.
+  Read path needed NO change (MongoFilterTranslator already rides the managed-aware `FieldPathResolver`;
+  `IgnoreExtraElements` drops the injected element on read). Write: inject the managed BSON element into
+  `model.ToBsonDocument()` + `ReplaceOne` via a `BsonDocument` view with a conflict-aware filter `{_id, <managed>}`
+  ⇒ foreign doc ⇒ insert-same-_id ⇒ **E11000 ⇒ reject**. Announces `RowScoped`. Mongo no-leak 1/1 + full suite
+  21/21 (unscoped path byte-identical). **Tenant isolation now spans relational + document stores.**
+- ✅ **ADAPTER-COMPATIBILITY SWEEP DONE** — full `Koan.sln` build clean (all 15 adapters); no-regression suites
+  green post-change: SQLite 5 · PG 9 · SqlServer 19 · Mongo 21 · InMemory(data) 33 · Json 7 · Redis 3 ·
+  InMemory(vector) 29 · Qdrant 35 · data-core 206 · cache 109 · tenancy 23. **The non-isolating adapters
+  (Couchbase/Redis/Json/InMemory + all vector) FAIL CLOSED for a tenant-scoped entity — secure, never leaky.**
 - ☐ **NEXT:** Phase 3c schema-column DDL indexability (Indexed descriptors → computed/expression index; PG/SqlServer;
   SQLite JSON-only) · Phase 5 classification (2nd contributor module, a Serialize-stage **field-transform** seam —
   distinct from the managed-field *inject* seam — for encrypt/tokenize/mask) + Mongo/bare-store serialization
