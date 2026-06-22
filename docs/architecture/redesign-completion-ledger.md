@@ -122,12 +122,26 @@ implemented and its tests pass on real stores.
   `AdapterNaming.GetOrCompute` per-`ServiceProvider` factory-lookup cache via `ConditionalWeakTable`
   (`81f2f2e1`); base-anchor split off partition in `StorageNameGenerator` (`28b30a42`). Data-core suite
   174 → **190/190** (16 new specs). Each behaviour-preserving except the determinism fix (a correctness win).
-- ◐ **NEXT: Phase 0b** — the **ARCH-0096 engine** in `Koan.Core.Naming` (`IdentifierComposer` + `Particle`/
-  `CompositionPolicy` readonly structs + `ParticleDescriptor` `[KoanDiscoverable]` discovery + the 3-plane
-  cache + the 0-alloc benchmark) **then** the **DATA-0105 descriptor base** (`IStorageContributor`, plane tree,
-  structural closure, deterministic ordering, `OFF=structurally-absent` + `IsInvariantOnly` fast path).
-- ☐ Phase 1 write-stamp · 2 name-particle · 3 schema-column · 4 tenancy=registration+SQLite proof ·
-  5 classification · ambient unification · Adapter Forge · Facet 4 · cross-cutting completion.
+- ✅ **Phase 0b ARCH-0096 engine DONE** (`309e8482`) — `IdentifierComposer` + `Particle`/`CompositionPolicy`
+  readonly structs + `IParticleFormatter` in `Koan.Core.Naming`: deterministic order, per-particle omission,
+  byte-limit clamp (mirrors `NamingUtils` byte-for-byte), allocation-free fast paths (13 specs, 56/56 core unit).
+  The descriptor-*discovery* seam (`IParticleContributor`/`[KoanDiscoverable]`) is deferred to its second
+  cross-cutting consumer (tenant, phase 4) per dogfood discipline.
+- ✅ **Phase 2 name-particle DONE** (`66c9470d`) — `StorageNameGenerator` composition delegates to
+  `IdentifierComposer`; partition is the first particle; `PartitionParticleFormatter` bridges the adapter token
+  policy. Deleted the hardcoded concat + local clamp. **Byte-identical (data-core 190/190); vector untouched.**
+  The ARCH-0096 engine is now proven against the real DATA-0104 grammar + adapter capabilities.
+- **Sequencing decision (2026-06-22):** the DATA-0105 pipeline's other stages (write-stamp/schema/read-filter)
+  are **independent of ARCH-0096**, and the **tenant no-leak proof flows through those, not identifier
+  composition** (tenant ≠ name particle; tenant-in-cache-key is a phase-4 coherence concern via the cache
+  template engine — a different shape, bundled there). So **cache-key delegation is deferred to phase 4** and the
+  critical path is the `IStorageContributor` pipeline.
+- ◐ **NEXT: the DATA-0105 `IStorageContributor` descriptor pipeline** (model + base: descriptor interface,
+  Type-plane plan memoization, structural closure, deterministic ordering, `OFF=structurally-absent` +
+  `IsInvariantOnly` fast path) **+ phase 1 write-stamp re-home** (identity + `[Timestamp]`; delete the inline
+  `RepositoryFacade` calls; preserve the `BatchFacade` no-timestamp invariant).
+- ☐ Phase 3 schema-column · 4 tenancy=registration (+ cache-key/tenant particle) + SQLite `AssertNoTenantLeak`
+  proof · 5 classification · ambient unification · Adapter Forge · Facet 4 · cross-cutting completion.
 
 > Full per-area detail + the DATA-0105 review punch-list (must-fixes i–xi, upgrades A–D, opportunities):
 > memory **[[facet3-tenancy-design]]** (the anchor). Tenancy spec: [tenancy-design.md](./tenancy-design.md).
