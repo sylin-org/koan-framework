@@ -75,6 +75,14 @@ public static class ComparableScalarEncoding
         settings.Converters.Add(_timeSpan);
         settings.Converters.Add(_dateOnly);
         settings.Converters.Add(_timeOnly);
+
+        // Serialize-stage managed-field hook (DATA-0105 §3b, Seam 2). Wrap the adapter's existing contract
+        // resolver in a ManagedFieldContractResolver, preserving its naming strategy (CamelCase on SqlServer;
+        // PascalCase default on SQLite/PG). When no module registers a managed field, the resolver is a pure
+        // pass-through, so real-property serialization stays byte-identical. One shared wiring point for the
+        // whole relational trio (all three call Apply).
+        var naming = (settings.ContractResolver as Newtonsoft.Json.Serialization.DefaultContractResolver)?.NamingStrategy;
+        settings.ContractResolver = new ManagedFieldContractResolver { NamingStrategy = naming };
         return settings;
     }
 
