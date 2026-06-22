@@ -153,10 +153,19 @@ implemented and its tests pass on real stores.
   **Docs realigned to canon** (this commit): **ARCH-0097** (axis-generic carrier) authored; **DATA-0105 §0**
   defines the contributor pattern + where contributors live (modules); **ARCH-0095** reframes the kernel as the
   `Koan.Tenancy` module + the `IStorageGuard`/contributor seam; tenancy-design.md packaging callout.
-- ◐ **NEXT: the `Koan.Tenancy` extraction** (A axis-generic carrier `EntityContext.WithSlice`/`GetSlice` →
-  B generic `IStorageGuard` seam on the facade → C create `Koan.Tenancy`, move all tenancy code, rewire to the
-  generic slice + guard seams → D `Koan.Tenancy` auto-registrar (Reference=Intent), de-register from the data
-  core → E move tenancy specs + green-ratchet; invariant: a `Koan.Data.Core` grep for "tenant" returns nothing).
+- ◐ **`Koan.Tenancy` extraction IN PROGRESS** (incremental, green each step):
+  - ✅ **A** (`1c9cfa23`) axis-generic carrier — `EntityContext.WithSlice`/`GetSlice` + slice map; removed the
+    named `Tenant` field/param + the data-core `using …Tenancy`; `Tenant.cs` on the slice API; 7 specs; 204.
+  - ✅ **B** (`773c03a5`) generic `IStorageGuard` seam — facade resolves `IStorageGuard[]` (no-op if none);
+    `TenantEnforcer→IStorageGuard`; deleted `ITenantEnforcer`; both ctor sites resolve the seam; 204.
+  - **CARRIER + FACADE NOW TENANCY-AGNOSTIC (code).** Remaining coupling = exactly **7 files to move** +
+    **1 registration to relocate** (the rest are agnostic doc comments).
+  - ☐ **C** create `src/Koan.Tenancy` (`dotnet sln add`) + move the 7 files (ns → `Koan.Tenancy`,
+    `TenantEnforcer`→`TenantStorageGuard`) + add the `.WithTenant` surface · **D** `Koan.Tenancy`
+    auto-registrar registers options + the guard, de-register from the data core · **E** new
+    `Koan.Tenancy.Tests`, move `TenantAmbientSpec`+`TenantEnforcementSpec`, green-ratchet; assert
+    `grep tenant src/Koan.Data.Core` = only agnostic doc comments. *(C/D/E are mechanical — do in a clean
+    context to avoid a broken tree mid-move.)*
 - ☐ **THEN Phase 3 schema-column contributor** — `RelationalSchemaOrchestrator` (+ `ProjectionResolver`)
   consult column descriptors so a contributor (tenant in phase 4) can add a column to the DDL + the projection;
   converge `[Column]`/property-`[StorageName]` and `[NotMapped]`/`[IgnoreStorage]`. The genuinely per-adapter seam.
