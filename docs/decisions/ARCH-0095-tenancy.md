@@ -1,6 +1,7 @@
 # ARCH-0095: First-class multi-tenancy — the ambient Tenant slice, the eight primitives, and the classification axis
 
 **Status**: Accepted (2026-06-21) — *design complete; three-round external review returned a unanimous "ship." Implementation is phased/TDD (see §Implementation plan); this ADR records the decision and the empirically-verified enforcement seam.*
+> ⚠ **Realigned by [ARCH-0099](ARCH-0099-tenancy-realignment.md) (2026-06-22):** posture is **open-in-dev / closed-in-prod via `KoanEnv`**, not `Mode=Off`-default fail-closed-always; the **owner-admin rejection (§6.8 fork 4) is disentangled** (the cross-tenant backdoor stays dead, but first-user-becomes-Owner-of-their-own-tenant is built); the **mode ladder (§2) is mandatory surface** (all three rungs), and its storage-isolation rung is the **per-adapter native container** (ARCH-0099 §4), not relational-schema-only.
 **Date**: 2026-06-21
 **Deciders**: Enterprise Architect
 **Scope**: How Koan provides multi-tenancy — tenant **isolation**, identity/membership, the control plane, lifecycle, enforcement, and a composing **data-classification** axis — as the flagship typed slice of the Facet-3 Ambient primitive, with the **same developer experience regardless of tenancy mode**. The full implementation-ready design is [tenancy-design.md](../architecture/tenancy-design.md); this ADR is the decision record.

@@ -1,6 +1,7 @@
 # ARCH-0096: The identifier-composition primitive — one anchor-and-particles engine across pillars
 
-**Status**: Proposed (2026-06-22)
+**Status**: Proposed (2026-06-22) — *engine + trailing partition particle landed; realigned by ARCH-0099.*
+> ⚠ **Realigned by [ARCH-0099](ARCH-0099-tenancy-realignment.md) (2026-06-22):** §5's *"tenant is a cache-key particle, not a name particle"* is **superseded** — tenant **is** a name particle, a **leading** container prefix by tenant id (`2a6v7.Todo`). The engine gained **positional particles** (`Particle.Position` Leading/Trailing + per-particle separator, commit `a46c11fc`), so a leading prefix is now expressible; the `IParticleContributor` discovery seam (§2) is the next wiring.
 **Date**: 2026-06-22
 **Deciders**: Enterprise Architect
 **Scope**: Converge the *several uncoordinated* hand-rolled implementations of one shape — **an anchor plus an ordered set of policy-rendered particles, composed into a single identifier/key** — onto **one engine** living below every pillar that builds one. The cross-cutting axes that motivate this (partition today, **tenant** next) are then registered **once** as immutable particle descriptors and honored by every composer, instead of being re-derived per pillar. This is the foundational primitive **DATA-0105** (the storage-composition pipeline) consumes for its Name stage, and the seam that lets tenancy (**ARCH-0095**) add an axis by *registration*, not per-pillar code.
