@@ -160,12 +160,15 @@ implemented and its tests pass on real stores.
     `TenantEnforcer→IStorageGuard`; deleted `ITenantEnforcer`; both ctor sites resolve the seam; 204.
   - **CARRIER + FACADE NOW TENANCY-AGNOSTIC (code).** Remaining coupling = exactly **7 files to move** +
     **1 registration to relocate** (the rest are agnostic doc comments).
-  - ☐ **C** create `src/Koan.Tenancy` (`dotnet sln add`) + move the 7 files (ns → `Koan.Tenancy`,
-    `TenantEnforcer`→`TenantStorageGuard`) + add the `.WithTenant` surface · **D** `Koan.Tenancy`
-    auto-registrar registers options + the guard, de-register from the data core · **E** new
-    `Koan.Tenancy.Tests`, move `TenantAmbientSpec`+`TenantEnforcementSpec`, green-ratchet; assert
-    `grep tenant src/Koan.Data.Core` = only agnostic doc comments. *(C/D/E are mechanical — do in a clean
-    context to avoid a broken tree mid-move.)*
+  - ✅ **C+D+E DONE** (`9c718b53`) — created `src/Koan.Tenancy` (in `Koan.sln`); moved the 7 files
+    (ns → `Koan.Tenancy`, `TenantEnforcer`→`TenantStorageGuard`); added the **`.WithTenant`** surface;
+    `KoanAutoRegistrar` binds options + registers the guard (Reference = Intent); removed the data-core
+    registration. New `tests/Suites/Tenancy/Koan.Tenancy.Tests` (specs moved + `TenancyRuntimeFixture`).
+    **Tenancy proven through a real `AddKoan()` boot with the module referenced — registrar discovered, gate
+    wired via the generic seam: 17/17. Data-core tenancy-free: 188/188. INVARIANT HOLDS: 0 non-comment tenant
+    lines in `Koan.Data.Core`.**
+- ✅ **`Koan.Tenancy` EXTRACTION COMPLETE.** The data core owns generic seams; tenancy is a separate module
+  providing contributors under Reference = Intent — the contributor pattern (DATA-0105 §0) is now real.
 - ☐ **THEN Phase 3 schema-column contributor** — `RelationalSchemaOrchestrator` (+ `ProjectionResolver`)
   consult column descriptors so a contributor (tenant in phase 4) can add a column to the DDL + the projection;
   converge `[Column]`/property-`[StorageName]` and `[NotMapped]`/`[IgnoreStorage]`. The genuinely per-adapter seam.
