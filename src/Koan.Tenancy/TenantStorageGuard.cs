@@ -28,10 +28,9 @@ internal sealed class TenantStorageGuard : IStorageGuard
         if (TenantScopeMetadata.IsHostScopedType(entityType)) return;   // [HostScoped] entity → not tenant-scoped
         if (TenancyAmbient.HasEffectiveTenant()) return;               // a concrete tenant (explicit or dev-fallback) is in scope
 
-        // A tenant-scoped operation with no concrete tenant in scope (unset, or explicit host scope).
-        var message =
-            $"No tenant in scope for tenant-scoped '{entityType.Name}'. Wrap the call in " +
-            $"'using (Tenant.Use(id))', configure tenant resolution, or mark the entity [HostScoped].";
+        // A tenant-scoped operation with no concrete tenant in scope (unset, or explicit host scope). The
+        // diagnostic names the exact fix (Redis protected-mode quality, ARCH-0099 §1).
+        var message = TenancyRefusal.NoTenantInScope(entityType.Name);
 
         if (_runtime.Posture == TenancyPosture.Open)
         {
