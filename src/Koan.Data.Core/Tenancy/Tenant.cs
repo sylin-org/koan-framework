@@ -15,7 +15,7 @@ namespace Koan.Data.Core.Tenancy;
 public static class Tenant
 {
     /// <summary>The ambient tenant slice, or <c>null</c> when no tenant is in scope.</summary>
-    public static TenantContext? Current => EntityContext.Current?.Tenant;
+    public static TenantContext? Current => EntityContext.GetSlice<TenantContext>();
 
     /// <summary>
     /// Scope subsequent entity operations to <paramref name="tenantId"/> for the lifetime of the returned
@@ -23,7 +23,7 @@ public static class Tenant
     /// act-as. Other ambient dimensions (source/adapter/partition/transaction) carry over unchanged.
     /// </summary>
     /// <exception cref="ArgumentException">The id is null, empty, or whitespace.</exception>
-    public static IDisposable Use(string tenantId) => EntityContext.With(tenant: TenantContext.For(tenantId));
+    public static IDisposable Use(string tenantId) => EntityContext.WithSlice(TenantContext.For(tenantId));
 
     /// <summary>
     /// Enter explicit <b>host / control-plane scope</b> — the one loud, audited escape from tenant scoping.
@@ -31,5 +31,5 @@ public static class Tenant
     /// closed unless an explicit allow-unscoped-write capability is present (enforced by the guard slice).
     /// Disposing restores the previous ambient tenant.
     /// </summary>
-    public static IDisposable None() => EntityContext.With(tenant: TenantContext.Host);
+    public static IDisposable None() => EntityContext.WithSlice(TenantContext.Host);
 }

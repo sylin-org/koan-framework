@@ -1,9 +1,9 @@
 using System;
+using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Cache.Abstractions.Policies;
 using Koan.Core.Hosting.App;
-using Koan.Data.Core.Tenancy;
 using Koan.Data.Core.Transactions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -43,11 +43,13 @@ public static class EntityContext
         public CacheBehavior? CacheBehavior { get; init; }
 
         /// <summary>
-        /// The ambient tenant slice (ARCH-0095). <c>null</c> = no tenant in scope (a tenant-scoped op fails
-        /// closed); <see cref="TenantContext.Host"/> = explicit host / control-plane scope; otherwise
-        /// scoped to a tenant. The isolation axis — distinct from <see cref="Partition"/> (the dataset axis).
+        /// Cross-cutting ambient axes that are NOT intrinsic to the data core (tenant, classification, …) ride
+        /// here as immutable, type-keyed <b>typed slices</b> (ARCH-0097) instead of named fields — so the data
+        /// core stays agnostic and each axis is owned by its own module. Read via
+        /// <see cref="EntityContext.GetSlice{T}"/>, pushed via <see cref="EntityContext.WithSlice{T}"/>;
+        /// inherited-unless-overridden like the routing dimensions.
         /// </summary>
-        public TenantContext? Tenant { get; init; }
+        public ImmutableDictionary<Type, object> Slices { get; init; } = ImmutableDictionary<Type, object>.Empty;
 
         /// <summary>
         /// Transaction coordinator instance for deferred execution.
@@ -63,15 +65,13 @@ public static class EntityContext
         /// <param name="partition">Storage partition suffix (e.g., "archive")</param>
         /// <param name="transaction">Transaction name for coordination (e.g., "save-batch")</param>
         /// <param name="cacheBehavior">Per-request cache behavior override.</param>
-        /// <param name="tenant">Ambient tenant slice (ARCH-0095); null = no tenant in scope.</param>
         /// <exception cref="InvalidOperationException">Thrown when both source and adapter are specified</exception>
         public ContextState(
             string? source = null,
             string? adapter = null,
             string? partition = null,
             string? transaction = null,
-            CacheBehavior? cacheBehavior = null,
-            TenantContext? tenant = null)
+            CacheBehavior? cacheBehavior = null)
         {
             // Critical constraint: source and adapter are mutually exclusive
             if (!string.IsNullOrWhiteSpace(source) && !string.IsNullOrWhiteSpace(adapter))
@@ -83,7 +83,6 @@ public static class EntityContext
             Partition = partition;
             Transaction = transaction;
             CacheBehavior = cacheBehavior;
-            Tenant = tenant;
         }
 
         internal void ValidatePartitionName()
@@ -120,6 +119,31 @@ public static class EntityContext
         _current.Value?.TransactionCoordinator;
 
     /// <summary>
+    /// Read the current ambient typed slice of type <typeparamref name="T"/> (ARCH-0097), or <c>null</c> when
+    /// no such slice is in scope. Cross-cutting axes (tenant, classification) are stored by their own modules
+    /// and read here; the data core never names the type.
+    /// </summary>
+    public static T? GetSlice<T>() where T : class
+        => _current.Value?.Slices.TryGetValue(typeof(T), out var v) == true ? (T)v : null;
+
+    /// <summary>
+    /// Push an ambient typed slice for the lifetime of the returned scope (ARCH-0097); disposing restores the
+    /// previous context. A <c>null</c> slice clears any current slice of that type. The slice inherits through
+    /// nested <see cref="With"/> scopes. This is the generic carrier a cross-cutting module (e.g. tenancy)
+    /// builds its surface on — the data core stays axis-agnostic.
+    /// </summary>
+    public static IDisposable WithSlice<T>(T? slice) where T : class
+    {
+        var prev = _current.Value;
+        var basis = prev ?? new ContextState();
+        var slices = slice is null
+            ? basis.Slices.Remove(typeof(T))
+            : basis.Slices.SetItem(typeof(T), slice);
+        _current.Value = basis with { Slices = slices };
+        return new SliceScope(prev);
+    }
+
+    /// <summary>
     /// Push a routing context for the lifetime of the returned scope. The new context is built
     /// <b>inherit-unless-overridden</b>, not wholesale-replaced: each dimension whose argument is left
     /// null adopts the ambient (previous) context's value for that dimension; a non-null argument
@@ -143,7 +167,6 @@ public static class EntityContext
     /// <param name="transaction">Transaction name for coordination; null inherits the ambient transaction when <paramref name="preserveTransaction"/> is true.</param>
     /// <param name="cacheBehavior">Per-request cache behavior override; null inherits the ambient behavior.</param>
     /// <param name="preserveTransaction">When true, retain the ambient transaction if one exists and no new transaction is specified.</param>
-    /// <param name="tenant">Ambient tenant slice (ARCH-0095); null inherits the ambient tenant. Pass <see cref="TenantContext.Host"/> to enter explicit host scope, or <see cref="TenantContext.For"/> to scope to a tenant.</param>
     /// <returns>Disposable that restores previous context on disposal</returns>
     /// <exception cref="InvalidOperationException">Thrown when source and adapter are both set on the effective context (directly or via inheritance), or when starting a transaction inside an existing one</exception>
     /// <exception cref="ArgumentException">Thrown when partition name is invalid</exception>
@@ -153,8 +176,7 @@ public static class EntityContext
         string? partition = null,
         string? transaction = null,
         CacheBehavior? cacheBehavior = null,
-        bool preserveTransaction = true,
-        TenantContext? tenant = null)
+        bool preserveTransaction = true)
     {
         var prev = _current.Value;
 
@@ -173,9 +195,13 @@ public static class EntityContext
             ? transaction ?? prev?.Transaction
             : transaction;
         var effectiveCacheBehavior = cacheBehavior ?? prev?.CacheBehavior;
-        var effectiveTenant = tenant ?? prev?.Tenant;
 
-        var newContext = new ContextState(effectiveSource, effectiveAdapter, effectivePartition, effectiveTransaction, effectiveCacheBehavior, effectiveTenant);
+        var newContext = new ContextState(effectiveSource, effectiveAdapter, effectivePartition, effectiveTransaction, effectiveCacheBehavior)
+        {
+            // Cross-cutting typed slices (tenant, classification, …) inherit unless overridden, like the
+            // routing dimensions — so a nested scope that changes one axis carries the slices through (ARCH-0097).
+            Slices = prev?.Slices ?? ImmutableDictionary<Type, object>.Empty,
+        };
         // Fail fast on partition names that would NOT survive identifier sanitization unchanged — their lossy
         // character replacement could collide a distinct partition onto the same physical store (data bleed).
         // GUIDs and already-identifier-safe names pass; see PartitionNameValidator.
@@ -285,6 +311,19 @@ public static class EntityContext
         }
 
         return factory.Create(name);
+    }
+
+    private sealed class SliceScope : IDisposable
+    {
+        private readonly ContextState? _previous;
+        private bool _disposed;
+        public SliceScope(ContextState? previous) => _previous = previous;
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _current.Value = _previous;
+        }
     }
 
     private sealed class TransactionScope : IDisposable
