@@ -338,6 +338,15 @@ implemented and its tests pass on real stores.
     minimal endpoints] + `Hosting/*StartupFilter` + `wwwroot/`). Then **2c-2** (caller-identity resolver + Owner
     authz gate + read endpoints), **2c-3** (mutation endpoints w/ authz), **step 3** (the site page, model
     `src/Connectors/Web/Auth/Test/wwwroot/testprovider-login.html`). Web tests = TestServer/WAF (ARCH-0091).
+  - **PRIOR-ART SWEEP DONE** (`wf_25fb6f0c-992`, 29 frameworks → `docs/architecture/tenancy-prior-art-findings.md`).
+    Verdict: §6/§7 validated (plane split = AWS/Nile/Neon canon; role-on-membership = unanimous B2B; fail-closed =
+    "most defensible in the field"); **§7's lockable per-tenant config primitive is genuinely novel** (nobody ships
+    it). Keystone: **Windows Group Policy** = the 1:1 ancestor of the lock + a checklist of 3 gaps. **§7 RESHAPED to
+    Group-Policy-grade** (`7e6ac91e`, architect-chosen "reshape core + roadmap rest"): tri-state override · the lock
+    carries its bound (`TenantMayChangeWithin(envelope)`, out-of-bounds unrepresentable) · clean-revert + RSoP
+    effective-value explainer · framework-axis invariants as a separate higher PLANE (Intune) · explicit-data
+    precedence. §7d roadmap = graduated-enforcement · structural plane-split enforcement · durable-carrier ·
+    revocation contract · time-boxed bootstrap credential · intent-scoped portal links. Additive, not a redesign.
 - ☐ **THEN:** Phase 3c schema-column DDL indexability (Indexed descriptors → computed/expression index; PG/SqlServer;
   SQLite JSON-only) + Mongo/bare-store managed serialization injection + in-memory managed `GetValue` · classification
   phases 4–7 (searchable blind-index · vector/messaging leak guards · crypto-shred+rotation · masked-read) · then
