@@ -139,4 +139,65 @@ public class IdentifierComposerSpec
         // regression on the single-particle path would blow well past this bound.
         perCall.Should().BeLessThan(80);
     }
+
+    // --- ARCH-0096 realignment: positional particles (leading container prefix vs trailing partition suffix) ---
+
+    [Fact]
+    public void Leading_particle_prepends_token_before_the_anchor()
+    {
+        var p = new[] { new Particle(0, "tenant", "2a6v7", ParticlePosition.Leading) };
+        IdentifierComposer.Compose("Todo", p, Storage()).Should().Be("2a6v7#Todo");
+    }
+
+    [Fact]
+    public void Leading_particle_honours_its_own_separator_override()
+    {
+        var p = new[] { new Particle(0, "tenant", "2a6v7", ParticlePosition.Leading, ".") };
+        IdentifierComposer.Compose("Todo", p, Storage()).Should().Be("2a6v7.Todo");   // the container-per-tenant shape
+    }
+
+    [Fact]
+    public void Leading_and_trailing_compose_around_the_anchor()
+    {
+        var p = new[]
+        {
+            new Particle(0, "tenant", "2a6v7", ParticlePosition.Leading, "."),   // tenant container prefix
+            new Particle(0, "partition", "alpha"),                                // partition suffix, policy '#'
+        };
+        IdentifierComposer.Compose("Todo", p, Storage()).Should().Be("2a6v7.Todo#alpha");
+    }
+
+    [Fact]
+    public void An_omitted_leading_particle_returns_the_anchor_reference()
+    {
+        var anchor = "Todo";
+        var p = new[] { new Particle(0, "tenant", "", ParticlePosition.Leading, ".") };
+        IdentifierComposer.Compose(anchor, p, Storage()).Should().BeSameAs(anchor);
+    }
+
+    [Fact]
+    public void Multiple_leading_particles_compose_in_order()
+    {
+        var p = new[]
+        {
+            new Particle(1, "b", "two", ParticlePosition.Leading),
+            new Particle(0, "a", "one", ParticlePosition.Leading),
+        };
+        IdentifierComposer.Compose("X", p, Storage()).Should().Be("one#two#X");
+    }
+
+    [Fact]
+    public void Leading_clamp_preserves_the_prefix_and_uniqueness_per_value()
+    {
+        var anchor = new string('t', 80);
+        var a = new[] { new Particle(0, "tenant", "2a6v7", ParticlePosition.Leading, ".") };
+        var b = new[] { new Particle(0, "tenant", "234vd", ParticlePosition.Leading, ".") };
+
+        var ra = IdentifierComposer.Compose(anchor, a, Storage(max: 40));
+        var rb = IdentifierComposer.Compose(anchor, b, Storage(max: 40));
+
+        Encoding.UTF8.GetByteCount(ra).Should().BeLessThanOrEqualTo(40);
+        ra.Should().StartWith("2a6v7");   // the leading tenant survives the clamp head
+        ra.Should().NotBe(rb);            // two tenants never collide, even when clamped (hash of the full id)
+    }
 }

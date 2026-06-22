@@ -28,28 +28,44 @@ public static class IdentifierComposer
         // Single-particle path (the dominant storage-name case): one concat, or the anchor if the token omits.
         if (particles.Length == 1)
         {
-            var only = policy.Formatter.Format(particles[0].Value);
-            var single = string.IsNullOrEmpty(only) ? anchor : anchor + policy.Separator + only;
+            var p0 = particles[0];
+            var only = policy.Formatter.Format(p0.Value);
+            if (string.IsNullOrEmpty(only)) return Clamp(anchor, anchor, policy);
+            var s0 = p0.Separator ?? policy.Separator;
+            if (p0.Position == ParticlePosition.Leading)
+            {
+                var lead = only + s0 + anchor;          // token{sep}anchor (e.g. 2a6v7.Todo)
+                return Clamp(lead, lead, policy);        // nothing trails ⇒ the whole string is the readable head
+            }
+            var single = anchor + s0 + only;            // anchor{sep}token — byte-identical to the prior path
             return Clamp(single, anchor, policy);
         }
 
-        // Multi-particle: deterministic order via a stackalloc index buffer (no heap), then format + join.
+        // Multi-particle: deterministic order via a stackalloc index buffer (no heap), then split by position.
         Span<int> order = particles.Length <= 16 ? stackalloc int[particles.Length] : new int[particles.Length];
         for (var i = 0; i < particles.Length; i++) order[i] = i;
         StableSort(order, particles);
 
-        var sb = new StringBuilder(anchor.Length + particles.Length * 8);
-        sb.Append(anchor);
-        var any = false;
+        // Build [leading tokens] anchor [trailing tokens], each joined by its own (or the policy's) separator.
+        var leading = new StringBuilder();
+        var trailing = new StringBuilder();
         foreach (var oi in order)
         {
-            var token = policy.Formatter.Format(particles[oi].Value);
+            var p = particles[oi];
+            var token = policy.Formatter.Format(p.Value);
             if (string.IsNullOrEmpty(token)) continue;
-            sb.Append(policy.Separator).Append(token);
-            any = true;
+            var sep = p.Separator ?? policy.Separator;
+            if (p.Position == ParticlePosition.Leading) leading.Append(token).Append(sep);
+            else trailing.Append(sep).Append(token);
         }
 
-        return Clamp(any ? sb.ToString() : anchor, anchor, policy);
+        if (leading.Length == 0 && trailing.Length == 0) return Clamp(anchor, anchor, policy);
+
+        // The readable head (preserved on overflow) is the leading particles + anchor, so a leading tenant prefix
+        // survives the byte clamp as far as it fits; the hash of the full identifier keeps it unique regardless.
+        var head = leading.Length == 0 ? anchor : leading.Append(anchor).ToString();
+        var full = trailing.Length == 0 ? head : head + trailing.ToString();
+        return Clamp(full, head, policy);
     }
 
     private static void StableSort(Span<int> order, ReadOnlySpan<Particle> particles)
@@ -77,14 +93,14 @@ public static class IdentifierComposer
     // --- length policy (mirrors Koan.Data.Abstractions.Naming.NamingUtils byte-for-byte, so the data pillar can
     // delegate to this composer without changing any produced name) ---
 
-    private static string Clamp(string identifier, string anchor, in CompositionPolicy policy)
+    private static string Clamp(string identifier, string head, in CompositionPolicy policy)
     {
         if (policy.MaxBytes is not { } max || ByteLength(identifier) <= max)
             return identifier;
 
         const int hashChars = 8;
         var hash = ShortHash(identifier, hashChars);
-        var prefix = TrimToBytes(anchor, max - hashChars - policy.Separator.Length); // reserve separator + hash
+        var prefix = TrimToBytes(head, max - hashChars - policy.Separator.Length); // reserve separator + hash
         return prefix + policy.Separator + hash;
     }
 
