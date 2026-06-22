@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using Koan.Data.Core.Pipeline;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -15,8 +14,6 @@ namespace Koan.Tenancy;
 /// </summary>
 internal sealed class TenantStorageGuard : IStorageGuard
 {
-    private static readonly ConcurrentDictionary<Type, bool> HostScopedCache = new();
-
     private readonly IOptions<TenancyOptions> _options;
     private readonly ILogger<TenantStorageGuard> _logger;
 
@@ -48,5 +45,5 @@ internal sealed class TenantStorageGuard : IStorageGuard
     }
 
     private static bool IsHostScoped(Type entityType)
-        => HostScopedCache.GetOrAdd(entityType, static t => new TenantScopeMetadata(t).IsHostScoped);
+        => TenantScopeMetadata.IsHostScopedType(entityType);
 }

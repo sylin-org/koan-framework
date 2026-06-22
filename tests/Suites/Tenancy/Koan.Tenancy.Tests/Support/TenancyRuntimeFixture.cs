@@ -24,16 +24,24 @@ internal sealed class TenancyRuntimeFixture : IAsyncDisposable
 
     public IServiceProvider Services => _host.Services;
 
-    public static async Task<TenancyRuntimeFixture> CreateAsync(IReadOnlyDictionary<string, string?>? extraSettings = null)
+    public static async Task<TenancyRuntimeFixture> CreateAsync(
+        IReadOnlyDictionary<string, string?>? extraSettings = null, string adapter = "sqlite")
     {
         var root = Path.Combine(Path.GetTempPath(), "Koan-Tenancy", Guid.CreateVersion7().ToString("n"));
         Directory.CreateDirectory(root);
 
+        // SQLite is the no-Docker adapter that ANNOUNCES isolation (DataCaps.Isolation.RowScoped) — tenancy needs
+        // an isolating store, so the guard tests AND the AssertNoTenantLeak proof run on it. The JSON adapter does
+        // NOT announce isolation; a tenant-scoped op there fails closed (a dedicated negative test boots adapter:"json").
         var settings = new Dictionary<string, string?>(StringComparer.Ordinal)
         {
             ["Koan:Environment"] = "Test",
-            ["Koan:Data:Json:DirectoryPath"] = root,
+            ["Koan:Data:Sources:Default:Adapter"] = adapter,
         };
+        if (string.Equals(adapter, "sqlite", StringComparison.OrdinalIgnoreCase))
+            settings["Koan:Data:Sources:Default:ConnectionString"] = $"Data Source={Path.Combine(root, "tenancy.db")}";
+        else if (string.Equals(adapter, "json", StringComparison.OrdinalIgnoreCase))
+            settings["Koan:Data:Json:DirectoryPath"] = root;
 
         if (extraSettings is not null)
         {

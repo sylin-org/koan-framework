@@ -39,6 +39,8 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     private readonly IStorageGuard[] _guards;
     private readonly IReadOnlyList<ManagedFieldDescriptor> _managed;
     private readonly string _idField;
+    private readonly bool _managedAdapterOk;
+    private readonly string? _managedAdapterError;
 
     public RepositoryFacade(IDataRepository<TEntity, TKey> inner, IStorageGuard[]? guards = null)
     {
@@ -47,30 +49,39 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         _writePlan = StorageWritePlan.For(typeof(TEntity));
         _managed = ManagedFieldRegistry.ForType(typeof(TEntity));
         _idField = AggregateMetadata.GetIdSpec(typeof(TEntity))?.Prop.Name ?? "Id";
-        if (_managed.Count > 0) AssertManagedAdapterCapability();
+        if (_managed.Count > 0) (_managedAdapterOk, _managedAdapterError) = InspectManagedAdapter();
+        else _managedAdapterOk = true;
     }
 
     private bool HasManaged => _managed.Count > 0;
 
-    // Fail closed at construction (≈ boot) for a managed-scoped entity routed to an adapter that cannot isolate
-    // it: it must announce every required capability AND be an IQueryRepository (key-ops lower to scoped queries).
-    private void AssertManagedAdapterCapability()
+    // Inspect (do NOT throw at construction) whether the adapter can isolate a managed-scoped entity: it must
+    // announce every required capability AND be an IQueryRepository (key-ops lower to scoped queries). We defer the
+    // throw to the first operation that actually has a managed value in scope, so a non-tenant app — or a referenced-
+    // but-off Koan.Tenancy on a non-isolating adapter — is a true no-op (zero regression). Fail-closed when used.
+    private (bool ok, string? error) InspectManagedAdapter()
     {
         var caps = DataCaps.Describe(_inner, _inner.GetType().Name);
         foreach (var d in _managed)
         {
             if (d.RequiredCapability is { } req && !caps.Has(req))
-                throw new InvalidOperationException(
-                    $"Entity '{typeof(TEntity).Name}' requires managed-field isolation capability '{req.Id}', but the " +
-                    $"adapter '{_inner.GetType().Name}' does not announce it. Route it to an isolating adapter, or exempt the entity.");
+                return (false,
+                    $"Entity '{typeof(TEntity).Name}' is in an active managed scope requiring isolation capability '{req.Id}', " +
+                    $"but the adapter '{_inner.GetType().Name}' does not announce it. Route it to an isolating adapter, or exempt the entity.");
         }
         if (_inner is not IQueryRepository<TEntity, TKey>)
-            throw new InvalidOperationException(
-                $"Entity '{typeof(TEntity).Name}' is managed-field-scoped, but the adapter '{_inner.GetType().Name}' does not " +
+            return (false,
+                $"Entity '{typeof(TEntity).Name}' is in an active managed scope, but the adapter '{_inner.GetType().Name}' does not " +
                 "implement IQueryRepository. Managed isolation lowers key operations to scoped queries, so it requires pushdown query support.");
+        return (true, null);
     }
 
-    // --- managed-field helpers (no-op fast paths when nothing is registered for this type) ---
+    private void RequireManagedAdapter()
+    {
+        if (!_managedAdapterOk) throw new InvalidOperationException(_managedAdapterError);
+    }
+
+    // --- managed-field helpers (no-op fast paths when nothing is registered / nothing is in scope) ---
 
     /// <summary>The managed values to stamp on the current write, or <c>null</c> when none is in scope (off / host).</summary>
     private IReadOnlyDictionary<string, object?>? CurrentManagedValues()
@@ -83,6 +94,7 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
             if (v is null) continue;                 // off / host scope ⇒ this field is not stamped
             (values ??= new(StringComparer.Ordinal))[d.StorageName] = v;
         }
+        if (values is not null) RequireManagedAdapter();   // an active scope on a non-isolating adapter fails closed
         return values;
     }
 
@@ -97,7 +109,9 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
             if (v is null) continue;                 // off / host ⇒ unfiltered (nothing was stamped); the guard handles enforce
             (preds ??= new()).Add(Filter.Eq(d.StorageName, v));
         }
-        return preds is null ? null : preds.Count == 1 ? preds[0] : Filter.All(preds.ToArray());
+        if (preds is null) return null;
+        RequireManagedAdapter();                          // an active scope on a non-isolating adapter fails closed
+        return preds.Count == 1 ? preds[0] : Filter.All(preds.ToArray());
     }
 
     private QueryDefinition ApplyManaged(QueryDefinition query, Filter managed)

@@ -1,6 +1,8 @@
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
+using Koan.Data.Abstractions.Capabilities;
+using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Core.Pipeline;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,9 +13,11 @@ namespace Koan.Tenancy.Initialization;
 
 /// <summary>
 /// Lights tenancy up when the <c>Koan.Tenancy</c> package is referenced (Reference = Intent, ARCH-0095): binds
-/// the posture options and registers the fail-closed tenant gate as a generic <see cref="IStorageGuard"/>
-/// contributor into the data-core storage pipeline (DATA-0105 §0). The data core never references this module;
-/// not referencing it leaves the guard seam empty (structural no-op). Default <c>Mode=Off</c> → no-op.
+/// the posture options, registers the fail-closed tenant gate as a generic <see cref="IStorageGuard"/>
+/// contributor, and registers the invisible <c>__koan_tenant</c> <see cref="ManagedFieldDescriptor"/> the data
+/// core stamps on writes and filters on reads (DATA-0105 §0/§3b). The data core never references this module;
+/// not referencing it leaves both seams empty (structural no-op). Default <c>Mode=Off</c> / no tenant in scope →
+/// the descriptor is inert (its value provider returns <c>null</c>), so a non-tenant app is byte-identical.
 /// </summary>
 public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 {
@@ -24,6 +28,18 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     {
         services.AddKoanOptions<TenancyOptions>("Koan:Data:Tenancy");
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IStorageGuard, TenantStorageGuard>());
+
+        // The tenant managed field — the invisible shadow discriminator (no POCO property). The framework stamps
+        // it on every write inside a tenant scope and AND-folds it into reads; on an adapter that announces
+        // isolation (DataCaps.Isolation.RowScoped) it isolates, otherwise a tenant-scoped op fails closed. Inert
+        // (value null) outside a tenant scope, so [HostScoped] entities and unscoped/Off apps are unaffected.
+        ManagedFieldRegistry.Register(new ManagedFieldDescriptor(
+            StorageName: "__koan_tenant",
+            ClrType: typeof(string),
+            ValueProvider: static () => Tenant.Current?.Id,
+            AppliesTo: static t => !TenantScopeMetadata.IsHostScopedType(t),
+            RequiredCapability: DataCaps.Isolation.RowScoped,
+            Indexed: true));
     }
 
     public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
