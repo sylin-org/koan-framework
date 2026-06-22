@@ -209,11 +209,18 @@ implemented and its tests pass on real stores.
   get-by-id IDOR · cross-tenant upsert **takeover REJECTED** · scoped RemoveAll · `[HostScoped]` exempt · `[Cacheable]`
   cache-key partition · raw fail-closed · non-isolating-adapter (JSON) fail-closed · tenancy-OFF zero regression.
   Tenancy suite 23/23. **All 6 adversarial-review blockers closed.**
+- ✅ **PHASE 4 RELATIONAL FAN-OUT DONE** (`29d39e37`, Docker-verified) — the managed-field write-verify extended to
+  **Postgres + SqlServer** (read pushdown + Serialize injection already worked via the shared resolver). Both
+  announce `Isolation.RowScoped`: PG `ON CONFLICT … DO UPDATE … WHERE (<table>."Json" #>> '{field}') = @scope`
+  (table-qualified — the Docker run caught a real `Json is ambiguous` bug); SqlServer `MERGE … WHEN MATCHED AND
+  JSON_VALUE = @scope` (0 rows ⇒ reject). Shared generic oracle **`ManagedFieldNoLeak`** (AdapterSurface TestKit,
+  non-tenant) run per adapter: **Postgres 1/1 · SqlServer 1/1 on real containers** (isolation · IDOR · cross-scope
+  upsert-takeover REJECTED · scoped RemoveAll). **The relational trio (SQLite+PG+SqlServer) all enforce isolation.**
 - ☐ **NEXT:** Phase 3c schema-column DDL indexability (Indexed descriptors → computed/expression index; PG/SqlServer;
-  SQLite JSON-only) · Phase 4 fan-out (PG/SqlServer/Mongo `AssertNoTenantLeak` + per-adapter conflict-aware upsert +
-  Mongo BSON injection — needs Docker) · Phase 5 classification (2nd contributor module) + bare-store serialization +
-  in-memory managed `GetValue` · then control-plane keyed entities / sagas / erasure cert · ambient unification ·
-  Adapter Forge · Facet 4.
+  SQLite JSON-only) · Phase 5 classification (2nd contributor module, a Serialize-stage **field-transform** seam —
+  distinct from the managed-field *inject* seam — for encrypt/tokenize/mask) + Mongo/bare-store serialization
+  injection (legit phase-5 per memo §6) + in-memory managed `GetValue` · then control-plane keyed entities / state
+  machine / sagas / erasure cert · ambient unification · Adapter Forge · Facet 4.
 
 > Full per-area detail + the DATA-0105 review punch-list (must-fixes i–xi, upgrades A–D, opportunities):
 > memory **[[facet3-tenancy-design]]** (the anchor). Tenancy spec: [tenancy-design.md](./tenancy-design.md).
