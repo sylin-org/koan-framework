@@ -52,8 +52,17 @@ operations are not mode-invariant — each boot-reported.
 ### 2. The isolation mode ladder
 
 Four depths — deployment (silo, out of scope) / connection (db-per-tenant, modes 2–3 = one strategy) /
-schema (4a, native schema riding DATA-0104's `.` namespace) / row (4b, discriminator + filter + RLS).
+schema (4a, a native DB-engine schema qualifier) / row (4b, discriminator + filter + RLS).
 **Tenant never enters the table-name spine** (it would collide with DATA-0104's `-` separator).
+
+> **Erratum (2026-06-22, superseded by [DATA-0105](DATA-0105-storage-composition-contributor-pipeline.md) §1):**
+> this section originally read "4a, native schema riding DATA-0104's `.` namespace." That is wrong —
+> `StorageNameResolver.ReplaceDot` *flattens* the `.` to the adapter separator per adapter, so a tenant
+> cannot ride the dot as a name particle. **4a is a DB-engine schema qualifier resolved at the Route stage**
+> (`CREATE SCHEMA acme; acme.todo`), and it is **net-new Route machinery** — `AdapterResolver` returns only
+> `(Adapter, Source)` with no schema slot (Postgres `SearchPath` is the prototype; adapters without a schema
+> concept fail closed under a schema-isolation capability token). The "tenant never enters the table-name
+> spine" conclusion is unaffected.
 Placement is **per-tenant** (heterogeneous registry), changeable by a verb. Honest limit: the ladder makes
 substrate choice and movement cheap and visible; it does not repeal physics (pool fan-out, catalog bloat).
 

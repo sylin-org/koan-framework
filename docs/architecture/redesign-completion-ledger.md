@@ -56,9 +56,9 @@ as discovery warrants.
 | ARCH-0086 | `KoanModule` boot primitive (Facet 2) | ✅ Accepted |
 | [ambient-context-charter](./ambient-context-charter.md) | Facet-3 ambient truth-test (11 Laws) | ⚠️ charter only — **needs an Ambient-unification ADR** (collapse the 7 ambient mechanisms onto one carrier; tenancy rode `EntityContext` directly, the full unification is unbuilt) |
 | ARCH-0094 | The Adapter Forge | ✅ Accepted — **implement** (queued post-tenancy) |
-| ARCH-0095 | Tenancy | ✅ Accepted — **needs §2 erratum** (4a = Route schema-qualifier, not a name particle) |
-| **ARCH-0096** | Cross-pillar axis-composition primitive | ☐ **TO AUTHOR** (next) |
-| **DATA-0105** | Storage-composition contributor pipeline | ◐ Proposed draft (`fac4e719`) — **TO FINALIZE** (consume ARCH-0096; descriptor model; drop Key stage; must-fixes i–xi) |
+| ARCH-0095 | Tenancy | ✅ Accepted — **§2 erratum filed** (4a = Route schema-qualifier, not a name particle; net-new Route machinery) |
+| **ARCH-0096** | Identifier-composition primitive (anchor + ordered particles) | ✅ **Authored (Proposed)** — empirically-scoped: data+cache = the dogfood-2; vector already converged; jobs/blob = same-shape follow-ons; tenant = cache-key particle; `Koan.Core.Naming` home (layering verified acyclic) |
+| **DATA-0105** | Storage-composition contributor pipeline | ✅ **Finalized (Proposed, revised ×2)** — consumes ARCH-0096; descriptor-not-callback; **6 stages (Key dropped)**; 3 memo planes; sync applicators; must-fixes i–xi + upgrades A–D folded; 3-lens spot-check ship-ready |
 | **Classification** | The data-classification axis (`[Pii]`/`[Phi]`/`[Secret]`, layered policy) | ☐ **TO AUTHOR** — folded in ARCH-0095/tenancy-design today; it is a sibling capability and the pipeline's 2nd consumer → own ADR |
 | **Facet 4** | (undefined here) | ☐ **TO SCOPE** via side-discovery against [foundation-consolidation-plan.md](./foundation-consolidation-plan.md) → ADR(s) |
 
@@ -109,10 +109,18 @@ implemented and its tests pass on real stores.
 - ✅ **Pivot** to the storage-composition contributor pipeline; exhaustive inventory + memoization survey.
 - ✅ **DATA-0105** drafted + **two** full adversarial review rounds; **cross-pillar decision ratified** (full
   cross-pillar axis-composition primitive). **Design principles → [[koan-design-principles]].**
-- ◐ **Foundational ADRs** — DATA-0105 committed as a Proposed draft (`fac4e719`); **NEXT: author ARCH-0096 +
-  final-revise DATA-0105 + ARCH-0095 §2 erratum.**
-- ☐ Storage pipeline impl · tenancy=registration · classification · ambient unification · Adapter Forge ·
-  Facet 4 · cross-cutting completion.
+- ✅ **Foundational ADRs DONE** — empirical survey (6 Explores) re-grounded the cross-pillar scope (vector
+  already converged onto `StorageNameGenerator`; the real dogfood-2 is data-name + cache-key; a 5th instance
+  `JobTypeBinding.CoalesceKey` + blob-binding are same-shape follow-ons; tenant is a cache-key particle, not a
+  name particle). **ARCH-0096** authored (identifier-composition primitive, `Koan.Core.Naming`, descriptor
+  model, 3-plane memo, layering verified acyclic). **DATA-0105** finalized (6 stages, Key dropped, descriptor
+  model, all must-fixes i–xi + upgrades A–D). **ARCH-0095 §2 erratum** filed. 3-lens spot-check (coherence /
+  layering / adversarial-factual) = unanimous ship-ready, 0 blocking.
+- ◐ **NEXT: Phase 0a** — the extracted standalone memo/determinism fixes (`ProjectionResolver` Type-cache;
+  `IndexMetadata` determinism `:35` Guid group-key + `:41` Dict iteration, then Type-cache;
+  `AdapterNaming.GetOrCompute` no-cache fix; base-anchor split off partition) as green-ratchet commits.
+- ☐ Phase 0b pipeline model · write-stamp · name-particle · schema-column · tenancy=registration+SQLite proof ·
+  classification · ambient unification · Adapter Forge · Facet 4 · cross-cutting completion.
 
 > Full per-area detail + the DATA-0105 review punch-list (must-fixes i–xi, upgrades A–D, opportunities):
 > memory **[[facet3-tenancy-design]]** (the anchor). Tenancy spec: [tenancy-design.md](./tenancy-design.md).
