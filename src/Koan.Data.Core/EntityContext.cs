@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Koan.Cache.Abstractions.Policies;
 using Koan.Core.Hosting.App;
+using Koan.Data.Core.Tenancy;
 using Koan.Data.Core.Transactions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -42,6 +43,13 @@ public static class EntityContext
         public CacheBehavior? CacheBehavior { get; init; }
 
         /// <summary>
+        /// The ambient tenant slice (ARCH-0095). <c>null</c> = no tenant in scope (a tenant-scoped op fails
+        /// closed); <see cref="TenantContext.Host"/> = explicit host / control-plane scope; otherwise
+        /// scoped to a tenant. The isolation axis — distinct from <see cref="Partition"/> (the dataset axis).
+        /// </summary>
+        public TenantContext? Tenant { get; init; }
+
+        /// <summary>
         /// Transaction coordinator instance for deferred execution.
         /// Used by entity and vector operations to participate in transactions.
         /// </summary>
@@ -55,13 +63,15 @@ public static class EntityContext
         /// <param name="partition">Storage partition suffix (e.g., "archive")</param>
         /// <param name="transaction">Transaction name for coordination (e.g., "save-batch")</param>
         /// <param name="cacheBehavior">Per-request cache behavior override.</param>
+        /// <param name="tenant">Ambient tenant slice (ARCH-0095); null = no tenant in scope.</param>
         /// <exception cref="InvalidOperationException">Thrown when both source and adapter are specified</exception>
         public ContextState(
             string? source = null,
             string? adapter = null,
             string? partition = null,
             string? transaction = null,
-            CacheBehavior? cacheBehavior = null)
+            CacheBehavior? cacheBehavior = null,
+            TenantContext? tenant = null)
         {
             // Critical constraint: source and adapter are mutually exclusive
             if (!string.IsNullOrWhiteSpace(source) && !string.IsNullOrWhiteSpace(adapter))
@@ -73,6 +83,7 @@ public static class EntityContext
             Partition = partition;
             Transaction = transaction;
             CacheBehavior = cacheBehavior;
+            Tenant = tenant;
         }
 
         internal void ValidatePartitionName()
@@ -132,6 +143,7 @@ public static class EntityContext
     /// <param name="transaction">Transaction name for coordination; null inherits the ambient transaction when <paramref name="preserveTransaction"/> is true.</param>
     /// <param name="cacheBehavior">Per-request cache behavior override; null inherits the ambient behavior.</param>
     /// <param name="preserveTransaction">When true, retain the ambient transaction if one exists and no new transaction is specified.</param>
+    /// <param name="tenant">Ambient tenant slice (ARCH-0095); null inherits the ambient tenant. Pass <see cref="TenantContext.Host"/> to enter explicit host scope, or <see cref="TenantContext.For"/> to scope to a tenant.</param>
     /// <returns>Disposable that restores previous context on disposal</returns>
     /// <exception cref="InvalidOperationException">Thrown when source and adapter are both set on the effective context (directly or via inheritance), or when starting a transaction inside an existing one</exception>
     /// <exception cref="ArgumentException">Thrown when partition name is invalid</exception>
@@ -141,7 +153,8 @@ public static class EntityContext
         string? partition = null,
         string? transaction = null,
         CacheBehavior? cacheBehavior = null,
-        bool preserveTransaction = true)
+        bool preserveTransaction = true,
+        TenantContext? tenant = null)
     {
         var prev = _current.Value;
 
@@ -160,8 +173,9 @@ public static class EntityContext
             ? transaction ?? prev?.Transaction
             : transaction;
         var effectiveCacheBehavior = cacheBehavior ?? prev?.CacheBehavior;
+        var effectiveTenant = tenant ?? prev?.Tenant;
 
-        var newContext = new ContextState(effectiveSource, effectiveAdapter, effectivePartition, effectiveTransaction, effectiveCacheBehavior);
+        var newContext = new ContextState(effectiveSource, effectiveAdapter, effectivePartition, effectiveTransaction, effectiveCacheBehavior, effectiveTenant);
         // Fail fast on partition names that would NOT survive identifier sanitization unchanged — their lossy
         // character replacement could collide a distinct partition onto the same physical store (data bleed).
         // GUIDs and already-identifier-safe names pass; see PartitionNameValidator.
