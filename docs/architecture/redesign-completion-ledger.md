@@ -347,6 +347,29 @@ implemented and its tests pass on real stores.
     effective-value explainer · framework-axis invariants as a separate higher PLANE (Intune) · explicit-data
     precedence. §7d roadmap = graduated-enforcement · structural plane-split enforcement · durable-carrier ·
     revocation contract · time-boxed bootstrap credential · intent-scoped portal links. Additive, not a redesign.
+- ◐ **ENTITLEMENTS/TIERS (§8) + DELIGHT + SNAPVAULT DOGFOOD — DESIGN CAPTURED, build pending.**
+  - **Two more prior-art sweeps** (61 platforms): tier/quota CORE (`wf_7c331efc-09c`, 25) + entitlement DIMENSIONS
+    (`wf_9c953f4e-e6c`, 36) → `docs/architecture/tenancy-entitlements-findings.md`. Verdict: add the tier as ONE more
+    resolution layer (ABP Edition, "not a new subsystem"); the **moat** = Koan owns resolution (§7) AND enforcement
+    (§1b), the billing/auth incumbents punt on numeric-quota enforcement.
+  - **ARCH-0099 §8 authored** (entitlements & tiers): 8a tier-as-layer (`solution→tier→tenant→user`, tier-as-data,
+    versioned) · 8b typed KIND taxonomy · 8c declared numeric OPERATOR (Replace/MaxWith/Add/Pool, bound-on-lock,
+    independent-buckets-most-restrictive) · 8d metering ledger (limit⊕meter join, domain idempotency, local reserve
+    for hard caps, cache-limit-never-balance) · 8e enforce-at-chokepoint (Limitable, hard-admission-default,
+    observe-mode, hard-backstop) · 8f over-limit FREEZE-not-delete + never-lock-remediation · 8g deferred/single-
+    pending/RSoP-visible plan-change · 8h billing-decoupled (one grantor, gate-on-status) · 8i capacity≠quota +
+    seat/resource aggregation · 8j RSoP+audit extension.
+  - **5-persona DELIGHT harvest** (`wf_0d56fd46-7ae`) → `docs/architecture/tenancy-delight-synthesis.md`. Unanimous
+    flagship = "the cross-tenant leak you literally cannot write" (BUILT). The moat (4/5). **Honesty layer:** the
+    two highest-leverage delights (quota enforcement + erasure certificate) are DESIGNED-not-built; the **async-hop/
+    durable-carrier hole most threatens the flagship**. Delight-killer: never ship a proof artifact before its
+    fan-out is exhaustive.
+  - **SnapVault dogfood** — studied `samples/S6.SnapVault` (photo SaaS, single-tenant, no auth) →
+    `docs/architecture/snapvault-tenancy-proposal.md` (its domain IS the tier example; "add nothing to the
+    entities") + `docs/architecture/snapvault-conversion-plan.md` (the **break-and-rebuild** plan: dogfood +
+    framework-first-per-feature; the big break = in-memory worker → `Koan.Jobs` to close the async-hop hole).
+    SnapVault exposes 3 real framework gaps: vector(Weaviate) tenant-isolation, storage blob per-tenant prefix, the
+    async-hop carrier. **The conversion is the pull that orders the remaining tenancy build.**
 - ☐ **THEN:** Phase 3c schema-column DDL indexability (Indexed descriptors → computed/expression index; PG/SqlServer;
   SQLite JSON-only) + Mongo/bare-store managed serialization injection + in-memory managed `GetValue` · classification
   phases 4–7 (searchable blind-index · vector/messaging leak guards · crypto-shred+rotation · masked-read) · then
