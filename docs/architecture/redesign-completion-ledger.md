@@ -226,14 +226,19 @@ implemented and its tests pass on real stores.
   green post-change: SQLite 5 · PG 9 · SqlServer 19 · Mongo 21 · InMemory(data) 33 · Json 7 · Redis 3 ·
   InMemory(vector) 29 · Qdrant 35 · data-core 206 · cache 109 · tenancy 23. **The non-isolating adapters
   (Couchbase/Redis/Json/InMemory + all vector) FAIL CLOSED for a tenant-scoped entity — secure, never leaky.**
-- ◐ **CLASSIFICATION (ARCH-0098) IN PROGRESS** — phase 1 (facts foundation) LANDED `cc486781` (`[Classified]`/`[Pii]`…
-  + `ClassifiedFieldDescriptor`/`ClassifiedPropertyBag`/`ClassifiedFieldRegistry`, two-gate off-model, no crypto;
-  16/16 + 2 mutations killed + 222 data-core regression). ADR adversarially reviewed (`wf_6a0f0278-5b5`) +
-  amendments folded. The classification field-transform is a **write-stamp clone-then-encrypt + net-new read-reverse**
-  (NOT the Serialize-stage seam — that earlier framing is corrected in the ADR). **NEXT = phase 0** (priority field on
-  BOTH `IWriteStamp` + `ManagedFieldDescriptor`; expose the internal contributor interface; open `StorageWritePlan`,
-  behavior-preserving) → phase 2 (crypto seam in `Koan.Classification`) → phase 3 (write-stamp all-surfaces +
-  read-reverse + cache L2-exclusion gate).
+- ◐ **CLASSIFICATION (ARCH-0098) IN PROGRESS** — phases 1 + 0 LANDED, ADR reviewed (`wf_6a0f0278-5b5`) + amended:
+  - ✅ **Phase 1 (facts)** `cc486781` — `[Classified]`/`[Pii]`/`[Phi]`/`[Pci]`/`[Secret]` + `ClassificationCategory` +
+    `ClassifiedFieldDescriptor` (facts-only, no Kind) + `ClassifiedPropertyBag` + `ClassifiedFieldRegistry`
+    (two-gate off-model), no crypto; 16/16 + 2 mutations killed.
+  - ✅ **Phase 0 (open the slot)** `3e80e010` — `IWriteStamp` made public + `int Priority` (identity 0 / `[Timestamp]`
+    100); `WriteStampContributor` + `StorageWriteContributorRegistry` (off-gated, idempotent); `StorageWritePlan.Build`
+    stable-priority merge + memo-invalidation; `ManagedFieldDescriptor.Priority` + ordered `ManagedFieldRegistry`.
+    Behavior-preserving: data-core 233/233, tenancy 23/23, 2 mutations killed. The "one opening, two consumers" slot
+    is open. The field-transform is **write-stamp clone-then-encrypt + net-new read-reverse** (NOT a serialize hook).
+  - ☐ **NEXT = phase 2** (crypto seam in a new `Koan.Classification` module: `IKeyProvider` per-tenant + `DestroyKey` +
+    `GetForDecrypt`-by-owning-tenant, `IFieldCipher` AES-GCM count-aware, `IBlindIndex`, request-scoped plaintext map;
+    borrow the `IIssuerKeyStore` SHAPE, honor the §3a contract) → phase 3 (write-stamp all-surfaces incl. batch/CAS +
+    read-reverse below `Data.QueryWithCount` + cache L2-exclusion gate; exhaustive read-path coverage).
 - ☐ **THEN:** Phase 3c schema-column DDL indexability (Indexed descriptors → computed/expression index; PG/SqlServer;
   SQLite JSON-only) + Mongo/bare-store managed serialization injection + in-memory managed `GetValue` · classification
   phases 4–7 (searchable blind-index · vector/messaging leak guards · crypto-shred+rotation · masked-read) · then
