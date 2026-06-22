@@ -1,13 +1,13 @@
 ---
 type: ARCHITECTURE
 domain: core
-title: "Agent-Extensible Adapters (strategic brief)"
+title: "The Adapter Forge (strategic brief)"
 audience: [architects, ai-agents]
 status: draft
 last_updated: 2026-06-21
 ---
 
-# Agent-Extensible Adapters (strategic brief)
+# The Adapter Forge (strategic brief)
 
 > The structural answer to the **"owns-every-axis = adoption lock-in"** barrier surfaced unanimously by
 > the tenancy external review: make the framework able to **direct an agent to author a conformant
@@ -15,7 +15,7 @@ last_updated: 2026-06-21
 > Framework-wide (not tenancy-specific); the tenancy *external-infra delegation seam* is the pilot and
 > highest-stakes instance. Status: draft — emerged from the post-round-3 architect dialogue. A
 > distributable feedback request lives in
-> [agent-extensible-adapters-rfc.md](./agent-extensible-adapters-rfc.md).
+> [adapter-forge-rfc.md](./adapter-forge-rfc.md).
 
 ## 1. The thesis
 
@@ -34,11 +34,11 @@ an agent can **generate and verify** on demand.
 
 The tenancy review's unanimous fatal adoption barrier: a team wants Koan's tenancy/isolation but is
 mandated to run Pinecone vectors or an enterprise Kafka bus Koan does not own. Today that is "rip out
-your stack or walk away." With agent-extensible adapters:
+your stack or walk away." With the Adapter Forge:
 
 ```
 koan adapter new --seam vector --provider pinecone
-  → an agent reads the vector-seam Agentic Blueprint
+  → an agent reads the vector-seam Adapter Blueprint
   → writes the adapter
   → runs the conformance kit against a real Pinecone instance
   → GREEN = shippable
@@ -57,7 +57,7 @@ A developer, to their coding agent:
 The agent:
 
 1. **Finds the blueprint** — matches the fuzzy intent ("old Oracle," a legacy SQL database) to the right
-   Agentic Blueprint (*"How to connect to a legacy SQL database"*) from the blueprint catalogue.
+   Adapter Blueprint (*"How to connect to a legacy SQL database"*) from the blueprint catalogue.
 2. **Checks for an existing adapter first (reuse before build)** — the blueprint's *first* instruction:
    *"search NuGet (and the Koan adapter catalogue) for an existing adapter for this target."* If one
    exists — first-party, or a community-published, conformance-verified one — **reference it and you're
@@ -71,7 +71,7 @@ The agent:
    construction.
 5. **Builds a generic, conformant adapter** — not a hand-tuned Oracle adapter; a *correct* one that
    satisfies the obligations.
-6. **Proves it** — runs the surface-validation conformance kit against that same real instance.
+6. **Proves it** — runs the Conformance Gate against that same real instance.
    Green = shippable.
 
 The developer said one sentence and barely touched the keyboard; the agent did the safe, empirical,
@@ -107,7 +107,7 @@ behavioral conformance, never code review.** We guide the build and we prove the
 over tuned code or grade the source. Both stay implementation-agnostic (work for an agent- or hand-written
 adapter) and durable (don't rot as coding techniques change).
 
-### 3a. The Agentic Blueprint — a good-implementation-hygiene script
+### 3a. The Adapter Blueprint — a good-implementation-hygiene script
 
 The Blueprint *set* is a collection of **good-implementation-hygiene scripts** — one per adapter type —
 that encode the disciplined process a good engineer follows. That is precisely what an agent most needs
@@ -148,12 +148,12 @@ Each scripts the same hygiene:
    has*: isolate at the chokepoint; ACID where it claims transactions; push down what it announces; carry
    the ambient context; fail-closed; honor classification).
 5. **Check for gotchas** — review against the known pitfalls for this adapter type / target.
-6. **Test** — run the surface-validation conformance kit (§3b) against the real instance; green = shippable.
+6. **Test** — run the Conformance Gate (§3b) against the real instance; green = shippable.
 
 It **empowers** the author and enforces the *hygiene*; it does **not** dictate the optimal code. (A
 reference adapter may be included as an *example* of conformance — not "the one true way.")
 
-### 3b. The surface-validation tools — the objective gate
+### 3b. The Conformance Gate — the objective gate
 
 Tools that exercise the adapter's **observable surface** against a real instance and check it meets the
 contract + the Blueprint's obligations — **black-box-first** (for high-blast seams, augmented by a narrow
@@ -161,8 +161,8 @@ static lint + a review of the isolation-critical lines; §5). The Blueprint's *T
 is what makes "green = trust" real.
 
 **Prior art:** the Jakarta/Java **TCK (Technology Compatibility Kit)** — "implement the spec, pass the TCK
-to claim conformance." The **Agentic Blueprint** is the authoring guide + spec-of-goodness; the
-**surface-validation tools** are the TCK.
+to claim conformance." The **Adapter Blueprint** is the authoring guide + spec-of-goodness; the
+**Conformance Gate** is the TCK.
 
 ## 4. The keystone — the capability-driven conformance kit
 
@@ -258,7 +258,8 @@ defense-in-depth tiered by data-classification** (folded into §4–§5). The re
   written*, not the name; a human following the same script gets the same result); one judged "Agentic
   Blueprint" stellar. The *verifier* name "surface-validation tools" was unanimously clunky → **Conformance
   Kit / Conformance Gate**. The *capability* "agent-extensible adapters" → punchier as **the Adapter
-  Forge**. **Open for the architect** (low-stakes; concept is settled).
+  Forge**. **Settled by the architect: capability = the Adapter Forge · artifact = the Adapter Blueprint ·
+  verifier = the Conformance Gate** ("agentic" dropped for durability).
 - **Killer use, sharpened — the *procurement flip* / *substrate hot-swap*.** Not "connect to Oracle" but
   "connect to *our* Oracle" (the weird schema, no-DDL DBA — only the empirical probe handles *this*
   instance). The business framing: an enterprise demands "your data in *our* Azure tenant on Cosmos DB +
@@ -269,11 +270,11 @@ defense-in-depth tiered by data-classification** (folded into §4–§5). The re
 
 ## 7. Open questions
 
-- **Naming (resolved by the architect).** The *artifact* = the **Agentic Blueprint** — a per-adapter-type
-  authoring guide (research → ingredients → build → test → gotchas), parallel to **cards** (cards = how to
-  *use* a pillar; blueprints = how to *extend* it). The *verifier* = the **surface-validation tools /
-  conformance kit**; the *capability* = **agent-extensible adapters**. Framing settled; the RFC
-  sanity-checks the name with frontier models.
+- **Naming (settled).** The *capability* = **the Adapter Forge**; the *artifact* = the **Adapter Blueprint**
+  (one per adapter type — research → … → test — parallel to **cards**: cards = how to *use* a pillar,
+  blueprints = how to *extend* it); the *verifier* = the **Conformance Gate**. ("Agentic" was dropped for
+  durability — the agent-optimization is a property of *how* a blueprint is written, not the name.) The
+  decision record is **ADR ARCH-0094**.
 - **Human-in-the-loop per blast tier** — where exactly is sign-off mandatory?
 - **Capability pass-through** — how does an agent-built adapter announce a *provider-specific* capability
   the framework didn't anticipate (Pinecone-only feature), without a framework change? (The round-3

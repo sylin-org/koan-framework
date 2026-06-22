@@ -530,7 +530,7 @@ plaintext, by default). → fold into the tenancy-design classification section 
 ## The conformance kit + agent-extensible adapters (framework-wide thread)
 The round-3 **external-infra delegation seam** gets a companion *capability*: **agent-authored,
 conformance-gated adapters** — the structural answer to the unanimous "owns-every-axis lock-in" barrier.
-Captured in [agent-extensible-adapters.md](./agent-extensible-adapters.md) (+ a frontier-model RFC). The
+Captured in [adapter-forge.md](./adapter-forge.md) (+ a frontier-model RFC). The
 keystone is the **capability-driven conformance kit**: a capability token and its conformance module are
 **co-defined** ("no capability-lies" — over-claim fails green, structurally); four validation layers
 (honesty · surface · correctness-via-oracle · isolation-fuzz); real-store only (ARCH-0079). It's the

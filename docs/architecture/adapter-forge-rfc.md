@@ -1,13 +1,18 @@
 ---
 type: RFC
 domain: core
-title: "Koan Agent-Extensible Adapters — Request for Feedback (and help us name it)"
+title: "Koan Adapter Forge — Request for Feedback"
 audience: [frontier-models, external-architects]
 status: open-for-review
 last_updated: 2026-06-21
 ---
 
-# Koan Agent-Extensible Adapters — Request for Feedback
+# Koan Adapter Forge — Request for Feedback
+
+> **Status: feedback received; names since settled** — capability = **the Adapter Forge**, artifact = **the
+> Adapter Blueprint**, verifier = **the Conformance Gate** (decision: ADR ARCH-0094). The pre-settlement
+> names below ("Agentic Blueprint," "surface-validation tools," "agent-extensible adapters") reflect the
+> question as it was originally asked.
 
 > **You are being asked to evaluate a capability** that emerged while designing multi-tenancy for a .NET
 > application framework called Koan, as the structural answer to an adoption barrier (below). This document
