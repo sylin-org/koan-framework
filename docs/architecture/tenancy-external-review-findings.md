@@ -186,3 +186,120 @@ regenerated every build," which is the answer to the reviewers' "second-framewor
 
 **Next:** architect ratifies §4 (especially the residency fork §4d-21) → fold the adopted set into
 [tenancy-design.md](./tenancy-design.md) → then enforcement-mechanics detail (now anchored by P1/P6).
+
+---
+
+# Round 2 — deltas (3 more frontier reviews on the round-2 RFC)
+
+The round-2 RFC (the 6 corrections + 7 primitives + the classification mechanism) drew 3 more reviews.
+They validated the round-1 changes, demanded **3 further honesty corrections**, surfaced an **8th
+primitive** (a saga coordinator — the "fewer but more meaningful parts" answer to four ad-hoc sagas),
+**unanimously** crowned the **erasure certificate** as the flagship delight, and exposed the **deepest
+tension** (classification vs. the AI/vector pillar).
+
+## R2.1 — Unanimous (all 3 reviewers) — act on these
+
+| Finding | Type |
+|---|---|
+| **P5 is not one primitive — split it** (≥2: executor + fleet-orchestrator; the orchestrator is a saga; one reviewer says 3) | correction |
+| **The Erasure Certificate** — cryptographically-signed, per-axis counts, retention exceptions — is THE round-2 delight + the "why-Koan" artifact for regulated SaaS | delight |
+| **"Atomic cutover" / "saga" still hand-waves CAP** — Relocate needs a P3 write-suspend window (honest: "zero-downtime-read, blocked-to-write"); Erase needs a defined partial-failure path (no silent `Certify`) | correction |
+| **3D fleet compliance matrix** (Tenant × Region × Isolation × Classification + compliance status) | delight |
+
+## R2.2 — The 8th primitive: a saga/lifecycle coordinator (the key structural catch)
+
+Relocate, Erase, posture-migration, and schema-fan-out are **all sagas**, currently designed ad hoc.
+Name **P8 · saga coordinator** (phase gates, compensating actions, rollback policy) over the jobs
+ledger; the four lifecycle sagas compose from it. This is the round-1 "20→7 primitives" discipline
+applied to the corrections themselves. **Running count: 8 primitives (P1–P8) + 2 seams.**
+
+## R2.3 — Three more honesty corrections
+
+- **Relocate** "atomic cutover" → "a **P3 write-suspend (quiesce) window** during cutover;
+  zero-downtime-to-read, **blocked-to-write maintenance window**." No magic 2PC across substrates.
+- **Erase** → add a partial-failure resolution path: a `Verify`-fails terminal (`EraseFailedStuck`) with
+  a defined recovery (retry/re-queue the failed axis); never silently `Certify`. Erase is a one-way door.
+- **Same-DX** gains two more asterisks: "(1) migration DX is placement-aware; **(2) READ PERFORMANCE
+  scales with classification posture** (detokenization); **(3) cross-ENTITY operations** (joins,
+  multi-entity transactions) are **not mode-invariant** across substrates — boot-reported."
+
+## R2.4 — P5 split + the expand/contract correction
+
+- **P5a · migration executor** — apply one migration to one substrate; idempotent, resumable.
+- **P5b · fleet orchestrator** — ordering, canary gates, rollback policy, version-skew; a saga, composes P8.
+- **Version-skew REQUIRES expand/contract** (old+new schema run simultaneously). The framework must
+  either enforce/automate expand/contract OR **restrict v1 to additive migrations only** — else a
+  breaking change silently corrupts data mid-canary. **[ARCHITECT DECISION 1]**
+
+## R2.5 — Classification refinements (from the critique)
+
+- **Searchable-equality is first-class**, not "non-queryable by default": `[Pii, Searchable]` → auto
+  blind-HMAC index (login flows need it); `LIKE`/range honestly denied + boot-reported.
+- **Plaintext lives in a request-scoped identity map** (AsyncLocal, discarded at request end) — NEVER the
+  distributed cache (which would pull it into compliance scope); this also fixes the detokenization N+1
+  *within* a request. Batch-detokenize at the query chokepoint for result sets.
+- **Opaque high-entropy tokens default; FPE is explicit-flagged** (FPE leaks on small domain spaces).
+- **"Tokenized ≠ compliant"** (GDPR Recital 26: pseudonymized data is still PII for the *controller* who
+  holds the detokenization key; tokenization = blast-radius reduction + *processor* residency, NOT
+  controller-obligation elimination) — the boot report must say so.
+- **Soft-enforce relations crossing a classification boundary** (FK co-located → vaulted breaks DB
+  integrity); dangling tokens → graceful redaction, not a null-ref panic.
+- **Identity-PII residency = the identity's OWN home region** (distinct from tenant residency) — resolves
+  the multi-tenant-user conflict (a user in EU tenant A + US tenant B).
+- **Key management**: per-tenant keys; rotation is a P5b/P8 job via a **KMS adapter seam** (don't build a KMS).
+- **P4 Export/Import must define token handling on restore** (re-tokenize vs decrypt-on-export — cross-env
+  restore of tokens is an industry nightmare).
+
+## R2.6 — The deepest tension: classification × the AI/vector pillar  [ARCHITECT DECISION 2]
+
+Tokenized `[Phi]` can't be embedded (a token is semantically meaningless) → classification **excludes
+classified fields from the AI/semantic stack**, a real limitation given Koan owns AI. And
+`[ProjectedToHost]` analytics over classified fields needs a cross-region detokenization fan-out that
+**violates the very pinning it enforced.** Options: (a) exclude-by-default + boot-report (honest);
+(b) vault-side embedding (hard); (c) embed-plaintext, store the vector classification-aware (the vector
+is *derived* from PII — jurisdictionally debatable). **Lean: (a) exclude-by-default + an explicit
+`Embeddable` opt-in** that surfaces the jurisdictional implication.
+
+## R2.7 — Other new holes (adopt)
+
+- **Connection broker pool starvation** (P6): reset session state *without teardown* where possible
+  (DISCARD ALL / reset-reusable); teardown only on reset-failure.
+- **Audit/leak-siren cardinality DDOS**: a looping cross-tenant-write bug emits hundreds of siren events →
+  the security mechanism becomes an availability vector. **Rate-limit/aggregate** ("100 violations for
+  tenant X in 1s"); add the **call site** to the siren payload.
+- **Vector/search erase is slow** ("lingering ghost" — surgical delete from vector DBs is hard; fan-out
+  may take hours): the Erase certificate distinguishes synchronously-purged axes from
+  async-purging-with-ETA.
+- **Classification posture migration is itself a saga** (flip CoLocate→Isolate migrates millions of rows;
+  in-flight reads) — composes P8 + P5.
+
+## R2.8 — More round-2 delights (adopt)
+
+- **Compliance posture self-assessment in the boot report** ("HIPAA-compatible: PHI retained, PII
+  erasable, audit ON") — the magic-moment delight + the self-reporting principle.
+- **"Flip the config / compliance time-machine"** (Day-200 HIPAA via a config change + the
+  posture-migration saga).
+- **Context-aware auto-masking** (classification flows to *presentation*: admin sees masked, doctor sees
+  plaintext, integration sees token) — composes with the SEC-0004 `can:[]` projection.
+- **Classification drift detection** (plaintext lingering pre-migration → boot-report/health check).
+
+## R2.9 — Architect decisions surfaced (round 2)
+
+1. **Expand/contract vs additive-only migrations in v1** (version-skew correctness). *Lean:* additive-only
+   v1 + the canary refuses a detected-breaking change; expand/contract documented for breaking changes.
+2. **Classified × AI/vector** (exclude-by-default vs embed-plaintext-derived-vector). *Lean:*
+   exclude-by-default + explicit `Embeddable` opt-in.
+3. **P8 saga coordinator** as the 8th primitive. *Lean:* YES (the principled answer to four ad-hoc sagas).
+4. **Adoption surface / "Koan.Tenancy.Lite"** — does tenancy core (P1–P3, P7) work at the Koan.Data level,
+   multi-axis being additive value? *Lean:* YES, graceful layering, no separate SKU (consistent with
+   Reference = Intent — each pillar is opt-in).
+
+## R2.10 — Net (round 2)
+
+The design held; the reviews drove it toward honesty and surfaced the **8th primitive (saga coordinator)**
+as the unifying structure for the lifecycle sagas, plus the **erasure certificate** as the flagship
+regulated-SaaS delight (the artifact that turns "owns every axis" into auditor-grade proof). The
+classification mechanism is validated (sibling capability, seam + adapters, searchable-equality,
+request-scoped plaintext, opaque tokens) with one deep open tension (classification × AI). **Running:
+8 primitives (P1–P8) + 2 seams + 4 round-2 architect decisions.** Next: architect ratifies the round-2
+decisions + the accumulated round-1 negotiation → fold all into tenancy-design.md → enforcement mechanics.
