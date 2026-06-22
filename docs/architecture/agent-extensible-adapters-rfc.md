@@ -7,31 +7,39 @@ status: open-for-review
 last_updated: 2026-06-21
 ---
 
-# Koan Agent-Extensible Adapters — Request for Feedback (and help us name it)
+# Koan Agent-Extensible Adapters — Request for Feedback
 
-> **You are being asked to evaluate a capability and help name it.** It emerged while designing
-> multi-tenancy for a .NET application framework called Koan, as the structural answer to an adoption
-> barrier (below). This document is self-contained. We want your honest, adversarial evaluation — where
-> the idea breaks, what its trust model can't cover — **and** your help with naming, which we're
-> genuinely stuck on.
+> **You are being asked to evaluate a capability** that emerged while designing multi-tenancy for a .NET
+> application framework called Koan, as the structural answer to an adoption barrier (below). This document
+> is self-contained. We want your honest, adversarial evaluation — especially of the trust model. Two
+> boundaries we hold: **the *Agentic Blueprint* guides an author on *how to build* a good adapter
+> (research, ingredients, structure, the qualities of a good adapter, testing, gotchas) but does not
+> prescribe the *optimal/performant code* — that's craft; and verification is *black-box behavioral
+> conformance* — we validate what the adapter *does*, never the source.** Tell us where those boundaries
+> leak, and whether "verify the behavior, not the code" is a sufficient trust model.
 
 ---
 
 ## 0. What we're asking
 
-1. **Evaluate the capability (§2–§5).** Is "conformance-gated, agent-authored adapters" *sound*? Where
-   does it break? What can a green conformance kit still miss? Is the trust model adequate for the
-   high-blast-radius seams (the ones that, done wrong, leak data across tenants)?
-2. **Name it (§6) — the live ask.** We need a good name for **the artifact** (the per-seam thing an agent
-   consumes to build an adapter) and possibly **the capability** as a whole. Our candidates are weak.
-   Critique them; propose better.
-3. **Prior art.** What existing patterns/systems does this resemble (we know the Jakarta **TCK**; what
-   else?), and what can we steal from how they succeeded or failed?
-4. **The killer use / delight.** What's the single most compelling thing this unlocks — the "we have to
-   have this" moment for a team?
+1. **Pressure-test the boundaries (§2–§5).** The **Agentic Blueprint** guides *how to build* a good adapter
+   (research → ingredients → structure → qualities → test → gotchas) *without* prescribing the optimal
+   code; the **surface validation** checks the behavior meets the bar *without* reading the source. Is that
+   the right split? Is there a "good adapter" property that can't be taught as guidance and proven
+   black-box?
+2. **Stress the trust model.** The validator **never reads the code** — it behaviorally fuzzes the
+   *surface* against a real instance (for isolation: can tenant A reach tenant B through *any* verb?). Is
+   "verify the behavior, not the code" *sufficient* — especially for the **data adapter, which is the code
+   that enforces tenant isolation**? What class of defect passes a rigorous surface-validation and still
+   ships a cross-tenant leak?
+3. **Prior art.** Beyond the Jakarta **TCK**, what does this resemble, and what should we steal?
+4. **The killer use / delight — and a naming sanity-check (§6).** The single most compelling thing this
+   unlocks; and we've *landed* on names (the **Agentic Blueprint** = the authoring guide; the
+   **surface-validation tools** = the verifier; **agent-extensible adapters** = the capability) — tell us
+   if they're wrong.
 
-Reply structure: **(a)** soundness + holes · **(b)** the naming (artifact + capability, with reasoning) ·
-**(c)** prior art · **(d)** the killer use.
+Reply structure: **(a)** the WHAT/VERIFY/HOW boundary · **(b)** the surface-validation trust model + holes ·
+**(c)** prior art · **(d)** killer use + naming sanity-check.
 
 ---
 
@@ -60,7 +68,7 @@ by maintainer time but by **what an agent can generate and verify on demand:**
 
 ```
 koan adapter new --seam vector --provider pinecone
-  → an agent reads the vector-seam authoring guide  (§3)
+  → an agent reads the vector-seam Agentic Blueprint  (§3)
   → writes the adapter
   → runs the conformance kit against a real Pinecone instance  (§4)
   → GREEN = shippable; RED = the agent iterates
@@ -69,31 +77,57 @@ koan adapter new --seam vector --provider pinecone
 If this works, "owns every axis" becomes "**coordinates** every axis, and grows a new one on demand,"
 and the adoption barrier largely dissolves.
 
+**What it looks like for a developer.** They tell their coding agent: *"Connect to our solution's
+database — it's an old Oracle server, I think. Check Koan's blueprints for anything we can use."* The
+agent finds the legacy-SQL Blueprint, which scripts the process: **(1)** check NuGet / the catalogue for
+an existing adapter first (reuse before build); **(2)** if none, ask the user for a **limited-privilege**
+connection string; **(3)** probe the live instance to discover its real capabilities; **(4)** build a
+generic adapter announcing only the capabilities it confirmed; **(5)** prove it with the conformance kit
+against that instance. The developer said one sentence; the agent did safe, empirical, *verified* work.
+(Is that the killer use — or is there a bigger one?)
+
 ---
 
-## 3. The artifact — a per-seam authoring guide *(what we need to name)*
+## 3. The two deliverables — the Agentic Blueprint (build) and the surface validation (verify)
 
-A per-seam, agent-readable bundle of five things:
+We do **not** prescribe "the optimal/performant code" — that's the author's craft. We *guide the build*
+and we *verify the behavior*. The author owns the implementation.
 
-1. **The contract** — the interface(s) + the capability tokens the adapter may announce.
-2. **The invariants** — fail-closed; carry the ambient tenant; honor data classification; **never
-   fail-open**. Encoded as checks, not prose.
-3. **A reference adapter** — a worked exemplar to pattern-match against.
-4. **The conformance kit** — the objective acceptance gate (§4).
-5. **Seam-specifics** — e.g. for a vector adapter: how to carry the tenant into the collection namespace,
-   how to honor "this field is classified, don't embed it"; for messaging: tenant on the outbox/envelope,
-   strip classified fields before durable storage.
+**3a. The Agentic Blueprint — a per-adapter-type authoring guide.** The same way Koan ships *cards* (how
+to *use* a pillar), it ships an Agentic Blueprint per adapter type (how to *extend* a pillar by authoring
+an adapter): "How to build a Data adapter to a SQL database," "How to build an AI adapter," "How to
+connect to a legacy database," … Each walks an author through the lifecycle:
+- **Research** — how to investigate the target (API, capability/transaction/query model, limits); what to
+  look for and where.
+- **Ingredients** — the client libraries, dependencies, concepts, and the Koan contract (interface(s) +
+  the capability tokens it may announce).
+- **Build** — how to approach/structure it, and **what a good adapter has**: the obligations — *isolate at
+  the chokepoint; ACID where it claims transactions; push down what it announces; carry the ambient
+  context; fail-closed; honor classification.*
+- **Test** — how to verify it (run the surface validation, below).
+- **Gotchas** — the known pitfalls for this adapter type/target.
 
-We believe this resembles the Jakarta/Java **TCK (Technology Compatibility Kit)** — "implement the spec,
-pass the TCK to claim conformance" — combined with an *agent-targeted authoring guide.* Is that the right
-mental model?
+It empowers the author; it does not dictate the optimal code. (A reference adapter may be included as an
+*example* of conformance — not "the one true way.")
+
+**3b. The surface validation — behavioral conformance (§4).** Tools that exercise the adapter's
+*observable surface* against a real instance and check it meets the contract + the Blueprint's obligations
+— **never reading the implementation.**
+
+This resembles the Jakarta/Java **TCK (Technology Compatibility Kit)** — "implement the spec, pass the TCK
+to claim conformance." The Agentic Blueprint is the authoring guide + spec-of-goodness; the surface
+validation is the TCK. Is that the right mental model — and is there a "good adapter" property that
+*can't* be taught as guidance or verified black-box
+or verified black-box?
 
 ---
 
 ## 4. The keystone — the capability-driven conformance kit (why this isn't vibes-based codegen)
 
 The entire trust model rests here. An agent-generated adapter is only trustworthy because there's an
-**objective acceptance gate**, not human approval of plausible-looking code:
+**objective acceptance gate** — and crucially it is **black-box: it probes observable behavior against a
+real instance and never reads, lints, or reviews the implementation.** We verify what the adapter *does*,
+not how it's written:
 
 - **Capability-flag-driven.** The adapter announces a capability set; the harness runs **exactly** the
   conformance modules matching each flag; un-announced capabilities are **not** tested (you're judged only
@@ -132,38 +166,35 @@ Is blast-radius the right axis for tiering trust? Is there a better one?
 
 ---
 
-## 6. The naming problem (please help)
+## 6. Naming — a sanity-check (we've landed; tell us if we're wrong)
 
-We need a name for **the artifact** — the per-seam bundle (contract + invariants + reference +
-conformance kit + seam-specifics) that an agent consumes to build an adapter. Existing Koan lexicon uses
-*"skills"* (how agents learn to use it) and *"cards"* (API-truth docs), so the new term should slot
-beside those without colliding.
+Once we separated the *authoring guide* from the *verifier* (§3), the naming settled:
 
-Our candidates, and why each is imperfect:
+- **The Agentic Blueprint** — the per-adapter-type authoring guide (research → ingredients → build → test
+  → gotchas). It slots beside the existing Koan lexicon: **cards** = how to *use* a pillar; **Agentic
+  Blueprints** = how to *extend* a pillar (build an adapter for it). There is one per adapter type ("Data
+  adapter to a SQL database," "AI adapter," "legacy database," …).
+- **The surface-validation tools** (a.k.a. the conformance kit) — the behavioral verifier.
+- **Agent-extensible adapters** — the capability as a whole.
 
-| Candidate | For it | Against it |
-|---|---|---|
-| **Blueprint** | "a buildable spec" — accurate to the contract half | undersells the proof/conformance half |
-| **Playbook** | "step-by-step plays an actor executes" — fits *directing* an agent | undersells the contract + the test gate |
-| **Workbook** | implies the agent *does work* guided by it | "fill-in-the-blanks" connotation feels light |
-| **Rulebook** | captures the invariants (fail-closed) | undersells the build/proof |
-| **Handbook** | a craftsperson's manual; general | generic; doesn't signal the conformance gate |
-| **Codex** | authoritative, distinctive | maybe too grand |
-
-The hard part: the artifact is simultaneously **instruction + contract + proof**, and no common word
-captures all three. Is there a word (or a coinable Koan term) that does? And separately — is **"agent-
-extensible adapters"** the right name for the *capability*, or is there something sharper (the
-"self-extending framework," an "adapter forge," …)?
+Sanity-check us: does "Agentic Blueprint" read right for a full authoring guide that's parallel to cards?
+Is there a sharper name for the *capability* than "agent-extensible adapters"? Low-stakes now — the
+*concept* (guide the build, prove the behavior, never the optimal code or a code review) is what we want
+validated.
 
 ---
 
 ## 7. The asks, restated
 
-- **(a)** Is the capability sound? Where does it break? What can a green conformance kit still miss
-  (especially a cross-tenant security defect)? Is blast-radius tiering the right trust model?
-- **(b)** **Name it** — the artifact (§6) and the capability — with your reasoning.
+- **(a)** Are the two boundaries right — the Blueprint **guides the build** (research → ingredients →
+  structure → qualities → test → gotchas) but stops short of prescribing the *optimal code*, and the
+  verifier **proves the behavior** but never reads the source? Is there a "good adapter" property that
+  can't be taught as guidance or verified black-box?
+- **(b)** Is **surface validation a sufficient trust model** — does any class of defect pass a rigorous,
+  real-store, isolation-fuzzed surface-validation and still ship a cross-tenant leak? Where would you
+  *still* not trust an agent-authored data adapter even with a green kit?
 - **(c)** Prior art beyond the TCK; what to steal.
-- **(d)** The killer use — the single most compelling thing this unlocks.
+- **(d)** The killer use — the single most compelling thing this unlocks — and the naming sanity-check (§6).
 
 **Be specific and be hard on the trust model — an agent that writes the data adapter is writing the code
 that enforces tenant isolation. Thank you.**
