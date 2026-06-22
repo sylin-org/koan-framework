@@ -265,6 +265,11 @@ implemented and its tests pass on real stores.
     every write path incl. batch encrypts at rest [Blocker 1] · `[Cacheable]` no-stale-plaintext-after-shred [Blocker 3]
     · unclassified untouched). **3 security mutations killed** (no-read-reverse, no-encrypt-on-write, cache-exclusion-off).
     **Zero regression**: data-core 233 · tenancy 23 · sqlite-cache 2 · sqlite-connector 5 (off-gate byte-identical).
+    **Adapter fan-out DONE** (`a8273ebf`): a generic `FieldTransformRoundTrip` oracle (AdapterSurface TestKit, flag-gated
+    reversible wrap — observes at-rest without a per-adapter raw read) proves the round-trip on **Mongo (bare-store/BSON)
+    · Postgres (jsonb) · SqlServer ([Json])** via Docker — with SQLite that is **all four store families**. The transform
+    runs ABOVE the adapter, so adapter-universality (the §4 capability asymmetry — base path needs no adapter token) is
+    empirical, not asserted.
     Note: the phase-0 `IWriteStamp` contributor seam stays a generic in-place-stamp extension point (classification uses
     the new field-transform seam); the priority field was the load-bearing phase-0 deliverable.
 - ☐ **THEN:** Phase 3c schema-column DDL indexability (Indexed descriptors → computed/expression index; PG/SqlServer;
