@@ -30,7 +30,7 @@ internal sealed class DataCoreRuntimeFixture : IAsyncDisposable
 
     public FakeVectorService VectorService => _vectorService;
 
-    public static async Task<DataCoreRuntimeFixture> CreateAsync(bool includeSqlite = false)
+    public static async Task<DataCoreRuntimeFixture> CreateAsync(bool includeSqlite = false, IReadOnlyDictionary<string, string?>? extraSettings = null)
     {
         var root = Path.Combine(Path.GetTempPath(), "Koan-DataCore", Guid.CreateVersion7().ToString("n"));
         Directory.CreateDirectory(root);
@@ -47,6 +47,12 @@ internal sealed class DataCoreRuntimeFixture : IAsyncDisposable
         {
             sqlitePath = Path.Combine(root, "data.sqlite");
             settings["Koan:Data:Sqlite:ConnectionString"] = $"Data Source={sqlitePath}";
+        }
+
+        if (extraSettings is not null)
+        {
+            foreach (var kv in extraSettings)
+                settings[kv.Key] = kv.Value;
         }
 
         var vectorService = new FakeVectorService();

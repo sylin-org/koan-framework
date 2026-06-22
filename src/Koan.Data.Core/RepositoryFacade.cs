@@ -5,6 +5,7 @@ using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Core.Metadata;
+using Koan.Data.Core.Tenancy;
 
 namespace Koan.Data.Core;
 
@@ -30,11 +31,14 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     private readonly IDataRepository<TEntity, TKey> _inner;
     private readonly IAggregateIdentityManager _manager;
     private readonly TimestampPropertyBag _timestampBag;
+    private readonly TenantScopeMetadata _tenantScope;
+    private readonly ITenantEnforcer? _tenantEnforcer;
 
-    public RepositoryFacade(IDataRepository<TEntity, TKey> inner, IAggregateIdentityManager manager)
+    public RepositoryFacade(IDataRepository<TEntity, TKey> inner, IAggregateIdentityManager manager, ITenantEnforcer? tenantEnforcer = null)
     {
-        _inner = inner; _manager = manager;
+        _inner = inner; _manager = manager; _tenantEnforcer = tenantEnforcer;
         _timestampBag = new TimestampPropertyBag(typeof(TEntity));
+        _tenantScope = new TenantScopeMetadata(typeof(TEntity));
     }
 
     // ARCH-0084: forward the inner provider's unified capabilities (native IDescribesCapabilities,
@@ -47,6 +51,9 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     private async Task Guard(CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
+        // ARCH-0095 P1: fail-closed tenant gate at the chokepoint, BEFORE touching the store. No-op when
+        // tenancy is off (default) or the entity is [HostScoped]. Read-filter/write-stamp land in the next slice.
+        _tenantEnforcer?.Guard(typeof(TEntity), _tenantScope.IsHostScoped);
         await _inner.EnsureReady(ct);
     }
 
