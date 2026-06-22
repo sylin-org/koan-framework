@@ -316,12 +316,28 @@ implemented and its tests pass on real stores.
     only Owner, later claims ignored; `EnsureDevAsync` graduates the in-memory dev seed onto durable rows,
     idempotent). Durable seeding stays **lazy** (not at module `Start` — a multi-host test can leave a stale
     `AppHost.Current`). 72/72; 2 mutations killed.
-  - **▶ NEXT — 2c + step 3 (the WEB half):** a new **`Koan.Web.Tenancy`** connector (keeps `Koan.Tenancy`
-    web-free) exposing the tenancy admin endpoints (list/create tenants · list/add members · issue/accept/revoke
-    invites · switch tenant · posture+diagnostics), dev-gated by the same `IsActive(env)` as the auth TestProvider;
-    it lazily calls `TenantBootstrap.EnsureDevAsync` on first dev request. Then **step 3 = the Tenancy Dev Console**
-    page (TestProvider-styled, dev-only, a projection over those endpoints — never a backdoor). Model the connector
-    on `src/Connectors/Web/Auth/Test/` (StartupFilter + endpoint extensions + wwwroot static page).
+- ◐ **PORTAL + CONFIG-PLANE DESIGN CAPTURED (architect, 2026-06-22); build is the WEB half (NEXT).**
+  - **ARCH-0099 §6 reshaped** (`af9b624e`) — the web surface is **`Koan.Tenancy.Web`** (tenancy family, keeps
+    `Koan.Tenancy` web-free), **one project hosting the self-service SITE + the admin APIs**, **posture-governed**
+    (dev auto-opens, loopback = seeded Owner; **prod serves the same surface Owner-gated** — caller identity →
+    `Membership` → `koan:owner`; first claim via the bootstrap allowlist/token). A real shippable portal, not
+    dev-only. The site is a projection over the APIs (dogfood). (Renames the earlier `Koan.Web.Tenancy`.)
+  - **ARCH-0099 §7 added** (`29a8b100`) — **the tenant configuration plane**: §7a the governed-config primitive
+    (app declares typed key + default + **mutability lock**; layered resolution; locked overrides degrade
+    honestly — generalizes the ARCH-0098 classification lock); §7b framework-axis configs riding the same
+    governance with ENFORCED invariants (captured domains → `ITenantResolver`, DNS-TXT verified · registration
+    posture open/invite/domain → invite flow · auth providers → `Koan.Web.Auth` · classification posture →
+    ARCH-0098); §7c the governance lattice. Config-as-declaration discipline.
+  - **▶ NEXT (the WEB build) — 2c-1 scaffold `Koan.Tenancy.Web`:** csproj (`Microsoft.NET.Sdk`, refs
+    `Koan.Tenancy` + `Koan.Web` + `Koan.Core`; ASP.NET via Koan.Web transitive; `wwwroot/**` Content) + add to
+    `Koan.sln` · `KoanModule` registrar `[After(Koan.Web's registrar)]` (so `UseRouting` is in the pipeline) →
+    `AddKoanOptions<TenancyWebOptions>` (RouteBase `/.tenancy`) + register an `IStartupFilter` that
+    `UseEndpoints(MapGet/MapPost …)` · `GET /.tenancy/api/diagnostics` (posture from `TenancyRuntime` + dev state
+    from `TenancyDevState`) · lazy `TenantBootstrap.EnsureDevAsync` on first dev request. **Mirror
+    `src/Connectors/Web/Auth/Test/`** (csproj + `Initialization/KoanAutoRegistrar` [`AddKoanControllersFrom` or
+    minimal endpoints] + `Hosting/*StartupFilter` + `wwwroot/`). Then **2c-2** (caller-identity resolver + Owner
+    authz gate + read endpoints), **2c-3** (mutation endpoints w/ authz), **step 3** (the site page, model
+    `src/Connectors/Web/Auth/Test/wwwroot/testprovider-login.html`). Web tests = TestServer/WAF (ARCH-0091).
 - ☐ **THEN:** Phase 3c schema-column DDL indexability (Indexed descriptors → computed/expression index; PG/SqlServer;
   SQLite JSON-only) + Mongo/bare-store managed serialization injection + in-memory managed `GetValue` · classification
   phases 4–7 (searchable blind-index · vector/messaging leak guards · crypto-shred+rotation · masked-read) · then
