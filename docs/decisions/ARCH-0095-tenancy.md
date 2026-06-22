@@ -82,14 +82,27 @@ connection broker (+ credential/KMS seam) · **P7 isolation test-kit (= the Conf
 incarnation, ARCH-0094)** · **P8 saga coordinator (internal-only** — orchestrates only the idempotent,
 compensable framework primitives P3/P4/P6, carries no user logic; each saga owns its own consistency
 semantics, which is the anti-leak boundary; the dev surface stays `Tenant.Erase()`, never `ISaga.Step()`).
-Each dogfoods an existing pillar. The **tenancy kernel** (P1–P3 + P7 at `Koan.Data`) is a named, tested
-config delivering ~80% of the value; the **Magic Cliff** is documented — the flagship async-hop guarantee
-needs `Koan.Jobs` + `Koan.Messaging`. Adoption is graceful layering, **no separate SKU**.
+Each dogfoods an existing pillar. The **tenancy kernel** (P1–P3 + P7) is delivered by **referencing the
+`Koan.Tenancy` module** — a Reference = Intent module that depends only on `Koan.Data.Core` and registers the
+tenant contributors into the generic storage-pipeline seams (§5, DATA-0105 §0). It is a *module*, not a *SKU*:
+"no separate SKU" means no paid/feature tier, not "tenancy code lives in the data core" — it explicitly does
+**not** (the data core is tenancy-agnostic; a grep for "tenant" in `Koan.Data.Core` returns nothing). The
+**Magic Cliff** is documented — the flagship async-hop guarantee needs `Koan.Jobs` + `Koan.Messaging`. Adoption
+is graceful layering.
+
+The **developer surface lives in `Koan.Tenancy`**, not the data core: the `TenantContext` ambient slice
+(ARCH-0097), the accessors `Tenant.Current` / `Tenant.Use(id)` / `Tenant.None()`, the `.WithTenant(…)`
+extension, and the `[HostScoped]` opt-out are all the module's — built on the data core's generic
+`EntityContext.WithSlice`/`GetSlice` carrier.
 
 ### 5. Enforcement at the chokepoint — the empirically-verified seam
 
 Enforcement is the charter's law L8 (leaks structurally impossible at the lowest framework-owned layer).
-The seam was re-derived from the data-core code and verified directly (not assumed):
+**The enforcement lives in `Koan.Data.Core` as generic, tenancy-agnostic seams — `IStorageGuard` (the
+fail-closed pre-op check), `IWriteStamp` (the discriminator stamp), and the read-filter seam — into which
+`Koan.Tenancy` registers contributors (DATA-0105 §0).** The data core invokes "the registered guards / stamps /
+filters"; it never names a tenant. The seam was re-derived from the data-core code and verified directly (not
+assumed):
 
 - **P1 read-filter + write-guard ⇒ `RepositoryFacade<TEntity,TKey>`** (`src/Koan.Data.Core/RepositoryFacade.cs`).
   It is the **single universal chokepoint**: every read (`Get`/`GetMany`/`Query`/`Count`/`QueryRaw`/`CountRaw`)
@@ -98,8 +111,10 @@ The seam was re-derived from the data-core code and verified directly (not assum
   `DataService.GetRepository()`). Writes already stamp ID + `[Timestamp]` (lines 107–108), so the tenant
   **stamp-and-verify** slots into the existing write pattern. The read-filter injects the tenant predicate
   into `QueryDefinition` for `Query`/`Count`, and is a **post-fetch ownership check** for the key-based
-  `Get`/`GetMany`/`Delete`. Implementation: a new injected `ITenantGuard<TEntity,TKey>` invoked in `Guard`
-  and at the write/read boundaries.
+  `Get`/`GetMany`/`Delete`. Implementation: `Koan.Tenancy` registers a `TenantStorageGuard : IStorageGuard`
+  (the fail-closed gate — it computes `[HostScoped]` and reads `Tenant.Current` itself) plus the tenant
+  write-stamp and read-filter contributors; the facade invokes the registered seams generically and never
+  names a tenant.
 - **The shared-schema discriminator is an invisible, framework-managed shadow field** (ratified). A
   tenant-scoped entity carries no tenant property on its POCO (secure-by-default, can't-forget, charter L8);
   the adapter persists/filters a hidden discriminator at the storage layer, driven by the ambient tenant.
@@ -199,12 +214,18 @@ database.
 
 ## Implementation plan (phased TDD — ARCH-0079 real-store spec + mutation check each step)
 
-1. **Ambient `Tenant` slice** — generalize `EntityContext`'s `ContextState` with a `Tenant` routing
-   dimension and the `Tenant.Current/Use/None` surface (charter carrier; restore-on-dispose; fail-closed).
-2. **P1 chokepoint guard** — `ITenantGuard<TEntity,TKey>` in `RepositoryFacade`: read-filter
-   (predicate-into-`QueryDefinition` + post-fetch ownership check) + write stamp-and-verify; fix-naming
-   fail-closed error; `[AllowUnscopedWrite]` escape; the RLS backstop named. **This is the Conformance
-   Gate's first incarnation (ARCH-0094 P7)** — ship `AssertNoTenantLeak` + the property-based fuzz with it.
+0. **Decouple (prerequisite).** Make the data core tenancy-agnostic: the **axis-generic ambient carrier**
+   (ARCH-0097 — `EntityContext.WithSlice`/`GetSlice`, no `tenant` field) and the **generic seams**
+   (`IStorageGuard`, the read-filter seam) in `Koan.Data.Core`; create the **`Koan.Tenancy` module** and move
+   `TenantContext`/`Tenant`/`TenancyMode`/`TenancyOptions`/`[HostScoped]`/the gate into it. (The shipped
+   slices 1a/1b put these *in* the data core; this slice extracts them.)
+1. **Ambient `Tenant` slice (in `Koan.Tenancy`)** — `TenantContext` over the generic carrier + the
+   `Tenant.Current/Use/None` + `.WithTenant` surface (restore-on-dispose; fail-closed).
+2. **P1 chokepoint guard** — `Koan.Tenancy`'s `TenantStorageGuard : IStorageGuard` (registered, discovered)
+   + the tenant read-filter (predicate-into-`QueryDefinition` + post-fetch ownership check) + write
+   stamp-and-verify contributors; fix-naming fail-closed error; `[AllowUnscopedWrite]` escape; the RLS
+   backstop named. **This is the Conformance Gate's first incarnation (ARCH-0094 P7)** — ship
+   `AssertNoTenantLeak` + the property-based fuzz with it.
 3. **P2 state machine + P3 Suspend-as-quiesce** at the chokepoint.
 4. **P6 connection broker** — tenant→source resolution above `AdapterResolver`'s `Source` priority;
    `ICredentialProvider` seam; guaranteed pool session reset (fail-the-process); honest boot-report limits.

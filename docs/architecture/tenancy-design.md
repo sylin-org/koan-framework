@@ -14,6 +14,17 @@ validation:
 
 # Koan Tenancy — Design (Facet 3 flagship slice)
 
+> **Packaging (canon, 2026-06-22).** Tenancy ships as a **separate `Koan.Tenancy` module**, not as code in
+> `Koan.Data.Core`. The data core exposes **generic, tenancy-agnostic seams** — the axis-generic ambient carrier
+> ([ARCH-0097](../decisions/ARCH-0097-axis-generic-ambient-carrier.md)) and the storage-pipeline contributor
+> seams (`IStorageGuard` / `IWriteStamp` / read-filter / schema-column / particle,
+> [DATA-0105 §0](../decisions/DATA-0105-storage-composition-contributor-pipeline.md)). `Koan.Tenancy` **provides
+> the contributors** and **owns the developer surface** (`TenantContext`, `Tenant.Use`/`Tenant.None`/
+> `Tenant.Current`, `.WithTenant`, `[HostScoped]`). **Reference = Intent**: referencing `Koan.Tenancy` lights
+> tenancy up; not referencing it leaves the seams empty (structural no-op). A grep for "tenant" in
+> `Koan.Data.Core` returns nothing — that invariant is the conformity guarantee. Everything below describes the
+> tenancy *behaviour*; read the module boundary onto it.
+
 > **What this is.** The implementation-ready design for first-class multi-tenancy in Koan, after a
 > three-round external review (three frontier models per round) plus a four-persona delight harvest —
 > unanimous verdict: **ship the ADR**. Tenancy is the **flagship typed slice** of the Ambient primitive

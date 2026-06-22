@@ -54,7 +54,8 @@ as discovery warrants.
 |---|---|---|
 | ARCH-0084 | Unified capability model (Facet 1) | ✅ Accepted |
 | ARCH-0086 | `KoanModule` boot primitive (Facet 2) | ✅ Accepted |
-| [ambient-context-charter](./ambient-context-charter.md) | Facet-3 ambient truth-test (11 Laws) | ⚠️ charter only — **needs an Ambient-unification ADR** (collapse the 7 ambient mechanisms onto one carrier; tenancy rode `EntityContext` directly, the full unification is unbuilt) |
+| [ambient-context-charter](./ambient-context-charter.md) | Facet-3 ambient truth-test (11 Laws) | ⚠️ charter only — the full 7-mechanism unification is future; the **load-bearing typed-slice carrier is now ARCH-0097** |
+| **ARCH-0097** | The axis-generic ambient carrier (typed slices) | ✅ **Authored (Proposed)** — `EntityContext.WithSlice`/`GetSlice`; cross-cutting axes (tenant, classification) ride as registered slices from their own modules, not named data-core fields. The decoupling prerequisite for `Koan.Tenancy`. |
 | ARCH-0094 | The Adapter Forge | ✅ Accepted — **implement** (queued post-tenancy) |
 | ARCH-0095 | Tenancy | ✅ Accepted — **§2 erratum filed** (4a = Route schema-qualifier, not a name particle; net-new Route machinery) |
 | **ARCH-0096** | Identifier-composition primitive (anchor + ordered particles) | ✅ **Authored (Proposed)** — empirically-scoped: data+cache = the dogfood-2; vector already converged; jobs/blob = same-shape follow-ons; tenant = cache-key particle; `Koan.Core.Naming` home (layering verified acyclic) |
@@ -136,11 +137,31 @@ implemented and its tests pass on real stores.
   composition** (tenant ≠ name particle; tenant-in-cache-key is a phase-4 coherence concern via the cache
   template engine — a different shape, bundled there). So **cache-key delegation is deferred to phase 4** and the
   critical path is the `IStorageContributor` pipeline.
-- ◐ **NEXT: the DATA-0105 `IStorageContributor` descriptor pipeline** (model + base: descriptor interface,
-  Type-plane plan memoization, structural closure, deterministic ordering, `OFF=structurally-absent` +
-  `IsInvariantOnly` fast path) **+ phase 1 write-stamp re-home** (identity + `[Timestamp]`; delete the inline
-  `RepositoryFacade` calls; preserve the `BatchFacade` no-timestamp invariant).
-- ☐ Phase 3 schema-column · 4 tenancy=registration (+ cache-key/tenant particle) + SQLite `AssertNoTenantLeak`
+- ✅ **Phase 1 write-stamp re-home DONE** (`6df31235`) — the Write-stamp stage is now a per-type memoized
+  `StorageWritePlan` (the seam tenant registers on in phase 4): `IWriteStamp` + `IdentityWriteStamp` +
+  `TimestampWriteStamp` (reuses `TimestampPropertyBag`). `RepositoryFacade` applies the plan; deleted the inline
+  `EnsureIdAsync`/`UpdateTimestamp` calls + the facade's manager dependency (both ctor sites updated). The
+  `BatchFacade` no-timestamp invariant is now **structural** (`TimestampWriteStamp.AppliesInBatch = false`).
+  id-gen unified into `AggregateIdentity.Ensure` (shared with the transaction-path manager — can't drift).
+  Behaviour-identical: 7 white-box specs (incl. the batch invariant); data-core **197/197**.
+  *Empirical note:* write-stamp + read-filter are **chokepoint** concerns (one place); the genuinely
+  **per-adapter** value is the **schema-column** seam (phase 3) — where the tenant discriminator joins DDL.
+- ⚠️ **ARCHITECT CORRECTION (2026-06-22): tenancy must be a separate `Koan.Tenancy` module.** Slices 1a/1b put
+  tenancy code *in* `Koan.Data.Core`; I then spread a reference into `AggregateConfig` (reverted, `a9ba7417`).
+  Decision: **full extraction now** — the data core exposes generic tenancy-agnostic seams (the contributor
+  pattern); `Koan.Tenancy` provides the contributors + owns the developer surface (`.WithTenant` etc.).
+  **Docs realigned to canon** (this commit): **ARCH-0097** (axis-generic carrier) authored; **DATA-0105 §0**
+  defines the contributor pattern + where contributors live (modules); **ARCH-0095** reframes the kernel as the
+  `Koan.Tenancy` module + the `IStorageGuard`/contributor seam; tenancy-design.md packaging callout.
+- ◐ **NEXT: the `Koan.Tenancy` extraction** (A axis-generic carrier `EntityContext.WithSlice`/`GetSlice` →
+  B generic `IStorageGuard` seam on the facade → C create `Koan.Tenancy`, move all tenancy code, rewire to the
+  generic slice + guard seams → D `Koan.Tenancy` auto-registrar (Reference=Intent), de-register from the data
+  core → E move tenancy specs + green-ratchet; invariant: a `Koan.Data.Core` grep for "tenant" returns nothing).
+- ☐ **THEN Phase 3 schema-column contributor** — `RelationalSchemaOrchestrator` (+ `ProjectionResolver`)
+  consult column descriptors so a contributor (tenant in phase 4) can add a column to the DDL + the projection;
+  converge `[Column]`/property-`[StorageName]` and `[NotMapped]`/`[IgnoreStorage]`. The genuinely per-adapter seam.
+- ☐ Phase 4 tenancy=registration (`TenancyContributor`: Route 4a / Schema column 4b / write-stamp / two-shaped
+  read-filter; subsume `ITenantEnforcer` same slice; + cache-key/tenant particle) + SQLite `AssertNoTenantLeak`
   proof · 5 classification · ambient unification · Adapter Forge · Facet 4 · cross-cutting completion.
 
 > Full per-area detail + the DATA-0105 review punch-list (must-fixes i–xi, upgrades A–D, opportunities):

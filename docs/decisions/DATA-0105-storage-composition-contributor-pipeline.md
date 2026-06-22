@@ -3,8 +3,8 @@
 **Status**: Proposed (2026-06-22) — *revised twice after adversarial review; this version adopts the **descriptor-not-callback** model, **consumes ARCH-0096** for the Name stage, **drops the Key stage** (cache-key composition is a cache-pillar concern), and folds in the second-review corrections.*
 **Date**: 2026-06-22
 **Deciders**: Enterprise Architect
-**Scope**: Converge the data core's *latent, hardcoded* storage-composition pipeline — the stages every entity operation already flows through (**Route → Name → Schema → Write-stamp → Serialize → Read-filter**) — onto **one discoverable contributor seam**, and re-home today's bespoke cross-cutting concerns (partition, identity, timestamps, indexes, projections) as the *built-in* contributors that prove it. The trigger is tenancy (ARCH-0095); without this, tenancy and classification each force per-adapter bespoke code. Binding constraint: **layered memoization** — every stable substructure (schemas above all) is memoized at the deepest plane where it is stable and never recomputed per op; a contributor returns an **immutable descriptor**, never a per-op callback.
-**Related**: **ARCH-0096** (the identifier-composition primitive — the Name stage *delegates* to it; cache-key composition lives there, not here) · **ARCH-0095** (tenancy — the first real consumer; **this ADR supersedes ARCH-0095 §2's "4a rides the `.` namespace" — see §1**) · **DATA-0104** (storage-name grammar — the anchor this preserves) · **ARCH-0084** (capability model — the negotiation this *extends*) · **ARCH-0086** (`KoanModule`/`[KoanDiscoverable]`/`KoanRegistry` — discovery) · **ARCH-0094** (the Adapter Forge — the pipeline gives the Conformance Gate *one structural check*, not the whole contract) · the [Ambient Context Charter](../architecture/ambient-context-charter.md) (typed slices) · **[koan-design-principles]**.
+**Scope**: Converge the data core's *latent, hardcoded* storage-composition pipeline — the stages every entity operation already flows through (**Route → Name → Schema → Write-stamp → Serialize → Read-filter**) — onto **one discoverable contributor seam**, and re-home today's bespoke cross-cutting concerns (partition, identity, timestamps, indexes, projections) as the *built-in* contributors that prove it. **The seams are tenancy-agnostic and live in `Koan.Data.Core`; cross-cutting concerns that are *not* intrinsic to the data core (tenancy, classification) provide their contributors from their *own modules* (`Koan.Tenancy`, …) under Reference = Intent — the data core never names them (§0).** The trigger is tenancy (ARCH-0095); without this, tenancy and classification each force per-adapter bespoke code *inside the data core*. Binding constraint: **layered memoization** — every stable substructure (schemas above all) is memoized at the deepest plane where it is stable and never recomputed per op; a contributor returns an **immutable descriptor**, never a per-op callback.
+**Related**: **ARCH-0096** (the identifier-composition primitive — the Name stage *delegates* to it; cache-key composition lives there, not here) · **ARCH-0097** (the axis-generic ambient carrier — a contributor reads declared ambient *slices*, and a cross-cutting axis like tenant rides as a slice from its own module) · **ARCH-0095** (tenancy — the first *external contributor module* (`Koan.Tenancy`); **this ADR supersedes ARCH-0095 §2's "4a rides the `.` namespace" — see §1**) · **DATA-0104** (storage-name grammar — the anchor this preserves) · **ARCH-0084** (capability model — the negotiation this *extends*) · **ARCH-0086** (`KoanModule`/`[KoanDiscoverable]`/`KoanRegistry` — discovery, incl. cross-module) · **ARCH-0094** (the Adapter Forge — the pipeline gives the Conformance Gate *one structural check*, not the whole contract) · **[koan-design-principles]**.
 
 ---
 
@@ -19,6 +19,41 @@ Two adversarial review rounds validated the structure and corrected the specific
 ---
 
 ## Decision
+
+### 0. The contributor pattern — generic seams in the data core; contributors from modules
+
+This is the load-bearing shape, stated once. **`Koan.Data.Core` owns a set of generic, tenancy-agnostic
+*seams*; modules register *contributors* into them.** The data core never names tenancy, classification, or any
+other cross-cutting concern — it only knows the seams.
+
+**The seams (all in `Koan.Data.Core`, tenancy-agnostic):**
+
+| Seam | Stage | Shape | First built-ins | First *external* contributor |
+|---|---|---|---|---|
+| **`IParticleFormatter` / particle** (ARCH-0096) | Name (+ cache Key) | a name/key particle | partition | tenant (cache key only) |
+| **`IStorageGuard`** | (pre-op) | fail-closed check at the chokepoint; throw to block | — | tenant gate (`Koan.Tenancy`) |
+| **`IWriteStamp`** (`StorageWritePlan`) | Write-stamp | sync entity/record mutation | identity, `[Timestamp]` | tenant discriminator |
+| **(read-filter seam)** | Read-filter | predicate + post-fetch ownership check | — | tenant filter |
+| **(schema-column contributor)** | Schema | a column added to DDL + projection | — | tenant discriminator column |
+| **(route qualifier)** | Route | a schema qualifier | — | tenant 4a schema |
+| **typed slice** (ARCH-0097) | ambient | a registered ambient axis (read by contributors) | — | `TenantContext` |
+
+**Where contributors live.** Intrinsic concerns (identity, `[Timestamp]`, partition, projections, indexes) are
+**built-in** contributors shipping inside `Koan.Data.Core`. Cross-cutting concerns that are *not* the data core's
+business — **tenancy** and **classification** — ship their contributors from their **own modules** (`Koan.Tenancy`
+is the first). A module:
+
+1. **defines its ambient slice** (e.g. `TenantContext`, ARCH-0097) and its **developer surface** (`Tenant.Use`,
+   `.WithTenant`, `[HostScoped]`) — *not* the data core;
+2. **registers its contributors** (`IStorageGuard`, `IWriteStamp`, read-filter, schema-column, particle) via
+   `[KoanDiscoverable]` / its `KoanAutoRegistrar` — discovered across modules (ARCH-0086);
+3. is **Reference = Intent**: referencing the module lights the concern up; **not referencing it = the seam is
+   empty = no-op** (structural absence, no per-op "is tenancy on?" branch in the data core).
+
+So the "tenancy kernel" is not tenancy code *in* `Koan.Data.Core`; it is **`Koan.Tenancy` referenced** (it
+depends on `Koan.Data.Core` and registers the contributors). The data core compiles, tests, and ships with **zero
+knowledge of tenancy** — that is the conformity-by-design invariant this ADR exists to guarantee, and the property
+the implementation must hold (a data-core grep for "tenant" returns nothing but seam-agnostic names).
 
 ### 1. The six stages (and the two corrections review forced)
 
