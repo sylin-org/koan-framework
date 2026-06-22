@@ -60,7 +60,7 @@ as discovery warrants.
 | ARCH-0095 | Tenancy | ✅ Accepted — **§2 erratum filed** (4a = Route schema-qualifier, not a name particle; net-new Route machinery) |
 | **ARCH-0096** | Identifier-composition primitive (anchor + ordered particles) | ✅ **Authored (Proposed)** — empirically-scoped: data+cache = the dogfood-2; vector already converged; jobs/blob = same-shape follow-ons; tenant = cache-key particle; `Koan.Core.Naming` home (layering verified acyclic) |
 | **DATA-0105** | Storage-composition contributor pipeline | ✅ **Finalized (Proposed, revised ×2)** — consumes ARCH-0096; descriptor-not-callback; **6 stages (Key dropped)**; 3 memo planes; sync applicators; must-fixes i–xi + upgrades A–D folded; 3-lens spot-check ship-ready |
-| **ARCH-0098** | The data-classification axis (`[Pii]`/`[Phi]`/`[Pci]`/`[Secret]`, layered policy, field-transform + crypto) | ✅ **Authored (Proposed)** — empirically grounded (side-discovery `wf_c4cb6674-564`): a **POCO-property value-transform** (write-stamp encrypt-in-place at the adapter-agnostic chokepoint + a **net-new read-reverse**) — NOT a serialize hook; a **sibling** `ClassifiedFieldRegistry`/`IFieldTransform` (round-trip, property-keyed) distinct from the managed-field registry (inject, one-way); greenfield crypto on the `IIssuerKeyStore` template (`IKeyProvider`+`IFieldCipher`+`IBlindIndex`+`DestroyKey` crypto-shred → erasure cert); KMS behind the Adapter-Forge external-infra seam. One contributor umbrella: the `StorageWritePlan` slot serves tenancy + classification (one opening, two consumers). 7-phase plan; impl pending (deserves fresh context — crypto + the net-new read-reverse). |
+| **ARCH-0098** | The data-classification axis (`[Pii]`/`[Phi]`/`[Pci]`/`[Secret]`, layered policy, field-transform + crypto) | ✅ **Accepted (review-amended; phase 1 LANDED `cc486781`)** — side-discovery `wf_c4cb6674-564` + adversarial review `wf_6a0f0278-5b5` (RATIFIABLE-WITH-AMENDMENTS, 9 verified HIGH+ findings folded): a **POCO-property value-transform** (write-stamp **clone-then-encrypt** at the adapter-agnostic chokepoint — covering batch `AppliesInBatch` + `ConditionalReplaceAsync` — + a **net-new read-reverse** below `Data.QueryWithCount`) — NOT a serialize hook; a **sibling** `ClassifiedFieldRegistry`/`IFieldTransform` (round-trip, property-keyed, two-gate off-model) distinct from the managed-field registry (inject, one-way); greenfield crypto on the `IIssuerKeyStore` *shape* + §3a contract (retiring-key retention · owning-tenant decrypt · count-aware nonce budget · KMS-not-DP master-wrap · tenant-local blind-index → erasure cert); cache=L2-exclusion phase-3 gate; messaging carrier=named follow-on. **Phase 1 (facts foundation) done; phase 0 (priority field + open `StorageWritePlan`) next.** |
 | **Facet 4** | (undefined here) | ☐ **TO SCOPE** via side-discovery against [foundation-consolidation-plan.md](./foundation-consolidation-plan.md) → ADR(s) |
 
 ## The sequence (dependency-ordered; refine via side-discovery)
@@ -226,11 +226,18 @@ implemented and its tests pass on real stores.
   green post-change: SQLite 5 · PG 9 · SqlServer 19 · Mongo 21 · InMemory(data) 33 · Json 7 · Redis 3 ·
   InMemory(vector) 29 · Qdrant 35 · data-core 206 · cache 109 · tenancy 23. **The non-isolating adapters
   (Couchbase/Redis/Json/InMemory + all vector) FAIL CLOSED for a tenant-scoped entity — secure, never leaky.**
-- ☐ **NEXT:** Phase 3c schema-column DDL indexability (Indexed descriptors → computed/expression index; PG/SqlServer;
-  SQLite JSON-only) · Phase 5 classification (2nd contributor module, a Serialize-stage **field-transform** seam —
-  distinct from the managed-field *inject* seam — for encrypt/tokenize/mask) + Mongo/bare-store serialization
-  injection (legit phase-5 per memo §6) + in-memory managed `GetValue` · then control-plane keyed entities / state
-  machine / sagas / erasure cert · ambient unification · Adapter Forge · Facet 4.
+- ◐ **CLASSIFICATION (ARCH-0098) IN PROGRESS** — phase 1 (facts foundation) LANDED `cc486781` (`[Classified]`/`[Pii]`…
+  + `ClassifiedFieldDescriptor`/`ClassifiedPropertyBag`/`ClassifiedFieldRegistry`, two-gate off-model, no crypto;
+  16/16 + 2 mutations killed + 222 data-core regression). ADR adversarially reviewed (`wf_6a0f0278-5b5`) +
+  amendments folded. The classification field-transform is a **write-stamp clone-then-encrypt + net-new read-reverse**
+  (NOT the Serialize-stage seam — that earlier framing is corrected in the ADR). **NEXT = phase 0** (priority field on
+  BOTH `IWriteStamp` + `ManagedFieldDescriptor`; expose the internal contributor interface; open `StorageWritePlan`,
+  behavior-preserving) → phase 2 (crypto seam in `Koan.Classification`) → phase 3 (write-stamp all-surfaces +
+  read-reverse + cache L2-exclusion gate).
+- ☐ **THEN:** Phase 3c schema-column DDL indexability (Indexed descriptors → computed/expression index; PG/SqlServer;
+  SQLite JSON-only) + Mongo/bare-store managed serialization injection + in-memory managed `GetValue` · classification
+  phases 4–7 (searchable blind-index · vector/messaging leak guards · crypto-shred+rotation · masked-read) · then
+  control-plane keyed entities / state machine / sagas / erasure cert · ambient unification · Adapter Forge · Facet 4.
 
 > Full per-area detail + the DATA-0105 review punch-list (must-fixes i–xi, upgrades A–D, opportunities):
 > memory **[[facet3-tenancy-design]]** (the anchor). Tenancy spec: [tenancy-design.md](./tenancy-design.md).
