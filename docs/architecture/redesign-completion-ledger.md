@@ -370,6 +370,19 @@ implemented and its tests pass on real stores.
     framework-first-per-feature; the big break = in-memory worker → `Koan.Jobs` to close the async-hop hole).
     SnapVault exposes 3 real framework gaps: vector(Weaviate) tenant-isolation, storage blob per-tenant prefix, the
     async-hop carrier. **The conversion is the pull that orders the remaining tenancy build.**
+  - **▶▶ CONVERSION STARTED (2026-06-24).** Phase-0 lead chosen by empirical grounding (`wf_ad703a7e-6a1`, 5 readers):
+    the **durable ambient carrier** leads, NOT the portal shell. Reason: SnapVault's headline break-and-rebuild
+    (in-memory worker → `Koan.Jobs`) is *structurally unsafe* without it — the carrier is the keystone the flagship's
+    async path depends on; portal/vector/storage sit downstream. Grounding facts: `EntityContext` slice carrier is
+    complete (ARCH-0097, 72/72) but **no snapshot/restore across the hop exists** — `JobRecord` has only `CorrelationId`,
+    `JobOrchestrator.ExecuteClaimedAsync` builds a fresh `JobContext` with zero ambient restore; the work-item is
+    `binding.Load`-ed at the TOP (before any context setup) so restore must wrap load-through-settle, which forces the
+    ledger to be `[HostScoped]`. **ARCH-0100 DRAFTED** (`docs/decisions/ARCH-0100-durable-ambient-carrier.md`, axis-
+    generic — ratifies ARCH-0099 §7d durable-carrier bullet): `IAmbientSliceCarrier`+`AmbientCarrierRegistry` in
+    `Koan.Data.Core` (Capture→bag→Restore, fail-closed on unregistered-axis); tenancy registers `TenantContextCarrier`
+    reusing `Tenant.Use`'s existing `IDisposable`; opaque sparse bag on `JobRecord`; `JobRecord`/`JobMetric` `[HostScoped]`;
+    messaging/outbox = same-mechanism follow-on. 7-phase TDD impl plan in the ADR. **NEXT: adversarial review (running
+    `wf_9daa6690-4b9`) → fold → phase-1 TDD (carrier registry in Koan.Data.Core).**
 - ☐ **THEN:** Phase 3c schema-column DDL indexability (Indexed descriptors → computed/expression index; PG/SqlServer;
   SQLite JSON-only) + Mongo/bare-store managed serialization injection + in-memory managed `GetValue` · classification
   phases 4–7 (searchable blind-index · vector/messaging leak guards · crypto-shred+rotation · masked-read) · then
