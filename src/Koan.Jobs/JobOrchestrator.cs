@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
+using Koan.Data.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -21,6 +22,7 @@ public sealed class JobOrchestrator
     private readonly ILogger<JobOrchestrator> _logger;
     private readonly IServiceScopeFactory _scopes;
     private readonly IReadOnlyList<IJobPoolResolver> _poolResolvers;
+    private readonly AmbientCarrierRegistry _carrier;
 
     private readonly string _owner = Guid.CreateVersion7().ToString("N");
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _lanes = new(StringComparer.Ordinal);
@@ -30,7 +32,7 @@ public sealed class JobOrchestrator
     public JobOrchestrator(
         IJobLedger ledger, JobTypeRegistry registry, IOptions<JobsOptions> options,
         TimeProvider clock, ILogger<JobOrchestrator> logger, IServiceScopeFactory scopes,
-        IEnumerable<IJobPoolResolver> poolResolvers)
+        IEnumerable<IJobPoolResolver> poolResolvers, AmbientCarrierRegistry carrier)
     {
         _ledger = ledger;
         _registry = registry;
@@ -39,6 +41,7 @@ public sealed class JobOrchestrator
         _logger = logger;
         _scopes = scopes;
         _poolResolvers = poolResolvers.ToList();
+        _carrier = carrier;
         _metrics = new JobMetricsRecorder(_options.MetricsEnabled, _owner, _clock);
     }
 
@@ -142,6 +145,17 @@ public sealed class JobOrchestrator
 
     private async Task<JobContext?> ExecuteClaimedAsync(JobRecord rec, JobTypeBinding binding, ResolvedActionPolicy policy, CancellationToken workerCt)
     {
+        // ARCH-0100: rehydrate the ambient slices captured at submit BEFORE loading the (possibly tenant-scoped)
+        // work-item, and keep them in scope across load + execute + settle (the conditional auto-save included) so
+        // every tenant-scoped read/write runs in the submitted tenant. A restore failure (an unregistered axis, or
+        // an unknown carrier format) is deterministic and non-retryable → dead-letter; the handler never runs
+        // fail-open in a wrong/absent ambient. A null/empty bag restores nothing (the §1b request guard owns the
+        // unscoped-write refusal under Closed; dev-fallback under Open).
+        IDisposable ambientScope;
+        try { ambientScope = _carrier.Restore(rec.AmbientCarrier); }
+        catch (Exception ex) { await SettleCarrierFailureAsync(rec, ex); return null; }
+        using var _ambient = ambientScope;
+
         object? workItem;
         try { workItem = await binding.Load(rec.WorkId, workerCt); }
         catch (Exception ex) { await SettleFailureAsync(rec, binding, policy, ex); return null; }
@@ -233,8 +247,10 @@ public sealed class JobOrchestrator
         if (next is not null && !cancelledInSettleWindow)
         {
             var nextPolicy = binding.ResolvePolicy(next, _options);
-            // Chain stages inherit the gate key resolved at submit (the chain's gate pool is fixed — §18).
-            var nextRec = JobRecordFactory.Create(binding, nextPolicy, workItem, rec.WorkId, next, now, null, rec.CorrelationId, rec.GateKey);
+            // Chain stages inherit the gate key resolved at submit (the chain's gate pool is fixed — §18) and the
+            // ambient carrier (ARCH-0100 §7): the successor is appended here by the orchestrator, NOT the
+            // coordinator, so capture-at-submit never fires for it — propagate the parent's bag verbatim.
+            var nextRec = JobRecordFactory.Create(binding, nextPolicy, workItem, rec.WorkId, next, now, null, rec.CorrelationId, rec.GateKey, rec.AmbientCarrier);
             await _ledger.Append(nextRec, CancellationToken.None);
         }
     }
@@ -267,9 +283,26 @@ public sealed class JobOrchestrator
             if (wi is not null)
             {
                 var nextPolicy = binding.ResolvePolicy(next, _options);
-                await _ledger.Append(JobRecordFactory.Create(binding, nextPolicy, wi, rec.WorkId, next, now, null, rec.CorrelationId, rec.GateKey), CancellationToken.None);
+                await _ledger.Append(JobRecordFactory.Create(binding, nextPolicy, wi, rec.WorkId, next, now, null, rec.CorrelationId, rec.GateKey, rec.AmbientCarrier), CancellationToken.None);
             }
         }
+    }
+
+    /// <summary>ARCH-0100: the captured ambient could not be rehydrated (an unregistered axis, or an unknown
+    /// carrier format). Deterministic — retrying would fail identically — so dead-letter immediately rather than
+    /// run the handler in a wrong/absent ambient (fail-closed). The work-item is never loaded.</summary>
+    private async Task SettleCarrierFailureAsync(JobRecord rec, Exception ex)
+    {
+        var now = _clock.GetUtcNow();
+        rec.Owner = null;
+        rec.LeaseUntil = null;
+        rec.LastError = ex.Message;
+        rec.LastSettledAt = now;
+        rec.DeadReason = DeadReason.CarrierRestoreFailed.ToString();
+        rec.ExpireAt = ExpiryAt(_options.FailedAfter, now);
+        SetStatus(rec, JobStatus.Dead, now, $"ambient carrier restore failed: {ex.Message}");
+        await _ledger.Update(rec, CancellationToken.None);
+        _metrics.Record(rec.WorkType, JobStatus.Dead, now);
     }
 
     private async Task ApplyDeferralAsync(JobRecord rec, JobTypeBinding binding, ResolvedActionPolicy policy,

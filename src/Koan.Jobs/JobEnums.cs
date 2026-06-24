@@ -16,6 +16,9 @@ public enum DeadReason
     Poison = 0,
     /// <summary>Reschedule/backoff hit the <c>Deadline</c> or <c>MaxReschedules</c> guard.</summary>
     PerpetuallyDeferred = 1,
+    /// <summary>ARCH-0100: the ambient carrier captured at submit could not be rehydrated at execute (an
+    /// unregistered axis, or an unknown carrier format) — deterministic, so dead-lettered rather than run fail-open.</summary>
+    CarrierRestoreFailed = 2,
 }
 
 /// <summary>How the durable tier secures a ready job under competing consumers (JOBS-0005 §7).</summary>

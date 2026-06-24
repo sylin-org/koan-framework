@@ -18,7 +18,8 @@ public sealed class DistributedSpec
             host.Clock,
             NullLogger<JobOrchestrator>.Instance,
             host.Services.GetRequiredService<IServiceScopeFactory>(),
-            Enumerable.Empty<IJobPoolResolver>());
+            Enumerable.Empty<IJobPoolResolver>(),
+            host.Services.GetRequiredService<Koan.Data.Core.AmbientCarrierRegistry>());
 
     [Fact]
     public async Task competing_consumers_never_double_claim()

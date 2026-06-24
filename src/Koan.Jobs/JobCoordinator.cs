@@ -20,9 +20,11 @@ public sealed class JobCoordinator : IJobCoordinator
     private readonly IServiceProvider _services;
     private readonly JobsOptions _options;
     private readonly TimeProvider _clock;
+    private readonly AmbientCarrierRegistry _carrier;
 
     public JobCoordinator(IJobLedger ledger, JobTypeRegistry registry, JobOrchestrator orchestrator,
-        IJobTransport transport, IServiceProvider services, IOptions<JobsOptions> options, TimeProvider clock)
+        IJobTransport transport, IServiceProvider services, IOptions<JobsOptions> options, TimeProvider clock,
+        AmbientCarrierRegistry carrier)
     {
         _ledger = ledger;
         _registry = registry;
@@ -31,6 +33,7 @@ public sealed class JobCoordinator : IJobCoordinator
         _services = services;
         _options = options.Value;
         _clock = clock;
+        _carrier = carrier;
     }
 
     /// <summary>Resolve a job's gate key at submit. A property-based <c>[JobGate]</c> is read inline; a method-based
@@ -65,7 +68,7 @@ public sealed class JobCoordinator : IJobCoordinator
             await binding.Save(workItem, ct);
 
         var gateKey = await ResolveGateKey(binding, workItem, ct);
-        var rec = JobRecordFactory.Create(binding, policy, workItem, workId, action, now, after, Correlation(), gateKey);
+        var rec = JobRecordFactory.Create(binding, policy, workItem, workId, action, now, after, Correlation(), gateKey, Carrier());
         await _ledger.Append(rec, ct);
 
         // Transactional outbox: inside an ambient transaction the work-item Save + the ledger Append enlist (TrackSave)
@@ -80,6 +83,7 @@ public sealed class JobCoordinator : IJobCoordinator
     {
         var now = _clock.GetUtcNow();
         var correlation = Correlation();
+        var carrier = Carrier();   // one ambient snapshot for the whole batch (all items share the submit context)
         var batch = new List<JobRecord>();
 
         foreach (var workItem in workItems)
@@ -100,7 +104,7 @@ public sealed class JobCoordinator : IJobCoordinator
                 await binding.Save(workItem, ct);
 
             var gateKey = await ResolveGateKey(binding, workItem, ct);
-            batch.Add(JobRecordFactory.Create(binding, policy, workItem, workId, action, now, after, correlation, gateKey));
+            batch.Add(JobRecordFactory.Create(binding, policy, workItem, workId, action, now, after, correlation, gateKey, carrier));
         }
 
         if (batch.Count > 0) await _ledger.AppendMany(batch, ct);
@@ -126,7 +130,7 @@ public sealed class JobCoordinator : IJobCoordinator
         }
 
         var gateKey = await ResolveGateKey(binding, workItem, ct);
-        var rec = JobRecordFactory.Create(binding, policy, workItem, SingletonWorkId, action, now, null, Correlation(), gateKey);
+        var rec = JobRecordFactory.Create(binding, policy, workItem, SingletonWorkId, action, now, null, Correlation(), gateKey, Carrier());
         await _ledger.Append(rec, ct);
 
         if (!EntityContext.InTransaction) _transport.Notify();
@@ -180,6 +184,10 @@ public sealed class JobCoordinator : IJobCoordinator
     });
 
     private static string? Correlation() => Activity.Current?.TraceId.ToString();
+
+    // ARCH-0100: snapshot the ambient carriable slices on the submitting context (symmetric with Correlation()).
+    // Null in the common case (no cross-cutting slice) — zero allocation, absent on the row.
+    private IReadOnlyDictionary<string, string>? Carrier() => _carrier.Capture();
 
     private static string? Snapshot(object workItem)
     {
