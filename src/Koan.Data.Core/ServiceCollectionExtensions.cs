@@ -46,6 +46,11 @@ public static class ServiceCollectionExtensions
         // Tenancy registers its gate from the Koan.Tenancy module's auto-registrar (Reference = Intent); no
         // registered guard → the chokepoint loop is empty → no-op. A grep for "tenant" here returns nothing.
 
+        // ARCH-0100: the durable ambient carrier. Aggregates the DI-enumerable IAmbientSliceCarrier set (each
+        // cross-cutting module registers its own; none → an empty registry that captures null / restores nothing).
+        // Koan.Jobs / Koan.Messaging resolve this to carry ambient slices across the async-hop, naming no axis.
+        services.TryAddSingleton<AmbientCarrierRegistry>();
+
         // Data source registry for source/adapter routing (DATA-0077)
         services.AddSingleton<DataSourceRegistry>(sp =>
         {

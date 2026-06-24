@@ -8,6 +8,7 @@ using Koan.Core.Modules;
 using Koan.Core.Provenance;
 using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Pipeline;
+using Koan.Data.Core;
 using Koan.Data.Core.Pipeline;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -37,6 +38,11 @@ public sealed class KoanAutoRegistrar : KoanModule
         services.TryAddSingleton<TenancyRuntime>();
         services.TryAddSingleton<TenancyDevState>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IStorageGuard, TenantStorageGuard>());
+
+        // ARCH-0100: register the tenant axis on the durable ambient carrier so the ambient tenant rides jobs
+        // (later: messaging) across the async-hop and rehydrates fail-closed at execute. DI-enumerable, so the
+        // carrier set is fixed at host build — Koan.Jobs names no axis; absent module ⇒ absent carrier (no-op).
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IAmbientSliceCarrier, TenantContextCarrier>());
 
         // The tenant managed field — the invisible shadow discriminator (no POCO property). The framework stamps
         // it on every write inside a tenant scope and AND-folds it into reads; on an adapter that announces
