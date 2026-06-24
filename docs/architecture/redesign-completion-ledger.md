@@ -469,6 +469,21 @@ implemented and its tests pass on real stores.
       collisions, Container particle, discovery skip-guard; 7 integration SQLite real-boot: `[Archived]` ≡ SoftDelete + multi-axis
       compose) + regression data-core 271 (off-proof), tenancy 84, SoftDelete 7, sqlite 11, mongo 25. New suites
       `tests/Suites/Data/Axes/*`. ▶ NEXT = Phase E (`.Explain()` query-RSoP + boot-report axis listing + boot-refuses-leaky-axis) → F (`DataAxis.AssertNoLeak<T>`).
+    - **◐ Phase E — self-reporting (ARCH-0101 §8/§9). §9 DONE (2026-06-24, `dev` `7d768d92`); §8 pre-flight = NEXT increment.**
+      **§9:** `DataAxis.Explain(sp, type)` — the query-RSoP rendering an entity's whole isolation story in one place
+      (composing planes · the read-scope active in the CURRENT ambient · adapter fail-closed satisfaction + pushdown ·
+      cache-exclusion · `IsLeak`), backed by a shared facade diagnostic (`IAxisScopeDiagnostics` + `IDataService.
+      GetScopeDiagnostics`, the undecorated-facade authority that holds the raw adapter) + a shared `ReadScopeFold` (one
+      fold authority — facade + Explain) so the explanation can't drift from a real read; + `DataAxisReport.Summarize` →
+      boot-report axis listing. Impl-diff review (`wf_807c3ae1-538`) folded 3 MEDIUM (diagnostic-surface only): cache-
+      exclusion now mirrors CachedRepository's 3rd leg (field-transform/`[Classified]`); a scoped entity on an
+      UNresolvable adapter reads as a leak (bias-to-strict, not swallowed-to-safe); docstrings corrected. Green: Phase E
+      63 (53 unit + 10 integration real-boot RSoP) + byte-identical regression (data-core 271, tenancy 84, SoftDelete 7,
+      sqlite 11). **§8 pre-flight (NEXT):** `KoanModule.Start` sweep over `AssemblyCache` entity types — a boot-active
+      predicate axis (soft-delete) on a confirmed non-isolating adapter refuses boot (conservative: gated on a non-default
+      read contributor; skip-on-unresolvable; confirmed-mismatch-only). **Behavior change** — migrates the tenancy
+      soft-delete-on-JSON proof from a runtime throw to a boot refusal; needs broad regression for hidden soft-delete-on-
+      non-isolating suites. → then F (`DataAxis.AssertNoLeak<T>`).
 - ☐ **THEN:** Phase 3c schema-column DDL indexability (Indexed descriptors → computed/expression index; PG/SqlServer;
   SQLite JSON-only) + Mongo/bare-store managed serialization injection + in-memory managed `GetValue` · classification
   phases 4–7 (searchable blind-index · vector/messaging leak guards · crypto-shred+rotation · masked-read) · then
