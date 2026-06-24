@@ -58,6 +58,14 @@ public static class ServiceCollectionExtensions
         // Koan.Jobs / Koan.Messaging resolve this to carry ambient slices across the async-hop, naming no axis.
         services.TryAddSingleton<AmbientCarrierRegistry>();
 
+        // ARCH-0101 §7: the [DataAxis] premium authoring layer. Discover every IDataAxis, declare it, and EXPAND it to
+        // the exact raw Phase A/B/C seams (managed field / read-filter / name particle / carrier / operation override)
+        // — byte-identical to a hand-written registration. Runs after the built-in equality contributor + carrier
+        // registry (it adds DI-enumerable read contributors + carriers) and before the IDataService add; discovery is
+        // already populated (manifest loader runs before this Register). No axis ⇒ no-op (off = structurally absent).
+        // Runs once per ServiceCollection (the IDataService guard above), so its DI registrations never double-add.
+        Axes.DataAxisExpander.ExpandDiscovered(services);
+
         // Data source registry for source/adapter routing (DATA-0077)
         services.AddSingleton<DataSourceRegistry>(sp =>
         {

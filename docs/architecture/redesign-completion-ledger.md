@@ -453,6 +453,22 @@ implemented and its tests pass on real stores.
       in-memory adapters · HardDelete purges soft-deleted · target-scoped bypass (no cascade leak) · `_deleteOverride` memoized.
       Green: SoftDelete 7, tenancy 84 (+ tenant×soft-delete two-axis isolation proof + JSON fail-closed), data-core 271, sqlite 11,
       mongo 25 (all byte-identical regression). ▶ NEXT = Phase D (`[DataAxis]` premium layer) → E (`.Explain()`+boot-refuse) → F (`AssertNoLeak<T>`).
+    - **✅ Phase D — the `[DataAxis]` premium authoring layer (ARCH-0101 §7) DONE (2026-06-24, `dev`).** `src/Koan.Data.Core/Axes/`:
+      a `[KoanDiscoverable]` **`IDataAxis`** (the `IKoanJob` pattern) + an **accumulative `Axis` builder** (`.Named`/`.AppliesTo`/`.Mode`/
+      `.Field`/`.Reads`/`.OnDelete`/`.Carries`; all derivation in one post-`Declare` resolve pass ⇒ verb-order-independent) + `Logical`
+      + **`DataAxisExpander`** (hosted in `RegisterKoanDataCoreServices`, once per SC). It validates → batch-collision-checks → **EXPANDS
+      byte-identically** to the raw seams: `ManagedFieldDescriptor` (RowScoped+indexed+auto-equality-unless-`.Reads`) · memoized
+      `DelegatingReadFilterContributor` (RowScoped+cache-excluded; **plain `Add`, never `TryAddEnumerable`** — the shared-type dedup
+      trap) · `OperationOverrideDescriptor` · `DelegatingNameParticleContributor` (Container) · carrier. **Mode is config** (Shared→
+      field+filter · Container→leading particle · Database→carrier-only). **ADR-first → design-validation panel (`wf_25cadfc7-48e`, 3
+      lenses, settled the 4 open decisions: Database=explicit-throw, keep-SoftDelete-raw, `.Reads`-only-first-class, no-`WithoutIsolation`-
+      in-D) → TDD → 4-lens impl-diff adversarial review (`wf_59a7628b-f10`, 14 agents, 7 confirmed/2 refuted) → folded 3 fix-classes:**
+      cross-source field-collision **ownership ledger** [HIGH] (re-entrant-safe; fails loud where the registry silently first-wins) ·
+      `Validate()` OnDelete-value-type-vs-field-ClrType [MEDIUM] · Container string-token-only (Validate + fail-closed contributor) [LOW].
+      Green: Phase D **51** (44 unit: off, builder/validation, byte-identical registry state, N-distinct contributors, batch+cross-source
+      collisions, Container particle, discovery skip-guard; 7 integration SQLite real-boot: `[Archived]` ≡ SoftDelete + multi-axis
+      compose) + regression data-core 271 (off-proof), tenancy 84, SoftDelete 7, sqlite 11, mongo 25. New suites
+      `tests/Suites/Data/Axes/*`. ▶ NEXT = Phase E (`.Explain()` query-RSoP + boot-report axis listing + boot-refuses-leaky-axis) → F (`DataAxis.AssertNoLeak<T>`).
 - ☐ **THEN:** Phase 3c schema-column DDL indexability (Indexed descriptors → computed/expression index; PG/SqlServer;
   SQLite JSON-only) + Mongo/bare-store managed serialization injection + in-memory managed `GetValue` · classification
   phases 4–7 (searchable blind-index · vector/messaging leak guards · crypto-shred+rotation · masked-read) · then
