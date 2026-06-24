@@ -501,8 +501,27 @@ implemented and its tests pass on real stores.
       on `read`, so the assertion is never vacuous). On `DataAxis` (parallel to `Explain`; throws, no test-framework dep).
       Focused adversarial review (`wf_3680d99b-eb0`, 3 lenses). Green: Axes 55 unit + 12 integration, tenancy 86,
       SoftDelete 7; purely additive ⇒ byte-identical regression preserved by construction. **▶▶ ARCH-0101 (the data-axis
-      model, Phases A–F) COMPLETE.** ▶ NEXT = gap B (cache fold→`AmbientAxisComposer` + out-of-band evict bug) · gap C
+      model, Phases A–F) COMPLETE.** ▶ NEXT = gap B (cache scope-key convergence + out-of-band evict bug) · gap C
       (storage blob-key 0.4 + Weaviate vector 0.3) → the SnapVault Phase-0 dogfood conversion.
+- ☐ **GAP B — cache scope-key convergence + the out-of-band evict BUG (NEXT; premise re-verified 2026-06-24 at head `30a16849`).**
+  **The bug (security-relevant correctness):** the managed-scope segment (tenant/axis) lives in the cache key on ONLY the
+  read path — `CachedRepository.AppendManagedScope` (private, `CachedRepository.cs:413/422`) appends it to the formatted
+  key. The OUT-OF-BAND evict sites build a DIFFERENT, scope-less (and partition-less) key, so a scoped entry is NEVER
+  evicted: `EntityCacheExtensions.Uncache` / `EntityCacheHandle.Flush` build `"{TypeName}:{id}"` (`EntityCacheExtensions.cs:46,79`
+  — no partition, no scope), and the canonical `CacheKey.For(type,id,partition)` builds `"{Type}:{Partition}:{Id}"`
+  (`CacheKey.cs:86` — partition but NO managed scope). THREE divergent key formats. **The fix:** ONE canonical scoped-key
+  builder — fold the managed scope into the shared `CacheKey` primitive (`CacheKey.For` gains the scope segment) and route
+  `AppendManagedScope` + `Uncache`/`Flush` through it, so read-path and evict agree. Converge the scope-fold onto the ONE
+  ARCH-0096 `AmbientAxisComposer` (the JobCoalesce/storage-name twin — "one composer", [[koan-design-principles]]), not a
+  bespoke string concat. Carry the DATA-0106 §5 non-equality cache-EXCLUSION hook (a predicate axis excludes the type;
+  already in `CachedRepository`, lines 65-96 — keep it). **Test:** a tenant writes + caches a row, `Uncache`/`Flush` under
+  the SAME tenant now actually removes it (today it misses); cross-tenant evict does NOT remove the other tenant's entry;
+  byte-identical for non-axis entities. Discipline: TDD + ARCH-0079 + impl-diff adversarial review + byte-identical regression.
+- ☐ **GAP C — storage blob-key per-tenant prefix (SnapVault 0.4) + Weaviate vector row-discriminator (0.3).** `Koan.Storage`
+  stays axis-agnostic: a generic blob-key contributor seam folds a leading axis prefix via `AmbientAxisComposer.Append(key,
+  bag, Leading, "/")` + a storage fail-closed guard; vector 0.3 = the row-discriminator leak guard ("tenant never in the
+  spine"). Design canon: [tenancy-storage-vector-isolation-design.md](./tenancy-storage-vector-isolation-design.md). NB the
+  `AmbientAxisComposer` doc-comment over-claims "storage uses it" — not built yet (this gap builds it). Then → SnapVault Phase-0 dogfood.
 - ☐ **THEN:** Phase 3c schema-column DDL indexability (Indexed descriptors → computed/expression index; PG/SqlServer;
   SQLite JSON-only) + Mongo/bare-store managed serialization injection + in-memory managed `GetValue` · classification
   phases 4–7 (searchable blind-index · vector/messaging leak guards · crypto-shred+rotation · masked-read) · then
