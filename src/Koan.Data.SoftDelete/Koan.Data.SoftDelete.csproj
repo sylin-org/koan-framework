@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <KoanPackageKind>Periphery</KoanPackageKind>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>Koan.Data.SoftDelete</AssemblyName>
+    <RootNamespace>Koan.Data.SoftDelete</RootNamespace>
+    <Description>Soft-delete for Koan (ARCH-0101 §4): the canonical operation-semantics-override reference module. [SoftDelete] opts an entity in; Delete sets an invisible __deleted field instead of physically removing the row, reads hide deleted rows, and .HardDelete()/.Restore()/.WithDeleted() are the escape verbs — all as registered contributors to the Koan.Data.Core storage pipeline (DATA-0105/0106/ARCH-0101) under Reference = Intent. The data core stays axis-agnostic.</Description>
+    <PackageTags>$(CommonPackageTags);soft-delete;audit;recycle-bin</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
+    <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
+  </ItemGroup>
+</Project>

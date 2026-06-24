@@ -440,6 +440,19 @@ implemented and its tests pass on real stores.
       front-door, ARCH-0101 §8); (2) lock-free `Gather` (volatile snapshot, mirrors ManagedFieldRegistry); (3) `Register`
       dedups by logical `Axis` not CLR type. Green: data-core 271 (byte-identical re-home+delegation), SQLite 11, Mongo naming 2.
       ▶ NEXT = Phase C (operation-override plane `.OnDelete` + `Koan.Data.SoftDelete` reference module).
+    - **✅ Phase C — operation-semantics override plane (ARCH-0101 §4) + `Koan.Data.SoftDelete` DONE (2026-06-24, `dev`).** A new
+      **unguarded operation-override write channel** (`ManagedFieldWriteScope.Overrides`; injected but NOT conflict-guarded since a
+      mutable state field changing by design must not be guarded; **isolation `Current` WINS on key collision** so an override can
+      never clobber a tenant stamp — relational injects from `Effective`/guard unchanged on `Current`; Mongo splits inject/guard) +
+      `OperationOverrideDescriptor`/`Registry` + a **target-scoped** `OperationOverrideBypass` ((type,id), bounded). The facade rewrites
+      Delete/DeleteMany/DeleteAll/RemoveAll: load the VISIBLE (read-scoped, IDOR-retained) rows, re-persist with the field set;
+      `.HardDelete()` (target-scoped bypass + WithDeleted) physically purges a visible-or-soft-deleted row. `Koan.Data.SoftDelete` =
+      the canonical reference module (`[SoftDelete]`, invisible `__deleted` managed field, NULL-safe hide-deleted read contributor
+      `AnyOf(IS NULL, != true)`, the override, `.HardDelete()`/`.Restore()`/`T.WithDeleted()` extension members). **4-lens impl-diff
+      review (`wf_17a6b8a6-538`) folded 4 fixes** (abuse-vector REFUTED via isolation-wins): RowScoped⇒clean fail-closed on
+      in-memory adapters · HardDelete purges soft-deleted · target-scoped bypass (no cascade leak) · `_deleteOverride` memoized.
+      Green: SoftDelete 7, tenancy 84 (+ tenant×soft-delete two-axis isolation proof + JSON fail-closed), data-core 271, sqlite 11,
+      mongo 25 (all byte-identical regression). ▶ NEXT = Phase D (`[DataAxis]` premium layer) → E (`.Explain()`+boot-refuse) → F (`AssertNoLeak<T>`).
 - ☐ **THEN:** Phase 3c schema-column DDL indexability (Indexed descriptors → computed/expression index; PG/SqlServer;
   SQLite JSON-only) + Mongo/bare-store managed serialization injection + in-memory managed `GetValue` · classification
   phases 4–7 (searchable blind-index · vector/messaging leak guards · crypto-shred+rotation · masked-read) · then

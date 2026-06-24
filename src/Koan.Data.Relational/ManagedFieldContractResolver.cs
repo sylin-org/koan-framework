@@ -47,17 +47,22 @@ public sealed class ManagedFieldContractResolver : DefaultContractResolver
                 Writable = false,            // serialize-only; on read the stored key is ignored
                 ValueProvider = new ScopeValueProvider(name),
                 ShouldSerialize = _ =>
-                    ManagedFieldWriteScope.Current is { } s && s.TryGetValue(name, out var v) && v is not null,
+                    ManagedFieldWriteScope.Effective is { } s && s.TryGetValue(name, out var v) && v is not null,
             });
         }
         return props;
     }
 
-    /// <summary>Reads a managed field's value for the current write from the per-op scope snapshot.</summary>
+    /// <summary>
+    /// Reads a managed field's value for the current write from the per-op scope snapshot. Reads <b>Effective</b>
+    /// (guarded isolation values ∪ unguarded operation overrides, ARCH-0101 §4) so a soft-delete <c>__deleted=true</c>
+    /// state stamp is persisted alongside the isolation stamp — the conflict guard (adapter-side) still reads only
+    /// <c>Current</c>, so the override is injected but never wrongly guarded.
+    /// </summary>
     private sealed class ScopeValueProvider(string name) : IValueProvider
     {
         public object? GetValue(object target)
-            => ManagedFieldWriteScope.Current is { } s && s.TryGetValue(name, out var v) ? v : null;
+            => ManagedFieldWriteScope.Effective is { } s && s.TryGetValue(name, out var v) ? v : null;
 
         public void SetValue(object target, object? value) { /* not writable — the stored key is ignored on read */ }
     }

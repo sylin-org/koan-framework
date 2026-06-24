@@ -452,35 +452,41 @@ internal sealed class MongoRepository<TEntity, TKey> :
             using var activity = MongoTelemetry.Activity.StartActivity("mongo.upsert");
             activity?.SetTag("entity", typeof(TEntity).FullName);
             var collection = await GetCollection(ct).ConfigureAwait(false);
-            var scope = ManagedFieldWriteScope.Current;
-            if (scope is null || scope.Count == 0)
+            // Inject from Effective (isolation ∪ operation-override, e.g. soft-delete __deleted=true); GUARD only on
+            // Current (the isolation values) — an override is a mutable state field, never a conflict condition (ARCH-0101 §4).
+            var inject = ManagedFieldWriteScope.Effective;
+            if (inject is null || inject.Count == 0)
             {
                 var filter = Builders<TEntity>.Filter.Eq(x => x.Id, model.Id);
                 await collection.ReplaceOneAsync(filter, model, new ReplaceOptions { IsUpsert = true }, ct).ConfigureAwait(false);
             }
             else
             {
-                await ManagedUpsertOneAsync(collection, model, scope, ct).ConfigureAwait(false);
+                await ManagedUpsertOneAsync(collection, model, inject, ManagedFieldWriteScope.Current, ct).ConfigureAwait(false);
             }
             return model;
         }, ct);
 
     // Managed-field conflict-aware upsert (DATA-0105 §3b — the write-verify half on Mongo). The entity is
-    // serialized to a BsonDocument via the registered class map, the managed elements (e.g. __koan_tenant) are
-    // injected (an invisible discriminator, not a POCO property — IgnoreExtraElements drops it on read), and the
-    // replace runs through a BsonDocument view with a conflict-aware filter {_id, <managed conds>}. A foreign-owned
-    // doc fails the filter → the upsert tries to INSERT the replacement with the same _id → E11000 duplicate key →
-    // a rejected cross-scope write. Generic: reads the scope dict, never names tenant/classification.
+    // serialized to a BsonDocument via the registered class map, the managed elements (e.g. __koan_tenant, and a
+    // soft-delete __deleted state override) are injected from <paramref name="inject"/> (an invisible discriminator,
+    // not a POCO property — IgnoreExtraElements drops it on read), and the replace runs through a BsonDocument view
+    // with a conflict-aware filter {_id, &lt;guard conds&gt;} built from <paramref name="guard"/> (the ISOLATION values
+    // only — never the mutable override). A foreign-owned doc fails the filter → the upsert tries to INSERT the
+    // replacement with the same _id → E11000 duplicate key → a rejected cross-scope write. Generic: reads the scope
+    // dicts, never names tenant/classification.
     private static async Task ManagedUpsertOneAsync(
-        IMongoCollection<TEntity> collection, TEntity model, IReadOnlyDictionary<string, object?> scope, CancellationToken ct)
+        IMongoCollection<TEntity> collection, TEntity model,
+        IReadOnlyDictionary<string, object?> inject, IReadOnlyDictionary<string, object?>? guard, CancellationToken ct)
     {
         var doc = model.ToBsonDocument();
-        foreach (var kv in scope) doc[kv.Key] = ToBson(kv.Value);
+        foreach (var kv in inject) doc[kv.Key] = ToBson(kv.Value);
 
         var docs = collection.Database.GetCollection<BsonDocument>(collection.CollectionNamespace.CollectionName);
         var filter = Builders<BsonDocument>.Filter.Eq("_id", doc["_id"]);
-        foreach (var kv in scope)
-            filter = Builders<BsonDocument>.Filter.And(filter, Builders<BsonDocument>.Filter.Eq(kv.Key, ToBson(kv.Value)));
+        if (guard is not null)
+            foreach (var kv in guard)
+                filter = Builders<BsonDocument>.Filter.And(filter, Builders<BsonDocument>.Filter.Eq(kv.Key, ToBson(kv.Value)));
 
         try
         {
@@ -525,16 +531,18 @@ internal sealed class MongoRepository<TEntity, TKey> :
                 return 0;
             }
 
-            var scope = ManagedFieldWriteScope.Current;
-            if (scope is not null && scope.Count > 0)
+            var inject = ManagedFieldWriteScope.Effective;
+            if (inject is not null && inject.Count > 0)
             {
-                // Under a managed scope, replace per document (the conflict-aware path); the bulk path stays the
-                // byte-identical fast path when nothing is in scope.
+                // Under a managed scope (isolation and/or operation-override), replace per document (the conflict-aware
+                // path); inject from Effective, GUARD only on Current. The bulk path stays the byte-identical fast path
+                // when nothing is in scope.
+                var guard = ManagedFieldWriteScope.Current;
                 var n = 0;
                 foreach (var model in modelList)
                 {
                     ct.ThrowIfCancellationRequested();
-                    await ManagedUpsertOneAsync(collection, model, scope, ct).ConfigureAwait(false);
+                    await ManagedUpsertOneAsync(collection, model, inject, guard, ct).ConfigureAwait(false);
                     n++;
                 }
                 return n;

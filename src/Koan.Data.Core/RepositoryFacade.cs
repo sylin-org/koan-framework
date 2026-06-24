@@ -45,6 +45,7 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     private readonly string? _scopeAdapterError;
     private readonly FilterSupport _filterCaps;
     private readonly bool _skipReadPushabilityCheck;
+    private readonly OperationOverrideDescriptor? _deleteOverride;
 
     public RepositoryFacade(IDataRepository<TEntity, TKey> inner, IStorageGuard[]? guards = null, IReadFilterContributor[]? readContributors = null)
     {
@@ -70,6 +71,9 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         // A predicate axis (dynamic shape) keeps the per-read Split as the source of truth.
         _skipReadPushabilityCheck = couldScope && _scopeAdapterOk
             && !HasNonDefaultReadContributor() && EqualityShapeIsPushable();
+        // The delete operation-override (soft-delete) is a per-(type) constant — registered boot-time, AppliesTo is a
+        // static predicate — so resolve it ONCE here (mirrors _managed), not per delete (no per-op registry lock).
+        _deleteOverride = OperationOverrideRegistry.ForDelete(typeof(TEntity));
     }
 
     private bool HasNonDefaultReadContributor()
@@ -213,6 +217,36 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         }
         if (values is not null) RequireScopeStatic();   // an active scope on a non-isolating adapter fails closed
         return values;
+    }
+
+    // --- operation-semantics override (ARCH-0101 §4) — the soft-delete plane ---
+
+    /// <summary>The delete override for a single keyed delete, or <c>null</c> when none is registered OR this exact
+    /// entity is being hard-deleted (a target-scoped <c>.HardDelete()</c> bypass). The mass-delete paths use
+    /// <see cref="_deleteOverride"/> directly — there is no batch hard-delete, so they always apply the override.
+    /// Either way the read-scoping (IDOR) below is RETAINED — the bypass is plane-specific.</summary>
+    private OperationOverrideDescriptor? DeleteOverrideFor(TKey id)
+        => _deleteOverride is not null && !OperationOverrideBypass.IsBypassedFor(typeof(TEntity), id)
+            ? _deleteOverride
+            : null;
+
+    /// <summary>
+    /// Re-persist a VISIBLE (already read-scoped) row with the override's state field set (e.g. <c>__deleted=true</c>),
+    /// through the UNGUARDED operation-override write channel so the mutable field is injected but never conflict-guarded.
+    /// The isolation stamp (tenant) stays GUARDED. The row round-trips through the field transform (plaintext → re-encrypt)
+    /// only when one exists (else both are no-ops).
+    /// </summary>
+    private async Task OverrideUpsert(TEntity row, OperationOverrideDescriptor ov, CancellationToken ct)
+    {
+        Reverse(row);                       // ensure plaintext before re-encrypting on write (no-op without a transform)
+        _writePlan.ApplyAll(row);           // identity + [Timestamp(OnSave)] — the override IS a write
+        var overrides = new Dictionary<string, object?>(StringComparer.Ordinal) { [ov.Field] = ov.OnDeleteValue };
+        var values = CurrentManagedValues();
+        var payload = WritePayload(row);
+        if (values is null)
+            using (ManagedFieldWriteScope.EnterOverrides(overrides)) await _inner.Upsert(payload, ct);
+        else
+            using (ManagedFieldWriteScope.Enter(values, overrides)) await _inner.Upsert(payload, ct);
     }
 
     /// <summary>
@@ -391,10 +425,21 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     {
         await Guard(ct);
         var managed = ReadScopeFilter();
+        var ov = DeleteOverrideFor(id);   // null when this exact entity is being hard-deleted (target-scoped bypass)
+        if (ov is not null)
+        {
+            // Soft-delete: load the VISIBLE (read-scoped) row, re-persist with the override field set. The load is
+            // still IDOR-scoped, so a soft-delete can only soft-remove a row the caller can see.
+            var scoped = managed is null ? QueryDefinition.All.Where(Filter.Eq(_idField, id)) : ScopedById(id, managed);
+            var res = await RequireQuery().Query(scoped, ct);
+            if (res.Items.Count == 0) return false;
+            await OverrideUpsert(res.Items[0], ov, ct);
+            return true;
+        }
         if (managed is null) return await _inner.Delete(id, ct);
         // check-then-delete: only an owned row may be deleted by id (IDOR).
-        var res = await RequireQuery().Query(ScopedById(id, managed), ct);
-        if (res.Items.Count == 0) return false;
+        var res2 = await RequireQuery().Query(ScopedById(id, managed), ct);
+        if (res2.Items.Count == 0) return false;
         return await _inner.Delete(id, ct);
     }
 
@@ -403,6 +448,16 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         await Guard(ct);
         var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
         var managed = ReadScopeFilter();
+        var ov = _deleteOverride;   // mass delete: no batch hard-delete exists, so the override always applies
+        if (ov is not null)
+        {
+            var scoped = managed is null
+                ? QueryDefinition.All.Where(Filter.In(_idField, idList.Cast<object?>().ToList()))
+                : ScopedByIds(idList, managed);
+            var soft = await RequireQuery().Query(scoped, ct);
+            foreach (var row in soft.Items) await OverrideUpsert(row, ov, ct);
+            return soft.Items.Count;
+        }
         if (managed is null) return await _inner.DeleteMany(idList, ct);
         var res = await RequireQuery().Query(ScopedByIds(idList, managed), ct);
         var owned = res.Items.Select(e => e.Id).ToList();
@@ -413,6 +468,16 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     {
         await Guard(ct);
         var managed = ReadScopeFilter();
+        var ov = _deleteOverride;   // mass delete: no batch hard-delete exists, so the override always applies
+        if (ov is not null)
+        {
+            // Soft-delete-all: load the visible (read-scoped) rows and soft-remove each. Already-deleted rows are
+            // outside the hide-deleted read scope, so they are not re-touched (idempotent).
+            var q = managed is null ? QueryDefinition.All : QueryDefinition.All.Where(managed);
+            var soft = await RequireQuery().Query(q, ct);
+            foreach (var row in soft.Items) await OverrideUpsert(row, ov, ct);
+            return soft.Items.Count;
+        }
         if (managed is not null)
         {
             // NEVER the unscoped Clear instruction under a managed scope — it would wipe every scope's rows.
@@ -432,6 +497,15 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     {
         await Guard(ct);
         var managed = ReadScopeFilter();
+        var ov = _deleteOverride;   // mass delete: no batch hard-delete exists, so the override always applies
+        if (ov is not null)
+        {
+            // Soft-delete: RemoveAll is a SCOPED soft-remove of the visible rows, never a physical truncate.
+            var q = managed is null ? QueryDefinition.All : QueryDefinition.All.Where(managed);
+            var soft = await RequireQuery().Query(q, ct);
+            foreach (var row in soft.Items) await OverrideUpsert(row, ov, ct);
+            return soft.Items.Count;
+        }
         if (managed is null) return await _inner.RemoveAll(strategy, ct);
         // RemoveAll is an unscoped truncate/wipe — never allowed to cross a managed boundary. Lower to a scoped delete.
         var owned = await RequireQuery().Query(QueryDefinition.All.Where(managed), ct);
