@@ -69,6 +69,11 @@ public class QueryDispatchFailureSpec
             where TKey : notnull
             => (IDataRepository<TEntity, TKey>)(object)_repo;
 
+        public Koan.Data.Core.Axes.IAxisScopeDiagnostics GetScopeDiagnostics<TEntity, TKey>()
+            where TEntity : class, IEntity<TKey>
+            where TKey : notnull
+            => throw new NotImplementedException();
+
         public Koan.Data.Core.Direct.IDirectSession Direct(string? source = null, string? adapter = null)
             => throw new NotImplementedException();
     }

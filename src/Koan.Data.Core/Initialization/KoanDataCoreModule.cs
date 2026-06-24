@@ -42,5 +42,10 @@ public sealed class KoanDataCoreModule : KoanModule
             ensureSetting.Value,
             sourceKey: ensureSetting.ResolvedKey,
             usedDefault: ensureSetting.UsedDefault);
+
+        // ARCH-0101 §9: list the active data-axis planes (managed isolation fields, operation overrides, container
+        // particles) in the boot report. Omitted entirely when no axis is registered (off = structurally absent).
+        if (Axes.DataAxisReport.Summarize() is { } axes)
+            module.SetSetting("DataAxes", b => b.Value(axes));
     }
 }

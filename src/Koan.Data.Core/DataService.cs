@@ -57,6 +57,25 @@ public sealed class DataService(IServiceProvider sp) : IDataService
     }
 
     /// <inheritdoc />
+    public Axes.IAxisScopeDiagnostics GetScopeDiagnostics<TEntity, TKey>()
+        where TEntity : class, IEntity<TKey>
+        where TKey : notnull
+    {
+        // Mirror GetRepository's raw-adapter resolution but return the UNDECORATED facade (the diagnostic authority that
+        // holds the raw adapter for the IQueryRepository check). Cheap + connection-free: capability description is
+        // static. Not cached — Explain / the boot pre-flight call it rarely, never on a hot path.
+        var sourceRegistry = sp.GetRequiredService<DataSourceRegistry>();
+        var (adapter, source) = AdapterResolver.ResolveForEntity<TEntity>(sp, sourceRegistry);
+        var factories = sp.GetServices<IDataAdapterFactory>();
+        var factory = factories.FirstOrDefault(f => f.CanHandle(adapter))
+            ?? throw new InvalidOperationException($"No data adapter factory for provider '{adapter}'");
+        var repo = factory.Create<TEntity, TKey>(sp, source);
+        var guards = sp.GetServices<Pipeline.IStorageGuard>().ToArray();
+        var readContributors = sp.GetServices<Pipeline.IReadFilterContributor>().ToArray();
+        return new RepositoryFacade<TEntity, TKey>(repo, guards, readContributors);
+    }
+
+    /// <inheritdoc />
     public Direct.IDirectSession Direct(string? source = null, string? adapter = null)
     {
         var svc = sp.GetService<Direct.IDirectDataService>()

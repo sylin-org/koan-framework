@@ -1,10 +1,11 @@
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Core.Axes;
+using Koan.Data.Core.Pipeline;
 
 namespace Koan.Data.Axes.Tests.Support;
 
-/// <summary>Reset the three process-global static registries the expander writes into, plus the expander's cross-host
+/// <summary>Reset the process-global static registries the expander / diagnostics read, plus the expander's cross-host
 /// field-ownership ledger — used in spec ctor/dispose so each unit spec sees a clean slate (mirrors the data-core
 /// pipeline specs).</summary>
 internal static class AxisRegistries
@@ -14,6 +15,7 @@ internal static class AxisRegistries
         ManagedFieldRegistry.Reset();
         StorageNameParticleRegistry.Reset();
         OperationOverrideRegistry.Reset();
+        StorageFieldTransformRegistry.Reset();
         DataAxisExpander.ResetForTesting();
     }
 }

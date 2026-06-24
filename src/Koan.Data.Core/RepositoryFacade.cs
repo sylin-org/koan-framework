@@ -5,6 +5,7 @@ using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Pipeline;
+using Koan.Data.Core.Axes;
 using Koan.Data.Core.Metadata;
 using Koan.Data.Core.Pipeline;
 
@@ -30,7 +31,8 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     IRawQueryRepository<TEntity, TKey>,
     IDescribesCapabilities,
     IConditionalWriteRepository<TEntity, TKey>,
-    IInstructionExecutor<TEntity>
+    IInstructionExecutor<TEntity>,
+    IAxisScopeDiagnostics
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
@@ -258,19 +260,25 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     /// </summary>
     private Filter? ReadScopeFilter()
     {
-        if (_readContributors.Length == 0) return null;
-        List<Filter>? survivors = null;
-        for (var i = 0; i < _readContributors.Length; i++)
-        {
-            var f = _readContributors[i].ReadFilter(typeof(TEntity));
-            if (f is null) continue;
-            (survivors ??= new()).Add(f);
-        }
-        if (survivors is null) return null;
-        var folded = survivors.Count == 1 ? survivors[0] : Filter.All(survivors.ToArray());
+        var folded = FoldReadScope();
+        if (folded is null) return null;
         RequireScopeForRead(folded);                     // active scope on a non-isolating / non-pushing adapter fails closed
         return folded;
     }
+
+    /// <summary>The AND-fold of every contributor's predicate in the current ambient, or <c>null</c> when nothing
+    /// scopes now — WITHOUT the fail-closed throw (shared by <see cref="ReadScopeFilter"/> and the §9 diagnostics).</summary>
+    private Filter? FoldReadScope() => ReadScopeFold.Fold(_readContributors, typeof(TEntity));
+
+    // --- IAxisScopeDiagnostics (ARCH-0101 §8/§9): the non-throwing read-scope inspection DataAxis.Explain + the boot
+    // pre-flight read. The facade is the ONE authority — it already computed _scopeAdapterOk / _filterCaps at construction. ---
+    string IAxisScopeDiagnostics.AdapterName => _inner.GetType().Name;
+    bool IAxisScopeDiagnostics.CouldScope => _managed.Count > 0 || HasNonDefaultReadContributor();
+    bool IAxisScopeDiagnostics.ScopeAdapterOk => _scopeAdapterOk;
+    string? IAxisScopeDiagnostics.ScopeAdapterError => _scopeAdapterOk ? null : _scopeAdapterError;
+    Filter? IAxisScopeDiagnostics.CurrentReadScope() => FoldReadScope();
+    bool IAxisScopeDiagnostics.IsFullyPushable(Filter folded)
+        => _skipReadPushabilityCheck || FilterSplitter.Split(folded, _filterCaps, typeof(TEntity)).Residual is null;
 
     /// <summary>
     /// Whether any registered read-filter contributor constrains the current read of this type (ambient-active) — DATA-0106 §4.
