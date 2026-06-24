@@ -426,6 +426,20 @@ implemented and its tests pass on real stores.
       so the equality hot path stays byte-identical to pre-DATA-0106. **Proven adapter-agnostic on SQLite (relational) AND MongoDB (document/BSON)** —
       the same fake moderation axis folds identically through the shared `FieldPathResolver`. Green: data-core 264, tenancy 81, sqlite 10, mongo 25,
       cache 50, json 7, inmemory 33. ▶ NEXT = Phase B (name-particle seam).
+    - **✅ Phase B — container-name particle seam (ARCH-0101 §3) DONE (2026-06-24, `dev`).** `IStorageNameParticleContributor`
+      + `StorageNameParticleRegistry` (static, the `ManagedFieldRegistry`/DATA-0105 §4 deviation from the ADR's "DI-enumerable"
+      — the name composer is static+cached, reached in data AND vector naming with no DI scope) folded into `StorageNameGenerator`
+      via the ONE ARCH-0096 `IdentifierComposer`. A separate-container axis (mode-3 tenant) emits `T1-Todo#partition` (leading
+      particle, anchor untouched — "the axis is never in the spine"); host emits `Todo` byte-identical. **Security-critical fold:
+      the ambient axis value is in the name cache key** `(provider,entity,partition,axisKey)` so a per-container name never caches
+      across tenants (mutation-verified). Tests: data-core naming unit (name shapes + the cache-key leak pin) + SQLite integration
+      (per-container isolation: write T1 / read T2 → not found; host sees a third container). **3-lens impl-diff review
+      (`wf_1c43dcc1-d57`) folded an injectivity guard + 2 conformity fixes (all latent — no production name-particle
+      contributor yet):** (1) particle value must be injective under the adapter policy (`PartitionTokenPolicy.IsInjective`, the
+      ONE rule `PartitionNameValidator` now delegates to) — lossy/case-fold value fails closed (parity with the partition
+      front-door, ARCH-0101 §8); (2) lock-free `Gather` (volatile snapshot, mirrors ManagedFieldRegistry); (3) `Register`
+      dedups by logical `Axis` not CLR type. Green: data-core 271 (byte-identical re-home+delegation), SQLite 11, Mongo naming 2.
+      ▶ NEXT = Phase C (operation-override plane `.OnDelete` + `Koan.Data.SoftDelete` reference module).
 - ☐ **THEN:** Phase 3c schema-column DDL indexability (Indexed descriptors → computed/expression index; PG/SqlServer;
   SQLite JSON-only) + Mongo/bare-store managed serialization injection + in-memory managed `GetValue` · classification
   phases 4–7 (searchable blind-index · vector/messaging leak guards · crypto-shred+rotation · masked-read) · then

@@ -34,4 +34,20 @@ public sealed record PartitionTokenPolicy
         var result = sb.ToString();
         return Lowercase ? result.ToLowerInvariant() : result;
     }
+
+    /// <summary>
+    /// Whether <paramref name="value"/> maps to its storage token <b>injectively</b> under this policy — i.e. two
+    /// distinct values can never collapse to the same token (the silent cross-scope-share vector). A value is
+    /// injective-safe iff it is a GUID (normalized deterministically) OR <see cref="Format"/> is the identity on it
+    /// (it is already a canonical token: no lossy character replacement, and — when <see cref="Lowercase"/> — already
+    /// lower-cased). The single shared rule behind both the partition front-door (<c>PartitionNameValidator</c>) and
+    /// the container-name particle plane (ARCH-0101 §3), so neither plane can ship a lossy-name leak.
+    /// </summary>
+    public bool IsInjective(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return false;
+        var trimmed = value.Trim();
+        if (Guid.TryParse(trimmed, out _)) return true;
+        return string.Equals(Format(trimmed), trimmed, StringComparison.Ordinal);
+    }
 }

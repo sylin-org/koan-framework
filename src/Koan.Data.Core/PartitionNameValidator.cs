@@ -1,4 +1,5 @@
 using System;
+using Koan.Data.Abstractions.Naming;
 
 namespace Koan.Data.Core;
 
@@ -30,28 +31,11 @@ namespace Koan.Data.Core;
 /// </summary>
 internal static class PartitionNameValidator
 {
-    // Separators kept verbatim by PartitionTokenPolicy.Default — anything outside [letters|digits|these]
-    // is replaced (lossy) and therefore collision-prone. Keep in sync with PartitionTokenPolicy.AllowedExtraChars.
-    private const string AllowedExtraChars = "-._";
-
-    /// <summary>Validate a partition name against the collision-safety rule above.</summary>
-    public static bool IsValid(string? name)
-    {
-        if (string.IsNullOrWhiteSpace(name)) return false;
-
-        var trimmed = name.Trim();
-        if (trimmed.Length == 0) return false;
-
-        // GUIDs are first-class partition values — the token policy normalizes them injectively.
-        if (Guid.TryParse(trimmed, out _)) return true;
-
-        // Otherwise the name must already be identifier-safe so sanitization is a no-op (injective).
-        foreach (var ch in trimmed)
-        {
-            if (!char.IsLetterOrDigit(ch) && AllowedExtraChars.IndexOf(ch) < 0)
-                return false;
-        }
-
-        return true;
-    }
+    /// <summary>
+    /// Validate a partition name against the collision-safety rule. Delegates to the ONE shared injectivity rule
+    /// (<see cref="PartitionTokenPolicy.IsInjective"/>) so the partition front-door and the ARCH-0101 §3 container-name
+    /// particle plane stay in lock-step (conformity — one rule, no drift). Default policy: GUID or only
+    /// letters/digits/<c>-._</c> (case-fold is a documented adapter-specific residual, see the class remarks).
+    /// </summary>
+    public static bool IsValid(string? name) => PartitionTokenPolicy.Default.IsInjective(name);
 }
