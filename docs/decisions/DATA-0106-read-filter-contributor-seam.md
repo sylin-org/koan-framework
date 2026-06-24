@@ -1,6 +1,6 @@
 # DATA-0106: The read-filter contributor seam — predicate-generic read scoping
 
-**Status**: Proposed (2026-06-24)
+**Status**: Proposed (2026-06-24) · adversarially reviewed (2 lenses — re-home correctness + fail-closed/cache; a CRITICAL + HIGHs folded below)
 **Date**: 2026-06-24
 **Deciders**: Enterprise Architect
 **Scope**: Make the data read-filter **predicate-generic**, not equality-shaped, so *any* data-segmentation capability — tenancy, classification, a future **moderation** — scopes reads as a **registered contributor**, never bespoke core code. Today the managed-field mechanism (DATA-0105) is axis-agnostic for the write-stamp but **hard-wires the read-filter to scalar equality**; a capability whose read semantics are a non-equality predicate (row-visibility) cannot register. This closes the one gap that keeps tenancy from being a *golden* example of the contributor model (contributor-purity assessment, 2026-06-24).
@@ -32,16 +32,21 @@ public interface IReadFilterContributor
 {
     /// Return a predicate to AND-fold into every read of <paramref name="entityType"/> (Query/Count and the
     /// key-op IDOR lowering), or null when this contributor imposes no constraint in the current ambient.
-    /// Must be cheap — it runs on every read; cache per-type metadata. The capability the filter needs to push
-    /// down (so the facade can fail closed when the adapter can't isolate) is declared by RequiredCapability.
+    /// Must be cheap — it runs on every read; cache per-type metadata.
     Filter? ReadFilter(System.Type entityType);
-    Koan.Data.Abstractions.Capabilities.CapabilityToken? RequiredCapability { get; }
+    /// The isolation capability the contributor needs the adapter to announce (the SAME nullable Capability type
+    /// ManagedFieldDescriptor.RequiredCapability uses — Koan.Core.Capabilities). The FACADE owns the throw (§4);
+    /// the contributor only declares.
+    Capability? RequiredCapability { get; }
 }
 ```
+The contributor returns data (a `Filter`) + a declaration (`RequiredCapability`); it has no channel to throw — **the facade owns fail-closed** (§4), exactly as it owns the `IStorageGuard` loop.
 
 ### 2. The read-filter is *uniformly* contributor-driven; equality is the built-in default contributor
 
-`RepositoryFacade`'s bespoke `ManagedReadFilter()` is **replaced** by folding every registered `IReadFilterContributor` (the same two-shaped application — `ApplyManaged` + `ScopedById`/`ScopedByIds`). The data core ships **one built-in contributor**, `ManagedEqualityReadContributor`, that yields `Filter.Eq(d.StorageName, d.ValueProvider())` for each managed descriptor whose **`AutoReadFilter`** is true — so:
+`RepositoryFacade`'s bespoke `ManagedReadFilter()` is **deleted** and replaced by one `ReadScopeFilter()` that folds every registered `IReadFilterContributor`. **Invariant: `grep ManagedReadFilter` returns zero after the change** — the folded filter threads through the *same* helpers (`ApplyManaged`, `ScopedById`, `ScopedByIds`) at **all eight** current call sites: `Get`, `GetMany`, `Query`, `Count`, `Delete`, **`DeleteMany`**, **`DeleteAll`**, **`RemoveAll`** (the last three are the cross-scope mass-delete leak class — omitting them regresses to an unscoped wipe). The fold is explicit: collect each contributor's non-null `ReadFilter`; **zero survivors → `null`** (wholly unfiltered, the existing fast path); **one → that filter**; **many → `Filter.All(survivors)`** — so the helpers receive a single `Filter?` byte-identical to today (no 1-element `AllOf`, no `null` operand).
+
+The data core ships **one built-in contributor**, `ManagedEqualityReadContributor`, that **reproduces today's `ManagedReadFilter` tri-state verbatim**: iterate the managed descriptors with `AutoReadFilter == true`; per descriptor, `ValueProvider()` null ⇒ skip (off/host); accumulate `Filter.Eq(StorageName, value)` only for non-null values; return `null` when nothing accumulates; unwrap a single predicate. So:
 
 - **Tenancy is byte-identical and stays one declaration.** Its `ManagedFieldDescriptor` (default `AutoReadFilter = true`) → the built-in contributor emits the same equality filter it does today. The read-filter now *flows through the seam* (golden) without tenancy changing a line.
 - **A predicate axis (moderation) registers its own `IReadFilterContributor`** returning, e.g., `Filter.AnyOf("__mod_visibility", viewer.Clearances)` or `Filter.Ne("__mod_status", "hidden")`. If it also stamps a field, its descriptor sets `AutoReadFilter = false` (stamp + schema-column + cache-partition, but **no** auto-equality that would wrongly conjoin).
@@ -50,13 +55,24 @@ public interface IReadFilterContributor
 
 The single additive member. `true` (default) preserves every existing axis (tenancy/classification) exactly. `false` means "stamp/schema/cache me, but I supply my own read predicate via an `IReadFilterContributor`." No other descriptor change; the write-stamp, schema-column, and cache-partition paths are untouched.
 
-### 4. Fail-closed is preserved and generalised
+### 4. Fail-closed is preserved and generalised — triggered by *any* contributor, enforced by pushdown
 
-`InspectManagedAdapter`'s fail-closed (an active managed scope on an adapter that can't isolate → throw) generalises: a contributor that yields a non-null filter **and** declares a `RequiredCapability` the adapter doesn't announce → fail closed, exactly as the equality path does today (the built-in equality contributor carries the descriptor's `RequiredCapability`, so tenancy's `RowScoped` fail-closed is unchanged). A predicate the adapter cannot push falls to the existing post-fetch/`NotSupported` path, never silently unfiltered.
+**The decisive correction (review CRITICAL+HIGH).** Today's fail-closed (`InspectManagedAdapter`/`RequireManagedAdapter`) is gated on `_managed.Count > 0` — so a contributor with **no** managed descriptor (a pure predicate axis) would bypass it entirely and run unfiltered or *post-fetched* on a non-isolating adapter. **Post-fetching an isolation filter is itself a leak** — it fetches cross-scope rows into process memory and skews `Count`. So:
 
-### 5. Cache interaction (ties to gap B)
+- **Trigger moves off `_managed.Count > 0` onto "any active contributor yields a non-null filter."** The adapter-inspection runs over the contributor *union*.
+- **The isolation filter MUST be enforced at the store, never as an in-memory residual.** The facade fail-closes (the existing `InvalidOperationException`) when the folded filter is non-null and **any** of: (a) a contributor declares a `RequiredCapability` the adapter doesn't announce; (b) the folded filter is **not fully pushable** by the adapter — checked via the existing `FilterSupport` oracle (the same one `FilterSplitter` uses), so an operator the adapter can't push fails closed rather than silently residual-filtering; (c) the adapter is not `IQueryRepository` (key-ops lower to scoped queries).
+- **Bias-to-strict:** a read-scoping contributor that yields a filter but declares **no** capability and isn't provably pushable **fails closed** — a `null` `RequiredCapability` is *not* a free pass. An axis that scopes reads without an isolation guarantee is a misconfiguration.
+- Tenancy is unchanged: the built-in equality contributor carries the descriptor's `RowScoped`, equality is pushable, so the existing fail-closed fires identically. The read-side throw (previously only structurally implied) gets an explicit spec (a *read*, not just a write, on a non-isolating adapter under an active equality contributor throws).
 
-A non-equality axis (`AutoReadFilter = false`) **cannot** be a cache-key segment — an id-keyed cache namespace is equality-by-construction, and partitioning by the row's stamped scalar is the wrong operand for a viewer-context predicate. So such a descriptor signals **cache-exclusion** for its entity (the framework already has the precedent — `[Classified]` excludes via `StorageFieldTransformRegistry`; extend the exclusion to "has a non-equality managed axis"). Equality axes (tenancy) remain cache-partitioned as today. Detailed in the cache convergence work (gap B).
+### 5. Cache-exclusion for non-equality axes ships **with** this ADR (not deferred)
+
+A non-equality axis **cannot** be a cache-key segment — an id-keyed cache namespace is equality-by-construction, and partitioning by the row's stamped scalar is the wrong operand for a viewer-context predicate (it would serve a hidden row to a viewer who shouldn't see it). The review showed this can't wait for gap B: `CachedRepository.AppendManagedScope` appends an equality segment for **every** managed descriptor regardless of `AutoReadFilter`, so a stamping non-equality axis would silently mis-partition `[Cacheable]` reads the moment DATA-0106 lands. So the minimal cache-exclusion ships **in this change set**:
+
+- `AppendManagedScope` **skips** any descriptor with `AutoReadFilter == false` (no equality segment from a non-equality axis).
+- `_excludeFromCache` **OR-includes** "the type has any `AutoReadFilter == false` managed descriptor" — the whole entity is cache-excluded (the framework already has the exclusion precedent: `[Classified]` via `StorageFieldTransformRegistry`).
+- **Mixed entity (an equality axis + a non-equality axis): exclusion wins for the whole entity** — correctness dominates a partition that would omit the visibility axis — and a first-use **diagnostic** is logged (`[Cacheable] X excluded: non-equality managed axis <name>`) so the lost cache is visible, not silent.
+
+Equality axes (tenancy) remain cache-partitioned exactly as today. The fuller cache convergence (the hand-rolled `AppendManagedScope` fold onto `AmbientAxisComposer` + the out-of-band evict-key scope bug where `CacheKey.For`/`Uncache` omit the suffix) remains **gap B** — but the *correctness*-critical exclusion is here.
 
 ---
 
@@ -66,14 +82,16 @@ A non-equality axis (`AutoReadFilter = false`) **cannot** be a cache-key segment
 - **A moderation capability rides as pure contributors.** Field-stamp (managed descriptor), read-visibility (`IReadFilterContributor` with a non-equality predicate), async-hop (carrier), fail-closed (guard) — zero core edits. The "would Moderation hit a wall?" test passes.
 - **One read-filter mechanism.** The bespoke `ManagedReadFilter` is gone; reads fold a uniform contributor set. Adding a read-scoping axis is a registration.
 - **Hot path.** Contributors are cached per type (like guards/managed fields); the no-contributor and no-ambient-value cases are the same empty fast paths. Equality stays a single `Filter.Eq` per axis.
-- **Scope.** This is the read-filter seam only. The write-stamp/schema/carrier/key seams are already generic (unchanged). The cache convergence + non-equality cache-exclusion is gap B; storage blob-key isolation is gap C.
+- **Scope.** The read-filter seam + the *correctness*-critical non-equality cache-**exclusion** (so a stamping non-equality axis can't mis-partition a `[Cacheable]` read). The write-stamp/schema/carrier/key seams are already generic (unchanged). The fuller cache **convergence** (hand-rolled fold → `AmbientAxisComposer`) + the out-of-band evict-key bug stay gap B; storage blob-key isolation is gap C.
 
 ---
 
 ## Implementation (phased — TDD, ARCH-0079 real-`AddKoan()` specs, mutation, green-ratchet)
 
-1. **Seam + built-in equality contributor (`Koan.Data.Core`).** Add `IReadFilterContributor` + `ManagedEqualityReadContributor` (reads the managed registry, honors `AutoReadFilter`, carries `RequiredCapability`); inject `IReadFilterContributor[]` into `RepositoryFacade` (like `_guards`); replace `ManagedReadFilter()` with the folded contributor set across `Get`/`GetMany`/`Query`/`Count`/`Delete`. Spec: an entity with the built-in equality contributor read-isolates **byte-identically** to today (re-run the existing managed-field/tenant read specs — they must pass unchanged).
-2. **`AutoReadFilter` flag (`Koan.Data.Abstractions`).** Add to `ManagedFieldDescriptor` (default true). Spec: a descriptor with `AutoReadFilter=false` stamps + schemas but contributes **no** equality read-filter.
-3. **Predicate-axis proof (`Koan.Data.Core` test).** A fake non-equality `IReadFilterContributor` (`Filter.Ne`/`Filter.AnyOf`) AND-folds into Query + the IDOR key-op lowering; an adapter that can't push it fails closed. The decisive Moderation test, made real on a fake axis (no Moderation module needed).
-4. **Tenancy re-home verification (`Koan.Tenancy` test).** The flagship `AssertNoTenantLeak` passes unchanged with the read-filter flowing through the built-in contributor (proves the re-home is byte-identical through a real boot).
-5. **(Gap B, separate slice)** cache fold convergence onto `AmbientAxisComposer` + the out-of-band evict-key scope fix + non-equality cache-exclusion.
+1. **Seam + built-in equality contributor (`Koan.Data.Core` / `Koan.Data.Abstractions`).** Add `IReadFilterContributor` (`Filter? ReadFilter(Type)` + `Capability? RequiredCapability`) + `ManagedEqualityReadContributor` (reproduces `ManagedReadFilter`'s tri-state verbatim, honors `AutoReadFilter`, carries the descriptor's `RequiredCapability`). Inject `IReadFilterContributor[]` into `RepositoryFacade` (like `_guards`); add `ReadScopeFilter()` (drop-null/single-survivor/`Filter.All` fold). **Replace `ManagedReadFilter()` at ALL EIGHT call sites** — `Get`/`GetMany`/`Query`/`Count`/`Delete`/`DeleteMany`/`DeleteAll`/`RemoveAll` — threading the folded filter through the unchanged `ApplyManaged`/`ScopedById`/`ScopedByIds`. **Grep gate: zero remaining `ManagedReadFilter` references.** Spec: the existing managed-field/tenant read specs pass **byte-identical**, AND the off path (no ambient value) issues the SAME single adapter call with no predicate (zero delta both on and off).
+2. **`AutoReadFilter` flag (`Koan.Data.Abstractions`).** Add to `ManagedFieldDescriptor` (default true). Spec: a descriptor with `AutoReadFilter=false` **still** stamps (`CurrentManagedValues`) + serializes the column, contributes **no** equality read-filter, and is **excluded from the cache** (see step 5).
+3. **Fail-closed over the contributor union (`Koan.Data.Core`).** Move the adapter-inspection trigger off `_managed.Count>0` onto "any active contributor yields a filter"; fail closed on unmet `RequiredCapability`, on a folded filter not fully pushable (`FilterSupport`), or non-`IQueryRepository`; a null-capability read-scoping contributor fails closed (bias-to-strict). Specs: (a) a **read** (not just a write) on a non-isolating adapter under an active equality contributor **throws**; (b) a pure predicate contributor (no managed field) on a non-isolating adapter **throws** (the CRITICAL — never silently post-fetches).
+4. **Predicate-axis proof + IDOR (`Koan.Data.Core` test).** A fake non-equality `IReadFilterContributor` (`Filter.Ne`/`Filter.AnyOf`) AND-folds into `Query`/`Count` **and** the IDOR key paths: assert a wrong-context **Get-by-id returns null** and a non-owned **Delete-by-id does not delete** and **DeleteMany/DeleteAll/RemoveAll** stay scoped. The decisive Moderation test on a fake axis (no Moderation module needed).
+5. **Cache-exclusion (`Koan.Cache`, same change set).** `AppendManagedScope` skips `AutoReadFilter==false` descriptors; `_excludeFromCache` OR-includes "type has any `AutoReadFilter==false` managed axis"; first-use diagnostic. Specs: a `[Cacheable]` entity with a non-equality axis is **not cached** (and still read-isolated via the predicate); a mixed (equality+non-equality) `[Cacheable]` entity is **excluded** yet still tenant-isolated.
+6. **Tenancy re-home verification (`Koan.Tenancy` test).** The flagship `AssertNoTenantLeak` passes unchanged with the read-filter flowing through the built-in contributor — and **add the missing scoped `DeleteMany`/`DeleteAll` assertions** (only `RemoveAll` is asserted today, so a delete-path regression is currently silent).
+7. **(Gap B, separate slice)** the fuller cache fold convergence onto `AmbientAxisComposer` + the out-of-band evict-key scope fix.
