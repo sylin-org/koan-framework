@@ -35,6 +35,10 @@ public sealed class AssertNoTenantLeakSpec
     [HostScoped]
     public sealed class SystemFlag : Entity<SystemFlag> { public string Name { get; set; } = ""; }
 
+    // ARCH-0100: the generic, tenancy-free exemption marker — infra entities (e.g. the Koan.Jobs ledger) use it
+    // instead of [HostScoped] so they never take a Koan.Tenancy dependency. It must earn the SAME exemption.
+    public sealed class InfraRow : Entity<InfraRow>, IAmbientExempt { public string Name { get; set; } = ""; }
+
     [Cacheable(300)]
     public sealed class CachedNote : Entity<CachedNote> { public string Title { get; set; } = ""; }
 
@@ -83,6 +87,21 @@ public sealed class AssertNoTenantLeakSpec
 
         using (Tenant.Use("acme")) (await SystemFlag.Get(flag.Id)).Should().NotBeNull();
         using (Tenant.Use("globex")) (await SystemFlag.Get(flag.Id)).Should().NotBeNull();
+    }
+
+    [Fact(DisplayName = "no tenant leak: an IAmbientExempt entity is exempt (same as [HostScoped]) — no Koan.Tenancy dependency")]
+    public async Task Ambient_exempt_entity_is_not_tenant_isolated()
+    {
+        await using var runtime = await TenancyRuntimeFixture.CreateAsync(extraSettings: Posture("Closed"));
+        runtime.ResetEntityCaches();
+        using var _iso = Isolate();
+
+        // The generic marker writes without a tenant (the guard exempts it; the managed field does not apply) and
+        // is visible under every tenant — proving the exemption predicate unions [HostScoped] OR IAmbientExempt.
+        var row = await new InfraRow { Name = "infra" }.Save();
+
+        using (Tenant.Use("acme")) (await InfraRow.Get(row.Id)).Should().NotBeNull();
+        using (Tenant.Use("globex")) (await InfraRow.Get(row.Id)).Should().NotBeNull();
     }
 
     [Fact(DisplayName = "no tenant leak: a [Cacheable] entity does not serve one tenant's cached row to another")]
