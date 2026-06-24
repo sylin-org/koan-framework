@@ -51,9 +51,11 @@ public sealed class JobCoordinator : IJobCoordinator
         var policy = binding.ResolvePolicy(action, _options);
         var workId = binding.GetId(workItem);
         var now = _clock.GetUtcNow();
+        var carrier = Carrier();   // capture the ambient ONCE here, before any await / scope change (ARCH-0100 §5)
 
-        // Coalesce check BEFORE any entity save: a duplicate submit returns the existing handle without touching the store.
-        var coalesceKey = binding.CoalesceKey(workItem, action);
+        // Coalesce check BEFORE any entity save: a duplicate submit returns the existing handle without touching the
+        // store. The key folds in the captured ambient so two tenants' idempotent submits never collide.
+        var coalesceKey = JobCoalesce.FoldAmbient(binding.CoalesceKey(workItem, action), carrier);
         if (coalesceKey is not null)
         {
             var existing = await _ledger.FindActiveByCoalesceKey(binding.WorkType, coalesceKey, ct);
@@ -68,7 +70,7 @@ public sealed class JobCoordinator : IJobCoordinator
             await binding.Save(workItem, ct);
 
         var gateKey = await ResolveGateKey(binding, workItem, ct);
-        var rec = JobRecordFactory.Create(binding, policy, workItem, workId, action, now, after, Correlation(), gateKey, Carrier());
+        var rec = JobRecordFactory.Create(binding, policy, workItem, workId, action, now, after, Correlation(), gateKey, carrier);
         await _ledger.Append(rec, ct);
 
         // Transactional outbox: inside an ambient transaction the work-item Save + the ledger Append enlist (TrackSave)
@@ -92,8 +94,8 @@ public sealed class JobCoordinator : IJobCoordinator
             var policy = binding.ResolvePolicy(action, _options);
             var workId = binding.GetId(workItem);
 
-            // Coalesce check BEFORE any entity save.
-            var coalesceKey = binding.CoalesceKey(workItem, action);
+            // Coalesce check BEFORE any entity save (ambient folded in — per-tenant dedup).
+            var coalesceKey = JobCoalesce.FoldAmbient(binding.CoalesceKey(workItem, action), carrier);
             if (coalesceKey is not null && await _ledger.FindActiveByCoalesceKey(binding.WorkType, coalesceKey, ct) is not null)
                 continue;
 
@@ -121,8 +123,9 @@ public sealed class JobCoordinator : IJobCoordinator
         // The singleton is ephemeral — it must NOT be persisted into the consumer's entity collection. The orchestrator
         // creates a fresh instance via binding.NewSingleton at execution time (no store round-trip on the hot path).
         var workItem = binding.NewSingleton(SingletonWorkId);
+        var carrier = Carrier();
 
-        var coalesceKey = binding.CoalesceKey(workItem, action);
+        var coalesceKey = JobCoalesce.FoldAmbient(binding.CoalesceKey(workItem, action), carrier);
         if (coalesceKey is not null)
         {
             var existing = await _ledger.FindActiveByCoalesceKey(binding.WorkType, coalesceKey, ct);
@@ -130,7 +133,7 @@ public sealed class JobCoordinator : IJobCoordinator
         }
 
         var gateKey = await ResolveGateKey(binding, workItem, ct);
-        var rec = JobRecordFactory.Create(binding, policy, workItem, SingletonWorkId, action, now, null, Correlation(), gateKey, Carrier());
+        var rec = JobRecordFactory.Create(binding, policy, workItem, SingletonWorkId, action, now, null, Correlation(), gateKey, carrier);
         await _ledger.Append(rec, ct);
 
         if (!EntityContext.InTransaction) _transport.Notify();

@@ -43,4 +43,9 @@ public sealed class TenantContextCarrier : IAmbientSliceCarrier
         throw new InvalidOperationException(
             $"TenantContextCarrier: cannot restore tenant from an unknown captured format '{captured}' (expected version '{Version}').");
     }
+
+    // Explicitly clear the ambient tenant for this scope — so a job submitted with no tenant never inherits the
+    // worker/inline-drain thread's tenant. Tenant.Current becomes null (unset); the §1b guard then owns the
+    // refusal (Closed) / dev-fallback (Open), exactly as for a request with no tenant.
+    public IDisposable Suppress() => EntityContext.WithSlice<TenantContext>(null);
 }

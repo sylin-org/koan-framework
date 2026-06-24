@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using AwesomeAssertions;
 using Koan.Data.Core;
 using Xunit;
@@ -24,6 +26,7 @@ public class AmbientCarrierRegistrySpec
         public string AxisKey => "test:foo";
         public string? Capture() => EntityContext.GetSlice<FooSlice>()?.V;
         public IDisposable Restore(string captured) => EntityContext.WithSlice(new FooSlice(captured));
+        public IDisposable Suppress() => EntityContext.WithSlice<FooSlice>(null);
     }
 
     private sealed class BarCarrier : IAmbientSliceCarrier
@@ -31,6 +34,7 @@ public class AmbientCarrierRegistrySpec
         public string AxisKey => "test:bar";
         public string? Capture() => EntityContext.GetSlice<BarSlice>()?.V;
         public IDisposable Restore(string captured) => EntityContext.WithSlice(new BarSlice(captured));
+        public IDisposable Suppress() => EntityContext.WithSlice<BarSlice>(null);
     }
 
     private sealed class ThrowingCarrier : IAmbientSliceCarrier
@@ -38,6 +42,7 @@ public class AmbientCarrierRegistrySpec
         public string AxisKey => "test:throw";
         public string? Capture() => "x";
         public IDisposable Restore(string captured) => throw new InvalidOperationException("boom");
+        public IDisposable Suppress() => EntityContext.WithSlice<BarSlice>(null);
     }
 
     private static AmbientCarrierRegistry Registry(params IAmbientSliceCarrier[] carriers) => new(carriers);
@@ -81,18 +86,27 @@ public class AmbientCarrierRegistrySpec
     }
 
     [Fact]
-    public void Restore_of_null_bag_is_a_safe_noop()
+    public void Restore_of_null_bag_suppresses_the_axis_and_does_not_inherit()
     {
+        // The inline-drain hole: a null bag must CLEAR the axis, not inherit the caller's ambient. Set an outer
+        // slice (the carrier-thread ambient), restore a null bag, and assert the axis is suppressed to null.
+        using (EntityContext.WithSlice(new FooSlice("carrier-thread")))
         using (Registry(new FooCarrier()).Restore(null))
+            EntityContext.GetSlice<FooSlice>().Should().BeNull();   // suppressed, NOT inherited
+    }
+
+    [Fact]
+    public void Restore_of_empty_bag_suppresses_the_axis_and_does_not_inherit()
+    {
+        using (EntityContext.WithSlice(new FooSlice("carrier-thread")))
+        using (Registry(new FooCarrier()).Restore(new Dictionary<string, string>()))
             EntityContext.GetSlice<FooSlice>().Should().BeNull();
     }
 
     [Fact]
-    public void Restore_of_empty_bag_is_a_safe_noop()
-    {
-        using (Registry(new FooCarrier()).Restore(new Dictionary<string, string>()))
-            EntityContext.GetSlice<FooSlice>().Should().BeNull();
-    }
+    public void Restore_with_no_registered_carriers_is_a_true_noop()
+        // The non-tenancy hot path: nothing to restore or suppress, no allocation, never throws.
+        => Registry().Restore(null).Should().NotBeNull();
 
     [Fact]
     public void Restore_throws_fail_closed_on_an_unregistered_axis()
@@ -137,5 +151,34 @@ public class AmbientCarrierRegistrySpec
     {
         var act = () => new AmbientCarrierRegistry(new IAmbientSliceCarrier[] { new FooCarrier(), new FooCarrier() });
         act.Should().Throw<InvalidOperationException>().Which.Message.Should().Contain("test:foo");
+    }
+
+    [Fact]
+    public void Restore_fails_closed_before_pushing_when_a_registered_axis_accompanies_an_unregistered_one()
+    {
+        // A real axis is present alongside an unregistered one. Fail-closed must fire BEFORE anything is pushed —
+        // so no partial ambient is left in scope after the throw.
+        var bag = new Dictionary<string, string> { ["test:foo"] = "f", ["test:unknown"] = "v" };
+        var act = () => Registry(new FooCarrier()).Restore(bag);
+        act.Should().Throw<AmbientCarrierException>();
+        EntityContext.GetSlice<FooSlice>().Should().BeNull();   // nothing left pushed
+    }
+
+    [Fact]
+    public async Task Restore_isolates_parallel_contexts()
+    {
+        var registry = Registry(new FooCarrier());
+
+        async Task<string?> Scope(string v)
+        {
+            using (registry.Restore(new Dictionary<string, string> { ["test:foo"] = v }))
+            {
+                await Task.Yield();
+                return EntityContext.GetSlice<FooSlice>()?.V;
+            }
+        }
+
+        var results = await Task.WhenAll(Scope("a"), Scope("b"), Scope("c"));
+        results.OrderBy(x => x).Should().Equal("a", "b", "c");   // each parallel flow saw only its own restored slice
     }
 }

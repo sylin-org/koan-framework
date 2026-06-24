@@ -37,6 +37,7 @@ public interface IAmbientSliceCarrier            // implemented by the owning mo
     string AxisKey { get; }                       // stable opaque key, e.g. "koan:tenant" — the bag key
     string? Capture();                            // read the ambient slice → portable string (null = absent)
     IDisposable Restore(string captured);         // push the slice back onto EntityContext; disposed after settle
+    IDisposable Suppress();                       // push an EXPLICITLY-CLEARED ambient (see §5 — don't inherit)
 }
 ```
 
@@ -84,7 +85,7 @@ await SettleSuccessAsync(...);                              // conditional auto-
 
 **The fail-closed guarantee is *composed*, not self-contained.** The carrier restores the submitted ambient; the *refusal* of an under-scoped write is the request-path guard's job (`TenantStorageGuard`, ARCH-0099 §1b). The three bag states are distinct and must be handled explicitly:
 
-1. **`null`/empty bag** → no slice restored. The handler runs with no ambient axis; a tenant-data write is then refused by `TenantStorageGuard` **under Closed posture**. **Under Open posture the dev-fallback tenant applies — this is expected dev behavior, not a leak.** (Scheduled/boot/`Trigger` submissions legitimately produce an empty bag — they originate on the host worker thread with no ambient slice; a scheduled job that touches tenant data must enter a tenant scope explicitly inside its handler. The carrier neither invents nor weakens an ambient that was never submitted.)
+1. **`null`/empty bag** → every registered axis is **explicitly *suppressed*** (cleared via `IAmbientSliceCarrier.Suppress()`), **not left to inherit** the worker/drain thread's ambient. This matters because `DrainAsync` in `JobMode.Inline` runs *synchronously inside the submitter's* `Tenant.Use(...)` scope — a plain no-op restore would let an unscoped job inherit the submitter's tenant and write its partition (the leak the impl-review found). After suppression the handler runs with no ambient axis; a tenant-data write is then refused by `TenantStorageGuard` **under Closed posture**. **Under Open posture the dev-fallback tenant applies — expected dev behavior, not a leak.** (Scheduled/boot/`Trigger` submissions legitimately produce an empty bag; a scheduled job that touches tenant data must enter a tenant scope explicitly inside its handler. The carrier neither invents nor weakens an ambient that was never submitted.) With **no** registered carriers (an app without any cross-cutting module) the restore is a true allocation-free no-op.
 2. **bag with a registered axis** → restore it; the handler runs in the submitted ambient.
 3. **bag names an axis whose carrier is *unregistered* at execute (owning module absent on this node), or `Restore` throws** → the job is **dead-lettered with a named reason**. It never silently drops the axis and runs fail-open. This is the one fail-closed decision the carrier owns by itself.
 
@@ -101,6 +102,16 @@ All four `Koan.Jobs` ledger entities — `JobRecord`, `JobMetric`, `JobGateRecor
 ### 7. Chains re-thread the bag; the orchestrator is a second capture site
 
 Chain successors (`ctx.ContinueWith`, `[JobChain]` auto-advance, `OnFailure.Continue`) are built by the **orchestrator's own** `JobRecordFactory.Create` calls, **not** through `JobCoordinator` — so capture-at-submit (§5) does not fire for them. `JobRecordFactory.Create` therefore takes the `AmbientCarrier` as a parameter, and the orchestrator **propagates the parent's `rec.AmbientCarrier` verbatim** into every chain successor (re-capturing from the still-restored ambient would be equivalent at those sites, but propagation is unambiguous and independent of restore still being active). Both stages of a chain submitted under `Tenant.Use("acme")` thus observe acme.
+
+### 7a. The coalesce/idempotency identity folds in the captured ambient
+
+The carrier guarantees the *handler* runs in the submitted ambient — but a job can be dropped or mis-routed **at the submit gate, before any capture/restore**, if the dedup is ambient-blind. `[JobIdempotent]` coalesces a duplicate submit onto an active job by a key built from the work-item; the lookup (`FindActiveByCoalesceKey`) reads the **exempt** (globally-visible) `JobRecord`. So a tenant-blind key lets tenant B's idempotent submit collapse onto tenant A's queued job — B's work is dropped and runs once *in A's ambient against A's data*. The "same work" for two tenants is **different work**.
+
+Fix (conformity-by-design): **fold the captured ambient bag into the stored `JobRecord.CoalesceKey`**, and compute the same fold for the dedup lookup. The dedup is then structurally ambient-scoped — no ledger query can forget the filter because the key itself encodes the axis. An unscoped/system submit (null bag) keeps its **global** coalesce identity (correct — a system singleton *should* coalesce across the host). This is axis-generic: the coordinator folds whatever the carrier captured, naming no axis.
+
+### 7b. Resource gates (`[JobGate]`) are global by design, not per-tenant
+
+A `[JobGate]` key and its backing `JobGateRecord` (exempt) are **global** — a tenant's cooperative backoff on resource key `"api"` defers *every* tenant's job keyed `"api"`. This is **intended**: a gate models a genuinely **shared** dependency (an external API's 429 should back everyone off, not just the tenant who hit it). It is not a data leak (no tenant data crosses). An app that wants a **per-tenant** gate includes the tenant in its `[JobGate]` key (the key is app-authored). The framework does **not** auto-fold the ambient into the gate key — doing so would break legitimate shared-resource coordination. (Contrast §7a: coalesce identity *is* auto-folded because cross-tenant coalescing is always wrong.)
 
 ### 8. Messaging / outbox ride the same carrier (follow-on, not a second design)
 

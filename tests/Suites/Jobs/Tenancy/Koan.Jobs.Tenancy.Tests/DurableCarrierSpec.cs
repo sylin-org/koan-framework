@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using AwesomeAssertions;
+using Koan.Data.Abstractions;
 using Koan.Data.Core.Model;
 using Koan.Jobs;
 using Koan.Jobs.TestKit;
@@ -127,6 +128,59 @@ public sealed class DurableCarrierSpec
         TenantBarrierJob.Seen["a"].Should().Be("acme");
         TenantBarrierJob.Seen["b"].Should().Be("globex");
     }
+
+    [Fact]
+    public async Task Two_tenants_same_idempotent_work_do_not_coalesce_and_each_runs_in_its_own_ambient()
+    {
+        // The cross-tenant coalesce hole: a tenant-blind [JobIdempotent] key would let globex's submit collapse
+        // onto acme's queued job and run once in acme's ambient. The captured ambient is folded into the coalesce
+        // identity, so the two are distinct work and each runs in its own tenant.
+        TenantIdempotentJob.Reset();
+        await using var host = await JobsHarness.StartSqliteAsync();
+
+        string idA, idB;
+        using (Tenant.Use("acme")) { var j = new TenantIdempotentJob { Key = "k1" }; idA = j.Id; await j.Job.Submit(); }
+        using (Tenant.Use("globex")) { var j = new TenantIdempotentJob { Key = "k1" }; idB = j.Id; await j.Job.Submit(); }
+        idA.Should().NotBe(idB);
+
+        await host.Drain();
+
+        TenantIdempotentJob.Observed.Should().BeEquivalentTo(new[] { "acme", "globex" });
+    }
+
+    [Fact]
+    public async Task A_drain_running_inside_a_tenant_scope_does_not_leak_into_an_unscoped_job()
+    {
+        // The null-bag inherit hole: an unscoped job's restore must EXPLICITLY clear the axis, not inherit the
+        // drain thread's ambient (e.g. an inline drain inside a caller's Tenant.Use scope). The work-item is exempt
+        // so it can be submitted unscoped under Closed posture.
+        ExemptObservingJob.Reset();
+        await using var host = await JobsHarness.StartSqliteAsync();
+
+        await new ExemptObservingJob().Job.Submit();          // unscoped → null bag
+
+        using (Tenant.Use("acme")) await host.Drain();        // the drain thread carries acme
+
+        ExemptObservingJob.ObservedSet.Should().BeTrue();
+        ExemptObservingJob.Observed.Should().BeNull();        // suppressed, NOT inherited from the drain thread
+    }
+
+    [Fact]
+    public async Task A_retried_tenant_job_re_restores_the_tenant_on_the_retry_attempt()
+    {
+        // The 'different node / restart' claim made concrete for retry: the bag persists on the ledger row, so a
+        // re-claimed attempt re-restores the captured tenant.
+        TenantRetryJob.Reset();
+        await using var host = await JobsHarness.StartSqliteAsync();
+
+        using (Tenant.Use("acme")) await new TenantRetryJob().Job.Submit(TenantRetryJob.Work);
+        await host.Drain();                                   // attempt 1 throws → requeued for retry
+        host.Advance(TimeSpan.FromMinutes(5));
+        await host.Drain();                                   // attempt 2 succeeds
+
+        TenantRetryJob.ObservedPerAttempt.Count.Should().BeGreaterThanOrEqualTo(2);
+        TenantRetryJob.ObservedPerAttempt.Should().OnlyContain(t => t == "acme");
+    }
 }
 
 /// <summary>A tenant-scoped work-item (NOT exempt): records the ambient tenant it observes, and writes itself — so
@@ -184,4 +238,56 @@ public sealed class TenantBarrierJob : Entity<TenantBarrierJob>, IKoanJob<Tenant
         Arrived = new SemaphoreSlim(0);
         Release = new SemaphoreSlim(0);
     }
+}
+
+/// <summary>A tenant-scoped idempotent job: records the ambient it ran in, to prove two tenants' same-key submits
+/// do not coalesce and each runs in its own tenant.</summary>
+[JobIdempotent(nameof(Key))]
+public sealed class TenantIdempotentJob : Entity<TenantIdempotentJob>, IKoanJob<TenantIdempotentJob>
+{
+    public string Key { get; set; } = "";
+    public static readonly ConcurrentBag<string?> Observed = new();
+
+    public static Task Execute(TenantIdempotentJob job, JobContext ctx, CancellationToken ct)
+    {
+        Observed.Add(Tenant.Current?.Id);
+        return Task.CompletedTask;
+    }
+
+    public static void Reset() => Observed.Clear();
+}
+
+/// <summary>An ambient-exempt observing job — can be submitted unscoped under Closed posture; records the ambient
+/// it observes, to prove an unscoped job does not inherit the drain thread's tenant.</summary>
+public sealed class ExemptObservingJob : Entity<ExemptObservingJob>, IKoanJob<ExemptObservingJob>, IAmbientExempt
+{
+    public static string? Observed;
+    public static bool ObservedSet;
+
+    public static Task Execute(ExemptObservingJob job, JobContext ctx, CancellationToken ct)
+    {
+        Observed = Tenant.Current?.Id;
+        ObservedSet = true;
+        return Task.CompletedTask;
+    }
+
+    public static void Reset() { Observed = null; ObservedSet = false; }
+}
+
+/// <summary>A tenant-scoped job that fails its first attempt and succeeds on retry, recording the ambient on each
+/// attempt — proving the carrier re-restores the captured tenant on a re-claimed attempt.</summary>
+[JobAction(Work, MaxAttempts = 3)]
+public sealed class TenantRetryJob : Entity<TenantRetryJob>, IKoanJob<TenantRetryJob>
+{
+    public const string Work = "work";
+    public static readonly ConcurrentBag<string?> ObservedPerAttempt = new();
+
+    public static Task Execute(TenantRetryJob job, JobContext ctx, CancellationToken ct)
+    {
+        ObservedPerAttempt.Add(Tenant.Current?.Id);
+        if (ctx.State.Attempt < 2) throw new InvalidOperationException("transient");
+        return Task.CompletedTask;
+    }
+
+    public static void Reset() => ObservedPerAttempt.Clear();
 }

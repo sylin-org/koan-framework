@@ -32,4 +32,12 @@ public interface IAmbientSliceCarrier
     /// refuse — the job dead-letters rather than running fail-open in a wrong/ghost ambient.
     /// </summary>
     System.IDisposable Restore(string captured);
+
+    /// <summary>
+    /// Push an <b>explicitly cleared</b> ambient for this axis (no slice) for the lifetime of the returned scope;
+    /// disposing restores the previous context. Used at execute when the captured bag carries no value for this
+    /// axis, so the work never <i>inherits</i> the carrier thread's ambient (e.g. an inline drain running inside a
+    /// caller's <c>Tenant.Use</c> scope) — an unscoped job observes a genuinely absent axis, not a leaked one.
+    /// </summary>
+    System.IDisposable Suppress();
 }

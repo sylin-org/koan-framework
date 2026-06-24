@@ -381,8 +381,22 @@ implemented and its tests pass on real stores.
     generic — ratifies ARCH-0099 §7d durable-carrier bullet): `IAmbientSliceCarrier`+`AmbientCarrierRegistry` in
     `Koan.Data.Core` (Capture→bag→Restore, fail-closed on unregistered-axis); tenancy registers `TenantContextCarrier`
     reusing `Tenant.Use`'s existing `IDisposable`; opaque sparse bag on `JobRecord`; `JobRecord`/`JobMetric` `[HostScoped]`;
-    messaging/outbox = same-mechanism follow-on. 7-phase TDD impl plan in the ADR. **NEXT: adversarial review (running
-    `wf_9daa6690-4b9`) → fold → phase-1 TDD (carrier registry in Koan.Data.Core).**
+    messaging/outbox = same-mechanism follow-on. 7-phase TDD impl plan in the ADR.
+  - **▶▶ ARCH-0100 ADR RATIFIED + IMPLEMENTED — phases 1–6 GREEN (2026-06-24).** 3-lens adversarial review of the ADR
+    (`wf_9daa6690-4b9`, all ratifiable-with-fixes) folded: generic `IAmbientExempt` marker in `Koan.Data.Abstractions`
+    (NOT `[HostScoped]` — avoids a `Koan.Jobs→Koan.Tenancy` edge); ALL FOUR ledger entities exempt
+    (JobRecord/JobMetric/**JobGateRecord/JobClaimTicket** — review CRITICAL-1); DI-enumerable discovery; chain-successor
+    bag propagation; fail-closed *composed* with the §1b guard (3 null-states); `Capture()`→null-not-empty; `Clone()`
+    deep-copy; mandatory carrier versioning; deleted-tenant ghost deferred to the P8 cancel-on-delete saga. Build (TDD,
+    real-`AddKoan` specs, mutation, green-ratchet per phase):
+    · **p1** `c0b8d435` — `AmbientCarrierRegistry`+`IAmbientSliceCarrier`+`IAmbientExempt` (10/10; fail-closed mutant killed)
+    · **p2** `0186c110` — `TenantScopeMetadata` unions `[HostScoped]`|`IAmbientExempt` (flagship AssertNoTenantLeak gains the proof)
+    · **p3** `31e33558` — 4 ledger entities `IAmbientExempt`; new `Koan.Jobs.Tenancy.Tests` (real SQLite boot + live Closed tenancy: full submit-under-tenant→claim→gate-backoff→settle, no leak)
+    · **p4** `bfb03570` — `TenantContextCarrier` (versioned tri-state; reuses `Tenant.Use`/`None`); DI-enumerable reg + `AmbientCarrierRegistry` singleton
+    · **p5+p6** `64f6ae0a` — capture at the 3 submit paths + restore-at-execute wrapping load→execute→settle + chain propagation + `DeadReason.CarrierRestoreFailed` fail-closed. `DurableCarrierSpec` 8/8 incl. a **barrier-forced 2-tenant concurrency** isolation proof; restore mutant killed (4 specs fail). No regressions: jobs in-memory 74/74, **SQLite durable 76/76**, data-core 252/252, tenancy 78/78.
+    **NEXT: fold the impl-diff adversarial review (`wf_84072b03-11c`) → then phase 7 = the SnapVault async-path proof
+    arrives during the conversion (SnapVault worker → `Koan.Jobs`). Messaging/outbox carrier = named follow-on. The
+    durable-carrier keystone is DONE; the conversion's headline break-and-rebuild is now safe.**
 - ☐ **THEN:** Phase 3c schema-column DDL indexability (Indexed descriptors → computed/expression index; PG/SqlServer;
   SQLite JSON-only) + Mongo/bare-store managed serialization injection + in-memory managed `GetValue` · classification
   phases 4–7 (searchable blind-index · vector/messaging leak guards · crypto-shred+rotation · masked-read) · then

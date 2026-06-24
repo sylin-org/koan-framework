@@ -49,30 +49,34 @@ public sealed class AmbientCarrierRegistry
 
     /// <summary>
     /// Rehydrate the slices described by <paramref name="bag"/> onto <see cref="EntityContext"/> for the lifetime
-    /// of the returned scope. Restores in registration order and disposes in reverse. <b>Fail-closed:</b> a bag
-    /// key with no registered carrier throws <see cref="AmbientCarrierException"/> (never a silent fail-open); if a
-    /// carrier's own <c>Restore</c> throws, any already-acquired scopes are unwound before the exception
-    /// propagates. A <c>null</c>/empty bag restores nothing and returns a safe no-op scope.
+    /// of the returned scope. Establishes an <b>explicit</b> ambient for <i>every</i> registered axis — each axis
+    /// is either <see cref="IAmbientSliceCarrier.Restore"/>d from the bag or <see cref="IAmbientSliceCarrier.Suppress"/>ed
+    /// (explicitly cleared) — so the work never inherits the carrier thread's ambient (the inline-drain leak). Applies
+    /// in registration order and disposes in reverse. <b>Fail-closed:</b> a bag key with no registered carrier throws
+    /// <see cref="AmbientCarrierException"/> <i>before</i> anything is pushed (never a silent fail-open); if a carrier's
+    /// own restore/suppress throws, any already-acquired scopes are unwound before the exception propagates. With no
+    /// registered carriers the call is a true no-op (the hot path for an app without a cross-cutting module).
     /// </summary>
     public IDisposable Restore(IReadOnlyDictionary<string, string>? bag)
     {
-        if (bag is null || bag.Count == 0) return NoopScope.Instance;
+        // Fail closed up front: a captured axis with no registered carrier here cannot be rehydrated.
+        if (bag is not null && bag.Count > 0)
+        {
+            var unregistered = bag.Keys.Where(k => !_byKey.ContainsKey(k)).ToArray();
+            if (unregistered.Length > 0) throw new AmbientCarrierException(unregistered);
+        }
 
-        List<IDisposable>? scopes = null;
-        var consumed = 0;
+        if (_carriers.Count == 0) return NoopScope.Instance;   // nothing to restore OR suppress — no allocation
+
+        var scopes = new List<IDisposable>(_carriers.Count);
         try
         {
             for (var i = 0; i < _carriers.Count; i++)
             {
-                if (!bag.TryGetValue(_carriers[i].AxisKey, out var captured)) continue;
-                (scopes ??= new List<IDisposable>()).Add(_carriers[i].Restore(captured));
-                consumed++;
-            }
-
-            if (consumed != bag.Count)
-            {
-                var unregistered = bag.Keys.Where(k => !_byKey.ContainsKey(k)).ToArray();
-                throw new AmbientCarrierException(unregistered);
+                var carrier = _carriers[i];
+                scopes.Add(bag is not null && bag.TryGetValue(carrier.AxisKey, out var captured)
+                    ? carrier.Restore(captured)     // captured value for this axis
+                    : carrier.Suppress());          // no value → clear, don't inherit the carrier thread's ambient
             }
         }
         catch
@@ -81,7 +85,7 @@ public sealed class AmbientCarrierRegistry
             throw;
         }
 
-        return scopes is null ? NoopScope.Instance : new CompositeScope(scopes);
+        return new CompositeScope(scopes);
     }
 
     private static void Unwind(List<IDisposable>? scopes)
