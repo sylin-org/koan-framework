@@ -1,3 +1,4 @@
+using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Core.Model;
 
@@ -9,7 +10,7 @@ namespace Koan.Jobs;
 /// adapters; durability follows the ambient adapter). The <c>Id</c> is the Job id; <see cref="WorkId"/>
 /// points at the work-item entity. JOBS-0005 §3/§7/§9.
 /// </summary>
-public sealed class JobRecord : Entity<JobRecord>
+public sealed class JobRecord : Entity<JobRecord>, IAmbientExempt
 {
     /// <summary>Stable key of the discovered <see cref="IKoanJob"/> work-item type (its full name).</summary>
     // JOBS-0005 §19.3: (WorkType,Status) serves the dashboard/coalesce; (WorkType,WorkId) the §17.2 exclusivity probe + history.

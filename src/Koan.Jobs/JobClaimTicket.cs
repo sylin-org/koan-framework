@@ -1,3 +1,4 @@
+using Koan.Data.Abstractions;
 using Koan.Data.Core.Model;
 
 namespace Koan.Jobs;
@@ -8,7 +9,7 @@ namespace Koan.Jobs;
 /// list ("list all tickets for job X" = <c>JobClaimTicket.Query(t =&gt; t.JobId == X)</c>). The smallest <c>Id</c>
 /// (a time-ordered GUIDv7) wins. Tickets are GC'd once the claim resolves.
 /// </summary>
-public sealed class JobClaimTicket : Entity<JobClaimTicket>
+public sealed class JobClaimTicket : Entity<JobClaimTicket>, IAmbientExempt
 {
     public string JobId { get; set; } = "";
     public string Owner { get; set; } = "";

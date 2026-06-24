@@ -1,3 +1,4 @@
+using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Core.Model;
 
@@ -10,7 +11,7 @@ namespace Koan.Jobs;
 /// ledger stays the source of truth; this rollup is derived and lossy-tolerant. Opt-in via
 /// <see cref="JobsOptions.MetricsEnabled"/>.
 /// </summary>
-public sealed class JobMetric : Entity<JobMetric>
+public sealed class JobMetric : Entity<JobMetric>, IAmbientExempt
 {
     /// <summary>Time bucket "yyyy-MM-ddTHH" (hourly) — lexicographic order is chronological.</summary>
     [Index(Group = "ix_metric", Order = 1)]
