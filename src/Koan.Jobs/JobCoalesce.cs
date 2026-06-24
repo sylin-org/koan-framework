@@ -1,6 +1,5 @@
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using Koan.Core.Naming;
 
 namespace Koan.Jobs;
 
@@ -10,23 +9,14 @@ namespace Koan.Jobs;
 /// collapse onto another tenant's queued job (which would then run once, in the wrong tenant's ambient, against the
 /// wrong tenant's data — bypassing the carrier guarantee at the submit gate, before any capture/restore).
 ///
-/// <para>Folding the ambient bag into the stored <see cref="JobRecord.CoalesceKey"/> makes the dedup structurally
-/// ambient-scoped (conformity-by-design): the dedup lookup compares the folded key, so no ledger query can forget
-/// the filter — the key itself encodes the axis. An unscoped/system submit (null bag) keeps its global coalesce
-/// identity. Axis-generic: this names no axis, it folds whatever the carrier captured.</para>
+/// <para>The coalesce key is an <b>identifier</b> (a base key + the ambient axes), so it folds the bag through the
+/// ONE ARCH-0096 <see cref="AmbientAxisComposer"/> — the same engine storage blob keys use — rather than a
+/// per-pillar hand-rolled fold. The dedup lookup computes the same fold, so it is structurally ambient-scoped: no
+/// ledger query can forget the filter because the key itself encodes the axis. An unscoped/system submit (null bag)
+/// keeps its global coalesce identity.</para>
 /// </summary>
 internal static class JobCoalesce
 {
-    // A distinctive delimiter that brackets the ambient suffix so it cannot be confused with the base key.
-    private const string AmbientMarker = "|@koan-ambient|";
-
     public static string? FoldAmbient(string? baseKey, IReadOnlyDictionary<string, string>? ambientCarrier)
-    {
-        if (baseKey is null) return null;                                          // no coalescing requested
-        if (ambientCarrier is null || ambientCarrier.Count == 0) return baseKey;   // unscoped/system → global coalesce
-        var sb = new StringBuilder(baseKey).Append(AmbientMarker);
-        foreach (var kv in ambientCarrier.OrderBy(k => k.Key, StringComparer.Ordinal))   // deterministic, order-independent
-            sb.Append(kv.Key).Append('=').Append(kv.Value).Append(';');
-        return sb.ToString();
-    }
+        => baseKey is null ? null : AmbientAxisComposer.Append(baseKey, ambientCarrier);
 }
