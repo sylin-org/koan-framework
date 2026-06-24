@@ -397,6 +397,25 @@ implemented and its tests pass on real stores.
     **NEXT: fold the impl-diff adversarial review (`wf_84072b03-11c`) → then phase 7 = the SnapVault async-path proof
     arrives during the conversion (SnapVault worker → `Koan.Jobs`). Messaging/outbox carrier = named follow-on. The
     durable-carrier keystone is DONE; the conversion's headline break-and-rebuild is now safe.**
+  - **▶▶ THE DATA-AXIS MODEL — shape ratified by the architect (2026-06-24), ADRs written, IMPL pending (post-compaction).**
+    Driven by the contributor-purity audit (`wf_8a2f7cf4-758` → `tenancy-contributor-purity-assessment.md`: tenancy ~90%
+    golden; the wall = read-filter is equality-shaped) + an architect negotiation that generalised tenancy into a full
+    **data-axis model** ([[tenancy-golden-contributor-standard]]). **The law:** all data-segmentation = registered
+    contributors over composition **planes**; each plane = 1 engine + 1 DI-enumerable seam; the data core names no axis;
+    an axis registers into the planes its MODE requires (Shared→field+filter · Container→name-particle · Database→routing).
+    Along the way I shipped a conformity fix the architect caught: the bespoke `JobCoalesce` fold → the ONE ARCH-0096
+    `AmbientAxisComposer` (`670476ba`). **ADRs:** **DATA-0106** (`9edddb6e`, read-filter contributor seam — predicate-
+    generic; adversarially reviewed `wf_b3a46d8f-310` → folded a CRITICAL [pure-predicate-contributor bypasses fail-closed]
+    + pushdown-not-residual + all-8-call-sites + cache-exclusion-ships-here) · **ARCH-0101** (`docs/decisions/ARCH-0101-
+    data-axis-model.md`, the cohesive model: plane catalog + the 2 NEW planes [container-name particle
+    `IStorageNameParticleContributor`; operation-semantics override `.OnDelete(Logical.SetTrue)` + plane-specific bypass
+    `.HardDelete()`] + the premium **`[DataAxis]`** authoring layer [sugar over the seams] + safety-by-construction
+    [boot-refuses-leaky-axis] + `.Explain()` query-RSoP + `DataAxis.AssertNoLeak<T>()`). Soft-delete = the canonical
+    operation-plane reference module; moderation = the canonical predicate-plane one. **IMPL SEQUENCE (post-compaction,
+    TDD+ARCH-0079+per-seam-review+mutation+green-ratchet):** A DATA-0106 read-filter · B name-particle seam · C operation-
+    override + `Koan.Data.SoftDelete` · D `[DataAxis]` premium layer · E `.Explain()`+boot-refuse · F `AssertNoLeak<T>` ·
+    THEN gap B (cache fold→AmbientAxisComposer + out-of-band evict-key bug) · gap C (storage 0.4 + vector 0.3,
+    `tenancy-storage-vector-isolation-design.md`) · THEN the SnapVault conversion.
 - ☐ **THEN:** Phase 3c schema-column DDL indexability (Indexed descriptors → computed/expression index; PG/SqlServer;
   SQLite JSON-only) + Mongo/bare-store managed serialization injection + in-memory managed `GetValue` · classification
   phases 4–7 (searchable blind-index · vector/messaging leak guards · crypto-shred+rotation · masked-read) · then
