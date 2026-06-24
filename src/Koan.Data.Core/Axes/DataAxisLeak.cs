@@ -20,3 +20,18 @@ public sealed class DataAxisLeakException(IReadOnlyList<DataAxisLeak> leaks, str
 {
     public IReadOnlyList<DataAxisLeak> Leaks { get; } = leaks;
 }
+
+/// <summary>
+/// Thrown by <see cref="DataAxis.AssertNoLeak{TEntity,TKey}"/> (ARCH-0101 §10) when a check observes a cross-context
+/// leak — a read, get-by-id, cache hit, async-hop, or scoped delete that crossed the axis boundary. Names the failed
+/// check and the entity so the proof failure is self-explanatory.
+/// </summary>
+public sealed class DataAxisLeakDetectedException(string check, Type entity, string detail)
+    : Exception($"DataAxis.AssertNoLeak<{entity.Name}>: the '{check}' isolation check LEAKED — {detail}")
+{
+    /// <summary>The matrix check that leaked (e.g. <c>"read"</c>, <c>"get-by-id IDOR"</c>, <c>"cache-key"</c>).</summary>
+    public string Check { get; } = check;
+
+    /// <summary>The entity whose axis isolation failed.</summary>
+    public Type Entity { get; } = entity;
+}

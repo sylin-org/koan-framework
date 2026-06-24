@@ -491,6 +491,18 @@ implemented and its tests pass on real stores.
       — DATA-0106 "off axis is a no-op"; literal §8 "read-scopes" ≠ a tenant entity at boot). Green: Axes 55 unit + 10
       integration; tenancy 85 (incl. the §8 Prod-refusal + Dev-warn); off-proof data-core 271 (gate stays closed),
       SoftDelete 7, sqlite 11, Json 7, InMemory 33. **▶ PHASE E COMPLETE.** → then F (`DataAxis.AssertNoLeak<T>`).
+    - **✅ Phase F — `DataAxis.AssertNoLeak<T>()` (ARCH-0101 §10) DONE (2026-06-24, `dev`).** The one-assertion cross-axis
+      isolation proof, generalizing the flagship `AssertNoTenantLeak` to ANY value-isolation axis: `AssertNoLeak<TEntity,
+      TKey>(withContext, a, b)` takes the axis's scope-enter `Func<string,IDisposable>` (e.g. `Tenant.Use`) and rides the
+      matrix through the booted ambient host — read · get-by-id IDOR · scoped delete · async-hop carrier round-trip
+      (`AmbientCarrierRegistry` capture→restore, when a carrier exists) · cache-key partition (when `[Cacheable]`) —
+      throwing `DataAxisLeakDetectedException` on the first leak. Re-expressed `AssertNoTenantLeak` over it (Note +
+      CachedNote, one call each) + a generic `RegionAxis` proof + a NEGATIVE proof (no-axis entity + no-op scope → throws
+      on `read`, so the assertion is never vacuous). On `DataAxis` (parallel to `Explain`; throws, no test-framework dep).
+      Focused adversarial review (`wf_3680d99b-eb0`, 3 lenses). Green: Axes 55 unit + 12 integration, tenancy 86,
+      SoftDelete 7; purely additive ⇒ byte-identical regression preserved by construction. **▶▶ ARCH-0101 (the data-axis
+      model, Phases A–F) COMPLETE.** ▶ NEXT = gap B (cache fold→`AmbientAxisComposer` + out-of-band evict bug) · gap C
+      (storage blob-key 0.4 + Weaviate vector 0.3) → the SnapVault Phase-0 dogfood conversion.
 - ☐ **THEN:** Phase 3c schema-column DDL indexability (Indexed descriptors → computed/expression index; PG/SqlServer;
   SQLite JSON-only) + Mongo/bare-store managed serialization injection + in-memory managed `GetValue` · classification
   phases 4–7 (searchable blind-index · vector/messaging leak guards · crypto-shred+rotation · masked-read) · then

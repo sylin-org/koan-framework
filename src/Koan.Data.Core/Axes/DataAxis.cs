@@ -19,7 +19,7 @@ namespace Koan.Data.Core.Axes;
 /// instead of tracing the facade. It reuses the same registries + the one facade inspection authority
 /// (<see cref="IAxisScopeDiagnostics"/>), so it can never drift from what a real read actually does.
 /// </summary>
-public static class DataAxis
+public static partial class DataAxis
 {
     /// <summary>Explain the axis composition + read-scope of <typeparamref name="TEntity"/> in the current ambient.</summary>
     public static AxisExplanation Explain<TEntity>(IServiceProvider services) where TEntity : class

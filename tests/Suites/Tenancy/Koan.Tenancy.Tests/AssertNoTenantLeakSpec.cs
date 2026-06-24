@@ -6,6 +6,7 @@ using AwesomeAssertions;
 using Koan.Cache.Abstractions.Policies;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
+using Koan.Data.Core.Axes;
 using Koan.Data.Core.Model;
 using Koan.Tenancy.Tests.Support;
 using Xunit;
@@ -73,6 +74,19 @@ public sealed class AssertNoTenantLeakSpec
         using (Tenant.Use("acme")) await Note.RemoveAll();
         using (Tenant.Use("acme")) (await Note.All()).Should().BeEmpty();
         using (Tenant.Use("globex")) (await Note.All()).Select(n => n.Id).Should().Equal(b.Id);
+    }
+
+    [Fact(DisplayName = "no tenant leak: the generalized DataAxis.AssertNoLeak<T> (ARCH-0101 §10) proves the whole matrix for the tenant axis")]
+    public async Task Generalized_AssertNoLeak_proves_the_tenant_axis()
+    {
+        // The flagship re-expressed: ONE call rides every plane of the matrix for the tenant axis (read · IDOR ·
+        // async-hop carrier round-trip · scoped delete) — the exact proof a future Moderation axis earns identically.
+        await using var runtime = await TenancyRuntimeFixture.CreateAsync(extraSettings: Posture("Closed"));
+        runtime.ResetEntityCaches();
+
+        await DataAxis.AssertNoLeak<Note, string>(Tenant.Use, "acme", "globex");
+        // CachedNote additionally exercises the [Cacheable] cache-key partition leg.
+        await DataAxis.AssertNoLeak<CachedNote, string>(Tenant.Use, "acme", "globex");
     }
 
     [Fact(DisplayName = "no tenant leak: scoped DeleteMany and DeleteAll never cross the tenant boundary")]
