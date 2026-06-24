@@ -1,6 +1,6 @@
 # DATA-0106: The read-filter contributor seam — predicate-generic read scoping
 
-**Status**: Proposed (2026-06-24) · adversarially reviewed (2 lenses — re-home correctness + fail-closed/cache; a CRITICAL + HIGHs folded below)
+**Status**: **Accepted + Implemented** (2026-06-24; on `dev`) · ADR adversarially reviewed (2 lenses) AND the impl diff adversarially reviewed (4 lenses → 2 HIGH + 1 MEDIUM, all verified + folded — see the Implementation note)
 **Date**: 2026-06-24
 **Deciders**: Enterprise Architect
 **Scope**: Make the data read-filter **predicate-generic**, not equality-shaped, so *any* data-segmentation capability — tenancy, classification, a future **moderation** — scopes reads as a **registered contributor**, never bespoke core code. Today the managed-field mechanism (DATA-0105) is axis-agnostic for the write-stamp but **hard-wires the read-filter to scalar equality**; a capability whose read semantics are a non-equality predicate (row-visibility) cannot register. This closes the one gap that keeps tenancy from being a *golden* example of the contributor model (contributor-purity assessment, 2026-06-24).
@@ -95,3 +95,21 @@ Equality axes (tenancy) remain cache-partitioned exactly as today. The fuller ca
 5. **Cache-exclusion (`Koan.Cache`, same change set).** `AppendManagedScope` skips `AutoReadFilter==false` descriptors; `_excludeFromCache` OR-includes "type has any `AutoReadFilter==false` managed axis"; first-use diagnostic. Specs: a `[Cacheable]` entity with a non-equality axis is **not cached** (and still read-isolated via the predicate); a mixed (equality+non-equality) `[Cacheable]` entity is **excluded** yet still tenant-isolated.
 6. **Tenancy re-home verification (`Koan.Tenancy` test).** The flagship `AssertNoTenantLeak` passes unchanged with the read-filter flowing through the built-in contributor — and **add the missing scoped `DeleteMany`/`DeleteAll` assertions** (only `RemoveAll` is asserted today, so a delete-path regression is currently silent).
 7. **(Gap B, separate slice)** the fuller cache fold convergence onto `AmbientAxisComposer` + the out-of-band evict-key scope fix.
+
+---
+
+## Implementation note (2026-06-24, `dev` — as shipped)
+
+Delivered exactly as specced, plus two corrections from a **4-lens adversarial review of the impl diff** (the review pattern that caught the ARCH-0100 CRITICAL). All findings verified high-confidence and folded; both HIGHs were RED-verified (the new test fails without the fix) before GREEN.
+
+**As-built surfaces:** `IReadFilterContributor` (`Filter? ReadFilter(Type)` + `Capability? RequiredCapability` + `bool ExcludesFromCache(Type) => false`) and the built-in `ManagedEqualityReadContributor` in `Koan.Data.Core.Pipeline`; `ManagedFieldDescriptor.AutoReadFilter = true`; `RepositoryFacade.ReadScopeFilter()` replacing `ManagedReadFilter` at all 8 sites (grep-zero); fail-closed `InspectScopeAdapter` over the managed-descriptor **and** contributor union + the §4b `FilterSplitter` pushability check; cache-exclusion in `CachedRepository`.
+
+**Review fix 1 (HIGH) — raw/CAS fail-closed rode the contributor union.** `GuardRawAgainstActiveScope` (QueryRaw/CountRaw) and `ConditionalReplaceAsync` still gated on `HasManaged && CurrentManagedValues() is not null` — so a *pure* predicate axis (a moderation `IReadFilterContributor` with **no** managed field, which §2 blesses) bypassed isolation on the opaque-SQL and CAS paths. Fixed by adding `RepositoryFacade.IsReadScoped()` (folds every contributor's `ReadFilter`) and tripping both gates on `IsReadScoped() || (HasManaged && CurrentManagedValues() is not null)`. Tenancy is byte-identical (its equality contributor yields a filter exactly when a managed value is active).
+
+**Review fix 2 (HIGH) — cache-exclusion rode only the managed registry.** `NonEqualityManagedAxis` read only `ManagedFieldRegistry`, so a `[Cacheable]` entity scoped *only* by a pure predicate contributor was cached by id (no scope segment) and leaked across viewers on a hit. Fixed by adding `IReadFilterContributor.ExcludesFromCache(Type)` (default `false`; a predicate axis returns `true` for its types), injecting `IEnumerable<IReadFilterContributor>` into `CachedRepository`, and OR-ing it into `_excludeFromCache`. The two layers can no longer diverge.
+
+**Review fix 3 (MEDIUM) — per-read `FilterSplitter.Split` on the equality hot path.** The equality (tenancy) shape is static per (type,adapter), so its pushability is settled **once** at construction (`EqualityShapeIsPushable`) and the per-read Split is skipped (`_skipReadPushabilityCheck`) when the only active scope is the built-in equality contributor — byte-identical to the pre-DATA-0106 read cost. A predicate axis (dynamic shape) keeps the per-read Split.
+
+**Cross-adapter agnosticism proven (the predicate plane is engine-generic, not just relational).** The decisive Moderation proof — a fake non-equality axis (`__mod_status != "hidden"`, `AutoReadFilter=false`) folding into Query/Count + the get-by-id/delete-by-id IDOR lowering + DeleteMany/DeleteAll/RemoveAll — passes **identically** on **SQLite** (relational, JSON-envelope, `json_extract … <> @p`) and **MongoDB** (document/BSON, `$ne`, non-Newtonsoft), through the *same* `FieldPathResolver` with no adapter-specific read branch. The §4b pushability fail-closed is facade-generic (proven on SQLite via an `IgnoreCase` predicate the relational caps can't push).
+
+**Green (all through real `AddKoan()` boots, ARCH-0079):** data-core 264, Koan.Tenancy 81 (incl. the flagship `AssertNoTenantLeak` + new scoped DeleteMany/DeleteAll + two cache-exclusion proofs), SQLite connector 10, Mongo connector 25, cache topology 50, JSON 7, InMemory 33 — and the data-core 255 baseline stayed byte-identical through the re-home.

@@ -43,7 +43,8 @@ internal sealed class CachedRepository<TEntity, TKey> :
         IDataRepository<TEntity, TKey> inner,
         ICacheClient cacheClient,
         CachePolicyDescriptor entityPolicy,
-        ILogger<CachedRepository<TEntity, TKey>> logger)
+        ILogger<CachedRepository<TEntity, TKey>> logger,
+        IEnumerable<IReadFilterContributor> readContributors)
     {
         _inner = inner ?? throw new ArgumentNullException(nameof(inner));
         _cacheClient = cacheClient ?? throw new ArgumentNullException(nameof(cacheClient));
@@ -60,7 +61,46 @@ internal sealed class CachedRepository<TEntity, TKey> :
         // rest) must NOT be cached — the cache decorates OUTSIDE the facade, so the cached value would be the
         // post-reverse PLAINTEXT and would leak into L2. Such types are excluded from caching entirely (read + write).
         // Generic: the cache never names classification; it asks the field-transform registry. Off ⇒ false ⇒ no change.
-        _excludeFromCache = StorageFieldTransformRegistry.HasTransformsFor(typeof(TEntity));
+        //
+        // DATA-0106 §5: an entity read-scoped by a NON-equality axis (a viewer-context row-visibility predicate, e.g.
+        // moderation) is excluded from caching. An id-keyed cache namespace is equality-by-construction; partitioning by
+        // the row's stamped scalar is the wrong operand for a viewer predicate (it would serve a hidden row to a viewer
+        // who shouldn't see it). Correctness dominates the lost partition — even a MIXED (equality + non-equality) entity
+        // is excluded for the whole type. Equality axes (tenancy) stay cache-partitioned via AppendManagedScope as before.
+        //
+        // The exclusion signal rides the WHOLE read-scope surface, not just the managed registry: a managed non-equality
+        // descriptor (AutoReadFilter==false) AND a PURE predicate IReadFilterContributor with no managed field (the
+        // canonical moderation shape). Keying only off the managed registry would miss the latter and silently cache-leak.
+        var nonEqualityAxis = NonEqualityManagedAxis(typeof(TEntity));
+        var predicateAxisExcludes = ReadContributorExcludes(readContributors, typeof(TEntity));
+        _excludeFromCache = StorageFieldTransformRegistry.HasTransformsFor(typeof(TEntity))
+            || nonEqualityAxis is not null
+            || predicateAxisExcludes;
+        if (nonEqualityAxis is not null || predicateAxisExcludes)
+            _logger.LogInformation(
+                "[Cacheable] {Entity} excluded from cache: a non-equality read-scope ('{Axis}') cannot be an equality cache-key segment (DATA-0106 §5); reads stay isolated via its read-filter predicate.",
+                _entityName, nonEqualityAxis ?? "predicate-contributor");
+    }
+
+    // The first non-equality managed axis (AutoReadFilter == false) applicable to the type, or null. Drives the
+    // cache-exclusion above. Off / no managed field ⇒ null ⇒ byte-identical (the registry IsEmpty fast path).
+    private static string? NonEqualityManagedAxis(Type entityType)
+    {
+        if (ManagedFieldRegistry.IsEmpty) return null;
+        var managed = ManagedFieldRegistry.ForType(entityType);
+        for (var i = 0; i < managed.Count; i++)
+            if (!managed[i].AutoReadFilter) return managed[i].StorageName;
+        return null;
+    }
+
+    // Whether any registered read-filter contributor declares this type's read-scope non-cacheable (a non-equality
+    // predicate). Ambient-independent — consulted once at decorator construction. Catches a PURE predicate axis that
+    // registers NO managed descriptor (so NonEqualityManagedAxis above cannot see it).
+    private static bool ReadContributorExcludes(IEnumerable<IReadFilterContributor> contributors, Type entityType)
+    {
+        foreach (var c in contributors)
+            if (c.ExcludesFromCache(entityType)) return true;
+        return false;
     }
 
     // ARCH-0084: forward the inner provider's unified capabilities (native IDescribesCapabilities,
@@ -388,6 +428,10 @@ internal sealed class CachedRepository<TEntity, TKey> :
         var sb = new System.Text.StringBuilder(baseKey);
         foreach (var d in managed)
         {
+            // DATA-0106 §5: only an EQUALITY axis is a cache-key segment. A non-equality axis (AutoReadFilter == false)
+            // already excludes the whole type from caching (_excludeFromCache), so AppendManagedScope never runs for it;
+            // this skip is the defensive belt — never let a viewer-context predicate's scalar masquerade as a key segment.
+            if (!d.AutoReadFilter) continue;
             var v = d.ValueProvider();
             sb.Append("::").Append(d.StorageName).Append('=').Append(v?.ToString() ?? "_");
         }

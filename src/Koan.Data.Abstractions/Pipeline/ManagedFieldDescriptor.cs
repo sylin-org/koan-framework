@@ -32,6 +32,15 @@ namespace Koan.Data.Abstractions.Pipeline;
 /// so a future second managed field composes deterministically. <see cref="ManagedFieldRegistry.ForType"/> orders by
 /// it (stably; ties keep registration order).
 /// </param>
+/// <param name="AutoReadFilter">
+/// Whether the built-in equality read-filter contributor (DATA-0106) derives a scalar
+/// <c>Filter.Eq(StorageName, ValueProvider())</c> for this field on every read. <c>true</c> (default) preserves every
+/// existing equality axis (tenancy/classification) exactly. <c>false</c> means "stamp + serialize + index me, but I
+/// supply my own read predicate via an <c>IReadFilterContributor</c>" — for a <b>non-equality</b> row-visibility axis
+/// (e.g. moderation: <c>visibility IN viewer.clearances</c>). A <c>false</c> field still writes its column and still
+/// fails closed, but contributes no auto-equality (which would wrongly conjoin) and <b>excludes its entity from the
+/// cache</b> (an id-keyed cache namespace is equality-by-construction; a viewer-context predicate cannot be a cache key).
+/// </param>
 public sealed record ManagedFieldDescriptor(
     string StorageName,
     Type ClrType,
@@ -39,4 +48,5 @@ public sealed record ManagedFieldDescriptor(
     Func<Type, bool> AppliesTo,
     Capability? RequiredCapability = null,
     bool Indexed = false,
-    int Priority = 0);
+    int Priority = 0,
+    bool AutoReadFilter = true);

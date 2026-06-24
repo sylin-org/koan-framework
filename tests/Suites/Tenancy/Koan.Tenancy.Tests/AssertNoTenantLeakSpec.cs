@@ -75,6 +75,29 @@ public sealed class AssertNoTenantLeakSpec
         using (Tenant.Use("globex")) (await Note.All()).Select(n => n.Id).Should().Equal(b.Id);
     }
 
+    [Fact(DisplayName = "no tenant leak: scoped DeleteMany and DeleteAll never cross the tenant boundary")]
+    public async Task Scoped_delete_paths_are_isolated()
+    {
+        // DATA-0106 step 6 — previously only RemoveAll was asserted, so a DeleteMany/DeleteAll regression was silent.
+        await using var runtime = await TenancyRuntimeFixture.CreateAsync(extraSettings: Posture("Closed"));
+        runtime.ResetEntityCaches();
+        using var _iso = Isolate();
+
+        Note a1, a2, b1;
+        using (Tenant.Use("acme")) { a1 = await new Note { Title = "a1" }.Save(); a2 = await new Note { Title = "a2" }.Save(); }
+        using (Tenant.Use("globex")) b1 = await new Note { Title = "b1" }.Save();
+
+        // DeleteMany under acme over a MIX of acme + globex ids deletes only acme's; globex's id is silently not owned.
+        using (Tenant.Use("acme")) (await Note.Remove(new[] { a1.Id, b1.Id })).Should().Be(1);
+        using (Tenant.Use("globex")) (await Note.Get(b1.Id)).Should().NotBeNull();   // globex untouched
+        using (Tenant.Use("acme")) (await Note.Get(a1.Id)).Should().BeNull();        // acme's deleted
+
+        // DeleteAll under acme wipes only acme's remaining rows — never the unscoped Clear instruction across tenants.
+        using (Tenant.Use("acme")) await Data<Note, string>.DeleteAll();
+        using (Tenant.Use("acme")) (await Note.All()).Should().BeEmpty();
+        using (Tenant.Use("globex")) (await Note.All()).Select(n => n.Id).Should().Equal(b1.Id);
+    }
+
     [Fact(DisplayName = "no tenant leak: a [HostScoped] entity is exempt — visible under every tenant")]
     public async Task HostScoped_entity_is_not_tenant_isolated()
     {

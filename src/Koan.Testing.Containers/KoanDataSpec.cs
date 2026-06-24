@@ -4,6 +4,7 @@ using Koan.Core;
 using Koan.Core.Hosting.App;
 using Koan.Data.Core;
 using Koan.Testing.Integration;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Koan.Testing.Containers;
@@ -44,11 +45,18 @@ public abstract class KoanDataSpec<TFixture> where TFixture : KoanContainerFixtu
     /// it as the ambient <see cref="AppHost.Current"/> so the static <c>Entity&lt;T&gt;</c> API resolves.
     /// Disposing (via <c>await using</c>) stops the host and clears the ambient binding.
     /// </summary>
-    protected async Task<BoundHost> BootAsync()
+    protected Task<BoundHost> BootAsync() => BootAsync(null);
+
+    /// <summary>
+    /// Boot a real Koan host (as <see cref="BootAsync()"/>) and additionally apply <paramref name="configure"/> to the
+    /// service collection AFTER <c>AddKoan()</c> — so a spec can register a fake contributor (e.g. an
+    /// <c>IReadFilterContributor</c>, DATA-0106) into the real boot's DI without a bespoke fixture.
+    /// </summary>
+    protected async Task<BoundHost> BootAsync(Action<IServiceCollection>? configure)
     {
         var host = await KoanIntegrationHost.Configure()
             .WithSettings(Fixture.SettingsForBoot())
-            .ConfigureServices(s => s.AddKoan())
+            .ConfigureServices(s => { s.AddKoan(); configure?.Invoke(s); })
             .StartAsync()
             .ConfigureAwait(false);
         AppHost.Current = host.Services;

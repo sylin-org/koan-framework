@@ -416,6 +416,16 @@ implemented and its tests pass on real stores.
     override + `Koan.Data.SoftDelete` · D `[DataAxis]` premium layer · E `.Explain()`+boot-refuse · F `AssertNoLeak<T>` ·
     THEN gap B (cache fold→AmbientAxisComposer + out-of-band evict-key bug) · gap C (storage 0.4 + vector 0.3,
     `tenancy-storage-vector-isolation-design.md`) · THEN the SnapVault conversion.
+    - **✅ Phase A — DATA-0106 read-filter seam DONE (2026-06-24, `dev`, uncommitted→committed this session).** `IReadFilterContributor`
+      + built-in `ManagedEqualityReadContributor` (re-home, byte-identical) + `ManagedFieldDescriptor.AutoReadFilter` + `ReadScopeFilter`
+      at all 8 sites (grep-zero `ManagedReadFilter`) + fail-closed over the managed+contributor union + §4b `FilterSplitter` pushability
+      + non-equality cache-exclusion. **4-lens impl-diff adversarial review (`wf_f75b6f5a-ae1`) → 2 HIGH + 1 MEDIUM, all verified + folded,
+      both HIGH RED-verified:** (1) raw/CAS fail-closed now rides the contributor union via `IsReadScoped()` (a pure predicate axis with no
+      managed field was bypassing QueryRaw/CountRaw/CAS); (2) cache-exclusion now rides the contributor set via `IReadFilterContributor.ExcludesFromCache`
+      (a `[Cacheable]` entity scoped only by a pure predicate contributor was leaking across viewers); (3) per-read Split memoized per (type,adapter)
+      so the equality hot path stays byte-identical to pre-DATA-0106. **Proven adapter-agnostic on SQLite (relational) AND MongoDB (document/BSON)** —
+      the same fake moderation axis folds identically through the shared `FieldPathResolver`. Green: data-core 264, tenancy 81, sqlite 10, mongo 25,
+      cache 50, json 7, inmemory 33. ▶ NEXT = Phase B (name-particle seam).
 - ☐ **THEN:** Phase 3c schema-column DDL indexability (Indexed descriptors → computed/expression index; PG/SqlServer;
   SQLite JSON-only) + Mongo/bare-store managed serialization injection + in-memory managed `GetValue` · classification
   phases 4–7 (searchable blind-index · vector/messaging leak guards · crypto-shred+rotation · masked-read) · then

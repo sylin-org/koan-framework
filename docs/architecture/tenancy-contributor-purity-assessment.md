@@ -12,7 +12,8 @@
 
 ## The three gaps to reach "golden"
 
-### A. The managed-field read-filter is equality-only (the load-bearing fix)
+### A. The managed-field read-filter is equality-only (the load-bearing fix) — ✅ CLOSED (DATA-0106, 2026-06-24)
+> Closed by the **separate `IReadFilterContributor` seam** (the architect's chosen design, not a `Func<Filter?>` on the descriptor). The equality read-filter is re-homed onto a built-in `ManagedEqualityReadContributor` (tenancy byte-identical), a predicate axis (moderation) registers its own contributor, and fail-closed/cache-exclusion ride the contributor union. Proven generic-for-Moderation on SQLite **and** MongoDB. See **DATA-0106** (Accepted + Implemented). The original analysis below stands as the rationale.
 - `RepositoryFacade.ManagedReadFilter()` unconditionally emits `Filter.Eq(d.StorageName, ValueProvider())` (`RepositoryFacade.cs:157`); the write-verify is `field = @p` (`SqliteRepository.cs:860`); the IDOR key-lowering `ScopedById` AND-folds the same equality (`RepositoryFacade.cs:167-171`).
 - `ManagedFieldDescriptor` carries **only** `ValueProvider: Func<object?>` (a scalar) — **no predicate member** (`ManagedFieldDescriptor.cs:35-42`). The framework owns the predicate shape and fixes it as scalar equality.
 - The `Filter` model is already rich enough (`Ne`/`In`/`HasAny`/`AnyOf`/`Not` exist, `Filter.cs:24-67`) and `FieldPathResolver` already resolves a managed name → storage leaf (`FieldPathResolver.cs:50-60`). The wall is **purely** the missing descriptor seam + the hard-coded `Filter.Eq`.

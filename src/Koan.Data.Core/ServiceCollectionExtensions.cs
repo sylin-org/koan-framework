@@ -46,6 +46,13 @@ public static class ServiceCollectionExtensions
         // Tenancy registers its gate from the Koan.Tenancy module's auto-registrar (Reference = Intent); no
         // registered guard → the chokepoint loop is empty → no-op. A grep for "tenant" here returns nothing.
 
+        // DATA-0106: the read-filter is uniformly contributor-driven. The data core ships ONE built-in default
+        // contributor — the equality fold (the re-homed ManagedReadFilter) — so tenancy's equality read-filter is a
+        // registered contributor too (golden, byte-identical). A predicate axis (moderation) adds its own
+        // Pipeline.IReadFilterContributor; the facade AND-folds the union. Absent every axis ⇒ the registry is empty
+        // ⇒ this contributor returns null ⇒ the read fold is a no-op (structural absence).
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<Pipeline.IReadFilterContributor, Pipeline.ManagedEqualityReadContributor>());
+
         // ARCH-0100: the durable ambient carrier. Aggregates the DI-enumerable IAmbientSliceCarrier set (each
         // cross-cutting module registers its own; none → an empty registry that captures null / restores nothing).
         // Koan.Jobs / Koan.Messaging resolve this to carry ambient slices across the async-hop, naming no axis.

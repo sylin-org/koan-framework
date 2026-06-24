@@ -47,7 +47,8 @@ public sealed class DataService(IServiceProvider sp) : IDataService
         // Schema readiness is the adapter's responsibility now (IDataRepository.EnsureReady);
         // the facade calls it before every operation — no separate EntitySchemaGuard layer.
         var guards = sp.GetServices<Pipeline.IStorageGuard>().ToArray();
-        var facade = new RepositoryFacade<TEntity, TKey>(repo, guards);
+        var readContributors = sp.GetServices<Pipeline.IReadFilterContributor>().ToArray();
+        var facade = new RepositoryFacade<TEntity, TKey>(repo, guards, readContributors);
 
         var decorated = ApplyDecorators(typeof(TEntity), typeof(TKey), facade, sp);
 

@@ -96,7 +96,7 @@ One assertion generates the cross-axis isolation proof — two contexts per axis
 
 ## Implementation (phased — each phase: TDD, ARCH-0079 real-`AddKoan()` specs, per-seam adversarial review, mutation, green-ratchet)
 
-- **Phase A — read-filter seam (DATA-0106, already ADR'd + reviewed).** The predicate plane: `IReadFilterContributor` + built-in `ManagedEqualityReadContributor` + `AutoReadFilter` + fail-closed-over-the-union + the non-equality cache-exclusion. *The foundation.*
+- **Phase A — read-filter seam (DATA-0106). ✅ DONE (2026-06-24, `dev`).** The predicate plane: `IReadFilterContributor` + built-in `ManagedEqualityReadContributor` + `AutoReadFilter` + fail-closed-over-the-union (+ `ExcludesFromCache` + `IsReadScoped` raw/CAS gate + hot-path memoization, from the impl-diff adversarial review) + the non-equality cache-exclusion. *The foundation.* Proven adapter-agnostic on SQLite **and** MongoDB (the relational and document families). Full detail in the DATA-0106 Implementation note.
 - **Phase B — container-name particle seam (§3).** `IStorageNameParticleContributor` folded into `StorageNameGenerator`. Spec: mode-3 tenant emits `T1-Todo#partition`; host-scoped emits `Todo`.
 - **Phase C — operation-semantics override (§4) + `Koan.Data.SoftDelete`.** Declarative `OnDelete` at the facade chokepoint; the plane-specific bypass slice; `.HardDelete()`/`.Restore()`/`.WithDeleted()`. Spec: `Delete` soft-updates and stays tenant-scoped; `HardDelete` physically removes but only a visible row.
 - **Phase D — the `[DataAxis]` premium layer (§7).** Discovered axis type + `Declare(builder)` + smart defaults + mode-as-config; expands to the Phase-A/B/C seams. Spec: a `[DataAxis]` and the equivalent raw-seam registration produce byte-identical behavior.

@@ -38,21 +38,59 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     private readonly StorageWritePlan _writePlan;
     private readonly StorageFieldTransformPlan _fieldTransform;
     private readonly IStorageGuard[] _guards;
+    private readonly IReadFilterContributor[] _readContributors;
     private readonly IReadOnlyList<ManagedFieldDescriptor> _managed;
     private readonly string _idField;
-    private readonly bool _managedAdapterOk;
-    private readonly string? _managedAdapterError;
+    private readonly bool _scopeAdapterOk;
+    private readonly string? _scopeAdapterError;
+    private readonly FilterSupport _filterCaps;
+    private readonly bool _skipReadPushabilityCheck;
 
-    public RepositoryFacade(IDataRepository<TEntity, TKey> inner, IStorageGuard[]? guards = null)
+    public RepositoryFacade(IDataRepository<TEntity, TKey> inner, IStorageGuard[]? guards = null, IReadFilterContributor[]? readContributors = null)
     {
         _inner = inner;
         _guards = guards ?? Array.Empty<IStorageGuard>();
+        _readContributors = readContributors ?? Array.Empty<IReadFilterContributor>();
         _writePlan = StorageWritePlan.For(typeof(TEntity));
         _fieldTransform = StorageFieldTransformPlan.For(typeof(TEntity));
         _managed = ManagedFieldRegistry.ForType(typeof(TEntity));
         _idField = AggregateMetadata.GetIdSpec(typeof(TEntity))?.Prop.Name ?? "Id";
-        if (_managed.Count > 0) (_managedAdapterOk, _managedAdapterError) = InspectManagedAdapter();
-        else _managedAdapterOk = true;
+        // The adapter is inspected once iff this entity could ever be scoped: it has a managed descriptor (write-stamp
+        // + equality read) OR a NON-default read-filter contributor (a predicate axis). The built-in equality
+        // contributor alone is not a trigger — with no managed descriptor it yields no filter, so a non-tenant app is
+        // a true no-op (byte-identical: no DataCaps.Describe, no FilterSupport). The result is consulted only when a
+        // scope is actually active at runtime (DATA-0106 §4 fail-closed deferral).
+        var couldScope = _managed.Count > 0 || HasNonDefaultReadContributor();
+        if (couldScope) (_scopeAdapterOk, _scopeAdapterError, _filterCaps) = InspectScopeAdapter();
+        else { _scopeAdapterOk = true; _filterCaps = FilterSupport.None; }
+        // Hot-path ([koan-design-principles] §2/§4): the equality (tenancy) read-filter shape is static per (type,adapter)
+        // — Eq over a fixed managed field — so its pushability is a CONSTANT, proven ONCE here. When the only active read
+        // scope is the built-in equality contributor (no predicate axis) and that shape is pushable, the per-read Split is
+        // skipped (RequireScopeForRead degrades to the single bool check — byte-identical to the pre-DATA-0106 read cost).
+        // A predicate axis (dynamic shape) keeps the per-read Split as the source of truth.
+        _skipReadPushabilityCheck = couldScope && _scopeAdapterOk
+            && !HasNonDefaultReadContributor() && EqualityShapeIsPushable();
+    }
+
+    private bool HasNonDefaultReadContributor()
+    {
+        for (var i = 0; i < _readContributors.Length; i++)
+            if (_readContributors[i] is not ManagedEqualityReadContributor) return true;
+        return false;
+    }
+
+    // The built-in equality contributor only ever emits Filter.Eq(StorageName, value) for AutoReadFilter descriptors.
+    // Pushability of an Eq depends only on (field, operator) — never the value — so it is a per-(type,adapter) constant
+    // we can settle once at construction and skip on every subsequent read (fix for the per-read Split regression).
+    private bool EqualityShapeIsPushable()
+    {
+        foreach (var d in _managed)
+        {
+            if (!d.AutoReadFilter) continue;
+            var probe = Filter.Eq(d.StorageName, "_");   // the value is irrelevant to pushability
+            if (FilterSplitter.Split(probe, _filterCaps, typeof(TEntity)).Residual is not null) return false;
+        }
+        return true;
     }
 
     // --- field-transform helpers (ARCH-0098 §0). All are no-op fast paths when the type has no transform. ---
@@ -102,30 +140,62 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
 
     private bool HasManaged => _managed.Count > 0;
 
-    // Inspect (do NOT throw at construction) whether the adapter can isolate a managed-scoped entity: it must
-    // announce every required capability AND be an IQueryRepository (key-ops lower to scoped queries). We defer the
-    // throw to the first operation that actually has a managed value in scope, so a non-tenant app — or a referenced-
-    // but-off Koan.Tenancy on a non-isolating adapter — is a true no-op (zero regression). Fail-closed when used.
-    private (bool ok, string? error) InspectManagedAdapter()
+    // Inspect (do NOT throw at construction) whether the adapter can isolate a scoped entity. It must announce every
+    // required isolation capability — over BOTH the managed descriptors (write-stamp + equality read) AND the
+    // read-filter contributors (a predicate axis declares its own) — AND be an IQueryRepository (key-ops lower to
+    // scoped queries). The adapter's FilterSupport is captured for the per-read pushability check (§4b). We defer the
+    // throw to the first operation that actually has a scope in effect, so a non-tenant app — or a referenced-but-off
+    // axis on a non-isolating adapter — is a true no-op (zero regression). Fail-closed when used.
+    private (bool ok, string? error, FilterSupport caps) InspectScopeAdapter()
     {
-        var caps = DataCaps.Describe(_inner, _inner.GetType().Name);
+        var describe = DataCaps.Describe(_inner, _inner.GetType().Name);
+        var caps = describe.Detail<FilterSupport>(DataCaps.Query.Filter) ?? FilterSupport.None;
         foreach (var d in _managed)
         {
-            if (d.RequiredCapability is { } req && !caps.Has(req))
+            if (d.RequiredCapability is { } req && !describe.Has(req))
                 return (false,
                     $"Entity '{typeof(TEntity).Name}' is in an active managed scope requiring isolation capability '{req.Id}', " +
-                    $"but the adapter '{_inner.GetType().Name}' does not announce it. Route it to an isolating adapter, or exempt the entity.");
+                    $"but the adapter '{_inner.GetType().Name}' does not announce it. Route it to an isolating adapter, or exempt the entity.",
+                    caps);
+        }
+        foreach (var c in _readContributors)
+        {
+            if (c.RequiredCapability is { } req && !describe.Has(req))
+                return (false,
+                    $"Entity '{typeof(TEntity).Name}' is read-scoped by a contributor requiring isolation capability '{req.Id}', " +
+                    $"but the adapter '{_inner.GetType().Name}' does not announce it. Route it to an isolating adapter, or exempt the entity.",
+                    caps);
         }
         if (_inner is not IQueryRepository<TEntity, TKey>)
             return (false,
                 $"Entity '{typeof(TEntity).Name}' is in an active managed scope, but the adapter '{_inner.GetType().Name}' does not " +
-                "implement IQueryRepository. Managed isolation lowers key operations to scoped queries, so it requires pushdown query support.");
-        return (true, null);
+                "implement IQueryRepository. Managed isolation lowers key operations to scoped queries, so it requires pushdown query support.",
+                caps);
+        return (true, null, caps);
     }
 
-    private void RequireManagedAdapter()
+    /// <summary>Fail-closed for a scoped WRITE: the adapter must satisfy the static isolation contract (capability + query).</summary>
+    private void RequireScopeStatic()
     {
-        if (!_managedAdapterOk) throw new InvalidOperationException(_managedAdapterError);
+        if (!_scopeAdapterOk) throw new InvalidOperationException(_scopeAdapterError);
+    }
+
+    /// <summary>
+    /// Fail-closed for a scoped READ: the static contract PLUS the folded predicate must be <b>fully pushable</b> by the
+    /// adapter (DATA-0106 §4b). An isolation filter MUST be enforced at the store — a residual would fetch cross-scope
+    /// rows into process memory and skew Count, which is itself a leak. Bias-to-strict: a contributor that yields a
+    /// filter the adapter cannot push fails closed even if it declared no capability (a null capability is no free pass).
+    /// </summary>
+    private void RequireScopeForRead(Filter folded)
+    {
+        RequireScopeStatic();
+        if (_skipReadPushabilityCheck) return;   // equality-only shape: pushability proven once at construction
+        var split = FilterSplitter.Split(folded, _filterCaps, typeof(TEntity));
+        if (split.Residual is not null)
+            throw new InvalidOperationException(
+                $"Entity '{typeof(TEntity).Name}' is read-scoped by a predicate the adapter '{_inner.GetType().Name}' cannot fully " +
+                "push down. An isolation filter must be enforced at the store, never evaluated in memory (a residual would fetch " +
+                "cross-scope rows and skew Count). Route it to an adapter that pushes the predicate, or narrow the axis to a pushable shape.");
     }
 
     // --- managed-field helpers (no-op fast paths when nothing is registered / nothing is in scope) ---
@@ -141,24 +211,43 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
             if (v is null) continue;                 // off / host scope ⇒ this field is not stamped
             (values ??= new(StringComparer.Ordinal))[d.StorageName] = v;
         }
-        if (values is not null) RequireManagedAdapter();   // an active scope on a non-isolating adapter fails closed
+        if (values is not null) RequireScopeStatic();   // an active scope on a non-isolating adapter fails closed
         return values;
     }
 
-    /// <summary>The AND-predicate isolating reads to the current managed scope, or <c>null</c> when none is in scope.</summary>
-    private Filter? ManagedReadFilter()
+    /// <summary>
+    /// The AND-fold of every registered read-filter contributor's predicate isolating reads to the current ambient
+    /// scope, or <c>null</c> when none constrains it (off / host / no axis) — DATA-0106 §2. Equality (tenancy) flows
+    /// through the built-in <see cref="ManagedEqualityReadContributor"/>; a predicate axis (moderation) contributes its
+    /// own. The tri-state is byte-identical to the former bespoke <c>ManagedReadFilter</c>: zero survivors ⇒ null (the
+    /// unfiltered fast path); one ⇒ that filter; many ⇒ <c>Filter.All(survivors)</c> — no 1-element AllOf, no null operand.
+    /// </summary>
+    private Filter? ReadScopeFilter()
     {
-        if (!HasManaged) return null;
-        List<Filter>? preds = null;
-        foreach (var d in _managed)
+        if (_readContributors.Length == 0) return null;
+        List<Filter>? survivors = null;
+        for (var i = 0; i < _readContributors.Length; i++)
         {
-            var v = d.ValueProvider();
-            if (v is null) continue;                 // off / host ⇒ unfiltered (nothing was stamped); the guard handles enforce
-            (preds ??= new()).Add(Filter.Eq(d.StorageName, v));
+            var f = _readContributors[i].ReadFilter(typeof(TEntity));
+            if (f is null) continue;
+            (survivors ??= new()).Add(f);
         }
-        if (preds is null) return null;
-        RequireManagedAdapter();                          // an active scope on a non-isolating adapter fails closed
-        return preds.Count == 1 ? preds[0] : Filter.All(preds.ToArray());
+        if (survivors is null) return null;
+        var folded = survivors.Count == 1 ? survivors[0] : Filter.All(survivors.ToArray());
+        RequireScopeForRead(folded);                     // active scope on a non-isolating / non-pushing adapter fails closed
+        return folded;
+    }
+
+    /// <summary>
+    /// Whether any registered read-filter contributor constrains the current read of this type (ambient-active) — DATA-0106 §4.
+    /// The raw-query and conditional-replace paths cannot carry the isolation predicate, so they fail closed when this is
+    /// true. This trips for a PURE predicate axis (no managed field) too, which <c>CurrentManagedValues()</c> alone misses.
+    /// </summary>
+    private bool IsReadScoped()
+    {
+        for (var i = 0; i < _readContributors.Length; i++)
+            if (_readContributors[i].ReadFilter(typeof(TEntity)) is not null) return true;
+        return false;
     }
 
     private QueryDefinition ApplyManaged(QueryDefinition query, Filter managed)
@@ -190,7 +279,7 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     public async Task<TEntity?> Get(TKey id, CancellationToken ct = default)
     {
         await Guard(ct);
-        var managed = ManagedReadFilter();
+        var managed = ReadScopeFilter();
         if (managed is null) return Reverse(await _inner.Get(id, ct));
         // IDOR defence: a key read is lowered to a managed-scoped query; a wrong-scope row returns null = not-found.
         var res = await RequireQuery().Query(ScopedById(id, managed), ct);
@@ -201,7 +290,7 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     {
         await Guard(ct);
         var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
-        var managed = ManagedReadFilter();
+        var managed = ReadScopeFilter();
         if (managed is null) return Reverse(await _inner.GetMany(idList, ct));
         var res = await RequireQuery().Query(ScopedByIds(idList, managed), ct);
         var byId = new Dictionary<TKey, TEntity>();
@@ -214,14 +303,14 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     public async Task<RepositoryQueryResult<TEntity>> Query(QueryDefinition query, CancellationToken ct = default)
     {
         await Guard(ct);
-        var managed = ManagedReadFilter();
+        var managed = ReadScopeFilter();
         return Reverse(await RequireQuery().Query(managed is null ? query : ApplyManaged(query, managed), ct));
     }
 
     public async Task<CountResult> Count(QueryDefinition query, CancellationToken ct = default)
     {
         await Guard(ct);
-        var managed = ManagedReadFilter();
+        var managed = ReadScopeFilter();
         return await RequireQuery().Count(managed is null ? query : ApplyManaged(query, managed), ct);
     }
 
@@ -237,7 +326,7 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     public async Task<RepositoryQueryResult<TEntity>> QueryRaw(string query, object? parameters, QueryDefinition shaping, CancellationToken ct = default)
     {
         await Guard(ct);
-        GuardRawAgainstManagedScope();
+        GuardRawAgainstActiveScope();
         return _inner is IRawQueryRepository<TEntity, TKey> raw
             ? Reverse(await raw.QueryRaw(query, parameters, shaping, ct))   // raw values come back protected; restore plaintext
             : throw new NotSupportedException($"The adapter backing {typeof(TEntity).Name} does not support raw queries.");
@@ -246,19 +335,23 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     public async Task<CountResult> CountRaw(string query, object? parameters, CancellationToken ct = default)
     {
         await Guard(ct);
-        GuardRawAgainstManagedScope();
+        GuardRawAgainstActiveScope();
         return _inner is IRawQueryRepository<TEntity, TKey> raw
             ? await raw.CountRaw(query, parameters, ct)
             : throw new NotSupportedException($"The adapter backing {typeof(TEntity).Name} does not support raw queries.");
     }
 
-    private void GuardRawAgainstManagedScope()
+    // The opaque raw SQL cannot carry the isolation predicate — neither the managed equality NOR a predicate axis's
+    // (moderation) read-filter. So a raw read fails closed when EITHER an active managed write-scope OR any active
+    // read-filter contributor constrains the type (DATA-0106 §4 — the trigger rides the contributor union, not just
+    // _managed.Count; a pure predicate axis has no managed field and would otherwise slip through). RLS is the backstop.
+    private void GuardRawAgainstActiveScope()
     {
-        if (HasManaged && CurrentManagedValues() is not null)
+        if (IsReadScoped() || (HasManaged && CurrentManagedValues() is not null))
             throw new NotSupportedException(
-                $"Raw queries on managed-field-scoped entity '{typeof(TEntity).Name}' are not isolated by the managed " +
+                $"Raw queries on scoped entity '{typeof(TEntity).Name}' are not isolated by the read-filter " +
                 "predicate (the SQL is opaque). They are gated behind a store-level isolation backstop (e.g. RLS); with " +
-                "none available the call fails closed under an active managed scope rather than read across scopes.");
+                "none available the call fails closed under an active scope rather than read across scopes.");
     }
 
     // --- writes ---
@@ -297,7 +390,7 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     public async Task<bool> Delete(TKey id, CancellationToken ct = default)
     {
         await Guard(ct);
-        var managed = ManagedReadFilter();
+        var managed = ReadScopeFilter();
         if (managed is null) return await _inner.Delete(id, ct);
         // check-then-delete: only an owned row may be deleted by id (IDOR).
         var res = await RequireQuery().Query(ScopedById(id, managed), ct);
@@ -309,7 +402,7 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     {
         await Guard(ct);
         var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
-        var managed = ManagedReadFilter();
+        var managed = ReadScopeFilter();
         if (managed is null) return await _inner.DeleteMany(idList, ct);
         var res = await RequireQuery().Query(ScopedByIds(idList, managed), ct);
         var owned = res.Items.Select(e => e.Id).ToList();
@@ -319,7 +412,7 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     public async Task<int> DeleteAll(CancellationToken ct = default)
     {
         await Guard(ct);
-        var managed = ManagedReadFilter();
+        var managed = ReadScopeFilter();
         if (managed is not null)
         {
             // NEVER the unscoped Clear instruction under a managed scope — it would wipe every scope's rows.
@@ -338,7 +431,7 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     public async Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default)
     {
         await Guard(ct);
-        var managed = ManagedReadFilter();
+        var managed = ReadScopeFilter();
         if (managed is null) return await _inner.RemoveAll(strategy, ct);
         // RemoveAll is an unscoped truncate/wipe — never allowed to cross a managed boundary. Lower to a scoped delete.
         var owned = await RequireQuery().Query(QueryDefinition.All.Where(managed), ct);
@@ -347,15 +440,16 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     }
 
     // Forward the inner adapter's conditional compare-and-set (probe via DataCaps.Write.ConditionalReplace). Under an
-    // active managed scope this fails closed: the compare-and-set guard is a CLR predicate over POCO properties and
-    // cannot carry the managed (non-POCO) predicate, so a CAS could retarget a row in another scope. Use Upsert.
+    // active scope this fails closed: the compare-and-set guard is a CLR predicate over POCO properties and cannot carry
+    // the isolation predicate (the managed equality OR a predicate axis's read-filter), so a CAS could retarget a row in
+    // another scope. The trigger rides the contributor union (a pure predicate axis has no managed field). Use Upsert.
     public async Task<bool> ConditionalReplaceAsync(TEntity model, Expression<Func<TEntity, bool>> guard, CancellationToken ct = default)
     {
         await Guard(ct);
-        if (HasManaged && CurrentManagedValues() is not null)
+        if (IsReadScoped() || (HasManaged && CurrentManagedValues() is not null))
             throw new NotSupportedException(
-                $"ConditionalReplaceAsync is not supported for managed-field-scoped entity '{typeof(TEntity).Name}' under an " +
-                "active managed scope — the compare-and-set guard cannot carry the managed predicate. Use Upsert (conflict-aware).");
+                $"ConditionalReplaceAsync is not supported for scoped entity '{typeof(TEntity).Name}' under an " +
+                "active scope — the compare-and-set guard cannot carry the isolation predicate. Use Upsert (conflict-aware).");
         if (_inner is IConditionalWriteRepository<TEntity, TKey> cas)
             // Field transform (ARCH-0098 Blocker 2): persist an encrypted clone so a CAS write never stores plaintext.
             // A classified property must NOT appear in the guard (it compares stored ciphertext to caller plaintext).

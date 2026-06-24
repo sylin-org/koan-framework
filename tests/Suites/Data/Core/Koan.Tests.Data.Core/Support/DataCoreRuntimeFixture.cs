@@ -30,7 +30,7 @@ internal sealed class DataCoreRuntimeFixture : IAsyncDisposable
 
     public FakeVectorService VectorService => _vectorService;
 
-    public static async Task<DataCoreRuntimeFixture> CreateAsync(bool includeSqlite = false, IReadOnlyDictionary<string, string?>? extraSettings = null)
+    public static async Task<DataCoreRuntimeFixture> CreateAsync(bool includeSqlite = false, IReadOnlyDictionary<string, string?>? extraSettings = null, Action<IServiceCollection>? configureServices = null)
     {
         var root = Path.Combine(Path.GetTempPath(), "Koan-DataCore", Guid.CreateVersion7().ToString("n"));
         Directory.CreateDirectory(root);
@@ -65,6 +65,8 @@ internal sealed class DataCoreRuntimeFixture : IAsyncDisposable
                 s.AddKoanTransactions();
                 // FakeVectorService registered AFTER AddKoan() so it wins.
                 s.AddSingleton<IVectorService>(vectorService);
+                // Spec hook: register fake contributors (e.g. an IReadFilterContributor, DATA-0106) into the real boot.
+                configureServices?.Invoke(s);
             })
             .StartAsync()
             .ConfigureAwait(false);
