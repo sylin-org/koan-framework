@@ -8,6 +8,7 @@ using Koan.Data.Core.Model;
 using Koan.Data.SoftDelete;
 using Koan.Tenancy;
 using Koan.Tenancy.Tests.Support;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Koan.Tenancy.Tests;
@@ -75,6 +76,8 @@ public sealed class TenantSoftDeleteSpec
     [Fact(DisplayName = "soft-delete fails closed on a non-isolating adapter (JSON) — clean 'does not announce', not an opaque mid-read throw")]
     public async Task Soft_delete_fails_closed_on_a_non_isolating_adapter()
     {
+        // Test env (non-Production) ⇒ the ARCH-0101 §8 pre-flight WARNS and boot continues, so the RUNTIME fail-closed
+        // (the subject of this test) still fires on the read. This is the Development half of the §8 posture.
         await using var runtime = await TenancyRuntimeFixture.CreateAsync(extraSettings: Posture("Closed"), adapter: "json");
         runtime.ResetEntityCaches();
         using var _iso = Isolate();
@@ -83,5 +86,21 @@ public sealed class TenantSoftDeleteSpec
         // JSON does not announce, so even an empty read fails closed cleanly rather than throwing an opaque managed-field error.
         var act = async () => await HDoc.All();
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*does not announce*");
+    }
+
+    private sealed class FakeResolver : ITenantResolver { public string Name => "fake"; }
+
+    [Fact(DisplayName = "ARCH-0101 §8: a soft-delete entity on a non-isolating adapter REFUSES boot in Production (the deploy-time safety net)")]
+    public async Task Soft_delete_on_a_non_isolating_adapter_refuses_boot_in_production()
+    {
+        // The Production half of the §8 posture: the SAME soft-delete-on-JSON leak that merely warns in Development is a
+        // hard boot refusal in Production. A resolver is injected so tenancy's own pre-flight passes — the refusal here
+        // is the data-axis pre-flight (DataAxisLeakException), naming the leaky [SoftDelete] entities.
+        var act = async () => await TenancyRuntimeFixture.CreateAsync(
+            environment: "Production", adapter: "json",
+            configureServices: s => s.AddSingleton<ITenantResolver, FakeResolver>());
+
+        (await act.Should().ThrowAsync<Koan.Data.Core.Axes.DataAxisLeakException>())
+            .Which.Leaks.Should().NotBeEmpty();
     }
 }

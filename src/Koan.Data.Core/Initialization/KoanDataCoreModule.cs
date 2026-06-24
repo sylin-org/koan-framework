@@ -28,6 +28,16 @@ public sealed class KoanDataCoreModule : KoanModule
         ServiceCollectionExtensions.RegisterKoanDataCoreServices(services);
     }
 
+    public override System.Threading.Tasks.Task Start(IServiceProvider services, System.Threading.CancellationToken ct)
+    {
+        // ARCH-0101 §8: the boot-refuses-leaky-axis pre-flight. Loud warning in Development (boot continues), boot
+        // refusal in Production. No-op when no always-on predicate axis is registered (off = byte-identical).
+        var env = services.GetRequiredService<IHostEnvironment>();
+        var logger = services.GetService<Microsoft.Extensions.Logging.ILoggerFactory>()?.CreateLogger("Koan.Data.Axes");
+        Axes.DataAxisPreflight.Run(services, env, logger);
+        return System.Threading.Tasks.Task.CompletedTask;
+    }
+
     public override void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         module.Describe(Version);

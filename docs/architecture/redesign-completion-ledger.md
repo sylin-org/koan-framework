@@ -479,11 +479,18 @@ implemented and its tests pass on real stores.
       exclusion now mirrors CachedRepository's 3rd leg (field-transform/`[Classified]`); a scoped entity on an
       UNresolvable adapter reads as a leak (bias-to-strict, not swallowed-to-safe); docstrings corrected. Green: Phase E
       63 (53 unit + 10 integration real-boot RSoP) + byte-identical regression (data-core 271, tenancy 84, SoftDelete 7,
-      sqlite 11). **§8 pre-flight (NEXT):** `KoanModule.Start` sweep over `AssemblyCache` entity types — a boot-active
-      predicate axis (soft-delete) on a confirmed non-isolating adapter refuses boot (conservative: gated on a non-default
-      read contributor; skip-on-unresolvable; confirmed-mismatch-only). **Behavior change** — migrates the tenancy
-      soft-delete-on-JSON proof from a runtime throw to a boot refusal; needs broad regression for hidden soft-delete-on-
-      non-isolating suites. → then F (`DataAxis.AssertNoLeak<T>`).
+      sqlite 11). **§8 pre-flight ✅ DONE (2026-06-24, `dev`):** `DataAxisPreflight` from `KoanDataCoreModule.Start` sweeps
+      `AssemblyCache` entity types; for each read-scoped-in-the-boot-ambient (always-on axis) on an adapter that can't
+      enforce it (reusing the §9 diagnostic) → **the architect's Koan posture: Dev WARNS + boot continues; Prod REFUSES
+      boot** (`DataAxisLeakException`). The posture dissolves the blast radius — tests run non-Production → warn → the
+      tenancy runtime-fail-closed JSON proof passes UNCHANGED (no migration). Impl-diff review (`wf_8ee3d9a0-59c`, 16
+      agents) confirmed 9 (all MEDIUM/LOW, deploy-time-detection gaps, every one runtime-backstopped — NO live leak) →
+      folded the load-bearing (gate opens on a managed field too [catches a constant-value equality axis]; `GetTypes`
+      partial-load keeps `ex.Types` not fail-open-skip; logger-less warn → console; cached MethodInfo) + DOCUMENTED the
+      deliberate v1 boundary (ambient-gated tenant write-stamp + write-stamp-only field defer to the runtime fail-closed
+      — DATA-0106 "off axis is a no-op"; literal §8 "read-scopes" ≠ a tenant entity at boot). Green: Axes 55 unit + 10
+      integration; tenancy 85 (incl. the §8 Prod-refusal + Dev-warn); off-proof data-core 271 (gate stays closed),
+      SoftDelete 7, sqlite 11, Json 7, InMemory 33. **▶ PHASE E COMPLETE.** → then F (`DataAxis.AssertNoLeak<T>`).
 - ☐ **THEN:** Phase 3c schema-column DDL indexability (Indexed descriptors → computed/expression index; PG/SqlServer;
   SQLite JSON-only) + Mongo/bare-store managed serialization injection + in-memory managed `GetValue` · classification
   phases 4–7 (searchable blind-index · vector/messaging leak guards · crypto-shred+rotation · masked-read) · then
