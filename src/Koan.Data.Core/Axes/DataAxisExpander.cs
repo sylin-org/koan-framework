@@ -143,7 +143,13 @@ public static class DataAxisExpander
                         RequiredCapability: DataCaps.Isolation.RowScoped,
                         Indexed: true,
                         Priority: 0,
-                        AutoReadFilter: axis.AutoReadFilter));
+                        AutoReadFilter: axis.AutoReadFilter,
+                        // ARCH-0102 §3: a field whose value is set by the delete override (soft-delete shape, a null
+                        // ambient provider) is operation-sourced; a plain ambient .Field is ambient-stamped. Derived,
+                        // never author-typed. (A future axis that is genuinely BOTH declares it explicitly.)
+                        Provenance: axis.OnDeleteValue is { } odv && string.Equals(odv.Field, fieldName, StringComparison.Ordinal)
+                            ? FieldProvenance.OperationSourced
+                            : FieldProvenance.AmbientStamped));
                 }
 
                 if (axis.ReadPredicate is { } predicate)

@@ -42,7 +42,10 @@ public sealed class KoanAutoRegistrar : KoanModule
             AppliesTo: static t => SoftDeleteMetadata.IsSoftDelete(t),
             RequiredCapability: DataCaps.Isolation.RowScoped,
             Indexed: true,
-            AutoReadFilter: false));
+            AutoReadFilter: false,
+            // ARCH-0102 §3: set on Delete (the override below), never ambient-stamped on a normal write — so a
+            // secondary store (e.g. the independent vector index) that never ran the delete cannot keep it current.
+            Provenance: FieldProvenance.OperationSourced));
 
         OperationOverrideRegistry.Register(new OperationOverrideDescriptor(
             Field: "__deleted",

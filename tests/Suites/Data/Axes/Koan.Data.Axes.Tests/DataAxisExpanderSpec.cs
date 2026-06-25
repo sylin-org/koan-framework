@@ -72,6 +72,7 @@ public sealed class DataAxisExpanderSpec : IDisposable
         field.Priority.Should().Be(0);
         field.AutoReadFilter.Should().BeFalse();
         field.ValueProvider().Should().BeNull();
+        field.Provenance.Should().Be(FieldProvenance.OperationSourced);   // ARCH-0102 §3: set on delete, not ambient-stamped
         ManagedFieldRegistry.ForType(typeof(Other)).Should().BeEmpty();
 
         // The operation override == Delete ⇒ __archived = true, applicable only to Doc.
@@ -108,10 +109,28 @@ public sealed class DataAxisExpanderSpec : IDisposable
         field.Indexed.Should().BeTrue();
         field.AutoReadFilter.Should().BeTrue();         // equality fold is automatic via the built-in contributor
         field.ValueProvider().Should().Be("acme");
+        field.Provenance.Should().Be(FieldProvenance.AmbientStamped);   // ARCH-0102 §3: a plain ambient .Field
 
         // No DelegatingReadFilterContributor — the built-in ManagedEqualityReadContributor (added by data-core boot, not
         // here) folds the equality. So a .Field-only axis adds nothing to the read-contributor DI seam.
         ResolveReadContributors(services).Should().BeEmpty();
+    }
+
+    // --- ARCH-0102 §3: provenance is a [Flags] type, so a field can be BOTH ambient-stamped AND operation-sourced
+    //     (the future moderation shape — ambient __vis that an operation also flips — an XOR enum could not express).
+    //     Representable today; the builder auto-derives the single-flag cases, a genuine both-axis declares it. ---
+
+    [Fact]
+    public void Provenance_is_flags_and_can_represent_both()
+    {
+        var both = new ManagedFieldDescriptor("__mod", typeof(string), () => "x", _ => true,
+            Provenance: FieldProvenance.AmbientStamped | FieldProvenance.OperationSourced);
+        both.Provenance.HasFlag(FieldProvenance.AmbientStamped).Should().BeTrue();
+        both.Provenance.HasFlag(FieldProvenance.OperationSourced).Should().BeTrue();
+
+        // The default for a plain managed field (no provenance argument) is ambient-stamped (the tenant shape).
+        new ManagedFieldDescriptor("__x", typeof(string), () => "x", _ => true).Provenance
+            .Should().Be(FieldProvenance.AmbientStamped);
     }
 
     // --- D2c: the builder is order-independent — .Reads().Field() ≡ .Field().Reads() ---

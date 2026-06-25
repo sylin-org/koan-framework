@@ -41,6 +41,13 @@ namespace Koan.Data.Abstractions.Pipeline;
 /// fails closed, but contributes no auto-equality (which would wrongly conjoin) and <b>excludes its entity from the
 /// cache</b> (an id-keyed cache namespace is equality-by-construction; a viewer-context predicate cannot be a cache key).
 /// </param>
+/// <param name="Provenance">
+/// ARCH-0102 §3 — where this field's value comes from (<see cref="FieldProvenance"/>), which decides the store-aware
+/// push. <see cref="FieldProvenance.AmbientStamped"/> (default — the tenant / moderation shape) is materialised in
+/// every store and its predicate is enforceable everywhere; <see cref="FieldProvenance.OperationSourced"/> (soft-delete's
+/// <c>__deleted</c>, set only on delete) is materialised only where the operation ran, so a secondary store can't enforce
+/// it. Derived from the declared shape, not author-typed (ADR Addendum II).
+/// </param>
 public sealed record ManagedFieldDescriptor(
     string StorageName,
     Type ClrType,
@@ -49,4 +56,5 @@ public sealed record ManagedFieldDescriptor(
     Capability? RequiredCapability = null,
     bool Indexed = false,
     int Priority = 0,
-    bool AutoReadFilter = true);
+    bool AutoReadFilter = true,
+    FieldProvenance Provenance = FieldProvenance.AmbientStamped);
