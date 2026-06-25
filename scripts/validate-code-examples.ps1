@@ -264,6 +264,7 @@ function Create-TestProject {
     <ProjectReference Include="..\..\src\Koan.Observability\Koan.Observability.csproj" />
     <ProjectReference Include="..\..\src\Koan.Media.Core\Koan.Media.Core.csproj" />
     <ProjectReference Include="..\..\src\Koan.Mcp\Koan.Mcp.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Tenancy\Koan.Tenancy.csproj" />
   </ItemGroup>
 
   <ItemGroup>

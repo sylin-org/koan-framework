@@ -31,6 +31,7 @@ Framework knowledge is provided through **Agent Skills** in `.claude/skills/` th
 | Blob storage, `StorageEntity<T>`, `[StorageBinding]`, file upload/streaming | `koan-storage` |
 | Messaging, `myMsg.Send()`, `On<T>` handlers, event-driven | `koan-messaging` |
 | Media, `MediaEntity<T>`, transforms, `[MediaRecipe]`, OCR/describe | `koan-media` |
+| Multi-tenancy, tenant isolation, `Tenant.Use`/`None`, `[HostScoped]`, `__koan_tenant`, dev-open/prod-closed posture | `koan-tenancy` |
 | Orchestration, `[KoanService]`, compose/devops, Aspire, `start.bat` | `koan-orchestration` |
 | Observability, OpenTelemetry, traces/metrics, health | `koan-observability` |
 | MCP server development | `koan-mcp-integration` |

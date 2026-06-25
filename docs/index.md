@@ -25,6 +25,7 @@ Task-oriented how-tos:
 - [Building APIs](guides/building-apis.md) — REST over entities, hooks, pagination
 - [Data modeling](guides/data-modeling.md) — entity-first patterns, relationships
 - [Background jobs](guides/jobs-howto.md) — entity-first jobs, scheduling, the capability ladder
+- [Multi-tenancy](guides/tenancy-howto.md) — automatic tenant isolation across data, blobs, and cache; posture; `[HostScoped]`
 - [AI integration](guides/ai-integration.md) — embeddings, semantic search, chat
 - [Media recipes](guides/media-recipes-howto.md) — format-preserving image pipeline
 - [Authentication](guides/authentication-setup.md) — auth providers and service auth

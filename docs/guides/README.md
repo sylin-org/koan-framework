@@ -85,6 +85,13 @@ _For contributors_: How application initialization actually works
 - HTTP grammar with named recipes, format shortcuts, and mutator allowlists
 - Multi-variant materialisation (one decode, N outputs)
 
+### [Multi-Tenancy](tenancy-howto.md)
+
+- Reference = Intent: every non-`[HostScoped]` `Entity<T>` is isolated by the ambient tenant — no tenant column, no `WHERE` filter
+- Automatic isolation across data reads/writes, blob storage (STOR-0011), cache, and the job async-hop
+- `Tenant.Use`/`None`/`Current` scoping, dev-open / prod-closed posture, and the `DataAxis.AssertNoLeak` proof
+- Retrofitting tenancy onto an app: `[HostScoped]` global rows, per-request middleware, background-worker scoping
+
 ### [AI Integration](ai-integration.md)
 
 - Vector stores and semantic search

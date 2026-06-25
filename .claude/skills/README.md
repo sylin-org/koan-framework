@@ -72,6 +72,7 @@ Every skill conforms — exemplars: **koan-caching**, **koan-jobs**.
 | **koan-storage** | storage.md | ✅ | `StorageEntity<T>` + `[StorageBinding]`, profiles, streaming, `MoveTo`/`CopyTo` tiering |
 | **koan-messaging** | messaging.md | ✅ | `myMsg.Send()` buffered-until-live, `services.On<T>()`, Reference=Intent transports |
 | **koan-media** | media.md | ✅ | `MediaEntity<T>`, content-addressed `Store`, `[MediaRecipe]` transforms, `[MediaAnalysis]` |
+| **koan-tenancy** | tenancy.md | ✅ | Automatic tenant isolation (data/blob/cache), `Tenant.Use`/`None`, `[HostScoped]`, dev-open/prod-closed posture, `AssertNoLeak` |
 | **koan-orchestration** | orchestration.md | ✅ | `[KoanService]` descriptors, DevHost CLI, `OrchestrationMode` self-orchestration, Aspire |
 | **koan-observability** | observability.md | ✅ | opt-in OTel leaf (ARCH-0088), traces/metrics, `IHealthContributor` self-reporting |
 
