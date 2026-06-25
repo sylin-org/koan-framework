@@ -72,6 +72,12 @@ public abstract class KeyValueStore<TEntity, TKey> :
         DescribeBackend(caps);
     }
 
+    /// <summary>The declared capability set, built once from <see cref="Describe"/> — the single source of truth the
+    /// batch path negotiates against (e.g. an atomic-batch request on a backend that did not announce
+    /// <see cref="DataCaps.Write.AtomicBatch"/> fails loud, rather than silently running non-atomically).</summary>
+    private CapabilitySet? _capabilities;
+    private CapabilitySet Capabilities => _capabilities ??= CapabilitySet.Build(GetType().Name, Describe);
+
     // ==================== Read ====================
 
     public async Task<TEntity?> Get(TKey id, CancellationToken ct = default)
@@ -243,6 +249,15 @@ public abstract class KeyValueStore<TEntity, TKey> :
         public async Task<BatchResult> Save(BatchOptions? options = null, CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
+
+            // Honor the atomic-batch contract from the declared capability: a backend that does not announce
+            // AtomicBatch (e.g. the JSON file floor) cannot guarantee an all-or-nothing batch, so a RequireAtomic
+            // request fails loud rather than running the writes one-by-one as if atomic.
+            if (options?.RequireAtomic == true && !_repo.Capabilities.Has(DataCaps.Write.AtomicBatch))
+                throw new NotSupportedException(
+                    $"The {_repo.GetType().Name} adapter does not support atomic batch transactions for " +
+                    $"{typeof(TEntity).Name} (it did not announce DataCaps.Write.AtomicBatch).");
+
             foreach (var (id, mutate) in _mutations)
             {
                 ct.ThrowIfCancellationRequested();

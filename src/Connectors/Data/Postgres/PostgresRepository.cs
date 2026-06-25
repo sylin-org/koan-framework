@@ -654,7 +654,7 @@ internal sealed class PostgresRepository<
     }
 
     // Managed-field conflict-aware upsert (DATA-0105 §3b — the write-verify half). When a managed write-scope is
-    // active, the jsonb already carries the managed keys (the ManagedFieldContractResolver injected them) AND the
+    // active, the jsonb already carries the managed keys (the ManagedFieldJsonInjector injected them) AND the
     // ON CONFLICT update is guarded so an existing row owned by a DIFFERENT scope is not overwritten — affected = 0
     // then means a rejected cross-scope write. Generic: reads the scope dict, never names tenant/classification.
     private static (string Sql, KeyValuePair<string, object?>[] Managed, bool Guarded) ManagedUpsert(string table)

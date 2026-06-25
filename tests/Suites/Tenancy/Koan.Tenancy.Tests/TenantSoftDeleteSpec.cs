@@ -73,17 +73,17 @@ public sealed class TenantSoftDeleteSpec
         using (Tenant.Use("acme")) (await TDoc.Get(a1.Id)).Should().NotBeNull();   // acme's row survives
     }
 
-    [Fact(DisplayName = "soft-delete fails closed on a non-isolating adapter (JSON) — clean 'does not announce', not an opaque mid-read throw")]
+    [Fact(DisplayName = "soft-delete fails closed on a non-isolating adapter (fake-noniso) — clean 'does not announce', not an opaque mid-read throw")]
     public async Task Soft_delete_fails_closed_on_a_non_isolating_adapter()
     {
         // Test env (non-Production) ⇒ the ARCH-0101 §8 pre-flight WARNS and boot continues, so the RUNTIME fail-closed
         // (the subject of this test) still fires on the read. This is the Development half of the §8 posture.
-        await using var runtime = await TenancyRuntimeFixture.CreateAsync(extraSettings: Posture("Closed"), adapter: "json");
+        await using var runtime = await TenancyRuntimeFixture.CreateAsync(extraSettings: Posture("Closed"), adapter: "fake-noniso");
         runtime.ResetEntityCaches();
         using var _iso = Isolate();
 
         // HDoc is [HostScoped] (no tenant axis) + [SoftDelete]. The soft-delete managed field requires RowScoped, which
-        // JSON does not announce, so even an empty read fails closed cleanly rather than throwing an opaque managed-field error.
+        // the fake adapter does not announce, so even an empty read fails closed cleanly rather than throwing an opaque error.
         var act = async () => await HDoc.All();
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*does not announce*");
     }
@@ -97,7 +97,7 @@ public sealed class TenantSoftDeleteSpec
         // hard boot refusal in Production. A resolver is injected so tenancy's own pre-flight passes — the refusal here
         // is the data-axis pre-flight (DataAxisLeakException), naming the leaky [SoftDelete] entities.
         var act = async () => await TenancyRuntimeFixture.CreateAsync(
-            environment: "Production", adapter: "json",
+            environment: "Production", adapter: "fake-noniso",
             configureServices: s => s.AddSingleton<ITenantResolver, FakeResolver>());
 
         (await act.Should().ThrowAsync<Koan.Data.Core.Axes.DataAxisLeakException>())

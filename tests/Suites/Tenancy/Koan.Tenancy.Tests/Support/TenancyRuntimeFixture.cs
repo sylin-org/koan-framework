@@ -1,7 +1,9 @@
 using Koan.Core;
 using Koan.Core.Hosting.App;
+using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Koan.Testing.Integration;
+using Koan.Tests.Shared;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Tenancy.Tests.Support;
@@ -35,8 +37,9 @@ internal sealed class TenancyRuntimeFixture : IAsyncDisposable
         Directory.CreateDirectory(root);
 
         // SQLite is the no-Docker adapter that ANNOUNCES isolation (DataCaps.Isolation.RowScoped) — tenancy needs
-        // an isolating store, so the guard tests AND the AssertNoTenantLeak proof run on it. The JSON adapter does
-        // NOT announce isolation; a tenant-scoped op there fails closed (a dedicated negative test boots adapter:"json").
+        // an isolating store, so the guard tests AND the AssertNoTenantLeak proof run on it. The non-isolating
+        // counter-example is the deliberately non-conformant NonIsolatingFakeAdapter (adapter:"fake-noniso"); since
+        // ARCH-0103 made every real KV adapter (JSON included) isolate, the fail-closed safety-net tests use the fake.
         var settings = new Dictionary<string, string?>(StringComparer.Ordinal)
         {
             ["Koan:Environment"] = environment,
@@ -50,6 +53,7 @@ internal sealed class TenancyRuntimeFixture : IAsyncDisposable
             settings["Koan:Data:Sources:Default:ConnectionString"] = $"Data Source={Path.Combine(root, "tenancy.db")}";
         else if (string.Equals(adapter, "json", StringComparison.OrdinalIgnoreCase))
             settings["Koan:Data:Json:DirectoryPath"] = root;
+        // "fake-noniso" needs no extra settings — the source Adapter key (above) selects the registered fake factory.
 
         if (withLocalStorage)
         {
@@ -75,7 +79,13 @@ internal sealed class TenancyRuntimeFixture : IAsyncDisposable
         var builder = KoanIntegrationHost.Configure()
             .WithEnvironment(environment)
             .WithSettings(settings)
-            .ConfigureServices(s => s.AddKoan());
+            .ConfigureServices(s =>
+            {
+                s.AddKoan();
+                // The deliberately non-isolating fake (inert unless a source names "fake-noniso") — the fail-closed
+                // safety-net counter-example now that every real KV adapter announces isolation (ARCH-0103).
+                s.AddSingleton<IDataAdapterFactory, NonIsolatingFakeAdapterFactory>();
+            });
         if (configureServices is not null)
             builder.ConfigureServices(configureServices);
 

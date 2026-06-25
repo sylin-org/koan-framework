@@ -44,4 +44,9 @@
     <ProjectReference Include="..\..\..\..\src\Koan.Data.Vector\Koan.Data.Vector.csproj" />
     <ProjectReference Include="..\..\..\..\src\Connectors\Data\Vector\InMemory\Koan.Data.Vector.Connector.InMemory.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- ARCH-0103 P2: the deliberately non-isolating fake adapter shared by the fail-closed safety-net suites. -->
+    <Compile Include="..\..\_shared\NonIsolatingFakeAdapter.cs" Link="Support\NonIsolatingFakeAdapter.cs" />
+  </ItemGroup>
 </Project>

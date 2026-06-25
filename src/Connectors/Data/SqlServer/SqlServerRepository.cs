@@ -51,7 +51,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         .Add(DataCaps.Query.Filter, RelationalFilterSupport.Default);
 
     // Managed-field conflict-aware upsert (DATA-0105 §3b — the write-verify half). When a managed write-scope is
-    // active, the [Json] already carries the managed keys (the ManagedFieldContractResolver injected them) AND a
+    // active, the [Json] already carries the managed keys (the ManagedFieldJsonInjector injected them) AND a
     // MERGE updates the row ONLY when its existing managed fields match the scope — a guard mismatch leaves the row
     // untouched (0 rows affected), which the caller treats as a rejected cross-scope write. Generic: reads the
     // scope dict, never names tenant/classification. Unguarded ⇒ the existing UPDATE-then-INSERT path verbatim.

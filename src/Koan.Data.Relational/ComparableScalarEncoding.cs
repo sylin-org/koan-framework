@@ -1,4 +1,5 @@
 using System.Globalization;
+using Koan.Data.Core;
 using Newtonsoft.Json;
 
 namespace Koan.Data.Relational;
@@ -77,12 +78,13 @@ public static class ComparableScalarEncoding
         settings.Converters.Add(_timeOnly);
 
         // Serialize-stage managed-field hook (DATA-0105 §3b, Seam 2). Wrap the adapter's existing contract
-        // resolver in a ManagedFieldContractResolver, preserving its naming strategy (CamelCase on SqlServer;
+        // resolver in the shared ManagedFieldJsonInjector (Koan.Data.Core, ARCH-0103 §9 — lifted here so the JSON-text
+        // KeyValueStore family stamps the same managed keys), preserving its naming strategy (CamelCase on SqlServer;
         // PascalCase default on SQLite/PG). When no module registers a managed field, the resolver is a pure
         // pass-through, so real-property serialization stays byte-identical. One shared wiring point for the
         // whole relational trio (all three call Apply).
         var naming = (settings.ContractResolver as Newtonsoft.Json.Serialization.DefaultContractResolver)?.NamingStrategy;
-        settings.ContractResolver = new ManagedFieldContractResolver { NamingStrategy = naming };
+        settings.ContractResolver = new ManagedFieldJsonInjector { NamingStrategy = naming };
         return settings;
     }
 

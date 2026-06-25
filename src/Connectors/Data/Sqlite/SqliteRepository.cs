@@ -839,7 +839,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     }
 
     // Managed-field conflict-aware upsert (DATA-0105 §3b — the write-verify half). When a managed write-scope is
-    // active, the row's JSON already carries the managed keys (the ManagedFieldContractResolver injected them on
+    // active, the row's JSON already carries the managed keys (the ManagedFieldJsonInjector injected them on
     // serialize) AND the ON CONFLICT update is guarded so an existing row owned by a DIFFERENT managed scope is
     // NOT overwritten — rows-affected = 0 then means a rejected cross-scope write (e.g. tenant B upserting tenant
     // A's id). Generic: reads the scope dict, never names tenant/classification. Off ⇒ the original SQL verbatim.

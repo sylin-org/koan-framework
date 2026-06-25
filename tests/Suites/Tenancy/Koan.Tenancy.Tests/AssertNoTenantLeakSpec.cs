@@ -170,14 +170,14 @@ public sealed class AssertNoTenantLeakSpec
         }
     }
 
-    [Fact(DisplayName = "no tenant leak: a tenant-scoped write fails closed on a non-isolating adapter (JSON)")]
+    [Fact(DisplayName = "no tenant leak: a tenant-scoped write fails closed on a non-isolating adapter (fake-noniso)")]
     public async Task Tenant_scoped_write_fails_closed_on_a_non_isolating_adapter()
     {
-        await using var runtime = await TenancyRuntimeFixture.CreateAsync(extraSettings: Posture("Closed"), adapter: "json");
+        await using var runtime = await TenancyRuntimeFixture.CreateAsync(extraSettings: Posture("Closed"), adapter: "fake-noniso");
         runtime.ResetEntityCaches();
         using var _iso = Isolate();
 
-        // JSON does not announce Isolation.RowScoped → a tenant-scoped op fails closed rather than leak.
+        // The fake adapter does not announce Isolation.RowScoped → a tenant-scoped op fails closed rather than leak.
         using (Tenant.Use("acme"))
         {
             var act = async () => await new Note { Title = "x" }.Save();

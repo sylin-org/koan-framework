@@ -16,9 +16,10 @@ using Xunit;
 namespace Koan.Tests.Data.Core.Specs.Pipeline;
 
 /// <summary>
-/// DATA-0106 §4 — fail-closed over the contributor UNION, through a real <c>AddKoan()</c> boot (ARCH-0079) on the
-/// non-isolating JSON adapter (it does NOT announce <c>Isolation.RowScoped</c>). Two proofs the prior managed-field
-/// design could not make:
+/// DATA-0106 §4 — fail-closed over the contributor UNION, through a real <c>AddKoan()</c> boot (ARCH-0079) on a
+/// deliberately non-isolating adapter (the <c>fake-noniso</c> fixture — it does NOT announce
+/// <c>Isolation.RowScoped</c>; since ARCH-0103 every real KV adapter, JSON included, isolates). Two proofs the prior
+/// managed-field design could not make:
 /// <list type="bullet">
 /// <item>A <b>READ</b> (not just a write) under an active equality axis fails closed on a non-isolating adapter — the
 /// read-side throw the old design only structurally implied.</item>
@@ -36,9 +37,9 @@ public sealed class ReadScopeFailClosedSpec : IDisposable
     public ReadScopeFailClosedSpec() => ManagedFieldRegistry.Reset();
     public void Dispose() { _scope.Value = null; ManagedFieldRegistry.Reset(); }
 
-    // Force the non-isolating JSON adapter (FilterSupport.Full, but NO Isolation.RowScoped).
-    private static IReadOnlyDictionary<string, string?> ForceJson()
-        => new Dictionary<string, string?> { ["Koan:Data:Sources:Default:Adapter"] = "json" };
+    // Force the deliberately non-isolating fake adapter (FilterSupport.Full, but NO Isolation.RowScoped).
+    private static IReadOnlyDictionary<string, string?> ForceNonIsolating()
+        => new Dictionary<string, string?> { ["Koan:Data:Sources:Default:Adapter"] = "fake-noniso" };
 
     public sealed class JNote : Entity<JNote> { public string Title { get; set; } = ""; }
 
@@ -63,7 +64,7 @@ public sealed class ReadScopeFailClosedSpec : IDisposable
             AppliesTo: t => t == typeof(JNote),
             RequiredCapability: DataCaps.Isolation.RowScoped));
 
-        await using var fx = await DataCoreRuntimeFixture.CreateAsync(extraSettings: ForceJson());
+        await using var fx = await DataCoreRuntimeFixture.CreateAsync(extraSettings: ForceNonIsolating());
         fx.ResetEntityCaches();
         _scope.Value = "acme";
         using var _ = fx.UsePartition();
@@ -77,7 +78,7 @@ public sealed class ReadScopeFailClosedSpec : IDisposable
     {
         // No managed field at all — the old fail-closed (gated on _managed.Count > 0) would have skipped this entirely.
         await using var fx = await DataCoreRuntimeFixture.CreateAsync(
-            extraSettings: ForceJson(),
+            extraSettings: ForceNonIsolating(),
             configureServices: s => s.AddSingleton<IReadFilterContributor>(new PredicateOnlyContributor()));
         fx.ResetEntityCaches();
         using var _ = fx.UsePartition();

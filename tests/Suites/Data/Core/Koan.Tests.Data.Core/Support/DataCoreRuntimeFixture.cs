@@ -1,8 +1,10 @@
 using Koan.Core;
 using Koan.Core.Hosting.App;
+using Koan.Data.Abstractions;
 using Koan.Data.Core.Transactions;
 using Koan.Data.Vector;
 using Koan.Testing.Integration;
+using Koan.Tests.Shared;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Tests.Data.Core.Support;
@@ -63,6 +65,9 @@ internal sealed class DataCoreRuntimeFixture : IAsyncDisposable
             {
                 s.AddKoan();
                 s.AddKoanTransactions();
+                // The deliberately non-isolating fake (inert unless a source names "fake-noniso") — the fail-closed
+                // safety-net counter-example now that every real KV adapter announces isolation (ARCH-0103).
+                s.AddSingleton<IDataAdapterFactory, NonIsolatingFakeAdapterFactory>();
                 // FakeVectorService registered AFTER AddKoan() so it wins.
                 s.AddSingleton<IVectorService>(vectorService);
                 // Spec hook: register fake contributors (e.g. an IReadFilterContributor, DATA-0106) into the real boot.
