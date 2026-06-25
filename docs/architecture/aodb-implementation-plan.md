@@ -1,8 +1,17 @@
 # ARCH-0102 (AODB) — the break-and-rebuild convergence plan
 
 - Date: 2026-06-25
-- Status: **Plan, pending architect sign-off** (no code moved yet)
+- Status: **PHASE 1 SHIPPED** on `dev` (8 commits, all green, unpushed); **Phase 2 pending a focused run** (see the box below).
 - Decision: [ARCH-0102 — the Access Overlay Definition Block](../decisions/ARCH-0102-access-overlay-definition-block.md)
+
+> **Progress (2026-06-25).**
+> **Phase 0** `a391e4d9` — overlay-naming transform; the confirmed Weaviate vector leak closed (live RED→GREEN `WeaviateOverlayIsolationSpec`).
+> **Phase 1a** `b9bf3792` — `[Flags] FieldProvenance` derived onto `ManagedFieldDescriptor`.
+> **Phase 1b** `bb34c995` — `ReadScopeFold.Compose` is the one provenance-tagging composer → inspectable `Aodb`; the vector's bespoke `FoldReadScope`/`FilterMentions` fork deleted and collapsed in (store-aware push via `CombineWriteStamped`). *Honest scope (critic-confirmed): the facade keeps `Fold` (no provenance walk on its hot path), storage/cache keep `EqualityFields` (key-particles ≠ predicates), `ManagedEqualityReadContributor` stays as a source — the genuine collapse is the vector fork → the one composer, not the plan's over-stated facade/storage/cache migration.*
+> **Phase 1c** `a016207e` + `255fefa9` — soft-delete and tenancy (the flagship) migrated to discovered `[DataAxis]` declarations; **both hand-registrars deleted**; tenancy guard/posture/pre-flight/dev-seed/Report stay (policy, not a plane). Byte-identical. **Phase 1 COMPLETE.**
+> Green throughout: tenancy 104 · data-core 273 · Weaviate 30 · InMemory vector 29 · SoftDelete 7 · Axes 56 · full-solution build clean.
+>
+> **▶▶ Phase 2 finding (blocking — it is NOT a no-op to fill).** `AxisMode.Database` is a deliberate *carrier-only, caller-routes* design today (the expander's Database case registers only the carrier; `Axis.Validate` forbids `.Field`; `AxisBuilderSpec` enshrines it). ARCH-0102's **auto-routing** is a contract change to the **data-routing core** (`AdapterResolver.ResolveForEntity` — the priority chain every data op flows through) and is **atomic** — a route registry without the `AdapterResolver` hook is a *silent non-isolation footgun* (declare Database mode → no isolation, no error). The 6 steps + the multi-DB SQLite gate are recorded in the `arch-0102-aodb-mission` memory; tackle as a focused TDD run (harness first).
 - Mandate (verbatim): *"adjust everything we have to adhere to this ADR. Break-and-rebuild targeting 'fewer but more meaningful moving parts' is a mandate."*
 - Provenance: a 6-reader investigation Workflow (`wf_def3d6c3-f98`) mapped every isolation surface onto the AODB, synthesized this plan, and an adversarial critic verified it. **The critic's verdict — *directionally sound, materially overstated* — is folded in below**: three "collapses" were honestly downgraded (one relocation, one scope-limit, one tautology dropped) and two fail-closed gaps were pinned as Phase-1b acceptance gates.
 

@@ -587,6 +587,24 @@ implemented and its tests pass on real stores.
   first-class PILLAR (`9d7296de`):** card `reference/cards/tenancy.md` + how-to `guides/tenancy-howto.md` + skill
   `koan-tenancy` (compile-gated) + CLAUDE.md/skills-README/SURFACES registration. **0.3 vector** = the remaining sibling
   (needs Docker/Weaviate; axis-generic with ARCH-0098). NEXT = fold `wf_03ef19e6-88c` → mark STOR-0011 Accepted; then 0.3 vector.
+- ◐ **ARCH-0102 — THE ACCESS OVERLAY DEFINITION BLOCK (AODB): PHASE 1 SHIPPED (2026-06-25, `dev`, unpushed, 8 ahead).**
+  The generalization of ARCH-0101: isolation intent composed once into an inspectable `Aodb` + pushed down + adapter-realized;
+  the break-and-rebuild collapse of the per-plane scoping forks onto ONE composer. ADR `docs/decisions/ARCH-0102-...md`
+  (decision + Addendum I corrections + Addendum II the delight inversion) + plan `docs/architecture/aodb-implementation-plan.md`.
+  **Phase 0 `a391e4d9`** — `OverlayNamingRule` (framework-owned, adapter-declared, override-only) closes the CONFIRMED
+  Weaviate vector leak (GraphQL reserves `__`; Weaviate declares `__`→`koan_`; the framework renames write-stamp + read-filter
+  from the one declaration; live RED→GREEN `WeaviateOverlayIsolationSpec`). **Phase 1a `b9bf3792`** — `[Flags] FieldProvenance`
+  derived onto `ManagedFieldDescriptor`. **Phase 1b `bb34c995`** — `ReadScopeFold.Compose` → the one provenance-tagging
+  inspectable `Aodb`; vector `FoldReadScope`/`FilterMentions` DELETED, collapsed in (store-aware push `CombineWriteStamped`).
+  *Honest scope (critic-confirmed): facade keeps `Fold`, storage/cache keep `EqualityFields`, `ManagedEqualityReadContributor`
+  stays a source — the genuine collapse is the vector fork → the one composer, not the plan's over-stated facade/storage/cache
+  migration.* **Phase 1c `a016207e`+`255fefa9`** — soft-delete & tenancy (the flagship) migrated to discovered `[DataAxis]`
+  declarations; **both hand-registrars DELETED**; tenancy guard/posture/pre-flight/dev-seed/Report STAY (policy, not plane).
+  Tenancy is now the golden contributor example the standard always demanded. Byte-identical: tenancy 104, data-core 273,
+  Weaviate 30, InMemory vector 29, SoftDelete 7, Axes 56; full-solution build clean. **▶ PHASE 2 (NEXT, focused run):
+  Database-mode AUTO-ROUTING — a CONTRACT CHANGE to the data-routing core (`AdapterResolver`), ATOMIC (a route registry without
+  the resolver hook is a silent-non-isolation footgun), needs a multi-DB SQLite gate. The 6 steps recorded in the
+  `arch-0102-aodb-mission` memory + the plan's Progress box.** Generalizes the contributor-agnostic realignment above.
 - ☐ **THEN:** Phase 3c schema-column DDL indexability (Indexed descriptors → computed/expression index; PG/SqlServer;
   SQLite JSON-only) + Mongo/bare-store managed serialization injection + in-memory managed `GetValue` · classification
   phases 4–7 (searchable blind-index · vector/messaging leak guards · crypto-shred+rotation · masked-read) · then
