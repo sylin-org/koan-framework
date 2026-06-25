@@ -35,5 +35,7 @@
     <ProjectReference Include="..\..\..\..\src\Koan.Cache\Koan.Cache.csproj" />
     <!-- ARCH-0101 §4: the tenant × soft-delete two-axis composition proof (Reference = Intent activates soft-delete). -->
     <ProjectReference Include="..\..\..\..\src\Koan.Data.SoftDelete\Koan.Data.SoftDelete.csproj" />
+    <!-- STOR-0011: the storage blob-key tenant-isolation proof (Local provider, no Docker). -->
+    <ProjectReference Include="..\..\..\..\src\Connectors\Storage\Local\Koan.Storage.Connector.Local.csproj" />
   </ItemGroup>
 </Project>

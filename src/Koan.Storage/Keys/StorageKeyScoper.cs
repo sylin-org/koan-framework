@@ -4,7 +4,6 @@ using System.Globalization;
 using Koan.Core.Hosting.App;
 using Koan.Core.Naming;
 using Koan.Data.Abstractions.Pipeline;
-using Koan.Data.Core;
 using Koan.Data.Core.Pipeline;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -67,15 +66,19 @@ public static class StorageKeyScoper
             // typeof(object) sentinel = "unknown type, treat as scope-required"; TenantStorageGuard fails closed
             // when no concrete tenant is in scope (the unscoped-raw-op fail-safe).
             foreach (var g in sp.GetServices<IStorageGuard>()) g.Guard(typeof(object));
-        var bag = sp?.GetService<AmbientCarrierRegistry>()?.Capture();
-        if (bag is null || bag.Count == 0) return logicalKey;
+        // A raw IStorageService caller has no entity type, so there is no [HostScoped] exemption (a type-less op
+        // cannot be host-scoped — isolate by default). Read EVERY registered equality axis's ambient value (no
+        // AppliesTo filter). Use the descriptor's CLEAN ValueProvider value — NOT AmbientCarrierRegistry.Capture(),
+        // whose value is a versioned durable-restore token (e.g. "v1:id:acme"), not a path-clean segment.
+        var all = ManagedFieldRegistry.All;
         List<Particle>? ps = null;
-        var i = 0;
-        foreach (var kv in bag)
+        for (var i = 0; i < all.Count; i++)
         {
-            var s = StorageKeyParticleFormatter.Instance.Format(kv.Value);
+            var d = all[i];
+            if (!d.AutoReadFilter) continue;                      // a non-equality axis is not a path segment
+            var s = Convert.ToString(d.ValueProvider(), CultureInfo.InvariantCulture);
             if (string.IsNullOrEmpty(s)) continue;
-            (ps ??= new List<Particle>(bag.Count)).Add(new Particle(i++, kv.Key, s, ParticlePosition.Leading, Sep));
+            (ps ??= new List<Particle>(all.Count)).Add(new Particle(i, d.StorageName, s, ParticlePosition.Leading, Sep));
         }
         return ps is null ? logicalKey : IdentifierComposer.Compose(logicalKey, ps.ToArray(), Policy);
     }

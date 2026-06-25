@@ -28,7 +28,8 @@ internal sealed class TenancyRuntimeFixture : IAsyncDisposable
         IReadOnlyDictionary<string, string?>? extraSettings = null,
         string adapter = "sqlite",
         string environment = "Test",
-        Action<IServiceCollection>? configureServices = null)
+        Action<IServiceCollection>? configureServices = null,
+        bool withLocalStorage = false)
     {
         var root = Path.Combine(Path.GetTempPath(), "Koan-Tenancy", Guid.CreateVersion7().ToString("n"));
         Directory.CreateDirectory(root);
@@ -49,6 +50,18 @@ internal sealed class TenancyRuntimeFixture : IAsyncDisposable
             settings["Koan:Data:Sources:Default:ConnectionString"] = $"Data Source={Path.Combine(root, "tenancy.db")}";
         else if (string.Equals(adapter, "json", StringComparison.OrdinalIgnoreCase))
             settings["Koan:Data:Json:DirectoryPath"] = root;
+
+        if (withLocalStorage)
+        {
+            // STOR-0011: a no-Docker Local storage profile rooted under the per-fixture temp dir, so the storage
+            // blob-key tenant-isolation proof runs through a real provider.
+            var storageDir = Path.Combine(root, "storage");
+            Directory.CreateDirectory(storageDir);
+            settings["Koan:Storage:Providers:Local:BasePath"] = storageDir;
+            settings["Koan:Storage:DefaultProfile"] = "test";
+            settings["Koan:Storage:Profiles:test:Provider"] = "local";
+            settings["Koan:Storage:Profiles:test:Container"] = "blobs";
+        }
 
         if (extraSettings is not null)
         {
