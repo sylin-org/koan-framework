@@ -6,8 +6,6 @@ using System.Threading.Tasks;
 using Koan.Core;
 using Koan.Core.Modules;
 using Koan.Core.Provenance;
-using Koan.Data.Abstractions.Capabilities;
-using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Core;
 using Koan.Data.Core.Pipeline;
 using Microsoft.Extensions.Configuration;
@@ -39,22 +37,9 @@ public sealed class KoanAutoRegistrar : KoanModule
         services.TryAddSingleton<TenancyDevState>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IStorageGuard, TenantStorageGuard>());
 
-        // ARCH-0100: register the tenant axis on the durable ambient carrier so the ambient tenant rides jobs
-        // (later: messaging) across the async-hop and rehydrates fail-closed at execute. DI-enumerable, so the
-        // carrier set is fixed at host build — Koan.Jobs names no axis; absent module ⇒ absent carrier (no-op).
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IAmbientSliceCarrier, TenantContextCarrier>());
-
-        // The tenant managed field — the invisible shadow discriminator (no POCO property). The framework stamps
-        // it on every write inside a tenant scope and AND-folds it into reads; on an adapter that announces
-        // isolation (DataCaps.Isolation.RowScoped) it isolates, otherwise a tenant-scoped op fails closed. Inert
-        // (value null) outside a tenant scope, so [HostScoped] entities and unscoped writes are unaffected.
-        ManagedFieldRegistry.Register(new ManagedFieldDescriptor(
-            StorageName: "__koan_tenant",
-            ClrType: typeof(string),
-            ValueProvider: static () => TenancyAmbient.EffectiveTenantId(),
-            AppliesTo: static t => !TenantScopeMetadata.IsHostScopedType(t),
-            RequiredCapability: DataCaps.Isolation.RowScoped,
-            Indexed: true));
+        // ARCH-0102 / ARCH-0101 §7: the tenant managed field + the durable async-hop carrier (ARCH-0100) are now
+        // declared in ONE place — TenantAxis : IDataAxis — discovered + expanded byte-identically by DataAxisExpander.
+        // The fail-closed guard above + the posture pre-flight / dev-seed (Start) stay here: they are policy, not a plane.
     }
 
     public override Task Start(IServiceProvider services, CancellationToken ct)
