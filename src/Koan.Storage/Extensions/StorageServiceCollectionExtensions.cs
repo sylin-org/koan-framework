@@ -16,7 +16,10 @@ public static class StorageServiceCollectionExtensions
     {
         services.AddLogging();
         services.AddKoanOptions<StorageOptions>(config, StorageConstants.Constants.Configuration.Section);
-        services.AddSingleton<IStorageService, StorageService>();
+        // STOR-0011: IStorageService is the data-axis isolation chokepoint — expose the ScopedStorageService
+        // decorator wrapping the concrete provider. Off (no axis registered) ⇒ the decorator passes through.
+        services.AddSingleton<StorageService>();
+        services.AddSingleton<IStorageService>(sp => new ScopedStorageService(sp.GetRequiredService<StorageService>()));
         return services;
     }
 }

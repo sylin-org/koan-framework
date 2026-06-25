@@ -27,7 +27,10 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
         if (!services.Any(d => d.ServiceType == typeof(IStorageService)))
         {
-            services.AddSingleton<IStorageService, StorageService>();
+            // STOR-0011: expose the ScopedStorageService decorator (the data-axis isolation chokepoint) wrapping
+            // the concrete provider. Off (no axis registered) ⇒ the decorator passes through (byte-identical).
+            services.AddSingleton<StorageService>();
+            services.AddSingleton<IStorageService>(sp => new ScopedStorageService(sp.GetRequiredService<StorageService>()));
         }
     }
 

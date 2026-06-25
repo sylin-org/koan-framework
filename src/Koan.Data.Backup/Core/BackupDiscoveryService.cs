@@ -103,6 +103,8 @@ public class BackupDiscoveryService(
             // List backup files from storage using the new listing capability
             try
             {
+                // STOR-0011: backups are cross-tenant host infrastructure — list host-scoped (no tenant prefix).
+                using var _scope = Koan.Storage.Keys.StorageScope.HostScoped();
                 await foreach (var file in storageService.ListObjects(storageProfile, "backups", null, ct))
                 {
                     try

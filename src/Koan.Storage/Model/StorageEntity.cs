@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Koan.Core;
 using Koan.Data.Core.Model;
 using Koan.Storage.Infrastructure;
+using Koan.Storage.Keys;
 using System.Text;
 using Newtonsoft.Json;
 
@@ -40,26 +41,33 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
     => (Koan.Core.Hosting.App.AppHost.Current?.GetService(typeof(IStorageService)) as IStorageService)
            ?? throw new InvalidOperationException("IStorageService not available. Ensure AppBootstrapper.InitializeModules() ran and AppHost.Current is set (greenfield boot).");
 
+    // STOR-0011: declare the entity type for the lifetime of a blob op so the ScopedStorageService decorator can
+    // apply this type's data axes (the leading particle) + the [HostScoped] exemption + the typed guard.
+    private static IDisposable Scope() => StorageScope.For(typeof(TEntity));
+
     // Static creators
     public static async Task<TEntity> CreateTextFile(string name, string content, string? contentType = "text/plain; charset=utf-8", CancellationToken ct = default)
     {
+        using var _scope = Scope();
         var (profile, container) = ResolveBinding();
         var obj = await Storage().CreateTextFile(name, content, contentType, profile, container, ct);
-        return From(obj);
+        return From(obj, name);
     }
 
     public static async Task<TEntity> Create<TDoc>(string name, TDoc value, JsonSerializerSettings? options = null, string contentType = "application/json; charset=utf-8", CancellationToken ct = default)
     {
+        using var _scope = Scope();
         var (profile, container) = ResolveBinding();
         var obj = await Storage().CreateJson(name, value, options, profile, container, contentType, ct);
-        return From(obj);
+        return From(obj, name);
     }
 
     public static async Task<TEntity> Create(string name, ReadOnlyMemory<byte> bytes, string? contentType = "application/octet-stream", CancellationToken ct = default)
     {
+        using var _scope = Scope();
         var (profile, container) = ResolveBinding();
         var obj = await Storage().Create(name, bytes, contentType, profile, container, ct);
-        return From(obj);
+        return From(obj, name);
     }
 
     // Convenience overload to ensure byte[] goes to binary path (not JSON generic)
@@ -68,26 +76,30 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
 
     public static async Task<TEntity> Onboard(string name, Stream content, string? contentType = null, CancellationToken ct = default)
     {
+        using var _scope = Scope();
         var (profile, container) = ResolveBinding();
         var obj = await Storage().Onboard(name, content, contentType, profile, container, ct);
-        return From(obj);
+        return From(obj, name);
     }
 
     // Instance operations
     public async Task<string> ReadAllText(Encoding? encoding = null, CancellationToken ct = default)
     {
+        using var _scope = Scope();
         var (profile, container) = InstanceBinding();
         return await Storage().ReadAllText(profile, container, Key, encoding, ct);
     }
 
     public async Task<byte[]> ReadAllBytes(CancellationToken ct = default)
     {
+        using var _scope = Scope();
         var (profile, container) = InstanceBinding();
         return await Storage().ReadAllBytes(profile, container, Key, ct);
     }
 
     public async Task<string> ReadRangeAsString(long from, long to, Encoding? encoding = null, CancellationToken ct = default)
     {
+        using var _scope = Scope();
         var (profile, container) = InstanceBinding();
         return await Storage().ReadRangeAsString(profile, container, Key, from, to, encoding, ct);
     }
@@ -95,24 +107,28 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
     // Stream-based reads (DX helpers)
     public async Task<Stream> OpenRead(CancellationToken ct = default)
     {
+        using var _scope = Scope();
         var (profile, container) = InstanceBinding();
         return await Storage().Read(profile, container, Key, ct);
     }
 
     public async Task<(Stream Stream, long? Length)> OpenReadRange(long? from = null, long? to = null, CancellationToken ct = default)
     {
+        using var _scope = Scope();
         var (profile, container) = InstanceBinding();
         return await Storage().ReadRange(profile, container, Key, from, to, ct);
     }
 
     public async Task<ObjectStat?> Head(CancellationToken ct = default)
     {
+        using var _scope = Scope();
         var (profile, container) = InstanceBinding();
         return await Storage().Head(profile, container, Key, ct);
     }
 
     public async Task<bool> Delete(CancellationToken ct = default)
     {
+        using var _scope = Scope();
         var (profile, container) = InstanceBinding();
         return await Storage().Delete(profile, container, Key, ct);
     }
@@ -120,24 +136,29 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
     public async Task<TTarget> CopyTo<TTarget>(CancellationToken ct = default)
         where TTarget : class, IStorageObject
     {
+        // STOR-0011: a tiering copy composes with the SOURCE type's axes (same-tenant tiering is the supported case;
+        // a cross-type transfer whose target carries different axes is an accepted limitation — the guard fires for
+        // the source type, and the single TransferToProfile key cannot express a re-scoped target).
+        using var _scope = Scope();
         // If this is a lightweight proxy (no provider known), defer to default profile resolution
         var (sourceProfile, sourceContainer) = string.IsNullOrWhiteSpace(Provider)
             ? ("", "")
             : InstanceBinding();
         var (targetProfile, targetContainer) = ResolveBindingFor<TTarget>();
         var obj = await Storage().TransferToProfile(sourceProfile, sourceContainer, Key, targetProfile, targetContainer, deleteSource: false, ct);
-        return To<TTarget>(obj);
+        return To<TTarget>(obj, Key);
     }
 
     public async Task<TTarget> MoveTo<TTarget>(CancellationToken ct = default)
         where TTarget : class, IStorageObject
     {
+        using var _scope = Scope();
         var (sourceProfile, sourceContainer) = string.IsNullOrWhiteSpace(Provider)
             ? ("", "")
             : InstanceBinding();
         var (targetProfile, targetContainer) = ResolveBindingFor<TTarget>();
         var obj = await Storage().TransferToProfile(sourceProfile, sourceContainer, Key, targetProfile, targetContainer, deleteSource: true, ct);
-        return To<TTarget>(obj);
+        return To<TTarget>(obj, Key);
     }
 
     private static (string Profile, string Container) ResolveBindingFor<T>()
@@ -159,12 +180,14 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
     // Static key-first helpers (DX): operate by key using type-level binding
     public static Task<Stream> OpenRead(string key, CancellationToken ct = default)
     {
+        using var _scope = Scope();
         var (profile, container) = ResolveBinding();
         return Storage().Read(profile, container, key, ct);
     }
 
     public static Task<(Stream Stream, long? Length)> OpenReadRange(string key, long? from = null, long? to = null, CancellationToken ct = default)
     {
+        using var _scope = Scope();
         var (profile, container) = ResolveBinding();
         return Storage().ReadRange(profile, container, key, from, to, ct);
     }
@@ -177,6 +200,7 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
         // rather than the natural 404.
         if (string.IsNullOrWhiteSpace(key)) return null;
 
+        using var _scope = Scope();
         var (profile, container) = ResolveBinding();
         var stat = await Storage().Head(profile, container, key, ct);
         if (stat is null) return null;
@@ -185,9 +209,9 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
         // the local-filesystem provider doesn't carry a sidecar today and returns null. When
         // the provider can't supply ContentType, fall back to the persisted entity row — that's
         // the value the caller passed to Upload/Put, and it's authoritative regardless of how
-        // the storage backend chose to (not) record it. The query is keyed on Key (typically
-        // indexed) and only runs when the fast path is empty; providers that DO persist mime
-        // skip this entirely.
+        // the storage backend chose to (not) record it. The query is keyed on Key (the LOGICAL
+        // key — the entity row stores the logical key, STOR-0011 §5; typically indexed) and only
+        // runs when the fast path is empty; providers that DO persist mime skip this entirely.
         if (string.IsNullOrWhiteSpace(stat.ContentType))
         {
             var entity = (await Query(e => ((IStorageObject)e).Key == key, ct)).FirstOrDefault();
@@ -199,15 +223,17 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
         return stat;
     }
 
-    // Map from StorageObject to TEntity (shallow copy of storage metadata)
-    private static TEntity From(StorageObject obj)
+    // Map from StorageObject to TEntity (shallow copy of storage metadata).
+    // STOR-0011 §5: the entity holds the LOGICAL key (the caller's name). The service-returned StorageObject.Key is
+    // PHYSICAL (axis-composed); never derive .Key from it on the write-return path — pass the logical key explicitly.
+    private static TEntity From(StorageObject obj, string? logicalKey = null)
     {
         var inst = Activator.CreateInstance<TEntity>();
         if (inst is StorageEntity<TEntity> se)
         {
             // Do NOT copy obj.Id - preserve entity's auto-generated GUID v7
             // The storage key is in obj.Key, not obj.Id
-            se.Key = obj.Key;
+            se.Key = logicalKey ?? obj.Key;
             se.Name = obj.Name;
             se.ContentType = obj.ContentType;
             se.Size = obj.Size;
@@ -221,7 +247,7 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
         return inst;
     }
 
-    private static TTarget To<TTarget>(StorageObject obj)
+    private static TTarget To<TTarget>(StorageObject obj, string? logicalKey = null)
         where TTarget : class, IStorageObject
     {
         var inst = Activator.CreateInstance<TTarget>();
@@ -229,7 +255,7 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
         {
             // Do NOT copy obj.Id - preserve entity's auto-generated GUID v7
             // The storage key is in obj.Key, not obj.Id
-            se.Key = obj.Key;
+            se.Key = logicalKey ?? obj.Key;
             se.Name = obj.Name;
             se.ContentType = obj.ContentType;
             se.Size = obj.Size;

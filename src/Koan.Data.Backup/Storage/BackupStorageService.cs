@@ -174,6 +174,9 @@ public class BackupStorageService
     {
         archiveStream.Position = 0;
 
+        // STOR-0011: backups are cross-tenant host infrastructure — operate host-scoped (unprefixed, unguarded) so
+        // the backup archive lands at the global "backups/" path rather than being tenant-isolated or failing closed.
+        using var _scope = Koan.Storage.Keys.StorageScope.HostScoped();
         var storageObject = await _storageService.Put(
             storageProfile,
             "backups",
@@ -193,6 +196,7 @@ public class BackupStorageService
     /// </summary>
     public async Task<ZipArchive> OpenBackupArchive(string backupPath, string storageProfile, CancellationToken ct = default)
     {
+        using var _scope = Koan.Storage.Keys.StorageScope.HostScoped();   // STOR-0011: host-scoped backup read
         var stream = await _storageService.Read(storageProfile, "backups", backupPath, ct);
         return new ZipArchive(stream, ZipArchiveMode.Read);
     }

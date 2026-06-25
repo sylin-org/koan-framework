@@ -115,6 +115,10 @@ public abstract class MediaEntity<TEntity> : Koan.Storage.Model.StorageEntity<TE
     // NOTE: 'new' intentionally hides StorageEntity<TEntity>.OpenRead to allow media-specific binding semantics.
     public static new async Task<Stream> OpenRead(string key, CancellationToken ct = default)
     {
+        // STOR-0011: declare the entity type so the ScopedStorageService decorator applies this type's data-axis
+        // isolation (the leading particle + guard) to this otherwise type-erased svc.Read — the override would
+        // otherwise bypass the chokepoint (a CRITICAL cross-tenant leak on the media read surface).
+        using var _scope = Koan.Storage.Keys.StorageScope.For(typeof(TEntity));
         var inst = Get(key);
         // Resolve binding from the model type; prefer instance Container override when present
         var attr = typeof(TEntity)
