@@ -153,3 +153,40 @@ Relational (P0, already conformant) is the reference; its specs seed `AodbConfor
 - **Positive**: one realization per mode per family; the routing split-brain closed by construction; the four non-isolating record adapters become isolating; the latent vector overlay leaks closed; "compliant" becomes a green CI cell, not a claim. Adding a new adapter = implement one family's backend primitives, inherit all three modes.
 - **Negative / risk**: a real rebuild of five document/KV adapters + the vector decorator onto new bases (mitigated by the proven relational template + per-phase conformance gates + byte-identity off-proofs). The marker-base factory is a partial structural merge (two `Create` surfaces remain) — the assembly boundary makes a single generic interface a cycle; the contract is unified where it matters (discovery, naming, source-routing).
 - **Rejected**: (a) capability-gated opt-out — the mandate forbids it; (b) a single generic `IAdapterFactory<TRepo>` returning both repo types — assembly cycle; (c) the "address+document projection / dumb-store" radical convergence — relational needs materialized columns for pushdown, so it cannot be a dumb store; the family-base level is the right altitude.
+
+## 9. P2 `KeyValueStore` — the realization detail (the build map)
+
+The P2 enforcement model, derived empirically from the read-path investigation (2026-06-25). **The framework already owns most of the read path generically** — the rebuild adds only the four adapter-side concerns the relational reference proves.
+
+### 9.1 Framework-vs-adapter responsibility (what the rebuild does NOT have to re-implement)
+
+| Concern | Owner | Mechanism (where) |
+|---|---|---|
+| AND the managed `__`-predicate into every read | **Framework** | `RepositoryFacade.Query/Count` fold `Filter.Eq("__scope",v)` into `query.Filter` before the adapter sees it |
+| get-by-id IDOR | **Framework** | `RepositoryFacade.Get` *lowers* a scoped key-read to `Query(id==X AND __scope==v)` — the adapter only ever gets the predicate via `Query`; raw `Get(id)` is called **only when unscoped** |
+| scoped `RemoveAll` | **Framework** | facade loads the scoped rows then deletes them by id (never a bulk unscoped truncate) |
+| fail-closed when non-isolating | **Framework** | `RepositoryFacade.InspectScopeAdapter` (at construction): an entity in an active managed scope on an adapter that does not declare the field's `RequiredCapability` (`RowScoped`) — or that is not `IQueryRepository` — throws `"*does not announce*"` |
+| **declare `RowScoped`** | **Adapter** | `IDescribesCapabilities.Describe` adds `DataCaps.Isolation.RowScoped` — the single switch that stops the fail-closed gate and lets the predicate flow |
+| **write-stamp** the managed values | **Adapter/base** | read `ManagedFieldWriteScope.Effective`; InMemory → object **sidecar**; Json/Redis → the shared **`ManagedFieldJsonInjector`** lifted from relational's `ManagedFieldContractResolver` (injects `"__scope":v` into the serialized JSON) |
+| **cross-scope write guard** | **Adapter/base** | on upsert, if an existing record's stamped managed values ≠ `ManagedFieldWriteScope.Current`, throw `InvalidOperationException("…cross-scope write…")` (relational does it via the `ON CONFLICT … WHERE json_extract(...) = @p`; KV does read-existing-then-compare) |
+| **evaluate** the managed predicate | **base** | `InMemoryFilterEvaluator` **refuses** managed fields by design (`ResolvedField.GetValue` throws "cannot be evaluated in memory"), so the base needs a **hybrid evaluator** |
+
+### 9.2 The `KeyValueStore<TEntity,TKey>` family base
+
+One abstract base (`Koan.Data.Core` or a new `Koan.Data.KeyValue` assembly both KV connectors reference) implementing `IDataRepository`/`IQueryRepository`/`IDescribesCapabilities`/`IInstructionExecutor`, owning the three contracts; the backends supply only primitives. Internal envelope: `KvRecord<TEntity>(TEntity Entity, IReadOnlyDictionary<string,object?>? Managed)`.
+
+- **Shared (FieldFilter → managed-record persistence).** *Write:* capture `ManagedFieldWriteScope.Effective`; guard cross-scope vs `…Current`; persist the envelope. *Read:* a **hybrid evaluator** walks the `Filter` AST and dispatches each leaf — a `FieldFilter` whose `FieldPathResolver.Resolve(...).IsManaged` is true is evaluated by **`DictionaryFilterEvaluator`** over the record's `Managed` dict; every other leaf (`FieldFilter`/`ClrFilter`) by **`InMemoryFilterEvaluator`** over the `Entity` (a single-leaf compile, so both convergence oracles are reused, none duplicated). Declares `RowScoped`.
+- **Container (Particle → container).** Already realized via the ambient partition → distinct physical store (`AdapterNaming.GetOrCompute`/`GetOrCreateStore(partition)`/keyspace); P2 verifies + adds the conformance cell. Name-mangling is the universal floor; the `__`-name survives because the managed keys live in the value/sidecar, not the container identifier.
+- **Database (Moniker → source-routed).** The per-source physical store the source ignores today: InMemory keys its store dict by `(source,type,partition)` (mirrors the P1 InMemoryVector fix); Json a per-source directory; Redis a per-source connection / DB-index — resolved via the shared `AdapterConnectionResolver` where a connection string applies.
+
+### 9.3 Backend primitives (the thin per-adapter seam)
+
+Each KV adapter supplies: connect/resolve-store-per-`(source,particle)`; `read-one(id)`, `scan-all`, `write(id, envelope)`, `remove(id)`, `clear`; and the envelope's serialize/deserialize (object identity for InMemory; `ManagedFieldJsonInjector`-configured Newtonsoft for Json/Redis). Everything else (the three contracts, capability declaration, batch, instructions) lives in the base.
+
+### 9.4 Conformance kit (the P2 gate)
+
+`AodbConformanceSpecsBase` proves all three modes through a real `AddKoan()` boot: **Shared** delegates to the existing `ManagedFieldNoLeak.AssertNoLeakAsync()` oracle (read isolation + get-by-id IDOR + cross-scope write-reject + scoped RemoveAll), **Container** asserts a distinct physical store per partition + `__`-name survival, **Database** asserts per-source physical routing (the `MultiDatabaseRoutingSpec` shape). Run per KV surface: InMemory + Json Docker-free, Redis via Testcontainers. (P5 generalizes the base across every adapter surface + adds the `ContainerScoped`/`DatabaseScoped` tokens + boot-report surfacing.)
+
+### 9.5 Sequencing (each = RED conformance → rebuild → GREEN + byte-identity off-proof + impl-diff review + commit)
+
+InMemory (sidecar; the Docker-free convergence oracle) → Json (JSON injector; Docker-free) → Redis (JSON injector + per-source connection; Testcontainers). The base lands with InMemory and is proven before Json/Redis fold on. Byte-identity off-proofs: data-core 274 + tenancy 104 stay green at every step (the `IsEmpty` short-circuits keep off-axis byte-identical).
