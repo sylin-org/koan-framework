@@ -30,6 +30,19 @@
 
 ### 0.3 Vector — the row-discriminator leak guard (NOT partition-in-name)
 
+> **UPDATE (2026-06-24) — IMPLEMENTED (`dev`, commit `0db14602`).** Built as the **STOR-0011 twin**: a generic
+> `ScopedVectorRepository<TEntity,TKey>` decorator over `IVectorSearchRepository`, wired at
+> `VectorService.TryGetRepository` (the one place both facades — `Vector<T>` and `VectorData<T>` — and the
+> direct-`Repo` writes resolve the repo). It **stamps** the registered equality axes (`ManagedFieldRegistry`,
+> axis-generic) into the vector metadata on `Upsert`/`UpsertMany`, and **ANDs** `Filter.Eq(StorageName, value)`
+> (the same Koan `Filter` the data read-filter uses) into `options.Filter` on `Search`. **Fail-closed** when the
+> adapter does not announce `VectorCaps.Filters`. The blanket `FailClosedIfManagedScoped` in `VectorData.Search`
+> is **retired**. Proof: `VectorTenantIsolationSpec` (real `AddKoan()` + the no-Docker **InMemory** adapter — a
+> KNN under tenant A with a query nearer B's point returns only A's vector; a user filter composes with the scope
+> filter). Off = byte-identical (InMemory surface 29/29). The notes below are the original Weaviate-specific
+> framing; the implementation is generic (every Filters-capable adapter rides the same decorator). v1 follow-ons:
+> `Delete`/`GetEmbedding` by-id IDOR; non-dictionary metadata (excluded on read, never leaked).
+
 - **Canon decides the fork:** tenant is a **row discriminator**, not the class-name partition ("tenant never in the spine"). So: on **Upsert**, inject the ambient `__koan_tenant` value into the vector object's properties; on **Search**, AND a `__koan_tenant == <ambient>` filter into the `where` clause. One shared class, row-filtered — consistent with the relational managed-field model.
 - **Fail-closed:** extend `FailClosedIfManagedScoped` discipline to **Upsert** (a tenant-scoped vector write with no isolation capability → throw); keep Search's existing guard. The adapter **announces** it can row-scope vectors (a `DataCaps.Isolation.RowScoped`-style capability for the vector pillar) — a tenant-scoped vector op on an adapter that can't isolate fails closed (the "embedding leak guard").
 - **Axis-generic, shared with classification:** this same injection is what ARCH-0098 classification's vector leak guard needs — design it axis-generic (inject the *managed discriminator(s)*, not "tenant" by name) so classification rides the same seam. Ideal: make the vector path honour `ManagedFieldRegistry` (the proper convergence) rather than a tenant-special filter; assess cost at impl.
