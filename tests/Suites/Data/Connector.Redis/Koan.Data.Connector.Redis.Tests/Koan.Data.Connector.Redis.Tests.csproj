@@ -32,5 +32,7 @@
     <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Connectors\Data\Redis\Koan.Data.Connector.Redis.csproj" />
+    <!-- ARCH-0103 P2: the cross-adapter ManagedFieldNoLeak oracle that proves Shared-mode isolation. -->
+    <ProjectReference Include="..\..\AdapterSurface\Koan.Data.AdapterSurface.TestKit\Koan.Data.AdapterSurface.TestKit.csproj" />
   </ItemGroup>
 </Project>

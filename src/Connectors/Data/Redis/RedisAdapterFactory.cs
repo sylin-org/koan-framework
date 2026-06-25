@@ -1,9 +1,10 @@
 using System;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
+using Koan.Data.Core;
 using Koan.Orchestration;
 using Koan.Orchestration.Attributes;
 using StackExchange.Redis;
@@ -32,11 +33,20 @@ public sealed class RedisAdapterFactory : IDataAdapterFactory
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
-        var opts = sp.GetRequiredService<IOptions<RedisOptions>>();
+        var baseOpts = sp.GetRequiredService<IOptions<RedisOptions>>().Value;
         var muxer = sp.GetRequiredService<IConnectionMultiplexer>();
-        // Note: Redis connection multiplexer is typically shared; source-specific
-        // connections would require factory-level changes to support multiple IConnectionMultiplexer instances
-        return new RedisRepository<TEntity, TKey>(opts, muxer, sp.GetService<ILoggerFactory>());
+        var config = sp.GetRequiredService<IConfiguration>();
+        var sourceRegistry = sp.GetRequiredService<DataSourceRegistry>();
+
+        // Database mode (ARCH-0103): the routed source selects a distinct Redis logical database (a distinct physical
+        // keyspace on the shared connection). Resolved via the shared AdapterConnectionResolver, the same primitive the
+        // relational trio uses for its per-source connection string. Default source ⇒ the base index (0) ⇒ unchanged.
+        // (Per-source distinct SERVERS — a separate IConnectionMultiplexer per source — is a follow-on; logical-database
+        // isolation realizes Database mode for the common single-instance deployment.)
+        var database = AdapterConnectionResolver.GetSourceSetting(
+            config, sourceRegistry, "redis", source, "Database", baseOpts.Database);
+
+        return new RedisRepository<TEntity, TKey>(muxer, database);
     }
 
     // The partition separator must NOT be ':' — Redis key delimiter is ':', and the keyspace scan pattern
