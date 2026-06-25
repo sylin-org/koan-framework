@@ -535,11 +535,23 @@ implemented and its tests pass on real stores.
   (review):** embedding-worker async-hop writes unstamped (needs ARCH-0100 carrier on the embed hop, a `Koan.Data.AI` fix) ·
   `_canFilter` should check `FilterSupport.CanPush(Eq)` not just token presence · Weaviate drops the `__koan_tenant`
   property-name on its gate (Docker) · Delete/GetEmbedding/ExportAll by-id IDOR · production-adapter Testcontainers specs.
-  **▶▶ THE DEEPER CONVERGENCE (architect call): storage + vector RE-DERIVE the equality read-filter from `ManagedFieldRegistry`
-  by hand (3 hand-copies: `ManagedEqualityReadContributor` + `StorageKeyScoper` + `ScopedVectorRepository`) instead of reusing
-  the `IReadFilterContributor` seam — so a non-equality/predicate axis (moderation) is honored by data+cache but invisible to
-  storage+vector. Converging all planes onto the one read-filter + capability-enforcement seam is the "fewer-but-more-meaningful"
-  follow-on.** Media `GET /media/{id}` + presign integration specs DEFERRED (app-authored `IMediaSource` + ASP.NET plumbing /
+  **▶▶ THE DEEPER CONVERGENCE — DONE (contributor-agnostic realignment, `dev`: `4c5a6807` vector + `b2570c2e` selection).**
+  The 3 hand-copies that re-derived axis logic are gone: (1) **vector** (`ScopedVectorRepository`) now resolves
+  `IReadFilterContributor[]` + `IStorageGuard[]` from DI and folds reads via the shared **`ReadScopeFold`** (made public) +
+  stamps ALL applicable managed fields on write — so a **non-equality moderation `IReadFilterContributor` now isolates a vector
+  KNN with ZERO vector-specific code** (proven: `VectorTenantIsolationSpec.Vector_honors_a_non_equality_read_contributor`,
+  `__vis != hidden` hides a hidden doc, moderator sees both); the bespoke `ScopeFilter` + the §3 band-aid are deleted; fail-closed
+  only when the fold yields a predicate but the adapter lacks `VectorCaps.Filters`. (2) The equality-axis **SELECTION** ("which
+  managed descriptors are an equality scope") is extracted to **`ManagedFieldRegistry.EqualityFields(type)`** (the ONE selection,
+  type-memoized, invalidated on Register/Reset) and consumed by `ManagedEqualityReadContributor` (the `Filter.Eq`),
+  `ScopedEntityCacheKey` (the cache-key segment), and `StorageKeyScoper` (the leading blob particle via the shared
+  `ComposeEqualityParticles`; the §3 non-equality fail-closed factored to `RefuseNonEqualityScope` — storage's capability
+  boundary, not a re-derivation). No plane re-implements the selection; each only RENDERS its plane-specific encoding.
+  **Byte-identical** (data-core 269 [−2 retired obsolete vector specs] · tenancy 103 · cache topology 50 / abstractions 60 ·
+  storage core 3 · InMemory vector 29). Obsolete `ManagedFieldVectorFailClosedSpec` (pinned the retired pre-decorator
+  blanket-fail-closed) retired; `VectorAdapterResolutionSpec` unwraps the always-applied decorator via the new
+  `IDecoratedVectorRepository` introspection seam. _Impl-diff review in flight; vector v1 follow-ons below still stand._
+  Media `GET /media/{id}` + presign integration specs DEFERRED (app-authored `IMediaSource` + ASP.NET plumbing /
   Docker-gated S3; the framework byte-read isolation is proven via `MediaEntity.OpenRead`).
   ADR [STOR-0011](../decisions/STOR-0011-storage-blob-key-axis-isolation.md) **v2 = Accepted** (impl-diff review `wf_03ef19e6-88c`,
   18/21 confirmed, FOLDED `a22c5e5e` — the missed `StorageObjectExtensions` parallel surface scoped + logical-key/Name fixed +
