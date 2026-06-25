@@ -521,7 +521,26 @@ implemented and its tests pass on real stores.
   + whitespace partitions); documented out-of-scope-evict-no-op (contract), `_`-tenant collision (pre-existing/dev-only),
   multi-axis ordering (latent). Green: convergence 5, tenancy 91, cache abstractions 60, topology 50, crossengine 14, Axes
   55+12, SoftDelete 7, data-core off-proof 271. Byte-identical read-path key preserved.
-- ◐ **GAP C — storage blob-key axis isolation (0.4) DONE + Accepted; Weaviate vector (0.3) is the remaining sibling.**
+- ✅ **GAP C — storage (0.4) + vector (0.3) axis isolation DONE. The tenancy data-plane is now isolated across data,
+  cache, blobs, AND vectors.**
+  **0.3 VECTOR SHIPPED (`dev`, `0db14602` impl + `e2a33932` canon + `c2d5c2ec` review-fold):** a `ScopedVectorRepository`
+  decorator (the STOR-0011 twin) at `VectorService.TryGetRepository` (covers both `Vector<T>`/`VectorData<T>` facades +
+  direct-`Repo` writes) — write-stamps the equality axes into vector metadata + ANDs `Filter.Eq(StorageName,value)` into
+  every search; reuses `ManagedFieldRegistry` + (after the review) `IStorageGuard`. Off = byte-identical (InMemory surface
+  29/29). Proof `VectorTenantIsolationSpec` (3 cases, no-Docker InMemory): KNN returns only the active tenant's vectors
+  even when the query is nearer the other tenant's point · user filter composes (AND) · **no-tenant-in-scope FAILS CLOSED**.
+  **Impl-diff review `wf_cc13952a-197` (12/21 confirmed) FOLDED the load-bearing security gap:** vector ran NO guard, so a
+  no-tenant-in-scope search fell through UNFILTERED (a fail-OPEN leak, newly exploitable once writes are stamped) — fixed by
+  reusing `IStorageGuard` (parity with data + storage) + non-equality fail-closed (§3). **▶ DOCUMENTED VECTOR FOLLOW-ONS
+  (review):** embedding-worker async-hop writes unstamped (needs ARCH-0100 carrier on the embed hop, a `Koan.Data.AI` fix) ·
+  `_canFilter` should check `FilterSupport.CanPush(Eq)` not just token presence · Weaviate drops the `__koan_tenant`
+  property-name on its gate (Docker) · Delete/GetEmbedding/ExportAll by-id IDOR · production-adapter Testcontainers specs.
+  **▶▶ THE DEEPER CONVERGENCE (architect call): storage + vector RE-DERIVE the equality read-filter from `ManagedFieldRegistry`
+  by hand (3 hand-copies: `ManagedEqualityReadContributor` + `StorageKeyScoper` + `ScopedVectorRepository`) instead of reusing
+  the `IReadFilterContributor` seam — so a non-equality/predicate axis (moderation) is honored by data+cache but invisible to
+  storage+vector. Converging all planes onto the one read-filter + capability-enforcement seam is the "fewer-but-more-meaningful"
+  follow-on.** Media `GET /media/{id}` + presign integration specs DEFERRED (app-authored `IMediaSource` + ASP.NET plumbing /
+  Docker-gated S3; the framework byte-read isolation is proven via `MediaEntity.OpenRead`).
   ADR [STOR-0011](../decisions/STOR-0011-storage-blob-key-axis-isolation.md) **v2 = Accepted** (impl-diff review `wf_03ef19e6-88c`,
   18/21 confirmed, FOLDED `a22c5e5e` — the missed `StorageObjectExtensions` parallel surface scoped + logical-key/Name fixed +
   ScopeAmbient §3 fail-closed/guard-order; 8 isolation cases green, tenancy 99/99; LOW perf/presign/list-shard/host-scoped items
