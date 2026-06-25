@@ -7,6 +7,7 @@ using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
+using Koan.Data.Abstractions.Naming;
 using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Core.Pipeline;
 using Koan.Data.Vector.Abstractions;
@@ -50,6 +51,7 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
     private readonly IReadFilterContributor[] _readContributors;
     private readonly IStorageGuard[] _guards;
     private readonly bool _canFilter;
+    private readonly OverlayNamingRule? _overlayNaming;
 
     public ScopedVectorRepository(IVectorSearchRepository<TEntity, TKey> inner, IServiceProvider sp)
     {
@@ -58,6 +60,9 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
         _readContributors = sp.GetServices<IReadFilterContributor>().ToArray();
         _guards = sp.GetServices<IStorageGuard>().ToArray();
         _canFilter = VectorCaps.Describe(inner, inner.GetType().Name).Has(VectorCaps.Filters);
+        // ARCH-0102 §5: the adapter DECLARES how to spell overlay (__-marked) fields in its store; the framework
+        // applies it at write-stamp AND read-filter from this one declaration. null ⇒ the __ default (no rename).
+        _overlayNaming = (inner as IOverlayNamingAware)?.OverlayNaming;
     }
 
     public Task Upsert(TKey id, float[] embedding, object? metadata = null, CancellationToken ct = default)
@@ -82,6 +87,7 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
                 $"Vector search on a scoped entity '{typeof(TEntity).Name}' fails closed: adapter " +
                 $"'{_inner.GetType().Name}' does not announce metadata filtering ({nameof(VectorCaps.Filters)}), so the " +
                 $"read-scope predicate cannot be enforced (GAP C 0.3 / DATA-0106 §4).");
+        scope = RenameOverlayFields(scope);                                   // §5: spell __ fields per the adapter's rule
         var combined = options.Filter is null ? scope : Filter.All(options.Filter, scope);
         return _inner.Search(options with { Filter = combined }, ct);
     }
@@ -152,7 +158,7 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
     // Stamp EVERY applicable managed field's value into the metadata (the registered ManagedFieldDescriptor seam —
     // equality and non-equality alike, so a read-filter predicate has its fields to match). Off / non-dict metadata ⇒
     // unchanged (a non-dict cannot be stamped and is excluded by the read-filter on read — safe, not a leak).
-    private static object? StampScope(object? metadata)
+    private object? StampScope(object? metadata)
     {
         if (ManagedFieldRegistry.IsEmpty) return metadata;
         var managed = ManagedFieldRegistry.ForType(typeof(TEntity));
@@ -163,10 +169,29 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
         {
             var v = managed[i].ValueProvider();
             if (v is null) continue;                                  // off / host / not-applicable
-            dict[managed[i].StorageName] = v;
+            dict[Rename(managed[i].StorageName)] = v;                 // §5: same overlay rename as the read filter
             stamped = true;
         }
         return stamped ? dict : metadata;
+    }
+
+    // §5 — spell an overlay field name per the adapter's declared rule (null ⇒ unchanged). The SAME rule renames
+    // the write-stamp key and the read-filter field, so write-name == read-name by construction (FC-6).
+    private string Rename(string name) => _overlayNaming is null ? name : _overlayNaming.Apply(name);
+
+    // Rewrite a read-scope predicate's overlay field names per the rule. Closed Filter hierarchy ⇒ exhaustive;
+    // only the framework scope is rewritten (user metadata is never in the __ namespace). null ⇒ identity.
+    private Filter RenameOverlayFields(Filter f)
+    {
+        if (_overlayNaming is null) return f;
+        return f switch
+        {
+            FieldFilter ff => ff with { Field = new FieldPath(ff.Field.Segments.Select(_overlayNaming.Apply).ToArray()) },
+            AllOf a => new AllOf(a.Operands.Select(RenameOverlayFields).ToArray()),
+            AnyOf a => new AnyOf(a.Operands.Select(RenameOverlayFields).ToArray()),
+            Not n => new Not(RenameOverlayFields(n.Operand)),
+            _ => f,                                                   // ClrFilter: opaque, never pushed to a vector store
+        };
     }
 
     private static bool TryGetMutableDict(object? metadata, out Dictionary<string, object?> dict)

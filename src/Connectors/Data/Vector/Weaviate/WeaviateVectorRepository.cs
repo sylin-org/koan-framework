@@ -18,10 +18,15 @@ using Newtonsoft.Json.Linq;
 
 namespace Koan.Data.Vector.Connector.Weaviate;
 
-internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRepository<TEntity, TKey>, IDescribesCapabilities, IInstructionExecutor<TEntity>
+internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRepository<TEntity, TKey>, IDescribesCapabilities, IInstructionExecutor<TEntity>, IOverlayNamingAware
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
+    // ARCH-0102 §5: GraphQL (Weaviate's query language) RESERVES a leading "__", so the framework rewrites
+    // overlay field names "__x" -> "koan_x" at write-stamp AND read-filter from this single declaration —
+    // letter-leading, GraphQL-legal, and in the reserved "koan_" namespace. Applied by ScopedVectorRepository.
+    public OverlayNamingRule? OverlayNaming { get; } = new("koan_");
+
     private readonly HttpClient _http;
     private readonly WeaviateOptions _options;
     private readonly IServiceProvider _sp;
