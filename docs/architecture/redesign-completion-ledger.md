@@ -521,11 +521,19 @@ implemented and its tests pass on real stores.
   + whitespace partitions); documented out-of-scope-evict-no-op (contract), `_`-tenant collision (pre-existing/dev-only),
   multi-axis ordering (latent). Green: convergence 5, tenancy 91, cache abstractions 60, topology 50, crossengine 14, Axes
   55+12, SoftDelete 7, data-core off-proof 271. Byte-identical read-path key preserved.
-- ☐ **GAP C — storage blob-key per-tenant prefix (SnapVault 0.4) + Weaviate vector row-discriminator (0.3).** `Koan.Storage`
-  stays axis-agnostic: a generic blob-key contributor seam folds a leading axis prefix via `AmbientAxisComposer.Append(key,
-  bag, Leading, "/")` + a storage fail-closed guard; vector 0.3 = the row-discriminator leak guard ("tenant never in the
-  spine"). Design canon: [tenancy-storage-vector-isolation-design.md](./tenancy-storage-vector-isolation-design.md). NB the
-  `AmbientAxisComposer` doc-comment over-claims "storage uses it" — not built yet (this gap builds it). Then → SnapVault Phase-0 dogfood.
+- ◐ **GAP C — storage blob-key axis isolation (0.4) + Weaviate vector row-discriminator (0.3).** **0.4 ADR DRAFTED:
+  [STOR-0011](../decisions/STOR-0011-storage-blob-key-axis-isolation.md) (Proposed; design-panel validation next).** Grounding
+  (2026-06-24) **simplified the canon: NO new `IStorageKeyContributor` seam** — `Koan.Storage` already references
+  `Koan.Data.Abstractions`+`Koan.Data.Core`, so it reuses the **existing `ManagedFieldRegistry`** (key particle, leading,
+  folded via the one ARCH-0096 `IdentifierComposer`, bare value) + the **existing `IStorageGuard`** seam (fail-closed;
+  `Koan.Tenancy`'s `TenantStorageGuard` already implements it, HostScoped-exempt + posture-aware). Storage = the **3rd
+  `ManagedFieldRegistry` consumer** (after data-core + the gap-B cache fold); zero new seam, zero new tenancy code, no new
+  layering edge. Key hazard captured in the ADR: the **logical-key invariant** (`StorageEntity<T>.Key` stays logical;
+  compose only at the `IStorageService` boundary, else write→read double-prefixes) + the **one-funnel** injection (avoid the
+  17-site leak). **0.3 vector** = sibling follow-on (needs Docker/Weaviate; design axis-generic alongside ARCH-0098
+  classification's vector guard). Canon: [tenancy-storage-vector-isolation-design.md](./tenancy-storage-vector-isolation-design.md)
+  (§0.4 superseded by STOR-0011). NEXT = STOR-0011 design-panel → TDD (`AssertNoStorageLeak<T>`, Local provider, no Docker) →
+  impl → impl-diff review → byte-identical regression → commit. Then 0.3 vector → SnapVault Phase-0 dogfood.
 - ☐ **THEN:** Phase 3c schema-column DDL indexability (Indexed descriptors → computed/expression index; PG/SqlServer;
   SQLite JSON-only) + Mongo/bare-store managed serialization injection + in-memory managed `GetValue` · classification
   phases 4–7 (searchable blind-index · vector/messaging leak guards · crypto-shred+rotation · masked-read) · then

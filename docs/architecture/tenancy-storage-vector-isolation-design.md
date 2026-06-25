@@ -14,6 +14,14 @@
 
 ### 0.4 Storage — a generic key-particle seam + a storage fail-closed guard
 
+> **UPDATE (2026-06-24) — superseded by [STOR-0011](../decisions/STOR-0011-storage-blob-key-axis-isolation.md).**
+> Empirical grounding resolved the open layering question in favour of **fewer parts**: a **new
+> `IStorageKeyContributor` seam is NOT needed.** `Koan.Storage` already references `Koan.Data.Abstractions` +
+> `Koan.Data.Core`, so it reads the **existing `ManagedFieldRegistry`** (the same registry `Koan.Tenancy` already
+> populates) for the key particle and resolves the **existing `IStorageGuard`** seam (which `Koan.Tenancy`'s
+> `TenantStorageGuard` already implements) for the fail-closed guard — no new seam, no `Koan.Tenancy`→`Koan.Storage`
+> edge, no new tenancy code. The notes below are the original direction; STOR-0011 is canonical.
+
 - **Layering law:** `Koan.Storage` must not name "tenant" (same discipline as the tenancy-agnostic data core). So introduce a **generic, DI-enumerable key-contributor seam** in `Koan.Storage` (e.g. `IStorageKeyContributor.Particle(entityType) → string?`), gathered at key composition and folded into the key via **`AmbientAxisComposer.Append(key, bag, Leading, "/")`** — the shared ARCH-0096 convergence helper (`Koan.Core.Naming`) that the **job coalesce key already uses** (added 2026-06-24, `ec…`). One engine appends the ambient axes to *any* identifier; storage is the second consumer. *Not* an inline `TenancyAmbient` call in storage. Mirrors `IStorageGuard` + `ManagedFieldRegistry` for the data core.
 - **Koan.Tenancy** registers a `TenantStorageKeyContributor` returning the effective tenant id as a leading particle; it honours the **same** exemption (`[HostScoped]`/`IAmbientExempt`) so system blobs are unprefixed.
 - **Fail-closed guard:** a storage-entry gate (Closed posture + tenant-scoped type + no tenant in scope → throw), reusing `TenancyRuntime.Posture` + `TenancyAmbient.EffectiveTenantId()` — the storage twin of `TenantStorageGuard`. The key particle is the primary isolation (composed key differs per tenant); the guard prevents the unscoped write to a global path.
