@@ -59,7 +59,7 @@ internal sealed class VectorService(IServiceProvider sp) : IVectorService
         var inner = factory?.Create<TEntity, TKey>(sp);
         // GAP C 0.3: wrap with the data-axis isolation decorator (write-stamp the registered equality axes into the
         // vector metadata + AND a scope read-filter into every search). Off (no managed field) ⇒ pass-through.
-        var repo = inner is not null ? new ScopedVectorRepository<TEntity, TKey>(inner) : null;
+        var repo = inner is not null ? new ScopedVectorRepository<TEntity, TKey>(inner, sp) : null;
         if (repo is not null) _cache[key] = repo;
         return repo;
     }

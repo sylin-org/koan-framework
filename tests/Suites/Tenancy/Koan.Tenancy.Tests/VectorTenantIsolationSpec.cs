@@ -1,12 +1,19 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using AwesomeAssertions;
+using Koan.Core.Capabilities;
+using Koan.Data.Abstractions.Capabilities;
+using Koan.Data.Abstractions.Filtering;
+using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Core.Model;
+using Koan.Data.Core.Pipeline;
 using Koan.Data.Vector;
 using Koan.Data.Vector.Abstractions;
 using Koan.Tenancy.Tests.Support;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Koan.Tenancy.Tests;
@@ -69,6 +76,78 @@ public sealed class VectorTenantIsolationSpec
 
         var search = async () => await Vector<VecDoc>.Search(new VectorQueryOptions(Query: AcmePoint, TopK: 10));
         await search.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    // --- The contributor-agnostic proof: a NON-equality read-contributor isolates vectors with ZERO vector code. ---
+
+    private static readonly AsyncLocal<bool> _moderator = new();
+    private static readonly AsyncLocal<string?> _writeVis = new();
+
+    private static IDisposable Set<T>(AsyncLocal<T> slot, T value)
+    {
+        var prev = slot.Value;
+        slot.Value = value;
+        return new Pop(() => slot.Value = prev!);
+    }
+    private sealed class Pop(Action undo) : IDisposable { public void Dispose() => undo(); }
+
+    // [HostScoped] so the TENANT axis does not apply — this entity carries ONLY the fake non-equality moderation axis.
+    [VectorAdapter("inmemory")]
+    [HostScoped]
+    public sealed class ModDoc : Entity<ModDoc> { }
+
+    private static void RegisterModAxis() => ManagedFieldRegistry.Register(new ManagedFieldDescriptor(
+        StorageName: "__vis",
+        ClrType: typeof(string),
+        ValueProvider: () => _writeVis.Value,
+        AppliesTo: t => t == typeof(ModDoc),
+        RequiredCapability: DataCaps.Isolation.RowScoped,
+        AutoReadFilter: false));   // non-equality axis (supplies its own predicate via the contributor below)
+
+    private sealed class ModReadContributor : IReadFilterContributor
+    {
+        public Filter? ReadFilter(Type t)
+        {
+            if (t != typeof(ModDoc)) return null;
+            if (_moderator.Value) return null;                                            // a moderator sees everything
+            return Filter.On(FieldPath.Of("__vis"), FilterOperator.Ne, FilterValue.Of("hidden"));
+        }
+        public Capability? RequiredCapability => DataCaps.Isolation.RowScoped;
+        public bool ExcludesFromCache(Type t) => t == typeof(ModDoc);
+    }
+
+    [Fact(DisplayName = "vector realignment: a NON-equality (moderation) IReadFilterContributor isolates a KNN — zero vector-specific axis code")]
+    public async Task Vector_honors_a_non_equality_read_contributor()
+    {
+        await using var runtime = await TenancyRuntimeFixture.CreateAsync(
+            extraSettings: Posture("Closed"),
+            configureServices: s => s.AddSingleton<IReadFilterContributor>(new ModReadContributor()));
+        RegisterModAxis();
+        try
+        {
+            runtime.ResetEntityCaches();
+
+            using (Set(_writeVis, "hidden")) await Vector<ModDoc>.Save("h1", AcmePoint);
+            using (Set(_writeVis, "public")) await Vector<ModDoc>.Save("p1", GlobexPoint);
+
+            // A non-moderator KNN: the contributor's non-equality predicate (__vis != hidden) hides h1 — vector folds the
+            // registered IReadFilterContributor through the SAME ReadScopeFold the data path uses; no equality assumption.
+            var r = await Vector<ModDoc>.Search(new VectorQueryOptions(Query: AcmePoint, TopK: 10));
+            r.Matches.Select(m => m.Id).Should().Equal("p1");
+
+            // A moderator sees both (the contributor returns no predicate).
+            using (Set(_moderator, true))
+            {
+                var rm = await Vector<ModDoc>.Search(new VectorQueryOptions(Query: AcmePoint, TopK: 10));
+                rm.Matches.Select(m => m.Id).Should().BeEquivalentTo(new[] { "h1", "p1" });
+            }
+        }
+        finally
+        {
+            _moderator.Value = false;
+            _writeVis.Value = null;
+            ManagedFieldRegistry.Reset();   // the tenancy registrar re-registers __koan_tenant on the next boot (idempotent)
+        }
     }
 
     [Fact(DisplayName = "vector isolation: a user filter composes with the scope filter (AND), still tenant-isolated")]
