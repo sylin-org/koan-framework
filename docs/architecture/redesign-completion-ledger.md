@@ -521,21 +521,26 @@ implemented and its tests pass on real stores.
   + whitespace partitions); documented out-of-scope-evict-no-op (contract), `_`-tenant collision (pre-existing/dev-only),
   multi-axis ordering (latent). Green: convergence 5, tenancy 91, cache abstractions 60, topology 50, crossengine 14, Axes
   55+12, SoftDelete 7, data-core off-proof 271. Byte-identical read-path key preserved.
-- ◐ **GAP C — storage blob-key axis isolation (0.4) + Weaviate vector row-discriminator (0.3). 0.4 = ADR v2 + delegation
-  plan READY; impl delegated.** ADR [STOR-0011](../decisions/STOR-0011-storage-blob-key-axis-isolation.md) **v2** + plan
-  [stor-0011-implementation-plan.md](./stor-0011-implementation-plan.md). Reuses the **existing** seams (`ManagedFieldRegistry`
-  + `IStorageGuard` + ARCH-0096 `IdentifierComposer` + the ARCH-0100 `AmbientCarrierRegistry`) — no new seam, no
-  `Koan.Tenancy`→`Koan.Storage` edge. **A 35-agent design panel (`wf_ac5a1e07-54a`) REJECTED v1** (a `StorageEntity<T>`
-  funnel): 5 CRITICAL + 6 HIGH showed the media surface (`MediaController`/`IMediaSource`/`MediaEntity.OpenRead`), presign,
-  the type-erased extension helpers, the backup services, and `From/To` all bypass `StorageEntity<T>`. **v2 relocates the
-  chokepoint to a `ScopedStorageService` DECORATOR over `IStorageService`** (the one boundary every blob path funnels
-  through) + an ambient `StorageScope` type-carrier (typed → `ForType`+typed-guard+[HostScoped]; raw → fail-safe ambient
-  bag + value-guard; infra → `HostScoped()` opt-out) + a mandatory sanitizing formatter + the logical(`StorageEntity.Key`)/
-  physical(`StorageObject`) boundary. Every panel CRITICAL/HIGH is mapped to a resolution in the ADR. **Off = byte-identical**
-  (decorator passes through when no axis). Plan = 5 delegable tasks (TASK 1–2 capable-model decorator+wiring, 3 isolation
-  test across ALL surfaces incl. `GET /media/{id}`, 4 SnapVault dogfood, 5 regression+review+ledger). **0.3 vector** =
-  sibling follow-on (needs Docker/Weaviate; axis-generic with ARCH-0098). NEXT = execute the delegation plan (TASK 1) →
-  impl-diff review → byte-identical regression → mark Accepted; then 0.3 vector → SnapVault Phase-0 dogfood.
+- ◐ **GAP C — storage blob-key axis isolation (0.4) IMPLEMENTED + proven; Weaviate vector (0.3) is the remaining sibling.**
+  ADR [STOR-0011](../decisions/STOR-0011-storage-blob-key-axis-isolation.md) **v2** (impl-diff review `wf_03ef19e6-88c` in flight).
+  **v1 (a `StorageEntity<T>` funnel) was REJECTED by a 35-agent design panel (`wf_ac5a1e07-54a`, 5 CRITICAL + 6 HIGH)** — the
+  media surface (`MediaController`/`IMediaSource`/`MediaEntity.OpenRead`), presign, the type-erased extension helpers, the
+  backup services, and `From/To` all bypass `StorageEntity<T>`. **v2 SHIPPED (`dev`, commits `9cff2a45` impl + `a7bb9029`
+  proof + `9a1b89e3` media proof):** a `ScopedStorageService` DECORATOR over `IStorageService` (the one boundary every blob
+  path funnels through) composes the leading axis particle + runs the guard, using an ambient `StorageScope` type-carrier
+  (typed → `ManagedFieldRegistry.ForType` + typed `IStorageGuard` + `[HostScoped]` exemption; raw → fail-safe
+  `ManagedFieldRegistry.All` clean values + value-guard; infra → `HostScoped()` opt-out [backup services]) + a mandatory
+  sanitizing `StorageKeyParticleFormatter` + the logical(`StorageEntity.Key`)/physical(`StorageObject`) boundary via
+  `From(obj, logicalKey)`. Reuses EXISTING seams — no new seam, no `Koan.Tenancy`→`Koan.Storage` edge. **Off = byte-identical**
+  (Storage Core 3, Media Core 567 green). **Real-boot proof `StorageTenantIsolationSpec` (6 cases): StorageEntity ·
+  MediaEntity (the OpenRead-override fix, PhotoAsset's base) · raw `IStorageService` · unscoped fail-closed · `[HostScoped]`
+  shared · hostile-value rejected** — the integration test caught a real bug (the fail-safe used the carrier's versioned
+  token `v1:id:acme` as a path segment → fixed to read `ManagedFieldRegistry.All` clean values). Tenancy suite 96/96.
+  **SnapVault dogfood:** the MediaEntity proof exercises PhotoAsset's exact surface; full SnapVault runtime-wiring deferred
+  (needs Docker + background-worker tenant-threading) and documented in the tenancy how-to instead. **Tenancy promoted to a
+  first-class PILLAR (`9d7296de`):** card `reference/cards/tenancy.md` + how-to `guides/tenancy-howto.md` + skill
+  `koan-tenancy` (compile-gated) + CLAUDE.md/skills-README/SURFACES registration. **0.3 vector** = the remaining sibling
+  (needs Docker/Weaviate; axis-generic with ARCH-0098). NEXT = fold `wf_03ef19e6-88c` → mark STOR-0011 Accepted; then 0.3 vector.
 - ☐ **THEN:** Phase 3c schema-column DDL indexability (Indexed descriptors → computed/expression index; PG/SqlServer;
   SQLite JSON-only) + Mongo/bare-store managed serialization injection + in-memory managed `GetValue` · classification
   phases 4–7 (searchable blind-index · vector/messaging leak guards · crypto-shred+rotation · masked-read) · then
