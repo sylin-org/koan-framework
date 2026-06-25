@@ -38,10 +38,12 @@ namespace Koan.Data.Vector;
 /// <c>ExportAll</c>/<c>Flush</c> admin ops; non-dictionary metadata cannot be stamped and is excluded on read (safe).</para>
 /// </summary>
 internal sealed class ScopedVectorRepository<TEntity, TKey> :
-    IVectorSearchRepository<TEntity, TKey>, IDescribesCapabilities, IInstructionExecutor<TEntity>
+    IVectorSearchRepository<TEntity, TKey>, IDescribesCapabilities, IInstructionExecutor<TEntity>, IDecoratedVectorRepository
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
+    public object InnerRepository => _inner;
+
     private readonly IVectorSearchRepository<TEntity, TKey> _inner;
     private readonly IReadFilterContributor[] _readContributors;
     private readonly IStorageGuard[] _guards;

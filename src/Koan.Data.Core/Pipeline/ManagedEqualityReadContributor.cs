@@ -23,12 +23,10 @@ internal sealed class ManagedEqualityReadContributor : IReadFilterContributor
 {
     public Filter? ReadFilter(System.Type entityType)
     {
-        if (ManagedFieldRegistry.IsEmpty) return null;            // structurally absent ⇒ byte-identical fast path
-        var managed = ManagedFieldRegistry.ForType(entityType);
+        var managed = ManagedFieldRegistry.EqualityFields(entityType);   // the ONE equality selection (shared)
         List<Filter>? preds = null;
         foreach (var d in managed)
         {
-            if (!d.AutoReadFilter) continue;                      // a non-equality axis supplies its own predicate
             var v = d.ValueProvider();
             if (v is null) continue;                              // off / host ⇒ unfiltered (nothing was stamped)
             (preds ??= new()).Add(Filter.Eq(d.StorageName, v));

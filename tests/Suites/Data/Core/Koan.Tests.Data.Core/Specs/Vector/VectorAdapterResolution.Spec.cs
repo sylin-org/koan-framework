@@ -32,7 +32,10 @@ public sealed class VectorAdapterResolutionSpec
         var vector = sp.GetRequiredService<IVectorService>();
         var repo = vector.TryGetRepository<EntityWithVectorAdapter, string>();
         repo.Should().NotBeNull();
-        (repo as FakeVectorRepo<EntityWithVectorAdapter, string>)!.ProviderName.Should().Be("foo");
+        // TryGetRepository wraps the adapter in the data-axis isolation decorator (GAP C 0.3); unwrap to inspect the
+        // selected provider.
+        (((IDecoratedVectorRepository)repo!).InnerRepository as FakeVectorRepo<EntityWithVectorAdapter, string>)!
+            .ProviderName.Should().Be("foo");
     }
 
     [Fact]
@@ -58,7 +61,8 @@ public sealed class VectorAdapterResolutionSpec
         var vector = sp.GetRequiredService<IVectorService>();
         var repo = vector.TryGetRepository<EntityWithSourceOnly, string>();
         repo.Should().NotBeNull();
-        (repo as FakeVectorRepo<EntityWithSourceOnly, string>)!.ProviderName.Should().Be("bar");
+        (((IDecoratedVectorRepository)repo!).InnerRepository as FakeVectorRepo<EntityWithSourceOnly, string>)!
+            .ProviderName.Should().Be("bar");
     }
 
     [Fact]
@@ -76,7 +80,8 @@ public sealed class VectorAdapterResolutionSpec
         var vector = sp.GetRequiredService<IVectorService>();
         var repo = vector.TryGetRepository<EntityWithSourceOnly, string>();
         repo.Should().NotBeNull();
-        (repo as FakeVectorRepo<EntityWithSourceOnly, string>)!.ProviderName.Should().Be("json");
+        (((IDecoratedVectorRepository)repo!).InnerRepository as FakeVectorRepo<EntityWithSourceOnly, string>)!
+            .ProviderName.Should().Be("json");
     }
 
     // Mirrors the bespoke ServiceProviderFixture base wiring (logging + a no-op application lifetime)

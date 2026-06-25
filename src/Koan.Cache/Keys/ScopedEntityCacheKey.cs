@@ -57,26 +57,18 @@ public static class ScopedEntityCacheKey
         => For(typeof(TEntity), id, partition);
 
     // The equality managed axes applicable to the type, as an axis bag { StorageName -> ValueProvider() }. Returns
-    // null when none apply (the off / no-axis fast path) so AppendScope returns the base unchanged. The bag is
-    // built in priority order; the composer re-orders by axis ordinal deterministically — for the single registered
-    // equality field (tenant) the two coincide, so the produced key is byte-identical to the prior hand-rolled fold.
+    // null when none apply (the off / no-axis fast path) so AppendScope returns the base unchanged. The equality
+    // SELECTION is the ONE shared ManagedFieldRegistry.EqualityFields (a non-equality axis already excludes the whole
+    // type from caching, CachedRepository._excludeFromCache, so it never reaches here); this consumer only renders.
     private static IReadOnlyDictionary<string, string>? BuildScopeBag(Type entityType)
     {
-        if (ManagedFieldRegistry.IsEmpty) return null;
-        var managed = ManagedFieldRegistry.ForType(entityType);
+        var managed = ManagedFieldRegistry.EqualityFields(entityType);
         if (managed.Count == 0) return null;
 
         Dictionary<string, string>? bag = null;
         for (var i = 0; i < managed.Count; i++)
-        {
-            var d = managed[i];
-            // Only an EQUALITY axis is a cache-key segment. A non-equality axis already excludes the whole type
-            // from caching (CachedRepository._excludeFromCache), so this fold never runs for it; the skip is the
-            // defensive belt — a viewer-context predicate's scalar must never masquerade as a key segment.
-            if (!d.AutoReadFilter) continue;
-            (bag ??= new Dictionary<string, string>(StringComparer.Ordinal))[d.StorageName]
-                = d.ValueProvider()?.ToString() ?? "_";
-        }
+            (bag ??= new Dictionary<string, string>(StringComparer.Ordinal))[managed[i].StorageName]
+                = managed[i].ValueProvider()?.ToString() ?? "_";
         return bag;
     }
 }

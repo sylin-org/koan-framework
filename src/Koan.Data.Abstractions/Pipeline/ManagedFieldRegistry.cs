@@ -20,6 +20,7 @@ public static class ManagedFieldRegistry
     private static readonly object _gate = new();
     private static readonly List<ManagedFieldDescriptor> _descriptors = new();
     private static readonly ConcurrentDictionary<Type, ManagedFieldDescriptor[]> _byType = new();
+    private static readonly ConcurrentDictionary<Type, ManagedFieldDescriptor[]> _equalityByType = new();
     private static volatile bool _isEmpty = true;
 
     /// <summary>Whether no managed field is registered — the hot-path off gate. Cheap volatile read.</summary>
@@ -45,7 +46,8 @@ public static class ManagedFieldRegistry
             if (_descriptors.Any(d => string.Equals(d.StorageName, descriptor.StorageName, StringComparison.Ordinal)))
                 return;
             _descriptors.Add(descriptor);
-            _byType.Clear();        // invalidate the per-type memo (boot-only ⇒ rare)
+            _byType.Clear();        // invalidate the per-type memos (boot-only ⇒ rare)
+            _equalityByType.Clear();
             _isEmpty = false;
         }
     }
@@ -63,6 +65,21 @@ public static class ManagedFieldRegistry
             // tenant field today, deterministic once a second managed field exists.
             return snapshot.Where(d => d.AppliesTo(t)).OrderBy(d => d.Priority).ToArray();
         });
+    }
+
+    /// <summary>
+    /// The ONE equality-axis selection (DATA-0106): the managed fields applicable to <paramref name="entityType"/>
+    /// that opt into the auto equality read-filter (<see cref="ManagedFieldDescriptor.AutoReadFilter"/> == true).
+    /// This is the single source for "which axes are an equality scope" — consumed by the read-filter contributor
+    /// (a <c>Filter.Eq</c>), the cache-key segment, and the storage-key particle alike, so no plane re-derives the
+    /// selection. Type-plane memoized; off ⇒ empty.
+    /// </summary>
+    public static IReadOnlyList<ManagedFieldDescriptor> EqualityFields(Type entityType)
+    {
+        ArgumentNullException.ThrowIfNull(entityType);
+        if (_isEmpty) return Array.Empty<ManagedFieldDescriptor>();
+        return _equalityByType.GetOrAdd(entityType, static t =>
+            ((IEnumerable<ManagedFieldDescriptor>)ForType(t)).Where(d => d.AutoReadFilter).ToArray());
     }
 
     /// <summary>
@@ -89,6 +106,7 @@ public static class ManagedFieldRegistry
         {
             _descriptors.Clear();
             _byType.Clear();
+            _equalityByType.Clear();
             _isEmpty = true;
         }
     }
