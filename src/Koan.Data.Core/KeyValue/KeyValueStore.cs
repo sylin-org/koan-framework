@@ -1,0 +1,299 @@
+using System;
+using System.Collections.Generic;
+using System.Collections.Frozen;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Koan.Core.Capabilities;
+using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Capabilities;
+using Koan.Data.Abstractions.Filtering;
+using Koan.Data.Abstractions.Instructions;
+using Koan.Data.Abstractions.Pipeline;
+using Koan.Data.Core.Sorting;
+
+namespace Koan.Data.Core.KeyValue;
+
+/// <summary>
+/// The key-value / document storage-model family base (ARCH-0103 §5, §9.2). It realizes the three AODB modes once for
+/// the whole family — Shared (managed-field write-stamp + cross-scope write guard + managed-aware read filter), Container
+/// (a distinct physical store per ambient particle), Database (a distinct physical store per routed source) — and owns
+/// the entire <see cref="IDataRepository{TEntity,TKey}"/> / <see cref="IQueryRepository{TEntity,TKey}"/> /
+/// <see cref="IBatchSet{TEntity,TKey}"/> / <see cref="IInstructionExecutor{TEntity}"/> surface. A concrete adapter
+/// supplies only the thin backend primitives below (get / scan / write / remove / clear over the current physical
+/// store) plus any extra capabilities it announces.
+///
+/// <para><b>Off ⇒ byte-identical:</b> with no managed field registered (<c>ManagedFieldRegistry.IsEmpty</c>) the write
+/// stamps nothing, the guard never runs, and <see cref="KvFilterEvaluator"/> routes the whole filter to
+/// <see cref="InMemoryFilterEvaluator"/> over the entity — the exact pre-rebuild behaviour. Declaring
+/// <see cref="DataCaps.Isolation.RowScoped"/> is what lets the facade's read scope reach the adapter at all; it does not
+/// change the off path.</para>
+/// </summary>
+public abstract class KeyValueStore<TEntity, TKey> :
+    IDataRepository<TEntity, TKey>,
+    IQueryRepository<TEntity, TKey>,
+    IDescribesCapabilities,
+    IInstructionExecutor<TEntity>
+    where TEntity : class, IEntity<TKey>
+    where TKey : notnull
+{
+    // ==================== Backend primitives (the thin per-adapter seam) ====================
+    // Each resolves the CURRENT physical store from the ambient context (the routed source captured at Create + the
+    // EntityContext partition), exactly as the pre-rebuild adapters resolved their per-(partition) store.
+
+    /// <summary>Read one record from the current store, or <c>null</c> when absent.</summary>
+    protected abstract Task<KvRecord<TEntity>?> ReadAsync(TKey id, CancellationToken ct);
+
+    /// <summary>Every record in the current store (the full-keyspace scan the family's filter contract is built on).</summary>
+    protected abstract Task<IReadOnlyList<KvRecord<TEntity>>> ScanAsync(CancellationToken ct);
+
+    /// <summary>Write (insert or replace by id) a record into the current store.</summary>
+    protected abstract Task WriteAsync(TKey id, KvRecord<TEntity> record, CancellationToken ct);
+
+    /// <summary>Remove one record from the current store; <c>true</c> when a record was removed.</summary>
+    protected abstract Task<bool> RemoveAsync(TKey id, CancellationToken ct);
+
+    /// <summary>Clear the current store, returning the number of records removed.</summary>
+    protected abstract Task<int> ClearAsync(CancellationToken ct);
+
+    /// <summary>Announce the backend-specific extra capabilities (bulk / atomic / fast-remove / TTL …). The family
+    /// caps (LINQ, Full filter, RowScoped) are added by <see cref="Describe"/>.</summary>
+    protected abstract void DescribeBackend(ICapabilities caps);
+
+    // ==================== Capability declaration ====================
+
+    public void Describe(ICapabilities caps)
+    {
+        caps.Add(DataCaps.Query.Linq)
+            .Add(DataCaps.Query.Filter, FilterSupport.Full)
+            // Shared mode: this family persists the framework-managed discriminator (sidecar / injected JSON), pushes a
+            // scalar equality on it (the hybrid evaluator), and guards a cross-scope write — so it announces RowScoped.
+            .Add(DataCaps.Isolation.RowScoped);
+        DescribeBackend(caps);
+    }
+
+    // ==================== Read ====================
+
+    public async Task<TEntity?> Get(TKey id, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        // The facade lowers a SCOPED key-read to a managed Query (IDOR); raw Get(id) is reached only when unscoped.
+        var rec = await ReadAsync(id, ct).ConfigureAwait(false);
+        return rec is { } r ? r.Entity : null;
+    }
+
+    public async Task<IReadOnlyList<TEntity?>> GetMany(IEnumerable<TKey> ids, CancellationToken ct = default)
+    {
+        var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
+        var results = new TEntity?[idList.Count];
+        for (var i = 0; i < idList.Count; i++)
+        {
+            ct.ThrowIfCancellationRequested();
+            var rec = await ReadAsync(idList[i], ct).ConfigureAwait(false);
+            results[i] = rec is { } r ? r.Entity : null;
+        }
+        return results;
+    }
+
+    public async Task<RepositoryQueryResult<TEntity>> Query(QueryDefinition query, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        var records = await ScanAsync(ct).ConfigureAwait(false);
+
+        IEnumerable<TEntity> items = query.Filter is null
+            ? records.Select(r => r.Entity)
+            : records.Where(KvFilterEvaluator.Compile<TEntity>(query.Filter)).Select(r => r.Entity);
+
+        // Materialize once for a stable count + ordering.
+        var filtered = items as IReadOnlyList<TEntity> ?? items.ToList();
+        var totalCount = (long)filtered.Count;
+
+        var sortHandled = RepositoryQueryResult<TEntity>.NoSortHandled;
+        IEnumerable<TEntity> ordered;
+        if (query.HasSort)
+        {
+            ordered = InMemorySorter.Apply(filtered, query.Sort);
+            sortHandled = query.Sort.ToFrozenSet();
+        }
+        else
+        {
+            // Match the in-memory reference / relational adapters: an unsorted query falls back to a stable Id order so
+            // results — and any pagination over them — are deterministic. With GUID v7 ids this is also insertion order.
+            ordered = filtered.OrderBy(static e => e.Id, Comparer<TKey>.Default);
+        }
+
+        var paginationHandled = false;
+        if (query.HasPagination)
+        {
+            var skip = (query.EffectivePage() - 1) * query.EffectivePageSize();
+            ordered = ordered.Skip(skip).Take(query.EffectivePageSize());
+            paginationHandled = true;
+        }
+
+        var list = ordered as IReadOnlyList<TEntity> ?? ordered.ToList();
+        return new RepositoryQueryResult<TEntity>
+        {
+            Items = list,
+            TotalCount = totalCount,
+            IsEstimate = false,
+            SortHandled = sortHandled,
+            PaginationHandled = paginationHandled,
+        };
+    }
+
+    public async Task<CountResult> Count(QueryDefinition query, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        var records = await ScanAsync(ct).ConfigureAwait(false);
+        if (query.Filter is null) return new CountResult(records.Count, false);
+        var count = records.LongCount(KvFilterEvaluator.Compile<TEntity>(query.Filter));
+        return new CountResult(count, false);
+    }
+
+    // ==================== Write ====================
+
+    public async Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+
+        // Cross-scope write guard (Shared mode): if an existing record is owned by a different managed scope, reject —
+        // the KV analogue of the relational ON CONFLICT … WHERE json_extract(...) = @p. Guards the GUARDED isolation
+        // values only (ManagedFieldWriteScope.Current), never the unguarded operation overrides.
+        var guarded = ManagedFieldWriteScope.Current;
+        if (guarded is { Count: > 0 })
+        {
+            var existing = await ReadAsync(model.Id, ct).ConfigureAwait(false);
+            if (existing is { } ex)
+            {
+                foreach (var kv in guarded)
+                {
+                    var have = ex.Managed is { } m && m.TryGetValue(kv.Key, out var v) ? v : null;
+                    if (!ManagedValueEquals(have, kv.Value)) throw CrossScopeWrite(model.Id);
+                }
+            }
+        }
+
+        await WriteAsync(model.Id, new KvRecord<TEntity>(model, SnapshotManaged()), ct).ConfigureAwait(false);
+        return model;
+    }
+
+    public async Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default)
+    {
+        var count = 0;
+        foreach (var m in models)
+        {
+            ct.ThrowIfCancellationRequested();
+            await Upsert(m, ct).ConfigureAwait(false);   // per-row guard + stamp
+            count++;
+        }
+        return count;
+    }
+
+    public Task<bool> Delete(TKey id, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return RemoveAsync(id, ct);
+    }
+
+    public async Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
+    {
+        var count = 0;
+        foreach (var id in ids)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (await RemoveAsync(id, ct).ConfigureAwait(false)) count++;
+        }
+        return count;
+    }
+
+    public Task<int> DeleteAll(CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        // The facade scopes RemoveAll (it loads the visible rows then deletes them by id), so a raw clear of the current
+        // store is reached only when unscoped — clearing exactly the current particle/source set.
+        return ClearAsync(ct);
+    }
+
+    public async Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return await ClearAsync(ct).ConfigureAwait(false);
+    }
+
+    // ==================== Batch ====================
+
+    public IBatchSet<TEntity, TKey> CreateBatch() => new KvBatch(this);
+
+    private sealed class KvBatch : IBatchSet<TEntity, TKey>
+    {
+        private readonly KeyValueStore<TEntity, TKey> _repo;
+        private readonly List<TEntity> _adds = new();
+        private readonly List<TEntity> _updates = new();
+        private readonly List<TKey> _deletes = new();
+        private readonly List<(TKey id, Action<TEntity> mutate)> _mutations = new();
+
+        public KvBatch(KeyValueStore<TEntity, TKey> repo) => _repo = repo;
+
+        public IBatchSet<TEntity, TKey> Add(TEntity entity) { _adds.Add(entity); return this; }
+        public IBatchSet<TEntity, TKey> Update(TEntity entity) { _updates.Add(entity); return this; }
+        public IBatchSet<TEntity, TKey> Delete(TKey id) { _deletes.Add(id); return this; }
+        public IBatchSet<TEntity, TKey> Update(TKey id, Action<TEntity> mutate) { _mutations.Add((id, mutate)); return this; }
+        public IBatchSet<TEntity, TKey> Clear() { _adds.Clear(); _updates.Clear(); _deletes.Clear(); _mutations.Clear(); return this; }
+
+        public async Task<BatchResult> Save(BatchOptions? options = null, CancellationToken ct = default)
+        {
+            ct.ThrowIfCancellationRequested();
+            foreach (var (id, mutate) in _mutations)
+            {
+                ct.ThrowIfCancellationRequested();
+                var rec = await _repo.ReadAsync(id, ct).ConfigureAwait(false);
+                if (rec is { } r) { mutate(r.Entity); _updates.Add(r.Entity); }
+            }
+
+            var add = 0;
+            foreach (var e in _adds) { ct.ThrowIfCancellationRequested(); await _repo.Upsert(e, ct).ConfigureAwait(false); add++; }
+            var upd = 0;
+            foreach (var e in _updates) { ct.ThrowIfCancellationRequested(); await _repo.Upsert(e, ct).ConfigureAwait(false); upd++; }
+            var del = 0;
+            foreach (var id in _deletes) { ct.ThrowIfCancellationRequested(); if (await _repo.RemoveAsync(id, ct).ConfigureAwait(false)) del++; }
+
+            return new BatchResult(add, upd, del);
+        }
+    }
+
+    // ==================== Instructions ====================
+
+    public virtual async Task<TResult> ExecuteAsync<TResult>(Instruction instruction, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(instruction);
+        ct.ThrowIfCancellationRequested();
+        switch (instruction.Name)
+        {
+            case DataInstructions.EnsureCreated:
+                return (TResult)(object)true;
+            case DataInstructions.Clear:
+                return (TResult)(object)(await ClearAsync(ct).ConfigureAwait(false));
+            default:
+                throw new NotSupportedException(
+                    $"Instruction '{instruction.Name}' is not supported by the {GetType().Name} key-value adapter for {typeof(TEntity).Name}.");
+        }
+    }
+
+    // ==================== Managed-field helpers ====================
+
+    /// <summary>Snapshot the values to stamp onto this write — the guarded isolation values merged with the unguarded
+    /// operation overrides (<c>ManagedFieldWriteScope.Effective</c>). <c>null</c> off any scope (the byte-identical path).</summary>
+    private static IReadOnlyDictionary<string, object?>? SnapshotManaged()
+    {
+        var eff = ManagedFieldWriteScope.Effective;
+        if (eff is null || eff.Count == 0) return null;
+        return new Dictionary<string, object?>(eff, StringComparer.Ordinal);
+    }
+
+    private static bool ManagedValueEquals(object? a, object? b)
+        => a is null ? b is null : a.Equals(b);
+
+    private static InvalidOperationException CrossScopeWrite(TKey id)
+        => new($"Rejected a cross-scope write to '{typeof(TEntity).Name}' id '{id}': the row is owned by a different " +
+               "managed scope (e.g. tenant/classification). A managed-field-scoped entity cannot overwrite another scope's row.");
+}

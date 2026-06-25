@@ -24,23 +24,10 @@ public sealed class InMemoryAdapterFactory : IDataAdapterFactory
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
-        // Get singleton data store
+        // The singleton store; the repo resolves its per-(source, partition) physical store from the ambient context
+        // on each op (ARCH-0103: Database mode = per routed source, Container mode = per ambient partition).
         var dataStore = sp.GetRequiredService<InMemoryDataStore>();
-
-        // Resolve partition from EntityContext or use default
-        var partition = GetPartition();
-
-        return new InMemoryRepository<TEntity, TKey>(dataStore, partition);
-    }
-
-    private static string GetPartition()
-    {
-        var ctx = Koan.Data.Core.EntityContext.Current;
-        if (ctx?.Partition != null)
-            return ctx.Partition;
-
-        // Default partition
-        return "default";
+        return new InMemoryRepository<TEntity, TKey>(dataStore, source);
     }
 
     public StorageNamingCapability GetNamingCapability(IServiceProvider services)

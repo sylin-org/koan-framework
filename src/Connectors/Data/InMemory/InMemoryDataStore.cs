@@ -1,32 +1,36 @@
 using System.Collections.Concurrent;
+using Koan.Data.Core.KeyValue;
 
 namespace Koan.Data.Connector.InMemory;
 
 /// <summary>
-/// Thread-safe global storage manager for in-memory data.
-/// Maintains isolated storage per (entity type, partition) tuple.
-/// Singleton lifetime ensures data persists across repository instances.
+/// Thread-safe global storage manager for in-memory data. Maintains an isolated store per
+/// (routed source, entity type, partition) tuple — so Database mode (per source, ARCH-0103) and Container mode
+/// (per partition) both isolate physically, with no external infrastructure. Each store holds
+/// <see cref="KvRecord{TEntity}"/> envelopes (entity + stamped managed values), the object-graph family's sidecar that
+/// lets the in-memory read-filter evaluate the managed discriminator without mutating the POCO. Singleton lifetime
+/// ensures data persists across repository instances.
 /// </summary>
 public sealed class InMemoryDataStore
 {
     private readonly ConcurrentDictionary<StoreKey, object> _stores = new();
 
     /// <summary>
-    /// Gets or creates a thread-safe store for the specified entity type and partition.
+    /// Gets or creates a thread-safe store for the specified routed source, entity type, and partition.
     /// </summary>
-    public ConcurrentDictionary<TKey, TEntity> GetOrCreateStore<TEntity, TKey>(string partition)
+    public ConcurrentDictionary<TKey, KvRecord<TEntity>> GetOrCreateStore<TEntity, TKey>(string source, string partition)
         where TEntity : class
         where TKey : notnull
     {
-        var key = new StoreKey(typeof(TEntity), partition);
-        return (ConcurrentDictionary<TKey, TEntity>)_stores.GetOrAdd(
+        var key = new StoreKey(source, typeof(TEntity), partition);
+        return (ConcurrentDictionary<TKey, KvRecord<TEntity>>)_stores.GetOrAdd(
             key,
-            _ => new ConcurrentDictionary<TKey, TEntity>()
+            _ => new ConcurrentDictionary<TKey, KvRecord<TEntity>>()
         );
     }
 
     /// <summary>
-    /// Clears all data for the specified entity type across all partitions.
+    /// Clears all data for the specified entity type across all sources and partitions.
     /// Use with caution - primarily for testing scenarios.
     /// </summary>
     public void ClearAll<TEntity>() where TEntity : class
@@ -40,7 +44,7 @@ public sealed class InMemoryDataStore
     }
 
     /// <summary>
-    /// Clears all data across all entity types and partitions.
+    /// Clears all data across all entity types, sources, and partitions.
     /// Use with caution - primarily for testing scenarios.
     /// </summary>
     public void ClearAll()
@@ -48,5 +52,5 @@ public sealed class InMemoryDataStore
         _stores.Clear();
     }
 
-    private readonly record struct StoreKey(Type EntityType, string Partition);
+    private readonly record struct StoreKey(string Source, Type EntityType, string Partition);
 }
