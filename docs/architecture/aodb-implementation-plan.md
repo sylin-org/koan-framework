@@ -30,9 +30,9 @@ The AODB's value is one composed artifact replacing N independent re-derivations
 
 ### New types
 - `src/Koan.Data.Core/Aodb/AodbComposer.cs` — a static, **type-memoized** composer (mirrors `EqualityFields`' compute-plan-once). `Compose(entityType)` reads the three unchanged source registries (`ManagedFieldRegistry`, `StorageNameParticleRegistry`, `OperationOverrideRegistry`) + the DI `IReadFilterContributor[]`, and emits an ordered `Aodb`. The **structural plan** (which elements, modes, provenance, cacheable bit) is memoized per entity-type forever; the **per-op values** are filled at the chokepoint. `IsEmpty ⇒ empty Aodb ⇒ byte-identical no-op.`
-- `src/Koan.Data.Abstractions/Aodb/Aodb.cs` — `{ ImmutableArray<AodbElement> Elements, string OverlayMarker, StorageNamingCapability Naming, bool Cacheable }`.
+- `src/Koan.Data.Abstractions/Aodb/Aodb.cs` — `{ ImmutableArray<AodbElement> Elements, string OverlayMarker, StorageNamingCapability Naming, bool Cacheable }`. **First-class + inspectable** (public; `.Explain()` and the boot report render it) — visibility is the Tier-2 delight payoff (resolves OQ-1 toward explicit).
 - `src/Koan.Data.Abstractions/Aodb/AodbElement.cs` — the discriminated union: `FieldFilter{ axis, field, value, operator, provenance }` | `Particle{ axis, name, value, position, separator }` | `Moniker{ axis, moniker, provisioningPosture }`. **Mode is implicit in the element shape** (FieldFilter=Shared, Particle=Container, Moniker=Database).
-- `src/Koan.Data.Abstractions/Pipeline/FieldProvenance.cs` — `enum { AmbientStamped, OperationSourced }`.
+- `src/Koan.Data.Abstractions/Pipeline/FieldProvenance.cs` — **`[Flags] enum { AmbientStamped = 1, OperationSourced = 2 }`** (resolves OQ-2 — *have both*). A field carries both flags when declared with both a `.Field(provider)` and an `.OnDelete/.OnFlag(...)`. Derived in the expander from the declared verbs; never author-typed.
 - `src/Koan.Data.Abstractions/Naming/OverlayNamingRule.cs` — closed-grammar record `{ MarkerReplace, Prefix, CaseStyle, Separator, MaxLength }` (reuses `NameCasing`/`NamingUtils`).
 - `src/Koan.Data.Abstractions/Naming/OverlayNameInjectivityVerifier.cs` — a **new domain** (NOT `PartitionTokenPolicy.IsInjective`, which round-trips one value): pairwise-distinctness of the rule-transformed overlay-name set, plus member-disjointness (Phase-0 scope decision below).
 - `src/Koan.Data.Core/Axes/ProvisioningPosture.cs` — `enum { Lazy, Eager, ExternalOnly }` (Phase 2).
@@ -64,10 +64,11 @@ These are **acceptance criteria**, not aspirations. Each phase that touches the 
 
 - **FC-1 — soft-delete write is tenant-gated.** A soft-delete UPDATE composes the operation-sourced element (`__deleted=true` to *set*) **PLUS the full ambient read-scope** (tenant equality) as the UPDATE's `WHERE`. *Test:* tenant A soft-deletes id X owned by B → 0 rows, X still visible to B. *Until proven per adapter, keep the load-then-rewrite* (don't assume every adapter does a predicated UPDATE).
 - **FC-2 — batch delete is not an IDOR hole.** `BatchFacade.Delete(id)` / `CachingBatchSet.Delete` today bypass IDOR read-scoping **and** the soft-delete override (a pre-existing hole the consolidation must not re-bless). Route it through the same Aodb as single-delete, or document it as an explicit gap with a SURFACES tripwire. *Test:* batch-delete of another tenant's id → no-op; batch-delete of a `[SoftDelete]` entity → soft-removes.
-- **FC-3 — predicate-axis provenance is a relocation, reported honestly.** An `IReadFilterContributor` (e.g. `SoftDeleteReadContributor.HideDeleted = Any(Exists(__deleted,false), Ne(__deleted,true))`) returns an **opaque Filter tree with no per-field provenance**. To decide store-aware push for a predicate axis, the composer **must still walk the tree** and match leaves against the operation-override registry — the exact `FilterMentions` logic. So this is **2 sites → 1** (the vector fork + the implicit facade assumption → one composer derivation), **not** a deletion. *Test:* a moderation-style predicate over a non-stamped field is correctly omitted from the vector push by the composer.
+- **FC-3 — predicate-axis provenance is a relocation, reported honestly.** An `IReadFilterContributor` (e.g. `SoftDeleteReadContributor.HideDeleted = Any(Exists(__deleted,false), Ne(__deleted,true))`) returns an **opaque Filter tree with no per-field provenance**. To decide the store-aware push for a predicate axis, the composer **must still walk the tree** and match leaves against the descriptor provenance flags — the exact `FilterMentions` logic. So this is **2 sites → 1** (the vector fork + the implicit facade assumption → one composer derivation), **not** a deletion. The push rule is *current-in-this-store*: emit a FieldFilter to store S iff `AmbientStamped-in-S AND (no OperationSourced mutation that S does not run)` — so tenant pushes everywhere, soft-delete is omitted from the vector. *Test:* a moderation-style predicate over a not-current field is correctly omitted from the vector push by the composer.
 - **FC-4 — read-scope pushability fail-closed carries verbatim.** The facade's `RequireScopeForRead`/`FilterSplitter` pushability check (a non-fully-pushable scoped read *throws*) must survive into the Aodb render unchanged — and the **weaker** vector fail-closed (no such check today) converges *up* to the facade's rigor.
 - **FC-5 — off ⇒ byte-identical.** The single most important non-regression criterion: `IsEmpty` short-circuits to an empty Aodb at **all** collapsed sites. **Dedicated test**, not a phase note.
 - **FC-6 — naming bijection.** write-name == read-name == index-name under the declared rule; live-adapter round-trip (write under A, read under B → empty) is the §9 gate.
+- **FC-7 — fail-closed is self-explaining (the delight gate).** Every fail-closed path (empty scoped read with no ambient axis value, refused boot, `external-only` absent keyspace) emits a message naming the axis, the cause, and the fix ("this entity is tenant-isolated and no tenant is in scope — `Tenant.Use(...)` or mark `[HostScoped]`"). `.Explain()` renders the same on demand. *Test:* each fail-closed path asserts the diagnostic content, not just the throw. Fail-closed without a message is a regression.
 
 ---
 
@@ -82,11 +83,11 @@ The whole sequencing is phase-gated on this; it makes an **empirically-confirmed
 - *Tests:* FC-6 live-Weaviate Testcontainers round-trip; overlay-vs-overlay injectivity unit; **FC-5** Mongo/SQL byte-identical.
 - *Risk:* index/schema-create is a third adapter-internal call site with no framework rename chokepoint today — larger than §8 implies; verify on the live adapter only.
 
-### Phase 1a — Lift Provenance onto the descriptor
-- Add `FieldProvenance`; add `Provenance` to `ManagedFieldDescriptor` (**not** Mode — critic LOW). `DataAxisExpander.Register` sets `Provenance = axis.OnDeleteValue is not null ? OperationSourced : AmbientStamped`.
-- Interim: the two hand-registrars pass the correct provenance until they migrate (1c).
-- Surface provenance in `DataAxisReport`/`DataAxisPreflight` (warn when an operation-sourced axis is read-scoped on a secondary store).
-- *Tests:* expander stamps provenance for the soft-delete vs tenant shapes; boot report shows it; **FC-5** (additive, no behavior change).
+### Phase 1a — Lift Provenance (derived flags) onto the descriptor
+- Add `[Flags] FieldProvenance`; add `Provenance` to `ManagedFieldDescriptor` (**not** Mode — critic LOW). `DataAxisExpander.Register` **derives the flags from the declared verbs** (OR-combine): `AmbientStamped` if the field has a live `ValueProvider`; `OperationSourced` if any `.OnDelete/.OnFlag(...)` targets it — both set ⇒ both flags (the moderation shape). The author types no provenance.
+- Interim: the two hand-registrars pass the derived flags until they migrate (1c).
+- Surface provenance in `DataAxisReport`/`DataAxisPreflight` (warn when an operation-sourced field is read-scoped on a secondary store that can't keep it current).
+- *Tests:* expander derives the flags for the soft-delete (operation-sourced only), tenant (ambient-stamped only), and a both-shaped fixture; boot report shows them; **FC-5** (additive, no behavior change).
 
 ### Phase 1b — Build the `AodbComposer` and collapse (the headline; HIGH blast radius)
 - Add `Aodb`/`AodbElement`/`AodbComposer`; memoize the plan; emit provenance/mode-tagged elements + the cacheable bit (**isolation legs only**).
@@ -114,14 +115,26 @@ Entirely greenfield: `AxisMode.Database` registers only a carrier today (the exp
 
 ---
 
-## Open questions for the architect
+## The delight ladder (the design law — ARCH-0102 Addendum II)
 
-1. **OQ-1 — explicit Aodb parameter vs implicit transport.** The ADR §160 names "an interface/contract change," but every value already has a transport (filter via translator, values via write-scope, moniker via `Create`). Is a new explicit `Aodb` method parameter worth the breaking change, or is implicit-transport-with-one-composer enough? *(Recommendation: implicit first; revisit only if a guarantee can't be made implicitly.)*
-2. **OQ-2 — provenance completeness.** Is `.OnDelete present ⇒ operation-sourced` the whole rule, or can a field be **both** ambient-stamped *and* operation-overridden (a future moderation axis that stamps `__vis` *and* has an op that overrides it)? If so, provenance is per-write-site, not per-descriptor — and the single descriptor field is insufficient.
-3. **OQ-3 — capability granularity.** Coarse Container/Database tokens (can-do-at-all) vs `FilterSupport`-style structured detail (which positions / which postures)? Coarse risks a no-capability-lie the Gate catches at runtime; detailed grows the surface.
-4. **OQ-4 — partition-as-Particle ownership.** Synthetic `IDataAxis`, built-in Particle contributor, or stay special-cased and merely *viewed* as a Particle? Must resolve **before** 1b (the key scopers consume it) and pin the Couchbase `EncodePartitionInName=false` regression.
-5. **OQ-5 — shared resolved-Aodb cache vs shared key shape.** §7 says "one tuple keys every plane's memo," but the data facade memoizes no resolved Aodb today. Is a new shared resolved-Aodb memo tier wanted, or does each plane keep its own memo keyed by the same tuple shape (no shared cache)?
-6. **OQ-6 — external-only fail-closed timing.** Boot-probe every tenant keyspace (fail-fast, but needs the full tenant set the P6 broker owns, deferred) vs per-op first-touch throw? Phase-1 boot-fixed Database mode may only fail closed per-op.
+*"Implement with zero config to see it working right now, sane defaults that just work; and enrich your flow for control/visibility when you can. We're enabling the user."* Three tiers, and a developer never pays for a tier they don't use:
+
+- **Tier 0 — do nothing; isolated + safe.** Reference `Koan.Tenancy` → every entity isolated across data/blob/cache/vector, no config. Dev-open (see it working *right now*) / prod-closed (can't ship a leak). Lazy provisioning (a new tenant's store appears on first touch).
+- **Tier 1 — enrich for control; one line, zero app-code change.** `Mode = Database` routes a tenant to its own DB; Container/Database on a vector axis ⇒ Weaviate native multi-tenancy automatically. **The same entity code at every isolation strength.**
+- **Tier 2 — enrich for visibility.** `.Explain()` renders the composed AODB; the boot report shows it per entity; `AssertNoLeak` is one line.
+
+**First-class deliverables of the phasing (not just leak-proofing):** the inspectable `Aodb` (Phase 1b, drives `.Explain`/boot report) · self-explaining fail-closed (FC-7, every phase) · one-line mode upgrade with zero app-code change (Phase 2) · zero-config lazy provisioning (Phase 2 default).
+
+## Resolved design questions (via the delight inversion)
+
+The six open questions were re-cast through the delight law; most were false either/ors — resolved to *default + enrichment*, decisions locked:
+
+1. **Transport → first-class, inspectable AODB** (was OQ-1). The `Aodb` is a real public object *because visibility is the Tier-2 payoff*. Values still flow through the natural seams (filter/write-scope/`Create`); the object is what `.Explain`/the Gate/the boot report inspect.
+2. **Provenance → derived flags, both allowed** (was OQ-2 — *have both*). `[Flags] FieldProvenance`; the author declares only `.Field`/`.OnDelete`, the expander OR-derives. Enables the moderation axis the XOR enum couldn't, and gives the *current-in-this-store* push (FC-3).
+3. **Capability granularity → coarse default + optional structured detail** (was OQ-3). Coarse token routes (Tier 0); an adapter *may* declare `FilterSupport`-style detail (Tier 1). Both.
+4. **Partition → viewed-as a Particle** (was OQ-4). Zero developer impact; Couchbase still native-routes (`EncodePartitionInName=false` regression pinned); unified in `.Explain`. Resolve the renderer before 1b.
+5. **Memo → shared key shape, not a forced shared cache** (was OQ-5). The resolved AODB tuple is the shared key; a shared resolved-cache is an invisible perf detail; the resolved AODB is inspectable.
+6. **Provisioning → lazy/dev-open default; eager/external-only/closed are enrichments** (was OQ-6). Phase-1 boot-fixed Database mode fails closed per-op (lazy); boot-probe is the Tier-1 opt-in once the tenant set is known (P6 broker, Phase 2). **The honest boundary:** prod's Database-mode default is `external-only` (can't `CREATE DATABASE`) — fail closed with a message naming what to provision (FC-7).
 
 ---
 

@@ -211,4 +211,26 @@ A 6-reader investigation (`wf_def3d6c3-f98`) mapped every current isolation surf
 
 - **Two fail-closed surfaces this ADR did not name** (now plan gates): **`BatchFacade.Delete(id)`** today bypasses IDOR read-scoping *and* the soft-delete override — the "route every op through the composer" framing must cover it or leave a SURFACES tripwire (FC-2). And **off ⇒ byte-identical** is the single most important non-regression criterion and gets a *dedicated* test (the `IsEmpty` short-circuit at every collapsed site), not a phase note (FC-5).
 
-Full consolidation map, phasing, the six fail-closed invariants, and six open questions are in the implementation plan.
+Full consolidation map, phasing, the fail-closed invariants, and the resolved design questions are in the implementation plan.
+
+---
+
+## Addendum II — the delight inversion (2026-06-25)
+
+The architect re-framed the open questions around developer **delight**, ignoring churn/effort: *"implement with zero config to see it working right now, with sane defaults that just work; and if you can, enrich your flow for better control/visibility. We're enabling the user."* This is the **design law** for the AODB, and it resolves the open questions — most of which were false either/ors.
+
+### The delight ladder
+- **Tier 0 — do nothing; isolated and safe.** Reference `Koan.Tenancy` → every entity is isolated across data, blob, cache, and vector. No attribute, no `UserId`, no filter, no config. **Dev-open** so you see it working *right now*; **prod-closed** so you cannot ship a leak. The AODB is what makes "one reference → all planes" true.
+- **Tier 1 — enrich for control; one line, zero app-code change.** Declare `Mode = Database` → that tenant routes to its own database (the adapter provisions it). Declare Container/Database on a vector axis → Weaviate uses native multi-tenancy automatically. **The same entity code runs at every isolation strength** — multi-provider transparency extended to *isolation strength*: you declare the strength, you never rewrite the app.
+- **Tier 2 — enrich for visibility.** `.Explain()` renders the composed overlay; the boot report shows each entity's AODB; `AssertNoLeak` is one line in a test. The composed AODB is a *thing you can look at*.
+
+### Resolutions
+- **Provenance is DERIVED FLAGS, both allowed (resolves OQ-2 — "have both").** `FieldProvenance` becomes `[Flags] { AmbientStamped, OperationSourced }`. The author declares only intent — `.Field(x, provider)` sets `AmbientStamped`; `.OnDelete/.OnFlag(...)` sets `OperationSourced`; both verbs on one field set both. **Zero provenance config; it falls out of the declared verbs.** This is not just ergonomic — it is what lets a future **Moderation** axis (ambient-stamp `__vis` *and* an operation that flips it) be expressible at all, which the XOR enum could not. It also sharpens the store-aware push (next).
+- **Store-aware push = "current in *this* store," not "present."** A store S can enforce a field's predicate iff `AmbientStamped-in-S AND (every operation that mutates the field also runs in S)`. Tenant (pure ambient) ⇒ current everywhere. Soft-delete on the independent vector store ⇒ present-but-stale (the delete never reached the vector) ⇒ fail closed until lifecycle-sync. The right answer falls out of the flags instead of being a special-cased exclusion.
+- **The AODB is a first-class, INSPECTABLE artifact (resolves OQ-1 toward explicit).** It is a real, public, composable object — *because visibility is the Tier-2 payoff* (it drives `.Explain()`, the boot report, the Conformance Gate, and adapter-author clarity), not merely to avoid an interface change.
+- **Lazy provisioning + dev-open are the Tier-0 defaults (resolves OQ-6); eager / external-only / prod-closed are enrichments.** A new tenant's store appears on first touch in dev; you opt into boot-probe/fail-fast when you want it.
+- **Self-explaining fail-closed is a first-class acceptance criterion (new — FC-7).** An empty result or a refused boot must say *why*: "this entity is tenant-isolated and no tenant is in scope — `Tenant.Use(...)` or mark `[HostScoped]`." Fail-closed without a message is a delight-killer; with one, the framework *teaches*. `.Explain()` is that, on demand.
+- **The honest boundary.** Zero-config-just-works is bounded by what the environment *permits*: the prod app cannot `CREATE DATABASE`, so Database-mode's prod default is **external-only** — route, and if the keyspace is absent, fail closed with a message naming exactly what to provision. Delight in prod is *clarity*, not auto-magic.
+- **Other resolutions:** OQ-3 — coarse capability token (Tier-0 routing) + optional structured detail (Tier-1 precision), both. OQ-4 — partition is *viewed-as* a Particle (zero developer impact, Couchbase still native-routes; unified in `.Explain`). OQ-5 — the resolved AODB tuple is the shared *key shape*; a shared resolved cache is an invisible perf detail, but the resolved AODB is inspectable.
+
+**First-class goals the phasing must hit (not just leak-proofing):** the same entity code at every isolation tier · self-explaining fail-closed · the inspectable overlay · zero-config lazy provisioning. These are in the implementation plan's *Delight ladder* section and its acceptance gates.
