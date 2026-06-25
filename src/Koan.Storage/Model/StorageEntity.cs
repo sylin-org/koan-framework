@@ -234,7 +234,9 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
             // Do NOT copy obj.Id - preserve entity's auto-generated GUID v7
             // The storage key is in obj.Key, not obj.Id
             se.Key = logicalKey ?? obj.Key;
-            se.Name = obj.Name;
+            // STOR-0011 §5: StorageService sets StorageObject.Name = the (now physical, axis-composed) key; the
+            // entity's Name must hold the LOGICAL name, not "acme/photo.jpg". Fall back to obj.Name only off-path.
+            se.Name = logicalKey ?? obj.Name;
             se.ContentType = obj.ContentType;
             se.Size = obj.Size;
             se.ContentHash = obj.ContentHash;
@@ -256,7 +258,7 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
             // Do NOT copy obj.Id - preserve entity's auto-generated GUID v7
             // The storage key is in obj.Key, not obj.Id
             se.Key = logicalKey ?? obj.Key;
-            se.Name = obj.Name;
+            se.Name = logicalKey ?? obj.Name;   // STOR-0011 §5: logical name, not the physical composed key
             se.ContentType = obj.ContentType;
             se.Size = obj.Size;
             se.ContentHash = obj.ContentHash;

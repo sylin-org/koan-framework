@@ -60,12 +60,14 @@ public static class StorageKeyScoper
 
     private static string ScopeAmbient(string logicalKey)
     {
-        if (ManagedFieldRegistry.IsEmpty) return logicalKey;      // off ⇒ byte-identical (no axis, no guard)
         var sp = AppHost.Current;
         if (sp is not null)
             // typeof(object) sentinel = "unknown type, treat as scope-required"; TenantStorageGuard fails closed
-            // when no concrete tenant is in scope (the unscoped-raw-op fail-safe).
+            // when no concrete tenant is in scope (the unscoped-raw-op fail-safe). Run BEFORE the IsEmpty
+            // short-circuit so a guard registered without a managed field (a future predicate-only axis) still
+            // fires — parity with ScopeTyped (which guards unconditionally).
             foreach (var g in sp.GetServices<IStorageGuard>()) g.Guard(typeof(object));
+        if (ManagedFieldRegistry.IsEmpty) return logicalKey;      // off ⇒ byte-identical (no axis)
         // A raw IStorageService caller has no entity type, so there is no [HostScoped] exemption (a type-less op
         // cannot be host-scoped — isolate by default). Read EVERY registered equality axis's ambient value (no
         // AppliesTo filter). Use the descriptor's CLEAN ValueProvider value — NOT AmbientCarrierRegistry.Capture(),
@@ -75,7 +77,13 @@ public static class StorageKeyScoper
         for (var i = 0; i < all.Count; i++)
         {
             var d = all[i];
-            if (!d.AutoReadFilter) continue;                      // a non-equality axis is not a path segment
+            if (!d.AutoReadFilter)                                // §3: a non-equality axis is never a path segment...
+            {
+                if (d.ValueProvider() is not null)               // ...and a value-yielding one FAILS CLOSED (not dropped)
+                    throw new InvalidOperationException(
+                        $"Non-equality axis '{d.StorageName}' cannot scope a blob key — storage is equality-only (STOR-0011 §3).");
+                continue;
+            }
             var s = Convert.ToString(d.ValueProvider(), CultureInfo.InvariantCulture);
             if (string.IsNullOrEmpty(s)) continue;
             (ps ??= new List<Particle>(all.Count)).Add(new Particle(i, d.StorageName, s, ParticlePosition.Leading, Sep));

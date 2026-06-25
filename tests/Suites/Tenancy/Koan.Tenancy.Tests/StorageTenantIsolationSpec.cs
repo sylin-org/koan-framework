@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using AwesomeAssertions;
 using Koan.Media.Abstractions.Model;
 using Koan.Storage.Abstractions;
+using Koan.Storage.Extensions;
 using Koan.Storage.Infrastructure;
 using Koan.Storage.Model;
 using Koan.Tenancy.Tests.Support;
@@ -38,6 +39,10 @@ public sealed class StorageTenantIsolationSpec
     // A MediaEntity — the SAME base SnapVault's PhotoAsset uses (PhotoAsset : MediaEntity<PhotoAsset>).
     [StorageBinding(Profile = "test", Container = "media")]
     public sealed class StudioPhoto : MediaEntity<StudioPhoto> { }
+
+    // A cold tier the blob can be promoted to (CopyTo/MoveTo logical-key round-trip).
+    [StorageBinding(Profile = "test", Container = "cold")]
+    public sealed class TenantBlobCold : StorageEntity<TenantBlobCold> { }
 
     private static Stream Bytes(string s) => new MemoryStream(Encoding.UTF8.GetBytes(s));
 
@@ -113,6 +118,43 @@ public sealed class StorageTenantIsolationSpec
         await SystemBlob.Onboard("banner.png", Bytes("SHARED"));   // [HostScoped] ⇒ no tenant needed, no prefix
         using (Tenant.Use("acme")) (await SystemBlob.Get("banner.png").ReadAllText()).Should().Be("SHARED");
         using (Tenant.Use("globex")) (await SystemBlob.Get("banner.png").ReadAllText()).Should().Be("SHARED");
+    }
+
+    [Fact(DisplayName = "storage isolation: a write-return entity holds the LOGICAL key + name (not the physical composed key)")]
+    public async Task Write_return_entity_holds_the_logical_key_and_name()
+    {
+        await using var runtime = await TenancyRuntimeFixture.CreateAsync(extraSettings: Posture("Closed"), withLocalStorage: true);
+        runtime.ResetEntityCaches();
+
+        using (Tenant.Use("acme"))
+        {
+            var e = await TenantBlob.Onboard("photo2.jpg", Bytes("X"));
+            e.Key.Should().Be("photo2.jpg");    // STOR-0011 §5: logical key, never "acme/photo2.jpg"
+            e.Name.Should().Be("photo2.jpg");   // and the logical name (StorageObject.Name = the physical key otherwise)
+        }
+    }
+
+    [Fact(DisplayName = "storage isolation: the IStorageObject extension helpers honour scope (HostScoped read unprefixed) + keep the logical key on CopyTo")]
+    public async Task IStorageObject_extensions_respect_scope_and_logical_key()
+    {
+        await using var runtime = await TenancyRuntimeFixture.CreateAsync(extraSettings: Posture("Closed"), withLocalStorage: true);
+        runtime.ResetEntityCaches();
+
+        // [HostScoped] blob read through an IStorageObject-typed reference (binds the extension, not the scoped
+        // instance method): must stay unprefixed (the extension declares StorageScope.For(obj.GetType())).
+        await SystemBlob.Onboard("banner.png", Bytes("SHARED"));
+        IStorageObject hostBlob = SystemBlob.Get("banner.png");
+        using (Tenant.Use("acme")) (await hostBlob.ReadAllText()).Should().Be("SHARED");
+
+        // CopyTo via the IStorageObject extension keeps the LOGICAL key (no physical round-trip ⇒ no double-prefix).
+        using (Tenant.Use("acme"))
+        {
+            await TenantBlob.Onboard("doc.txt", Bytes("ACME-DOC"));
+            IStorageObject src = TenantBlob.Get("doc.txt");
+            var cold = await src.CopyTo<TenantBlobCold>();
+            cold.Key.Should().Be("doc.txt");                                              // logical, not "acme/doc.txt"
+            (await TenantBlobCold.Get("doc.txt").ReadAllText()).Should().Be("ACME-DOC");  // re-read by logical key (no double-prefix)
+        }
     }
 
     [Fact(DisplayName = "storage isolation: a path-hostile tenant id is rejected by the sanitizing formatter")]
