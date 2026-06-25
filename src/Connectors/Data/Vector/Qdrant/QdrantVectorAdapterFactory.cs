@@ -29,7 +29,9 @@ public sealed class QdrantVectorAdapterFactory : IVectorAdapterFactory
     public bool CanHandle(string provider)
         => string.Equals(provider, "qdrant", StringComparison.OrdinalIgnoreCase);
 
-    public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp)
+    // ARCH-0103 §4.1: accepts the routed source for contract alignment; per-source physical placement (native
+    // multi-tenancy / per-collection) is realized in P4.
+    public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp, string source = "Default")
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {

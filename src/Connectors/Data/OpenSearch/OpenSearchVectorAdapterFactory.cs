@@ -41,7 +41,9 @@ public sealed class OpenSearchVectorAdapterFactory : IVectorAdapterFactory
     public bool CanHandle(string provider)
         => string.Equals(provider, "opensearch", StringComparison.OrdinalIgnoreCase);
 
-    public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp)
+    // ARCH-0103 §4.1: accepts the routed source for contract alignment; per-source physical placement (per-index /
+    // per-cluster) is realized in P4.
+    public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp, string source = "Default")
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {

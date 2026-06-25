@@ -117,7 +117,9 @@ public sealed class AcmeVectorAdapterFactory : IVectorAdapterFactory
 {
     public string Provider => "acme";
     public bool CanHandle(string provider) => string.Equals(provider, "acme", StringComparison.OrdinalIgnoreCase);
-    public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp) => ...
+    // ARCH-0103 §4.1 — the source parameter is the routed Moniker (Database-mode placement); honor it for per-source
+    // physical isolation where the backend supports it, else accept it and document the deferral.
+    public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp, string source = "Default") => ...
 }
 ```
 

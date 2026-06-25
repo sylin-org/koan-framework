@@ -40,10 +40,12 @@ public sealed class InMemoryVectorAdapterFactory : IVectorAdapterFactory
             Partition = PartitionTokenPolicy.Default,
         };
 
-    public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp)
+    public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp, string source = "Default")
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
-        => new InMemoryVectorRepository<TEntity, TKey>(this, sp, _stores);
+        // ARCH-0103 P1 (Moniker): the routed source prefixes the store key, so a Database-mode axis lands each ambient's
+        // embeddings in a distinct in-memory store (native-or-emulated: the emulation is a source-keyed dictionary).
+        => new InMemoryVectorRepository<TEntity, TKey>(this, sp, _stores, source);
 
     /// <summary>Clears every per-(entity, partition) store this factory has issued (in-memory reset).</summary>
     public void ClearAll() => _stores.Clear();

@@ -34,15 +34,18 @@ internal sealed class InMemoryVectorRepository<TEntity, TKey>
     private readonly InMemoryVectorAdapterFactory _factory;
     private readonly IServiceProvider _sp;
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, (float[] Embedding, object? Metadata)>> _stores;
+    private readonly string _source;
 
     public InMemoryVectorRepository(
         InMemoryVectorAdapterFactory factory,
         IServiceProvider sp,
-        ConcurrentDictionary<string, ConcurrentDictionary<string, (float[] Embedding, object? Metadata)>> stores)
+        ConcurrentDictionary<string, ConcurrentDictionary<string, (float[] Embedding, object? Metadata)>> stores,
+        string source = "Default")
     {
         _factory = factory;
         _sp = sp;
         _stores = stores;
+        _source = source;
     }
 
     public void Describe(ICapabilities caps) => caps
@@ -55,7 +58,10 @@ internal sealed class InMemoryVectorRepository<TEntity, TKey>
     {
         var partition = Koan.Data.Core.EntityContext.Current?.Partition;
         var storage = ((INamingProvider)_factory).ResolveStorage(typeof(TEntity), partition, _sp);
-        return _stores.GetOrAdd(storage, _ => new ConcurrentDictionary<string, (float[], object?)>(StringComparer.Ordinal));
+        // ARCH-0103 P1 (Moniker): the routed source prefixes the store key — Database-mode isolation by source,
+        // orthogonal to partition (Container) and the metadata read-filter (Shared). Off-axis source is "Default".
+        var bucketKey = _source + "::" + storage;
+        return _stores.GetOrAdd(bucketKey, _ => new ConcurrentDictionary<string, (float[], object?)>(StringComparer.Ordinal));
     }
 
     public Task Upsert(TKey id, float[] embedding, object? metadata = null, CancellationToken ct = default)

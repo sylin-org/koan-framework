@@ -84,6 +84,28 @@ public sealed class VectorAdapterResolutionSpec
             .ProviderName.Should().Be("json");
     }
 
+    [Fact]
+    public async Task Default_fallback_picks_highest_priority_when_desired_matches_no_vector_factory()
+    {
+        // ARCH-0103 §4.1 — the vector factory pick now uses the shared [ProviderPriority]+CanHandle ranking
+        // (FactoryResolver), converging onto the same rule the record plane already used. When the desired provider
+        // matches NO registered vector factory, the fallback resolves the HIGHEST-PRIORITY adapter, NOT the
+        // first-registered. Registered low-then-high so DI order != priority order; the entity's [SourceAdapter] names a
+        // provider no vector factory handles, forcing the no-match fallback. (Pre-ARCH-0103 this returned "low".)
+        var services = NewServices();
+        services.AddKoanDataCore();
+        services.AddKoanDataVector();
+        services.AddSingleton<IDataService, DataService>();
+        services.AddSingleton<IVectorAdapterFactory>(new LowPriorityVectorFactory());   // registered first
+        services.AddSingleton<IVectorAdapterFactory>(new HighPriorityVectorFactory());  // higher [ProviderPriority]
+        await using var sp = services.BuildServiceProvider();
+
+        var repo = sp.GetRequiredService<IVectorService>().TryGetRepository<EntityWithUnmatchedSource, string>();
+        repo.Should().NotBeNull();
+        (((IDecoratedVectorRepository)repo!).InnerRepository as FakeVectorRepo<EntityWithUnmatchedSource, string>)!
+            .ProviderName.Should().Be("high");
+    }
+
     // Mirrors the bespoke ServiceProviderFixture base wiring (logging + a no-op application lifetime)
     // that previously sat under .UsingServiceProvider(...), so the inlined provider matches it exactly.
     private static ServiceCollection NewServices()
@@ -146,7 +168,7 @@ public sealed class VectorAdapterResolutionSpec
 
         public bool CanHandle(string candidate) => string.Equals(candidate, _provider, StringComparison.OrdinalIgnoreCase);
 
-        public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp)
+        public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp, string source = "Default")
             where TEntity : class, IEntity<TKey>
             where TKey : notnull
             => new FakeVectorRepo<TEntity, TKey>(_provider);
@@ -157,6 +179,37 @@ public sealed class VectorAdapterResolutionSpec
                 Style = Koan.Data.Abstractions.Naming.StorageNamingStyle.EntityType,
                 PartitionSeparator = '#',
             };
+    }
+
+    // Two DISTINCT factory types with DISTINCT [ProviderPriority] for the priority-ranked-fallback regression
+    // (ARCH-0103 §4.1). Registered low-then-high so DI order disagrees with priority order.
+    [ProviderPriority(5)]
+    private sealed class LowPriorityVectorFactory : IVectorAdapterFactory
+    {
+        public string Provider => "low";
+        public bool CanHandle(string candidate) => string.Equals(candidate, "low", StringComparison.OrdinalIgnoreCase);
+        public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp, string source = "Default")
+            where TEntity : class, IEntity<TKey> where TKey : notnull => new FakeVectorRepo<TEntity, TKey>("low");
+        public Koan.Data.Abstractions.Naming.StorageNamingCapability GetNamingCapability(IServiceProvider services)
+            => new() { Style = Koan.Data.Abstractions.Naming.StorageNamingStyle.EntityType, PartitionSeparator = '#' };
+    }
+
+    [ProviderPriority(50)]
+    private sealed class HighPriorityVectorFactory : IVectorAdapterFactory
+    {
+        public string Provider => "high";
+        public bool CanHandle(string candidate) => string.Equals(candidate, "high", StringComparison.OrdinalIgnoreCase);
+        public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp, string source = "Default")
+            where TEntity : class, IEntity<TKey> where TKey : notnull => new FakeVectorRepo<TEntity, TKey>("high");
+        public Koan.Data.Abstractions.Naming.StorageNamingCapability GetNamingCapability(IServiceProvider services)
+            => new() { Style = Koan.Data.Abstractions.Naming.StorageNamingStyle.EntityType, PartitionSeparator = '#' };
+    }
+
+    [SourceAdapter("nomatch")]
+    private sealed class EntityWithUnmatchedSource : Entity<EntityWithUnmatchedSource, string>
+    {
+        [Identifier]
+        public override string Id { get; set; } = default!;
     }
 
     [SourceAdapter("json")]
