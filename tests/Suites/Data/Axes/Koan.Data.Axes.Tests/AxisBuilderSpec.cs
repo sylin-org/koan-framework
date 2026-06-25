@@ -156,17 +156,30 @@ public sealed class AxisBuilderSpec
             .Named("shard").Mode(AxisMode.Database).Field("__s", () => "s")
             .Validate()).Should().Throw<InvalidOperationException>().WithMessage("*must declare .Carries*");
 
+    // ARCH-0102 §3: Database mode now REQUIRES .Field (the per-operation source-key provider) alongside .Carries.
     [Fact]
-    public void Database_with_a_field_filter_or_override_is_rejected()
+    public void A_database_axis_with_a_carrier_and_field_validates()
         => FluentActions.Invoking(() => new Axis()
             .Named("shard").Mode(AxisMode.Database).Carries(new FakeCarrier("k")).Field("__s", () => "s")
-            .Validate()).Should().Throw<InvalidOperationException>().WithMessage("*cannot declare .Field*");
+            .Validate()).Should().NotThrow();
 
     [Fact]
-    public void A_database_axis_with_only_a_carrier_validates()
+    public void A_database_axis_without_a_field_is_rejected()
         => FluentActions.Invoking(() => new Axis()
             .Named("shard").Mode(AxisMode.Database).Carries(new FakeCarrier("k"))
-            .Validate()).Should().NotThrow();
+            .Validate()).Should().Throw<InvalidOperationException>().WithMessage("*must declare .Field*");
+
+    [Fact]
+    public void Database_with_Reads_is_rejected()
+        => FluentActions.Invoking(() => new Axis()
+            .Named("shard").Mode(AxisMode.Database).Carries(new FakeCarrier("k")).Field("__s", () => "s").Reads(_ => Hide)
+            .Validate()).Should().Throw<InvalidOperationException>().WithMessage("*cannot declare .Reads*");
+
+    [Fact]
+    public void Database_with_OnDelete_is_rejected()
+        => FluentActions.Invoking(() => new Axis()
+            .Named("shard").Mode(AxisMode.Database).Carries(new FakeCarrier("k")).Field("__s", () => "s").OnDelete(Logical.SetTrue("__s"))
+            .Validate()).Should().Throw<InvalidOperationException>().WithMessage("*cannot declare*");
 
     private sealed class FakeCarrier(string key) : IAmbientSliceCarrier
     {

@@ -22,9 +22,13 @@ public enum AxisMode
     Container = 1,
 
     /// <summary>
-    /// A <b>separate data source</b> per axis value (DATA-0077 ambient source routing). There is no contributor plane —
-    /// routing rides <c>EntityContext.With(source:)</c>, driven by the axis's own <c>.Carries</c> scope. The expander
-    /// registers only the carrier; declaring <c>.Field</c>/<c>.Reads</c>/<c>.OnDelete</c> in this mode is rejected.
+    /// A <b>separate data source</b> per axis value (DATA-0077 source routing, ARCH-0102 §3 auto-routing). <c>.Field</c>'s
+    /// value provider is the per-operation SOURCE-KEY provider — its value (read from the ambient) selects the data source
+    /// the framework routes to; the expander registers it as a <c>DatabaseRouteDescriptor</c> that <c>AdapterResolver</c>
+    /// consults (after an explicit <c>EntityContext.Source</c>, which always wins). <c>.Carries</c> is also required — it
+    /// makes the routing key durable across the async hop (ARCH-0100). No managed column, no read-filter (the separate
+    /// source IS the isolation); declaring <c>.Reads</c>/<c>.OnDelete</c> is rejected. The unconfigured-source posture is
+    /// external-only (fail closed) until lazy provisioning lands (the P6 broker).
     /// </summary>
     Database = 2,
 }

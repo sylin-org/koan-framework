@@ -587,7 +587,7 @@ implemented and its tests pass on real stores.
   first-class PILLAR (`9d7296de`):** card `reference/cards/tenancy.md` + how-to `guides/tenancy-howto.md` + skill
   `koan-tenancy` (compile-gated) + CLAUDE.md/skills-README/SURFACES registration. **0.3 vector** = the remaining sibling
   (needs Docker/Weaviate; axis-generic with ARCH-0098). NEXT = fold `wf_03ef19e6-88c` → mark STOR-0011 Accepted; then 0.3 vector.
-- ◐ **ARCH-0102 — THE ACCESS OVERLAY DEFINITION BLOCK (AODB): PHASE 1 SHIPPED (2026-06-25, `dev`, unpushed, 8 ahead).**
+- ◐ **ARCH-0102 — THE ACCESS OVERLAY DEFINITION BLOCK (AODB): PHASES 1 + 2 SHIPPED (2026-06-25, `dev`, unpushed).**
   The generalization of ARCH-0101: isolation intent composed once into an inspectable `Aodb` + pushed down + adapter-realized;
   the break-and-rebuild collapse of the per-plane scoping forks onto ONE composer. ADR `docs/decisions/ARCH-0102-...md`
   (decision + Addendum I corrections + Addendum II the delight inversion) + plan `docs/architecture/aodb-implementation-plan.md`.
@@ -601,10 +601,18 @@ implemented and its tests pass on real stores.
   migration.* **Phase 1c `a016207e`+`255fefa9`** — soft-delete & tenancy (the flagship) migrated to discovered `[DataAxis]`
   declarations; **both hand-registrars DELETED**; tenancy guard/posture/pre-flight/dev-seed/Report STAY (policy, not plane).
   Tenancy is now the golden contributor example the standard always demanded. Byte-identical: tenancy 104, data-core 273,
-  Weaviate 30, InMemory vector 29, SoftDelete 7, Axes 56; full-solution build clean. **▶ PHASE 2 (NEXT, focused run):
-  Database-mode AUTO-ROUTING — a CONTRACT CHANGE to the data-routing core (`AdapterResolver`), ATOMIC (a route registry without
-  the resolver hook is a silent-non-isolation footgun), needs a multi-DB SQLite gate. The 6 steps recorded in the
-  `arch-0102-aodb-mission` memory + the plan's Progress box.** Generalizes the contributor-agnostic realignment above.
+  Weaviate 30, InMemory vector 29, SoftDelete 7, Axes 56; full-solution build clean. **▶ PHASE 2 SHIPPED — Database-mode
+  AUTO-ROUTING.** The carrier-only contract relaxed: a Database axis now declares `.Field` (the per-op SOURCE-KEY provider)
+  + `.Carries`, forbids `.Reads`/`.OnDelete`. The expander registers a `DatabaseRouteDescriptor` into the new
+  `DatabaseRouteRegistry` (copy-on-write, lock-free reads); `AdapterResolver.ResolveForEntity` consults it at **Priority 1.5**
+  (after an explicit `EntityContext.Source` — the caller override always wins), gated by `IsEmpty` ⇒ off = byte-identical
+  (FC-5). Unconfigured-source routing fails closed, self-explaining (FC-7) = `ProvisioningPosture.ExternalOnly`. Proven by a
+  Docker-free multi-DB SQLite gate (`MultiDatabaseRoutingSpec`): RED (no hook ⇒ both shards in Default, no error — the footgun)
+  → GREEN (physical isolation across two DB files) + fail-closed. Adversarial routing-core review 0 CRITICAL; the under-lock /
+  per-call-lock findings fixed by the copy-on-write registry. Green: axes unit 58, axes integration 14, data-core off-proof 273
+  (FC-5), tenancy 104. **Phase-3 follow-ons (pinned):** strict-isolation `NullKeyBehavior.FailClosed` opt-in; overlapping-route
+  boot detection; per-tenant placement = P6 broker. Remaining for ARCH-0102: Tier-2 visibility (`.Explain` full-Aodb + boot
+  report). Generalizes the contributor-agnostic realignment above.
 - ☐ **THEN:** Phase 3c schema-column DDL indexability (Indexed descriptors → computed/expression index; PG/SqlServer;
   SQLite JSON-only) + Mongo/bare-store managed serialization injection + in-memory managed `GetValue` · classification
   phases 4–7 (searchable blind-index · vector/messaging leak guards · crypto-shred+rotation · masked-read) · then

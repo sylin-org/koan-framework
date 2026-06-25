@@ -88,7 +88,9 @@ public sealed class Axis
     /// write, AND-folded into reads (auto-equality unless <see cref="Reads"/> is also declared), indexed, fail-closed
     /// (RowScoped), and a cache-key partition. In <see cref="AxisMode.Container"/> the same <paramref name="valueProvider"/>
     /// supplies the leading container particle token (<paramref name="storageName"/>/<paramref name="clrType"/> are
-    /// then decorative).
+    /// then decorative). In <see cref="AxisMode.Database"/> the <paramref name="valueProvider"/> is the per-operation
+    /// SOURCE-KEY provider — its value selects the data source the framework routes the operation to (ARCH-0102 §3);
+    /// <paramref name="storageName"/>/<paramref name="clrType"/> are decorative (the routing key is the value, not a column).
     /// </summary>
     /// <param name="storageName">The persisted key — must be camel-case-stable (lead with <c>'_'</c> or be all-lowercase);
     /// validated at registration by <c>ManagedFieldRegistry</c>.</param>
@@ -143,8 +145,9 @@ public sealed class Axis
     /// Validate the accumulated declaration (ARCH-0101 §8 — fail loud at boot, never ship a half-axis). Run by the
     /// expander before any registry write. Enforces: a logical id; at least one plane; and the mode-specific shape —
     /// Shared <c>OnDelete</c> requires the matching <c>Field</c>; Container requires a <c>Field</c> and forbids
-    /// <c>Reads</c>/<c>OnDelete</c> (the container IS the isolation); Database requires a <c>Carries</c> and forbids
-    /// every field/filter/override plane (source routing is ambient, not a contributor plane).
+    /// <c>Reads</c>/<c>OnDelete</c> (the container IS the isolation); Database requires both <c>Carries</c> and
+    /// <c>Field</c> (the source-key provider) and forbids <c>Reads</c>/<c>OnDelete</c> (a separate data source is the
+    /// isolation — ARCH-0102 §3).
     /// </summary>
     /// <exception cref="InvalidOperationException">The declaration is malformed.</exception>
     public void Validate()
@@ -197,14 +200,24 @@ public sealed class Axis
                 break;
 
             case AxisMode.Database:
+                // ARCH-0102 §3 (auto-routing): in Database mode the .Field value provider is the per-operation SOURCE-KEY
+                // provider — its value selects the data source the framework routes to (DataAxisExpander registers it as a
+                // DatabaseRouteDescriptor; AdapterResolver derives the source from it). Both planes are REQUIRED and the
+                // shared-store planes are forbidden: a separate data source IS the isolation, so there is no read-filter or
+                // operation-override plane in Database mode.
                 if (Carrier is null)
                     throw new InvalidOperationException(
-                        $"Database-mode axis '{Id}' must declare .Carries(...) — source routing rides EntityContext.With(source:) " +
-                        "from the axis carrier/scope; there is no field/filter/override plane to register.");
-                if (FieldName is not null || ReadPredicate is not null || OnDeleteValue is not null)
+                        $"Database-mode axis '{Id}' must declare .Carries(...) — the source-routing key is read from the ambient at " +
+                        "resolution time; the carrier makes it durable across the async hop (ARCH-0100), without which a cross-hop " +
+                        "operation silently routes to the default source (a non-isolation hole).");
+                if (FieldName is null)
                     throw new InvalidOperationException(
-                        $"Database-mode axis '{Id}' cannot declare .Field/.Reads/.OnDelete — source routing has no contributor plane " +
-                        "(it is ambient EntityContext.With(source:)); declare only .Carries(...).");
+                        $"Database-mode axis '{Id}' must declare .Field(...) — in Database mode the .Field value provider is the " +
+                        "per-operation SOURCE-KEY provider (its value selects the data source the framework routes to). (ARCH-0102 §3)");
+                if (ReadPredicate is not null || OnDeleteValue is not null)
+                    throw new InvalidOperationException(
+                        $"Database-mode axis '{Id}' cannot declare .Reads/.OnDelete — a separate data source IS the isolation; " +
+                        "there is no shared-store read-filter or operation-override plane in Database mode (declare .Field + .Carries only).");
                 break;
         }
     }

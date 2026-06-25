@@ -3,6 +3,7 @@ using System.Linq;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Abstractions;
+using Koan.Data.Core.Routing;
 
 namespace Koan.Data.Core;
 
@@ -11,6 +12,8 @@ namespace Koan.Data.Core;
 ///
 /// Priority chain (first match wins):
 /// 1. EntityContext.Current.Source → use source's configured adapter
+/// 1.5. Database-mode [DataAxis] route (ARCH-0102 §3) → source derived from the ambient (auto-routing), gated by
+///      DatabaseRouteRegistry.IsEmpty so off = byte-identical
 /// 2. EntityContext.Current.Adapter → explicit adapter override
 /// 3. [DataAdapter] or [SourceAdapter] attribute → entity-level configuration
 /// 4. "Default" source (if configured) → framework-level default
@@ -47,6 +50,35 @@ internal static class AdapterResolver
                     $"Add 'Adapter' key to Koan:Data:Sources:{ctx.Source} configuration.");
 
             return (sourceDefinition.Adapter, ctx.Source);
+        }
+
+        // Priority 1.5 (ARCH-0102 §3 — Database-mode auto-routing): a Database-mode axis derives the data source from the
+        // ambient (e.g. tenant → that tenant's DB) with no explicit EntityContext.Source. An explicit Source (Priority 1)
+        // is the caller's deliberate override and always wins. Gated by IsEmpty: when no Database-mode axis is registered
+        // this is a single volatile read and the chain below is byte-identical (FC-5, the load-bearing non-regression).
+        if (!DatabaseRouteRegistry.IsEmpty)
+        {
+            var routedKey = DatabaseRouteRegistry.ResolveSourceKey(typeof(TEntity));
+            if (routedKey is not null)
+            {
+                var routedDefinition = sourceRegistry.GetSource(routedKey);
+
+                // Provisioning is a posture (ARCH-0102 §3), not a mechanism: external-only (the realized Phase-2 default)
+                // fails closed on an absent keyspace rather than silently mis-routing — self-explaining (FC-7). Lazy
+                // derivation (Tier-0 zero-config) and eager pre-provisioning are the P6 broker; until then, configure it.
+                if (routedDefinition == null)
+                    throw new InvalidOperationException(
+                        $"Database-mode axis routed entity '{typeof(TEntity).Name}' to data source '{routedKey}', which is " +
+                        $"not configured (provisioning posture: {nameof(ProvisioningPosture.ExternalOnly)}). " +
+                        $"Add Koan:Data:Sources:{routedKey}:{{Adapter,ConnectionString}}, or pre-provision the source. (ARCH-0102 §3)");
+
+                if (string.IsNullOrWhiteSpace(routedDefinition.Adapter))
+                    throw new InvalidOperationException(
+                        $"Database-mode axis routed entity '{typeof(TEntity).Name}' to data source '{routedKey}', which does " +
+                        $"not specify an adapter. Add 'Adapter' to Koan:Data:Sources:{routedKey}.");
+
+                return (routedDefinition.Adapter, routedKey);
+            }
         }
 
         // Priority 2: Adapter specified in context → use with implicit "Default" source

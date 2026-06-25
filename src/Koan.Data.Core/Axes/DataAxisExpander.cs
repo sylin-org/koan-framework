@@ -6,6 +6,7 @@ using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Core.Pipeline;
+using Koan.Data.Core.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -171,7 +172,10 @@ public static class DataAxisExpander
                 break;
 
             case AxisMode.Database:
-                // Source routing is ambient (EntityContext.With(source:)) — only the carrier is a registrable plane.
+                // ARCH-0102 §3 (auto-routing): the .Field value provider is the per-operation SOURCE-KEY provider — register
+                // it as a route so AdapterResolver derives the data source from the ambient. The carrier (registered above)
+                // makes that ambient durable across the async hop (ARCH-0100); Validate requires both. Idempotent by axis id.
+                DatabaseRouteRegistry.Register(new DatabaseRouteDescriptor(id, appliesTo, axis.FieldValueProvider!));
                 break;
         }
     }

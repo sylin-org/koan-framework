@@ -2,6 +2,7 @@ using Koan.Data.Abstractions.Naming;
 using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Core.Axes;
 using Koan.Data.Core.Pipeline;
+using Koan.Data.Core.Routing;
 
 namespace Koan.Data.Axes.Tests.Support;
 
@@ -16,6 +17,7 @@ internal static class AxisRegistries
         StorageNameParticleRegistry.Reset();
         OperationOverrideRegistry.Reset();
         StorageFieldTransformRegistry.Reset();
+        DatabaseRouteRegistry.Reset();
         DataAxisExpander.ResetForTesting();
     }
 }
