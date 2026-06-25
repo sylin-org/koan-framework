@@ -612,7 +612,15 @@ implemented and its tests pass on real stores.
   per-call-lock findings fixed by the copy-on-write registry. Green: axes unit 58, axes integration 14, data-core off-proof 273
   (FC-5), tenancy 104. **Phase-3 follow-ons (pinned):** strict-isolation `NullKeyBehavior.FailClosed` opt-in; overlapping-route
   boot detection; per-tenant placement = P6 broker. Remaining for ARCH-0102: Tier-2 visibility (`.Explain` full-Aodb + boot
-  report). Generalizes the contributor-agnostic realignment above.
+  report). Generalizes the contributor-agnostic realignment above. **▶ FLEET MANDATE (ARCH-0103, architect canon):** every
+  Koan-shipped data adapter (all 15) MUST implement all three AODB modes (Shared/Container/Database), realization bar =
+  native-or-emulated NO EXCEPTIONS, ZERO debt carried (harvest+rebuild). Realized via storage-model **family bases**
+  (`RelationalStore` exists; new `DocumentStore`/`KeyValueStore`; `ScopedVectorRepository`+new `HttpVectorStore`) + a
+  **helper-module layer** (`ManagedFieldJsonInjector`, `FilterAstWalker`, `HttpVectorStore`) so adapters get THIN
+  (feasibility eval: fleet ≈ −45% LOC + debt cleared). ONE `IAdapterFactory` marker + `RoutedSource` (kills the vector/record
+  routing split-brain). Build P1 Moniker-contract → P2 KeyValueStore → P3 DocumentStore → P4 vector+overlay-leak-fix → P5
+  conformance ledger (`ContainerScoped`/`DatabaseScoped` tokens + `AodbConformanceSpecsBase<TFactory>`). ADR
+  `docs/decisions/ARCH-0103-aodb-adapter-conformance.md`.
 - ☐ **THEN:** Phase 3c schema-column DDL indexability (Indexed descriptors → computed/expression index; PG/SqlServer;
   SQLite JSON-only) + Mongo/bare-store managed serialization injection + in-memory managed `GetValue` · classification
   phases 4–7 (searchable blind-index · vector/messaging leak guards · crypto-shred+rotation · masked-read) · then
