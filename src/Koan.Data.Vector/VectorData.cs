@@ -162,29 +162,13 @@ public static class VectorData<TEntity>
 
     public static Task<VectorQueryResult<string>> Search(VectorQueryOptions options, CancellationToken ct = default)
     {
-        FailClosedIfManagedScoped();
+        // GAP C 0.3: vector isolation is enforced by the ScopedVectorRepository decorator (write-stamp + read-filter,
+        // applied at VectorService.TryGetRepository) — it ANDs the active scope predicate into the search and fails
+        // closed only when the adapter cannot metadata-filter. The former blanket fail-closed-under-scope is retired.
         var repo = Repo;
         // AI-0036 §9 / DATA-0097 P1: validate + split the filter (residual-is-error) before the repo sees it.
         var gated = Querying.VectorFilterCoordinator.Gate(options, repo);
         return repo.Search(gated, ct);
-    }
-
-    // The vector path bypasses the RepositoryFacade chokepoint, and the schemaless vector metadata-filter splitter
-    // never resolves a managed field — so a KNN over a managed-field-scoped entity (tenant / classification) would
-    // return results across scopes. v1 fails closed under an active managed scope (DATA-0105 §3.3 / ARCH-0095);
-    // isolating vector search (a metadata predicate or a per-scope collection) is a named follow-on. (Writes still
-    // proceed so auto-embed-on-save is unaffected; the stored vectors are simply unsearchable until isolation lands.)
-    private static void FailClosedIfManagedScoped()
-    {
-        if (ManagedFieldRegistry.IsEmpty) return;
-        foreach (var d in ManagedFieldRegistry.ForType(typeof(TEntity)))
-        {
-            if (d.ValueProvider() is not null)
-                throw new NotSupportedException(
-                    $"Vector search on managed-field-scoped entity '{typeof(TEntity).Name}' is not isolated (the vector " +
-                    $"path bypasses the data chokepoint), so it fails closed under an active managed scope on field " +
-                    $"'{d.StorageName}'. Isolating vector search is a follow-on (per-scope collection or metadata predicate).");
-        }
     }
 
     private static IDictionary<string, object?>? NormalizeMetadata(object? metadata)
