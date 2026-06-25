@@ -55,6 +55,22 @@ public sealed class VectorTenantIsolationSpec
         }
     }
 
+    [Fact(DisplayName = "vector isolation: a vector op with NO tenant in scope fails closed (Closed posture) — not an unfiltered search / unstamped write")]
+    public async Task Vector_op_with_no_tenant_fails_closed()
+    {
+        await using var runtime = await TenancyRuntimeFixture.CreateAsync(extraSettings: Posture("Closed"));
+        runtime.ResetEntityCaches();
+
+        // No tenant in scope under Closed: a tenant-scoped vector write/search must FAIL CLOSED via the reused
+        // IStorageGuard (the convergence fix) — previously Search fell through to an UNFILTERED KNN (a cross-tenant
+        // leak, since writes are now stamped) and the write landed unscoped.
+        var write = async () => await Vector<VecDoc>.Save("x", AcmePoint);
+        await write.Should().ThrowAsync<InvalidOperationException>();
+
+        var search = async () => await Vector<VecDoc>.Search(new VectorQueryOptions(Query: AcmePoint, TopK: 10));
+        await search.Should().ThrowAsync<InvalidOperationException>();
+    }
+
     [Fact(DisplayName = "vector isolation: a user filter composes with the scope filter (AND), still tenant-isolated")]
     public async Task User_filter_composes_with_scope()
     {

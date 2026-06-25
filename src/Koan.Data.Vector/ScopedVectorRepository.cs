@@ -4,12 +4,15 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Core.Capabilities;
+using Koan.Core.Hosting.App;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Pipeline;
+using Koan.Data.Core.Pipeline;
 using Koan.Data.Vector.Abstractions;
 using Koan.Data.Vector.Abstractions.Capabilities;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Data.Vector;
 
@@ -47,15 +50,22 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
     }
 
     public Task Upsert(TKey id, float[] embedding, object? metadata = null, CancellationToken ct = default)
-        => _inner.Upsert(id, embedding, StampScope(metadata), ct);
+    {
+        RunGuards();
+        return _inner.Upsert(id, embedding, StampScope(metadata), ct);
+    }
 
     public Task<int> UpsertMany(IEnumerable<(TKey Id, float[] Embedding, object? Metadata)> items, CancellationToken ct = default)
-        => _inner.UpsertMany(items.Select(x => (x.Id, x.Embedding, StampScope(x.Metadata))), ct);
+    {
+        RunGuards();
+        return _inner.UpsertMany(items.Select(x => (x.Id, x.Embedding, StampScope(x.Metadata))), ct);
+    }
 
     public Task<VectorQueryResult<TKey>> Search(VectorQueryOptions options, CancellationToken ct = default)
     {
+        RunGuards();
         var scope = ScopeFilter();
-        if (scope is null) return _inner.Search(options, ct);          // off ⇒ unchanged (byte-identical)
+        if (scope is null) return _inner.Search(options, ct);          // off / [HostScoped] ⇒ unchanged (byte-identical)
         if (!_canFilter)
             throw new NotSupportedException(
                 $"Vector search on a scoped entity '{typeof(TEntity).Name}' fails closed: adapter " +
@@ -83,6 +93,18 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
 
     // --- scope helpers (mirror ManagedEqualityReadContributor + the relational write-stamp; equality axes only) ---
 
+    // Convergence (review wf_cc13952a-197): run the SAME fail-closed guard the data + storage paths use
+    // (IStorageGuard / TenantStorageGuard). Without it a tenant-scoped vector op with NO tenant in scope fell
+    // through to an UNFILTERED search / an unstamped write (a cross-tenant leak under prod-Closed posture). The
+    // guard exempts [HostScoped] itself, fails closed under Closed, and warns under dev-Open. Off (no guard
+    // registered) ⇒ no-op ⇒ byte-identical.
+    private static void RunGuards()
+    {
+        var sp = AppHost.Current;
+        if (sp is null) return;
+        foreach (var g in sp.GetServices<IStorageGuard>()) g.Guard(typeof(TEntity));
+    }
+
     private static object? StampScope(object? metadata)
     {
         if (ManagedFieldRegistry.IsEmpty) return metadata;
@@ -92,7 +114,13 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
         for (var i = 0; i < managed.Count; i++)
         {
             var d = managed[i];
-            if (!d.AutoReadFilter) continue;                              // a non-equality axis is not a metadata segment
+            if (!d.AutoReadFilter)                                        // §3 (mirroring STOR-0011): a non-equality axis
+            {                                                            // is never a vector metadata segment...
+                if (d.ValueProvider() is not null)                       // ...and a value-yielding one FAILS CLOSED
+                    throw new InvalidOperationException(
+                        $"Non-equality axis '{d.StorageName}' cannot scope a vector — the metadata path is equality-only (GAP C 0.3 / STOR-0011 §3).");
+                continue;
+            }
             var v = d.ValueProvider();
             if (v is null) continue;
             dict[d.StorageName] = v;
@@ -109,7 +137,13 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
         for (var i = 0; i < managed.Count; i++)
         {
             var d = managed[i];
-            if (!d.AutoReadFilter) continue;
+            if (!d.AutoReadFilter)                                        // §3: a non-equality axis fails closed (never dropped)
+            {
+                if (d.ValueProvider() is not null)
+                    throw new InvalidOperationException(
+                        $"Non-equality axis '{d.StorageName}' cannot scope a vector search — the metadata filter is equality-only (GAP C 0.3 / STOR-0011 §3).");
+                continue;
+            }
             var v = d.ValueProvider();
             if (v is null) continue;
             (preds ??= new List<Filter>()).Add(Filter.Eq(d.StorageName, v));
