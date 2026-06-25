@@ -521,8 +521,11 @@ implemented and its tests pass on real stores.
   + whitespace partitions); documented out-of-scope-evict-no-op (contract), `_`-tenant collision (pre-existing/dev-only),
   multi-axis ordering (latent). Green: convergence 5, tenancy 91, cache abstractions 60, topology 50, crossengine 14, Axes
   55+12, SoftDelete 7, data-core off-proof 271. Byte-identical read-path key preserved.
-- ◐ **GAP C — storage blob-key axis isolation (0.4) IMPLEMENTED + proven; Weaviate vector (0.3) is the remaining sibling.**
-  ADR [STOR-0011](../decisions/STOR-0011-storage-blob-key-axis-isolation.md) **v2** (impl-diff review `wf_03ef19e6-88c` in flight).
+- ◐ **GAP C — storage blob-key axis isolation (0.4) DONE + Accepted; Weaviate vector (0.3) is the remaining sibling.**
+  ADR [STOR-0011](../decisions/STOR-0011-storage-blob-key-axis-isolation.md) **v2 = Accepted** (impl-diff review `wf_03ef19e6-88c`,
+  18/21 confirmed, FOLDED `a22c5e5e` — the missed `StorageObjectExtensions` parallel surface scoped + logical-key/Name fixed +
+  ScopeAmbient §3 fail-closed/guard-order; 8 isolation cases green, tenancy 99/99; LOW perf/presign/list-shard/host-scoped items
+  documented in the ADR).
   **v1 (a `StorageEntity<T>` funnel) was REJECTED by a 35-agent design panel (`wf_ac5a1e07-54a`, 5 CRITICAL + 6 HIGH)** — the
   media surface (`MediaController`/`IMediaSource`/`MediaEntity.OpenRead`), presign, the type-erased extension helpers, the
   backup services, and `From/To` all bypass `StorageEntity<T>`. **v2 SHIPPED (`dev`, commits `9cff2a45` impl + `a7bb9029`

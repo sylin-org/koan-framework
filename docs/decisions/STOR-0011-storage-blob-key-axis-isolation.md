@@ -1,14 +1,20 @@
 ---
 id: STOR-0011
 title: "Storage blob-key axis isolation — the data-axis model on the blob path"
-status: Proposed
+status: Accepted
 date: 2026-06-24
 relates_to: [ARCH-0101, DATA-0105, DATA-0106, ARCH-0096, ARCH-0099, ARCH-0100, STOR-0001]
 supersedes_design: docs/architecture/tenancy-storage-vector-isolation-design.md (§0.4)
-revision: v2 — chokepoint relocated to IStorageService after design review wf_ac5a1e07-54a
+revision: v2 — chokepoint relocated to IStorageService after design review wf_ac5a1e07-54a; implemented + impl-diff reviewed (wf_03ef19e6-88c)
 ---
 
 # STOR-0011 — Storage blob-key axis isolation
+
+> **Status: implemented + proven (`dev`, commits `9cff2a45`/`a7bb9029`/`9a1b89e3`/`a22c5e5e`).** The
+> `ScopedStorageService` decorator, `StorageScope`/`StorageKeyScoper`/`StorageKeyParticleFormatter`, the
+> `StorageEntity`/`MediaEntity` wiring, and the `StorageObjectExtensions` scope all ship. Proof:
+> `StorageTenantIsolationSpec` (8 real-boot cases). Off = byte-identical (Storage Core 3, Media Core 567).
+> **Impl-diff review `wf_03ef19e6-88c` (18/21 confirmed) folded** — see "Implementation review fold" below.
 
 > Redesign gap C, step 0.4. The blob path is the last framework surface where a registered data axis (tenant
 > today; classification/region tomorrow) does **not** isolate. This ADR makes the **blob storage boundary**
@@ -148,3 +154,28 @@ A storage isolation proof exercising **every** surface the decorator must cover 
 - **Risk:** an `IMediaSource` reaching a non-Koan backend directly is outside any framework chokepoint (stated, not
   implied); a raw caller that *intends* host scope must declare it (`StorageScope.HostScoped()`) or its op is
   tenant-prefixed by the fail-safe default — a deliberate fail-closed bias.
+
+## Implementation review fold (`wf_03ef19e6-88c`, 18/21 confirmed)
+
+A post-implementation impl-diff adversarial review found a real surface the first pass missed and several
+consistency gaps. **Fixed** (commit `a22c5e5e`):
+
+- **`StorageObjectExtensions` was a parallel un-scoped surface** (HIGH/MEDIUM). Its six `IStorageObject` extension
+  helpers (`ReadAllText`/`ReadAllBytes`/`Head`/`Delete`/`CopyTo`/`MoveTo`) bind when a reference is `IStorageObject`-
+  typed (instead of the scoped `StorageEntity<T>` instance methods). They now each declare
+  `StorageScope.For(obj.GetType())`, and `CopyTo`/`MoveTo` hydrate the target with the **source's logical** key/name
+  (not the physical `StorageObject.Key`/`Name`), keeping the new entity's own GUID.
+- **`StorageEntity.Name` leaked the physical key** (MEDIUM) — `StorageService` sets `StorageObject.Name = key`, so the
+  persisted `Name` was `acme/photo.jpg`. `From`/`To` now set `Name` from the logical key.
+- **`ScopeAmbient` consistency** (MEDIUM) — a value-yielding non-equality axis now **fails closed** (§3 parity with
+  `ScopeTyped`, not silently dropped); guards run **before** the `IsEmpty` short-circuit (so a guard registered without
+  a managed field still fires).
+
+**Documented, not changed** (LOW / by-design): the off-path pays an `AsyncLocal` push + a `GetServices<IStorageGuard>`
+resolve per op (storage is I/O-bound; a cached "any guard registered" gate is a future optimization); presign
+isolation is asserted by code-reading only (the Local provider has no presign — needs an S3/MinIO spec); a tenant
+`ListObjects` on the **sharding** Local provider returns empty (the leading particle nests under the SHA shard — logical
+isolation holds, but a navigable per-tenant root would require sharding *after* the particle); a raw `IStorageService`
+op for a logically-host-scoped resource is tenant-prefixed by the fail-safe unless it declares `StorageScope.HostScoped()`
+(intended fail-closed bias). The two-tenant `GET /media/{id}` and presign specs are the remaining integration gaps
+(Docker-gated), tracked with 0.3.
