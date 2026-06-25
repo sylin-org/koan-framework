@@ -173,8 +173,13 @@ public sealed class VectorTenantIsolationSpec
         await using var runtime = await TenancyRuntimeFixture.CreateAsync(
             extraSettings: Posture("Closed"),
             configureServices: s => s.AddSingleton<IReadFilterContributor>(new ArchiveReadContributor()));
-        OperationOverrideRegistry.Register(new OperationOverrideDescriptor(
-            Field: "__archived", OnDeleteValue: true, AppliesTo: t => t == typeof(ArchDoc)));
+        // __archived is an OPERATION-SOURCED managed field (the soft-delete shape: set on delete, ValueProvider null ⇒
+        // never ambient-stamped). The composer reads its provenance flag (ARCH-0102 §3), so CombineWriteStamped excludes
+        // its predicate from the vector push — no OperationOverrideRegistry cross-reference; the Phase-1a flag is the authority.
+        ManagedFieldRegistry.Register(new ManagedFieldDescriptor(
+            StorageName: "__archived", ClrType: typeof(bool), ValueProvider: () => null,
+            AppliesTo: t => t == typeof(ArchDoc), AutoReadFilter: false,
+            Provenance: FieldProvenance.OperationSourced));
         try
         {
             runtime.ResetEntityCaches();
@@ -192,7 +197,6 @@ public sealed class VectorTenantIsolationSpec
         }
         finally
         {
-            OperationOverrideRegistry.Reset();
             ManagedFieldRegistry.Reset();
         }
     }
