@@ -550,7 +550,19 @@ implemented and its tests pass on real stores.
   **Byte-identical** (data-core 269 [−2 retired obsolete vector specs] · tenancy 103 · cache topology 50 / abstractions 60 ·
   storage core 3 · InMemory vector 29). Obsolete `ManagedFieldVectorFailClosedSpec` (pinned the retired pre-decorator
   blanket-fail-closed) retired; `VectorAdapterResolutionSpec` unwraps the always-applied decorator via the new
-  `IDecoratedVectorRepository` introspection seam. _Impl-diff review in flight; vector v1 follow-ons below still stand._
+  `IDecoratedVectorRepository` introspection seam. **Focused impl-diff review FOLDED (`fe685742`): a HIGH — the vector fold
+  pulled in `SoftDeleteReadContributor`, but `[SoftDelete]`'s `__deleted` is set on the DATA row's delete (an
+  `OperationOverrideDescriptor`), never stamped into the independent vector store on write, so its predicate references a
+  field absent from every vector record (vacuous at best, OVER-FILTERS a KNN to zero at worst). Fix `FoldReadScope` = the
+  shared fold MINUS any operation-override axis (detected generically via `OperationOverrideRegistry.ForDelete` + a
+  closed-hierarchy `Filter` field walk) — so the STAMPED axes (tenant, moderation) stay enforced while the unsynced
+  override axis is excluded (TDD RED→GREEN; off ⇒ byte-identical). + a LOW: the metadata dict copy was `OrdinalIgnoreCase`
+  (THROWS on a user's case-colliding keys) → `Ordinal`.** Review cleared the EqualityFields memo (invalidated on
+  Register+Reset), the storage particle-ordinal (single-particle ⇒ no key bytes change; the index-base is now consistent
+  across both paths), and `ManagedEqualityReadContributor` co-registration. **▶ NEW FOLLOW-ON: vector lifecycle-sync of an
+  operation-override** — a soft-deleted entity's vector stays searchable (the delete doesn't propagate to the independent
+  vector store); until a vector-delete hook lands, `[SoftDelete]`+vector visibility is NOT enforced on the vector plane
+  (a visibility gap, not a security one — tenant isolation IS enforced).
   Media `GET /media/{id}` + presign integration specs DEFERRED (app-authored `IMediaSource` + ASP.NET plumbing /
   Docker-gated S3; the framework byte-read isolation is proven via `MediaEntity.OpenRead`).
   ADR [STOR-0011](../decisions/STOR-0011-storage-blob-key-axis-isolation.md) **v2 = Accepted** (impl-diff review `wf_03ef19e6-88c`,
