@@ -72,11 +72,32 @@ public class CacheKeyForSpec
     }
 
     [Fact]
-    public void For_partition_with_whitespace_around_trimmed()
+    public void For_partition_with_surrounding_whitespace_is_preserved_raw()
     {
+        // Gap B: the partition is rendered VERBATIM (not trimmed) so the evict key byte-matches the read path's
+        // template, which stores EntityContext.Partition raw. Trimming would collapse two distinct partitions
+        // ("  archive  " vs "archive") onto one cache key — a cross-partition evict/serve hazard.
         var key = CacheKey.For<Todo>("abc", partition: "  archive  ");
 
-        key.Value.Should().Be("Todo:archive:abc");
+        key.Value.Should().Be("Todo:  archive  :abc");
+    }
+
+    [Fact]
+    public void For_with_IFormattable_id_renders_culture_invariantly()
+    {
+        // Gap B: the id token is rendered culture-invariantly (matching the read path's CacheKeyTemplate), so a
+        // negative-int / DateTime key produces the SAME cache key under any process culture — otherwise an
+        // out-of-band evict under a non-invariant culture would silently miss the cached entry.
+        var prior = System.Globalization.CultureInfo.CurrentCulture;
+        try
+        {
+            System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo("ar-SA");
+            CacheKey.For<Todo>(-42).Value.Should().Be("Todo:_:-42");
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentCulture = prior;
+        }
     }
 
     [Fact]

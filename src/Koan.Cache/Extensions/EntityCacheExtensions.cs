@@ -1,9 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Cache.Abstractions.Primitives;
 using Koan.Cache.Abstractions.Stores;
+using Koan.Cache.Keys;
 using Koan.Data.Abstractions;
+using Koan.Data.Core;
 using Koan.Data.Core.Model;
 
 namespace Koan.Cache.Extensions;
@@ -16,8 +19,10 @@ namespace Koan.Cache.Extensions;
 public static class EntityCacheExtensions
 {
     /// <summary>
-    /// Removes this entity's cache entry from the registered cache store.
-    /// Uses the convention-based key format: <c>{TypeName}:{Id}</c>.
+    /// Removes this entity's cache entry from the registered cache store. Builds the SAME scoped key the read
+    /// path cached under (gap B): the canonical <c>{TypeName}:{Partition}:{Id}</c> shape plus any managed
+    /// equality-axis scope (e.g. the tenant discriminator), read from the ambient <c>EntityContext</c>. Call it
+    /// under the same scope (tenant) the entity was cached under.
     /// </summary>
     public static async ValueTask<bool> Uncache<TEntity, TKey>(
         this Entity<TEntity, TKey> entity,
@@ -25,8 +30,11 @@ public static class EntityCacheExtensions
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
+        // A default/unset id was never cached (the write path skips a default key — CachedRepository.IsDefaultKey);
+        // mirror that here so Uncache stays an idempotent no-op rather than throwing on a null id.
+        if (EqualityComparer<TKey>.Default.Equals(entity.Id, default!)) return false;
         var client = ResolveClient();
-        var key = BuildEntityKey<TEntity, TKey>(entity.Id);
+        var key = ScopedEntityCacheKey.For(typeof(TEntity), entity.Id, EntityContext.Current?.Partition);
         return await client.Remove(key, ct).ConfigureAwait(false);
     }
 
@@ -39,11 +47,6 @@ public static class EntityCacheExtensions
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
         => new(ResolveClient());
-
-    private static CacheKey BuildEntityKey<TEntity, TKey>(TKey id)
-        where TEntity : class, IEntity<TKey>
-        where TKey : notnull
-        => new($"{CacheKey.EntityTypeName(typeof(TEntity))}:{id}");
 
     private static ICacheWriter ResolveClient()
     {
@@ -72,11 +75,15 @@ public readonly struct EntityCacheHandle<TEntity, TKey>
     }
 
     /// <summary>
-    /// Removes the cache entry for the entity with the given <paramref name="id"/>.
+    /// Removes the cache entry for the entity with the given <paramref name="id"/>. Builds the SAME scoped key the
+    /// read path cached under (gap B): <c>{TypeName}:{Partition}:{Id}</c> plus any managed equality-axis scope, read
+    /// from the ambient <c>EntityContext</c>. Call it under the same scope (tenant) the entity was cached under.
     /// </summary>
     public ValueTask<bool> Flush(TKey id, CancellationToken ct = default)
     {
-        var key = new CacheKey($"{CacheKey.EntityTypeName(typeof(TEntity))}:{id}");
+        // A default/unset id was never cached; no-op rather than throw (parity with Uncache + the write path).
+        if (EqualityComparer<TKey>.Default.Equals(id, default!)) return new ValueTask<bool>(false);
+        var key = ScopedEntityCacheKey.For(typeof(TEntity), id, EntityContext.Current?.Partition);
         return _writer.Remove(key, ct);
     }
 

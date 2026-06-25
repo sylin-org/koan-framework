@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Koan.Cache.Abstractions.Policies;
 using Koan.Cache.Abstractions.Primitives;
 using Koan.Cache.Abstractions.Stores;
+using Koan.Cache.Keys;
 using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Capabilities;
@@ -66,7 +67,7 @@ internal sealed class CachedRepository<TEntity, TKey> :
         // moderation) is excluded from caching. An id-keyed cache namespace is equality-by-construction; partitioning by
         // the row's stamped scalar is the wrong operand for a viewer predicate (it would serve a hidden row to a viewer
         // who shouldn't see it). Correctness dominates the lost partition — even a MIXED (equality + non-equality) entity
-        // is excluded for the whole type. Equality axes (tenancy) stay cache-partitioned via AppendManagedScope as before.
+        // is excluded for the whole type. Equality axes (tenancy) stay cache-partitioned via ScopedEntityCacheKey as before.
         //
         // The exclusion signal rides the WHOLE read-scope surface, not just the managed registry: a managed non-equality
         // descriptor (AutoReadFilter==false) AND a PURE predicate IReadFilterContributor with no managed field (the
@@ -410,32 +411,13 @@ internal sealed class CachedRepository<TEntity, TKey> :
             return false;
         }
 
-        key = new CacheKey(AppendManagedScope(formatted));
+        // DATA-0105 §3.2 — the cache decorator wraps OUTSIDE the RepositoryFacade, so a cache hit never reaches the
+        // managed read-filter; the managed equality scope (tenant/classification) MUST partition the cache key or a
+        // [Cacheable] managed entity serves one scope's row to another. The scope-fold is delegated to the one
+        // canonical builder (gap B) so the read path and the out-of-band evict sites compose the SAME key. Off / no
+        // managed field for this type ⇒ no suffix ⇒ byte-identical key.
+        key = new CacheKey(ScopedEntityCacheKey.AppendScope(formatted, typeof(TEntity)));
         return true;
-    }
-
-    // DATA-0105 §3.2 — the cache decorator wraps OUTSIDE the RepositoryFacade, so a cache hit never reaches the
-    // managed read-filter. The managed scope (tenant/classification) MUST therefore partition the cache key, or a
-    // [Cacheable] managed entity serves one scope's row to another above the chokepoint. The scope is appended to
-    // the formatted key (independent of the template) in deterministic registration order. Off / no managed field
-    // for this type ⇒ no suffix ⇒ byte-identical key.
-    private static string AppendManagedScope(string baseKey)
-    {
-        if (ManagedFieldRegistry.IsEmpty) return baseKey;
-        var managed = ManagedFieldRegistry.ForType(typeof(TEntity));
-        if (managed.Count == 0) return baseKey;
-
-        var sb = new System.Text.StringBuilder(baseKey);
-        foreach (var d in managed)
-        {
-            // DATA-0106 §5: only an EQUALITY axis is a cache-key segment. A non-equality axis (AutoReadFilter == false)
-            // already excludes the whole type from caching (_excludeFromCache), so AppendManagedScope never runs for it;
-            // this skip is the defensive belt — never let a viewer-context predicate's scalar masquerade as a key segment.
-            if (!d.AutoReadFilter) continue;
-            var v = d.ValueProvider();
-            sb.Append("::").Append(d.StorageName).Append('=').Append(v?.ToString() ?? "_");
-        }
-        return sb.ToString();
     }
 
     private static bool IsDefaultKey(TKey key)

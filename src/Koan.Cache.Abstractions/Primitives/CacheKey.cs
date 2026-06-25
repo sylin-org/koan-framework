@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 
 namespace Koan.Cache.Abstractions.Primitives;
 
@@ -83,14 +84,23 @@ public readonly record struct CacheKey
     /// <summary>
     /// Build the canonical entity cache key for <paramref name="entityType"/>. Non-generic form.
     /// </summary>
+    /// <remarks>
+    /// The tokens are rendered to byte-match the read path's template (<c>CacheKeyTemplate</c>), so an out-of-band
+    /// evict hits the same entry the read path cached (redesign gap B): the partition is taken <b>verbatim</b> (NOT
+    /// trimmed — the template stores <c>EntityContext.Partition</c> raw, and two distinct partitions must never
+    /// collapse to one cache key), and the id is rendered <b>culture-invariantly</b> for an
+    /// <see cref="IFormattable"/> key (matching the template's invariant rendering) so a negative-int / DateTime key
+    /// keys identically under any process culture.
+    /// </remarks>
     public static CacheKey For(Type entityType, object id, string? partition = null)
     {
         if (entityType is null) throw new ArgumentNullException(nameof(entityType));
         if (id is null) throw new ArgumentNullException(nameof(id));
 
         var typeName = EntityTypeName(entityType);
-        var partitionToken = string.IsNullOrWhiteSpace(partition) ? "_" : partition.Trim();
-        var idToken = id.ToString() ?? throw new ArgumentException("Id.ToString() returned null.", nameof(id));
+        var partitionToken = string.IsNullOrWhiteSpace(partition) ? "_" : partition;
+        var idToken = (id is IFormattable f ? f.ToString(null, CultureInfo.InvariantCulture) : id.ToString())
+            ?? throw new ArgumentException("Id.ToString() returned null.", nameof(id));
 
         return new CacheKey($"{typeName}:{partitionToken}:{idToken}");
     }
