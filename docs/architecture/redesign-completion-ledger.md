@@ -521,19 +521,21 @@ implemented and its tests pass on real stores.
   + whitespace partitions); documented out-of-scope-evict-no-op (contract), `_`-tenant collision (pre-existing/dev-only),
   multi-axis ordering (latent). Green: convergence 5, tenancy 91, cache abstractions 60, topology 50, crossengine 14, Axes
   55+12, SoftDelete 7, data-core off-proof 271. Byte-identical read-path key preserved.
-- ◐ **GAP C — storage blob-key axis isolation (0.4) + Weaviate vector row-discriminator (0.3).** **0.4 ADR DRAFTED:
-  [STOR-0011](../decisions/STOR-0011-storage-blob-key-axis-isolation.md) (Proposed; design-panel validation next).** Grounding
-  (2026-06-24) **simplified the canon: NO new `IStorageKeyContributor` seam** — `Koan.Storage` already references
-  `Koan.Data.Abstractions`+`Koan.Data.Core`, so it reuses the **existing `ManagedFieldRegistry`** (key particle, leading,
-  folded via the one ARCH-0096 `IdentifierComposer`, bare value) + the **existing `IStorageGuard`** seam (fail-closed;
-  `Koan.Tenancy`'s `TenantStorageGuard` already implements it, HostScoped-exempt + posture-aware). Storage = the **3rd
-  `ManagedFieldRegistry` consumer** (after data-core + the gap-B cache fold); zero new seam, zero new tenancy code, no new
-  layering edge. Key hazard captured in the ADR: the **logical-key invariant** (`StorageEntity<T>.Key` stays logical;
-  compose only at the `IStorageService` boundary, else write→read double-prefixes) + the **one-funnel** injection (avoid the
-  17-site leak). **0.3 vector** = sibling follow-on (needs Docker/Weaviate; design axis-generic alongside ARCH-0098
-  classification's vector guard). Canon: [tenancy-storage-vector-isolation-design.md](./tenancy-storage-vector-isolation-design.md)
-  (§0.4 superseded by STOR-0011). NEXT = STOR-0011 design-panel → TDD (`AssertNoStorageLeak<T>`, Local provider, no Docker) →
-  impl → impl-diff review → byte-identical regression → commit. Then 0.3 vector → SnapVault Phase-0 dogfood.
+- ◐ **GAP C — storage blob-key axis isolation (0.4) + Weaviate vector row-discriminator (0.3). 0.4 = ADR v2 + delegation
+  plan READY; impl delegated.** ADR [STOR-0011](../decisions/STOR-0011-storage-blob-key-axis-isolation.md) **v2** + plan
+  [stor-0011-implementation-plan.md](./stor-0011-implementation-plan.md). Reuses the **existing** seams (`ManagedFieldRegistry`
+  + `IStorageGuard` + ARCH-0096 `IdentifierComposer` + the ARCH-0100 `AmbientCarrierRegistry`) — no new seam, no
+  `Koan.Tenancy`→`Koan.Storage` edge. **A 35-agent design panel (`wf_ac5a1e07-54a`) REJECTED v1** (a `StorageEntity<T>`
+  funnel): 5 CRITICAL + 6 HIGH showed the media surface (`MediaController`/`IMediaSource`/`MediaEntity.OpenRead`), presign,
+  the type-erased extension helpers, the backup services, and `From/To` all bypass `StorageEntity<T>`. **v2 relocates the
+  chokepoint to a `ScopedStorageService` DECORATOR over `IStorageService`** (the one boundary every blob path funnels
+  through) + an ambient `StorageScope` type-carrier (typed → `ForType`+typed-guard+[HostScoped]; raw → fail-safe ambient
+  bag + value-guard; infra → `HostScoped()` opt-out) + a mandatory sanitizing formatter + the logical(`StorageEntity.Key`)/
+  physical(`StorageObject`) boundary. Every panel CRITICAL/HIGH is mapped to a resolution in the ADR. **Off = byte-identical**
+  (decorator passes through when no axis). Plan = 5 delegable tasks (TASK 1–2 capable-model decorator+wiring, 3 isolation
+  test across ALL surfaces incl. `GET /media/{id}`, 4 SnapVault dogfood, 5 regression+review+ledger). **0.3 vector** =
+  sibling follow-on (needs Docker/Weaviate; axis-generic with ARCH-0098). NEXT = execute the delegation plan (TASK 1) →
+  impl-diff review → byte-identical regression → mark Accepted; then 0.3 vector → SnapVault Phase-0 dogfood.
 - ☐ **THEN:** Phase 3c schema-column DDL indexability (Indexed descriptors → computed/expression index; PG/SqlServer;
   SQLite JSON-only) + Mongo/bare-store managed serialization injection + in-memory managed `GetValue` · classification
   phases 4–7 (searchable blind-index · vector/messaging leak guards · crypto-shred+rotation · masked-read) · then
