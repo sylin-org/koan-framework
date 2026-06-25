@@ -4,6 +4,7 @@ using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using AwesomeAssertions;
+using Koan.Media.Abstractions.Model;
 using Koan.Storage.Abstractions;
 using Koan.Storage.Infrastructure;
 using Koan.Storage.Model;
@@ -34,6 +35,10 @@ public sealed class StorageTenantIsolationSpec
     [StorageBinding(Profile = "test", Container = "sys")]
     public sealed class SystemBlob : StorageEntity<SystemBlob> { }
 
+    // A MediaEntity — the SAME base SnapVault's PhotoAsset uses (PhotoAsset : MediaEntity<PhotoAsset>).
+    [StorageBinding(Profile = "test", Container = "media")]
+    public sealed class StudioPhoto : MediaEntity<StudioPhoto> { }
+
     private static Stream Bytes(string s) => new MemoryStream(Encoding.UTF8.GetBytes(s));
 
     private static async Task<string> ReadAll(Stream s)
@@ -57,6 +62,21 @@ public sealed class StorageTenantIsolationSpec
 
         // The persisted logical key is unprefixed (STOR-0011 §5: the entity holds the LOGICAL key, never acme/...).
         using (Tenant.Use("acme")) TenantBlob.Get("photo.jpg").Key.Should().Be("photo.jpg");
+    }
+
+    [Fact(DisplayName = "storage isolation: the MediaEntity surface (Upload + the OpenRead override) isolates — the surface PhotoAsset uses")]
+    public async Task MediaEntity_surface_is_isolated()
+    {
+        await using var runtime = await TenancyRuntimeFixture.CreateAsync(extraSettings: Posture("Closed"), withLocalStorage: true);
+        runtime.ResetEntityCaches();
+
+        using (Tenant.Use("acme")) await StudioPhoto.Upload(Bytes("ACME-IMG"), "sunset.jpg");
+        using (Tenant.Use("globex")) await StudioPhoto.Upload(Bytes("GLOBEX-IMG"), "sunset.jpg");
+
+        // MediaEntity.OpenRead(key) is a `new`-shadowing static that previously bypassed the chokepoint (the panel's
+        // CRITICAL); the fix scopes it, so each studio reads only its own image for the same logical name.
+        using (Tenant.Use("acme")) (await ReadAll(await StudioPhoto.OpenRead("sunset.jpg"))).Should().Be("ACME-IMG");
+        using (Tenant.Use("globex")) (await ReadAll(await StudioPhoto.OpenRead("sunset.jpg"))).Should().Be("GLOBEX-IMG");
     }
 
     [Fact(DisplayName = "storage isolation: a raw IStorageService op (type-erased) is isolated by the ambient tenant (fail-safe)")]
