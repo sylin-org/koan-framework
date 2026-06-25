@@ -23,9 +23,11 @@ namespace Koan.Data.Vector;
 /// <item><b>Write</b> (Upsert/UpsertMany): stamps every applicable <c>ManagedFieldDescriptor</c>'s value into the
 /// vector metadata (the registered write-stamp contributor — equality AND non-equality fields, so a read predicate's
 /// fields are present to filter on).</item>
-/// <item><b>Search</b>: ANDs the <see cref="ReadScopeFold"/> of every registered <see cref="IReadFilterContributor"/>
-/// (the ONE read-scope fold the facade read path uses) into the query — so tenancy's equality AND a future
-/// moderation axis's non-equality predicate both scope a KNN, with no hand-rolled predicate here.</item>
+/// <item><b>Search</b>: ANDs the <see cref="ReadScopeFold"/> of the registered <see cref="IReadFilterContributor"/>s
+/// (the ONE read-scope fold the facade read path uses) into the query — so tenancy's equality AND a moderation axis's
+/// non-equality predicate both scope a KNN, with no hand-rolled predicate here. EXCLUDES an operation-override axis
+/// (e.g. [SoftDelete]'s <c>__deleted</c>, registered in <c>OperationOverrideRegistry</c>): its field is set on the DATA
+/// row's delete, never stamped into the independent vector store, so it is unenforceable here — see <c>FoldReadScope</c>.</item>
 /// <item><b>Guard</b>: runs every registered <see cref="IStorageGuard"/> (the same fail-closed gate data + storage
 /// use) — so an op with no scope in an active axis fails closed rather than reading/writing unscoped.</item>
 /// </list>
@@ -73,7 +75,7 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
     public Task<VectorQueryResult<TKey>> Search(VectorQueryOptions options, CancellationToken ct = default)
     {
         RunGuards();
-        var scope = ReadScopeFold.Fold(_readContributors, typeof(TEntity));   // the ONE shared read-scope fold
+        var scope = FoldReadScope(typeof(TEntity));
         if (scope is null) return _inner.Search(options, ct);                 // no axis scopes this type ⇒ unchanged
         if (!_canFilter)
             throw new NotSupportedException(
@@ -82,6 +84,46 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
                 $"read-scope predicate cannot be enforced (GAP C 0.3 / DATA-0106 §4).");
         var combined = options.Filter is null ? scope : Filter.All(options.Filter, scope);
         return _inner.Search(options with { Filter = combined }, ct);
+    }
+
+    // The vector read-scope: the shared ReadScopeFold, MINUS any axis whose field the vector store cannot enforce.
+    // An OPERATION-OVERRIDE axis (e.g. [SoftDelete]'s __deleted) is written into the DATA row's lifecycle on delete,
+    // never stamped into the independent vector metadata on write — so its predicate references a field absent from
+    // every vector record. Folding it is unenforceable (the deleted row's vector still exists ⇒ it was never isolated)
+    // and would OVER-FILTER (an equality over the missing field matches nothing); excluding it keeps the STAMPED axes
+    // (tenant, moderation) enforced. (Vector lifecycle-sync of an operation-override is a separate follow-on; until
+    // then a soft-deleted vector remains searchable — a visibility gap surfaced honestly here, never a silent break.)
+    private Filter? FoldReadScope(Type entityType)
+    {
+        if (OperationOverrideRegistry.IsEmpty) return ReadScopeFold.Fold(_readContributors, entityType);   // byte-identical
+        var overrideField = OperationOverrideRegistry.ForDelete(entityType)?.Field;
+        if (overrideField is null) return ReadScopeFold.Fold(_readContributors, entityType);   // no override axis here
+        List<Filter>? survivors = null;
+        for (var i = 0; i < _readContributors.Length; i++)
+        {
+            var f = _readContributors[i].ReadFilter(entityType);
+            if (f is null) continue;
+            if (FilterMentions(f, overrideField)) continue;       // an operation-override axis the vector store can't sync
+            (survivors ??= new()).Add(f);
+        }
+        if (survivors is null) return null;
+        return survivors.Count == 1 ? survivors[0] : Filter.All(survivors.ToArray());
+    }
+
+    // Does the predicate tree reference the (single-segment, managed) field name? Closed Filter hierarchy ⇒ exhaustive.
+    private static bool FilterMentions(Filter f, string field) => f switch
+    {
+        FieldFilter ff => string.Equals(ff.Field.Leaf, field, StringComparison.Ordinal),
+        AllOf a => AnyMentions(a.Operands, field),
+        AnyOf a => AnyMentions(a.Operands, field),
+        Not n => FilterMentions(n.Operand, field),
+        _ => false,                                               // ClrFilter: opaque residual, never pushed to a vector store
+    };
+
+    private static bool AnyMentions(IReadOnlyList<Filter> ops, string field)
+    {
+        for (var i = 0; i < ops.Count; i++) if (FilterMentions(ops[i], field)) return true;
+        return false;
     }
 
     // Pass-through (v1 follow-ons noted in the type summary).
@@ -129,12 +171,14 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
 
     private static bool TryGetMutableDict(object? metadata, out Dictionary<string, object?> dict)
     {
-        // Note: at runtime object? == object, so the <string,object?> cases also match a Dictionary<string,object>.
+        // Ordinal (not OrdinalIgnoreCase): the managed StorageName is canonical, and an ignore-case copy would THROW
+        // on a user metadata pair that differs only in case (e.g. "Category"/"category"). Note: at runtime object? ==
+        // object, so the <string,object?> cases also match a Dictionary<string,object>.
         switch (metadata)
         {
-            case null: dict = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase); return true;
-            case IDictionary<string, object?> d: dict = new Dictionary<string, object?>(d, StringComparer.OrdinalIgnoreCase); return true;
-            case IReadOnlyDictionary<string, object?> d: dict = new Dictionary<string, object?>(d, StringComparer.OrdinalIgnoreCase); return true;
+            case null: dict = new Dictionary<string, object?>(StringComparer.Ordinal); return true;
+            case IDictionary<string, object?> d: dict = new Dictionary<string, object?>(d, StringComparer.Ordinal); return true;
+            case IReadOnlyDictionary<string, object?> d: dict = new Dictionary<string, object?>(d, StringComparer.Ordinal); return true;
             default: dict = null!; return false;
         }
     }

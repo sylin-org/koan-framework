@@ -150,6 +150,53 @@ public sealed class VectorTenantIsolationSpec
         }
     }
 
+    // --- An OPERATION-OVERRIDE axis (soft-delete-shaped) is excluded from the vector fold (its field lives in the
+    //     DATA row's lifecycle, never stamped into the independent vector store) — tenant isolation stays enforced. ---
+
+    [VectorAdapter("inmemory")]
+    public sealed class ArchDoc : Entity<ArchDoc> { }   // tenant-scoped (NOT [HostScoped]) + the fake override below
+
+    private sealed class ArchiveReadContributor : IReadFilterContributor
+    {
+        // A predicate over the OVERRIDE field __archived that, if APPLIED to the vector store, matches ZERO records
+        // (no vector carries __archived — the vector write never stamps an operation-override field) → the search
+        // would over-filter every acme vector to nothing. The decorator must EXCLUDE it (the override axis is the
+        // data-row's lifecycle, unenforceable on the unsynced vector store), leaving the tenant predicate intact.
+        public Filter? ReadFilter(Type t) => t == typeof(ArchDoc) ? Filter.Eq("__archived", "live") : null;
+        public Capability? RequiredCapability => DataCaps.Isolation.RowScoped;
+        public bool ExcludesFromCache(Type t) => t == typeof(ArchDoc);
+    }
+
+    [Fact(DisplayName = "vector: an operation-override axis (soft-delete-shaped) is excluded from the KNN fold — tenant isolation stays, no over-filter")]
+    public async Task Vector_excludes_an_operation_override_axis_and_keeps_tenant()
+    {
+        await using var runtime = await TenancyRuntimeFixture.CreateAsync(
+            extraSettings: Posture("Closed"),
+            configureServices: s => s.AddSingleton<IReadFilterContributor>(new ArchiveReadContributor()));
+        OperationOverrideRegistry.Register(new OperationOverrideDescriptor(
+            Field: "__archived", OnDeleteValue: true, AppliesTo: t => t == typeof(ArchDoc)));
+        try
+        {
+            runtime.ResetEntityCaches();
+
+            using (Tenant.Use("acme")) { await Vector<ArchDoc>.Save("a1", AcmePoint); await Vector<ArchDoc>.Save("a2", GlobexPoint); }
+            using (Tenant.Use("globex")) await Vector<ArchDoc>.Save("g1", AcmePoint);
+
+            using (Tenant.Use("acme"))
+            {
+                var r = await Vector<ArchDoc>.Search(new VectorQueryOptions(Query: AcmePoint, TopK: 10));
+                // override predicate EXCLUDED ⇒ both acme vectors returned (not zero from the unenforceable
+                // __archived==live); tenant predicate KEPT ⇒ globex's g1 excluded.
+                r.Matches.Select(m => m.Id).Should().BeEquivalentTo(new[] { "a1", "a2" });
+            }
+        }
+        finally
+        {
+            OperationOverrideRegistry.Reset();
+            ManagedFieldRegistry.Reset();
+        }
+    }
+
     [Fact(DisplayName = "vector isolation: a user filter composes with the scope filter (AND), still tenant-isolated")]
     public async Task User_filter_composes_with_scope()
     {
