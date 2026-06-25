@@ -161,10 +161,47 @@ public abstract class KeyValueStore<TEntity, TKey> :
     public async Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
+        var record = await GuardAndSnapshotAsync(model, ct).ConfigureAwait(false);
+        await WriteAsync(model.Id, record, ct).ConfigureAwait(false);
+        return model;
+    }
 
-        // Cross-scope write guard (Shared mode): if an existing record is owned by a different managed scope, reject —
-        // the KV analogue of the relational ON CONFLICT … WHERE json_extract(...) = @p. Guards the GUARDED isolation
-        // values only (ManagedFieldWriteScope.Current), never the unguarded operation overrides.
+    public async Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default)
+    {
+        var list = models as IReadOnlyList<TEntity> ?? models.ToList();
+        if (list.Count == 0) return 0;
+
+        // Guard + stamp every row first (the per-row Shared-mode contract), THEN hand the whole set to WriteManyAsync.
+        // The default WriteManyAsync loops WriteAsync, but a backend with a native bulk write (Json: one file persist;
+        // Redis: MSET) overrides it — so bulk upsert stays one physical write, not N (the family's perf floor).
+        var records = new List<KvRecord<TEntity>>(list.Count);
+        foreach (var m in list)
+        {
+            ct.ThrowIfCancellationRequested();
+            records.Add(await GuardAndSnapshotAsync(m, ct).ConfigureAwait(false));
+        }
+        await WriteManyAsync(records, ct).ConfigureAwait(false);
+        return records.Count;
+    }
+
+    public Task<bool> Delete(TKey id, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return RemoveAsync(id, ct);
+    }
+
+    public async Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
+    {
+        var list = ids as IReadOnlyList<TKey> ?? ids.ToList();
+        ct.ThrowIfCancellationRequested();
+        return await RemoveManyAsync(list, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>The cross-scope write guard + managed-value stamp for one row, shared by <see cref="Upsert"/> and
+    /// <see cref="UpsertMany"/>. Guards only the GUARDED isolation values (<c>ManagedFieldWriteScope.Current</c>), never
+    /// the unguarded operation overrides — the KV analogue of the relational <c>ON CONFLICT … WHERE json_extract(...)</c>.</summary>
+    private async Task<KvRecord<TEntity>> GuardAndSnapshotAsync(TEntity model, CancellationToken ct)
+    {
         var guarded = ManagedFieldWriteScope.Current;
         if (guarded is { Count: > 0 })
         {
@@ -178,30 +215,24 @@ public abstract class KeyValueStore<TEntity, TKey> :
                 }
             }
         }
-
-        await WriteAsync(model.Id, new KvRecord<TEntity>(model, SnapshotManaged()), ct).ConfigureAwait(false);
-        return model;
+        return new KvRecord<TEntity>(model, SnapshotManaged());
     }
 
-    public async Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default)
+    /// <summary>Persist a batch of already-guarded, already-stamped records. The default loops <see cref="WriteAsync"/>
+    /// (correct for every backend); a backend with a native bulk write overrides it to collapse N physical writes into
+    /// one (Json persists its file once; Redis uses MSET) so bulk upsert is not O(N) round-trips / O(N²) file rewrites.</summary>
+    protected virtual async Task WriteManyAsync(IReadOnlyList<KvRecord<TEntity>> records, CancellationToken ct)
     {
-        var count = 0;
-        foreach (var m in models)
+        foreach (var r in records)
         {
             ct.ThrowIfCancellationRequested();
-            await Upsert(m, ct).ConfigureAwait(false);   // per-row guard + stamp
-            count++;
+            await WriteAsync(r.Entity.Id, r, ct).ConfigureAwait(false);
         }
-        return count;
     }
 
-    public Task<bool> Delete(TKey id, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        return RemoveAsync(id, ct);
-    }
-
-    public async Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
+    /// <summary>Remove a batch of ids, returning the number removed. The default loops <see cref="RemoveAsync"/>; a
+    /// backend with a native bulk delete overrides it (Json persists once; Redis issues one DEL).</summary>
+    protected virtual async Task<int> RemoveManyAsync(IReadOnlyList<TKey> ids, CancellationToken ct)
     {
         var count = 0;
         foreach (var id in ids)
@@ -265,12 +296,11 @@ public abstract class KeyValueStore<TEntity, TKey> :
                 if (rec is { } r) { mutate(r.Entity); _updates.Add(r.Entity); }
             }
 
-            var add = 0;
-            foreach (var e in _adds) { ct.ThrowIfCancellationRequested(); await _repo.Upsert(e, ct).ConfigureAwait(false); add++; }
-            var upd = 0;
-            foreach (var e in _updates) { ct.ThrowIfCancellationRequested(); await _repo.Upsert(e, ct).ConfigureAwait(false); upd++; }
-            var del = 0;
-            foreach (var id in _deletes) { ct.ThrowIfCancellationRequested(); if (await _repo.RemoveAsync(id, ct).ConfigureAwait(false)) del++; }
+            // Route through the bulk paths (UpsertMany / DeleteMany) so each backend collapses the batch into its native
+            // bulk write — the same per-row guard + stamp runs, but a JSON file is persisted once, not per row.
+            var add = _adds.Count > 0 ? await _repo.UpsertMany(_adds, ct).ConfigureAwait(false) : 0;
+            var upd = _updates.Count > 0 ? await _repo.UpsertMany(_updates, ct).ConfigureAwait(false) : 0;
+            var del = _deletes.Count > 0 ? await _repo.DeleteMany(_deletes, ct).ConfigureAwait(false) : 0;
 
             return new BatchResult(add, upd, del);
         }

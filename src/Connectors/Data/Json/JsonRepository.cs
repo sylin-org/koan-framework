@@ -81,6 +81,25 @@ internal sealed class JsonRepository<TEntity, TKey> : KeyValueStore<TEntity, TKe
         return ok;
     }
 
+    // Bulk write/remove collapse to ONE file persist (the base default would persist per row — O(N²) file rewrites).
+    protected override async Task WriteManyAsync(IReadOnlyList<KvRecord<TEntity>> records, CancellationToken ct)
+    {
+        if (records.Count == 0) return;
+        var (name, store) = Resolve();
+        foreach (var r in records) store[r.Entity.Id] = r;
+        await PersistAsync(name, store).ConfigureAwait(false);
+    }
+
+    protected override async Task<int> RemoveManyAsync(IReadOnlyList<TKey> ids, CancellationToken ct)
+    {
+        if (ids.Count == 0) return 0;
+        var (name, store) = Resolve();
+        var count = 0;
+        foreach (var id in ids) if (store.TryRemove(id, out _)) count++;
+        if (count > 0) await PersistAsync(name, store).ConfigureAwait(false);
+        return count;
+    }
+
     protected override async Task<int> ClearAsync(CancellationToken ct)
     {
         var (name, store) = Resolve();

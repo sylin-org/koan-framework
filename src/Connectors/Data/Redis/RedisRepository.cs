@@ -82,6 +82,32 @@ internal sealed class RedisRepository<TEntity, TKey> : KeyValueStore<TEntity, TK
     protected override async Task<bool> RemoveAsync(TKey id, CancellationToken ct)
         => await Db().KeyDeleteAsync(KeyOf(id)).ConfigureAwait(false);
 
+    // Bulk write: one atomic MSET for non-TTL types (the common case); per-key SET PX when the type carries a TTL index
+    // (MSET cannot express per-key expiry). Restores the native fast path the base's per-row default would lose.
+    protected override async Task WriteManyAsync(IReadOnlyList<KvRecord<TEntity>> records, CancellationToken ct)
+    {
+        if (records.Count == 0) return;
+        var db = Db();
+        if (TtlProperty is null)
+        {
+            var entries = records
+                .Select(r => new KeyValuePair<RedisKey, RedisValue>(KeyOf(r.Entity.Id), Serialize(r)))
+                .ToArray();
+            await db.StringSetAsync(entries).ConfigureAwait(false);   // MSET
+            return;
+        }
+        foreach (var r in records)
+            await WriteWithTtlAsync(db, KeyOf(r.Entity.Id), Serialize(r), r.Entity).ConfigureAwait(false);
+    }
+
+    // Bulk remove: one pipelined DEL over all keys.
+    protected override async Task<int> RemoveManyAsync(IReadOnlyList<TKey> ids, CancellationToken ct)
+    {
+        if (ids.Count == 0) return 0;
+        var keys = ids.Select(KeyOf).ToArray();
+        return (int)await Db().KeyDeleteAsync(keys).ConfigureAwait(false);
+    }
+
     protected override async Task<int> ClearAsync(CancellationToken ct)
     {
         var db = Db();
