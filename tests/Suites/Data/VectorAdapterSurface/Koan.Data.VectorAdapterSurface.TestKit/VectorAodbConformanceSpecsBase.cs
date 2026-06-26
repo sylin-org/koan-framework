@@ -56,10 +56,20 @@ public abstract class VectorAodbConformanceSpecsBase : IAsyncLifetime
 
     /// <summary>
     /// Hook for adapters whose vector store needs read-your-writes coaxing after a save (e.g. an async index with no
-    /// synchronous-refresh knob). Default no-op — the in-process and synchronous-refresh adapters are immediately
-    /// consistent. Runs in the entity's current ambient scope.
+    /// synchronous-refresh knob — Weaviate's HNSW). Called after EACH save with the just-saved <paramref name="id"/> and
+    /// its embedding <paramref name="query"/>, in the entity's current ambient scope, so an override can poll the
+    /// own-scope search until that id is queryable. Default no-op — the in-process and synchronous-refresh adapters
+    /// (RefreshMode/ConsistencyLevel) are immediately consistent.
     /// </summary>
-    protected virtual Task SettleAsync() => Task.CompletedTask;
+    protected virtual Task SettleAsync<TEntity>(string id, float[] query) where TEntity : class, IEntity<string>
+        => Task.CompletedTask;
+
+    /// <summary>
+    /// Hook to tear down an external backend (e.g. a Testcontainers container) a subclass started in
+    /// <see cref="BootHostAsync"/>. Called by <see cref="DisposeAsync"/> AFTER the host is disposed. Default no-op — the
+    /// in-process adapters (InMemoryVector, SqliteVec) have nothing external to stop.
+    /// </summary>
+    protected virtual ValueTask DisposeBackendAsync() => ValueTask.CompletedTask;
 
     public async ValueTask InitializeAsync()
     {
@@ -76,9 +86,19 @@ public abstract class VectorAodbConformanceSpecsBase : IAsyncLifetime
             if (ReferenceEquals(AppHost.Current, Host.Services)) AppHost.Current = null;
             await Host.DisposeAsync().ConfigureAwait(false);
         }
+        await DisposeBackendAsync().ConfigureAwait(false);
     }
 
     private void SkipIfUnavailable() => Assert.SkipWhen(_skip is not null, _skip ?? "");
+
+    // Probe whether the adapter supports by-id vector retrieval (GetEmbedding). SearchEngine (ElasticSearch/OpenSearch)
+    // and Milvus throw NotSupportedException — for them the kNN Search proves isolation alone and the stronger by-id
+    // physical-separation check is skipped. Qdrant/Weaviate/InMemoryVector/SqliteVec support it and get the by-id proof.
+    private static async Task<bool> SupportsGetEmbedding<TEntity>(string probeId) where TEntity : class, IEntity<string>
+    {
+        try { await Vector<TEntity>.GetEmbedding(probeId); return true; }
+        catch (NotSupportedException) { return false; }
+    }
 
     private IVectorSearchRepository<VectorConformanceTenantDoc, string> ResolveScopedRepo()
     {
@@ -119,8 +139,8 @@ public abstract class VectorAodbConformanceSpecsBase : IAsyncLifetime
         var rowScoped = DataCaps.Describe(ResolveScopedRepo(), "scoped-vector").Has(DataCaps.Isolation.RowScoped);
 
         // The write-stamp persists the managed discriminator regardless of filter support; only the READ filter needs it.
-        using (Tenant.Use("acme")) { await Vector<VectorConformanceTenantDoc>.Save("a1", PointA); await SettleAsync(); }
-        using (Tenant.Use("globex")) { await Vector<VectorConformanceTenantDoc>.Save("g1", PointB); await SettleAsync(); }
+        using (Tenant.Use("acme")) { await Vector<VectorConformanceTenantDoc>.Save("a1", PointA); await SettleAsync<VectorConformanceTenantDoc>("a1", PointA); }
+        using (Tenant.Use("globex")) { await Vector<VectorConformanceTenantDoc>.Save("g1", PointB); await SettleAsync<VectorConformanceTenantDoc>("g1", PointB); }
 
         if (rowScoped)
         {
@@ -154,15 +174,29 @@ public abstract class VectorAodbConformanceSpecsBase : IAsyncLifetime
         SkipIfUnavailable();
         var pA = "vcc-" + Guid.CreateVersion7().ToString("n");
         var pB = "vcc-" + Guid.CreateVersion7().ToString("n");
-        using (EntityContext.Partition(pA)) { await Vector<VectorConformancePartitionDoc>.Save("p1", PointA); await SettleAsync(); }
-        using (EntityContext.Partition(pB)) { await Vector<VectorConformancePartitionDoc>.Save("p2", PointB); await SettleAsync(); }
+        using (EntityContext.Partition(pA)) { await Vector<VectorConformancePartitionDoc>.Save("p1", PointA); await SettleAsync<VectorConformancePartitionDoc>("p1", PointA); }
+        using (EntityContext.Partition(pB)) { await Vector<VectorConformancePartitionDoc>.Save("p2", PointB); await SettleAsync<VectorConformancePartitionDoc>("p2", PointB); }
 
+        bool byId;
         using (EntityContext.Partition(pA))
+        {
+            byId = await SupportsGetEmbedding<VectorConformancePartitionDoc>("p1");
+            if (byId)
+            {
+                // Physical separation (by-id): p2 was written under pB, so it is ABSENT from pA's physical container.
+                (await Vector<VectorConformancePartitionDoc>.GetEmbedding("p1")).Should().NotBeNull();
+                (await Vector<VectorConformancePartitionDoc>.GetEmbedding("p2")).Should().BeNull();
+            }
+            // kNN: a search in pA returns only pA's vector even when pB's vector is nearer the query.
             (await Vector<VectorConformancePartitionDoc>.Search(new VectorQueryOptions(Query: PointB, TopK: 10)))
                 .Matches.Select(m => m.Id).Should().Equal("p1");
+        }
         using (EntityContext.Partition(pB))
+        {
+            if (byId) (await Vector<VectorConformancePartitionDoc>.GetEmbedding("p1")).Should().BeNull();
             (await Vector<VectorConformancePartitionDoc>.Search(new VectorQueryOptions(Query: PointA, TopK: 10)))
                 .Matches.Select(m => m.Id).Should().Equal("p2");
+        }
     }
 
     // ==================== Database (Moniker → per-source physical isolation) ====================
@@ -172,14 +206,28 @@ public abstract class VectorAodbConformanceSpecsBase : IAsyncLifetime
     public async Task Database_shard_isolates()
     {
         SkipIfUnavailable();
-        using (VectorConformanceShardAmbient.Use(SourceA)) { await Vector<VectorConformanceShardedDoc>.Save("s1", PointA); await SettleAsync(); }
-        using (VectorConformanceShardAmbient.Use(SourceB)) { await Vector<VectorConformanceShardedDoc>.Save("s2", PointB); await SettleAsync(); }
+        using (VectorConformanceShardAmbient.Use(SourceA)) { await Vector<VectorConformanceShardedDoc>.Save("s1", PointA); await SettleAsync<VectorConformanceShardedDoc>("s1", PointA); }
+        using (VectorConformanceShardAmbient.Use(SourceB)) { await Vector<VectorConformanceShardedDoc>.Save("s2", PointB); await SettleAsync<VectorConformanceShardedDoc>("s2", PointB); }
 
+        bool byId;
         using (VectorConformanceShardAmbient.Use(SourceA))
+        {
+            byId = await SupportsGetEmbedding<VectorConformanceShardedDoc>("s1");
+            if (byId)
+            {
+                // Physical separation (by-id): s2 was written under shard B, so it is ABSENT from shard A's physical store.
+                (await Vector<VectorConformanceShardedDoc>.GetEmbedding("s1")).Should().NotBeNull();
+                (await Vector<VectorConformanceShardedDoc>.GetEmbedding("s2")).Should().BeNull();
+            }
+            // kNN: a search in shard A returns only shard A's vector even when shard B's vector is nearer the query.
             (await Vector<VectorConformanceShardedDoc>.Search(new VectorQueryOptions(Query: PointB, TopK: 10)))
                 .Matches.Select(m => m.Id).Should().Equal("s1");
+        }
         using (VectorConformanceShardAmbient.Use(SourceB))
+        {
+            if (byId) (await Vector<VectorConformanceShardedDoc>.GetEmbedding("s1")).Should().BeNull();
             (await Vector<VectorConformanceShardedDoc>.Search(new VectorQueryOptions(Query: PointA, TopK: 10)))
                 .Matches.Select(m => m.Id).Should().Equal("s2");
+        }
     }
 }

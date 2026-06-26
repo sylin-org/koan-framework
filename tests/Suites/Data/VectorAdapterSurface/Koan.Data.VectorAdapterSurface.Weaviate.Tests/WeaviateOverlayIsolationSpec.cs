@@ -82,7 +82,7 @@ public sealed class WeaviateOverlayFixture : IAsyncLifetime
         services.AddLogging();
         services.AddHttpClient();
         services.AddSingleton<IHostApplicationLifetime, NoopLifetime>();
-        // Since the Weaviate test project now references Koan.Tenancy (for WeaviateVectorIsolationSpec), the
+        // Since the Weaviate test project now references Koan.Tenancy (for WeaviateVectorAodbConformanceSpec), the
         // tenancy TenantStorageGuard is discovered by AddKoanDataCore and resolved by ScopedVectorRepository's
         // ctor — it needs IHostEnvironment to construct (TenancyRuntime). Provide a Development one so the
         // resolved posture is dev-OPEN (warn-and-proceed); with no ambient tenant the tenant stamp/filter is

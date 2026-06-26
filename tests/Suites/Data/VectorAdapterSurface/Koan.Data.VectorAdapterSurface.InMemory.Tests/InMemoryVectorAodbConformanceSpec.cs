@@ -12,8 +12,9 @@ namespace Koan.Data.VectorAdapterSurface.InMemory.Tests;
 /// The Docker-free cell of the vector AODB conformance ledger (ARCH-0103 §6) — InMemoryVector, the in-process vector
 /// floor, is the canonical co-definition: a real <c>AddKoan()</c> host with tenancy + the discoverable
 /// <see cref="VectorConformanceShardAxis"/> proves the decorator <b>declares</b> all three isolation tokens AND realizes
-/// all three modes (Shared overlay, Container partition-fold, Database source-fold), with no container to start. The
-/// live-Docker behavioral proof for the HTTP fleet lives in each adapter's <c>*VectorIsolationSpec</c>.
+/// all three modes (Shared overlay, Container partition-fold, Database source-fold), with no container to start. All
+/// seven vector adapters now share this kit (ARCH-0103 §9.16); the live-Docker proof for the HTTP fleet lives in each
+/// adapter's <c>*VectorAodbConformanceSpec</c> subclass.
 /// </summary>
 public sealed class InMemoryVectorAodbConformanceSpec : VectorAodbConformanceSpecsBase
 {
