@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <NoWarn>$(NoWarn);NU1902;NU1903</NoWarn>
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1902;NU1903</WarningsNotAsErrors>
+    <!-- ARCH-0091: xUnit v3 runs as a self-executing test assembly (VSTest-compatible mode keeps `dotnet test`). -->
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Data.VectorAdapterSurface.TestKit\Koan.Data.VectorAdapterSurface.TestKit.csproj" />
+    <!-- Record plane: InMemory (the vector cells exercise only Vector<T>; the data adapter just satisfies the boot). -->
+    <ProjectReference Include="..\..\..\..\..\src\Connectors\Data\InMemory\Koan.Data.Connector.InMemory.csproj" />
+    <!-- The adapter under test: the in-process sqlite-vec vector floor (Docker-free, native vec0 embedded). -->
+    <ProjectReference Include="..\..\..\..\..\src\Connectors\Data\Vector\SqliteVec\Koan.Data.Vector.Connector.SqliteVec.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.6.0" />
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+</Project>

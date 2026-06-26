@@ -26,7 +26,7 @@ namespace Koan.Data.VectorAdapterSurface.TestKit;
 /// <see cref="DataCaps.Isolation.ContainerScoped"/>/<see cref="DataCaps.Isolation.DatabaseScoped"/> (the name-mangling
 /// floor) always and <see cref="DataCaps.Isolation.RowScoped"/> when the inner adapter announces metadata filtering — an
 /// adapter that declares a mode but does not realize it fails the matching behavioral cell; one that realizes but does
-/// not declare fails <see cref="Declares_all_three_isolation_modes"/>. Over-claim and under-claim both go red.
+/// not declare fails <see cref="Declares_realized_isolation_modes"/>. Over-claim and under-claim both go red.
 /// </para>
 /// <para>
 /// Note the vector Database mode is the <b>name-fold floor</b> (routed source → distinct collection name) on HTTP
