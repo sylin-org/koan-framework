@@ -269,8 +269,14 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
     // Collection management
     // ─────────────────────────────────────────────────────────────────────────────
 
+    // A BLANK CollectionName (not just null) means "no override" — use the framework's storage naming. The
+    // MilvusOptionsConfigurator binds an absent config key to "" (not null), so `?? ` alone would pin the empty name and
+    // collapse every entity/partition/source onto one empty-named collection (an isolation breach). IsNullOrWhiteSpace
+    // catches both null and "" (same fix + root cause as the Qdrant CollectionName getter).
     private string CollectionName
-        => _options.CollectionName ?? VectorAdapterNaming.GetOrCompute<TEntity, TKey>(_services);
+        => string.IsNullOrWhiteSpace(_options.CollectionName)
+            ? VectorAdapterNaming.GetOrCompute<TEntity, TKey>(_services)
+            : _options.CollectionName!;
 
     private async Task EnsureCollectionInitialized(CancellationToken ct)
     {

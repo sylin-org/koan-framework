@@ -363,8 +363,13 @@ internal sealed class QdrantVectorRepository<TEntity, TKey> :
     // Collection management
     // ─────────────────────────────────────────────────────────────────────────────
 
+    // A BLANK CollectionName (not just null) means "no override" — use the framework's storage naming. The
+    // QdrantOptionsConfigurator binds an absent config key to "" (not null), so `?? ` alone would treat "" as a pinned
+    // empty name and produce "/collections/" → 404. IsNullOrWhiteSpace catches both the null and the "" path.
     private string CollectionName
-        => _options.CollectionName ?? VectorAdapterNaming.GetOrCompute<TEntity, TKey>(_services);
+        => string.IsNullOrWhiteSpace(_options.CollectionName)
+            ? VectorAdapterNaming.GetOrCompute<TEntity, TKey>(_services)
+            : _options.CollectionName!;
 
     private async Task EnsureCollectionInitialized(CancellationToken ct)
     {
