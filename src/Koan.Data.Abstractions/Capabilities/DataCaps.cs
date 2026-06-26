@@ -39,14 +39,30 @@ public static class DataCaps
         public static readonly Capability ConditionalReplace = new("write.conditionalReplace");
     }
 
-    /// <summary>Row-isolation negotiation tokens (DATA-0105 / ARCH-0095). Axis-free: the token names the
-    /// adapter <b>guarantee</b>, not the consumer that needs it (Koan.Tenancy <c>Require</c>s it).</summary>
+    /// <summary>Isolation negotiation tokens — the AODB three-mode conformance ledger (ARCH-0103 §6; DATA-0105 /
+    /// ARCH-0095). Axis-free: each token names the adapter <b>guarantee</b>, not the consumer that needs it
+    /// (Koan.Tenancy <c>Require</c>s the mode its axis declares). Each token is <b>co-defined with its conformance
+    /// check</b> (ARCH-0094): an adapter that declares a token but does not realize its mode fails the matching cell of
+    /// <c>AodbConformanceSpecsBase</c> — so over-claim cannot stay green.</summary>
     public static class Isolation
     {
-        /// <summary>Provider can persist and filter a framework-managed row discriminator (a managed field, see
-        /// <see cref="Pipeline.ManagedFieldDescriptor"/>): it stores the injected key with each record AND pushes
-        /// a scalar equality on it. A managed-scoped entity routed to an adapter lacking this token fails closed.</summary>
+        /// <summary>Shared mode (FieldFilter). Provider can persist and filter a framework-managed row discriminator (a
+        /// managed field, see <see cref="Pipeline.ManagedFieldDescriptor"/>): it stores the injected key with each
+        /// record AND pushes a scalar equality on it, guarding a cross-scope write. A managed-scoped entity routed to an
+        /// adapter lacking this token fails closed (the only token enforced at routing time today).</summary>
         public static readonly Capability RowScoped = new("isolation.rowScoped");
+
+        /// <summary>Container mode (Particle). Provider resolves a <b>distinct physical container</b> (collection /
+        /// table / keyspace / directory) per ambient partition, so writes under one partition are physically separate
+        /// from another's — proven by the Container cell of <c>AodbConformanceSpecsBase</c> (per-partition isolation +
+        /// concurrent no-leak + partition-name survival). Realized via the shared naming particle plane.</summary>
+        public static readonly Capability ContainerScoped = new("isolation.containerScoped");
+
+        /// <summary>Database mode (Moniker). Provider routes a Database-mode axis to a <b>distinct physical data
+        /// source</b> (connection / file / logical database) per routed source key, failing closed on an unconfigured
+        /// source (external-only posture) — proven by the Database cell of <c>AodbConformanceSpecsBase</c>. Realized via
+        /// the shared <c>RoutedSource</c> + the per-source factory placement.</summary>
+        public static readonly Capability DatabaseScoped = new("isolation.databaseScoped");
     }
 
     /// <summary>Retention negotiation tokens.</summary>

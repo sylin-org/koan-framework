@@ -46,9 +46,13 @@ internal sealed class PostgresRepository<
         .Add(DataCaps.Query.Linq).Add(DataCaps.Query.String)
         .Add(DataCaps.Write.BulkUpsert).Add(DataCaps.Write.AtomicBatch).Add(DataCaps.Write.BulkDelete).Add(DataCaps.Write.FastRemove)
         .Add(DataCaps.Write.ConditionalReplace)
-        // Row-isolation (DATA-0105 §3b): persists a framework-managed discriminator inside the jsonb envelope and
-        // pushes scalar equality on it ("Json" #>> '{field}'), with a conflict-aware upsert verifying ownership.
+        // The AODB three-mode ledger (ARCH-0103 §6). Shared (DATA-0105 §3b): persists a framework-managed discriminator
+        // inside the jsonb envelope + pushes scalar equality ("Json" #>> '{field}') + a conflict-aware upsert verifies
+        // ownership. Container: a distinct partition-suffixed table per ambient partition. Database: a per-source
+        // connection. Co-defined with the AodbConformanceSpecsBase cells that prove each.
         .Add(DataCaps.Isolation.RowScoped)
+        .Add(DataCaps.Isolation.ContainerScoped)
+        .Add(DataCaps.Isolation.DatabaseScoped)
         .Add(DataCaps.Query.Filter, RelationalFilterSupport.Default);
 
     // Storage optimization support

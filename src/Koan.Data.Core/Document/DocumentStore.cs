@@ -228,8 +228,13 @@ public abstract class DocumentStore<TEntity, TKey> :
     public void Describe(ICapabilities caps)
     {
         caps.Add(DataCaps.Query.Linq)
-            // Shared mode: the family stamps the framework-managed discriminator and conflict-guards the write.
-            .Add(DataCaps.Isolation.RowScoped);
+            // The AODB three-mode ledger (ARCH-0103 §6) — the family realizes all three uniformly: Shared stamps the
+            // framework-managed discriminator + conflict-guards the write; Container resolves a distinct native container
+            // per ambient partition (the dialect); Database routes per source (the factory). Co-defined with the
+            // AodbConformanceSpecsBase cells that prove each.
+            .Add(DataCaps.Isolation.RowScoped)
+            .Add(DataCaps.Isolation.ContainerScoped)
+            .Add(DataCaps.Isolation.DatabaseScoped);
         DescribeBackend(caps);
     }
 

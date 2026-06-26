@@ -45,9 +45,13 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         .Add(DataCaps.Write.BulkUpsert).Add(DataCaps.Write.BulkDelete)
         .Add(DataCaps.Write.AtomicBatch).Add(DataCaps.Write.FastRemove)
         .Add(DataCaps.Write.ConditionalReplace)
-        // Row-isolation (DATA-0105 §3b): persists a framework-managed discriminator inside the [Json] envelope and
-        // pushes scalar equality on it (JSON_VALUE), with a MERGE-guarded upsert verifying ownership on write.
+        // The AODB three-mode ledger (ARCH-0103 §6). Shared (DATA-0105 §3b): persists a framework-managed discriminator
+        // inside the [Json] envelope + pushes scalar equality (JSON_VALUE) + a MERGE-guarded upsert verifies ownership.
+        // Container: a distinct partition-suffixed table per ambient partition. Database: a per-source connection.
+        // Co-defined with the AodbConformanceSpecsBase cells that prove each.
         .Add(DataCaps.Isolation.RowScoped)
+        .Add(DataCaps.Isolation.ContainerScoped)
+        .Add(DataCaps.Isolation.DatabaseScoped)
         .Add(DataCaps.Query.Filter, RelationalFilterSupport.Default);
 
     // Managed-field conflict-aware upsert (DATA-0105 §3b — the write-verify half). When a managed write-scope is

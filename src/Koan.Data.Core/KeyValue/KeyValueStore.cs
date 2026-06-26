@@ -66,9 +66,13 @@ public abstract class KeyValueStore<TEntity, TKey> :
     {
         caps.Add(DataCaps.Query.Linq)
             .Add(DataCaps.Query.Filter, FilterSupport.Full)
-            // Shared mode: this family persists the framework-managed discriminator (sidecar / injected JSON), pushes a
-            // scalar equality on it (the hybrid evaluator), and guards a cross-scope write — so it announces RowScoped.
-            .Add(DataCaps.Isolation.RowScoped);
+            // The AODB three-mode ledger (ARCH-0103 §6) — the family realizes all three uniformly: Shared persists the
+            // framework-managed discriminator (sidecar / injected JSON) + pushes a scalar equality (the hybrid evaluator)
+            // + guards a cross-scope write; Container = a distinct store/keyspace/file per ambient partition; Database =
+            // a per-source store/connection/index. Co-defined with the AodbConformanceSpecsBase cells that prove each.
+            .Add(DataCaps.Isolation.RowScoped)
+            .Add(DataCaps.Isolation.ContainerScoped)
+            .Add(DataCaps.Isolation.DatabaseScoped);
         DescribeBackend(caps);
     }
 
