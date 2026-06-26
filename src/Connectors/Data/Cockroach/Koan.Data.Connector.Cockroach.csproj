@@ -4,10 +4,10 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <AssemblyName>Koan.Data.Connector.Postgres</AssemblyName>
-    <RootNamespace>Koan.Data.Connector.Postgres</RootNamespace>
-    <Description>PostgreSQL provider for Koan relational data: Dapper-based SQL integration with guardrails and governance.</Description>
-    <PackageTags>$(CommonPackageTags);data;postgres;relational;sql;dapper</PackageTags>
+    <AssemblyName>Koan.Data.Connector.Cockroach</AssemblyName>
+    <RootNamespace>Koan.Data.Connector.Cockroach</RootNamespace>
+    <Description>CockroachDB provider for Koan relational data: a thin pg-wire delta over the Postgres connector (Npgsql + Dapper) with guardrails and governance.</Description>
+    <PackageTags>$(CommonPackageTags);data;cockroach;cockroachdb;relational;sql;dapper</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Dapper" Version="2.1.66" />
@@ -17,19 +17,15 @@
     <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.8" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-    <PackageReference Include="Aspire.Hosting.PostgreSQL" Version="13.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <!-- The CockroachDB adapter is a thin subclass of PostgresRepository (pg-wire reuse, ARCH-0094 Phase 4): it
-         inherits the repository + PgDialect + DDL wholesale and overrides only StableOrderClause (no `ctid`). -->
-    <InternalsVisibleTo Include="Koan.Data.Connector.Cockroach" />
-  </ItemGroup>
-  <ItemGroup>
+    <!-- The thin pg-wire reuse (ARCH-0094 Phase 4): CockroachRepository subclasses PostgresRepository, reusing the
+         repository / PgDialect / DDL wholesale. Postgres grants InternalsVisibleTo to this assembly. -->
+    <ProjectReference Include="..\Postgres\Koan.Data.Connector.Postgres.csproj" />
     <ProjectReference Include="..\..\..\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\..\..\Koan.Data.Relational\Koan.Data.Relational.csproj" />
     <ProjectReference Include="..\..\..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
     <ProjectReference Include="..\..\..\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\..\..\Koan.Orchestration.Abstractions\Koan.Orchestration.Abstractions.csproj" />
-    <ProjectReference Include="..\..\..\Koan.Orchestration.Aspire\Koan.Orchestration.Aspire.csproj" />
   </ItemGroup>
 </Project>

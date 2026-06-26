@@ -599,6 +599,14 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Axes.Integration.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.VectorAdapterSurface.SqliteVec.Tests", "tests\Suites\Data\VectorAdapterSurface\Koan.Data.VectorAdapterSurface.SqliteVec.Tests\Koan.Data.VectorAdapterSurface.SqliteVec.Tests.csproj", "{20EB0DBF-1AEC-4726-B492-D1790A353BCA}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Cockroach", "Cockroach", "{C786ACA2-7A22-3FD1-DB7D-A6062C5F7934}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Connector.Cockroach", "src\Connectors\Data\Cockroach\Koan.Data.Connector.Cockroach.csproj", "{6915DD44-E369-460B-91FD-9FEB5E7934E3}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Connector.Cockroach", "Connector.Cockroach", "{B2F23E3A-6D34-1877-C081-B25B34689817}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Connector.Cockroach.Tests", "tests\Suites\Data\Connector.Cockroach\Koan.Data.Connector.Cockroach.Tests\Koan.Data.Connector.Cockroach.Tests.csproj", "{76261394-48EF-4307-9FA5-4F524EEC68AA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -3067,6 +3075,30 @@ Global
 		{20EB0DBF-1AEC-4726-B492-D1790A353BCA}.Release|x64.Build.0 = Release|Any CPU
 		{20EB0DBF-1AEC-4726-B492-D1790A353BCA}.Release|x86.ActiveCfg = Release|Any CPU
 		{20EB0DBF-1AEC-4726-B492-D1790A353BCA}.Release|x86.Build.0 = Release|Any CPU
+		{6915DD44-E369-460B-91FD-9FEB5E7934E3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6915DD44-E369-460B-91FD-9FEB5E7934E3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6915DD44-E369-460B-91FD-9FEB5E7934E3}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{6915DD44-E369-460B-91FD-9FEB5E7934E3}.Debug|x64.Build.0 = Debug|Any CPU
+		{6915DD44-E369-460B-91FD-9FEB5E7934E3}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{6915DD44-E369-460B-91FD-9FEB5E7934E3}.Debug|x86.Build.0 = Debug|Any CPU
+		{6915DD44-E369-460B-91FD-9FEB5E7934E3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6915DD44-E369-460B-91FD-9FEB5E7934E3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6915DD44-E369-460B-91FD-9FEB5E7934E3}.Release|x64.ActiveCfg = Release|Any CPU
+		{6915DD44-E369-460B-91FD-9FEB5E7934E3}.Release|x64.Build.0 = Release|Any CPU
+		{6915DD44-E369-460B-91FD-9FEB5E7934E3}.Release|x86.ActiveCfg = Release|Any CPU
+		{6915DD44-E369-460B-91FD-9FEB5E7934E3}.Release|x86.Build.0 = Release|Any CPU
+		{76261394-48EF-4307-9FA5-4F524EEC68AA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{76261394-48EF-4307-9FA5-4F524EEC68AA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{76261394-48EF-4307-9FA5-4F524EEC68AA}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{76261394-48EF-4307-9FA5-4F524EEC68AA}.Debug|x64.Build.0 = Debug|Any CPU
+		{76261394-48EF-4307-9FA5-4F524EEC68AA}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{76261394-48EF-4307-9FA5-4F524EEC68AA}.Debug|x86.Build.0 = Debug|Any CPU
+		{76261394-48EF-4307-9FA5-4F524EEC68AA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{76261394-48EF-4307-9FA5-4F524EEC68AA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{76261394-48EF-4307-9FA5-4F524EEC68AA}.Release|x64.ActiveCfg = Release|Any CPU
+		{76261394-48EF-4307-9FA5-4F524EEC68AA}.Release|x64.Build.0 = Release|Any CPU
+		{76261394-48EF-4307-9FA5-4F524EEC68AA}.Release|x86.ActiveCfg = Release|Any CPU
+		{76261394-48EF-4307-9FA5-4F524EEC68AA}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -3360,6 +3392,10 @@ Global
 		{13A35997-4075-4F05-AD8D-A28DDF5E9E23} = {5C071B2B-9EC2-DF32-531B-E06722112586}
 		{AEC2A66C-120F-4B5E-BABB-4A6BB12A57A4} = {5C071B2B-9EC2-DF32-531B-E06722112586}
 		{20EB0DBF-1AEC-4726-B492-D1790A353BCA} = {E19DE968-F9C4-C371-351B-E94BA6875ADF}
+		{C786ACA2-7A22-3FD1-DB7D-A6062C5F7934} = {1F5CC4C7-1255-AAD3-2DDB-2EEFC1110E38}
+		{6915DD44-E369-460B-91FD-9FEB5E7934E3} = {C786ACA2-7A22-3FD1-DB7D-A6062C5F7934}
+		{B2F23E3A-6D34-1877-C081-B25B34689817} = {96C9A827-DD11-51F2-22BF-E3C00045C44D}
+		{76261394-48EF-4307-9FA5-4F524EEC68AA} = {B2F23E3A-6D34-1877-C081-B25B34689817}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {669C5778-BFAE-4972-B427-0AFF99562045}

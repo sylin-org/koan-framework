@@ -291,3 +291,45 @@ Resolves the carve-out **"the Blueprint artifact format + catalogue/discoverabil
 - **Open (deferred).** Intent→blueprint matching for the Forge CLI/agent (Phase 4); whether to surface the blueprint in
   the CLAUDE.md pattern-recognition table (kept to `BLUEPRINTS.md` + frontmatter `description` for now); the obligation
   token is grep-level (Type + Member both present in the file), with AST-level member-on-type checking deferred.
+
+### Phase 4 — the end-to-end Forge slice: agent → blueprint → gate → retry (DONE, 2026-06-26)
+
+The thesis made real: an **agent** authored a conformant adapter for an un-owned engine by following the **Blueprint**
+(Phase 3), and the **Conformance Gate runner** (Phase 2, the capability-driven Gate of Phase 1) **drove it to green
+through its own feedback** — "the framework extends itself through agents."
+
+- **The slice (chosen, tractable).** A scoping pass found that a from-scratch relational adapter is heavy (~1,200–1,900
+  LOC, no shared base — hand-rolled per dialect) and that the *novel, valuable* part is the **orchestration loop**, not
+  heroic codegen. So the slice proves the loop on a **wire-compatible reuse** target: **CockroachDB** (it speaks the
+  Postgres wire protocol + SQL, and Koan ships a Postgres adapter to reuse). A prerequisite landed first: the data/sql
+  blueprint gained an operational **§6 Scaffold** + a §2.4 reuse go/no-go heuristic (it was process-complete but
+  silent on project layout / test wiring / fixture).
+- **The loop (the proof).** A single agent in an isolated git worktree copy-adapted the Postgres adapter → CockroachDB
+  (adapter + conformance test + a CockroachDB Testcontainers fixture), then ran `forge-verify.ps1 -Adapter Cockroach`
+  and **iterated on the verdict**. Iteration 1 → **RED**: Shared/Container/Database all failed with the same
+  Cockroach-specific delta — `42703: column "ctid" does not exist` (the Postgres repository orders by the `ctid`
+  system column for its stable fallback; CockroachDB has none). The agent fixed the minimal delta (`ORDER BY ctid` →
+  `ORDER BY "Id"`, the portable PK order) → iteration 2 → **GREEN** (all four cells). Independently re-verified GREEN by
+  re-running the gate. The gate caught a *real* bug and the feedback drove the fix — exactly the contribution-half claim.
+- **The harvest — refined to the canon-correct shape.** The agent's output was a ~2,300-LOC byte-for-byte Postgres
+  copy + the one `ctid` delta — the *"generic-but-proven, regenerable"* artifact this ADR predicts (§6), but a
+  near-duplicate of the Postgres repository, which the framework's *no-2nd-parallel-impl* rule disallows for a
+  hand-maintained fleet member. So the result was promoted to the maintainable form by **fixing the seam**: the Postgres
+  repository was unsealed and its hardcoded `ctid` lifted into a `protected virtual StableOrderClause` (Postgres
+  byte-identical — still `ctid`; gate re-verified GREEN), with `InternalsVisibleTo` granted to Cockroach. The shipped
+  **`CockroachRepository` is then a 45-line subclass** (the agent's copy was ~1,200 LOC — the full Postgres repository
+  it now inherits wholesale) overriding only `StableOrderClause` and mapping its options onto the base — reusing the
+  entire repository / `PgDialect` / DDL; the copied dialect + DDL were deleted. `CockroachAdapterFactory` (`[ProviderPriority(13)]`, `CanHandle` answers `cockroach`/`cockroachdb` only — the
+  `npgsql` alias stays with Postgres) + thin per-adapter plumbing complete it. Both Postgres and Cockroach pass the gate
+  GREEN; the adapter is in `Koan.sln`.
+- **Significance.** The full Forge loop is demonstrated end-to-end on a genuinely un-owned engine, and the
+  *procurement-flip* killer-use is realized concretely: "we run CockroachDB" → reuse the Postgres adapter → green =
+  shippable. The Conformance Gate proved its third job (gating an agent-authored adapter), and the "fix the seam, don't
+  duplicate" refinement shows the Forge's output graduating from generic-but-proven to canon-shaped.
+- **Open (honestly scoped).** The Cockroach adapter is **AODB-gate-conformant** — the Forge's bar (all three isolation
+  modes). Because it inherits the Postgres repository wholesale, the *shared* repository logic is already covered by
+  Postgres's own auxiliary specs (filter-convergence / comparable-encoding / redaction); only the `ctid` order is
+  Cockroach-specific, and the gate covers isolation — so porting those auxiliary specs is a parity nicety, not a
+  correctness gap. An **Aspire registrar is N/A by design** (no `Aspire.Hosting.CockroachDB` resource provider ships,
+  and ARCH-0077 deprecates the orchestration layer); Reference=Intent + discovery is the conformant surface. The
+  `koan adapter new` scaffold CLI + intent→blueprint matching remain (Phases 5–7).

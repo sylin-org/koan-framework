@@ -27,7 +27,7 @@ using Newtonsoft.Json;
 
 namespace Koan.Data.Connector.Postgres;
 
-internal sealed class PostgresRepository<
+internal class PostgresRepository<
     [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.PublicParameterlessConstructor | DynamicallyAccessedMemberTypes.PublicProperties)] TEntity,
     TKey> :
     IDataRepository<TEntity, TKey>,
@@ -535,11 +535,16 @@ internal sealed class PostgresRepository<
         return textExpr;
     }
 
-    /// <summary>Builds an ORDER BY clause from the sort specs; falls back to a stable ctid order.</summary>
+    /// <summary>The stable total-order fallback used when no sort is requested — an overridable seam. Postgres orders by
+    /// its physical-row <c>ctid</c> system column (cheap, stable); a pg-wire engine that lacks <c>ctid</c> (e.g.
+    /// CockroachDB, error 42703) overrides this to the portable equivalent (<c>ORDER BY "Id"</c>).</summary>
+    protected virtual string StableOrderClause => "ORDER BY ctid";
+
+    /// <summary>Builds an ORDER BY clause from the sort specs; falls back to <see cref="StableOrderClause"/>.</summary>
     private (string orderBy, IReadOnlySet<SortSpec> sortHandled) BuildOrderBy(IReadOnlyList<SortSpec> sort)
     {
         if (sort is null || sort.Count == 0)
-            return ("ORDER BY ctid", RepositoryQueryResult<TEntity>.NoSortHandled);
+            return (StableOrderClause, RepositoryQueryResult<TEntity>.NoSortHandled);
 
         var parts = new List<string>(sort.Count);
         var handled = new List<SortSpec>(sort.Count);
@@ -563,7 +568,7 @@ internal sealed class PostgresRepository<
         }
 
         if (parts.Count == 0)
-            return ("ORDER BY ctid", RepositoryQueryResult<TEntity>.NoSortHandled);
+            return (StableOrderClause, RepositoryQueryResult<TEntity>.NoSortHandled);
         var orderBy = "ORDER BY " + string.Join(", ", parts);
         return (orderBy, handled.ToFrozenSet());
     }
@@ -613,7 +618,7 @@ internal sealed class PostgresRepository<
             var whereSql = RewriteWhereForProjection(query);
             var size = shaping.HasPagination ? shaping.EffectivePageSize() : _defaultPageSize;
             var offset = shaping.HasPagination ? (shaping.EffectivePage() - 1) * size : 0;
-            var sql = $"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE {whereSql} ORDER BY ctid LIMIT {size} OFFSET {offset}";
+            var sql = $"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE {whereSql} {StableOrderClause} LIMIT {size} OFFSET {offset}";
             var rows = await conn.QueryAsync<(string Id, string Json)>(sql, parameters);
             return new RepositoryQueryResult<TEntity>
             {
