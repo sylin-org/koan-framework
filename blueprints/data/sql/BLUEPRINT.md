@@ -42,6 +42,11 @@ Author a relational adapter when the target speaks SQL over ADO.NET and is NOT o
    — a community or prior adapter may already exist (Reference = Intent if found).
 3. Factories are ranked by `[ProviderPriority(N)]` (Postgres = 14) through the shared `FactoryResolver`; a new adapter
    picks an unused priority. Authoring is the **fallback** only when no reusable adapter exists.
+4. **Reuse go/no-go.** If the engine speaks an existing wire protocol *and* SQL dialect (e.g. **CockroachDB ≈ Postgres**
+   wire + SQL), author a **thin** adapter that REUSES the sibling's dialect / DDL executor / translator (subclass or
+   delegate to it) and overrides only the deltas the Conformance Gate surfaces — do **not** re-author a dialect. Author a
+   genuinely new dialect only when the wire/SQL is distinct (Oracle; or MySQL/MariaDB — no MySQL sibling ships yet). The
+   gate is the arbiter: reuse until a cell goes red, then override the minimum to make it green.
 
 ## 3. Research — empirical, least-privilege probe
 
@@ -80,7 +85,35 @@ Each row is a binding obligation; the cited member is grep-verified by `blueprin
 7. **AODB realization** — Shared via the `ComparableScalarEncoding.Apply`-installed managed-field write-stamp + the read-filter fold + a conflict-aware upsert that carries the discriminator in its WHERE; Container via the partition particle in the physical table name (the framework-owned `StorageNameGenerator` folds it — and any registered separate-container axis particle — from your announced `StorageNamingCapability`; you never hand-build the name); Database via `ResolveRoutedConnection` + the Database-mode route → a per-source connection.
 8. **Fail-closed** — DDL policy gates; cross-scope write rejection; routing to an unconfigured source throws a self-explaining error (never a silent fallthrough).
 
-## 6. Gotchas — real, source-observed
+## 6. Scaffold — the project layout the gate discovers
+
+The Conformance Gate (`scripts/forge-verify.ps1`) discovers an adapter by **one** filename convention: exactly one
+`{Provider}AodbConformanceSpec.cs` test class under `tests/Suites/Data/`, with a sibling `.csproj`. Lay the slice out so
+that discovery succeeds — three locations, mirroring the shipped Sqlite/Postgres exemplars:
+
+**(a) The adapter** — `src/Connectors/Data/{Provider}/` (one project, `KoanPackageKind=Periphery`, `net10.0`,
+`ProjectReference` to `Koan.Data.Abstractions` + `Koan.Data.Core` + `Koan.Data.Relational`, `PackageReference` to the
+engine's ADO.NET provider). For a wire-compatible reuse, the bulk is a thin shell over the sibling — files: the factory
+(`[ProviderPriority(N)]` + `[KoanService]`), the repository (or a subclass/delegate of the sibling's), `{Provider}Options`,
+the connection factory, the options configurator, a health contributor, and `Initialization/KoanAutoRegistrar.cs`. Reuse
+the sibling's `ILinqSqlDialect` / `IRelationalDdlExecutor` unless the gate proves a delta.
+
+**(b) The test project** — `tests/Suites/Data/Connector.{Provider}/Koan.Data.Connector.{Provider}.Tests/`
+(`OutputType=Exe`, xUnit v3; `ProjectReference` to `Koan.Data.AdapterSurface.TestKit` + `Koan.Testing.Containers` +
+`Koan.Testing.Hosting` + the adapter). Four files: `{Provider}AodbConformanceSpec.cs` (`: AodbConformanceSpecsBase<{Provider}Fixture>`,
+the ctor `({Provider}Fixture, ITestOutputHelper)`, and `RoutedSourceSettings()` mapping `conformance_a`/`conformance_b`
+to two **distinct physical databases** — relational: a real `CREATE DATABASE` per source); `GlobalUsings.cs`;
+`Properties/AssemblyInfo.cs` (`[assembly: CollectionBehavior(DisableTestParallelization = true)]` +
+`[assembly: AssemblyFixture(typeof({Provider}Fixture))]`); the `.csproj`.
+
+**(c) The fixture** — `src/Koan.Testing.Containers/Fixtures/{Provider}Fixture.cs` (`: KoanContainerFixture`): override
+`Engine`/`Adapter`, and `StartContainerAsync` <!-- obligation: KoanContainerFixture.StartContainerAsync @ src/Koan.Testing.Containers/KoanContainerFixture.cs --> (spin the engine — Testcontainers for a server, a temp file for in-process — and return its
+connection string) + `StopContainerAsync` <!-- obligation: KoanContainerFixture.StopContainerAsync @ src/Koan.Testing.Containers/KoanContainerFixture.cs -->. The base owns the Docker-absent skip and the `Koan_{ENGINE}__CONNECTION_STRING` bring-your-own override.
+
+Then iterate: `pwsh scripts/forge-verify.ps1 -Adapter {Provider}` → read the per-cell verdict + reason → fix → repeat
+until `GREEN`.
+
+## 7. Gotchas — real, source-observed
 
 - **Identifier byte limit per engine** — announce `MaxIdentifierBytes`; the generator hashes a composed name past the limit so isolation is preserved (PG 63, SQL Server `sysname` 128). Don't emit raw over-limit names.
 - **`"auto"` connstring sentinel** must collapse onto the discovery-resolved base for non-Default sources too (ARCH-0103 P5) — `ResolveRoutedConnection` does this; a hand-rolled resolver re-introduces the bug.
@@ -90,7 +123,7 @@ Each row is a binding obligation; the cited member is grep-verified by `blueprin
 - **JSON-less engines** (SQLite-class) — when `SupportsJsonFunctions` is false, fall back to physical nullable columns; don't fake JSON support.
 - **Composite `[Index]` groups** — create best-effort at table-create (`CREATE INDEX IF NOT EXISTS`), JOBS-0008.
 
-## 7. Test — the Conformance Gate (must go green against a real instance)
+## 8. Test — the Conformance Gate (must go green against a real instance)
 
 Subclass `AodbConformanceSpecsBase<YourFixture>` <!-- obligation: AodbConformanceSpecsBase.Declares_all_three_isolation_modes @ tests/Suites/Data/AdapterSurface/Koan.Data.AdapterSurface.TestKit/AodbConformanceSpecsBase.cs --> and supply a fixture mapping two conformance sources to two distinct
 physical stores of your engine (relational: a real `CREATE DATABASE` per source). All four cells MUST pass —
@@ -101,7 +134,7 @@ classification carried, NOT the pillar; the `blast:` in this blueprint's frontma
 adds the beyond-happy-path suite (contention / soak / chaos / durability) + the static forbidden-pattern lint + an
 isolation-line human review. Green against the real instance = shippable.
 
-## 8. See also
+## 9. See also
 
 - Card: [docs/reference/cards/data.md](../../../docs/reference/cards/data.md)
 - ADRs: [ARCH-0094](../../../docs/decisions/ARCH-0094-adapter-forge.md) (the Forge) · [ARCH-0084](../../../docs/decisions/ARCH-0084-unified-capability-model.md) (capability model) · [ARCH-0102](../../../docs/decisions/ARCH-0102-access-overlay-definition-block.md) (AODB) · [ARCH-0103](../../../docs/decisions/ARCH-0103-aodb-adapter-conformance.md) (fleet conformance + shared helpers) · [DATA-0100](../../../docs/decisions/DATA-0100-comparable-encoding-contract.md) (comparable encoding)
