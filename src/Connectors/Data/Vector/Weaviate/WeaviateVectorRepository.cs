@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Security.Cryptography;
+using System.Text;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -59,8 +60,47 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         {
             // DATA-0086: vector naming routes to WeaviateVectorAdapterFactory.ResolveStorage,
             // which owns its own cache and applies partition composition.
-            return VectorAdapterNaming.GetOrCompute<TEntity, TKey>(_sp);
+            return SanitizeClassName(VectorAdapterNaming.GetOrCompute<TEntity, TKey>(_sp));
         }
+    }
+
+    // Normalize the resolved name to the EXACT class identifier Weaviate stores, so write-name == read-name ==
+    // schema-name stays bijective (FC-6). Two adjustments, both byte-identical for the common case (a top-level
+    // entity whose name already starts with the upper-cased root namespace and has no illegal chars):
+    //   1. GraphQL class names allow only [_0-9A-Za-z]. .NET surfaces a '+' in Type.FullName for NESTED entity
+    //      types that the framework name resolver leaves intact (it folds only '.'), so a nested entity reaches
+    //      Weaviate with a '+' and is rejected (422 'not a valid class name'). Fold any non-word char to '_'.
+    //      This addresses the same nested-type '+' gap Couchbase fixed adapter-locally (FormatIdentifier) — but
+    //      it is a bare char fold, NOT Couchbase's lossy-collision hash: an entity 'A+B' (nested) and a distinct
+    //      'A.B' (namespaced, already folded to 'A_B' by the resolver) would both land on 'A_B'. That collision
+    //      is out of scope for the canonical Koan entity set (no such coexisting pair exists); if one ever could,
+    //      adopt Couchbase's append-ShortHash-on-lossy-fold pattern here.
+    //   2. Weaviate AUTO-CAPITALIZES the first letter of a class name on creation, and GraphQL is case-sensitive.
+    //      Any name whose anchor starts lowercase — the Database-mode source fold's lowercase leading particle
+    //      ("alpha_…"), OR a lowercase root namespace on a top-level entity — is stored as "Alpha_…"/"Myapp_…"
+    //      but a read computing the lowercase form queries a non-existent class and silently returns nothing (a
+    //      cross-source isolation read would falsely look empty). Upper-case the first char to match what Weaviate
+    //      stores. CAVEAT (injectivity): because Weaviate first-char-folds, two Database-mode sources differing
+    //      ONLY in first-char case ("alpha" vs "Alpha") collapse to one physical class — the framework's
+    //      source-fold injectivity guard cannot see this fold (the Weaviate naming policy is case-preserving), so
+    //      Database-mode sources MUST be first-char-canonical (conventionally lowercase) to stay isolated.
+    private static string SanitizeClassName(string name)
+    {
+        static bool IsLegal(char c)
+            => (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_';
+
+        var firstNeedsUpper = name.Length > 0 && name[0] is >= 'a' and <= 'z';
+        var hasIllegal = false;
+        for (var i = 0; i < name.Length && !hasIllegal; i++) hasIllegal = !IsLegal(name[i]);
+        if (!firstNeedsUpper && !hasIllegal) return name;
+
+        var sb = new StringBuilder(name.Length);
+        for (var i = 0; i < name.Length; i++)
+        {
+            var c = IsLegal(name[i]) ? name[i] : '_';
+            sb.Append(i == 0 ? char.ToUpperInvariant(c) : c);
+        }
+        return sb.ToString();
     }
 
     private async Task EnsureSchema(CancellationToken ct)

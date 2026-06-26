@@ -13,6 +13,10 @@
   <ItemGroup>
     <ProjectReference Include="..\Koan.Data.VectorAdapterSurface.TestKit\Koan.Data.VectorAdapterSurface.TestKit.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Connectors\Data\Vector\Weaviate\Koan.Data.Vector.Connector.Weaviate.csproj" />
+    <!-- The production-adapter AODB isolation spec boots a real AddKoan() host (tenancy + a Database-mode axis)
+         against the live Weaviate container, beyond the custom-SP surface harness. -->
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Testing.Hosting\Koan.Testing.Hosting.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Tenancy\Koan.Tenancy.csproj" />
   </ItemGroup>
 
   <ItemGroup>
