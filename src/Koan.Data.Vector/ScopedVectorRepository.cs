@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Aodb;
+using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
@@ -106,7 +107,24 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
     public Task Flush(CancellationToken ct = default) => _inner.Flush(ct);
     public IAsyncEnumerable<VectorExportBatch<TKey>> ExportAll(int? batchSize = null, CancellationToken ct = default) => _inner.ExportAll(batchSize, ct);
 
-    public void Describe(ICapabilities caps) => VectorCaps.Describe(_inner, _inner.GetType().Name).CopyInto(caps);
+    public void Describe(ICapabilities caps)
+    {
+        VectorCaps.Describe(_inner, _inner.GetType().Name).CopyInto(caps);
+        // ARCH-0103 §6 — the vector plane realizes all three AODB isolation modes through THIS decorator (the one
+        // chokepoint wrapping every vector adapter), so the isolation tokens are declared here, not on the inner:
+        //   • Container + Database — the shared name-mangling floor (VectorAdapterNaming over StorageNameGenerator)
+        //     folds the ambient partition and the Database-mode routed source into a DISTINCT physical
+        //     collection/index/class for EVERY vector adapter uniformly, so both modes are realized fleet-wide.
+        //     (Database here is the LAZY name-fold posture — any ambient source resolves to a distinct collection, so
+        //     there is no external-only fail-close-on-unconfigured; that posture clause of DataCaps.Isolation.DatabaseScoped
+        //     is record-plane-specific, see the token doc.)
+        //   • RowScoped — the overlay write-stamp + read-filter (above) realizes Shared, but only when the inner
+        //     adapter announces metadata filtering (VectorCaps.Filters); the Shared path already fail-closes on its
+        //     absence, so the token is gated on the same bit. Each token is co-defined with its proof
+        //     (ARCH-0094) by VectorAodbConformanceSpecsBase — declare-but-not-realize goes red.
+        caps.Add(DataCaps.Isolation.ContainerScoped).Add(DataCaps.Isolation.DatabaseScoped);
+        if (_canFilter) caps.Add(DataCaps.Isolation.RowScoped);
+    }
 
     public Task<TResult> ExecuteAsync<TResult>(Instruction instruction, CancellationToken ct = default)
         => _inner is IInstructionExecutor<TEntity> exec

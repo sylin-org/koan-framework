@@ -58,10 +58,15 @@ public static class DataCaps
         /// concurrent no-leak + partition-name survival). Realized via the shared naming particle plane.</summary>
         public static readonly Capability ContainerScoped = new("isolation.containerScoped");
 
-        /// <summary>Database mode (Moniker). Provider routes a Database-mode axis to a <b>distinct physical data
-        /// source</b> (connection / file / logical database) per routed source key, failing closed on an unconfigured
-        /// source (external-only posture) — proven by the Database cell of <c>AodbConformanceSpecsBase</c>. Realized via
-        /// the shared <c>RoutedSource</c> + the per-source factory placement.</summary>
+        /// <summary>Database mode (Moniker). Provider routes a Database-mode axis to a <b>distinct physical isolation
+        /// unit</b> per routed source key — a distinct data <i>source</i> (connection / file / logical database) on the
+        /// record plane, or a distinct collection/index/class via the source-name fold on the vector plane. The core
+        /// guarantee is uniform: distinct source ⇒ distinct physical isolation. The <b>provisioning posture</b>, however,
+        /// differs by plane and is NOT part of the token's guarantee: the record plane is external-only (a routed source
+        /// absent from the registry <b>fails closed</b> — proven by the Database cell of <c>AodbConformanceSpecsBase</c>),
+        /// while the vector name-fold floor is lazy (any ambient source resolves to a distinct name, so there is nothing
+        /// to fail closed on — proven by <c>VectorAodbConformanceSpecsBase</c>). Realized via the shared <c>RoutedSource</c>
+        /// + the per-source factory placement (record) or the source-name particle (vector).</summary>
         public static readonly Capability DatabaseScoped = new("isolation.databaseScoped");
     }
 

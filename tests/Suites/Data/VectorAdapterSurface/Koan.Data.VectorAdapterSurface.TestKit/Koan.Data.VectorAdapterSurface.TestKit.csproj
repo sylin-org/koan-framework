@@ -14,6 +14,10 @@
     <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Vector\Koan.Data.Vector.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Vector.Abstractions\Koan.Data.Vector.Abstractions.csproj" />
+    <!-- ARCH-0103 §6 — the vector AODB conformance kit boots a real AddKoan() host with tenancy + a Database-mode
+         axis (VectorAodbConformanceSpecsBase). -->
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Tenancy\Koan.Tenancy.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Testing.Hosting\Koan.Testing.Hosting.csproj" />
   </ItemGroup>
 
   <ItemGroup>
