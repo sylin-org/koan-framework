@@ -23,7 +23,7 @@ namespace Koan.Data.Connector.Mongo;
     AppEnv = new[] { "Koan__Data__Mongo__ConnectionString={scheme}://{host}:{port}", "Koan__Data__Mongo__Database=Koan" },
     Scheme = "mongodb", Host = "mongo", EndpointPort = 27017, UriPattern = "mongodb://{host}:{port}",
     LocalScheme = "mongodb", LocalHost = "localhost", LocalPort = 27017, LocalPattern = "mongodb://{host}:{port}")]
-public sealed class MongoAdapterFactory : IDataAdapterFactory, IAsyncDisposable
+public sealed class MongoAdapterFactory : IDataAdapterFactory, IAsyncDisposable, IDisposable
 {
     // One MongoClientProvider (one MongoClient / connection pool) per resolved source — keyed by connection+database, so
     // every entity type on a source SHARES one pool instead of opening one per (entity, source). The Default source uses
@@ -80,6 +80,16 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory, IAsyncDisposable
     {
         foreach (var provider in _sourceProviders.Values)
             await provider.DisposeAsync().ConfigureAwait(false);
+        _sourceProviders.Clear();
+    }
+
+    // The factory is a DI singleton; the host disposes it async on teardown. Implement IDisposable too so a SYNC
+    // ServiceProvider.Dispose() (future CLI/preflight tooling) doesn't throw on this IAsyncDisposable-only singleton.
+    // MongoClientProvider.DisposeAsync is synchronous-bodied, so the bridge never blocks.
+    public void Dispose()
+    {
+        foreach (var provider in _sourceProviders.Values)
+            provider.DisposeAsync().AsTask().GetAwaiter().GetResult();
         _sourceProviders.Clear();
     }
 

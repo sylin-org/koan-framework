@@ -109,9 +109,12 @@ public abstract class DocumentStore<TEntity, TKey> :
     // ==================== The operation template (readiness gate + tracing) ====================
 
     /// <summary>Run a native op under the readiness gate (which also rides schema auto-provisioning) and one traced
-    /// span tagged with entity / source / partition, recording the error status on a throw.</summary>
+    /// span tagged with entity / source / partition, recording the error status on a throw. Observes cancellation
+    /// eagerly (before any work) so a pre-cancelled token short-circuits even an op that would otherwise no-op.</summary>
     protected Task<T> RunAsync<T>(string op, Func<Task<T>> native, CancellationToken ct)
-        => this.WithReadinessAsync<T, TEntity>(async () =>
+    {
+        ct.ThrowIfCancellationRequested();
+        return this.WithReadinessAsync<T, TEntity>(async () =>
         {
             using var activity = Telemetry.StartActivity($"{Verb}.{op}");
             if (activity is not null)
@@ -131,6 +134,7 @@ public abstract class DocumentStore<TEntity, TKey> :
                 throw;
             }
         }, ct);
+    }
 
     // ==================== Read ====================
 
@@ -180,6 +184,10 @@ public abstract class DocumentStore<TEntity, TKey> :
 
     public IBatchSet<TEntity, TKey> CreateBatch() => new DocBatch(this);
 
+    // BATCH CONTRACT (family-uniform, mirrors KeyValueStore): a batch applies all upserts (adds + updates + replayed
+    // mutations) BEFORE all deletes — not in interleaved call order. Mixing an upsert and a delete of the SAME id in one
+    // batch is therefore undefined-by-contract (the upsert wins, the delete then removes it). Group by intent, don't
+    // interleave same-id upsert/delete.
     private sealed class DocBatch : IBatchSet<TEntity, TKey>
     {
         private readonly DocumentStore<TEntity, TKey> _repo;
@@ -238,6 +246,11 @@ public abstract class DocumentStore<TEntity, TKey> :
     // is what CONNECTS the provider (transitioning Initializing→Ready) and ensures the schema. Gating it on readiness
     // would deadlock — waiting for a Ready state only this call can produce. The dialect makes it idempotent (one run
     // per container via Schema).
+    //
+    // SCHEMA MEMOIZATION: the schema-ready state is memoized per container (the Schema gate) — ensure (container +
+    // indexes) runs ONCE per container per process, then short-circuits. An out-of-band external drop of the container
+    // is therefore not auto-re-ensured (a process restart or RemoveAll(Fast), which invalidates the gate, re-ensures);
+    // in practice a write recreates the container at the driver level, so only declared indexes lag until then.
     public Task EnsureReady(CancellationToken ct = default) => EnsureContainerAsync(ct);
 
     // ==================== Capabilities ====================
