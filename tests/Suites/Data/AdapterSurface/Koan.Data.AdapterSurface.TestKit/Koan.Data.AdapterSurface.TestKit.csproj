@@ -17,6 +17,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- ARCH-0094 Phase 1: the capability-driven Conformance Gate, LINK-compiled (not project-referenced) so the
+         two planes share its source, not an assembly — this testkit's discoverable conformance axis stays unshared. -->
+    <Compile Include="..\..\..\_shared\CapabilityConformanceGate.cs" Link="Support\CapabilityConformanceGate.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="AwesomeAssertions" Version="9.4.0" />
     <PackageReference Include="xunit.v3.extensibility.core" Version="3.2.2" />
     <PackageReference Include="xunit.v3.assert" Version="3.2.2" />

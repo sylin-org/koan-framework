@@ -2,9 +2,11 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using AwesomeAssertions;
+using Koan.Core.Capabilities;
 using Koan.Core.Hosting.App;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Capabilities;
+using Koan.Data.Conformance;
 using Koan.Data.Core;
 using Koan.Data.Vector;
 using Koan.Data.Vector.Abstractions;
@@ -107,6 +109,22 @@ public abstract class VectorAodbConformanceSpecsBase : IAsyncLifetime
             ?? throw new InvalidOperationException("No vector adapter resolved for the conformance entity.");
     }
 
+    /// <summary>The AODB isolation modules the vector decorator gates (ARCH-0094 Phase 1). Container + Database are the
+    /// universal name-fold floor (<see cref="UnclaimedDisposition.Required"/>); RowScoped is
+    /// <see cref="UnclaimedDisposition.FailClosed"/> — co-defined behaviorally by <see cref="Shared_tenant_overlay_isolates"/>
+    /// (declared ⇒ the overlay isolates a kNN; under-claimed ⇒ a scoped read fails closed), so an honest pure-KNN store
+    /// (e.g. SqliteVec) under-claims it without over-claiming.</summary>
+    private static readonly (Capability Token, UnclaimedDisposition Disposition)[] Modules =
+    {
+        (DataCaps.Isolation.RowScoped, UnclaimedDisposition.FailClosed),
+        (DataCaps.Isolation.ContainerScoped, UnclaimedDisposition.Required),
+        (DataCaps.Isolation.DatabaseScoped, UnclaimedDisposition.Required),
+    };
+
+    /// <summary>The vector decorator's announced capabilities, read off the resolved <c>ScopedVectorRepository</c>
+    /// (which merges the inner adapter's set with the framework isolation guarantees).</summary>
+    private CapabilitySet ResolveCaps() => DataCaps.Describe(ResolveScopedRepo(), "scoped-vector");
+
     // ==================== The co-definition: the decorator declares the modes it realizes ====================
 
     [Fact(DisplayName = "Vector AODB ledger: the ScopedVectorRepository declares the universal floor modes (ContainerScoped + DatabaseScoped); RowScoped is co-defined by the Shared cell")]
@@ -119,14 +137,10 @@ public abstract class VectorAodbConformanceSpecsBase : IAsyncLifetime
         Host!.Services.GetServices<IVectorAdapterFactory>().Should().HaveCount(1,
             "the conformance host must register exactly one vector adapter (the one under test)");
 
-        var caps = DataCaps.Describe(ResolveScopedRepo(), "scoped-vector");
-        // Container + Database are the universal name-mangling floor — realized (and so declared) by EVERY vector adapter.
-        caps.Has(DataCaps.Isolation.ContainerScoped).Should().BeTrue("Container mode (the partition name-fold floor) must be declared");
-        caps.Has(DataCaps.Isolation.DatabaseScoped).Should().BeTrue("Database mode (the source name-fold floor) must be declared");
-        // RowScoped (Shared) is gated on the inner adapter's metadata filtering, so it is NOT universal: a pure-KNN store
-        // (e.g. SqliteVec) honestly under-claims it. Its declaration is co-defined BEHAVIORALLY by the Shared cell below
-        // (declared ⇒ the overlay isolates; not declared ⇒ a scoped read fails closed) — neither over- nor under-claim
-        // can stay green. Asserting it unconditionally here would force an honest non-filtering adapter to over-claim.
+        // Container + Database are Required (the universal name-fold floor, realized by EVERY vector adapter); RowScoped
+        // is FailClosed — NOT asserted here, co-defined BEHAVIORALLY by the Shared cell below (declared ⇒ the overlay
+        // isolates; under-claimed ⇒ a scoped read fails closed), so an honest pure-KNN store is not forced to over-claim.
+        CapabilityConformanceGate.AssertRequiredDeclared(ResolveCaps(), Modules);
     }
 
     // ==================== Shared (FieldFilter → __koan_tenant overlay stamp + read-filter) ====================
@@ -136,33 +150,34 @@ public abstract class VectorAodbConformanceSpecsBase : IAsyncLifetime
     public async Task Shared_tenant_overlay_isolates()
     {
         SkipIfUnavailable();
-        var rowScoped = DataCaps.Describe(ResolveScopedRepo(), "scoped-vector").Has(DataCaps.Isolation.RowScoped);
+        var caps = ResolveCaps();
 
         // The write-stamp persists the managed discriminator regardless of filter support; only the READ filter needs it.
         using (Tenant.Use("acme")) { await Vector<VectorConformanceTenantDoc>.Save("a1", PointA); await SettleAsync<VectorConformanceTenantDoc>("a1", PointA); }
         using (Tenant.Use("globex")) { await Vector<VectorConformanceTenantDoc>.Save("g1", PointB); await SettleAsync<VectorConformanceTenantDoc>("g1", PointB); }
 
-        if (rowScoped)
-        {
-            // Declared ⇒ the overlay must isolate the kNN (the other tenant's vector is excluded even when nearer).
-            using (Tenant.Use("acme"))
-                (await Vector<VectorConformanceTenantDoc>.Search(new VectorQueryOptions(Query: PointB, TopK: 10)))
-                    .Matches.Select(m => m.Id).Should().Equal("a1");
-            using (Tenant.Use("globex"))
-                (await Vector<VectorConformanceTenantDoc>.Search(new VectorQueryOptions(Query: PointA, TopK: 10)))
-                    .Matches.Select(m => m.Id).Should().Equal("g1");
-        }
-        else
-        {
-            // Under-claimed (the inner cannot filter metadata) ⇒ a scoped read must FAIL CLOSED, never silently leak the
-            // other tenant's vector. This is the honest path for a pure-KNN store (e.g. SqliteVec).
-            Func<Task> scopedRead = async () =>
+        await CapabilityConformanceGate.RunCell(caps, Modules, DataCaps.Isolation.RowScoped,
+            realize: async () =>
             {
+                // Declared ⇒ the overlay must isolate the kNN (the other tenant's vector is excluded even when nearer).
                 using (Tenant.Use("acme"))
-                    await Vector<VectorConformanceTenantDoc>.Search(new VectorQueryOptions(Query: PointB, TopK: 10));
-            };
-            await scopedRead.Should().ThrowAsync<NotSupportedException>();
-        }
+                    (await Vector<VectorConformanceTenantDoc>.Search(new VectorQueryOptions(Query: PointB, TopK: 10)))
+                        .Matches.Select(m => m.Id).Should().Equal("a1");
+                using (Tenant.Use("globex"))
+                    (await Vector<VectorConformanceTenantDoc>.Search(new VectorQueryOptions(Query: PointA, TopK: 10)))
+                        .Matches.Select(m => m.Id).Should().Equal("g1");
+            },
+            failClosed: async () =>
+            {
+                // Under-claimed (the inner cannot filter metadata) ⇒ a scoped read must FAIL CLOSED, never silently leak the
+                // other tenant's vector. This is the honest path for a pure-KNN store (e.g. SqliteVec).
+                Func<Task> scopedRead = async () =>
+                {
+                    using (Tenant.Use("acme"))
+                        await Vector<VectorConformanceTenantDoc>.Search(new VectorQueryOptions(Query: PointB, TopK: 10));
+                };
+                await scopedRead.Should().ThrowAsync<NotSupportedException>();
+            });
     }
 
     // ==================== Container (Particle → distinct physical container per partition) ====================
@@ -172,31 +187,36 @@ public abstract class VectorAodbConformanceSpecsBase : IAsyncLifetime
     public async Task Container_partition_isolates()
     {
         SkipIfUnavailable();
-        var pA = "vcc-" + Guid.CreateVersion7().ToString("n");
-        var pB = "vcc-" + Guid.CreateVersion7().ToString("n");
-        using (EntityContext.Partition(pA)) { await Vector<VectorConformancePartitionDoc>.Save("p1", PointA); await SettleAsync<VectorConformancePartitionDoc>("p1", PointA); }
-        using (EntityContext.Partition(pB)) { await Vector<VectorConformancePartitionDoc>.Save("p2", PointB); await SettleAsync<VectorConformancePartitionDoc>("p2", PointB); }
+        await CapabilityConformanceGate.RunCell(ResolveCaps(), Modules,
+            DataCaps.Isolation.ContainerScoped,
+            realize: async () =>
+        {
+            var pA = "vcc-" + Guid.CreateVersion7().ToString("n");
+            var pB = "vcc-" + Guid.CreateVersion7().ToString("n");
+            using (EntityContext.Partition(pA)) { await Vector<VectorConformancePartitionDoc>.Save("p1", PointA); await SettleAsync<VectorConformancePartitionDoc>("p1", PointA); }
+            using (EntityContext.Partition(pB)) { await Vector<VectorConformancePartitionDoc>.Save("p2", PointB); await SettleAsync<VectorConformancePartitionDoc>("p2", PointB); }
 
-        bool byId;
-        using (EntityContext.Partition(pA))
-        {
-            byId = await SupportsGetEmbedding<VectorConformancePartitionDoc>("p1");
-            if (byId)
+            bool byId;
+            using (EntityContext.Partition(pA))
             {
-                // Physical separation (by-id): p2 was written under pB, so it is ABSENT from pA's physical container.
-                (await Vector<VectorConformancePartitionDoc>.GetEmbedding("p1")).Should().NotBeNull();
-                (await Vector<VectorConformancePartitionDoc>.GetEmbedding("p2")).Should().BeNull();
+                byId = await SupportsGetEmbedding<VectorConformancePartitionDoc>("p1");
+                if (byId)
+                {
+                    // Physical separation (by-id): p2 was written under pB, so it is ABSENT from pA's physical container.
+                    (await Vector<VectorConformancePartitionDoc>.GetEmbedding("p1")).Should().NotBeNull();
+                    (await Vector<VectorConformancePartitionDoc>.GetEmbedding("p2")).Should().BeNull();
+                }
+                // kNN: a search in pA returns only pA's vector even when pB's vector is nearer the query.
+                (await Vector<VectorConformancePartitionDoc>.Search(new VectorQueryOptions(Query: PointB, TopK: 10)))
+                    .Matches.Select(m => m.Id).Should().Equal("p1");
             }
-            // kNN: a search in pA returns only pA's vector even when pB's vector is nearer the query.
-            (await Vector<VectorConformancePartitionDoc>.Search(new VectorQueryOptions(Query: PointB, TopK: 10)))
-                .Matches.Select(m => m.Id).Should().Equal("p1");
-        }
-        using (EntityContext.Partition(pB))
-        {
-            if (byId) (await Vector<VectorConformancePartitionDoc>.GetEmbedding("p1")).Should().BeNull();
-            (await Vector<VectorConformancePartitionDoc>.Search(new VectorQueryOptions(Query: PointA, TopK: 10)))
-                .Matches.Select(m => m.Id).Should().Equal("p2");
-        }
+            using (EntityContext.Partition(pB))
+            {
+                if (byId) (await Vector<VectorConformancePartitionDoc>.GetEmbedding("p1")).Should().BeNull();
+                (await Vector<VectorConformancePartitionDoc>.Search(new VectorQueryOptions(Query: PointA, TopK: 10)))
+                    .Matches.Select(m => m.Id).Should().Equal("p2");
+            }
+        });
     }
 
     // ==================== Database (Moniker → per-source physical isolation) ====================
@@ -206,28 +226,33 @@ public abstract class VectorAodbConformanceSpecsBase : IAsyncLifetime
     public async Task Database_shard_isolates()
     {
         SkipIfUnavailable();
-        using (VectorConformanceShardAmbient.Use(SourceA)) { await Vector<VectorConformanceShardedDoc>.Save("s1", PointA); await SettleAsync<VectorConformanceShardedDoc>("s1", PointA); }
-        using (VectorConformanceShardAmbient.Use(SourceB)) { await Vector<VectorConformanceShardedDoc>.Save("s2", PointB); await SettleAsync<VectorConformanceShardedDoc>("s2", PointB); }
+        await CapabilityConformanceGate.RunCell(ResolveCaps(), Modules,
+            DataCaps.Isolation.DatabaseScoped,
+            realize: async () =>
+        {
+            using (VectorConformanceShardAmbient.Use(SourceA)) { await Vector<VectorConformanceShardedDoc>.Save("s1", PointA); await SettleAsync<VectorConformanceShardedDoc>("s1", PointA); }
+            using (VectorConformanceShardAmbient.Use(SourceB)) { await Vector<VectorConformanceShardedDoc>.Save("s2", PointB); await SettleAsync<VectorConformanceShardedDoc>("s2", PointB); }
 
-        bool byId;
-        using (VectorConformanceShardAmbient.Use(SourceA))
-        {
-            byId = await SupportsGetEmbedding<VectorConformanceShardedDoc>("s1");
-            if (byId)
+            bool byId;
+            using (VectorConformanceShardAmbient.Use(SourceA))
             {
-                // Physical separation (by-id): s2 was written under shard B, so it is ABSENT from shard A's physical store.
-                (await Vector<VectorConformanceShardedDoc>.GetEmbedding("s1")).Should().NotBeNull();
-                (await Vector<VectorConformanceShardedDoc>.GetEmbedding("s2")).Should().BeNull();
+                byId = await SupportsGetEmbedding<VectorConformanceShardedDoc>("s1");
+                if (byId)
+                {
+                    // Physical separation (by-id): s2 was written under shard B, so it is ABSENT from shard A's physical store.
+                    (await Vector<VectorConformanceShardedDoc>.GetEmbedding("s1")).Should().NotBeNull();
+                    (await Vector<VectorConformanceShardedDoc>.GetEmbedding("s2")).Should().BeNull();
+                }
+                // kNN: a search in shard A returns only shard A's vector even when shard B's vector is nearer the query.
+                (await Vector<VectorConformanceShardedDoc>.Search(new VectorQueryOptions(Query: PointB, TopK: 10)))
+                    .Matches.Select(m => m.Id).Should().Equal("s1");
             }
-            // kNN: a search in shard A returns only shard A's vector even when shard B's vector is nearer the query.
-            (await Vector<VectorConformanceShardedDoc>.Search(new VectorQueryOptions(Query: PointB, TopK: 10)))
-                .Matches.Select(m => m.Id).Should().Equal("s1");
-        }
-        using (VectorConformanceShardAmbient.Use(SourceB))
-        {
-            if (byId) (await Vector<VectorConformanceShardedDoc>.GetEmbedding("s1")).Should().BeNull();
-            (await Vector<VectorConformanceShardedDoc>.Search(new VectorQueryOptions(Query: PointA, TopK: 10)))
-                .Matches.Select(m => m.Id).Should().Equal("s2");
-        }
+            using (VectorConformanceShardAmbient.Use(SourceB))
+            {
+                if (byId) (await Vector<VectorConformanceShardedDoc>.GetEmbedding("s1")).Should().BeNull();
+                (await Vector<VectorConformanceShardedDoc>.Search(new VectorQueryOptions(Query: PointA, TopK: 10)))
+                    .Matches.Select(m => m.Id).Should().Equal("s2");
+            }
+        });
     }
 }

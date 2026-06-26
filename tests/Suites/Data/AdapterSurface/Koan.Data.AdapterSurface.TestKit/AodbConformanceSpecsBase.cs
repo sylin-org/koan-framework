@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using AwesomeAssertions;
+using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Capabilities;
+using Koan.Data.Conformance;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
 using Koan.Testing.Containers;
@@ -52,20 +54,36 @@ public abstract class AodbConformanceSpecsBase<TFixture> : KoanDataSpec<TFixture
     /// </summary>
     protected abstract IEnumerable<KeyValuePair<string, string?>> RoutedSourceSettings();
 
-    // ==================== The co-definition: declare all three tokens ====================
+    // ==================== The capability-driven gate (ARCH-0094 Phase 1) ====================
+
+    /// <summary>The AODB isolation modules this ledger gates, each with its under-claim disposition. Record adapters
+    /// realize all three modes (the ARCH-0103 fleet mandate), so all three are <see cref="UnclaimedDisposition.Required"/>:
+    /// under-claim fails <see cref="Declares_all_three_isolation_modes"/>, over-claim fails the matching realization cell.</summary>
+    private static readonly (Capability Token, UnclaimedDisposition Disposition)[] Modules =
+    {
+        (DataCaps.Isolation.RowScoped, UnclaimedDisposition.Required),
+        (DataCaps.Isolation.ContainerScoped, UnclaimedDisposition.Required),
+        (DataCaps.Isolation.DatabaseScoped, UnclaimedDisposition.Required),
+    };
+
+    /// <summary>The adapter's announced data capabilities, read off a resolved repository (the repository facade
+    /// forwards the inner adapter's set; capabilities are adapter-level, so any conformance entity's repository
+    /// reports the same tokens).</summary>
+    private static CapabilitySet ResolveCaps(IServiceProvider sp)
+    {
+        var repo = sp.GetRequiredService<IDataService>().GetRepository<ConformancePartitionDoc, string>();
+        return DataCaps.Describe(repo, repo.GetType().Name);
+    }
+
+    // ==================== The co-definition: declare the required tokens ====================
 
     [Fact(DisplayName = "AODB ledger: the adapter declares all three isolation modes (RowScoped + ContainerScoped + DatabaseScoped)")]
     public async Task Declares_all_three_isolation_modes()
     {
         RequireBackingStore();
         await using var host = await BootAsync();
-        var data = host.Services.GetRequiredService<IDataService>();
-        var repo = data.GetRepository<ConformancePartitionDoc, string>();
-
-        var caps = DataCaps.Describe(repo, repo.GetType().Name);
-        caps.Has(DataCaps.Isolation.RowScoped).Should().BeTrue("Shared mode (FieldFilter) must be declared");
-        caps.Has(DataCaps.Isolation.ContainerScoped).Should().BeTrue("Container mode (Particle) must be declared");
-        caps.Has(DataCaps.Isolation.DatabaseScoped).Should().BeTrue("Database mode (Moniker) must be declared");
+        // All three modes are Required (the fleet mandate) — the gate fails any under-claim.
+        CapabilityConformanceGate.AssertRequiredDeclared(ResolveCaps(host.Services), Modules);
     }
 
     // ==================== Shared (FieldFilter → managed-record persistence) ====================
@@ -75,7 +93,9 @@ public abstract class AodbConformanceSpecsBase<TFixture> : KoanDataSpec<TFixture
     {
         RequireBackingStore();
         await using var host = await BootAsync();
-        await ManagedFieldNoLeak.AssertNoLeakAsync();
+        await CapabilityConformanceGate.RunCell(ResolveCaps(host.Services), Modules,
+            DataCaps.Isolation.RowScoped,
+            realize: () => ManagedFieldNoLeak.AssertNoLeakAsync());
     }
 
     // ==================== Container (Particle → distinct physical container per partition) ====================
@@ -85,45 +105,49 @@ public abstract class AodbConformanceSpecsBase<TFixture> : KoanDataSpec<TFixture
     {
         RequireBackingStore();
         await using var host = await BootAsync();
-
-        var pA = NewPartition("ca");
-        var pB = NewPartition("cb");
-
-        ConformancePartitionDoc a, b;
-        using (Lease(pA)) a = await new ConformancePartitionDoc { Title = "a" }.Save();
-        using (Lease(pB)) b = await new ConformancePartitionDoc { Title = "b" }.Save();
-
-        // Read isolation across partitions.
-        using (Lease(pA))
+        await CapabilityConformanceGate.RunCell(ResolveCaps(host.Services), Modules,
+            DataCaps.Isolation.ContainerScoped,
+            realize: async () =>
         {
-            (await ConformancePartitionDoc.All()).Select(d => d.Id).Should().Equal(a.Id);
-            (await ConformancePartitionDoc.Get(b.Id)).Should().BeNull();   // pB's row is unreachable from pA
-        }
-        using (Lease(pB))
-        {
-            (await ConformancePartitionDoc.All()).Select(d => d.Id).Should().Equal(b.Id);
-            (await ConformancePartitionDoc.Get(a.Id)).Should().BeNull();
-        }
+            var pA = NewPartition("ca");
+            var pB = NewPartition("cb");
 
-        // Concurrent interleaved writes across two FRESH partitions must not cross-contaminate (no shared mutable
-        // per-partition state on the adapter): each partition ends with EXACTLY its own rows.
-        const int perPartition = 15;
-        var cA = NewPartition("cc");
-        var cB = NewPartition("cd");
-        await Task.WhenAll(
-            Task.Run(async () =>
-            {
-                for (var i = 0; i < perPartition; i++)
-                    using (Lease(cA)) await new ConformancePartitionDoc { Title = $"a{i}" }.Save();
-            }),
-            Task.Run(async () =>
-            {
-                for (var i = 0; i < perPartition; i++)
-                    using (Lease(cB)) await new ConformancePartitionDoc { Title = $"b{i}" }.Save();
-            }));
+            ConformancePartitionDoc a, b;
+            using (Lease(pA)) a = await new ConformancePartitionDoc { Title = "a" }.Save();
+            using (Lease(pB)) b = await new ConformancePartitionDoc { Title = "b" }.Save();
 
-        using (Lease(cA)) (await ConformancePartitionDoc.All()).Should().HaveCount(perPartition);
-        using (Lease(cB)) (await ConformancePartitionDoc.All()).Should().HaveCount(perPartition);
+            // Read isolation across partitions.
+            using (Lease(pA))
+            {
+                (await ConformancePartitionDoc.All()).Select(d => d.Id).Should().Equal(a.Id);
+                (await ConformancePartitionDoc.Get(b.Id)).Should().BeNull();   // pB's row is unreachable from pA
+            }
+            using (Lease(pB))
+            {
+                (await ConformancePartitionDoc.All()).Select(d => d.Id).Should().Equal(b.Id);
+                (await ConformancePartitionDoc.Get(a.Id)).Should().BeNull();
+            }
+
+            // Concurrent interleaved writes across two FRESH partitions must not cross-contaminate (no shared mutable
+            // per-partition state on the adapter): each partition ends with EXACTLY its own rows.
+            const int perPartition = 15;
+            var cA = NewPartition("cc");
+            var cB = NewPartition("cd");
+            await Task.WhenAll(
+                Task.Run(async () =>
+                {
+                    for (var i = 0; i < perPartition; i++)
+                        using (Lease(cA)) await new ConformancePartitionDoc { Title = $"a{i}" }.Save();
+                }),
+                Task.Run(async () =>
+                {
+                    for (var i = 0; i < perPartition; i++)
+                        using (Lease(cB)) await new ConformancePartitionDoc { Title = $"b{i}" }.Save();
+                }));
+
+            using (Lease(cA)) (await ConformancePartitionDoc.All()).Should().HaveCount(perPartition);
+            using (Lease(cB)) (await ConformancePartitionDoc.All()).Should().HaveCount(perPartition);
+        });
     }
 
     // ==================== Database (Moniker → per-source physical routing) ====================
@@ -133,30 +157,34 @@ public abstract class AodbConformanceSpecsBase<TFixture> : KoanDataSpec<TFixture
     {
         RequireBackingStore();
         await using var host = await BootAsync(RoutedSourceSettings());
-
-        // No explicit EntityContext.Source — only the ambient shard. The Database-mode axis derives the source.
-        ConformanceShardedDoc a, b;
-        using (ConformanceShardAmbient.Use(SourceA)) a = await new ConformanceShardedDoc { Title = "from-a" }.Save();
-        using (ConformanceShardAmbient.Use(SourceB)) b = await new ConformanceShardedDoc { Title = "from-b" }.Save();
-
-        using (ConformanceShardAmbient.Use(SourceA))
+        await CapabilityConformanceGate.RunCell(ResolveCaps(host.Services), Modules,
+            DataCaps.Isolation.DatabaseScoped,
+            realize: async () =>
         {
-            (await ConformanceShardedDoc.All()).Select(d => d.Title).Should().Equal("from-a");
-            (await ConformanceShardedDoc.Get(b.Id)).Should().BeNull();   // b lives in the other physical source
-        }
-        using (ConformanceShardAmbient.Use(SourceB))
-        {
-            (await ConformanceShardedDoc.All()).Select(d => d.Title).Should().Equal("from-b");
-            (await ConformanceShardedDoc.Get(a.Id)).Should().BeNull();
-        }
+            // No explicit EntityContext.Source — only the ambient shard. The Database-mode axis derives the source.
+            ConformanceShardedDoc a, b;
+            using (ConformanceShardAmbient.Use(SourceA)) a = await new ConformanceShardedDoc { Title = "from-a" }.Save();
+            using (ConformanceShardAmbient.Use(SourceB)) b = await new ConformanceShardedDoc { Title = "from-b" }.Save();
 
-        // Fail-closed (external-only posture): routing to an unconfigured source throws a self-explaining error.
-        Func<Task> act = async () =>
-        {
-            using (ConformanceShardAmbient.Use(SourceUnconfigured))
-                await new ConformanceShardedDoc { Title = "nope" }.Save();
-        };
-        (await act.Should().ThrowAsync<InvalidOperationException>())
-            .WithMessage($"*{SourceUnconfigured}*not configured*");
+            using (ConformanceShardAmbient.Use(SourceA))
+            {
+                (await ConformanceShardedDoc.All()).Select(d => d.Title).Should().Equal("from-a");
+                (await ConformanceShardedDoc.Get(b.Id)).Should().BeNull();   // b lives in the other physical source
+            }
+            using (ConformanceShardAmbient.Use(SourceB))
+            {
+                (await ConformanceShardedDoc.All()).Select(d => d.Title).Should().Equal("from-b");
+                (await ConformanceShardedDoc.Get(a.Id)).Should().BeNull();
+            }
+
+            // Fail-closed (external-only posture): routing to an unconfigured source throws a self-explaining error.
+            Func<Task> act = async () =>
+            {
+                using (ConformanceShardAmbient.Use(SourceUnconfigured))
+                    await new ConformanceShardedDoc { Title = "nope" }.Save();
+            };
+            (await act.Should().ThrowAsync<InvalidOperationException>())
+                .WithMessage($"*{SourceUnconfigured}*not configured*");
+        });
     }
 }

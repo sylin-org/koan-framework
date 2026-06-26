@@ -172,6 +172,54 @@ ARCH-0098 classification axis. Phasing: `1` capability-driven Gate generalizatio
 **`3` first Blueprint + grounding-lint** → `4` end-to-end Forge slice → `5` beyond-happy-path → `6` high-blast gates →
 `7` maturity ladder + remaining blueprints.
 
+### Phase 1 — capability-driven Gate generalization (DONE, 2026-06-26)
+
+Realizes §3's **"capability-flag-driven + no-capability-lies"** as a reusable primitive. Before this phase the
+conformance ledger (`AodbConformanceSpecsBase` + `VectorAodbConformanceSpecsBase`) was hardwired to the three AODB
+isolation tokens; this phase turns it into **one capability-driven Conformance Gate** seeded with those three modules
+and ready for any future `DataCaps`/`VectorCaps` token. **Tight scope:** the two AODB bases only — the other 11 data
+tokens (`Query.*`, `Write.*`, `Retention.TtlIndex`) keep their per-connector co-defined specs and migrate onto the
+gate in a later phase; this phase is a *pure restructuring* (the realization bodies and display names are unchanged),
+guarded by a **same-outcome** re-run of the existing 8 record + 7 vector adapter cells — each cell's pass/skip/fail is
+preserved; the only added work per cell is a side-effect-free capability read.
+
+- **The disposition model (the generalization).** Each conformance module declares what happens when the adapter does
+  **not** announce its token. The three dispositions are *emergent from what already shipped*, not invented:
+  - **`Required`** — the fleet mandate (ARCH-0103): the token MUST be announced; under-claim fails the *declares* cell.
+    (The realization proof still runs — it is independent of the declaration.) All three record isolation tokens, and
+    the vector Container/Database tokens, are `Required`.
+  - **`FailClosed`** — under-claim is allowed, but the cell then proves the adapter **fails closed** on a scoped access
+    rather than silently leaking. The vector `RowScoped` pattern for a pure-KNN store (e.g. SqliteVec): declared ⇒ the
+    overlay isolates a kNN; under-claimed ⇒ a scoped read throws, never returns the other tenant's vectors.
+  - **`Skip`** — the §3 literal default: under-claim ⇒ the cell is **skipped, loud** (a visible xUnit skip — *never* a
+    silent pass). Built and unit-proven, but **inert** today (no isolation token uses it); it is the slot a Phase-5
+    non-safety token (e.g. `Query.FastCount`) drops into.
+  In every disposition an **announced** token always runs its realization proof, so **over-claim** (declare-but-not-realize)
+  fails green structurally regardless of disposition — the co-definition is preserved, now uniform across both planes.
+- **Reconciliation of the fleet mandate with §3.** ARCH-0103's "all 15 adapters realize all three modes — supersedes
+  capability-gating" is *not* in tension with §3's "un-announced ⇒ skipped": the gate carries a **required-set**
+  (the fleet mandate, expressed as the `Required` disposition) layered over the capability-driven skip mechanism.
+  Under-claim of a *required* token fails loud; under-claim of an *optional* token skips loud or proves fail-closed.
+  Because every record adapter declares all three and the vector decorator declares Container+Database (RowScoped iff
+  it can filter), the restructured kit is **behaviorally identical** to the prior behavior (same pass/skip/fail per cell).
+- **The primitive.** `CapabilityConformanceGate` (link-compiled from `tests/Suites/_shared/CapabilityConformanceGate.cs`
+  into *each* AODB testkit, the `NonIsolatingFakeAdapter` pattern — **no shared assembly**, so the record testkit's
+  discoverable `ConformanceShardAxis` is never dragged into the vector adapter hosts and the off-proofs stay
+  unaffected). `ResolveCell(declared, token, disposition)` is the **pure** decision (announced ⇒ Realize; else the
+  disposition decides); `RunCell(declared, modules, token, …)` is the xUnit action — it **looks up the disposition from
+  the module table** (the single source of truth, so a cell can't drift out of sync), **eagerly** validates that a
+  FailClosed module supplies its fail-closed proof, runs the realization / fail-closed proof, or raises the **loud skip**
+  for an unannounced Skip token (then throws, so a skip can never fall through to a silent green); `AssertRequiredDeclared(…)`
+  is the under-claim catcher for the *declares* cell. Each base carries a small `(token, disposition)` module table — the
+  one place a token's disposition is declared.
+- **Proof.** Unit tests (`CapabilityConformanceGateTests`) pin the decision truth table across all three dispositions,
+  prove the Skip path raises a loud skip and **never** runs its realization, and cover the wiring guards (eager
+  FailClosed-proof check, unregistered-token throw). The 8 record + 7 vector adapter cells re-run with **identical
+  outcomes** (Docker-free subset locally: InMemory/Json/SQLite record + InMemoryVector/SqliteVec vector, plus Mongo +
+  Qdrant on real engines; the remaining containerized surfaces are unchanged by construction — the realization bodies and
+  display names are untouched, only the run/skip/fail-closed dispatch is centralized and a side-effect-free caps read is
+  added per cell).
+
 ### Phase 3 — the Adapter Blueprint format + the grounding-lint (DONE, 2026-06-26)
 
 Resolves the carve-out **"the Blueprint artifact format + catalogue/discoverability"** for the first type.
