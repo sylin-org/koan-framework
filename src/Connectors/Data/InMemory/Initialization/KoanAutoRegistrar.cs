@@ -31,6 +31,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         module.Describe(ModuleVersion);
         module.AddSetting("Storage", "InMemory (ephemeral)");
         module.AddSetting("Priority", "-100 (fallback)");
+        module.AddNote("AODB isolation: RowScoped + ContainerScoped + DatabaseScoped (conformance: AodbConformanceSpecsBase)");
     }
 }
 

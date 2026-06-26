@@ -58,6 +58,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // Autonomous discovery adapter handles all connection string resolution
         // Boot report shows discovery results from SqliteDiscoveryAdapter
         module.AddNote("SQLite discovery handled by autonomous SqliteDiscoveryAdapter");
+        module.AddNote("AODB isolation: RowScoped + ContainerScoped + DatabaseScoped (conformance: AodbConformanceSpecsBase)");
 
         // Configure default options for reporting with provenance metadata
         var defaultOptions = new SqliteOptions();

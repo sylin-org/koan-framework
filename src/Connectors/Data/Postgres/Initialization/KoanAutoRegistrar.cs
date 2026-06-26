@@ -63,6 +63,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
         // Autonomous discovery adapter handles all connection string resolution
         // Boot report shows discovery results from PostgresDiscoveryAdapter
         module.AddNote("PostgreSQL discovery handled by autonomous PostgresDiscoveryAdapter");
+        module.AddNote("AODB isolation: RowScoped + ContainerScoped + DatabaseScoped (conformance: AodbConformanceSpecsBase)");
 
         // Configure default options for reporting (with provenance)
         var defaultOptions = new PostgresOptions();

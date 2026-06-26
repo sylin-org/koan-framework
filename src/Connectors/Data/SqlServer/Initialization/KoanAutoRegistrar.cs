@@ -57,6 +57,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // Autonomous discovery adapter handles all connection string resolution
         // Boot report shows discovery results from SqlServerDiscoveryAdapter
         module.AddNote("SQL Server discovery handled by autonomous SqlServerDiscoveryAdapter");
+        module.AddNote("AODB isolation: RowScoped + ContainerScoped + DatabaseScoped (conformance: AodbConformanceSpecsBase)");
 
         // Configure default options for reporting with provenance metadata
         var defaultOptions = new SqlServerOptions();
