@@ -34,19 +34,17 @@ namespace Koan.Data.Core.Document;
 /// telemetry + readiness boilerplate the per-adapter repos used to repeat ~12 times each.</para>
 /// </summary>
 public abstract class DocumentStore<TEntity, TKey> :
+    AdapterReadinessForwardingBase,
     IDataRepository<TEntity, TKey>,
     IQueryRepository<TEntity, TKey>,
     IDescribesCapabilities,
-    IInstructionExecutor<TEntity>,
-    IAdapterReadiness,
-    IAdapterReadinessConfiguration
+    IInstructionExecutor<TEntity>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
     // ==================== The native seam (the dialect supplies these) ====================
-
-    /// <summary>The readiness source (the connection provider) the op-template gates on and the forwarding delegates to.</summary>
-    protected abstract IAdapterReadiness Readiness { get; }
+    // (Readiness — the connection provider — and the readiness config Policy/Timeout/EnableReadinessGating are inherited
+    // from AdapterReadinessForwardingBase; the dialect overrides them.)
 
     /// <summary>The provider's <see cref="ActivitySource"/> (e.g. <c>Koan.Data.Connector.Mongo</c>).</summary>
     protected abstract ActivitySource Telemetry { get; }
@@ -85,26 +83,7 @@ public abstract class DocumentStore<TEntity, TKey> :
     /// <summary>The shared schema-ready gate (one run per container key). The dialect's container resolution drives it.</summary>
     protected OnceGate Schema { get; } = new();
 
-    // ==================== Readiness configuration (the dialect maps from options) ====================
-
-    public abstract ReadinessPolicy Policy { get; }
-    public abstract TimeSpan Timeout { get; }
-    public abstract bool EnableReadinessGating { get; }
-
-    // ==================== Readiness forwarding (IAdapterReadiness → the provider) ====================
-
-    public AdapterReadinessState ReadinessState => Readiness.ReadinessState;
-    public bool IsReady => Readiness.IsReady;
-    public TimeSpan ReadinessTimeout => Readiness.ReadinessTimeout;
-    public ReadinessStateManager StateManager => Readiness.StateManager;
-    public Task<bool> IsReadyAsync(CancellationToken ct = default) => Readiness.IsReadyAsync(ct);
-    public Task WaitForReadiness(TimeSpan? timeout = null, CancellationToken ct = default) => Readiness.WaitForReadiness(timeout, ct);
-
-    public event EventHandler<ReadinessStateChangedEventArgs>? ReadinessStateChanged
-    {
-        add => Readiness.ReadinessStateChanged += value;
-        remove => Readiness.ReadinessStateChanged -= value;
-    }
+    // (Readiness forwarding + Policy/Timeout/EnableReadinessGating live on AdapterReadinessForwardingBase.)
 
     // ==================== The operation template (readiness gate + tracing) ====================
 
@@ -114,26 +93,17 @@ public abstract class DocumentStore<TEntity, TKey> :
     protected Task<T> RunAsync<T>(string op, Func<Task<T>> native, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        return this.WithReadinessAsync<T, TEntity>(async () =>
-        {
-            using var activity = Telemetry.StartActivity($"{Verb}.{op}");
-            if (activity is not null)
-            {
-                activity.SetTag("db.entity", typeof(TEntity).FullName);
-                if (RoutedSource is { Length: > 0 } source) activity.SetTag("koan.source", source);
-                var partition = EntityContext.Current?.Partition;
-                if (partition is { Length: > 0 }) activity.SetTag("koan.partition", partition);
-            }
-            try
-            {
-                return await native().ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
-                throw;
-            }
-        }, ct);
+        return this.WithReadinessAsync<T, TEntity>(
+            () => AdapterActivity.TraceAsync(Telemetry, $"{Verb}.{op}", Tag, native), ct);
+    }
+
+    /// <summary>Tag a backend-op span with the entity, routed source, and ambient partition.</summary>
+    private void Tag(Activity activity)
+    {
+        activity.SetTag("db.entity", typeof(TEntity).FullName);
+        if (RoutedSource is { Length: > 0 } source) activity.SetTag("koan.source", source);
+        var partition = EntityContext.Current?.Partition;
+        if (partition is { Length: > 0 }) activity.SetTag("koan.partition", partition);
     }
 
     // ==================== Read ====================
