@@ -39,21 +39,14 @@ public sealed class SqliteVecAdapterFactory : IVectorAdapterFactory
     {
         var baseOpts = sp.GetService<IOptions<SqliteVecOptions>>()?.Value ?? new SqliteVecOptions();
 
-        // ARCH-0103 P1 (Moniker): a distinct .db file per routed source. The Default source keeps the configured
-        // ConnectionString (byte-identical to the pre-P1 single-file path); any other source resolves through the
-        // SAME AdapterConnectionResolver the record plane uses (reuse, not a bespoke per-source rule — [[no-stopgaps]]).
-        string connectionString;
-        if ((string.IsNullOrWhiteSpace(source) || string.Equals(source, "Default", StringComparison.OrdinalIgnoreCase))
-            && !string.IsNullOrWhiteSpace(baseOpts.ConnectionString))
-        {
-            connectionString = baseOpts.ConnectionString;
-        }
-        else
-        {
-            var config = sp.GetRequiredService<IConfiguration>();
-            var sourceRegistry = sp.GetRequiredService<DataSourceRegistry>();
-            connectionString = AdapterConnectionResolver.ResolveConnectionString(config, sourceRegistry, "SqliteVec", source);
-        }
+        // ARCH-0103 P1 (Moniker): a distinct .db file per routed source, via the SHARED AdapterConnectionResolver the
+        // record plane uses (reuse, not a bespoke per-source rule — [[no-stopgaps]]). The Default keeps the configured
+        // ConnectionString (byte-identical to the pre-P1 single-file path); a non-Default source whose connection relies
+        // on discovery and resolves to "auto" collapses onto it rather than keying a .db file on the sentinel (P5 hoist).
+        var config = sp.GetRequiredService<IConfiguration>();
+        var sourceRegistry = sp.GetRequiredService<DataSourceRegistry>();
+        var connectionString = AdapterConnectionResolver.ResolveRoutedConnection(
+            config, sourceRegistry, "SqliteVec", source, baseOpts.ConnectionString);
 
         var sourceOpts = new SqliteVecOptions { ConnectionString = connectionString, DistanceMetric = baseOpts.DistanceMetric };
         return new SqliteVecVectorRepository<TEntity, TKey>(this, sp, sourceOpts);

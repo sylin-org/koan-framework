@@ -62,6 +62,44 @@ public static class AdapterConnectionResolver
     }
 
     /// <summary>
+    /// Resolve the per-source connection string for a Database-mode routed source, collapsing the <c>"auto"</c> /
+    /// blank discovery sentinel onto the already-resolved Default connection (ARCH-0103 P5 fleet hoist). The flow:
+    /// <list type="number">
+    /// <item>The Default source (or blank) returns <paramref name="resolvedDefault"/> when present — the
+    /// discovery-resolved base connection the adapter's options configurator already produced (byte-identical to the
+    /// pre-routing single path); otherwise it falls through to <see cref="ResolveConnectionString"/>.</item>
+    /// <item>A non-Default source resolves via <see cref="ResolveConnectionString"/>; if that yields the literal
+    /// <c>"auto"</c> or blank — a source relying on runtime discovery, which this resolver cannot perform — it collapses
+    /// onto <paramref name="resolvedDefault"/> so the per-source pool/store never keys on the unresolved sentinel.</item>
+    /// </list>
+    /// This is the shared form of the per-adapter <c>ResolveRoutedConnection</c> the Mongo (<c>d0ea898e</c>) and Couchbase
+    /// (ARCH-0103 P4) factories grew locally: the relational + SqliteVec factories had no <c>"auto"</c> fallback at all,
+    /// so a non-Default source relying on discovery keyed its store on <c>"auto"</c>. With this they collapse uniformly.
+    /// </summary>
+    public static string ResolveRoutedConnection(
+        IConfiguration config,
+        DataSourceRegistry sourceRegistry,
+        string providerId,
+        string source,
+        string? resolvedDefault)
+    {
+        if (string.IsNullOrWhiteSpace(source) || string.Equals(source, "Default", StringComparison.OrdinalIgnoreCase))
+        {
+            return string.IsNullOrWhiteSpace(resolvedDefault)
+                ? ResolveConnectionString(config, sourceRegistry, providerId, source)
+                : resolvedDefault!;
+        }
+
+        var resolved = ResolveConnectionString(config, sourceRegistry, providerId, source);
+        return IsUnresolvedSentinel(resolved) && !string.IsNullOrWhiteSpace(resolvedDefault) ? resolvedDefault! : resolved;
+    }
+
+    // Blank or the literal "auto" discovery sentinel — a source whose physical connection the static resolver cannot
+    // produce (it relies on runtime discovery, which only the Default source's options configurator performed at boot).
+    private static bool IsUnresolvedSentinel(string? connection)
+        => string.IsNullOrWhiteSpace(connection) || string.Equals(connection.Trim(), "auto", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
     /// Get source-specific setting or fall back to adapter default.
     /// </summary>
     public static T GetSourceSetting<T>(

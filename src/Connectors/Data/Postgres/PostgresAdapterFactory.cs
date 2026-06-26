@@ -41,22 +41,11 @@ public sealed class PostgresAdapterFactory : IDataAdapterFactory
         var baseOpts = sp.GetRequiredService<IOptions<PostgresOptions>>().Value;
         var resolver = sp.GetRequiredService<IStorageNameResolver>();
 
-        // Resolve source-specific connection string
-        // If base options already have a connection (from discovery) and no specific source requested, use it
-        string connectionString;
-        if ((string.IsNullOrWhiteSpace(source) || string.Equals(source, "Default", StringComparison.OrdinalIgnoreCase))
-            && !string.IsNullOrWhiteSpace(baseOpts.ConnectionString))
-        {
-            connectionString = baseOpts.ConnectionString;
-        }
-        else
-        {
-            connectionString = AdapterConnectionResolver.ResolveConnectionString(
-                config,
-                sourceRegistry,
-                "Postgres",
-                source);
-        }
+        // Resolve the source's connection through the shared resolver: the Default (or a non-Default whose source
+        // relies on discovery and resolves to "auto") collapses onto the discovery-resolved base connection, so a
+        // routed source never keys its store on the unresolved sentinel (ARCH-0103 P5 fleet hoist).
+        var connectionString = AdapterConnectionResolver.ResolveRoutedConnection(
+            config, sourceRegistry, "Postgres", source, baseOpts.ConnectionString);
 
         // Create source-specific options
         var sourceOpts = new PostgresOptions
