@@ -47,13 +47,10 @@ public abstract class AodbConformanceSpecsBase<TFixture> : KoanDataSpec<TFixture
     /// Adapter-specific configuration mapping <see cref="SourceA"/> and <see cref="SourceB"/> to DISTINCT physical
     /// stores on the fixture's backend (same server/engine, different database/file/keyspace/index). Keys are under
     /// <c>Koan:Data:Sources:{conformance_a|conformance_b}:*</c>. E.g. Mongo: per-source <c>Database</c> names;
-    /// SQLite: per-source files; Redis: per-source logical-database index.
+    /// SQLite: per-source files; Redis: per-source logical-database index. Invoked ONLY by the Database cell, so an
+    /// adapter that must provision the routed stores (e.g. relational CREATE DATABASE) does so once, not per fact.
     /// </summary>
     protected abstract IEnumerable<KeyValuePair<string, string?>> RoutedSourceSettings();
-
-    /// <summary>Boot the conformance host: the fixture's Default source PLUS the two routed conformance sources, with
-    /// the shared <see cref="ConformanceShardAxis"/> auto-discovered.</summary>
-    private Task<BoundHost> BootConformanceAsync() => BootAsync(RoutedSourceSettings());
 
     // ==================== The co-definition: declare all three tokens ====================
 
@@ -61,7 +58,7 @@ public abstract class AodbConformanceSpecsBase<TFixture> : KoanDataSpec<TFixture
     public async Task Declares_all_three_isolation_modes()
     {
         RequireBackingStore();
-        await using var host = await BootConformanceAsync();
+        await using var host = await BootAsync();
         var data = host.Services.GetRequiredService<IDataService>();
         var repo = data.GetRepository<ConformancePartitionDoc, string>();
 
@@ -77,7 +74,7 @@ public abstract class AodbConformanceSpecsBase<TFixture> : KoanDataSpec<TFixture
     public async Task Shared_isolation_holds()
     {
         RequireBackingStore();
-        await using var host = await BootConformanceAsync();
+        await using var host = await BootAsync();
         await ManagedFieldNoLeak.AssertNoLeakAsync();
     }
 
@@ -87,7 +84,7 @@ public abstract class AodbConformanceSpecsBase<TFixture> : KoanDataSpec<TFixture
     public async Task Container_isolation_holds()
     {
         RequireBackingStore();
-        await using var host = await BootConformanceAsync();
+        await using var host = await BootAsync();
 
         var pA = NewPartition("ca");
         var pB = NewPartition("cb");
@@ -135,7 +132,7 @@ public abstract class AodbConformanceSpecsBase<TFixture> : KoanDataSpec<TFixture
     public async Task Database_isolation_holds()
     {
         RequireBackingStore();
-        await using var host = await BootConformanceAsync();
+        await using var host = await BootAsync(RoutedSourceSettings());
 
         // No explicit EntityContext.Source — only the ambient shard. The Database-mode axis derives the source.
         ConformanceShardedDoc a, b;
