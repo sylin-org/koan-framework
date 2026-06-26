@@ -121,7 +121,7 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
         string? username,
         string? password)
     {
-        var fallback = BuildMongoConnectionString("localhost", 27017, databaseName, username, password);
+        var fallback = MongoConnectionString.Build("localhost", 27017, databaseName, username, password);
         try
         {
             if (IsAutoDetectionDisabled())
@@ -329,7 +329,7 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
         if (!string.IsNullOrWhiteSpace(mongoConnectionString) &&
             mongoConnectionString.StartsWith("mongodb", StringComparison.OrdinalIgnoreCase))
         {
-            connectionString = MergeMongoOverrides(mongoConnectionString, databaseName, username, password);
+            connectionString = MongoConnectionString.MergeOverrides(mongoConnectionString, databaseName, username, password);
             return true;
         }
 
@@ -341,7 +341,7 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
             var port = parsedGeneric.IsDefaultPort || parsedGeneric.Port <= 0
                 ? resolved.Port ?? 27017
                 : parsedGeneric.Port;
-            connectionString = BuildMongoConnectionString(parsedGeneric.Host, port, databaseName, username, password);
+            connectionString = MongoConnectionString.Build(parsedGeneric.Host, port, databaseName, username, password);
             return true;
         }
 
@@ -353,92 +353,8 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
             return false;
         }
 
-        connectionString = BuildMongoConnectionString(host, resolved.Port ?? 27017, databaseName, username, password);
+        connectionString = MongoConnectionString.Build(host, resolved.Port ?? 27017, databaseName, username, password);
         return true;
-    }
-
-    /// <summary>
-    /// Applies database, username, and password overrides to a MongoDB connection string
-    /// using string manipulation. Handles both single-host and replica-set (multi-host)
-    /// connection strings without routing through System.Uri or UriBuilder.
-    /// </summary>
-    private static string MergeMongoOverrides(
-        string connectionString,
-        string? databaseName,
-        string? username,
-        string? password)
-    {
-        // Format: mongodb[+srv]://[user:pass@]hosts[/database][?options]
-        var schemeEnd = connectionString.IndexOf("://", StringComparison.Ordinal);
-        if (schemeEnd < 0) return connectionString;
-
-        var scheme = connectionString[..(schemeEnd + 3)]; // e.g. "mongodb://"
-        var rest = connectionString[(schemeEnd + 3)..];    // everything after "://"
-
-        // Split existing auth from host portion
-        string existingAuth = "";
-        var atIndex = rest.IndexOf('@');
-        var slashIndex = rest.IndexOf('/');
-        var questionIndex = rest.IndexOf('?');
-
-        // '@' must appear before any '/' or '?' to be auth (not part of query params)
-        if (atIndex >= 0 && (slashIndex < 0 || atIndex < slashIndex) && (questionIndex < 0 || atIndex < questionIndex))
-        {
-            existingAuth = rest[..atIndex];
-            rest = rest[(atIndex + 1)..];
-        }
-
-        // Split hosts from path+query
-        string hosts;
-        string pathAndQuery;
-        var pathStart = rest.IndexOf('/');
-        if (pathStart >= 0)
-        {
-            hosts = rest[..pathStart];
-            pathAndQuery = rest[pathStart..]; // includes leading '/'
-        }
-        else
-        {
-            var queryStart = rest.IndexOf('?');
-            if (queryStart >= 0)
-            {
-                hosts = rest[..queryStart];
-                pathAndQuery = rest[queryStart..];
-            }
-            else
-            {
-                hosts = rest;
-                pathAndQuery = "";
-            }
-        }
-
-        // Apply auth override (only if not already present)
-        var auth = !string.IsNullOrWhiteSpace(existingAuth)
-            ? existingAuth + "@"
-            : !string.IsNullOrWhiteSpace(username)
-                ? $"{username}:{password ?? ""}@"
-                : "";
-
-        // Apply database override (only if not already present in path)
-        if (!string.IsNullOrWhiteSpace(databaseName))
-        {
-            // Extract existing path portion (before any '?')
-            var existingPath = pathAndQuery;
-            var existingQuery = "";
-            var qIdx = pathAndQuery.IndexOf('?');
-            if (qIdx >= 0)
-            {
-                existingPath = pathAndQuery[..qIdx];
-                existingQuery = pathAndQuery[qIdx..];
-            }
-
-            if (string.IsNullOrWhiteSpace(existingPath.Trim('/')))
-            {
-                pathAndQuery = "/" + databaseName.Trim() + existingQuery;
-            }
-        }
-
-        return (scheme + auth + hosts + pathAndQuery).TrimEnd('/');
     }
 
     private static bool IsAutoConnection(string? connectionString)
@@ -447,12 +363,6 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
             || string.Equals(connectionString.Trim(), "auto", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string BuildMongoConnectionString(string hostname, int port, string? database, string? username, string? password)
-    {
-        var auth = string.IsNullOrEmpty(username) ? "" : $"{username}:{password ?? ""}@";
-        var db = string.IsNullOrEmpty(database) ? "" : $"/{database}";
-        return $"mongodb://{auth}{hostname}:{port}{db}";
-    }
     private static class LogActions
     {
         public const string Config = "mongo.config";

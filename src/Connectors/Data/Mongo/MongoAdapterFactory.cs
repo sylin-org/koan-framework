@@ -56,7 +56,9 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory, IAsyncDisposable,
 
         // Resolve the source's physical placement (connection + database) — Database mode (ARCH-0103).
         var connectionString = AdapterConnectionResolver.ResolveConnectionString(config, sourceRegistry, "Mongo", source);
-        if (string.IsNullOrWhiteSpace(connectionString)) connectionString = baseOptions.ConnectionString;
+        // A non-Default source relying on runtime discovery resolves to the literal "auto" (or blank);
+        // fall back to the discovery-resolved Default connection rather than keying the pool on garbage.
+        connectionString = MongoConnectionString.ResolveRoutedConnection(connectionString, baseOptions.ConnectionString);
         var database = AdapterConnectionResolver.GetSourceSetting(config, sourceRegistry, "Mongo", source, "Database", baseOptions.Database);
 
         var sourceOptions = new MongoOptions

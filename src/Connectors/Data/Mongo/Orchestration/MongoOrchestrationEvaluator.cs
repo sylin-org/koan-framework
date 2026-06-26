@@ -58,7 +58,7 @@ public class MongoOrchestrationEvaluator : BaseOrchestrationEvaluator
             var urls = envList.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
                 .Select(s => s.Trim())
                 .Where(s => !string.IsNullOrWhiteSpace(s))
-                .Select(ExtractHostFromConnectionString)
+                .Select(MongoConnectionString.ExtractHost)
                 .Where(host => !string.IsNullOrWhiteSpace(host))
                 .ToArray();
 
@@ -84,7 +84,7 @@ public class MongoOrchestrationEvaluator : BaseOrchestrationEvaluator
                 Infrastructure.ConfigurationConstants.DataFallback.Password);
 
             // Build connection string for validation
-            var connectionString = BuildMongoConnectionString(hostResult.HostEndpoint!, databaseName, username, password);
+            var connectionString = MongoConnectionString.Build(hostResult.HostEndpoint!, databaseName, username, password);
 
             // Try to connect with the configured credentials
             var isValid = await Task.Run(() => TryMongoPing(connectionString, TimeSpan.FromMilliseconds(1000)));
@@ -141,38 +141,6 @@ public class MongoOrchestrationEvaluator : BaseOrchestrationEvaluator
             Infrastructure.ConfigurationConstants.FullKey(Infrastructure.ConfigurationConstants.Keys.Database),
             Infrastructure.ConfigurationConstants.DataFallback.Database,
             "ConnectionStrings:Database");
-    }
-
-    private static string BuildMongoConnectionString(string hostPort, string? databaseName, string? username, string? password)
-    {
-        // Parse host and port
-        var parts = hostPort.Split(':');
-        var host = parts[0];
-        var port = parts.Length > 1 ? parts[1] : "27017";
-
-        var auth = string.IsNullOrEmpty(username) ? "" : $"{username}:{password ?? ""}@";
-        var db = string.IsNullOrEmpty(databaseName) ? "" : $"/{databaseName}";
-        return $"mongodb://{auth}{host}:{port}{db}";
-    }
-
-    private static string? ExtractHostFromConnectionString(string connectionString)
-    {
-        try
-        {
-            // Handle both mongodb:// and plain host:port formats
-            if (connectionString.StartsWith("mongodb://", StringComparison.OrdinalIgnoreCase))
-            {
-                var uri = new Uri(connectionString);
-                return $"{uri.Host}:{uri.Port}";
-            }
-
-            // Assume it's just host:port
-            return connectionString;
-        }
-        catch
-        {
-            return null;
-        }
     }
 
     private static bool TryMongoPing(string connectionString, TimeSpan timeout)
