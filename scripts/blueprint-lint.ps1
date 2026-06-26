@@ -6,8 +6,10 @@
   Part of the green ratchet (Leg F). Blueprints are the EXTEND-a-pillar parallel to the .claude/skills
   cards (USE-a-pillar). Unlike a skill — which marks a `<!-- validate -->` usage block that is COMPILED —
   a blueprint asserts OBLIGATIONS that must trace to real shipped first-party adapter source. So this gate
-  GREP-VERIFIES every citation is alive in the cited file: a blueprint cannot drift into fiction (the exact
-  rot that retired skills in the 2026-06-18 audit), and it cannot teach an agent a member that no longer exists.
+  GREP-VERIFIES every citation's member NAME is still present (in code, not comments) in the cited file — so a
+  renamed-away or deleted member is caught (the drift that retired skills in the 2026-06-18 audit). Type-binding is
+  grep-level: a name that survives on a DIFFERENT co-located type, or in a string literal, is NOT distinguished —
+  full member-on-type checking is an AST job, deferred (ARCH-0094 §Phase-3). Comments are stripped before matching.
 
     ERRORS (always fatal):
       - directory leaf == frontmatter `name:`            (the loader/catalogue key)
@@ -96,11 +98,17 @@ try {
             $path = $m.Groups[2].Value.Trim()
             $full = Join-Path $repoRoot $path
             if (-not (Test-Path $full)) { Add-Row $rel 'ERROR' "obligation '$sym' cites a path that does not resolve: $path"; continue }
+            # Strip comments before the grep so a member mentioned ONLY in an xmldoc / `// deleted X` note / <see cref>
+            # does not false-pass (the demonstrated drift holes). Residual grep-level limits remain — a name in a string
+            # literal or on a DIFFERENT co-located type still matches; full member-on-type binding is an AST job (deferred).
             $src = Get-Content -Raw $full
+            $src = [regex]::Replace($src, '/\*.*?\*/', '', [System.Text.RegularExpressions.RegexOptions]::Singleline)
+            $src = [regex]::Replace($src, '(?m)//.*$', '')
             $dot = $sym.LastIndexOf('.')
             $typePart = if ($dot -ge 0) { $sym.Substring(0, $dot) } else { $sym }
-            $typeLeaf = ($typePart -split '\.')[-1]
+            $typeLeaf = (($typePart -split '\.')[-1] -replace '<.*$', '')   # bare type leaf (drop any generic arg list)
             $member = if ($dot -ge 0) { $sym.Substring($dot + 1) } else { $sym }
+            $member = $member -replace '<.*$', '' -replace '\(.*$', ''      # bare member (drop generics / arg list)
             if ($src -notmatch [regex]("\b" + [regex]::Escape($typeLeaf) + "\b")) { Add-Row $rel 'ERROR' "obligation type '$typeLeaf' not found in $path (for '$sym')" }
             if ($src -notmatch [regex]("\b" + [regex]::Escape($member) + "\b")) { Add-Row $rel 'ERROR' "obligation member '$member' not found in $path (for '$sym')" }
         }

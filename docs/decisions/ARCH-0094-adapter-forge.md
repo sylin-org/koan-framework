@@ -185,9 +185,10 @@ Resolves the carve-out **"the Blueprint artifact format + catalogue/discoverabil
 - **The grounding mechanism (the load-bearing difference from cards).** A card marks a `<!-- validate -->` C# block
   that is *compiled*; a blueprint states *obligations* that must trace to real shipped source, so each obligation (and
   each conformance cell it must pass) carries a `<!-- obligation: Type.Member @ relpath -->` token, and
-  **`scripts/blueprint-lint.ps1`** grep-verifies the cited member is *alive* in that file. A blueprint therefore cannot
-  drift into fiction (the rot that retired skills in the 2026-06-18 audit) or teach a member that no longer exists. The
-  lint is a near-clone of `scripts/skills-lint.ps1`: ERRORS (dir-path == `name`; `name`/`description` present; the
+  **`scripts/blueprint-lint.ps1`** grep-verifies the cited member name is still present *in code* (comments are stripped)
+  in that file — so a renamed-away or deleted member is caught (the rot that retired skills in the 2026-06-18 audit).
+  Type-binding is grep-level: a name surviving on a DIFFERENT co-located type, or in a string literal, is not
+  distinguished — full member-on-type checking is an AST job, deferred. The lint is a near-clone of `scripts/skills-lint.ps1`: ERRORS (dir-path == `name`; `name`/`description` present; the
   EXTEND-required `pillar`/`type`/`grounded-in`; no version pins; every `grounded-in` path resolves; every obligation
   token's path resolves and its Type + Member grep-hit) + WARNINGS under `-Strict` (`conformance`/`card` resolve;
   relative links resolve; catalogue parity). Wired as **green-ratchet Leg F** (after the skills-lint Leg D), so it
