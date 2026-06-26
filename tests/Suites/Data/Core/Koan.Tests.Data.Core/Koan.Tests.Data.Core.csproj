@@ -36,6 +36,9 @@
     <ProjectReference Include="..\..\..\..\..\src\Connectors\Data\Json\Koan.Data.Connector.Json.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Connectors\Data\Sqlite\Koan.Data.Connector.Sqlite.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Connectors\Data\InMemory\Koan.Data.Connector.InMemory.csproj" />
+    <!-- A real HTTP vector adapter (public factory) for the warn-on-pin WIRING proof (VectorNamePinWiringSpec) — proves a
+         production adapter's pinned name-getter calls the shared warner; no Docker (a stub IHttpClientFactory). -->
+    <ProjectReference Include="..\..\..\..\..\src\Connectors\Data\Vector\Qdrant\Koan.Data.Vector.Connector.Qdrant.csproj" />
   </ItemGroup>
 
   <ItemGroup>

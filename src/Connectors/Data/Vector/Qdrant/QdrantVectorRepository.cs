@@ -367,9 +367,16 @@ internal sealed class QdrantVectorRepository<TEntity, TKey> :
     // QdrantOptionsConfigurator binds an absent config key to "" (not null), so `?? ` alone would treat "" as a pinned
     // empty name and produce "/collections/" → 404. IsNullOrWhiteSpace catches both the null and the "" path.
     private string CollectionName
-        => string.IsNullOrWhiteSpace(_options.CollectionName)
-            ? VectorAdapterNaming.GetOrCompute<TEntity, TKey>(_services)
-            : _options.CollectionName!;
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(_options.CollectionName))
+                return VectorAdapterNaming.GetOrCompute<TEntity, TKey>(_services);
+            // A pinned CollectionName bypasses the partition+source name-fold — warn once if that defeats active isolation.
+            VectorAdapterNaming.WarnIfPinnedNameDefeatsIsolation<TEntity>(_options.CollectionName!, "CollectionName");
+            return _options.CollectionName!;
+        }
+    }
 
     private async Task EnsureCollectionInitialized(CancellationToken ct)
     {

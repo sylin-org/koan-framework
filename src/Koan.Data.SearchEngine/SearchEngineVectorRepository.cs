@@ -574,6 +574,9 @@ public sealed class SearchEngineVectorRepository<TEntity, TKey> :
         {
             if (!string.IsNullOrEmpty(_options.IndexName))
             {
+                // A pinned IndexName bypasses the partition+source name-fold (IndexPrefix does NOT — it decorates the
+                // computed name) — warn once if that defeats active isolation.
+                VectorAdapterNaming.WarnIfPinnedNameDefeatsIsolation<TEntity>(_options.IndexName!, "IndexName");
                 return _options.IndexName!;
             }
 

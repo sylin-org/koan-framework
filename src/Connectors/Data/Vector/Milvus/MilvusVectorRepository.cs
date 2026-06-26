@@ -274,9 +274,16 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
     // collapse every entity/partition/source onto one empty-named collection (an isolation breach). IsNullOrWhiteSpace
     // catches both null and "" (same fix + root cause as the Qdrant CollectionName getter).
     private string CollectionName
-        => string.IsNullOrWhiteSpace(_options.CollectionName)
-            ? VectorAdapterNaming.GetOrCompute<TEntity, TKey>(_services)
-            : _options.CollectionName!;
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(_options.CollectionName))
+                return VectorAdapterNaming.GetOrCompute<TEntity, TKey>(_services);
+            // A pinned CollectionName bypasses the partition+source name-fold — warn once if that defeats active isolation.
+            VectorAdapterNaming.WarnIfPinnedNameDefeatsIsolation<TEntity>(_options.CollectionName!, "CollectionName");
+            return _options.CollectionName!;
+        }
+    }
 
     private async Task EnsureCollectionInitialized(CancellationToken ct)
     {
