@@ -32,22 +32,14 @@ public class MongoOptimizationAutoRegistrar : IKoanInitializer
                 return;
             }
 
-            try
-            {
-                // Step 1: global driver conventions + Guid/Guid? representation.
-                ConfigureGlobalMongoDriverSettings();
+            // Step 1: global driver conventions + Guid/Guid? representation.
+            ConfigureGlobalMongoDriverSettings();
 
-                // Step 2 (DATA-0098): register the GUID identity serializer per-member, on declared
-                // identity fields only — there is NO global typeof(string) override.
-                RegisterIdentitySerializers();
+            // Step 2 (DATA-0098): register the GUID identity serializer per-member, on declared
+            // identity fields only — there is NO global typeof(string) override.
+            RegisterIdentitySerializers();
 
-                _globalConfigurationApplied = true;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[MONGO-AUTO-REGISTRAR] Failed to apply global configuration: {ex.Message}");
-                throw;
-            }
+            _globalConfigurationApplied = true;
         }
     }
 
@@ -159,9 +151,9 @@ public class MongoOptimizationAutoRegistrar : IKoanInitializer
 
                 BsonClassMap.RegisterClassMap(classMap);
             }
-            catch (Exception ex)
+            catch
             {
-                Console.WriteLine($"[MONGO-AUTO-REGISTRAR] Failed to register identity serializers for {entityType.Name}: {ex.Message}");
+                // One entity's class-map registration must never break the global BSON init.
             }
         }
     }
@@ -179,10 +171,9 @@ public class MongoOptimizationAutoRegistrar : IKoanInitializer
             {
                 types = assembly.GetTypes();
             }
-            catch (Exception ex)
+            catch
             {
-                Console.WriteLine($"[MONGO-AUTO-REGISTRAR] Error scanning assembly {assembly.FullName}: {ex.Message}");
-                continue;
+                continue;   // a non-loadable assembly must never break the entity scan
             }
 
             foreach (var type in types)

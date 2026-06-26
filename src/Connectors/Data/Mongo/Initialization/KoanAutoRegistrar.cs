@@ -110,10 +110,8 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             // Already registered - safe to ignore
         }
 
-        // Apply MongoDB GUID optimization directly for v3.5.0 compatibility
-        Console.WriteLine("[MONGO-KOAN-AUTO-REGISTRAR] Applying MongoDB GUID optimization directly...");
-        var optimizer = new MongoOptimizationAutoRegistrar();
-        optimizer.Initialize(null!); // Optimizer doesn't use services parameter
+        // Apply the global MongoDB GUID + comparable-encoding optimization (DATA-0098/0100). The services arg is unused.
+        new MongoOptimizationAutoRegistrar().Initialize(null!);
     }
 
     public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
