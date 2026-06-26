@@ -22,7 +22,10 @@ public sealed class SqlServerAodbConformanceSpec(SqlServerFixture fixture, ITest
     };
 
     /// <summary>Create a fresh physical database on the fixture's server and return a connection string targeting it.
-    /// A unique per-run name keeps each Database-cell run clean without DROP churn.</summary>
+    /// A unique per-run name keeps each Database-cell run clean without DROP churn. The provisioned databases are NOT
+    /// dropped: under the Testcontainers fixture the whole server is reclaimed on teardown, and the GUID-suffixed names
+    /// never collide — so a persistent bring-your-own-server (env-override) lane accumulates harmless orphan databases
+    /// rather than risking a flaky mid-suite DROP against in-use connections.</summary>
     private string ProvisionDatabase(string slot)
     {
         var dbName = "koan_aodb_conf_" + slot + "_" + Guid.CreateVersion7().ToString("n")[..12];
