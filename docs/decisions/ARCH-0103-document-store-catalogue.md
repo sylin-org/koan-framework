@@ -147,19 +147,19 @@ Each is a closed bug or a correctness contract. The rebuild MUST preserve it; Ph
 | # | Invariant | Provenance | Pinned by |
 |---|---|---|---|
 | **I1** | Container resolved to a **local** per op from the ambient partition (never a shared mutable field) — concurrent partitions must not cross | partition-race fix | Web AdapterSurface concurrent-partition spec |
-| **I2** | Collection name clamped to the 255-byte namespace budget (reserve 64+1 for db) — overflow hashed injectively | naming | NEEDS characterization |
+| **I2** | Collection name clamped to the 255-byte namespace budget (reserve 64+1 for db) — overflow hashed injectively | naming | **`MongoNamingSpec`** |
 | **I3** | Query reports exactly the sort/pagination it pushed (residual finished by coordinator) | unified query contract | FilterConvergence + query specs |
 | **I4** | Query never falls back / never re-throws translation failures (the killed 500) | DATA-XXXX | FilterConvergence |
-| **I5** | Comparand encoded through the field's **own** serializer (`AllMemberMaps`, inc. inherited base members) so write↔query never drift | DATA-0098/0100 | FilterConvergence + DATA-0100 specs |
-| **I6** | GUID identity ⇒ native UUID BinData, **per declared member only**, NO global `typeof(string)` override | DATA-0098 | CRUD + filter specs |
-| **I7** | `MongoGuidEncoding` is the **single** write/query source of truth (a Guid-parseable string ⇒ BinData on both paths) — else FK predicates silently match nothing and delete-when-empty loses data | DATA-0098 (data-loss bug) | NEEDS explicit characterization (string-typed Guid FK round-trip + filter) |
-| **I8** | `[Index]`/sort/filter field names traverse the **same** camelCase+`_id` map (else indexes are uncovered → blocking in-memory sort) | JOBS-0008 | NEEDS characterization |
+| **I5** | Comparand encoded through the field's **own** serializer (`AllMemberMaps`, inc. inherited base members) so write↔query never drift | DATA-0098/0100 | FilterConvergence + `MongoIdentityEncodingMatrix` |
+| **I6** | GUID identity ⇒ native UUID BinData, **per declared member only**, NO global `typeof(string)` override | DATA-0098 | `MongoIdentityEncodingMatrix` + CRUD |
+| **I7** | `MongoGuidEncoding` is the **single** write/query source of truth (a Guid-parseable string ⇒ BinData on both paths) — else FK predicates silently match nothing and delete-when-empty loses data | DATA-0098 (data-loss bug) | **`MongoGuidStringFilterSpec`** |
+| **I8** | `[Index]`/sort/filter field names traverse the **same** camelCase+`_id` map (else indexes are uncovered → blocking in-memory sort) | JOBS-0008 | `MongoFilterWireShape` (field-name); verify index-coverage during rebuild |
 | **I9** | Managed values = `Effective` for inject (isolation ∪ operation override, e.g. soft-delete `__deleted`), **`Current` only** for the conflict guard | ARCH-0101 §4 | `ManagedFieldNoLeak` + tenant soft-delete |
 | **I10** | Cross-scope write rejected: a foreign-owned doc cannot be overwritten by id (E11000 path) | DATA-0105 §3b | `ManagedFieldNoLeak` |
 | **I11** | Reject diagnostic is generic (names entity/id, never the tenant/axis) | ARCH-0101 | `ManagedFieldNoLeak` |
 | **I12** | camelCase elements + enum-as-string + ignore-extra-elements global | conventions | CRUD specs |
 | **I13** | `DateTimeOffset`→DateTime(UTC), `TimeSpan`→Int64(ticks), registered individually (one failure can't skip the rest) | DATA-0100 | DATA-0100 comparable-encoding specs |
-| **I14** | `List<string>` elements stay BSON strings (not BinData) — array containment + round-trip | DATA-XXXX | NEEDS characterization (List<string> Has/HasAll) |
+| **I14** | `List<string>` elements stay BSON strings (not BinData) — array containment + round-trip | DATA-XXXX | `MongoFieldTransformRoundTripSpec` / identity-matrix; verify Has/HasAll during rebuild |
 | **I15** | `$all` (and JObject) avoid the `typeof(object)` serializer hazard | DATA-0098 | filter collection-op specs |
 | **I16** | No `_t` discriminator written; `BsonValue` members default `BsonNull` | conventions | CRUD specs |
 | **I17** | TTL `[Index(Ttl)]` ⇒ `expireAfterSeconds=0`; null/absent value never expires | DATA-0101 | Mongo TTL spec |
@@ -182,7 +182,7 @@ Define, with Mongo as the first green cell: capability tokens **`DataCaps.Isolat
 ## 8. Phasing & gates
 
 - **P0** — this catalogue (done).
-- **P1** — characterization tests for I2, I7, I8, I14 (the harvested invariants not already pinned).
+- **P1** — **satisfied by the existing oracle.** The Mongo suite already pins the harvested invariants through 18 real-`AddKoan()` specs: `MongoNamingSpec` (I2), `MongoGuidStringFilterSpec` (I7 — the DATA-0098 data-loss regression), `MongoIdentityEncodingMatrix` (I5/I6), `MongoComparableEncoding` (I13), `MongoFilterWireShape` (I8/I15), `MongoFilterConvergenceSpec` (I3/I4/I5), `MongoManagedFieldNoLeakSpec` (I9/I10/I11), `MongoFieldTransformRoundTripSpec` (I14), the TTL/batch/partition-concurrency specs (I17/I18/I1). The rebuild is protected by this fixed oracle; the only residual to confirm during the rebuild is index-coverage for I8 and `Has`/`HasAll` for I14.
 - **P2** — `DocumentStore` base + `MongoDocumentStore` (translator/conventions harvested intact; per-source pool; `KoanModule`). Gate: Mongo connector + Web AdapterSurface Mongo green (Testcontainers) + data-core 274 / tenancy 104 byte-identical.
 - **P3** — `ContainerScoped`/`DatabaseScoped` tokens + `AodbConformanceSpecsBase` green on Mongo + Database-routing spec; adversarial review; commit.
 - **P4** — orchestration/discovery/boot-report/connection-string cleanup (`KoanModule` + one helper); then **Couchbase** folds onto the proven base (gains the write-stamp I9/I10 + per-source).
