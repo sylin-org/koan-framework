@@ -105,11 +105,26 @@ public abstract class ServiceDiscoveryAdapterBase : IServiceDiscoveryAdapter
                     ("url", containerUrl));
             }
 
+            // Reach a service on the Docker HOST from inside a container. `host.docker.internal` is the
+            // Docker-provided host gateway (Docker Desktop / WSL2 by default; Linux needs
+            // --add-host=host.docker.internal:host-gateway). Tried AFTER the compose service and BEFORE localhost
+            // (which, inside a container, is the container itself). An unresolvable host simply fails the health
+            // probe and the next candidate is tried.
+            if (!string.IsNullOrWhiteSpace(attribute.LocalHost))
+            {
+                var dockerHostUrl = $"{attribute.LocalScheme}://host.docker.internal:{attribute.LocalPort}";
+                candidates.Add(new DiscoveryCandidate(dockerHostUrl, "docker-host", 3));
+                KoanLog.ConfigDebug(_logger, "discovery.candidate", null,
+                    ("service", ServiceName),
+                    ("method", "docker-host"),
+                    ("url", dockerHostUrl));
+            }
+
             // Local fallback when in container
             if (!string.IsNullOrWhiteSpace(attribute.LocalHost))
             {
                 var localhostUrl = $"{attribute.LocalScheme}://{attribute.LocalHost}:{attribute.LocalPort}";
-                candidates.Add(new DiscoveryCandidate(localhostUrl, "local-fallback", 3));
+                candidates.Add(new DiscoveryCandidate(localhostUrl, "local-fallback", 4));
                 KoanLog.ConfigDebug(_logger, "discovery.candidate", null,
                     ("service", ServiceName),
                     ("method", "local-fallback"),
