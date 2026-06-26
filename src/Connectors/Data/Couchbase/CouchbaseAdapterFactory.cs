@@ -55,11 +55,10 @@ public sealed class CouchbaseAdapterFactory : IDataAdapterFactory, IAsyncDisposa
         var config = sp.GetRequiredService<IConfiguration>();
         var sourceRegistry = sp.GetRequiredService<DataSourceRegistry>();
 
-        // Resolve the source's physical placement (connection + bucket) — Database mode (ARCH-0103).
-        var connectionString = AdapterConnectionResolver.ResolveConnectionString(config, sourceRegistry, "Couchbase", source);
-        // A non-Default source relying on runtime discovery resolves to the literal "auto" (or blank); fall back to the
-        // discovery-resolved Default connection rather than keying the pool on garbage.
-        connectionString = ResolveRoutedConnection(connectionString, baseOptions.ConnectionString);
+        // Resolve the source's physical placement (connection + bucket) — Database mode (ARCH-0103). The shared resolver
+        // collapses a non-Default source's "auto"/blank discovery sentinel onto the discovery-resolved Default (so the
+        // per-source pool never keys on the unresolved literal) — the fleet form of the local helper this replaces.
+        var connectionString = AdapterConnectionResolver.ResolveRoutedConnection(config, sourceRegistry, "Couchbase", source, baseOptions.ConnectionString);
         var bucket = AdapterConnectionResolver.GetSourceSetting(config, sourceRegistry, "Couchbase", source, "Bucket", baseOptions.Bucket);
         var username = NullIfBlank(AdapterConnectionResolver.GetSourceSetting(config, sourceRegistry, "Couchbase", source, "Username", baseOptions.Username ?? ""));
         var password = NullIfBlank(AdapterConnectionResolver.GetSourceSetting(config, sourceRegistry, "Couchbase", source, "Password", baseOptions.Password ?? ""));
@@ -90,18 +89,6 @@ public sealed class CouchbaseAdapterFactory : IDataAdapterFactory, IAsyncDisposa
             _ => new CouchbaseClusterProvider(optionsMonitor, sp.GetService<ILogger<CouchbaseClusterProvider>>()));
 
         return new CouchbaseDocumentStore<TEntity, TKey>(provider, optionsMonitor, sp, source);
-    }
-
-    // Collapse a non-Default source's blank/"auto" connection string to the discovery-resolved Default connection, so a
-    // source that relies on runtime discovery doesn't key its provider pool on the literal "auto" sentinel.
-    private static string ResolveRoutedConnection(string sourceConnection, string? resolvedDefault)
-    {
-        if (!string.IsNullOrWhiteSpace(sourceConnection) &&
-            !string.Equals(sourceConnection.Trim(), "auto", StringComparison.OrdinalIgnoreCase))
-        {
-            return sourceConnection;
-        }
-        return string.IsNullOrWhiteSpace(resolvedDefault) ? sourceConnection : resolvedDefault!;
     }
 
     private static string? NullIfBlank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;

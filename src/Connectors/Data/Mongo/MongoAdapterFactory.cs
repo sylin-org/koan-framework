@@ -54,11 +54,11 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory, IAsyncDisposable,
         var config = sp.GetRequiredService<IConfiguration>();
         var sourceRegistry = sp.GetRequiredService<DataSourceRegistry>();
 
-        // Resolve the source's physical placement (connection + database) — Database mode (ARCH-0103).
-        var connectionString = AdapterConnectionResolver.ResolveConnectionString(config, sourceRegistry, "Mongo", source);
-        // A non-Default source relying on runtime discovery resolves to the literal "auto" (or blank);
-        // fall back to the discovery-resolved Default connection rather than keying the pool on garbage.
-        connectionString = MongoConnectionString.ResolveRoutedConnection(connectionString, baseOptions.ConnectionString);
+        // Resolve the source's physical placement (connection + database) — Database mode (ARCH-0103). The shared
+        // resolver collapses a non-Default source's "auto"/blank discovery sentinel onto the discovery-resolved Default
+        // (so the per-source pool never keys on the unresolved literal) — the fleet hoist of the local
+        // MongoConnectionString.ResolveRoutedConnection, which stays as the test-pinned pure 2-arg helper.
+        var connectionString = AdapterConnectionResolver.ResolveRoutedConnection(config, sourceRegistry, "Mongo", source, baseOptions.ConnectionString);
         var database = AdapterConnectionResolver.GetSourceSetting(config, sourceRegistry, "Mongo", source, "Database", baseOptions.Database);
 
         var sourceOptions = new MongoOptions
