@@ -157,3 +157,45 @@ adapter they didn't write** — run its Gate against their instance; green = tru
 - The **human-in-the-loop thresholds** per maturity/blast tier (when sign-off is mandatory) are to be set.
 - **Performance is never prescribed** — the Forge produces *generic-but-proven* adapters; optimization is
   a separate, later, human-craft concern.
+
+---
+
+## Implementation status
+
+A pre-implementation survey (2026-06-26) found the **Conformance Gate is ~80–85% built for the low-blast tier** — it
+*is* the ARCH-0103 conformance machinery (`AodbConformanceSpecsBase` + `VectorAodbConformanceSpecsBase`, the
+`FilterConvergence`/`ManagedFieldNoLeak`/`FieldTransformRoundTrip`/`TemporalConvergence` oracles, `DataAxis.AssertNoLeak`,
+the real-store harness), with Layers 1–4 (honesty/surface/correctness/isolation) green across 8 record + 7 vector
+adapters. The **Forge** (CLI + agent-orchestration) and the **Blueprints** are greenfield; the high-blast
+beyond-happy-path suite (contention/soak/chaos/durability) + static lint are unbuilt and partly blocked on the
+ARCH-0098 classification axis. Phasing: `1` capability-driven Gate generalization → `2` orchestrable Gate runner →
+**`3` first Blueprint + grounding-lint** → `4` end-to-end Forge slice → `5` beyond-happy-path → `6` high-blast gates →
+`7` maturity ladder + remaining blueprints.
+
+### Phase 3 — the Adapter Blueprint format + the grounding-lint (DONE, 2026-06-26)
+
+Resolves the carve-out **"the Blueprint artifact format + catalogue/discoverability"** for the first type.
+
+- **Format (chosen).** A standalone `blueprints/<pillar>/<type>/BLUEPRINT.md` tree (e.g. `blueprints/data/sql/`) +
+  a `blueprints/BLUEPRINTS.md` catalogue — the EXTEND-a-pillar parallel to the `.claude/skills` cards (USE-a-pillar),
+  kept separate so the two linters and the DX-0048 "one fact, one home" layering don't conflate. Agent-optimized
+  Markdown + YAML frontmatter (`name` = the `blueprints/`-relative path segments joined by `-`, e.g. `data-sql`;
+  `pillar`/`type`/`family-base`/`conformance`/`blast`/`status`/`last_validated`/`grounded-in`). Body sections follow
+  the ARCH-0094 hygiene phases: Trigger · Discover · Research · Resources · Implement · Gotchas · Test · See also.
+- **The grounding mechanism (the load-bearing difference from cards).** A card marks a `<!-- validate -->` C# block
+  that is *compiled*; a blueprint states *obligations* that must trace to real shipped source, so each obligation (and
+  each conformance cell it must pass) carries a `<!-- obligation: Type.Member @ relpath -->` token, and
+  **`scripts/blueprint-lint.ps1`** grep-verifies the cited member is *alive* in that file. A blueprint therefore cannot
+  drift into fiction (the rot that retired skills in the 2026-06-18 audit) or teach a member that no longer exists. The
+  lint is a near-clone of `scripts/skills-lint.ps1`: ERRORS (dir-path == `name`; `name`/`description` present; the
+  EXTEND-required `pillar`/`type`/`grounded-in`; no version pins; every `grounded-in` path resolves; every obligation
+  token's path resolves and its Type + Member grep-hit) + WARNINGS under `-Strict` (`conformance`/`card` resolve;
+  relative links resolve; catalogue parity). Wired as **green-ratchet Leg F** (after the skills-lint Leg D), so it
+  rides into `pr-gate.yml` with no workflow edit. Proven both directions: green on the authored blueprint; RED when an
+  obligation member is fictionalized.
+- **First blueprint.** `blueprints/data/sql/BLUEPRINT.md` — the relational/SQL type, distilled from the shipped
+  Postgres/SQLite/SQL Server adapters + the `Koan.Data.Relational` family base, with obligation tokens citing the real
+  factory/DDL/connection/capability/registration members and the four `AodbConformanceSpecsBase` cells.
+- **Open (deferred).** Intent→blueprint matching for the Forge CLI/agent (Phase 4); whether to surface the blueprint in
+  the CLAUDE.md pattern-recognition table (kept to `BLUEPRINTS.md` + frontmatter `description` for now); the obligation
+  token is grep-level (Type + Member both present in the file), with AST-level member-on-type checking deferred.

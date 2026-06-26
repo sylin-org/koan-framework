@@ -24,6 +24,9 @@
                     link/card resolution + catalog parity (now fatal — H10 complete).
     E.  Lockfile    scripts/compare-koan-lock.ps1 — composition-lockfile drift (P1.1): the build
                     regenerates each app's koan.lock.json; fail if one drifted uncommitted.
+    F.  Blueprint   scripts/blueprint-lint.ps1 -Strict — the ARCH-0094 Adapter Blueprint grounding gate:
+                    every `<!-- obligation: Type.Member @ file -->` token's cited member must be alive in the
+                    shipped source (anti-drift), plus EXTEND-required frontmatter + catalogue parity.
 
   Exit code is 0 (GREEN) only when every run leg passes; otherwise 1 (RED).
 
@@ -86,6 +89,10 @@ try {
     # D. Skills lint (DX-0048) — skill contract: dir==name, frontmatter, version pins, link/card resolution.
     # -Strict (H10 complete): link/card resolution + catalog parity are now fatal, not warnings.
     Invoke-Leg 'D. skills-lint' { & "$root/scripts/skills-lint.ps1" -Strict }
+
+    # F. Blueprint lint (ARCH-0094 Phase 3) — the Adapter Blueprint grounding gate: every obligation token's cited
+    # member must be alive in the shipped source (anti-drift), plus the EXTEND-required frontmatter + catalogue parity.
+    Invoke-Leg 'F. blueprint-lint' { & "$root/scripts/blueprint-lint.ps1" -Strict }
 
     Write-Host "`n=== [ratchet] summary ===" -ForegroundColor Cyan
     $failed = @()
