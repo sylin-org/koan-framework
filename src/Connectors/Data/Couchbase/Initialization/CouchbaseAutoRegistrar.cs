@@ -48,6 +48,7 @@ public sealed class CouchbaseAutoRegistrar : IKoanAutoRegistrar
         // Autonomous discovery adapter handles all connection string resolution
         // Boot report shows discovery results from CouchbaseDiscoveryAdapter
         module.AddNote("Couchbase discovery handled by autonomous CouchbaseDiscoveryAdapter");
+        module.AddNote("AODB isolation: RowScoped + ContainerScoped + DatabaseScoped (conformance: AodbConformanceSpecsBase)");
 
         // Use centralized boot reporting with adapter-specific callback
         var options = AdapterBootReporting.ConfigureForBootReportWithConfigurator<CouchbaseOptions, CouchbaseOptionsConfigurator>(

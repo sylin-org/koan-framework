@@ -263,9 +263,12 @@ internal sealed class CouchbaseN1qlFilterTranslator
     /// <summary>
     /// Normalizes a CLR value to the on-disk JSON representation Couchbase persists. Critically,
     /// GUIDs are stored as the 32-char dashless ("N") form by <c>GetKey</c>/<c>PrepareEntityForStorage</c>
-    /// — so filter parameters must use the same form or they silently never match.
+    /// — so filter parameters must use the same form or they silently never match. <c>internal</c> so the
+    /// Shared-mode managed write-stamp (<c>CouchbaseDocumentStore.ManagedUpsertOneAsync</c>) routes each
+    /// injected managed value through the SAME normalization, keeping the stamped representation and the
+    /// scoped read filter byte-identical for Guid/enum/DateTime-typed managed fields (not just strings).
     /// </summary>
-    private static object? NormalizeValue(object? value) => value switch
+    internal static object? NormalizeValue(object? value) => value switch
     {
         Guid guid => guid.ToString("N", CultureInfo.InvariantCulture),
         // Enums are persisted as their NUMERIC value (the Couchbase SDK's default Newtonsoft serializer,
