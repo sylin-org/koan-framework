@@ -220,6 +220,49 @@ preserved; the only added work per cell is a side-effect-free capability read.
   display names are untouched, only the run/skip/fail-closed dispatch is centralized and a side-effect-free caps read is
   added per cell).
 
+### Phase 2 — the orchestrable Gate runner (DONE, 2026-06-26)
+
+Makes the Conformance Gate **invokable and machine-parseable** — the discrete step the Phase-4 agent loop
+(`agent → blueprint → gate → retry`) drives, and a human-runnable check.
+
+- **Home: a script, not a CLI verb.** `scripts/forge-verify.ps1`. The existing `koan` CLI
+  (`Koan.Orchestration.Cli`) is on the **ARCH-0077 Aspire-deprecation path** (obsolete by 0.9, removed by 1.0), so
+  it is not a durable home for a Forge tool. The framework's gate-runner idiom is a PowerShell script (the
+  green-ratchet legs — and the Forge's *own* Phase-3 `blueprint-lint.ps1` is Leg F), so the runner follows it. It
+  **reuses the real-store xUnit conformance kit** rather than re-implementing the harness as a runtime API (which
+  would be a second parallel harness — against the no-stopgaps / no-parallel-impl canon). A first-class `koan-forge`
+  tool can later *wrap* the script when the `koan adapter new` scaffold (Phase 4+) justifies one.
+- **How.** Discovers each adapter's `*AodbConformanceSpec` project by glob (8 record + 7 vector; keyed `plane/adapter`,
+  since `InMemory` exists on both planes), runs its cells via `dotnet test --filter FullyQualifiedName~Aodb` with a
+  TRX logger, parses the TRX, maps each cell to its AODB mode (Declares / Shared / Container / Database, by method-name
+  keyword), and extracts the per-cell **failure/skip reason** (`ErrorInfo/Message`) — the agent-actionable detail raw
+  `dotnet test` does not surface. General over *any* project carrying a `*AodbConformanceSpec`, so an agent-authored
+  adapter plugs in identically.
+- **The verdict (honest, per-adapter and aggregated).** **Per adapter**, four states: **GREEN** (all four cells
+  passed — realizes every declared mode, shippable) · **RED** (a cell FAILED — an isolation lie or leak) · **SKIPPED**
+  (all four modes ran but a cell was skipped, e.g. Docker unavailable or a capability-driven Skip, and none failed —
+  inconclusive) · **ERROR** (a structural problem — no `.csproj`, no TRX produced, or **an expected mode's cell never
+  appeared in the TRX**; the gate could not be assessed). The **cell-count guard** is the load-bearing honesty
+  property: every conformance spec inherits all four cells, so a TRX missing a mode is an ERROR — *never a silent GREEN
+  on a partial run* (the review's CRITICAL). The **gate-level** verdict aggregates these as **GREEN / RED /
+  INCONCLUSIVE**. `-Output json` emits the structured report (timestamp, gate verdict, summary, per-adapter `verdict` +
+  `expectedCells`/`actualCells`/`missingModes` + per-cell `mode`/`outcome`/`reason`) the Phase-4 agent parses; the
+  console table + colored per-adapter/gate lines are for humans. Exit code: **0 = all GREEN · 1 = any RED (fix the
+  adapter) · 3 = any ERROR (fix the project/structure) · 2 = no RED/ERROR but some SKIPPED (fix the environment)** — the
+  four signals the agent branches on. Selectors: `-Adapter <name> [-Plane record|vector]`, `-DockerFree` (the 5
+  in-process/file surfaces), `-All`.
+- **Proof.** GREEN verified live over the 5 Docker-free surfaces (record InMemory/Json/SQLite + vector
+  InMemoryVector/SqliteVec → exit 0) and the JSON shape confirmed; **RED, SKIPPED, and ERROR induced empirically** — a
+  forced `Assert.Fail` / `Assert.Skip` in one cell (reverted) drove RED / SKIPPED with the reason captured + exit 1 / 2,
+  and narrowing the filter so three modes never ran drove the **cell-count guard** to ERROR (exit 3 — *not* a false GREEN
+  even though the one present cell passed).
+- **Open (deferred).** Wiring the gate as a green-ratchet **Leg G** (local, Docker-gated — the conformance suite is
+  container-heavy and KOAN's general CI is disabled by design, so it stays a local/opt-in leg); the `koan adapter new`
+  scaffold + the agent-orchestration loop (Phase 4); a per-`dotnet test` timeout and per-cell severity/remediation hints
+  (review LOWs — the Phase-4 agent classifies a RED by mode and can impose its own timeout, so deferred). The runner
+  captures the skip *message*; distinguishing skip *kinds* (capability-driven vs Docker-unavailable) is left to the agent
+  parsing the reason string.
+
 ### Phase 3 — the Adapter Blueprint format + the grounding-lint (DONE, 2026-06-26)
 
 Resolves the carve-out **"the Blueprint artifact format + catalogue/discoverability"** for the first type.
