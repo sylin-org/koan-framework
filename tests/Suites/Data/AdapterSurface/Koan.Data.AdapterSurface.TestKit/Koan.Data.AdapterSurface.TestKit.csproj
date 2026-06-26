@@ -12,9 +12,13 @@
     <ProjectReference Include="..\..\..\..\..\src\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <!-- ARCH-0103 P5: the conformance ledger base (AodbConformanceSpecsBase) boots real engine fixtures. -->
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Testing.Containers\Koan.Testing.Containers.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="AwesomeAssertions" Version="9.4.0" />
+    <PackageReference Include="xunit.v3.extensibility.core" Version="3.2.2" />
+    <PackageReference Include="xunit.v3.assert" Version="3.2.2" />
   </ItemGroup>
 </Project>

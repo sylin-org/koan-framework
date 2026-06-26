@@ -63,6 +63,27 @@ public abstract class KoanDataSpec<TFixture> where TFixture : KoanContainerFixtu
         return new BoundHost(host);
     }
 
+    /// <summary>
+    /// Boot a real Koan host (as <see cref="BootAsync()"/>) with <paramref name="extraSettings"/> merged OVER the
+    /// fixture's settings — e.g. extra routed data sources for an AODB Database-mode conformance cell. Later keys win.
+    /// </summary>
+    protected async Task<BoundHost> BootAsync(
+        IEnumerable<System.Collections.Generic.KeyValuePair<string, string?>> extraSettings,
+        Action<IServiceCollection>? configure = null)
+    {
+        var settings = new System.Collections.Generic.Dictionary<string, string?>(StringComparer.Ordinal);
+        foreach (var kv in Fixture.SettingsForBoot()) settings[kv.Key] = kv.Value;
+        foreach (var kv in extraSettings) settings[kv.Key] = kv.Value;
+
+        var host = await KoanIntegrationHost.Configure()
+            .WithSettings(settings)
+            .ConfigureServices(s => { s.AddKoan(); configure?.Invoke(s); })
+            .StartAsync()
+            .ConfigureAwait(false);
+        AppHost.Current = host.Services;
+        return new BoundHost(host);
+    }
+
     /// <summary>A fresh, unique partition name for this spec (engine-prefixed, GUID v7) for data isolation.</summary>
     protected string NewPartition(string? label = null)
     {
