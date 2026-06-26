@@ -27,9 +27,19 @@ public sealed class CouchbaseAdapterFactory : IDataAdapterFactory, IAsyncDisposa
 {
     // One CouchbaseClusterProvider (one cluster connection + one bucket) per resolved source — keyed by connection+bucket,
     // so every entity type on a source SHARES one provider instead of opening one per (entity, source). The Default source
-    // uses the DI-managed provider (which also drives boot-time readiness); these cached providers are disposed with the
-    // factory (a DI singleton). Database mode (ARCH-0103) = a distinct native BUCKET per routed source.
-    private readonly ConcurrentDictionary<string, CouchbaseClusterProvider> _sourceProviders = new(StringComparer.Ordinal);
+    // uses the DI-managed provider (which also drives boot-time readiness); a routed source that physically coincides with
+    // Default reuses that same DI provider (the dedup below) rather than opening a duplicate cluster connection. Database
+    // mode (ARCH-0103) = a distinct native BUCKET per routed source.
+    //
+    // Lifetime (ARCH-0103 §9.15): each cached provider lives for the factory's lifetime (a DI singleton disposed on host
+    // teardown). There is deliberately NO eviction: the repositories created here are cached upstream per (entity, key,
+    // adapter, source) and HOLD their provider, so evicting+disposing one would kill a live repository's connection. The
+    // cache is bounded by the deployment's distinct-physical-source count, not by entity count.
+    private readonly ConcurrentDictionary<(string Connection, string Bucket, string? Username, string? Password, string? ManagementUrl), CouchbaseClusterProvider> _sourceProviders = new();
+
+    /// <summary>Test-support: the number of distinct non-Default per-source providers currently pooled (the Default and
+    /// any Default-coinciding source reuse the DI-managed provider and are NOT counted here).</summary>
+    internal int SourceProviderCount => _sourceProviders.Count;
 
     public string Provider => "couchbase";
 
@@ -64,6 +74,21 @@ public sealed class CouchbaseAdapterFactory : IDataAdapterFactory, IAsyncDisposa
         var password = NullIfBlank(AdapterConnectionResolver.GetSourceSetting(config, sourceRegistry, "Couchbase", source, "Password", baseOptions.Password ?? ""));
         var managementUrl = NullIfBlank(AdapterConnectionResolver.GetSourceSetting(config, sourceRegistry, "Couchbase", source, "ManagementUrl", baseOptions.ManagementUrl ?? ""));
 
+        // Dedup (ARCH-0103 §9.15): a routed source whose resolved physical placement coincides with Default — same
+        // connection, bucket, AND credentials/management endpoint (so reusing Default's provider can't cross to a
+        // different cluster identity) — reuses the DI-managed provider (one cluster connection + shared readiness) and
+        // Default's full options, instead of opening a duplicate keyed under a different cache entry.
+        if (!string.IsNullOrWhiteSpace(baseOptions.ConnectionString)
+            && string.Equals(connectionString, baseOptions.ConnectionString, StringComparison.Ordinal)
+            && string.Equals(bucket, baseOptions.Bucket, StringComparison.Ordinal)
+            && string.Equals(username, NullIfBlank(baseOptions.Username), StringComparison.Ordinal)
+            && string.Equals(password, NullIfBlank(baseOptions.Password), StringComparison.Ordinal)
+            && string.Equals(managementUrl, NullIfBlank(baseOptions.ManagementUrl), StringComparison.Ordinal))
+        {
+            var sharedProvider = sp.GetRequiredService<CouchbaseClusterProvider>();
+            return new CouchbaseDocumentStore<TEntity, TKey>(sharedProvider, globalOptions, sp, source);
+        }
+
         var sourceOptions = new CouchbaseOptions
         {
             ConnectionString = connectionString,
@@ -83,9 +108,12 @@ public sealed class CouchbaseAdapterFactory : IDataAdapterFactory, IAsyncDisposa
         };
         var optionsMonitor = new CouchbaseStaticOptionsMonitor<CouchbaseOptions>(sourceOptions);
 
-        // One provider per (connection, bucket) — shared across every entity on this source.
+        // One provider per distinct physical placement — keyed by the FULL cluster identity (the same five fields the
+        // Default-dedup compares), not just connection+bucket: two sources with the same connection+bucket but DIFFERENT
+        // credentials are distinct clusters and must NOT share a provider (a narrower key would authenticate one as the
+        // other — a cross-source credential leak). A value-tuple key compares the parts ordinally with no delimiter risk.
         var provider = _sourceProviders.GetOrAdd(
-            connectionString + "|" + bucket,
+            (connectionString, bucket, username, password, managementUrl),
             _ => new CouchbaseClusterProvider(optionsMonitor, sp.GetService<ILogger<CouchbaseClusterProvider>>()));
 
         return new CouchbaseDocumentStore<TEntity, TKey>(provider, optionsMonitor, sp, source);

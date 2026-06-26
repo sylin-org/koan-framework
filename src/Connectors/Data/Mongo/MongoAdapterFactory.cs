@@ -27,9 +27,19 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory, IAsyncDisposable,
 {
     // One MongoClientProvider (one MongoClient / connection pool) per resolved source — keyed by connection+database, so
     // every entity type on a source SHARES one pool instead of opening one per (entity, source). The Default source uses
-    // the DI-managed provider (which also drives boot-time readiness); these cached providers are disposed with the
-    // factory (a DI singleton).
+    // the DI-managed provider (which also drives boot-time readiness); a routed source that physically coincides with
+    // Default reuses that same DI provider (the dedup below) rather than opening a duplicate client.
+    //
+    // Lifetime (ARCH-0103 §9.15): each cached provider lives for the factory's lifetime (the factory is a DI singleton
+    // disposed on host teardown). There is deliberately NO eviction: the repositories created here are themselves cached
+    // upstream per (entity, key, adapter, source) and HOLD their provider, so evicting+disposing a cached provider would
+    // kill a live repository's client. The cache is therefore bounded by the deployment's distinct-physical-source count,
+    // not by entity count — one MongoClient per distinct (connection, database), which is the intended pooling contract.
     private readonly ConcurrentDictionary<string, MongoClientProvider> _sourceProviders = new(StringComparer.Ordinal);
+
+    /// <summary>Test-support: the number of distinct non-Default per-source providers currently pooled (the Default and
+    /// any Default-coinciding source reuse the DI-managed provider and are NOT counted here).</summary>
+    internal int SourceProviderCount => _sourceProviders.Count;
 
     public string Provider => "mongo";
 
@@ -60,6 +70,20 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory, IAsyncDisposable,
         // MongoConnectionString.ResolveRoutedConnection, which stays as the test-pinned pure 2-arg helper.
         var connectionString = AdapterConnectionResolver.ResolveRoutedConnection(config, sourceRegistry, "Mongo", source, baseOptions.ConnectionString);
         var database = AdapterConnectionResolver.GetSourceSetting(config, sourceRegistry, "Mongo", source, "Database", baseOptions.Database);
+
+        // Dedup (ARCH-0103 §9.15): a routed source whose resolved physical placement (connection + database) coincides
+        // with Default — e.g. a source that relies on discovery, so ResolveRoutedConnection collapsed its sentinel onto
+        // the Default connection — reuses the DI-managed provider (one MongoClient/pool + shared readiness) and Default's
+        // full options (globalOptions), instead of opening a SECOND client to the same server+db keyed under a different
+        // cache entry. Reusing globalOptions also sidesteps the partial-copy naming gap of the per-source path below
+        // (sourceOptions copies only ConnectionString/Database/DefaultPageSize/Readiness, not NamingStyle/Separator/etc).
+        if (!string.IsNullOrWhiteSpace(baseOptions.ConnectionString)
+            && string.Equals(connectionString, baseOptions.ConnectionString, StringComparison.Ordinal)
+            && string.Equals(database, baseOptions.Database, StringComparison.Ordinal))
+        {
+            var sharedProvider = sp.GetRequiredService<MongoClientProvider>();
+            return new MongoDocumentStore<TEntity, TKey>(sharedProvider, globalOptions, sp, source);
+        }
 
         var sourceOptions = new MongoOptions
         {
