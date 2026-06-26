@@ -26,7 +26,7 @@ namespace Koan.Data.Connector.Mongo;
 /// EnumRepresentationConvention), DateTime, Decimal, etc. The translator never re-derives a value's
 /// BSON form, so write↔query encoding cannot drift per type. Collection (List&lt;string&gt;) ELEMENT
 /// values are emitted as their native CLR type (the array element serializer is carved out — see
-/// MongoOptimizationAutoRegistrar).
+/// MongoDriverConfiguration).
 /// </summary>
 internal sealed class MongoFilterTranslator<TEntity>
 {

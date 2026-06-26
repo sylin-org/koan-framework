@@ -6,7 +6,6 @@ using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Data.Abstractions;
 using Koan.Data.Core.Optimization;
-using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Conventions;
@@ -15,31 +14,92 @@ using MongoDB.Bson.Serialization.Serializers;
 namespace Koan.Data.Connector.Mongo.Initialization;
 
 /// <summary>
-/// KoanAutoRegistrar that scans all Entity types and applies global MongoDB driver configuration
-/// for GUID optimization. Addresses MongoDB .NET driver v3.0+ issues with custom serializers.
+/// The single, once-guarded Mongo-family global driver configuration (ARCH-0103 §L). Folds the two
+/// former static-config sites — <c>KoanAutoRegistrar.ConfigureMongoStaticState</c> and the
+/// independently-discovered <c>MongoOptimizationAutoRegistrar</c> (with its separate lock and the
+/// <c>Initialize(null!)</c> hand-invoke) — into ONE entry point behind ONE guard. The proven config
+/// bodies (conventions, GUID/comparable serializers, per-member identity class maps) are preserved
+/// verbatim; only the call structure changed.
+/// <para>
+/// This runs in the Initialize phase by necessity (ARCH-0086): the serializers must exist before any
+/// Mongo operation during bootstrap — <c>KoanModule.Start</c> (host-start) is too late. <see cref="MongoModule"/>
+/// invokes <see cref="EnsureApplied"/> from <c>Register</c>.
+/// </para>
 /// </summary>
-public class MongoOptimizationAutoRegistrar : IKoanInitializer
+internal static class MongoDriverConfiguration
 {
+    // CORE-0003: AppDomain-scoped guard for the process-global MongoDB driver state.
     private static readonly object _lock = new();
-    private static bool _globalConfigurationApplied = false;
+    private static bool _applied;
 
-    public void Initialize(IServiceCollection services)
+    /// <summary>Apply the global Mongo driver configuration exactly once per AppDomain.</summary>
+    public static void EnsureApplied()
     {
+        if (_applied)
+        {
+            return;
+        }
+
         lock (_lock)
         {
-            if (_globalConfigurationApplied)
+            if (_applied)
             {
                 return;
             }
 
-            // Step 1: global driver conventions + Guid/Guid? representation.
+            // Order preserved from the former two-site config: framework conventions (disable
+            // discriminators / null-BsonValue / JObject provider) first, then the driver-global
+            // GUID + comparable-encoding conventions, then the per-member identity class maps.
+            ConfigureFrameworkConventions();
             ConfigureGlobalMongoDriverSettings();
-
-            // Step 2 (DATA-0098): register the GUID identity serializer per-member, on declared
-            // identity fields only — there is NO global typeof(string) override.
             RegisterIdentitySerializers();
 
-            _globalConfigurationApplied = true;
+            _applied = true;
+        }
+    }
+
+    /// <summary>
+    /// Framework-level conventions: disable <c>_t</c>/<c>_v</c> discriminators, default null
+    /// <see cref="BsonValue"/> members to <see cref="BsonNull"/>, and register the JObject provider.
+    /// </summary>
+    private static void ConfigureFrameworkConventions()
+    {
+        // Configure MongoDB conventions globally at startup - disables _t discriminators
+        var pack = new ConventionPack
+        {
+            new IgnoreExtraElementsConvention(true),
+            new NullBsonValueConvention()
+        };
+
+        try
+        {
+            ConventionRegistry.Register("KoanGlobalConventions", pack, _ => true);
+        }
+        catch (ArgumentException)
+        {
+            // Already registered - safe to ignore
+        }
+
+        // Disable discriminators by registering custom null discriminator convention
+        // This prevents _t/_v fields from being added to documents
+        try
+        {
+            BsonSerializer.RegisterDiscriminatorConvention(
+                typeof(object),
+                new NoDiscriminatorConvention());
+        }
+        catch (BsonSerializationException)
+        {
+            // Already registered - safe to ignore
+        }
+
+        try
+        {
+            BsonSerializer.RegisterSerializationProvider(new JObjectSerializationProvider());
+        }
+        catch (BsonSerializationException)
+        {
+            // Already registered - safe to ignore
         }
     }
 
@@ -211,6 +271,32 @@ public class MongoOptimizationAutoRegistrar : IKoanInitializer
                name.StartsWith("netstandard") ||
                name.StartsWith("MongoDB.") ||
                name.Contains("Test");
+    }
+}
+
+/// <summary>
+/// Custom discriminator convention that disables discriminator serialization entirely.
+/// This prevents MongoDB from adding _t fields to documents.
+/// </summary>
+public class NoDiscriminatorConvention : IDiscriminatorConvention
+{
+    public string ElementName => "_t";
+    public Type GetActualType(MongoDB.Bson.IO.IBsonReader bsonReader, Type nominalType) => nominalType;
+    public MongoDB.Bson.BsonValue GetDiscriminator(Type nominalType, Type actualType) => null!;
+}
+
+/// <summary>
+/// Convention to handle nulls for BsonValue properties globally.
+/// </summary>
+public class NullBsonValueConvention : IMemberMapConvention
+{
+    public string Name => "NullBsonValueConvention";
+    public void Apply(BsonMemberMap memberMap)
+    {
+        if (memberMap.MemberType == typeof(BsonValue))
+        {
+            memberMap.SetDefaultValue(BsonNull.Value);
+        }
     }
 }
 

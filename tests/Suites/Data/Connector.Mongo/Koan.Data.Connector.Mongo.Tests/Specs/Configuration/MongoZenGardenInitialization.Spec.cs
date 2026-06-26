@@ -86,7 +86,7 @@ public sealed class MongoZenGardenInitializationSpec
         services.AddSingleton<IOptions<AdaptersReadinessOptions>>(Options.Create(new AdaptersReadinessOptions()));
         services.AddSingleton(zenGardenProvider);
 
-        new KoanAutoRegistrar().Initialize(services);
+        new MongoModule().Register(services);
 
         return services.BuildServiceProvider();
     }
