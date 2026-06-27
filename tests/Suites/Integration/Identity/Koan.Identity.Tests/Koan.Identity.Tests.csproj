@@ -32,6 +32,10 @@
     <ProjectReference Include="..\..\..\..\..\src\Koan.Identity.Web\Koan.Identity.Web.csproj" />
     <!-- SEC-0007 P4 — the Identity × Tenancy bridge (membership access, tenant resolution, invites, deprovisioning). -->
     <ProjectReference Include="..\..\..\..\..\src\Koan.Identity.Tenancy\Koan.Identity.Tenancy.csproj" />
+    <!-- SEC-0007 P3-grp4 Phase 1 — the account-security factor base + the local password + MFA factors. -->
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Identity.Credentials\Koan.Identity.Credentials.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Identity.Passwords\Koan.Identity.Passwords.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Identity.Mfa\Koan.Identity.Mfa.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Web.Auth\Koan.Web.Auth.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
     <!-- Offline in-memory data adapter (auto-elected; no container). -->

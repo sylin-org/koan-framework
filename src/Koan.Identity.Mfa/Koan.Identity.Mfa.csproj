@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <KoanPackageKind>Periphery</KoanPackageKind>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>Koan.Identity.Mfa</AssemblyName>
+    <RootNamespace>Koan.Identity.Mfa</RootNamespace>
+    <Description>SEC-0007 P3 group 4 — the optional MFA factor (off by default, D4): TOTP authenticator enrollment (Otp.NET) with the shared secret encrypted at rest (IDataProtector), pre-provisioned hashed single-use recovery codes, the step-up requirement that makes the 2-phase sign-in interrupt, and the MFA/recovery Security Checkup nudges. Reference = Intent.</Description>
+    <PackageTags>$(CommonPackageTags);identity;mfa;totp;2fa;recovery;credentials</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Otp.NET" Version="1.3.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Identity.Credentials\Koan.Identity.Credentials.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Koan.Identity.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>

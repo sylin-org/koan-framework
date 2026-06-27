@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Koan.Data.Core;
 using Koan.Identity.Impersonation;
 using Koan.Identity.Management;
@@ -44,6 +45,32 @@ public sealed class IdentityAuthFlowHandler : IKoanAuthFlowHandler
                 ctx.Identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, person.Id));
                 subject = person.Id;
             }
+        }
+
+        // SEC-0007 P3-grp4 — pre-session gates (e.g. MFA step-up). Consulted with the CANONICAL subject, BEFORE any
+        // role stamping or Session creation: a blocking gate Rejects, which empties the cookie principal — so no
+        // authenticated session is written until the required factor is satisfied (the 2-phase sign-in enforcement).
+        var principalView = new ClaimsPrincipal(ctx.Identity);
+        foreach (var gate in ctx.Services.GetServices<ISignInGate>().OrderBy(g => g.Order))
+        {
+            SignInGateBlock? block;
+            try
+            {
+                block = await gate.EvaluateAsync(subject, principalView, ctx.Services, ct).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                // FAIL CLOSED: a gate that cannot be evaluated (a transient store fault, a ticket-save failure) must
+                // ABORT the sign-in, never allow it — otherwise the dispatcher swallows the exception and continues
+                // with no rejection, issuing a full cookie that silently bypasses the required factor. "Cannot prove
+                // the gate is satisfied ⇒ do not issue a session."
+                ctx.Services.GetService<ILoggerFactory>()?.CreateLogger("Koan.Identity.SignInGate")
+                    ?.LogWarning(ex, "Sign-in gate {Gate} threw for {Subject}; failing closed (sign-in aborted).", gate.GetType().FullName, subject);
+                ctx.Reject("koan_signin_gate_error");
+                return;
+            }
+            if (block is not null) { ctx.Reject(block.Reason); return; }
         }
 
         // Stamp the person's GLOBAL roles (IdentityRole, Layer 2) onto the cookie so production actually HONORS a
