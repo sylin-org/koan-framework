@@ -62,3 +62,24 @@ The delight harvest's north-star demo *is* the SnapVault acceptance suite: (A) c
 ## Sequencing note
 
 Phase 0 (framework prerequisites) and §8 itself land **after** the posture seam (built) and the §7 config plane / RSoP explainer (the ADR's own rule: don't grow past 2 layers without the explainer). The conversion is therefore *interleaved* with the remaining framework build — SnapVault is the pull that orders it.
+
+## Readiness status (2026-06-26)
+
+A dependency re-evaluation against the shipped codebase. **SnapVault itself is still unconverted** (single-tenant: the
+`// FUTURE: add UserId` comment, the in-memory `IPhotoProcessingQueue`/`PhotoProcessingWorker`, global `[StorageBinding]`
+keys, unscoped `Vector<PhotoAsset>.Search()`; no `Koan.Tenancy`/`Koan.Jobs` reference).
+
+| Dependency | Gates | Status |
+|---|---|---|
+| **0.2** durable-carrier (ARCH-0100) | Phase 1 | ✅ **shipped** — `AmbientCarrierRegistry` + `JobRecord.AmbientCarrier`; `DurableCarrierSpec` |
+| **0.3** vector tenant-isolation | Phase 1 | ✅ **shipped** — `ScopedVectorRepository` + Weaviate/Qdrant AODB conformance (ARCH-0102/0103) |
+| **0.4** storage per-tenant prefix | Phase 1 | ✅ **shipped** — `ScopedStorageService`; `StorageTenantIsolationSpec` |
+| **0.1** portal `Koan.Tenancy.Web` | **Phase 2** | ⚠️ **missing** — control-plane *data* layer (`Tenant`/`Membership`/`Invite`) built; the web shell is not (ledger 2c) |
+| §7 governed config + RSoP explainer | Phase 3 | ❌ missing |
+| §8 entitlements / tiers / quota | Phase 4 | ❌ missing |
+| classification (ARCH-0098) | Phase 5 | ◐ partial — `Koan.Classification` cipher/key-provider/`[Classified]`/field-transform shipped; per-tenant durable keys + erasure certificate pending |
+| §3 / P6 placement broker | Phase 6 | ❌ missing |
+
+**Verdict: Phase 1 (the isolation flagship) is UNBLOCKED** — its three prerequisites (0.2/0.3/0.4) are shipped and
+proven; the portal (0.1) gates Phase 2, not Phase 1. **Phase 1 is the entry point** and dogfoods exactly the vector
+isolation + durable-carrier work that just landed. Phases 2–6 pull their respective framework features (interleaved).
