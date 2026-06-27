@@ -128,7 +128,9 @@ The understand-pass confirmed, by hand: **Koan ships the isolation *mechanism* b
 - **Production (Closed):** tenancy active with no resolver **refuses to boot** (fail-fast).
 - The flagship spec drives tenants **programmatically** (`Tenant.Use(StudioA)`); the SPA sends **no tenant carrier** (`api.js` adds no header/cookie/param; no studio-picker UI).
 
-**Implication:** a UI studio-picker needs a backend that turns a request into an ambient tenant. The rebuild must provide that binding. See Decision **D1**.
+**Implication:** a UI studio-picker needs a backend that turns a request into an ambient tenant. See Decision **D1**.
+
+> **UPDATE (2026-06-27): the request→tenant binding now SHIPS in the framework — this section's "no concrete resolver / no middleware" finding is superseded.** SEC-0007 P4 added **`Koan.Identity.Tenancy`**: the four tenant-resolution carriers (claim / header `X-Koan-Tenant` / subdomain `{code}.host` / path `/t/{code}`, the latter two resolving a `TenantRecord.Code`) + an `AfterAuthentication` `IKoanWebPipelineContributor` middleware that **membership-authorizes** the candidate against `Membership` and wraps the request in `Tenant.Use(...)` (and projects `Membership.Roles`). So the rebuild does **not** build a sample-side resolver — it **references `Koan.Identity` + `Koan.Identity.Tenancy`**, and the studio-picker just sets a carrier (a header, or a `/t/{code}` path). Building it this way also makes the rebuild the **SEC-0007 P5 identity dogfood**.
 
 ---
 
@@ -146,7 +148,7 @@ The understand-pass confirmed, by hand: **Koan ships the isolation *mechanism* b
 
 ## 7. Open decisions (the forks — recommendations inline)
 
-- **D1 — Tenant on-ramp. DECIDED (2026-06-26): design a first-class tenant-resolution module (dogfood the seam).** Rather than sample-glue, treat this as the concrete slice of ARCH-0099's `ITenantResolver` seam. Explore strategies — **subdomain** (`{tenant}.domain.com`), **path-prefix** (`domain.com/t/{code}`), **query string**, **header**, **JWT/OIDC claim** — against prior art (Finbuckle.MultiTenant et al.), then design a composable resolver + per-request middleware that wraps each request in `Tenant.Use(...)`, authorizes the candidate against memberships, honors the dev-open/prod-closed posture, and self-reports. SnapVault is the driving consumer; the UI studio-picker affordance follows the chosen strategy. **A dedicated resolver design/ADR lands before implementation** (in progress).
+- **D1 — Tenant on-ramp. DELIVERED in the framework (2026-06-27, SEC-0007 P4 — `Koan.Identity.Tenancy`).** The first-class tenant-resolution module envisioned here was built as part of SEC-0007: composable carriers (claim / header / subdomain `{code}.host` / path `/t/{code}`) implementing the ARCH-0099 `ITenantResolver` seam + an `AfterAuthentication` middleware that wraps each request in `Tenant.Use(...)`, **membership-authorizes** the candidate against `Membership`, projects `Membership.Roles`, and honors the dev-open/prod-closed posture. **The rebuild consumes it** (reference `Koan.Identity` + `Koan.Identity.Tenancy`) — no sample-side resolver. The UI studio-picker sets a carrier (recommend the `X-Koan-Tenant` header or a `/t/{code}` path). This makes SnapVault the SEC-0007 P5 dogfood of the durable person + membership model. *(Deferred framework piece, not blocking: DNS-verified custom-domain routing.)*
 - **D2 — Surface policy. DECIDED (2026-06-26): drop ALL orphans AND smart collections.** The new backend exposes only the currently-UI-called endpoints (the contract doc). Gone: the whole `AdminController`; `/Photos/search`·`/favorites`·`/range`·`/adjacent`·`PUT favorite`; Events `timeline`·`by-tier`·`archive`; styles `system`·`user`; the smart-collections Discovery endpoint; and the unused inherited `EntityController<T>` verbs. Smallest meaningful surface.
 - **D3 — Media URLs.** The UI calls `/api/media/photos/{id}/{gallery|original}` + `/api/media/{masonry|retina}-thumbnails/{id}`; the framework recipe controller serves `/media/{id}/{recipe}`. **Recommended:** update the 4 UI call sites (`grid.js`, `lightbox.js`, `ImagePreloader.js`) to the recipe URLs — a small, contained UI edit bundled with the tenant-affordance work — rather than maintaining a compatibility alias.
 - **D4 — Progress transport.** SignalR → SSE (already confirmed). The UI's `processMonitor.js` moves from a SignalR hub to an `EventSource` on a per-batch stream endpoint; payload shapes (`PhotoProgressEvent`/`JobCompletionEvent`) are preserved.
@@ -159,10 +161,10 @@ The understand-pass confirmed, by hand: **Koan ships the isolation *mechanism* b
 The legacy backend stays runnable as the reference until the new surface is coherent, then is deleted in one swap. Suggested sequence (each step compiles green; the flagship spec is the gate; TDD where it pays):
 
 1. **Skeleton** — `SnapVaultModule : KoanModule`, the kept entities (with `[Parent]`), `Program.cs ≈ AddKoan().AsWebApi()`, config trimmed (delete dead styles config), the flagship spec pointed at the new entities.
-2. **Tenancy on-ramp** (D1) — resolver + middleware + UI studio-picker.
+2. **Tenancy on-ramp** (D1) — reference `Koan.Identity` + `Koan.Identity.Tenancy` (the framework's carriers + the `AfterAuthentication` membership-authorizing middleware ship it, SEC-0007 P4); add the UI studio-picker that sets a carrier (the `X-Koan-Tenant` header or a `/t/{code}` path). No sample-side resolver. This is also the SEC-0007 P5 identity dogfood.
 3. **Media recipes** (D3) — `[MediaRecipe]` set + `IMediaSource`; UI media URLs repointed; derivative types deleted.
 4. **Jobs/progress** (D4) — ledger + `ctx.Progress`; SSE stream; SignalR + hub deleted.
-5. **Domain services** — port §3 verbatim into thin services (ingest pipeline, search, smart-collections, navigation, collections); the UI-faced endpoints only.
+5. **Domain services** — port §3 verbatim into thin services (ingest pipeline, search, navigation, collections); the UI-faced endpoints only. (Smart-collections dropped per D2.)
 6. **AI & vector cleanup** — typed-ish parse + normalization; vector `eventId` push-down; `EmbeddingTelemetry` + a thin health contributor; monitor service deleted.
 7. **Swap & measure** — delete the legacy backend; flagship green (+ re-home the parked blob leg); record LOC / entity-count / removed-package reduction.
 
