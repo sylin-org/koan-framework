@@ -18,6 +18,14 @@ public sealed class TenantRecord : Entity<TenantRecord>
     /// <summary>The mutable display name (e.g. "Acme"). Renaming never moves storage — the id is the handle.</summary>
     public string Name { get; set; } = "";
 
+    /// <summary>
+    /// Optional routing slug (e.g. <c>acme</c>) — the human-facing handle the subdomain (<c>{code}.host</c>) and
+    /// path (<c>/t/{code}</c>) tenant carriers resolve to this tenant's <c>Id</c> (ARCH-0099 §1 / SEC-0007 P4). The
+    /// claim and header carriers use the <c>Id</c> directly. Empty = not reachable by slug (id-only). Renaming the
+    /// slug never moves storage — the immutable <c>Id</c> remains the handle. Uniqueness is the app's to enforce.
+    /// </summary>
+    public string? Code { get; set; }
+
     /// <summary>Lifecycle status; defaults to <see cref="TenantStatus.Active"/>.</summary>
     public TenantStatus Status { get; set; } = TenantStatus.Active;
 

@@ -1,3 +1,4 @@
+using Koan.Core;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Core.Model;

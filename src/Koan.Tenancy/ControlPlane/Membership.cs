@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Koan.Core;
 using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Core.Model;
 
@@ -34,4 +35,11 @@ public sealed class Membership : Entity<Membership>
 
     /// <summary>True when this membership carries <paramref name="role"/>.</summary>
     public bool HasRole(string role) => Roles.Contains(role);
+
+    /// <summary>
+    /// The deterministic id for a <c>(tenantId, identityId)</c> seat — one membership per person per tenant. Concurrent
+    /// creates of the same seat (e.g. a double-submitted invite accept, or a racing owner claim) converge to <b>one</b>
+    /// upserted row instead of racing two duplicates. Creation sites set this id; queries stay by field.
+    /// </summary>
+    public static string KeyFor(string tenantId, string identityId) => DeterministicId.From(tenantId, identityId);
 }

@@ -30,6 +30,8 @@
     <ProjectReference Include="..\..\..\..\..\src\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Identity\Koan.Identity.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Identity.Web\Koan.Identity.Web.csproj" />
+    <!-- SEC-0007 P4 — the Identity × Tenancy bridge (membership access, tenant resolution, invites, deprovisioning). -->
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Identity.Tenancy\Koan.Identity.Tenancy.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Web.Auth\Koan.Web.Auth.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
     <!-- Offline in-memory data adapter (auto-elected; no container). -->

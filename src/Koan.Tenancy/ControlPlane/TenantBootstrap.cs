@@ -19,14 +19,21 @@ public static class TenantBootstrap
 
     /// <summary>
     /// Claim Owner of <paramref name="tenantId"/> for <paramref name="identityId"/> — one-shot: if an Owner
-    /// already exists, returns it unchanged; otherwise creates the Owner membership. (A concurrent double-claim
-    /// is left to a later CAS hardening via IConditionalWriteRepository; the prod claim window is gated + rare.)
+    /// already exists, returns it unchanged; otherwise creates the Owner membership. A concurrent double-claim by the
+    /// SAME identity converges to one row via the deterministic <see cref="Membership.KeyFor"/> seat id (both upsert
+    /// the same id); a race between two DIFFERENT identities is still gated rare by the prod claim window.
     /// </summary>
     public static async Task<Membership> ClaimOwnerAsync(string tenantId, string identityId)
     {
         var existingOwner = (await Membership.Query(m => m.TenantId == tenantId)).FirstOrDefault(m => m.IsOwner);
         if (existingOwner is not null) return existingOwner;
-        return await new Membership { TenantId = tenantId, IdentityId = identityId, Roles = { TenancyRoles.Owner } }.Save();
+        return await new Membership
+        {
+            Id = Membership.KeyFor(tenantId, identityId),
+            TenantId = tenantId,
+            IdentityId = identityId,
+            Roles = { TenancyRoles.Owner },
+        }.Save();
     }
 
     /// <summary>Ensure a tenant with <paramref name="id"/> exists (idempotent); creates it named <paramref name="name"/> if absent.</summary>

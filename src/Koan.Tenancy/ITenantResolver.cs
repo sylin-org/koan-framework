@@ -13,4 +13,13 @@ public interface ITenantResolver
 {
     /// <summary>A short, stable name for diagnostics and the boot report (e.g. <c>"claim"</c>, <c>"host"</c>, <c>"header"</c>).</summary>
     string Name { get; }
+
+    /// <summary>
+    /// Resolve a <b>candidate</b> tenant id from the inbound <paramref name="request"/>, or null when this resolver's
+    /// carrier is not present on the request. The caller (the web pipeline middleware) authorizes the candidate
+    /// against the subject's memberships before scoping — a resolver returns the <i>signalled</i> tenant, it does not
+    /// grant access. The default no-op keeps the bare boot-marker pattern (a presence-only resolver) compiling.
+    /// </summary>
+    ValueTask<string?> ResolveAsync(TenantResolutionRequest request, CancellationToken ct = default)
+        => new((string?)null);
 }

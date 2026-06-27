@@ -24,15 +24,28 @@ internal sealed class IdentityReconciler : IIdentityReconciler
 
         var canonicalId = await ResolveLinkedIdentityIdAsync(claims.Subject, claims.Provider, ct).ConfigureAwait(false)
                           ?? claims.Subject;
-        var identity = await Identity.Get(canonicalId, ct).ConfigureAwait(false) ?? new Identity { Id = canonicalId };
+        var existing = await Identity.Get(canonicalId, ct).ConfigureAwait(false);
+        var identity = existing ?? new Identity { Id = canonicalId };
+        var changed = existing is null;
 
         // Backfill display fields from the IdP only when empty — a user-set value is authoritative and never clobbered.
         if (string.IsNullOrWhiteSpace(identity.DisplayName) && !string.IsNullOrWhiteSpace(claims.DisplayName))
+        {
             identity.DisplayName = claims.DisplayName;
+            changed = true;
+        }
         if (string.IsNullOrWhiteSpace(identity.Picture) && !string.IsNullOrWhiteSpace(claims.Picture))
+        {
             identity.Picture = claims.Picture;
+            changed = true;
+        }
 
-        await identity.Save(ct).ConfigureAwait(false);
+        // Save-if-changed: a returning person with nothing to backfill is NOT re-written, so a concurrent lifecycle
+        // write (e.g. a just-issued Deactivation that flips Status / bumps Epoch) cannot be reverted by a stale
+        // full-row replace from this sign-in path. The reconciler never sets Status, so it can only ever lose a
+        // lifecycle change via that clobber — skipping the redundant write removes the race in the common case.
+        if (changed)
+            await identity.Save(ct).ConfigureAwait(false);
 
         if (!string.IsNullOrWhiteSpace(claims.Email))
             await ReconcileEmailAsync(identity.Id, claims.Email!, claims.EmailVerified, ct).ConfigureAwait(false);
@@ -53,8 +66,8 @@ internal sealed class IdentityReconciler : IIdentityReconciler
     internal static string ProviderKeyHash(string subject)
         => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(subject)));
 
-    /// <summary>The one canonical email normalization, shared by the factor writer (and any matcher).</summary>
-    internal static string NormalizeEmail(string email) => email.Trim().ToLowerInvariant();
+    /// <summary>The one canonical email normalization, shared by the factor writer (and any matcher) — see <see cref="IdentityEmail.Normalize"/>.</summary>
+    internal static string NormalizeEmail(string email) => IdentityEmail.Normalize(email);
 
     private static async Task ReconcileEmailAsync(string identityId, string address, bool verified, CancellationToken ct)
     {

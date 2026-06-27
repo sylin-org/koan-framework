@@ -1,3 +1,4 @@
+using Koan.Core;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Core.Model;
@@ -35,4 +36,10 @@ public sealed class IdentityEmail : Entity<IdentityEmail>, IAmbientExempt
     /// </summary>
     public static string KeyFor(string identityId, string normalizedAddress)
         => DeterministicId.From(identityId, normalizedAddress);
+
+    /// <summary>
+    /// The one canonical email normalization (trim + lower-case): the factor writer, the reconciler matcher, and any
+    /// out-of-pillar matcher (the SEC-0007 P4 invite acceptance) MUST share it so addresses compare identically.
+    /// </summary>
+    public static string Normalize(string address) => address.Trim().ToLowerInvariant();
 }

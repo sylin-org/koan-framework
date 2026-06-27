@@ -34,7 +34,18 @@ public sealed class SessionService
     /// request path: <see cref="SessionGuard"/> rejects a cookie whose session is revoked at the next validation
     /// tick, so the effect is immediate + observable (the device list shows them revoked). Returns the count revoked.
     /// </summary>
-    public async Task<int> SignOutEverywhereElseAsync(string identityId, string currentSessionId, CancellationToken ct = default)
+    public Task<int> SignOutEverywhereElseAsync(string identityId, string currentSessionId, CancellationToken ct = default)
+        => RevokeManyAsync(identityId, currentSessionId, ct);
+
+    /// <summary>
+    /// Revoke <b>every</b> active session for a person (no exception) — the session leg of atomic deprovisioning
+    /// (SEC-0007 P4). Enforcement is the same request-path <see cref="SessionGuard"/> as everywhere-else, so a
+    /// deactivated person's existing cookies stop working at the next validation tick. Returns the count revoked.
+    /// </summary>
+    public Task<int> RevokeAllAsync(string identityId, CancellationToken ct = default)
+        => RevokeManyAsync(identityId, currentSessionId: null, ct);
+
+    private static async Task<int> RevokeManyAsync(string identityId, string? currentSessionId, CancellationToken ct)
     {
         var sessions = await Session.Query(s => s.IdentityId == identityId, ct).ConfigureAwait(false);
         var now = DateTimeOffset.UtcNow;
