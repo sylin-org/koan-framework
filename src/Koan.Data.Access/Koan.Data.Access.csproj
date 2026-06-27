@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <KoanPackageKind>Periphery</KoanPackageKind>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>Koan.Data.Access</AssemblyName>
+    <RootNamespace>Koan.Data.Access</RootNamespace>
+    <Description>Data-layer access scoping for Koan (SEC-0008): the ambient SUBJECT slice + carrier and the access read-axis. [AccessScoped] opts an entity in; reads are narrowed to the ambient subject's matching scope tokens via a pushable row-visibility predicate (fail-closed on an absent subject), enforced at the data layer through the Koan.Data.Core read-filter contributor seam (DATA-0106 / ARCH-0101 §7) — so a raw Entity.Query() in a service, job, or SSE handler is inherently scoped, not just an EntityController read. The subject rides the durable async-hop (ARCH-0100), so a guest-triggered job is scoped too. Reference = Intent; the data core stays subject-agnostic.</Description>
+    <PackageTags>$(CommonPackageTags);access;authorization;row-visibility;ambient-subject</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
+    <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
+  </ItemGroup>
+</Project>
