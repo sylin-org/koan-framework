@@ -19,11 +19,13 @@ public sealed class IdentitySelfServiceController : ControllerBase
 {
     private readonly SessionService _sessions;
     private readonly ApiTokenService _tokens;
+    private readonly IdentityLinkService _links;
 
-    public IdentitySelfServiceController(SessionService sessions, ApiTokenService tokens)
+    public IdentitySelfServiceController(SessionService sessions, ApiTokenService tokens, IdentityLinkService links)
     {
         _sessions = sessions;
         _tokens = tokens;
+        _links = links;
     }
 
     private string? Subject => User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
@@ -42,7 +44,16 @@ public sealed class IdentitySelfServiceController : ControllerBase
 
     [HttpGet("connected")]
     public async Task<ActionResult<IReadOnlyList<ExternalIdentityLink>>> Connected(CancellationToken ct)
-        => Subject is null ? Unauthorized() : Ok(await ExternalIdentityLink.Query(l => l.IdentityId == Subject, ct));
+        => Subject is null ? Unauthorized() : Ok(await _links.ForPersonAsync(Subject, ct));
+
+    // Unlink a connected account (unlink-safe across all factor types — you can only unlink your OWN links).
+    // Linking a NEW provider happens via that provider's auth callback (so the sub is verified), not a raw POST.
+    [HttpDelete("connected/{linkId}")]
+    public async Task<IActionResult> Unlink([FromRoute] string linkId, CancellationToken ct)
+    {
+        if (Subject is null) return Unauthorized();
+        return await _links.UnlinkAsync(Subject, linkId, ct) ? NoContent() : NotFound();
+    }
 
     [HttpGet("sessions")]
     public async Task<ActionResult<IReadOnlyList<Session>>> Sessions(CancellationToken ct)

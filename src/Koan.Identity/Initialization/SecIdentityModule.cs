@@ -38,6 +38,7 @@ public sealed class SecIdentityModule : KoanModule
         services.TryAddSingleton<Management.SessionService>();
         services.TryAddSingleton<Management.ApiTokenService>();
         services.TryAddSingleton<Management.IdentityLifecycleService>();
+        services.TryAddSingleton<Management.IdentityLinkService>(); // D5 — explicit account-linking
 
         // Layer 2 — access model: the global role binding + the contributor-pipeline effective-access resolver +
         // the bidirectional explainer. Contributors are discovered ([KoanDiscoverable]) so an external Membership

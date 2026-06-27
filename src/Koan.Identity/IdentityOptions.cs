@@ -26,17 +26,4 @@ public sealed class IdentityOptions
     /// detectable. Off by default — chaining serializes audit writes through the chain head (a deliberate cost).
     /// </summary>
     public bool HashChainAudit { get; set; }
-
-    /// <summary>
-    /// Opt into person ≠ email auto-merge (SEC-0007 D5): a new IdP sign-in carrying a VERIFIED email that already
-    /// belongs to an Active person links onto that person instead of minting a duplicate.
-    /// <para>
-    /// <b>OFF by default — and unsafe to enable without a provider-trust policy.</b> The merge trusts the IdP's
-    /// <c>email_verified</c> assertion; a low-assurance or attacker-operated IdP asserting a victim's verified email
-    /// would take over the victim's person. The ADR marks the matching/collision rules an open question (provider /
-    /// domain authority). Enable only once that policy exists (e.g. an authoritative-provider/domain allow-list, or
-    /// require an explicit signed-in account-link rather than a fresh IdP claim).
-    /// </para>
-    /// </summary>
-    public bool AutoMergeVerifiedEmail { get; set; }
 }

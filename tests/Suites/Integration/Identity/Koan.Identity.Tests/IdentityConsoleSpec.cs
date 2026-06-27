@@ -24,7 +24,8 @@ public sealed class IdentityConsoleSpec
     private IdentitySelfServiceController SelfService(string subject)
         => WithUser(new IdentitySelfServiceController(
             _fx.Services.GetRequiredService<SessionService>(),
-            _fx.Services.GetRequiredService<ApiTokenService>()), subject);
+            _fx.Services.GetRequiredService<ApiTokenService>(),
+            _fx.Services.GetRequiredService<IdentityLinkService>()), subject);
 
     private IdentityAdminController Admin()
         => WithUser(new IdentityAdminController(_fx.Services.GetRequiredService<IdentityLifecycleService>()), "operator", IdentityWebRoles.Operator);

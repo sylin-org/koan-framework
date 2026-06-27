@@ -90,7 +90,8 @@ public sealed class IdentityDayTwoSpec
     {
         var ctrl = new IdentitySelfServiceController(
             _fx.Services.GetRequiredService<SessionService>(),
-            _fx.Services.GetRequiredService<ApiTokenService>());
+            _fx.Services.GetRequiredService<ApiTokenService>(),
+            _fx.Services.GetRequiredService<IdentityLinkService>());
         ctrl.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(ImpersonationClaims.BuildImpersonatedIdentity("imp-t2", "imp-a2", Array.Empty<string>())) },
