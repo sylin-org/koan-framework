@@ -32,6 +32,7 @@ internal static class IdentityAuditHooks
             Hook<Group>("Group", e => e.Id);
             Hook<Session>("Session", e => e.IdentityId);
             Hook<ApiToken>("ApiToken", e => e.IdentityId);
+            Hook<IdentityRole>("IdentityRole", e => e.IdentityId); // access mutations self-audit too (Layer 2)
             _registered = true;
         }
     }

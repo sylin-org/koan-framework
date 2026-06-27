@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Koan.Core;
 using Koan.Core.Hosting.App;
+using Koan.Core.Hosting.Registry;
 using Koan.Core.Modules;
 using Koan.Core.Ordering;
 using Koan.Core.Provenance;
@@ -37,6 +38,15 @@ public sealed class SecIdentityModule : KoanModule
         services.TryAddSingleton<Management.SessionService>();
         services.TryAddSingleton<Management.ApiTokenService>();
         services.TryAddSingleton<Management.IdentityLifecycleService>();
+
+        // Layer 2 — access model: the global role binding + the contributor-pipeline effective-access resolver +
+        // the bidirectional explainer. Contributors are discovered ([KoanDiscoverable]) so an external Membership
+        // contributor (with Koan.Tenancy) lights up over the same resolver — graceful degradation, no fork.
+        services.TryAddSingleton<Management.IdentityRoleService>();
+        services.TryAddScoped<Access.EffectiveAccessResolver>();
+        services.TryAddScoped<Access.AccessExplainer>();
+        foreach (var type in KoanRegistry.GetDiscoveredImplementors(typeof(Access.IEffectiveAccessContributor)))
+            services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(Access.IEffectiveAccessContributor), type));
 
         // Replace the in-memory stubs (registered by AddKoanWebAuth) with durable Entity<>-backed stores.
         // Ordered after the auth registrar (see [After]) so Replace finds and supersedes the defaults.
