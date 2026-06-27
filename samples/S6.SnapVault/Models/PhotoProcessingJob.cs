@@ -34,7 +34,7 @@ public sealed class PhotoProcessingJob : Entity<PhotoProcessingJob>, IKoanJob<Ph
     public string ContentType { get; set; } = "application/octet-stream";
     /// <summary>Storage key of the staged raw upload (see <see cref="UploadStaging"/>).</summary>
     public string StagingKey { get; set; } = "";
-    /// <summary>The batch <see cref="ProcessingJob"/> id for progress/error aggregation.</summary>
+    /// <summary>The batch-progress id for progress/error aggregation (legacy batch tracker, dropped in step 1).</summary>
     public string BatchJobId { get; set; } = "";
 
     // --- Reanalyze inputs ---

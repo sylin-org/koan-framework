@@ -24,7 +24,11 @@ public interface IPhotoProcessingService
     /// <summary>
     /// Semantic search across photos using natural language query with hybrid search control
     /// </summary>
+    /// <param name="query">The natural-language search query.</param>
+    /// <param name="eventId">Optional event scope; null searches the whole (tenant-scoped) library.</param>
     /// <param name="alpha">Search mode: 0.0 = pure keyword, 1.0 = pure semantic, 0.5 = hybrid</param>
+    /// <param name="topK">Maximum number of results to return.</param>
+    /// <param name="ct">Cancellation token.</param>
     Task<List<PhotoAsset>> SemanticSearch(string query, string? eventId = null, double alpha = 0.5, int topK = 20, CancellationToken ct = default);
 
     /// <summary>

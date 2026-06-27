@@ -2,6 +2,7 @@ using Koan.Media.Abstractions.Model;
 using Koan.Storage.Infrastructure;
 using Koan.Data.Vector.Abstractions;
 using Koan.Data.AI.Attributes;
+using Koan.Data.Core.Relationships;
 
 namespace S6.SnapVault.Models;
 
@@ -18,15 +19,10 @@ namespace S6.SnapVault.Models;
 public class PhotoAsset : MediaEntity<PhotoAsset>
 {
     // Event relationship
+    [Parent(typeof(Event))]
     public string EventId { get; set; } = "";
     public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
     public DateTime? CapturedAt { get; set; } // From EXIF
-
-    // Derivative relationships (using framework's media graph)
-    // ThumbnailMediaId already provided by MediaEntity<T> (square, for grid views)
-    public string? MasonryThumbnailMediaId { get; set; } // Aspect-ratio preserving, 300px for masonry views
-    public string? RetinaThumbnailMediaId { get; set; } // Aspect-ratio preserving, 600px for retina/4K displays
-    public string? GalleryMediaId { get; set; }
 
     // Original file metadata
     public string OriginalFileName { get; set; } = "";
@@ -46,10 +42,14 @@ public class PhotoAsset : MediaEntity<PhotoAsset>
     public List<string> DetectedObjects { get; set; } = new();
     public string MoodDescription { get; set; } = "";
     public List<string> AutoTags { get; set; } = new();
-    public string DetailedDescription { get; set; } = ""; // AI vision-generated detailed analysis (legacy)
     public AiAnalysis? AiAnalysis { get; set; } // Structured AI analysis (tags, summary, facts)
 
-    // Smart mode classification cache (avoids repeated classification API calls)
+    // Smart mode classification cache (avoids repeated classification API calls).
+    // [Parent] makes this a navigable relationship for GetRelatives. Two caveats for the step-5 relatives surface:
+    // PhotoAsset now has TWO parents (Event + AnalysisStyle), so callers must use GetParent<AnalysisStyle>() (the
+    // non-generic GetParent() throws on multiple parents); and AnalysisStyle is [HostScoped] while PhotoAsset is
+    // tenant-scoped — validate cross-scope resolution + nullable (no inference yet) handling when that nav lands.
+    [Parent(typeof(AnalysisStyle))]
     public string? InferredStyleId { get; set; } // FK to AnalysisStyle (detected style)
     public DateTime? InferredAt { get; set; } // When classification was performed
 

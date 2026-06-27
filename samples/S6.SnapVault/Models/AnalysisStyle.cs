@@ -25,7 +25,7 @@ public class AnalysisStyle : Entity<AnalysisStyle>
     // ==================== Metadata ====================
 
     /// <summary>
-    /// Display name (e.g., "Portrait & People")
+    /// Display name (e.g., "Portrait &amp; People")
     /// </summary>
     public string Name { get; set; } = "";
 
