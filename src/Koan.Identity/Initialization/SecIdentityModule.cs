@@ -33,6 +33,11 @@ public sealed class SecIdentityModule : KoanModule
         services.AddKoanOptions<IdentityOptions>(IdentityOptions.SectionPath);
         services.TryAddSingleton<IIdentityReconciler, IdentityReconciler>();
 
+        // Layer 1 — management services (offline-capable; the web consoles expose them).
+        services.TryAddSingleton<Management.SessionService>();
+        services.TryAddSingleton<Management.ApiTokenService>();
+        services.TryAddSingleton<Management.IdentityLifecycleService>();
+
         // Replace the in-memory stubs (registered by AddKoanWebAuth) with durable Entity<>-backed stores.
         // Ordered after the auth registrar (see [After]) so Replace finds and supersedes the defaults.
         services.Replace(ServiceDescriptor.Singleton<IUserStore, IdentityUserStore>());
@@ -45,6 +50,9 @@ public sealed class SecIdentityModule : KoanModule
     {
         // Entity statics resolve the repository through the ambient provider; bind it if a hosted service hasn't yet.
         AppHost.Current ??= services;
+
+        // Layer 1 — audit-by-construction: hook the lifecycle seam once per process so identity mutations self-audit.
+        Audit.IdentityAuditHooks.EnsureRegistered();
 
         var env = services.GetRequiredService<IHostEnvironment>();
         var cfg = services.GetRequiredService<IConfiguration>();

@@ -22,7 +22,8 @@ namespace Koan.Identity.Tests;
 /// <c>Membership.IdentityId</c> soft-FK resolution, the durable dev-seed, the ambient-exempt global plane, and
 /// the dev-open / prod-closed fail-closed boot guard.
 /// </summary>
-public sealed class IdentityReconciliationSpec : IClassFixture<IdentityHostFixture>
+[Collection("identity")]
+public sealed class IdentityReconciliationSpec
 {
     private readonly IdentityHostFixture _fx;
     public IdentityReconciliationSpec(IdentityHostFixture fx) => _fx = fx;

@@ -29,6 +29,7 @@
     <ProjectReference Include="..\..\..\..\..\src\Koan.Testing.Hosting\Koan.Testing.Hosting.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Identity\Koan.Identity.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Identity.Web\Koan.Identity.Web.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Web.Auth\Koan.Web.Auth.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
     <!-- Offline in-memory data adapter (auto-elected; no container). -->
