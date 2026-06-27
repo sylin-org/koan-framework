@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Koan.Data.Core;
+using Koan.Identity.Impersonation;
 using Koan.Identity.Management;
 
 namespace Koan.Identity.Web;
@@ -43,7 +44,10 @@ public sealed class IdentityAdminController : ControllerBase
 
     [HttpPost("identities/suspend")]
     public async Task<ActionResult<IdentityLifecycleService.BulkResult>> Suspend([FromBody] BulkRequest req, CancellationToken ct)
-        => Ok(await _lifecycle.SuspendAsync(req.IdentityIds ?? new(), ct));
+    {
+        if (ImpersonationGuard.IsBlocked(User, "identity.suspend")) return StatusCode(403, new { error = "suspending identities is blocked while impersonating" });
+        return Ok(await _lifecycle.SuspendAsync(req.IdentityIds ?? new(), ct));
+    }
 
     [HttpPost("identities/reactivate")]
     public async Task<ActionResult<IdentityLifecycleService.BulkResult>> Reactivate([FromBody] BulkRequest req, CancellationToken ct)
@@ -51,7 +55,10 @@ public sealed class IdentityAdminController : ControllerBase
 
     [HttpDelete("identities/{id}")]
     public async Task<ActionResult<IdentityLifecycleService.DeleteReport>> Delete([FromRoute] string id, CancellationToken ct)
-        => Ok(await _lifecycle.DeleteWithDependentsAsync(id, ct));
+    {
+        if (ImpersonationGuard.IsBlocked(User, "identity.delete")) return StatusCode(403, new { error = "deleting identities is blocked while impersonating" });
+        return Ok(await _lifecycle.DeleteWithDependentsAsync(id, ct));
+    }
 
     [HttpGet("groups")]
     public async Task<ActionResult<IReadOnlyList<Group>>> Groups(CancellationToken ct)

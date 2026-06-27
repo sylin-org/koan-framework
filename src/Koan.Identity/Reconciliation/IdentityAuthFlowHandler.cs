@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Core;
+using Koan.Identity.Impersonation;
 using Koan.Identity.Management;
 using Koan.Web.Auth.Contributors;
 using Koan.Web.Auth.Flow;
@@ -53,8 +54,25 @@ public sealed class IdentityAuthFlowHandler : IKoanAuthFlowHandler
 
     public async Task OnValidatePrincipal(AuthValidatePrincipalContext ctx, CancellationToken ct)
     {
-        if (ctx.Inner.Principal is { } principal && await SessionGuard.ShouldRejectAsync(principal, ct).ConfigureAwait(false))
+        if (ctx.Inner.Principal is not { } principal) return;
+
+        if (await SessionGuard.ShouldRejectAsync(principal, ct).ConfigureAwait(false))
+        {
             ctx.Inner.RejectPrincipal();
+            return;
+        }
+
+        // Impersonation re-check: if acting-as, the grant must still be active — revoke/expiry ends the session on
+        // the next request (the impersonated cookie stops working the moment the grant is gone).
+        if (ImpersonationClaims.IsImpersonating(principal))
+        {
+            var actor = ImpersonationClaims.ActorOf(principal);
+            var target = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? principal.FindFirst("sub")?.Value;
+            var impersonation = ctx.Services.GetService<ImpersonationService>();
+            if (actor is not null && target is not null && impersonation is not null
+                && !await impersonation.IsActiveAsync(actor, target, ct).ConfigureAwait(false))
+                ctx.Inner.RejectPrincipal();
+        }
     }
 
     public async Task OnSignOut(AuthSignOutContext ctx, CancellationToken ct)

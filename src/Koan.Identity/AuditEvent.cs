@@ -40,4 +40,15 @@ public sealed class AuditEvent : Entity<AuditEvent>, IAmbientExempt
     /// <summary>When the action occurred (set once, on creation).</summary>
     [Timestamp]
     public DateTimeOffset OccurredAt { get; set; }
+
+    // --- Tamper-evidence (Layer 3, optional hash-chaining; null/0 when chaining is off) ---
+
+    /// <summary>Monotonic position in the hash chain (0-based); 0 with a null <see cref="Hash"/> = unchained.</summary>
+    public long Sequence { get; set; }
+
+    /// <summary>The previous event's <see cref="Hash"/> this one chains from (<c>GENESIS</c> for the first).</summary>
+    public string? PrevHash { get; set; }
+
+    /// <summary>SHA-256 over (sequence | prevHash | canonical content). Editing any past event breaks the chain.</summary>
+    public string? Hash { get; set; }
 }

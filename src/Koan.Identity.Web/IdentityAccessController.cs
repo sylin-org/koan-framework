@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Koan.Identity.Access;
+using Koan.Identity.Impersonation;
 using Koan.Identity.Management;
 
 namespace Koan.Identity.Web;
@@ -42,7 +43,10 @@ public sealed class IdentityAccessController : ControllerBase
 
     [HttpPost("roles")]
     public async Task<ActionResult<IdentityRole>> Grant([FromRoute] string id, [FromBody] GrantRequest req, CancellationToken ct)
-        => Ok(await _roles.GrantAsync(id, req.RoleKey, ct));
+    {
+        if (ImpersonationGuard.IsBlocked(User, "role.grant")) return StatusCode(403, new { error = "granting roles is blocked while impersonating" });
+        return Ok(await _roles.GrantAsync(id, req.RoleKey, ct));
+    }
 
     [HttpDelete("roles/{roleKey}")]
     public async Task<IActionResult> Revoke([FromRoute] string id, [FromRoute] string roleKey, CancellationToken ct)

@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Koan.Data.Core;
+using Koan.Identity.Impersonation;
 using Koan.Identity.Management;
 
 namespace Koan.Identity.Web;
@@ -71,6 +72,7 @@ public sealed class IdentitySelfServiceController : ControllerBase
     public async Task<ActionResult<object>> IssueToken([FromBody] IssueTokenRequest req, CancellationToken ct)
     {
         if (Subject is null) return Unauthorized();
+        if (ImpersonationGuard.IsBlocked(User, "apitoken.issue")) return StatusCode(403, new { error = "issuing tokens is blocked while impersonating" });
         var issued = await _tokens.IssueAsync(Subject, req.Name, req.Scopes ?? new(), req.ExpiresAt, ct);
         return Ok(new { token = Project(issued.Token), secret = issued.Secret });
     }
@@ -79,6 +81,7 @@ public sealed class IdentitySelfServiceController : ControllerBase
     public async Task<ActionResult<object>> RotateToken([FromRoute] string id, CancellationToken ct)
     {
         if (Subject is null) return Unauthorized();
+        if (ImpersonationGuard.IsBlocked(User, "apitoken.rotate")) return StatusCode(403, new { error = "rotating tokens is blocked while impersonating" });
         var existing = await ApiToken.Get(id, ct);
         if (existing is null || existing.IdentityId != Subject) return NotFound(); // never rotate another person's token
         var rotated = await _tokens.RotateAsync(id, ct);

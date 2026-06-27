@@ -33,6 +33,7 @@ internal static class IdentityAuditHooks
             Hook<Session>("Session", e => e.IdentityId);
             Hook<ApiToken>("ApiToken", e => e.IdentityId);
             Hook<IdentityRole>("IdentityRole", e => e.IdentityId); // access mutations self-audit too (Layer 2)
+            Hook<Impersonation.ImpersonationGrant>("ImpersonationGrant", e => e.Target); // impersonation self-audits (Layer 3)
             _registered = true;
         }
     }
@@ -72,7 +73,7 @@ internal static class IdentityAuditHooks
     {
         try
         {
-            await new AuditEvent
+            var e = new AuditEvent
             {
                 Actor = AppHost.Current?.GetService<IIdentityActorAccessor>()?.CurrentActorSubject,
                 Subject = subject,
@@ -80,7 +81,14 @@ internal static class IdentityAuditHooks
                 Target = $"{entityName}/{id}",
                 Before = Snapshot(before),
                 After = Snapshot(after),
-            }.Save(ct).ConfigureAwait(false);
+            };
+
+            // Tamper-evidence (Layer 3, opt-in): chain-stamp + write atomically (head advances only on success).
+            if (AppHost.Current?.GetService<Microsoft.Extensions.Options.IOptions<IdentityOptions>>()?.Value?.HashChainAudit == true
+                && AppHost.Current?.GetService<AuditChain>() is { } chain)
+                await chain.AppendAsync(e, ev => ev.Save(ct), ct).ConfigureAwait(false);
+            else
+                await e.Save(ct).ConfigureAwait(false);
         }
         catch
         {

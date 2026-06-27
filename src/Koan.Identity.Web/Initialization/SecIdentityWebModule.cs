@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
@@ -19,8 +20,15 @@ public sealed class SecIdentityWebModule : KoanModule
 
     public override void Register(IServiceCollection services)
     {
-        // Mount both controllers from this assembly.
+        // Mount the controllers from this assembly.
         services.AddKoanControllersFrom<IdentitySelfServiceController>();
+
+        // D8 — the impersonation banner rides every response while an actor claim is present.
+        services.Configure<Microsoft.AspNetCore.Mvc.MvcOptions>(o => o.Filters.Add<ImpersonationBannerFilter>());
+
+        // Audit attribution: resolve the acting subject from the request principal (actor when impersonating).
+        services.AddHttpContextAccessor();
+        services.TryAddSingleton<Koan.Identity.IIdentityActorAccessor, HttpContextActorAccessor>();
     }
 
     public override void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)

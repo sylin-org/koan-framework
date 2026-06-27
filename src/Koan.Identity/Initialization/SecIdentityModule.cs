@@ -48,6 +48,11 @@ public sealed class SecIdentityModule : KoanModule
         foreach (var type in KoanRegistry.GetDiscoveredImplementors(typeof(Access.IEffectiveAccessContributor)))
             services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(Access.IEffectiveAccessContributor), type));
 
+        // Layer 3 — day-2 power: safe impersonation, JIT/time-boxed grants, tamper-evident audit.
+        services.TryAddSingleton<Impersonation.ImpersonationService>();
+        services.TryAddSingleton<Management.JitGrantService>();
+        services.TryAddSingleton<Audit.AuditChain>();
+
         // Replace the in-memory stubs (registered by AddKoanWebAuth) with durable Entity<>-backed stores.
         // Ordered after the auth registrar (see [After]) so Replace finds and supersedes the defaults.
         services.Replace(ServiceDescriptor.Singleton<IUserStore, IdentityUserStore>());

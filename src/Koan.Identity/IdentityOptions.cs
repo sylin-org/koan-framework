@@ -20,4 +20,10 @@ public sealed class IdentityOptions
     /// person reconciles with the tenancy dev membership (<c>Membership.IdentityId</c>).
     /// </summary>
     public string? DevUser { get; set; }
+
+    /// <summary>
+    /// Opt into tamper-evident audit (Layer 3): each <c>AuditEvent</c> is hash-chained so altering a past event is
+    /// detectable. Off by default — chaining serializes audit writes through the chain head (a deliberate cost).
+    /// </summary>
+    public bool HashChainAudit { get; set; }
 }
