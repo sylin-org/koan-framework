@@ -6,8 +6,9 @@ namespace S6.SnapVault.Models;
 /// User-created photo collection using Active Record pattern
 /// Photos belong to multiple collections (many-to-many via PhotoIds array)
 ///
-/// FUTURE: Add UserId property for multi-user support
-/// Migration path: public string? UserId { get; set; }
+/// Multi-tenant: this entity carries no owner/tenant field. Referencing Koan.Tenancy isolates it
+/// automatically by the ambient tenant via the invisible <c>__koan_tenant</c> discriminator — one
+/// studio's collections are unreachable from another's (proven by the SnapVault tenancy spec).
 /// </summary>
 public class Collection : Entity<Collection>
 {

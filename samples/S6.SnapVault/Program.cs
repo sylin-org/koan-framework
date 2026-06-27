@@ -37,9 +37,8 @@ builder.Services.AddSingleton<IAnalysisPromptFactory, AnalysisPromptFactory>();
 // Production monitoring and telemetry
 builder.Services.AddSingleton<EmbeddingMonitoringService>();
 
-// Register background processing queue and worker
-builder.Services.AddSingleton<IPhotoProcessingQueue, InMemoryPhotoProcessingQueue>();
-builder.Services.AddHostedService<PhotoProcessingWorker>();
+// Background photo processing is durable, tenant-carrying Koan.Jobs (PhotoProcessingJob) — auto-discovered and
+// drained by the framework's job worker via AddKoan(). No hand-wired queue or HostedService.
 
 // SignalR for real-time progress updates
 builder.Services.AddSignalR();

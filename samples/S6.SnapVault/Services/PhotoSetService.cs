@@ -99,13 +99,13 @@ public sealed class PhotoSetService
         switch (definition.Context)
         {
             case "all-photos":
-                var allResult = await PhotoAsset.AllWithCount(new DataQueryOptions(page: 1, pageSize: 1), ct);
+                var allResult = await PhotoAsset.AllWithCount(QueryDefinition.All.WithPagination(1, 1), ct);
                 return (int)allResult.TotalCount;
 
             case "favorites":
                 var favResult = await PhotoAsset.QueryWithCount(
                     p => p.IsFavorite,
-                    new DataQueryOptions(page: 1, pageSize: 1),
+                    QueryDefinition.All.WithPagination(1, 1),
                     ct);
                 return (int)favResult.TotalCount;
 
@@ -128,7 +128,7 @@ public sealed class PhotoSetService
 
                 var collResult = await PhotoAsset.QueryWithCount(
                     p => collection.PhotoIds.Contains(p.Id),
-                    new DataQueryOptions(page: 1, pageSize: 1),
+                    QueryDefinition.All.WithPagination(1, 1),
                     ct);
                 return (int)collResult.TotalCount;
 
@@ -169,7 +169,7 @@ public sealed class PhotoSetService
         // Calculate page number for provider's pagination
         // Note: Koan uses 1-based page numbers
         int page = (skip / take) + 1;
-        var options = new DataQueryOptions(page: page, pageSize: take);
+        var options = QueryDefinition.All.WithPagination(page, take);
 
         // Adjust skip for page offset
         int pageSkip = skip % take;

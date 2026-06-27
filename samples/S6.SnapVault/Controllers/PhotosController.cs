@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
+using Koan.Data.Core.Sorting;
+using Koan.Jobs;
 using Koan.Web.Attributes;
 using Koan.Web.Controllers;
 using S6.SnapVault.Models;
@@ -20,18 +22,15 @@ public class PhotosController : EntityController<PhotoAsset>
 {
     private readonly ILogger<PhotosController> _logger;
     private readonly IPhotoProcessingService _processingService;
-    private readonly IPhotoProcessingQueue _queue;
     private readonly IHubContext<PhotoProcessingHub> _hubContext;
 
     public PhotosController(
         ILogger<PhotosController> logger,
         IPhotoProcessingService processingService,
-        IPhotoProcessingQueue queue,
         IHubContext<PhotoProcessingHub> hubContext)
     {
         _logger = logger;
         _processingService = processingService;
-        _queue = queue;
         _hubContext = hubContext;
     }
 
@@ -201,8 +200,8 @@ public class PhotosController : EntityController<PhotoAsset>
         {
             case "favorites":
                 // Use Query with DataQueryOptions for pushdown
-                var queryOptions = new DataQueryOptions { Sort = sortExpression };
-                var favorites = await PhotoAsset.Query(p => p.IsFavorite, queryOptions, ct);
+                var query = QueryDefinition.All.WithSort<PhotoAsset>(sortExpression);
+                var favorites = await PhotoAsset.Query(p => p.IsFavorite, query, ct);
                 return favorites.ToList();
 
             case "search":
@@ -253,7 +252,7 @@ public class PhotosController : EntityController<PhotoAsset>
             case "all-photos":
             default:
                 // Use DataQueryOptions for provider-level sort pushdown
-                var allOptions = new DataQueryOptions { Sort = sortExpression };
+                var allOptions = QueryDefinition.All.WithSort<PhotoAsset>(sortExpression);
                 var allPhotos = await PhotoAsset.All(allOptions, ct);
                 return allPhotos.ToList();
         }
@@ -330,32 +329,31 @@ public class PhotosController : EntityController<PhotoAsset>
             "Created upload job {JobId} with {Count} file(s) for event {EventId}",
             job.Id, validFiles.Count, eventId ?? "auto");
 
-        // Queue files for background processing
+        // Stage each file durably and submit a tenant-carrying processing job (replaces the in-memory queue).
         var queuedCount = 0;
         foreach (var file in validFiles)
         {
             try
             {
-                // Read file into memory for queuing
-                using var ms = new MemoryStream();
-                await file.CopyToAsync(ms, ct);
-                var fileData = ms.ToArray();
+                // Stage the raw bytes to (tenant-scoped) storage so the request returns fast and the upload
+                // survives a restart. The job reads them back under the same studio's rehydrated tenant.
+                using var raw = file.OpenReadStream();
+                var staged = await UploadStaging.Onboard(file.FileName, raw, file.ContentType, ct);
 
-                // Queue for background processing
-                var queuedUpload = new QueuedPhotoUpload
+                // Submit the durable job. The ambient tenant is captured here and rehydrated when it runs
+                // (ARCH-0100), so the whole pipeline executes in the studio that uploaded the photo.
+                await new PhotoProcessingJob
                 {
-                    JobId = job.Id,
                     EventId = eventId,
-                    FileName = file.FileName,
+                    OriginalFileName = file.FileName,
                     ContentType = file.ContentType,
-                    FileData = fileData
-                };
-
-                _queue.Enqueue(queuedUpload);
+                    StagingKey = staged.Key,
+                    BatchJobId = job.Id
+                }.Job.Submit(PhotoProcessingJob.Ingest);
                 queuedCount++;
 
                 // Notify clients that file is queued
-                await _hubContext.Clients.Group($"job:{job.Id}").Send("PhotoQueued", new PhotoProgressEvent
+                await _hubContext.Clients.Group($"job:{job.Id}").SendAsync("PhotoQueued", new PhotoProgressEvent
                 {
                     JobId = job.Id,
                     PhotoId = "", // Not yet created
@@ -509,19 +507,9 @@ public class PhotosController : EntityController<PhotoAsset>
         photo.MoodDescription = "";
         await photo.Save(ct);
 
-        // Regenerate AI metadata in background
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await _processingService.GenerateAIMetadata(photo, CancellationToken.None);
-                _logger.LogInformation("Successfully regenerated AI metadata for photo {PhotoId}", id);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to regenerate AI metadata for photo {PhotoId}", id);
-            }
-        }, CancellationToken.None);
+        // Regenerate via a durable, tenant-carrying job (replaces a fire-and-forget Task.Run that escaped the
+        // request's tenant scope — the async-hop hole the conversion plan named).
+        await new PhotoProcessingJob { PhotoId = id }.Job.Submit(PhotoProcessingJob.Reanalyze);
 
         return Ok(new { Message = "AI regeneration started in background", PhotoId = id });
     }
@@ -710,9 +698,12 @@ public class PhotosController : EntityController<PhotoAsset>
     /// Download full-resolution photo
     /// </summary>
     [HttpGet("{id}/download")]
-    public ActionResult DownloadPhoto(string id)
+    public async Task<ActionResult> DownloadPhoto(string id, CancellationToken ct = default)
     {
-        var photo = PhotoAsset.Get(id);
+        // NOTE: PhotoAsset is a StorageEntity, whose synchronous Get(key) lightweight-proxy shadows the async
+        // record-store Entity.Get(id). The un-awaited form silently returned a non-null proxy (so the not-found
+        // check never fired and Key was the entity id, not the stored blob key). Use the async data read.
+        var photo = await PhotoAsset.Get(id, ct);
         if (photo == null)
         {
             return NotFound();

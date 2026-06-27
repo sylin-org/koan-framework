@@ -14,6 +14,13 @@
     <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />
     <ProjectReference Include="..\..\src\Koan.Web.Extensions\Koan.Web.Extensions.csproj" />
 
+    <!-- Multi-tenancy (Reference = Intent): every non-[HostScoped] Entity<T> auto-isolates by the
+         ambient tenant across data, blob storage, cache, and the async-hop. SnapVault Phase 1. -->
+    <ProjectReference Include="..\..\src\Koan.Tenancy\Koan.Tenancy.csproj" />
+
+    <!-- Durable, tenant-carrying background jobs (replaces the in-memory queue + PhotoProcessingWorker). -->
+    <ProjectReference Include="..\..\src\Koan.Jobs\Koan.Jobs.csproj" />
+
     <!-- Data Providers -->
     <ProjectReference Include="..\..\src\Connectors\Data\Mongo\Koan.Data.Connector.Mongo.csproj" />
 
@@ -39,15 +46,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Image Processing Library -->
+    <!-- Image Processing Library. Pinned to the same ImageSharp line Koan.Media.Core builds against
+         (3.1.x / Drawing 2.1.x); a sample must not force a higher major onto the framework's media stack.
+         EXIF is read via ImageSharp's ExifProfile, and SignalR server APIs come from Microsoft.AspNetCore.App —
+         so the former MetadataExtractor and Microsoft.AspNetCore.SignalR.Client refs were unused and removed. -->
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
-    <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.4" />
-
-    <!-- EXIF Metadata -->
-    <PackageReference Include="MetadataExtractor" Version="2.8.1" />
-
-    <!-- SignalR for Progress Updates -->
-    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.8" />
+    <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.6" />
   </ItemGroup>
 
 </Project>

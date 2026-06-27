@@ -6,6 +6,8 @@ using S6.SnapVault.Models;
 using S6.SnapVault.Hubs;
 using S6.SnapVault.Services.AI;
 using Koan.Media.Core.Extensions;
+using Koan.Media.Core.Pipeline;
+using Koan.Media.Abstractions.Recipes;
 using Koan.AI;
 using Koan.AI.Contracts.Options;
 using Koan.Data.Core;
@@ -35,15 +37,15 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
         _promptFactory = promptFactory;
     }
 
-    public async Task<PhotoAsset> ProcessUpload(string? eventId, IFormFile file, string jobId, CancellationToken ct = default)
+    public async Task<PhotoAsset> ProcessUpload(string? eventId, Stream content, string fileName, string contentType, string jobId, CancellationToken ct = default)
     {
-        _logger.LogInformation("Processing upload: {FileName} for event {EventId} (job: {JobId})", file.FileName, eventId ?? "auto", jobId);
+        _logger.LogInformation("Processing upload: {FileName} for event {EventId} (job: {JobId})", fileName, eventId ?? "auto", jobId);
 
         // Create PhotoAsset entity (eventId will be set after EXIF extraction if null)
         var photo = new PhotoAsset
         {
             EventId = eventId ?? "", // Temporary, will be set after determining date
-            OriginalFileName = file.FileName,
+            OriginalFileName = fileName,
             UploadedAt = DateTime.UtcNow,
             ProcessingStatus = ProcessingStatus.InProgress
         };
@@ -53,11 +55,11 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
         {
             try
             {
-                await _hubContext.Clients.Group($"job:{jobId}").Send("PhotoProgress", new PhotoProgressEvent
+                await _hubContext.Clients.Group($"job:{jobId}").SendAsync("PhotoProgress", new PhotoProgressEvent
                 {
                     JobId = jobId,
                     PhotoId = photoId,
-                    FileName = file.FileName,
+                    FileName = fileName,
                     Status = status,
                     Stage = stage,
                     Error = error
@@ -73,17 +75,20 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
         {
             await EmitProgress("", "processing", "upload");
 
-            // Open source stream
-            using var sourceStream = file.OpenReadStream();
+            // Buffer the raw content into a seekable stream (the staging blob stream may be forward-only;
+            // the pipeline re-reads from position 0 for dimensions, EXIF, and the full-resolution upload).
+            using var sourceStream = new MemoryStream();
+            await content.CopyToAsync(sourceStream, ct);
+            sourceStream.Position = 0;
 
             // Extract dimensions before transformations
             using (var dimensionCheck = new MemoryStream())
             {
-                await sourceStream.CopyTo(dimensionCheck, ct);
+                await sourceStream.CopyToAsync(dimensionCheck, ct);
                 dimensionCheck.Position = 0;
                 sourceStream.Position = 0;
 
-                var info = await Image.Identify(dimensionCheck, ct);
+                var info = await Image.IdentifyAsync(dimensionCheck, ct);
                 photo.Width = info.Width;
                 photo.Height = info.Height;
             }
@@ -104,7 +109,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             }
 
             // Upload full-resolution to cold storage using MediaEntity<T> pattern
-            var fullResEntity = await PhotoAsset.Upload(sourceStream, file.FileName, file.ContentType, ct: ct);
+            var fullResEntity = await PhotoAsset.Upload(sourceStream, fileName, contentType, ct: ct);
             photo.Id = fullResEntity.Id;
             photo.Key = fullResEntity.Key;
             photo.ContentType = fullResEntity.ContentType;
@@ -112,47 +117,58 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
 
             await EmitProgress(photo.Id, "processing", "thumbnails");
 
-            // Use DX-0047 fluent API to create derivatives
-            // Branch 1: Gallery view (1200px max)
-            var galleryStream = await fullResEntity.OpenRead(ct);
-            var autoOriented = await galleryStream.AutoOrient(ct);
-            var resized = await autoOriented.ResizeFit(1200, 1200, ct);
-            var galleryResult = await resized.Result(ct);
+            // Create derivatives via the IMediaPipeline fluent API (MEDIA-0004 §11): one decode, four encodes.
+            // Each named variant configures its own branch over the shared, auto-oriented source image.
+            await using var fullResStream = await fullResEntity.OpenRead(ct);
+            var derivatives = await fullResStream.AsMedia()
+                .AutoOrient()
+                .MaterializeAsync(b => b
+                    .Add("gallery", v => v.ResizeFit(1200, 1200).EncodeAs("jpeg"))                       // 1200px web view
+                    .Add("thumbnail", v => v.Crop(CropSpec.Square).ResizeFit(150, 150).EncodeAs("jpeg")) // 150² grid crop
+                    .Add("masonry", v => v.ResizeFit(300, 300).EncodeAs("jpeg"))                         // 300px masonry
+                    .Add("retina", v => v.ResizeFit(600, 600).EncodeAs("jpeg")),                         // 600px retina/4K
+                    ct);
 
-            var galleryBranch = galleryResult.Branch();
-            var galleryDimensions = await GetStreamDimensions(galleryBranch, ct);
-            var galleryEntity = await PhotoGallery.Upload(galleryBranch, $"{photo.Id}_gallery.jpg", "image/jpeg", ct: ct);
-            await galleryEntity.Save(ct); // Save gallery entity to database
+            // Branch 1: Gallery view
+            using (var ms = new MemoryStream())
+            {
+                await derivatives.Variants["gallery"].WriteToAsync(ms, ct);
+                ms.Position = 0;
+                var galleryEntity = await PhotoGallery.Upload(ms, $"{photo.Id}_gallery.jpg", "image/jpeg", ct: ct);
+                await galleryEntity.Save(ct);
+                photo.GalleryMediaId = galleryEntity.Id;
+            }
 
-            photo.GalleryMediaId = galleryEntity.Id;
+            // Branch 2: Thumbnail (square crop for grid views)
+            using (var ms = new MemoryStream())
+            {
+                await derivatives.Variants["thumbnail"].WriteToAsync(ms, ct);
+                ms.Position = 0;
+                var thumbnailEntity = await PhotoThumbnail.Upload(ms, $"{photo.Id}_thumb.jpg", "image/jpeg", ct: ct);
+                await thumbnailEntity.Save(ct);
+                // Set base MediaEntity ThumbnailMediaId (protected internal setter, but PhotoAsset is derived)
+                typeof(PhotoAsset).BaseType!.GetProperty("ThumbnailMediaId")!.SetValue(photo, thumbnailEntity.Id);
+            }
 
-            // Branch 2: Thumbnail (150x150 square crop for grid views)
-            var thumbnailBranch = galleryResult.Branch();
-            var cropped = await thumbnailBranch.CropSquare(ct: ct);
-            var thumbnailStream = await cropped.ResizeFit(150, 150, ct);
-            var thumbnailEntity = await PhotoThumbnail.Upload(thumbnailStream, $"{photo.Id}_thumb.jpg", "image/jpeg", ct: ct);
-            await thumbnailEntity.Save(ct); // Save thumbnail entity to database
+            // Branch 3: Masonry thumbnail (aspect-preserving for masonry layouts)
+            using (var ms = new MemoryStream())
+            {
+                await derivatives.Variants["masonry"].WriteToAsync(ms, ct);
+                ms.Position = 0;
+                var masonryEntity = await PhotoMasonryThumbnail.Upload(ms, $"{photo.Id}_masonry.jpg", "image/jpeg", ct: ct);
+                await masonryEntity.Save(ct);
+                photo.MasonryThumbnailMediaId = masonryEntity.Id;
+            }
 
-            // Set base MediaEntity ThumbnailMediaId (protected internal setter, but PhotoAsset is derived)
-            typeof(PhotoAsset).BaseType!.GetProperty("ThumbnailMediaId")!.SetValue(photo, thumbnailEntity.Id);
-
-            // Branch 3: Masonry thumbnail (300px max, preserve aspect ratio for masonry layouts)
-            var masonryBranch = galleryResult.Branch();
-            var masonryResized = await masonryBranch.ResizeFit(300, 300, ct);
-            var masonryEntity = await PhotoMasonryThumbnail.Upload(masonryResized, $"{photo.Id}_masonry.jpg", "image/jpeg", ct: ct);
-            await masonryEntity.Save(ct); // Save masonry thumbnail entity to database
-
-            photo.MasonryThumbnailMediaId = masonryEntity.Id;
-
-            // Branch 4: Retina thumbnail (600px max, preserve aspect ratio for retina/4K displays)
-            var retinaBranch = galleryResult.Branch();
-            var retinaResized = await retinaBranch.ResizeFit(600, 600, ct);
-            var retinaEntity = await PhotoRetinaThumbnail.Upload(retinaResized, $"{photo.Id}_retina.jpg", "image/jpeg", ct: ct);
-            await retinaEntity.Save(ct); // Save retina thumbnail entity to database
-
-            photo.RetinaThumbnailMediaId = retinaEntity.Id;
-
-            await galleryResult.Dispose();
+            // Branch 4: Retina thumbnail (aspect-preserving for retina/4K displays)
+            using (var ms = new MemoryStream())
+            {
+                await derivatives.Variants["retina"].WriteToAsync(ms, ct);
+                ms.Position = 0;
+                var retinaEntity = await PhotoRetinaThumbnail.Upload(ms, $"{photo.Id}_retina.jpg", "image/jpeg", ct: ct);
+                await retinaEntity.Save(ct);
+                photo.RetinaThumbnailMediaId = retinaEntity.Id;
+            }
 
             // Save photo entity (without AI metadata yet)
             await photo.Save(ct);
@@ -169,34 +185,28 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
 
             await EmitProgress(photo.Id, "processing", "ai-description");
 
-            // Generate AI metadata asynchronously (with SignalR updates)
-            _ = Task.Run(async () =>
+            // Generate AI metadata + embedding INLINE — durable and tenant-carried. The old fire-and-forget
+            // Task.Run escaped both the job's retry guarantees and the ambient tenant scope; running it here keeps
+            // the whole pipeline inside the studio that submitted the upload, and lets the job settle only once AI
+            // has completed (or failed non-fatally).
+            try
             {
-                try
-                {
-                    await GenerateAIMetadata(photo, CancellationToken.None);
-
-                    // Emit completion event after AI processing
-                    await EmitProgress(photo.Id, "completed", "completed");
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to generate AI metadata for photo {PhotoId}", photo.Id);
-                    await EmitProgress(photo.Id, "failed", "ai-description", ex.Message);
-                }
-            }, CancellationToken.None);
-
-            photo.ProcessingStatus = ProcessingStatus.Completed;
-            await photo.Save(ct);
-
-            // Emit progress for basic processing complete (AI still running in background)
-            await EmitProgress(photo.Id, "processing", "completed");
+                await GenerateAIMetadata(photo, ct);
+                await EmitProgress(photo.Id, "completed", "completed");
+            }
+            catch (Exception ex)
+            {
+                // Non-fatal: the upload (storage + derivatives + EXIF) succeeded and the photo is usable; AI can be
+                // regenerated later via /regenerate-ai-analysis. Don't fail the whole ingest job for this.
+                _logger.LogError(ex, "AI metadata generation failed for photo {PhotoId}; stored without analysis", photo.Id);
+                await EmitProgress(photo.Id, "failed", "ai-description", ex.Message);
+            }
 
             return photo;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to process photo {FileName}", file.FileName);
+            _logger.LogError(ex, "Failed to process photo {FileName}", fileName);
             photo.ProcessingStatus = ProcessingStatus.Failed;
 
             await EmitProgress(photo.Id ?? "", "failed", "upload", ex.Message);
@@ -207,7 +217,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
                 var job = await ProcessingJob.Get(jobId, CancellationToken.None);
                 if (job != null)
                 {
-                    job.Errors.Add($"{file.FileName}: {ex.Message}");
+                    job.Errors.Add($"{fileName}: {ex.Message}");
                     await job.Save(CancellationToken.None);
                 }
             }
@@ -335,7 +345,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
         try
         {
             stream.Position = 0;
-            using var image = await Image.Load(stream, ct);
+            using var image = await Image.LoadAsync(stream, ct);
 
             var exif = image.Metadata.ExifProfile;
             if (exif == null) return;
@@ -403,15 +413,6 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
         var seconds = coordinate[2].ToDouble();
 
         return degrees + (minutes / 60.0) + (seconds / 3600.0);
-    }
-
-    private static async Task<(int width, int height)> GetStreamDimensions(Stream stream, CancellationToken ct)
-    {
-        var originalPosition = stream.Position;
-        stream.Position = 0;
-        var info = await Image.Identify(stream, ct);
-        stream.Position = originalPosition;
-        return (info.Width, info.Height);
     }
 
     /// <summary>
@@ -847,7 +848,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
                     job.CompletedAt = DateTime.UtcNow;
 
                     // Emit job completion event
-                    await _hubContext.Clients.Group($"job:{jobId}").Send("JobCompleted", new JobCompletionEvent
+                    await _hubContext.Clients.Group($"job:{jobId}").SendAsync("JobCompleted", new JobCompletionEvent
                     {
                         JobId = jobId,
                         Status = job.Status == ProcessingStatus.Completed ? "completed" : "partial-success",

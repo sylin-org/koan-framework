@@ -8,11 +8,13 @@ using S6.SnapVault.Models;
 public interface IPhotoProcessingService
 {
     /// <summary>
-    /// Process a single uploaded photo: storage, derivatives, EXIF, AI analysis
-    /// If eventId is null, auto-creates daily event based on EXIF capture date
-    /// Emits SignalR events to notify clients of processing progress
+    /// Process a single uploaded photo from a raw content stream: storage, derivatives, EXIF, AI analysis.
+    /// If eventId is null, auto-creates a daily event based on EXIF capture date.
+    /// Emits SignalR events to notify clients of processing progress.
+    /// Runs inside the durable, tenant-carrying <c>PhotoProcessingJob</c> (no fire-and-forget) — AI analysis
+    /// completes in the same tenant scope before the job settles.
     /// </summary>
-    Task<PhotoAsset> ProcessUpload(string? eventId, IFormFile file, string jobId, CancellationToken ct = default);
+    Task<PhotoAsset> ProcessUpload(string? eventId, Stream content, string fileName, string contentType, string jobId, CancellationToken ct = default);
 
     /// <summary>
     /// Generate AI metadata and vector embedding for a photo

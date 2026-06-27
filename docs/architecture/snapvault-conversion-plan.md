@@ -2,6 +2,7 @@
 
 - Date: 2026-06-22
 - Vehicle: `samples/S6.SnapVault` (study + target proposal: [snapvault-tenancy-proposal.md](./snapvault-tenancy-proposal.md)).
+- Companion (Koan-adoption axis): [snapvault-koan-modernization.md](./snapvault-koan-modernization.md) — the break-and-rebuild that strips bespoke code for Koan capabilities ("less but more meaningful parts"). This plan is the *tenancy* axis; Phase-1 tenancy is the shared foundation (DONE + green, 2026-06-26).
 - Canon: ARCH-0099 §1–§8, ARCH-0098 (classification). Research: [tenancy-prior-art-findings.md](./tenancy-prior-art-findings.md), [tenancy-entitlements-findings.md](./tenancy-entitlements-findings.md), [tenancy-delight-synthesis.md](./tenancy-delight-synthesis.md).
 
 ## Decisions

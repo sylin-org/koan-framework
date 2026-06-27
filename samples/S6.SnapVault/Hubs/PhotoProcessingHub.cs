@@ -32,7 +32,7 @@ public class PhotoProcessingHub : Hub
     /// </summary>
     public async Task SubscribeToJob(string jobId)
     {
-        await Groups.AddToGroup(Context.ConnectionId, $"job:{jobId}");
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"job:{jobId}");
         _logger.LogDebug("Client {ConnectionId} subscribed to job {JobId}", Context.ConnectionId, jobId);
     }
 
@@ -41,7 +41,7 @@ public class PhotoProcessingHub : Hub
     /// </summary>
     public async Task UnsubscribeFromJob(string jobId)
     {
-        await Groups.RemoveFromGroup(Context.ConnectionId, $"job:{jobId}");
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"job:{jobId}");
         _logger.LogDebug("Client {ConnectionId} unsubscribed from job {JobId}", Context.ConnectionId, jobId);
     }
 }
