@@ -178,3 +178,44 @@ The legacy backend stays runnable as the reference until the new surface is cohe
 4. The hand-written code that remains is exactly the §3 domain core + the §5 tenant on-ramp.
 5. `Program.cs ≈ AddKoan().AsWebApi()` + `SnapVaultModule`; no derivative entity types, reflection hack, bespoke queue/hub/JSON-parser/page-math/monitor service.
 6. A measured before/after recorded as a follow-up.
+
+---
+
+## 9. The studio↔client lifecycle (scope expansion — 2026-06-27)
+
+After the skeleton (step 1) landed green, a delight pass ([snapvault-delight-research.md](./snapvault-delight-research.md)) + a user directive reframed SnapVault from a studio-only photo CRUD into a **studio↔client lifecycle**. This section records the consequences for the build shape. It is an *expansion* of §2–§8, not a replacement — the harvest plan still holds; this adds the client/guest surface on top.
+
+**User decisions (2026-06-27):** (a) build the lifecycle **as the spine now** (fold into steps 2 & 5, not a later follow-on); (b) the invited-guest v1 scope is a **proofing gallery** (favorite/rate/select picks + optional comments; the studio sees the selections); (c) persist the delight research (done — the companion doc).
+
+### 9.1 The flagship arc (lead with this)
+> **Invite** a client to their event set → they accept into a **durable, portable identity** (invite-binds-to-identity, no email-merge takeover) → **fail-closed scoped access to only that set** (the proofing gallery) → at engagement end, **atomic deprovision + a signed erasure certificate**.
+
+This is the SEC-0007 P5 identity dogfood made visible. Five differentiators, priority order: ① invite-gated proofing galleries ② verifiable client-erasure certificate ③ per-client isolation as structural impossibility ④ honest hybrid search (vector+lexical+OCR+floor) ⑤ reroll-with-locks as explainable AI.
+
+### 9.2 Personas (new third persona)
+- **Studio operator / staff** — the existing tenant member; uploads, organizes, full library.
+- **Invited client/guest** — a durable *person* granted scoped read+proof access to **one set**, never the studio's library. NOT a tenant member.
+
+### 9.3 Architecture: guest access = a capability grant, NOT a second tenant axis
+The market-research synthesis suggested "per-client sub-isolation" as a nested tenant axis. **Rejected** — a client doesn't *own* a library; the studio does and grants a view. Correct, cheaper, on-moat shape:
+- **Studio = tenant** — the shipped fail-closed isolation (the invisible `__koan_tenant` discriminator). Unchanged.
+- **Guest = identity + a grant to a set** — SEC-0004 **gate·constrain·project**: the grant *is* the read-path filter, fail-closed; a guest's queries are constrained to their granted set, cross-set/cross-client get-by-id returns null by construction. No new framework axis; rides shipped seams (`Koan.Identity` + `Koan.Identity.Tenancy` + the SEC-0004 floor).
+
+### 9.4 Entity additions (sketch — detailed shape is the step-2/5 seam-map's job)
+- **Shareable set** — reuse `Collection` (curated ordered) and/or `Event` as the unit a studio shares; add a lightweight "shared" marker + the grant binding rather than a new container type.
+- **Gallery invite** — email → set → guest role; **binds to the canonical person on accept** (reuse the `Koan.Identity` invite-binds-to-identity primitive; do NOT hand-roll). Pending-until-accepted.
+- **Guest access grant** — identity → set → permissions `{view, download?, select}`. Realized via the SEC-0004 grant model (AgentGrant-style, resource = the set), enforced on the read path.
+- **Proof selection** — `(guestIdentityId, setId, photoId)` with pick/rating + optional comment; the studio reads the aggregated client selections. Guest favorites/picks are attributed to the **guest**, distinct from the studio's own `IsFavorite`/`Rating` on `PhotoAsset`.
+
+> Port-verbatim invariants INV-1/INV-2 are unaffected. New entities are GUIDv7 `Entity<T>`; the grant + selection writes are tenant-carried (the studio tenant) and guest-attributed.
+
+### 9.5 Build-step consequences
+- **Step 2 (identity/tenancy on-ramp) — expanded.** In addition to the studio carrier (`X-Koan-Tenant` / `/t/{code}`): reference `Koan.Identity` + `Koan.Identity.Tenancy`; wire **gallery invite → accept → identity-bound guest grant**; wire **atomic deprovision + erasure certificate** ("delete client & prove it"). The flagship spec gains a leg: a guest sees only their set; a cross-set read fails closed; deprovision purges set photos + derivatives + embeddings + facts + the grant and emits the certificate.
+- **Step 5 (domain services) — expanded.** Add the **guest-scoped proofing endpoints** (list my set, view photo, favorite/rate/select, comment) constrained by the grant, and the **studio-side "client selections" view**. Reroll-with-locks gains the explainable reason + sub-scores surface here.
+- **Step 6 (AI/vector) — unchanged scope**, plus the OCR lexical lane + relevance-floor honest empty state for hybrid search.
+- **NEW: guest UI.** The existing SPA has no guest/share surface; a minimal guest gallery view (+ a studio share/invite affordance + a selections view) is net-new frontend. The §6 "SPA rewrite out of scope" clause is **lifted for the guest surface only** (the studio SPA is still harvested, not rewritten).
+
+### 9.6 Acceptance additions
+7. **Lifecycle flagship green** — invite→accept→scoped guest access; cross-set read fails closed; deprovision purges + certifies (real `AddKoan()`, no Docker).
+8. **Proofing works end-to-end** — an invited guest selects picks; the studio sees them; the guest never sees another set.
+9. **No bespoke axis logic** — guest isolation rides the SEC-0004 grant + read-path predicate + the shipped tenant isolation; the invite rides `Koan.Identity` invite-binds-to-identity. (Contributor-pipelines-never-bespoke.)
