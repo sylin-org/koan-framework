@@ -33,8 +33,17 @@ public sealed class IdentityAuthFlowHandler : IKoanAuthFlowHandler
             var picture = claims.FindFirst("avatar")?.Value ?? claims.FindFirst("picture")?.Value;
             var email = claims.FindFirst(ClaimTypes.Email)?.Value ?? claims.FindFirst("email")?.Value;
             var emailVerified = string.Equals(claims.FindFirst("email_verified")?.Value, "true", StringComparison.OrdinalIgnoreCase);
-            await reconciler.ReconcileAsync(
+            var person = await reconciler.ReconcileAsync(
                 new IdentityClaims(subject, displayName, picture, email, emailVerified, ctx.Provider), ct).ConfigureAwait(false);
+
+            // Person ≠ email merge: if this IdP sub merged onto an existing person, rewrite the cookie's subject to
+            // the canonical person id so downstream (roles, session, Membership) all resolve to ONE identity.
+            if (!string.Equals(person.Id, subject, StringComparison.Ordinal))
+            {
+                if (ctx.Identity.FindFirst(ClaimTypes.NameIdentifier) is { } nameId) ctx.Identity.RemoveClaim(nameId);
+                ctx.Identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, person.Id));
+                subject = person.Id;
+            }
         }
 
         // Stamp the person's GLOBAL roles (IdentityRole, Layer 2) onto the cookie so production actually HONORS a

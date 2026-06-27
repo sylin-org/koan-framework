@@ -27,6 +27,8 @@ public sealed class IdentityHostFixture : IAsyncLifetime
     {
         _host = await KoanIntegrationHost.Configure()
             .WithSetting("Koan:Orchestration:EnableSelfOrchestration", "false")
+            // Exercise the person≠email merge through the wired handler/store paths (off by default in production).
+            .WithSetting("Koan:Identity:AutoMergeVerifiedEmail", "true")
             .ConfigureServices(s => s.AddKoan())
             .StartAsync();
     }

@@ -237,6 +237,96 @@ public sealed class IdentityReconciliationSpec
     }
 
     [Fact]
+    public async Task Verified_email_merges_a_second_idp_onto_the_existing_person()
+    {
+        await Reconciler.ReconcileAsync(new IdentityClaims("google-merge", DisplayName: "Mergie", Email: "mergie@x.com", EmailVerified: true));
+        (await Identity.Get("google-merge")).Should().NotBeNull();
+
+        // A DIFFERENT IdP sub, same VERIFIED email → merges onto the existing person (differentiator ①: person ≠ email).
+        var person = await Reconciler.ReconcileAsync(new IdentityClaims("microsoft-merge", DisplayName: "Mergie MS", Email: "mergie@x.com", EmailVerified: true));
+        person.Id.Should().Be("google-merge", "the second IdP links onto the existing person");
+        (await Identity.Get("microsoft-merge")).Should().BeNull("no duplicate identity is minted for the second IdP — the root-rot fix");
+    }
+
+    [Fact]
+    public async Task Unverified_email_does_not_merge()
+    {
+        await Reconciler.ReconcileAsync(new IdentityClaims("anchor-sub", Email: "shared@x.com", EmailVerified: true));
+
+        // An UNVERIFIED claim of the same email must NOT hijack the person (safe-by-default).
+        var person = await Reconciler.ReconcileAsync(new IdentityClaims("attacker-sub", Email: "shared@x.com", EmailVerified: false));
+        person.Id.Should().Be("attacker-sub", "only a verified email merges");
+        (await Identity.Get("attacker-sub")).Should().NotBeNull("the unverified sign-in gets its own separate identity, not the anchor's");
+    }
+
+    [Fact]
+    public async Task Auto_merge_is_off_by_default()
+    {
+        await Reconciler.ReconcileAsync(new IdentityClaims("default-anchor", Email: "default@x.com", EmailVerified: true));
+
+        // A reconciler WITHOUT the explicit opt-in must never merge — the safe production default.
+        var off = new IdentityReconciler(); // no options → AutoMergeVerifiedEmail = false
+        var person = await off.ReconcileAsync(new IdentityClaims("default-second", Email: "default@x.com", EmailVerified: true));
+        person.Id.Should().Be("default-second", "without the explicit opt-in, a matching verified email does NOT merge");
+        (await Identity.Get("default-second")).Should().NotBeNull("a separate identity is created when merge is off");
+    }
+
+    [Fact]
+    public async Task Merge_never_targets_a_deactivated_person()
+    {
+        var dead = await Reconciler.ReconcileAsync(new IdentityClaims("dead-anchor", Email: "dead@x.com", EmailVerified: true));
+        dead.Status = IdentityStatus.Deactivated;
+        await dead.Save();
+
+        // A new IdP with the deactivated person's verified email must NOT resurrect the account.
+        var person = await Reconciler.ReconcileAsync(new IdentityClaims("resurrector", Email: "dead@x.com", EmailVerified: true));
+        person.Id.Should().Be("resurrector", "merging onto a deactivated person would reverse deprovisioning — refused");
+    }
+
+    [Fact]
+    public async Task Ambiguous_verified_email_refuses_to_merge()
+    {
+        // Two distinct persons holding the same VERIFIED address (data inconsistency) → refuse to guess a target.
+        await new Identity { Id = "amb-a", DisplayName = "A" }.Save();
+        await new IdentityEmail { Id = IdentityEmail.KeyFor("amb-a", "amb@x.com"), IdentityId = "amb-a", Address = "amb@x.com", Verified = true, Primary = true }.Save();
+        await new Identity { Id = "amb-b", DisplayName = "B" }.Save();
+        await new IdentityEmail { Id = IdentityEmail.KeyFor("amb-b", "amb@x.com"), IdentityId = "amb-b", Address = "amb@x.com", Verified = true, Primary = true }.Save();
+
+        var person = await Reconciler.ReconcileAsync(new IdentityClaims("amb-new", Email: "amb@x.com", EmailVerified: true));
+        person.Id.Should().Be("amb-new", "an ambiguous match (>1 verified holder) refuses to auto-merge rather than guess");
+    }
+
+    [Fact]
+    public async Task Merge_rewrites_the_cookie_subject_and_links_to_the_canonical_person()
+    {
+        await Reconciler.ReconcileAsync(new IdentityClaims("canon-sub", DisplayName: "Canon", Email: "canon@x.com", EmailVerified: true));
+
+        using var scope = _fx.Services.CreateScope();
+
+        // A second IdP signs in with the same verified email → the handler rewrites NameIdentifier to the canonical id.
+        var handler = scope.ServiceProvider.GetServices<IKoanAuthFlowHandler>().OfType<IdentityAuthFlowHandler>().Single();
+        var ci = new ClaimsIdentity(authenticationType: "test");
+        ci.AddClaim(new Claim(ClaimTypes.NameIdentifier, "second-idp-sub"));
+        ci.AddClaim(new Claim(ClaimTypes.Email, "canon@x.com"));
+        ci.AddClaim(new Claim("email_verified", "true"));
+        var ctx = new AuthSignInContext
+        {
+            Provider = "test",
+            Identity = ci,
+            Services = scope.ServiceProvider,
+            HttpContext = new DefaultHttpContext { RequestServices = scope.ServiceProvider },
+        };
+        await scope.ServiceProvider.GetRequiredService<AuthFlowDispatcher>().DispatchSignIn(ctx, default);
+
+        ci.FindFirst(ClaimTypes.NameIdentifier)!.Value.Should().Be("canon-sub", "the cookie subject is rewritten to the canonical person");
+
+        // The external-identity store links a third IdP onto the canonical person, not a new one.
+        var store = _fx.Services.GetRequiredService<IExternalIdentityStore>();
+        await store.Link(new ExternalIdentity { UserId = "third-idp-sub", Provider = "discord", ProviderKeyHash = "H3", ClaimsJson = "{\"email\":\"canon@x.com\",\"email_verified\":true}" });
+        (await store.GetByUser("canon-sub")).Should().Contain(l => l.Provider == "discord", "the link attaches to the canonical person");
+    }
+
+    [Fact]
     public async Task Forced_open_outside_development_refuses_to_boot()
     {
         // A non-Development host with the Identity posture forced Open must fail the SEC-0007 boot guard

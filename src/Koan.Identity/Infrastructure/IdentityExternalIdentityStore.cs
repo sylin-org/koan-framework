@@ -29,12 +29,12 @@ internal sealed class IdentityExternalIdentityStore : IExternalIdentityStore
         // subject, sequentially within the request. ReconcileAsync is idempotent so the two passes converge. This
         // path carries the full userinfo JSON (incl. email), so on OAuth2 — where the cookie identity does NOT carry
         // an email claim — Link() is the de-facto email source; the handler covers OIDC and email-stamping providers.
-        await _reconciler.ReconcileAsync(ClaimsFrom(identity), ct).ConfigureAwait(false);
+        var person = await _reconciler.ReconcileAsync(ClaimsFrom(identity), ct).ConfigureAwait(false);
 
         await new ExternalIdentityLink
         {
             Id = ExternalIdentityLink.KeyFor(identity.UserId, identity.Provider, identity.ProviderKeyHash),
-            IdentityId = identity.UserId,
+            IdentityId = person.Id, // the canonical person (merge-aware) — a second IdP links onto the existing person
             Provider = identity.Provider,
             ProviderKeyHash = identity.ProviderKeyHash,
             ClaimsJson = identity.ClaimsJson,
