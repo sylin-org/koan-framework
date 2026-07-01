@@ -1,5 +1,7 @@
+using System.Security.Cryptography;
 using Koan.Data.Core;
 using Koan.Media.Abstractions.Model;
+using Koan.Media.Abstractions.Recipes;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Media.Web.Routing;
@@ -59,6 +61,48 @@ public class MediaEntitySource<TEntity> : IMediaSource
             // the stored bytes are immutable per key, so the timestamp only ever moves forward on a re-store.
             LastModified: entity.UpdatedAt ?? entity.CreatedAt,
             ContentType: string.IsNullOrEmpty(entity.ContentType) ? "application/octet-stream" : entity.ContentType!);
+    }
+
+    // ----- Derivation cache (MEDIA-0007): persist recipe renders so repeat requests skip the pipeline. -----
+    // The controller calls OpenAsync (the access gate) BEFORE OpenDerivationAsync, so a cached render is only
+    // ever served to a caller who already resolved the source — the cache cannot bypass access scoping.
+
+    /// <inheritdoc />
+    public async Task<MediaDerivationHandle?> OpenDerivationAsync(
+        string sourceId, string recipeFingerprint, CancellationToken ct = default)
+    {
+        var row = await Data<MediaDerivation, string>
+            .Get(MediaDerivation.KeyFor(sourceId, recipeFingerprint), ct).ConfigureAwait(false);
+        if (row is null) return null;
+        var bytes = await row.OpenRead(ct).ConfigureAwait(false);
+        return new MediaDerivationHandle(
+            bytes, string.IsNullOrEmpty(row.ContentType) ? "application/octet-stream" : row.ContentType!);
+    }
+
+    /// <inheritdoc />
+    public async Task TryStoreDerivationAsync(
+        string sourceId, string recipeFingerprint, MediaOutput output,
+        string? recipeName, string? recipeVersion, CancellationToken ct = default)
+    {
+        var rowId = MediaDerivation.KeyFor(sourceId, recipeFingerprint);
+        // Idempotent: the fingerprint pins an immutable render, so a present row is already correct.
+        if (await Data<MediaDerivation, string>.Get(rowId, ct).ConfigureAwait(false) is not null) return;
+
+        // Materialize the render bytes via the streaming terminal (not the obsolete MediaOutput.Bytes).
+        using var buffer = new MemoryStream();
+        await output.WriteToAsync(buffer, ct).ConfigureAwait(false);
+        var bytes = buffer.ToArray();
+
+        // Content-addressed blob key: filesystem-safe hex + dedups byte-identical renders.
+        var blobKey = Convert.ToHexStringLower(SHA256.HashData(bytes));
+        var row = await MediaDerivation.Onboard(blobKey, new MemoryStream(bytes), output.ContentType, ct)
+            .ConfigureAwait(false);
+        row.Id = rowId;
+        row.SourceMediaId = sourceId;
+        row.DerivationKey = recipeFingerprint;
+        row.RecipeName = recipeName;
+        row.RecipeVersion = recipeVersion;
+        await row.Save(ct).ConfigureAwait(false);
     }
 }
 
