@@ -9,17 +9,16 @@
 
 ---
 
-## ✨ NEW: AI-0020 Modernization (2025-01)
+## ✨ Greenfield rebuild on Koan
 
-SnapVault has been **fully modernized** with the latest AI-0020 patterns:
+SnapVault was **rebuilt greenfield** on the current Koan Framework — a clean Koan-native backend, the domain ported
+verbatim, the legacy backend deleted in one swap. Versus that legacy backend, on the comparable surface: **−41% LOC**,
+**−604 lines of bespoke plumbing** (media controller, monitoring service, cascade config) eliminated to zero,
+**−4 media-derivative entity types** (now three one-line `[MediaRecipe]`s), and **−2 third-party NuGet packages**
+(EXIF → ImageSharp, progress → SSE) — while *adding* an entire studio↔client guest lifecycle, fail-closed data-layer
+access (SEC-0008), and SSE progress. The framework absorbed the plumbing (Reference = Intent).
 
-🔒 **Transaction Coordination** - Atomic commits prevent orphaned vectors (MongoDB + Weaviate)
-🏷️ **[Embedding] Attribute** - Declarative embedding generation with lifecycle hooks
-🚀 **Pipeline API** - Fluent vision analysis: `Ai.FromImage().ToText()`
-📊 **Production Monitoring** - Real-time cost tracking, success rate, latency alerts
-📉 **62.5% Code Reduction** - ~250 lines eliminated (400 → 150 AI-related code)
-
-**See**: [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md) for complete before/after comparison.
+**See**: [snapvault-product-spec.md](../../docs/architecture/snapvault-product-spec.md) for the build shape + the full measurement.
 
 ---
 
@@ -30,9 +29,9 @@ SnapVault is a **self-hosted photo management system** built with Koan Framework
 ✨ **AI Vision Analysis** - Vision models analyze photos and generate structured metadata (tags, summaries, compositional details)
 🔍 **Semantic Search** - Natural language queries like "sunset at beach" or "people laughing"
 🎨 **Modern Dark UI** - Professional gallery with keyboard shortcuts, accessibility, and responsive design
-⚡ **Smart Processing** - Automatic generation of optimized derivatives (thumbnails, gallery views) with intelligent caching
+⚡ **Smart Processing** - On-demand `[MediaRecipe]` renders (gallery/masonry/retina) served + cached from the single original, no pre-generated derivative entities
 📊 **Real-time Progress** - Server-Sent Events stream upload progress (a projection of the durable jobs ledger; no SignalR)
-💾 **Intelligent Storage** - Three-tier architecture (hot-cdn, warm, cold) optimizes costs and performance
+💾 **Provider-Swappable Storage** - One stored original; `cold` profile binds to Local (dev) or S3 (prod) by config alone
 📱 **Complete Features** - Favorites, ratings, bulk actions, drag-drop upload, event organization, timeline views
 
 ## Quick Start
@@ -64,20 +63,22 @@ The script automatically:
 
 This sample demonstrates **production-ready Koan Framework patterns**:
 
-### 🖼️ Media Processing (DX-0047 Fluent API)
+### 🖼️ Media Processing — declarative `[MediaRecipe]`
 
-Process images using declarative transformation pipelines with automatic resource management:
+Renders are **declared, not stored**. The framework serves `GET /media/{id}/{recipe}`, rendering (and caching) on
+demand from the single stored original — no derivative entities, no pre-generation, no bespoke controller:
 
 ```csharp
-// Create multiple derivatives efficiently with branching
-var result = await photo.OpenRead().AutoOrient().ResizeFit(1200, 1200).Result();
+// Media/PhotoRecipes.cs — three one-line declarations replace 4 derivative entity types + a reflection hack
+[MediaRecipe("gallery", Description = "1200px web view, JPEG")]
+public static MediaRecipe Gallery() => MediaRecipe.New().ResizeFit(1200, 1200).EncodeAs("jpeg");
 
-var gallery = await result.Branch().Upload<PhotoGallery>("gallery.jpg");
-var thumb = await result.Branch().CropSquare().ResizeFit(150, 150).Upload<PhotoThumbnail>();
-var masonry = await result.Branch().ResizeFit(300, 300).Upload<PhotoMasonryThumbnail>();
+[MediaRecipe("masonry", Description = "300px masonry grid tile, JPEG")]
+public static MediaRecipe Masonry() => MediaRecipe.New().ResizeFit(300, 300).EncodeAs("jpeg");
 ```
 
-**Why it matters**: Before DX-0047, this required ~80 lines of operator loops. The fluent API reduces it to 15 lines.
+**Why it matters**: serving inherits the SEC-0008 access axis + tenancy *structurally* (via `MediaEntitySource<T>`),
+and there is nothing to keep in sync — the original is the only blob.
 
 ### 🤖 AI Integration (Vision + Embeddings) - NEW AI-0020 Patterns!
 
@@ -126,25 +127,26 @@ var results = await Vector<PhotoAsset>.Search(
 - ✅ **Async queue** handles high-volume scenarios (100+ photos)
 - ✅ **Auto-truncation** respects token limits with developer warnings
 
-### 💾 Multi-Tier Storage Architecture
+### 💾 Single-Original Storage + On-Demand Renders
 
-Optimize storage costs with declarative tier assignment:
+The greenfield collapsed the legacy hot/warm/cold derivative tiers into **one stored original** plus
+**on-demand `[MediaRecipe]` renders** — no `PhotoGallery`/`PhotoThumbnail`/`PhotoMasonry`/`PhotoRetina`
+entities, no pre-generation, no bespoke media controller:
 
 ```csharp
-// Full-resolution originals in cold storage
+// The one stored original — the only blob that persists.
 [StorageBinding(Profile = "cold", Container = "photos")]
 public class PhotoAsset : MediaEntity<PhotoAsset> { }
 
-// Gallery views in warm storage
-[StorageBinding(Profile = "warm", Container = "gallery")]
-public class PhotoGallery : MediaEntity<PhotoGallery> { }
-
-// Thumbnails in CDN-backed hot storage
-[StorageBinding(Profile = "hot-cdn", Container = "thumbnails")]
-public class PhotoThumbnail : MediaEntity<PhotoThumbnail> { }
+// Renders are declared, not stored: the framework serves GET /media/{id}/{recipe}, rendering (and
+// caching) on demand from the single original — access-scoped via MediaEntitySource<T>.
+[MediaRecipe("gallery")] static MediaRecipe Gallery() => Recipe().ResizeFit(1200, 1200).EncodeAs("jpeg");
 ```
 
-**Production mapping**: hot-cdn → CloudFront, warm → S3 Standard, cold → Glacier
+**Storage is provider-swappable by config alone** (multi-provider transparency — zero entity/code change):
+`appsettings.json` binds the `cold` profile to `Local` for dev (`./storage`); `appsettings.Production.json`
+binds the *same* `cold` profile to `S3` for prod. S3 credentials come from the environment (never committed):
+`Koan__Storage__Providers__S3__Endpoint`, `Koan__Storage__Providers__S3__AccessKey`, `…__SecretKey`.
 
 ### 📡 Real-Time Progress Tracking
 
@@ -246,22 +248,35 @@ public static async Task Execute(PhotoProcessingJob job, JobContext ctx, Cancell
 
 ```
 samples/S6.SnapVault/
-├── Controllers/
-│   ├── PhotosController.cs      # Photo upload, search, actions
-│   └── EventsController.cs      # Event management, timeline
-├── Services/
-│   └── PhotoProcessingService.cs # Image transformations, EXIF, AI
+├── Controllers/                 # Thin actions over Entity<T> / EntityController<T>
+│   ├── PhotosController.cs      # EntityController<PhotoAsset> + upload/actions/locks (raw write verbs sealed)
+│   ├── EventsController.cs      # EntityController<Event>  (list/create, [Pagination(Mode=Off)])
+│   ├── CollectionsController.cs # EntityController<Collection> + rename/add(capped)/remove
+│   ├── PhotoSetsController.cs   # POST /query — the windowed grid (all-photos/favorites/collection/search/event)
+│   ├── AnalysisStylesController.cs
+│   ├── MaintenanceController.cs # stats + wipe (operator-only)
+│   ├── GalleryController.cs     # studio↔client: invite → accept (operator/guest)
+│   ├── ProofingController.cs    # guest-scoped select/rate/comment (the guest-write floor)
+│   └── UploadProgressController.cs # SSE progress projection
+├── Services/                    # Ported §3 domain + the guest lifecycle (thin, no repositories)
+│   ├── PhotoProcessingService.cs   # ingest: storage → EXIF → daily-event → AI → embedding
+│   ├── PhotoSetService.cs          # the windowing/sort engine
+│   ├── AI/AnalysisPromptFactory.cs # 15 styles + smart classification + reroll-with-holds
+│   └── Lifecycle/                  # GalleryInvite/GuestScope/Proofing/Deprovisioning services
 ├── Models/
-│   ├── PhotoAsset.cs            # Main photo entity (cold storage)
-│   ├── PhotoGallery.cs          # Gallery derivative (warm)
-│   ├── PhotoThumbnail.cs        # Thumbnail (hot-cdn)
-│   ├── Event.cs                 # Event organization
-│   └── AiAnalysis.cs            # Structured AI output
+│   ├── PhotoAsset.cs            # the stored original ([StorageBinding cold], [AccessScoped], [Embedding])
+│   ├── Event.cs / Collection.cs / AnalysisStyle.cs / PhotoSetSession.cs / AiAnalysis.cs
+│   ├── PhotoProcessingJob.cs / UploadStaging.cs   # durable tenant-carrying ingest
+│   └── Lifecycle/              # GalleryInvite/GalleryGrant/ProofSelection/ClientErasureCertificate
+├── Media/PhotoRecipes.cs        # the 3 [MediaRecipe] declarations (gallery/masonry/retina)
 ├── Progress/                    # Upload progress = an SSE read-projection of the jobs ledger (no SignalR hub)
 │   ├── PhotoProgressContract.cs
 │   └── UploadProgressProjection.cs
 ├── Initialization/
-│   └── KoanAutoRegistrar.cs     # Framework configuration
+│   ├── SnapVaultModule.cs       # KoanModule — DI + boot (replaces the old KoanAutoRegistrar)
+│   ├── SnapVaultSubjectMiddleware.cs  # operator/guest fail-closed subject resolution (SEC-0008)
+│   ├── OperatorOnlyAttribute.cs / PhotoAssetCleanup.cs
+│   └── AnalysisStyleSeeder.cs
 ├── wwwroot/
 │   ├── js/
 │   │   ├── app.js               # Main application
@@ -286,11 +301,10 @@ samples/S6.SnapVault/
 
 ### Photo Management
 
-- ✅ **Batch Upload** - Upload multiple photos with progress tracking
-- ✅ **Automatic Derivatives** - Thumbnails, gallery views, masonry variants generated automatically
-- ✅ **EXIF Preservation** - Camera, lens, settings, GPS coordinates extracted and stored
-- ✅ **Event Organization** - Group photos into events (weddings, vacations, birthdays)
-- ✅ **Timeline View** - Browse photos chronologically with month/year grouping
+- ✅ **Batch Upload** - Upload multiple photos with durable, tenant-carried processing + SSE progress
+- ✅ **On-Demand Renders** - Gallery/masonry/retina served + cached from the single original via `[MediaRecipe]` (no stored derivatives)
+- ✅ **EXIF Preservation** - Camera, lens, settings, GPS coordinates extracted (via ImageSharp) and stored
+- ✅ **Event Organization** - Group photos into events (weddings, vacations, birthdays); auto daily-event on upload
 - ✅ **Favorites & Ratings** - Mark favorites and rate photos 1-5 stars
 - ✅ **Bulk Actions** - Select multiple photos for favorite, download, or delete operations
 
@@ -318,80 +332,76 @@ samples/S6.SnapVault/
 
 ## API Reference
 
+The authoritative, file:line-cited surface is [snapvault-ui-api-contract.md](../../docs/architecture/snapvault-ui-api-contract.md). Highlights:
+
 ### Photos Endpoints
 
 ```http
-GET    /api/photos              # Query all photos
-GET    /api/photos/{id}         # Get single photo
-POST   /api/photos/upload       # Upload with batch processing
-POST   /api/photos/search       # Semantic + keyword search
-GET    /api/photos/by-event/{id} # Get photos for event
-POST   /api/photos/{id}/favorite # Toggle favorite
-POST   /api/photos/{id}/rate    # Set rating (0-5)
-GET    /api/photos/{id}/download # Download full-resolution
-POST   /api/photos/{id}/regenerate-ai  # Re-analyze photo
-POST   /api/photos/bulk/delete  # Delete multiple photos
+GET    /api/photos                 # List (EntityController: filter/sort/pagination + X-Total-Count)
+GET    /api/photos/{id}            # Get single photo
+POST   /api/photos/upload          # Multipart upload → durable batch jobs (SSE progress)
+POST   /api/photosets/query        # The windowed grid: all-photos/favorites/collection/search/event
+GET    /api/photos/by-event/{eventId}
+GET    /api/photos/{id}/download   # Full-resolution attachment
+POST   /api/photos/{id}/favorite · /rate · /regenerate-ai · /regenerate-ai-analysis
+POST   /api/photos/{id}/facts/{key}/toggle-lock · /summary/toggle-lock · /facts/lock-all · /unlock-all
+POST   /api/photos/bulk/favorite · /bulk/delete
+# Raw EntityController write verbs (Upsert/Patch/Delete/…) are SEALED to 405 — photos enter only via /upload,
+# leave only via /bulk/delete. Semantic search is POST /api/photosets/query (context=search), not /photos/search.
 ```
 
-### Events Endpoints
+### Events / Collections Endpoints
 
 ```http
-GET    /api/events              # Query all events
-GET    /api/events/{id}         # Get single event
-POST   /api/events              # Create new event
-DELETE /api/events/{id}         # Delete event
-GET    /api/events/timeline     # Get timeline grouped by month/year
+GET    /api/events                 # List (EntityController, full array)
+POST   /api/events                 # Create
+GET    /api/collections            # List; + rename / add(capped) / remove
+```
+
+### Media, Progress & Studio↔Client
+
+```http
+GET    /media/{id}/{recipe}        # On-demand render (gallery/masonry/retina), access-scoped
+GET    /api/photos/progress/{batchId}  # SSE upload progress (jobs-ledger projection)
+POST   /api/gallery/invite · /api/gallery/accept        # studio invites → guest binds to identity
+POST   /api/proofing/{photoId}                           # guest select/rate/comment (guest-write floor)
+GET    /api/maintenance/stats · POST /api/maintenance/wipe-repository  # operator-only
 ```
 
 ---
 
 ## Configuration
 
-### Environment Variables
+### Configuration is Reference = Intent + `appsettings.json`
 
-The start script creates a `.env` file automatically. For manual configuration:
+There is no imperative registration: referencing the connector projects (Mongo, Weaviate, Ollama, Storage.Local/S3)
+in the `.csproj` is what enables them (`AddKoan()` discovers them). Providers/endpoints live in `appsettings.json`
+(the `start.bat` orchestration wires the container endpoints). The `.NET` hierarchical config keys — overridable by
+environment with the `__` separator — are:
 
 ```bash
-# Data Provider
-KOAN_DATA_PROVIDER=mongodb
-KOAN_MONGODB_CONNECTION=mongodb://localhost:27017
-
-# Vector Provider
-KOAN_VECTOR_PROVIDER=weaviate
-KOAN_WEAVIATE_ENDPOINT=http://localhost:8080
-
-# AI Provider
-KOAN_AI_PROVIDER=ollama
-KOAN_OLLAMA_ENDPOINT=http://localhost:11434
-
-# Storage
-KOAN_STORAGE_PROVIDER=localfile
-KOAN_STORAGE_BASEPATH=./.Koan/storage
+Koan__Data__Mongo__Database=SnapVault
+Koan__Storage__Providers__Local__BasePath=./storage    # dev
 ```
 
-### Storage Profiles
+### Storage: one original, provider-swappable by config
 
-Configured in `Initialization/KoanAutoRegistrar.cs`:
+`appsettings.json` binds the `cold` profile (where `PhotoAsset` originals live) to `Local` for dev; every render is
+an on-demand `[MediaRecipe]` served from that single original — no per-tier derivative entities.
 
-```csharp
-config.UseLocalFileStorage(opts => {
-    opts.AddProfile("hot-cdn", profile => {
-        profile.UseCache = true;
-        profile.CacheMaxAge = TimeSpan.FromDays(30);
-    });
-
-    opts.AddProfile("warm", profile => {
-        profile.UseCache = true;
-        profile.CacheMaxAge = TimeSpan.FromDays(7);
-    });
-
-    opts.AddProfile("cold", profile => {
-        profile.UseCache = false;
-    });
-});
+```jsonc
+// appsettings.json (dev)                    // appsettings.Production.json (prod — same profile, S3 backend)
+"Storage": {                                 "Storage": {
+  "DefaultProfile": "cold",                    "Providers": { "S3": { "BucketPrefix": "snapvault",
+  "Providers": { "Local": {                                          "Region": "us-east-1", "UseSsl": true } },
+    "BasePath": "./storage" } },               "Profiles": { "cold": { "Provider": "s3", "Container": "photos" } }
+  "Profiles": { "cold": {                    }
+    "Provider": "local", "Container": "photos" } } }
 ```
 
-**Production**: Replace with `UseS3Storage()` or `UseAzureBlobStorage()` and map profiles to appropriate tiers.
+**Production** swaps the *same* `cold` profile to `S3` with **zero entity or code change** (multi-provider
+transparency). S3 credentials are supplied by the environment, never committed:
+`Koan__Storage__Providers__S3__Endpoint`, `Koan__Storage__Providers__S3__AccessKey`, `…__SecretKey`.
 
 ---
 

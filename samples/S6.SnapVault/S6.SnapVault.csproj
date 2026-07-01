@@ -76,14 +76,4 @@
     <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.6" />
   </ItemGroup>
 
-  <ItemGroup>
-    <!-- _legacy/ holds value-bearing port-source not yet rebuilt (ported in steps 2-6, deleted at step 7).
-         Excluded from compile + content so step 1 reduces to the kept core. Microsoft.NET.Sdk.Web globs
-         **/*.cs as Compile and **/* as content, so remove from both. -->
-    <Compile Remove="_legacy\**\*.cs" />
-    <Content Remove="_legacy\**\*" />
-    <None Remove="_legacy\**\*" />
-    <EmbeddedResource Remove="_legacy\**\*" />
-  </ItemGroup>
-
 </Project>
