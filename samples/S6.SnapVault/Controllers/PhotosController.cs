@@ -25,8 +25,8 @@ public sealed class PhotosController : ControllerBase
     /// submit and rehydrated when each job runs (ARCH-0100).
     /// </summary>
     [HttpPost("upload")]
-    [RequestSizeLimit(128L * 1024 * 1024)]
-    [RequestFormLimits(MultipartBodyLengthLimit = 128L * 1024 * 1024)]
+    [RequestSizeLimit(260L * 1024 * 1024)]                                  // UI max batch = 10 files × 25 MB + headroom
+    [RequestFormLimits(MultipartBodyLengthLimit = 260L * 1024 * 1024)]
     public async Task<IActionResult> Upload(CancellationToken ct)
     {
         var form = await Request.ReadFormAsync(ct);

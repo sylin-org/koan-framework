@@ -114,9 +114,10 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
 
         // Generate AI metadata + embedding INLINE — durable and tenant-carried. Non-fatal: the upload (storage +
         // EXIF) already succeeded and the photo is usable; AI can be regenerated later via /regenerate-ai-analysis.
+        // (Embedding is attribute-driven + async — it runs on the worker AFTER this job settles, so there is no
+        // synchronous "embedding" progress stage to honestly report.)
         try
         {
-            await Progress(0.85, PhotoProcessingStage.Embedding);
             await GenerateAIMetadata(photo, ct);
             await Progress(1.0, PhotoProcessingStage.Completed);
         }
@@ -156,8 +157,17 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             _logger.LogError(ex, "Failed to generate AI metadata for photo {PhotoId}, rolling back transaction", photo.Id);
             await EntityContext.Rollback(ct);
 
-            photo.ProcessingStatus = ProcessingStatus.Failed;
-            await photo.Save(ct);
+            // Best-effort Failed marker OUTSIDE the rolled-back transaction — a second failure here must not mask the
+            // original nor strand the photo in InProgress limbo.
+            try
+            {
+                photo.ProcessingStatus = ProcessingStatus.Failed;
+                await photo.Save(ct);
+            }
+            catch (Exception saveEx)
+            {
+                _logger.LogWarning(saveEx, "Failed to persist Failed status for photo {PhotoId}", photo.Id);
+            }
             throw;
         }
     }
@@ -224,9 +234,10 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
         try
         {
             stream.Position = 0;
-            using var image = await Image.LoadAsync(stream, ct);
-
-            var exif = image.Metadata.ExifProfile;
+            // Identify (header-only) — reads the EXIF profile without decompressing the full pixel buffer
+            // (a 25 MB JPEG would otherwise unpack to hundreds of MB just to read a few tags).
+            var info = await Image.IdentifyAsync(stream, ct);
+            var exif = info?.Metadata.ExifProfile;
             if (exif == null) return;
 
             if (exif.TryGetValue(ExifTag.Model, out var modelValue))
@@ -254,13 +265,25 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
                 latValue.Value is Rational[] gpsLatitude &&
                 lonValue.Value is Rational[] gpsLongitude)
             {
-                photo.Location = new GpsCoordinates
-                {
-                    Latitude = ConvertToDecimalDegrees(gpsLatitude),
-                    Longitude = ConvertToDecimalDegrees(gpsLongitude)
-                };
+                var latitude = ConvertToDecimalDegrees(gpsLatitude);
+                var longitude = ConvertToDecimalDegrees(gpsLongitude);
+                // Honor the hemisphere refs: S latitudes and W longitudes are negative. Without this the whole
+                // southern/western hemisphere is silently mirrored into the northern/eastern (Sydney → Mediterranean).
+                if (exif.TryGetValue(ExifTag.GPSLatitudeRef, out var latRef) &&
+                    string.Equals(latRef.Value?.ToString(), "S", StringComparison.OrdinalIgnoreCase))
+                    latitude = -latitude;
+                if (exif.TryGetValue(ExifTag.GPSLongitudeRef, out var lonRef) &&
+                    string.Equals(lonRef.Value?.ToString(), "W", StringComparison.OrdinalIgnoreCase))
+                    longitude = -longitude;
+
+                photo.Location = new GpsCoordinates { Latitude = latitude, Longitude = longitude };
                 if (exif.TryGetValue(ExifTag.GPSAltitude, out var altValue))
-                    photo.Location.Altitude = Convert.ToDouble(altValue.Value);
+                {
+                    var altitude = Convert.ToDouble(altValue.Value);
+                    if (exif.TryGetValue(ExifTag.GPSAltitudeRef, out var altRef) && Convert.ToInt32(altRef.Value) == 1)
+                        altitude = -altitude;   // GPSAltitudeRef == 1 ⇒ below sea level
+                    photo.Location.Altitude = altitude;
+                }
             }
 
             _logger.LogDebug("EXIF extracted: Camera={Camera} ISO={ISO} Date={Date}", photo.CameraModel, photo.ISO, photo.CapturedAt);
