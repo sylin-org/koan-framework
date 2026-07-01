@@ -99,6 +99,10 @@ public sealed class SnapVaultMaintenanceSpec
             await new MediaDerivation { Id = MediaDerivation.KeyFor(uploaded.Id, "fp"), SourceMediaId = uploaded.Id, Key = "blob-" + Stamp() }.Save();
             await new PhotoSetSession { Context = "all-photos" }.Save();
             await new PhotoProcessingJob { PhotoId = uploaded.Id }.Save();
+            // Guest-lifecycle rows for this studio (5e wipe-fold) — HostScoped, keyed by StudioTenantId.
+            await new GalleryGrant { Id = GalleryGrant.KeyFor("g-" + Stamp(), ev.Id), IdentityId = "g", EventId = ev.Id, StudioTenantId = studio }.Save();
+            await new GalleryInvite { Id = GalleryInvite.KeyFor("inv-" + Stamp()), InviteId = "inv", EventId = ev.Id, StudioTenantId = studio }.Save();
+            await new ProofSelection { Id = ProofSelection.KeyFor("g", uploaded.Id), GuestIdentityId = "g", EventId = ev.Id, PhotoId = uploaded.Id, StudioTenantId = studio }.Save();
 
             var body = new MemoryStream();
             await Controller(body).WipeRepository();
@@ -110,6 +114,10 @@ public sealed class SnapVaultMaintenanceSpec
             (await PhotoProcessingJob.All()).Should().BeEmpty();
             (await PhotoSetSession.All()).Should().BeEmpty();
             (await MediaDerivation.All()).Should().BeEmpty();
+            // …including the studio's guest-lifecycle rows (5e).
+            (await GalleryGrant.Query(g => g.StudioTenantId == studio)).Should().BeEmpty();
+            (await GalleryInvite.Query(gi => gi.StudioTenantId == studio)).Should().BeEmpty();
+            (await ProofSelection.Query(p => p.StudioTenantId == studio)).Should().BeEmpty();
 
             // …and the original BLOB is gone too (proves the wipe's photo.Delete, not just Remove).
             (await PhotoAsset.Head(blobKey, CancellationToken.None)).Should().BeNull("the wipe deleted the blob");

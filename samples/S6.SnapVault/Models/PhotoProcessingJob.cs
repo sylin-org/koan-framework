@@ -1,3 +1,4 @@
+using Koan.Data.Access;
 using Koan.Data.Core.Model;
 using Koan.Jobs;
 using Microsoft.Extensions.DependencyInjection;
@@ -43,6 +44,12 @@ public sealed class PhotoProcessingJob : Entity<PhotoProcessingJob>, IKoanJob<Ph
 
     public static async Task Execute(PhotoProcessingJob job, JobContext ctx, CancellationToken ct)
     {
+        // Ingest/reanalyze are studio-SYSTEM operations: run elevated (Subject.System) so they work under the
+        // SEC-0008 fail-closed access posture regardless of who triggered them (an absent/constrained carried
+        // subject would otherwise scope or deny the pipeline's PhotoAsset reads). The studio tenant is already
+        // rehydrated by the ARCH-0100 carrier, so the work still happens in the submitting studio.
+        using var _system = Subject.System();
+
         var service = ctx.Services.GetRequiredService<IPhotoProcessingService>();
 
         switch (ctx.Action)

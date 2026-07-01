@@ -23,11 +23,14 @@ public sealed class ProofingService
         var sel = await ProofSelection.Get(ProofSelection.KeyFor(guestId, photoId)) ?? new ProofSelection
         {
             Id = ProofSelection.KeyFor(guestId, photoId),
-            GuestIdentityId = guestId,
-            EventId = eventId,
-            PhotoId = photoId,
-            StudioTenantId = studioTenantId,
         };
+        // Re-anchor the scope fields from the (controller-derived, trusted) values on EVERY write — an existing row
+        // is never allowed to keep a stale/mismatched guest, event, or studio (the caller already proved the guest
+        // can see the photo + holds the grant these came from).
+        sel.GuestIdentityId = guestId;
+        sel.EventId = eventId;
+        sel.PhotoId = photoId;
+        sel.StudioTenantId = studioTenantId;
         if (favorite is not null) sel.IsFavorite = favorite.Value;
         if (rating is not null) sel.Rating = rating.Value;
         if (selected is not null) sel.IsSelected = selected.Value;

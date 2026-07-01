@@ -8,6 +8,9 @@ using S6.SnapVault.Models;
 
 namespace S6.SnapVault.Services;
 
+/// <summary>A resolved guest's access context: the constrained scope tokens + the studio tenant to enter.</summary>
+public sealed record GuestAccess(IReadOnlyList<string> Scopes, string StudioTenantId);
+
 /// <summary>
 /// Resolves an invited guest's ambient access scope from their active <see cref="GalleryGrant"/>s — the SEC-0008
 /// snapshot-at-the-edge. The grant table is read UN-constrained (grants aren't <c>[AccessScoped]</c> — that is the
@@ -27,6 +30,30 @@ public sealed class GuestScopeService
             .Select(g => "event:" + g.EventId)
             .Distinct(StringComparer.Ordinal)
             .ToList();
+    }
+
+    /// <summary>
+    /// Resolve a request principal to a guest access context — the constrained scope tokens PLUS the studio tenant to
+    /// enter (derived SERVER-SIDE from the grants, never a client hint). Returns null when the person holds no active
+    /// grants (i.e. they are not a guest — a revoked client resolves to null and fails closed, never an operator).
+    /// A guest with galleries across multiple studios resolves to ONE studio deterministically (their earliest grant)
+    /// and ONLY that studio's scope tokens — so no cross-studio token rides in the ambient Subject; the tenant axis
+    /// isolates cleanly and a per-studio selection is a 5f concern.
+    /// </summary>
+    public async Task<GuestAccess?> ResolveGuestAsync(string personId, CancellationToken ct = default)
+    {
+        var grants = (await GalleryGrant.Query(g => g.IdentityId == personId && g.IsActive, ct))
+            .Where(g => g.Allows("view"))
+            .ToList();
+        if (grants.Count == 0) return null;
+
+        // Deterministic single studio (earliest grant) — query order is adapter-defined, so never rely on grants[0].
+        var studio = grants
+            .GroupBy(g => g.StudioTenantId)
+            .OrderBy(grp => grp.Min(g => g.CreatedAt))
+            .First();
+        var scopes = studio.Select(g => "event:" + g.EventId).Distinct(StringComparer.Ordinal).ToList();
+        return new GuestAccess(scopes, studio.Key);
     }
 
     /// <summary>

@@ -5,6 +5,7 @@ using Koan.Web.Attributes;
 using Koan.Web.Controllers;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using S6.SnapVault.Initialization;
 using S6.SnapVault.Models;
 using S6.SnapVault.Services;
 
@@ -19,6 +20,9 @@ namespace S6.SnapVault.Controllers;
 /// </summary>
 [Route("api/photos")]
 [Pagination(Mode = PaginationMode.On, DefaultSize = 30, MaxSize = 200, DefaultSort = "-id")]
+[OperatorOnly]   // 5e: the studio photo surface (upload + writes + operator reads) is operator-only — a guest browses
+                 // their gallery via the access-scoped PhotoSetsController + media serving, and proofs via /proofing;
+                 // it never reaches the studio's write verbs (which the access axis, a READ axis, would not gate).
 public sealed class PhotosController : EntityController<PhotoAsset>
 {
     private const long MaxFileBytes = 25L * 1024 * 1024;                 // 25 MB per file

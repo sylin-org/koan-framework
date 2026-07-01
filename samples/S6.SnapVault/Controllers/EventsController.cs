@@ -1,6 +1,7 @@
 using Koan.Web.Attributes;
 using Koan.Web.Controllers;
 using Microsoft.AspNetCore.Mvc;
+using S6.SnapVault.Initialization;
 using S6.SnapVault.Models;
 
 namespace S6.SnapVault.Controllers;
@@ -16,6 +17,7 @@ namespace S6.SnapVault.Controllers;
 /// </summary>
 [Route("api/events")]
 [Pagination(Mode = PaginationMode.Off)]
+[OperatorOnly]   // Events are only tenant-scoped (not [AccessScoped]); a guest must not list/create the studio's events
 public sealed class EventsController : EntityController<Event>
 {
 }

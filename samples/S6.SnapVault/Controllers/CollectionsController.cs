@@ -4,6 +4,7 @@ using Koan.Web.Controllers;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using S6.SnapVault.Configuration;
+using S6.SnapVault.Initialization;
 using S6.SnapVault.Models;
 
 namespace S6.SnapVault.Controllers;
@@ -21,6 +22,7 @@ namespace S6.SnapVault.Controllers;
 /// </summary>
 [Route("api/collections")]
 [Pagination(Mode = PaginationMode.Off)]
+[OperatorOnly]   // Collections are only tenant-scoped (not [AccessScoped]); the whole surface is operator-managed
 public sealed class CollectionsController : EntityController<Collection>
 {
     private readonly CollectionOptions _options;

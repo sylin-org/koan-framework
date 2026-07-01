@@ -34,3 +34,12 @@ public sealed class CollectionPhotosRequest
 {
     public List<string> PhotoIds { get; set; } = new();
 }
+
+/// <summary>5e — a guest's proofing mark on one photo (any subset; nulls leave the existing value untouched).</summary>
+public sealed class ProofMarkRequest
+{
+    public bool? Favorite { get; set; }
+    public int? Rating { get; set; }
+    public bool? Selected { get; set; }
+    public string? Comment { get; set; }
+}

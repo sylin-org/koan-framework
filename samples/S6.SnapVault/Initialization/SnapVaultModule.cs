@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Koan.Core;
@@ -7,6 +8,7 @@ using Koan.Core.AI;
 using Koan.Core.Modules;
 using Koan.Core.Provenance;
 using Koan.Media.Web.Routing;
+using Koan.Web.Hosting;
 using Koan.ZenGarden;
 using S6.SnapVault.Configuration;
 using S6.SnapVault.Models;
@@ -53,12 +55,11 @@ public sealed class SnapVaultModule : KoanModule
         // Read/query surface (step 5b): the session-windowed grid (#5 /photosets/query).
         services.AddSingleton<PhotoSetService>();
 
-        // SEC-0008 access posture (step 5b, DEV ONLY): the studio operator has no request-path Subject yet (the
-        // operator+guest subject-resolution middleware lands in 5e, where this flips back to fail-closed). Until
-        // then, DEV treats an absent subject as unconstrained so operators can read their own tenant's photos —
-        // safe because NO guest surface exists until 5e (nothing to leak to); PROD stays fail-closed by default.
-        services.AddOptions<Koan.Data.Access.AccessOptions>()
-            .Configure<IHostEnvironment>((o, env) => { if (env.IsDevelopment()) o.FailClosedOnAbsentSubject = false; });
+        // SEC-0008 access posture (step 5e): FAIL-CLOSED everywhere (the framework default — the step-5b dev-open
+        // override is GONE). Every request-path subject is now set explicitly by SnapVaultSubjectMiddleware (guest /
+        // operator-via-carrier / dev-trust anonymous operator), and the ingest/AI jobs run Subject.System() — so a
+        // path that reaches an [AccessScoped] read without establishing a subject sees NOTHING rather than everything.
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanWebPipelineContributor, SnapVaultSubjectContributor>());
     }
 
     public override async Task Start(IServiceProvider services, CancellationToken ct)

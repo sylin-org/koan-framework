@@ -43,10 +43,11 @@ public sealed class GalleryGrant : Entity<GalleryGrant>
     [Timestamp]
     public DateTimeOffset CreatedAt { get; set; }
 
-    /// <summary>True when the grant is active, unexpired, and carries <paramref name="permission"/>.</summary>
+    /// <summary>True when the grant is active, unexpired, and carries <paramref name="permission"/> (case-insensitive
+    /// — a casing drift on this security-critical list must not silently deny).</summary>
     public bool Allows(string permission)
         => IsActive
-           && Permissions.Contains(permission)
+           && Permissions.Contains(permission, StringComparer.OrdinalIgnoreCase)
            && (ExpiresAt is null || DateTimeOffset.UtcNow < ExpiresAt);
 
     /// <summary>Deterministic id — one grant per (guest, event) so a re-accept converges instead of duplicating.

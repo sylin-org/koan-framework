@@ -1,6 +1,8 @@
 using Koan.Data.Core;
 using Koan.Media.Web.Routing;
+using Koan.Tenancy;
 using Microsoft.AspNetCore.Mvc;
+using S6.SnapVault.Initialization;
 using S6.SnapVault.Models;
 using System.Text.Json;
 
@@ -16,6 +18,7 @@ namespace S6.SnapVault.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/maintenance")]
+[OperatorOnly]   // stats + wipe are operator-only — a guest must never reach the destructive/aggregate surface
 public sealed class MaintenanceController : ControllerBase
 {
     private const double BytesPerGB = 1024.0 * 1024 * 1024;
@@ -125,12 +128,8 @@ public sealed class MaintenanceController : ControllerBase
             }
             await Progress(85, $"Deleted {jobs.Count} job(s)");
 
-            // 5. Session + render-cache mop-up (85→100%): PhotoSetSession snapshots and any MediaDerivation rows the
+            // 5. Session + render-cache mop-up (85→92%): PhotoSetSession snapshots and any MediaDerivation rows the
             // per-photo eviction didn't reach (a source-less render, or one whose photo delete failed above).
-            // NOTE (5e): the studio's [HostScoped] guest-lifecycle rows (GalleryGrant / GalleryInvite /
-            // ProofSelection, keyed by StudioTenantId) are NOT wiped here — the guest surface doesn't exist until
-            // 5e, and clearing them needs the operator's resolved tenant id that 5e's subject middleware provides.
-            // They orphan inert until then (their events/photos are gone, so SEC-0008 already yields nothing).
             var sessions = await PhotoSetSession.All(ct);
             foreach (var session in sessions)
             {
@@ -141,6 +140,25 @@ public sealed class MaintenanceController : ControllerBase
             {
                 try { await derivation.Delete(ct); } catch { /* blob best-effort */ }
                 try { await derivation.Remove(ct); } catch (Exception ex) { _logger.LogWarning(ex, "Wipe: failed to delete derivation {DerivationId}", derivation.Id); }
+            }
+            await Progress(92, "Cleared sessions and render cache");
+
+            // 6. Studio guest-lifecycle rows (92→100%, 5e). These are [HostScoped] (platform-shared) keyed by
+            // StudioTenantId, NOT the ambient tenant axis, so they need the resolved studio id — cleared when a
+            // studio tenant is resolved (the operator carrier / a test's Tenant.Use); skipped for the tenant-less
+            // dev-trust operator. Memberships (the operator's own seat) and the tamper-evident
+            // ClientErasureCertificate (IAmbientExempt audit trail) are deliberately left intact.
+            var studioTenantId = Tenant.Current?.Id;
+            if (!string.IsNullOrEmpty(studioTenantId))
+            {
+                var grants = await GalleryGrant.Query(g => g.StudioTenantId == studioTenantId, ct);
+                foreach (var g in grants) { try { await g.Remove(ct); } catch (Exception ex) { _logger.LogWarning(ex, "Wipe: failed to delete grant {GrantId}", g.Id); } }
+                var galleryInvites = await GalleryInvite.Query(gi => gi.StudioTenantId == studioTenantId, ct);
+                foreach (var gi in galleryInvites) { try { await gi.Remove(ct); } catch (Exception ex) { _logger.LogWarning(ex, "Wipe: failed to delete gallery invite {InviteId}", gi.Id); } }
+                var proofSelections = await ProofSelection.Query(p => p.StudioTenantId == studioTenantId, ct);
+                foreach (var s in proofSelections) { try { await s.Remove(ct); } catch (Exception ex) { _logger.LogWarning(ex, "Wipe: failed to delete selection {SelectionId}", s.Id); } }
+                _logger.LogWarning("Wipe: cleared {Grants} grants, {Invites} gallery invites, {Selections} selections for studio {Studio}",
+                    grants.Count, galleryInvites.Count, proofSelections.Count, studioTenantId);
             }
 
             await Progress(100, "Repository wiped successfully");
