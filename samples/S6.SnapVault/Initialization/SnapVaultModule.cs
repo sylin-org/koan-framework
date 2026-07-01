@@ -49,6 +49,16 @@ public sealed class SnapVaultModule : KoanModule
         // style-customized vision prompt (base template + DB-driven style parameters).
         services.AddSingleton<Services.AI.IAnalysisPromptFactory, Services.AI.AnalysisPromptFactory>();
         services.AddSingleton<IPhotoProcessingService, PhotoProcessingService>();
+
+        // Read/query surface (step 5b): the session-windowed grid (#5 /photosets/query).
+        services.AddSingleton<PhotoSetService>();
+
+        // SEC-0008 access posture (step 5b, DEV ONLY): the studio operator has no request-path Subject yet (the
+        // operator+guest subject-resolution middleware lands in 5e, where this flips back to fail-closed). Until
+        // then, DEV treats an absent subject as unconstrained so operators can read their own tenant's photos —
+        // safe because NO guest surface exists until 5e (nothing to leak to); PROD stays fail-closed by default.
+        services.AddOptions<Koan.Data.Access.AccessOptions>()
+            .Configure<IHostEnvironment>((o, env) => { if (env.IsDevelopment()) o.FailClosedOnAbsentSubject = false; });
     }
 
     public override async Task Start(IServiceProvider services, CancellationToken ct)
