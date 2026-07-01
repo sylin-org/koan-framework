@@ -351,18 +351,21 @@ Selector note:
 ### MongoDB adapter behavior
 
 - Default auto path (`ConnectionString` empty or `auto`):
-  - resolves `mongodb` through Zen Garden first
-  - falls back to existing Mongo autonomous discovery if unresolved
-- Explicit Zen Garden URI path:
+  - runs the health-checked discovery probe; Zen Garden **contributes** its resolved `mongodb`
+    endpoint as one candidate (`IDiscoveryCandidateContributor`), tried ahead of the
+    compose-name / `host.docker.internal` / `localhost` guesses but **health-checked like all of
+    them** — so an unreachable ZG answer (e.g. a same-host offering advertised on an interface the
+    app can't reach) falls through instead of stranding the app. Zen Garden informs discovery here;
+    it no longer short-circuits it.
+- Explicit Zen Garden URI path (unchanged — resolves ZG directly, honoring your explicit offering/instance):
   - `Koan:Data:Mongo:ConnectionString = "zen-garden://mongodb"`
   - `Koan:Data:Mongo:ConnectionString = "zen-garden://mongodb:dev"`
   - unresolved intent falls back to Mongo autonomous discovery
 
-Optional Mongo Zen Garden overrides:
-
-- `Koan:Data:Mongo:ZenGarden:Offering`
-- `Koan:Data:Mongo:ZenGarden:Instance`
-- `Koan:Data:Mongo:ZenGarden:Capabilities` (array or csv)
+To pin a non-default offering or instance for the auto path, use the explicit
+`zen-garden://<offering>:<instance>` connection string above. (The former per-adapter
+`Koan:Data:Mongo:ZenGarden:Offering` / `Instance` / `Capabilities` auto-path override keys were
+removed when Zen Garden became a discovery contributor.)
 
 ### Ollama adapter behavior
 

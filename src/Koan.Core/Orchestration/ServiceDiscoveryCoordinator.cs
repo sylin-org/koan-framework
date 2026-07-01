@@ -12,13 +12,16 @@ namespace Koan.Core.Orchestration;
 internal sealed class ServiceDiscoveryCoordinator : IServiceDiscoveryCoordinator
 {
     private readonly ConcurrentDictionary<string, IServiceDiscoveryAdapter> _adapters = new();
+    private readonly IDiscoveryCandidateContributor[] _contributors;
     private readonly ILogger<ServiceDiscoveryCoordinator> _logger;
 
     public ServiceDiscoveryCoordinator(
         IEnumerable<IServiceDiscoveryAdapter> adapters,
+        IEnumerable<IDiscoveryCandidateContributor> contributors,
         ILogger<ServiceDiscoveryCoordinator> logger)
     {
         _logger = logger;
+        _contributors = contributors?.ToArray() ?? [];
         RegisterAdapters(adapters);
     }
 
@@ -34,6 +37,11 @@ internal sealed class ServiceDiscoveryCoordinator : IServiceDiscoveryCoordinator
         }
 
         context ??= new DiscoveryContext();
+
+        // Gather candidates from external discovery contributors (Zen Garden / Koi, if present) and fold them
+        // into the context so the adapter's health-checked probe treats them as candidates — not authoritative
+        // short-circuits. A contributor failure must never break discovery, so each is guarded.
+        context = await ApplyContributedCandidates(serviceName, context, cancellationToken);
 
         KoanLog.ConfigDebug(_logger, LogActions.Delegate, null,
             ("service", serviceName),
@@ -63,6 +71,44 @@ internal sealed class ServiceDiscoveryCoordinator : IServiceDiscoveryCoordinator
 
     public IServiceDiscoveryAdapter[] GetRegisteredAdapters() =>
         _adapters.Values.ToArray();
+
+    private async Task<DiscoveryContext> ApplyContributedCandidates(
+        string serviceName, DiscoveryContext context, CancellationToken cancellationToken)
+    {
+        if (_contributors.Length == 0) return context;
+
+        var contributed = new List<DiscoveryCandidate>();
+        foreach (var contributor in _contributors)
+        {
+            try
+            {
+                var items = await contributor.ContributeCandidates(serviceName, context, cancellationToken);
+                if (items is { Count: > 0 })
+                {
+                    contributed.AddRange(items.Where(c => c is not null && !string.IsNullOrWhiteSpace(c.Url)));
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // A genuine caller cancellation must propagate — it is not a contributor failure to swallow.
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // Best-effort: a contributor is an aid to discovery, never a gate. Log and carry on.
+                KoanLog.ConfigDebug(_logger, LogActions.Delegate, "contributor-failed",
+                    ("service", serviceName),
+                    ("contributor", contributor.GetType().Name),
+                    ("error", ex.Message));
+            }
+        }
+
+        // Preserve any pre-existing contributed candidates the caller set explicitly.
+        if (context.ContributedCandidates is { Count: > 0 })
+            contributed.InsertRange(0, context.ContributedCandidates);
+
+        return contributed.Count > 0 ? context with { ContributedCandidates = contributed } : context;
+    }
 
     private void RegisterAdapters(IEnumerable<IServiceDiscoveryAdapter> adapters)
     {

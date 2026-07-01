@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Linq;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -102,21 +101,13 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
         }
         else if (IsAutoConnection(requestedConnection))
         {
-            var defaultIntent = BuildDefaultZenGardenIntent();
-            if (TryResolveZenGardenConnection(defaultIntent, out var resolved))
-            {
-                options.ConnectionString = resolved;
-                if (!hasUserExplicitEndpoint)
-                    options.Endpoint = resolved;
-                KoanLog.ConfigInfo(Logger, LogActions.ZenGarden, "auto-resolved", ("offering", defaultIntent.ToOfferingSelector()));
-            }
-            else
-            {
-                KoanLog.ConfigInfo(Logger, LogActions.Discovery, "auto-mode");
-                options.ConnectionString = ResolveAutonomousConnection();
-                if (!hasUserExplicitEndpoint)
-                    options.Endpoint = options.ConnectionString;
-            }
+            // Discovery mode: always run the health-checked candidate probe. Zen Garden (if referenced)
+            // contributes its resolved offering endpoint into that probe as ONE health-checked candidate rather
+            // than short-circuiting here, so an unreachable ZG answer falls through to the standard candidates.
+            KoanLog.ConfigInfo(Logger, LogActions.Discovery, "auto-mode");
+            options.ConnectionString = ResolveAutonomousConnection();
+            if (!hasUserExplicitEndpoint)
+                options.Endpoint = options.ConnectionString;
         }
         else
         {
@@ -216,73 +207,6 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
     private bool IsAutoDetectionDisabled()
     {
         return Koan.Core.Configuration.Read(Configuration, Infrastructure.Constants.Configuration.Flags.DisableAutoDetection, false);
-    }
-
-    private ZenGardenConnectionIntent BuildDefaultZenGardenIntent()
-    {
-        var configuredOffering = ReadProviderConfiguration(
-            "",
-            Infrastructure.Constants.Configuration.ZenGarden.Offering);
-
-        if (string.IsNullOrWhiteSpace(configuredOffering) &&
-            _zenGardenInitializationProvider?.TryGetDefaultOffering("weaviate", out var mappedOffering) == true)
-        {
-            configuredOffering = mappedOffering;
-        }
-
-        if (string.IsNullOrWhiteSpace(configuredOffering))
-        {
-            configuredOffering = "weaviate";
-        }
-
-        var configuredInstance = ReadProviderConfiguration(
-            "",
-            Infrastructure.Constants.Configuration.ZenGarden.Instance);
-
-        return ZenGardenConnectionIntent.ForOffering(
-            configuredOffering,
-            configuredInstance,
-            ReadZenGardenCapabilities());
-    }
-
-    private IReadOnlyList<string> ReadZenGardenCapabilities()
-    {
-        var sectionValues = Configuration
-            .GetSection(Infrastructure.Constants.Configuration.ZenGarden.Capabilities)
-            .Get<string[]>() ?? [];
-
-        var singleValue = ReadProviderConfiguration(
-            "",
-            Infrastructure.Constants.Configuration.ZenGarden.Capability);
-
-        var parsed = new List<string>();
-        foreach (var raw in sectionValues)
-        {
-            AppendCapabilities(raw, parsed);
-        }
-
-        AppendCapabilities(singleValue, parsed);
-
-        return new ReadOnlyCollection<string>(parsed
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Select(x => x.ToLowerInvariant())
-            .ToArray());
-    }
-
-    private static void AppendCapabilities(string? raw, ICollection<string> output)
-    {
-        if (string.IsNullOrWhiteSpace(raw))
-        {
-            return;
-        }
-
-        foreach (var token in raw.Split([',', '|'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            if (!string.IsNullOrWhiteSpace(token))
-            {
-                output.Add(token.Trim());
-            }
-        }
     }
 
     private bool TryResolveZenGardenConnection(

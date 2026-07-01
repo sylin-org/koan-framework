@@ -84,6 +84,26 @@ public abstract class ServiceDiscoveryAdapterBase : IServiceDiscoveryAdapter
         // 1. Add service-specific environment variable candidates (highest priority)
         candidates.AddRange(GetEnvironmentCandidates());
 
+        // 1.5 Fold in candidates contributed by external discovery sources (Zen Garden / Koi), populated by the
+        // coordinator. These are health-checked like any other candidate — tried ahead of the compose/host/local
+        // guesses but behind explicit env/config — so an unreachable contributed answer (e.g. a same-host offering
+        // advertised on an interface this app can't reach) fails its probe and the loop falls through. The
+        // contributor informs discovery; it never short-circuits it.
+        if (context.ContributedCandidates is { Count: > 0 })
+        {
+            foreach (var contributed in context.ContributedCandidates)
+            {
+                if (contributed is not null && !string.IsNullOrWhiteSpace(contributed.Url))
+                {
+                    candidates.Add(contributed);
+                    KoanLog.ConfigDebug(_logger, "discovery.candidate", null,
+                        ("service", ServiceName),
+                        ("method", contributed.Method),
+                        ("url", contributed.Url));
+                }
+            }
+        }
+
         // 2. Add explicit configuration candidates
         var explicitConfig = ReadExplicitConfiguration();
         if (!string.IsNullOrWhiteSpace(explicitConfig))

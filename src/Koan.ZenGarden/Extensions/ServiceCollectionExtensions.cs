@@ -67,6 +67,12 @@ public static class ServiceCollectionExtensions
 
         services.TryAddSingleton<IZenGardenInitializationProvider, ZenGardenInitializationProvider>();
 
+        // Contribute ZG-resolved offering endpoints into the orchestration discovery probe as health-checked
+        // candidates (never authoritative short-circuits). Present only because this app references ZenGarden.
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<
+            Koan.Core.Orchestration.Abstractions.IDiscoveryCandidateContributor,
+            Koan.ZenGarden.Discovery.ZenGardenDiscoveryCandidateContributor>());
+
         // Register the model advisor — bridges orchestrator recommendations into Koan.AI routing.
         // When both Koan.ZenGarden and Koan.AI are referenced, Client.Chat/Embed/Ocr
         // automatically use the best available model with zero configuration.

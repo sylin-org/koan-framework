@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Linq;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -86,18 +85,14 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
         }
         else if (IsAutoConnection(requestedConnection))
         {
-            var defaultIntent = BuildDefaultZenGardenIntent();
-            if (TryResolveZenGardenConnection(defaultIntent, databaseName, username, password, out var resolved))
-            {
-                options.ConnectionString = resolved;
-                KoanLog.ConfigInfo(Logger, LogActions.ZenGarden, "auto-resolved", ("offering", defaultIntent.ToOfferingSelector()));
-            }
-            else
-            {
-                KoanLog.ConfigInfo(Logger, LogActions.Discovery, "auto-mode",
-                    ("database", databaseName ?? "(none)"));
-                options.ConnectionString = ResolveAutonomousConnection(databaseName, username, password);
-            }
+            // Discovery mode: always run the health-checked candidate probe. Zen Garden (if referenced)
+            // contributes its resolved offering endpoint into that probe as ONE health-checked candidate — it no
+            // longer short-circuits here, so an unreachable ZG answer (e.g. a same-host offering advertised at the
+            // docker bridge gateway for a loopback-bound host MongoDB) falls through to the compose-name /
+            // host.docker.internal / localhost candidates instead of stranding the app.
+            KoanLog.ConfigInfo(Logger, LogActions.Discovery, "auto-mode",
+                ("database", databaseName ?? "(none)"));
+            options.ConnectionString = ResolveAutonomousConnection(databaseName, username, password);
         }
         else
         {
@@ -189,73 +184,6 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
     private bool IsAutoDetectionDisabled()
     {
         return Koan.Core.Configuration.Read(Configuration, Infrastructure.ConfigurationConstants.FullKey(Infrastructure.ConfigurationConstants.Keys.DisableAutoDetection), false);
-    }
-
-    private ZenGardenConnectionIntent BuildDefaultZenGardenIntent()
-    {
-        var configuredOffering = ReadProviderConfiguration(
-            "",
-            Infrastructure.ConfigurationConstants.ZenGarden.Offering);
-
-        if (string.IsNullOrWhiteSpace(configuredOffering) &&
-            _zenGardenInitializationProvider?.TryGetDefaultOffering("mongo", out var mappedOffering) == true)
-        {
-            configuredOffering = mappedOffering;
-        }
-
-        if (string.IsNullOrWhiteSpace(configuredOffering))
-        {
-            configuredOffering = "mongodb";
-        }
-
-        var configuredInstance = ReadProviderConfiguration(
-            "",
-            Infrastructure.ConfigurationConstants.ZenGarden.Instance);
-
-        return ZenGardenConnectionIntent.ForOffering(
-            configuredOffering,
-            configuredInstance,
-            ReadZenGardenCapabilities());
-    }
-
-    private IReadOnlyList<string> ReadZenGardenCapabilities()
-    {
-        var sectionValues = Configuration
-            .GetSection(Infrastructure.ConfigurationConstants.ZenGarden.Capabilities)
-            .Get<string[]>() ?? [];
-
-        var singleValue = ReadProviderConfiguration(
-            "",
-            Infrastructure.ConfigurationConstants.ZenGarden.Capability);
-
-        var parsed = new List<string>();
-        foreach (var raw in sectionValues)
-        {
-            AppendCapabilities(raw, parsed);
-        }
-
-        AppendCapabilities(singleValue, parsed);
-
-        return new ReadOnlyCollection<string>(parsed
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Select(x => x.ToLowerInvariant())
-            .ToArray());
-    }
-
-    private static void AppendCapabilities(string? raw, ICollection<string> output)
-    {
-        if (string.IsNullOrWhiteSpace(raw))
-        {
-            return;
-        }
-
-        foreach (var token in raw.Split([',', '|'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            if (!string.IsNullOrWhiteSpace(token))
-            {
-                output.Add(token.Trim());
-            }
-        }
     }
 
     private bool TryResolveZenGardenConnection(
