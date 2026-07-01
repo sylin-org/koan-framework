@@ -189,8 +189,8 @@ export class ImagePreloader {
 
     try {
       const url = quality === 'original'
-        ? `/api/media/photos/${photoId}/original`
-        : `/api/media/photos/${photoId}/gallery`;
+        ? `/media/${photoId}`            // seedless = the untransformed original
+        : `/media/${photoId}/gallery`;
 
       // Create Image object to preload
       const img = new Image();

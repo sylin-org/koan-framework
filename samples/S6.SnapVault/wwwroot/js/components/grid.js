@@ -182,7 +182,7 @@ export class PhotoGrid {
 
     if (!preset) {
       console.warn(`Unknown preset: ${presetId}, falling back to masonry`);
-      return `/api/media/masonry-thumbnails/${photo.masonryThumbnailMediaId || photo.id}`;
+      return `/media/${photo.id}/masonry`;
     }
 
     // Select optimal tier based on display characteristics
@@ -197,27 +197,14 @@ export class PhotoGrid {
       this._tierLogged = true;
     }
 
-    // Map tier to appropriate endpoint
+    // The smart tier name IS the recipe name. Recipes are served on-demand from the single stored original
+    // at /media/{id}/{recipe} (framework Koan.Media.Web) — no per-tier media-id lookup and no availability
+    // guard: the recipe renders (or serves its cache) for any photo id. Unknown tiers fall back to masonry.
     switch (tier) {
-      case 'gallery':
-        // Gallery tier (1200px) - use photo ID (endpoint looks up gallery media)
-        if (photo.galleryMediaId) {
-          return `/api/media/photos/${photo.id}/gallery`;
-        }
-        // Fallback to masonry if gallery not available
-        return `/api/media/masonry-thumbnails/${photo.masonryThumbnailMediaId || photo.id}`;
-
-      case 'retina':
-        // Retina tier (600px) - use media ID directly
-        if (photo.retinaThumbnailMediaId) {
-          return `/api/media/retina-thumbnails/${photo.retinaThumbnailMediaId}`;
-        }
-        return `/api/media/masonry-thumbnails/${photo.masonryThumbnailMediaId || photo.id}`;
-
+      case 'gallery': return `/media/${photo.id}/gallery`;
+      case 'retina':  return `/media/${photo.id}/retina`;
       case 'masonry':
-      default:
-        // Masonry tier (300px) - use media ID directly
-        return `/api/media/masonry-thumbnails/${photo.masonryThumbnailMediaId || photo.id}`;
+      default:        return `/media/${photo.id}/masonry`;
     }
   }
 

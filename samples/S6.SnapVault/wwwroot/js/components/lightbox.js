@@ -387,8 +387,8 @@ export class Lightbox {
     // Optimized for future web deployment with slow networks
 
     const image = this.container.querySelector('.lightbox-image');
-    const galleryUrl = `/api/media/photos/${this.currentPhotoId}/gallery`;
-    const originalUrl = `/api/media/photos/${this.currentPhotoId}/original`;
+    const galleryUrl = `/media/${this.currentPhotoId}/gallery`;
+    const originalUrl = `/media/${this.currentPhotoId}`; // seedless = the untransformed original
 
     // Cancel any pending original loads from previous photo
     if (this.originalLoadAbort) {
@@ -628,7 +628,7 @@ export class Lightbox {
   onUserZoom() {
     if (this.imageLoadState === 'gallery-loaded') {
       const image = this.container.querySelector('.lightbox-image');
-      const originalUrl = `/api/media/photos/${this.currentPhotoId}/original`;
+      const originalUrl = `/media/${this.currentPhotoId}`; // seedless = the untransformed original
 
       // Cancel timer and load immediately
       clearTimeout(this.originalLoadTimer);

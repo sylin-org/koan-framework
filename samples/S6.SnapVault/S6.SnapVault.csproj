@@ -24,9 +24,11 @@
     <!-- Data Providers -->
     <ProjectReference Include="..\..\src\Connectors\Data\Mongo\Koan.Data.Connector.Mongo.csproj" />
 
-    <!-- Media Processing -->
+    <!-- Media Processing. Koan.Media.Web brings the recipe controller (GET /media/{id}/{recipe}) +
+         MediaEntitySource<T> — on-demand transforms served from the single stored original, access-scoped. -->
     <ProjectReference Include="..\..\src\Koan.Media.Core\Koan.Media.Core.csproj" />
     <ProjectReference Include="..\..\src\Koan.Media.Abstractions\Koan.Media.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Media.Web\Koan.Media.Web.csproj" />
 
     <!-- Storage -->
     <ProjectReference Include="..\..\src\Koan.Storage\Koan.Storage.csproj" />

@@ -11,6 +11,7 @@ using Koan.Data.Core;
 using Koan.Identity;
 using Koan.Identity.Tenancy.Invitations;
 using Koan.Jobs;
+using Koan.Media.Web.Routing;
 using Koan.Tenancy;
 using Koan.Testing.Integration;
 using Microsoft.Extensions.DependencyInjection;
@@ -159,6 +160,57 @@ public sealed class SnapVaultGuestLifecycleSpec
         reaccept.Outcome.Should().Be(InviteAcceptOutcome.NotFound);
         reaccept.Grant.Should().BeNull();
         (await GalleryGrant.Get(GalleryGrant.KeyFor(guestId, eventB))).Should().BeNull();
+    }
+
+    [Fact(DisplayName = "media serving is access-scoped: MediaEntitySource resolves a photo only for a subject that can see it")]
+    public async Task Media_serving_inherits_the_access_axis()
+    {
+        // The framework generic SnapVault registers as its IMediaSource. Serving resolves the media id THROUGH
+        // PhotoAsset.Get, so the SEC-0008 access axis gates the media bytes exactly like a raw Entity read —
+        // the moat: a guest can't fetch another event's photo bytes by id (an IDOR the legacy anonymous
+        // MediaController allowed), and a subject-less request fails closed. All three assertions short-circuit
+        // at the Get gate (null) before any storage read, so they hold even while the blob leg is parked.
+        var source = new MediaEntitySource<PhotoAsset>();
+        var invites = Svc<GalleryInviteService>();
+        var scopes = Svc<GuestScopeService>();
+
+        var stamp = Stamp();
+        var studio = "studio-" + stamp;
+        var guestId = "guest-" + stamp;
+        var guestEmail = "client-" + stamp + "@example.com";
+        await SeedGuestAsync(guestId, IdentityEmail.Normalize(guestEmail));
+
+        PhotoAsset photoA, photoB;
+        Event eventA, eventB;
+        using (Tenant.Use(studio))
+        {
+            eventA = new Event { Name = "Wedding" }; await eventA.Save();
+            eventB = new Event { Name = "Reception" }; await eventB.Save();
+            photoA = new PhotoAsset { EventId = eventA.Id, OriginalFileName = "a.jpg" }; await photoA.Save();
+            photoB = new PhotoAsset { EventId = eventB.Id, OriginalFileName = "b.jpg" }; await photoB.Save();
+        }
+
+        // The guest is invited to eventA only.
+        (await invites.AcceptAsync((await invites.InviteAsync(studio, eventA.Id, guestEmail)).Token, guestId))
+            .Outcome.Should().Be(InviteAcceptOutcome.Accepted);
+        var guestScopes = await scopes.ScopesForAsync(guestId);
+
+        using (Tenant.Use(studio))
+        using (Subject.Use(guestId, guestScopes))
+        {
+            // Cross-event: the guest cannot resolve eventB's photo bytes → fail-closed null → 404 upstream.
+            (await source.OpenAsync(photoB.Id, CancellationToken.None)).Should().BeNull();
+        }
+
+        // No established subject at all → the media source refuses to resolve (the step-5 tripwire's safety net:
+        // an unauthenticated /media request can't serve until a subject is set on the request path).
+        using (Tenant.Use(studio))
+            (await source.OpenAsync(photoA.Id, CancellationToken.None)).Should().BeNull();
+
+        // Unknown id under full access → null (not an error).
+        using (Tenant.Use(studio))
+        using (Subject.System())
+            (await source.OpenAsync("no-such-photo-" + stamp, CancellationToken.None)).Should().BeNull();
     }
 
     [Fact(DisplayName = "invite is fail-closed: a leaked link redeemed by the wrong person is refused (EmailNotOwned)")]

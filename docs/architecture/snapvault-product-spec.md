@@ -165,7 +165,7 @@ The legacy backend stays runnable as the reference until the new surface is cohe
 3. **Media recipes** (D3) — `[MediaRecipe]` set + `IMediaSource`; UI media URLs repointed; derivative types deleted.
 4. **Jobs/progress** (D4) — ledger + `ctx.Progress`; SSE stream; SignalR + hub deleted.
 5. **Domain services** — port §3 verbatim into thin services (ingest pipeline, search, navigation, collections); the UI-faced endpoints only. (Smart-collections dropped per D2.)
-6. **AI & vector cleanup** — typed-ish parse + normalization; vector `eventId` push-down; `EmbeddingTelemetry` + a thin health contributor; monitor service deleted.
+6. **AI & vector cleanup** — typed-ish parse + normalization; vector `eventId` push-down; `EmbeddingTelemetry` + a thin health contributor; monitor service deleted. **Media coupling (from the step-3 media rebuild):** the legacy vision call read the *gallery derivative entity* (`PhotoGallery.Get(GalleryMediaId).OpenRead()`), which is now gone — re-source the vision bytes by rendering the `gallery` recipe in-process (`original.OpenRead().AsMedia().Apply(PhotoRecipes.Gallery()).WriteToAsync(buf)`; the pipeline API is public, already used by the legacy code) rather than feeding the full-res original (which defeats the 1200px downscale the gallery recipe exists to provide).
 7. **Swap & measure** — delete the legacy backend; flagship green (+ re-home the parked blob leg); record LOC / entity-count / removed-package reduction.
 
 ---

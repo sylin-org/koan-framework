@@ -6,8 +6,10 @@ using Koan.Core;
 using Koan.Core.AI;
 using Koan.Core.Modules;
 using Koan.Core.Provenance;
+using Koan.Media.Web.Routing;
 using Koan.ZenGarden;
 using S6.SnapVault.Configuration;
+using S6.SnapVault.Models;
 using S6.SnapVault.Services;
 
 namespace S6.SnapVault.Initialization;
@@ -33,6 +35,13 @@ public sealed class SnapVaultModule : KoanModule
         services.AddSingleton<GuestScopeService>();
         services.AddSingleton<ProofingService>();
         services.AddSingleton<SnapVaultDeprovisioningService>();
+
+        // Media serving (D3): the framework recipe controller (GET /media/{id}/{recipe}, Reference=Intent via
+        // Koan.Media.Web) resolves source bytes through this IMediaSource. MediaEntitySource<PhotoAsset> resolves
+        // the id via PhotoAsset.Get — so media serving inherits the SEC-0008 access axis + tenant isolation
+        // structurally: a guest serves only their granted events, a subject-less request fails closed (404).
+        // One line replaces the hand-written IMediaSource + the whole legacy derivative/serving stack.
+        services.AddMediaSource<PhotoAsset>();
 
         // NOTE: IPhotoProcessingService (consumed by PhotoProcessingJob.Execute) is intentionally NOT registered
         // yet — its implementation is port-source in _legacy/ and gets rebuilt in the jobs/domain steps (4-5).
