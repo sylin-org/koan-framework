@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using Koan.AI;
+using Koan.Core;
 using Koan.AI.Contracts.Options;
 using Koan.Data.Core;
 using Koan.Data.Vector;
@@ -91,9 +92,19 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
         }
 
         // Store the full-resolution original (creates the PhotoAsset + blob), then enrich it with metadata.
-        var photo = await PhotoAsset.Upload(sourceStream, fileName, contentType, ct: ct);
+        // Blob key must be UNIQUE per photo: MediaEntity.Upload keys the blob by the caller's name, so passing the
+        // raw fileName collides whenever two uploads share a name — the 2nd overwrites the 1st's bytes, and BOTH
+        // records (distinct ids, distinct events) then resolve the same image on the gallery/download surface. Key
+        // by a fresh id + the original extension (extension kept so content-type inference + a plausible download
+        // name survive); the human-facing name lives on OriginalFileName. Distinct keys also make blob reclamation
+        // on ANY delete path safe — no sibling can share a to-be-deleted key (§9.7 tripwire). The upload name is
+        // display-only metadata — strip any path components (Path.GetFileName) so a crafted name can't leak a path
+        // into OriginalFileName or the download Content-Disposition suggestion.
+        var safeFileName = Path.GetFileName(fileName);
+        var storageName = StringId.New() + Path.GetExtension(safeFileName);
+        var photo = await PhotoAsset.Upload(sourceStream, storageName, contentType, ct: ct);
         photo.EventId = resolvedEventId!;
-        photo.OriginalFileName = fileName;
+        photo.OriginalFileName = safeFileName;
         photo.UploadedAt = DateTime.UtcNow;
         photo.Width = width;
         photo.Height = height;
@@ -186,22 +197,32 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
 
             var queryVector = await Client.Embed(query, ct);
 
+            // Push the optional event narrowing DOWN into the vector query instead of post-filtering in memory:
+            // EventId is stamped as filterable vector metadata at embed-write (VectorFilterableMetadata), so the
+            // store returns a topK whose members ALL belong to the event — better recall than fetching a global
+            // topK and discarding the off-event ones. The SEC-0008 access scope is applied separately by the
+            // scoped vector repository; this filter is operator narrowing, not the security boundary. An adapter
+            // that can't push the filter throws, and the outer catch falls back to keyword search (which also
+            // honors eventId), so the push-down never widens results. (Production-only: the unit harness has no
+            // embedding provider, so this branch falls through to the keyword path.)
+            object? filter = string.IsNullOrEmpty(eventId)
+                ? null
+                : new Dictionary<string, object> { ["EventId"] = eventId };
+
             // Hybrid vector search with user-controlled alpha (0.0 = keyword, 1.0 = semantic).
             var vectorResults = await Vector<PhotoAsset>.Search(
                 vector: queryVector,
                 text: query,
                 alpha: alpha,
                 topK: topK,
+                filter: filter,
                 ct: ct);
 
             var photos = new List<PhotoAsset>();
             foreach (var match in vectorResults.Matches)
             {
                 var photo = await PhotoAsset.Get(match.Id, ct);
-                if (photo != null && (string.IsNullOrEmpty(eventId) || photo.EventId == eventId))
-                {
-                    photos.Add(photo);
-                }
+                if (photo != null) photos.Add(photo);
             }
 
             _logger.LogInformation("Semantic search returned {Count} results", photos.Count);

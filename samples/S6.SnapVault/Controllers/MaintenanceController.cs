@@ -60,8 +60,8 @@ public sealed class MaintenanceController : ControllerBase
     /// <summary>
     /// Wipe the studio's repository — DESTRUCTIVE. Streams NDJSON progress (<c>{ percentage, message }</c> per line;
     /// the SPA reads <c>percentage</c>/<c>message</c>). Deletes the current tenant's entities in dependency order,
-    /// each photo record AND its blob (the deleted derivative types no longer exist, so they're skipped — the
-    /// per-photo AfterRemove hook already evicts cached renders + prunes collections). Per-item failures are logged
+    /// each photo record via <c>Remove</c> — the per-photo AfterRemove hook reclaims the original blob, evicts
+    /// cached renders, and prunes collections (the deleted derivative types no longer exist). Per-item failures are logged
     /// and skipped, never fatal. Errors are reported as a generic message (never raw exception text on the wire).
     /// </summary>
     [HttpPost("wipe-repository")]
@@ -89,19 +89,18 @@ public sealed class MaintenanceController : ControllerBase
             }
             await Progress(5, $"Deleted {collections.Count} collection(s)");
 
-            // 2. Photos (5→60%). Delete the blob (best-effort — must not block the record removal) then the record;
-            // the record removal fires the AfterRemove hook (cached-render eviction). Wiping the whole tenant's
-            // photos, so it is safe to delete blobs even under the fileName-keyed store (no surviving photo can
-            // share a to-be-deleted blob — unlike a partial delete).
+            // 2. Photos (5→60%). Just Remove the record — the AfterRemove hook now reclaims the original blob (plus
+            // evicts cached renders + prunes collections) on every delete path, so the wipe no longer needs its own
+            // blob delete. This is the whole point of the unique-key fix: blob reclamation is one structural home,
+            // not a per-caller step remembered here.
             var photos = await PhotoAsset.All(ct);
             var totalPhotos = photos.Count;
             var deletedPhotos = 0;
             foreach (var photo in photos)
             {
-                try { await photo.Delete(ct); } catch { /* original blob best-effort — the record removal below is what matters */ }
                 try
                 {
-                    await photo.Remove(ct);     // record → AfterRemove cleanup (render eviction + collection pruning)
+                    await photo.Remove(ct);     // record → AfterRemove cleanup (original blob + render eviction + collection pruning)
                     deletedPhotos++;
                 }
                 catch (Exception ex) { _logger.LogWarning(ex, "Wipe: failed to delete photo {PhotoId}", photo.Id); }

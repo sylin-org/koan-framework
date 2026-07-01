@@ -119,7 +119,8 @@ public sealed class SnapVaultMaintenanceSpec
             (await GalleryInvite.Query(gi => gi.StudioTenantId == studio)).Should().BeEmpty();
             (await ProofSelection.Query(p => p.StudioTenantId == studio)).Should().BeEmpty();
 
-            // …and the original BLOB is gone too (proves the wipe's photo.Delete, not just Remove).
+            // …and the original BLOB is gone too — proves the AfterRemove hook reclaims the blob on Remove (the wipe
+            // no longer calls photo.Delete directly; blob reclamation is one structural home).
             (await PhotoAsset.Head(blobKey, CancellationToken.None)).Should().BeNull("the wipe deleted the blob");
 
             Encoding.UTF8.GetString(body.ToArray()).Should().Contain("wiped successfully");

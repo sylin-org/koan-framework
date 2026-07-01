@@ -13,6 +13,9 @@ namespace S6.SnapVault.Initialization;
 /// cache (<see cref="MediaEntitySource{TEntity}"/> resolves the source before any cached render), so an
 /// un-evicted render is already unreachable.
 /// <list type="number">
+/// <item>Reclaim this photo's own stored original blob. Only safe because ingest keys each blob by a fresh
+/// <c>StringId</c> (not the fileName), so no sibling can share the key — the fix that turned a per-controller
+/// "whole-tenant wipe only" caveat into a structural, every-path reclaim (§9.7).</item>
 /// <item>Evict this source's cached recipe renders (<see cref="MediaDerivation"/>) — record <b>and</b> blob.
 /// Targeted by <c>SourceMediaId</c>, not the framework's probe-if-orphaned sweep (which the default
 /// <c>MediaEntitySource</c> leaves a no-op); targeting also cannot false-positive a still-live but access-gated
@@ -35,6 +38,16 @@ internal static class PhotoAssetCleanup
         {
             var photoId = ctx.Current.Id;
             var ct = ctx.CancellationToken;
+
+            // 0. Reclaim this photo's own stored original blob. Safe now that ingest keys each photo's blob uniquely
+            // (a fresh StringId, not the fileName) — no sibling can share the key, so this runs on EVERY delete path
+            // (bulk delete, client deprovisioning) instead of leaking the original bytes (§9.7 tripwire). Best-effort:
+            // the record is already gone, and a missing/absent blob must never fail the user's delete.
+            if (!string.IsNullOrEmpty(ctx.Current.Key))
+            {
+                try { await ctx.Current.Delete(ct); }
+                catch (Exception ex) { logger.LogWarning(ex, "Failed to delete original blob for removed photo {PhotoId}", photoId); }
+            }
 
             // 1. Evict cached recipe renders whose source is this photo (blob first, then the record). Guard EACH
             // derivation independently so one failed eviction can't strand the rest (the outer guard is only for the
