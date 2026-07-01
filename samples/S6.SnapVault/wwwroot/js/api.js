@@ -8,6 +8,30 @@ export class API {
     this.baseUrl = window.location.origin;
   }
 
+  /**
+   * Build an Error from a non-2xx response, surfacing the server's JSON error body when present.
+   * The backend returns { error: "..." } (e.g. "Collection limit reached (2048 photos maximum)."); callers
+   * grep error.message (the collection-cap toast checks for "limit"), so the body must reach them — the bare
+   * status line would hide it. Falls back to "HTTP <status>: <statusText>" when the body is absent/not JSON.
+   * @param {Response} response
+   * @returns {Promise<Error>}
+   */
+  async _errorFrom(response) {
+    let message = `HTTP ${response.status}: ${response.statusText}`;
+    try {
+      const text = await response.text();
+      if (text) {
+        const body = JSON.parse(text);
+        if (body && (body.error || body.message)) {
+          message = body.error || body.message;
+        }
+      }
+    } catch {
+      // Non-JSON body — keep the status line.
+    }
+    return new Error(message);
+  }
+
   async get(url, params = {}, options = {}) {
     const queryString = new URLSearchParams(params).toString();
     const fullUrl = `${this.baseUrl}${url}${queryString ? `?${queryString}` : ''}`;
@@ -20,7 +44,7 @@ export class API {
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      throw await this._errorFrom(response);
     }
 
     const data = await response.json();
@@ -52,7 +76,7 @@ export class API {
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      throw await this._errorFrom(response);
     }
 
     // Handle empty responses
@@ -71,7 +95,7 @@ export class API {
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      throw await this._errorFrom(response);
     }
 
     return await response.json();
@@ -83,7 +107,7 @@ export class API {
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      throw await this._errorFrom(response);
     }
 
     return response.ok;
@@ -106,7 +130,14 @@ export class API {
         if (xhr.status >= 200 && xhr.status < 300) {
           resolve(JSON.parse(xhr.responseText));
         } else {
-          reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`));
+          let message = `HTTP ${xhr.status}: ${xhr.statusText}`;
+          try {
+            const body = JSON.parse(xhr.responseText);
+            if (body && (body.error || body.message)) message = body.error || body.message;
+          } catch {
+            // Non-JSON body — keep the status line.
+          }
+          reject(new Error(message));
         }
       });
 

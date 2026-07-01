@@ -65,6 +65,10 @@ public sealed class SnapVaultModule : KoanModule
     {
         var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("SnapVault");
 
+        // §9.7 structural delete-cleanup: register the PhotoAsset AfterRemove hook ONCE so every delete path
+        // (bulk delete, future deprovisioning) evicts cached recipe renders + prunes collection membership.
+        PhotoAssetCleanup.Register(logger);
+
         // ZenGarden model advisor (zero-config model selection). Reads AppHost.Current, which Program.cs sets
         // synchronously before await app.RunAsync() — so it is available by the time Start runs in host startup.
         var vision = ZenGarden.RecommendedModel(AiCapability.Vision);

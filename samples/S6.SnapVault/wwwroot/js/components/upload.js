@@ -177,8 +177,10 @@ export class UploadModal {
         <option value="" disabled>──────────</option>
       `;
 
-      // Add user events (excluding auto-generated daily events)
-      const userEvents = events.filter(e => e.type !== 6); // EventType.DailyAuto = 6
+      // Add user events (excluding auto-generated daily events). EventType.DailyAuto is ordinal 5
+      // (Wedding=0, Corporate=1, Birthday=2, Graduation=3, Anniversary=4, DailyAuto=5, Other=6) and the API
+      // serializes Type as its number — filtering !== 5 hides auto-albums while keeping a genuine "Other".
+      const userEvents = events.filter(e => e.type !== 5); // EventType.DailyAuto = 5
       userEvents.forEach(event => {
         const option = document.createElement('option');
         option.value = event.id;

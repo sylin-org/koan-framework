@@ -1,7 +1,9 @@
 using Koan.Data.Abstractions;
+using Koan.Data.Core;
 using Koan.Jobs;
 using Koan.Web.Attributes;
 using Koan.Web.Controllers;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using S6.SnapVault.Models;
 using S6.SnapVault.Services;
@@ -24,8 +26,13 @@ public sealed class PhotosController : EntityController<PhotoAsset>
         new(StringComparer.OrdinalIgnoreCase) { ".jpg", ".jpeg", ".png", ".heic", ".heif" };
 
     private readonly PhotoSetService _photoSets;
+    private readonly IPhotoProcessingService _processing;
 
-    public PhotosController(PhotoSetService photoSets) => _photoSets = photoSets;
+    public PhotosController(PhotoSetService photoSets, IPhotoProcessingService processing)
+    {
+        _photoSets = photoSets;
+        _processing = processing;
+    }
 
     /// <summary>#1 — library stats for the sidebar badges (accurate regardless of pagination).</summary>
     [HttpGet("stats")]
@@ -170,4 +177,221 @@ public sealed class PhotosController : EntityController<PhotoAsset>
         // Shape honored by upload.js: { jobId, totalQueued } (totalFailed is additive).
         return Ok(new { jobId = batchId, totalQueued = jobs.Count, totalFailed = failed.Count });
     }
+
+    // ------------------------------------------------------------------------------------------------------------
+    // Studio mutations (#9–#19). Thin actions over the entity: the interesting behaviour is elsewhere — deletes
+    // fire the structural AfterRemove cleanup (PhotoAssetCleanup), regeneration rides the durable tenant-carrying
+    // job, and lock keys honour INV-1 (lowercase). Isolation is inherited from the ambient axes (no [Authorize]).
+    // ------------------------------------------------------------------------------------------------------------
+
+    /// <summary>#9 — toggle favorite (POST, no body). Returns the new state as { isFavorite }.</summary>
+    [HttpPost("{id}/favorite")]
+    public async Task<IActionResult> ToggleFavorite(string id, CancellationToken ct = default)
+    {
+        var photo = await PhotoAsset.Get(id, ct);
+        if (photo is null) return NotFound();
+        photo.IsFavorite = !photo.IsFavorite;
+        await photo.Save(ct);
+        return Ok(new { photo.IsFavorite });
+    }
+
+    /// <summary>#10 — set rating (0..5). Returns { rating }.</summary>
+    [HttpPost("{id}/rate")]
+    public async Task<IActionResult> Rate(string id, [FromBody] RateRequest request, CancellationToken ct = default)
+    {
+        if (request is null || request.Rating < 0 || request.Rating > 5)
+            return BadRequest(new { error = "Rating must be between 0 and 5." });
+
+        var photo = await PhotoAsset.Get(id, ct);
+        if (photo is null) return NotFound();
+        photo.Rating = request.Rating;
+        await photo.Save(ct);
+        return Ok(new { photo.Rating });
+    }
+
+    /// <summary>#11 — bulk favorite/unfavorite. Per-item failures are collected, never fatal.</summary>
+    [HttpPost("bulk/favorite")]
+    public async Task<IActionResult> BulkFavorite([FromBody] BulkPhotoRequest request, CancellationToken ct = default)
+    {
+        if (request?.PhotoIds is null || request.PhotoIds.Count == 0)
+            return BadRequest(new { error = "photoIds is required." });
+
+        var updated = 0;
+        var errors = new List<string>();
+        foreach (var photoId in request.PhotoIds)
+        {
+            try
+            {
+                var photo = await PhotoAsset.Get(photoId, ct);
+                if (photo is null) { errors.Add($"Photo {photoId} not found"); continue; }
+                photo.IsFavorite = request.IsFavorite;
+                await photo.Save(ct);
+                updated++;
+            }
+            catch (Exception ex) { errors.Add($"Photo {photoId}: {ex.Message}"); }
+        }
+
+        return Ok(new { updated, failed = errors.Count, errors, request.IsFavorite });
+    }
+
+    /// <summary>
+    /// #12 — bulk delete (the ONLY delete path; the raw EntityController delete verbs are sealed). Each
+    /// <c>Remove</c> fires the structural AfterRemove hook (cached-render eviction + collection dead-id pruning),
+    /// so the controller stays a thin loop. Returns { deleted, errors } — the SPA reads <c>deleted</c> and
+    /// <c>errors[0]</c>.
+    /// </summary>
+    [HttpPost("bulk/delete")]
+    public async Task<IActionResult> BulkDelete([FromBody] BulkPhotoRequest request, CancellationToken ct = default)
+    {
+        if (request?.PhotoIds is null || request.PhotoIds.Count == 0)
+            return BadRequest(new { error = "photoIds is required." });
+
+        var deleted = 0;
+        var errors = new List<string>();
+        foreach (var photoId in request.PhotoIds)
+        {
+            try
+            {
+                var photo = await PhotoAsset.Get(photoId, ct);
+                if (photo is null) { errors.Add($"Photo {photoId} not found"); continue; }
+                await photo.Remove(ct);   // → AfterRemove: evict cached renders + prune collections
+                deleted++;
+            }
+            catch (Exception ex) { errors.Add($"Photo {photoId}: {ex.Message}"); }
+        }
+
+        return Ok(new { deleted, failed = errors.Count, errors });
+    }
+
+    /// <summary>#13 — download the full-resolution original as an attachment (SPA opens it via window.open).</summary>
+    [HttpGet("{id}/download")]
+    public async Task<IActionResult> Download(string id, CancellationToken ct = default)
+    {
+        // Async data read (not the StorageEntity sync Get(key) proxy, which would shadow it and never 404).
+        var photo = await PhotoAsset.Get(id, ct);
+        if (photo is null) return NotFound();
+
+        var stream = await photo.OpenRead(ct);
+        var fileName = string.IsNullOrEmpty(photo.OriginalFileName) ? $"{id}.jpg" : photo.OriginalFileName;
+        var contentType = string.IsNullOrEmpty(photo.ContentType) ? "application/octet-stream" : photo.ContentType!;
+        return File(stream, contentType, fileName);   // Content-Disposition: attachment
+    }
+
+    /// <summary>#14 — regenerate AI (fire-and-forget). Submits the durable, tenant-carrying Reanalyze job.</summary>
+    [HttpPost("{id}/regenerate-ai")]
+    public async Task<IActionResult> RegenerateAI(string id, CancellationToken ct = default)
+    {
+        var photo = await PhotoAsset.Get(id, ct);
+        if (photo is null) return NotFound();
+
+        // A durable job (not a fire-and-forget Task.Run) so regeneration runs in this studio's rehydrated tenant
+        // (ARCH-0100) and survives a restart. The Reanalyze handler calls RegenerateAIAnalysis (reroll-with-holds).
+        await new PhotoProcessingJob { PhotoId = id }.Job.Submit(PhotoProcessingJob.Reanalyze);
+        return Ok(new { message = "AI regeneration queued", photoId = id });
+    }
+
+    /// <summary>#15 — regenerate AI analysis synchronously, preserving locked facts + summary ("reroll with holds").</summary>
+    [HttpPost("{id}/regenerate-ai-analysis")]
+    public async Task<IActionResult> RegenerateAIAnalysis(string id, [FromBody] RegenerateAIAnalysisRequest? request = null, CancellationToken ct = default)
+    {
+        try
+        {
+            var photo = await _processing.RegenerateAIAnalysis(id, request?.AnalysisStyleId, ct);
+            return Ok(photo);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>#16 — toggle a fact's lock. INV-1: fact keys are lowercase. Returns { isLocked, lockedFactKeys }.</summary>
+    [HttpPost("{id}/facts/{factKey}/toggle-lock")]
+    public async Task<IActionResult> ToggleFactLock(string id, string factKey, CancellationToken ct = default)
+    {
+        var photo = await PhotoAsset.Get(id, ct);
+        if (photo is null) return NotFound();
+        if (photo.AiAnalysis is null) return BadRequest(new { error = "Photo has no AI analysis." });
+
+        var key = factKey.ToLowerInvariant();   // INV-1 — facts are stored lowercase
+        if (!photo.AiAnalysis.Facts.ContainsKey(key))
+            return BadRequest(new { error = $"Fact key '{key}' not found in analysis." });
+
+        bool isLocked;
+        if (photo.AiAnalysis.LockedFactKeys.Contains(key)) { photo.AiAnalysis.LockedFactKeys.Remove(key); isLocked = false; }
+        else { photo.AiAnalysis.LockedFactKeys.Add(key); isLocked = true; }
+        await photo.Save(ct);
+
+        return Ok(new { factKey = key, isLocked, lockedFactKeys = photo.AiAnalysis.LockedFactKeys.ToList() });
+    }
+
+    /// <summary>#17 — toggle the summary lock. Returns { summaryLocked }.</summary>
+    [HttpPost("{id}/summary/toggle-lock")]
+    public async Task<IActionResult> ToggleSummaryLock(string id, CancellationToken ct = default)
+    {
+        var photo = await PhotoAsset.Get(id, ct);
+        if (photo is null) return NotFound();
+        if (photo.AiAnalysis is null) return BadRequest(new { error = "Photo has no AI analysis." });
+
+        photo.AiAnalysis.SummaryLocked = !photo.AiAnalysis.SummaryLocked;
+        await photo.Save(ct);
+        return Ok(new { photo.AiAnalysis.SummaryLocked });
+    }
+
+    /// <summary>#18 — lock the summary and every fact.</summary>
+    [HttpPost("{id}/facts/lock-all")]
+    public async Task<IActionResult> LockAllFacts(string id, CancellationToken ct = default)
+    {
+        var photo = await PhotoAsset.Get(id, ct);
+        if (photo is null) return NotFound();
+        if (photo.AiAnalysis is null) return BadRequest(new { error = "Photo has no AI analysis." });
+
+        photo.AiAnalysis.SummaryLocked = true;
+        photo.AiAnalysis.LockedFactKeys = new HashSet<string>(photo.AiAnalysis.Facts.Keys);   // keys already lowercase
+        await photo.Save(ct);
+
+        return Ok(new
+        {
+            summaryLocked = photo.AiAnalysis.SummaryLocked,
+            lockedCount = photo.AiAnalysis.LockedFactKeys.Count,
+            lockedFactKeys = photo.AiAnalysis.LockedFactKeys.ToList()
+        });
+    }
+
+    /// <summary>#19 — unlock the summary and every fact.</summary>
+    [HttpPost("{id}/facts/unlock-all")]
+    public async Task<IActionResult> UnlockAllFacts(string id, CancellationToken ct = default)
+    {
+        var photo = await PhotoAsset.Get(id, ct);
+        if (photo is null) return NotFound();
+        if (photo.AiAnalysis is null) return BadRequest(new { error = "Photo has no AI analysis." });
+
+        photo.AiAnalysis.SummaryLocked = false;
+        photo.AiAnalysis.LockedFactKeys.Clear();
+        await photo.Save(ct);
+
+        return Ok(new { summaryLocked = photo.AiAnalysis.SummaryLocked, lockedFactKeys = photo.AiAnalysis.LockedFactKeys.ToList() });
+    }
+
+    // ------------------------------------------------------------------------------------------------------------
+    // §9.7 tripwire — seal the raw EntityController write/delete verbs (405). Photos enter ONLY via /upload (the
+    // ingest pipeline that stores the original + extracts EXIF/AI); a raw Upsert would mint a blob-less PhotoAsset.
+    // Photos leave ONLY via bulk/delete (which fires the AfterRemove cleanup). These overrides inherit the base
+    // route attributes ([HttpPost("")], [HttpPost("bulk")], [HttpDelete("{id}")], …), so the routes still exist —
+    // they just refuse.
+    // ------------------------------------------------------------------------------------------------------------
+
+    private static IActionResult SealedWrite() => new ObjectResult(new
+    {
+        error = "Photos are created via POST /api/photos/upload and removed via POST /api/photos/bulk/delete."
+    })
+    { StatusCode = StatusCodes.Status405MethodNotAllowed };
+
+    public override Task<IActionResult> Upsert(PhotoAsset model, CancellationToken ct) => Task.FromResult(SealedWrite());
+    public override Task<IActionResult> UpsertMany(IEnumerable<PhotoAsset> models, CancellationToken ct) => Task.FromResult(SealedWrite());
+    public override Task<IActionResult> Patch(string id, CancellationToken ct) => Task.FromResult(SealedWrite());   // partial update would let EventId (the access axis) be rewritten
+    public override Task<IActionResult> Delete(string id, CancellationToken ct) => Task.FromResult(SealedWrite());
+    public override Task<IActionResult> DeleteMany(IEnumerable<string> ids, CancellationToken ct) => Task.FromResult(SealedWrite());
+    public override Task<IActionResult> DeleteByQuery(string? q, CancellationToken ct) => Task.FromResult(SealedWrite());
+    public override Task<IActionResult> DeleteAll(CancellationToken ct) => Task.FromResult(SealedWrite());
 }
