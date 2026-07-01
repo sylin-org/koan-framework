@@ -7,6 +7,7 @@ using Koan.Data.Core;
 using Koan.Data.Vector;
 using Koan.Media.Core.Extensions;
 using Koan.Media.Core.Pipeline;
+using Koan.Tenancy;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 using S6.SnapVault.Media;
@@ -195,7 +196,9 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
                 return await FallbackKeywordSearch(query, eventId, topK, ct);
             }
 
-            var queryVector = await Client.Embed(query, ct);
+            // Same embed model as PhotoAsset's [Embedding(Model=...)] — the query vector must live in the same
+            // space as the stored vectors, so pin the model rather than falling through to the vision DefaultModel.
+            var queryVector = await Client.Embed(query, new EmbedOptions { Model = "nomic-embed-text" }, ct);
 
             // Push the optional event narrowing DOWN into the vector query instead of post-filtering in memory:
             // EventId is stamped as filterable vector metadata at embed-write (VectorFilterableMetadata), so the
@@ -574,24 +577,28 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
         return detectedStyle;
     }
 
-    /// <summary>Get or create a daily event for the given date (INV-2: half-open UTC day-range, never <c>.Date ==</c>).</summary>
+    /// <summary>
+    /// Get or create the daily auto-event for the given date. Uses a DETERMINISTIC per-(tenant, day) id so that
+    /// several ingest jobs racing on the same day (a bulk upload) CONVERGE on one row instead of each winning a
+    /// check-then-create and minting a duplicate daily event. The id stays a globally-unique GUID (the tenant is
+    /// folded into the derivation) — required because <c>EventId</c> doubles as the SEC-0008 <c>event:&lt;id&gt;</c>
+    /// scope token, so a slug or a cross-studio-shared value would break isolation.
+    /// </summary>
     private async Task<Event> GetOrCreateDailyEvent(DateTime date, CancellationToken ct)
     {
         var normalizedDate = date.Date;
         var eventName = normalizedDate.ToString("MMMM d, yyyy");
 
-        // INV-2: inclusive/exclusive UTC day range (avoids the Mongo translator emitting unsupported $dateTrunc).
-        var dayStart = normalizedDate;
-        var dayEndExclusive = dayStart.AddDays(1);
-        var existingEvents = await Event.Query(e =>
-            e.Type == EventType.DailyAuto &&
-            e.EventDate >= dayStart &&
-            e.EventDate < dayEndExclusive, ct);
+        var tenant = Tenant.Current?.Id ?? "default";
+        var deterministicId = DeterministicGuid($"{tenant}:daily:{normalizedDate:yyyy-MM-dd}").ToString();
 
-        if (existingEvents.Any()) return existingEvents.First();
+        // Fast path: already created (this or a peer job) — return it.
+        var existing = await Event.Get(deterministicId, ct);
+        if (existing != null) return existing;
 
         var newEvent = new Event
         {
+            Id = deterministicId,
             Name = eventName,
             Type = EventType.DailyAuto,
             EventDate = normalizedDate,
@@ -599,10 +606,24 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             CreatedAt = DateTime.UtcNow,
             ProcessingStatus = ProcessingStatus.InProgress
         };
+        // Idempotent by construction: a racing peer upserts the SAME id, so the tenant still ends with ONE
+        // daily-event row (last write wins, and the payload is identical for a given day).
         await newEvent.Save(ct);
 
         _logger.LogInformation("Created daily event: {EventName} ({EventId})", eventName, newEvent.Id);
         return newEvent;
+    }
+
+    /// <summary>
+    /// Deterministic GUID from a name (SHA-256 of the UTF-8 name, first 16 bytes). Not a time-ordered v7 id — its
+    /// job is to be STABLE for a given name so concurrent creators converge on one row — but it is a valid,
+    /// globally-unique GUID in the same dashed format as the framework's entity ids.
+    /// </summary>
+    private static Guid DeterministicGuid(string name)
+    {
+        Span<byte> hash = stackalloc byte[32];
+        System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(name), hash);
+        return new Guid(hash[..16]);
     }
 
     private async Task UpdateEventPhotoCount(string eventId, CancellationToken ct)

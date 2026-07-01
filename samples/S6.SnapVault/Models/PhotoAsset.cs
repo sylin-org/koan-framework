@@ -11,11 +11,15 @@ namespace S6.SnapVault.Models;
 /// Full-resolution photo asset with complete metadata (stored in cold tier for cost optimization)
 /// </summary>
 [StorageBinding(Profile = "cold", Container = "photos")]
+// Model MUST match the query-side embed model in PhotoProcessingService.SemanticSearch (same model = same vector
+// space). nomic-embed-text is a dedicated embedding model — distinct from the vision chat model (Ollama DefaultModel),
+// since one Ollama model can't both see images and embed text.
 [Embedding(
     Policy = EmbeddingPolicy.AllStrings,
     Async = true,
     MaxTokens = 8191,
     Version = 2,
+    Model = "nomic-embed-text",
     Exclude = ["EventId", "InferredStyleId"])]
 // SEC-0008 data-layer access scoping: a CONSTRAINED subject (an invited guest) sees only photos whose EventId is in
 // their "event:<id>" scope tokens — fail-closed on an absent subject. Studio operators run Subject.Unconstrained,
