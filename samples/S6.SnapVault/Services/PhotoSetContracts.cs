@@ -1,3 +1,5 @@
+using S6.SnapVault.Models;
+
 namespace S6.SnapVault.Services;
 
 /// <summary>
@@ -49,4 +51,17 @@ public sealed record PhotoMetadata
     public bool IsFavorite { get; init; }
     public int Width { get; init; }
     public int Height { get; init; }
+
+    /// <summary>Project a stored photo to the lightweight grid shape (shared by #5 and #6).</summary>
+    public static PhotoMetadata From(PhotoAsset p) => new()
+    {
+        Id = p.Id,
+        FileName = p.OriginalFileName,
+        CapturedAt = p.CapturedAt,
+        CreatedAt = p.CreatedAt.UtcDateTime,
+        Rating = p.Rating,
+        IsFavorite = p.IsFavorite,
+        Width = p.Width,
+        Height = p.Height,
+    };
 }

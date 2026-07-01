@@ -38,17 +38,7 @@ public sealed class PhotoSetsController : ControllerBase
             return BadRequest(new { error = "Must provide sessionId or definition" });
 
         var photoAssets = await _service.ExecuteQuery(session, request.StartIndex, request.Count, ct);
-        var photos = photoAssets.Select(p => new PhotoMetadata
-        {
-            Id = p.Id,
-            FileName = p.OriginalFileName,
-            CapturedAt = p.CapturedAt,
-            CreatedAt = p.CreatedAt.UtcDateTime,
-            Rating = p.Rating,
-            IsFavorite = p.IsFavorite,
-            Width = p.Width,
-            Height = p.Height,
-        }).ToList();
+        var photos = photoAssets.Select(PhotoMetadata.From).ToList();
 
         return Ok(new PhotoSetQueryResponse
         {

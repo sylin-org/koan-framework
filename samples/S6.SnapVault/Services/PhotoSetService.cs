@@ -47,6 +47,12 @@ public sealed class PhotoSetService
         => ExecuteQueryWithPagination(session.Context, session.CollectionId, session.SearchQuery,
             session.SearchAlpha ?? 0.5, session.SortBy, session.SortOrder, startIndex, count, ct);
 
+    /// <summary>Materialize the FULL ordered set for a definition (no windowing) — used to locate a photo's index
+    /// within a browsing context (#4). Reuses the same context routing/sort, so index and grid stay consistent.</summary>
+    public Task<List<PhotoAsset>> MaterializeContext(PhotoSetDefinition def, CancellationToken ct = default)
+        => ExecuteQueryWithPagination(def.Context, def.CollectionId, def.SearchQuery,
+            def.SearchAlpha ?? 0.5, def.SortBy, def.SortOrder, 0, int.MaxValue, ct);
+
     private async Task<int> ComputeTotalCount(PhotoSetDefinition definition, CancellationToken ct)
     {
         switch (definition.Context)

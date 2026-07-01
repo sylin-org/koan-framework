@@ -71,6 +71,12 @@ public sealed class SnapVaultPhotoSetSpec
             var collection = await svc.CreateSession(new PhotoSetDefinition { Context = "collection", CollectionId = col.Id });
             collection.TotalCount.Should().Be(3);
             (await svc.ExecuteQuery(collection, 0, 10)).Select(p => p.Id).Should().Equal(p3.Id, p0.Id, p4.Id);
+
+            // #4 index basis: MaterializeContext returns the full ordered set (same routing/sort as the grid), so a
+            // photo's index is its position — index and grid never disagree.
+            var ordered = await svc.MaterializeContext(new PhotoSetDefinition { Context = "all-photos", SortBy = "capturedAt", SortOrder = "desc" });
+            ordered.Select(p => p.Id).Should().Equal(p4.Id, p3.Id, p2.Id, p1.Id, p0.Id);
+            ordered.FindIndex(p => p.Id == p2.Id).Should().Be(2);
         }
     }
 }
