@@ -11,13 +11,22 @@ namespace Koan.Data.AI;
 /// </summary>
 /// <typeparam name="TEntity">Entity type with [Embedding] attribute</typeparam>
 [Storage(Name = "EmbedJobs")]
-public class EmbedJob<TEntity> : Entity<EmbedJob<TEntity>>
+public class EmbedJob<TEntity> : Entity<EmbedJob<TEntity>>, IAmbientExempt
     where TEntity : class, IEntity<string>
 {
     /// <summary>
     /// Entity ID of the item to embed
     /// </summary>
     public required string EntityId { get; set; }
+
+    /// <summary>
+    /// ARCH-0100: the ambient slices (tenant, access subject, …) captured at ENQUEUE, keyed by axis. The embedding
+    /// worker is a global background service with no ambient of its own, so it rehydrates this before loading the
+    /// entity + writing the vector/state — without it, a <c>[AccessScoped]</c> / tenant-scoped entity reads back as
+    /// "not found" (fail-closed) and its embedding never lands. Null when nothing cross-cutting was in scope.
+    /// Carried opaquely (this record names no axis), mirroring <c>JobRecord.AmbientCarrier</c>.
+    /// </summary>
+    public Dictionary<string, string>? AmbientCarrier { get; set; }
 
     /// <summary>
     /// Entity type name (for diagnostics and filtering)

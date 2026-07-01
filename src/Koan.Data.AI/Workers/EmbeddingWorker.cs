@@ -1,4 +1,5 @@
 using Koan.AI;
+using Koan.AI.Contracts.Options;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Koan.Data.Vector;
@@ -18,7 +19,8 @@ namespace Koan.Data.AI.Workers;
 public class EmbeddingWorker(
     ILogger<EmbeddingWorker> logger,
     IOptions<EmbeddingWorkerOptions> options,
-    EmbeddingTelemetry? telemetry = null) : BackgroundService
+    EmbeddingTelemetry? telemetry = null,
+    AmbientCarrierRegistry? carrierRegistry = null) : BackgroundService
 {
     // Rate limiting: track embeddings generated per minute
     private readonly ConcurrentQueue<DateTimeOffset> _recentEmbeddings = new();
@@ -211,6 +213,12 @@ public class EmbeddingWorker(
 
         try
         {
+            // ARCH-0100: rehydrate the ambient (tenant + access subject) captured at enqueue so this global worker
+            // reads/writes the scoped entity, vector, and state in the scope it belongs to. Without it, a
+            // [AccessScoped]/tenant-scoped entity reads back null (fail-closed) → "not found". Fail-closed itself: an
+            // unrestorable carrier throws here and the job is retried/dead-lettered, never silently mis-scoped.
+            using var _ambient = carrierRegistry?.Restore(job.AmbientCarrier);
+
             // Load the entity to get fresh data
             var entity = await Data<TEntity, string>.Get(job.EntityId, ct);
             if (entity == null)
@@ -239,13 +247,17 @@ public class EmbeddingWorker(
             // Estimate tokens for cost tracking
             var estimatedTokens = EmbeddingMetadata.EstimateTokens(job.EmbeddingText);
 
-            // Generate embedding with source routing
+            // Generate embedding with source routing AND the configured embed model. Passing the model is
+            // essential: without it the embed falls through to the adapter's DefaultModel, which for a mixed
+            // vision+embedding deployment may be a chat/vision model that cannot embed (HTTP 500 "does not support
+            // embeddings"). The model is [Embedding(Model=…)] (metadata.Model) or the job's captured model.
+            var embedModel = metadata.Model ?? job.Model;
             float[] embedding;
-            using (metadata.Source != null || metadata.Model != null
-                ? Client.Scope(all: metadata.Source)
-                : null)
+            using (metadata.Source != null ? Client.Scope(all: metadata.Source) : null)
             {
-                embedding = await Client.Embed(job.EmbeddingText, ct);
+                embedding = string.IsNullOrWhiteSpace(embedModel)
+                    ? await Client.Embed(job.EmbeddingText, ct)
+                    : await Client.Embed(job.EmbeddingText, new EmbedOptions { Model = embedModel }, ct);
             }
 
             stopwatch.Stop();

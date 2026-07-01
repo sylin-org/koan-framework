@@ -409,6 +409,15 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // Build embedding text now (to capture current state)
         var text = metadata.BuildEmbeddingText(entity);
 
+        // ARCH-0100: snapshot the ambient (tenant + access subject) at ENQUEUE — this hook runs inside the caller's
+        // Save, so the ambient is exactly the scope the entity lives in. The global embedding worker has no ambient
+        // of its own, so without this it reads a [AccessScoped]/tenant-scoped entity back as "not found" (fail-closed)
+        // and the embedding never lands. Resolved via AppHost (the hook is static); null when no carrier is registered.
+        var registry = Koan.Core.Hosting.App.AppHost.Current?.GetService(typeof(Koan.Data.Core.AmbientCarrierRegistry))
+            as Koan.Data.Core.AmbientCarrierRegistry;
+        var ambient = registry?.Capture();
+        var carrierBag = ambient is null ? null : new Dictionary<string, string>(ambient);
+
         // Check if job already exists for this entity
         var jobId = EmbedJob<TEntity>.MakeId(entity.Id);
         var existingJob = await EmbedJob<TEntity>.Get(jobId, ct);
@@ -421,6 +430,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 existingJob.ContentSignature = signature;
                 existingJob.EmbeddingText = text;
                 existingJob.Model = metadata.Model;
+                existingJob.AmbientCarrier = carrierBag;   // re-capture: the enqueuing ambient is the authoritative one
 
                 // Reset retry count if content changed
                 existingJob.RetryCount = 0;
@@ -453,7 +463,8 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             CreatedAt = DateTimeOffset.UtcNow,
             Model = metadata.Model,
             MaxRetries = 3, // TODO: Make configurable via EmbeddingWorkerOptions
-            Priority = 0
+            Priority = 0,
+            AmbientCarrier = carrierBag
         };
 
         await job.Save(ct);
@@ -472,13 +483,15 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // Build embedding text
         var text = metadata.BuildEmbeddingText(entity);
 
-        // Generate embedding with source routing
+        // Generate embedding with source routing AND the configured embed model — same reason as the async worker:
+        // without the model, a mixed vision+embedding deployment falls through to a non-embedding DefaultModel and
+        // 500s ("does not support embeddings").
         float[] embedding;
-        using (metadata.Source != null || metadata.Model != null
-            ? Koan.AI.Client.Scope(all: metadata.Source)
-            : null)
+        using (metadata.Source != null ? Koan.AI.Client.Scope(all: metadata.Source) : null)
         {
-            embedding = await Koan.AI.Client.Embed(text, ct);
+            embedding = string.IsNullOrWhiteSpace(metadata.Model)
+                ? await Koan.AI.Client.Embed(text, ct)
+                : await Koan.AI.Client.Embed(text, new Koan.AI.Contracts.Options.EmbedOptions { Model = metadata.Model }, ct);
         }
 
         // W4 (AI-0036 P2): fail loud before writing if this model would make the index mixed-space.
