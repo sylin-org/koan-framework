@@ -120,7 +120,9 @@ public sealed class PhotoSetService
             case "search":
                 if (string.IsNullOrEmpty(searchQuery))
                     throw new ArgumentException("SearchQuery required for search context");
-                var searchResults = await _processingService.SemanticSearch(searchQuery, null, searchAlpha, skip + take, ct);
+                // Overflow-safe topK (skip+take can exceed int.MaxValue when MaterializeContext passes take=MaxValue).
+                var topK = (int)Math.Min((long)skip + take, int.MaxValue);
+                var searchResults = await _processingService.SemanticSearch(searchQuery, null, searchAlpha, topK, ct);
                 // Search is already relevance-sorted.
                 return searchResults.Skip(skip).Take(take).ToList();
 

@@ -1,3 +1,4 @@
+using Koan.Data.Abstractions;
 using Koan.Jobs;
 using Koan.Web.Attributes;
 using Koan.Web.Controllers;
@@ -30,8 +31,10 @@ public sealed class PhotosController : EntityController<PhotoAsset>
     [HttpGet("stats")]
     public async Task<ActionResult<PhotoStats>> GetStats(CancellationToken ct = default)
     {
-        var all = await PhotoAsset.All(ct);
-        return Ok(new PhotoStats { TotalPhotos = all.Count, Favorites = all.Count(p => p.IsFavorite) });
+        // Count pushdown (a 1-row page carrying the total) — no full materialization just to count.
+        var total = await PhotoAsset.AllWithCount(QueryDefinition.All.WithPagination(1, 1), ct);
+        var favorites = await PhotoAsset.QueryWithCount(p => p.IsFavorite, QueryDefinition.All.WithPagination(1, 1), ct);
+        return Ok(new PhotoStats { TotalPhotos = (int)total.TotalCount, Favorites = (int)favorites.TotalCount });
     }
 
     /// <summary>#4 — a photo's position within a browsing context (lightbox jump-to-index). Reuses the same context
